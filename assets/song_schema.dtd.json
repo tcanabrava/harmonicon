@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/harmonica-rhythm-game.json",
+  "title": "Harmonica Rhythm Game Chart",
+  "type": "object",
+  "required": ["song", "harmonica", "track", "scoring"],
+  "additionalProperties": false,
+
+  "properties": {
+    "song": {
+      "type": "object",
+      "required": ["title", "artist", "tempo_bpm", "key", "time_signature", "difficulty"],
+      "additionalProperties": false,
+      "properties": {
+        "title":          { "type": "string" },
+        "artist":         { "type": "string" },
+        "tempo_bpm":      { "type": "number", "minimum": 20, "maximum": 300 },
+        "key":            { "type": "string" },
+        "time_signature": { "type": "string", "pattern": "^[0-9]+/[0-9]+$" },
+        "difficulty": {
+          "type": "string",
+          "enum": ["easy", "intermediate", "advanced", "expert"]
+        }
+      }
+    },
+
+    "harmonica": {
+      "type": "object",
+      "required": ["type", "holes"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "type":     { "type": "string", "enum": ["diatonic", "chromatic"] },
+        "holes":    { "type": "integer" },
+        "position": { "type": "string" }
+      },
+      "if":   { "properties": { "type": { "const": "diatonic" } } },
+      "then": {
+        "required": ["bending_profile"],
+        "properties": {
+          "holes": { "const": 10 },
+          "bending_profile": {
+            "type": "string",
+            "enum": ["richter_standard", "country_tuned"],
+            "description": "Tuning system determining per-hole bend availability and overblow positions"
+          },
+          "layout": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "blow": { "type": "array", "items": { "type": "string" }, "minItems": 10, "maxItems": 10 },
+              "draw": { "type": "array", "items": { "type": "string" }, "minItems": 10, "maxItems": 10 }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "holes": { "type": "integer", "enum": [10, 12, 16] },
+          "layout": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "blow":       { "type": "array", "items": { "type": "string" } },
+              "draw":       { "type": "array", "items": { "type": "string" } },
+              "blow_slide": { "type": "array", "items": { "type": "string" } },
+              "draw_slide": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+
+    "track": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["time", "duration", "events"],
+        "additionalProperties": false,
+        "properties": {
+          "time":     { "type": "number", "minimum": 0 },
+          "duration": { "type": "number", "exclusiveMinimum": 0 },
+          "phrase":   { "type": "string" },
+          "groove":   { "type": "string" },
+
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["hole", "action"],
+              "additionalProperties": false,
+              "properties": {
+                "hole":   { "type": "integer", "minimum": 1, "maximum": 10 },
+                "action": { "type": "string", "enum": ["blow", "draw"] },
+                "note":   { "type": "string", "pattern": "^[A-G][#b]?[0-9]$" },
+
+                "modifiers": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "Stacked techniques applied simultaneously. Invalid combinations (overblow+bend, overdraw+bend, overblow+overdraw) must be rejected by the parser.",
+                  "items": {
+                    "type": "object",
+                    "required": ["type"],
+                    "unevaluatedProperties": false,
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["bend", "overblow", "overdraw", "vibrato", "wah-wah", "hold"]
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "type":      { "const": "bend" },
+                          "semitones": { "type": "number", "minimum": -3, "exclusiveMaximum": 0 },
+                          "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+                        },
+                        "required": ["semitones"]
+                      },
+                      {
+                        "properties": { "type": { "const": "overblow" } }
+                      },
+                      {
+                        "properties": { "type": { "const": "overdraw" } }
+                      },
+                      {
+                        "properties": {
+                          "type":           { "const": "vibrato" },
+                          "oscillation_hz": { "type": "number", "exclusiveMinimum": 0 },
+                          "intensity":      { "type": "number", "minimum": 0, "maximum": 1 }
+                        },
+                        "required": ["oscillation_hz"]
+                      },
+                      {
+                        "properties": {
+                          "type":           { "const": "wah-wah" },
+                          "oscillation_hz": { "type": "number", "exclusiveMinimum": 0 },
+                          "intensity":      { "type": "number", "minimum": 0, "maximum": 1 }
+                        },
+                        "required": ["oscillation_hz"]
+                      },
+                      {
+                        "properties": {
+                          "type":      { "const": "hold" },
+                          "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "loop": {
+      "type": "object",
+      "required": ["start_index", "end_index"],
+      "additionalProperties": false,
+      "properties": {
+        "type":        { "type": "string", "enum": ["intro", "verse", "chorus", "bridge", "outro", "full"] },
+        "repeat":      { "type": "boolean" },
+        "start_index": { "type": "integer", "minimum": 0 },
+        "end_index":   { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "scoring": {
+      "type": "object",
+      "required": ["perfect_window_ms", "good_window_ms", "miss_window_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "perfect_window_ms": {
+          "type": "integer", "minimum": 1,
+          "description": "Timing tolerance for a perfect hit in ms; must be less than good_window_ms"
+        },
+        "good_window_ms": {
+          "type": "integer", "minimum": 1,
+          "description": "Timing tolerance for a good hit in ms; must be between perfect_window_ms and miss_window_ms"
+        },
+        "miss_window_ms": {
+          "type": "integer", "minimum": 1,
+          "description": "Outer timing boundary in ms; notes outside this window count as a miss"
+        },
+        "combo": {
+          "type": "object",
+          "required": ["enabled", "base_multiplier", "step_multiplier", "max_multiplier"],
+          "additionalProperties": false,
+          "description": "Score multiplier after each consecutive hit: current = min(base + step * hits, max)",
+          "properties": {
+            "enabled":         { "type": "boolean" },
+            "base_multiplier": { "type": "number", "minimum": 1 },
+            "step_multiplier": { "type": "number", "exclusiveMinimum": 0,
+                                 "description": "Additive bonus per consecutive hit" },
+            "max_multiplier":  { "type": "number", "exclusiveMinimum": 1 },
+            "decay_ms":        { "type": "integer", "exclusiveMinimum": 0,
+                                 "description": "Idle time before combo resets; omit to disable time-based decay" }
+          }
+        },
+        "style_bonus": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        }
+      }
+    },
+
+    "fx_mapping": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}
