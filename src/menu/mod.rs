@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::error::info, prelude::*};
 
 use crate::song::SongManifest;
 
@@ -37,14 +37,13 @@ impl Plugin for MenuPlugin {
         app.init_state::<AppState>()
         .init_resource::<AvailableSongs>()
 
-        .add_systems(OnEnter(AppState::Startup), scan_songs)
+        .add_systems(OnEnter(AppState::Startup), (spawn_camera, scan_songs))
         .add_systems(Update, startup_complete.run_if(in_state(AppState::Startup)))
 
         .add_systems(OnEnter(AppState::Menu), setup_menu)
         .add_systems(Update,
             handle_song_selection.run_if(in_state(AppState::Menu)))
         .add_systems(OnExit(AppState::Menu), cleanup_menu)
-
         .add_systems(Update,
             check_loading.run_if(in_state(AppState::SongLoading)))
         ;
@@ -56,15 +55,11 @@ fn startup_complete(mut next_state: ResMut<NextState<AppState>>) {
     next_state.set(AppState::Menu);
 }
 
-fn finish_loading(mut next_state: ResMut<NextState<AppState>>) {
-    next_state.set(AppState::Menu);
-}
-
 fn spawn_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
-fn scan_songs(mut available: ResMut<AvailableSongs>, mut next_state: ResMut<NextState<AppState>>) {
+fn scan_songs(mut available: ResMut<AvailableSongs>) {
     let songs_root = std::path::Path::new("assets/songs");
 
     let Ok(artists) = std::fs::read_dir(songs_root) else {
@@ -105,7 +100,6 @@ fn scan_songs(mut available: ResMut<AvailableSongs>, mut next_state: ResMut<Next
 }
 
 fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
-    info!("Setting up menu");
     commands
         .spawn((
             Node {
@@ -134,7 +128,6 @@ fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
             ));
 
             if songs.0.is_empty() {
-                info!("MENU: Found {} song(s)", songs.0.len());
                 root.spawn((
                     Text::new("No songs found — add folders under assets/songs/<artist>/<song>/"),
                     TextFont { font_size: 16.0, ..default() },
