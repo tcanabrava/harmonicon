@@ -1,25 +1,129 @@
+```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/schemas/harmonica-rhythm-game.json",
-  "title": "Harmonica Rhythm Game Chart",
+  "$id": "https://example.com/schemas/harpchart.schema.json",
+  "title": "HarpChart v1.0",
+  "description": "Schema for harmonica rhythm game charts.",
   "type": "object",
-  "required": ["song", "harmonica", "track", "scoring"],
+  "required": ["song", "harmonica", "timing", "track", "scoring"],
   "additionalProperties": false,
 
   "properties": {
-    "song": {
+    "metadata": {
       "type": "object",
-      "required": ["title", "artist", "tempo_bpm", "key", "time_signature", "difficulty"],
       "additionalProperties": false,
       "properties": {
-        "title":          { "type": "string" },
-        "artist":         { "type": "string" },
-        "tempo_bpm":      { "type": "number", "minimum": 20, "maximum": 300 },
-        "key":            { "type": "string" },
-        "time_signature": { "type": "string", "pattern": "^[0-9]+/[0-9]+$" },
+        "format_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "author": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "description": "Original song title or source material."
+        },
+        "license": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+
+    "song": {
+      "type": "object",
+      "required": [
+        "title",
+        "artist",
+        "tempo_bpm",
+        "key",
+        "difficulty"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "artist": {
+          "type": "string"
+        },
+        "tempo_bpm": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 300
+        },
+        "key": {
+          "type": "string"
+        },
+        "time_signature": {
+          "type": "string",
+          "pattern": "^[0-9]+/[0-9]+$",
+          "description": "Informational default. When timing.time_signature_map is present it takes precedence."
+        },
         "difficulty": {
           "type": "string",
-          "enum": ["easy", "intermediate", "advanced", "expert"]
+          "enum": [
+            "easy",
+            "intermediate",
+            "advanced",
+            "expert"
+          ]
+        }
+      }
+    },
+
+    "timing": {
+      "type": "object",
+      "required": ["resolution", "tempo_map"],
+      "additionalProperties": false,
+      "properties": {
+        "resolution": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Ticks per quarter note."
+        },
+
+        "tempo_map": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["tick", "bpm"],
+            "additionalProperties": false,
+            "properties": {
+              "tick": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "bpm": {
+                "type": "number",
+                "minimum": 20,
+                "maximum": 300
+              }
+            }
+          }
+        },
+
+        "time_signature_map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tick", "time_signature"],
+            "additionalProperties": false,
+            "properties": {
+              "tick": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "time_signature": {
+                "type": "string",
+                "pattern": "^[0-9]+/[0-9]+$"
+              }
+            }
+          }
         }
       }
     },
@@ -28,42 +132,113 @@
       "type": "object",
       "required": ["type", "holes"],
       "unevaluatedProperties": false,
+
       "properties": {
-        "type":     { "type": "string", "enum": ["diatonic", "chromatic"] },
-        "holes":    { "type": "integer" },
-        "position": { "type": "string" }
+        "type": {
+          "type": "string",
+          "enum": ["diatonic", "chromatic"]
+        },
+
+        "holes": {
+          "type": "integer",
+          "minimum": 1
+        },
+
+        "position": {
+          "type": "string"
+        }
       },
-      "if":   { "properties": { "type": { "const": "diatonic" } } },
+
+      "if": {
+        "properties": {
+          "type": {
+            "const": "diatonic"
+          }
+        }
+      },
+
       "then": {
         "required": ["bending_profile"],
+
         "properties": {
-          "holes": { "const": 10 },
+          "holes": {
+            "const": 10
+          },
+
           "bending_profile": {
             "type": "string",
-            "enum": ["richter_standard", "country_tuned"],
-            "description": "Tuning system determining per-hole bend availability and overblow positions"
+            "enum": [
+              "richter_standard",
+              "country_tuned"
+            ]
           },
+
           "layout": {
             "type": "object",
             "additionalProperties": false,
+
             "properties": {
-              "blow": { "type": "array", "items": { "type": "string" }, "minItems": 10, "maxItems": 10 },
-              "draw": { "type": "array", "items": { "type": "string" }, "minItems": 10, "maxItems": 10 }
+              "blow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 10,
+                "maxItems": 10
+              },
+
+              "draw": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 10,
+                "maxItems": 10
+              }
             }
           }
         }
       },
+
       "else": {
         "properties": {
-          "holes": { "type": "integer", "enum": [10, 12, 16] },
+          "holes": {
+            "type": "integer",
+            "enum": [10, 12, 16]
+          },
+
           "layout": {
             "type": "object",
             "additionalProperties": false,
+
             "properties": {
-              "blow":       { "type": "array", "items": { "type": "string" } },
-              "draw":       { "type": "array", "items": { "type": "string" } },
-              "blow_slide": { "type": "array", "items": { "type": "string" } },
-              "draw_slide": { "type": "array", "items": { "type": "string" } }
+              "blow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+
+              "draw": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+
+              "blow_slide": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+
+              "draw_slide": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           }
         }
@@ -73,79 +248,218 @@
     "track": {
       "type": "array",
       "minItems": 1,
+
       "items": {
         "type": "object",
-        "required": ["time", "duration", "events"],
+
+        "required": [
+          "duration",
+          "events"
+        ],
+
         "additionalProperties": false,
+
         "properties": {
-          "time":     { "type": "number", "minimum": 0 },
-          "duration": { "type": "number", "exclusiveMinimum": 0 },
-          "phrase":   { "type": "string" },
-          "groove":   { "type": "string" },
+          "id": {
+            "type": "string",
+            "description": "Human-readable label for debugging and log output."
+          },
+
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+
+          "tick": {
+            "type": "integer",
+            "minimum": 0
+          },
+
+          "duration": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+
+          "phrase": {
+            "type": "string"
+          },
+
+          "groove": {
+            "type": "string"
+          },
+
+          "play_mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "chord",
+              "split"
+            ]
+          },
 
           "events": {
             "type": "array",
             "minItems": 1,
+
             "items": {
               "type": "object",
-              "required": ["hole", "action"],
+
+              "required": [
+                "hole",
+                "action"
+              ],
+
               "additionalProperties": false,
+
               "properties": {
-                "hole":   { "type": "integer", "minimum": 1, "maximum": 10 },
-                "action": { "type": "string", "enum": ["blow", "draw"] },
-                "note":   { "type": "string", "pattern": "^[A-G][#b]?[0-9]$" },
+                "hole": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Must not exceed harmonica.holes. This is validated by the engine."
+                },
+
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "blow",
+                    "draw"
+                  ]
+                },
+
+                "note": {
+                  "type": "string",
+                  "pattern": "^[A-G][#b]?[0-9]$"
+                },
 
                 "modifiers": {
                   "type": "array",
+
                   "minItems": 1,
                   "maxItems": 2,
                   "uniqueItems": true,
-                  "description": "Stacked techniques applied simultaneously. Invalid combinations (overblow+bend, overdraw+bend, overblow+overdraw) must be rejected by the parser.",
+
+                  "description": "Modifier compatibility is validated by the engine.",
+
                   "items": {
                     "type": "object",
+
                     "required": ["type"],
+
                     "unevaluatedProperties": false,
+
                     "properties": {
                       "type": {
                         "type": "string",
-                        "enum": ["bend", "overblow", "overdraw", "vibrato", "wah-wah", "hold"]
+
+                        "enum": [
+                          "bend",
+                          "overblow",
+                          "overdraw",
+                          "vibrato",
+                          "wah-wah",
+                          "hold"
+                        ]
                       }
                     },
+
                     "oneOf": [
                       {
                         "properties": {
-                          "type":      { "const": "bend" },
-                          "semitones": { "type": "number", "minimum": -3, "exclusiveMaximum": 0 },
-                          "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+                          "type": {
+                            "const": "bend"
+                          },
+
+                          "semitones": {
+                            "type": "number",
+                            "minimum": -3,
+                            "exclusiveMaximum": 0
+                          },
+
+                          "intensity": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
                         },
-                        "required": ["semitones"]
+
+                        "required": [
+                          "semitones"
+                        ]
                       },
-                      {
-                        "properties": { "type": { "const": "overblow" } }
-                      },
-                      {
-                        "properties": { "type": { "const": "overdraw" } }
-                      },
+
                       {
                         "properties": {
-                          "type":           { "const": "vibrato" },
-                          "oscillation_hz": { "type": "number", "exclusiveMinimum": 0 },
-                          "intensity":      { "type": "number", "minimum": 0, "maximum": 1 }
-                        },
-                        "required": ["oscillation_hz"]
+                          "type": {
+                            "const": "overblow"
+                          }
+                        }
                       },
+
                       {
                         "properties": {
-                          "type":           { "const": "wah-wah" },
-                          "oscillation_hz": { "type": "number", "exclusiveMinimum": 0 },
-                          "intensity":      { "type": "number", "minimum": 0, "maximum": 1 }
-                        },
-                        "required": ["oscillation_hz"]
+                          "type": {
+                            "const": "overdraw"
+                          }
+                        }
                       },
+
                       {
                         "properties": {
-                          "type":      { "const": "hold" },
-                          "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+                          "type": {
+                            "const": "vibrato"
+                          },
+
+                          "oscillation_hz": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+
+                          "intensity": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+
+                        "required": [
+                          "oscillation_hz"
+                        ]
+                      },
+
+                      {
+                        "properties": {
+                          "type": {
+                            "const": "wah-wah"
+                          },
+
+                          "oscillation_hz": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+
+                          "intensity": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+
+                        "required": [
+                          "oscillation_hz"
+                        ]
+                      },
+
+                      {
+                        "properties": {
+                          "type": {
+                            "const": "hold"
+                          },
+
+                          "intensity": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
                         }
                       }
                     ]
@@ -154,64 +468,142 @@
               }
             }
           }
-        }
+        },
+
+        "oneOf": [
+          {
+            "required": ["time"]
+          },
+
+          {
+            "required": ["tick"]
+          }
+        ]
       }
     },
 
     "loop": {
       "type": "object",
-      "required": ["start_index", "end_index"],
+
+      "required": [
+        "start_index",
+        "end_index"
+      ],
+
       "additionalProperties": false,
+
       "properties": {
-        "type":        { "type": "string", "enum": ["intro", "verse", "chorus", "bridge", "outro", "full"] },
-        "repeat":      { "type": "boolean" },
-        "start_index": { "type": "integer", "minimum": 0 },
-        "end_index":   { "type": "integer", "minimum": 1 }
+        "type": {
+          "type": "string",
+
+          "enum": [
+            "intro",
+            "verse",
+            "chorus",
+            "bridge",
+            "outro",
+            "full"
+          ]
+        },
+
+        "repeat": {
+          "type": "boolean"
+        },
+
+        "start_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+
+        "end_index": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
 
     "scoring": {
       "type": "object",
-      "required": ["perfect_window_ms", "good_window_ms", "miss_window_ms"],
+
+      "required": [
+        "perfect_window_ms",
+        "good_window_ms",
+        "miss_window_ms"
+      ],
+
       "additionalProperties": false,
+
       "properties": {
         "perfect_window_ms": {
-          "type": "integer", "minimum": 1,
-          "description": "Timing tolerance for a perfect hit in ms; must be less than good_window_ms"
+          "type": "integer",
+          "minimum": 1
         },
+
         "good_window_ms": {
-          "type": "integer", "minimum": 1,
-          "description": "Timing tolerance for a good hit in ms; must be between perfect_window_ms and miss_window_ms"
+          "type": "integer",
+          "minimum": 1
         },
+
         "miss_window_ms": {
-          "type": "integer", "minimum": 1,
-          "description": "Outer timing boundary in ms; notes outside this window count as a miss"
+          "type": "integer",
+          "minimum": 1
         },
+
         "combo": {
           "type": "object",
-          "required": ["enabled", "base_multiplier", "step_multiplier", "max_multiplier"],
+
+          "required": [
+            "enabled",
+            "base_multiplier",
+            "step_multiplier",
+            "max_multiplier"
+          ],
+
           "additionalProperties": false,
-          "description": "Score multiplier after each consecutive hit: current = min(base + step * hits, max)",
+
           "properties": {
-            "enabled":         { "type": "boolean" },
-            "base_multiplier": { "type": "number", "minimum": 1 },
-            "step_multiplier": { "type": "number", "exclusiveMinimum": 0,
-                                 "description": "Additive bonus per consecutive hit" },
-            "max_multiplier":  { "type": "number", "exclusiveMinimum": 1 },
-            "decay_ms":        { "type": "integer", "exclusiveMinimum": 0,
-                                 "description": "Idle time before combo resets; omit to disable time-based decay" }
+            "enabled": {
+              "type": "boolean"
+            },
+
+            "base_multiplier": {
+              "type": "number",
+              "minimum": 1
+            },
+
+            "step_multiplier": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+
+            "max_multiplier": {
+              "type": "number",
+              "exclusiveMinimum": 1
+            },
+
+            "decay_ms": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
           }
         },
+
         "style_bonus": {
           "type": "object",
-          "additionalProperties": { "type": "number" }
+
+          "additionalProperties": {
+            "type": "number"
+          }
         }
       }
     },
 
     "fx_mapping": {
       "type": "object",
-      "additionalProperties": { "type": "string" }
+
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   }
 }
