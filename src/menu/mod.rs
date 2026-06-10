@@ -109,20 +109,19 @@ fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
             },
             BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
             MenuRoot,
-        ))
-        .with_children(|root| {
-            root.spawn((
+            children![(
                 Text::new("Harmonicon"),
                 TextFont { font_size: 52.0, ..default() },
                 TextColor(Color::WHITE),
-            ));
-
-            root.spawn((
+            ),
+            (
                 Text::new("Choose a song"),
                 TextFont { font_size: 22.0, ..default() },
                 TextColor(Color::srgb(0.6, 0.6, 0.7)),
-            ));
-
+            )]
+        ),
+        )
+        .with_children(|root| {
             if songs.0.is_empty() {
                 root.spawn((
                     Text::new("No songs found — add folders under assets/songs/<artist>/<song>/"),
@@ -141,14 +140,12 @@ fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
                     },
                     BackgroundColor(Color::srgb(0.18, 0.18, 0.28)),
                     SongButton(song.asset_path.clone()),
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
+                    children![(
                         Text::new(format!("{} — {}", song.artist, song.name)),
                         TextFont { font_size: 20.0, ..default() },
                         TextColor(Color::WHITE),
-                    ));
-                });
+                    )],
+                ));
             }
         });
 }

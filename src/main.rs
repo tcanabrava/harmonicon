@@ -1,14 +1,18 @@
-mod audio_input;
 mod gameplay;
 mod menu;
-mod pitch_detect;
 mod song;
+mod audio_system;
 
 use bevy::prelude::*;
 use gameplay::GameplayPlugin;
 use menu::{AppState, MenuPlugin};
-use pitch_detect::PitchEvent;
 use song::SongPlugin;
+
+use audio_system::{
+    audio_input,
+    pitch_detect,
+    pitch_detect::PitchEvent,
+};
 
 fn main() {
     App::new()
