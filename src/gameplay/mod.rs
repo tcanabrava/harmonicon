@@ -3,13 +3,14 @@ use std::collections::HashSet;
 use bevy::{audio::AudioSource, prelude::*};
 
 use crate::{
+    assets_management::GlobalFonts,
+    audio_system::midi_functions::{midi_to_note, note_to_midi},
     menu::{AppState, SelectedSong},
     pitch_detect::{PitchEvent, PitchInfo},
     song::{
-        chart::{Action, BendingProfile, HarpChart, Harmonica},
         SongManifest,
-    },
-    audio_system::midi_functions::{note_to_midi, midi_to_note},
+        chart::{Action, BendingProfile, Harmonica, HarpChart},
+    }
 };
 
 pub struct GameplayPlugin;
@@ -194,7 +195,7 @@ fn build_valid_notes(chart: &HarpChart) -> HashSet<String> {
     set
 }
 
-fn ui_12_bar_blues_grid(grid: &mut ChildSpawnerCommands, chords: &[String], key: &str) {
+fn ui_12_bar_blues_grid(grid: &mut ChildSpawnerCommands, chords: &[String], key: &str, font: &FontSource) {
     for row in 0..3usize {
         grid.spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -222,12 +223,12 @@ fn ui_12_bar_blues_grid(grid: &mut ChildSpawnerCommands, chords: &[String], key:
                 .with_children(|cell| {
                     cell.spawn((
                         Text::new(chord),
-                        TextFont { font_size: FontSize::Px(17.0), ..default() },
+                        TextFont { font_size: FontSize::Px(17.0), font: font.clone(), ..default() },
                         TextColor(Color::WHITE),
                     ));
                     cell.spawn((
                         Text::new(format!("{}", idx + 1)),
-                        TextFont { font_size: FontSize::Px(9.0), ..default() },
+                        TextFont { font_size: FontSize::Px(9.0), font: font.clone(), ..Default::default() },
                         TextColor(Color::srgb(0.45, 0.45, 0.55)),
                     ));
                 });
@@ -236,7 +237,7 @@ fn ui_12_bar_blues_grid(grid: &mut ChildSpawnerCommands, chords: &[String], key:
     }
 }
 
-fn ui_note_highway(hw: &mut ChildSpawnerCommands, chart: &HarpChart) {
+fn ui_note_highway(hw: &mut ChildSpawnerCommands, chart: &HarpChart, font: &FontSource) {
 
     // alternating lane shading + dividers
     for h in 0..HOLE_COUNT {
@@ -325,7 +326,7 @@ fn ui_note_highway(hw: &mut ChildSpawnerCommands, chart: &HarpChart) {
             .with_children(|note_node| {
                 note_node.spawn((
                     Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
-                    TextFont { font_size: FontSize::Px(12.0), ..default() },
+                    TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
                     TextColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
                 ));
             });
@@ -333,7 +334,7 @@ fn ui_note_highway(hw: &mut ChildSpawnerCommands, chart: &HarpChart) {
     }
 }
 
-fn ui_harmonica_holes(harp_col: &mut ChildSpawnerCommands, chart: &HarpChart) {
+fn ui_harmonica_holes(harp_col: &mut ChildSpawnerCommands, chart: &HarpChart, font: &FontSource) {
     // hole cells — each takes exactly 1/10 of the full width
     harp_col.spawn(Node {
         flex_direction: FlexDirection::Row,
@@ -362,17 +363,17 @@ fn ui_harmonica_holes(harp_col: &mut ChildSpawnerCommands, chart: &HarpChart) {
             .with_children(|cell| {
                 cell.spawn((
                     Text::new(b),
-                    TextFont { font_size: FontSize::Px(11.0), ..default() },
+                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 cell.spawn((
                     Text::new(format!("{hole}")),
-                    TextFont { font_size: FontSize::Px(16.0), ..default() },
+                    TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
                     TextColor(Color::WHITE),
                 ));
                 cell.spawn((
                     Text::new(d),
-                    TextFont { font_size: FontSize::Px(11.0), ..default() },
+                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
             });
@@ -388,12 +389,12 @@ fn ui_harmonica_holes(harp_col: &mut ChildSpawnerCommands, chart: &HarpChart) {
     .with_children(|leg| {
         leg.spawn((
             Text::new("\u{25A0} BLOW"),
-            TextFont { font_size: FontSize::Px(11.0), ..default() },
+            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
         leg.spawn((
             Text::new("\u{25A0} DRAW"),
-            TextFont { font_size: FontSize::Px(11.0), ..default() },
+            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));
     });
@@ -403,6 +404,7 @@ fn setup_gameplay(
     mut commands: Commands,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
+    font: Res<GlobalFonts>,
     mut clock: ResMut<GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
     mut valid_notes: ResMut<ValidHarpNotes>,
@@ -428,6 +430,7 @@ fn setup_gameplay(
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
     let harp_info = harp_display(chart);
+    let font = font.gameplay.clone();
 
     commands
         .spawn((
@@ -452,17 +455,17 @@ fn setup_gameplay(
             }, children![
                 (
                     Text::new(title),
-                    TextFont { font_size: FontSize::Px(22.0), ..default() },
+                    TextFont { font_size: FontSize::Px(22.0), font: font.clone(), ..default() },
                     TextColor(Color::WHITE),
                 ),
                 (
                     Text::new(info),
-                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(0.60, 0.65, 0.75)),
                 ),
                 (
                     Text::new(harp_info),
-                    TextFont { font_size: FontSize::Px(12.0), ..default() },
+                    TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(0.45, 0.72, 0.55)),
                 )
             ]));
@@ -474,7 +477,7 @@ fn setup_gameplay(
                 ..default()
             })
             .with_children(|grid| {
-                ui_12_bar_blues_grid(grid, &chords, key);
+                ui_12_bar_blues_grid(grid, &chords, key, &font);
             });
 
             // ── Note highway ──────────────────────────────────────────────
@@ -491,7 +494,7 @@ fn setup_gameplay(
                 BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
             ))
             .with_children(|hw| {
-                ui_note_highway(hw, &chart);
+                ui_note_highway(hw, &chart, &font);
             });
 
             // ── Harmonica holes ───────────────────────────────────────────
@@ -503,7 +506,7 @@ fn setup_gameplay(
                 ..default()
             })
             .with_children(|harp_col| {
-                ui_harmonica_holes(harp_col, &chart);
+                ui_harmonica_holes(harp_col, &chart, &font);
             });
 
             // ── Countdown overlay (covers the whole gameplay area) ────────

@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::song::SongManifest;
 use crate::assets_management::AvailableSongs;
+use crate::assets_management::GlobalFonts;
 
 pub struct MenuPlugin;
 
@@ -130,7 +131,7 @@ fn spawn_menu_root(commands: &mut Commands, title: &str, subtitle: Option<&str>)
 }
 
 /// Spawn a single button as a child of `parent_entity`.
-fn spawn_button(commands: &mut Commands, parent: Entity, label: &str, btn: MenuButton) {
+fn spawn_button(commands: &mut Commands, parent: Entity, font: &FontSource, label: &str, btn: MenuButton) {
     let button = commands
         .spawn((
             Button,
@@ -148,7 +149,7 @@ fn spawn_button(commands: &mut Commands, parent: Entity, label: &str, btn: MenuB
     commands.entity(button).with_children(|b| {
         b.spawn((
             Text::new(label.to_string()),
-            TextFont { font_size: FontSize::Px(20.0), ..default() },
+            TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
             TextColor(Color::WHITE),
         ));
     });
@@ -158,22 +159,23 @@ fn spawn_button(commands: &mut Commands, parent: Entity, label: &str, btn: MenuB
 
 // ── Menu pages ────────────────────────────────────────────────────────────────
 
-fn setup_main_menu(mut commands: Commands) {
+fn setup_main_menu(mut commands: Commands, font: Res<GlobalFonts>) {
     let root = spawn_menu_root(&mut commands, "Harmonicon", None);
-    spawn_button(&mut commands, root, "Play",    MenuButton::Play);
-    spawn_button(&mut commands, root, "Options", MenuButton::Options);
-    spawn_button(&mut commands, root, "Credits", MenuButton::Credits);
-    spawn_button(&mut commands, root, "Quit",    MenuButton::Quit);
+    let font = font.gameplay.clone();
+    spawn_button(&mut commands, root, &font, "Play",    MenuButton::Play);
+    spawn_button(&mut commands, root, &font, "Options", MenuButton::Options);
+    spawn_button(&mut commands, root, &font, "Credits", MenuButton::Credits);
+    spawn_button(&mut commands, root, &font, "Quit",    MenuButton::Quit);
 }
 
-fn setup_play_menu(mut commands: Commands) {
+fn setup_play_menu(mut commands: Commands, font: Res<GlobalFonts>) {
     let root = spawn_menu_root(&mut commands, "Play", None);
-    spawn_button(&mut commands, root, "Play Song",     MenuButton::PlaySong);
-    spawn_button(&mut commands, root, "Jam Session",   MenuButton::JamSession);
-    spawn_button(&mut commands, root, "\u{2190} Back", MenuButton::BackToMain);
+    spawn_button(&mut commands, root, &font.gameplay, "Play Song",     MenuButton::PlaySong);
+    spawn_button(&mut commands, root, &font.gameplay, "Jam Session",   MenuButton::JamSession);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain);
 }
 
-fn setup_artist_list(mut commands: Commands, songs: Res<AvailableSongs>) {
+fn setup_artist_list(mut commands: Commands, font: Res<GlobalFonts>, songs: Res<AvailableSongs>) {
     let root = spawn_menu_root(&mut commands, "Select Artist", None);
 
     if songs.0.is_empty() {
@@ -182,7 +184,7 @@ fn setup_artist_list(mut commands: Commands, songs: Res<AvailableSongs>) {
                 Text::new(
                     "No songs found. Add folders under assets/songs/<artist>/<song>/",
                 ),
-                TextFont { font_size: FontSize::Px(16.0), ..default() },
+                TextFont { font_size: FontSize::Px(16.0), font: font.gameplay.clone(), ..default() },
                 TextColor(Color::srgb(0.8, 0.4, 0.4)),
             ))
             .id();
@@ -193,16 +195,17 @@ fn setup_artist_list(mut commands: Commands, songs: Res<AvailableSongs>) {
         for artist in artists {
             let n = songs.0[artist].len();
             let label = format!("{artist}  ({n} song{})", if n == 1 { "" } else { "s" });
-            spawn_button(&mut commands, root, &label, MenuButton::Artist(artist.clone()));
+            spawn_button(&mut commands, root, &font.gameplay, &label, MenuButton::Artist(artist.clone()));
         }
     }
-    spawn_button(&mut commands, root, "\u{2190} Back", MenuButton::BackToPlay);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToPlay);
 }
 
 fn setup_song_list(
     mut commands: Commands,
     songs: Res<AvailableSongs>,
     selected_artist: Res<SelectedArtist>,
+    font: Res<GlobalFonts>,
 ) {
     let subtitle = format!("by {}", selected_artist.0);
     let root = spawn_menu_root(&mut commands, "Select Song", Some(&subtitle));
@@ -214,12 +217,13 @@ fn setup_song_list(
             spawn_button(
                 &mut commands,
                 root,
+                &font.gameplay,
                 &song.name,
                 MenuButton::Song(song.asset_path.clone()),
             );
         }
     }
-    spawn_button(&mut commands, root, "\u{2190} Back", MenuButton::BackToArtistList);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToArtistList);
 }
 
 // ── Input + hover ─────────────────────────────────────────────────────────────

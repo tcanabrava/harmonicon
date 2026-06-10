@@ -3,7 +3,8 @@ use std::collections::HashMap;
 
 #[derive(Resource)]
 pub struct GlobalFonts {
-    pub gameplay: Handle<Font>,
+    pub gameplay: FontSource,
+    pub symbols: FontSource,
 }
 
 pub struct AssetsManagementPlugin;
@@ -30,7 +31,8 @@ impl Plugin for AssetsManagementPlugin {
 fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
     info!("Loading global fonts...");
     commands.insert_resource(GlobalFonts {
-        gameplay: asset_server.load("fonts/UbuntuSansMono-Regular.otf"),
+        gameplay: FontSource::Handle(asset_server.load("fonts/UbuntuSansMono-Regular.otf")),
+        symbols: FontSource::Handle(asset_server.load("fonts/NotoSansSymbols-Regular.ttf")),
     });
 }
 
