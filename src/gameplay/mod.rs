@@ -236,6 +236,169 @@ fn ui_12_bar_blues_grid(grid: &mut ChildSpawnerCommands, chords: &[String], key:
     }
 }
 
+fn ui_note_highway(hw: &mut ChildSpawnerCommands, chart: &HarpChart) {
+
+    // alternating lane shading + dividers
+    for h in 0..HOLE_COUNT {
+        let left_pct = h as f32 * LANE_PCT;
+        let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
+        hw.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Percent(left_pct),
+                top: Val::Percent(0.0),
+                width: Val::Percent(LANE_PCT),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha)),
+        ));
+        // lane divider line (skip leftmost)
+        if h > 0 {
+            hw.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Percent(left_pct),
+                    top: Val::Percent(0.0),
+                    width: Val::Px(1.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.08)),
+            ));
+        }
+    }
+
+    // hit zone fill
+    hw.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Percent(0.0),
+            bottom: Val::Percent(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(HIT_H_PCT),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(1.0, 1.0, 0.55, 0.10)),
+    ));
+    // hit zone top edge (bright line)
+    hw.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Percent(0.0),
+            bottom: Val::Percent(HIT_H_PCT),
+            width: Val::Percent(80.0),
+            height: Val::Px(2.0),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(1.0, 1.0, 0.70, 0.55)),
+    ));
+
+    // note visuals
+    for item in &chart.track {
+        let t = item.time.unwrap_or(0.0);
+        let h_pct = note_height_pct(item.duration);
+        for event in &item.events {
+            let is_blow = matches!(event.action, Action::Blow);
+            let (r, g, b) = if is_blow {
+                (0.25f32, 0.55, 0.95)
+            } else {
+                (0.95f32, 0.38, 0.15)
+            };
+            let left_pct = (event.hole as f32 - 1.0) * LANE_PCT + 0.3;
+            hw.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Percent(left_pct),
+                    top: Val::Percent(-h_pct), // off-screen until first update
+                    width: Val::Percent(LANE_PCT - 0.6),
+                    height: Val::Percent(h_pct),
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    border: UiRect::all(Val::Px(1.5)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(r, g, b, 0.88)),
+                BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.50)),
+                NoteVisual { time: t, height_pct: h_pct },
+            ))
+            .with_children(|note_node| {
+                note_node.spawn((
+                    Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
+                    TextFont { font_size: 12.0, ..default() },
+                    TextColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
+                ));
+            });
+        }
+    }
+}
+
+fn ui_harmonica_holes(harp_col: &mut ChildSpawnerCommands, chart: &HarpChart) {
+    // hole cells — each takes exactly 1/10 of the full width
+    harp_col.spawn(Node {
+        flex_direction: FlexDirection::Row,
+        width: Val::Percent(100.0),
+        ..default()
+    })
+    .with_children(|row| {
+        for hole in 1u8..=10 {
+            let b = blow_label(hole, chart);
+            let d = draw_label(hole, chart);
+            row.spawn((
+                Node {
+                    width: Val::Percent(LANE_PCT),
+                    height: Val::Vh(9.0),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceAround,
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.10, 0.12, 0.16)),
+                BorderColor::all(Color::srgb(0.28, 0.30, 0.40)),
+                HoleCell(hole),
+                HoleState::default(),
+            ))
+            .with_children(|cell| {
+                cell.spawn((
+                    Text::new(b),
+                    TextFont { font_size: 11.0, ..default() },
+                    TextColor(Color::srgb(0.50, 0.75, 1.00)),
+                ));
+                cell.spawn((
+                    Text::new(format!("{hole}")),
+                    TextFont { font_size: 16.0, ..default() },
+                    TextColor(Color::WHITE),
+                ));
+                cell.spawn((
+                    Text::new(d),
+                    TextFont { font_size: 11.0, ..default() },
+                    TextColor(Color::srgb(1.00, 0.62, 0.35)),
+                ));
+            });
+        }
+    });
+
+    // blow/draw colour legend
+    harp_col.spawn(Node {
+        flex_direction: FlexDirection::Row,
+        column_gap: Val::Px(20.0),
+        ..default()
+    })
+    .with_children(|leg| {
+        leg.spawn((
+            Text::new("\u{25A0} BLOW"),
+            TextFont { font_size: 11.0, ..default() },
+            TextColor(Color::srgb(0.50, 0.75, 1.00)),
+        ));
+        leg.spawn((
+            Text::new("\u{25A0} DRAW"),
+            TextFont { font_size: 11.0, ..default() },
+            TextColor(Color::srgb(1.00, 0.62, 0.35)),
+        ));
+    });
+}
+
 fn setup_gameplay(
     mut commands: Commands,
     selected: Res<SelectedSong>,
@@ -282,28 +445,27 @@ fn setup_gameplay(
         ))
         .with_children(|root| {
             // ── Title / info ──────────────────────────────────────────────
-            root.spawn(Node {
+            root.spawn((Node {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 ..default()
-            })
-            .with_children(|col| {
-                col.spawn((
+            }, children![
+                (
                     Text::new(title),
                     TextFont { font_size: 22.0, ..default() },
                     TextColor(Color::WHITE),
-                ));
-                col.spawn((
+                ),
+                (
                     Text::new(info),
                     TextFont { font_size: 13.0, ..default() },
                     TextColor(Color::srgb(0.60, 0.65, 0.75)),
-                ));
-                col.spawn((
+                ),
+                (
                     Text::new(harp_info),
                     TextFont { font_size: 12.0, ..default() },
                     TextColor(Color::srgb(0.45, 0.72, 0.55)),
-                ));
-            });
+                )
+            ]));
 
             // ── 12-bar blues grid (4 × 3) ─────────────────────────────────
             root.spawn(Node {
@@ -329,99 +491,7 @@ fn setup_gameplay(
                 BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
             ))
             .with_children(|hw| {
-                // alternating lane shading + dividers
-                for h in 0..HOLE_COUNT {
-                    let left_pct = h as f32 * LANE_PCT;
-                    let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
-                    hw.spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: Val::Percent(left_pct),
-                            top: Val::Percent(0.0),
-                            width: Val::Percent(LANE_PCT),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha)),
-                    ));
-                    // lane divider line (skip leftmost)
-                    if h > 0 {
-                        hw.spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Percent(left_pct),
-                                top: Val::Percent(0.0),
-                                width: Val::Px(1.0),
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.08)),
-                        ));
-                    }
-                }
-
-                // hit zone fill
-                hw.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Percent(0.0),
-                        bottom: Val::Percent(0.0),
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(HIT_H_PCT),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(1.0, 1.0, 0.55, 0.10)),
-                ));
-                // hit zone top edge (bright line)
-                hw.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Percent(0.0),
-                        bottom: Val::Percent(HIT_H_PCT),
-                        width: Val::Percent(80.0),
-                        height: Val::Px(2.0),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(1.0, 1.0, 0.70, 0.55)),
-                ));
-
-                // note visuals
-                for item in &chart.track {
-                    let t = item.time.unwrap_or(0.0);
-                    let h_pct = note_height_pct(item.duration);
-                    for event in &item.events {
-                        let is_blow = matches!(event.action, Action::Blow);
-                        let (r, g, b) = if is_blow {
-                            (0.25f32, 0.55, 0.95)
-                        } else {
-                            (0.95f32, 0.38, 0.15)
-                        };
-                        let left_pct = (event.hole as f32 - 1.0) * LANE_PCT + 0.3;
-                        hw.spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Percent(left_pct),
-                                top: Val::Percent(-h_pct), // off-screen until first update
-                                width: Val::Percent(LANE_PCT - 0.6),
-                                height: Val::Percent(h_pct),
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::Center,
-                                border: UiRect::all(Val::Px(1.5)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(r, g, b, 0.88)),
-                            BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.50)),
-                            NoteVisual { time: t, height_pct: h_pct },
-                        ))
-                        .with_children(|note_node| {
-                            note_node.spawn((
-                                Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
-                                TextFont { font_size: 12.0, ..default() },
-                                TextColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
-                            ));
-                        });
-                    }
-                }
+                ui_note_highway(hw, &chart);
             });
 
             // ── Harmonica holes ───────────────────────────────────────────
@@ -433,69 +503,7 @@ fn setup_gameplay(
                 ..default()
             })
             .with_children(|harp_col| {
-                // hole cells — each takes exactly 1/10 of the full width
-                harp_col.spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    width: Val::Percent(100.0),
-                    ..default()
-                })
-                .with_children(|row| {
-                    for hole in 1u8..=10 {
-                        let b = blow_label(hole, chart);
-                        let d = draw_label(hole, chart);
-                        row.spawn((
-                            Node {
-                                width: Val::Percent(LANE_PCT),
-                                height: Val::Vh(9.0),
-                                flex_direction: FlexDirection::Column,
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::SpaceAround,
-                                border: UiRect::all(Val::Px(1.0)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.10, 0.12, 0.16)),
-                            BorderColor::all(Color::srgb(0.28, 0.30, 0.40)),
-                            HoleCell(hole),
-                            HoleState::default(),
-                        ))
-                        .with_children(|cell| {
-                            cell.spawn((
-                                Text::new(b),
-                                TextFont { font_size: 11.0, ..default() },
-                                TextColor(Color::srgb(0.50, 0.75, 1.00)),
-                            ));
-                            cell.spawn((
-                                Text::new(format!("{hole}")),
-                                TextFont { font_size: 16.0, ..default() },
-                                TextColor(Color::WHITE),
-                            ));
-                            cell.spawn((
-                                Text::new(d),
-                                TextFont { font_size: 11.0, ..default() },
-                                TextColor(Color::srgb(1.00, 0.62, 0.35)),
-                            ));
-                        });
-                    }
-                });
-
-                // blow/draw colour legend
-                harp_col.spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(20.0),
-                    ..default()
-                })
-                .with_children(|leg| {
-                    leg.spawn((
-                        Text::new("\u{25A0} BLOW"),
-                        TextFont { font_size: 11.0, ..default() },
-                        TextColor(Color::srgb(0.50, 0.75, 1.00)),
-                    ));
-                    leg.spawn((
-                        Text::new("\u{25A0} DRAW"),
-                        TextFont { font_size: 11.0, ..default() },
-                        TextColor(Color::srgb(1.00, 0.62, 0.35)),
-                    ));
-                });
+                ui_harmonica_holes(harp_col, &chart);
             });
 
             // ── Countdown overlay (covers the whole gameplay area) ────────
