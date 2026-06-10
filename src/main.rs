@@ -1,9 +1,11 @@
 mod audio_input;
+mod gameplay;
 mod menu;
 mod pitch_detect;
 mod song;
 
 use bevy::prelude::*;
+use gameplay::GameplayPlugin;
 use menu::{AppState, MenuPlugin};
 use pitch_detect::PitchEvent;
 use song::SongPlugin;
@@ -17,7 +19,7 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins((SongPlugin, MenuPlugin))
+        .add_plugins((SongPlugin, MenuPlugin, GameplayPlugin))
         .add_message::<PitchEvent>()
         .add_systems(Startup, spawn_camera)
         .add_systems(OnEnter(AppState::Playing), setup_audio)
