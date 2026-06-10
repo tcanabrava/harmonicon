@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{audio::AudioSource, prelude::*};
 
 use crate::{
     menu::{AppState, SelectedSong},
@@ -15,11 +15,19 @@ impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()
+            .init_resource::<MusicStarted>()
             .add_systems(OnEnter(AppState::Playing), setup_gameplay)
             .add_systems(OnExit(AppState::Playing), cleanup_gameplay)
             .add_systems(
                 Update,
-                (tick_clock, collect_pitches, update_notes, update_bar, update_holes)
+                (
+                    tick_clock,
+                    collect_pitches,
+                    update_countdown,
+                    update_notes,
+                    update_bar,
+                    update_holes,
+                )
                     .chain()
                     .run_if(in_state(AppState::Playing)),
             );
@@ -48,7 +56,17 @@ struct BarCell(usize);
 #[derive(Component)]
 struct HoleCell(u8);
 
+#[derive(Component)]
+struct CountdownOverlay;
+
+#[derive(Component)]
+struct CountdownText;
+
+#[derive(Resource, Default)]
+struct MusicStarted(bool);
+
 const HOLE_COUNT: usize = 10;
+const COUNTDOWN: f64 = 3.0;
 const LANE_PCT: f32 = 100.0 / HOLE_COUNT as f32; // 10 % per lane
 const HIT_H_PCT: f32 = 7.0; // hit zone height as % of highway
 const LOOKAHEAD: f64 = 3.0;
@@ -113,12 +131,16 @@ fn setup_gameplay(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut clock: ResMut<GameplayClock>,
+    mut music_started: ResMut<MusicStarted>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
         return;
     };
-    clock.0 = 0.0;
+    // Start the clock negative so notes are already visible during the
+    // countdown and music begins exactly when the clock reaches 0.
+    clock.0 = -COUNTDOWN;
+    music_started.0 = false;
 
     let chart = &manifest.chart;
     let key = chart.song.key.as_str();
@@ -396,7 +418,81 @@ fn setup_gameplay(
                     ));
                 });
             });
+
+            // ── Countdown overlay (covers the whole gameplay area) ────────
+            // Absolute positioning + high GlobalZIndex keeps it on top of
+            // the note highway while remaining semi-transparent so the player
+            // can see the first notes already approaching.
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    row_gap: Val::Px(12.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.05, 0.55)),
+                GlobalZIndex(100),
+                CountdownOverlay,
+            ))
+            .with_children(|ov| {
+                ov.spawn((
+                    Text::new("GET READY"),
+                    TextFont { font_size: 22.0, ..default() },
+                    TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
+                ));
+                ov.spawn((
+                    Text::new("3"),
+                    TextFont { font_size: 120.0, ..default() },
+                    TextColor(Color::WHITE),
+                    CountdownText,
+                ));
+            });
         });
+}
+
+fn update_countdown(
+    clock: Res<GameplayClock>,
+    mut overlay: Query<&mut Visibility, With<CountdownOverlay>>,
+    mut text: Query<(&mut Text, &mut TextFont), With<CountdownText>>,
+    mut music_started: ResMut<MusicStarted>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut commands: Commands,
+) {
+    if clock.0 >= 0.0 {
+        for mut vis in &mut overlay {
+            *vis = Visibility::Hidden;
+        }
+        if !music_started.0 {
+            music_started.0 = true;
+            if let Some(manifest) = manifests.get(&selected.0) {
+                commands.spawn((
+                    AudioPlayer::<AudioSource>(manifest.music.clone()),
+                    PlaybackSettings::ONCE,
+                ));
+            }
+        }
+        return;
+    }
+
+    for mut vis in &mut overlay {
+        *vis = Visibility::Visible;
+    }
+
+    // frac goes 0 → 1 over each second; font pulses large → normal
+    let remaining = -clock.0; // positive, counts down
+    let n = remaining.ceil() as u32;
+    let frac = remaining.fract() as f32; // 0 = just changed, 1 = about to change
+    let font_size = 80.0 + (1.0 - frac) * 80.0; // 160 → 80 px over each second
+
+    for (mut t, mut font) in &mut text {
+        t.0 = format!("{n}");
+        font.font_size = font_size;
+    }
 }
 
 fn cleanup_gameplay(mut commands: Commands, roots: Query<Entity, With<GameplayRoot>>) {
