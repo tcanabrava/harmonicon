@@ -33,7 +33,7 @@ fn main() {
         }))
         .add_plugins((AssetsManagementPlugin, SongPlugin, MenuPlugin, GameplayPlugin))
         .add_message::<PitchEvent>()
-        .add_systems(Startup, spawn_camera)
+        .add_systems(Startup, (spawn_camera, initialize_game))
         .add_systems(OnEnter(AppState::Playing), setup_audio)
         .add_systems(
             Update,
@@ -46,6 +46,10 @@ fn main() {
 
 fn spawn_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
+}
+
+fn initialize_game(mut next: ResMut<NextState<AppState>>) {
+    next.set(AppState::Menu);
 }
 
 fn setup_audio(world: &mut World) {

@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use bevy::prelude::*;
 
 use crate::song::SongManifest;
+use crate::assets_management::AvailableSongs;
 
 pub struct MenuPlugin;
 
@@ -33,18 +32,6 @@ enum MenuPage {
 
 #[derive(Resource)]
 pub struct SelectedSong(pub Handle<SongManifest>);
-
-#[derive(Debug, Clone)]
-pub struct SongEntry {
-    pub artist: String,
-    pub name: String,
-    pub asset_path: String,
-}
-
-/// Songs indexed by artist name. Each artist maps to a sorted list of songs.
-#[derive(Resource, Default)]
-pub struct AvailableSongs(pub HashMap<String, Vec<SongEntry>>);
-
 // ── Private resources / components ───────────────────────────────────────────
 
 #[derive(Resource, Default)]
@@ -80,11 +67,7 @@ impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<AppState>()
             .add_sub_state::<MenuPage>()
-            .init_resource::<AvailableSongs>()
             .init_resource::<SelectedArtist>()
-            // Startup: scan disk once, then transition straight to Menu.
-            .add_systems(OnEnter(AppState::Startup), scan_all_songs)
-            .add_systems(Update, startup_complete.run_if(in_state(AppState::Startup)))
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main),       setup_main_menu)
             .add_systems(OnExit(MenuPage::Main),        cleanup_menu)
@@ -101,56 +84,6 @@ impl Plugin for MenuPlugin {
             .add_systems(Update, check_loading.run_if(in_state(AppState::SongLoading)));
     }
 }
-
-// ── Startup ───────────────────────────────────────────────────────────────────
-
-fn startup_complete(mut next: ResMut<NextState<AppState>>) {
-    next.set(AppState::Menu);
-}
-
-fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
-    let songs_root = std::path::Path::new("assets/songs");
-    let Ok(artists) = std::fs::read_dir(songs_root) else {
-        warn!("No songs directory found at assets/songs/");
-        return;
-    };
-
-    for artist_dir in artists.flatten() {
-        if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            continue;
-        }
-        let artist = artist_dir.file_name().to_string_lossy().into_owned();
-        let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
-            continue;
-        };
-        for song_dir in song_dirs.flatten() {
-            if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                continue;
-            }
-            if !song_dir.path().join("chart.harpchart").exists() {
-                continue;
-            }
-            let name = song_dir.file_name().to_string_lossy().into_owned();
-            available
-                .0
-                .entry(artist.clone())
-                .or_default()
-                .push(SongEntry {
-                    asset_path: format!("songs/{artist}/{name}/chart.harpchart"),
-                    artist: artist.clone(),
-                    name,
-                });
-        }
-    }
-
-    let total: usize = available.0.values().map(|v| v.len()).sum();
-    info!(
-        "Found {} song(s) across {} artist(s)",
-        total,
-        available.0.len()
-    );
-}
-
 // ── UI helpers ────────────────────────────────────────────────────────────────
 
 fn menu_bg() -> Color {
