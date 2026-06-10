@@ -37,7 +37,7 @@ impl Plugin for MenuPlugin {
         app.init_state::<AppState>()
         .init_resource::<AvailableSongs>()
 
-        .add_systems(OnEnter(AppState::Startup), (spawn_camera, scan_songs))
+        .add_systems(OnEnter(AppState::Startup), scan_songs)
         .add_systems(Update, startup_complete.run_if(in_state(AppState::Startup)))
 
         .add_systems(OnEnter(AppState::Menu), setup_menu)
@@ -53,10 +53,6 @@ impl Plugin for MenuPlugin {
 fn startup_complete(mut next_state: ResMut<NextState<AppState>>) {
     info!("Startup complete");
     next_state.set(AppState::Menu);
-}
-
-fn spawn_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
 }
 
 fn scan_songs(mut available: ResMut<AvailableSongs>) {
