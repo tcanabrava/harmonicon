@@ -1,10 +1,12 @@
+use std::collections::HashSet;
+
 use bevy::{audio::AudioSource, prelude::*};
 
 use crate::{
     menu::{AppState, SelectedSong},
     pitch_detect::{PitchEvent, PitchInfo},
     song::{
-        chart::{Action, HarpChart, Harmonica},
+        chart::{Action, BendingProfile, HarpChart, Harmonica},
         SongManifest,
     },
 };
@@ -16,6 +18,7 @@ impl Plugin for GameplayPlugin {
         app.init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()
             .init_resource::<MusicStarted>()
+            .init_resource::<ValidHarpNotes>()
             .add_systems(OnEnter(AppState::Playing), setup_gameplay)
             .add_systems(OnExit(AppState::Playing), cleanup_gameplay)
             .add_systems(
@@ -56,6 +59,15 @@ struct BarCell(usize);
 #[derive(Component)]
 struct HoleCell(u8);
 
+// Tracks animated lighting state for one hole.
+// We lerp a scalar `brightness` (0 = dark, 1 = fully lit) and remember the
+// last matched action so the colour stays correct while fading out.
+#[derive(Component, Default)]
+struct HoleState {
+    brightness: f32,
+    is_blow: bool,
+}
+
 #[derive(Component)]
 struct CountdownOverlay;
 
@@ -64,6 +76,9 @@ struct CountdownText;
 
 #[derive(Resource, Default)]
 struct MusicStarted(bool);
+
+#[derive(Resource, Default)]
+struct ValidHarpNotes(HashSet<String>);
 
 const HOLE_COUNT: usize = 10;
 const COUNTDOWN: f64 = 3.0;
@@ -126,21 +141,100 @@ fn draw_label(hole: u8, chart: &HarpChart) -> String {
     "\u{2014}".into()
 }
 
+fn harp_display(chart: &HarpChart) -> String {
+    match &chart.harmonica {
+        Harmonica::Diatonic { holes, bending_profile, position, .. } => {
+            let pos = position.as_deref().unwrap_or("?");
+            let profile = match bending_profile {
+                BendingProfile::RichterStandard => "Richter",
+                BendingProfile::CountryTuned => "Country",
+            };
+            format!("Diatonic \u{00B7} {} holes \u{00B7} {} position \u{00B7} {}", holes, pos, profile)
+        }
+        Harmonica::Chromatic { holes, position, .. } => {
+            let pos = position.as_deref().unwrap_or("?");
+            format!("Chromatic \u{00B7} {} holes \u{00B7} {} position", holes, pos)
+        }
+    }
+}
+
+// Convert a note string like "G4", "C#5", "Bb3" to a MIDI number.
+fn note_to_midi(note: &str) -> Option<i32> {
+    const NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    let (pitch, oct_str) = if note.len() >= 3
+        && (note.as_bytes().get(1) == Some(&b'#') || note.as_bytes().get(1) == Some(&b'b'))
+    {
+        (&note[..2], &note[2..])
+    } else {
+        (&note[..1], &note[1..])
+    };
+    // Normalise flats to enharmonic sharps.
+    let pitch = match pitch {
+        "Db" => "C#", "Eb" => "D#", "Fb" => "E", "Gb" => "F#",
+        "Ab" => "G#", "Bb" => "A#", "Cb" => "B", p => p,
+    };
+    let semitone = NAMES.iter().position(|&n| n == pitch)? as i32;
+    let octave: i32 = oct_str.parse().ok()?;
+    Some((octave + 1) * 12 + semitone)
+}
+
+fn midi_to_note(midi: i32) -> String {
+    const NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    let semitone = ((midi % 12) + 12) % 12;
+    let octave = midi / 12 - 1;
+    format!("{}{}", NAMES[semitone as usize], octave)
+}
+
+// Build the complete set of notes this harmonica can physically produce,
+// including all bendable pitches between blow and draw notes.
+fn build_valid_notes(chart: &HarpChart) -> HashSet<String> {
+    let mut set = HashSet::new();
+    match &chart.harmonica {
+        Harmonica::Diatonic { layout: Some(l), .. } => {
+            let blow = l.blow.as_deref().unwrap_or(&[]);
+            let draw = l.draw.as_deref().unwrap_or(&[]);
+            for (i, (b, d)) in blow.iter().zip(draw.iter()).enumerate() {
+                set.insert(b.clone());
+                set.insert(d.clone());
+                // Holes 1-6: draw bends downward toward the blow note.
+                // Holes 7-10: blow bends downward toward the draw note.
+                let (bend_from, bend_to) = if i < 6 { (d, b) } else { (b, d) };
+                if let (Some(from_m), Some(to_m)) = (note_to_midi(bend_from), note_to_midi(bend_to)) {
+                    let lo = from_m.min(to_m);
+                    let hi = from_m.max(to_m);
+                    for m in (lo + 1)..hi {
+                        set.insert(midi_to_note(m));
+                    }
+                }
+            }
+        }
+        Harmonica::Chromatic { layout: Some(l), .. } => {
+            for opt in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide] {
+                if let Some(notes) = opt {
+                    for n in notes { set.insert(n.clone()); }
+                }
+            }
+        }
+        _ => {}
+    }
+    set
+}
+
 fn setup_gameplay(
     mut commands: Commands,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut clock: ResMut<GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
+    mut valid_notes: ResMut<ValidHarpNotes>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
         return;
     };
-    // Start the clock negative so notes are already visible during the
-    // countdown and music begins exactly when the clock reaches 0.
     clock.0 = -COUNTDOWN;
     music_started.0 = false;
+    valid_notes.0 = build_valid_notes(&manifest.chart);
 
     let chart = &manifest.chart;
     let key = chart.song.key.as_str();
@@ -154,6 +248,7 @@ fn setup_gameplay(
         bpm as u32,
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
+    let harp_info = harp_display(chart);
 
     commands
         .spawn((
@@ -186,6 +281,11 @@ fn setup_gameplay(
                     Text::new(info),
                     TextFont { font_size: 13.0, ..default() },
                     TextColor(Color::srgb(0.60, 0.65, 0.75)),
+                ));
+                col.spawn((
+                    Text::new(harp_info),
+                    TextFont { font_size: 12.0, ..default() },
+                    TextColor(Color::srgb(0.45, 0.72, 0.55)),
                 ));
             });
 
@@ -378,6 +478,7 @@ fn setup_gameplay(
                             BackgroundColor(Color::srgb(0.10, 0.12, 0.16)),
                             BorderColor::all(Color::srgb(0.28, 0.30, 0.40)),
                             HoleCell(hole),
+                            HoleState::default(),
                         ))
                         .with_children(|cell| {
                             cell.spawn((
@@ -555,25 +656,66 @@ fn update_bar(
 }
 
 fn update_holes(
+    time: Res<Time>,
     active: Res<ActivePitches>,
+    valid_notes: Res<ValidHarpNotes>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
-    mut cells: Query<(&HoleCell, &mut BackgroundColor)>,
+    mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState)>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else { return };
     let chart = &manifest.chart;
+    let dt = time.delta_secs();
 
-    for (cell, mut bg) in &mut cells {
-        let b = blow_label(cell.0, chart);
-        let d = draw_label(cell.0, chart);
-        let hit = active.0.iter().any(|p| {
+    // Exponential approach factors — frame-rate independent.
+    // Attack: reach ~95 % in ~100 ms.  Decay: reach ~5 % in ~600 ms.
+    let attack = 1.0 - (-dt * 25.0_f32).exp();
+    let decay  = 1.0 - (-dt *  4.0_f32).exp();
+
+    // Only consider pitches that this specific harmonica can physically produce.
+    // Everything else is assumed to be backing-track bleed or ambient noise.
+    let harp_pitches: Vec<&PitchInfo> = active
+        .0
+        .iter()
+        .filter(|p| valid_notes.0.contains(&format!("{}{}", p.note, p.octave)))
+        .collect();
+
+    for (cell, mut bg, mut state) in &mut cells {
+        let blow = blow_label(cell.0, chart);
+        let draw = draw_label(cell.0, chart);
+
+        let mut blow_hit = false;
+        let mut draw_hit = false;
+        for p in &harp_pitches {
             let name = format!("{}{}", p.note, p.octave);
-            name == b || name == d
-        });
-        *bg = if hit {
-            BackgroundColor(Color::srgb(0.15, 0.85, 0.35))
+            if name == blow { blow_hit = true; }
+            if name == draw { draw_hit = true; }
+        }
+
+        let (target, is_blow) = if blow_hit {
+            (1.0f32, true)
+        } else if draw_hit {
+            (1.0f32, false)
         } else {
-            BackgroundColor(Color::srgb(0.10, 0.12, 0.16))
+            (0.0f32, state.is_blow) // keep last colour while fading
         };
+
+        // Remember the last active action so the colour looks right on release.
+        if blow_hit || draw_hit {
+            state.is_blow = is_blow;
+        }
+
+        let factor = if target > state.brightness { attack } else { decay };
+        state.brightness += (target - state.brightness) * factor;
+        let b = state.brightness;
+
+        // Resting colour: dark neutral.
+        // Blow: deep blue lit up.   Draw: deep orange lit up.
+        let color = if state.is_blow {
+            Color::srgb(0.10 + 0.18 * b, 0.12 + 0.33 * b, 0.16 + 0.72 * b)
+        } else {
+            Color::srgb(0.10 + 0.78 * b, 0.12 + 0.22 * b, 0.16 - 0.04 * b)
+        };
+        *bg = BackgroundColor(color);
     }
 }
