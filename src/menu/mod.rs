@@ -1,3 +1,5 @@
+use std::fs::DirEntry;
+
 use bevy::{ecs::error::info, prelude::*};
 
 use crate::song::SongManifest;
@@ -37,7 +39,7 @@ impl Plugin for MenuPlugin {
         app.init_state::<AppState>()
         .init_resource::<AvailableSongs>()
 
-        .add_systems(OnEnter(AppState::Startup), scan_songs)
+        .add_systems(OnEnter(AppState::Startup), scan_all_songs)
         .add_systems(Update, startup_complete.run_if(in_state(AppState::Startup)))
 
         .add_systems(OnEnter(AppState::Menu), setup_menu)
@@ -55,7 +57,33 @@ fn startup_complete(mut next_state: ResMut<NextState<AppState>>) {
     next_state.set(AppState::Menu);
 }
 
-fn scan_songs(mut available: ResMut<AvailableSongs>) {
+fn scan_artists(artist_dir: &DirEntry, entries: &mut Vec<SongEntry>) {
+    if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+        return;
+    }
+    let artist = artist_dir.file_name().to_string_lossy().into_owned();
+
+    let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
+        return;
+    };
+
+    for song_dir in song_dirs.flatten() {
+        if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        if !song_dir.path().join("chart.harpchart").exists() {
+            continue;
+        }
+        let name = song_dir.file_name().to_string_lossy().into_owned();
+        entries.push(SongEntry {
+            asset_path: format!("songs/{artist}/{name}/chart.harpchart"),
+            artist: artist.clone(),
+            name,
+        });
+    }
+}
+
+fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
     let songs_root = std::path::Path::new("assets/songs");
 
     let Ok(artists) = std::fs::read_dir(songs_root) else {
@@ -63,36 +91,42 @@ fn scan_songs(mut available: ResMut<AvailableSongs>) {
         return;
     };
 
-    let mut entries = Vec::new();
+    let mut entries = Vec::<SongEntry>::new();
 
     for artist_dir in artists.flatten() {
-        if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            continue;
-        }
-        let artist = artist_dir.file_name().to_string_lossy().into_owned();
-
-        let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
-            continue;
-        };
-
-        for song_dir in song_dirs.flatten() {
-            if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                continue;
-            }
-            if !song_dir.path().join("chart.harpchart").exists() {
-                continue;
-            }
-            let name = song_dir.file_name().to_string_lossy().into_owned();
-            entries.push(SongEntry {
-                asset_path: format!("songs/{artist}/{name}/chart.harpchart"),
-                artist: artist.clone(),
-                name,
-            });
-        }
+        scan_artists(&artist_dir, &mut entries);
     }
+
     available.0 = entries;
 
     info!("Found {} song(s)", available.0.len());
+}
+
+fn ui_spawn_song_button(
+    song: &SongEntry,
+) -> impl Bundle {
+    (
+        Button,
+        Node {
+            padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.18, 0.18, 0.28)),
+        SongButton(song.asset_path.clone()),
+        children![(
+            Text::new(format!("{} — {}", song.artist, song.name)),
+            TextFont { font_size: 20.0, ..default() },
+            TextColor(Color::WHITE),
+        )],
+    )
+}
+
+fn ui_no_song_found() -> impl Bundle {
+    (
+        Text::new("No songs found — add folders under assets/songs/<artist>/<song>/"),
+        TextFont { font_size: 16.0, ..default() },
+        TextColor(Color::srgb(0.8, 0.4, 0.4)),
+    )
 }
 
 fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
@@ -123,29 +157,12 @@ fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
         )
         .with_children(|root| {
             if songs.0.is_empty() {
-                root.spawn((
-                    Text::new("No songs found — add folders under assets/songs/<artist>/<song>/"),
-                    TextFont { font_size: 16.0, ..default() },
-                    TextColor(Color::srgb(0.8, 0.4, 0.4)),
-                ));
+                root.spawn(ui_no_song_found());
                 return;
             }
 
             for song in &songs.0 {
-                root.spawn((
-                    Button,
-                    Node {
-                        padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgb(0.18, 0.18, 0.28)),
-                    SongButton(song.asset_path.clone()),
-                    children![(
-                        Text::new(format!("{} — {}", song.artist, song.name)),
-                        TextFont { font_size: 20.0, ..default() },
-                        TextColor(Color::WHITE),
-                    )],
-                ));
+                root.spawn(ui_spawn_song_button(song));
             }
         });
 }
