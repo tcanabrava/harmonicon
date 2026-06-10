@@ -8,9 +8,9 @@ use crate::{
 };
 
 use super::{
-    ActivePitches, CountdownOverlay, CountdownText, GameplayRoot, HoleCell, HoleState,
-    MusicStarted, NoteVisual, ValidHarpNotes, COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT,
-    LOOKAHEAD,
+    ActivePitches, CountdownOverlay, CountdownText, ComboText, FeedbackText, GameplayRoot,
+    HoleCell, HoleState, MusicStarted, NoteVisual, ScoreText, ScheduledNote, ValidHarpNotes,
+    COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT, LOOKAHEAD,
 };
 
 pub fn setup(
@@ -129,6 +129,42 @@ pub fn setup(
             })
             .with_children(|col| {
                 spawn_harmonica_strip(col, chart, &fonts.gameplay);
+            });
+
+            // Score panel — top-right corner, above the note highway
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(8.0),
+                    right: Val::Px(8.0),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexEnd,
+                    row_gap: Val::Px(2.0),
+                    padding: UiRect::all(Val::Px(8.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
+                GlobalZIndex(50),
+            ))
+            .with_children(|p| {
+                p.spawn((
+                    Text::new("0"),
+                    TextFont { font_size: FontSize::Px(30.0), font: fonts.gameplay.clone(), ..default() },
+                    TextColor(Color::WHITE),
+                    ScoreText,
+                ));
+                p.spawn((
+                    Text::new(""),
+                    TextFont { font_size: FontSize::Px(15.0), font: fonts.gameplay.clone(), ..default() },
+                    TextColor(Color::srgb(0.90, 0.72, 0.20)),
+                    ComboText,
+                ));
+                p.spawn((
+                    Text::new(""),
+                    TextFont { font_size: FontSize::Px(22.0), font: fonts.gameplay.clone(), ..default() },
+                    TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                    FeedbackText,
+                ));
             });
 
             // Countdown overlay
@@ -290,6 +326,11 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate
             let is_blow = matches!(event.action, Action::Blow);
             let (r, g, b) = if is_blow { (0.25f32, 0.55, 0.95) } else { (0.95f32, 0.38, 0.15) };
             let left_pct = (event.hole as f32 - 1.0) * LANE_PCT + 0.3;
+            let expected_pitch = if is_blow {
+                blow_label(event.hole, chart)
+            } else {
+                draw_label(event.hole, chart)
+            };
             hw.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -305,6 +346,14 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate
                 BackgroundColor(Color::srgba(r, g, b, 0.88)),
                 BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.50)),
                 NoteVisual { time: t, height_pct: h_pct },
+                ScheduledNote {
+                    time: t,
+                    hole: event.hole,
+                    is_blow,
+                    expected_pitch,
+                    hit: false,
+                    missed: false,
+                },
             ))
             .with_children(|note| {
                 note.spawn((

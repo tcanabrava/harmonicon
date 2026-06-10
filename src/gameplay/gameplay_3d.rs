@@ -8,8 +8,9 @@ use crate::{
 };
 
 use super::{
-    ActivePitches, BarCell, CountdownOverlay, CountdownText, GameplayRoot, HoleCell, HoleState,
-    MusicStarted, ValidHarpNotes, COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
+    ActivePitches, BarCell, ComboText, CountdownOverlay, CountdownText, FeedbackText, GameplayRoot,
+    HoleCell, HoleState, MusicStarted, ScoreText, ScheduledNote, ValidHarpNotes,
+    COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
 };
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -216,12 +217,25 @@ pub fn setup(
                 ..default()
             });
             let note_mesh = meshes.add(Cuboid::new(LANE_WIDTH - LANE_GAP, NOTE_H, depth));
+            let expected_pitch = if is_blow {
+                blow_label(event.hole, chart)
+            } else {
+                draw_label(event.hole, chart)
+            };
             // Spawn off-screen; update_notes_3d repositions each frame
             commands.spawn((
                 Mesh3d(note_mesh),
                 MeshMaterial3d(note_mat),
                 Transform::from_xyz(lane_x(event.hole), LANE_Y + NOTE_H * 0.5, FAR_Z),
                 NoteVisual3D { time: t, lane: event.hole, is_blow, depth },
+                ScheduledNote {
+                    time: t,
+                    hole: event.hole,
+                    is_blow,
+                    expected_pitch,
+                    hit: false,
+                    missed: false,
+                },
                 GameplayRoot,
             ));
         }
@@ -466,6 +480,43 @@ fn spawn_hud_overlay(
                 ));
             });
         });
+
+    // Score panel — top-right corner
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(8.0),
+            right: Val::Px(8.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::FlexEnd,
+            row_gap: Val::Px(2.0),
+            padding: UiRect::all(Val::Px(8.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+        GlobalZIndex(20),
+        GameplayRoot,
+    ))
+    .with_children(|p| {
+        p.spawn((
+            Text::new("0"),
+            TextFont { font_size: FontSize::Px(30.0), font: font.clone(), ..default() },
+            TextColor(Color::WHITE),
+            ScoreText,
+        ));
+        p.spawn((
+            Text::new(""),
+            TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+            TextColor(Color::srgb(0.90, 0.72, 0.20)),
+            ComboText,
+        ));
+        p.spawn((
+            Text::new(""),
+            TextFont { font_size: FontSize::Px(22.0), font: font.clone(), ..default() },
+            TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+            FeedbackText,
+        ));
+    });
 
     // Countdown overlay (full-screen, on top of everything)
     commands.spawn((
