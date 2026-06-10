@@ -4,6 +4,16 @@ use crate::song::SongManifest;
 use crate::assets_management::AvailableSongs;
 use crate::assets_management::GlobalFonts;
 
+#[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
+pub enum GameplayMode {
+    #[default]
+    Play2D,
+    Play3D,
+}
+
+#[derive(Resource, Default)]
+pub struct PendingSongPath(pub String);
+
 pub struct MenuPlugin;
 
 // ── App-level states ──────────────────────────────────────────────────────────
@@ -27,6 +37,7 @@ enum MenuPage {
     Play,
     ArtistList,
     SongList,
+    ModeSelect,
 }
 
 // ── Public resources ──────────────────────────────────────────────────────────
@@ -56,10 +67,14 @@ enum MenuButton {
     // Drill-down
     Artist(String),
     Song(String), // carries the asset path
+    // Mode selection
+    PlayMode2D,
+    PlayMode3D,
     // Back navigation — each variant knows exactly where to return
     BackToMain,
     BackToPlay,
     BackToArtistList,
+    BackToSongList,
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
@@ -69,6 +84,8 @@ impl Plugin for MenuPlugin {
         app.init_state::<AppState>()
             .add_sub_state::<MenuPage>()
             .init_resource::<SelectedArtist>()
+            .init_resource::<GameplayMode>()
+            .init_resource::<PendingSongPath>()
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main),       setup_main_menu)
             .add_systems(OnExit(MenuPage::Main),        cleanup_menu)
@@ -78,6 +95,8 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::ArtistList),  cleanup_menu)
             .add_systems(OnEnter(MenuPage::SongList),   setup_song_list)
             .add_systems(OnExit(MenuPage::SongList),    cleanup_menu)
+            .add_systems(OnEnter(MenuPage::ModeSelect), setup_mode_select)
+            .add_systems(OnExit(MenuPage::ModeSelect),  cleanup_menu)
             // Input and hover are independent — two separate registrations.
             .add_systems(Update, handle_menu_input.run_if(in_state(AppState::Menu)))
             .add_systems(Update, button_hover.run_if(in_state(AppState::Menu)))
@@ -226,6 +245,13 @@ fn setup_song_list(
     spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToArtistList);
 }
 
+fn setup_mode_select(mut commands: Commands, font: Res<GlobalFonts>) {
+    let root = spawn_menu_root(&mut commands, "Select Mode", None);
+    spawn_button(&mut commands, root, &font.gameplay, "Play 2D", MenuButton::PlayMode2D);
+    spawn_button(&mut commands, root, &font.gameplay, "Play 3D", MenuButton::PlayMode3D);
+    spawn_button(&mut commands, root, &font.symbols,  "\u{2190} Back", MenuButton::BackToSongList);
+}
+
 // ── Input + hover ─────────────────────────────────────────────────────────────
 
 fn handle_menu_input(
@@ -233,6 +259,8 @@ fn handle_menu_input(
     mut next_page: ResMut<NextState<MenuPage>>,
     mut next_state: ResMut<NextState<AppState>>,
     mut selected_artist: ResMut<SelectedArtist>,
+    mut pending_path: ResMut<PendingSongPath>,
+    mut gameplay_mode: ResMut<GameplayMode>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
     mut app_exit: MessageWriter<AppExit>,
@@ -253,13 +281,25 @@ fn handle_menu_input(
                 next_page.set(MenuPage::SongList);
             }
             MenuButton::Song(path) => {
-                let handle = asset_server.load::<SongManifest>(path.clone());
+                pending_path.0 = path.clone();
+                next_page.set(MenuPage::ModeSelect);
+            }
+            MenuButton::PlayMode2D => {
+                *gameplay_mode = GameplayMode::Play2D;
+                let handle = asset_server.load::<SongManifest>(pending_path.0.clone());
+                commands.insert_resource(SelectedSong(handle));
+                next_state.set(AppState::SongLoading);
+            }
+            MenuButton::PlayMode3D => {
+                *gameplay_mode = GameplayMode::Play3D;
+                let handle = asset_server.load::<SongManifest>(pending_path.0.clone());
                 commands.insert_resource(SelectedSong(handle));
                 next_state.set(AppState::SongLoading);
             }
             MenuButton::BackToMain       => next_page.set(MenuPage::Main),
             MenuButton::BackToPlay       => next_page.set(MenuPage::Play),
             MenuButton::BackToArtistList => next_page.set(MenuPage::ArtistList),
+            MenuButton::BackToSongList   => next_page.set(MenuPage::SongList),
         }
     }
 }

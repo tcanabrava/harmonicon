@@ -1,0 +1,298 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Tomaz Canabrava",
+    "source": "One Bourbon, One Scotch, One Beer",
+    "license": "Gameplay chart example",
+    "description": "Ten-second blues harmonica rhythm-game excerpt inspired by One Bourbon, One Scotch, One Beer."
+  },
+
+  "song": {
+    "title": "One Bourbon, One Scotch, One Beer",
+    "artist": "John Lee Hooker",
+    "tempo_bpm": 120,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 120
+      }
+    ]
+  },
+
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "2nd",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"],
+      "draw": ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"]
+    }
+  },
+
+  "track": [
+    {
+      "id": "phrase_01",
+      "time": 0.00,
+      "duration": 0.50,
+      "phrase": "intro hit",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_02",
+      "time": 0.75,
+      "duration": 0.50,
+      "phrase": "boom",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_03",
+      "time": 1.50,
+      "duration": 0.75,
+      "phrase": "boom response",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_04",
+      "time": 2.50,
+      "duration": 0.50,
+      "phrase": "shuffle accent",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_05",
+      "time": 3.00,
+      "duration": 0.50,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            },
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_06",
+      "time": 4.00,
+      "duration": 1.00,
+      "phrase": "held answer",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            },
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 3,
+              "intensity": 0.5
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_07",
+      "time": 5.50,
+      "duration": 0.50,
+      "phrase": "turnaround",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_08",
+      "time": 6.00,
+      "duration": 0.50,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_09",
+      "time": 7.00,
+      "duration": 1.00,
+      "phrase": "call",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_10",
+      "time": 8.50,
+      "duration": 0.50,
+      "phrase": "closing accent",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "phrase_11",
+      "time": 9.25,
+      "duration": 0.75,
+      "phrase": "final sustain",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "hold"
+            },
+            {
+              "type": "vibrato",
+              "oscillation_hz": 4,
+              "intensity": 0.3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "loop": {
+    "type": "verse",
+    "repeat": false,
+    "start_index": 0,
+    "end_index": 10
+  },
+
+  "scoring": {
+    "perfect_window_ms": 60,
+    "good_window_ms": 120,
+    "miss_window_ms": 220,
+
+    "combo": {
+      "enabled": true,
+      "base_multiplier": 1.0,
+      "step_multiplier": 0.1,
+      "max_multiplier": 4.0,
+      "decay_ms": 2000
+    },
+
+    "style_bonus": {
+      "bend": 50,
+      "vibrato": 25,
+      "wah-wah": 40,
+      "hold": 20
+    }
+  },
+
+  "fx_mapping": {
+    "bend": "pitch_bend",
+    "vibrato": "pitch_lfo",
+    "wah-wah": "filter_lfo",
+    "hold": "sustain"
+  }
+}
