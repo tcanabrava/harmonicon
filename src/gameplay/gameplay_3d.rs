@@ -2,14 +2,14 @@ use bevy::{audio::AudioSource, prelude::*};
 
 use crate::{
     assets_management::GlobalFonts,
-    menu::{AppState, SelectedSong},
+    menu::SelectedSong,
     song::SongManifest,
     harmonica::{blow_label, draw_label, harp_display, semitone, twelve_bar},
 };
 
 use super::{
-    ActivePitches, BarCell, ComboText, CountdownOverlay, CountdownText, FeedbackText, GameplayRoot,
-    HoleCell, HoleState, MusicStarted, ScoreText, ScheduledNote, ValidHarpNotes,
+    ActivePitches, ActiveTargets, ComboText, CountdownOverlay, CountdownText, FeedbackText,
+    GameplayRoot, HoleCell, HoleState, MusicStarted, ScoreText, ScheduledNote, ValidHarpNotes,
     COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
 };
 
@@ -32,7 +32,6 @@ pub struct GameplayCamera3D;
 #[derive(Component)]
 pub(super) struct NoteVisual3D {
     time: f64,
-    lane: u8,
     is_blow: bool,
     depth: f32,
 }
@@ -227,7 +226,7 @@ pub fn setup(
                 Mesh3d(note_mesh),
                 MeshMaterial3d(note_mat),
                 Transform::from_xyz(lane_x(event.hole), LANE_Y + NOTE_H * 0.5, FAR_Z),
-                NoteVisual3D { time: t, lane: event.hole, is_blow, depth },
+                NoteVisual3D { time: t, is_blow, depth },
                 ScheduledNote {
                     time: t,
                     hole: event.hole,
@@ -263,7 +262,7 @@ fn spawn_harmonica_3d(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-    chart: &crate::song::chart::HarpChart,
+    _chart: &crate::song::chart::HarpChart,
 ) {
     let body_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.18, 0.20, 0.25),
@@ -607,13 +606,22 @@ pub fn update_countdown(
 
 pub fn update_notes_3d(
     clock: Res<super::GameplayClock>,
-    mut notes: Query<(&NoteVisual3D, &mut Transform)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut notes: Query<(&NoteVisual3D, &ScheduledNote, &MeshMaterial3d<StandardMaterial>, &mut Transform)>,
 ) {
     let elapsed = clock.0;
-    for (note, mut tf) in &mut notes {
+    for (note, scheduled, mat_handle, mut tf) in &mut notes {
         let remaining = (note.time - elapsed) as f32;
         let z = HIT_Z - remaining / LOOKAHEAD as f32 * LANE_DEPTH - note.depth * 0.5;
         tf.translation.z = z;
+
+        // Flash the note gold when it has just been hit
+        if scheduled.hit {
+            if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
+                mat.emissive = LinearRgba::new(2.5, 2.0, 0.3, 1.0);
+                mat.base_color = Color::srgb(1.0, 0.9, 0.3);
+            }
+        }
     }
 }
 
@@ -650,6 +658,7 @@ pub fn update_holes_3d(
     time: Res<Time>,
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
+    targets: Res<ActiveTargets>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -680,10 +689,15 @@ pub fn update_holes_3d(
             if name == draw { draw_hit = true; }
         }
 
+        let hint = targets.0.iter().find(|(h, _)| *h == cell.0).map(|(_, b)| *b);
+        let hint_floor = if hint.is_some() { 0.18f32 } else { 0.0 };
+
         let (target, is_blow) = if blow_hit {
             (1.0f32, true)
         } else if draw_hit {
             (1.0f32, false)
+        } else if let Some(is_blow_hint) = hint {
+            (hint_floor, is_blow_hint)
         } else {
             (0.0f32, state.is_blow)
         };

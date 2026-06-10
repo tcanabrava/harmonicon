@@ -2,15 +2,15 @@ use bevy::{audio::AudioSource, prelude::*};
 
 use crate::{
     assets_management::GlobalFonts,
-    menu::{AppState, SelectedSong},
+    menu::SelectedSong,
     song::SongManifest,
     harmonica::{blow_label, draw_label, harp_display, semitone, twelve_bar},
 };
 
 use super::{
-    ActivePitches, CountdownOverlay, CountdownText, ComboText, FeedbackText, GameplayRoot,
-    HoleCell, HoleState, MusicStarted, NoteVisual, ScoreText, ScheduledNote, ValidHarpNotes,
-    COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT, LOOKAHEAD,
+    ActivePitches, ActiveTargets, CountdownOverlay, CountdownText, ComboText, FeedbackText,
+    GameplayRoot, HoleCell, HoleState, MusicStarted, NoteVisual, ScoreText, ScheduledNote,
+    ValidHarpNotes, COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT, LOOKAHEAD,
 };
 
 pub fn setup(
@@ -524,6 +524,7 @@ pub fn update_holes(
     time: Res<Time>,
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
+    targets: Res<ActiveTargets>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState)>,
@@ -553,10 +554,20 @@ pub fn update_holes(
             if name == draw { draw_hit = true; }
         }
 
+        // Floor brightness when a note for this hole is in the hit window,
+        // giving the player a visual cue about what to play next.
+        let hint = targets.0.iter()
+            .find(|(h, _)| *h == cell.0)
+            .map(|(_, b)| *b);
+        let hint_floor = if hint.is_some() { 0.18f32 } else { 0.0 };
+
         let (target, is_blow) = if blow_hit {
             (1.0f32, true)
         } else if draw_hit {
             (1.0f32, false)
+        } else if let Some(is_blow_hint) = hint {
+            // Nudge toward the hinted colour while fading in
+            (hint_floor, is_blow_hint)
         } else {
             (0.0f32, state.is_blow)
         };

@@ -21,6 +21,7 @@ impl Plugin for GameplayPlugin {
             .init_resource::<Score>()
             .init_resource::<HitFeedback>()
             .init_resource::<ScoringConfig>()
+            .init_resource::<ActiveTargets>()
             // Mode-gated setup
             .add_systems(
                 OnEnter(AppState::Playing),
@@ -41,7 +42,7 @@ impl Plugin for GameplayPlugin {
             // Shared systems: tick, pitch collection, scoring, display
             .add_systems(
                 Update,
-                (tick_clock, collect_pitches, score_notes, update_score_display)
+                (tick_clock, collect_pitches, update_active_targets, score_notes, update_score_display)
                     .chain()
                     .run_if(in_state(AppState::Playing)),
             )
@@ -57,7 +58,7 @@ impl Plugin for GameplayPlugin {
                     .chain()
                     .run_if(
                         in_state(AppState::Playing)
-                            .and(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
+                            .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                     ),
             )
             // 3D update chain
@@ -72,7 +73,7 @@ impl Plugin for GameplayPlugin {
                     .chain()
                     .run_if(
                         in_state(AppState::Playing)
-                            .and(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
+                            .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                     ),
             );
     }
@@ -97,6 +98,7 @@ pub struct Score {
     pub points: u32,
     pub combo: u32,
     pub max_combo: u32,
+    pub last_hit_time: f64, // clock time of the last successful hit, for decay
 }
 
 #[derive(Resource, Default)]
@@ -104,6 +106,11 @@ pub struct HitFeedback {
     pub quality: Option<HitQuality>,
     pub timer: f32,
 }
+
+/// Notes currently inside the good-hit window: (hole, is_blow).
+/// Updated every frame so hole-display systems can show a target hint.
+#[derive(Resource, Default)]
+pub struct ActiveTargets(pub Vec<(u8, bool)>);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum HitQuality {
@@ -161,13 +168,15 @@ pub struct CountdownText;
 /// Falls back to sensible defaults if the chart doesn't specify them.
 #[derive(Resource)]
 pub struct ScoringConfig {
-    pub perfect_window: f64,   // seconds
-    pub good_window: f64,      // seconds
-    pub miss_window: f64,      // seconds — after this the combo breaks
+    pub perfect_window: f64,
+    pub good_window: f64,
+    pub miss_window: f64,
     pub combo_enabled: bool,
     pub base_multiplier: f32,
-    pub step_multiplier: f32,  // added per note in the current combo
+    pub step_multiplier: f32,
     pub max_multiplier: f32,
+    /// Seconds without a hit before the combo resets. `None` = never decays.
+    pub decay_secs: Option<f64>,
 }
 
 impl Default for ScoringConfig {
@@ -180,6 +189,7 @@ impl Default for ScoringConfig {
             base_multiplier: 1.0,
             step_multiplier: 0.1,
             max_multiplier:  4.0,
+            decay_secs:      None,
         }
     }
 }
@@ -219,6 +229,7 @@ fn setup_scoring_config(
         config.base_multiplier  = combo.base_multiplier;
         config.step_multiplier  = combo.step_multiplier;
         config.max_multiplier   = combo.max_multiplier;
+        config.decay_secs       = combo.decay_ms.map(|ms| ms as f64 / 1000.0);
     }
 
     info!(
@@ -240,6 +251,22 @@ fn collect_pitches(mut reader: MessageReader<PitchEvent>, mut active: ResMut<Act
     }
 }
 
+fn update_active_targets(
+    clock: Res<GameplayClock>,
+    config: Res<ScoringConfig>,
+    notes: Query<&ScheduledNote>,
+    mut targets: ResMut<ActiveTargets>,
+) {
+    targets.0.clear();
+    if clock.0 < 0.0 { return; }
+    for note in &notes {
+        if note.hit || note.missed { continue; }
+        if (clock.0 - note.time).abs() <= config.good_window {
+            targets.0.push((note.hole, note.is_blow));
+        }
+    }
+}
+
 fn score_notes(
     clock: Res<GameplayClock>,
     active: Res<ActivePitches>,
@@ -251,6 +278,15 @@ fn score_notes(
 ) {
     // Don't score during the countdown
     if clock.0 < 0.0 { return; }
+
+    // Combo decay: reset if player hasn't hit a note in decay_secs
+    if config.combo_enabled {
+        if let Some(decay) = config.decay_secs {
+            if score.combo > 0 && clock.0 - score.last_hit_time > decay {
+                score.combo = 0;
+            }
+        }
+    }
 
     // Only consider pitches the harmonica can produce
     let harp_pitches: Vec<String> = active
@@ -283,6 +319,7 @@ fn score_notes(
         if !harp_pitches.contains(&note.expected_pitch) { continue; }
 
         note.hit = true;
+        score.last_hit_time = clock.0;
         score.combo += 1;
         score.max_combo = score.max_combo.max(score.combo);
 
