@@ -2,8 +2,11 @@ mod gameplay;
 mod menu;
 mod song;
 mod audio_system;
+mod assets_management;
 
 use bevy::prelude::*;
+
+use assets_management::AssetsManagementPlugin;
 use gameplay::GameplayPlugin;
 use menu::{AppState, MenuPlugin};
 use song::SongPlugin;
@@ -14,6 +17,11 @@ use audio_system::{
     pitch_detect::PitchEvent,
 };
 
+#[derive(Resource)]
+pub struct GameFonts {
+    pub gameplay: Handle<Font>,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -23,7 +31,7 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins((SongPlugin, MenuPlugin, GameplayPlugin))
+        .add_plugins((AssetsManagementPlugin, SongPlugin, MenuPlugin, GameplayPlugin))
         .add_message::<PitchEvent>()
         .add_systems(Startup, spawn_camera)
         .add_systems(OnEnter(AppState::Playing), setup_audio)
