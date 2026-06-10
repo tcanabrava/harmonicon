@@ -1,10 +1,12 @@
-use std::fs::DirEntry;
+use std::collections::HashMap;
 
-use bevy::{ecs::error::info, prelude::*};
+use bevy::prelude::*;
 
 use crate::song::SongManifest;
 
 pub struct MenuPlugin;
+
+// ── App-level states ──────────────────────────────────────────────────────────
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AppState {
@@ -14,6 +16,20 @@ pub enum AppState {
     SongLoading,
     Playing,
 }
+
+// ── Menu sub-states (only active while AppState == Menu) ──────────────────────
+
+#[derive(SubStates, Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[source(AppState = AppState::Menu)]
+enum MenuPage {
+    #[default]
+    Main,
+    Play,
+    ArtistList,
+    SongList,
+}
+
+// ── Public resources ──────────────────────────────────────────────────────────
 
 #[derive(Resource)]
 pub struct SelectedSong(pub Handle<SongManifest>);
@@ -25,112 +41,129 @@ pub struct SongEntry {
     pub asset_path: String,
 }
 
+/// Songs indexed by artist name. Each artist maps to a sorted list of songs.
 #[derive(Resource, Default)]
-pub struct AvailableSongs(pub Vec<SongEntry>);
+pub struct AvailableSongs(pub HashMap<String, Vec<SongEntry>>);
 
+// ── Private resources / components ───────────────────────────────────────────
+
+#[derive(Resource, Default)]
+struct SelectedArtist(String);
+
+/// Marks every entity that belongs to a menu screen so `cleanup_menu` can
+/// remove it in one sweep when the page changes.
 #[derive(Component)]
 struct MenuRoot;
 
 #[derive(Component)]
-struct SongButton(String);
+enum MenuButton {
+    // Main menu
+    Play,
+    Options,
+    Credits,
+    Quit,
+    // Play sub-menu
+    PlaySong,
+    JamSession,
+    // Drill-down
+    Artist(String),
+    Song(String), // carries the asset path
+    // Back navigation — each variant knows exactly where to return
+    BackToMain,
+    BackToPlay,
+    BackToArtistList,
+}
+
+// ── Plugin ────────────────────────────────────────────────────────────────────
 
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<AppState>()
-        .init_resource::<AvailableSongs>()
-
-        .add_systems(OnEnter(AppState::Startup), scan_all_songs)
-        .add_systems(Update, startup_complete.run_if(in_state(AppState::Startup)))
-
-        .add_systems(OnEnter(AppState::Menu), setup_menu)
-        .add_systems(Update,
-            handle_song_selection.run_if(in_state(AppState::Menu)))
-        .add_systems(OnExit(AppState::Menu), cleanup_menu)
-        .add_systems(Update,
-            check_loading.run_if(in_state(AppState::SongLoading)))
-        ;
+            .add_sub_state::<MenuPage>()
+            .init_resource::<AvailableSongs>()
+            .init_resource::<SelectedArtist>()
+            // Startup: scan disk once, then transition straight to Menu.
+            .add_systems(OnEnter(AppState::Startup), scan_all_songs)
+            .add_systems(Update, startup_complete.run_if(in_state(AppState::Startup)))
+            // Each page manages its own lifetime.
+            .add_systems(OnEnter(MenuPage::Main),       setup_main_menu)
+            .add_systems(OnExit(MenuPage::Main),        cleanup_menu)
+            .add_systems(OnEnter(MenuPage::Play),       setup_play_menu)
+            .add_systems(OnExit(MenuPage::Play),        cleanup_menu)
+            .add_systems(OnEnter(MenuPage::ArtistList), setup_artist_list)
+            .add_systems(OnExit(MenuPage::ArtistList),  cleanup_menu)
+            .add_systems(OnEnter(MenuPage::SongList),   setup_song_list)
+            .add_systems(OnExit(MenuPage::SongList),    cleanup_menu)
+            // Input and hover are independent — two separate registrations.
+            .add_systems(Update, handle_menu_input.run_if(in_state(AppState::Menu)))
+            .add_systems(Update, button_hover.run_if(in_state(AppState::Menu)))
+            // Wait for the asset to finish loading before starting gameplay.
+            .add_systems(Update, check_loading.run_if(in_state(AppState::SongLoading)));
     }
 }
 
-fn startup_complete(mut next_state: ResMut<NextState<AppState>>) {
-    info!("Startup complete");
-    next_state.set(AppState::Menu);
-}
+// ── Startup ───────────────────────────────────────────────────────────────────
 
-fn scan_artists(artist_dir: &DirEntry, entries: &mut Vec<SongEntry>) {
-    if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-        return;
-    }
-    let artist = artist_dir.file_name().to_string_lossy().into_owned();
-
-    let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
-        return;
-    };
-
-    for song_dir in song_dirs.flatten() {
-        if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            continue;
-        }
-        if !song_dir.path().join("chart.harpchart").exists() {
-            continue;
-        }
-        let name = song_dir.file_name().to_string_lossy().into_owned();
-        entries.push(SongEntry {
-            asset_path: format!("songs/{artist}/{name}/chart.harpchart"),
-            artist: artist.clone(),
-            name,
-        });
-    }
+fn startup_complete(mut next: ResMut<NextState<AppState>>) {
+    next.set(AppState::Menu);
 }
 
 fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
     let songs_root = std::path::Path::new("assets/songs");
-
     let Ok(artists) = std::fs::read_dir(songs_root) else {
         warn!("No songs directory found at assets/songs/");
         return;
     };
 
-    let mut entries = Vec::<SongEntry>::new();
-
     for artist_dir in artists.flatten() {
-        scan_artists(&artist_dir, &mut entries);
+        if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        let artist = artist_dir.file_name().to_string_lossy().into_owned();
+        let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
+            continue;
+        };
+        for song_dir in song_dirs.flatten() {
+            if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            if !song_dir.path().join("chart.harpchart").exists() {
+                continue;
+            }
+            let name = song_dir.file_name().to_string_lossy().into_owned();
+            available
+                .0
+                .entry(artist.clone())
+                .or_default()
+                .push(SongEntry {
+                    asset_path: format!("songs/{artist}/{name}/chart.harpchart"),
+                    artist: artist.clone(),
+                    name,
+                });
+        }
     }
 
-    available.0 = entries;
-
-    info!("Found {} song(s)", available.0.len());
+    let total: usize = available.0.values().map(|v| v.len()).sum();
+    info!(
+        "Found {} song(s) across {} artist(s)",
+        total,
+        available.0.len()
+    );
 }
 
-fn ui_spawn_song_button(
-    song: &SongEntry,
-) -> impl Bundle {
-    (
-        Button,
-        Node {
-            padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
-            ..default()
-        },
-        BackgroundColor(Color::srgb(0.18, 0.18, 0.28)),
-        SongButton(song.asset_path.clone()),
-        children![(
-            Text::new(format!("{} — {}", song.artist, song.name)),
-            TextFont { font_size: 20.0, ..default() },
-            TextColor(Color::WHITE),
-        )],
-    )
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+fn menu_bg() -> Color {
+    Color::srgb(0.05, 0.05, 0.08)
+}
+fn btn_default() -> Color {
+    Color::srgb(0.14, 0.14, 0.22)
 }
 
-fn ui_no_song_found() -> impl Bundle {
-    (
-        Text::new("No songs found — add folders under assets/songs/<artist>/<song>/"),
-        TextFont { font_size: 16.0, ..default() },
-        TextColor(Color::srgb(0.8, 0.4, 0.4)),
-    )
-}
-
-fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
-    commands
+/// Spawn a full-screen centred column with a title and optional subtitle.
+/// Returns the entity so the caller can add button children afterwards.
+fn spawn_menu_root(commands: &mut Commands, title: &str, subtitle: Option<&str>) -> Entity {
+    let root = commands
         .spawn((
             Node {
                 width: Val::Percent(100.0),
@@ -141,47 +174,175 @@ fn setup_menu(mut commands: Commands, songs: Res<AvailableSongs>) {
                 row_gap: Val::Px(16.0),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
+            BackgroundColor(menu_bg()),
             MenuRoot,
-            children![(
-                Text::new("Harmonicon"),
-                TextFont { font_size: 52.0, ..default() },
-                TextColor(Color::WHITE),
-            ),
-            (
-                Text::new("Choose a song"),
-                TextFont { font_size: 22.0, ..default() },
-                TextColor(Color::srgb(0.6, 0.6, 0.7)),
-            )]
-        ),
-        )
-        .with_children(|root| {
-            if songs.0.is_empty() {
-                root.spawn(ui_no_song_found());
-                return;
-            }
+        ))
+        .id();
 
-            for song in &songs.0 {
-                root.spawn(ui_spawn_song_button(song));
-            }
-        });
+    commands.entity(root).with_children(|p| {
+        p.spawn((
+            Text::new(title.to_string()),
+            TextFont { font_size: 52.0, ..default() },
+            TextColor(Color::WHITE),
+        ));
+        if let Some(sub) = subtitle {
+            p.spawn((
+                Text::new(sub.to_string()),
+                TextFont { font_size: 20.0, ..default() },
+                TextColor(Color::srgb(0.6, 0.6, 0.7)),
+            ));
+        }
+    });
+    root
 }
 
-fn handle_song_selection(
-    buttons: Query<(&Interaction, &SongButton), Changed<Interaction>>,
+/// Spawn a single button as a child of `parent_entity`.
+fn spawn_button(commands: &mut Commands, parent: Entity, label: &str, btn: MenuButton) {
+    let button = commands
+        .spawn((
+            Button,
+            Node {
+                min_width: Val::Px(260.0),
+                padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(btn_default()),
+            btn,
+        ))
+        .id();
+
+    commands.entity(button).with_children(|b| {
+        b.spawn((
+            Text::new(label.to_string()),
+            TextFont { font_size: 20.0, ..default() },
+            TextColor(Color::WHITE),
+        ));
+    });
+
+    commands.entity(parent).add_child(button);
+}
+
+// ── Menu pages ────────────────────────────────────────────────────────────────
+
+fn setup_main_menu(mut commands: Commands) {
+    let root = spawn_menu_root(&mut commands, "Harmonicon", None);
+    spawn_button(&mut commands, root, "Play",    MenuButton::Play);
+    spawn_button(&mut commands, root, "Options", MenuButton::Options);
+    spawn_button(&mut commands, root, "Credits", MenuButton::Credits);
+    spawn_button(&mut commands, root, "Quit",    MenuButton::Quit);
+}
+
+fn setup_play_menu(mut commands: Commands) {
+    let root = spawn_menu_root(&mut commands, "Play", None);
+    spawn_button(&mut commands, root, "Play Song",     MenuButton::PlaySong);
+    spawn_button(&mut commands, root, "Jam Session",   MenuButton::JamSession);
+    spawn_button(&mut commands, root, "\u{2190} Back", MenuButton::BackToMain);
+}
+
+fn setup_artist_list(mut commands: Commands, songs: Res<AvailableSongs>) {
+    let root = spawn_menu_root(&mut commands, "Select Artist", None);
+
+    if songs.0.is_empty() {
+        let msg = commands
+            .spawn((
+                Text::new(
+                    "No songs found. Add folders under assets/songs/<artist>/<song>/",
+                ),
+                TextFont { font_size: 16.0, ..default() },
+                TextColor(Color::srgb(0.8, 0.4, 0.4)),
+            ))
+            .id();
+        commands.entity(root).add_child(msg);
+    } else {
+        let mut artists: Vec<&String> = songs.0.keys().collect();
+        artists.sort_unstable();
+        for artist in artists {
+            let n = songs.0[artist].len();
+            let label = format!("{artist}  ({n} song{})", if n == 1 { "" } else { "s" });
+            spawn_button(&mut commands, root, &label, MenuButton::Artist(artist.clone()));
+        }
+    }
+    spawn_button(&mut commands, root, "\u{2190} Back", MenuButton::BackToPlay);
+}
+
+fn setup_song_list(
+    mut commands: Commands,
+    songs: Res<AvailableSongs>,
+    selected_artist: Res<SelectedArtist>,
+) {
+    let subtitle = format!("by {}", selected_artist.0);
+    let root = spawn_menu_root(&mut commands, "Select Song", Some(&subtitle));
+
+    if let Some(artist_songs) = songs.0.get(&selected_artist.0) {
+        let mut sorted = artist_songs.clone();
+        sorted.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+        for song in &sorted {
+            spawn_button(
+                &mut commands,
+                root,
+                &song.name,
+                MenuButton::Song(song.asset_path.clone()),
+            );
+        }
+    }
+    spawn_button(&mut commands, root, "\u{2190} Back", MenuButton::BackToArtistList);
+}
+
+// ── Input + hover ─────────────────────────────────────────────────────────────
+
+fn handle_menu_input(
+    buttons: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
+    mut next_page: ResMut<NextState<MenuPage>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut selected_artist: ResMut<SelectedArtist>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
-    mut next_state: ResMut<NextState<AppState>>,
+    mut app_exit: MessageWriter<AppExit>,
 ) {
-    for (interaction, song_button) in &buttons {
-        if *interaction == Interaction::Pressed {
-            info!("Loading song: {}", song_button.0);
-            let handle = asset_server.load::<SongManifest>(&song_button.0);
-            commands.insert_resource(SelectedSong(handle));
-            next_state.set(AppState::SongLoading);
+    for (interaction, button) in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        match button {
+            MenuButton::Play       => next_page.set(MenuPage::Play),
+            MenuButton::Options    => { /* TODO */ }
+            MenuButton::Credits    => { /* TODO */ }
+            MenuButton::Quit       => { app_exit.write(AppExit::Success); }
+            MenuButton::PlaySong   => next_page.set(MenuPage::ArtistList),
+            MenuButton::JamSession => { /* TODO */ }
+            MenuButton::Artist(a)  => {
+                selected_artist.0 = a.clone();
+                next_page.set(MenuPage::SongList);
+            }
+            MenuButton::Song(path) => {
+                let handle = asset_server.load::<SongManifest>(path.clone());
+                commands.insert_resource(SelectedSong(handle));
+                next_state.set(AppState::SongLoading);
+            }
+            MenuButton::BackToMain       => next_page.set(MenuPage::Main),
+            MenuButton::BackToPlay       => next_page.set(MenuPage::Play),
+            MenuButton::BackToArtistList => next_page.set(MenuPage::ArtistList),
         }
     }
 }
+
+fn button_hover(
+    mut buttons: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<MenuButton>),
+    >,
+) {
+    for (interaction, mut bg) in &mut buttons {
+        *bg = BackgroundColor(match interaction {
+            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
+            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
+            Interaction::None    => btn_default(),
+        });
+    }
+}
+
+// ── Loading + cleanup ─────────────────────────────────────────────────────────
 
 fn check_loading(
     selected: Res<SelectedSong>,
