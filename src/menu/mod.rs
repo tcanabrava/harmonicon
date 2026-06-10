@@ -115,13 +115,13 @@ fn spawn_menu_root(commands: &mut Commands, title: &str, subtitle: Option<&str>)
     commands.entity(root).with_children(|p| {
         p.spawn((
             Text::new(title.to_string()),
-            TextFont { font_size: 52.0, ..default() },
+            TextFont { font_size: FontSize::Px(52.0), ..default() },
             TextColor(Color::WHITE),
         ));
         if let Some(sub) = subtitle {
             p.spawn((
                 Text::new(sub.to_string()),
-                TextFont { font_size: 20.0, ..default() },
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
                 TextColor(Color::srgb(0.6, 0.6, 0.7)),
             ));
         }
@@ -148,7 +148,7 @@ fn spawn_button(commands: &mut Commands, parent: Entity, label: &str, btn: MenuB
     commands.entity(button).with_children(|b| {
         b.spawn((
             Text::new(label.to_string()),
-            TextFont { font_size: 20.0, ..default() },
+            TextFont { font_size: FontSize::Px(20.0), ..default() },
             TextColor(Color::WHITE),
         ));
     });
@@ -182,7 +182,7 @@ fn setup_artist_list(mut commands: Commands, songs: Res<AvailableSongs>) {
                 Text::new(
                     "No songs found. Add folders under assets/songs/<artist>/<song>/",
                 ),
-                TextFont { font_size: 16.0, ..default() },
+                TextFont { font_size: FontSize::Px(16.0), ..default() },
                 TextColor(Color::srgb(0.8, 0.4, 0.4)),
             ))
             .id();

@@ -222,12 +222,12 @@ fn ui_12_bar_blues_grid(grid: &mut ChildSpawnerCommands, chords: &[String], key:
                 .with_children(|cell| {
                     cell.spawn((
                         Text::new(chord),
-                        TextFont { font_size: 17.0, ..default() },
+                        TextFont { font_size: FontSize::Px(17.0), ..default() },
                         TextColor(Color::WHITE),
                     ));
                     cell.spawn((
                         Text::new(format!("{}", idx + 1)),
-                        TextFont { font_size: 9.0, ..default() },
+                        TextFont { font_size: FontSize::Px(9.0), ..default() },
                         TextColor(Color::srgb(0.45, 0.45, 0.55)),
                     ));
                 });
@@ -325,7 +325,7 @@ fn ui_note_highway(hw: &mut ChildSpawnerCommands, chart: &HarpChart) {
             .with_children(|note_node| {
                 note_node.spawn((
                     Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
-                    TextFont { font_size: 12.0, ..default() },
+                    TextFont { font_size: FontSize::Px(12.0), ..default() },
                     TextColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
                 ));
             });
@@ -362,17 +362,17 @@ fn ui_harmonica_holes(harp_col: &mut ChildSpawnerCommands, chart: &HarpChart) {
             .with_children(|cell| {
                 cell.spawn((
                     Text::new(b),
-                    TextFont { font_size: 11.0, ..default() },
+                    TextFont { font_size: FontSize::Px(11.0), ..default() },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 cell.spawn((
                     Text::new(format!("{hole}")),
-                    TextFont { font_size: 16.0, ..default() },
+                    TextFont { font_size: FontSize::Px(16.0), ..default() },
                     TextColor(Color::WHITE),
                 ));
                 cell.spawn((
                     Text::new(d),
-                    TextFont { font_size: 11.0, ..default() },
+                    TextFont { font_size: FontSize::Px(11.0), ..default() },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
             });
@@ -388,12 +388,12 @@ fn ui_harmonica_holes(harp_col: &mut ChildSpawnerCommands, chart: &HarpChart) {
     .with_children(|leg| {
         leg.spawn((
             Text::new("\u{25A0} BLOW"),
-            TextFont { font_size: 11.0, ..default() },
+            TextFont { font_size: FontSize::Px(11.0), ..default() },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
         leg.spawn((
             Text::new("\u{25A0} DRAW"),
-            TextFont { font_size: 11.0, ..default() },
+            TextFont { font_size: FontSize::Px(11.0), ..default() },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));
     });
@@ -452,17 +452,17 @@ fn setup_gameplay(
             }, children![
                 (
                     Text::new(title),
-                    TextFont { font_size: 22.0, ..default() },
+                    TextFont { font_size: FontSize::Px(22.0), ..default() },
                     TextColor(Color::WHITE),
                 ),
                 (
                     Text::new(info),
-                    TextFont { font_size: 13.0, ..default() },
+                    TextFont { font_size: FontSize::Px(13.0), ..default() },
                     TextColor(Color::srgb(0.60, 0.65, 0.75)),
                 ),
                 (
                     Text::new(harp_info),
-                    TextFont { font_size: 12.0, ..default() },
+                    TextFont { font_size: FontSize::Px(12.0), ..default() },
                     TextColor(Color::srgb(0.45, 0.72, 0.55)),
                 )
             ]));
@@ -528,12 +528,12 @@ fn setup_gameplay(
             .with_children(|ov| {
                 ov.spawn((
                     Text::new("GET READY"),
-                    TextFont { font_size: 22.0, ..default() },
+                    TextFont { font_size: FontSize::Px(22.0), ..default() },
                     TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
                 ));
                 ov.spawn((
                     Text::new("3"),
-                    TextFont { font_size: 120.0, ..default() },
+                    TextFont { font_size: FontSize::Px(120.0), ..default() },
                     TextColor(Color::WHITE),
                     CountdownText,
                 ));
@@ -574,7 +574,7 @@ fn update_countdown(
     let remaining = -clock.0; // positive, counts down
     let n = remaining.ceil() as u32;
     let frac = remaining.fract() as f32; // 0 = just changed, 1 = about to change
-    let font_size = 80.0 + (1.0 - frac) * 80.0; // 160 → 80 px over each second
+    let font_size = FontSize::Px(80.0 + (1.0 - frac) * 80.0); // 160 → 80 px over each second
 
     for (mut t, mut font) in &mut text {
         t.0 = format!("{n}");
