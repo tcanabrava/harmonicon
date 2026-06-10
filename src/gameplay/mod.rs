@@ -5,11 +5,10 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 
 use crate::{
-    menu::{AppState, GameplayMode},
+    menu::{AppState, GameplayMode, SelectedSong},
     pitch_detect::{PitchEvent, PitchInfo},
+    song::SongManifest,
 };
-
-pub use gameplay_3d::GameplayCamera3D;
 
 pub struct GameplayPlugin;
 
@@ -21,11 +20,13 @@ impl Plugin for GameplayPlugin {
             .init_resource::<ValidHarpNotes>()
             .init_resource::<Score>()
             .init_resource::<HitFeedback>()
+            .init_resource::<ScoringConfig>()
             // Mode-gated setup
             .add_systems(
                 OnEnter(AppState::Playing),
                 (
                     reset_score,
+                    setup_scoring_config,
                     gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                     gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 ),
@@ -156,6 +157,33 @@ pub struct CountdownText;
 #[derive(Component)] pub struct ComboText;
 #[derive(Component)] pub struct FeedbackText;
 
+/// Scoring parameters resolved from the song's chart at game start.
+/// Falls back to sensible defaults if the chart doesn't specify them.
+#[derive(Resource)]
+pub struct ScoringConfig {
+    pub perfect_window: f64,   // seconds
+    pub good_window: f64,      // seconds
+    pub miss_window: f64,      // seconds — after this the combo breaks
+    pub combo_enabled: bool,
+    pub base_multiplier: f32,
+    pub step_multiplier: f32,  // added per note in the current combo
+    pub max_multiplier: f32,
+}
+
+impl Default for ScoringConfig {
+    fn default() -> Self {
+        Self {
+            perfect_window:  0.060,
+            good_window:     0.130,
+            miss_window:     0.130,
+            combo_enabled:   true,
+            base_multiplier: 1.0,
+            step_multiplier: 0.1,
+            max_multiplier:  4.0,
+        }
+    }
+}
+
 // ── Shared constants ──────────────────────────────────────────────────────────
 
 pub const HOLE_COUNT: usize = 10;
@@ -164,8 +192,6 @@ pub const LANE_PCT: f32 = 100.0 / HOLE_COUNT as f32;
 pub const HIT_H_PCT: f32 = 7.0;
 pub const LOOKAHEAD: f64 = 3.0;
 
-const PERFECT_WINDOW: f64 = 0.060; // ±60 ms
-const GOOD_WINDOW: f64    = 0.130; // ±130 ms
 const PERFECT_POINTS: u32 = 100;
 const GOOD_POINTS: u32    = 50;
 
@@ -174,6 +200,34 @@ const GOOD_POINTS: u32    = 50;
 fn reset_score(mut score: ResMut<Score>, mut feedback: ResMut<HitFeedback>) {
     *score    = Score::default();
     *feedback = HitFeedback::default();
+}
+
+fn setup_scoring_config(
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut config: ResMut<ScoringConfig>,
+) {
+    let Some(manifest) = manifests.get(&selected.0) else { return };
+    let s = &manifest.chart.scoring;
+
+    config.perfect_window = s.perfect_window_ms as f64 / 1000.0;
+    config.good_window    = s.good_window_ms    as f64 / 1000.0;
+    config.miss_window    = s.miss_window_ms    as f64 / 1000.0;
+
+    if let Some(combo) = &s.combo {
+        config.combo_enabled    = combo.enabled;
+        config.base_multiplier  = combo.base_multiplier;
+        config.step_multiplier  = combo.step_multiplier;
+        config.max_multiplier   = combo.max_multiplier;
+    }
+
+    info!(
+        "Scoring config: perfect={:.0}ms good={:.0}ms miss={:.0}ms combo={}",
+        config.perfect_window * 1000.0,
+        config.good_window    * 1000.0,
+        config.miss_window    * 1000.0,
+        config.combo_enabled,
+    );
 }
 
 fn tick_clock(mut clock: ResMut<GameplayClock>, time: Res<Time>) {
@@ -190,6 +244,7 @@ fn score_notes(
     clock: Res<GameplayClock>,
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
+    config: Res<ScoringConfig>,
     mut notes: Query<&mut ScheduledNote>,
     mut score: ResMut<Score>,
     mut feedback: ResMut<HitFeedback>,
@@ -210,15 +265,19 @@ fn score_notes(
 
         let offset = clock.0 - note.time; // positive = clock is past the note
 
-        // Passed the good window without being hit
-        if offset > GOOD_WINDOW {
+        // Note passed the miss window — combo breaks
+        if offset > config.miss_window {
             note.missed = true;
-            score.combo = 0;
+            if config.combo_enabled { score.combo = 0; }
             continue;
         }
 
-        // Not yet in the window
-        if offset < -GOOD_WINDOW { continue; }
+        // Note not yet inside the scoring window
+        if offset < -config.good_window { continue; }
+
+        // Note is unhittable (past good window) but miss_window hasn't been
+        // reached yet — wait silently without breaking the combo
+        if offset > config.good_window { continue; }
 
         // In window — check if the player is playing this note right now
         if !harp_pitches.contains(&note.expected_pitch) { continue; }
@@ -227,15 +286,20 @@ fn score_notes(
         score.combo += 1;
         score.max_combo = score.max_combo.max(score.combo);
 
-        let quality = if offset.abs() <= PERFECT_WINDOW {
+        let quality = if offset.abs() <= config.perfect_window {
             HitQuality::Perfect
         } else {
             HitQuality::Good
         };
 
-        let base       = if quality == HitQuality::Perfect { PERFECT_POINTS } else { GOOD_POINTS };
-        let multiplier = (1 + score.combo / 10).min(4) as u32;
-        score.points  += base * multiplier;
+        let base = if quality == HitQuality::Perfect { PERFECT_POINTS } else { GOOD_POINTS };
+        let multiplier = if config.combo_enabled {
+            (config.base_multiplier + score.combo as f32 * config.step_multiplier)
+                .min(config.max_multiplier)
+        } else {
+            1.0
+        };
+        score.points += (base as f32 * multiplier) as u32;
 
         feedback.quality = Some(quality);
         feedback.timer   = 0.75;
