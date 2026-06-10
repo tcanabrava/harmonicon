@@ -194,6 +194,48 @@ fn build_valid_notes(chart: &HarpChart) -> HashSet<String> {
     set
 }
 
+fn ui_12_bar_blues_grid(grid: &mut ChildSpawnerCommands, chords: &[String], key: &str) {
+    for row in 0..3usize {
+        grid.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(3.0),
+            ..default()
+        })
+        .with_children(|r| {
+            for col in 0..4usize {
+                let idx = row * 4 + col;
+                let chord = chords[idx].clone();
+                r.spawn((
+                    Node {
+                        width: Val::Vw(6.5),
+                        height: Val::Vh(5.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(bar_bg(idx, key)),
+                    BorderColor::all(Color::srgb(0.25, 0.25, 0.38)),
+                    BarCell(idx),
+                ))
+                .with_children(|cell| {
+                    cell.spawn((
+                        Text::new(chord),
+                        TextFont { font_size: 17.0, ..default() },
+                        TextColor(Color::WHITE),
+                    ));
+                    cell.spawn((
+                        Text::new(format!("{}", idx + 1)),
+                        TextFont { font_size: 9.0, ..default() },
+                        TextColor(Color::srgb(0.45, 0.45, 0.55)),
+                    ));
+                });
+            }
+        });
+    }
+}
+
 fn setup_gameplay(
     mut commands: Commands,
     selected: Res<SelectedSong>,
@@ -270,45 +312,7 @@ fn setup_gameplay(
                 ..default()
             })
             .with_children(|grid| {
-                for row in 0..3usize {
-                    grid.spawn(Node {
-                        flex_direction: FlexDirection::Row,
-                        column_gap: Val::Px(3.0),
-                        ..default()
-                    })
-                    .with_children(|r| {
-                        for col in 0..4usize {
-                            let idx = row * 4 + col;
-                            let chord = chords[idx].clone();
-                            r.spawn((
-                                Node {
-                                    width: Val::Vw(6.5),
-                                    height: Val::Vh(5.0),
-                                    flex_direction: FlexDirection::Column,
-                                    align_items: AlignItems::Center,
-                                    justify_content: JustifyContent::Center,
-                                    border: UiRect::all(Val::Px(1.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(bar_bg(idx, key)),
-                                BorderColor::all(Color::srgb(0.25, 0.25, 0.38)),
-                                BarCell(idx),
-                            ))
-                            .with_children(|cell| {
-                                cell.spawn((
-                                    Text::new(chord),
-                                    TextFont { font_size: 17.0, ..default() },
-                                    TextColor(Color::WHITE),
-                                ));
-                                cell.spawn((
-                                    Text::new(format!("{}", idx + 1)),
-                                    TextFont { font_size: 9.0, ..default() },
-                                    TextColor(Color::srgb(0.45, 0.45, 0.55)),
-                                ));
-                            });
-                        }
-                    });
-                }
+                ui_12_bar_blues_grid(grid, &chords, key);
             });
 
             // ── Note highway ──────────────────────────────────────────────
