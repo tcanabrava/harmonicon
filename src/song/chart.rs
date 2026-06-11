@@ -188,6 +188,43 @@ pub struct Combo {
     pub decay_ms: Option<u32>,
 }
 
+/// Convert a tick position to absolute seconds, accounting for tempo changes.
+/// `resolution` is ticks per quarter note; `tempo_map` must be sorted by tick.
+/// Assumes the first entry covers tick 0 (standard for MIDI-derived charts).
+pub fn tick_to_seconds(tick: u64, resolution: u32, tempo_map: &[TempoPoint]) -> f64 {
+    if tempo_map.is_empty() || resolution == 0 {
+        return 0.0;
+    }
+    let mut elapsed  = 0.0f64;
+    let mut prev_tick = tempo_map[0].tick;
+    let mut prev_bpm  = tempo_map[0].bpm as f64;
+
+    for point in tempo_map.iter().skip(1) {
+        if tick <= prev_tick { break; }
+        let seg_end   = point.tick.min(tick);
+        let seg_ticks = seg_end - prev_tick;
+        elapsed += (seg_ticks as f64 / resolution as f64) * (60.0 / prev_bpm);
+        if tick <= point.tick { return elapsed; }
+        prev_tick = point.tick;
+        prev_bpm  = point.bpm as f64;
+    }
+    if tick > prev_tick {
+        let remaining = tick - prev_tick;
+        elapsed += (remaining as f64 / resolution as f64) * (60.0 / prev_bpm);
+    }
+    elapsed
+}
+
+/// Return the time-signature string active at `tick`, scanning `time_sig_map`
+/// (which must be sorted by tick). Returns `None` when the map is empty.
+pub fn time_sig_at_tick(tick: u64, time_sig_map: &[TimeSigPoint]) -> Option<&str> {
+    time_sig_map
+        .iter()
+        .rev()
+        .find(|p| p.tick <= tick)
+        .map(|p| p.time_signature.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,6 +329,73 @@ mod tests {
         assert!(combo.enabled);
         assert_eq!(combo.step_multiplier, 0.25);
         assert_eq!(combo.decay_ms, Some(2000));
+    }
+
+    // ── tick_to_seconds ───────────────────────────────────────────────────────
+
+    #[test]
+    fn tick_zero_is_zero_seconds() {
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
+        assert_eq!(tick_to_seconds(0, 480, &map), 0.0);
+    }
+
+    #[test]
+    fn one_beat_at_120bpm() {
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
+        let secs = tick_to_seconds(480, 480, &map);
+        assert!((secs - 0.5).abs() < 1e-9, "got {secs}");
+    }
+
+    #[test]
+    fn tempo_change_midway() {
+        // 0..960 @ 120 bpm (2 beats = 1 s), then 960..1440 @ 180 bpm (1 beat = 1/3 s)
+        let map = vec![
+            TempoPoint { tick: 0,   bpm: 120.0 },
+            TempoPoint { tick: 960, bpm: 180.0 },
+        ];
+        let secs = tick_to_seconds(1440, 480, &map);
+        assert!((secs - (1.0 + 1.0 / 3.0)).abs() < 1e-9, "got {secs}");
+    }
+
+    #[test]
+    fn tick_at_tempo_change_boundary() {
+        let map = vec![
+            TempoPoint { tick: 0,   bpm: 120.0 },
+            TempoPoint { tick: 960, bpm: 180.0 },
+        ];
+        let secs = tick_to_seconds(960, 480, &map);
+        assert!((secs - 1.0).abs() < 1e-9, "got {secs}");
+    }
+
+    #[test]
+    fn empty_tempo_map_returns_zero() {
+        assert_eq!(tick_to_seconds(999, 480, &[]), 0.0);
+    }
+
+    // ── time_sig_at_tick ──────────────────────────────────────────────────────
+
+    #[test]
+    fn time_sig_at_start() {
+        let map = vec![
+            TimeSigPoint { tick: 0,   time_signature: "4/4".into() },
+            TimeSigPoint { tick: 960, time_signature: "3/4".into() },
+        ];
+        assert_eq!(time_sig_at_tick(0, &map), Some("4/4"));
+    }
+
+    #[test]
+    fn time_sig_changes_at_tick() {
+        let map = vec![
+            TimeSigPoint { tick: 0,   time_signature: "4/4".into() },
+            TimeSigPoint { tick: 960, time_signature: "3/4".into() },
+        ];
+        assert_eq!(time_sig_at_tick(960, &map), Some("3/4"));
+        assert_eq!(time_sig_at_tick(959, &map), Some("4/4"));
+    }
+
+    #[test]
+    fn time_sig_empty_map_returns_none() {
+        assert_eq!(time_sig_at_tick(0, &[]), None);
     }
 
     #[test]

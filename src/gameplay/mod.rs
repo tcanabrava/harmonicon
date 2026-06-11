@@ -3,7 +3,7 @@ mod gameplay_3d;
 mod scoring;
 
 use std::collections::HashSet;
-use bevy::prelude::*;
+use bevy::{audio::AudioSource, prelude::*};
 use scoring::{
     classify_note, combo_label, compute_multiplier, compute_points,
     should_decay_combo, NoteOutcome,
@@ -13,7 +13,7 @@ use crate::{
     assets_management::GlobalFonts,
     menu::{AppState, GameplayMode, SelectedSong},
     pitch_detect::{PitchEvent, PitchInfo},
-    song::SongManifest,
+    song::{chart::Modifier, SongManifest},
 };
 
 pub struct GameplayPlugin;
@@ -29,6 +29,7 @@ impl Plugin for GameplayPlugin {
             .init_resource::<ScoringConfig>()
             .init_resource::<ActiveTargets>()
             .init_resource::<Paused>()
+            .init_resource::<LoopConfig>()
             // Setup: shared pause menu + mode-specific scenes
             .add_systems(
                 OnEnter(AppState::Playing),
@@ -56,7 +57,7 @@ impl Plugin for GameplayPlugin {
             // Gameplay-logic chains only run when not paused
             .add_systems(
                 Update,
-                (tick_clock, collect_pitches, update_active_targets, score_notes, update_score_display)
+                (tick_clock, handle_loop_boundary, collect_pitches, update_active_targets, score_notes, update_score_display)
                     .chain()
                     .run_if(
                         in_state(AppState::Playing)
@@ -158,6 +159,9 @@ pub struct ScheduledNote {
     pub expected_pitch: String,
     pub hit: bool,
     pub missed: bool,
+    /// Technique modifiers from the chart (bend, vibrato, etc.).
+    /// Used to trigger fx sounds when the note is hit.
+    pub modifiers: Vec<Modifier>,
 }
 
 #[derive(Component)]
@@ -213,6 +217,8 @@ pub struct ScoringConfig {
     pub max_multiplier: f32,
     /// Seconds without a hit before the combo resets. `None` = never decays.
     pub decay_secs: Option<f64>,
+    /// Beats per bar resolved from `timing.time_signature_map` (or `song.time_signature`).
+    pub beats_per_bar: f64,
 }
 
 impl Default for ScoringConfig {
@@ -226,8 +232,18 @@ impl Default for ScoringConfig {
             step_multiplier: 0.1,
             max_multiplier:  4.0,
             decay_secs:      None,
+            beats_per_bar:   4.0,
         }
     }
+}
+
+/// Active loop region. When `active`, the gameplay clock resets to `start_time`
+/// each time it passes `end_time`, repeating that section indefinitely.
+#[derive(Resource, Default)]
+pub struct LoopConfig {
+    pub active: bool,
+    pub start_time: f64,
+    pub end_time: f64,
 }
 
 // ── Shared constants ──────────────────────────────────────────────────────────
@@ -274,13 +290,22 @@ fn setup_scoring_config(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut config: ResMut<ScoringConfig>,
+    mut loop_cfg: ResMut<LoopConfig>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else { return };
-    let s = &manifest.chart.scoring;
+    let chart = &manifest.chart;
+    let s     = &chart.scoring;
 
     config.perfect_window = s.perfect_window_ms as f64 / 1000.0;
     config.good_window    = s.good_window_ms    as f64 / 1000.0;
     config.miss_window    = s.miss_window_ms    as f64 / 1000.0;
+
+    // Resolve beats per bar: time_signature_map at tick=0 takes precedence over song field.
+    let beats_str = chart.timing.time_signature_map
+        .as_deref()
+        .and_then(|m| crate::song::chart::time_sig_at_tick(0, m))
+        .or(chart.song.time_signature.as_deref());
+    config.beats_per_bar = parse_beats(beats_str);
 
     if let Some(combo) = &s.combo {
         config.combo_enabled    = combo.enabled;
@@ -290,17 +315,62 @@ fn setup_scoring_config(
         config.decay_secs       = combo.decay_ms.map(|ms| ms as f64 / 1000.0);
     }
 
+    // Set up loop section if the chart requests repeat playback.
+    *loop_cfg = LoopConfig::default();
+    if let Some(ls) = &chart.loop_section {
+        if ls.repeat == Some(true) {
+            let track = &chart.track;
+            let si = ls.start_index;
+            let ei = ls.end_index;
+            if si < track.len() && ei < track.len() && si <= ei {
+                let resolve = |i: usize| -> f64 {
+                    track[i].time.unwrap_or_else(|| {
+                        let tick = track[i].tick.unwrap_or(0);
+                        crate::song::chart::tick_to_seconds(
+                            tick,
+                            chart.timing.resolution,
+                            &chart.timing.tempo_map,
+                        )
+                    })
+                };
+                loop_cfg.active     = true;
+                loop_cfg.start_time = resolve(si);
+                loop_cfg.end_time   = resolve(ei) + track[ei].duration;
+                info!(
+                    "Loop section ({:?}): {:.2}s – {:.2}s",
+                    ls.section_type, loop_cfg.start_time, loop_cfg.end_time,
+                );
+            }
+        }
+    }
+
     info!(
-        "Scoring config: perfect={:.0}ms good={:.0}ms miss={:.0}ms combo={}",
+        "Scoring config: perfect={:.0}ms good={:.0}ms miss={:.0}ms combo={} beats/bar={}",
         config.perfect_window * 1000.0,
         config.good_window    * 1000.0,
         config.miss_window    * 1000.0,
         config.combo_enabled,
+        config.beats_per_bar,
     );
 }
 
 fn tick_clock(mut clock: ResMut<GameplayClock>, time: Res<Time>) {
     clock.0 += time.delta_secs_f64();
+}
+
+fn handle_loop_boundary(
+    loop_cfg: Res<LoopConfig>,
+    mut clock: ResMut<GameplayClock>,
+    mut notes: Query<&mut ScheduledNote>,
+) {
+    if !loop_cfg.active || clock.0 < loop_cfg.end_time { return; }
+    clock.0 = loop_cfg.start_time;
+    for mut note in &mut notes {
+        if note.time >= loop_cfg.start_time && note.time <= loop_cfg.end_time {
+            note.hit    = false;
+            note.missed = false;
+        }
+    }
 }
 
 fn collect_pitches(mut reader: MessageReader<PitchEvent>, mut active: ResMut<ActivePitches>) {
@@ -330,9 +400,12 @@ fn score_notes(
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
     mut notes: Query<&mut ScheduledNote>,
     mut score: ResMut<Score>,
     mut feedback: ResMut<HitFeedback>,
+    mut commands: Commands,
 ) {
     if clock.0 < 0.0 { return; }
 
@@ -348,6 +421,8 @@ fn score_notes(
         .filter(|p| valid_notes.0.contains(&format!("{}{}", p.note, p.octave)))
         .map(|p| format!("{}{}", p.note, p.octave))
         .collect();
+
+    let fx_sounds = manifests.get(&selected.0).map(|m| &m.fx_sounds);
 
     for mut note in &mut notes {
         if note.hit || note.missed { continue; }
@@ -374,8 +449,33 @@ fn score_notes(
                 score.points += compute_points(quality, multiplier);
                 feedback.quality = Some(quality);
                 feedback.timer   = 0.75;
+
+                // Play fx sound for each modifier on this note, if mapped.
+                if let Some(fx) = fx_sounds {
+                    for modifier in &note.modifiers {
+                        let key = modifier_fx_key(modifier);
+                        if let Some(handle) = fx.get(key) {
+                            commands.spawn((
+                                AudioPlayer::<AudioSource>(handle.clone()),
+                                PlaybackSettings::ONCE,
+                                GameplayRoot,
+                            ));
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+fn modifier_fx_key(modifier: &Modifier) -> &'static str {
+    match modifier {
+        Modifier::Bend { .. }    => "bend",
+        Modifier::Vibrato { .. } => "vibrato",
+        Modifier::WahWah { .. }  => "wah-wah",
+        Modifier::Hold { .. }    => "hold",
+        Modifier::Overblow       => "overblow",
+        Modifier::Overdraw       => "overdraw",
     }
 }
 

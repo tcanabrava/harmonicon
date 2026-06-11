@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use bevy::{
     asset::{io::Reader, AssetLoader, LoadContext},
     audio::AudioSource,
@@ -73,7 +74,17 @@ impl AssetLoader for SongChartLoader {
         let music = load_context.load::<AudioSource>(parent.join("music.ogg"));
         let elements = load_context.load::<Image>(parent.join("elements.png"));
 
-        Ok(SongManifest { chart, background, music, elements })
+        let fx_sounds: HashMap<String, Handle<AudioSource>> = chart
+            .fx_mapping
+            .as_ref()
+            .map(|map| {
+                map.iter()
+                    .map(|(k, v)| (k.clone(), load_context.load::<AudioSource>(parent.join(v))))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(SongManifest { chart, background, music, elements, fx_sounds })
     }
 
     fn extensions(&self) -> &[&str] {

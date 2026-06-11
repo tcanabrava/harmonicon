@@ -10,8 +10,8 @@ use crate::{
 use super::{
     ActivePitches, ActiveTargets, ComboText, CountdownOverlay, CountdownText, FeedbackText,
     GameplayRoot, HoleCell, HoleState, MusicPlayer, MusicStarted, ScoreText, ScheduledNote,
-    ValidHarpNotes, COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
-    parse_beats, secs_per_bar, current_bar_index,
+    ScoringConfig, ValidHarpNotes, COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
+    secs_per_bar, current_bar_index,
 };
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -202,7 +202,10 @@ pub fn setup(
 
     // ── Note visuals ──────────────────────────────────────────────────────────
     for item in &chart.track {
-        let t = item.time.unwrap_or(0.0);
+        let t = item.time.unwrap_or_else(|| {
+            let tick = item.tick.unwrap_or(0);
+            crate::song::chart::tick_to_seconds(tick, chart.timing.resolution, &chart.timing.tempo_map)
+        });
         let depth = note_depth(item.duration);
         for event in &item.events {
             use crate::song::chart::Action;
@@ -218,11 +221,9 @@ pub fn setup(
                 ..default()
             });
             let note_mesh = meshes.add(Cuboid::new(LANE_WIDTH - LANE_GAP, NOTE_H, depth));
-            let expected_pitch = if is_blow {
-                blow_label(event.hole, chart)
-            } else {
-                draw_label(event.hole, chart)
-            };
+            let expected_pitch = event.note.clone().unwrap_or_else(|| {
+                if is_blow { blow_label(event.hole, chart) } else { draw_label(event.hole, chart) }
+            });
             // Spawn off-screen; update_notes_3d repositions each frame
             commands.spawn((
                 Mesh3d(note_mesh),
@@ -236,6 +237,7 @@ pub fn setup(
                     expected_pitch,
                     hit: false,
                     missed: false,
+                    modifiers: event.modifiers.clone().unwrap_or_default(),
                 },
                 GameplayRoot,
             ));
@@ -389,7 +391,9 @@ fn spawn_hud_overlay(
         chart.song.tempo_bpm as u32,
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
-    let harp_info = harp_display(chart);
+    let harp_info    = harp_display(chart);
+    let description  = chart.metadata.as_ref().and_then(|m| m.description.as_deref());
+    let chart_author = chart.metadata.as_ref().and_then(|m| m.author.as_deref());
 
     commands
         .spawn((
@@ -416,6 +420,20 @@ fn spawn_hud_overlay(
                     Text::new(text.to_string()),
                     TextFont { font_size: FontSize::Px(size), font: font.clone(), ..default() },
                     TextColor(color),
+                ));
+            }
+            if let Some(desc) = description {
+                p.spawn((
+                    Text::new(desc.to_string()),
+                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                    TextColor(Color::srgb(0.50, 0.50, 0.55)),
+                ));
+            }
+            if let Some(author) = chart_author {
+                p.spawn((
+                    Text::new(format!("Chart: {author}")),
+                    TextFont { font_size: FontSize::Px(9.0), font: font.clone(), ..default() },
+                    TextColor(Color::srgb(0.40, 0.40, 0.45)),
                 ));
             }
 
@@ -633,14 +651,14 @@ pub fn update_bar_3d(
     clock: Res<super::GameplayClock>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
+    config: Res<ScoringConfig>,
     mut cells: Query<(&BarCell3D, &mut BackgroundColor)>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else { return };
-    let bpm    = manifest.chart.song.tempo_bpm as f64;
-    let beats  = parse_beats(manifest.chart.song.time_signature.as_deref());
-    let spb    = secs_per_bar(bpm, beats);
+    let bpm     = manifest.chart.song.tempo_bpm as f64;
+    let spb     = secs_per_bar(bpm, config.beats_per_bar);
     let current = current_bar_index(clock.0, spb);
-    let key    = manifest.chart.song.key.as_str();
+    let key     = manifest.chart.song.key.as_str();
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current {

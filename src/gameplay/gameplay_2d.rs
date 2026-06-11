@@ -10,8 +10,8 @@ use crate::{
 use super::{
     ActivePitches, ActiveTargets, CountdownOverlay, CountdownText, ComboText, FeedbackText,
     GameplayRoot, HoleCell, HoleState, MusicPlayer, MusicStarted, NoteVisual, ScoreText,
-    ScheduledNote, ValidHarpNotes, COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT, LOOKAHEAD,
-    parse_beats, secs_per_bar, current_bar_index,
+    ScheduledNote, ScoringConfig, ValidHarpNotes, COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT,
+    LOOKAHEAD, secs_per_bar, current_bar_index,
 };
 
 pub fn setup(
@@ -44,6 +44,8 @@ pub fn setup(
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
     let harp_info = harp_display(chart);
+    let description = chart.metadata.as_ref().and_then(|m| m.description.as_deref());
+    let chart_author = chart.metadata.as_ref().and_then(|m| m.author.as_deref());
 
     commands
         .spawn((
@@ -93,6 +95,20 @@ pub fn setup(
                     TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
                     TextColor(Color::srgb(0.45, 0.72, 0.55)),
                 ));
+                if let Some(desc) = description {
+                    col.spawn((
+                        Text::new(desc.to_string()),
+                        TextFont { font_size: FontSize::Px(11.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::srgb(0.50, 0.50, 0.55)),
+                    ));
+                }
+                if let Some(author) = chart_author {
+                    col.spawn((
+                        Text::new(format!("Chart: {author}")),
+                        TextFont { font_size: FontSize::Px(10.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::srgb(0.40, 0.40, 0.45)),
+                    ));
+                }
             });
 
             // 12-bar blues grid
@@ -329,17 +345,18 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate
     ));
 
     for item in &chart.track {
-        let t = item.time.unwrap_or(0.0);
+        let t = item.time.unwrap_or_else(|| {
+            let tick = item.tick.unwrap_or(0);
+            crate::song::chart::tick_to_seconds(tick, chart.timing.resolution, &chart.timing.tempo_map)
+        });
         let h_pct = note_height_pct(item.duration);
         for event in &item.events {
             let is_blow = matches!(event.action, Action::Blow);
             let (r, g, b) = if is_blow { (0.25f32, 0.55, 0.95) } else { (0.95f32, 0.38, 0.15) };
             let left_pct = (event.hole as f32 - 1.0) * LANE_PCT + 0.3;
-            let expected_pitch = if is_blow {
-                blow_label(event.hole, chart)
-            } else {
-                draw_label(event.hole, chart)
-            };
+            let expected_pitch = event.note.clone().unwrap_or_else(|| {
+                if is_blow { blow_label(event.hole, chart) } else { draw_label(event.hole, chart) }
+            });
             hw.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -362,6 +379,7 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate
                     expected_pitch,
                     hit: false,
                     missed: false,
+                    modifiers: event.modifiers.clone().unwrap_or_default(),
                 },
             ))
             .with_children(|note| {
@@ -502,14 +520,14 @@ pub fn update_bar(
     clock: Res<super::GameplayClock>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
+    config: Res<ScoringConfig>,
     mut cells: Query<(&super::BarCell, &mut BackgroundColor)>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else { return };
-    let bpm    = manifest.chart.song.tempo_bpm as f64;
-    let beats  = parse_beats(manifest.chart.song.time_signature.as_deref());
-    let spb    = secs_per_bar(bpm, beats);
+    let bpm     = manifest.chart.song.tempo_bpm as f64;
+    let spb     = secs_per_bar(bpm, config.beats_per_bar);
     let current = current_bar_index(clock.0, spb);
-    let key    = manifest.chart.song.key.as_str();
+    let key     = manifest.chart.song.key.as_str();
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current {
