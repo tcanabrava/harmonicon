@@ -10,9 +10,9 @@ use crate::{
 
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, CountdownOverlay, CountdownText,
-    FeedbackText, GameplayRoot, HOLE_COUNT, HoleCell, HoleState, LOOKAHEAD, MusicPlayer,
-    MusicStarted, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes, current_bar_index,
-    secs_per_bar,
+    FeedbackText, GameplayRoot, HOLE_COUNT, HoleCell, HoleState, LOOKAHEAD, MetronomeBeat,
+    MusicPlayer, MusicStarted, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes,
+    current_bar_index, secs_per_bar,
 };
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -376,7 +376,11 @@ pub fn setup(
         &selected_model.0,
         &model_cfg,
     );
-    spawn_hud_overlay(&mut commands, chart, &chords, key, &font);
+    let beats_per_bar = {
+        let ts = chart.song.time_signature.as_deref().unwrap_or("4/4");
+        ts.split('/').next().and_then(|n| n.parse::<usize>().ok()).unwrap_or(4)
+    };
+    spawn_hud_overlay(&mut commands, chart, &chords, key, &font, chart.song.tempo_bpm, beats_per_bar);
 }
 
 fn spawn_harmonica_3d(
@@ -431,6 +435,8 @@ fn spawn_hud_overlay(
     chords: &[String],
     key: &str,
     font: &FontSource,
+    bpm: f32,
+    beats_per_bar: usize,
 ) {
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     let info = format!(
@@ -500,10 +506,10 @@ fn spawn_hud_overlay(
                 ));
             }
 
-            // 12-bar blues grid
+            // 12-bar blues grid (2× size)
             p.spawn(Node {
                 flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(2.0),
+                row_gap: Val::Px(4.0),
                 margin: UiRect::top(Val::Px(4.0)),
                 ..default()
             })
@@ -511,7 +517,7 @@ fn spawn_hud_overlay(
                 for row in 0..3usize {
                     grid.spawn(Node {
                         flex_direction: FlexDirection::Row,
-                        column_gap: Val::Px(2.0),
+                        column_gap: Val::Px(4.0),
                         ..default()
                     })
                     .with_children(|r| {
@@ -519,8 +525,9 @@ fn spawn_hud_overlay(
                             let idx = row * 4 + col;
                             r.spawn((
                                 Node {
-                                    width: Val::Px(38.0),
-                                    height: Val::Px(26.0),
+                                    width: Val::Px(76.0),
+                                    height: Val::Px(52.0),
+                                    flex_direction: FlexDirection::Column,
                                     align_items: AlignItems::Center,
                                     justify_content: JustifyContent::Center,
                                     border: UiRect::all(Val::Px(1.0)),
@@ -534,11 +541,20 @@ fn spawn_hud_overlay(
                                 cell.spawn((
                                     Text::new(chords[idx].clone()),
                                     TextFont {
-                                        font_size: FontSize::Px(12.0),
+                                        font_size: FontSize::Px(24.0),
                                         font: font.clone(),
                                         ..default()
                                     },
                                     TextColor(Color::WHITE),
+                                ));
+                                cell.spawn((
+                                    Text::new(format!("{}", idx + 1)),
+                                    TextFont {
+                                        font_size: FontSize::Px(11.0),
+                                        font: font.clone(),
+                                        ..default()
+                                    },
+                                    TextColor(Color::srgb(0.45, 0.45, 0.55)),
                                 ));
                             });
                         }
@@ -556,22 +572,50 @@ fn spawn_hud_overlay(
             .with_children(|leg| {
                 leg.spawn((
                     Text::new("\u{25A0} BLOW"),
-                    TextFont {
-                        font_size: FontSize::Px(10.0),
-                        font: font.clone(),
-                        ..default()
-                    },
+                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 leg.spawn((
                     Text::new("\u{25A0} DRAW"),
-                    TextFont {
-                        font_size: FontSize::Px(10.0),
-                        font: font.clone(),
-                        ..default()
-                    },
+                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
+            });
+
+            // Metronome
+            p.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(6.0),
+                margin: UiRect::top(Val::Px(8.0)),
+                ..default()
+            })
+            .with_children(|metro| {
+                metro.spawn((
+                    Text::new(format!("\u{2669} = {}", bpm as u32)),
+                    TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                    TextColor(Color::srgb(0.65, 0.65, 0.70)),
+                ));
+                metro.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(6.0),
+                    ..default()
+                })
+                .with_children(|row| {
+                    for i in 0..beats_per_bar {
+                        let size = if i == 0 { Val::Px(28.0) } else { Val::Px(22.0) };
+                        row.spawn((
+                            Node {
+                                width: size,
+                                height: size,
+                                border: UiRect::all(Val::Px(1.5)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9)),
+                            BorderColor::all(Color::srgb(0.35, 0.35, 0.50)),
+                            MetronomeBeat(i),
+                        ));
+                    }
+                });
             });
         });
 

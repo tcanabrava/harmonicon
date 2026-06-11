@@ -11,8 +11,8 @@ use crate::{
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, CountdownOverlay, CountdownText,
     FeedbackText, GameplayRoot, HIT_H_PCT, HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD,
-    MusicPlayer, MusicStarted, NoteVisual, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes,
-    current_bar_index, secs_per_bar,
+    MetronomeBeat, MusicPlayer, MusicStarted, NoteVisual, ScheduledNote, ScoreText, ScoringConfig,
+    ValidHarpNotes, current_bar_index, secs_per_bar,
 };
 
 pub fn setup(
@@ -51,22 +51,24 @@ pub fn setup(
         .and_then(|m| m.description.as_deref());
     let chart_author = chart.metadata.as_ref().and_then(|m| m.author.as_deref());
 
+    let beats_per_bar = {
+        let ts = chart.song.time_signature.as_deref().unwrap_or("4/4");
+        ts.split('/').next().and_then(|n| n.parse::<usize>().ok()).unwrap_or(4)
+    };
+
     commands
         .spawn((
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(8.0),
-                padding: UiRect::axes(Val::Px(0.0), Val::Px(10.0)),
+                flex_direction: FlexDirection::Row,
                 ..default()
             },
             ImageNode::new(manifest.background.clone()),
             GameplayRoot,
         ))
         .with_children(|root| {
-            // Dark overlay so text/notes remain readable over the background art
+            // Dark overlay
             root.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -77,150 +79,141 @@ pub fn setup(
                 BackgroundColor(Color::srgba(0.04, 0.04, 0.06, 0.70)),
             ));
 
-            // Title / info
+            // ── Left panel: note highway + harmonica ─────────────────────────
             root.spawn(Node {
+                width: Val::Percent(60.0),
+                height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(8.0)),
+                row_gap: Val::Px(4.0),
                 ..default()
             })
-            .with_children(|col| {
-                col.spawn((
-                    Text::new(title),
-                    TextFont {
-                        font_size: FontSize::Px(22.0),
-                        font: fonts.gameplay.clone(),
+            .with_children(|left| {
+                // Note highway
+                left.spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        flex_grow: 1.0,
+                        min_height: Val::Px(120.0),
+                        overflow: Overflow::clip(),
                         ..default()
                     },
-                    TextColor(Color::WHITE),
-                ));
-                col.spawn((
-                    Text::new(info),
-                    TextFont {
-                        font_size: FontSize::Px(13.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.60, 0.65, 0.75)),
-                ));
-                col.spawn((
-                    Text::new(harp_info),
-                    TextFont {
-                        font_size: FontSize::Px(12.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.45, 0.72, 0.55)),
-                ));
-                if let Some(desc) = description {
-                    col.spawn((
-                        Text::new(desc.to_string()),
-                        TextFont {
-                            font_size: FontSize::Px(11.0),
-                            font: fonts.gameplay.clone(),
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.50, 0.50, 0.55)),
-                    ));
-                }
-                if let Some(author) = chart_author {
-                    col.spawn((
-                        Text::new(format!("Chart: {author}")),
-                        TextFont {
-                            font_size: FontSize::Px(10.0),
-                            font: fonts.gameplay.clone(),
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.40, 0.40, 0.45)),
-                    ));
-                }
-            });
+                    BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
+                ))
+                .with_children(|hw| {
+                    spawn_highway(hw, &fonts.symbols, chart);
+                });
 
-            // 12-bar blues grid
-            root.spawn(Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(3.0),
-                ..default()
-            })
-            .with_children(|grid| {
-                spawn_12_bar_grid(grid, &chords, key, &fonts.gameplay);
-            });
-
-            // Note highway
-            root.spawn((
-                Node {
-                    width: Val::Percent(80.0),
-                    flex_grow: 0.8,
-                    min_height: Val::Px(120.0),
-                    overflow: Overflow::clip(),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
-            ))
-            .with_children(|hw| {
-                spawn_highway(hw, &fonts.symbols, chart);
-            });
-
-            // Harmonica holes
-            root.spawn(Node {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                width: Val::Percent(80.0),
-                row_gap: Val::Px(2.0),
-                ..default()
-            })
-            .with_children(|col| {
-                spawn_harmonica_strip(col, chart, &fonts.gameplay);
-            });
-
-            // Score panel — top-right corner, above the note highway
-            root.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    top: Val::Px(8.0),
-                    right: Val::Px(8.0),
+                // Harmonica holes
+                left.spawn(Node {
                     flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::FlexEnd,
+                    align_items: AlignItems::Center,
+                    width: Val::Percent(100.0),
                     row_gap: Val::Px(2.0),
-                    padding: UiRect::all(Val::Px(8.0)),
                     ..default()
-                },
-                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.50)),
-                GlobalZIndex(50),
-            ))
-            .with_children(|p| {
-                p.spawn((
-                    Text::new("0"),
-                    TextFont {
-                        font_size: FontSize::Px(30.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                    ScoreText,
-                ));
-                p.spawn((
-                    Text::new(""),
-                    TextFont {
-                        font_size: FontSize::Px(15.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.90, 0.72, 0.20)),
-                    ComboText,
-                ));
-                p.spawn((
-                    Text::new(""),
-                    TextFont {
-                        font_size: FontSize::Px(22.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
-                    FeedbackText,
-                ));
+                })
+                .with_children(|col| {
+                    spawn_harmonica_strip(col, chart, &fonts.gameplay);
+                });
             });
 
-            // Countdown overlay
+            // ── Right panel: info + 12-bar + metronome + score ───────────────
+            root.spawn(Node {
+                width: Val::Percent(40.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(12.0)),
+                row_gap: Val::Px(12.0),
+                ..default()
+            })
+            .with_children(|right| {
+                // Song info
+                right.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(3.0),
+                    ..default()
+                })
+                .with_children(|col| {
+                    col.spawn((
+                        Text::new(title),
+                        TextFont { font_size: FontSize::Px(18.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::WHITE),
+                    ));
+                    col.spawn((
+                        Text::new(info),
+                        TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::srgb(0.60, 0.65, 0.75)),
+                    ));
+                    col.spawn((
+                        Text::new(harp_info),
+                        TextFont { font_size: FontSize::Px(11.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::srgb(0.45, 0.72, 0.55)),
+                    ));
+                    if let Some(desc) = description {
+                        col.spawn((
+                            Text::new(desc.to_string()),
+                            TextFont { font_size: FontSize::Px(10.0), font: fonts.gameplay.clone(), ..default() },
+                            TextColor(Color::srgb(0.50, 0.50, 0.55)),
+                        ));
+                    }
+                    if let Some(author) = chart_author {
+                        col.spawn((
+                            Text::new(format!("Chart: {author}")),
+                            TextFont { font_size: FontSize::Px(9.0), font: fonts.gameplay.clone(), ..default() },
+                            TextColor(Color::srgb(0.40, 0.40, 0.45)),
+                        ));
+                    }
+                });
+
+                // 12-bar blues grid
+                right.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(3.0),
+                    ..default()
+                })
+                .with_children(|grid| {
+                    spawn_12_bar_grid(grid, &chords, key, &fonts.gameplay);
+                });
+
+                // Metronome
+                right.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(6.0),
+                    ..default()
+                })
+                .with_children(|metro| {
+                    spawn_metronome(metro, beats_per_bar, bpm, &fonts.gameplay);
+                });
+
+                // Score
+                right.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(2.0),
+                    ..default()
+                })
+                .with_children(|p| {
+                    p.spawn((
+                        Text::new("0"),
+                        TextFont { font_size: FontSize::Px(28.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::WHITE),
+                        ScoreText,
+                    ));
+                    p.spawn((
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(14.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::srgb(0.90, 0.72, 0.20)),
+                        ComboText,
+                    ));
+                    p.spawn((
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(20.0), font: fonts.gameplay.clone(), ..default() },
+                        TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                        FeedbackText,
+                    ));
+                });
+            });
+
+            // Countdown overlay (always fullscreen, absolute)
             root.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -239,20 +232,12 @@ pub fn setup(
             .with_children(|ov| {
                 ov.spawn((
                     Text::new("GET READY"),
-                    TextFont {
-                        font_size: FontSize::Px(22.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
-                    },
+                    TextFont { font_size: FontSize::Px(22.0), font: fonts.gameplay.clone(), ..default() },
                     TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
                 ));
                 ov.spawn((
                     Text::new("3"),
-                    TextFont {
-                        font_size: FontSize::Px(120.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
-                    },
+                    TextFont { font_size: FontSize::Px(120.0), font: fonts.gameplay.clone(), ..default() },
                     TextColor(Color::WHITE),
                     CountdownText,
                 ));
@@ -552,6 +537,42 @@ fn spawn_harmonica_strip(
             },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));
+    });
+}
+
+fn spawn_metronome(
+    parent: &mut ChildSpawnerCommands,
+    beats_per_bar: usize,
+    bpm: f32,
+    font: &FontSource,
+) {
+    parent.spawn((
+        Text::new(format!("♩ = {}", bpm as u32)),
+        TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+        TextColor(Color::srgb(0.65, 0.65, 0.70)),
+    ));
+
+    // Beat indicator row
+    parent.spawn(Node {
+        flex_direction: FlexDirection::Row,
+        column_gap: Val::Px(6.0),
+        ..default()
+    })
+    .with_children(|row| {
+        for i in 0..beats_per_bar {
+            let size = if i == 0 { Val::Px(28.0) } else { Val::Px(22.0) };
+            row.spawn((
+                Node {
+                    width: size,
+                    height: size,
+                    border: UiRect::all(Val::Px(1.5)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9)),
+                BorderColor::all(Color::srgb(0.35, 0.35, 0.50)),
+                MetronomeBeat(i),
+            ));
+        }
     });
 }
 
