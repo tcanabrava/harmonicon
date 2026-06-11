@@ -598,9 +598,18 @@ pub fn groove_harmonica(
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
+    // Hold still during the countdown (clock is negative); only dance once the
+    // music has started.
+    if clock.0 < 0.0 {
+        for mut tf in &mut groove {
+            tf.translation = Vec3::ZERO;
+            tf.rotation = Quat::IDENTITY;
+        }
+        return;
+    }
+
     let bpm = manifest.chart.song.tempo_bpm.max(1.0);
-    // Beats elapsed (fractional). Negative during the countdown — sin/cos handle
-    // that fine, so the harmonica sways gently even before the music kicks in.
+    // Beats elapsed (fractional).
     let beat = (clock.0 / (60.0 / bpm as f64)) as f32;
     let bi = beat.floor();
     let frac = beat.fract();
