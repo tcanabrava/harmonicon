@@ -1,8 +1,8 @@
+mod assets_management;
+mod audio_system;
 mod gameplay;
 mod menu;
 mod song;
-mod audio_system;
-mod assets_management;
 use bevy::prelude::*;
 
 use assets_management::AssetsManagementPlugin;
@@ -10,11 +10,7 @@ use gameplay::GameplayPlugin;
 use menu::{AppState, MenuPlugin};
 use song::SongPlugin;
 
-use audio_system::{
-    audio_input,
-    pitch_detect,
-    pitch_detect::PitchEvent,
-};
+use audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
 
 #[derive(Resource)]
 pub struct GameFonts {
@@ -23,26 +19,32 @@ pub struct GameFonts {
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins(DefaultPlugins
-        .set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Harmonicon".into(),
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Harmonicon".into(),
+                    ..default()
+                }),
+                ..default()
+            })
+            // bevy_render warns about its own internal shadow-view cameras in 0.19 RC
+            .set(bevy::log::LogPlugin {
+                filter: "warn,bevy_render::camera=error".into(),
                 ..default()
             }),
-            ..default()
-        })
-        // bevy_render warns about its own internal shadow-view cameras in 0.19 RC
-        .set(bevy::log::LogPlugin {
-            filter: "warn,bevy_render::camera=error".into(),
-            ..default()
-        }))
-    .add_plugins((AssetsManagementPlugin, SongPlugin, MenuPlugin, GameplayPlugin));
+    )
+    .add_plugins((
+        AssetsManagementPlugin,
+        SongPlugin,
+        MenuPlugin,
+        GameplayPlugin,
+    ));
 
     #[cfg(feature = "inspector")]
     app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 
-    app
-        .add_message::<PitchEvent>()
+    app.add_message::<PitchEvent>()
         .add_systems(Startup, (spawn_camera, initialize_game))
         .add_systems(OnEnter(AppState::Playing), setup_audio)
         .add_systems(
@@ -57,7 +59,6 @@ fn main() {
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((Camera2d, Name::new("Camera2d (main)")));
 }
-
 
 fn initialize_game(mut next: ResMut<NextState<AppState>>) {
     next.set(AppState::Menu);

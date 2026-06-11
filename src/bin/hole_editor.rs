@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use bevy::input::mouse::{MouseMotion, MouseWheel};
+use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +22,9 @@ struct HarmonicaModelConfig {
     holes: Vec<HoleConfig>,
 }
 
-fn default_scale() -> f32 { 1.0 }
+fn default_scale() -> f32 {
+    1.0
+}
 
 #[derive(Resource)]
 struct EditorState {
@@ -42,7 +44,12 @@ struct OrbitState {
 
 impl Default for OrbitState {
     fn default() -> Self {
-        Self { yaw: 0.3, pitch: 0.4, radius: 15.0, target: Vec3::ZERO }
+        Self {
+            yaw: 0.3,
+            pitch: 0.4,
+            radius: 15.0,
+            target: Vec3::ZERO,
+        }
     }
 }
 
@@ -86,7 +93,12 @@ fn main() {
             }),
             ..default()
         }))
-        .insert_resource(EditorState { model_name, config, selected: 0, dirty: false })
+        .insert_resource(EditorState {
+            model_name,
+            config,
+            selected: 0,
+            dirty: false,
+        })
         .insert_resource(OrbitState {
             yaw: 0.3,
             pitch: 0.4,
@@ -94,7 +106,15 @@ fn main() {
             target: Vec3::ZERO,
         })
         .add_systems(Startup, setup)
-        .add_systems(Update, (orbit_camera, handle_input, update_hole_meshes, update_info_text))
+        .add_systems(
+            Update,
+            (
+                orbit_camera,
+                handle_input,
+                update_hole_meshes,
+                update_info_text,
+            ),
+        )
         .run();
 }
 
@@ -112,10 +132,16 @@ fn setup(
     ));
 
     commands.spawn((
-        DirectionalLight { illuminance: 8_000.0, ..default() },
+        DirectionalLight {
+            illuminance: 8_000.0,
+            ..default()
+        },
         Transform::from_xyz(5.0, 10.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
-    commands.spawn(AmbientLight { brightness: 400.0, ..default() });
+    commands.spawn(AmbientLight {
+        brightness: 400.0,
+        ..default()
+    });
 
     let [tx, ty, tz] = state.config.model_translation;
     commands.spawn((
@@ -149,7 +175,10 @@ fn setup(
 
     commands.spawn((
         Text::new(""),
-        TextFont { font_size: FontSize::Px(13.0), ..default() },
+        TextFont {
+            font_size: FontSize::Px(13.0),
+            ..default()
+        },
         TextColor(Color::WHITE),
         Node {
             position_type: PositionType::Absolute,
@@ -182,10 +211,10 @@ fn orbit_camera(
         orbit.pitch = (orbit.pitch - delta.y * 0.005).clamp(-1.4, 1.4);
     } else if buttons.pressed(MouseButton::Left) {
         // Pan: move the look-at target in the camera's view plane.
-        let right    = Vec3::new(-orbit.yaw.sin(), 0.0, orbit.yaw.cos());
+        let right = Vec3::new(-orbit.yaw.sin(), 0.0, orbit.yaw.cos());
         let screen_up = Vec3::new(
             -orbit.yaw.cos() * orbit.pitch.sin(),
-             orbit.pitch.cos(),
+            orbit.pitch.cos(),
             -orbit.yaw.sin() * orbit.pitch.sin(),
         );
         let factor = orbit.radius * 0.0015;
@@ -210,12 +239,20 @@ fn handle_input(
         *orbit = OrbitState::default();
     }
     let n = state.config.holes.len();
-    if n == 0 { return; }
+    if n == 0 {
+        return;
+    }
 
     for (key, idx) in [
-        (KeyCode::Digit1, 0usize), (KeyCode::Digit2, 1), (KeyCode::Digit3, 2),
-        (KeyCode::Digit4, 3),      (KeyCode::Digit5, 4), (KeyCode::Digit6, 5),
-        (KeyCode::Digit7, 6),      (KeyCode::Digit8, 7), (KeyCode::Digit9, 8),
+        (KeyCode::Digit1, 0usize),
+        (KeyCode::Digit2, 1),
+        (KeyCode::Digit3, 2),
+        (KeyCode::Digit4, 3),
+        (KeyCode::Digit5, 4),
+        (KeyCode::Digit6, 5),
+        (KeyCode::Digit7, 6),
+        (KeyCode::Digit8, 7),
+        (KeyCode::Digit9, 8),
         (KeyCode::Digit0, 9),
     ] {
         if keys.just_pressed(key) && idx < n {
@@ -224,9 +261,9 @@ fn handle_input(
     }
 
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-    let alt   = keys.pressed(KeyCode::AltLeft)   || keys.pressed(KeyCode::AltRight);
+    let alt = keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight);
     let speed = if alt { 1.0f32 } else { 0.1 };
-    let step  = speed * time.delta_secs();
+    let step = speed * time.delta_secs();
 
     let idx = state.selected;
     let mut changed = false;
@@ -238,20 +275,37 @@ fn handle_input(
         }};
     }
 
-    if keys.pressed(KeyCode::ArrowLeft)  { if shift { mv!(w, -step) } else { mv!(x, -step) } }
-    if keys.pressed(KeyCode::ArrowRight) { if shift { mv!(w,  step) } else { mv!(x,  step) } }
-    if keys.pressed(KeyCode::ArrowUp)    { if shift { mv!(h,  step) } else { mv!(y,  step) } }
-    if keys.pressed(KeyCode::ArrowDown)  { if shift { mv!(h, -step) } else { mv!(y, -step) } }
-    if keys.pressed(KeyCode::PageUp)     { if shift { mv!(d,  step) } else { mv!(z,  step) } }
-    if keys.pressed(KeyCode::PageDown)   { if shift { mv!(d, -step) } else { mv!(z, -step) } }
+    if keys.pressed(KeyCode::ArrowLeft) {
+        if shift { mv!(w, -step) } else { mv!(x, -step) }
+    }
+    if keys.pressed(KeyCode::ArrowRight) {
+        if shift { mv!(w, step) } else { mv!(x, step) }
+    }
+    if keys.pressed(KeyCode::ArrowUp) {
+        if shift { mv!(h, step) } else { mv!(y, step) }
+    }
+    if keys.pressed(KeyCode::ArrowDown) {
+        if shift { mv!(h, -step) } else { mv!(y, -step) }
+    }
+    if keys.pressed(KeyCode::PageUp) {
+        if shift { mv!(d, step) } else { mv!(z, step) }
+    }
+    if keys.pressed(KeyCode::PageDown) {
+        if shift { mv!(d, -step) } else { mv!(z, -step) }
+    }
 
-    if changed { state.dirty = true; }
+    if changed {
+        state.dirty = true;
+    }
 
     if keys.just_pressed(KeyCode::KeyS) {
         let path = format!("assets/harmonicas/3d/{}/holes.json", state.model_name);
         match serde_json::to_string_pretty(&state.config) {
             Ok(json) => match std::fs::write(&path, &json) {
-                Ok(_)  => { info!("Saved {path}"); state.dirty = false; }
+                Ok(_) => {
+                    info!("Saved {path}");
+                    state.dirty = false;
+                }
                 Err(e) => error!("Write failed: {e}"),
             },
             Err(e) => error!("Serialize failed: {e}"),
@@ -262,30 +316,35 @@ fn handle_input(
 fn update_hole_meshes(
     state: Res<EditorState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut indicators: Query<(&HoleIndicator, &mut Transform, &MeshMaterial3d<StandardMaterial>)>,
+    mut indicators: Query<(
+        &HoleIndicator,
+        &mut Transform,
+        &MeshMaterial3d<StandardMaterial>,
+    )>,
 ) {
     for (ind, mut tf, mat_handle) in &mut indicators {
-        let Some(hole) = state.config.holes.get(ind.0) else { continue };
+        let Some(hole) = state.config.holes.get(ind.0) else {
+            continue;
+        };
         tf.translation = Vec3::new(hole.x, hole.y, hole.z);
         tf.scale = Vec3::new(hole.w, hole.h, hole.d);
 
         if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
             if ind.0 == state.selected {
                 mat.base_color = Color::srgba(1.0, 0.85, 0.1, 0.8);
-                mat.emissive   = LinearRgba::new(2.0, 1.5, 0.0, 1.0);
+                mat.emissive = LinearRgba::new(2.0, 1.5, 0.0, 1.0);
             } else {
                 mat.base_color = Color::srgba(0.1, 0.8, 0.2, 0.4);
-                mat.emissive   = LinearRgba::new(0.0, 0.5, 0.0, 1.0);
+                mat.emissive = LinearRgba::new(0.0, 0.5, 0.0, 1.0);
             }
         }
     }
 }
 
-fn update_info_text(
-    state: Res<EditorState>,
-    mut query: Query<&mut Text, With<InfoText>>,
-) {
-    let Ok(mut text) = query.single_mut() else { return };
+fn update_info_text(state: Res<EditorState>, mut query: Query<&mut Text, With<InfoText>>) {
+    let Ok(mut text) = query.single_mut() else {
+        return;
+    };
 
     let dirty = if state.dirty { " [unsaved]" } else { "" };
     let mut s = format!("Hole Editor — {}{dirty}\n", state.model_name);
@@ -298,7 +357,13 @@ fn update_info_text(
         let marker = if i == state.selected { "►" } else { " " };
         s += &format!(
             "{marker} {:2}  x={:7.3}  y={:7.3}  z={:7.3}  w={:6.3}  h={:6.3}  d={:6.3}\n",
-            i + 1, hole.x, hole.y, hole.z, hole.w, hole.h, hole.d,
+            i + 1,
+            hole.x,
+            hole.y,
+            hole.z,
+            hole.w,
+            hole.h,
+            hole.d,
         );
     }
 

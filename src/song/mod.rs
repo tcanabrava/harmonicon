@@ -1,6 +1,6 @@
 pub mod chart;
-mod loader;
 pub mod harmonica;
+mod loader;
 
 pub use chart::HarpChart;
 pub use harmonica::Harmonica;

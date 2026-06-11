@@ -1,12 +1,12 @@
 use bevy::{
-    asset::{io::Reader, AssetLoader, LoadContext},
+    asset::{AssetLoader, LoadContext, io::Reader},
     audio::AudioSource,
     image::Image,
     prelude::*,
 };
 use thiserror::Error;
 
-use super::{chart::HarpChart, SongManifest};
+use super::{SongManifest, chart::HarpChart};
 
 const SCHEMA: &str = include_str!("../../assets/song_schema.dtd.json");
 
@@ -73,7 +73,12 @@ impl AssetLoader for SongChartLoader {
         let music = load_context.load::<AudioSource>(parent.join("music.ogg"));
         let elements = load_context.load::<Image>(parent.join("elements.png"));
 
-        Ok(SongManifest { chart, background, music, elements })
+        Ok(SongManifest {
+            chart,
+            background,
+            music,
+            elements,
+        })
     }
 
     fn extensions(&self) -> &[&str] {

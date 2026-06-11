@@ -1,7 +1,7 @@
 use super::HitQuality;
 
 pub const PERFECT_POINTS: u32 = 100;
-pub const GOOD_POINTS: u32    = 50;
+pub const GOOD_POINTS: u32 = 50;
 
 /// The outcome of evaluating a scheduled note at a given instant.
 #[derive(Debug, PartialEq)]
@@ -31,10 +31,18 @@ pub fn classify_note(
     good_window: f64,
     miss_window: f64,
 ) -> NoteOutcome {
-    if offset > miss_window  { return NoteOutcome::Missed; }
-    if offset < -good_window { return NoteOutcome::TooEarly; }
-    if offset > good_window  { return NoteOutcome::Gap; }
-    if !playing_expected     { return NoteOutcome::Waiting; }
+    if offset > miss_window {
+        return NoteOutcome::Missed;
+    }
+    if offset < -good_window {
+        return NoteOutcome::TooEarly;
+    }
+    if offset > good_window {
+        return NoteOutcome::Gap;
+    }
+    if !playing_expected {
+        return NoteOutcome::Waiting;
+    }
     if offset.abs() <= perfect_window {
         NoteOutcome::Hit(HitQuality::Perfect)
     } else {
@@ -51,7 +59,7 @@ pub fn compute_multiplier(combo: u32, base_mult: f32, step_mult: f32, max_mult: 
 pub fn compute_points(quality: HitQuality, multiplier: f32) -> u32 {
     let base = match quality {
         HitQuality::Perfect => PERFECT_POINTS,
-        HitQuality::Good    => GOOD_POINTS,
+        HitQuality::Good => GOOD_POINTS,
     };
     (base as f32 * multiplier) as u32
 }
@@ -63,7 +71,9 @@ pub fn should_decay_combo(
     last_hit_time: f64,
     decay_secs: Option<f64>,
 ) -> bool {
-    if combo == 0 { return false; }
+    if combo == 0 {
+        return false;
+    }
     match decay_secs {
         Some(decay) => clock - last_hit_time > decay,
         None => false,
@@ -72,7 +82,9 @@ pub fn should_decay_combo(
 
 /// HUD label for the current combo. Empty string when combo is ≤ 1.
 pub fn combo_label(combo: u32) -> String {
-    if combo <= 1 { return String::new(); }
+    if combo <= 1 {
+        return String::new();
+    }
     let mult = (1 + combo / 10).min(4);
     if mult > 1 {
         format!("\u{00D7}{} [\u{00D7}{} pts]", combo, mult)
@@ -89,43 +101,67 @@ mod tests {
 
     #[test]
     fn too_early_before_window() {
-        assert_eq!(classify_note(-0.20, false, 0.06, 0.13, 0.13), NoteOutcome::TooEarly);
+        assert_eq!(
+            classify_note(-0.20, false, 0.06, 0.13, 0.13),
+            NoteOutcome::TooEarly
+        );
     }
 
     #[test]
     fn missed_past_miss_window() {
-        assert_eq!(classify_note(0.20, false, 0.06, 0.13, 0.13), NoteOutcome::Missed);
+        assert_eq!(
+            classify_note(0.20, false, 0.06, 0.13, 0.13),
+            NoteOutcome::Missed
+        );
     }
 
     #[test]
     fn gap_between_good_and_miss_window() {
         // good_window=0.13, miss_window=0.20 → offset 0.15 is in the gap
-        assert_eq!(classify_note(0.15, false, 0.06, 0.13, 0.20), NoteOutcome::Gap);
+        assert_eq!(
+            classify_note(0.15, false, 0.06, 0.13, 0.20),
+            NoteOutcome::Gap
+        );
     }
 
     #[test]
     fn waiting_in_window_but_not_playing() {
-        assert_eq!(classify_note(0.05, false, 0.06, 0.13, 0.13), NoteOutcome::Waiting);
+        assert_eq!(
+            classify_note(0.05, false, 0.06, 0.13, 0.13),
+            NoteOutcome::Waiting
+        );
     }
 
     #[test]
     fn perfect_hit_within_perfect_window() {
-        assert_eq!(classify_note(0.03, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Perfect));
+        assert_eq!(
+            classify_note(0.03, true, 0.06, 0.13, 0.13),
+            NoteOutcome::Hit(HitQuality::Perfect)
+        );
     }
 
     #[test]
     fn perfect_hit_early_side() {
-        assert_eq!(classify_note(-0.04, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Perfect));
+        assert_eq!(
+            classify_note(-0.04, true, 0.06, 0.13, 0.13),
+            NoteOutcome::Hit(HitQuality::Perfect)
+        );
     }
 
     #[test]
     fn good_hit_outside_perfect_window_late() {
-        assert_eq!(classify_note(0.10, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Good));
+        assert_eq!(
+            classify_note(0.10, true, 0.06, 0.13, 0.13),
+            NoteOutcome::Hit(HitQuality::Good)
+        );
     }
 
     #[test]
     fn good_hit_outside_perfect_window_early() {
-        assert_eq!(classify_note(-0.10, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Good));
+        assert_eq!(
+            classify_note(-0.10, true, 0.06, 0.13, 0.13),
+            NoteOutcome::Hit(HitQuality::Good)
+        );
     }
 
     // ── compute_multiplier ────────────────────────────────────────────────────
@@ -205,7 +241,7 @@ mod tests {
         // mult = (1 + 10/10).min(4) = 2
         let s = combo_label(10);
         assert!(s.contains("\u{00D7}10"), "label: {s}");
-        assert!(s.contains("\u{00D7}2"),  "label: {s}");
+        assert!(s.contains("\u{00D7}2"), "label: {s}");
     }
 
     #[test]

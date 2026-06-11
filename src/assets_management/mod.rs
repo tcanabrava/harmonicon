@@ -9,7 +9,6 @@ pub struct GlobalFonts {
 
 pub struct AssetsManagementPlugin;
 
-
 #[derive(Debug, Clone)]
 pub struct SongEntry {
     pub artist: String,
@@ -30,7 +29,9 @@ pub struct AvailableHarmonicas(pub Vec<String>);
 pub struct SelectedHarmonicaModel(pub String);
 
 impl Default for SelectedHarmonicaModel {
-    fn default() -> Self { Self("default".into()) }
+    fn default() -> Self {
+        Self("default".into())
+    }
 }
 
 impl Plugin for AssetsManagementPlugin {
@@ -38,7 +39,10 @@ impl Plugin for AssetsManagementPlugin {
         app.init_resource::<AvailableSongs>()
             .init_resource::<AvailableHarmonicas>()
             .init_resource::<SelectedHarmonicaModel>()
-            .add_systems(Startup, (scan_all_songs, scan_harmonica_models, load_global_fonts));
+            .add_systems(
+                Startup,
+                (scan_all_songs, scan_harmonica_models, load_global_fonts),
+            );
     }
 }
 
@@ -57,12 +61,22 @@ fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
         return;
     };
     for entry in entries.flatten() {
-        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) { continue; }
-        if !entry.path().join("harmonica.glb").exists() { continue; }
-        available.0.push(entry.file_name().to_string_lossy().into_owned());
+        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        if !entry.path().join("harmonica.glb").exists() {
+            continue;
+        }
+        available
+            .0
+            .push(entry.file_name().to_string_lossy().into_owned());
     }
     available.0.sort_unstable();
-    info!("Found {} harmonica model(s): {:?}", available.0.len(), available.0);
+    info!(
+        "Found {} harmonica model(s): {:?}",
+        available.0.len(),
+        available.0
+    );
 }
 
 pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {

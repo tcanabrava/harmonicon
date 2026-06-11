@@ -1,5 +1,5 @@
 use bevy::prelude::Message;
-use rustfft::{num_complex::Complex, Fft, FftPlanner};
+use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use std::sync::Arc;
 
 // Harmonica range: roughly C4 (262 Hz) to the top of a 10-hole diatonic.
@@ -67,8 +67,7 @@ pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -
         .iter()
         .enumerate()
         .map(|(i, &s)| {
-            let w =
-                0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (n - 1) as f32).cos());
+            let w = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (n - 1) as f32).cos());
             Complex::new(s * w, 0.0)
         })
         .collect();
@@ -106,7 +105,13 @@ pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -
 
     suppress_harmonics(&raw_peaks)
         .into_iter()
-        .filter_map(|(freq, _)| freq_to_note(freq).map(|(note, octave)| PitchInfo { note, octave, frequency: freq }))
+        .filter_map(|(freq, _)| {
+            freq_to_note(freq).map(|(note, octave)| PitchInfo {
+                note,
+                octave,
+                frequency: freq,
+            })
+        })
         .collect()
 }
 

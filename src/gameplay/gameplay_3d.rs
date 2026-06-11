@@ -9,10 +9,10 @@ use crate::{
 };
 
 use super::{
-    ActivePitches, ActiveTargets, ComboText, CountdownOverlay, CountdownText, FeedbackText,
-    GameplayRoot, HoleCell, HoleState, MusicPlayer, MusicStarted, ScoreText, ScheduledNote,
-    ScoringConfig, ValidHarpNotes, COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
-    secs_per_bar, current_bar_index,
+    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, CountdownOverlay, CountdownText,
+    FeedbackText, GameplayRoot, HOLE_COUNT, HoleCell, HoleState, LOOKAHEAD, MusicPlayer,
+    MusicStarted, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes, current_bar_index,
+    secs_per_bar,
 };
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ const LANE_WIDTH: f32 = 1.0;
 const LANE_GAP: f32 = 0.06;
 const LANE_DEPTH: f32 = 60.0;
 const HIT_Z: f32 = 6.0;
-const FAR_Z: f32 = HIT_Z - LANE_DEPTH;          // -54
+const FAR_Z: f32 = HIT_Z - LANE_DEPTH; // -54
 const LANE_Y: f32 = 1.6;
 const NOTE_H: f32 = 0.18;
 const HARP_Z: f32 = HIT_Z + 2.2;
@@ -80,7 +80,9 @@ struct HarmonicaModelConfig {
     holes: Vec<HoleConfig>,
 }
 
-fn default_model_scale() -> f32 { 1.0 }
+fn default_model_scale() -> f32 {
+    1.0
+}
 
 impl HarmonicaModelConfig {
     fn default_layout() -> Self {
@@ -154,8 +156,7 @@ pub fn setup(
     // order=0 renders first and the 2D HUD composites on top.
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 14.0, 24.0)
-            .looking_at(Vec3::new(0.0, 0.0, HIT_Z - 18.0), Vec3::Y),
+        Transform::from_xyz(0.0, 14.0, 24.0).looking_at(Vec3::new(0.0, 0.0, HIT_Z - 18.0), Vec3::Y),
         GameplayCamera3D,
         GameplayRoot,
         Name::new("Camera3d (gameplay 3D)"),
@@ -199,16 +200,16 @@ pub fn setup(
 
     // ── Lane geometry derived from holes.json ────────────────────────────────
     let holes = &model_cfg.holes;
-    let left_edge   = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
-    let right_edge  = holes.last().map(|h| h.x + h.w * 0.5).unwrap_or(5.0);
+    let left_edge = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
+    let right_edge = holes.last().map(|h| h.x + h.w * 0.5).unwrap_or(5.0);
     let total_width = right_edge - left_edge;
-    let center_x    = (left_edge + right_edge) * 0.5;
+    let center_x = (left_edge + right_edge) * 0.5;
     let lane_width = total_width / holes.len() as f32;
 
     // Extend the track to end at the holes' Z so it meets the harmonica face.
-    let track_end_z  = holes.first().map(|h| h.z).unwrap_or(HARP_Z);
-    let track_len    = track_end_z - FAR_Z;
-    let track_ctr_z  = FAR_Z + track_len * 0.5;
+    let track_end_z = holes.first().map(|h| h.z).unwrap_or(HARP_Z);
+    let track_len = track_end_z - FAR_Z;
+    let track_ctr_z = FAR_Z + track_len * 0.5;
 
     let lane_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.08, 0.08, 0.12),
@@ -226,7 +227,9 @@ pub fn setup(
 
     // Alternating lane shading
     for (i, hole) in holes.iter().enumerate() {
-        if i % 2 == 1 { continue; }
+        if i % 2 == 1 {
+            continue;
+        }
         let shade_mat = materials.add(StandardMaterial {
             base_color: Color::srgba(1.0, 1.0, 1.0, 0.04),
             alpha_mode: AlphaMode::Blend,
@@ -262,7 +265,11 @@ pub fn setup(
     for item in &chart.track {
         let t = item.time.unwrap_or_else(|| {
             let tick = item.tick.unwrap_or(0);
-            crate::song::chart::tick_to_seconds(tick, chart.timing.resolution, &chart.timing.tempo_map)
+            crate::song::chart::tick_to_seconds(
+                tick,
+                chart.timing.resolution,
+                &chart.timing.tempo_map,
+            )
         });
         let depth = note_depth(item.duration);
         for event in &item.events {
@@ -283,7 +290,9 @@ pub fn setup(
             let note_w = hole_cfg.map(|h| h.w).unwrap_or(LANE_WIDTH - LANE_GAP);
             let note_mesh = meshes.add(Cuboid::new(note_w, NOTE_H, depth));
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
-                chart.harmonica.wind_direction_label(event.hole, &event.action)
+                chart
+                    .harmonica
+                    .wind_direction_label(event.hole, &event.action)
             });
             // Spawn off-screen; update_notes_3d repositions each frame
             commands.spawn((
@@ -316,13 +325,7 @@ pub fn setup(
     );
 
     // ── 2D HUD overlay (renders via Camera2d on top) ──────────────────────────
-    spawn_hud_overlay(
-        &mut commands,
-        chart,
-        &chords,
-        key,
-        &font,
-    );
+    spawn_hud_overlay(&mut commands, chart, &chords, key, &font);
 }
 
 fn spawn_harmonica_3d(
@@ -335,9 +338,13 @@ fn spawn_harmonica_3d(
 ) {
     let [tx, ty, tz] = config.model_translation;
     commands.spawn((
-        WorldAssetRoot(asset_server.load(format!("harmonicas/3d/{model_name}/harmonica.glb#Scene0"))),
+        WorldAssetRoot(
+            asset_server.load(format!("harmonicas/3d/{model_name}/harmonica.glb#Scene0")),
+        ),
         Transform::from_xyz(tx, ty, tz)
-            .with_rotation(Quat::from_rotation_y(config.model_rotation_y_deg.to_radians()))
+            .with_rotation(Quat::from_rotation_y(
+                config.model_rotation_y_deg.to_radians(),
+            ))
             .with_scale(Vec3::splat(config.model_scale)),
         GameplayRoot,
     ));
@@ -381,8 +388,11 @@ fn spawn_hud_overlay(
         chart.song.tempo_bpm as u32,
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
-    let harp_info    = chart.harmonica.display();
-    let description  = chart.metadata.as_ref().and_then(|m| m.description.as_deref());
+    let harp_info = chart.harmonica.display();
+    let description = chart
+        .metadata
+        .as_ref()
+        .and_then(|m| m.description.as_deref());
     let chart_author = chart.metadata.as_ref().and_then(|m| m.author.as_deref());
 
     commands
@@ -402,27 +412,39 @@ fn spawn_hud_overlay(
         ))
         .with_children(|p| {
             for (text, size, color) in [
-                (title.as_str(),    18.0f32, Color::WHITE),
-                (info.as_str(),     12.0,    Color::srgb(0.65, 0.70, 0.80)),
-                (harp_info.as_str(), 11.0,   Color::srgb(0.45, 0.72, 0.55)),
+                (title.as_str(), 18.0f32, Color::WHITE),
+                (info.as_str(), 12.0, Color::srgb(0.65, 0.70, 0.80)),
+                (harp_info.as_str(), 11.0, Color::srgb(0.45, 0.72, 0.55)),
             ] {
                 p.spawn((
                     Text::new(text.to_string()),
-                    TextFont { font_size: FontSize::Px(size), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(size),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(color),
                 ));
             }
             if let Some(desc) = description {
                 p.spawn((
                     Text::new(desc.to_string()),
-                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(10.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.50, 0.50, 0.55)),
                 ));
             }
             if let Some(author) = chart_author {
                 p.spawn((
                     Text::new(format!("Chart: {author}")),
-                    TextFont { font_size: FontSize::Px(9.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(9.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.40, 0.40, 0.45)),
                 ));
             }
@@ -460,7 +482,11 @@ fn spawn_hud_overlay(
                             .with_children(|cell| {
                                 cell.spawn((
                                     Text::new(chords[idx].clone()),
-                                    TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                                    TextFont {
+                                        font_size: FontSize::Px(12.0),
+                                        font: font.clone(),
+                                        ..default()
+                                    },
                                     TextColor(Color::WHITE),
                                 ));
                             });
@@ -479,84 +505,114 @@ fn spawn_hud_overlay(
             .with_children(|leg| {
                 leg.spawn((
                     Text::new("\u{25A0} BLOW"),
-                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(10.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 leg.spawn((
                     Text::new("\u{25A0} DRAW"),
-                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(10.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
             });
         });
 
     // Score panel — top-right corner
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(8.0),
-            right: Val::Px(8.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::FlexEnd,
-            row_gap: Val::Px(2.0),
-            padding: UiRect::all(Val::Px(8.0)),
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-        GlobalZIndex(20),
-        GameplayRoot,
-    ))
-    .with_children(|p| {
-        p.spawn((
-            Text::new("0"),
-            TextFont { font_size: FontSize::Px(30.0), font: font.clone(), ..default() },
-            TextColor(Color::WHITE),
-            ScoreText,
-        ));
-        p.spawn((
-            Text::new(""),
-            TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
-            TextColor(Color::srgb(0.90, 0.72, 0.20)),
-            ComboText,
-        ));
-        p.spawn((
-            Text::new(""),
-            TextFont { font_size: FontSize::Px(22.0), font: font.clone(), ..default() },
-            TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
-            FeedbackText,
-        ));
-    });
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(8.0),
+                right: Val::Px(8.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexEnd,
+                row_gap: Val::Px(2.0),
+                padding: UiRect::all(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+            GlobalZIndex(20),
+            GameplayRoot,
+        ))
+        .with_children(|p| {
+            p.spawn((
+                Text::new("0"),
+                TextFont {
+                    font_size: FontSize::Px(30.0),
+                    font: font.clone(),
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                ScoreText,
+            ));
+            p.spawn((
+                Text::new(""),
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    font: font.clone(),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.90, 0.72, 0.20)),
+                ComboText,
+            ));
+            p.spawn((
+                Text::new(""),
+                TextFont {
+                    font_size: FontSize::Px(22.0),
+                    font: font.clone(),
+                    ..default()
+                },
+                TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                FeedbackText,
+            ));
+        });
 
     // Countdown overlay (full-screen, on top of everything)
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            row_gap: Val::Px(12.0),
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.05, 0.55)),
-        GlobalZIndex(100),
-        CountdownOverlay,
-        GameplayRoot,
-    ))
-    .with_children(|ov| {
-        ov.spawn((
-            Text::new("GET READY"),
-            TextFont { font_size: FontSize::Px(22.0), font: font.clone(), ..default() },
-            TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
-        ));
-        ov.spawn((
-            Text::new("3"),
-            TextFont { font_size: FontSize::Px(120.0), font: font.clone(), ..default() },
-            TextColor(Color::WHITE),
-            CountdownText,
-        ));
-    });
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(12.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.05, 0.55)),
+            GlobalZIndex(100),
+            CountdownOverlay,
+            GameplayRoot,
+        ))
+        .with_children(|ov| {
+            ov.spawn((
+                Text::new("GET READY"),
+                TextFont {
+                    font_size: FontSize::Px(22.0),
+                    font: font.clone(),
+                    ..default()
+                },
+                TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
+            ));
+            ov.spawn((
+                Text::new("3"),
+                TextFont {
+                    font_size: FontSize::Px(120.0),
+                    font: font.clone(),
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                CountdownText,
+            ));
+        });
 }
 
 fn bar_bg_3d(bar: usize, key: &str) -> Color {
@@ -619,7 +675,12 @@ pub fn update_countdown(
 pub fn update_notes_3d(
     clock: Res<super::GameplayClock>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut notes: Query<(&NoteVisual3D, &ScheduledNote, &MeshMaterial3d<StandardMaterial>, &mut Transform)>,
+    mut notes: Query<(
+        &NoteVisual3D,
+        &ScheduledNote,
+        &MeshMaterial3d<StandardMaterial>,
+        &mut Transform,
+    )>,
 ) {
     let elapsed = clock.0;
     for (note, scheduled, mat_handle, mut tf) in &mut notes {
@@ -644,11 +705,13 @@ pub fn update_bar_3d(
     config: Res<ScoringConfig>,
     mut cells: Query<(&BarCell3D, &mut BackgroundColor)>,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else { return };
-    let bpm     = manifest.chart.song.tempo_bpm as f64;
-    let spb     = secs_per_bar(bpm, config.beats_per_bar);
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let bpm = manifest.chart.song.tempo_bpm as f64;
+    let spb = secs_per_bar(bpm, config.beats_per_bar);
     let current = current_bar_index(clock.0, spb);
-    let key     = manifest.chart.song.key.as_str();
+    let key = manifest.chart.song.key.as_str();
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current {
@@ -669,12 +732,14 @@ pub fn update_holes_3d(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut cells: Query<(&HoleCell, &HoleMesh3D, &mut HoleState)>,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else { return };
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
     let chart = &manifest.chart;
     let dt = time.delta_secs();
 
     let attack = 1.0 - (-dt * 25.0_f32).exp();
-    let decay  = 1.0 - (-dt *  4.0_f32).exp();
+    let decay = 1.0 - (-dt * 4.0_f32).exp();
 
     let harp_pitches: Vec<&crate::pitch_detect::PitchInfo> = active
         .0
@@ -690,11 +755,19 @@ pub fn update_holes_3d(
         let mut draw_hit = false;
         for p in &harp_pitches {
             let name = format!("{}{}", p.note, p.octave);
-            if name == blow { blow_hit = true; }
-            if name == draw { draw_hit = true; }
+            if name == blow {
+                blow_hit = true;
+            }
+            if name == draw {
+                draw_hit = true;
+            }
         }
 
-        let hint = targets.0.iter().find(|(h, _)| *h == cell.0).map(|(_, b)| *b);
+        let hint = targets
+            .0
+            .iter()
+            .find(|(h, _)| *h == cell.0)
+            .map(|(_, b)| *b);
         let hint_floor = if hint.is_some() { 0.18f32 } else { 0.0 };
 
         let (target, is_blow) = if blow_hit {
@@ -711,17 +784,23 @@ pub fn update_holes_3d(
             state.is_blow = is_blow;
         }
 
-        let factor = if target > state.brightness { attack } else { decay };
+        let factor = if target > state.brightness {
+            attack
+        } else {
+            decay
+        };
         state.brightness += (target - state.brightness) * factor;
         let b = state.brightness;
 
         if let Some(mut mat) = materials.get_mut(&hole_mat.0) {
             if state.is_blow {
-                mat.emissive = LinearRgba::new(0.05 + 0.15 * b, 0.10 + 0.50 * b, 0.10 + 2.0 * b, 1.0);
+                mat.emissive =
+                    LinearRgba::new(0.05 + 0.15 * b, 0.10 + 0.50 * b, 0.10 + 2.0 * b, 1.0);
                 mat.base_color = Color::srgb(0.05 + 0.20 * b, 0.08 + 0.40 * b, 0.08 + 0.75 * b);
             } else {
                 mat.emissive = LinearRgba::new(0.05 + 2.0 * b, 0.05 + 0.40 * b, 0.02, 1.0);
-                mat.base_color = Color::srgb(0.08 + 0.78 * b, 0.06 + 0.25 * b, (0.08 - 0.04 * b).max(0.0));
+                mat.base_color =
+                    Color::srgb(0.08 + 0.78 * b, 0.06 + 0.25 * b, (0.08 - 0.04 * b).max(0.0));
             }
         }
     }
@@ -729,9 +808,7 @@ pub fn update_holes_3d(
 
 /// Called on `OnExit(AppState::Playing)` — restores Camera2d to its normal
 /// state so the 2D menu renders correctly after leaving 3D gameplay.
-pub fn restore_camera(
-    mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
-) {
+pub fn restore_camera(mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>) {
     for (mut cam, _) in &mut cameras {
         cam.order = 0;
         cam.clear_color = ClearColorConfig::Default;

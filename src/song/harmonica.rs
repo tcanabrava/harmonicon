@@ -1,18 +1,10 @@
 use serde::Deserialize;
 
-use crate::song::chart::{
-    Action, BendingProfile
-};
+use crate::song::chart::{Action, BendingProfile};
 
-use crate::song::chart::{
-    DiatonicLayout,
-    ChromaticLayout,
-};
+use crate::song::chart::{ChromaticLayout, DiatonicLayout};
 
-use crate::audio_system::midi_functions::{
-    midi_to_note,
-    note_to_midi
-};
+use crate::audio_system::midi_functions::{midi_to_note, note_to_midi};
 
 use std::collections::HashSet;
 
@@ -37,15 +29,26 @@ pub fn twelve_bar(key: &str) -> [String; 12] {
     let iv = semitone(key, 5);
     let v = semitone(key, 7);
     [
-        key.into(), key.into(), key.into(), key.into(),
-        iv.clone(), iv.clone(), key.into(), key.into(),
-        v.clone(),  iv.clone(), key.into(), v.clone(),
+        key.into(),
+        key.into(),
+        key.into(),
+        key.into(),
+        iv.clone(),
+        iv.clone(),
+        key.into(),
+        key.into(),
+        v.clone(),
+        iv.clone(),
+        key.into(),
+        v.clone(),
     ]
 }
 
 // Returns the semitone label for the given root and offset.
 pub fn semitone(root: &str, n: i32) -> String {
-    const NOTES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const NOTES: [&str; 12] = [
+        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+    ];
     let i = NOTES.iter().position(|&x| x == root).unwrap_or(0);
     NOTES[((i as i32 + n).rem_euclid(12)) as usize].to_string()
 }
@@ -60,7 +63,10 @@ impl Harmonica {
             return default_return;
         };
 
-        let Harmonica::Diatonic { layout: Some(l), .. } = self else {
+        let Harmonica::Diatonic {
+            layout: Some(l), ..
+        } = self
+        else {
             return default_return;
         };
 
@@ -82,17 +88,30 @@ impl Harmonica {
     // Returns a human-readable string describing the harmonica type and settings.
     pub fn display(&self) -> String {
         match &self {
-            Harmonica::Diatonic { holes, bending_profile, position, .. } => {
+            Harmonica::Diatonic {
+                holes,
+                bending_profile,
+                position,
+                ..
+            } => {
                 let pos = position.as_deref().unwrap_or("?");
                 let profile = match bending_profile {
                     BendingProfile::RichterStandard => "Richter",
                     BendingProfile::CountryTuned => "Country",
                 };
-                format!("Diatonic \u{00B7} {} holes \u{00B7} {} position \u{00B7} {}", holes, pos, profile)
+                format!(
+                    "Diatonic \u{00B7} {} holes \u{00B7} {} position \u{00B7} {}",
+                    holes, pos, profile
+                )
             }
-            Harmonica::Chromatic { holes, position, .. } => {
+            Harmonica::Chromatic {
+                holes, position, ..
+            } => {
                 let pos = position.as_deref().unwrap_or("?");
-                format!("Chromatic \u{00B7} {} holes \u{00B7} {} position", holes, pos)
+                format!(
+                    "Chromatic \u{00B7} {} holes \u{00B7} {} position",
+                    holes, pos
+                )
             }
         }
     }
@@ -102,7 +121,9 @@ impl Harmonica {
     pub fn build_valid_notes(&self) -> HashSet<String> {
         let mut set = HashSet::new();
         match &self {
-            Harmonica::Diatonic { layout: Some(l), .. } => {
+            Harmonica::Diatonic {
+                layout: Some(l), ..
+            } => {
                 let blow = l.blow.as_deref().unwrap_or(&[]);
                 let draw = l.draw.as_deref().unwrap_or(&[]);
                 for (i, (b, d)) in blow.iter().zip(draw.iter()).enumerate() {
@@ -111,7 +132,9 @@ impl Harmonica {
                     // Holes 1-6: draw bends downward toward the blow note.
                     // Holes 7-10: blow bends downward toward the draw note.
                     let (bend_from, bend_to) = if i < 6 { (d, b) } else { (b, d) };
-                    if let (Some(from_m), Some(to_m)) = (note_to_midi(bend_from), note_to_midi(bend_to)) {
+                    if let (Some(from_m), Some(to_m)) =
+                        (note_to_midi(bend_from), note_to_midi(bend_to))
+                    {
                         let lo = from_m.min(to_m);
                         let hi = from_m.max(to_m);
                         for m in (lo + 1)..hi {
@@ -120,10 +143,14 @@ impl Harmonica {
                     }
                 }
             }
-            Harmonica::Chromatic { layout: Some(l), .. } => {
+            Harmonica::Chromatic {
+                layout: Some(l), ..
+            } => {
                 for opt in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide] {
                     if let Some(notes) = opt {
-                        for n in notes { set.insert(n.clone()); }
+                        for n in notes {
+                            set.insert(n.clone());
+                        }
                     }
                 }
             }
@@ -136,7 +163,7 @@ impl Harmonica {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::song::chart::{HarpChart};
+    use crate::song::chart::HarpChart;
 
     fn test_chart() -> HarpChart {
         serde_json::from_str(r#"{
@@ -164,16 +191,16 @@ mod tests {
 
     #[test]
     fn semitone_intervals() {
-        assert_eq!(semitone("C", 7), "G");  // perfect fifth
-        assert_eq!(semitone("C", 5), "F");  // perfect fourth
-        assert_eq!(semitone("C", 4), "E");  // major third
-        assert_eq!(semitone("G", 5), "C");  // fourth up from G
-        assert_eq!(semitone("A", 3), "C");  // minor third up
+        assert_eq!(semitone("C", 7), "G"); // perfect fifth
+        assert_eq!(semitone("C", 5), "F"); // perfect fourth
+        assert_eq!(semitone("C", 4), "E"); // major third
+        assert_eq!(semitone("G", 5), "C"); // fourth up from G
+        assert_eq!(semitone("A", 3), "C"); // minor third up
     }
 
     #[test]
     fn semitone_wraps_at_octave() {
-        assert_eq!(semitone("B",  1), "C");
+        assert_eq!(semitone("B", 1), "C");
         assert_eq!(semitone("C", 12), "C");
         assert_eq!(semitone("A", 14), "B");
     }
@@ -182,7 +209,7 @@ mod tests {
     fn twelve_bar_c_major() {
         let bar = twelve_bar("C");
         // Pattern: I I I I  IV IV I I  V IV I V
-        let expected = ["C","C","C","C","F","F","C","C","G","F","C","G"];
+        let expected = ["C", "C", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"];
         assert_eq!(bar, expected.map(str::to_string));
     }
 
@@ -190,7 +217,7 @@ mod tests {
     fn twelve_bar_g_major() {
         let bar = twelve_bar("G");
         // IV of G = C,  V of G = D
-        let expected = ["G","G","G","G","C","C","G","G","D","C","G","D"];
+        let expected = ["G", "G", "G", "G", "C", "C", "G", "G", "D", "C", "G", "D"];
         assert_eq!(bar, expected.map(str::to_string));
     }
 
@@ -199,14 +226,23 @@ mod tests {
         let chart = test_chart();
         assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Blow), "C4");
         assert_eq!(chart.harmonica.wind_direction_label(4, &Action::Blow), "C5");
-        assert_eq!(chart.harmonica.wind_direction_label(10, &Action::Blow), "C7");
+        assert_eq!(
+            chart.harmonica.wind_direction_label(10, &Action::Blow),
+            "C7"
+        );
     }
 
     #[test]
     fn blow_label_out_of_range_returns_dash() {
         let chart = test_chart();
-        assert_eq!(chart.harmonica.wind_direction_label(0, &Action::Blow), "\u{2014}");   // hole=0 guard
-        assert_eq!(chart.harmonica.wind_direction_label(11, &Action::Blow), "\u{2014}");  // beyond layout
+        assert_eq!(
+            chart.harmonica.wind_direction_label(0, &Action::Blow),
+            "\u{2014}"
+        ); // hole=0 guard
+        assert_eq!(
+            chart.harmonica.wind_direction_label(11, &Action::Blow),
+            "\u{2014}"
+        ); // beyond layout
     }
 
     #[test]
@@ -214,17 +250,20 @@ mod tests {
         let chart = test_chart();
         assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Draw), "D4");
         assert_eq!(chart.harmonica.wind_direction_label(3, &Action::Draw), "B4");
-        assert_eq!(chart.harmonica.wind_direction_label(0, &Action::Draw), "\u{2014}");
+        assert_eq!(
+            chart.harmonica.wind_direction_label(0, &Action::Draw),
+            "\u{2014}"
+        );
     }
 
     #[test]
     fn build_valid_notes_contains_blow_and_draw() {
         let chart = test_chart();
         let notes = chart.harmonica.build_valid_notes();
-        for n in &["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"] {
+        for n in &["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"] {
             assert!(notes.contains(*n), "missing blow note {n}");
         }
-        for n in &["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"] {
+        for n in &["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"] {
             assert!(notes.contains(*n), "missing draw note {n}");
         }
     }
@@ -236,7 +275,7 @@ mod tests {
         // Hole 1: draw=D4(62) bends down to blow=C4(60) → C#4(61) reachable
         assert!(notes.contains("C#4"), "missing bend note C#4");
         // Hole 2: draw=G4(67) bends down to blow=E4(64) → F4(65), F#4(66) reachable
-        assert!(notes.contains("F4"),  "missing bend note F4");
+        assert!(notes.contains("F4"), "missing bend note F4");
         assert!(notes.contains("F#4"), "missing bend note F#4");
     }
 

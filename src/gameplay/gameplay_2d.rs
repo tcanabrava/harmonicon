@@ -4,15 +4,15 @@ use crate::{
     assets_management::GlobalFonts,
     menu::SelectedSong,
     song::SongManifest,
-    song::harmonica::{semitone, twelve_bar},
     song::chart::Action,
+    song::harmonica::{semitone, twelve_bar},
 };
 
 use super::{
-    ActivePitches, ActiveTargets, CountdownOverlay, CountdownText, ComboText, FeedbackText,
-    GameplayRoot, HoleCell, HoleState, MusicPlayer, MusicStarted, NoteVisual, ScoreText,
-    ScheduledNote, ScoringConfig, ValidHarpNotes, COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT,
-    LOOKAHEAD, secs_per_bar, current_bar_index,
+    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, CountdownOverlay, CountdownText,
+    FeedbackText, GameplayRoot, HIT_H_PCT, HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD,
+    MusicPlayer, MusicStarted, NoteVisual, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes,
+    current_bar_index, secs_per_bar,
 };
 
 pub fn setup(
@@ -45,7 +45,10 @@ pub fn setup(
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
     let harp_info = chart.harmonica.display();
-    let description = chart.metadata.as_ref().and_then(|m| m.description.as_deref());
+    let description = chart
+        .metadata
+        .as_ref()
+        .and_then(|m| m.description.as_deref());
     let chart_author = chart.metadata.as_ref().and_then(|m| m.author.as_deref());
 
     commands
@@ -83,30 +86,50 @@ pub fn setup(
             .with_children(|col| {
                 col.spawn((
                     Text::new(title),
-                    TextFont { font_size: FontSize::Px(22.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(22.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::WHITE),
                 ));
                 col.spawn((
                     Text::new(info),
-                    TextFont { font_size: FontSize::Px(13.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(13.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.60, 0.65, 0.75)),
                 ));
                 col.spawn((
                     Text::new(harp_info),
-                    TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(12.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.45, 0.72, 0.55)),
                 ));
                 if let Some(desc) = description {
                     col.spawn((
                         Text::new(desc.to_string()),
-                        TextFont { font_size: FontSize::Px(11.0), font: fonts.gameplay.clone(), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(11.0),
+                            font: fonts.gameplay.clone(),
+                            ..default()
+                        },
                         TextColor(Color::srgb(0.50, 0.50, 0.55)),
                     ));
                 }
                 if let Some(author) = chart_author {
                     col.spawn((
                         Text::new(format!("Chart: {author}")),
-                        TextFont { font_size: FontSize::Px(10.0), font: fonts.gameplay.clone(), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(10.0),
+                            font: fonts.gameplay.clone(),
+                            ..default()
+                        },
                         TextColor(Color::srgb(0.40, 0.40, 0.45)),
                     ));
                 }
@@ -167,19 +190,31 @@ pub fn setup(
             .with_children(|p| {
                 p.spawn((
                     Text::new("0"),
-                    TextFont { font_size: FontSize::Px(30.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(30.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::WHITE),
                     ScoreText,
                 ));
                 p.spawn((
                     Text::new(""),
-                    TextFont { font_size: FontSize::Px(15.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(15.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.90, 0.72, 0.20)),
                     ComboText,
                 ));
                 p.spawn((
                     Text::new(""),
-                    TextFont { font_size: FontSize::Px(22.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(22.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
                     FeedbackText,
                 ));
@@ -204,12 +239,20 @@ pub fn setup(
             .with_children(|ov| {
                 ov.spawn((
                     Text::new("GET READY"),
-                    TextFont { font_size: FontSize::Px(22.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(22.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
                 ));
                 ov.spawn((
                     Text::new("3"),
-                    TextFont { font_size: FontSize::Px(120.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(120.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::WHITE),
                     CountdownText,
                 ));
@@ -237,7 +280,7 @@ fn note_height_pct(duration: f64) -> f32 {
 /// Top-percentage position for a note node scrolling down the highway.
 pub fn note_top_pct(note_time: f64, elapsed: f64, lookahead: f64, height_pct: f32) -> f32 {
     let remaining = note_time - elapsed;
-    let progress  = 1.0 - (remaining / lookahead) as f32;
+    let progress = 1.0 - (remaining / lookahead) as f32;
     let hit_center_pct = 100.0 - HIT_H_PCT * 0.5;
     hit_center_pct * progress - height_pct
 }
@@ -275,12 +318,20 @@ fn spawn_12_bar_grid(
                 .with_children(|cell| {
                     cell.spawn((
                         Text::new(chord),
-                        TextFont { font_size: FontSize::Px(17.0), font: font.clone(), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(17.0),
+                            font: font.clone(),
+                            ..default()
+                        },
                         TextColor(Color::WHITE),
                     ));
                     cell.spawn((
                         Text::new(format!("{}", idx + 1)),
-                        TextFont { font_size: FontSize::Px(9.0), font: font.clone(), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(9.0),
+                            font: font.clone(),
+                            ..default()
+                        },
                         TextColor(Color::srgb(0.45, 0.45, 0.55)),
                     ));
                 });
@@ -289,7 +340,11 @@ fn spawn_12_bar_grid(
     }
 }
 
-fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate::song::chart::HarpChart) {
+fn spawn_highway(
+    hw: &mut ChildSpawnerCommands,
+    font: &FontSource,
+    chart: &crate::song::chart::HarpChart,
+) {
     use crate::song::chart::Action;
 
     for h in 0..HOLE_COUNT {
@@ -348,15 +403,25 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate
     for item in &chart.track {
         let t = item.time.unwrap_or_else(|| {
             let tick = item.tick.unwrap_or(0);
-            crate::song::chart::tick_to_seconds(tick, chart.timing.resolution, &chart.timing.tempo_map)
+            crate::song::chart::tick_to_seconds(
+                tick,
+                chart.timing.resolution,
+                &chart.timing.tempo_map,
+            )
         });
         let h_pct = note_height_pct(item.duration);
         for event in &item.events {
             let is_blow = matches!(event.action, Action::Blow);
-            let (r, g, b) = if is_blow { (0.25f32, 0.55, 0.95) } else { (0.95f32, 0.38, 0.15) };
+            let (r, g, b) = if is_blow {
+                (0.25f32, 0.55, 0.95)
+            } else {
+                (0.95f32, 0.38, 0.15)
+            };
             let left_pct = (event.hole as f32 - 1.0) * LANE_PCT + 0.3;
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
-                chart.harmonica.wind_direction_label(event.hole, &event.action)
+                chart
+                    .harmonica
+                    .wind_direction_label(event.hole, &event.action)
             });
             hw.spawn((
                 Node {
@@ -372,7 +437,10 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate
                 },
                 BackgroundColor(Color::srgba(r, g, b, 0.88)),
                 BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.50)),
-                NoteVisual { time: t, height_pct: h_pct },
+                NoteVisual {
+                    time: t,
+                    height_pct: h_pct,
+                },
                 ScheduledNote {
                     time: t,
                     hole: event.hole,
@@ -386,7 +454,11 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, font: &FontSource, chart: &crate
             .with_children(|note| {
                 note.spawn((
                     Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
-                    TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(12.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
                 ));
             });
@@ -426,17 +498,29 @@ fn spawn_harmonica_strip(
             .with_children(|cell| {
                 cell.spawn((
                     Text::new(b),
-                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(11.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 cell.spawn((
                     Text::new(format!("{hole}")),
-                    TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(16.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::WHITE),
                 ));
                 cell.spawn((
                     Text::new(d),
-                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(11.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
             });
@@ -452,12 +536,20 @@ fn spawn_harmonica_strip(
     .with_children(|leg| {
         leg.spawn((
             Text::new("\u{25A0} BLOW"),
-            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+            TextFont {
+                font_size: FontSize::Px(11.0),
+                font: font.clone(),
+                ..default()
+            },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
         leg.spawn((
             Text::new("\u{25A0} DRAW"),
-            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+            TextFont {
+                font_size: FontSize::Px(11.0),
+                font: font.clone(),
+                ..default()
+            },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));
     });
@@ -507,10 +599,7 @@ pub fn update_countdown(
     }
 }
 
-pub fn update_notes(
-    clock: Res<super::GameplayClock>,
-    mut notes: Query<(&NoteVisual, &mut Node)>,
-) {
+pub fn update_notes(clock: Res<super::GameplayClock>, mut notes: Query<(&NoteVisual, &mut Node)>) {
     let elapsed = clock.0;
     for (note, mut node) in &mut notes {
         node.top = Val::Percent(note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct));
@@ -524,11 +613,13 @@ pub fn update_bar(
     config: Res<ScoringConfig>,
     mut cells: Query<(&super::BarCell, &mut BackgroundColor)>,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else { return };
-    let bpm     = manifest.chart.song.tempo_bpm as f64;
-    let spb     = secs_per_bar(bpm, config.beats_per_bar);
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let bpm = manifest.chart.song.tempo_bpm as f64;
+    let spb = secs_per_bar(bpm, config.beats_per_bar);
     let current = current_bar_index(clock.0, spb);
-    let key     = manifest.chart.song.key.as_str();
+    let key = manifest.chart.song.key.as_str();
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current {
@@ -548,12 +639,14 @@ pub fn update_holes(
     manifests: Res<Assets<SongManifest>>,
     mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState)>,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else { return };
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
     let chart = &manifest.chart;
     let dt = time.delta_secs();
 
     let attack = 1.0 - (-dt * 25.0_f32).exp();
-    let decay  = 1.0 - (-dt *  4.0_f32).exp();
+    let decay = 1.0 - (-dt * 4.0_f32).exp();
 
     let harp_pitches: Vec<&crate::pitch_detect::PitchInfo> = active
         .0
@@ -569,13 +662,19 @@ pub fn update_holes(
         let mut draw_hit = false;
         for p in &harp_pitches {
             let name = format!("{}{}", p.note, p.octave);
-            if name == blow { blow_hit = true; }
-            if name == draw { draw_hit = true; }
+            if name == blow {
+                blow_hit = true;
+            }
+            if name == draw {
+                draw_hit = true;
+            }
         }
 
         // Floor brightness when a note for this hole is in the hit window,
         // giving the player a visual cue about what to play next.
-        let hint = targets.0.iter()
+        let hint = targets
+            .0
+            .iter()
             .find(|(h, _)| *h == cell.0)
             .map(|(_, b)| *b);
         let hint_floor = if hint.is_some() { 0.18f32 } else { 0.0 };
@@ -595,7 +694,11 @@ pub fn update_holes(
             state.is_blow = is_blow;
         }
 
-        let factor = if target > state.brightness { attack } else { decay };
+        let factor = if target > state.brightness {
+            attack
+        } else {
+            decay
+        };
         state.brightness += (target - state.brightness) * factor;
         let b = state.brightness;
 
@@ -655,6 +758,9 @@ mod tests {
         let h = 5.0;
         let t0 = note_top_pct(2.0, 0.0, LOOKAHEAD, h);
         let t1 = note_top_pct(2.0, 1.0, LOOKAHEAD, h);
-        assert!(t1 > t0, "note should move down (larger top%) as time advances");
+        assert!(
+            t1 > t0,
+            "note should move down (larger top%) as time advances"
+        );
     }
 }

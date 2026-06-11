@@ -1,7 +1,7 @@
 use bevy::prelude::Resource;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{SampleFormat, StreamConfig};
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded};
 
 pub const CHUNK_SIZE: usize = 4096;
 
@@ -47,7 +47,13 @@ pub fn create_audio_capture() -> Result<(AudioStream, AudioCapture), Box<dyn std
 
     stream.play()?;
 
-    Ok((AudioStream(stream), AudioCapture { receiver: rx, sample_rate }))
+    Ok((
+        AudioStream(stream),
+        AudioCapture {
+            receiver: rx,
+            sample_rate,
+        },
+    ))
 }
 
 // ---------------------------------------------------------------------------

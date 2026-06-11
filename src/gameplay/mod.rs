@@ -2,19 +2,18 @@ mod gameplay_2d;
 mod gameplay_3d;
 mod scoring;
 
-use std::collections::HashSet;
 use bevy::prelude::*;
-use std::collections::HashMap;
 use scoring::{
-    classify_note, combo_label, compute_multiplier, compute_points,
-    should_decay_combo, NoteOutcome,
+    NoteOutcome, classify_note, combo_label, compute_multiplier, compute_points, should_decay_combo,
 };
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate::{
     assets_management::GlobalFonts,
     menu::{AppState, GameplayMode, SelectedSong},
     pitch_detect::{PitchEvent, PitchInfo},
-    song::{chart::Modifier, SongManifest},
+    song::{SongManifest, chart::Modifier},
 };
 
 pub struct GameplayPlugin;
@@ -59,12 +58,16 @@ impl Plugin for GameplayPlugin {
             // Gameplay-logic chains only run when not paused
             .add_systems(
                 Update,
-                (tick_clock, handle_loop_boundary, collect_pitches, update_active_targets, score_notes, update_score_display)
+                (
+                    tick_clock,
+                    handle_loop_boundary,
+                    collect_pitches,
+                    update_active_targets,
+                    score_notes,
+                    update_score_display,
+                )
                     .chain()
-                    .run_if(
-                        in_state(AppState::Playing)
-                            .and_then(|p: Res<Paused>| !p.0),
-                    ),
+                    .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
             )
             // 2D update chain
             .add_systems(
@@ -185,9 +188,12 @@ pub struct CountdownOverlay;
 pub struct CountdownText;
 
 // Score HUD marker components
-#[derive(Component)] pub struct ScoreText;
-#[derive(Component)] pub struct ComboText;
-#[derive(Component)] pub struct FeedbackText;
+#[derive(Component)]
+pub struct ScoreText;
+#[derive(Component)]
+pub struct ComboText;
+#[derive(Component)]
+pub struct FeedbackText;
 
 /// Set to true while gameplay is paused; all update chains gate on `!paused`.
 #[derive(Resource, Default)]
@@ -226,15 +232,15 @@ pub struct ScoringConfig {
 impl Default for ScoringConfig {
     fn default() -> Self {
         Self {
-            perfect_window:  0.060,
-            good_window:     0.130,
-            miss_window:     0.130,
-            combo_enabled:   true,
+            perfect_window: 0.060,
+            good_window: 0.130,
+            miss_window: 0.130,
+            combo_enabled: true,
             base_multiplier: 1.0,
             step_multiplier: 0.1,
-            max_multiplier:  4.0,
-            decay_secs:      None,
-            beats_per_bar:   4.0,
+            max_multiplier: 4.0,
+            decay_secs: None,
+            beats_per_bar: 4.0,
         }
     }
 }
@@ -289,9 +295,9 @@ fn reset_score(
     mut feedback: ResMut<HitFeedback>,
     mut paused: ResMut<Paused>,
 ) {
-    *score    = Score::default();
+    *score = Score::default();
     *feedback = HitFeedback::default();
-    paused.0  = false;
+    paused.0 = false;
 }
 
 fn setup_scoring_config(
@@ -301,27 +307,31 @@ fn setup_scoring_config(
     mut loop_cfg: ResMut<LoopConfig>,
     mut fx_mapping: ResMut<FxMapping>,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else { return };
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
     let chart = &manifest.chart;
-    let s     = &chart.scoring;
+    let s = &chart.scoring;
 
     config.perfect_window = s.perfect_window_ms as f64 / 1000.0;
-    config.good_window    = s.good_window_ms    as f64 / 1000.0;
-    config.miss_window    = s.miss_window_ms    as f64 / 1000.0;
+    config.good_window = s.good_window_ms as f64 / 1000.0;
+    config.miss_window = s.miss_window_ms as f64 / 1000.0;
 
     // Resolve beats per bar: time_signature_map at tick=0 takes precedence over song field.
-    let beats_str = chart.timing.time_signature_map
+    let beats_str = chart
+        .timing
+        .time_signature_map
         .as_deref()
         .and_then(|m| crate::song::chart::time_sig_at_tick(0, m))
         .or(chart.song.time_signature.as_deref());
     config.beats_per_bar = parse_beats(beats_str);
 
     if let Some(combo) = &s.combo {
-        config.combo_enabled    = combo.enabled;
-        config.base_multiplier  = combo.base_multiplier;
-        config.step_multiplier  = combo.step_multiplier;
-        config.max_multiplier   = combo.max_multiplier;
-        config.decay_secs       = combo.decay_ms.map(|ms| ms as f64 / 1000.0);
+        config.combo_enabled = combo.enabled;
+        config.base_multiplier = combo.base_multiplier;
+        config.step_multiplier = combo.step_multiplier;
+        config.max_multiplier = combo.max_multiplier;
+        config.decay_secs = combo.decay_ms.map(|ms| ms as f64 / 1000.0);
     }
 
     // Set up loop section if the chart requests repeat playback.
@@ -342,9 +352,9 @@ fn setup_scoring_config(
                         )
                     })
                 };
-                loop_cfg.active     = true;
+                loop_cfg.active = true;
                 loop_cfg.start_time = resolve(si);
-                loop_cfg.end_time   = resolve(ei) + track[ei].duration;
+                loop_cfg.end_time = resolve(ei) + track[ei].duration;
                 info!(
                     "Loop section ({:?}): {:.2}s – {:.2}s",
                     ls.section_type, loop_cfg.start_time, loop_cfg.end_time,
@@ -354,7 +364,8 @@ fn setup_scoring_config(
     }
 
     // Resolve fx_mapping: modifier name → DSP effect processor name.
-    fx_mapping.0 = chart.fx_mapping
+    fx_mapping.0 = chart
+        .fx_mapping
         .as_ref()
         .map(|m| m.clone())
         .unwrap_or_default();
@@ -362,8 +373,8 @@ fn setup_scoring_config(
     info!(
         "Scoring config: perfect={:.0}ms good={:.0}ms miss={:.0}ms combo={} beats/bar={}",
         config.perfect_window * 1000.0,
-        config.good_window    * 1000.0,
-        config.miss_window    * 1000.0,
+        config.good_window * 1000.0,
+        config.miss_window * 1000.0,
         config.combo_enabled,
         config.beats_per_bar,
     );
@@ -378,11 +389,13 @@ fn handle_loop_boundary(
     mut clock: ResMut<GameplayClock>,
     mut notes: Query<&mut ScheduledNote>,
 ) {
-    if !loop_cfg.active || clock.0 < loop_cfg.end_time { return; }
+    if !loop_cfg.active || clock.0 < loop_cfg.end_time {
+        return;
+    }
     clock.0 = loop_cfg.start_time;
     for mut note in &mut notes {
         if note.time >= loop_cfg.start_time && note.time <= loop_cfg.end_time {
-            note.hit    = false;
+            note.hit = false;
             note.missed = false;
         }
     }
@@ -401,9 +414,13 @@ fn update_active_targets(
     mut targets: ResMut<ActiveTargets>,
 ) {
     targets.0.clear();
-    if clock.0 < 0.0 { return; }
+    if clock.0 < 0.0 {
+        return;
+    }
     for note in &notes {
-        if note.hit || note.missed { continue; }
+        if note.hit || note.missed {
+            continue;
+        }
         if (clock.0 - note.time).abs() <= config.good_window {
             targets.0.push((note.hole, note.is_blow));
         }
@@ -420,7 +437,9 @@ fn score_notes(
     mut score: ResMut<Score>,
     mut feedback: ResMut<HitFeedback>,
 ) {
-    if clock.0 < 0.0 { return; }
+    if clock.0 < 0.0 {
+        return;
+    }
 
     if config.combo_enabled
         && should_decay_combo(score.combo, clock.0, score.last_hit_time, config.decay_secs)
@@ -436,15 +455,25 @@ fn score_notes(
         .collect();
 
     for mut note in &mut notes {
-        if note.hit || note.missed { continue; }
+        if note.hit || note.missed {
+            continue;
+        }
 
         let offset = clock.0 - note.time;
         let playing = harp_pitches.contains(&note.expected_pitch);
 
-        match classify_note(offset, playing, config.perfect_window, config.good_window, config.miss_window) {
+        match classify_note(
+            offset,
+            playing,
+            config.perfect_window,
+            config.good_window,
+            config.miss_window,
+        ) {
             NoteOutcome::Missed => {
                 note.missed = true;
-                if config.combo_enabled { score.combo = 0; }
+                if config.combo_enabled {
+                    score.combo = 0;
+                }
             }
             NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
             NoteOutcome::Hit(quality) => {
@@ -453,13 +482,18 @@ fn score_notes(
                 score.combo += 1;
                 score.max_combo = score.max_combo.max(score.combo);
                 let multiplier = if config.combo_enabled {
-                    compute_multiplier(score.combo, config.base_multiplier, config.step_multiplier, config.max_multiplier)
+                    compute_multiplier(
+                        score.combo,
+                        config.base_multiplier,
+                        config.step_multiplier,
+                        config.max_multiplier,
+                    )
                 } else {
                     1.0
                 };
                 score.points += compute_points(quality, multiplier);
                 feedback.quality = Some(quality);
-                feedback.timer   = 0.75;
+                feedback.timer = 0.75;
 
                 // Resolve which DSP effects should activate for each modifier.
                 for modifier in &note.modifiers {
@@ -475,12 +509,12 @@ fn score_notes(
 
 fn modifier_fx_key(modifier: &Modifier) -> &'static str {
     match modifier {
-        Modifier::Bend { .. }    => "bend",
+        Modifier::Bend { .. } => "bend",
         Modifier::Vibrato { .. } => "vibrato",
-        Modifier::WahWah { .. }  => "wah-wah",
-        Modifier::Hold { .. }    => "hold",
-        Modifier::Overblow       => "overblow",
-        Modifier::Overdraw       => "overdraw",
+        Modifier::WahWah { .. } => "wah-wah",
+        Modifier::Hold { .. } => "hold",
+        Modifier::Overblow => "overblow",
+        Modifier::Overdraw => "overdraw",
     }
 }
 
@@ -488,14 +522,8 @@ fn update_score_display(
     score: Res<Score>,
     mut feedback: ResMut<HitFeedback>,
     time: Res<Time>,
-    mut q_score: Query<
-        &mut Text,
-        (With<ScoreText>, Without<ComboText>, Without<FeedbackText>),
-    >,
-    mut q_combo: Query<
-        &mut Text,
-        (With<ComboText>, Without<ScoreText>, Without<FeedbackText>),
-    >,
+    mut q_score: Query<&mut Text, (With<ScoreText>, Without<ComboText>, Without<FeedbackText>)>,
+    mut q_combo: Query<&mut Text, (With<ComboText>, Without<ScoreText>, Without<FeedbackText>)>,
     mut q_feedback: Query<
         (&mut Text, &mut TextColor),
         (With<FeedbackText>, Without<ScoreText>, Without<ComboText>),
@@ -522,9 +550,9 @@ fn update_score_display(
                 // easily done here, so we just fade alpha.
                 let (label, r, g, b) = match q {
                     HitQuality::Perfect => ("PERFECT!", 1.00f32, 0.85, 0.10),
-                    HitQuality::Good    => ("GOOD",     0.40,    1.00, 0.35),
+                    HitQuality::Good => ("GOOD", 0.40, 1.00, 0.35),
                 };
-                t.0    = label.to_string();
+                t.0 = label.to_string();
                 *color = TextColor(Color::srgba(r, g, b, alpha));
                 if feedback.timer == 0.0 {
                     feedback.quality = None;
@@ -557,10 +585,14 @@ fn setup_pause_menu(mut commands: Commands, fonts: Res<GlobalFonts>) {
         .with_children(|p| {
             p.spawn((
                 Text::new("PAUSED"),
-                TextFont { font_size: FontSize::Px(52.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(52.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
-            spawn_pause_button(p, "Resume",   PauseButton::Resume,  &font);
+            spawn_pause_button(p, "Resume", PauseButton::Resume, &font);
             spawn_pause_button(p, "Quit Song", PauseButton::QuitSong, &font);
         });
 }
@@ -586,7 +618,11 @@ fn spawn_pause_button(
         .with_children(|b| {
             b.spawn((
                 Text::new(label.to_string()),
-                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
         });
@@ -598,13 +634,23 @@ fn handle_pause_input(
     mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    if !keyboard.just_pressed(KeyCode::Escape) { return; }
+    if !keyboard.just_pressed(KeyCode::Escape) {
+        return;
+    }
     paused.0 = !paused.0;
     for mut vis in &mut overlay {
-        *vis = if paused.0 { Visibility::Visible } else { Visibility::Hidden };
+        *vis = if paused.0 {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
     for sink in &sinks {
-        if paused.0 { sink.pause(); } else { sink.play(); }
+        if paused.0 {
+            sink.pause();
+        } else {
+            sink.play();
+        }
     }
 }
 
@@ -616,12 +662,18 @@ fn handle_pause_buttons(
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
     for (interaction, button) in &buttons {
-        if *interaction != Interaction::Pressed { continue; }
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
         match button {
             PauseButton::Resume => {
                 paused.0 = false;
-                for mut vis in &mut overlay { *vis = Visibility::Hidden; }
-                for sink in &sinks { sink.play(); }
+                for mut vis in &mut overlay {
+                    *vis = Visibility::Hidden;
+                }
+                for sink in &sinks {
+                    sink.play();
+                }
             }
             PauseButton::QuitSong => {
                 paused.0 = false;
@@ -641,7 +693,7 @@ fn pause_button_hover(
         *bg = BackgroundColor(match interaction {
             Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
             Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-            Interaction::None    => Color::srgb(0.14, 0.14, 0.22),
+            Interaction::None => Color::srgb(0.14, 0.14, 0.22),
         });
     }
 }

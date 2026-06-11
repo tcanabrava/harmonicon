@@ -1,6 +1,6 @@
+use crate::song::harmonica::Harmonica;
 use serde::Deserialize;
 use std::collections::HashMap;
-use crate::song::harmonica::Harmonica;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct HarpChart {
@@ -62,7 +62,6 @@ pub struct TimeSigPoint {
     pub time_signature: String,
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BendingProfile {
@@ -123,15 +122,24 @@ pub enum Action {
 #[serde(tag = "type")]
 pub enum Modifier {
     #[serde(rename = "bend")]
-    Bend { semitones: f32, intensity: Option<f32> },
+    Bend {
+        semitones: f32,
+        intensity: Option<f32>,
+    },
     #[serde(rename = "overblow")]
     Overblow,
     #[serde(rename = "overdraw")]
     Overdraw,
     #[serde(rename = "vibrato")]
-    Vibrato { oscillation_hz: f32, intensity: Option<f32> },
+    Vibrato {
+        oscillation_hz: f32,
+        intensity: Option<f32>,
+    },
     #[serde(rename = "wah-wah")]
-    WahWah { oscillation_hz: f32, intensity: Option<f32> },
+    WahWah {
+        oscillation_hz: f32,
+        intensity: Option<f32>,
+    },
     #[serde(rename = "hold")]
     Hold { intensity: Option<f32> },
 }
@@ -181,18 +189,22 @@ pub fn tick_to_seconds(tick: u64, resolution: u32, tempo_map: &[TempoPoint]) -> 
     if tempo_map.is_empty() || resolution == 0 {
         return 0.0;
     }
-    let mut elapsed  = 0.0f64;
+    let mut elapsed = 0.0f64;
     let mut prev_tick = tempo_map[0].tick;
-    let mut prev_bpm  = tempo_map[0].bpm as f64;
+    let mut prev_bpm = tempo_map[0].bpm as f64;
 
     for point in tempo_map.iter().skip(1) {
-        if tick <= prev_tick { break; }
-        let seg_end   = point.tick.min(tick);
+        if tick <= prev_tick {
+            break;
+        }
+        let seg_end = point.tick.min(tick);
         let seg_ticks = seg_end - prev_tick;
         elapsed += (seg_ticks as f64 / resolution as f64) * (60.0 / prev_bpm);
-        if tick <= point.tick { return elapsed; }
+        if tick <= point.tick {
+            return elapsed;
+        }
         prev_tick = point.tick;
-        prev_bpm  = point.bpm as f64;
+        prev_bpm = point.bpm as f64;
     }
     if tick > prev_tick {
         let remaining = tick - prev_tick;
@@ -243,7 +255,12 @@ mod tests {
     #[test]
     fn diatonic_layout_fields_parsed() {
         let chart: HarpChart = serde_json::from_str(MINIMAL_DIATONIC).unwrap();
-        let Harmonica::Diatonic { holes, layout: Some(ref l), .. } = chart.harmonica else {
+        let Harmonica::Diatonic {
+            holes,
+            layout: Some(ref l),
+            ..
+        } = chart.harmonica
+        else {
             panic!("expected Diatonic with layout");
         };
         assert_eq!(holes, 10);
@@ -271,7 +288,10 @@ mod tests {
             "scoring": {"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}
         }"#;
         let chart: HarpChart = serde_json::from_str(json).unwrap();
-        assert!(matches!(chart.harmonica, Harmonica::Chromatic { holes: 12, .. }));
+        assert!(matches!(
+            chart.harmonica,
+            Harmonica::Chromatic { holes: 12, .. }
+        ));
     }
 
     #[test]
@@ -321,13 +341,19 @@ mod tests {
 
     #[test]
     fn tick_zero_is_zero_seconds() {
-        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
+        let map = vec![TempoPoint {
+            tick: 0,
+            bpm: 120.0,
+        }];
         assert_eq!(tick_to_seconds(0, 480, &map), 0.0);
     }
 
     #[test]
     fn one_beat_at_120bpm() {
-        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
+        let map = vec![TempoPoint {
+            tick: 0,
+            bpm: 120.0,
+        }];
         let secs = tick_to_seconds(480, 480, &map);
         assert!((secs - 0.5).abs() < 1e-9, "got {secs}");
     }
@@ -336,8 +362,14 @@ mod tests {
     fn tempo_change_midway() {
         // 0..960 @ 120 bpm (2 beats = 1 s), then 960..1440 @ 180 bpm (1 beat = 1/3 s)
         let map = vec![
-            TempoPoint { tick: 0,   bpm: 120.0 },
-            TempoPoint { tick: 960, bpm: 180.0 },
+            TempoPoint {
+                tick: 0,
+                bpm: 120.0,
+            },
+            TempoPoint {
+                tick: 960,
+                bpm: 180.0,
+            },
         ];
         let secs = tick_to_seconds(1440, 480, &map);
         assert!((secs - (1.0 + 1.0 / 3.0)).abs() < 1e-9, "got {secs}");
@@ -346,8 +378,14 @@ mod tests {
     #[test]
     fn tick_at_tempo_change_boundary() {
         let map = vec![
-            TempoPoint { tick: 0,   bpm: 120.0 },
-            TempoPoint { tick: 960, bpm: 180.0 },
+            TempoPoint {
+                tick: 0,
+                bpm: 120.0,
+            },
+            TempoPoint {
+                tick: 960,
+                bpm: 180.0,
+            },
         ];
         let secs = tick_to_seconds(960, 480, &map);
         assert!((secs - 1.0).abs() < 1e-9, "got {secs}");
@@ -363,8 +401,14 @@ mod tests {
     #[test]
     fn time_sig_at_start() {
         let map = vec![
-            TimeSigPoint { tick: 0,   time_signature: "4/4".into() },
-            TimeSigPoint { tick: 960, time_signature: "3/4".into() },
+            TimeSigPoint {
+                tick: 0,
+                time_signature: "4/4".into(),
+            },
+            TimeSigPoint {
+                tick: 960,
+                time_signature: "3/4".into(),
+            },
         ];
         assert_eq!(time_sig_at_tick(0, &map), Some("4/4"));
     }
@@ -372,8 +416,14 @@ mod tests {
     #[test]
     fn time_sig_changes_at_tick() {
         let map = vec![
-            TimeSigPoint { tick: 0,   time_signature: "4/4".into() },
-            TimeSigPoint { tick: 960, time_signature: "3/4".into() },
+            TimeSigPoint {
+                tick: 0,
+                time_signature: "4/4".into(),
+            },
+            TimeSigPoint {
+                tick: 960,
+                time_signature: "3/4".into(),
+            },
         ];
         assert_eq!(time_sig_at_tick(960, &map), Some("3/4"));
         assert_eq!(time_sig_at_tick(959, &map), Some("4/4"));
@@ -387,16 +437,20 @@ mod tests {
     #[test]
     fn difficulty_variants_all_parse() {
         for (s, _) in &[
-            ("easy", "easy"), ("intermediate", "intermediate"),
-            ("advanced", "advanced"), ("expert", "expert"),
+            ("easy", "easy"),
+            ("intermediate", "intermediate"),
+            ("advanced", "advanced"),
+            ("expert", "expert"),
         ] {
-            let json = format!(r#"{{
+            let json = format!(
+                r#"{{
                 "song": {{"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"{s}"}},
                 "timing": {{"resolution":480,"tempo_map":[{{"tick":0,"bpm":120.0}}]}},
                 "harmonica": {{"type":"diatonic","holes":10,"bending_profile":"richter_standard"}},
                 "track": [],
                 "scoring": {{"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}}
-            }}"#);
+            }}"#
+            );
             serde_json::from_str::<HarpChart>(&json)
                 .unwrap_or_else(|e| panic!("difficulty '{s}' failed to parse: {e}"));
         }
