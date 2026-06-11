@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+use crate::song::harmonica::Harmonica;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct HarpChart {
@@ -61,21 +62,6 @@ pub struct TimeSigPoint {
     pub time_signature: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum Harmonica {
-    Diatonic {
-        holes: u8,
-        bending_profile: BendingProfile,
-        position: Option<String>,
-        layout: Option<DiatonicLayout>,
-    },
-    Chromatic {
-        holes: u8,
-        position: Option<String>,
-        layout: Option<ChromaticLayout>,
-    },
-}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]

@@ -3,7 +3,6 @@ mod menu;
 mod song;
 mod audio_system;
 mod assets_management;
-mod harmonica;
 use bevy::prelude::*;
 
 use assets_management::AssetsManagementPlugin;

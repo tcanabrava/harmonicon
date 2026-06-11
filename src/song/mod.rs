@@ -1,7 +1,9 @@
 pub mod chart;
 mod loader;
+pub mod harmonica;
 
 pub use chart::HarpChart;
+pub use harmonica::Harmonica;
 pub use loader::SongChartLoader;
 
 use bevy::{audio::AudioSource, image::Image, prelude::*};

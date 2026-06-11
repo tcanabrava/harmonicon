@@ -14,6 +14,11 @@ pub enum GameplayMode {
 #[derive(Resource, Default)]
 pub struct PendingSongPath(pub String);
 
+/// Set to `true` by the pause menu "Quit Song" button so that re-entering
+/// `AppState::Menu` lands on the artist's song list rather than the main menu.
+#[derive(Resource, Default)]
+pub struct ReturnToSongList(pub bool);
+
 pub struct MenuPlugin;
 
 // ── App-level states ──────────────────────────────────────────────────────────

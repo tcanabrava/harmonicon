@@ -4,7 +4,8 @@ use crate::{
     assets_management::GlobalFonts,
     menu::SelectedSong,
     song::SongManifest,
-    harmonica::{blow_label, draw_label, harp_display, semitone, twelve_bar},
+    song::chart::Action,
+    song::harmonica::{semitone, twelve_bar},
 };
 
 use super::{
@@ -70,7 +71,7 @@ pub fn setup(
     };
     clock.0 = -COUNTDOWN;
     music_started.0 = false;
-    valid_notes.0 = crate::harmonica::build_valid_notes(&manifest.chart);
+    valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
 
     // Make the Camera2d render on top without clearing the 3D scene
     for (mut cam, _) in &mut cameras {
@@ -222,7 +223,7 @@ pub fn setup(
             });
             let note_mesh = meshes.add(Cuboid::new(LANE_WIDTH - LANE_GAP, NOTE_H, depth));
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
-                if is_blow { blow_label(event.hole, chart) } else { draw_label(event.hole, chart) }
+                chart.harmonica.wind_direction_label(event.hole, &event.action)
             });
             // Spawn off-screen; update_notes_3d repositions each frame
             commands.spawn((
@@ -391,7 +392,7 @@ fn spawn_hud_overlay(
         chart.song.tempo_bpm as u32,
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
-    let harp_info    = harp_display(chart);
+    let harp_info    = chart.harmonica.display();
     let description  = chart.metadata.as_ref().and_then(|m| m.description.as_deref());
     let chart_author = chart.metadata.as_ref().and_then(|m| m.author.as_deref());
 
@@ -693,8 +694,8 @@ pub fn update_holes_3d(
         .collect();
 
     for (cell, hole_mat, mut state) in &mut cells {
-        let blow = blow_label(cell.0, chart);
-        let draw = draw_label(cell.0, chart);
+        let blow = chart.harmonica.wind_direction_label(cell.0, &Action::Blow);
+        let draw = chart.harmonica.wind_direction_label(cell.0, &Action::Draw);
 
         let mut blow_hit = false;
         let mut draw_hit = false;
