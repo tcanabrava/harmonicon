@@ -4,7 +4,7 @@ use crate::{
     assets_management::{GlobalFonts, SelectedHarmonicaModel},
     menu::SelectedSong,
     song::SongManifest,
-    song::chart::Action,
+    song::chart::{Action, HarpChart},
     song::harmonica::{semitone, twelve_bar},
 };
 
@@ -179,58 +179,17 @@ pub fn setup_background(
 
 }
 
-pub fn setup(
-    mut commands: Commands,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    mut clock: ResMut<super::GameplayClock>,
-    mut music_started: ResMut<MusicStarted>,
-    mut valid_notes: ResMut<ValidHarpNotes>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    fonts: Res<GlobalFonts>,
-    asset_server: Res<AssetServer>,
-    selected_model: Res<SelectedHarmonicaModel>,
-    mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
+fn create_note_track(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    total_width: f32,
+    lane_width: f32,
+    track_len: f32,
+    center_x: f32,
+    track_ctr_z: f32,
+    holes: &[HoleConfig],
 ) {
-    let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
-        error!("SongManifest not ready when entering Playing (3D) state");
-        return;
-    };
-    clock.0 = -COUNTDOWN;
-    music_started.0 = false;
-    valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
-
-    // Make the Camera2d render on top without clearing the 3D scene
-    for (mut cam, _) in &mut cameras {
-        cam.order = 1;
-        cam.clear_color = ClearColorConfig::None;
-    }
-
-    let chart = &manifest.chart;
-    let key = chart.song.key.as_str();
-    let chords = twelve_bar(key);
-    let font = fonts.gameplay.clone();
-    let model_cfg = load_model_config(&selected_model.0);
-
-    setup_camera_3d(&mut commands);
-    setup_lighting(&mut commands);
-    setup_background(&mut commands, manifest.background.clone(), &mut meshes, &mut materials);
-
-
-    // ── Lane geometry derived from holes.json ────────────────────────────────
-    let holes = &model_cfg.holes;
-    let left_edge = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
-    let right_edge = holes.last().map(|h| h.x + h.w * 0.5).unwrap_or(5.0);
-    let total_width = right_edge - left_edge;
-    let center_x = (left_edge + right_edge) * 0.5;
-    let lane_width = total_width / holes.len() as f32;
-
-    // Extend the track to end at the holes' Z so it meets the harmonica face.
-    let track_end_z = holes.first().map(|h| h.z).unwrap_or(HARP_Z);
-    let track_len = track_end_z - FAR_Z;
-    let track_ctr_z = FAR_Z + track_len * 0.5;
-
     let lane_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.08, 0.08, 0.12),
         metallic: 0.3,
@@ -264,7 +223,15 @@ pub fn setup(
             GameplayRoot,
         ));
     }
+}
 
+fn create_hit_zone(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    center_x: f32,
+    total_width: f32,
+) {
     // ── Hit zone ─────────────────────────────────────────────────────────────
     let hit_mat = materials.add(StandardMaterial {
         base_color: Color::srgba(1.0, 1.0, 0.6, 0.15),
@@ -280,8 +247,15 @@ pub fn setup(
         Transform::from_xyz(center_x, LANE_Y + 0.03, HIT_Z),
         GameplayRoot,
     ));
+}
 
-    // ── Note visuals ──────────────────────────────────────────────────────────
+pub fn create_note_visuals(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    holes: &[HoleConfig],
+    chart: &HarpChart,
+) {
     for item in &chart.track {
         let t = item.time.unwrap_or_else(|| {
             let tick = item.tick.unwrap_or(0);
@@ -333,8 +307,67 @@ pub fn setup(
             ));
         }
     }
+}
 
-    // ── Harmonica 3D model ────────────────────────────────────────────────────
+pub fn setup(
+    mut commands: Commands,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut clock: ResMut<super::GameplayClock>,
+    mut music_started: ResMut<MusicStarted>,
+    mut valid_notes: ResMut<ValidHarpNotes>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    fonts: Res<GlobalFonts>,
+    asset_server: Res<AssetServer>,
+    selected_model: Res<SelectedHarmonicaModel>,
+    mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
+) {
+    let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
+        error!("SongManifest not ready when entering Playing (3D) state");
+        return;
+    };
+    clock.0 = -COUNTDOWN;
+    music_started.0 = false;
+    valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
+
+    // Make the Camera2d render on top without clearing the 3D scene
+    for (mut cam, _) in &mut cameras {
+        cam.order = 1;
+        cam.clear_color = ClearColorConfig::None;
+    }
+
+    let chart = &manifest.chart;
+    let key = chart.song.key.as_str();
+    let chords = twelve_bar(key);
+    let font = fonts.gameplay.clone();
+    let model_cfg = load_model_config(&selected_model.0);
+
+    setup_camera_3d(&mut commands);
+    setup_lighting(&mut commands);
+    setup_background(&mut commands, manifest.background.clone(), &mut meshes, &mut materials);
+
+    // ── Lane geometry derived from holes.json ────────────────────────────────
+    let holes = &model_cfg.holes;
+    let left_edge = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
+    let right_edge = holes.last().map(|h| h.x + h.w * 0.5).unwrap_or(5.0);
+    let total_width = right_edge - left_edge;
+    let center_x = (left_edge + right_edge) * 0.5;
+    let lane_width = total_width / holes.len() as f32;
+
+    // Extend the track to end at the holes' Z so it meets the harmonica face.
+    let track_end_z = holes.first().map(|h| h.z).unwrap_or(HARP_Z);
+    let track_len = track_end_z - FAR_Z;
+    let track_ctr_z = FAR_Z + track_len * 0.5;
+
+    create_note_track(
+        &mut commands, &mut meshes, &mut materials,
+        total_width, lane_width, track_len, center_x, track_ctr_z,
+        holes
+    );
+
+    create_hit_zone(&mut commands, &mut meshes, &mut materials, center_x, total_width);
+    create_note_visuals(&mut commands, &mut meshes, &mut materials, holes, &chart);
     spawn_harmonica_3d(
         &mut commands,
         &mut meshes,
@@ -343,8 +376,6 @@ pub fn setup(
         &selected_model.0,
         &model_cfg,
     );
-
-    // ── 2D HUD overlay (renders via Camera2d on top) ──────────────────────────
     spawn_hud_overlay(&mut commands, chart, &chords, key, &font);
 }
 
