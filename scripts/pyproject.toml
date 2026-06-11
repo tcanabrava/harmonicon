@@ -1,0 +1,13 @@
+[project]
+name = "scripts"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "numpy>=2.4.6",
+    "pillow>=12.2.0",
+    "scikit-image>=0.26.0",
+    "scipy>=1.17.1",
+    "trimesh>=4.12.2",
+]
