@@ -199,10 +199,15 @@ pub fn setup(
 
     // ── Lane geometry derived from holes.json ────────────────────────────────
     let holes = &model_cfg.holes;
-    let left_edge  = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
-    let right_edge = holes.last().map(|h| h.x + h.w * 0.5).unwrap_or(5.0);
+    let left_edge   = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
+    let right_edge  = holes.last().map(|h| h.x + h.w * 0.5).unwrap_or(5.0);
     let total_width = right_edge - left_edge;
     let center_x    = (left_edge + right_edge) * 0.5;
+
+    // Extend the track to end at the holes' Z so it meets the harmonica face.
+    let track_end_z  = holes.first().map(|h| h.z).unwrap_or(HARP_Z);
+    let track_len    = track_end_z - FAR_Z;
+    let track_ctr_z  = FAR_Z + track_len * 0.5;
 
     let lane_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.08, 0.08, 0.12),
@@ -210,11 +215,11 @@ pub fn setup(
         perceptual_roughness: 0.8,
         ..default()
     });
-    let floor_mesh = meshes.add(Cuboid::new(total_width, 0.05, LANE_DEPTH));
+    let floor_mesh = meshes.add(Cuboid::new(total_width, 0.05, track_len));
     commands.spawn((
         Mesh3d(floor_mesh),
         MeshMaterial3d(lane_mat.clone()),
-        Transform::from_xyz(center_x, LANE_Y - 0.025, HIT_Z - LANE_DEPTH * 0.5),
+        Transform::from_xyz(center_x, LANE_Y - 0.025, track_ctr_z),
         GameplayRoot,
     ));
 
@@ -225,12 +230,12 @@ pub fn setup(
         unlit: true,
         ..default()
     });
-    let div_mesh = meshes.add(Cuboid::new(0.02, 0.15, LANE_DEPTH));
+    let div_mesh = meshes.add(Cuboid::new(0.02, 0.15, track_len));
     for hole in holes.iter() {
         commands.spawn((
             Mesh3d(div_mesh.clone()),
             MeshMaterial3d(div_mat.clone()),
-            Transform::from_xyz(hole.x - hole.w * 0.5, LANE_Y + 0.07, HIT_Z - LANE_DEPTH * 0.5),
+            Transform::from_xyz(hole.x - hole.w * 0.5, LANE_Y + 0.07, track_ctr_z),
             GameplayRoot,
         ));
     }
@@ -238,7 +243,7 @@ pub fn setup(
         commands.spawn((
             Mesh3d(div_mesh.clone()),
             MeshMaterial3d(div_mat.clone()),
-            Transform::from_xyz(last.x + last.w * 0.5, LANE_Y + 0.07, HIT_Z - LANE_DEPTH * 0.5),
+            Transform::from_xyz(last.x + last.w * 0.5, LANE_Y + 0.07, track_ctr_z),
             GameplayRoot,
         ));
     }
@@ -252,11 +257,11 @@ pub fn setup(
             unlit: true,
             ..default()
         });
-        let shade_mesh = meshes.add(Cuboid::new(hole.w, 0.04, LANE_DEPTH));
+        let shade_mesh = meshes.add(Cuboid::new(hole.w, 0.04, track_len));
         commands.spawn((
             Mesh3d(shade_mesh),
             MeshMaterial3d(shade_mat),
-            Transform::from_xyz(hole.x, LANE_Y + 0.02, HIT_Z - LANE_DEPTH * 0.5),
+            Transform::from_xyz(hole.x, LANE_Y + 0.02, track_ctr_z),
             GameplayRoot,
         ));
     }
