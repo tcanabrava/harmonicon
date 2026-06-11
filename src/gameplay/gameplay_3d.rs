@@ -11,7 +11,7 @@ use crate::{
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText,
     FeedbackText, GameplayRoot, HOLE_COUNT, HoleCell, HoleState, LOOKAHEAD,
-    MusicStarted, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes,
+    MusicStarted, ScheduledNote, ScoreText, ValidHarpNotes,
 };
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
@@ -41,6 +41,11 @@ pub(super) struct NoteVisual3D {
 
 #[derive(Component)]
 pub(super) struct HoleMesh3D(Handle<StandardMaterial>);
+
+/// Parent entity holding the GLB model and its hole overlays. Animated by
+/// `groove_harmonica` so the whole harmonica bobs in time with the music.
+#[derive(Component)]
+pub(super) struct HarmonicaGroove;
 
 fn lane_x(hole: u8) -> f32 {
     (hole as f32 - 1.0) * LANE_WIDTH - (HOLE_COUNT as f32 * LANE_WIDTH) / 2.0 + LANE_WIDTH * 0.5
@@ -377,39 +382,50 @@ fn spawn_harmonica_3d(
     config: &HarmonicaModelConfig,
 ) {
     let [tx, ty, tz] = config.model_translation;
-    commands.spawn((
-        WorldAssetRoot(
-            asset_server.load(format!("harmonicas/3d/{model_name}/harmonica.glb#Scene0")),
-        ),
-        Transform::from_xyz(tx, ty, tz)
-            .with_rotation(Quat::from_rotation_y(
-                config.model_rotation_y_deg.to_radians(),
-            ))
-            .with_scale(Vec3::splat(config.model_scale)),
-        GameplayRoot,
-    ));
 
-    for (i, hole_cfg) in config.holes.iter().enumerate() {
-        let hole = (i + 1) as u8;
-        let hole_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(0.10, 0.11, 0.15),
-            emissive: LinearRgba::new(0.0, 0.0, 0.0, 0.0),
-            metallic: 0.3,
-            perceptual_roughness: 0.6,
-            ..default()
-        });
-        let hole_mesh = meshes.add(Cuboid::new(hole_cfg.w, hole_cfg.h, hole_cfg.d));
-        let mat_handle = hole_mat.clone();
-        commands.spawn((
-            Mesh3d(hole_mesh),
-            MeshMaterial3d(hole_mat),
-            Transform::from_xyz(hole_cfg.x, hole_cfg.y, hole_cfg.z),
-            HoleCell(hole),
-            HoleState::default(),
-            HoleMesh3D(mat_handle),
+    // Everything that should "dance" lives under one parent. `groove_harmonica`
+    // nudges this parent's Transform; children (model + holes) inherit the motion
+    // so the hole overlays stay glued to the model face.
+    commands
+        .spawn((
+            Transform::default(),
+            Visibility::default(),
+            HarmonicaGroove,
             GameplayRoot,
-        ));
-    }
+        ))
+        .with_children(|groove| {
+            groove.spawn((
+                WorldAssetRoot(
+                    asset_server.load(format!("harmonicas/3d/{model_name}/harmonica.glb#Scene0")),
+                ),
+                Transform::from_xyz(tx, ty, tz)
+                    .with_rotation(Quat::from_rotation_y(
+                        config.model_rotation_y_deg.to_radians(),
+                    ))
+                    .with_scale(Vec3::splat(config.model_scale)),
+            ));
+
+            for (i, hole_cfg) in config.holes.iter().enumerate() {
+                let hole = (i + 1) as u8;
+                let hole_mat = materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.10, 0.11, 0.15),
+                    emissive: LinearRgba::new(0.0, 0.0, 0.0, 0.0),
+                    metallic: 0.3,
+                    perceptual_roughness: 0.6,
+                    ..default()
+                });
+                let hole_mesh = meshes.add(Cuboid::new(hole_cfg.w, hole_cfg.h, hole_cfg.d));
+                let mat_handle = hole_mat.clone();
+                groove.spawn((
+                    Mesh3d(hole_mesh),
+                    MeshMaterial3d(hole_mat),
+                    Transform::from_xyz(hole_cfg.x, hole_cfg.y, hole_cfg.z),
+                    HoleCell(hole),
+                    HoleState::default(),
+                    HoleMesh3D(mat_handle),
+                ));
+            }
+        });
 }
 
 fn spawn_hud_overlay(
@@ -558,6 +574,65 @@ fn spawn_hud_overlay(
 }
 
 // ── Per-frame systems ─────────────────────────────────────────────────────────
+
+/// Deterministic pseudo-random in -1..1 from an integer-ish input. The classic
+/// `fract(sin(x) * big)` hash — repeatable per beat, so the groove is stable but
+/// looks improvised.
+fn hash11(n: f32) -> f32 {
+    let x = (n * 127.1).sin() * 43758.547;
+    x.fract() * 2.0 - 1.0
+}
+
+/// Sways the harmonica a few millimeters in all directions, in time with the
+/// song's tempo, so it looks like it's grooving to the music. The motion has a
+/// blues shuffle: a triplet bounce, a backbeat accent, and per-beat randomness
+/// so it never settles into a metronomic rocking-chair arc.
+pub fn groove_harmonica(
+    clock: Res<super::GameplayClock>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut groove: Query<&mut Transform, With<HarmonicaGroove>>,
+) {
+    use std::f32::consts::{PI, TAU};
+
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let bpm = manifest.chart.song.tempo_bpm.max(1.0);
+    // Beats elapsed (fractional). Negative during the countdown — sin/cos handle
+    // that fine, so the harmonica sways gently even before the music kicks in.
+    let beat = (clock.0 / (60.0 / bpm as f64)) as f32;
+    let bi = beat.floor();
+    let frac = beat.fract();
+
+    // Per-beat random accent, smoothly interpolated across the beat (smoothstep)
+    // so each beat lands a little differently — the "improvised" blues feel.
+    let s = frac * frac * (3.0 - 2.0 * frac);
+    let accent = hash11(bi) + (hash11(bi + 1.0) - hash11(bi)) * s;
+
+    // Backbeat emphasis on beats 2 & 4 (the blues snare hits), the off-beats get
+    // a stronger kick than the downbeats.
+    let backbeat = if (bi as i32).rem_euclid(2) == 1 { 1.0 } else { 0.6 };
+
+    // Triplet shuffle: a strong hit on the beat plus a lighter swung hit on the
+    // last triplet (the "and-a"). This is what gives the bounce its blues swing
+    // instead of an even, sea-saw oscillation.
+    let shuffle = (beat * TAU).sin() * 0.7 + (beat * TAU * 1.5).sin() * 0.3;
+    let bob = shuffle * backbeat * (0.6 + 0.4 * accent);
+
+    // Quasi-periodic sway/nod: layering sines at incommensurate (non-integer)
+    // ratios means they never line up the same way twice, so the side-to-side and
+    // fore/aft never repeat into a clean rocking arc. The accent nudges them too.
+    let sway = (beat * PI).sin() * 0.6 + (beat * PI * 0.37).sin() * 0.25 + accent * 0.35;
+    let nod = (beat * PI * 0.73 + PI * 0.25).cos() * 0.6 + (beat * TAU * 0.21).sin() * 0.4;
+
+    for mut tf in &mut groove {
+        tf.translation = Vec3::new(sway * 0.03, bob * 0.022, nod * 0.018);
+        tf.rotation = Quat::from_rotation_z(sway * 0.018)
+            * Quat::from_rotation_x(nod * 0.012)
+            * Quat::from_rotation_y(accent * 0.012);
+    }
+}
 
 pub fn update_notes_3d(
     clock: Res<super::GameplayClock>,

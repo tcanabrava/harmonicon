@@ -97,6 +97,7 @@ impl Plugin for GameplayPlugin {
                 (
                     gameplay_3d::update_notes_3d,
                     gameplay_3d::update_holes_3d,
+                    gameplay_3d::groove_harmonica,
                 )
                     .chain()
                     .run_if(

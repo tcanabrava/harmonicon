@@ -11,7 +11,7 @@ use crate::{
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText,
     FeedbackText, GameplayRoot, HIT_H_PCT, HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD,
-    MusicStarted, NoteVisual, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes,
+    MusicStarted, NoteVisual, ScheduledNote, ScoreText, ValidHarpNotes,
 };
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
