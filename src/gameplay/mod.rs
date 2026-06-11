@@ -1,3 +1,4 @@
+mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;
 mod metronome_overlay;
@@ -23,6 +24,7 @@ pub struct GameplayPlugin;
 impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
+            countdown_overlay::CountdownPlugin,
             twelve_bar_blues_overlay::TwelveBarBluesPlugin,
             metronome_overlay::MetronomePlugin,
         ))
@@ -79,7 +81,6 @@ impl Plugin for GameplayPlugin {
             .add_systems(
                 Update,
                 (
-                    gameplay_2d::update_countdown,
                     gameplay_2d::update_notes,
                     gameplay_2d::update_holes,
                 )
@@ -94,7 +95,6 @@ impl Plugin for GameplayPlugin {
             .add_systems(
                 Update,
                 (
-                    gameplay_3d::update_countdown,
                     gameplay_3d::update_notes_3d,
                     gameplay_3d::update_holes_3d,
                 )
@@ -182,11 +182,6 @@ pub struct HoleState {
     pub is_blow: bool,
 }
 
-#[derive(Component)]
-pub struct CountdownOverlay;
-
-#[derive(Component)]
-pub struct CountdownText;
 
 // Score HUD marker components
 #[derive(Component)]
