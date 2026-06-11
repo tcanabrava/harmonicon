@@ -1,0 +1,4 @@
+add_executable(test_metronome test_metronome.cpp)
+target_link_libraries(test_metronome OrinMetronome)
+target_compile_definitions(test_metronome PUBLIC TEST_BUILD)
+add_test(NAME test_metronome COMMAND test_metronome)

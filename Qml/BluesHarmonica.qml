@@ -34,6 +34,17 @@ Kirigami.Page {
         onErrorMessage: {
             errorText.text = message
         }
+        // the metronome follows the speed of the loaded song.
+        onReadyChanged: {
+            if (harmonicasheet.ready) {
+                metronome.bpm = harmonicasheet.bpmTotal
+            }
+        }
+        onBpmTotalChanged: {
+            if (harmonicasheet.ready) {
+                metronome.bpm = harmonicasheet.bpmTotal
+            }
+        }
     }
 
     ColumnLayout {
@@ -105,6 +116,10 @@ Kirigami.Page {
             SheetInformation {
                 sheet: harmonicasheet
             }
+        }
+        Metronome {
+            id: metronome
+            Layout.fillWidth: true
         }
         ControlBar {
             id: controlBar

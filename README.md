@@ -32,6 +32,10 @@ currently.
 click on load a song, and start the music.
 Follow the notes with the harmonica.
 
+A metronome is available at the bottom of the harmonica page. It clicks with an accent
+on the first beat of the measure, the bpm and the beats per measure are adjustable, and
+the bpm follows the loaded song automatically.
+
 = Português =
 
 == O que é ==
@@ -62,3 +66,7 @@ $ make install
 
 Abra a aplicação, isso irá te mostrar um seletor de flauta e gaita, mas no momento apenas gaita esta implementado.
 Escolha gaita, e selecione uma das musicas exemplo, na pasta Orin/Examples. Carregue a musica, e siga as notas no instrumento.
+
+Um metrônomo está disponível na parte inferior da página da gaita. Ele toca um clique com
+acento no primeiro tempo do compasso, o bpm e os tempos por compasso são ajustáveis, e o
+bpm acompanha automaticamente a música carregada.

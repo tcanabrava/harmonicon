@@ -5,6 +5,7 @@
 #include <QSurfaceFormat>
 
 #include "Harmonica/HarmonicaSheet.h"
+#include "Metronome/Metronome.h"
 
 #include "preferences.h"
 
@@ -21,6 +22,7 @@ int main(int argc, char *argv[])
     app.setOrganizationDomain("Canabrava");
 
     qmlRegisterType<HarmonicaSheet>("orin.music.harmonica", 1,0, "HarmonicaSheet");
+    qmlRegisterType<Metronome>("orin.music.metronome", 1,0, "Metronome");
     qmlRegisterUncreatableType<HarmonicaSoundData>("orin.music.harmonica", 1,0, "HarmonicaSoundData", "Can use, not create");
 
     qRegisterMetaType<HarmonicaSoundData>("HarmonicaSoundData");

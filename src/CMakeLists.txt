@@ -1,4 +1,5 @@
 add_subdirectory(Harmonica)
+add_subdirectory(Metronome)
 
 set(PROJECT_SOURCES
         main.cpp
@@ -31,6 +32,7 @@ target_compile_definitions(Orin
 
 target_link_libraries(Orin
   PRIVATE OrinHarmonica
+  PRIVATE OrinMetronome
   PRIVATE Qt${QT_VERSION_MAJOR}::Core
   PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
   PRIVATE Qt${QT_VERSION_MAJOR}::WebEngine

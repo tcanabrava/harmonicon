@@ -12,8 +12,11 @@
         <file>Qml/HarmonicaNoteFlow.qml</file>
         <file>Qml/BluesHarmonicaNoteBlow.qml</file>
         <file>Qml/SheetInformation.qml</file>
+        <file>Qml/Metronome.qml</file>
         <file>Images/flute.png</file>
         <file>Images/harmonica.png</file>
         <file>Images/harmonica_bg.svg</file>
+        <file>Sounds/tick_high.wav</file>
+        <file>Sounds/tick_low.wav</file>
     </qresource>
 </RCC>
