@@ -3,7 +3,8 @@ mod gameplay_3d;
 mod scoring;
 
 use std::collections::HashSet;
-use bevy::{audio::AudioSource, prelude::*};
+use bevy::prelude::*;
+use std::collections::HashMap;
 use scoring::{
     classify_note, combo_label, compute_multiplier, compute_points,
     should_decay_combo, NoteOutcome,
@@ -30,6 +31,7 @@ impl Plugin for GameplayPlugin {
             .init_resource::<ActiveTargets>()
             .init_resource::<Paused>()
             .init_resource::<LoopConfig>()
+            .init_resource::<FxMapping>()
             // Setup: shared pause menu + mode-specific scenes
             .add_systems(
                 OnEnter(AppState::Playing),
@@ -246,6 +248,12 @@ pub struct LoopConfig {
     pub end_time: f64,
 }
 
+/// Maps modifier type names (e.g. `"bend"`, `"vibrato"`) to the DSP effect
+/// processor name the chart author intends to activate (e.g. `"pitch_bend"`).
+/// Populated from `chart.fx_mapping` at song start; consumed by the audio/DSP layer.
+#[derive(Resource, Default)]
+pub struct FxMapping(pub HashMap<String, String>);
+
 // ── Shared constants ──────────────────────────────────────────────────────────
 
 pub const HOLE_COUNT: usize = 10;
@@ -291,6 +299,7 @@ fn setup_scoring_config(
     manifests: Res<Assets<SongManifest>>,
     mut config: ResMut<ScoringConfig>,
     mut loop_cfg: ResMut<LoopConfig>,
+    mut fx_mapping: ResMut<FxMapping>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else { return };
     let chart = &manifest.chart;
@@ -343,6 +352,12 @@ fn setup_scoring_config(
             }
         }
     }
+
+    // Resolve fx_mapping: modifier name → DSP effect processor name.
+    fx_mapping.0 = chart.fx_mapping
+        .as_ref()
+        .map(|m| m.clone())
+        .unwrap_or_default();
 
     info!(
         "Scoring config: perfect={:.0}ms good={:.0}ms miss={:.0}ms combo={} beats/bar={}",
@@ -400,12 +415,10 @@ fn score_notes(
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
+    fx_mapping: Res<FxMapping>,
     mut notes: Query<&mut ScheduledNote>,
     mut score: ResMut<Score>,
     mut feedback: ResMut<HitFeedback>,
-    mut commands: Commands,
 ) {
     if clock.0 < 0.0 { return; }
 
@@ -421,8 +434,6 @@ fn score_notes(
         .filter(|p| valid_notes.0.contains(&format!("{}{}", p.note, p.octave)))
         .map(|p| format!("{}{}", p.note, p.octave))
         .collect();
-
-    let fx_sounds = manifests.get(&selected.0).map(|m| &m.fx_sounds);
 
     for mut note in &mut notes {
         if note.hit || note.missed { continue; }
@@ -450,17 +461,11 @@ fn score_notes(
                 feedback.quality = Some(quality);
                 feedback.timer   = 0.75;
 
-                // Play fx sound for each modifier on this note, if mapped.
-                if let Some(fx) = fx_sounds {
-                    for modifier in &note.modifiers {
-                        let key = modifier_fx_key(modifier);
-                        if let Some(handle) = fx.get(key) {
-                            commands.spawn((
-                                AudioPlayer::<AudioSource>(handle.clone()),
-                                PlaybackSettings::ONCE,
-                                GameplayRoot,
-                            ));
-                        }
+                // Resolve which DSP effects should activate for each modifier.
+                for modifier in &note.modifiers {
+                    let key = modifier_fx_key(modifier);
+                    if let Some(effect) = fx_mapping.0.get(key) {
+                        debug!("fx: modifier={key} → effect={effect}");
                     }
                 }
             }
