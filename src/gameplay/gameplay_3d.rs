@@ -32,7 +32,6 @@ pub struct GameplayCamera3D;
 #[derive(Component)]
 pub(super) struct NoteVisual3D {
     time: f64,
-    is_blow: bool,
     depth: f32,
 }
 
@@ -226,7 +225,7 @@ pub fn setup(
                 Mesh3d(note_mesh),
                 MeshMaterial3d(note_mat),
                 Transform::from_xyz(lane_x(event.hole), LANE_Y + NOTE_H * 0.5, FAR_Z),
-                NoteVisual3D { time: t, is_blow, depth },
+                NoteVisual3D { time: t, depth },
                 ScheduledNote {
                     time: t,
                     hole: event.hole,

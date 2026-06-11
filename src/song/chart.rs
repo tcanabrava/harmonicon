@@ -187,3 +187,128 @@ pub struct Combo {
     pub max_multiplier: f32,
     pub decay_ms: Option<u32>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MINIMAL_DIATONIC: &str = r#"{
+        "song": { "title": "Test", "artist": "Tester", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
+        "timing": { "resolution": 480, "tempo_map": [{"tick": 0, "bpm": 120.0}] },
+        "harmonica": {
+            "type": "diatonic", "holes": 10, "bending_profile": "richter_standard",
+            "layout": {
+                "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+                "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+            }
+        },
+        "track": [],
+        "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
+    }"#;
+
+    #[test]
+    fn minimal_chart_deserializes() {
+        let chart: HarpChart = serde_json::from_str(MINIMAL_DIATONIC).unwrap();
+        assert_eq!(chart.song.title, "Test");
+        assert_eq!(chart.song.tempo_bpm, 120.0);
+        assert_eq!(chart.scoring.perfect_window_ms, 50);
+        assert_eq!(chart.scoring.good_window_ms, 100);
+        assert!(chart.track.is_empty());
+        assert!(chart.scoring.combo.is_none());
+    }
+
+    #[test]
+    fn diatonic_layout_fields_parsed() {
+        let chart: HarpChart = serde_json::from_str(MINIMAL_DIATONIC).unwrap();
+        let Harmonica::Diatonic { holes, layout: Some(ref l), .. } = chart.harmonica else {
+            panic!("expected Diatonic with layout");
+        };
+        assert_eq!(holes, 10);
+        let blow = l.blow.as_ref().unwrap();
+        assert_eq!(blow.len(), 10);
+        assert_eq!(blow[0], "C4");
+        assert_eq!(blow[9], "C7");
+    }
+
+    #[test]
+    fn chromatic_harmonica_deserializes() {
+        let json = r#"{
+            "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+            "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
+            "harmonica": {
+                "type": "chromatic", "holes": 12,
+                "layout": {
+                    "blow":       ["C4","D4","E4","F4","G4","A4","B4","C5","D5","E5","F5","G5"],
+                    "draw":       ["D4","E4","F#4","G4","A4","B4","C#5","D5","E5","F#5","G5","A5"],
+                    "blow_slide": ["C#4","D#4","F4","F#4","G#4","A#4","B4","C#5","D#5","F5","F#5","G#5"],
+                    "draw_slide": ["D#4","F4","G4","G#4","A#4","C5","D5","D#5","F5","G5","G#5","A#5"]
+                }
+            },
+            "track": [],
+            "scoring": {"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}
+        }"#;
+        let chart: HarpChart = serde_json::from_str(json).unwrap();
+        assert!(matches!(chart.harmonica, Harmonica::Chromatic { holes: 12, .. }));
+    }
+
+    #[test]
+    fn track_item_with_blow_event_parsed() {
+        let json = r#"{
+            "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+            "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
+            "harmonica": {"type":"diatonic","holes":10,"bending_profile":"richter_standard"},
+            "track": [{"time": 1.0, "duration": 0.5, "events": [{"hole": 4, "action": "blow"}]}],
+            "scoring": {"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}
+        }"#;
+        let chart: HarpChart = serde_json::from_str(json).unwrap();
+        assert_eq!(chart.track.len(), 1);
+        let ev = &chart.track[0].events[0];
+        assert_eq!(ev.hole, 4);
+        assert!(matches!(ev.action, Action::Blow));
+    }
+
+    #[test]
+    fn combo_scoring_config_parsed() {
+        let json = r#"{
+            "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+            "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
+            "harmonica": {"type":"diatonic","holes":10,"bending_profile":"richter_standard"},
+            "track": [],
+            "scoring": {
+                "perfect_window_ms": 40,
+                "good_window_ms": 80,
+                "miss_window_ms": 120,
+                "combo": {
+                    "enabled": true,
+                    "base_multiplier": 1.0,
+                    "step_multiplier": 0.25,
+                    "max_multiplier": 4.0,
+                    "decay_ms": 2000
+                }
+            }
+        }"#;
+        let chart: HarpChart = serde_json::from_str(json).unwrap();
+        let combo = chart.scoring.combo.unwrap();
+        assert!(combo.enabled);
+        assert_eq!(combo.step_multiplier, 0.25);
+        assert_eq!(combo.decay_ms, Some(2000));
+    }
+
+    #[test]
+    fn difficulty_variants_all_parse() {
+        for (s, _) in &[
+            ("easy", "easy"), ("intermediate", "intermediate"),
+            ("advanced", "advanced"), ("expert", "expert"),
+        ] {
+            let json = format!(r#"{{
+                "song": {{"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"{s}"}},
+                "timing": {{"resolution":480,"tempo_map":[{{"tick":0,"bpm":120.0}}]}},
+                "harmonica": {{"type":"diatonic","holes":10,"bending_profile":"richter_standard"}},
+                "track": [],
+                "scoring": {{"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}}
+            }}"#);
+            serde_json::from_str::<HarpChart>(&json)
+                .unwrap_or_else(|e| panic!("difficulty '{s}' failed to parse: {e}"));
+        }
+    }
+}

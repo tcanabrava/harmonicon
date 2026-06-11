@@ -164,3 +164,71 @@ fn freq_to_note(freq: f32) -> Option<(String, i32)> {
     let note_idx = (midi_rounded % 12) as usize;
     Some((NOTE_NAMES[note_idx].to_string(), octave))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f32::consts::PI;
+
+    #[test]
+    fn silence_returns_empty() {
+        let samples = vec![0.0f32; 4096];
+        let mut state = FftState::default();
+        assert!(detect_pitches(&samples, 44100, &mut state).is_empty());
+    }
+
+    #[test]
+    fn too_short_returns_empty() {
+        let mut state = FftState::default();
+        assert!(detect_pitches(&[], 44100, &mut state).is_empty());
+        assert!(detect_pitches(&[0.5], 44100, &mut state).is_empty());
+    }
+
+    #[test]
+    fn sine_440hz_detected_as_a4() {
+        let sample_rate = 44100u32;
+        let n = 4096;
+        let samples: Vec<f32> = (0..n)
+            .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+        let mut state = FftState::default();
+        let pitches = detect_pitches(&samples, sample_rate, &mut state);
+        assert!(!pitches.is_empty(), "expected at least one pitch");
+        let a4 = pitches.iter().find(|p| p.note == "A" && p.octave == 4);
+        assert!(a4.is_some(), "expected A4, got {:?}", pitches);
+    }
+
+    #[test]
+    fn harmonic_is_suppressed() {
+        // 880 Hz is 2× 440 Hz and should be removed as a harmonic.
+        let peaks = vec![(440.0f32, 1.0f32), (880.0, 0.5)];
+        let result = suppress_harmonics(&peaks);
+        assert_eq!(result.len(), 1);
+        assert!((result[0].0 - 440.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn non_harmonic_peaks_both_kept() {
+        // 440 Hz (A4) and 659 Hz (E5) are not harmonically related.
+        let peaks = vec![(440.0f32, 1.0f32), (659.0, 0.8)];
+        let result = suppress_harmonics(&peaks);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn freq_to_note_a440() {
+        assert_eq!(freq_to_note(440.0), Some(("A".to_string(), 4)));
+    }
+
+    #[test]
+    fn freq_to_note_middle_c() {
+        // C4 ≈ 261.63 Hz
+        assert_eq!(freq_to_note(261.63), Some(("C".to_string(), 4)));
+    }
+
+    #[test]
+    fn freq_to_note_zero_or_negative_returns_none() {
+        assert_eq!(freq_to_note(0.0), None);
+        assert_eq!(freq_to_note(-1.0), None);
+    }
+}

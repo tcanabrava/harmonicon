@@ -56,7 +56,7 @@ fn setup_audio(world: &mut World) {
     match audio_input::create_audio_capture() {
         Ok((stream, capture)) => {
             info!("Audio capture started at {} Hz", capture.sample_rate);
-            world.insert_non_send_resource(stream);
+            world.insert_non_send(stream);
             world.insert_resource(capture);
         }
         Err(e) => {
