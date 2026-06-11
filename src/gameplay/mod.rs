@@ -1,6 +1,8 @@
 mod gameplay_2d;
 mod gameplay_3d;
+mod metronome_overlay;
 mod scoring;
+mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
 use scoring::{
@@ -20,7 +22,11 @@ pub struct GameplayPlugin;
 
 impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GameplayClock>()
+        app.add_plugins((
+            twelve_bar_blues_overlay::TwelveBarBluesPlugin,
+            metronome_overlay::MetronomePlugin,
+        ))
+        .init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()
             .init_resource::<MusicStarted>()
             .init_resource::<ValidHarpNotes>()
@@ -75,9 +81,7 @@ impl Plugin for GameplayPlugin {
                 (
                     gameplay_2d::update_countdown,
                     gameplay_2d::update_notes,
-                    gameplay_2d::update_bar,
                     gameplay_2d::update_holes,
-                    update_metronome,
                 )
                     .chain()
                     .run_if(
@@ -92,9 +96,7 @@ impl Plugin for GameplayPlugin {
                 (
                     gameplay_3d::update_countdown,
                     gameplay_3d::update_notes_3d,
-                    gameplay_3d::update_bar_3d,
                     gameplay_3d::update_holes_3d,
-                    update_metronome,
                 )
                     .chain()
                     .run_if(
@@ -172,9 +174,6 @@ pub struct ScheduledNote {
 }
 
 #[derive(Component)]
-pub struct BarCell(pub usize);
-
-#[derive(Component)]
 pub struct HoleCell(pub u8);
 
 #[derive(Component, Default)]
@@ -182,10 +181,6 @@ pub struct HoleState {
     pub brightness: f32,
     pub is_blow: bool,
 }
-
-/// One beat-indicator cell in the metronome strip. Index is 0-based within the bar.
-#[derive(Component)]
-pub struct MetronomeBeat(pub usize);
 
 #[derive(Component)]
 pub struct CountdownOverlay;
@@ -701,40 +696,6 @@ fn pause_button_hover(
             Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
             Interaction::None => Color::srgb(0.14, 0.14, 0.22),
         });
-    }
-}
-
-pub fn update_metronome(
-    clock: Res<GameplayClock>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    config: Res<ScoringConfig>,
-    mut beats: Query<(&MetronomeBeat, &mut BackgroundColor)>,
-) {
-    let Some(manifest) = manifests.get(&selected.0) else { return };
-    if clock.0 < 0.0 { return; }
-
-    let bpm = manifest.chart.song.tempo_bpm as f64;
-    let beat_dur = 60.0 / bpm;
-    let beats_per_bar = config.beats_per_bar as usize;
-    let beat_pos = clock.0 / beat_dur;
-    let current = beat_pos.floor() as usize % beats_per_bar;
-    let phase = beat_pos.fract() as f32;
-
-    for (cell, mut bg) in &mut beats {
-        let brightness = if cell.0 == current {
-            (1.0 - phase).powf(1.5)
-        } else {
-            0.0
-        };
-        let is_downbeat = cell.0 == 0;
-        let base = if is_downbeat { 0.25 } else { 0.12 };
-        *bg = BackgroundColor(Color::srgba(
-            base + brightness * 0.9,
-            base + brightness * if is_downbeat { 0.4 } else { 0.7 },
-            base + brightness * if is_downbeat { 0.1 } else { 0.9 },
-            0.9,
-        ));
     }
 }
 

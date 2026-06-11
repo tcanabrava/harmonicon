@@ -1,0 +1,150 @@
+use bevy::prelude::*;
+
+use crate::{
+    menu::{AppState, SelectedSong},
+    song::{
+        SongManifest,
+        harmonica::{semitone, twelve_bar},
+    },
+};
+
+use super::{GameplayClock, Paused, ScoringConfig, current_bar_index, secs_per_bar};
+
+#[derive(Component)]
+pub struct BarCell(pub usize);
+
+pub struct GridConfig {
+    pub cell_width: Val,
+    pub cell_height: Val,
+    pub chord_font_size: f32,
+    pub bar_num_font_size: f32,
+    pub col_gap: f32,
+}
+
+impl GridConfig {
+    pub fn for_2d() -> Self {
+        Self {
+            cell_width: Val::Vw(6.5),
+            cell_height: Val::Vh(5.0),
+            chord_font_size: 17.0,
+            bar_num_font_size: 9.0,
+            col_gap: 3.0,
+        }
+    }
+
+    pub fn for_3d() -> Self {
+        Self {
+            cell_width: Val::Px(76.0),
+            cell_height: Val::Px(52.0),
+            chord_font_size: 24.0,
+            bar_num_font_size: 11.0,
+            col_gap: 4.0,
+        }
+    }
+}
+
+pub fn bar_bg(bar: usize, key: &str) -> Color {
+    let iv = semitone(key, 5);
+    let v = semitone(key, 7);
+    let chords = twelve_bar(key);
+    if chords[bar] == v {
+        Color::srgba(0.20, 0.10, 0.14, 0.85)
+    } else if chords[bar] == iv {
+        Color::srgba(0.10, 0.20, 0.14, 0.85)
+    } else {
+        Color::srgba(0.10, 0.16, 0.26, 0.85)
+    }
+}
+
+pub fn spawn_12_bar_grid(
+    parent: &mut ChildSpawnerCommands,
+    chords: &[String],
+    key: &str,
+    font: &FontSource,
+    cfg: &GridConfig,
+) {
+    for row in 0..3usize {
+        parent
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(cfg.col_gap),
+                ..default()
+            })
+            .with_children(|r| {
+                for col in 0..4usize {
+                    let idx = row * 4 + col;
+                    r.spawn((
+                        Node {
+                            width: cfg.cell_width,
+                            height: cfg.cell_height,
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Center,
+                            border: UiRect::all(Val::Px(1.0)),
+                            ..default()
+                        },
+                        BackgroundColor(bar_bg(idx, key)),
+                        BorderColor::all(Color::srgb(0.25, 0.25, 0.38)),
+                        BarCell(idx),
+                    ))
+                    .with_children(|cell| {
+                        cell.spawn((
+                            Text::new(chords[idx].clone()),
+                            TextFont {
+                                font_size: FontSize::Px(cfg.chord_font_size),
+                                font: font.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                        ));
+                        cell.spawn((
+                            Text::new(format!("{}", idx + 1)),
+                            TextFont {
+                                font_size: FontSize::Px(cfg.bar_num_font_size),
+                                font: font.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.45, 0.45, 0.55)),
+                        ));
+                    });
+                }
+            });
+    }
+}
+
+pub fn update_bar(
+    clock: Res<GameplayClock>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    config: Res<ScoringConfig>,
+    mut cells: Query<(&BarCell, &mut BackgroundColor)>,
+) {
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let bpm = manifest.chart.song.tempo_bpm as f64;
+    let spb = secs_per_bar(bpm, config.beats_per_bar);
+    let current = current_bar_index(clock.0, spb);
+    let key = manifest.chart.song.key.as_str();
+
+    for (cell, mut bg) in &mut cells {
+        *bg = if cell.0 == current {
+            BackgroundColor(Color::srgba(0.75, 0.55, 0.08, 0.95))
+        } else {
+            BackgroundColor(bar_bg(cell.0, key))
+        };
+    }
+}
+
+pub struct TwelveBarBluesPlugin;
+
+impl Plugin for TwelveBarBluesPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            update_bar.run_if(
+                in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0),
+            ),
+        );
+    }
+}

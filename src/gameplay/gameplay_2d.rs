@@ -5,15 +5,16 @@ use crate::{
     menu::SelectedSong,
     song::SongManifest,
     song::chart::Action,
-    song::harmonica::{semitone, twelve_bar},
+    song::harmonica::twelve_bar,
 };
 
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, CountdownOverlay, CountdownText,
     FeedbackText, GameplayRoot, HIT_H_PCT, HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD,
-    MetronomeBeat, MusicPlayer, MusicStarted, NoteVisual, ScheduledNote, ScoreText, ScoringConfig,
-    ValidHarpNotes, current_bar_index, secs_per_bar,
+    MusicPlayer, MusicStarted, NoteVisual, ScheduledNote, ScoreText, ScoringConfig, ValidHarpNotes,
 };
+use super::metronome_overlay::spawn_metronome;
+use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 
 pub fn setup(
     mut commands: Commands,
@@ -172,7 +173,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|grid| {
-                    spawn_12_bar_grid(grid, &chords, key, &fonts.gameplay);
+                    spawn_12_bar_grid(grid, &chords, key, &fonts.gameplay, &GridConfig::for_2d());
                 });
 
                 // Metronome
@@ -245,19 +246,6 @@ pub fn setup(
         });
 }
 
-fn bar_bg(bar: usize, key: &str) -> Color {
-    let iv = semitone(key, 5);
-    let v = semitone(key, 7);
-    let chords = twelve_bar(key);
-    if chords[bar] == v {
-        Color::srgb(0.20, 0.10, 0.14)
-    } else if chords[bar] == iv {
-        Color::srgb(0.10, 0.20, 0.14)
-    } else {
-        Color::srgb(0.10, 0.16, 0.26)
-    }
-}
-
 fn note_height_pct(duration: f64) -> f32 {
     ((duration / LOOKAHEAD) as f32 * 100.0).clamp(3.5, 40.0)
 }
@@ -268,61 +256,6 @@ pub fn note_top_pct(note_time: f64, elapsed: f64, lookahead: f64, height_pct: f3
     let progress = 1.0 - (remaining / lookahead) as f32;
     let hit_center_pct = 100.0 - HIT_H_PCT * 0.5;
     hit_center_pct * progress - height_pct
-}
-
-fn spawn_12_bar_grid(
-    grid: &mut ChildSpawnerCommands,
-    chords: &[String],
-    key: &str,
-    font: &FontSource,
-) {
-    for row in 0..3usize {
-        grid.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(3.0),
-            ..default()
-        })
-        .with_children(|r| {
-            for col in 0..4usize {
-                let idx = row * 4 + col;
-                let chord = chords[idx].clone();
-                r.spawn((
-                    Node {
-                        width: Val::Vw(6.5),
-                        height: Val::Vh(5.0),
-                        flex_direction: FlexDirection::Column,
-                        align_items: AlignItems::Center,
-                        justify_content: JustifyContent::Center,
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BackgroundColor(bar_bg(idx, key)),
-                    BorderColor::all(Color::srgb(0.25, 0.25, 0.38)),
-                    super::BarCell(idx),
-                ))
-                .with_children(|cell| {
-                    cell.spawn((
-                        Text::new(chord),
-                        TextFont {
-                            font_size: FontSize::Px(17.0),
-                            font: font.clone(),
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-                    cell.spawn((
-                        Text::new(format!("{}", idx + 1)),
-                        TextFont {
-                            font_size: FontSize::Px(9.0),
-                            font: font.clone(),
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.45, 0.45, 0.55)),
-                    ));
-                });
-            }
-        });
-    }
 }
 
 fn spawn_highway(
@@ -483,29 +416,17 @@ fn spawn_harmonica_strip(
             .with_children(|cell| {
                 cell.spawn((
                     Text::new(b),
-                    TextFont {
-                        font_size: FontSize::Px(11.0),
-                        font: font.clone(),
-                        ..default()
-                    },
+                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 cell.spawn((
                     Text::new(format!("{hole}")),
-                    TextFont {
-                        font_size: FontSize::Px(16.0),
-                        font: font.clone(),
-                        ..default()
-                    },
+                    TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
                     TextColor(Color::WHITE),
                 ));
                 cell.spawn((
                     Text::new(d),
-                    TextFont {
-                        font_size: FontSize::Px(11.0),
-                        font: font.clone(),
-                        ..default()
-                    },
+                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
             });
@@ -521,58 +442,14 @@ fn spawn_harmonica_strip(
     .with_children(|leg| {
         leg.spawn((
             Text::new("\u{25A0} BLOW"),
-            TextFont {
-                font_size: FontSize::Px(11.0),
-                font: font.clone(),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
         leg.spawn((
             Text::new("\u{25A0} DRAW"),
-            TextFont {
-                font_size: FontSize::Px(11.0),
-                font: font.clone(),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));
-    });
-}
-
-fn spawn_metronome(
-    parent: &mut ChildSpawnerCommands,
-    beats_per_bar: usize,
-    bpm: f32,
-    font: &FontSource,
-) {
-    parent.spawn((
-        Text::new(format!("♩ = {}", bpm as u32)),
-        TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
-        TextColor(Color::srgb(0.65, 0.65, 0.70)),
-    ));
-
-    // Beat indicator row
-    parent.spawn(Node {
-        flex_direction: FlexDirection::Row,
-        column_gap: Val::Px(6.0),
-        ..default()
-    })
-    .with_children(|row| {
-        for i in 0..beats_per_bar {
-            let size = if i == 0 { Val::Px(28.0) } else { Val::Px(22.0) };
-            row.spawn((
-                Node {
-                    width: size,
-                    height: size,
-                    border: UiRect::all(Val::Px(1.5)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9)),
-                BorderColor::all(Color::srgb(0.35, 0.35, 0.50)),
-                MetronomeBeat(i),
-            ));
-        }
     });
 }
 
@@ -627,30 +504,6 @@ pub fn update_notes(clock: Res<super::GameplayClock>, mut notes: Query<(&NoteVis
     }
 }
 
-pub fn update_bar(
-    clock: Res<super::GameplayClock>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    config: Res<ScoringConfig>,
-    mut cells: Query<(&super::BarCell, &mut BackgroundColor)>,
-) {
-    let Some(manifest) = manifests.get(&selected.0) else {
-        return;
-    };
-    let bpm = manifest.chart.song.tempo_bpm as f64;
-    let spb = secs_per_bar(bpm, config.beats_per_bar);
-    let current = current_bar_index(clock.0, spb);
-    let key = manifest.chart.song.key.as_str();
-
-    for (cell, mut bg) in &mut cells {
-        *bg = if cell.0 == current {
-            BackgroundColor(Color::srgb(0.75, 0.55, 0.08))
-        } else {
-            BackgroundColor(bar_bg(cell.0, key))
-        };
-    }
-}
-
 pub fn update_holes(
     time: Res<Time>,
     active: Res<ActivePitches>,
@@ -691,8 +544,6 @@ pub fn update_holes(
             }
         }
 
-        // Floor brightness when a note for this hole is in the hit window,
-        // giving the player a visual cue about what to play next.
         let hint = targets
             .0
             .iter()
@@ -705,7 +556,6 @@ pub fn update_holes(
         } else if draw_hit {
             (1.0f32, false)
         } else if let Some(is_blow_hint) = hint {
-            // Nudge toward the hinted colour while fading in
             (hint_floor, is_blow_hint)
         } else {
             (0.0f32, state.is_blow)
@@ -715,11 +565,7 @@ pub fn update_holes(
             state.is_blow = is_blow;
         }
 
-        let factor = if target > state.brightness {
-            attack
-        } else {
-            decay
-        };
+        let factor = if target > state.brightness { attack } else { decay };
         state.brightness += (target - state.brightness) * factor;
         let b = state.brightness;
 
@@ -736,8 +582,6 @@ pub fn update_holes(
 mod tests {
     use super::*;
 
-    // ── note_height_pct ───────────────────────────────────────────────────────
-
     #[test]
     fn height_pct_clamped_to_minimum() {
         assert_eq!(note_height_pct(0.001), 3.5);
@@ -745,23 +589,17 @@ mod tests {
 
     #[test]
     fn height_pct_clamped_to_maximum() {
-        // LOOKAHEAD seconds maps to 100 % before clamping → clamped to 40
         assert_eq!(note_height_pct(LOOKAHEAD), 40.0);
     }
 
     #[test]
     fn height_pct_proportional() {
-        // 1 second at LOOKAHEAD=3 → 33.33 %
         let h = note_height_pct(1.0);
         assert!((h - 33.333).abs() < 0.01, "got {h}");
     }
 
-    // ── note_top_pct ──────────────────────────────────────────────────────────
-
     #[test]
     fn note_top_pct_at_hit_line() {
-        // When elapsed == note_time the note is at the hit line.
-        // progress = 1.0, hit_center_pct = 100 - HIT_H_PCT*0.5
         let expected = (100.0 - HIT_H_PCT * 0.5) - 10.0;
         let got = note_top_pct(1.0, 1.0, LOOKAHEAD, 10.0);
         assert!((got - expected).abs() < 0.01, "got {got}");
@@ -769,7 +607,6 @@ mod tests {
 
     #[test]
     fn note_top_pct_in_future_is_negative() {
-        // A note LOOKAHEAD seconds away: progress=0, top = -height_pct
         let got = note_top_pct(LOOKAHEAD, 0.0, LOOKAHEAD, 10.0);
         assert!((got - (-10.0)).abs() < 0.01, "got {got}");
     }
@@ -779,9 +616,6 @@ mod tests {
         let h = 5.0;
         let t0 = note_top_pct(2.0, 0.0, LOOKAHEAD, h);
         let t1 = note_top_pct(2.0, 1.0, LOOKAHEAD, h);
-        assert!(
-            t1 > t0,
-            "note should move down (larger top%) as time advances"
-        );
+        assert!(t1 > t0, "note should move down (larger top%) as time advances");
     }
 }
