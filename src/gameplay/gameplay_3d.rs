@@ -147,6 +147,7 @@ pub fn setup(
     let key = chart.song.key.as_str();
     let chords = twelve_bar(key);
     let font = fonts.gameplay.clone();
+    let model_cfg = load_model_config(&selected_model.0);
 
     // ── 3D Camera ────────────────────────────────────────────────────────────
     // Camera2d is set to order=1 in this function, so Camera3d at the default
@@ -196,23 +197,28 @@ pub fn setup(
         GameplayRoot,
     ));
 
-    // ── Lane floor ───────────────────────────────────────────────────────────
+    // ── Lane geometry derived from holes.json ────────────────────────────────
+    let holes = &model_cfg.holes;
+    let left_edge  = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
+    let right_edge = holes.last().map(|h| h.x + h.w * 0.5).unwrap_or(5.0);
+    let total_width = right_edge - left_edge;
+    let center_x    = (left_edge + right_edge) * 0.5;
+
     let lane_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.08, 0.08, 0.12),
         metallic: 0.3,
         perceptual_roughness: 0.8,
         ..default()
     });
-    let total_width = HOLE_COUNT as f32 * LANE_WIDTH;
     let floor_mesh = meshes.add(Cuboid::new(total_width, 0.05, LANE_DEPTH));
     commands.spawn((
         Mesh3d(floor_mesh),
         MeshMaterial3d(lane_mat.clone()),
-        Transform::from_xyz(0.0, LANE_Y - 0.025, HIT_Z - LANE_DEPTH * 0.5),
+        Transform::from_xyz(center_x, LANE_Y - 0.025, HIT_Z - LANE_DEPTH * 0.5),
         GameplayRoot,
     ));
 
-    // Lane dividers
+    // Lane dividers — one at each hole's left edge, plus one at the right edge
     let div_mat = materials.add(StandardMaterial {
         base_color: Color::srgba(0.4, 0.4, 0.6, 0.4),
         alpha_mode: AlphaMode::Blend,
@@ -220,31 +226,37 @@ pub fn setup(
         ..default()
     });
     let div_mesh = meshes.add(Cuboid::new(0.02, 0.15, LANE_DEPTH));
-    for h in 0..=HOLE_COUNT {
-        let x = -(HOLE_COUNT as f32 * LANE_WIDTH) / 2.0 + h as f32 * LANE_WIDTH;
+    for hole in holes.iter() {
         commands.spawn((
             Mesh3d(div_mesh.clone()),
             MeshMaterial3d(div_mat.clone()),
-            Transform::from_xyz(x, LANE_Y + 0.07, HIT_Z - LANE_DEPTH * 0.5),
+            Transform::from_xyz(hole.x - hole.w * 0.5, LANE_Y + 0.07, HIT_Z - LANE_DEPTH * 0.5),
+            GameplayRoot,
+        ));
+    }
+    if let Some(last) = holes.last() {
+        commands.spawn((
+            Mesh3d(div_mesh.clone()),
+            MeshMaterial3d(div_mat.clone()),
+            Transform::from_xyz(last.x + last.w * 0.5, LANE_Y + 0.07, HIT_Z - LANE_DEPTH * 0.5),
             GameplayRoot,
         ));
     }
 
     // Alternating lane shading
-    for h in 0..HOLE_COUNT {
-        if h % 2 == 1 { continue; }
-        let alpha = 0.04f32;
+    for (i, hole) in holes.iter().enumerate() {
+        if i % 2 == 1 { continue; }
         let shade_mat = materials.add(StandardMaterial {
-            base_color: Color::srgba(1.0, 1.0, 1.0, alpha),
+            base_color: Color::srgba(1.0, 1.0, 1.0, 0.04),
             alpha_mode: AlphaMode::Blend,
             unlit: true,
             ..default()
         });
-        let shade_mesh = meshes.add(Cuboid::new(LANE_WIDTH - LANE_GAP, 0.04, LANE_DEPTH));
+        let shade_mesh = meshes.add(Cuboid::new(hole.w, 0.04, LANE_DEPTH));
         commands.spawn((
             Mesh3d(shade_mesh),
             MeshMaterial3d(shade_mat),
-            Transform::from_xyz(lane_x(h as u8 + 1), LANE_Y + 0.02, HIT_Z - LANE_DEPTH * 0.5),
+            Transform::from_xyz(hole.x, LANE_Y + 0.02, HIT_Z - LANE_DEPTH * 0.5),
             GameplayRoot,
         ));
     }
@@ -261,7 +273,7 @@ pub fn setup(
     commands.spawn((
         Mesh3d(hit_mesh),
         MeshMaterial3d(hit_mat),
-        Transform::from_xyz(0.0, LANE_Y + 0.03, HIT_Z),
+        Transform::from_xyz(center_x, LANE_Y + 0.03, HIT_Z),
         GameplayRoot,
     ));
 
@@ -285,7 +297,10 @@ pub fn setup(
                 emissive: LinearRgba::new(emit_r, emit_g, emit_b, 1.0),
                 ..default()
             });
-            let note_mesh = meshes.add(Cuboid::new(LANE_WIDTH - LANE_GAP, NOTE_H, depth));
+            let hole_cfg = holes.get(event.hole.saturating_sub(1) as usize);
+            let note_x = hole_cfg.map(|h| h.x).unwrap_or_else(|| lane_x(event.hole));
+            let note_w = hole_cfg.map(|h| h.w).unwrap_or(LANE_WIDTH - LANE_GAP);
+            let note_mesh = meshes.add(Cuboid::new(note_w, NOTE_H, depth));
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
                 chart.harmonica.wind_direction_label(event.hole, &event.action)
             });
@@ -293,7 +308,7 @@ pub fn setup(
             commands.spawn((
                 Mesh3d(note_mesh),
                 MeshMaterial3d(note_mat),
-                Transform::from_xyz(lane_x(event.hole), LANE_Y + NOTE_H * 0.5, FAR_Z),
+                Transform::from_xyz(note_x, LANE_Y + NOTE_H * 0.5, FAR_Z),
                 NoteVisual3D { time: t, depth },
                 ScheduledNote {
                     time: t,
@@ -316,6 +331,7 @@ pub fn setup(
         &mut materials,
         &asset_server,
         &selected_model.0,
+        &model_cfg,
     );
 
     // ── 2D HUD overlay (renders via Camera2d on top) ──────────────────────────
@@ -334,8 +350,8 @@ fn spawn_harmonica_3d(
     materials: &mut Assets<StandardMaterial>,
     asset_server: &AssetServer,
     model_name: &str,
+    config: &HarmonicaModelConfig,
 ) {
-    let config = load_model_config(model_name);
     let [tx, ty, tz] = config.model_translation;
     commands.spawn((
         WorldAssetRoot(asset_server.load(format!("harmonicas/3d/{model_name}/harmonica.glb#Scene0"))),
