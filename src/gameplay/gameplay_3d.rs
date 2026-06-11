@@ -116,6 +116,68 @@ fn load_model_config(model_name: &str) -> HarmonicaModelConfig {
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
+// Setup related methods.
+
+// ── 3D Camera ────────────────────────────────────────────────────────────
+// Camera2d is set to order=1 in this function, so Camera3d at the default
+// order=0 renders first and the 2D HUD composites on top.
+fn setup_camera_3d(commands: &mut Commands) {
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(0.0, 14.0, 24.0)
+            .looking_at(Vec3::new(0.0, 0.0, HIT_Z - 18.0), Vec3::Y),
+        GameplayCamera3D,
+        GameplayRoot,
+        Name::new("Camera3d (gameplay 3D)"),
+    ));
+}
+
+fn setup_lighting(commands: &mut Commands) {
+    // ── Lighting ─────────────────────────────────────────────────────────────
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 8_000.0,
+            color: Color::srgb(1.0, 0.97, 0.90),
+            ..default()
+        },
+        Transform::from_xyz(8.0, 20.0, 10.0)
+            .looking_at(Vec3::ZERO, Vec3::Y),
+        GameplayRoot,
+    ));
+    commands.spawn((
+        AmbientLight {
+            color: Color::srgb(0.15, 0.15, 0.22),
+            brightness: 200.0,
+            ..default()
+        },
+        GameplayRoot,
+    ));
+}
+
+// ── Background image (large unlit quad behind the lanes) ─────────────────
+// Rectangle is in the XY plane; position it upright at Z = FAR_Z - 2 so
+// it fills the horizon visible through the Camera3d.
+pub fn setup_background(
+    commands: &mut Commands,
+    background: Handle<Image>,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) {
+    let backdrop_mat = materials.add(StandardMaterial {
+        base_color_texture: Some(background.clone()),
+        unlit: true,
+        cull_mode: None,
+        ..default()
+    });
+    let backdrop_mesh = meshes.add(Rectangle::new(200.0, 140.0));
+    commands.spawn((
+        Mesh3d(backdrop_mesh),
+        MeshMaterial3d(backdrop_mat),
+        Transform::from_xyz(0.0, 14.0, FAR_Z - 2.0),
+        GameplayRoot,
+    ));
+
+}
 
 pub fn setup(
     mut commands: Commands,
@@ -131,7 +193,7 @@ pub fn setup(
     selected_model: Res<SelectedHarmonicaModel>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else {
+    let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing (3D) state");
         return;
     };
@@ -151,52 +213,10 @@ pub fn setup(
     let font = fonts.gameplay.clone();
     let model_cfg = load_model_config(&selected_model.0);
 
-    // ── 3D Camera ────────────────────────────────────────────────────────────
-    // Camera2d is set to order=1 in this function, so Camera3d at the default
-    // order=0 renders first and the 2D HUD composites on top.
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 14.0, 24.0).looking_at(Vec3::new(0.0, 0.0, HIT_Z - 18.0), Vec3::Y),
-        GameplayCamera3D,
-        GameplayRoot,
-        Name::new("Camera3d (gameplay 3D)"),
-    ));
+    setup_camera_3d(&mut commands);
+    setup_lighting(&mut commands);
+    setup_background(&mut commands, manifest.background.clone(), &mut meshes, &mut materials);
 
-    // ── Lighting ─────────────────────────────────────────────────────────────
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 8_000.0,
-            color: Color::srgb(1.0, 0.97, 0.90),
-            ..default()
-        },
-        Transform::from_xyz(8.0, 20.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-        GameplayRoot,
-    ));
-    commands.spawn((
-        AmbientLight {
-            color: Color::srgb(0.15, 0.15, 0.22),
-            brightness: 200.0,
-            ..default()
-        },
-        GameplayRoot,
-    ));
-
-    // ── Background image (large unlit quad behind the lanes) ─────────────────
-    // Rectangle is in the XY plane; position it upright at Z = FAR_Z - 2 so
-    // it fills the horizon visible through the Camera3d.
-    let backdrop_mat = materials.add(StandardMaterial {
-        base_color_texture: Some(manifest.background.clone()),
-        unlit: true,
-        cull_mode: None,
-        ..default()
-    });
-    let backdrop_mesh = meshes.add(Rectangle::new(200.0, 140.0));
-    commands.spawn((
-        Mesh3d(backdrop_mesh),
-        MeshMaterial3d(backdrop_mat),
-        Transform::from_xyz(0.0, 14.0, FAR_Z - 2.0),
-        GameplayRoot,
-    ));
 
     // ── Lane geometry derived from holes.json ────────────────────────────────
     let holes = &model_cfg.holes;
