@@ -20,6 +20,10 @@ optional = true
 [features]
 inspector = ["bevy-inspector-egui"]
 
+[[bin]]
+name = "hole-editor"
+path = "src/bin/hole_editor.rs"
+
 [profile.dev]
 opt-level = 1
 

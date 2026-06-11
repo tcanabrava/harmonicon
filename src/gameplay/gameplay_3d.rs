@@ -1,7 +1,7 @@
 use bevy::{audio::AudioSource, prelude::*};
 
 use crate::{
-    assets_management::GlobalFonts,
+    assets_management::{GlobalFonts, SelectedHarmonicaModel},
     menu::SelectedSong,
     song::SongManifest,
     song::chart::Action,
@@ -51,6 +51,68 @@ fn note_depth(duration: f64) -> f32 {
     ((duration as f32 / LOOKAHEAD as f32) * LANE_DEPTH).clamp(0.4, 12.0)
 }
 
+// ── Harmonica model config ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct HoleConfig {
+    x: f32,
+    y: f32,
+    z: f32,
+    /// Width along the X axis.
+    w: f32,
+    /// Height along the Y axis.
+    h: f32,
+    /// Depth along the Z axis.
+    d: f32,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct HarmonicaModelConfig {
+    /// World-space translation for the GLB scene root.
+    model_translation: [f32; 3],
+    /// Y-axis rotation applied to the GLB scene, in degrees.
+    #[serde(default)]
+    model_rotation_y_deg: f32,
+    /// Uniform scale applied to the GLB scene.
+    #[serde(default = "default_model_scale")]
+    model_scale: f32,
+    /// One entry per hole; index 0 = hole 1, index 9 = hole 10.
+    holes: Vec<HoleConfig>,
+}
+
+fn default_model_scale() -> f32 { 1.0 }
+
+impl HarmonicaModelConfig {
+    fn default_layout() -> Self {
+        Self {
+            model_translation: [0.0, LANE_Y + 0.45, HARP_Z],
+            model_rotation_y_deg: 0.0,
+            model_scale: 1.0,
+            holes: (1u8..=HOLE_COUNT as u8)
+                .map(|hole| HoleConfig {
+                    x: lane_x(hole),
+                    y: LANE_Y + 0.9 + 0.10,
+                    z: HARP_Z,
+                    w: LANE_WIDTH - LANE_GAP - 0.08,
+                    h: 0.20,
+                    d: 0.90,
+                })
+                .collect(),
+        }
+    }
+}
+
+fn load_model_config(model_name: &str) -> HarmonicaModelConfig {
+    let path = format!("assets/harmonicas/3d/{model_name}/holes.json");
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| {
+            warn!("No holes.json for model '{model_name}', using default layout");
+            HarmonicaModelConfig::default_layout()
+        })
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 pub fn setup(
@@ -63,6 +125,8 @@ pub fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     fonts: Res<GlobalFonts>,
+    asset_server: Res<AssetServer>,
+    selected_model: Res<SelectedHarmonicaModel>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -250,7 +314,8 @@ pub fn setup(
         &mut commands,
         &mut meshes,
         &mut materials,
-        chart,
+        &asset_server,
+        &selected_model.0,
     );
 
     // ── 2D HUD overlay (renders via Camera2d on top) ──────────────────────────
@@ -267,46 +332,21 @@ fn spawn_harmonica_3d(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-    _chart: &crate::song::chart::HarpChart,
+    asset_server: &AssetServer,
+    model_name: &str,
 ) {
-    let body_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.18, 0.20, 0.25),
-        metallic: 0.85,
-        perceptual_roughness: 0.25,
-        ..default()
-    });
-    let total_width = HOLE_COUNT as f32 * LANE_WIDTH;
-    let body_mesh = meshes.add(Cuboid::new(total_width + 0.4, 0.9, 1.6));
+    let config = load_model_config(model_name);
+    let [tx, ty, tz] = config.model_translation;
     commands.spawn((
-        Mesh3d(body_mesh),
-        MeshMaterial3d(body_mat),
-        Transform::from_xyz(0.0, LANE_Y + 0.45, HARP_Z),
+        WorldAssetRoot(asset_server.load(format!("harmonicas/3d/{model_name}/harmonica.glb#Scene0"))),
+        Transform::from_xyz(tx, ty, tz)
+            .with_rotation(Quat::from_rotation_y(config.model_rotation_y_deg.to_radians()))
+            .with_scale(Vec3::splat(config.model_scale)),
         GameplayRoot,
     ));
 
-    // Cover plates (top/bottom chrome strips)
-    let cover_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.70, 0.72, 0.78),
-        metallic: 0.95,
-        perceptual_roughness: 0.10,
-        ..default()
-    });
-    for y_off in [-0.35f32, 0.35] {
-        let strip = meshes.add(Cuboid::new(total_width + 0.4, 0.12, 1.65));
-        commands.spawn((
-            Mesh3d(strip),
-            MeshMaterial3d(cover_mat.clone()),
-            Transform::from_xyz(0.0, LANE_Y + 0.45 + y_off, HARP_Z),
-            GameplayRoot,
-        ));
-    }
-
-    // ── Holes — raised buttons on top of the body, visible from above ────────
-    // Body top face is at LANE_Y + 0.9. Buttons sit on top with a small stem
-    // so the camera (above and behind) can see their lit top face clearly.
-    const BUTTON_H: f32 = 0.20;
-    const BODY_TOP: f32 = LANE_Y + 0.9;
-    for hole in 1u8..=10 {
+    for (i, hole_cfg) in config.holes.iter().enumerate() {
+        let hole = (i + 1) as u8;
         let hole_mat = materials.add(StandardMaterial {
             base_color: Color::srgb(0.10, 0.11, 0.15),
             emissive: LinearRgba::new(0.0, 0.0, 0.0, 0.0),
@@ -314,63 +354,15 @@ fn spawn_harmonica_3d(
             perceptual_roughness: 0.6,
             ..default()
         });
-        // Flat button: wide in X (lane width), shallow in Y (visible top face),
-        // moderate depth in Z so the camera angle shows it clearly.
-        let hole_mesh = meshes.add(Cuboid::new(
-            LANE_WIDTH - LANE_GAP - 0.08,
-            BUTTON_H,
-            0.90,
-        ));
+        let hole_mesh = meshes.add(Cuboid::new(hole_cfg.w, hole_cfg.h, hole_cfg.d));
         let mat_handle = hole_mat.clone();
         commands.spawn((
             Mesh3d(hole_mesh),
             MeshMaterial3d(hole_mat),
-            // Centre button on top of body, offset slightly toward camera in Z
-            Transform::from_xyz(lane_x(hole), BODY_TOP + BUTTON_H * 0.5, HARP_Z),
+            Transform::from_xyz(hole_cfg.x, hole_cfg.y, hole_cfg.z),
             HoleCell(hole),
             HoleState::default(),
             HoleMesh3D(mat_handle),
-            GameplayRoot,
-        ));
-
-        // Thin accent ring around each button (chrome coloured, unlit)
-        let ring_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(0.55, 0.58, 0.65),
-            metallic: 0.9,
-            perceptual_roughness: 0.15,
-            ..default()
-        });
-        let ring_mesh = meshes.add(Cuboid::new(
-            LANE_WIDTH - LANE_GAP - 0.02,
-            BUTTON_H * 0.15,
-            0.96,
-        ));
-        commands.spawn((
-            Mesh3d(ring_mesh),
-            MeshMaterial3d(ring_mat),
-            Transform::from_xyz(lane_x(hole), BODY_TOP + BUTTON_H + 0.01, HARP_Z),
-            GameplayRoot,
-        ));
-
-        // blow/draw labels available in HUD; not used for 3D geometry
-        let label_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(0.12, 0.14, 0.20),
-            unlit: true,
-            ..default()
-        });
-        let label_mesh = meshes.add(Cuboid::new(LANE_WIDTH - LANE_GAP - 0.1, 0.04, 0.16));
-        // blow label above hole
-        commands.spawn((
-            Mesh3d(label_mesh.clone()),
-            MeshMaterial3d(label_mat.clone()),
-            Transform::from_xyz(lane_x(hole), BODY_TOP + BUTTON_H + 0.03, HARP_Z + 0.42),
-            GameplayRoot,
-        ));
-        // draw label below hole
-        commands.spawn((
-            Mesh3d(label_mesh),
-            MeshMaterial3d(label_mat),
-            Transform::from_xyz(lane_x(hole), BODY_TOP + BUTTON_H + 0.03, HARP_Z - 0.42),
             GameplayRoot,
         ));
     }

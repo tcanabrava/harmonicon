@@ -21,10 +21,24 @@ pub struct SongEntry {
 #[derive(Resource, Default)]
 pub struct AvailableSongs(pub HashMap<String, Vec<SongEntry>>);
 
+/// Names of harmonica 3D models found under `assets/harmonicas/3d/<name>/harmonica.glb`.
+#[derive(Resource, Default)]
+pub struct AvailableHarmonicas(pub Vec<String>);
+
+/// The currently selected harmonica model name (subfolder under `assets/harmonicas/3d/`).
+#[derive(Resource)]
+pub struct SelectedHarmonicaModel(pub String);
+
+impl Default for SelectedHarmonicaModel {
+    fn default() -> Self { Self("default".into()) }
+}
+
 impl Plugin for AssetsManagementPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<AvailableSongs>();
-        app.add_systems(Startup, (scan_all_songs, load_global_fonts));
+        app.init_resource::<AvailableSongs>()
+            .init_resource::<AvailableHarmonicas>()
+            .init_resource::<SelectedHarmonicaModel>()
+            .add_systems(Startup, (scan_all_songs, scan_harmonica_models, load_global_fonts));
     }
 }
 
@@ -34,6 +48,21 @@ fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
         gameplay: FontSource::Handle(asset_server.load("fonts/UbuntuSansMono-Regular.otf")),
         symbols: FontSource::Handle(asset_server.load("fonts/NotoSansSymbols-Regular.ttf")),
     });
+}
+
+fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
+    let root = std::path::Path::new("assets/harmonicas/3d");
+    let Ok(entries) = std::fs::read_dir(root) else {
+        warn!("No harmonica models directory at assets/harmonicas/3d/");
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) { continue; }
+        if !entry.path().join("harmonica.glb").exists() { continue; }
+        available.0.push(entry.file_name().to_string_lossy().into_owned());
+    }
+    available.0.sort_unstable();
+    info!("Found {} harmonica model(s): {:?}", available.0.len(), available.0);
 }
 
 pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
