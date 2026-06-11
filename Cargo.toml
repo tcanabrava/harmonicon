@@ -13,6 +13,13 @@ serde_json = "1"
 jsonschema = "0.28"
 thiserror = "2"
 
+[dependencies.bevy-inspector-egui]
+version = "0.36"
+optional = true
+
+[features]
+inspector = ["bevy-inspector-egui"]
+
 [profile.dev]
 opt-level = 1
 

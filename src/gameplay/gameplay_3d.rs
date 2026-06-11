@@ -84,13 +84,15 @@ pub fn setup(
     let font = fonts.gameplay.clone();
 
     // ── 3D Camera ────────────────────────────────────────────────────────────
+    // Camera2d is set to order=1 in this function, so Camera3d at the default
+    // order=0 renders first and the 2D HUD composites on top.
     commands.spawn((
         Camera3d::default(),
-        Camera { order: 0, ..default() },
         Transform::from_xyz(0.0, 14.0, 24.0)
             .looking_at(Vec3::new(0.0, 0.0, HIT_Z - 18.0), Vec3::Y),
         GameplayCamera3D,
         GameplayRoot,
+        Name::new("Camera3d (gameplay 3D)"),
     ));
 
     // ── Lighting ─────────────────────────────────────────────────────────────

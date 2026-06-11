@@ -23,15 +23,26 @@ pub struct GameFonts {
 }
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins
+        .set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Harmonicon".into(),
                 ..default()
             }),
             ..default()
+        })
+        // bevy_render warns about its own internal shadow-view cameras in 0.19 RC
+        .set(bevy::log::LogPlugin {
+            filter: "warn,bevy_render::camera=error".into(),
+            ..default()
         }))
-        .add_plugins((AssetsManagementPlugin, SongPlugin, MenuPlugin, GameplayPlugin))
+    .add_plugins((AssetsManagementPlugin, SongPlugin, MenuPlugin, GameplayPlugin));
+
+    #[cfg(feature = "inspector")]
+    app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
+
+    app
         .add_message::<PitchEvent>()
         .add_systems(Startup, (spawn_camera, initialize_game))
         .add_systems(OnEnter(AppState::Playing), setup_audio)
@@ -45,8 +56,9 @@ fn main() {
 }
 
 fn spawn_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    commands.spawn((Camera2d, Name::new("Camera2d (main)")));
 }
+
 
 fn initialize_game(mut next: ResMut<NextState<AppState>>) {
     next.set(AppState::Menu);
