@@ -77,7 +77,7 @@ pub fn harp_display(chart: &HarpChart) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::song::chart::{Action, HarpChart, Harmonica};
+    use crate::song::chart::{HarpChart, Harmonica};
 
     fn test_chart() -> HarpChart {
         serde_json::from_str(r#"{

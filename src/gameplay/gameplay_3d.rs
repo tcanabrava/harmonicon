@@ -11,6 +11,7 @@ use super::{
     ActivePitches, ActiveTargets, ComboText, CountdownOverlay, CountdownText, FeedbackText,
     GameplayRoot, HoleCell, HoleState, MusicStarted, ScoreText, ScheduledNote, ValidHarpNotes,
     COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
+    parse_beats, secs_per_bar, current_bar_index,
 };
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -631,18 +632,11 @@ pub fn update_bar_3d(
     mut cells: Query<(&BarCell3D, &mut BackgroundColor)>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else { return };
-    let bpm = manifest.chart.song.tempo_bpm as f64;
-    let beats = manifest
-        .chart
-        .song
-        .time_signature
-        .as_deref()
-        .and_then(|s| s.split('/').next())
-        .and_then(|n| n.parse::<f64>().ok())
-        .unwrap_or(4.0);
-    let secs_per_bar = (60.0 / bpm) * beats;
-    let current = (clock.0.max(0.0) / secs_per_bar) as usize % 12;
-    let key = manifest.chart.song.key.as_str();
+    let bpm    = manifest.chart.song.tempo_bpm as f64;
+    let beats  = parse_beats(manifest.chart.song.time_signature.as_deref());
+    let spb    = secs_per_bar(bpm, beats);
+    let current = current_bar_index(clock.0, spb);
+    let key    = manifest.chart.song.key.as_str();
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current {

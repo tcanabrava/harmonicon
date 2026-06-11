@@ -11,6 +11,7 @@ use super::{
     ActivePitches, ActiveTargets, CountdownOverlay, CountdownText, ComboText, FeedbackText,
     GameplayRoot, HoleCell, HoleState, MusicStarted, NoteVisual, ScoreText, ScheduledNote,
     ValidHarpNotes, COUNTDOWN, HOLE_COUNT, HIT_H_PCT, LANE_PCT, LOOKAHEAD,
+    parse_beats, secs_per_bar, current_bar_index,
 };
 
 pub fn setup(
@@ -214,6 +215,14 @@ fn bar_bg(bar: usize, key: &str) -> Color {
 
 fn note_height_pct(duration: f64) -> f32 {
     ((duration / LOOKAHEAD) as f32 * 100.0).clamp(3.5, 40.0)
+}
+
+/// Top-percentage position for a note node scrolling down the highway.
+pub fn note_top_pct(note_time: f64, elapsed: f64, lookahead: f64, height_pct: f32) -> f32 {
+    let remaining = note_time - elapsed;
+    let progress  = 1.0 - (remaining / lookahead) as f32;
+    let hit_center_pct = 100.0 - HIT_H_PCT * 0.5;
+    hit_center_pct * progress - height_pct
 }
 
 fn spawn_12_bar_grid(
@@ -483,11 +492,7 @@ pub fn update_notes(
 ) {
     let elapsed = clock.0;
     for (note, mut node) in &mut notes {
-        let remaining = note.time - elapsed;
-        let progress = 1.0 - (remaining / LOOKAHEAD) as f32;
-        let hit_center_pct = 100.0 - HIT_H_PCT * 0.5;
-        let top_pct = hit_center_pct * progress - note.height_pct;
-        node.top = Val::Percent(top_pct);
+        node.top = Val::Percent(note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct));
     }
 }
 
@@ -498,18 +503,11 @@ pub fn update_bar(
     mut cells: Query<(&super::BarCell, &mut BackgroundColor)>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else { return };
-    let bpm = manifest.chart.song.tempo_bpm as f64;
-    let beats = manifest
-        .chart
-        .song
-        .time_signature
-        .as_deref()
-        .and_then(|s| s.split('/').next())
-        .and_then(|n| n.parse::<f64>().ok())
-        .unwrap_or(4.0);
-    let secs_per_bar = (60.0 / bpm) * beats;
-    let current = (clock.0.max(0.0) / secs_per_bar) as usize % 12;
-    let key = manifest.chart.song.key.as_str();
+    let bpm    = manifest.chart.song.tempo_bpm as f64;
+    let beats  = parse_beats(manifest.chart.song.time_signature.as_deref());
+    let spb    = secs_per_bar(bpm, beats);
+    let current = current_bar_index(clock.0, spb);
+    let key    = manifest.chart.song.key.as_str();
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current {
@@ -586,5 +584,56 @@ pub fn update_holes(
             Color::srgb(0.10 + 0.78 * b, 0.12 + 0.22 * b, (0.16 - 0.04 * b).max(0.0))
         };
         *bg = BackgroundColor(color);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── note_height_pct ───────────────────────────────────────────────────────
+
+    #[test]
+    fn height_pct_clamped_to_minimum() {
+        assert_eq!(note_height_pct(0.001), 3.5);
+    }
+
+    #[test]
+    fn height_pct_clamped_to_maximum() {
+        // LOOKAHEAD seconds maps to 100 % before clamping → clamped to 40
+        assert_eq!(note_height_pct(LOOKAHEAD), 40.0);
+    }
+
+    #[test]
+    fn height_pct_proportional() {
+        // 1 second at LOOKAHEAD=3 → 33.33 %
+        let h = note_height_pct(1.0);
+        assert!((h - 33.333).abs() < 0.01, "got {h}");
+    }
+
+    // ── note_top_pct ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn note_top_pct_at_hit_line() {
+        // When elapsed == note_time the note is at the hit line.
+        // progress = 1.0, hit_center_pct = 100 - HIT_H_PCT*0.5
+        let expected = (100.0 - HIT_H_PCT * 0.5) - 10.0;
+        let got = note_top_pct(1.0, 1.0, LOOKAHEAD, 10.0);
+        assert!((got - expected).abs() < 0.01, "got {got}");
+    }
+
+    #[test]
+    fn note_top_pct_in_future_is_negative() {
+        // A note LOOKAHEAD seconds away: progress=0, top = -height_pct
+        let got = note_top_pct(LOOKAHEAD, 0.0, LOOKAHEAD, 10.0);
+        assert!((got - (-10.0)).abs() < 0.01, "got {got}");
+    }
+
+    #[test]
+    fn note_top_pct_moves_down_over_time() {
+        let h = 5.0;
+        let t0 = note_top_pct(2.0, 0.0, LOOKAHEAD, h);
+        let t1 = note_top_pct(2.0, 1.0, LOOKAHEAD, h);
+        assert!(t1 > t0, "note should move down (larger top%) as time advances");
     }
 }

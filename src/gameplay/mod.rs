@@ -1,8 +1,13 @@
 mod gameplay_2d;
 mod gameplay_3d;
+mod scoring;
 
 use std::collections::HashSet;
 use bevy::prelude::*;
+use scoring::{
+    classify_note, combo_label, compute_multiplier, compute_points,
+    should_decay_combo, NoteOutcome,
+};
 
 use crate::{
     menu::{AppState, GameplayMode, SelectedSong},
@@ -202,8 +207,25 @@ pub const LANE_PCT: f32 = 100.0 / HOLE_COUNT as f32;
 pub const HIT_H_PCT: f32 = 7.0;
 pub const LOOKAHEAD: f64 = 3.0;
 
-const PERFECT_POINTS: u32 = 100;
-const GOOD_POINTS: u32    = 50;
+// ── Shared pure helpers ───────────────────────────────────────────────────────
+
+/// Parse the beat count from an optional "N/D" time-signature string.
+pub fn parse_beats(time_sig: Option<&str>) -> f64 {
+    time_sig
+        .and_then(|s| s.split('/').next())
+        .and_then(|n| n.parse::<f64>().ok())
+        .unwrap_or(4.0)
+}
+
+/// Seconds per bar given BPM and beat count.
+pub fn secs_per_bar(bpm: f64, beats: f64) -> f64 {
+    (60.0 / bpm) * beats
+}
+
+/// Which of the 12 bars in a twelve-bar cycle the clock is currently on.
+pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
+    (clock.max(0.0) / secs_per_bar) as usize % 12
+}
 
 // ── Shared systems ────────────────────────────────────────────────────────────
 
@@ -276,19 +298,14 @@ fn score_notes(
     mut score: ResMut<Score>,
     mut feedback: ResMut<HitFeedback>,
 ) {
-    // Don't score during the countdown
     if clock.0 < 0.0 { return; }
 
-    // Combo decay: reset if player hasn't hit a note in decay_secs
-    if config.combo_enabled {
-        if let Some(decay) = config.decay_secs {
-            if score.combo > 0 && clock.0 - score.last_hit_time > decay {
-                score.combo = 0;
-            }
-        }
+    if config.combo_enabled
+        && should_decay_combo(score.combo, clock.0, score.last_hit_time, config.decay_secs)
+    {
+        score.combo = 0;
     }
 
-    // Only consider pitches the harmonica can produce
     let harp_pitches: Vec<String> = active
         .0
         .iter()
@@ -299,47 +316,30 @@ fn score_notes(
     for mut note in &mut notes {
         if note.hit || note.missed { continue; }
 
-        let offset = clock.0 - note.time; // positive = clock is past the note
+        let offset = clock.0 - note.time;
+        let playing = harp_pitches.contains(&note.expected_pitch);
 
-        // Note passed the miss window — combo breaks
-        if offset > config.miss_window {
-            note.missed = true;
-            if config.combo_enabled { score.combo = 0; }
-            continue;
+        match classify_note(offset, playing, config.perfect_window, config.good_window, config.miss_window) {
+            NoteOutcome::Missed => {
+                note.missed = true;
+                if config.combo_enabled { score.combo = 0; }
+            }
+            NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
+            NoteOutcome::Hit(quality) => {
+                note.hit = true;
+                score.last_hit_time = clock.0;
+                score.combo += 1;
+                score.max_combo = score.max_combo.max(score.combo);
+                let multiplier = if config.combo_enabled {
+                    compute_multiplier(score.combo, config.base_multiplier, config.step_multiplier, config.max_multiplier)
+                } else {
+                    1.0
+                };
+                score.points += compute_points(quality, multiplier);
+                feedback.quality = Some(quality);
+                feedback.timer   = 0.75;
+            }
         }
-
-        // Note not yet inside the scoring window
-        if offset < -config.good_window { continue; }
-
-        // Note is unhittable (past good window) but miss_window hasn't been
-        // reached yet — wait silently without breaking the combo
-        if offset > config.good_window { continue; }
-
-        // In window — check if the player is playing this note right now
-        if !harp_pitches.contains(&note.expected_pitch) { continue; }
-
-        note.hit = true;
-        score.last_hit_time = clock.0;
-        score.combo += 1;
-        score.max_combo = score.max_combo.max(score.combo);
-
-        let quality = if offset.abs() <= config.perfect_window {
-            HitQuality::Perfect
-        } else {
-            HitQuality::Good
-        };
-
-        let base = if quality == HitQuality::Perfect { PERFECT_POINTS } else { GOOD_POINTS };
-        let multiplier = if config.combo_enabled {
-            (config.base_multiplier + score.combo as f32 * config.step_multiplier)
-                .min(config.max_multiplier)
-        } else {
-            1.0
-        };
-        score.points += (base as f32 * multiplier) as u32;
-
-        feedback.quality = Some(quality);
-        feedback.timer   = 0.75;
     }
 }
 
@@ -365,16 +365,7 @@ fn update_score_display(
     }
 
     for mut t in &mut q_combo {
-        t.0 = if score.combo > 1 {
-            let mult = (1 + score.combo / 10).min(4);
-            if mult > 1 {
-                format!("\u{00D7}{} [\u{00D7}{} pts]", score.combo, mult)
-            } else {
-                format!("\u{00D7}{}", score.combo)
-            }
-        } else {
-            String::new()
-        };
+        t.0 = combo_label(score.combo);
     }
 
     feedback.timer = (feedback.timer - time.delta_secs()).max(0.0);
@@ -405,5 +396,63 @@ fn update_score_display(
 fn cleanup_gameplay(mut commands: Commands, roots: Query<Entity, With<GameplayRoot>>) {
     for e in &roots {
         commands.entity(e).despawn();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_beats_4_4() {
+        assert_eq!(parse_beats(Some("4/4")), 4.0);
+    }
+
+    #[test]
+    fn parse_beats_3_4() {
+        assert_eq!(parse_beats(Some("3/4")), 3.0);
+    }
+
+    #[test]
+    fn parse_beats_none_defaults_to_4() {
+        assert_eq!(parse_beats(None), 4.0);
+    }
+
+    #[test]
+    fn parse_beats_malformed_defaults_to_4() {
+        assert_eq!(parse_beats(Some("invalid")), 4.0);
+    }
+
+    #[test]
+    fn secs_per_bar_120bpm_4beats() {
+        assert!((secs_per_bar(120.0, 4.0) - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn secs_per_bar_60bpm_4beats() {
+        assert!((secs_per_bar(60.0, 4.0) - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn current_bar_index_at_zero() {
+        assert_eq!(current_bar_index(0.0, 2.0), 0);
+    }
+
+    #[test]
+    fn current_bar_index_advances() {
+        assert_eq!(current_bar_index(2.0, 2.0), 1);
+        assert_eq!(current_bar_index(4.0, 2.0), 2);
+    }
+
+    #[test]
+    fn current_bar_index_wraps_at_12() {
+        // 12 bars × 2 s/bar = 24 s → wraps back to bar 0
+        assert_eq!(current_bar_index(24.0, 2.0), 0);
+    }
+
+    #[test]
+    fn current_bar_index_clamps_negative_clock() {
+        // During countdown the clock is negative — should give bar 0
+        assert_eq!(current_bar_index(-1.5, 2.0), 0);
     }
 }
