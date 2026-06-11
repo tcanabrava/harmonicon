@@ -9,8 +9,8 @@ use crate::{
 
 use super::{
     ActivePitches, ActiveTargets, ComboText, CountdownOverlay, CountdownText, FeedbackText,
-    GameplayRoot, HoleCell, HoleState, MusicStarted, ScoreText, ScheduledNote, ValidHarpNotes,
-    COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
+    GameplayRoot, HoleCell, HoleState, MusicPlayer, MusicStarted, ScoreText, ScheduledNote,
+    ValidHarpNotes, COUNTDOWN, HOLE_COUNT, LOOKAHEAD,
     parse_beats, secs_per_bar, current_bar_index,
 };
 
@@ -583,6 +583,8 @@ pub fn update_countdown(
                 commands.spawn((
                     AudioPlayer::<AudioSource>(manifest.music.clone()),
                     PlaybackSettings::ONCE,
+                    MusicPlayer,
+                    GameplayRoot,
                 ));
             }
         }

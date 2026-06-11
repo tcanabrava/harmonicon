@@ -10,6 +10,7 @@ use scoring::{
 };
 
 use crate::{
+    assets_management::GlobalFonts,
     menu::{AppState, GameplayMode, SelectedSong},
     pitch_detect::{PitchEvent, PitchInfo},
     song::SongManifest,
@@ -27,12 +28,14 @@ impl Plugin for GameplayPlugin {
             .init_resource::<HitFeedback>()
             .init_resource::<ScoringConfig>()
             .init_resource::<ActiveTargets>()
-            // Mode-gated setup
+            .init_resource::<Paused>()
+            // Setup: shared pause menu + mode-specific scenes
             .add_systems(
                 OnEnter(AppState::Playing),
                 (
                     reset_score,
                     setup_scoring_config,
+                    setup_pause_menu,
                     gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                     gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 ),
@@ -44,12 +47,21 @@ impl Plugin for GameplayPlugin {
                 gameplay_3d::restore_camera
                     .run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
             )
-            // Shared systems: tick, pitch collection, scoring, display
+            // Pause input always runs during Playing (even when paused)
+            .add_systems(
+                Update,
+                (handle_pause_input, handle_pause_buttons, pause_button_hover)
+                    .run_if(in_state(AppState::Playing)),
+            )
+            // Gameplay-logic chains only run when not paused
             .add_systems(
                 Update,
                 (tick_clock, collect_pitches, update_active_targets, score_notes, update_score_display)
                     .chain()
-                    .run_if(in_state(AppState::Playing)),
+                    .run_if(
+                        in_state(AppState::Playing)
+                            .and_then(|p: Res<Paused>| !p.0),
+                    ),
             )
             // 2D update chain
             .add_systems(
@@ -63,6 +75,7 @@ impl Plugin for GameplayPlugin {
                     .chain()
                     .run_if(
                         in_state(AppState::Playing)
+                            .and_then(|p: Res<Paused>| !p.0)
                             .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                     ),
             )
@@ -78,6 +91,7 @@ impl Plugin for GameplayPlugin {
                     .chain()
                     .run_if(
                         in_state(AppState::Playing)
+                            .and_then(|p: Res<Paused>| !p.0)
                             .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                     ),
             );
@@ -169,6 +183,23 @@ pub struct CountdownText;
 #[derive(Component)] pub struct ComboText;
 #[derive(Component)] pub struct FeedbackText;
 
+/// Set to true while gameplay is paused; all update chains gate on `!paused`.
+#[derive(Resource, Default)]
+pub struct Paused(pub bool);
+
+/// Marks the music audio entity so it can be found for pause/resume.
+#[derive(Component)]
+pub struct MusicPlayer;
+
+#[derive(Component)]
+struct PauseMenuRoot;
+
+#[derive(Component)]
+enum PauseButton {
+    Resume,
+    QuitSong,
+}
+
 /// Scoring parameters resolved from the song's chart at game start.
 /// Falls back to sensible defaults if the chart doesn't specify them.
 #[derive(Resource)]
@@ -229,9 +260,14 @@ pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
 
 // ── Shared systems ────────────────────────────────────────────────────────────
 
-fn reset_score(mut score: ResMut<Score>, mut feedback: ResMut<HitFeedback>) {
+fn reset_score(
+    mut score: ResMut<Score>,
+    mut feedback: ResMut<HitFeedback>,
+    mut paused: ResMut<Paused>,
+) {
     *score    = Score::default();
     *feedback = HitFeedback::default();
+    paused.0  = false;
 }
 
 fn setup_scoring_config(
@@ -390,6 +426,118 @@ fn update_score_display(
                 }
             }
         }
+    }
+}
+
+fn setup_pause_menu(mut commands: Commands, fonts: Res<GlobalFonts>) {
+    let font = fonts.gameplay.clone();
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(20.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.65)),
+            GlobalZIndex(200),
+            Visibility::Hidden,
+            GameplayRoot,
+            PauseMenuRoot,
+        ))
+        .with_children(|p| {
+            p.spawn((
+                Text::new("PAUSED"),
+                TextFont { font_size: FontSize::Px(52.0), font: font.clone(), ..default() },
+                TextColor(Color::WHITE),
+            ));
+            spawn_pause_button(p, "Resume",   PauseButton::Resume,  &font);
+            spawn_pause_button(p, "Quit Song", PauseButton::QuitSong, &font);
+        });
+}
+
+fn spawn_pause_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    btn: PauseButton,
+    font: &FontSource,
+) {
+    parent
+        .spawn((
+            Button,
+            Node {
+                min_width: Val::Px(220.0),
+                padding: UiRect::axes(Val::Px(28.0), Val::Px(12.0)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
+            btn,
+        ))
+        .with_children(|b| {
+            b.spawn((
+                Text::new(label.to_string()),
+                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextColor(Color::WHITE),
+            ));
+        });
+}
+
+fn handle_pause_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut paused: ResMut<Paused>,
+    mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    if !keyboard.just_pressed(KeyCode::Escape) { return; }
+    paused.0 = !paused.0;
+    for mut vis in &mut overlay {
+        *vis = if paused.0 { Visibility::Visible } else { Visibility::Hidden };
+    }
+    for sink in &sinks {
+        if paused.0 { sink.pause(); } else { sink.play(); }
+    }
+}
+
+fn handle_pause_buttons(
+    buttons: Query<(&Interaction, &PauseButton), Changed<Interaction>>,
+    mut paused: ResMut<Paused>,
+    mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    for (interaction, button) in &buttons {
+        if *interaction != Interaction::Pressed { continue; }
+        match button {
+            PauseButton::Resume => {
+                paused.0 = false;
+                for mut vis in &mut overlay { *vis = Visibility::Hidden; }
+                for sink in &sinks { sink.play(); }
+            }
+            PauseButton::QuitSong => {
+                paused.0 = false;
+                next_state.set(AppState::Menu);
+            }
+        }
+    }
+}
+
+fn pause_button_hover(
+    mut buttons: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<PauseButton>),
+    >,
+) {
+    for (interaction, mut bg) in &mut buttons {
+        *bg = BackgroundColor(match interaction {
+            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
+            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
+            Interaction::None    => Color::srgb(0.14, 0.14, 0.22),
+        });
     }
 }
 
