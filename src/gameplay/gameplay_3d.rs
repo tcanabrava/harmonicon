@@ -15,6 +15,7 @@ use super::{
 };
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
+use super::modifier_legend::spawn_modifier_legend;
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 
@@ -539,6 +540,15 @@ fn spawn_hud_overlay(
             })
             .with_children(|metro| {
                 spawn_metronome(metro, beats_per_bar, bpm, font);
+            });
+
+            // Technique colour legend
+            p.spawn(Node {
+                margin: UiRect::top(Val::Px(8.0)),
+                ..default()
+            })
+            .with_children(|leg| {
+                spawn_modifier_legend(leg, font);
             });
         });
 

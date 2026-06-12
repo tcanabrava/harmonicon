@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui_render::prelude::MaterialNode;
 
 use crate::{
     assets_management::GlobalFonts,
@@ -15,8 +16,10 @@ use super::{
 };
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
+use super::modifier_legend::spawn_modifier_legend;
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
+use super::vibrato_material::{VibratoMaterial, vibrato_params};
 
 pub fn setup(
     mut commands: Commands,
@@ -25,6 +28,7 @@ pub fn setup(
     mut clock: ResMut<super::GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
     mut valid_notes: ResMut<ValidHarpNotes>,
+    mut vib_materials: ResMut<Assets<VibratoMaterial>>,
     fonts: Res<GlobalFonts>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -36,6 +40,33 @@ pub fn setup(
     valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
 
     let chart = &manifest.chart;
+
+    // Pre-build a vibrato shader material per note (in the same flat order
+    // `spawn_highway` walks the track), so the highway closures only need a
+    // shared slice — no nested mutable borrow of the asset store.
+    let vib_handles: Vec<Option<Handle<VibratoMaterial>>> = chart
+        .track
+        .iter()
+        .flat_map(|item| {
+            let h_pct = note_height_pct(item.duration);
+            item.events.iter().map(move |event| {
+                let intensity = event.modifiers.as_ref().and_then(|ms| {
+                    ms.iter().find_map(|m| match m {
+                        Modifier::Vibrato { intensity, .. } => Some(intensity.unwrap_or(0.5)),
+                        _ => None,
+                    })
+                })?;
+                let (r, g, b) = note_rgb(matches!(event.action, Action::Blow));
+                Some((h_pct, intensity, Color::srgba(r, g, b, 0.95)))
+            })
+        })
+        .map(|opt| opt.map(|(h_pct, intensity, color)| {
+            vib_materials.add(VibratoMaterial {
+                color: color.to_linear(),
+                params: vibrato_params(h_pct, intensity),
+            })
+        }))
+        .collect();
     let key = chart.song.key.as_str();
     let bpm = chart.song.tempo_bpm;
     let chords = twelve_bar(key);
@@ -104,7 +135,7 @@ pub fn setup(
                     BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
                 ))
                 .with_children(|hw| {
-                    spawn_highway(hw, &fonts.symbols, chart);
+                    spawn_highway(hw, &fonts.symbols, chart, &vib_handles);
                 });
 
                 // Harmonica holes
@@ -191,6 +222,9 @@ pub fn setup(
                     spawn_metronome(metro, beats_per_bar, bpm, &fonts.gameplay);
                 });
 
+                // Technique colour legend
+                spawn_modifier_legend(right, &fonts.gameplay);
+
                 // Score
                 right.spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -239,6 +273,7 @@ fn spawn_highway(
     hw: &mut ChildSpawnerCommands,
     font: &FontSource,
     chart: &crate::song::chart::HarpChart,
+    vib_handles: &[Option<Handle<VibratoMaterial>>],
 ) {
     use crate::song::chart::Action;
 
@@ -295,17 +330,17 @@ fn spawn_highway(
         BackgroundColor(Color::srgba(1.0, 1.0, 0.70, 0.55)),
     ));
 
+    let mut note_idx = 0usize;
     for item in &chart.track {
         let t = super::resolve_item_time(item, &chart.timing);
         let h_pct = note_height_pct(item.duration);
         let play_mode = item.play_mode.as_ref();
         for event in &item.events {
+            let idx = note_idx;
+            note_idx += 1;
+
             let is_blow = matches!(event.action, Action::Blow);
-            let (r, g, b) = if is_blow {
-                (0.25f32, 0.55, 0.95)
-            } else {
-                (0.95f32, 0.38, 0.15)
-            };
+            let (r, g, b) = note_rgb(is_blow);
             let left_pct = (event.hole as f32 - 1.0) * LANE_PCT + 0.3;
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
@@ -319,7 +354,11 @@ fn spawn_highway(
                 .first()
                 .map(modifier_color)
                 .unwrap_or(Color::srgba(1.0, 1.0, 1.0, 0.50));
-            hw.spawn((
+            // Vibrato notes are filled by a shader (smooth wavy polygon) instead of
+            // a flat tile, so they carry a MaterialNode and skip the body/border.
+            let vibrato = vib_handles.get(idx).and_then(|h| h.clone());
+
+            let mut tile = hw.spawn((
                 Node {
                     position_type: PositionType::Absolute,
                     left: Val::Percent(left_pct),
@@ -328,11 +367,15 @@ fn spawn_highway(
                     height: Val::Percent(h_pct),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
-                    border: UiRect::all(Val::Px(if modifiers.is_empty() { 1.5 } else { 2.5 })),
+                    border: UiRect::all(Val::Px(if vibrato.is_some() {
+                        0.0
+                    } else if modifiers.is_empty() {
+                        1.5
+                    } else {
+                        2.5
+                    })),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(r, g, b, 0.88)),
-                BorderColor::all(border),
                 NoteVisual {
                     time: t,
                     height_pct: h_pct,
@@ -346,8 +389,16 @@ fn spawn_highway(
                     missed: false,
                     modifiers: modifiers.clone(),
                 },
-            ))
-            .with_children(|note| {
+            ));
+            if let Some(handle) = vibrato {
+                tile.insert(MaterialNode(handle));
+            } else {
+                tile.insert((
+                    BackgroundColor(Color::srgba(r, g, b, 0.88)),
+                    BorderColor::all(border),
+                ));
+            }
+            tile.with_children(|note| {
                 note.spawn((
                     Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
                     TextFont {
@@ -407,24 +458,31 @@ fn spawn_highway(
     }
 }
 
-/// Short badge label and accent colour for a note technique modifier.
+/// Blow/draw fill colour for a note tile (blue for blow, orange for draw).
+fn note_rgb(is_blow: bool) -> (f32, f32, f32) {
+    if is_blow {
+        (0.25, 0.55, 0.95)
+    } else {
+        (0.95, 0.38, 0.15)
+    }
+}
+
+/// Short badge label and accent colour for a note technique modifier. Bends
+/// append their depth to the shared abbreviation (e.g. `♭1`, `♭0.5`).
 fn modifier_badge(m: &Modifier) -> (String, Color) {
-    match m {
+    let abbr = super::modifier_abbrev(m);
+    let label = match m {
         Modifier::Bend { semitones, .. } => {
             let amt = semitones.abs();
-            let txt = if (amt - amt.trunc()).abs() < 0.01 {
-                format!("\u{266D}{}", amt as i32)
+            if (amt - amt.trunc()).abs() < 0.01 {
+                format!("{abbr}{}", amt as i32)
             } else {
-                format!("\u{266D}{amt:.1}")
-            };
-            (txt, modifier_color(m))
+                format!("{abbr}{amt:.1}")
+            }
         }
-        Modifier::Vibrato { .. } => ("vib".into(), modifier_color(m)),
-        Modifier::WahWah { .. } => ("wah".into(), modifier_color(m)),
-        Modifier::Hold { .. } => ("hold".into(), modifier_color(m)),
-        Modifier::Overblow => ("ob".into(), modifier_color(m)),
-        Modifier::Overdraw => ("od".into(), modifier_color(m)),
-    }
+        _ => abbr.to_string(),
+    };
+    (label, modifier_color(m))
 }
 
 /// Label for the multi-note play modes; `single` (and absent) needs no badge.

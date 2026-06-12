@@ -2,9 +2,11 @@ mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;
 mod metronome_overlay;
+mod modifier_legend;
 mod phrase_overlay;
 mod scoring;
 mod twelve_bar_blues_overlay;
+mod vibrato_material;
 
 use bevy::prelude::*;
 use scoring::{
@@ -35,6 +37,7 @@ impl Plugin for GameplayPlugin {
             twelve_bar_blues_overlay::TwelveBarBluesPlugin,
             metronome_overlay::MetronomePlugin,
             phrase_overlay::PhrasePlugin,
+            vibrato_material::VibratoMaterialPlugin,
         ))
         .init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()
@@ -318,6 +321,20 @@ pub fn modifier_color(m: &crate::song::chart::Modifier) -> Color {
         Hold { .. } => Color::srgb(0.85, 0.85, 0.92),
         Overblow => Color::srgb(0.32, 0.88, 0.62),
         Overdraw => Color::srgb(0.96, 0.55, 0.30),
+    }
+}
+
+/// Short badge abbreviation for a modifier, shared by the note badges and the
+/// HUD legend so the two never drift apart.
+pub fn modifier_abbrev(m: &crate::song::chart::Modifier) -> &'static str {
+    use crate::song::chart::Modifier::*;
+    match m {
+        Bend { .. } => "\u{266D}",
+        Vibrato { .. } => "vib",
+        WahWah { .. } => "wah",
+        Hold { .. } => "hold",
+        Overblow => "ob",
+        Overdraw => "od",
     }
 }
 
