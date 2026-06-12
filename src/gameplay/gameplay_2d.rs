@@ -4,17 +4,18 @@ use crate::{
     assets_management::GlobalFonts,
     menu::SelectedSong,
     song::SongManifest,
-    song::chart::Action,
+    song::chart::{Action, Modifier, PlayMode},
     song::harmonica::twelve_bar,
 };
 
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText,
     FeedbackText, GameplayRoot, HIT_H_PCT, HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD,
-    MusicStarted, NoteVisual, ScheduledNote, ScoreText, ValidHarpNotes,
+    MusicStarted, NoteVisual, ScheduledNote, ScoreText, ValidHarpNotes, modifier_color,
 };
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
+use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 
 pub fn setup(
@@ -167,6 +168,9 @@ pub fn setup(
                     }
                 });
 
+                // Live phrase / groove banner (driven by phrase_overlay::update_phrase)
+                spawn_phrase_banner(right, &fonts.gameplay);
+
                 // 12-bar blues grid
                 right.spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -292,15 +296,9 @@ fn spawn_highway(
     ));
 
     for item in &chart.track {
-        let t = item.time.unwrap_or_else(|| {
-            let tick = item.tick.unwrap_or(0);
-            crate::song::chart::tick_to_seconds(
-                tick,
-                chart.timing.resolution,
-                &chart.timing.tempo_map,
-            )
-        });
+        let t = super::resolve_item_time(item, &chart.timing);
         let h_pct = note_height_pct(item.duration);
+        let play_mode = item.play_mode.as_ref();
         for event in &item.events {
             let is_blow = matches!(event.action, Action::Blow);
             let (r, g, b) = if is_blow {
@@ -314,6 +312,13 @@ fn spawn_highway(
                     .harmonica
                     .wind_direction_label(event.hole, &event.action)
             });
+            let modifiers = event.modifiers.clone().unwrap_or_default();
+            // A modifier tints the tile border so the technique reads at a glance,
+            // even before the badge glyphs are legible at the top of the highway.
+            let border = modifiers
+                .first()
+                .map(modifier_color)
+                .unwrap_or(Color::srgba(1.0, 1.0, 1.0, 0.50));
             hw.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -323,11 +328,11 @@ fn spawn_highway(
                     height: Val::Percent(h_pct),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
-                    border: UiRect::all(Val::Px(1.5)),
+                    border: UiRect::all(Val::Px(if modifiers.is_empty() { 1.5 } else { 2.5 })),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(r, g, b, 0.88)),
-                BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.50)),
+                BorderColor::all(border),
                 NoteVisual {
                     time: t,
                     height_pct: h_pct,
@@ -339,7 +344,7 @@ fn spawn_highway(
                     expected_pitch,
                     hit: false,
                     missed: false,
-                    modifiers: event.modifiers.clone().unwrap_or_default(),
+                    modifiers: modifiers.clone(),
                 },
             ))
             .with_children(|note| {
@@ -352,8 +357,82 @@ fn spawn_highway(
                     },
                     TextColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
                 ));
+
+                // Modifier hint badges, pinned to the top edge of the note tile.
+                if !modifiers.is_empty() {
+                    note.spawn(Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(1.0),
+                        flex_direction: FlexDirection::Row,
+                        column_gap: Val::Px(2.0),
+                        ..default()
+                    })
+                    .with_children(|badges| {
+                        for m in &modifiers {
+                            let (label, color) = modifier_badge(m);
+                            badges
+                                .spawn((
+                                    Node {
+                                        padding: UiRect::axes(Val::Px(2.0), Val::Px(0.5)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(color),
+                                ))
+                                .with_children(|pill| {
+                                    pill.spawn((
+                                        Text::new(label),
+                                        TextFont { font_size: FontSize::Px(9.0), ..default() },
+                                        TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
+                                    ));
+                                });
+                        }
+                    });
+                }
+
+                // Chord / split play-mode badge, pinned to the bottom edge.
+                if let Some(tag) = play_mode_label(play_mode) {
+                    note.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            bottom: Val::Px(1.0),
+                            ..default()
+                        },
+                        Text::new(tag),
+                        TextFont { font_size: FontSize::Px(8.0), ..default() },
+                        TextColor(Color::srgba(0.95, 0.95, 1.0, 0.75)),
+                    ));
+                }
             });
         }
+    }
+}
+
+/// Short badge label and accent colour for a note technique modifier.
+fn modifier_badge(m: &Modifier) -> (String, Color) {
+    match m {
+        Modifier::Bend { semitones, .. } => {
+            let amt = semitones.abs();
+            let txt = if (amt - amt.trunc()).abs() < 0.01 {
+                format!("\u{266D}{}", amt as i32)
+            } else {
+                format!("\u{266D}{amt:.1}")
+            };
+            (txt, modifier_color(m))
+        }
+        Modifier::Vibrato { .. } => ("vib".into(), modifier_color(m)),
+        Modifier::WahWah { .. } => ("wah".into(), modifier_color(m)),
+        Modifier::Hold { .. } => ("hold".into(), modifier_color(m)),
+        Modifier::Overblow => ("ob".into(), modifier_color(m)),
+        Modifier::Overdraw => ("od".into(), modifier_color(m)),
+    }
+}
+
+/// Label for the multi-note play modes; `single` (and absent) needs no badge.
+fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
+    match mode {
+        Some(PlayMode::Chord) => Some("chord"),
+        Some(PlayMode::Split) => Some("split"),
+        Some(PlayMode::Single) | None => None,
     }
 }
 
@@ -548,5 +627,38 @@ mod tests {
         let t0 = note_top_pct(2.0, 0.0, LOOKAHEAD, h);
         let t1 = note_top_pct(2.0, 1.0, LOOKAHEAD, h);
         assert!(t1 > t0, "note should move down (larger top%) as time advances");
+    }
+
+    // ── modifier_badge ────────────────────────────────────────────────────────
+
+    #[test]
+    fn bend_badge_shows_whole_semitone_without_decimals() {
+        let (label, _) = modifier_badge(&Modifier::Bend { semitones: -1.0, intensity: None });
+        assert_eq!(label, "\u{266D}1");
+    }
+
+    #[test]
+    fn bend_badge_shows_half_semitone_with_decimal() {
+        let (label, _) = modifier_badge(&Modifier::Bend { semitones: -0.5, intensity: None });
+        assert_eq!(label, "\u{266D}0.5");
+    }
+
+    #[test]
+    fn technique_badges_have_expected_labels() {
+        assert_eq!(modifier_badge(&Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }).0, "vib");
+        assert_eq!(modifier_badge(&Modifier::WahWah { oscillation_hz: 3.0, intensity: None }).0, "wah");
+        assert_eq!(modifier_badge(&Modifier::Hold { intensity: None }).0, "hold");
+        assert_eq!(modifier_badge(&Modifier::Overblow).0, "ob");
+        assert_eq!(modifier_badge(&Modifier::Overdraw).0, "od");
+    }
+
+    // ── play_mode_label ───────────────────────────────────────────────────────
+
+    #[test]
+    fn play_mode_label_badges_only_multi_note_modes() {
+        assert_eq!(play_mode_label(Some(&PlayMode::Chord)), Some("chord"));
+        assert_eq!(play_mode_label(Some(&PlayMode::Split)), Some("split"));
+        assert_eq!(play_mode_label(Some(&PlayMode::Single)), None);
+        assert_eq!(play_mode_label(None), None);
     }
 }

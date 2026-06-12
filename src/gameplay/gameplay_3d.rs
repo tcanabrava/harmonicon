@@ -15,6 +15,7 @@ use super::{
 };
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
+use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -249,14 +250,7 @@ pub fn create_note_visuals(
     chart: &HarpChart,
 ) {
     for item in &chart.track {
-        let t = item.time.unwrap_or_else(|| {
-            let tick = item.tick.unwrap_or(0);
-            crate::song::chart::tick_to_seconds(
-                tick,
-                chart.timing.resolution,
-                &chart.timing.tempo_map,
-            )
-        });
+        let t = super::resolve_item_time(item, &chart.timing);
         let depth = note_depth(item.duration);
         for event in &item.events {
             use crate::song::chart::Action;
@@ -266,11 +260,23 @@ pub fn create_note_visuals(
             } else {
                 (0.95f32, 0.38, 0.15, 1.2, 0.2, 0.05)
             };
-            let note_mat = materials.add(StandardMaterial {
-                base_color: Color::srgb(r, g, b),
-                emissive: LinearRgba::new(emit_r, emit_g, emit_b, 1.0),
-                ..default()
-            });
+            let modifiers = event.modifiers.clone().unwrap_or_default();
+            // Notes carrying a technique get a coloured emissive rim matching the
+            // 2D badge palette, so bends/wah/etc. read at a glance on the lane too.
+            let note_mat = if let Some(m) = modifiers.first() {
+                let c = super::modifier_color(m).to_linear();
+                materials.add(StandardMaterial {
+                    base_color: Color::srgb(r, g, b),
+                    emissive: LinearRgba::new(c.red * 1.6, c.green * 1.6, c.blue * 1.6, 1.0),
+                    ..default()
+                })
+            } else {
+                materials.add(StandardMaterial {
+                    base_color: Color::srgb(r, g, b),
+                    emissive: LinearRgba::new(emit_r, emit_g, emit_b, 1.0),
+                    ..default()
+                })
+            };
             let hole_cfg = holes.get(event.hole.saturating_sub(1) as usize);
             let note_x = hole_cfg.map(|h| h.x).unwrap_or_else(|| lane_x(event.hole));
             let note_w = hole_cfg.map(|h| h.w).unwrap_or(LANE_WIDTH - LANE_GAP);
@@ -292,7 +298,7 @@ pub fn create_note_visuals(
                     expected_pitch,
                     hit: false,
                     missed: false,
-                    modifiers: event.modifiers.clone().unwrap_or_default(),
+                    modifiers,
                 },
                 GameplayRoot,
             ));
@@ -489,6 +495,9 @@ fn spawn_hud_overlay(
                     TextColor(Color::srgb(0.40, 0.40, 0.45)),
                 ));
             }
+
+            // Live phrase / groove banner (driven by phrase_overlay::update_phrase)
+            spawn_phrase_banner(p, font);
 
             // 12-bar blues grid
             p.spawn(Node {

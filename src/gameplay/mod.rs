@@ -2,6 +2,7 @@ mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;
 mod metronome_overlay;
+mod phrase_overlay;
 mod scoring;
 mod twelve_bar_blues_overlay;
 
@@ -27,6 +28,7 @@ impl Plugin for GameplayPlugin {
             countdown_overlay::CountdownPlugin,
             twelve_bar_blues_overlay::TwelveBarBluesPlugin,
             metronome_overlay::MetronomePlugin,
+            phrase_overlay::PhrasePlugin,
         ))
         .init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()
@@ -283,6 +285,29 @@ pub fn secs_per_bar(bpm: f64, beats: f64) -> f64 {
 /// Which of the 12 bars in a twelve-bar cycle the clock is currently on.
 pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
     (clock.max(0.0) / secs_per_bar) as usize % 12
+}
+
+/// Resolve a track item's start time in seconds, preferring an explicit `time`
+/// and falling back to converting its `tick` through the tempo map.
+pub fn resolve_item_time(item: &crate::song::chart::TrackItem, timing: &crate::song::chart::Timing) -> f64 {
+    item.time.unwrap_or_else(|| {
+        let tick = item.tick.unwrap_or(0);
+        crate::song::chart::tick_to_seconds(tick, timing.resolution, &timing.tempo_map)
+    })
+}
+
+/// Accent colour for a note-technique modifier, shared by the 2D badge/border
+/// hints and the 3D note-material tint so both modes read the same.
+pub fn modifier_color(m: &crate::song::chart::Modifier) -> Color {
+    use crate::song::chart::Modifier::*;
+    match m {
+        Bend { .. } => Color::srgb(0.78, 0.42, 0.96),
+        Vibrato { .. } => Color::srgb(0.35, 0.82, 0.96),
+        WahWah { .. } => Color::srgb(1.00, 0.72, 0.25),
+        Hold { .. } => Color::srgb(0.85, 0.85, 0.92),
+        Overblow => Color::srgb(0.32, 0.88, 0.62),
+        Overdraw => Color::srgb(0.96, 0.55, 0.30),
+    }
 }
 
 // ── Shared systems ────────────────────────────────────────────────────────────
@@ -756,5 +781,49 @@ mod tests {
     fn current_bar_index_clamps_negative_clock() {
         // During countdown the clock is negative — should give bar 0
         assert_eq!(current_bar_index(-1.5, 2.0), 0);
+    }
+
+    // ── resolve_item_time ───────────────────────────────────────────────────────
+
+    use crate::song::chart::{TempoPoint, Timing, TrackItem};
+
+    fn track_item(time: Option<f64>, tick: Option<u64>) -> TrackItem {
+        TrackItem {
+            id: None,
+            time,
+            tick,
+            duration: 0.5,
+            phrase: None,
+            groove: None,
+            play_mode: None,
+            events: vec![],
+        }
+    }
+
+    fn timing_120bpm() -> Timing {
+        Timing {
+            resolution: 480,
+            tempo_map: vec![TempoPoint { tick: 0, bpm: 120.0 }],
+            time_signature_map: None,
+        }
+    }
+
+    #[test]
+    fn resolve_item_time_prefers_explicit_time() {
+        let item = track_item(Some(2.5), Some(9999));
+        assert!((resolve_item_time(&item, &timing_120bpm()) - 2.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn resolve_item_time_falls_back_to_tick() {
+        // One quarter note (480 ticks) at 120 BPM = 0.5 s
+        let item = track_item(None, Some(480));
+        assert!((resolve_item_time(&item, &timing_120bpm()) - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn resolve_item_time_defaults_missing_tick_to_zero() {
+        let item = track_item(None, None);
+        assert_eq!(resolve_item_time(&item, &timing_120bpm()), 0.0);
     }
 }
