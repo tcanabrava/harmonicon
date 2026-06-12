@@ -22,6 +22,12 @@ use crate::{
 
 pub struct GameplayPlugin;
 
+/// The shared per-frame gameplay logic (clock tick, scoring, loop handling).
+/// Clock readers — note movement, hole/bar/metronome displays — must be ordered
+/// after this set so they never sample a stale clock and stutter.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GameplayLogic;
+
 impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
@@ -65,7 +71,9 @@ impl Plugin for GameplayPlugin {
                 (handle_pause_input, handle_pause_buttons, pause_button_hover)
                     .run_if(in_state(AppState::Playing)),
             )
-            // Gameplay-logic chains only run when not paused
+            // Gameplay-logic chains only run when not paused. This set ticks the
+            // clock, so every clock reader below must run after it — otherwise the
+            // executor may read a stale clock on some frames, making notes stutter.
             .add_systems(
                 Update,
                 (
@@ -77,6 +85,7 @@ impl Plugin for GameplayPlugin {
                     update_score_display,
                 )
                     .chain()
+                    .in_set(GameplayLogic)
                     .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
             )
             // 2D update chain
@@ -87,6 +96,7 @@ impl Plugin for GameplayPlugin {
                     gameplay_2d::update_holes,
                 )
                     .chain()
+                    .after(GameplayLogic)
                     .run_if(
                         in_state(AppState::Playing)
                             .and_then(|p: Res<Paused>| !p.0)
@@ -102,6 +112,7 @@ impl Plugin for GameplayPlugin {
                     gameplay_3d::groove_harmonica,
                 )
                     .chain()
+                    .after(GameplayLogic)
                     .run_if(
                         in_state(AppState::Playing)
                             .and_then(|p: Res<Paused>| !p.0)
