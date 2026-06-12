@@ -74,7 +74,9 @@ fn main() {
                 list_tracks(&smf);
                 std::process::exit(1);
             };
-            process_track(&smf, idx, &name, ticks_per_quarter, &midi_path);
+            // Use the track's real name (not the raw selector) in the chart.
+            let display = track_name_of(&smf.tracks[idx]).unwrap_or_else(|| format!("track {idx}"));
+            process_track(&smf, idx, &display, ticks_per_quarter, &midi_path);
 
             // Remove the track and write the leftover MIDI.
             smf.tracks.remove(idx);
