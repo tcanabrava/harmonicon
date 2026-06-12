@@ -1,10 +1,12 @@
+use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
+use bevy::render::mesh::PrimitiveTopology;
 
 use crate::{
     assets_management::{GlobalFonts, SelectedHarmonicaModel},
     menu::SelectedSong,
     song::SongManifest,
-    song::chart::{Action, HarpChart},
+    song::chart::{Action, HarpChart, Modifier},
     song::harmonica::twelve_bar,
 };
 
@@ -60,7 +62,7 @@ fn note_depth(duration: f64) -> f32 {
 // ── Harmonica model config ────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, serde::Deserialize)]
-struct HoleConfig {
+pub struct HoleConfig {
     x: f32,
     y: f32,
     z: f32,
@@ -243,6 +245,67 @@ fn create_hit_zone(
     ));
 }
 
+/// Builds a vibrato note body: a `width`×`height` slab whose cross-section is
+/// swept along Z (its length) following a sine, with flat end caps — the 3D
+/// analogue of the 2D sine-edged tile. `intensity` widens the sway; the wave
+/// count scales with the note's length so the wavelength stays roughly constant.
+fn wavy_note_mesh(width: f32, height: f32, depth: f32, intensity: f32) -> Mesh {
+    use std::f32::consts::TAU;
+
+    let amp = 0.20 + intensity.clamp(0.0, 1.0) * 0.30; // world-unit sway in X
+    let cycles = (depth / 2.0).clamp(1.0, 6.0);
+    let segments = ((cycles * 8.0).ceil() as usize).clamp(12, 96);
+    let (hw, hh, hd) = (width * 0.5, height * 0.5, depth * 0.5);
+
+    // Corners of the cross-section at sample plane `r`: [TL, TR, BR, BL].
+    let ring = |r: usize| -> [[f32; 3]; 4] {
+        let t = r as f32 / segments as f32;
+        let z = -hd + t * depth;
+        let cx = amp * (t * cycles * TAU).sin();
+        [
+            [cx - hw, hh, z],  // TL
+            [cx + hw, hh, z],  // TR
+            [cx + hw, -hh, z], // BR
+            [cx - hw, -hh, z], // BL
+        ]
+    };
+
+    // Non-indexed triangle soup so `compute_normals` yields crisp per-face (flat)
+    // normals. Winding is CCW-outward for every face so nothing is back-culled.
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    for r in 0..segments {
+        let a = ring(r); // nearer -Z
+        let b = ring(r + 1); // nearer +Z
+        let (atl, atr, abr, abl) = (a[0], a[1], a[2], a[3]);
+        let (btl, btr, bbr, bbl) = (b[0], b[1], b[2], b[3]);
+        positions.extend_from_slice(&[
+            // top (+Y)
+            atl, btl, btr, atl, btr, atr,
+            // bottom (-Y)
+            abl, abr, bbr, abl, bbr, bbl,
+            // left (-X)
+            atl, abl, bbl, atl, bbl, btl,
+            // right (+X)
+            atr, btr, bbr, atr, bbr, abr,
+        ]);
+    }
+    // End caps: front ring faces -Z, back ring faces +Z.
+    let f = ring(0);
+    positions.extend_from_slice(&[f[0], f[1], f[2], f[0], f[2], f[3]]);
+    let k = ring(segments);
+    positions.extend_from_slice(&[k[0], k[2], k[1], k[0], k[3], k[2]]);
+
+    let uvs = vec![[0.0_f32, 0.0]; positions.len()];
+
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    // No indices -> flat normals (one normal per face), so the faceted body
+    // reads as solid rather than smeared/glitchy.
+    mesh.compute_normals();
+    mesh
+}
+
 pub fn create_note_visuals(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -281,7 +344,16 @@ pub fn create_note_visuals(
             let hole_cfg = holes.get(event.hole.saturating_sub(1) as usize);
             let note_x = hole_cfg.map(|h| h.x).unwrap_or_else(|| lane_x(event.hole));
             let note_w = hole_cfg.map(|h| h.w).unwrap_or(LANE_WIDTH - LANE_GAP);
-            let note_mesh = meshes.add(Cuboid::new(note_w, NOTE_H, depth));
+            // A vibrato note's body waves along its length (Z), like the 2D
+            // sine-edged tile; everything else stays a straight cuboid.
+            let vibrato = modifiers.iter().find_map(|m| match m {
+                Modifier::Vibrato { intensity, .. } => Some(intensity.unwrap_or(0.5)),
+                _ => None,
+            });
+            let note_mesh = match vibrato {
+                Some(intensity) => meshes.add(wavy_note_mesh(note_w, NOTE_H, depth, intensity)),
+                None => meshes.add(Cuboid::new(note_w, NOTE_H, depth)),
+            };
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
                     .harmonica
@@ -773,5 +845,32 @@ pub fn restore_camera(mut cameras: Query<(&mut Camera, &mut Transform), With<Cam
     for (mut cam, _) in &mut cameras {
         cam.order = 0;
         cam.clear_color = ClearColorConfig::Default;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wavy_mesh_has_expected_topology() {
+        // depth 4 -> cycles 2 -> 16 segments. Non-indexed triangle soup:
+        // per segment 4 faces * 2 tris * 3 verts = 24, plus 2 caps * 2 tris * 3.
+        let mesh = wavy_note_mesh(0.8, 0.18, 4.0, 0.5);
+        let verts = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
+        assert_eq!(verts, 16 * 24 + 12);
+
+        // Flat normals require a non-indexed mesh, and must be populated.
+        assert!(mesh.indices().is_none());
+        assert!(mesh.attribute(Mesh::ATTRIBUTE_NORMAL).is_some());
+    }
+
+    #[test]
+    fn wavy_mesh_segment_count_scales_with_length() {
+        // Longer notes get more segments (more wave cycles), so more vertices.
+        let short = wavy_note_mesh(0.8, 0.18, 1.0, 0.5);
+        let long = wavy_note_mesh(0.8, 0.18, 12.0, 0.5);
+        let n = |m: &Mesh| m.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
+        assert!(n(&long) > n(&short));
     }
 }
