@@ -12,6 +12,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jsonschema = "0.28"
 thiserror = "2"
+midly = "0.5"
 
 [dependencies.bevy-inspector-egui]
 version = "0.36"
@@ -23,6 +24,10 @@ inspector = ["bevy-inspector-egui"]
 [[bin]]
 name = "hole-editor"
 path = "src/bin/hole_editor.rs"
+
+[[bin]]
+name = "midi-to-chart"
+path = "src/bin/midi_to_chart.rs"
 
 [profile.dev]
 opt-level = 1
