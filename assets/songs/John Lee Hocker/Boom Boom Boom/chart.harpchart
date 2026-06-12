@@ -4,45 +4,78 @@
     "author": "Tomaz Canabrava",
     "source": "Boom Boom",
     "license": "Gameplay chart example",
-    "description": "Ten-second blues harmonica rhythm-game excerpt inspired by Boom Boom."
+    "description": "Full-length John Lee Hooker 'Boom Boom' shuffle: six 12-bar choruses of cross-harp blues at 120 BPM, with the signature low boom riff, call-and-response licks, bends, holds, vibrato and wah."
   },
-
   "song": {
     "title": "Boom Boom",
     "artist": "John Lee Hooker",
-    "tempo_bpm": 160,
-    "key": "E",
+    "tempo_bpm": 120,
+    "key": "G",
     "time_signature": "4/4",
     "difficulty": "intermediate"
   },
-
   "timing": {
     "resolution": 480,
     "tempo_map": [
       {
         "tick": 0,
-        "bpm": 159
+        "bpm": 120
       }
     ]
   },
-
   "harmonica": {
     "type": "diatonic",
     "holes": 10,
     "position": "2nd",
     "bending_profile": "richter_standard",
     "layout": {
-      "blow": ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"],
-      "draw": ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"]
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
     }
   },
-
   "track": [
     {
-      "id": "phrase_01",
-      "time": 0.00,
-      "duration": 0.50,
-      "phrase": "intro hit",
+      "id": "c01_b01_boom_0",
+      "time": 0.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c01_b01_boom_1",
+      "time": 0.95,
+      "duration": 0.3,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -52,12 +85,124 @@
         }
       ]
     },
-
     {
-      "id": "phrase_02",
-      "time": 0.75,
-      "duration": 0.50,
-      "phrase": "boom",
+      "id": "c01_b01_boom_2",
+      "time": 1.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b01_boom_3",
+      "time": 1.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b02_boom_shuffle_0",
+      "time": 2.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c01_b02_boom_shuffle_1",
+      "time": 2.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b02_boom_shuffle_2",
+      "time": 2.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b02_boom_shuffle_3",
+      "time": 3.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b02_boom_shuffle_4",
+      "time": 3.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b02_boom_shuffle_5",
+      "time": 3.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b03_response_bend_0",
+      "time": 4.45,
+      "duration": 0.45,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -71,34 +216,14 @@
             }
           ]
         }
-      ]
+      ],
+      "phrase": "response_bend"
     },
-
     {
-      "id": "phrase_03",
-      "time": 1.50,
-      "duration": 0.75,
-      "phrase": "boom response",
-      "play_mode": "single",
-      "events": [
-        {
-          "hole": 4,
-          "action": "draw",
-          "note": "D5",
-          "modifiers": [
-            {
-              "type": "hold"
-            }
-          ]
-        }
-      ]
-    },
-
-    {
-      "id": "phrase_04",
-      "time": 2.50,
-      "duration": 0.50,
-      "phrase": "shuffle accent",
+      "id": "c01_b03_response_bend_1",
+      "time": 5.117,
+      "duration": 0.28,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -108,11 +233,47 @@
         }
       ]
     },
-
     {
-      "id": "phrase_05",
-      "time": 3.00,
-      "duration": 0.50,
+      "id": "c01_b03_response_bend_2",
+      "time": 5.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c01_b04_climb_0",
+      "time": 6.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c01_b04_climb_1",
+      "time": 6.95,
+      "duration": 0.26,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -123,22 +284,44 @@
             {
               "type": "bend",
               "semitones": -0.5
-            },
-            {
-              "type": "vibrato",
-              "oscillation_hz": 5,
-              "intensity": 0.4
             }
           ]
         }
       ]
     },
-
     {
-      "id": "phrase_06",
-      "time": 4.00,
-      "duration": 1.00,
-      "phrase": "held answer",
+      "id": "c01_b04_climb_2",
+      "time": 7.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b04_climb_3",
+      "time": 7.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b05_held_0",
+      "time": 8.45,
+      "duration": 1.6,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -156,14 +339,86 @@
             }
           ]
         }
+      ],
+      "phrase": "held"
+    },
+    {
+      "id": "c01_b06_iv_riff_0",
+      "time": 10.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c01_b06_iv_riff_1",
+      "time": 10.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
       ]
     },
-
     {
-      "id": "phrase_07",
-      "time": 5.50,
-      "duration": 0.50,
-      "phrase": "turnaround",
+      "id": "c01_b06_iv_riff_2",
+      "time": 11.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b06_iv_riff_3",
+      "time": 11.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b07_boom_shuffle_0",
+      "time": 12.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c01_b07_boom_shuffle_1",
+      "time": 12.783,
+      "duration": 0.16,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -173,11 +428,67 @@
         }
       ]
     },
-
     {
-      "id": "phrase_08",
-      "time": 6.00,
-      "duration": 0.50,
+      "id": "c01_b07_boom_shuffle_2",
+      "time": 12.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b07_boom_shuffle_3",
+      "time": 13.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b07_boom_shuffle_4",
+      "time": 13.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b07_boom_shuffle_5",
+      "time": 13.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b08_response_bend_0",
+      "time": 14.45,
+      "duration": 0.45,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -191,34 +502,241 @@
             }
           ]
         }
-      ]
+      ],
+      "phrase": "response_bend"
     },
-
     {
-      "id": "phrase_09",
-      "time": 7.00,
-      "duration": 1.00,
-      "phrase": "call",
+      "id": "c01_b08_response_bend_1",
+      "time": 15.117,
+      "duration": 0.28,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
-          "hole": 4,
+          "hole": 2,
           "action": "draw",
-          "note": "D5",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b08_response_bend_2",
+      "time": 15.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
           "modifiers": [
             {
-              "type": "hold"
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
             }
           ]
         }
       ]
     },
-
     {
-      "id": "phrase_10",
-      "time": 8.50,
-      "duration": 0.50,
-      "phrase": "closing accent",
+      "id": "c01_b09_v_riff_0",
+      "time": 16.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ],
+      "phrase": "v_riff"
+    },
+    {
+      "id": "c01_b09_v_riff_1",
+      "time": 16.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b09_v_riff_2",
+      "time": 17.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b09_v_riff_3",
+      "time": 17.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c01_b10_iv_riff_0",
+      "time": 18.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c01_b10_iv_riff_1",
+      "time": 18.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b10_iv_riff_2",
+      "time": 19.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b10_iv_riff_3",
+      "time": 19.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c01_b11_boom_0",
+      "time": 20.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c01_b11_boom_1",
+      "time": 20.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b11_boom_2",
+      "time": 21.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b11_boom_3",
+      "time": 21.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b12_turnaround_0",
+      "time": 22.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "turnaround"
+    },
+    {
+      "id": "c01_b12_turnaround_1",
+      "time": 22.95,
+      "duration": 0.3,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -234,12 +752,3373 @@
         }
       ]
     },
-
     {
-      "id": "phrase_11",
-      "time": 9.25,
-      "duration": 0.75,
-      "phrase": "final sustain",
+      "id": "c01_b12_turnaround_2",
+      "time": 23.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c01_b12_turnaround_3",
+      "time": 23.95,
+      "duration": 0.5,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b01_boom_shuffle_0",
+      "time": 24.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c02_b01_boom_shuffle_1",
+      "time": 24.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b01_boom_shuffle_2",
+      "time": 24.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b01_boom_shuffle_3",
+      "time": 25.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b01_boom_shuffle_4",
+      "time": 25.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b01_boom_shuffle_5",
+      "time": 25.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b02_response_bend_0",
+      "time": 26.45,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "response_bend"
+    },
+    {
+      "id": "c02_b02_response_bend_1",
+      "time": 27.117,
+      "duration": 0.28,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b02_response_bend_2",
+      "time": 27.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c02_b03_climb_0",
+      "time": 28.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c02_b03_climb_1",
+      "time": 28.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c02_b03_climb_2",
+      "time": 29.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b03_climb_3",
+      "time": 29.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b04_call_high_0",
+      "time": 31.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "call_high"
+    },
+    {
+      "id": "c02_b04_call_high_1",
+      "time": 31.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b05_iv_riff_0",
+      "time": 32.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c02_b05_iv_riff_1",
+      "time": 32.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b05_iv_riff_2",
+      "time": 33.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b05_iv_riff_3",
+      "time": 33.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b06_iv_riff_0",
+      "time": 34.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c02_b06_iv_riff_1",
+      "time": 34.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b06_iv_riff_2",
+      "time": 35.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b06_iv_riff_3",
+      "time": 35.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b07_response_bend_0",
+      "time": 36.45,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "response_bend"
+    },
+    {
+      "id": "c02_b07_response_bend_1",
+      "time": 37.117,
+      "duration": 0.28,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b07_response_bend_2",
+      "time": 37.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c02_b08_climb_0",
+      "time": 38.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c02_b08_climb_1",
+      "time": 38.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c02_b08_climb_2",
+      "time": 39.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b08_climb_3",
+      "time": 39.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b09_climb_0",
+      "time": 40.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c02_b09_climb_1",
+      "time": 40.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c02_b09_climb_2",
+      "time": 41.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b09_climb_3",
+      "time": 41.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c02_b10_held_0",
+      "time": 42.45,
+      "duration": 1.6,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            },
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 3,
+              "intensity": 0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "held"
+    },
+    {
+      "id": "c02_b11_boom_shuffle_0",
+      "time": 44.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c02_b11_boom_shuffle_1",
+      "time": 44.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b11_boom_shuffle_2",
+      "time": 44.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b11_boom_shuffle_3",
+      "time": 45.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b11_boom_shuffle_4",
+      "time": 45.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b11_boom_shuffle_5",
+      "time": 45.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b12_turnaround_0",
+      "time": 46.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "turnaround"
+    },
+    {
+      "id": "c02_b12_turnaround_1",
+      "time": 46.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c02_b12_turnaround_2",
+      "time": 47.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c02_b12_turnaround_3",
+      "time": 47.95,
+      "duration": 0.5,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b01_response_bend_0",
+      "time": 48.45,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "response_bend"
+    },
+    {
+      "id": "c03_b01_response_bend_1",
+      "time": 49.117,
+      "duration": 0.28,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b01_response_bend_2",
+      "time": 49.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c03_b02_climb_0",
+      "time": 50.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c03_b02_climb_1",
+      "time": 50.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c03_b02_climb_2",
+      "time": 51.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b02_climb_3",
+      "time": 51.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b03_call_high_0",
+      "time": 53.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "call_high"
+    },
+    {
+      "id": "c03_b03_call_high_1",
+      "time": 53.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b04_boom_0",
+      "time": 54.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c03_b04_boom_1",
+      "time": 54.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b04_boom_2",
+      "time": 55.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b04_boom_3",
+      "time": 55.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b05_iv_riff_0",
+      "time": 56.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c03_b05_iv_riff_1",
+      "time": 56.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b05_iv_riff_2",
+      "time": 57.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b05_iv_riff_3",
+      "time": 57.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b06_held_0",
+      "time": 58.45,
+      "duration": 1.6,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            },
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 3,
+              "intensity": 0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "held"
+    },
+    {
+      "id": "c03_b07_climb_0",
+      "time": 60.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c03_b07_climb_1",
+      "time": 60.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c03_b07_climb_2",
+      "time": 61.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b07_climb_3",
+      "time": 61.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b08_call_high_0",
+      "time": 63.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "call_high"
+    },
+    {
+      "id": "c03_b08_call_high_1",
+      "time": 63.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b09_v_riff_0",
+      "time": 64.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ],
+      "phrase": "v_riff"
+    },
+    {
+      "id": "c03_b09_v_riff_1",
+      "time": 64.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b09_v_riff_2",
+      "time": 65.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b09_v_riff_3",
+      "time": 65.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c03_b10_iv_riff_0",
+      "time": 66.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c03_b10_iv_riff_1",
+      "time": 66.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b10_iv_riff_2",
+      "time": 67.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b10_iv_riff_3",
+      "time": 67.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c03_b11_response_bend_0",
+      "time": 68.45,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "response_bend"
+    },
+    {
+      "id": "c03_b11_response_bend_1",
+      "time": 69.117,
+      "duration": 0.28,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b11_response_bend_2",
+      "time": 69.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c03_b12_turnaround_0",
+      "time": 70.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "turnaround"
+    },
+    {
+      "id": "c03_b12_turnaround_1",
+      "time": 70.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c03_b12_turnaround_2",
+      "time": 71.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c03_b12_turnaround_3",
+      "time": 71.95,
+      "duration": 0.5,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b01_climb_0",
+      "time": 72.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c04_b01_climb_1",
+      "time": 72.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c04_b01_climb_2",
+      "time": 73.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b01_climb_3",
+      "time": 73.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b02_call_high_0",
+      "time": 75.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "call_high"
+    },
+    {
+      "id": "c04_b02_call_high_1",
+      "time": 75.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b03_boom_0",
+      "time": 76.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c04_b03_boom_1",
+      "time": 76.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b03_boom_2",
+      "time": 77.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b03_boom_3",
+      "time": 77.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b04_boom_shuffle_0",
+      "time": 78.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c04_b04_boom_shuffle_1",
+      "time": 78.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b04_boom_shuffle_2",
+      "time": 78.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b04_boom_shuffle_3",
+      "time": 79.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b04_boom_shuffle_4",
+      "time": 79.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b04_boom_shuffle_5",
+      "time": 79.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b05_held_0",
+      "time": 80.45,
+      "duration": 1.6,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            },
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 3,
+              "intensity": 0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "held"
+    },
+    {
+      "id": "c04_b06_iv_riff_0",
+      "time": 82.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c04_b06_iv_riff_1",
+      "time": 82.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b06_iv_riff_2",
+      "time": 83.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b06_iv_riff_3",
+      "time": 83.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b07_call_high_0",
+      "time": 85.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "call_high"
+    },
+    {
+      "id": "c04_b07_call_high_1",
+      "time": 85.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b08_boom_0",
+      "time": 86.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c04_b08_boom_1",
+      "time": 86.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b08_boom_2",
+      "time": 87.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b08_boom_3",
+      "time": 87.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b09_climb_0",
+      "time": 88.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c04_b09_climb_1",
+      "time": 88.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c04_b09_climb_2",
+      "time": 89.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b09_climb_3",
+      "time": 89.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b10_iv_riff_0",
+      "time": 90.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c04_b10_iv_riff_1",
+      "time": 90.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b10_iv_riff_2",
+      "time": 91.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b10_iv_riff_3",
+      "time": 91.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b11_climb_0",
+      "time": 92.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c04_b11_climb_1",
+      "time": 92.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c04_b11_climb_2",
+      "time": 93.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b11_climb_3",
+      "time": 93.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c04_b12_turnaround_0",
+      "time": 94.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "turnaround"
+    },
+    {
+      "id": "c04_b12_turnaround_1",
+      "time": 94.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c04_b12_turnaround_2",
+      "time": 95.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c04_b12_turnaround_3",
+      "time": 95.95,
+      "duration": 0.5,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b01_call_high_0",
+      "time": 97.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "call_high"
+    },
+    {
+      "id": "c05_b01_call_high_1",
+      "time": 97.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b02_boom_0",
+      "time": 98.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c05_b02_boom_1",
+      "time": 98.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b02_boom_2",
+      "time": 99.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b02_boom_3",
+      "time": 99.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b03_boom_shuffle_0",
+      "time": 100.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c05_b03_boom_shuffle_1",
+      "time": 100.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b03_boom_shuffle_2",
+      "time": 100.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b03_boom_shuffle_3",
+      "time": 101.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b03_boom_shuffle_4",
+      "time": 101.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b03_boom_shuffle_5",
+      "time": 101.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b04_response_bend_0",
+      "time": 102.45,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "response_bend"
+    },
+    {
+      "id": "c05_b04_response_bend_1",
+      "time": 103.117,
+      "duration": 0.28,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b04_response_bend_2",
+      "time": 103.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c05_b05_iv_riff_0",
+      "time": 104.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c05_b05_iv_riff_1",
+      "time": 104.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b05_iv_riff_2",
+      "time": 105.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b05_iv_riff_3",
+      "time": 105.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b06_iv_riff_0",
+      "time": 106.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c05_b06_iv_riff_1",
+      "time": 106.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b06_iv_riff_2",
+      "time": 107.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b06_iv_riff_3",
+      "time": 107.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b07_boom_0",
+      "time": 108.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c05_b07_boom_1",
+      "time": 108.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b07_boom_2",
+      "time": 109.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b07_boom_3",
+      "time": 109.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b08_boom_shuffle_0",
+      "time": 110.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c05_b08_boom_shuffle_1",
+      "time": 110.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b08_boom_shuffle_2",
+      "time": 110.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b08_boom_shuffle_3",
+      "time": 111.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b08_boom_shuffle_4",
+      "time": 111.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b08_boom_shuffle_5",
+      "time": 111.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b09_v_riff_0",
+      "time": 112.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ],
+      "phrase": "v_riff"
+    },
+    {
+      "id": "c05_b09_v_riff_1",
+      "time": 112.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b09_v_riff_2",
+      "time": 113.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "c05_b09_v_riff_3",
+      "time": 113.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c05_b10_held_0",
+      "time": 114.45,
+      "duration": 1.6,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            },
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 3,
+              "intensity": 0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "held"
+    },
+    {
+      "id": "c05_b11_call_high_0",
+      "time": 117.45,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "call_high"
+    },
+    {
+      "id": "c05_b11_call_high_1",
+      "time": 117.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b12_turnaround_0",
+      "time": 118.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "turnaround"
+    },
+    {
+      "id": "c05_b12_turnaround_1",
+      "time": 118.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c05_b12_turnaround_2",
+      "time": 119.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c05_b12_turnaround_3",
+      "time": 119.95,
+      "duration": 0.5,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b01_boom_0",
+      "time": 120.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c06_b01_boom_1",
+      "time": 120.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b01_boom_2",
+      "time": 121.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b01_boom_3",
+      "time": 121.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b02_boom_shuffle_0",
+      "time": 122.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c06_b02_boom_shuffle_1",
+      "time": 122.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b02_boom_shuffle_2",
+      "time": 122.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b02_boom_shuffle_3",
+      "time": 123.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b02_boom_shuffle_4",
+      "time": 123.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b02_boom_shuffle_5",
+      "time": 123.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b03_response_bend_0",
+      "time": 124.45,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "response_bend"
+    },
+    {
+      "id": "c06_b03_response_bend_1",
+      "time": 125.117,
+      "duration": 0.28,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b03_response_bend_2",
+      "time": 125.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c06_b04_climb_0",
+      "time": 126.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c06_b04_climb_1",
+      "time": 126.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c06_b04_climb_2",
+      "time": 127.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b04_climb_3",
+      "time": 127.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b05_iv_riff_0",
+      "time": 128.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c06_b05_iv_riff_1",
+      "time": 128.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b05_iv_riff_2",
+      "time": 129.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b05_iv_riff_3",
+      "time": 129.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b06_held_0",
+      "time": 130.45,
+      "duration": 1.6,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "hold"
+            },
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 3,
+              "intensity": 0.5
+            }
+          ]
+        }
+      ],
+      "phrase": "held"
+    },
+    {
+      "id": "c06_b07_boom_shuffle_0",
+      "time": 132.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom_shuffle"
+    },
+    {
+      "id": "c06_b07_boom_shuffle_1",
+      "time": 132.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b07_boom_shuffle_2",
+      "time": 132.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b07_boom_shuffle_3",
+      "time": 133.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b07_boom_shuffle_4",
+      "time": 133.783,
+      "duration": 0.16,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b07_boom_shuffle_5",
+      "time": 133.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b08_response_bend_0",
+      "time": 134.45,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "response_bend"
+    },
+    {
+      "id": "c06_b08_response_bend_1",
+      "time": 135.117,
+      "duration": 0.28,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b08_response_bend_2",
+      "time": 135.95,
+      "duration": 0.45,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 5,
+              "intensity": 0.4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c06_b09_climb_0",
+      "time": 136.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "climb"
+    },
+    {
+      "id": "c06_b09_climb_1",
+      "time": 136.95,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "c06_b09_climb_2",
+      "time": 137.45,
+      "duration": 0.26,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b09_climb_3",
+      "time": 137.95,
+      "duration": 0.4,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b10_iv_riff_0",
+      "time": 138.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "iv_riff"
+    },
+    {
+      "id": "c06_b10_iv_riff_1",
+      "time": 138.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b10_iv_riff_2",
+      "time": 139.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b10_iv_riff_3",
+      "time": 139.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "c06_b11_boom_0",
+      "time": 140.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "boom"
+    },
+    {
+      "id": "c06_b11_boom_1",
+      "time": 140.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b11_boom_2",
+      "time": 141.45,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b11_boom_3",
+      "time": 141.95,
+      "duration": 0.3,
+      "groove": "shuffle",
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "c06_b12_sustain_root_0",
+      "time": 142.45,
+      "duration": 1.8,
+      "groove": "shuffle",
       "play_mode": "single",
       "events": [
         {
@@ -257,22 +4136,20 @@
             }
           ]
         }
-      ]
+      ],
+      "phrase": "sustain_root"
     }
   ],
-
   "loop": {
-    "type": "verse",
+    "type": "full",
     "repeat": false,
     "start_index": 0,
-    "end_index": 10
+    "end_index": 261
   },
-
   "scoring": {
     "perfect_window_ms": 60,
     "good_window_ms": 120,
     "miss_window_ms": 220,
-
     "combo": {
       "enabled": true,
       "base_multiplier": 1.0,
@@ -280,7 +4157,6 @@
       "max_multiplier": 4.0,
       "decay_ms": 2000
     },
-
     "style_bonus": {
       "bend": 50,
       "vibrato": 25,
@@ -288,7 +4164,6 @@
       "hold": 20
     }
   },
-
   "fx_mapping": {
     "bend": "pitch_bend",
     "vibrato": "pitch_lfo",
