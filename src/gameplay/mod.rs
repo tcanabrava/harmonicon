@@ -18,8 +18,8 @@ use std::collections::HashSet;
 
 use crate::{
     assets_management::GlobalFonts,
+    audio_system::pitch_detect::{PitchEvent, PitchInfo},
     menu::{AppState, GameplayMode, SelectedSong},
-    pitch_detect::{PitchEvent, PitchInfo},
     song::{SongManifest, chart::Modifier},
 };
 

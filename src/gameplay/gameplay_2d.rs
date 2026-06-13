@@ -616,7 +616,7 @@ pub fn update_holes(
     let attack = 1.0 - (-dt * 25.0_f32).exp();
     let decay = 1.0 - (-dt * 4.0_f32).exp();
 
-    let harp_pitches: Vec<&crate::pitch_detect::PitchInfo> = active
+    let harp_pitches: Vec<&crate::audio_system::pitch_detect::PitchInfo> = active
         .0
         .iter()
         .filter(|p| valid_notes.0.contains(&format!("{}{}", p.note, p.octave)))

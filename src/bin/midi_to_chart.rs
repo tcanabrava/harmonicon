@@ -14,12 +14,9 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use harmonicon::audio_system::midi_functions::{midi_to_note, note_to_midi};
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use serde_json::{Value, json};
-
-const NOTE_NAMES: [&str; 12] = [
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-];
 
 // Standard C richter diatonic layout (holes 1..=10), matching the in-repo charts.
 const BLOW: [&str; 10] = [
@@ -223,40 +220,6 @@ fn extract_notes(track: &[midly::TrackEvent]) -> Vec<Note> {
     notes
 }
 
-fn midi_to_name(n: u8) -> String {
-    let octave = n as i32 / 12 - 1;
-    format!("{}{}", NOTE_NAMES[(n % 12) as usize], octave)
-}
-
-fn name_to_midi(s: &str) -> Option<u8> {
-    let b = s.as_bytes();
-    let mut semis: i32 = match b.first()? {
-        b'C' => 0,
-        b'D' => 2,
-        b'E' => 4,
-        b'F' => 5,
-        b'G' => 7,
-        b'A' => 9,
-        b'B' => 11,
-        _ => return None,
-    };
-    let mut i = 1;
-    match b.get(i) {
-        Some(b'#') => {
-            semis += 1;
-            i += 1;
-        }
-        Some(b'b') => {
-            semis -= 1;
-            i += 1;
-        }
-        _ => {}
-    }
-    let octave: i32 = std::str::from_utf8(&b[i..]).ok()?.parse().ok()?;
-    let midi = (octave + 1) * 12 + semis;
-    (0..=127).contains(&midi).then_some(midi as u8)
-}
-
 /// A resolved playing instruction for one MIDI pitch.
 struct Mapped {
     hole: u8,
@@ -271,13 +234,13 @@ fn build_pitch_maps() -> (HashMap<u8, u8>, HashMap<u8, u8>) {
     let mut blow = HashMap::new();
     let mut draw = HashMap::new();
     for (i, n) in BLOW.iter().enumerate() {
-        if let Some(m) = name_to_midi(n) {
-            blow.insert(m, (i + 1) as u8);
+        if let Some(m) = note_to_midi(n) {
+            blow.insert(m as u8, (i + 1) as u8);
         }
     }
     for (i, n) in DRAW.iter().enumerate() {
-        if let Some(m) = name_to_midi(n) {
-            draw.insert(m, (i + 1) as u8);
+        if let Some(m) = note_to_midi(n) {
+            draw.insert(m as u8, (i + 1) as u8);
         }
     }
     (blow, draw)
@@ -363,7 +326,7 @@ fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path) 
                 let mut ev = json!({
                     "hole": m.hole,
                     "action": m.action,
-                    "note": midi_to_name(m.natural),
+                    "note": midi_to_note(m.natural as i32),
                 });
                 if let Some(semis) = m.bend {
                     ev["modifiers"] = json!([{ "type": "bend", "semitones": semis }]);

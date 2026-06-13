@@ -1,24 +1,12 @@
-mod assets_management;
-mod audio_system;
-mod gameplay;
-mod menu;
-mod song;
-mod spectrogram;
 use bevy::prelude::*;
 
-use assets_management::AssetsManagementPlugin;
-use gameplay::GameplayPlugin;
-use menu::{AppState, MenuPlugin};
-use song::SongPlugin;
-use spectrogram::SpectrogramPlugin;
-
-use audio_system::pitch_detect::AudioFrame;
-use audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
-
-#[derive(Resource)]
-pub struct GameFonts {
-    pub gameplay: Handle<Font>,
-}
+use harmonicon::assets_management::AssetsManagementPlugin;
+use harmonicon::audio_system::pitch_detect::AudioFrame;
+use harmonicon::audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
+use harmonicon::gameplay::GameplayPlugin;
+use harmonicon::menu::{AppState, MenuPlugin};
+use harmonicon::song::SongPlugin;
+use harmonicon::spectrogram::SpectrogramPlugin;
 
 fn main() {
     let mut app = App::new();
