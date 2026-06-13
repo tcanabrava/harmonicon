@@ -19,7 +19,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::spawn_modifier_legend;
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::vibrato_material::{VibratoMaterial, vibrato_params};
+use super::note_shape_material::{NoteShapeMaterial, note_shape_params};
 
 pub fn setup(
     mut commands: Commands,
@@ -28,7 +28,7 @@ pub fn setup(
     mut clock: ResMut<super::GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
     mut valid_notes: ResMut<ValidHarpNotes>,
-    mut vib_materials: ResMut<Assets<VibratoMaterial>>,
+    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
     fonts: Res<GlobalFonts>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -41,31 +41,32 @@ pub fn setup(
 
     let chart = &manifest.chart;
 
-    // Pre-build a vibrato shader material per note (in the same flat order
+    // Pre-build a shaped-note shader material per note (in the same flat order
     // `spawn_highway` walks the track), so the highway closures only need a
-    // shared slice — no nested mutable borrow of the asset store.
-    let vib_handles: Vec<Option<Handle<VibratoMaterial>>> = chart
+    // shared slice — no nested mutable borrow of the asset store. A note gets a
+    // material if it bends and/or vibrates; the shader draws both.
+    let shape_handles: Vec<Option<Handle<NoteShapeMaterial>>> = chart
         .track
         .iter()
         .flat_map(|item| {
             let h_pct = note_height_pct(item.duration);
             item.events.iter().map(move |event| {
-                let intensity = event.modifiers.as_ref().and_then(|ms| {
-                    ms.iter().find_map(|m| match m {
-                        Modifier::Vibrato { intensity, .. } => Some(intensity.unwrap_or(0.5)),
-                        _ => None,
-                    })
-                })?;
+                let (vib, bend) = note_techniques(event.modifiers.as_deref());
+                if vib.is_none() && bend.is_none() {
+                    return None;
+                }
                 let (r, g, b) = note_rgb(matches!(event.action, Action::Blow));
-                Some((h_pct, intensity, Color::srgba(r, g, b, 0.95)))
+                Some((h_pct, vib, bend, Color::srgba(r, g, b, 0.95)))
             })
         })
-        .map(|opt| opt.map(|(h_pct, intensity, color)| {
-            vib_materials.add(VibratoMaterial {
-                color: color.to_linear(),
-                params: vibrato_params(h_pct, intensity),
+        .map(|opt| {
+            opt.map(|(h_pct, vib, bend, color)| {
+                shape_materials.add(NoteShapeMaterial {
+                    color: color.to_linear(),
+                    params: note_shape_params(h_pct, vib, bend),
+                })
             })
-        }))
+        })
         .collect();
     let key = chart.song.key.as_str();
     let bpm = chart.song.tempo_bpm;
@@ -135,7 +136,7 @@ pub fn setup(
                     BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
                 ))
                 .with_children(|hw| {
-                    spawn_highway(hw, &fonts.symbols, chart, &vib_handles);
+                    spawn_highway(hw, &fonts.symbols, chart, &shape_handles);
                 });
 
                 // Harmonica holes
@@ -273,7 +274,7 @@ fn spawn_highway(
     hw: &mut ChildSpawnerCommands,
     font: &FontSource,
     chart: &crate::song::chart::HarpChart,
-    vib_handles: &[Option<Handle<VibratoMaterial>>],
+    shape_handles: &[Option<Handle<NoteShapeMaterial>>],
 ) {
     use crate::song::chart::Action;
 
@@ -354,9 +355,10 @@ fn spawn_highway(
                 .first()
                 .map(modifier_color)
                 .unwrap_or(Color::srgba(1.0, 1.0, 1.0, 0.50));
-            // Vibrato notes are filled by a shader (smooth wavy polygon) instead of
-            // a flat tile, so they carry a MaterialNode and skip the body/border.
-            let vibrato = vib_handles.get(idx).and_then(|h| h.clone());
+            // Bend/vibrato notes are filled by a shader (smooth curved polygon)
+            // instead of a flat tile, so they carry a MaterialNode and skip the
+            // body/border.
+            let shape = shape_handles.get(idx).and_then(|h| h.clone());
 
             let mut tile = hw.spawn((
                 Node {
@@ -367,7 +369,7 @@ fn spawn_highway(
                     height: Val::Percent(h_pct),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
-                    border: UiRect::all(Val::Px(if vibrato.is_some() {
+                    border: UiRect::all(Val::Px(if shape.is_some() {
                         0.0
                     } else if modifiers.is_empty() {
                         1.5
@@ -390,7 +392,7 @@ fn spawn_highway(
                     modifiers: modifiers.clone(),
                 },
             ));
-            if let Some(handle) = vibrato {
+            if let Some(handle) = shape {
                 tile.insert(MaterialNode(handle));
             } else {
                 tile.insert((
@@ -456,6 +458,25 @@ fn spawn_highway(
             });
         }
     }
+}
+
+/// Extracts the shape-driving techniques from a note's modifiers:
+/// `(vibrato_intensity, pitch_shift_semitones)`. The pitch shift is negative for
+/// bends (pitch down) and positive for overblow/overdraw (pitch up); its sign
+/// drives the arc direction and its magnitude the arc depth. Either may be absent.
+fn note_techniques(modifiers: Option<&[Modifier]>) -> (Option<f32>, Option<f32>) {
+    let mut vib = None;
+    let mut shift = None;
+    for m in modifiers.unwrap_or(&[]) {
+        match m {
+            Modifier::Vibrato { intensity, .. } => vib = Some(intensity.unwrap_or(0.5)),
+            Modifier::Bend { semitones, .. } => shift = Some(*semitones),
+            // Overblow/overdraw raise pitch ~1 semitone — represent as an up-bend.
+            Modifier::Overblow | Modifier::Overdraw => shift = Some(1.0),
+            _ => {}
+        }
+    }
+    (vib, shift)
 }
 
 /// Blow/draw fill colour for a note tile (blue for blow, orange for draw).

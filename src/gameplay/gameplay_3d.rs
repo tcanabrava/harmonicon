@@ -245,23 +245,24 @@ fn create_hit_zone(
     ));
 }
 
-/// Builds a vibrato note body: a `width`×`height` slab whose cross-section is
-/// swept along Z (its length) following a sine, with flat end caps — the 3D
-/// analogue of the 2D sine-edged tile. `intensity` widens the sway; the wave
-/// count scales with the note's length so the wavelength stays roughly constant.
-fn wavy_note_mesh(width: f32, height: f32, depth: f32, intensity: f32) -> Mesh {
-    use std::f32::consts::TAU;
-
-    let amp = 0.20 + intensity.clamp(0.0, 1.0) * 0.30; // world-unit sway in X
-    let cycles = (depth / 2.0).clamp(1.0, 6.0);
-    let segments = ((cycles * 8.0).ceil() as usize).clamp(12, 96);
+/// Builds a technique note body: a `width`×`height` slab whose cross-section is
+/// swept along Z (its length) with its X centre displaced by `centerline(t)`
+/// (t in 0..=1), with flat end caps — the 3D analogue of the 2D shaped tile.
+/// `centerline` carries the vibrato sine and/or bend arc.
+fn swept_note_mesh(
+    width: f32,
+    height: f32,
+    depth: f32,
+    segments: usize,
+    centerline: impl Fn(f32) -> f32,
+) -> Mesh {
     let (hw, hh, hd) = (width * 0.5, height * 0.5, depth * 0.5);
 
     // Corners of the cross-section at sample plane `r`: [TL, TR, BR, BL].
     let ring = |r: usize| -> [[f32; 3]; 4] {
         let t = r as f32 / segments as f32;
         let z = -hd + t * depth;
-        let cx = amp * (t * cycles * TAU).sin();
+        let cx = centerline(t);
         [
             [cx - hw, hh, z],  // TL
             [cx + hw, hh, z],  // TR
@@ -344,15 +345,34 @@ pub fn create_note_visuals(
             let hole_cfg = holes.get(event.hole.saturating_sub(1) as usize);
             let note_x = hole_cfg.map(|h| h.x).unwrap_or_else(|| lane_x(event.hole));
             let note_w = hole_cfg.map(|h| h.w).unwrap_or(LANE_WIDTH - LANE_GAP);
-            // A vibrato note's body waves along its length (Z), like the 2D
-            // sine-edged tile; everything else stays a straight cuboid.
+            // A bend/vibrato note's body curves along its length (Z), like the 2D
+            // shaped tile: vibrato sways as a sine, a bend arcs to one side.
+            // Everything else stays a straight cuboid.
             let vibrato = modifiers.iter().find_map(|m| match m {
                 Modifier::Vibrato { intensity, .. } => Some(intensity.unwrap_or(0.5)),
                 _ => None,
             });
-            let note_mesh = match vibrato {
-                Some(intensity) => meshes.add(wavy_note_mesh(note_w, NOTE_H, depth, intensity)),
-                None => meshes.add(Cuboid::new(note_w, NOTE_H, depth)),
+            // Pitch shift in semitones: negative bends down, positive (overblow/
+            // overdraw) bends up. Sign sets the arc direction, magnitude its depth.
+            let shift = modifiers.iter().find_map(|m| match m {
+                Modifier::Bend { semitones, .. } => Some(*semitones),
+                Modifier::Overblow | Modifier::Overdraw => Some(1.0),
+                _ => None,
+            });
+            let note_mesh = if vibrato.is_some() || shift.is_some() {
+                use std::f32::consts::TAU;
+                let vib_amp = vibrato.map_or(0.0, |i| 0.18 + 0.22 * i.clamp(0.0, 1.0));
+                let bend_amp = shift.map_or(0.0, |s| {
+                    let mag = 0.06 + 0.30 * (s.abs() / 3.0).clamp(0.0, 1.0);
+                    mag * if s < 0.0 { -1.0 } else { 1.0 }
+                });
+                let cycles = (depth / 2.0).clamp(1.0, 6.0);
+                let segments = ((cycles * 8.0).ceil() as usize).clamp(12, 96);
+                meshes.add(swept_note_mesh(note_w, NOTE_H, depth, segments, move |t| {
+                    vib_amp * (t * cycles * TAU).sin() + bend_amp * t * t
+                }))
+            } else {
+                meshes.add(Cuboid::new(note_w, NOTE_H, depth))
             };
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
@@ -853,10 +873,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wavy_mesh_has_expected_topology() {
-        // depth 4 -> cycles 2 -> 16 segments. Non-indexed triangle soup:
-        // per segment 4 faces * 2 tris * 3 verts = 24, plus 2 caps * 2 tris * 3.
-        let mesh = wavy_note_mesh(0.8, 0.18, 4.0, 0.5);
+    fn swept_mesh_has_expected_topology() {
+        // 16 segments, non-indexed triangle soup: per segment 4 faces * 2 tris *
+        // 3 verts = 24, plus 2 caps * 2 tris * 3 = 12.
+        let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, |_| 0.0);
         let verts = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
         assert_eq!(verts, 16 * 24 + 12);
 
@@ -866,11 +886,29 @@ mod tests {
     }
 
     #[test]
-    fn wavy_mesh_segment_count_scales_with_length() {
-        // Longer notes get more segments (more wave cycles), so more vertices.
-        let short = wavy_note_mesh(0.8, 0.18, 1.0, 0.5);
-        let long = wavy_note_mesh(0.8, 0.18, 12.0, 0.5);
-        let n = |m: &Mesh| m.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
-        assert!(n(&long) > n(&short));
+    fn swept_mesh_more_segments_more_vertices() {
+        let n = |segs| {
+            swept_note_mesh(0.8, 0.18, 4.0, segs, |_| 0.0)
+                .attribute(Mesh::ATTRIBUTE_POSITION)
+                .unwrap()
+                .len()
+        };
+        assert!(n(48) > n(12));
+    }
+
+    #[test]
+    fn swept_centerline_offsets_geometry() {
+        // A bend centerline pushes the body toward +X: max X grows vs. a straight slab.
+        let max_x = |off: f32| {
+            let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, move |t| off * t * t);
+            let pos = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
+            // VertexAttributeValues -> read as Float32x3
+            if let bevy::render::mesh::VertexAttributeValues::Float32x3(v) = pos {
+                v.iter().map(|p| p[0]).fold(f32::MIN, f32::max)
+            } else {
+                panic!("expected Float32x3 positions");
+            }
+        };
+        assert!(max_x(0.6) > max_x(0.0));
     }
 }

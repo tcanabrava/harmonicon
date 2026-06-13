@@ -3,10 +3,10 @@ mod gameplay_2d;
 mod gameplay_3d;
 mod metronome_overlay;
 mod modifier_legend;
+mod note_shape_material;
 mod phrase_overlay;
 mod scoring;
 mod twelve_bar_blues_overlay;
-mod vibrato_material;
 
 use bevy::prelude::*;
 use scoring::{
@@ -37,7 +37,7 @@ impl Plugin for GameplayPlugin {
             twelve_bar_blues_overlay::TwelveBarBluesPlugin,
             metronome_overlay::MetronomePlugin,
             phrase_overlay::PhrasePlugin,
-            vibrato_material::VibratoMaterialPlugin,
+            note_shape_material::NoteShapePlugin,
         ))
         .init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()
