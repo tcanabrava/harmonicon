@@ -6,6 +6,7 @@ mod metronome_overlay;
 mod modifier_legend;
 mod note_shape_material;
 mod phrase_overlay;
+mod results;
 mod scoring;
 mod twelve_bar_blues_overlay;
 
@@ -45,6 +46,8 @@ impl Plugin for GameplayPlugin {
             .init_resource::<MusicStarted>()
             .init_resource::<ValidHarpNotes>()
             .init_resource::<Score>()
+            .init_resource::<SongStats>()
+            .init_resource::<SongEnd>()
             .init_resource::<HitFeedback>()
             .init_resource::<ScoringConfig>()
             .init_resource::<ActiveTargets>()
@@ -89,10 +92,19 @@ impl Plugin for GameplayPlugin {
                     update_active_targets,
                     score_notes,
                     update_score_display,
+                    detect_song_end,
                 )
                     .chain()
                     .in_set(GameplayLogic)
                     .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+            )
+            // Results screen lifecycle.
+            .add_systems(OnEnter(AppState::Results), results::setup)
+            .add_systems(OnExit(AppState::Results), results::cleanup)
+            .add_systems(
+                Update,
+                (results::handle_buttons, results::button_hover)
+                    .run_if(in_state(AppState::Results)),
             )
             // 2D update chain
             .add_systems(
@@ -149,6 +161,31 @@ pub struct Score {
     pub max_combo: u32,
     pub last_hit_time: f64, // clock time of the last successful hit, for decay
 }
+
+/// Per-song hit tally shown on the results screen. Reset at the start of each
+/// song. `good` are on-time/early Good hits; `delayed` are late Good hits.
+#[derive(Resource, Default)]
+pub struct SongStats {
+    pub perfect: u32,
+    pub good: u32,
+    pub delayed: u32,
+    pub miss: u32,
+}
+
+/// Gameplay-clock time at which the song's content ends (so the results screen
+/// can appear). `INFINITY` for looping songs, which never finish.
+#[derive(Resource)]
+pub struct SongEnd(pub f64);
+
+impl Default for SongEnd {
+    fn default() -> Self {
+        Self(f64::INFINITY)
+    }
+}
+
+/// Extra seconds after the last note before the results screen, so the final
+/// notes ring out.
+const SONG_END_TAIL: f64 = 2.5;
 
 #[derive(Resource, Default)]
 pub struct HitFeedback {
@@ -345,10 +382,12 @@ pub fn modifier_abbrev(m: &crate::song::chart::Modifier) -> &'static str {
 
 fn reset_score(
     mut score: ResMut<Score>,
+    mut stats: ResMut<SongStats>,
     mut feedback: ResMut<HitFeedback>,
     mut paused: ResMut<Paused>,
 ) {
     *score = Score::default();
+    *stats = SongStats::default();
     *feedback = HitFeedback::default();
     paused.0 = false;
 }
@@ -359,6 +398,7 @@ fn setup_scoring_config(
     mut config: ResMut<ScoringConfig>,
     mut loop_cfg: ResMut<LoopConfig>,
     mut fx_mapping: ResMut<FxMapping>,
+    mut song_end: ResMut<SongEnd>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
@@ -415,6 +455,19 @@ fn setup_scoring_config(
             }
         }
     }
+
+    // Song end = last note's end + a tail, so the results screen appears once the
+    // content finishes. Looping songs never end.
+    let last_note_end = chart
+        .track
+        .iter()
+        .map(|item| resolve_item_time(item, &chart.timing) + item.duration)
+        .fold(0.0_f64, f64::max);
+    song_end.0 = if loop_cfg.active {
+        f64::INFINITY
+    } else {
+        last_note_end + SONG_END_TAIL
+    };
 
     // Resolve fx_mapping: modifier name → DSP effect processor name.
     fx_mapping.0 = chart
@@ -488,6 +541,7 @@ fn score_notes(
     fx_mapping: Res<FxMapping>,
     mut notes: Query<&mut ScheduledNote>,
     mut score: ResMut<Score>,
+    mut stats: ResMut<SongStats>,
     mut feedback: ResMut<HitFeedback>,
 ) {
     if clock.0 < 0.0 {
@@ -524,6 +578,7 @@ fn score_notes(
         ) {
             NoteOutcome::Missed => {
                 note.missed = true;
+                stats.miss += 1;
                 if config.combo_enabled {
                     score.combo = 0;
                 }
@@ -531,6 +586,12 @@ fn score_notes(
             NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
             NoteOutcome::Hit(quality) => {
                 note.hit = true;
+                match quality {
+                    HitQuality::Perfect => stats.perfect += 1,
+                    // A late Good hit counts as "delayed"; early/on-time as "good".
+                    HitQuality::Good if offset > 0.0 => stats.delayed += 1,
+                    HitQuality::Good => stats.good += 1,
+                }
                 score.last_hit_time = clock.0;
                 score.combo += 1;
                 score.max_combo = score.max_combo.max(score.combo);
@@ -751,6 +812,24 @@ fn pause_button_hover(
             Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
             Interaction::None => Color::srgb(0.14, 0.14, 0.22),
         });
+    }
+}
+
+/// Once the song's content has finished (and we're not looping or jamming),
+/// transition to the results screen. Gated on `music_started` so it never fires
+/// during the countdown.
+fn detect_song_end(
+    clock: Res<GameplayClock>,
+    song_end: Res<SongEnd>,
+    music_started: Res<MusicStarted>,
+    mode: Res<GameplayMode>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    if *mode == GameplayMode::JamSession || !music_started.0 {
+        return;
+    }
+    if clock.0 >= song_end.0 {
+        next_state.set(AppState::Results);
     }
 }
 

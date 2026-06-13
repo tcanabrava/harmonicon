@@ -29,6 +29,8 @@ pub enum AppState {
     Menu,
     SongLoading,
     Playing,
+    /// Post-song results / statistics screen.
+    Results,
 }
 
 // ── Menu sub-states (only active while AppState == Menu) ──────────────────────
