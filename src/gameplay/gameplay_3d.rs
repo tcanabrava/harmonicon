@@ -188,8 +188,10 @@ fn create_note_track(
     track_ctr_z: f32,
     holes: &[HoleConfig],
 ) {
+    // Semi-translucent so notes dipping below the lane (downward bends) stay visible.
     let lane_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.08, 0.08, 0.12),
+        base_color: Color::srgba(0.08, 0.08, 0.12, 0.5),
+        alpha_mode: AlphaMode::Blend,
         metallic: 0.3,
         perceptual_roughness: 0.8,
         ..default()
@@ -245,16 +247,23 @@ fn create_hit_zone(
     ));
 }
 
+/// Sigmoid bend profile (matches `note_shape.wgsl`): holds flat, transitions
+/// sharply through the middle, then holds flat — a note bending pitch and settling.
+fn bend_ease(t: f32) -> f32 {
+    let x = ((t - 0.5) * 2.0 + 0.5).clamp(0.0, 1.0);
+    x * x * x * (x * (x * 6.0 - 15.0) + 10.0)
+}
+
 /// Builds a technique note body: a `width`×`height` slab whose cross-section is
-/// swept along Z (its length) with its X centre displaced by `centerline(t)`
-/// (t in 0..=1), with flat end caps — the 3D analogue of the 2D shaped tile.
-/// `centerline` carries the vibrato sine and/or bend arc.
+/// swept along Z (its length) with its centre displaced by `offset(t)` returning
+/// `(dx, dy)` (t in 0..=1), with flat end caps — the 3D analogue of the 2D shaped
+/// tile. Vibrato sways on X; a bend arcs on Y (up or down).
 fn swept_note_mesh(
     width: f32,
     height: f32,
     depth: f32,
     segments: usize,
-    centerline: impl Fn(f32) -> f32,
+    offset: impl Fn(f32) -> (f32, f32),
 ) -> Mesh {
     let (hw, hh, hd) = (width * 0.5, height * 0.5, depth * 0.5);
 
@@ -262,12 +271,12 @@ fn swept_note_mesh(
     let ring = |r: usize| -> [[f32; 3]; 4] {
         let t = r as f32 / segments as f32;
         let z = -hd + t * depth;
-        let cx = centerline(t);
+        let (dx, dy) = offset(t);
         [
-            [cx - hw, hh, z],  // TL
-            [cx + hw, hh, z],  // TR
-            [cx + hw, -hh, z], // BR
-            [cx - hw, -hh, z], // BL
+            [dx - hw, dy + hh, z], // TL
+            [dx + hw, dy + hh, z], // TR
+            [dx + hw, dy - hh, z], // BR
+            [dx - hw, dy - hh, z], // BL
         ]
     };
 
@@ -362,14 +371,20 @@ pub fn create_note_visuals(
             let note_mesh = if vibrato.is_some() || shift.is_some() {
                 use std::f32::consts::TAU;
                 let vib_amp = vibrato.map_or(0.0, |i| 0.18 + 0.22 * i.clamp(0.0, 1.0));
+                // Y deflection in world units. Large so the bend reads clearly down
+                // the lane from the camera; the S-curve below holds it as a plateau.
                 let bend_amp = shift.map_or(0.0, |s| {
-                    let mag = 0.06 + 0.30 * (s.abs() / 3.0).clamp(0.0, 1.0);
+                    let mag = 0.8 + 4.0 * (s.abs() / 3.0).clamp(0.0, 1.0);
                     mag * if s < 0.0 { -1.0 } else { 1.0 }
                 });
                 let cycles = (depth / 2.0).clamp(1.0, 6.0);
                 let segments = ((cycles * 8.0).ceil() as usize).clamp(12, 96);
                 meshes.add(swept_note_mesh(note_w, NOTE_H, depth, segments, move |t| {
-                    vib_amp * (t * cycles * TAU).sin() + bend_amp * t * t
+                    // Vibrato sways on X; the bend arcs on Y as a sigmoid (down for
+                    // negative, up for overblow/overdraw) — hold, bend, hold.
+                    let dx = vib_amp * (t * cycles * TAU).sin();
+                    let dy = bend_amp * bend_ease(t);
+                    (dx, dy)
                 }))
             } else {
                 meshes.add(Cuboid::new(note_w, NOTE_H, depth))
@@ -876,7 +891,7 @@ mod tests {
     fn swept_mesh_has_expected_topology() {
         // 16 segments, non-indexed triangle soup: per segment 4 faces * 2 tris *
         // 3 verts = 24, plus 2 caps * 2 tris * 3 = 12.
-        let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, |_| 0.0);
+        let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, |_| (0.0, 0.0));
         let verts = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
         assert_eq!(verts, 16 * 24 + 12);
 
@@ -888,7 +903,7 @@ mod tests {
     #[test]
     fn swept_mesh_more_segments_more_vertices() {
         let n = |segs| {
-            swept_note_mesh(0.8, 0.18, 4.0, segs, |_| 0.0)
+            swept_note_mesh(0.8, 0.18, 4.0, segs, |_| (0.0, 0.0))
                 .attribute(Mesh::ATTRIBUTE_POSITION)
                 .unwrap()
                 .len()
@@ -897,18 +912,37 @@ mod tests {
     }
 
     #[test]
-    fn swept_centerline_offsets_geometry() {
-        // A bend centerline pushes the body toward +X: max X grows vs. a straight slab.
-        let max_x = |off: f32| {
-            let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, move |t| off * t * t);
+    fn bend_ease_is_a_centered_sigmoid() {
+        // Anchored 0->1, symmetric, with flat plateaus outside the central band.
+        assert_eq!(bend_ease(0.0), 0.0);
+        assert_eq!(bend_ease(1.0), 1.0);
+        assert!((bend_ease(0.5) - 0.5).abs() < 1e-6);
+        assert_eq!(bend_ease(0.2), 0.0, "holds flat before the transition");
+        assert_eq!(bend_ease(0.8), 1.0, "holds flat after the transition");
+        // Monotonic non-decreasing.
+        let mut prev = -1.0;
+        for i in 0..=20 {
+            let v = bend_ease(i as f32 / 20.0);
+            assert!(v >= prev - 1e-6);
+            prev = v;
+        }
+    }
+
+    #[test]
+    fn bend_arcs_on_y_axis() {
+        // A positive bend lifts the body in +Y; a negative bend dips it in -Y.
+        let extreme_y = |dy_amp: f32, pick: fn(&[f32]) -> f32| {
+            let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, move |t| (0.0, dy_amp * t * t));
             let pos = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
-            // VertexAttributeValues -> read as Float32x3
             if let bevy::render::mesh::VertexAttributeValues::Float32x3(v) = pos {
-                v.iter().map(|p| p[0]).fold(f32::MIN, f32::max)
+                pick(&v.iter().map(|p| p[1]).collect::<Vec<_>>())
             } else {
                 panic!("expected Float32x3 positions");
             }
         };
-        assert!(max_x(0.6) > max_x(0.0));
+        let max = |ys: &[f32]| ys.iter().copied().fold(f32::MIN, f32::max);
+        let min = |ys: &[f32]| ys.iter().copied().fold(f32::MAX, f32::min);
+        assert!(extreme_y(0.6, max) > extreme_y(0.0, max), "up-bend raises top");
+        assert!(extreme_y(-0.6, min) < extreme_y(0.0, min), "down-bend lowers bottom");
     }
 }
