@@ -51,19 +51,21 @@ pub fn setup(
         .flat_map(|item| {
             let h_pct = note_height_pct(item.duration);
             item.events.iter().map(move |event| {
-                let (vib, bend) = note_techniques(event.modifiers.as_deref());
-                if vib.is_none() && bend.is_none() {
+                let (vib, bend, wah) = note_techniques(event.modifiers.as_deref());
+                if vib.is_none() && bend.is_none() && wah.is_none() {
                     return None;
                 }
                 let (r, g, b) = note_rgb(matches!(event.action, Action::Blow));
-                Some((h_pct, vib, bend, Color::srgba(r, g, b, 0.95)))
+                Some((h_pct, vib, bend, wah, Color::srgba(r, g, b, 0.95)))
             })
         })
         .map(|opt| {
-            opt.map(|(h_pct, vib, bend, color)| {
+            opt.map(|(h_pct, vib, bend, wah, color)| {
+                let (params, wah) = note_shape_params(h_pct, vib, bend, wah);
                 shape_materials.add(NoteShapeMaterial {
                     color: color.to_linear(),
-                    params: note_shape_params(h_pct, vib, bend),
+                    params,
+                    wah,
                 })
             })
         })
@@ -461,22 +463,25 @@ fn spawn_highway(
 }
 
 /// Extracts the shape-driving techniques from a note's modifiers:
-/// `(vibrato_intensity, pitch_shift_semitones)`. The pitch shift is negative for
-/// bends (pitch down) and positive for overblow/overdraw (pitch up); its sign
-/// drives the arc direction and its magnitude the arc depth. Either may be absent.
-fn note_techniques(modifiers: Option<&[Modifier]>) -> (Option<f32>, Option<f32>) {
+/// `(vibrato_intensity, pitch_shift_semitones, wah_intensity)`. The pitch shift is
+/// negative for bends (pitch down) and positive for overblow/overdraw (pitch up);
+/// its sign drives the arc direction and its magnitude the arc depth. Wah pulses
+/// the note width. Any may be absent.
+fn note_techniques(modifiers: Option<&[Modifier]>) -> (Option<f32>, Option<f32>, Option<f32>) {
     let mut vib = None;
     let mut shift = None;
+    let mut wah = None;
     for m in modifiers.unwrap_or(&[]) {
         match m {
             Modifier::Vibrato { intensity, .. } => vib = Some(intensity.unwrap_or(0.5)),
+            Modifier::WahWah { intensity, .. } => wah = Some(intensity.unwrap_or(0.5)),
             Modifier::Bend { semitones, .. } => shift = Some(*semitones),
             // Overblow/overdraw raise pitch ~1 semitone — represent as an up-bend.
             Modifier::Overblow | Modifier::Overdraw => shift = Some(1.0),
             _ => {}
         }
     }
-    (vib, shift)
+    (vib, shift, wah)
 }
 
 /// Blow/draw fill colour for a note tile (blue for blow, orange for draw).
