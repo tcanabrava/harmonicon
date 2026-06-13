@@ -712,6 +712,7 @@ fn handle_pause_buttons(
     mut paused: ResMut<Paused>,
     mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut return_to_song_list: ResMut<crate::menu::ReturnToSongList>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
     for (interaction, button) in &buttons {
@@ -730,6 +731,8 @@ fn handle_pause_buttons(
             }
             PauseButton::QuitSong => {
                 paused.0 = false;
+                // Land back on the song list, not the main menu.
+                return_to_song_list.0 = true;
                 next_state.set(AppState::Menu);
             }
         }

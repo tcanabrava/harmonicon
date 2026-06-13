@@ -13,20 +13,8 @@ pub enum GameplayMode {
     JamSession,
 }
 
-/// Tracks which entry led into the song selector, so picking a song either goes
-/// to the 2D/3D mode select (Play) or straight into a jam (Jam).
-#[derive(Resource, Default, PartialEq)]
-enum SongPick {
-    #[default]
-    Play,
-    Jam,
-}
-
-#[derive(Resource, Default)]
-pub struct PendingSongPath(pub String);
-
-/// Set to `true` by the pause menu "Quit Song" button so that re-entering
-/// `AppState::Menu` lands on the artist's song list rather than the main menu.
+/// Set to `true` by the pause menu's "Quit Song" button so that re-entering
+/// `AppState::Menu` lands on the song list rather than the main menu.
 #[derive(Resource, Default)]
 pub struct ReturnToSongList(pub bool);
 
@@ -90,7 +78,6 @@ enum MenuButton {
     BackToMain,
     BackToPlay,
     BackToArtistList,
-    BackToSongList,
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
@@ -101,8 +88,8 @@ impl Plugin for MenuPlugin {
             .add_sub_state::<MenuPage>()
             .init_resource::<SelectedArtist>()
             .init_resource::<GameplayMode>()
-            .init_resource::<PendingSongPath>()
-            .init_resource::<SongPick>()
+            .init_resource::<ReturnToSongList>()
+            .add_systems(OnEnter(AppState::Menu), route_menu_entry)
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main), setup_main_menu)
             .add_systems(OnExit(MenuPage::Main), cleanup_menu)
@@ -340,7 +327,7 @@ fn setup_mode_select(mut commands: Commands, font: Res<GlobalFonts>) {
         root,
         &font.symbols,
         "\u{2190} Back",
-        MenuButton::BackToSongList,
+        MenuButton::BackToPlay,
     );
 }
 
@@ -351,9 +338,7 @@ fn handle_menu_input(
     mut next_page: ResMut<NextState<MenuPage>>,
     mut next_state: ResMut<NextState<AppState>>,
     mut selected_artist: ResMut<SelectedArtist>,
-    mut pending_path: ResMut<PendingSongPath>,
     mut gameplay_mode: ResMut<GameplayMode>,
-    mut song_pick: ResMut<SongPick>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
     mut app_exit: MessageWriter<AppExit>,
@@ -369,47 +354,33 @@ fn handle_menu_input(
             MenuButton::Quit => {
                 app_exit.write(AppExit::Success);
             }
-            MenuButton::PlaySong => {
-                *song_pick = SongPick::Play;
+            // The render mode is chosen up front, before picking a song.
+            MenuButton::PlaySong => next_page.set(MenuPage::ModeSelect),
+            MenuButton::JamSession => {
+                *gameplay_mode = GameplayMode::JamSession;
                 next_page.set(MenuPage::ArtistList);
             }
-            MenuButton::JamSession => {
-                *song_pick = SongPick::Jam;
+            MenuButton::PlayMode2D => {
+                *gameplay_mode = GameplayMode::Play2D;
+                next_page.set(MenuPage::ArtistList);
+            }
+            MenuButton::PlayMode3D => {
+                *gameplay_mode = GameplayMode::Play3D;
                 next_page.set(MenuPage::ArtistList);
             }
             MenuButton::Artist(a) => {
                 selected_artist.0 = a.clone();
                 next_page.set(MenuPage::SongList);
             }
+            // The mode is already chosen — picking a song starts the game.
             MenuButton::Song(path) => {
-                pending_path.0 = path.clone();
-                match *song_pick {
-                    // Play picks a render mode next; Jam starts immediately.
-                    SongPick::Play => next_page.set(MenuPage::ModeSelect),
-                    SongPick::Jam => {
-                        *gameplay_mode = GameplayMode::JamSession;
-                        let handle = asset_server.load::<SongManifest>(path.clone());
-                        commands.insert_resource(SelectedSong(handle));
-                        next_state.set(AppState::SongLoading);
-                    }
-                }
-            }
-            MenuButton::PlayMode2D => {
-                *gameplay_mode = GameplayMode::Play2D;
-                let handle = asset_server.load::<SongManifest>(pending_path.0.clone());
-                commands.insert_resource(SelectedSong(handle));
-                next_state.set(AppState::SongLoading);
-            }
-            MenuButton::PlayMode3D => {
-                *gameplay_mode = GameplayMode::Play3D;
-                let handle = asset_server.load::<SongManifest>(pending_path.0.clone());
+                let handle = asset_server.load::<SongManifest>(path.clone());
                 commands.insert_resource(SelectedSong(handle));
                 next_state.set(AppState::SongLoading);
             }
             MenuButton::BackToMain => next_page.set(MenuPage::Main),
             MenuButton::BackToPlay => next_page.set(MenuPage::Play),
             MenuButton::BackToArtistList => next_page.set(MenuPage::ArtistList),
-            MenuButton::BackToSongList => next_page.set(MenuPage::SongList),
         }
     }
 }
@@ -445,5 +416,18 @@ fn check_loading(
 fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<MenuRoot>>) {
     for entity in &roots {
         commands.entity(entity).despawn();
+    }
+}
+
+/// On entering the menu, jump straight to the song list if we just quit a song
+/// (so "Quit Song" returns to the list, not the main menu). Otherwise the menu
+/// opens on its default page (Main).
+fn route_menu_entry(
+    mut ret: ResMut<ReturnToSongList>,
+    mut next_page: ResMut<NextState<MenuPage>>,
+) {
+    if ret.0 {
+        ret.0 = false;
+        next_page.set(MenuPage::SongList);
     }
 }
