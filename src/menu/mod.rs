@@ -9,6 +9,17 @@ pub enum GameplayMode {
     #[default]
     Play2D,
     Play3D,
+    /// Free-play: the 12-bar chart + metronome, no falling notes.
+    JamSession,
+}
+
+/// Tracks which entry led into the song selector, so picking a song either goes
+/// to the 2D/3D mode select (Play) or straight into a jam (Jam).
+#[derive(Resource, Default, PartialEq)]
+enum SongPick {
+    #[default]
+    Play,
+    Jam,
 }
 
 #[derive(Resource, Default)]
@@ -91,6 +102,7 @@ impl Plugin for MenuPlugin {
             .init_resource::<SelectedArtist>()
             .init_resource::<GameplayMode>()
             .init_resource::<PendingSongPath>()
+            .init_resource::<SongPick>()
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main), setup_main_menu)
             .add_systems(OnExit(MenuPage::Main), cleanup_menu)
@@ -341,6 +353,7 @@ fn handle_menu_input(
     mut selected_artist: ResMut<SelectedArtist>,
     mut pending_path: ResMut<PendingSongPath>,
     mut gameplay_mode: ResMut<GameplayMode>,
+    mut song_pick: ResMut<SongPick>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
     mut app_exit: MessageWriter<AppExit>,
@@ -356,15 +369,30 @@ fn handle_menu_input(
             MenuButton::Quit => {
                 app_exit.write(AppExit::Success);
             }
-            MenuButton::PlaySong => next_page.set(MenuPage::ArtistList),
-            MenuButton::JamSession => { /* TODO */ }
+            MenuButton::PlaySong => {
+                *song_pick = SongPick::Play;
+                next_page.set(MenuPage::ArtistList);
+            }
+            MenuButton::JamSession => {
+                *song_pick = SongPick::Jam;
+                next_page.set(MenuPage::ArtistList);
+            }
             MenuButton::Artist(a) => {
                 selected_artist.0 = a.clone();
                 next_page.set(MenuPage::SongList);
             }
             MenuButton::Song(path) => {
                 pending_path.0 = path.clone();
-                next_page.set(MenuPage::ModeSelect);
+                match *song_pick {
+                    // Play picks a render mode next; Jam starts immediately.
+                    SongPick::Play => next_page.set(MenuPage::ModeSelect),
+                    SongPick::Jam => {
+                        *gameplay_mode = GameplayMode::JamSession;
+                        let handle = asset_server.load::<SongManifest>(path.clone());
+                        commands.insert_resource(SelectedSong(handle));
+                        next_state.set(AppState::SongLoading);
+                    }
+                }
             }
             MenuButton::PlayMode2D => {
                 *gameplay_mode = GameplayMode::Play2D;

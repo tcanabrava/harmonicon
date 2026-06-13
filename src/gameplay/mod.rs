@@ -1,6 +1,7 @@
 mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;
+mod jam_session;
 mod metronome_overlay;
 mod modifier_legend;
 mod note_shape_material;
@@ -59,6 +60,8 @@ impl Plugin for GameplayPlugin {
                     setup_pause_menu,
                     gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                     gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
+                    jam_session::setup
+                        .run_if(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
                 ),
             )
             // Cleanup: shared entity despawn + restore camera on 3D exit
