@@ -10,8 +10,11 @@ use super::{Score, SongStats};
 #[derive(Component)]
 pub(super) struct ResultsRoot;
 
-#[derive(Component)]
-pub(super) struct ContinueButton;
+#[derive(Component, Clone, Copy)]
+pub(super) enum ResultsButton {
+    Retry,
+    Continue,
+}
 
 /// Weighted accuracy in 0..1 from the hit tally (perfect counts full, good less,
 /// a late "delayed" hit least). Empty songs grade as 0.
@@ -107,26 +110,44 @@ pub(super) fn setup(
                 Node { margin: UiRect::top(Val::Px(8.0)), ..default() },
             ));
 
-            // Continue button.
-            root.spawn((
-                Button,
-                Node {
-                    min_width: Val::Px(220.0),
-                    padding: UiRect::axes(Val::Px(28.0), Val::Px(12.0)),
-                    justify_content: JustifyContent::Center,
-                    margin: UiRect::top(Val::Px(18.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-                ContinueButton,
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new("Continue"),
-                    TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
-                    TextColor(Color::WHITE),
-                ));
+            // Retry / Continue buttons.
+            root.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(16.0),
+                margin: UiRect::top(Val::Px(18.0)),
+                ..default()
+            })
+            .with_children(|row| {
+                spawn_results_button(row, &font, "Retry", ResultsButton::Retry);
+                spawn_results_button(row, &font, "Continue", ResultsButton::Continue);
             });
+        });
+}
+
+fn spawn_results_button(
+    parent: &mut ChildSpawnerCommands,
+    font: &FontSource,
+    label: &str,
+    kind: ResultsButton,
+) {
+    parent
+        .spawn((
+            Button,
+            Node {
+                min_width: Val::Px(180.0),
+                padding: UiRect::axes(Val::Px(28.0), Val::Px(12.0)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
+            kind,
+        ))
+        .with_children(|b| {
+            b.spawn((
+                Text::new(label.to_string()),
+                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextColor(Color::WHITE),
+            ));
         });
 }
 
@@ -165,20 +186,28 @@ pub(super) fn cleanup(mut commands: Commands, roots: Query<Entity, With<ResultsR
 }
 
 pub(super) fn handle_buttons(
-    buttons: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
+    buttons: Query<(&Interaction, &ResultsButton), Changed<Interaction>>,
     mut return_to_song_list: ResMut<ReturnToSongList>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    for interaction in &buttons {
-        if *interaction == Interaction::Pressed {
-            return_to_song_list.0 = true;
-            next_state.set(AppState::Menu);
+    for (interaction, button) in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        match button {
+            // Re-enter via SongLoading so the song restarts fresh (asset already
+            // loaded → resumes immediately).
+            ResultsButton::Retry => next_state.set(AppState::SongLoading),
+            ResultsButton::Continue => {
+                return_to_song_list.0 = true;
+                next_state.set(AppState::Menu);
+            }
         }
     }
 }
 
 pub(super) fn button_hover(
-    mut buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<ContinueButton>)>,
+    mut buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<ResultsButton>)>,
 ) {
     for (interaction, mut bg) in &mut buttons {
         *bg = BackgroundColor(match interaction {

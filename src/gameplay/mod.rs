@@ -262,6 +262,7 @@ struct PauseMenuRoot;
 #[derive(Component)]
 enum PauseButton {
     Resume,
+    Restart,
     QuitSong,
 }
 
@@ -707,6 +708,7 @@ fn setup_pause_menu(mut commands: Commands, fonts: Res<GlobalFonts>) {
                 TextColor(Color::WHITE),
             ));
             spawn_pause_button(p, "Resume", PauseButton::Resume, &font);
+            spawn_pause_button(p, "Restart", PauseButton::Restart, &font);
             spawn_pause_button(p, "Quit Song", PauseButton::QuitSong, &font);
         });
 }
@@ -789,6 +791,12 @@ fn handle_pause_buttons(
                 for sink in &sinks {
                     sink.play();
                 }
+            }
+            PauseButton::Restart => {
+                paused.0 = false;
+                // Re-enter via SongLoading so the whole song setup runs fresh
+                // (the asset is already loaded, so it resumes immediately).
+                next_state.set(AppState::SongLoading);
             }
             PauseButton::QuitSong => {
                 paused.0 = false;
