@@ -780,8 +780,11 @@ pub fn groove_harmonica(
 
 pub fn update_notes_3d(
     clock: Res<super::GameplayClock>,
+    loop_cfg: Res<super::LoopConfig>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut commands: Commands,
     mut notes: Query<(
+        Entity,
         &NoteVisual3D,
         &ScheduledNote,
         &MeshMaterial3d<StandardMaterial>,
@@ -789,9 +792,15 @@ pub fn update_notes_3d(
     )>,
 ) {
     let elapsed = clock.0;
-    for (note, scheduled, mat_handle, mut tf) in &mut notes {
+    for (entity, note, scheduled, mat_handle, mut tf) in &mut notes {
         let remaining = (note.time - elapsed) as f32;
         let z = HIT_Z - remaining / LOOKAHEAD as f32 * LANE_DEPTH - note.depth * 0.5;
+        // Once a note has travelled past the hit zone, recycle it — but not while
+        // looping, where notes are replayed in place.
+        if !loop_cfg.active && z > HIT_Z + note.depth + 4.0 {
+            commands.entity(entity).despawn();
+            continue;
+        }
         tf.translation.z = z;
 
         if scheduled.hit {

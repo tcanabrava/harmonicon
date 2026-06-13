@@ -591,10 +591,22 @@ fn spawn_harmonica_strip(
 
 // ── Per-frame systems ─────────────────────────────────────────────────────────
 
-pub fn update_notes(clock: Res<super::GameplayClock>, mut notes: Query<(&NoteVisual, &mut Node)>) {
+pub fn update_notes(
+    clock: Res<super::GameplayClock>,
+    loop_cfg: Res<super::LoopConfig>,
+    mut commands: Commands,
+    mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
+) {
     let elapsed = clock.0;
-    for (note, mut node) in &mut notes {
-        node.top = Val::Percent(note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct));
+    for (entity, note, mut node) in &mut notes {
+        let top = note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct);
+        // Once a note has fully scrolled past the bottom, recycle it — but not
+        // while looping, where notes are replayed in place.
+        if !loop_cfg.active && top > 100.0 {
+            commands.entity(entity).despawn();
+            continue;
+        }
+        node.top = Val::Percent(top);
     }
 }
 
