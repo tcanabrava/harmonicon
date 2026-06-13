@@ -1,52 +1,104 @@
 //! Audio spectrogram visualizations.
 //!
 //! The base here owns the shared analysis: it turns the latest captured audio
-//! into a normalized, smoothed set of frequency `bands` (the [`Spectrum`]
-//! resource). Individual visualizations (bars, fluid, circular, …) are pluggable
-//! — each lives in its own sub-module with a spawn function and an update system
-//! gated on the active [`SpectrogramStyle`]. Only the bar style is implemented;
-//! adding another means: a sub-module, a `SpectrogramStyle` variant, a `spawn_*`
-//! arm below, and registering its update system in [`SpectrogramPlugin`].
+//! into both a frequency view (normalized, smoothed `bands`) and a time view
+//! (a triggered `waveform`) in the [`Spectrum`] resource. Individual
+//! visualizations (bars, oscilloscope, fluid, circular, …) are pluggable — each
+//! lives in its own sub-module with a `spawn` function and an `update` system
+//! gated on the active [`SpectrogramStyle`]. Press **V** to cycle styles.
+//!
+//! Adding another means: a sub-module, a `SpectrogramStyle` variant, an arm in
+//! [`spawn_content`], and registering its update system in [`SpectrogramPlugin`].
 
 mod bars;
+mod oscilloscope;
 
 use bevy::prelude::*;
+use bevy::ui_render::prelude::UiMaterialPlugin;
 
-use crate::audio_system::pitch_detect::LiveSpectrum;
+use crate::audio_system::pitch_detect::AudioFrame;
 use crate::menu::AppState;
+
+use oscilloscope::OscilloscopeMaterial;
+pub use oscilloscope::OscMaterial;
 
 /// Number of frequency bands the spectrum is reduced to.
 pub const NUM_BANDS: usize = 32;
+/// Number of points sampled for the oscilloscope trace.
+pub const WAVE_POINTS: usize = 128;
 
 // Display range — the harmonica's useful band.
 const MIN_FREQ: f32 = 150.0;
 const MAX_FREQ: f32 = 4000.0;
+// Peak amplitude below which the input is treated as silence.
+const SILENCE_PEAK: f32 = 0.01;
 
-/// Latest normalized (0..1) magnitude per frequency band, smoothed over time.
+/// Analysis ready for rendering: per-band levels (0..1, smoothed) for frequency
+/// views, and a normalized, trigger-aligned waveform (-1..1) for time views.
 #[derive(Resource)]
 pub struct Spectrum {
     pub bands: Vec<f32>,
+    pub waveform: Vec<f32>,
 }
 
 impl Default for Spectrum {
     fn default() -> Self {
-        Self { bands: vec![0.0; NUM_BANDS] }
+        Self { bands: vec![0.0; NUM_BANDS], waveform: vec![0.0; WAVE_POINTS] }
     }
 }
 
-/// Which visualization is currently shown. Switch this to swap renderers.
+/// Which visualization is currently shown. Cycle with [`SpectrogramStyle::next`].
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum SpectrogramStyle {
     #[default]
     Bars,
+    Oscilloscope,
     // Fluid,    // not yet implemented
     // Circular, // not yet implemented
 }
 
-/// Spawns the active visualization as a child of `parent`, filling its box.
-pub fn spawn_spectrogram(parent: &mut ChildSpawnerCommands, style: SpectrogramStyle) {
+impl SpectrogramStyle {
+    fn next(self) -> Self {
+        match self {
+            Self::Bars => Self::Oscilloscope,
+            Self::Oscilloscope => Self::Bars,
+        }
+    }
+}
+
+/// Marks the container that holds the active visualization, so it can be rebuilt
+/// in place when the style is switched.
+#[derive(Component)]
+struct SpectrogramRoot;
+
+/// Spawns the spectrogram (a filling container hosting the active style) as a
+/// child of `parent`. `osc` is the shared oscilloscope material handle.
+pub fn spawn_spectrogram(
+    parent: &mut ChildSpawnerCommands,
+    style: SpectrogramStyle,
+    osc: &Handle<OscilloscopeMaterial>,
+) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            SpectrogramRoot,
+        ))
+        .with_children(|root| spawn_content(root, style, osc));
+}
+
+/// Builds the active style's nodes into `parent`.
+fn spawn_content(
+    parent: &mut ChildSpawnerCommands,
+    style: SpectrogramStyle,
+    osc: &Handle<OscilloscopeMaterial>,
+) {
     match style {
         SpectrogramStyle::Bars => bars::spawn(parent),
+        SpectrogramStyle::Oscilloscope => oscilloscope::spawn(parent, osc),
     }
 }
 
@@ -54,16 +106,51 @@ pub struct SpectrogramPlugin;
 
 impl Plugin for SpectrogramPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Spectrum>()
+        let playing = || in_state(AppState::Playing);
+        app.add_plugins(UiMaterialPlugin::<OscilloscopeMaterial>::default())
+            .init_resource::<Spectrum>()
             .init_resource::<SpectrogramStyle>()
+            .add_systems(Startup, oscilloscope::init_material)
             .add_systems(Update, analyze_audio.run_if(in_state(AppState::Playing)))
+            .add_systems(Update, switch_visualization.run_if(in_state(AppState::Playing)))
             .add_systems(
                 Update,
                 bars::update_bars.run_if(
-                    in_state(AppState::Playing)
-                        .and_then(|s: Res<SpectrogramStyle>| *s == SpectrogramStyle::Bars),
+                    playing().and_then(|s: Res<SpectrogramStyle>| *s == SpectrogramStyle::Bars),
+                ),
+            )
+            .add_systems(
+                Update,
+                oscilloscope::update_scope.run_if(
+                    playing()
+                        .and_then(|s: Res<SpectrogramStyle>| *s == SpectrogramStyle::Oscilloscope),
                 ),
             );
+    }
+}
+
+/// Cycles the visualization style on **V** and rebuilds the spectrogram in place.
+fn switch_visualization(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut style: ResMut<SpectrogramStyle>,
+    osc: Res<OscMaterial>,
+    roots: Query<(Entity, Option<&Children>), With<SpectrogramRoot>>,
+    mut commands: Commands,
+) {
+    if !keys.just_pressed(KeyCode::KeyV) {
+        return;
+    }
+    *style = style.next();
+    let style = *style; // Copy, so each closure below can capture it freely.
+    let handle = osc.0.clone();
+    for (root, children) in &roots {
+        if let Some(children) = children {
+            for child in children.iter() {
+                commands.entity(child).despawn();
+            }
+        }
+        let handle = handle.clone();
+        commands.entity(root).with_children(move |c| spawn_content(c, style, &handle));
     }
 }
 
@@ -103,11 +190,40 @@ pub fn bands_from_magnitudes(magnitudes: &[f32], freq_res: f32) -> Vec<f32> {
     bands
 }
 
-/// Reduces the published [`LiveSpectrum`] to bands and smooths them into
-/// [`Spectrum`] (fast attack, slow decay) so the visualization rises sharply and
-/// falls gracefully.
-fn analyze_audio(live: Res<LiveSpectrum>, time: Res<Time>, mut spectrum: ResMut<Spectrum>) {
-    let target = bands_from_magnitudes(&live.magnitudes, live.freq_res);
+/// Decimates a block of samples into a `points`-long, trigger-aligned waveform
+/// in -1..1 (auto-gained to fill). Triggering on the first rising zero crossing
+/// keeps the trace stationary between frames. Silence yields a flat (zero) line.
+pub fn compute_waveform(samples: &[f32], points: usize) -> Vec<f32> {
+    if samples.len() < points * 2 {
+        return vec![0.0; points];
+    }
+    let peak = samples.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
+    if peak < SILENCE_PEAK {
+        return vec![0.0; points];
+    }
+
+    // Trigger: first rising zero crossing in the first half of the block.
+    let mut start = 0;
+    for i in 1..samples.len() / 2 {
+        if samples[i - 1] < 0.0 && samples[i] >= 0.0 {
+            start = i;
+            break;
+        }
+    }
+
+    let window = &samples[start..];
+    let step = (window.len() / points).max(1);
+    let gain = 1.0 / peak; // auto-gain so the trace fills vertically
+    (0..points)
+        .map(|i| (window[(i * step).min(window.len() - 1)] * gain).clamp(-1.0, 1.0))
+        .collect()
+}
+
+/// Reduces the published [`AudioFrame`] into [`Spectrum`]: bands are smoothed
+/// (fast attack, slow decay) so they rise sharply and fall gracefully; the
+/// waveform is taken instantaneously (the trigger keeps it steady).
+fn analyze_audio(frame: Res<AudioFrame>, time: Res<Time>, mut spectrum: ResMut<Spectrum>) {
+    let target = bands_from_magnitudes(&frame.magnitudes, frame.freq_res);
 
     let dt = time.delta_secs();
     let attack = 1.0 - (-dt * 30.0).exp();
@@ -116,6 +232,8 @@ fn analyze_audio(live: Res<LiveSpectrum>, time: Res<Time>, mut spectrum: ResMut<
         let k = if tgt > *cur { attack } else { decay };
         *cur += (tgt - *cur) * k;
     }
+
+    spectrum.waveform = compute_waveform(&frame.samples, WAVE_POINTS);
 }
 
 #[cfg(test)]
@@ -154,5 +272,28 @@ mod tests {
             (loudest as i32 - expected as i32).abs() <= 1,
             "loudest band {loudest}, expected ~{expected}"
         );
+    }
+
+    #[test]
+    fn silence_yields_flat_waveform() {
+        let wave = compute_waveform(&[0.0; 4096], WAVE_POINTS);
+        assert_eq!(wave.len(), WAVE_POINTS);
+        assert!(wave.iter().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn waveform_is_triggered_and_auto_gained() {
+        let sr = 44_100.0;
+        let samples: Vec<f32> = (0..4096)
+            .map(|i| (2.0 * std::f32::consts::PI * 200.0 * i as f32 / sr).sin() * 0.25)
+            .collect();
+        let wave = compute_waveform(&samples, WAVE_POINTS);
+        assert_eq!(wave.len(), WAVE_POINTS);
+        // Trigger is a rising zero crossing, so the trace starts near zero rising.
+        assert!(wave[0].abs() < 0.2, "starts near the trigger, got {}", wave[0]);
+        assert!(wave[1] >= wave[0], "rising after the trigger");
+        // Auto-gain: a quarter-scale sine should still reach near full deflection.
+        let peak = wave.iter().fold(0.0f32, |m, &v| m.max(v.abs()));
+        assert!(peak > 0.8, "auto-gain should fill the trace, peak {peak}");
     }
 }

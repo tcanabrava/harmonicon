@@ -12,7 +12,7 @@ use menu::{AppState, MenuPlugin};
 use song::SongPlugin;
 use spectrogram::SpectrogramPlugin;
 
-use audio_system::pitch_detect::LiveSpectrum;
+use audio_system::pitch_detect::AudioFrame;
 use audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
 
 #[derive(Resource)]
@@ -49,7 +49,7 @@ fn main() {
     app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 
     app.add_message::<PitchEvent>()
-        .init_resource::<LiveSpectrum>()
+        .init_resource::<AudioFrame>()
         .add_systems(Startup, (spawn_camera, initialize_game))
         .add_systems(OnEnter(AppState::Playing), setup_audio)
         .add_systems(
@@ -85,7 +85,7 @@ fn setup_audio(world: &mut World) {
 fn process_audio(
     capture: Option<Res<audio_input::AudioCapture>>,
     mut writer: MessageWriter<PitchEvent>,
-    mut spectrum: ResMut<LiveSpectrum>,
+    mut frame: ResMut<AudioFrame>,
     mut fft: Local<pitch_detect::FftState>,
 ) {
     let Some(capture) = capture else { return };
@@ -93,9 +93,11 @@ fn process_audio(
         // One FFT per chunk: pitches and the magnitude spectrum come out together.
         let analysis = pitch_detect::analyze(&samples, capture.sample_rate, &mut fft);
         writer.write(PitchEvent(analysis.pitches));
-        // Publish the spectrum so the spectrogram reuses this FFT.
-        spectrum.magnitudes = analysis.magnitudes;
-        spectrum.freq_res = analysis.freq_res;
+        // Publish the frame so visualizers reuse this FFT (freq) or the raw
+        // waveform (time) without re-analysing.
+        frame.magnitudes = analysis.magnitudes;
+        frame.freq_res = analysis.freq_res;
+        frame.samples = samples;
     }
 }
 

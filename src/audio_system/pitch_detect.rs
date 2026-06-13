@@ -35,10 +35,13 @@ pub struct Analysis {
     pub freq_res: f32,
 }
 
-/// The latest magnitude spectrum, published by the audio pipeline for reuse.
-/// Empty `magnitudes` means silence / no audio.
+/// The latest analysed audio frame, published by the audio pipeline so multiple
+/// consumers reuse one FFT: `magnitudes`/`freq_res` for frequency-domain views
+/// (spectrogram bars) and `samples` for time-domain views (oscilloscope). Empty
+/// vectors mean silence / no audio.
 #[derive(Resource, Default)]
-pub struct LiveSpectrum {
+pub struct AudioFrame {
+    pub samples: Vec<f32>,
     pub magnitudes: Vec<f32>,
     pub freq_res: f32,
 }

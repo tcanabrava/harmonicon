@@ -5,7 +5,7 @@ use crate::{
     song::harmonica::twelve_bar,
 };
 
-use crate::spectrogram::{SpectrogramStyle, spawn_spectrogram};
+use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
@@ -23,6 +23,7 @@ pub fn setup(
     mut clock: ResMut<super::GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
     spectrogram_style: Res<SpectrogramStyle>,
+    osc_material: Res<OscMaterial>,
     fonts: Res<GlobalFonts>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -108,7 +109,7 @@ pub fn setup(
                 ..default()
             })
             .with_children(|right| {
-                spawn_spectrogram(right, *spectrogram_style);
+                spawn_spectrogram(right, *spectrogram_style, &osc_material.0);
             });
         });
 
