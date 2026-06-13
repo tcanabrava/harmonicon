@@ -12,7 +12,7 @@ use menu::{AppState, MenuPlugin};
 use song::SongPlugin;
 use spectrogram::SpectrogramPlugin;
 
-use audio_system::audio_input::LatestSamples;
+use audio_system::pitch_detect::LiveSpectrum;
 use audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
 
 #[derive(Resource)]
@@ -49,7 +49,7 @@ fn main() {
     app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
 
     app.add_message::<PitchEvent>()
-        .init_resource::<LatestSamples>()
+        .init_resource::<LiveSpectrum>()
         .add_systems(Startup, (spawn_camera, initialize_game))
         .add_systems(OnEnter(AppState::Playing), setup_audio)
         .add_systems(
@@ -85,16 +85,17 @@ fn setup_audio(world: &mut World) {
 fn process_audio(
     capture: Option<Res<audio_input::AudioCapture>>,
     mut writer: MessageWriter<PitchEvent>,
-    mut latest: ResMut<LatestSamples>,
+    mut spectrum: ResMut<LiveSpectrum>,
     mut fft: Local<pitch_detect::FftState>,
 ) {
     let Some(capture) = capture else { return };
     while let Ok(samples) = capture.receiver.try_recv() {
-        let pitches = pitch_detect::detect_pitches(&samples, capture.sample_rate, &mut fft);
-        writer.write(PitchEvent(pitches));
-        // Stash the most recent chunk for the spectrogram (no channel contention).
-        latest.sample_rate = capture.sample_rate;
-        latest.samples = samples;
+        // One FFT per chunk: pitches and the magnitude spectrum come out together.
+        let analysis = pitch_detect::analyze(&samples, capture.sample_rate, &mut fft);
+        writer.write(PitchEvent(analysis.pitches));
+        // Publish the spectrum so the spectrogram reuses this FFT.
+        spectrum.magnitudes = analysis.magnitudes;
+        spectrum.freq_res = analysis.freq_res;
     }
 }
 

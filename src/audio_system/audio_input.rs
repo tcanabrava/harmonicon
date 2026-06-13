@@ -15,15 +15,6 @@ pub struct AudioCapture {
     pub sample_rate: u32,
 }
 
-/// The most recently captured audio chunk, stashed by the audio pipeline so that
-/// downstream consumers (e.g. the spectrogram) can analyse it without competing
-/// to drain the capture channel. Empty when no audio is flowing.
-#[derive(Resource, Default)]
-pub struct LatestSamples {
-    pub samples: Vec<f32>,
-    pub sample_rate: u32,
-}
-
 pub fn create_audio_capture() -> Result<(AudioStream, AudioCapture), Box<dyn std::error::Error>> {
     let host = cpal::default_host();
     let device = host

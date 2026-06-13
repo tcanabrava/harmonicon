@@ -1,4 +1,4 @@
-use bevy::prelude::Message;
+use bevy::prelude::{Message, Resource};
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use std::sync::Arc;
 
@@ -26,6 +26,23 @@ pub struct PitchInfo {
 #[derive(Message)]
 pub struct PitchEvent(pub Vec<PitchInfo>);
 
+/// One block of audio analysed: the detected pitches plus the magnitude spectrum
+/// (half, DC..Nyquist) and its bin width. Sharing the spectrum lets other
+/// consumers (the spectrogram) reuse this FFT instead of computing their own.
+pub struct Analysis {
+    pub pitches: Vec<PitchInfo>,
+    pub magnitudes: Vec<f32>,
+    pub freq_res: f32,
+}
+
+/// The latest magnitude spectrum, published by the audio pipeline for reuse.
+/// Empty `magnitudes` means silence / no audio.
+#[derive(Resource, Default)]
+pub struct LiveSpectrum {
+    pub magnitudes: Vec<f32>,
+    pub freq_res: f32,
+}
+
 // System-local state for the Bevy `Local<FftState>` parameter — avoids
 // re-allocating the FFT plan on every frame.
 pub struct FftState {
@@ -44,15 +61,26 @@ impl Default for FftState {
     }
 }
 
+/// Detect pitches in a block of audio. Thin wrapper over [`analyze`] for callers
+/// that only want the pitches.
 pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -> Vec<PitchInfo> {
-    let n = samples.len();
-    if n < 2 {
-        return vec![];
-    }
+    analyze(samples, sample_rate, state).pitches
+}
 
+/// Window + FFT a block once, returning both the detected pitches and the
+/// magnitude spectrum so the FFT can be shared. Returns empty magnitudes for
+/// too-short or silent input.
+pub fn analyze(samples: &[f32], sample_rate: u32, state: &mut FftState) -> Analysis {
+    let n = samples.len();
+    let freq_res = if n > 0 { sample_rate as f32 / n as f32 } else { 0.0 };
+    let silent = Analysis { pitches: vec![], magnitudes: vec![], freq_res };
+
+    if n < 2 {
+        return silent;
+    }
     let rms = (samples.iter().map(|&s| s * s).sum::<f32>() / n as f32).sqrt();
     if rms < SILENCE_THRESHOLD {
-        return vec![];
+        return silent;
     }
 
     // Lazily create (or re-create on size change) the forward FFT plan.
@@ -76,15 +104,20 @@ pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -
 
     let half = n / 2;
     let magnitudes: Vec<f32> = buffer[..half].iter().map(|c| c.norm()).collect();
+    let pitches = pitches_from_magnitudes(&magnitudes, freq_res);
 
+    Analysis { pitches, magnitudes, freq_res }
+}
+
+/// Peak-picks fundamentals from a precomputed magnitude spectrum.
+fn pitches_from_magnitudes(magnitudes: &[f32], freq_res: f32) -> Vec<PitchInfo> {
+    let half = magnitudes.len();
     let max_mag = magnitudes.iter().cloned().fold(0.0f32, f32::max);
-    if max_mag < 1e-9 {
+    if max_mag < 1e-9 || freq_res <= 0.0 {
         return vec![];
     }
 
     let threshold = max_mag * PEAK_THRESHOLD_RATIO;
-    let freq_res = sample_rate as f32 / n as f32;
-
     let min_bin = (MIN_FREQ / freq_res) as usize;
     let max_bin = ((MAX_FREQ / freq_res) as usize).min(half.saturating_sub(2));
 
@@ -95,7 +128,7 @@ pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -
             && magnitudes[i] > magnitudes[i + 1]
             && magnitudes[i] > threshold
         {
-            let freq = parabolic_peak(&magnitudes, i, freq_res);
+            let freq = parabolic_peak(magnitudes, i, freq_res);
             raw_peaks.push((freq, magnitudes[i]));
         }
     }
