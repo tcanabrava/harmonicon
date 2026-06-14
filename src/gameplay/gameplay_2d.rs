@@ -599,6 +599,7 @@ pub fn update_notes(
     clock: Res<super::GameplayClock>,
     loop_cfg: Res<super::LoopConfig>,
     mut commands: Commands,
+    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
     mut notes: Query<(
         Entity,
         &NoteVisual,
@@ -606,10 +607,11 @@ pub fn update_notes(
         &mut Node,
         Option<&mut BackgroundColor>,
         Option<&mut BorderColor>,
+        Option<&MaterialNode<NoteShapeMaterial>>,
     )>,
 ) {
     let elapsed = clock.0;
-    for (entity, note, scheduled, mut node, bg, border) in &mut notes {
+    for (entity, note, scheduled, mut node, bg, border, shape) in &mut notes {
         let top = note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct);
         // Once a note has fully scrolled past the bottom, recycle it — but not
         // while looping, where notes are replayed in place.
@@ -619,10 +621,11 @@ pub fn update_notes(
         }
         node.top = Val::Percent(top);
 
-        // Recolor the tile to mirror the 3D path: hit notes flash gold, missed
-        // notes dim to red so a whiff no longer looks like a clean hit. Shader-
-        // filled bend/vibrato notes have no BackgroundColor/BorderColor, so the
-        // `Option`s simply skip them. Untouched notes keep their per-hole color.
+        // Recolor the note to mirror the 3D path: hit notes flash gold, missed
+        // notes dim to red so a whiff no longer looks like a clean hit. Flat
+        // tiles carry BackgroundColor/BorderColor; shader-filled bend/vibrato
+        // notes carry a MaterialNode instead — each has its own material, so
+        // tinting one never touches another. Untouched notes keep their color.
         let recolor = if scheduled.hit {
             Some((
                 Color::srgba(1.0, 0.85, 0.25, 0.95),
@@ -642,6 +645,11 @@ pub fn update_notes(
             }
             if let Some(mut border) = border {
                 *border = BorderColor::all(edge);
+            }
+            if let Some(shape) = shape {
+                if let Some(mut material) = shape_materials.get_mut(&shape.0) {
+                    material.color = fill.to_linear();
+                }
             }
         }
     }
