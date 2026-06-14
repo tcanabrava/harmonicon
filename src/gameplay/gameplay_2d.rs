@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::prelude::*;
+use bevy::ui::ComputedNode;
 use bevy::ui_render::prelude::MaterialNode;
 
 use crate::{
@@ -147,6 +148,7 @@ pub fn setup(
                         ..default()
                     },
                     BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
+                    NoteHighway,
                 ))
                 .with_children(|hw| {
                     spawn_highway(
@@ -282,6 +284,11 @@ pub fn setup(
 fn note_height_pct(duration: f64) -> f32 {
     ((duration / LOOKAHEAD) as f32 * 100.0).clamp(3.5, 40.0)
 }
+
+/// The note highway (the clipping container notes scroll inside). Marked so the
+/// recycle logic can measure its height and convert head-heights to a fraction.
+#[derive(Component)]
+pub(super) struct NoteHighway;
 
 /// The round comet head (an `ImageNode`), child of a note. Tinted on hit/miss.
 #[derive(Component)]
@@ -432,7 +439,6 @@ fn spawn_highway(
     let mut note_idx = 0usize;
     for item in &chart.track {
         let t = super::resolve_item_time(item, &chart.timing);
-        let h_pct = note_height_pct(item.duration);
         let play_mode = item.play_mode.as_ref();
         for event in &item.events {
             let idx = note_idx;
@@ -468,7 +474,9 @@ fn spawn_highway(
                 },
                 NoteVisual {
                     time: t,
-                    height_pct: h_pct,
+                    // Tail reaches from the attach point on the head up by the
+                    // tail's length; keep the note alive until all of it exits.
+                    tail_extent: (1.0 - tail_cfg.tail_y) + tail_len,
                 },
                 ScheduledNote {
                     time: t,
@@ -713,16 +721,27 @@ pub fn update_notes(
     clock: Res<super::GameplayClock>,
     loop_cfg: Res<super::LoopConfig>,
     mut commands: Commands,
-    mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
+    highway: Query<&ComputedNode, With<NoteHighway>>,
+    mut notes: Query<(Entity, &NoteVisual, &ComputedNode, &mut Node)>,
 ) {
     let elapsed = clock.0;
-    for (entity, note, mut node) in &mut notes {
+    // Highway height (physical px) to convert a note's head-height into a fraction
+    // of the highway, so we know how far its tail reaches above the head.
+    let highway_h = highway.iter().next().map(|c| c.size().y).unwrap_or(0.0);
+
+    for (entity, note, computed, mut node) in &mut notes {
         let bottom = note_head_bottom_pct(note.time, elapsed, LOOKAHEAD);
-        // Once a note's head has fallen well past the hit line, recycle it — but
-        // not while looping, where notes are replayed in place.
-        if !loop_cfg.active && bottom < -25.0 {
-            commands.entity(entity).despawn();
-            continue;
+
+        // Recycle only once the *whole comet* (head + its full tail) has fallen
+        // past the bottom — long notes have long tails and must linger. Skip while
+        // looping (notes replay in place) and until layout has measured sizes.
+        if !loop_cfg.active && highway_h > 0.0 {
+            let head_pct = computed.size().y / highway_h * 100.0;
+            let tail_pct = note.tail_extent * head_pct;
+            if bottom < -(tail_pct + 5.0) {
+                commands.entity(entity).despawn();
+                continue;
+            }
         }
         node.bottom = Val::Percent(bottom);
     }

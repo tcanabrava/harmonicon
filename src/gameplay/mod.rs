@@ -259,7 +259,10 @@ pub struct GameplayRoot;
 #[derive(Component)]
 pub struct NoteVisual {
     pub time: f64,
-    pub height_pct: f32,
+    /// How far the comet reaches above the head's bottom edge, in head-heights
+    /// (tail attach offset + tail length). Used to keep a note alive until its
+    /// whole tail — not just the head — has scrolled off the bottom.
+    pub tail_extent: f32,
 }
 
 /// Attached to every note entity (both modes). Drives scoring logic.
