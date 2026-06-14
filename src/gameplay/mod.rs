@@ -125,6 +125,7 @@ impl Plugin for GameplayPlugin {
                 (
                     gameplay_2d::update_notes,
                     gameplay_2d::update_note_visuals,
+                    gameplay_2d::animate_note_tails,
                     gameplay_2d::update_holes,
                 )
                     .chain()

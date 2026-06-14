@@ -50,14 +50,12 @@ pub fn setup(
 
     let chart = &manifest.chart;
 
-    // Pre-build a shaped-note shader material per note (in the same flat order
-    // `spawn_highway` walks the track), so the highway closures only need a
-    // shared slice — no nested mutable borrow of the asset store. A note gets a
-    // material if it bends and/or vibrates; the shader draws both.
-    // Every note is a comet now (round head + duration-length tail), all drawn by
-    // the note shader. Technique modifiers modulate the tail; plain notes get a
-    // straight tapering tail. One material per note so hit/miss tinting and the
-    // per-frame head-fraction update never bleed between notes.
+    // Pre-build one comet-tail shader material per note (in the same flat order
+    // `spawn_highway` walks the track), so the highway closures only need a shared
+    // slice — no nested mutable borrow of the asset store. The technique modifier
+    // shapes the tail *and* picks its animation (`wah.z`); each note gets a
+    // distinct phase so same-technique tails don't pulse in lockstep. `params.z`
+    // is the animation clock, driven live by `animate_note_tails`.
     let note_materials: Vec<Handle<NoteShapeMaterial>> = chart
         .track
         .iter()
@@ -65,12 +63,17 @@ pub fn setup(
             let h_pct = note_height_pct(item.duration);
             item.events.iter().map(move |event| {
                 let (vib, bend, wah) = note_techniques(event.modifiers.as_deref());
+                let mode = note_anim_mode(event.modifiers.as_deref());
                 let (r, g, b) = note_rgb(matches!(event.action, Action::Blow));
-                (h_pct, vib, bend, wah, Color::srgba(r, g, b, 0.95))
+                (h_pct, vib, bend, wah, mode, Color::srgba(r, g, b, 0.95))
             })
         })
-        .map(|(h_pct, vib, bend, wah, color)| {
-            let (params, wah_v) = note_shape_params(h_pct, vib, bend, wah);
+        .enumerate()
+        .map(|(i, (h_pct, vib, bend, wah, mode, color))| {
+            let (mut params, mut wah_v) = note_shape_params(h_pct, vib, bend, wah);
+            params.z = 0.0; // animation time, refreshed every frame
+            wah_v.z = mode; // which technique animation to run
+            wah_v.w = i as f32 * 0.7; // per-note phase offset
             shape_materials.add(NoteShapeMaterial {
                 color: color.to_linear(),
                 params,
@@ -325,6 +328,33 @@ fn load_note_theme_config(theme: &str) -> NoteThemeConfig {
 fn tail_len_frac(duration: f64) -> f32 {
     const TAIL_SCALE: f32 = 9.0;
     ((duration / LOOKAHEAD) as f32 * TAIL_SCALE).clamp(0.6, 6.0)
+}
+
+/// Which tail animation a note runs, picked from its (first) technique modifier
+/// and passed to the shader as `wah.z`. Plain notes get the gentle default flow.
+/// Indices must match the `mode` branches in `assets/shaders/note_shape.wgsl`.
+fn note_anim_mode(modifiers: Option<&[Modifier]>) -> f32 {
+    match modifiers.and_then(|m| m.first()) {
+        Some(Modifier::Bend { .. }) => 1.0,
+        Some(Modifier::Vibrato { .. }) => 2.0,
+        Some(Modifier::WahWah { .. }) => 3.0,
+        Some(Modifier::Hold { .. }) => 4.0,
+        Some(Modifier::Overblow) => 5.0,
+        Some(Modifier::Overdraw) => 6.0,
+        None => 0.0,
+    }
+}
+
+/// Drives every note tail's animation clock (`params.z`) from the gameplay clock,
+/// so the tails flow in time with the song and freeze when the game is paused.
+pub fn animate_note_tails(
+    clock: Res<super::GameplayClock>,
+    mut materials: ResMut<Assets<NoteShapeMaterial>>,
+) {
+    let t = clock.0 as f32;
+    for (_, material) in materials.iter_mut() {
+        material.params.z = t;
+    }
 }
 
 /// Distance (in %) from the bottom of the highway to a note head's bottom edge.

@@ -330,9 +330,6 @@
           "note": "D5",
           "modifiers": [
             {
-              "type": "hold"
-            },
-            {
               "type": "wah-wah",
               "oscillation_hz": 3,
               "intensity": 0.5
@@ -1327,9 +1324,6 @@
           "action": "draw",
           "note": "D5",
           "modifiers": [
-            {
-              "type": "hold"
-            },
             {
               "type": "wah-wah",
               "oscillation_hz": 3,
