@@ -20,7 +20,7 @@ use super::{
 use super::countdown_overlay::spawn_countdown;
 use super::song_progress_overlay::spawn_song_progress;
 use super::metronome_overlay::spawn_metronome;
-use super::modifier_legend::spawn_modifier_legend;
+use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::note_shape_material::{NoteShapeMaterial, note_shape_params};
@@ -82,6 +82,11 @@ pub fn setup(
             })
         })
         .collect();
+
+    // Animated tail previews for the techniques legend (built up front so the UI
+    // closures only borrow a ready slice, not the material store).
+    let legend_materials = build_legend_materials(&mut shape_materials);
+
     let key = chart.song.key.as_str();
     let bpm = chart.song.tempo_bpm;
     let chords = twelve_bar(key);
@@ -246,7 +251,7 @@ pub fn setup(
                 });
 
                 // Technique colour legend
-                spawn_modifier_legend(right, &fonts.gameplay);
+                spawn_modifier_legend(right, &fonts.gameplay, &legend_materials);
 
                 // Score
                 right.spawn(Node {
@@ -343,7 +348,7 @@ const SCROLL_SPAN: f32 = 100.0 - HIT_H_PCT * 0.5;
 /// Which tail animation a note runs, picked from its (first) technique modifier
 /// and passed to the shader as `wah.z`. Plain notes get the gentle default flow.
 /// Indices must match the `mode` branches in `assets/shaders/note_shape.wgsl`.
-fn note_anim_mode(modifiers: Option<&[Modifier]>) -> f32 {
+pub(super) fn note_anim_mode(modifiers: Option<&[Modifier]>) -> f32 {
     match modifiers.and_then(|m| m.first()) {
         Some(Modifier::Bend { .. }) => 1.0,
         Some(Modifier::Vibrato { .. }) => 2.0,
@@ -594,7 +599,9 @@ fn spawn_highway(
 /// negative for bends (pitch down) and positive for overblow/overdraw (pitch up);
 /// its sign drives the arc direction and its magnitude the arc depth. Wah pulses
 /// the note width. Any may be absent.
-fn note_techniques(modifiers: Option<&[Modifier]>) -> (Option<f32>, Option<f32>, Option<f32>) {
+pub(super) fn note_techniques(
+    modifiers: Option<&[Modifier]>,
+) -> (Option<f32>, Option<f32>, Option<f32>) {
     let mut vib = None;
     let mut shift = None;
     let mut wah = None;

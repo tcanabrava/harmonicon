@@ -20,9 +20,10 @@ use super::{
 use super::countdown_overlay::spawn_countdown;
 use super::song_progress_overlay::spawn_song_progress;
 use super::metronome_overlay::spawn_metronome;
-use super::modifier_legend::spawn_modifier_legend;
+use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
+use super::note_shape_material::{NoteShapeMaterial};
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
 
@@ -438,6 +439,7 @@ pub fn setup(
     fonts: Res<GlobalFonts>,
     asset_server: Res<AssetServer>,
     selected_model: Res<SelectedHarmonicaModel>,
+    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
 ) {
     let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
@@ -495,7 +497,7 @@ pub fn setup(
         let ts = chart.song.time_signature.as_deref().unwrap_or("4/4");
         ts.split('/').next().and_then(|n| n.parse::<usize>().ok()).unwrap_or(4)
     };
-    spawn_hud_overlay(&mut commands, chart, &chords, key, &font, chart.song.tempo_bpm, beats_per_bar);
+    spawn_hud_overlay(&mut commands, chart, &chords, key, &font, chart.song.tempo_bpm, beats_per_bar, shape_materials);
     spawn_song_progress(&mut commands);
     spawn_countdown(&mut commands, &font);
 }
@@ -563,6 +565,7 @@ fn spawn_hud_overlay(
     font: &FontSource,
     bpm: f32,
     beats_per_bar: usize,
+    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
 ) {
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     let info = format!(
@@ -662,13 +665,18 @@ fn spawn_hud_overlay(
                 spawn_metronome(metro, beats_per_bar, bpm, font);
             });
 
+
+            // Animated tail previews for the techniques legend (built up front so the UI
+            // closures only borrow a ready slice, not the material store).
+            let legend_materials = build_legend_materials(&mut shape_materials);
+
             // Technique colour legend
             p.spawn(Node {
                 margin: UiRect::top(Val::Px(8.0)),
                 ..default()
             })
             .with_children(|leg| {
-                spawn_modifier_legend(leg, font);
+                spawn_modifier_legend(leg, font, &legend_materials);
             });
         });
 
