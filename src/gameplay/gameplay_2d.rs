@@ -360,18 +360,6 @@ pub(super) fn note_anim_mode(modifiers: Option<&[Modifier]>) -> f32 {
     }
 }
 
-/// Drives every note tail's animation clock (`params.z`) from the gameplay clock,
-/// so the tails flow in time with the song and freeze when the game is paused.
-pub fn animate_note_tails(
-    clock: Res<super::GameplayClock>,
-    mut materials: ResMut<Assets<NoteShapeMaterial>>,
-) {
-    let t = clock.0 as f32;
-    for (_, material) in materials.iter_mut() {
-        material.params.z = t;
-    }
-}
-
 /// Distance (in %) from the bottom of the highway to a note head's bottom edge.
 /// The head's bottom reaches the hit line exactly at `note_time`; it decreases
 /// as the note falls, going negative once the head drops past the hit line.

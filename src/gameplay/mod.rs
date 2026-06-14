@@ -12,6 +12,7 @@ mod results;
 mod scoring;
 mod song_progress_overlay;
 mod twelve_bar_blues_overlay;
+use note_shape_material::{NoteShapeMaterial};
 
 use bevy::prelude::*;
 use scoring::{
@@ -106,6 +107,7 @@ impl Plugin for GameplayPlugin {
                     score_notes,
                     update_score_display,
                     detect_song_end,
+                    animate_note_tails
                 )
                     .chain()
                     .in_set(GameplayLogic)
@@ -126,7 +128,6 @@ impl Plugin for GameplayPlugin {
                     gameplay_2d::update_notes,
                     gameplay_2d::size_note_tails,
                     gameplay_2d::update_note_visuals,
-                    gameplay_2d::animate_note_tails,
                     gameplay_2d::update_holes,
                 )
                     .chain()
@@ -375,6 +376,19 @@ pub const HIT_H_PCT: f32 = 7.0;
 pub const LOOKAHEAD: f64 = 3.0;
 
 // ── Shared pure helpers ───────────────────────────────────────────────────────
+
+
+/// Drives every note tail's animation clock (`params.z`) from the gameplay clock,
+/// so the tails flow in time with the song and freeze when the game is paused.
+pub fn animate_note_tails(
+    clock: Res<GameplayClock>,
+    mut materials: ResMut<Assets<NoteShapeMaterial>>,
+) {
+    let t = clock.0 as f32;
+    for (_, material) in materials.iter_mut() {
+        material.params.z = t;
+    }
+}
 
 /// Parse the beat count from an optional "N/D" time-signature string.
 pub fn parse_beats(time_sig: Option<&str>) -> f64 {
