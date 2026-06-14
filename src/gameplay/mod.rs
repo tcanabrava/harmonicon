@@ -18,10 +18,12 @@ use scoring::{
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use bevy::audio::Volume;
+
 use crate::{
     assets_management::GlobalFonts,
     audio_system::pitch_detect::{PitchEvent, PitchInfo},
-    menu::{AppState, GameplayMode, SelectedSong},
+    menu::{AppState, AudioSettings, GameplayMode, SelectedSong},
     song::{SongManifest, chart::Modifier},
 };
 
@@ -81,6 +83,12 @@ impl Plugin for GameplayPlugin {
                 Update,
                 (handle_pause_input, handle_pause_buttons, pause_button_hover)
                     .run_if(in_state(AppState::Playing)),
+            )
+            // Apply live volume changes to the playing song (even while paused).
+            .add_systems(
+                Update,
+                apply_music_volume
+                    .run_if(in_state(AppState::Playing).and_then(resource_changed::<AudioSettings>)),
             )
             // Gameplay-logic chains only run when not paused. This set ticks the
             // clock, so every clock reader below must run after it — otherwise the
@@ -840,6 +848,15 @@ fn detect_song_end(
     }
     if clock.0 >= song_end.0 {
         next_state.set(AppState::Results);
+    }
+}
+
+/// Push the current music level onto the playing song's sink whenever the
+/// `AudioSettings` resource changes, so dragging the Options slider is heard
+/// immediately. (Metronome clicks pick up their level when each click spawns.)
+fn apply_music_volume(audio: Res<AudioSettings>, mut sinks: Query<&mut AudioSink, With<MusicPlayer>>) {
+    for mut sink in &mut sinks {
+        sink.set_volume(Volume::Linear(audio.music_volume));
     }
 }
 

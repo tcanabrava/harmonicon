@@ -1,7 +1,10 @@
-use bevy::{audio::AudioSource, prelude::*};
+use bevy::{
+    audio::{AudioSource, Volume},
+    prelude::*,
+};
 
 use crate::{
-    menu::{AppState, SelectedSong},
+    menu::{AppState, AudioSettings, SelectedSong},
     song::SongManifest,
 };
 
@@ -176,6 +179,7 @@ fn click_metronome(
     config: Res<ScoringConfig>,
     muted: Res<MetronomeMuted>,
     sounds: Res<MetronomeSounds>,
+    audio: Res<AudioSettings>,
     mut last: ResMut<LastClickedBeat>,
     mut commands: Commands,
 ) {
@@ -198,7 +202,10 @@ fn click_metronome(
     } else {
         sounds.beat.clone()
     };
-    commands.spawn((AudioPlayer::<AudioSource>(sample), PlaybackSettings::DESPAWN));
+    commands.spawn((
+        AudioPlayer::<AudioSource>(sample),
+        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.metronome_volume)),
+    ));
 }
 
 // ── Mute toggle ───────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
 
 use crate::assets_management::AvailableSongs;
 use crate::assets_management::GlobalFonts;
@@ -17,6 +18,34 @@ pub enum GameplayMode {
 /// `AppState::Menu` lands on the song list rather than the main menu.
 #[derive(Resource, Default)]
 pub struct ReturnToSongList(pub bool);
+
+/// Player-tunable audio levels (0.0–1.0, linear). Edited on the Options page and
+/// read by the audio spawners (song music, metronome clicks). Adjusting the
+/// music slider updates the currently playing song in real time.
+#[derive(Resource)]
+pub struct AudioSettings {
+    pub music_volume: f32,
+    pub metronome_volume: f32,
+}
+
+impl Default for AudioSettings {
+    fn default() -> Self {
+        Self {
+            music_volume: 0.8,
+            metronome_volume: 0.7,
+        }
+    }
+}
+
+impl AudioSettings {
+    /// Current level for a given slider kind.
+    fn value(&self, kind: VolumeSlider) -> f32 {
+        match kind {
+            VolumeSlider::Music => self.music_volume,
+            VolumeSlider::Metronome => self.metronome_volume,
+        }
+    }
+}
 
 pub struct MenuPlugin;
 
@@ -44,6 +73,7 @@ enum MenuPage {
     ArtistList,
     SongList,
     ModeSelect,
+    Options,
 }
 
 // ── Public resources ──────────────────────────────────────────────────────────
@@ -82,6 +112,21 @@ enum MenuButton {
     BackToArtistList,
 }
 
+/// Which audio level a slider controls.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+enum VolumeSlider {
+    Music,
+    Metronome,
+}
+
+/// The growing fill of a slider track; its width mirrors the bound level.
+#[derive(Component)]
+struct SliderFill(VolumeSlider);
+
+/// The "NN%" readout beside a slider.
+#[derive(Component)]
+struct SliderValueLabel(VolumeSlider);
+
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 impl Plugin for MenuPlugin {
@@ -91,6 +136,7 @@ impl Plugin for MenuPlugin {
             .init_resource::<SelectedArtist>()
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
+            .init_resource::<AudioSettings>()
             .add_systems(OnEnter(AppState::Menu), route_menu_entry)
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main), setup_main_menu)
@@ -103,6 +149,12 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::SongList), cleanup_menu)
             .add_systems(OnEnter(MenuPage::ModeSelect), setup_mode_select)
             .add_systems(OnExit(MenuPage::ModeSelect), cleanup_menu)
+            .add_systems(OnEnter(MenuPage::Options), setup_options_menu)
+            .add_systems(OnExit(MenuPage::Options), cleanup_menu)
+            .add_systems(
+                Update,
+                (drag_sliders, update_sliders).run_if(in_state(MenuPage::Options)),
+            )
             // Input and hover are independent — two separate registrations.
             .add_systems(Update, handle_menu_input.run_if(in_state(AppState::Menu)))
             .add_systems(Update, button_hover.run_if(in_state(AppState::Menu)))
@@ -333,6 +385,154 @@ fn setup_mode_select(mut commands: Commands, font: Res<GlobalFonts>) {
     );
 }
 
+fn setup_options_menu(
+    mut commands: Commands,
+    font: Res<GlobalFonts>,
+    settings: Res<AudioSettings>,
+) {
+    let root = spawn_menu_root(&mut commands, "Options", Some("Audio"));
+    spawn_volume_slider(
+        &mut commands,
+        root,
+        &font.gameplay,
+        "Music",
+        VolumeSlider::Music,
+        settings.music_volume,
+    );
+    spawn_volume_slider(
+        &mut commands,
+        root,
+        &font.gameplay,
+        "Metronome",
+        VolumeSlider::Metronome,
+        settings.metronome_volume,
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &font.symbols,
+        "\u{2190} Back",
+        MenuButton::BackToMain,
+    );
+}
+
+/// One labelled slider row: `<name>  [====       ]  NN%`. The track is a `Button`
+/// so it reports `Interaction`, and carries `RelativeCursorPosition` so the drag
+/// system can read the cursor's position along it.
+fn spawn_volume_slider(
+    commands: &mut Commands,
+    parent: Entity,
+    font: &FontSource,
+    label: &str,
+    kind: VolumeSlider,
+    value: f32,
+) {
+    let row = commands
+        .spawn(Node {
+            width: Val::Px(420.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(14.0),
+            ..default()
+        })
+        .id();
+
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Node {
+                width: Val::Px(110.0),
+                ..default()
+            },
+            Text::new(label.to_string()),
+            TextFont {
+                font_size: FontSize::Px(20.0),
+                font: font.clone(),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+
+        r.spawn((
+            Button,
+            Node {
+                width: Val::Px(220.0),
+                height: Val::Px(14.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
+            RelativeCursorPosition::default(),
+            kind,
+        ))
+        .with_children(|track| {
+            track.spawn((
+                Node {
+                    width: Val::Percent(value * 100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
+                SliderFill(kind),
+            ));
+        });
+
+        r.spawn((
+            Node {
+                width: Val::Px(50.0),
+                ..default()
+            },
+            Text::new(format!("{:.0}%", value * 100.0)),
+            TextFont {
+                font_size: FontSize::Px(18.0),
+                font: font.clone(),
+                ..default()
+            },
+            TextColor(Color::srgb(0.6, 0.6, 0.7)),
+            SliderValueLabel(kind),
+        ));
+    });
+
+    commands.entity(parent).add_child(row);
+}
+
+/// While a slider track is pressed, set its level from the cursor's position
+/// along the track. Only writes when the value actually changes so resting on a
+/// pressed slider doesn't re-trigger downstream change detection every frame.
+fn drag_sliders(
+    mut settings: ResMut<AudioSettings>,
+    sliders: Query<(&Interaction, &RelativeCursorPosition, &VolumeSlider)>,
+) {
+    for (interaction, rel, kind) in &sliders {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let Some(norm) = rel.normalized else {
+            continue;
+        };
+        let frac = (norm.x + 0.5).clamp(0.0, 1.0);
+        if (settings.value(*kind) - frac).abs() <= f32::EPSILON {
+            continue;
+        }
+        match kind {
+            VolumeSlider::Music => settings.music_volume = frac,
+            VolumeSlider::Metronome => settings.metronome_volume = frac,
+        }
+    }
+}
+
+/// Mirror the current levels onto the slider fills and percentage readouts.
+fn update_sliders(
+    settings: Res<AudioSettings>,
+    mut fills: Query<(&mut Node, &SliderFill)>,
+    mut labels: Query<(&mut Text, &SliderValueLabel)>,
+) {
+    for (mut node, fill) in &mut fills {
+        node.width = Val::Percent(settings.value(fill.0) * 100.0);
+    }
+    for (mut text, label) in &mut labels {
+        text.0 = format!("{:.0}%", settings.value(label.0) * 100.0);
+    }
+}
+
 // ── Input + hover ─────────────────────────────────────────────────────────────
 
 fn handle_menu_input(
@@ -351,7 +551,7 @@ fn handle_menu_input(
         }
         match button {
             MenuButton::Play => next_page.set(MenuPage::Play),
-            MenuButton::Options => { /* TODO */ }
+            MenuButton::Options => next_page.set(MenuPage::Options),
             MenuButton::Credits => { /* TODO */ }
             MenuButton::Quit => {
                 app_exit.write(AppExit::Success);

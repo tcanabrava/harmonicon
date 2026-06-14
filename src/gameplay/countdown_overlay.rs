@@ -1,7 +1,10 @@
-use bevy::{audio::AudioSource, prelude::*};
+use bevy::{
+    audio::{AudioSource, Volume},
+    prelude::*,
+};
 
 use crate::{
-    menu::{AppState, SelectedSong},
+    menu::{AppState, AudioSettings, SelectedSong},
     song::SongManifest,
 };
 
@@ -53,6 +56,7 @@ pub fn update_countdown(
     mut music_started: ResMut<MusicStarted>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
+    audio: Res<AudioSettings>,
     mut commands: Commands,
 ) {
     if clock.0 >= 0.0 {
@@ -64,7 +68,7 @@ pub fn update_countdown(
             if let Some(manifest) = manifests.get(&selected.0) {
                 commands.spawn((
                     AudioPlayer::<AudioSource>(manifest.music.clone()),
-                    PlaybackSettings::ONCE,
+                    PlaybackSettings::ONCE.with_volume(Volume::Linear(audio.music_volume)),
                     MusicPlayer,
                     GameplayRoot,
                 ));
