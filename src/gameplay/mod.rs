@@ -49,6 +49,7 @@ impl Plugin for GameplayPlugin {
         ))
         .init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()
+            .init_resource::<PitchGate>()
             .init_resource::<MusicStarted>()
             .init_resource::<ValidHarpNotes>()
             .init_resource::<Score>()
@@ -159,6 +160,38 @@ pub struct GameplayClock(pub f64);
 
 #[derive(Resource, Default)]
 pub struct ActivePitches(pub Vec<PitchInfo>);
+
+/// Enforces a fresh attack per note. A sustained pitch may satisfy only **one**
+/// note: once it scores, the pitch is "consumed" and cannot score again until it
+/// stops sounding and is articulated anew. Without this, a single held breath on
+/// (say) G4 would clear every G4 note that later scrolls into its hit window.
+#[derive(Resource, Default)]
+pub struct PitchGate {
+    /// Valid harp pitches consumed by a hit since their last onset. Each is
+    /// dropped once the pitch is no longer detected, re-arming it for the next
+    /// articulation.
+    consumed: HashSet<String>,
+}
+
+impl PitchGate {
+    /// Drop consumption for any pitch that is no longer sounding, so its next
+    /// articulation counts as a fresh attack.
+    fn release_absent(&mut self, playing: &HashSet<String>) {
+        self.consumed.retain(|p| playing.contains(p));
+    }
+
+    /// True if `pitch` is sounding and has not already scored a note during its
+    /// current, continuous sustain.
+    fn is_fresh(&self, pitch: &str, playing: &HashSet<String>) -> bool {
+        playing.contains(pitch) && !self.consumed.contains(pitch)
+    }
+
+    /// Mark `pitch` as having scored; it won't score another note until it is
+    /// released (see [`release_absent`](Self::release_absent)) and replayed.
+    fn consume(&mut self, pitch: &str) {
+        self.consumed.insert(pitch.to_string());
+    }
+}
 
 #[derive(Resource, Default)]
 pub struct MusicStarted(pub bool);
@@ -398,11 +431,13 @@ fn reset_score(
     mut stats: ResMut<SongStats>,
     mut feedback: ResMut<HitFeedback>,
     mut paused: ResMut<Paused>,
+    mut gate: ResMut<PitchGate>,
 ) {
     *score = Score::default();
     *stats = SongStats::default();
     *feedback = HitFeedback::default();
     paused.0 = false;
+    gate.consumed.clear();
 }
 
 fn setup_scoring_config(
@@ -556,6 +591,7 @@ fn score_notes(
     mut score: ResMut<Score>,
     mut stats: ResMut<SongStats>,
     mut feedback: ResMut<HitFeedback>,
+    mut gate: ResMut<PitchGate>,
 ) {
     if clock.0 < 0.0 {
         return;
@@ -567,12 +603,16 @@ fn score_notes(
         score.combo = 0;
     }
 
-    let harp_pitches: Vec<String> = active
+    let harp_pitches: HashSet<String> = active
         .0
         .iter()
         .filter(|p| valid_notes.0.contains(&format!("{}{}", p.note, p.octave)))
         .map(|p| format!("{}{}", p.note, p.octave))
         .collect();
+
+    // Re-arm any pitch the player has stopped sounding, so its next attack is
+    // fresh. Pitches still held remain consumed and can't score again.
+    gate.release_absent(&harp_pitches);
 
     for mut note in &mut notes {
         if note.hit || note.missed {
@@ -580,7 +620,9 @@ fn score_notes(
         }
 
         let offset = clock.0 - note.time;
-        let playing = harp_pitches.contains(&note.expected_pitch);
+        // A note counts as "playing" only on a fresh attack: the pitch must be
+        // sounding and not already consumed by an earlier note in this sustain.
+        let playing = gate.is_fresh(&note.expected_pitch, &harp_pitches);
 
         match classify_note(
             offset,
@@ -599,6 +641,9 @@ fn score_notes(
             NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
             NoteOutcome::Hit(quality) => {
                 note.hit = true;
+                // Claim the attack so a held breath can't also clear the next
+                // same-pitch note; the player must re-articulate for that one.
+                gate.consume(&note.expected_pitch);
                 match quality {
                     HitQuality::Perfect => stats.perfect += 1,
                     // A late Good hit counts as "delayed"; early/on-time as "good".
@@ -967,5 +1012,61 @@ mod tests {
     fn resolve_item_time_defaults_missing_tick_to_zero() {
         let item = track_item(None, None);
         assert_eq!(resolve_item_time(&item, &timing_120bpm()), 0.0);
+    }
+
+    // ── PitchGate (re-attack detection) ──────────────────────────────────────────
+
+    fn playing(pitches: &[&str]) -> HashSet<String> {
+        pitches.iter().map(|p| p.to_string()).collect()
+    }
+
+    #[test]
+    fn a_sounding_unconsumed_pitch_is_fresh() {
+        let gate = PitchGate::default();
+        assert!(gate.is_fresh("G4", &playing(&["G4"])));
+    }
+
+    #[test]
+    fn a_silent_pitch_is_never_fresh() {
+        let gate = PitchGate::default();
+        assert!(!gate.is_fresh("G4", &playing(&[])));
+    }
+
+    #[test]
+    fn a_held_pitch_cannot_score_twice() {
+        // The core fix: one sustained breath clears one note, not the next.
+        let mut gate = PitchGate::default();
+        let held = playing(&["G4"]);
+
+        // First note: fresh attack scores, then we consume the pitch.
+        assert!(gate.is_fresh("G4", &held));
+        gate.consume("G4");
+
+        // The breath is still held — a second G4 note must NOT count.
+        gate.release_absent(&held);
+        assert!(!gate.is_fresh("G4", &held));
+    }
+
+    #[test]
+    fn re_articulating_a_pitch_re_arms_it() {
+        let mut gate = PitchGate::default();
+        gate.consume("G4");
+
+        // Player stops playing: G4 drops out of the detected set and re-arms.
+        gate.release_absent(&playing(&[]));
+
+        // Next attack on G4 is fresh again.
+        assert!(gate.is_fresh("G4", &playing(&["G4"])));
+    }
+
+    #[test]
+    fn consuming_one_pitch_leaves_others_fresh() {
+        let mut gate = PitchGate::default();
+        let chord = playing(&["G4", "B4"]);
+        gate.consume("G4");
+        gate.release_absent(&chord);
+
+        assert!(!gate.is_fresh("G4", &chord));
+        assert!(gate.is_fresh("B4", &chord));
     }
 }
