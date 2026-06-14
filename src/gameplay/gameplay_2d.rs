@@ -599,10 +599,17 @@ pub fn update_notes(
     clock: Res<super::GameplayClock>,
     loop_cfg: Res<super::LoopConfig>,
     mut commands: Commands,
-    mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
+    mut notes: Query<(
+        Entity,
+        &NoteVisual,
+        &ScheduledNote,
+        &mut Node,
+        Option<&mut BackgroundColor>,
+        Option<&mut BorderColor>,
+    )>,
 ) {
     let elapsed = clock.0;
-    for (entity, note, mut node) in &mut notes {
+    for (entity, note, scheduled, mut node, bg, border) in &mut notes {
         let top = note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct);
         // Once a note has fully scrolled past the bottom, recycle it — but not
         // while looping, where notes are replayed in place.
@@ -611,6 +618,32 @@ pub fn update_notes(
             continue;
         }
         node.top = Val::Percent(top);
+
+        // Recolor the tile to mirror the 3D path: hit notes flash gold, missed
+        // notes dim to red so a whiff no longer looks like a clean hit. Shader-
+        // filled bend/vibrato notes have no BackgroundColor/BorderColor, so the
+        // `Option`s simply skip them. Untouched notes keep their per-hole color.
+        let recolor = if scheduled.hit {
+            Some((
+                Color::srgba(1.0, 0.85, 0.25, 0.95),
+                Color::srgb(1.0, 0.9, 0.4),
+            ))
+        } else if scheduled.missed {
+            Some((
+                Color::srgba(0.45, 0.12, 0.12, 0.35),
+                Color::srgba(0.7, 0.2, 0.2, 0.5),
+            ))
+        } else {
+            None
+        };
+        if let Some((fill, edge)) = recolor {
+            if let Some(mut bg) = bg {
+                *bg = BackgroundColor(fill);
+            }
+            if let Some(mut border) = border {
+                *border = BorderColor::all(edge);
+            }
+        }
     }
 }
 
