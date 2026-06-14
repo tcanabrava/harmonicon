@@ -8,6 +8,7 @@ mod note_shape_material;
 mod phrase_overlay;
 mod results;
 mod scoring;
+mod song_progress_overlay;
 mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
@@ -40,6 +41,7 @@ impl Plugin for GameplayPlugin {
             metronome_overlay::MetronomePlugin,
             phrase_overlay::PhrasePlugin,
             note_shape_material::NoteShapePlugin,
+            song_progress_overlay::SongProgressPlugin,
         ))
         .init_resource::<GameplayClock>()
             .init_resource::<ActivePitches>()

@@ -16,6 +16,7 @@ use super::{
     MusicStarted, ScheduledNote, ScoreText, ValidHarpNotes,
 };
 use super::countdown_overlay::spawn_countdown;
+use super::song_progress_overlay::spawn_song_progress;
 use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::spawn_modifier_legend;
 use super::phrase_overlay::spawn_phrase_banner;
@@ -493,6 +494,7 @@ pub fn setup(
         ts.split('/').next().and_then(|n| n.parse::<usize>().ok()).unwrap_or(4)
     };
     spawn_hud_overlay(&mut commands, chart, &chords, key, &font, chart.song.tempo_bpm, beats_per_bar);
+    spawn_song_progress(&mut commands);
     spawn_countdown(&mut commands, &font);
 }
 

@@ -15,6 +15,7 @@ use super::{
     MusicStarted, NoteVisual, ScheduledNote, ScoreText, ValidHarpNotes, modifier_color,
 };
 use super::countdown_overlay::spawn_countdown;
+use super::song_progress_overlay::spawn_song_progress;
 use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::spawn_modifier_legend;
 use super::phrase_overlay::spawn_phrase_banner;
@@ -257,6 +258,7 @@ pub fn setup(
             });
 
         });
+    spawn_song_progress(&mut commands);
     spawn_countdown(&mut commands, &fonts.gameplay);
 }
 
