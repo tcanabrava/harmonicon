@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //! midi-to-chart — turn a MIDI track into a Harmonicon `chart.hpchart`.
 //!
 //! Usage:

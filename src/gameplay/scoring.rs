@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use super::HitQuality;
 
 pub const PERFECT_POINTS: u32 = 100;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;

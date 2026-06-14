@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Note-body shape for technique notes, drawn as a UI material so the silhouette
 // is smooth and antialiased. The filled band has straight horizontal top/bottom
 // edges; its centerline is displaced horizontally down the note's length by:

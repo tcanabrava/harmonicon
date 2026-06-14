@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use serde::Deserialize;
 
 use crate::song::chart::{Action, BendingProfile};

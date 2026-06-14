@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::prelude::{Message, Resource};
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use std::sync::Arc;

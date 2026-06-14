@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::prelude::*;
 
 use super::{modifier_abbrev, modifier_color};

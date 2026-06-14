@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Convert a note string like "G4", "C#5", "Bb3" to a MIDI number.
 pub fn note_to_midi(note: &str) -> Option<i32> {
     const NAMES: [&str; 12] = [

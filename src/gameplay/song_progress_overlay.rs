@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //! A thin song-progress bar pinned to the top of the screen, shared by the 2D
 //! and 3D gameplay views. The fill tracks the gameplay clock against the song's
 //! end time.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
     audio::AudioSource,

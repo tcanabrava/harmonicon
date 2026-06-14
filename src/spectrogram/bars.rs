@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //! Bar spectrogram: one vertical bar per frequency band, growing from the
 //! bottom. Low frequencies on the left, highs on the right.
 

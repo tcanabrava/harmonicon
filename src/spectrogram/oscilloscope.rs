@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //! Oscilloscope: a continuous, glowing time-domain trace of the harmonica
 //! waveform, drawn by a UI material shader (one node, not per-sample dots).
 

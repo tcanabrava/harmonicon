@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::prelude::*;
 
 use harmonicon::assets_management::AssetsManagementPlugin;

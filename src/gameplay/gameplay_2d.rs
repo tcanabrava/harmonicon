@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::prelude::*;
 use bevy::ui_render::prelude::MaterialNode;
 

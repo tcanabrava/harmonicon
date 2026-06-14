@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::mesh::PrimitiveTopology;

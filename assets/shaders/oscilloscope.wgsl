@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 // Oscilloscope trace: a continuous glowing line plotting the audio waveform.
 // The waveform (128 samples in -1..1) is packed into a uniform array of vec4.
 // For each pixel we light it by distance to the line segment spanning the two

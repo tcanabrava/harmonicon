@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::{
     audio::{AudioSource, Volume},
     prelude::*,

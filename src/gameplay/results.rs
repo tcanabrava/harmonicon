@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //! Post-song results screen: the hit breakdown and a letter grade.
 
 use bevy::prelude::*;

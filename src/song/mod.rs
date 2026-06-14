@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pub mod chart;
 pub mod harmonica;
 mod loader;

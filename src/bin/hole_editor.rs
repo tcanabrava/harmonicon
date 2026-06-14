@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};

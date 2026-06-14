@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //! Audio spectrogram visualizations.
 //!
 //! The base here owns the shared analysis: it turns the latest captured audio
