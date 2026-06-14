@@ -5,18 +5,21 @@ use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
 use bevy::ui_render::prelude::{UiMaterial, UiMaterialPlugin};
 
-/// UI material that fills a note tile with a technique shape: straight top/bottom
-/// edges and a centerline displaced by a vibrato sine and/or a bend arc. Drawn in
+/// UI material for a note's comet **tail**. The round head is a separate image
+/// (`assets/notes/circular.png`) layered on top of the tail's base; this material
+/// only draws the tapered, fading trail, displaced by the note's techniques
+/// (vibrato wiggle, bend arc, wah breathing). Drawn in
 /// `assets/shaders/note_shape.wgsl`.
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
 pub struct NoteShapeMaterial {
     #[uniform(0)]
     pub color: LinearRgba,
-    /// x = vibrato amplitude, y = vibrato cycles, z = body half-width,
-    /// w = bend amplitude. All amplitudes are fractions of the note width.
+    /// x = vibrato amplitude, y = vibrato cycles, z = body half-width (legacy,
+    /// unused by the tail shader), w = bend amplitude. Amplitudes are fractions
+    /// of the note width.
     #[uniform(1)]
     pub params: Vec4,
-    /// x = wah depth (0..~0.7), y = wah cycles. Pulses the body width.
+    /// x = wah depth (0..~0.7), y = wah cycles (pulses the tail width).
     #[uniform(2)]
     pub wah: Vec4,
 }

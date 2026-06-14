@@ -33,11 +33,15 @@ pub fn setup(
     mut valid_notes: ResMut<ValidHarpNotes>,
     mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
     fonts: Res<GlobalFonts>,
+    asset_server: Res<AssetServer>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
         return;
     };
+    // The comet head: a translucent disc (white interior, black rim) tinted per
+    // note by the head's ImageNode color.
+    let head_image: Handle<Image> = asset_server.load("notes/circular.png");
     clock.0 = -COUNTDOWN;
     music_started.0 = false;
     valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
@@ -48,28 +52,27 @@ pub fn setup(
     // `spawn_highway` walks the track), so the highway closures only need a
     // shared slice — no nested mutable borrow of the asset store. A note gets a
     // material if it bends and/or vibrates; the shader draws both.
-    let shape_handles: Vec<Option<Handle<NoteShapeMaterial>>> = chart
+    // Every note is a comet now (round head + duration-length tail), all drawn by
+    // the note shader. Technique modifiers modulate the tail; plain notes get a
+    // straight tapering tail. One material per note so hit/miss tinting and the
+    // per-frame head-fraction update never bleed between notes.
+    let note_materials: Vec<Handle<NoteShapeMaterial>> = chart
         .track
         .iter()
         .flat_map(|item| {
             let h_pct = note_height_pct(item.duration);
             item.events.iter().map(move |event| {
                 let (vib, bend, wah) = note_techniques(event.modifiers.as_deref());
-                if vib.is_none() && bend.is_none() && wah.is_none() {
-                    return None;
-                }
                 let (r, g, b) = note_rgb(matches!(event.action, Action::Blow));
-                Some((h_pct, vib, bend, wah, Color::srgba(r, g, b, 0.95)))
+                (h_pct, vib, bend, wah, Color::srgba(r, g, b, 0.95))
             })
         })
-        .map(|opt| {
-            opt.map(|(h_pct, vib, bend, wah, color)| {
-                let (params, wah) = note_shape_params(h_pct, vib, bend, wah);
-                shape_materials.add(NoteShapeMaterial {
-                    color: color.to_linear(),
-                    params,
-                    wah,
-                })
+        .map(|(h_pct, vib, bend, wah, color)| {
+            let (params, wah_v) = note_shape_params(h_pct, vib, bend, wah);
+            shape_materials.add(NoteShapeMaterial {
+                color: color.to_linear(),
+                params,
+                wah: wah_v,
             })
         })
         .collect();
@@ -141,7 +144,7 @@ pub fn setup(
                     BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
                 ))
                 .with_children(|hw| {
-                    spawn_highway(hw, &fonts.symbols, chart, &shape_handles);
+                    spawn_highway(hw, &fonts.symbols, chart, &note_materials, &head_image);
                 });
 
                 // Harmonica holes
@@ -268,6 +271,14 @@ fn note_height_pct(duration: f64) -> f32 {
     ((duration / LOOKAHEAD) as f32 * 100.0).clamp(3.5, 40.0)
 }
 
+/// The round comet head (an `ImageNode`), child of a note. Tinted on hit/miss.
+#[derive(Component)]
+pub(super) struct NoteHead;
+
+/// The comet tail (a shader `MaterialNode`), child of a note. Tinted on hit/miss.
+#[derive(Component)]
+pub(super) struct NoteTail;
+
 /// Top-percentage position for a note node scrolling down the highway.
 pub fn note_top_pct(note_time: f64, elapsed: f64, lookahead: f64, height_pct: f32) -> f32 {
     let remaining = note_time - elapsed;
@@ -280,7 +291,8 @@ fn spawn_highway(
     hw: &mut ChildSpawnerCommands,
     font: &FontSource,
     chart: &crate::song::chart::HarpChart,
-    shape_handles: &[Option<Handle<NoteShapeMaterial>>],
+    note_materials: &[Handle<NoteShapeMaterial>],
+    head_image: &Handle<Image>,
 ) {
     use crate::song::chart::Action;
 
@@ -348,40 +360,28 @@ fn spawn_highway(
 
             let is_blow = matches!(event.action, Action::Blow);
             let (r, g, b) = note_rgb(is_blow);
-            let left_pct = (event.hole as f32 - 1.0) * LANE_PCT + 0.3;
+            let note_color = Color::srgba(r, g, b, 1.0);
+            let left_pct = (event.hole as f32 - 1.0) * LANE_PCT;
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
                     .harmonica
                     .wind_direction_label(event.hole, &event.action)
             });
             let modifiers = event.modifiers.clone().unwrap_or_default();
-            // A modifier tints the tile border so the technique reads at a glance,
-            // even before the badge glyphs are legible at the top of the highway.
-            let border = modifiers
-                .first()
-                .map(modifier_color)
-                .unwrap_or(Color::srgba(1.0, 1.0, 1.0, 0.50));
-            // Bend/vibrato notes are filled by a shader (smooth curved polygon)
-            // instead of a flat tile, so they carry a MaterialNode and skip the
-            // body/border.
-            let shape = shape_handles.get(idx).and_then(|h| h.clone());
+            // Each note is a comet: a round head image filling the lane, plus a
+            // duration-length shader tail above it. The container is as tall as
+            // the duration; the tail fills it (its head-sized base hidden behind
+            // the head image, which also covers the seam), and the head is a
+            // lane-width square pinned to the bottom — the leading, falling edge.
+            let material = note_materials[idx].clone();
 
-            let mut tile = hw.spawn((
+            hw.spawn((
                 Node {
                     position_type: PositionType::Absolute,
                     left: Val::Percent(left_pct),
                     top: Val::Percent(-h_pct),
-                    width: Val::Percent(LANE_PCT - 0.6),
+                    width: Val::Percent(LANE_PCT),
                     height: Val::Percent(h_pct),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    border: UiRect::all(Val::Px(if shape.is_some() {
-                        0.0
-                    } else if modifiers.is_empty() {
-                        1.5
-                    } else {
-                        2.5
-                    })),
                     ..default()
                 },
                 NoteVisual {
@@ -397,27 +397,56 @@ fn spawn_highway(
                     missed: false,
                     modifiers: modifiers.clone(),
                 },
-            ));
-            if let Some(handle) = shape {
-                tile.insert(MaterialNode(handle));
-            } else {
-                tile.insert((
-                    BackgroundColor(Color::srgba(r, g, b, 0.88)),
-                    BorderColor::all(border),
-                ));
-            }
-            tile.with_children(|note| {
+            ))
+            .with_children(|note| {
+                // Tail (drawn first, so the head image layers over its base).
                 note.spawn((
-                    Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
-                    TextFont {
-                        font_size: FontSize::Px(12.0),
-                        font: font.clone(),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        bottom: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        right: Val::Px(0.0),
                         ..default()
                     },
-                    TextColor(Color::srgba(1.0, 1.0, 1.0, 0.85)),
+                    MaterialNode(material),
+                    NoteTail,
                 ));
 
-                // Modifier hint badges, pinned to the top edge of the note tile.
+                // Head: a lane-width circle pinned to the bottom, kept square via
+                // aspect_ratio so it stays round at any window size. The white
+                // interior of the PNG takes the note colour; the black rim stays.
+                note.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        bottom: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        aspect_ratio: Some(1.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    ImageNode {
+                        image: head_image.clone(),
+                        color: note_color,
+                        ..default()
+                    },
+                    NoteHead,
+                ))
+                .with_children(|head| {
+                    head.spawn((
+                        Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
+                        TextFont {
+                            font_size: FontSize::Px(13.0),
+                            font: font.clone(),
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
+                    ));
+                });
+
+                // Modifier hint badges, pinned to the tail tip (top edge).
                 if !modifiers.is_empty() {
                     note.spawn(Node {
                         position_type: PositionType::Absolute,
@@ -599,19 +628,10 @@ pub fn update_notes(
     clock: Res<super::GameplayClock>,
     loop_cfg: Res<super::LoopConfig>,
     mut commands: Commands,
-    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
-    mut notes: Query<(
-        Entity,
-        &NoteVisual,
-        &ScheduledNote,
-        &mut Node,
-        Option<&mut BackgroundColor>,
-        Option<&mut BorderColor>,
-        Option<&MaterialNode<NoteShapeMaterial>>,
-    )>,
+    mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
 ) {
     let elapsed = clock.0;
-    for (entity, note, scheduled, mut node, bg, border, shape) in &mut notes {
+    for (entity, note, mut node) in &mut notes {
         let top = note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct);
         // Once a note has fully scrolled past the bottom, recycle it — but not
         // while looping, where notes are replayed in place.
@@ -620,35 +640,34 @@ pub fn update_notes(
             continue;
         }
         node.top = Val::Percent(top);
+    }
+}
 
-        // Recolor the note to mirror the 3D path: hit notes flash gold, missed
-        // notes dim to red so a whiff no longer looks like a clean hit. Flat
-        // tiles carry BackgroundColor/BorderColor; shader-filled bend/vibrato
-        // notes carry a MaterialNode instead — each has its own material, so
-        // tinting one never touches another. Untouched notes keep their color.
-        let recolor = if scheduled.hit {
-            Some((
-                Color::srgba(1.0, 0.85, 0.25, 0.95),
-                Color::srgb(1.0, 0.9, 0.4),
-            ))
+/// Tints a note's head image and tail material when it is hit or missed. Mirrors
+/// the 3D path: a hit flashes gold, a miss dims to red so a whiff never looks
+/// like a clean hit. Reacts only to `ScheduledNote` changes (set by scoring), so
+/// it runs the frame a note's outcome lands, not every frame.
+pub fn update_note_visuals(
+    notes: Query<(&ScheduledNote, &Children), Changed<ScheduledNote>>,
+    mut heads: Query<&mut ImageNode, With<NoteHead>>,
+    tails: Query<&MaterialNode<NoteShapeMaterial>, With<NoteTail>>,
+    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
+) {
+    for (scheduled, children) in &notes {
+        let tint = if scheduled.hit {
+            Color::srgba(1.0, 0.85, 0.25, 1.0)
         } else if scheduled.missed {
-            Some((
-                Color::srgba(0.45, 0.12, 0.12, 0.35),
-                Color::srgba(0.7, 0.2, 0.2, 0.5),
-            ))
+            Color::srgba(0.5, 0.13, 0.13, 1.0)
         } else {
-            None
+            continue;
         };
-        if let Some((fill, edge)) = recolor {
-            if let Some(mut bg) = bg {
-                *bg = BackgroundColor(fill);
+        for child in children {
+            if let Ok(mut head) = heads.get_mut(*child) {
+                head.color = tint;
             }
-            if let Some(mut border) = border {
-                *border = BorderColor::all(edge);
-            }
-            if let Some(shape) = shape {
-                if let Some(mut material) = shape_materials.get_mut(&shape.0) {
-                    material.color = fill.to_linear();
+            if let Ok(tail) = tails.get(*child) {
+                if let Some(mut material) = shape_materials.get_mut(&tail.0) {
+                    material.color = tint.to_linear();
                 }
             }
         }
