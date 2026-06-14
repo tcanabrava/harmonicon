@@ -294,9 +294,13 @@ pub(super) struct NoteHighway;
 #[derive(Component)]
 pub(super) struct NoteHead;
 
-/// The comet tail (a shader `MaterialNode`), child of a note. Tinted on hit/miss.
+/// The comet tail (a shader `MaterialNode`), child of a note. Tinted on hit/miss
+/// and sized each frame to be time-accurate. Carries the note's duration as a
+/// fraction of `LOOKAHEAD` so `size_note_tails` can length it correctly.
 #[derive(Component)]
-pub(super) struct NoteTail;
+pub(super) struct NoteTail {
+    duration_frac: f32,
+}
 
 /// Per-theme tail layout, loaded from `assets/notes/<theme>.json`. Values are
 /// fractions of the head image: `tail_x` is the tail's horizontal center,
@@ -330,12 +334,11 @@ fn load_note_theme_config(theme: &str) -> NoteThemeConfig {
         })
 }
 
-/// How long a note's comet tail is, as a multiple of the head size, derived from
-/// its duration. Longer notes trail farther.
-fn tail_len_frac(duration: f64) -> f32 {
-    const TAIL_SCALE: f32 = 9.0;
-    ((duration / LOOKAHEAD) as f32 * TAIL_SCALE).clamp(0.6, 6.0)
-}
+/// The highway distance (in %) a note scrolls from entering at the top to its
+/// head reaching the hit line — i.e. the span covered in `LOOKAHEAD` seconds.
+/// A tail representing `duration` seconds is `SCROLL_SPAN * duration / LOOKAHEAD`
+/// percent long, which is what makes the tail time-accurate.
+const SCROLL_SPAN: f32 = 100.0 - HIT_H_PCT * 0.5;
 
 /// Which tail animation a note runs, picked from its (first) technique modifier
 /// and passed to the shader as `wah.z`. Plain notes get the gentle default flow.
@@ -461,7 +464,7 @@ fn spawn_highway(
             // is drawn first so the head image layers over its base and hides the
             // join.
             let material = note_materials[idx].clone();
-            let tail_len = tail_len_frac(item.duration);
+            let duration_frac = (item.duration / LOOKAHEAD) as f32;
 
             hw.spawn((
                 Node {
@@ -474,9 +477,7 @@ fn spawn_highway(
                 },
                 NoteVisual {
                     time: t,
-                    // Tail reaches from the attach point on the head up by the
-                    // tail's length; keep the note alive until all of it exits.
-                    tail_extent: (1.0 - tail_cfg.tail_y) + tail_len,
+                    duration_frac,
                 },
                 ScheduledNote {
                     time: t,
@@ -489,21 +490,21 @@ fn spawn_highway(
                 },
             ))
             .with_children(|note| {
-                // Tail: width and attach point come from the theme; length from
-                // the note's duration. Anchored by its bottom at the attach point
-                // and extending upward. Drawn first → the head image covers its
-                // base.
+                // Tail: width and attach point come from the theme; length set
+                // each frame by `size_note_tails` to be time-accurate. Anchored by
+                // its bottom at the attach point and extending upward. Drawn first
+                // → the head image covers its base.
                 note.spawn((
                     Node {
                         position_type: PositionType::Absolute,
                         left: Val::Percent((tail_cfg.tail_x - tail_cfg.tail_width * 0.5) * 100.0),
                         bottom: Val::Percent((1.0 - tail_cfg.tail_y) * 100.0),
                         width: Val::Percent(tail_cfg.tail_width * 100.0),
-                        height: Val::Percent(tail_len * 100.0),
+                        height: Val::Percent(100.0), // placeholder; set in size_note_tails
                         ..default()
                     },
                     MaterialNode(material),
-                    NoteTail,
+                    NoteTail { duration_frac },
                 ));
 
                 // Head: the theme disc filling the square, tinted by the note
@@ -721,29 +722,43 @@ pub fn update_notes(
     clock: Res<super::GameplayClock>,
     loop_cfg: Res<super::LoopConfig>,
     mut commands: Commands,
-    highway: Query<&ComputedNode, With<NoteHighway>>,
-    mut notes: Query<(Entity, &NoteVisual, &ComputedNode, &mut Node)>,
+    mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
 ) {
     let elapsed = clock.0;
-    // Highway height (physical px) to convert a note's head-height into a fraction
-    // of the highway, so we know how far its tail reaches above the head.
-    let highway_h = highway.iter().next().map(|c| c.size().y).unwrap_or(0.0);
-
-    for (entity, note, computed, mut node) in &mut notes {
+    for (entity, note, mut node) in &mut notes {
         let bottom = note_head_bottom_pct(note.time, elapsed, LOOKAHEAD);
 
-        // Recycle only once the *whole comet* (head + its full tail) has fallen
-        // past the bottom — long notes have long tails and must linger. Skip while
-        // looping (notes replay in place) and until layout has measured sizes.
-        if !loop_cfg.active && highway_h > 0.0 {
-            let head_pct = computed.size().y / highway_h * 100.0;
-            let tail_pct = note.tail_extent * head_pct;
-            if bottom < -(tail_pct + 5.0) {
-                commands.entity(entity).despawn();
-                continue;
-            }
+        // Recycle only once the whole comet has fallen past the bottom. The tail
+        // tip sits `SCROLL_SPAN * duration_frac` % above the head, so a long note
+        // lingers exactly as long as its tail needs. Not while looping.
+        let tail_pct = SCROLL_SPAN * note.duration_frac;
+        if !loop_cfg.active && bottom < -(tail_pct + 15.0) {
+            commands.entity(entity).despawn();
+            continue;
         }
         node.bottom = Val::Percent(bottom);
+    }
+}
+
+/// Lengths every comet tail to be time-accurate: its tip meets the hit line at
+/// the note's end. The on-screen length is the highway distance scrolled during
+/// the note's duration, so it's measured against the live highway height.
+pub fn size_note_tails(
+    highway: Query<&ComputedNode, With<NoteHighway>>,
+    mut tails: Query<(&NoteTail, &mut Node)>,
+) {
+    let Some(hw) = highway.iter().next() else {
+        return;
+    };
+    let height_px = hw.size().y;
+    if height_px <= 0.0 {
+        return;
+    }
+    // ComputedNode sizes are physical px; Node lengths are logical px.
+    let logical = height_px * hw.inverse_scale_factor();
+    for (tail, mut node) in &mut tails {
+        let len = (SCROLL_SPAN / 100.0) * tail.duration_frac * logical;
+        node.height = Val::Px(len.max(1.0));
     }
 }
 

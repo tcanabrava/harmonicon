@@ -124,6 +124,7 @@ impl Plugin for GameplayPlugin {
                 Update,
                 (
                     gameplay_2d::update_notes,
+                    gameplay_2d::size_note_tails,
                     gameplay_2d::update_note_visuals,
                     gameplay_2d::animate_note_tails,
                     gameplay_2d::update_holes,
@@ -259,10 +260,11 @@ pub struct GameplayRoot;
 #[derive(Component)]
 pub struct NoteVisual {
     pub time: f64,
-    /// How far the comet reaches above the head's bottom edge, in head-heights
-    /// (tail attach offset + tail length). Used to keep a note alive until its
-    /// whole tail — not just the head — has scrolled off the bottom.
-    pub tail_extent: f32,
+    /// The note's duration as a fraction of `LOOKAHEAD`. The tail spans the
+    /// highway distance scrolled over that duration, so its tip meets the hit
+    /// line at the note's end — and the note is recycled only once that whole
+    /// tail has scrolled off the bottom.
+    pub duration_frac: f32,
 }
 
 /// Attached to every note entity (both modes). Drives scoring logic.
