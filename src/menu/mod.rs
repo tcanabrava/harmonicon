@@ -3,8 +3,10 @@
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
+use crate::assets_management::AvailableNoteThemes;
 use crate::assets_management::AvailableSongs;
 use crate::assets_management::GlobalFonts;
+use crate::assets_management::SelectedNoteTheme;
 use crate::song::SongManifest;
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
@@ -129,6 +131,12 @@ struct SliderFill(VolumeSlider);
 #[derive(Component)]
 struct SliderValueLabel(VolumeSlider);
 
+/// A note-theme choice button on the Options page; carries the theme name. Kept
+/// separate from `MenuButton` so its highlight reflects the current selection
+/// instead of the generic hover styling.
+#[derive(Component)]
+struct ThemeButton(String);
+
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 impl Plugin for MenuPlugin {
@@ -155,7 +163,13 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::Options), cleanup_menu)
             .add_systems(
                 Update,
-                (drag_sliders, update_sliders).run_if(in_state(MenuPage::Options)),
+                (
+                    drag_sliders,
+                    update_sliders,
+                    handle_theme_buttons,
+                    theme_button_visuals,
+                )
+                    .run_if(in_state(MenuPage::Options)),
             )
             // Input and hover are independent — two separate registrations.
             .add_systems(Update, handle_menu_input.run_if(in_state(AppState::Menu)))
@@ -391,6 +405,7 @@ fn setup_options_menu(
     mut commands: Commands,
     font: Res<GlobalFonts>,
     settings: Res<AudioSettings>,
+    themes: Res<AvailableNoteThemes>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"));
     spawn_volume_slider(
@@ -409,6 +424,9 @@ fn setup_options_menu(
         VolumeSlider::Metronome,
         settings.metronome_volume,
     );
+
+    spawn_theme_selector(&mut commands, root, &font.gameplay, &themes.0);
+
     spawn_button(
         &mut commands,
         root,
@@ -416,6 +434,94 @@ fn setup_options_menu(
         "\u{2190} Back",
         MenuButton::BackToMain,
     );
+}
+
+/// A "Note theme" row of selectable buttons, one per discovered theme. The
+/// current selection is shown by `theme_button_visuals`, not the spawn color.
+fn spawn_theme_selector(
+    commands: &mut Commands,
+    parent: Entity,
+    font: &FontSource,
+    themes: &[String],
+) {
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(12.0),
+            ..default()
+        })
+        .id();
+
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Node {
+                width: Val::Px(110.0),
+                ..default()
+            },
+            Text::new("Note theme"),
+            TextFont {
+                font_size: FontSize::Px(20.0),
+                font: font.clone(),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+        for theme in themes {
+            r.spawn((
+                Button,
+                Node {
+                    padding: UiRect::axes(Val::Px(16.0), Val::Px(8.0)),
+                    ..default()
+                },
+                BackgroundColor(btn_default()),
+                ThemeButton(theme.clone()),
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    Text::new(theme.clone()),
+                    TextFont {
+                        font_size: FontSize::Px(18.0),
+                        font: font.clone(),
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+            });
+        }
+    });
+
+    commands.entity(parent).add_child(row);
+}
+
+/// Apply a clicked theme button to the selected-theme resource.
+fn handle_theme_buttons(
+    buttons: Query<(&Interaction, &ThemeButton), Changed<Interaction>>,
+    mut selected: ResMut<SelectedNoteTheme>,
+) {
+    for (interaction, button) in &buttons {
+        if *interaction == Interaction::Pressed {
+            selected.0 = button.0.clone();
+        }
+    }
+}
+
+/// Highlight the selected theme button; the rest follow normal hover styling.
+fn theme_button_visuals(
+    selected: Res<SelectedNoteTheme>,
+    mut buttons: Query<(&Interaction, &ThemeButton, &mut BackgroundColor)>,
+) {
+    for (interaction, button, mut bg) in &mut buttons {
+        *bg = BackgroundColor(if button.0 == selected.0 {
+            Color::srgb(0.25, 0.45, 0.30)
+        } else {
+            match interaction {
+                Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
+                Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
+                Interaction::None => btn_default(),
+            }
+        });
+    }
 }
 
 /// One labelled slider row: `<name>  [====       ]  NN%`. The track is a `Button`

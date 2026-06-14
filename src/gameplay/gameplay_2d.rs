@@ -34,14 +34,16 @@ pub fn setup(
     mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
     fonts: Res<GlobalFonts>,
     asset_server: Res<AssetServer>,
+    note_theme: Res<crate::assets_management::SelectedNoteTheme>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
         return;
     };
-    // The comet head: a translucent disc (white interior, black rim) tinted per
-    // note by the head's ImageNode color.
-    let head_image: Handle<Image> = asset_server.load("notes/circular.png");
+    // Comet head: the selected theme's disc image (white interior tinted per note,
+    // black rim kept), paired with its tail layout from `<theme>.json`.
+    let head_image: Handle<Image> = asset_server.load(format!("notes/{}.png", note_theme.0));
+    let tail_cfg = load_note_theme_config(&note_theme.0);
     clock.0 = -COUNTDOWN;
     music_started.0 = false;
     valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
@@ -144,7 +146,14 @@ pub fn setup(
                     BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
                 ))
                 .with_children(|hw| {
-                    spawn_highway(hw, &fonts.symbols, chart, &note_materials, &head_image);
+                    spawn_highway(
+                        hw,
+                        &fonts.symbols,
+                        chart,
+                        &note_materials,
+                        &head_image,
+                        &tail_cfg,
+                    );
                 });
 
                 // Harmonica holes
@@ -279,12 +288,52 @@ pub(super) struct NoteHead;
 #[derive(Component)]
 pub(super) struct NoteTail;
 
-/// Top-percentage position for a note node scrolling down the highway.
-pub fn note_top_pct(note_time: f64, elapsed: f64, lookahead: f64, height_pct: f32) -> f32 {
-    let remaining = note_time - elapsed;
-    let progress = 1.0 - (remaining / lookahead) as f32;
-    let hit_center_pct = 100.0 - HIT_H_PCT * 0.5;
-    hit_center_pct * progress - height_pct
+/// Per-theme tail layout, loaded from `assets/notes/<theme>.json`. Values are
+/// fractions of the head image: `tail_x` is the tail's horizontal center,
+/// `tail_y` the vertical attach point on the head (0 = top, 1 = bottom), and
+/// `tail_width` the tail base width — all relative to the head's width/height.
+#[derive(Debug, Clone, serde::Deserialize)]
+struct NoteThemeConfig {
+    tail_x: f32,
+    tail_y: f32,
+    tail_width: f32,
+}
+
+impl Default for NoteThemeConfig {
+    fn default() -> Self {
+        Self {
+            tail_x: 0.5,
+            tail_y: 0.5,
+            tail_width: 0.45,
+        }
+    }
+}
+
+fn load_note_theme_config(theme: &str) -> NoteThemeConfig {
+    let path = format!("assets/notes/{theme}.json");
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| {
+            warn!("No usable {path}; using default tail layout");
+            NoteThemeConfig::default()
+        })
+}
+
+/// How long a note's comet tail is, as a multiple of the head size, derived from
+/// its duration. Longer notes trail farther.
+fn tail_len_frac(duration: f64) -> f32 {
+    const TAIL_SCALE: f32 = 9.0;
+    ((duration / LOOKAHEAD) as f32 * TAIL_SCALE).clamp(0.6, 6.0)
+}
+
+/// Distance (in %) from the bottom of the highway to a note head's bottom edge.
+/// The head's bottom reaches the hit line exactly at `note_time`; it decreases
+/// as the note falls, going negative once the head drops past the hit line.
+pub fn note_head_bottom_pct(note_time: f64, elapsed: f64, lookahead: f64) -> f32 {
+    let progress = 1.0 - (note_time - elapsed) / lookahead;
+    let hit_center_pct = 100.0 - (HIT_H_PCT as f64) * 0.5;
+    (100.0 - hit_center_pct * progress) as f32
 }
 
 fn spawn_highway(
@@ -293,6 +342,7 @@ fn spawn_highway(
     chart: &crate::song::chart::HarpChart,
     note_materials: &[Handle<NoteShapeMaterial>],
     head_image: &Handle<Image>,
+    tail_cfg: &NoteThemeConfig,
 ) {
     use crate::song::chart::Action;
 
@@ -368,20 +418,22 @@ fn spawn_highway(
                     .wind_direction_label(event.hole, &event.action)
             });
             let modifiers = event.modifiers.clone().unwrap_or_default();
-            // Each note is a comet: a round head image filling the lane, plus a
-            // duration-length shader tail above it. The container is as tall as
-            // the duration; the tail fills it (its head-sized base hidden behind
-            // the head image, which also covers the seam), and the head is a
-            // lane-width square pinned to the bottom — the leading, falling edge.
+            // The note entity IS the comet head: a lane-width square (kept round
+            // by the disc image + aspect_ratio), positioned each frame by its
+            // bottom edge so it reaches the hit line on time. The tail hangs off
+            // the head's attach point (from the theme JSON) and trails upward; it
+            // is drawn first so the head image layers over its base and hides the
+            // join.
             let material = note_materials[idx].clone();
+            let tail_len = tail_len_frac(item.duration);
 
             hw.spawn((
                 Node {
                     position_type: PositionType::Absolute,
                     left: Val::Percent(left_pct),
-                    top: Val::Percent(-h_pct),
+                    bottom: Val::Percent(150.0), // placeholder; set in update_notes
                     width: Val::Percent(LANE_PCT),
-                    height: Val::Percent(h_pct),
+                    aspect_ratio: Some(1.0),
                     ..default()
                 },
                 NoteVisual {
@@ -399,30 +451,32 @@ fn spawn_highway(
                 },
             ))
             .with_children(|note| {
-                // Tail (drawn first, so the head image layers over its base).
+                // Tail: width and attach point come from the theme; length from
+                // the note's duration. Anchored by its bottom at the attach point
+                // and extending upward. Drawn first → the head image covers its
+                // base.
                 note.spawn((
                     Node {
                         position_type: PositionType::Absolute,
-                        top: Val::Px(0.0),
-                        bottom: Val::Px(0.0),
-                        left: Val::Px(0.0),
-                        right: Val::Px(0.0),
+                        left: Val::Percent((tail_cfg.tail_x - tail_cfg.tail_width * 0.5) * 100.0),
+                        bottom: Val::Percent((1.0 - tail_cfg.tail_y) * 100.0),
+                        width: Val::Percent(tail_cfg.tail_width * 100.0),
+                        height: Val::Percent(tail_len * 100.0),
                         ..default()
                     },
                     MaterialNode(material),
                     NoteTail,
                 ));
 
-                // Head: a lane-width circle pinned to the bottom, kept square via
-                // aspect_ratio so it stays round at any window size. The white
-                // interior of the PNG takes the note colour; the black rim stays.
+                // Head: the theme disc filling the square, tinted by the note
+                // colour (white interior → colour, black rim preserved).
                 note.spawn((
                     Node {
                         position_type: PositionType::Absolute,
-                        bottom: Val::Px(0.0),
+                        top: Val::Px(0.0),
                         left: Val::Px(0.0),
                         width: Val::Percent(100.0),
-                        aspect_ratio: Some(1.0),
+                        height: Val::Percent(100.0),
                         align_items: AlignItems::Center,
                         justify_content: JustifyContent::Center,
                         ..default()
@@ -446,7 +500,8 @@ fn spawn_highway(
                     ));
                 });
 
-                // Modifier hint badges, pinned to the tail tip (top edge).
+                // Modifier hint badges, pinned to the head's top edge (where the
+                // tail emerges).
                 if !modifiers.is_empty() {
                     note.spawn(Node {
                         position_type: PositionType::Absolute,
@@ -632,14 +687,14 @@ pub fn update_notes(
 ) {
     let elapsed = clock.0;
     for (entity, note, mut node) in &mut notes {
-        let top = note_top_pct(note.time, elapsed, LOOKAHEAD, note.height_pct);
-        // Once a note has fully scrolled past the bottom, recycle it — but not
-        // while looping, where notes are replayed in place.
-        if !loop_cfg.active && top > 100.0 {
+        let bottom = note_head_bottom_pct(note.time, elapsed, LOOKAHEAD);
+        // Once a note's head has fallen well past the hit line, recycle it — but
+        // not while looping, where notes are replayed in place.
+        if !loop_cfg.active && bottom < -25.0 {
             commands.entity(entity).despawn();
             continue;
         }
-        node.top = Val::Percent(top);
+        node.bottom = Val::Percent(bottom);
     }
 }
 
@@ -769,24 +824,32 @@ mod tests {
     }
 
     #[test]
-    fn note_top_pct_at_hit_line() {
-        let expected = (100.0 - HIT_H_PCT * 0.5) - 10.0;
-        let got = note_top_pct(1.0, 1.0, LOOKAHEAD, 10.0);
+    fn head_bottom_at_hit_line_on_time() {
+        // At the note's time, the head's bottom sits at the hit-line center.
+        let expected = HIT_H_PCT * 0.5;
+        let got = note_head_bottom_pct(1.0, 1.0, LOOKAHEAD);
         assert!((got - expected).abs() < 0.01, "got {got}");
     }
 
     #[test]
-    fn note_top_pct_in_future_is_negative() {
-        let got = note_top_pct(LOOKAHEAD, 0.0, LOOKAHEAD, 10.0);
-        assert!((got - (-10.0)).abs() < 0.01, "got {got}");
+    fn head_bottom_high_in_the_future() {
+        // A note a full lookahead away enters at the top of the highway.
+        let got = note_head_bottom_pct(LOOKAHEAD, 0.0, LOOKAHEAD);
+        assert!((got - 100.0).abs() < 0.01, "got {got}");
     }
 
     #[test]
-    fn note_top_pct_moves_down_over_time() {
-        let h = 5.0;
-        let t0 = note_top_pct(2.0, 0.0, LOOKAHEAD, h);
-        let t1 = note_top_pct(2.0, 1.0, LOOKAHEAD, h);
-        assert!(t1 > t0, "note should move down (larger top%) as time advances");
+    fn head_bottom_descends_over_time() {
+        let b0 = note_head_bottom_pct(2.0, 0.0, LOOKAHEAD);
+        let b1 = note_head_bottom_pct(2.0, 1.0, LOOKAHEAD);
+        assert!(b1 < b0, "head should fall (smaller bottom%) as time advances");
+    }
+
+    #[test]
+    fn head_bottom_goes_negative_past_the_line() {
+        // Well after its time, the head has dropped below the hit line.
+        let got = note_head_bottom_pct(0.0, 3.0, LOOKAHEAD);
+        assert!(got < 0.0, "got {got}");
     }
 
     // ── modifier_badge ────────────────────────────────────────────────────────

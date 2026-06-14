@@ -36,16 +36,63 @@ impl Default for SelectedHarmonicaModel {
     }
 }
 
+/// Note-drawing themes found under `assets/notes/<name>.png` (each paired with a
+/// `<name>.json` describing its comet tail). The string is the bare `<name>`.
+#[derive(Resource, Default)]
+pub struct AvailableNoteThemes(pub Vec<String>);
+
+/// The currently selected note theme (`<name>` of an `assets/notes/<name>.png`).
+#[derive(Resource)]
+pub struct SelectedNoteTheme(pub String);
+
+impl Default for SelectedNoteTheme {
+    fn default() -> Self {
+        Self("circular".into())
+    }
+}
+
 impl Plugin for AssetsManagementPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AvailableSongs>()
             .init_resource::<AvailableHarmonicas>()
             .init_resource::<SelectedHarmonicaModel>()
+            .init_resource::<AvailableNoteThemes>()
+            .init_resource::<SelectedNoteTheme>()
             .add_systems(
                 Startup,
-                (scan_all_songs, scan_harmonica_models, load_global_fonts),
+                (
+                    scan_all_songs,
+                    scan_harmonica_models,
+                    scan_note_themes,
+                    load_global_fonts,
+                ),
             );
     }
+}
+
+fn scan_note_themes(mut available: ResMut<AvailableNoteThemes>) {
+    let root = std::path::Path::new("assets/notes");
+    let Ok(entries) = std::fs::read_dir(root) else {
+        warn!("No note themes directory at assets/notes/");
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        // A theme is a `<name>.png`; skip editor backups like `circular.png~`.
+        if path.extension().and_then(|e| e.to_str()) != Some("png") {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            available.0.push(stem.to_owned());
+        }
+    }
+    available.0.sort_unstable();
+    available.0.dedup();
+    info!(
+        "Found {} note theme(s): {:?}",
+        available.0.len(),
+        available.0
+    );
 }
 
 fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
