@@ -5,6 +5,11 @@ pub fn note_to_midi(note: &str) -> Option<i32> {
     const NAMES: [&str; 12] = [
         "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
     ];
+    // Note names are ASCII; bail before the byte-slicing below so non-ASCII input
+    // (e.g. the "—" placeholder for a missing hole) returns None instead of panicking.
+    if !note.is_ascii() || note.is_empty() {
+        return None;
+    }
     let (pitch, oct_str) = if note.len() >= 3
         && (note.as_bytes().get(1) == Some(&b'#') || note.as_bytes().get(1) == Some(&b'b'))
     {

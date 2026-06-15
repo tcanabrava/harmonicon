@@ -61,10 +61,6 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         width_mul = 0.08 + 0.92 * nodes;
         pulse = 0.50 + 0.60 * nodes;
     } else if (mode < 4.5) {
-        let breath = 0.5 + 0.5 * sin(t * 2.4 + phase);
-        width_mul = 0.55 + 0.45 * breath;
-        pulse = 0.30 + 1.00 * breath;
-    } else if (mode < 5.5) {
         let flare = pow(0.5 + 0.5 * sin(s * 5.0 * TAU - t * 13.0 + phase), 3.0);
         center_off = bend_amp * bend_ease(s);
         width_mul = 0.50 + 0.50 * flare;

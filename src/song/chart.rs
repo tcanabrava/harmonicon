@@ -142,8 +142,6 @@ pub enum Modifier {
         oscillation_hz: f32,
         intensity: Option<f32>,
     },
-    #[serde(rename = "hold")]
-    Hold { intensity: Option<f32> },
 }
 
 #[derive(Debug, Clone, Deserialize)]

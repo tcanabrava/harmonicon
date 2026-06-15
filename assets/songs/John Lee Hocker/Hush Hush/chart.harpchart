@@ -84,12 +84,7 @@
         {
           "hole": 4,
           "action": "draw",
-          "note": "D5",
-          "modifiers": [
-            {
-              "type": "hold"
-            }
-          ]
+          "note": "D5"
         }
       ]
     },
@@ -147,9 +142,6 @@
           "note": "D5",
           "modifiers": [
             {
-              "type": "hold"
-            },
-            {
               "type": "wah-wah",
               "oscillation_hz": 3,
               "intensity": 0.5
@@ -204,12 +196,7 @@
         {
           "hole": 4,
           "action": "draw",
-          "note": "D5",
-          "modifiers": [
-            {
-              "type": "hold"
-            }
-          ]
+          "note": "D5"
         }
       ]
     },
@@ -248,9 +235,6 @@
           "note": "G4",
           "modifiers": [
             {
-              "type": "hold"
-            },
-            {
               "type": "vibrato",
               "oscillation_hz": 4,
               "intensity": 0.3
@@ -284,15 +268,13 @@
     "style_bonus": {
       "bend": 50,
       "vibrato": 25,
-      "wah-wah": 40,
-      "hold": 20
+      "wah-wah": 40
     }
   },
 
   "fx_mapping": {
     "bend": "pitch_bend",
     "vibrato": "pitch_lfo",
-    "wah-wah": "filter_lfo",
-    "hold": "sustain"
+    "wah-wah": "filter_lfo"
   }
 }

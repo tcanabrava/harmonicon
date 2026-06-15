@@ -12,9 +12,8 @@
 //   1 bend     – the pitch arc, leaning and wavering as it slides
 //   2 vibrato  – a wiggle travelling down the tail
 //   3 wah-wah  – the width breathing open and closed
-//   4 hold     – a calm, even brightness swell (a long steady note)
-//   5 overblow – fast, bright flares shooting up the tail (high energy)
-//   6 overdraw – energetic flares with a twist, travelling the other way
+//   4 overblow – fast, bright flares shooting up the tail (high energy)
+//   5 overdraw – energetic flares with a twist, travelling the other way
 //
 // uv.y = 0 is the tip (top); uv.y = 1 is the base by the head (bottom).
 
@@ -83,11 +82,6 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
         width_mul = 0.08 + 0.92 * nodes;
         pulse = 0.50 + 0.60 * nodes;
     } else if (mode < 4.5) {
-        // hold: a strong, slow breath — the whole tail swells and dims together.
-        let breath = 0.5 + 0.5 * sin(t * 2.4 + phase);
-        width_mul = 0.55 + 0.45 * breath;
-        pulse = 0.30 + 1.00 * breath;
-    } else if (mode < 5.5) {
         // overblow: fast, hard flares shooting up the tail.
         let flare = pow(0.5 + 0.5 * sin(s * 5.0 * TAU - t * 13.0 + phase), 3.0);
         center_off = bend_amp * bend_ease(s);

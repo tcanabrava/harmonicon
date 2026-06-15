@@ -316,11 +316,13 @@ pub fn create_note_visuals(
                 Vec2::new(tail_w * 0.5, tail_len * 0.5),
             )));
 
-            let expected_pitch = event.note.clone().unwrap_or_else(|| {
+            let natural_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
                     .harmonica
                     .wind_direction_label(event.hole, &event.action)
             });
+            // A bend targets the bent pitch, so the technique is scored not shown.
+            let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
 
             commands
                 .spawn((

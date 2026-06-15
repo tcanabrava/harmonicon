@@ -12,13 +12,12 @@ use crate::song::chart::Modifier;
 /// clearly; the actual params/animation come from the same `note_techniques` /
 /// `note_anim_mode` / `tail_params` the falling notes use, so the legend
 /// can never drift from what the notes do.
-fn legend_techniques() -> [(Modifier, &'static str); 6] {
+fn legend_techniques() -> [(Modifier, &'static str); 5] {
     use crate::song::chart::Modifier::*;
     [
         (Bend { semitones: -1.0, intensity: None }, "bend"),
         (Vibrato { oscillation_hz: 5.0, intensity: Some(0.9) }, "vibrato"),
         (WahWah { oscillation_hz: 3.0, intensity: Some(0.9) }, "wah-wah"),
-        (Hold { intensity: None }, "hold"),
         (Overblow, "overblow"),
         (Overdraw, "overdraw"),
     ]
@@ -120,8 +119,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legend_covers_all_six_techniques() {
-        assert_eq!(legend_techniques().len(), 6);
+    fn legend_covers_all_techniques() {
+        assert_eq!(legend_techniques().len(), 5);
     }
 
     #[test]
@@ -129,7 +128,7 @@ mod tests {
         let names: Vec<&str> = legend_techniques().iter().map(|(_, n)| *n).collect();
         assert_eq!(
             names,
-            ["bend", "vibrato", "wah-wah", "hold", "overblow", "overdraw"]
+            ["bend", "vibrato", "wah-wah", "overblow", "overdraw"]
         );
     }
 }

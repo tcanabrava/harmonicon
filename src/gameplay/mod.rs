@@ -25,6 +25,7 @@ use std::collections::HashSet;
 use bevy::audio::Volume;
 
 use crate::{
+    audio_system::midi::{midi_to_note, note_to_midi},
     audio_system::pitch_detect::{PitchEvent, PitchInfo},
     menu::{AppState, GameplayMode, SelectedSong},
     settings::AudioSettings,
@@ -332,6 +333,9 @@ pub struct ScoringConfig {
     pub decay_secs: Option<f64>,
     /// Beats per bar resolved from `timing.time_signature_map` (or `song.time_signature`).
     pub beats_per_bar: f64,
+    /// Bonus points per technique (keyed by technique name) awarded on a hit,
+    /// from the chart's `scoring.style_bonus`. Empty = no style points.
+    pub style_bonus: HashMap<String, f32>,
 }
 
 impl Default for ScoringConfig {
@@ -346,6 +350,7 @@ impl Default for ScoringConfig {
             max_multiplier: 4.0,
             decay_secs: None,
             beats_per_bar: 4.0,
+            style_bonus: HashMap::new(),
         }
     }
 }
@@ -402,6 +407,30 @@ pub fn resolve_item_time(item: &crate::song::chart::TrackItem, timing: &crate::s
     })
 }
 
+/// The pitch the player must actually produce for a note. A `bend` shifts the
+/// note's natural pitch by its semitones (negative = down), so the bend is
+/// *validated* by scoring — playing the unbent note no longer counts. Notes
+/// without a bend (or an unknown pitch name) keep their natural pitch.
+pub fn target_pitch(natural: &str, modifiers: &[Modifier]) -> String {
+    let bend = modifiers.iter().find_map(|m| match m {
+        Modifier::Bend { semitones, .. } => Some(semitones.round() as i32),
+        _ => None,
+    });
+    match (bend, note_to_midi(natural)) {
+        (Some(s), Some(midi)) if s != 0 => midi_to_note(midi + s),
+        _ => natural.to_string(),
+    }
+}
+
+/// Style-bonus points awarded for a hit note's techniques, summed over its
+/// modifiers using the chart's `style_bonus` table (keyed by technique name).
+pub fn style_bonus_points(modifiers: &[Modifier], table: &HashMap<String, f32>) -> f32 {
+    modifiers
+        .iter()
+        .map(|m| table.get(modifier_fx_key(m)).copied().unwrap_or(0.0))
+        .sum()
+}
+
 
 // ── Shared systems ────────────────────────────────────────────────────────────
 
@@ -453,6 +482,9 @@ fn setup_scoring_config(
         config.max_multiplier = combo.max_multiplier;
         config.decay_secs = combo.decay_ms.map(|ms| ms as f64 / 1000.0);
     }
+
+    // Per-technique style points awarded when a technique note is hit.
+    config.style_bonus = s.style_bonus.clone().unwrap_or_default();
 
     // Set up loop section if the chart requests repeat playback.
     *loop_cfg = LoopConfig::default();
@@ -643,6 +675,11 @@ fn score_notes(
                     1.0
                 };
                 score.points += compute_points(quality, multiplier);
+                // Reward executing the note's techniques. Bends are genuinely
+                // validated (the note's expected pitch is the bent one); the
+                // bonus is the payoff for nailing them.
+                score.points +=
+                    style_bonus_points(&note.modifiers, &config.style_bonus).round() as u32;
                 feedback.quality = Some(quality);
                 feedback.timer = 0.75;
 
@@ -663,7 +700,6 @@ fn modifier_fx_key(modifier: &Modifier) -> &'static str {
         Modifier::Bend { .. } => "bend",
         Modifier::Vibrato { .. } => "vibrato",
         Modifier::WahWah { .. } => "wah-wah",
-        Modifier::Hold { .. } => "hold",
         Modifier::Overblow => "overblow",
         Modifier::Overdraw => "overdraw",
     }
@@ -901,5 +937,61 @@ mod tests {
 
         assert!(!gate.is_fresh("G4", &chord));
         assert!(gate.is_fresh("B4", &chord));
+    }
+
+    // ── target_pitch (bend validation) ───────────────────────────────────────────
+
+    #[test]
+    fn bend_targets_the_bent_pitch() {
+        let bend = vec![Modifier::Bend { semitones: -1.0, intensity: None }];
+        // A 1-semitone draw bend on B4 must be played as A#4, not the natural B4.
+        assert_eq!(target_pitch("B4", &bend), "A#4");
+    }
+
+    #[test]
+    fn deeper_bend_targets_lower_pitch() {
+        let bend = vec![Modifier::Bend { semitones: -2.0, intensity: None }];
+        assert_eq!(target_pitch("B4", &bend), "A4");
+    }
+
+    #[test]
+    fn non_bend_techniques_keep_the_natural_pitch() {
+        let vib = vec![Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }];
+        assert_eq!(target_pitch("D5", &vib), "D5");
+        assert_eq!(target_pitch("D5", &[]), "D5");
+    }
+
+    #[test]
+    fn unknown_pitch_name_is_left_alone() {
+        let bend = vec![Modifier::Bend { semitones: -1.0, intensity: None }];
+        assert_eq!(target_pitch("\u{2014}", &bend), "\u{2014}");
+    }
+
+    // ── style_bonus_points ───────────────────────────────────────────────────────
+
+    fn bonus_table() -> HashMap<String, f32> {
+        [("bend".to_string(), 50.0), ("vibrato".to_string(), 25.0)]
+            .into_iter()
+            .collect()
+    }
+
+    #[test]
+    fn style_bonus_sums_matched_techniques() {
+        let mods = vec![
+            Modifier::Bend { semitones: -1.0, intensity: None },
+            Modifier::Vibrato { oscillation_hz: 5.0, intensity: None },
+        ];
+        assert_eq!(style_bonus_points(&mods, &bonus_table()), 75.0);
+    }
+
+    #[test]
+    fn style_bonus_ignores_techniques_absent_from_the_table() {
+        let mods = vec![Modifier::WahWah { oscillation_hz: 3.0, intensity: None }];
+        assert_eq!(style_bonus_points(&mods, &bonus_table()), 0.0);
+    }
+
+    #[test]
+    fn style_bonus_is_zero_without_modifiers() {
+        assert_eq!(style_bonus_points(&[], &bonus_table()), 0.0);
     }
 }

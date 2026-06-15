@@ -347,15 +347,14 @@ const SCROLL_SPAN: f32 = 100.0 - HIT_H_PCT * 0.5;
 
 /// Which tail animation a note runs, picked from its (first) technique modifier
 /// and passed to the shader as `wah.z`. Plain notes get the gentle default flow.
-/// Indices must match the `mode` branches in `assets/shaders/note_tail_2d.wgsl`.
+/// Indices must match the `mode` branches in the note-tail shaders (2D + 3D).
 pub(super) fn note_anim_mode(modifiers: Option<&[Modifier]>) -> f32 {
     match modifiers.and_then(|m| m.first()) {
         Some(Modifier::Bend { .. }) => 1.0,
         Some(Modifier::Vibrato { .. }) => 2.0,
         Some(Modifier::WahWah { .. }) => 3.0,
-        Some(Modifier::Hold { .. }) => 4.0,
-        Some(Modifier::Overblow) => 5.0,
-        Some(Modifier::Overdraw) => 6.0,
+        Some(Modifier::Overblow) => 4.0,
+        Some(Modifier::Overdraw) => 5.0,
         None => 0.0,
     }
 }
@@ -444,12 +443,15 @@ fn spawn_highway(
             let (r, g, b) = note_rgb(is_blow);
             let note_color = Color::srgba(r, g, b, 1.0);
             let left_pct = (event.hole as f32 - 1.0) * LANE_PCT;
-            let expected_pitch = event.note.clone().unwrap_or_else(|| {
+            let modifiers = event.modifiers.clone().unwrap_or_default();
+            let natural_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
                     .harmonica
                     .wind_direction_label(event.hole, &event.action)
             });
-            let modifiers = event.modifiers.clone().unwrap_or_default();
+            // The pitch the player must actually produce — a bend targets the bent
+            // pitch, so the technique is scored, not just shown.
+            let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
             // The note entity IS the comet head: a lane-width square (kept round
             // by the disc image + aspect_ratio), positioned each frame by its
             // bottom edge so it reaches the hit line on time. The tail hangs off
@@ -568,7 +570,6 @@ pub(super) fn note_techniques(
             Modifier::Bend { semitones, .. } => shift = Some(*semitones),
             // Overblow/overdraw raise pitch ~1 semitone — represent as an up-bend.
             Modifier::Overblow | Modifier::Overdraw => shift = Some(1.0),
-            _ => {}
         }
     }
     (vib, shift, wah)

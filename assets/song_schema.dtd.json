@@ -355,8 +355,7 @@
                           "overblow",
                           "overdraw",
                           "vibrato",
-                          "wah-wah",
-                          "hold"
+                          "wah-wah"
                         ]
                       }
                     },
@@ -446,20 +445,6 @@
                         "required": [
                           "oscillation_hz"
                         ]
-                      },
-
-                      {
-                        "properties": {
-                          "type": {
-                            "const": "hold"
-                          },
-
-                          "intensity": {
-                            "type": "number",
-                            "minimum": 0,
-                            "maximum": 1
-                          }
-                        }
                       }
                     ]
                   }
