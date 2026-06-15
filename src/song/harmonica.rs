@@ -6,7 +6,7 @@ use crate::song::chart::{Action, BendingProfile};
 
 use crate::song::chart::{ChromaticLayout, DiatonicLayout};
 
-use crate::audio_system::midi_functions::{midi_to_note, note_to_midi};
+use crate::audio_system::midi::{midi_to_note, note_to_midi};
 
 use std::collections::HashSet;
 

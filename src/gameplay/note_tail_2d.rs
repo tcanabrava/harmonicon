@@ -8,9 +8,9 @@ use bevy::ui_render::prelude::{UiMaterial, UiMaterialPlugin};
 /// UI material for a note's comet **tail**. The round head is a separate image
 /// layered on top of the tail's base; this material draws the tapered, fading
 /// trail, shaped by the note's techniques and *animated* per technique. Drawn in
-/// `assets/shaders/note_shape.wgsl`.
+/// `assets/shaders/note_tail_2d.wgsl`.
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
-pub struct NoteShapeMaterial {
+pub struct NoteTail2dMaterial {
     #[uniform(0)]
     pub color: LinearRgba,
     /// x = vibrato amplitude, y = vibrato cycles, z = animation time in seconds
@@ -24,9 +24,9 @@ pub struct NoteShapeMaterial {
     pub wah: Vec4,
 }
 
-impl UiMaterial for NoteShapeMaterial {
+impl UiMaterial for NoteTail2dMaterial {
     fn fragment_shader() -> ShaderRef {
-        "shaders/note_shape.wgsl".into()
+        "shaders/note_tail_2d.wgsl".into()
     }
 }
 
@@ -36,7 +36,7 @@ impl UiMaterial for NoteShapeMaterial {
 /// bends it up; `wah` is the wah-wah intensity (0..1). The bend arc depth is
 /// proportional to `|shift|` and its sign sets the lean direction; the body
 /// half-width shrinks with the total centerline sway; wah pulses the width.
-pub fn note_shape_params(
+pub fn tail_params(
     h_pct: f32,
     vibrato: Option<f32>,
     shift: Option<f32>,
@@ -77,11 +77,23 @@ pub fn note_shape_params(
     (params, wah)
 }
 
-pub struct NoteShapePlugin;
+pub struct NoteTail2dPlugin;
 
-impl Plugin for NoteShapePlugin {
+impl Plugin for NoteTail2dPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(UiMaterialPlugin::<NoteShapeMaterial>::default());
+        app.add_plugins(UiMaterialPlugin::<NoteTail2dMaterial>::default());
+    }
+}
+
+/// Drives every 2D note tail's animation clock (`params.z`) from the gameplay
+/// clock, so the tails flow in time with the song and freeze when paused.
+pub fn animate_note_tails(
+    clock: Res<super::GameplayClock>,
+    mut materials: ResMut<Assets<NoteTail2dMaterial>>,
+) {
+    let t = clock.0 as f32;
+    for (_, material) in materials.iter_mut() {
+        material.params.z = t;
     }
 }
 
@@ -91,7 +103,7 @@ mod tests {
 
     #[test]
     fn no_techniques_is_all_body() {
-        let (p, wah) = note_shape_params(10.0, None, None, None);
+        let (p, wah) = tail_params(10.0, None, None, None);
         assert_eq!(p.x, 0.0); // vibrato amp
         assert_eq!(p.w, 0.0); // bend amp
         assert_eq!(p.z, 0.5); // full half-width body
@@ -100,8 +112,8 @@ mod tests {
 
     #[test]
     fn bend_arc_depth_scales_with_semitones() {
-        let shallow = note_shape_params(10.0, None, Some(-0.5), None).0;
-        let deep = note_shape_params(10.0, None, Some(-3.0), None).0;
+        let shallow = tail_params(10.0, None, Some(-0.5), None).0;
+        let deep = tail_params(10.0, None, Some(-3.0), None).0;
         assert!(deep.w.abs() > shallow.w.abs(), "deeper bend leans more");
         assert!(shallow.w.abs() > 0.0, "even a half-step is visibly a bend");
     }
@@ -109,13 +121,13 @@ mod tests {
     #[test]
     fn bend_direction_follows_sign() {
         // Pitch down (negative) and up (positive) lean opposite ways.
-        assert!(note_shape_params(10.0, None, Some(-1.0), None).0.w < 0.0);
-        assert!(note_shape_params(10.0, None, Some(1.0), None).0.w > 0.0);
+        assert!(tail_params(10.0, None, Some(-1.0), None).0.w < 0.0);
+        assert!(tail_params(10.0, None, Some(1.0), None).0.w > 0.0);
     }
 
     #[test]
     fn body_stays_solid_when_both_techniques_present() {
-        let (p, _) = note_shape_params(10.0, Some(1.0), Some(-3.0), None);
+        let (p, _) = tail_params(10.0, Some(1.0), Some(-3.0), None);
         // half-width never collapses below the 0.10 floor implied by the 0.40 cap.
         assert!(p.z >= 0.10 - 1e-6, "got {}", p.z);
         // |amplitudes| plus half-width fill exactly half the tile (band touches edges).
@@ -124,10 +136,10 @@ mod tests {
 
     #[test]
     fn wah_depth_scales_and_stays_open_to_pinch() {
-        let (_, none) = note_shape_params(10.0, None, None, None);
+        let (_, none) = tail_params(10.0, None, None, None);
         assert_eq!(none.x, 0.0);
-        let (_, soft) = note_shape_params(10.0, None, None, Some(0.0));
-        let (_, hard) = note_shape_params(10.0, None, None, Some(1.0));
+        let (_, soft) = tail_params(10.0, None, None, Some(0.0));
+        let (_, hard) = tail_params(10.0, None, None, Some(1.0));
         assert!(hard.x > soft.x, "more intensity pinches harder");
         assert!(hard.x < 1.0, "never fully shut");
     }

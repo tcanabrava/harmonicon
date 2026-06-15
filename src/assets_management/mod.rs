@@ -36,6 +36,42 @@ impl Default for SelectedHarmonicaModel {
     }
 }
 
+/// One clickable hole overlay box on a 3D harmonica model, in the model's local
+/// space. Part of [`HarmonicaModelConfig`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HoleConfig {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    /// Width along the X axis.
+    pub w: f32,
+    /// Height along the Y axis.
+    pub h: f32,
+    /// Depth along the Z axis.
+    pub d: f32,
+}
+
+/// Placement of a 3D harmonica model and its hole overlays, loaded from
+/// `assets/harmonicas/3d/<name>/holes.json`. Shared by the 3D gameplay view and
+/// the `hole-editor` tool so the on-disk schema has a single definition.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HarmonicaModelConfig {
+    /// World-space translation for the GLB scene root.
+    pub model_translation: [f32; 3],
+    /// Y-axis rotation applied to the GLB scene, in degrees.
+    #[serde(default)]
+    pub model_rotation_y_deg: f32,
+    /// Uniform scale applied to the GLB scene.
+    #[serde(default = "default_model_scale")]
+    pub model_scale: f32,
+    /// One entry per hole; index 0 = hole 1, index 9 = hole 10.
+    pub holes: Vec<HoleConfig>,
+}
+
+pub fn default_model_scale() -> f32 {
+    1.0
+}
+
 /// 2D note themes found under `assets/notes/2d/<name>.png` (each paired with a
 /// `<name>.json` tail layout). The string is the bare `<name>`.
 #[derive(Resource, Default)]

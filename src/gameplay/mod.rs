@@ -6,14 +6,14 @@ mod gameplay_3d;
 mod jam_session;
 mod metronome_overlay;
 mod modifier_legend;
-mod note_shape_material;
+mod note_tail_2d;
 mod note_tail_3d;
+mod pause_menu;
 mod phrase_overlay;
 mod results;
 mod scoring;
 mod song_progress_overlay;
 mod twelve_bar_blues_overlay;
-use note_shape_material::{NoteShapeMaterial};
 
 use bevy::prelude::*;
 use scoring::{
@@ -25,9 +25,9 @@ use std::collections::HashSet;
 use bevy::audio::Volume;
 
 use crate::{
-    assets_management::GlobalFonts,
     audio_system::pitch_detect::{PitchEvent, PitchInfo},
-    menu::{AppState, AudioSettings, GameplayMode, SelectedSong},
+    menu::{AppState, GameplayMode, SelectedSong},
+    settings::AudioSettings,
     song::{SongManifest, chart::Modifier},
 };
 
@@ -46,7 +46,7 @@ impl Plugin for GameplayPlugin {
             twelve_bar_blues_overlay::TwelveBarBluesPlugin,
             metronome_overlay::MetronomePlugin,
             phrase_overlay::PhrasePlugin,
-            note_shape_material::NoteShapePlugin,
+            note_tail_2d::NoteTail2dPlugin,
             note_tail_3d::NoteTail3dPlugin,
             song_progress_overlay::SongProgressPlugin,
         ))
@@ -70,7 +70,7 @@ impl Plugin for GameplayPlugin {
                 (
                     reset_score,
                     setup_scoring_config,
-                    setup_pause_menu,
+                    pause_menu::setup_pause_menu,
                     gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                     gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                     jam_session::setup
@@ -87,7 +87,11 @@ impl Plugin for GameplayPlugin {
             // Pause input always runs during Playing (even when paused)
             .add_systems(
                 Update,
-                (handle_pause_input, handle_pause_buttons, pause_button_hover)
+                (
+                    pause_menu::handle_pause_input,
+                    pause_menu::handle_pause_buttons,
+                    pause_menu::pause_button_hover,
+                )
                     .run_if(in_state(AppState::Playing)),
             )
             // Apply live volume changes to the playing song (even while paused).
@@ -109,7 +113,7 @@ impl Plugin for GameplayPlugin {
                     score_notes,
                     update_score_display,
                     detect_song_end,
-                    animate_note_tails
+                    note_tail_2d::animate_note_tails,
                 )
                     .chain()
                     .in_set(GameplayLogic)
@@ -313,16 +317,6 @@ pub struct Paused(pub bool);
 #[derive(Component)]
 pub struct MusicPlayer;
 
-#[derive(Component)]
-struct PauseMenuRoot;
-
-#[derive(Component)]
-enum PauseButton {
-    Resume,
-    Restart,
-    QuitSong,
-}
-
 /// Scoring parameters resolved from the song's chart at game start.
 /// Falls back to sensible defaults if the chart doesn't specify them.
 #[derive(Resource)]
@@ -381,19 +375,6 @@ pub const LOOKAHEAD: f64 = 3.0;
 
 // ── Shared pure helpers ───────────────────────────────────────────────────────
 
-
-/// Drives every note tail's animation clock (`params.z`) from the gameplay clock,
-/// so the tails flow in time with the song and freeze when the game is paused.
-pub fn animate_note_tails(
-    clock: Res<GameplayClock>,
-    mut materials: ResMut<Assets<NoteShapeMaterial>>,
-) {
-    let t = clock.0 as f32;
-    for (_, material) in materials.iter_mut() {
-        material.params.z = t;
-    }
-}
-
 /// Parse the beat count from an optional "N/D" time-signature string.
 pub fn parse_beats(time_sig: Option<&str>) -> f64 {
     time_sig
@@ -421,19 +402,6 @@ pub fn resolve_item_time(item: &crate::song::chart::TrackItem, timing: &crate::s
     })
 }
 
-/// Accent colour for a note-technique modifier, shared by the 2D badge/border
-/// hints and the 3D note-material tint so both modes read the same.
-pub fn modifier_color(m: &crate::song::chart::Modifier) -> Color {
-    use crate::song::chart::Modifier::*;
-    match m {
-        Bend { .. } => Color::srgb(0.78, 0.42, 0.96),
-        Vibrato { .. } => Color::srgb(0.35, 0.82, 0.96),
-        WahWah { .. } => Color::srgb(1.00, 0.72, 0.25),
-        Hold { .. } => Color::srgb(0.85, 0.85, 0.92),
-        Overblow => Color::srgb(0.32, 0.88, 0.62),
-        Overdraw => Color::srgb(0.96, 0.55, 0.30),
-    }
-}
 
 // ── Shared systems ────────────────────────────────────────────────────────────
 
@@ -742,152 +710,6 @@ fn update_score_display(
                 }
             }
         }
-    }
-}
-
-fn setup_pause_menu(mut commands: Commands, fonts: Res<GlobalFonts>) {
-    let font = fonts.gameplay.clone();
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(20.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.65)),
-            GlobalZIndex(200),
-            Visibility::Hidden,
-            GameplayRoot,
-            PauseMenuRoot,
-        ))
-        .with_children(|p| {
-            p.spawn((
-                Text::new("PAUSED"),
-                TextFont {
-                    font_size: FontSize::Px(52.0),
-                    font: font.clone(),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-            spawn_pause_button(p, "Resume", PauseButton::Resume, &font);
-            spawn_pause_button(p, "Restart", PauseButton::Restart, &font);
-            spawn_pause_button(p, "Quit Song", PauseButton::QuitSong, &font);
-        });
-}
-
-fn spawn_pause_button(
-    parent: &mut ChildSpawnerCommands,
-    label: &str,
-    btn: PauseButton,
-    font: &FontSource,
-) {
-    parent
-        .spawn((
-            Button,
-            Node {
-                min_width: Val::Px(220.0),
-                padding: UiRect::axes(Val::Px(28.0), Val::Px(12.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-            btn,
-        ))
-        .with_children(|b| {
-            b.spawn((
-                Text::new(label.to_string()),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    font: font.clone(),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-        });
-}
-
-fn handle_pause_input(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut paused: ResMut<Paused>,
-    mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
-    sinks: Query<&AudioSink, With<MusicPlayer>>,
-) {
-    if !keyboard.just_pressed(KeyCode::Escape) {
-        return;
-    }
-    paused.0 = !paused.0;
-    for mut vis in &mut overlay {
-        *vis = if paused.0 {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-    }
-    for sink in &sinks {
-        if paused.0 {
-            sink.pause();
-        } else {
-            sink.play();
-        }
-    }
-}
-
-fn handle_pause_buttons(
-    buttons: Query<(&Interaction, &PauseButton), Changed<Interaction>>,
-    mut paused: ResMut<Paused>,
-    mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
-    mut next_state: ResMut<NextState<AppState>>,
-    mut return_to_song_list: ResMut<crate::menu::ReturnToSongList>,
-    sinks: Query<&AudioSink, With<MusicPlayer>>,
-) {
-    for (interaction, button) in &buttons {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-        match button {
-            PauseButton::Resume => {
-                paused.0 = false;
-                for mut vis in &mut overlay {
-                    *vis = Visibility::Hidden;
-                }
-                for sink in &sinks {
-                    sink.play();
-                }
-            }
-            PauseButton::Restart => {
-                paused.0 = false;
-                // Re-enter via SongLoading so the whole song setup runs fresh
-                // (the asset is already loaded, so it resumes immediately).
-                next_state.set(AppState::SongLoading);
-            }
-            PauseButton::QuitSong => {
-                paused.0 = false;
-                // Land back on the song list, not the main menu.
-                return_to_song_list.0 = true;
-                next_state.set(AppState::Menu);
-            }
-        }
-    }
-}
-
-fn pause_button_hover(
-    mut buttons: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<PauseButton>),
-    >,
-) {
-    for (interaction, mut bg) in &mut buttons {
-        *bg = BackgroundColor(match interaction {
-            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
-            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-            Interaction::None => Color::srgb(0.14, 0.14, 0.22),
-        });
     }
 }
 

@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use harmonicon::audio_system::midi_functions::{midi_to_note, note_to_midi};
+use harmonicon::audio_system::midi::{midi_to_note, note_to_midi};
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use serde_json::{Value, json};
 

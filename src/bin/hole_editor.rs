@@ -2,31 +2,7 @@
 
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct HoleConfig {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
-    h: f32,
-    d: f32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct HarmonicaModelConfig {
-    model_translation: [f32; 3],
-    #[serde(default)]
-    model_rotation_y_deg: f32,
-    #[serde(default = "default_scale")]
-    model_scale: f32,
-    holes: Vec<HoleConfig>,
-}
-
-fn default_scale() -> f32 {
-    1.0
-}
+use harmonicon::assets_management::HarmonicaModelConfig;
 
 #[derive(Resource)]
 struct EditorState {

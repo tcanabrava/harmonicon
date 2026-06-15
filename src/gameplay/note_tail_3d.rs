@@ -6,7 +6,7 @@ use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
 
 /// 3D mesh material for a note's comet tail — the `Material` twin of the 2D
-/// `NoteShapeMaterial`. Drawn on a flat ribbon behind the cube head; the shader
+/// `NoteTail2dMaterial`. Drawn on a flat ribbon behind the cube head; the shader
 /// carves the animated tail shape via alpha. Same uniform layout as the 2D
 /// material so the technique animations stay in lockstep.
 #[derive(Asset, TypePath, AsBindGroup, Clone)]

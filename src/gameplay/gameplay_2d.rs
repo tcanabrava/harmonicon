@@ -23,7 +23,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::note_shape_material::{NoteShapeMaterial, note_shape_params};
+use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 
 pub fn setup(
     mut commands: Commands,
@@ -32,7 +32,7 @@ pub fn setup(
     mut clock: ResMut<super::GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
     mut valid_notes: ResMut<ValidHarpNotes>,
-    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
+    mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
     fonts: Res<GlobalFonts>,
     asset_server: Res<AssetServer>,
     note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
@@ -57,7 +57,7 @@ pub fn setup(
     // shapes the tail *and* picks its animation (`wah.z`); each note gets a
     // distinct phase so same-technique tails don't pulse in lockstep. `params.z`
     // is the animation clock, driven live by `animate_note_tails`.
-    let note_materials: Vec<Handle<NoteShapeMaterial>> = chart
+    let note_materials: Vec<Handle<NoteTail2dMaterial>> = chart
         .track
         .iter()
         .flat_map(|item| {
@@ -71,11 +71,11 @@ pub fn setup(
         })
         .enumerate()
         .map(|(i, (h_pct, vib, bend, wah, mode, color))| {
-            let (mut params, mut wah_v) = note_shape_params(h_pct, vib, bend, wah);
+            let (mut params, mut wah_v) = tail_params(h_pct, vib, bend, wah);
             params.z = 0.0; // animation time, refreshed every frame
             wah_v.z = mode; // which technique animation to run
             wah_v.w = i as f32 * 0.7; // per-note phase offset
-            shape_materials.add(NoteShapeMaterial {
+            shape_materials.add(NoteTail2dMaterial {
                 color: color.to_linear(),
                 params,
                 wah: wah_v,
@@ -347,7 +347,7 @@ const SCROLL_SPAN: f32 = 100.0 - HIT_H_PCT * 0.5;
 
 /// Which tail animation a note runs, picked from its (first) technique modifier
 /// and passed to the shader as `wah.z`. Plain notes get the gentle default flow.
-/// Indices must match the `mode` branches in `assets/shaders/note_shape.wgsl`.
+/// Indices must match the `mode` branches in `assets/shaders/note_tail_2d.wgsl`.
 pub(super) fn note_anim_mode(modifiers: Option<&[Modifier]>) -> f32 {
     match modifiers.and_then(|m| m.first()) {
         Some(Modifier::Bend { .. }) => 1.0,
@@ -373,7 +373,7 @@ fn spawn_highway(
     hw: &mut ChildSpawnerCommands,
     font: &FontSource,
     chart: &crate::song::chart::HarpChart,
-    note_materials: &[Handle<NoteShapeMaterial>],
+    note_materials: &[Handle<NoteTail2dMaterial>],
     head_image: &Handle<Image>,
     tail_cfg: &NoteThemeConfig,
 ) {
@@ -714,8 +714,8 @@ pub fn size_note_tails(
 pub fn update_note_visuals(
     notes: Query<(&ScheduledNote, &Children), Changed<ScheduledNote>>,
     mut heads: Query<&mut ImageNode, With<NoteHead>>,
-    tails: Query<&MaterialNode<NoteShapeMaterial>, With<NoteTail>>,
-    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
+    tails: Query<&MaterialNode<NoteTail2dMaterial>, With<NoteTail>>,
+    mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
 ) {
     for (scheduled, children) in &notes {
         let tint = if scheduled.hit {

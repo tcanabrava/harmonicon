@@ -1,1 +1,5 @@
 /target
+# rust-analyzer's separate check target
+/server
+# Python tooling for the asset scripts
+scripts/.venv/

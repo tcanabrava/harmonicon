@@ -6,7 +6,8 @@ use bevy::{
 };
 
 use crate::{
-    menu::{AppState, AudioSettings, SelectedSong},
+    menu::{AppState, SelectedSong},
+    settings::AudioSettings,
     song::SongManifest,
 };
 

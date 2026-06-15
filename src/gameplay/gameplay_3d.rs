@@ -3,7 +3,9 @@
 use bevy::prelude::*;
 
 use crate::{
-    assets_management::{GlobalFonts, SelectedHarmonicaModel, SelectedNoteTheme3d},
+    assets_management::{
+        GlobalFonts, HarmonicaModelConfig, HoleConfig, SelectedHarmonicaModel, SelectedNoteTheme3d,
+    },
     menu::SelectedSong,
     song::SongManifest,
     song::chart::{Action, HarpChart},
@@ -22,7 +24,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::note_shape_material::{NoteShapeMaterial, note_shape_params};
+use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_tail_3d::NoteTail3dMaterial;
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -102,54 +104,23 @@ fn note_depth(duration: f64) -> f32 {
 
 // ── Harmonica model config ────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct HoleConfig {
-    x: f32,
-    y: f32,
-    z: f32,
-    /// Width along the X axis.
-    w: f32,
-    /// Height along the Y axis.
-    h: f32,
-    /// Depth along the Z axis.
-    d: f32,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct HarmonicaModelConfig {
-    /// World-space translation for the GLB scene root.
-    model_translation: [f32; 3],
-    /// Y-axis rotation applied to the GLB scene, in degrees.
-    #[serde(default)]
-    model_rotation_y_deg: f32,
-    /// Uniform scale applied to the GLB scene.
-    #[serde(default = "default_model_scale")]
-    model_scale: f32,
-    /// One entry per hole; index 0 = hole 1, index 9 = hole 10.
-    holes: Vec<HoleConfig>,
-}
-
-fn default_model_scale() -> f32 {
-    1.0
-}
-
-impl HarmonicaModelConfig {
-    fn default_layout() -> Self {
-        Self {
-            model_translation: [0.0, LANE_Y + 0.45, HARP_Z],
-            model_rotation_y_deg: 0.0,
-            model_scale: 1.0,
-            holes: (1u8..=HOLE_COUNT as u8)
-                .map(|hole| HoleConfig {
-                    x: lane_x(hole),
-                    y: LANE_Y + 0.9 + 0.10,
-                    z: HARP_Z,
-                    w: LANE_WIDTH - LANE_GAP - 0.08,
-                    h: 0.20,
-                    d: 0.90,
-                })
-                .collect(),
-        }
+/// The fallback layout when a model has no `holes.json`: holes evenly spaced
+/// across the lanes at the harmonica's resting position.
+fn default_model_layout() -> HarmonicaModelConfig {
+    HarmonicaModelConfig {
+        model_translation: [0.0, LANE_Y + 0.45, HARP_Z],
+        model_rotation_y_deg: 0.0,
+        model_scale: 1.0,
+        holes: (1u8..=HOLE_COUNT as u8)
+            .map(|hole| HoleConfig {
+                x: lane_x(hole),
+                y: LANE_Y + 0.9 + 0.10,
+                z: HARP_Z,
+                w: LANE_WIDTH - LANE_GAP - 0.08,
+                h: 0.20,
+                d: 0.90,
+            })
+            .collect(),
     }
 }
 
@@ -160,7 +131,7 @@ fn load_model_config(model_name: &str) -> HarmonicaModelConfig {
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_else(|| {
             warn!("No holes.json for model '{model_name}', using default layout");
-            HarmonicaModelConfig::default_layout()
+            default_model_layout()
         })
 }
 
@@ -330,7 +301,7 @@ pub fn create_note_visuals(
             // Tail: a flat ribbon driven by the same technique animation as 2D.
             let (vib, shift, wah) = note_techniques(event.modifiers.as_deref());
             let mode = note_anim_mode(event.modifiers.as_deref());
-            let (mut params, mut wah_v) = note_shape_params(20.0, vib, shift, wah);
+            let (mut params, mut wah_v) = tail_params(20.0, vib, shift, wah);
             params.z = 0.0; // animation clock, set each frame
             wah_v.z = mode; // which technique animation
             wah_v.w = t as f32 * 1.7; // per-note phase
@@ -403,7 +374,7 @@ pub fn setup(
     fonts: Res<GlobalFonts>,
     asset_server: Res<AssetServer>,
     selected_model: Res<SelectedHarmonicaModel>,
-    shape_materials: ResMut<Assets<NoteShapeMaterial>>,
+    shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
     mut tail_materials: ResMut<Assets<NoteTail3dMaterial>>,
     note_theme: Res<SelectedNoteTheme3d>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
@@ -545,7 +516,7 @@ fn spawn_hud_overlay(
     font: &FontSource,
     bpm: f32,
     beats_per_bar: usize,
-    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
+    mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
 ) {
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     let info = format!(

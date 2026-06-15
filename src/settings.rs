@@ -16,7 +16,24 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::assets_management::{SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d};
-use crate::menu::AudioSettings;
+
+/// Player-tunable audio levels (0.0–1.0, linear), read by the audio spawners
+/// (song music, metronome clicks) and edited on the Options page. Persisted by
+/// this module; adjusting the music level updates the playing song in real time.
+#[derive(Resource)]
+pub struct AudioSettings {
+    pub music_volume: f32,
+    pub metronome_volume: f32,
+}
+
+impl Default for AudioSettings {
+    fn default() -> Self {
+        Self {
+            music_volume: 0.8,
+            metronome_volume: 0.7,
+        }
+    }
+}
 
 /// The on-disk shape of the settings. `#[serde(default)]` lets an older or
 /// hand-edited file omit fields and still load.
@@ -83,7 +100,8 @@ pub struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, apply_loaded_settings)
+        app.init_resource::<AudioSettings>()
+            .add_systems(Startup, apply_loaded_settings)
             // Save whenever either settings resource changes. The Startup load
             // also marks them changed, so the file is created on first run.
             .add_systems(
