@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
-use bevy::render::mesh::PrimitiveTopology;
 
 use crate::{
-    assets_management::{GlobalFonts, SelectedHarmonicaModel},
+    assets_management::{GlobalFonts, SelectedHarmonicaModel, SelectedNoteTheme},
     menu::SelectedSong,
     song::SongManifest,
-    song::chart::{Action, HarpChart, Modifier},
+    song::chart::{Action, HarpChart},
     song::harmonica::twelve_bar,
 };
 
@@ -18,12 +16,14 @@ use super::{
     MusicStarted, ScheduledNote, ScoreText, ValidHarpNotes,
 };
 use super::countdown_overlay::spawn_countdown;
+use super::gameplay_2d::{note_anim_mode, note_techniques};
 use super::song_progress_overlay::spawn_song_progress;
 use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::phrase_overlay::spawn_phrase_banner;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::note_shape_material::{NoteShapeMaterial};
+use super::note_shape_material::{NoteShapeMaterial, note_shape_params};
+use super::note_tail_3d::NoteTail3dMaterial;
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
 
@@ -44,11 +44,48 @@ pub struct GameplayCamera3D;
 #[derive(Component)]
 pub(super) struct NoteVisual3D {
     time: f64,
-    depth: f32,
+    /// Z length of the cube head, used to land its front face on the hit line.
+    head_depth: f32,
+    /// Z length of the trailing tail ribbon, used to recycle once it has passed.
+    tail_len: f32,
 }
+
+/// The cube head of a 3D note (child). Tinted gold/red on hit/miss.
+#[derive(Component)]
+pub(super) struct NoteHead3d;
+
+/// The animated tail ribbon of a 3D note (child). Tinted gold/red on hit/miss.
+#[derive(Component)]
+pub(super) struct NoteTail3d;
 
 #[derive(Component)]
 pub(super) struct HoleMesh3D(Handle<StandardMaterial>);
+
+/// Per-theme 3D note layout, from `assets/notes/3d/<theme>.json`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub(super) struct NoteCube3dConfig {
+    /// Uniform scale applied to the cube head (relative to a lane-wide note).
+    head_scale: f32,
+    /// Tail ribbon width as a fraction of the note width.
+    tail_width: f32,
+}
+
+impl Default for NoteCube3dConfig {
+    fn default() -> Self {
+        Self { head_scale: 0.8, tail_width: 0.6 }
+    }
+}
+
+fn load_note_cube_config(theme: &str) -> NoteCube3dConfig {
+    let path = format!("assets/notes/3d/{theme}.json");
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| {
+            warn!("No usable {path}; using default 3D note layout");
+            NoteCube3dConfig::default()
+        })
+}
 
 /// Parent entity holding the GLB model and its hole overlays. Animated by
 /// `groove_harmonica` so the whole harmonica bobs in time with the music.
@@ -251,89 +288,24 @@ fn create_hit_zone(
     ));
 }
 
-/// Sigmoid bend profile (matches `note_shape.wgsl`): holds flat, transitions
-/// sharply through the middle, then holds flat — a note bending pitch and settling.
-fn bend_ease(t: f32) -> f32 {
-    let x = ((t - 0.5) * 2.0 + 0.5).clamp(0.0, 1.0);
-    x * x * x * (x * (x * 6.0 - 15.0) + 10.0)
-}
 
-/// Builds a technique note body: a `width`×`height` slab whose cross-section is
-/// swept along Z (its length) with its centre displaced and scaled by `shape(t)`
-/// returning `(dx, dy, scale)` (t in 0..=1), with flat end caps — the 3D analogue
-/// of the 2D shaped tile. Vibrato sways on X, a bend arcs on Y (up or down), and
-/// wah breathes the cross-section via `scale`.
-fn swept_note_mesh(
-    width: f32,
-    height: f32,
-    depth: f32,
-    segments: usize,
-    shape: impl Fn(f32) -> (f32, f32, f32),
-) -> Mesh {
-    let (hw, hh, hd) = (width * 0.5, height * 0.5, depth * 0.5);
-
-    // Corners of the cross-section at sample plane `r`: [TL, TR, BR, BL].
-    let ring = |r: usize| -> [[f32; 3]; 4] {
-        let t = r as f32 / segments as f32;
-        let z = -hd + t * depth;
-        let (dx, dy, scale) = shape(t);
-        let (sw, sh) = (hw * scale, hh * scale);
-        [
-            [dx - sw, dy + sh, z], // TL
-            [dx + sw, dy + sh, z], // TR
-            [dx + sw, dy - sh, z], // BR
-            [dx - sw, dy - sh, z], // BL
-        ]
-    };
-
-    // Non-indexed triangle soup so `compute_normals` yields crisp per-face (flat)
-    // normals. Winding is CCW-outward for every face so nothing is back-culled.
-    let mut positions: Vec<[f32; 3]> = Vec::new();
-    for r in 0..segments {
-        let a = ring(r); // nearer -Z
-        let b = ring(r + 1); // nearer +Z
-        let (atl, atr, abr, abl) = (a[0], a[1], a[2], a[3]);
-        let (btl, btr, bbr, bbl) = (b[0], b[1], b[2], b[3]);
-        positions.extend_from_slice(&[
-            // top (+Y)
-            atl, btl, btr, atl, btr, atr,
-            // bottom (-Y)
-            abl, abr, bbr, abl, bbr, bbl,
-            // left (-X)
-            atl, abl, bbl, atl, bbl, btl,
-            // right (+X)
-            atr, btr, bbr, atr, bbr, abr,
-        ]);
-    }
-    // End caps: front ring faces -Z, back ring faces +Z.
-    let f = ring(0);
-    positions.extend_from_slice(&[f[0], f[1], f[2], f[0], f[2], f[3]]);
-    let k = ring(segments);
-    positions.extend_from_slice(&[k[0], k[2], k[1], k[0], k[3], k[2]]);
-
-    let uvs = vec![[0.0_f32, 0.0]; positions.len()];
-
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    // No indices -> flat normals (one normal per face), so the faceted body
-    // reads as solid rather than smeared/glitchy.
-    mesh.compute_normals();
-    mesh
-}
-
+/// Spawns each note as a 3D comet: an elongated cube head (from the theme's glTF)
+/// tinted by blow/draw colour, trailing a flat ribbon that runs the technique's
+/// animation via [`NoteTail3dMaterial`] — the 3D twin of the 2D head+tail comet.
 pub fn create_note_visuals(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    tail_materials: &mut ResMut<Assets<NoteTail3dMaterial>>,
+    head_mesh: &Handle<Mesh>,
+    cfg: &NoteCube3dConfig,
     holes: &[HoleConfig],
     chart: &HarpChart,
 ) {
     for item in &chart.track {
         let t = super::resolve_item_time(item, &chart.timing);
-        let depth = note_depth(item.duration);
+        let tail_len = note_depth(item.duration);
         for event in &item.events {
-            use crate::song::chart::Action;
             let is_blow = matches!(event.action, Action::Blow);
             let (r, g, b, emit_r, emit_g, emit_b) = if is_blow {
                 (0.25f32, 0.55, 0.95, 0.1, 0.3, 1.2)
@@ -341,88 +313,80 @@ pub fn create_note_visuals(
                 (0.95f32, 0.38, 0.15, 1.2, 0.2, 0.05)
             };
             let modifiers = event.modifiers.clone().unwrap_or_default();
-            // Notes carrying a technique get a coloured emissive rim matching the
-            // 2D badge palette, so bends/wah/etc. read at a glance on the lane too.
-            let note_mat = if let Some(m) = modifiers.first() {
-                let c = super::modifier_color(m).to_linear();
-                materials.add(StandardMaterial {
-                    base_color: Color::srgb(r, g, b),
-                    emissive: LinearRgba::new(c.red * 1.6, c.green * 1.6, c.blue * 1.6, 1.0),
-                    ..default()
-                })
-            } else {
-                materials.add(StandardMaterial {
-                    base_color: Color::srgb(r, g, b),
-                    emissive: LinearRgba::new(emit_r, emit_g, emit_b, 1.0),
-                    ..default()
-                })
-            };
+
             let hole_cfg = holes.get(event.hole.saturating_sub(1) as usize);
             let note_x = hole_cfg.map(|h| h.x).unwrap_or_else(|| lane_x(event.hole));
             let note_w = hole_cfg.map(|h| h.w).unwrap_or(LANE_WIDTH - LANE_GAP);
-            // A bend/vibrato note's body curves along its length (Z), like the 2D
-            // shaped tile: vibrato sways as a sine, a bend arcs to one side.
-            // Everything else stays a straight cuboid.
-            let vibrato = modifiers.iter().find_map(|m| match m {
-                Modifier::Vibrato { intensity, .. } => Some(intensity.unwrap_or(0.5)),
-                _ => None,
+
+            // Head: the elongated cube (1.4 units long in Z), tinted blow/draw.
+            let head_scale = note_w * cfg.head_scale;
+            let head_depth = head_scale * 1.4;
+            let head_mat = materials.add(StandardMaterial {
+                base_color: Color::srgb(r, g, b),
+                emissive: LinearRgba::new(emit_r, emit_g, emit_b, 1.0),
+                ..default()
             });
-            // Pitch shift in semitones: negative bends down, positive (overblow/
-            // overdraw) bends up. Sign sets the arc direction, magnitude its depth.
-            let shift = modifiers.iter().find_map(|m| match m {
-                Modifier::Bend { semitones, .. } => Some(*semitones),
-                Modifier::Overblow | Modifier::Overdraw => Some(1.0),
-                _ => None,
+
+            // Tail: a flat ribbon driven by the same technique animation as 2D.
+            let (vib, shift, wah) = note_techniques(event.modifiers.as_deref());
+            let mode = note_anim_mode(event.modifiers.as_deref());
+            let (mut params, mut wah_v) = note_shape_params(20.0, vib, shift, wah);
+            params.z = 0.0; // animation clock, set each frame
+            wah_v.z = mode; // which technique animation
+            wah_v.w = t as f32 * 1.7; // per-note phase
+            let tail_mat = tail_materials.add(NoteTail3dMaterial {
+                color: Color::srgba(r, g, b, 0.9).to_linear(),
+                params,
+                wah: wah_v,
             });
-            let wah = modifiers.iter().find_map(|m| match m {
-                Modifier::WahWah { intensity, .. } => Some(intensity.unwrap_or(0.5)),
-                _ => None,
-            });
-            let note_mesh = if vibrato.is_some() || shift.is_some() || wah.is_some() {
-                use std::f32::consts::TAU;
-                let vib_amp = vibrato.map_or(0.0, |i| 0.18 + 0.22 * i.clamp(0.0, 1.0));
-                // Y deflection in world units. Large so the bend reads clearly down
-                // the lane from the camera; the S-curve below holds it as a plateau.
-                let bend_amp = shift.map_or(0.0, |s| {
-                    let mag = 0.8 + 4.0 * (s.abs() / 3.0).clamp(0.0, 1.0);
-                    mag * if s < 0.0 { -1.0 } else { 1.0 }
-                });
-                let wah_depth = wah.map_or(0.0, |i| 0.30 + 0.40 * i.clamp(0.0, 1.0));
-                let cycles = (depth / 2.0).clamp(1.0, 6.0);
-                let wah_cycles = (depth / 3.5).clamp(1.0, 4.0);
-                let segments = ((cycles * 8.0).ceil() as usize).clamp(12, 96);
-                meshes.add(swept_note_mesh(note_w, NOTE_H, depth, segments, move |t| {
-                    // Vibrato sways on X; the bend arcs on Y as a sigmoid (down for
-                    // negative, up for overblow/overdraw); wah breathes the body.
-                    let dx = vib_amp * (t * cycles * TAU).sin();
-                    let dy = bend_amp * bend_ease(t);
-                    let scale = 1.0 - wah_depth * (0.5 - 0.5 * (t * wah_cycles * TAU).cos());
-                    (dx, dy, scale)
-                }))
-            } else {
-                meshes.add(Cuboid::new(note_w, NOTE_H, depth))
-            };
+            let tail_w = note_w * cfg.tail_width;
+            let tail_mesh = meshes.add(Mesh::from(Plane3d::new(
+                Vec3::Y,
+                Vec2::new(tail_w * 0.5, tail_len * 0.5),
+            )));
+
             let expected_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
                     .harmonica
                     .wind_direction_label(event.hole, &event.action)
             });
-            commands.spawn((
-                Mesh3d(note_mesh),
-                MeshMaterial3d(note_mat),
-                Transform::from_xyz(note_x, LANE_Y + NOTE_H * 0.5, FAR_Z),
-                NoteVisual3D { time: t, depth },
-                ScheduledNote {
-                    time: t,
-                    hole: event.hole,
-                    is_blow,
-                    expected_pitch,
-                    hit: false,
-                    missed: false,
-                    modifiers,
-                },
-                GameplayRoot,
-            ));
+
+            commands
+                .spawn((
+                    Transform::from_xyz(note_x, LANE_Y + NOTE_H * 0.5, FAR_Z),
+                    Visibility::default(),
+                    NoteVisual3D { time: t, head_depth, tail_len },
+                    ScheduledNote {
+                        time: t,
+                        hole: event.hole,
+                        is_blow,
+                        expected_pitch,
+                        hit: false,
+                        missed: false,
+                        modifiers,
+                    },
+                    GameplayRoot,
+                ))
+                .with_children(|note| {
+                    // Cube head at the leading edge (parent origin).
+                    note.spawn((
+                        Mesh3d(head_mesh.clone()),
+                        MeshMaterial3d(head_mat),
+                        Transform::from_scale(Vec3::splat(head_scale)),
+                        NoteHead3d,
+                    ));
+                    // Tail ribbon trailing behind the head (−Z), flat over the lane.
+                    note.spawn((
+                        Mesh3d(tail_mesh),
+                        MeshMaterial3d(tail_mat),
+                        Transform::from_xyz(
+                            0.0,
+                            -NOTE_H * 0.5 + 0.02,
+                            -(head_depth * 0.5 + tail_len * 0.5),
+                        ),
+                        NoteTail3d,
+                    ));
+                });
         }
     }
 }
@@ -439,7 +403,9 @@ pub fn setup(
     fonts: Res<GlobalFonts>,
     asset_server: Res<AssetServer>,
     selected_model: Res<SelectedHarmonicaModel>,
-    mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
+    shape_materials: ResMut<Assets<NoteShapeMaterial>>,
+    mut tail_materials: ResMut<Assets<NoteTail3dMaterial>>,
+    note_theme: Res<SelectedNoteTheme>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
 ) {
     let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
@@ -483,7 +449,21 @@ pub fn setup(
     );
 
     create_hit_zone(&mut commands, &mut meshes, &mut materials, center_x, total_width);
-    create_note_visuals(&mut commands, &mut meshes, &mut materials, holes, chart);
+
+    // Comet head mesh from the theme's glTF cube + its 3D tail layout.
+    let head_mesh: Handle<Mesh> =
+        asset_server.load(format!("notes/3d/{}.glb#Mesh0/Primitive0", note_theme.0));
+    let note_cfg = load_note_cube_config(&note_theme.0);
+    create_note_visuals(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut tail_materials,
+        &head_mesh,
+        &note_cfg,
+        holes,
+        chart,
+    );
     spawn_harmonica_3d(
         &mut commands,
         &mut meshes,
@@ -793,34 +773,78 @@ pub fn groove_harmonica(
 pub fn update_notes_3d(
     clock: Res<super::GameplayClock>,
     loop_cfg: Res<super::LoopConfig>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
-    mut notes: Query<(
-        Entity,
-        &NoteVisual3D,
-        &ScheduledNote,
-        &MeshMaterial3d<StandardMaterial>,
-        &mut Transform,
-    )>,
+    mut notes: Query<(Entity, &NoteVisual3D, &mut Transform)>,
 ) {
     let elapsed = clock.0;
-    for (entity, note, scheduled, mat_handle, mut tf) in &mut notes {
+    for (entity, note, mut tf) in &mut notes {
         let remaining = (note.time - elapsed) as f32;
-        let z = HIT_Z - remaining / LOOKAHEAD as f32 * LANE_DEPTH - note.depth * 0.5;
-        // Once a note has travelled past the hit zone, recycle it — but not while
-        // looping, where notes are replayed in place.
-        if !loop_cfg.active && z > HIT_Z + note.depth + 4.0 {
+        // The head's front face lands on the hit line at the note's time.
+        let z = HIT_Z - remaining / LOOKAHEAD as f32 * LANE_DEPTH - note.head_depth * 0.5;
+        // Recycle once the whole comet (head + trailing tail) has passed the hit
+        // zone — not while looping, where notes are replayed in place.
+        if !loop_cfg.active && z > HIT_Z + note.head_depth * 0.5 + note.tail_len + 4.0 {
             commands.entity(entity).despawn();
             continue;
         }
         tf.translation.z = z;
+    }
+}
 
-        if scheduled.hit {
-            if let Some(mut mat) = materials.get_mut(&mat_handle.0) {
-                mat.emissive = LinearRgba::new(2.5, 2.0, 0.3, 1.0);
-                mat.base_color = Color::srgb(1.0, 0.9, 0.3);
+/// Tints a 3D note's cube head and tail ribbon when it is hit or missed — gold on
+/// a hit, dim red on a miss — mirroring the 2D path. Reacts only to scoring
+/// changes, so it runs the frame the outcome lands.
+pub fn update_note_visuals_3d(
+    notes: Query<(&ScheduledNote, &Children), Changed<ScheduledNote>>,
+    heads: Query<&MeshMaterial3d<StandardMaterial>, With<NoteHead3d>>,
+    tails: Query<&MeshMaterial3d<NoteTail3dMaterial>, With<NoteTail3d>>,
+    mut std_materials: ResMut<Assets<StandardMaterial>>,
+    mut tail_materials: ResMut<Assets<NoteTail3dMaterial>>,
+) {
+    for (scheduled, children) in &notes {
+        let tint = if scheduled.hit {
+            Some((
+                Color::srgb(1.0, 0.9, 0.3),
+                LinearRgba::new(2.5, 2.0, 0.3, 1.0),
+                Color::srgba(1.0, 0.85, 0.25, 0.95).to_linear(),
+            ))
+        } else if scheduled.missed {
+            Some((
+                Color::srgb(0.4, 0.12, 0.12),
+                LinearRgba::new(0.2, 0.05, 0.05, 1.0),
+                Color::srgba(0.5, 0.13, 0.13, 0.6).to_linear(),
+            ))
+        } else {
+            None
+        };
+        let Some((base, emissive, tail_color)) = tint else {
+            continue;
+        };
+        for child in children {
+            if let Ok(h) = heads.get(*child) {
+                if let Some(mut m) = std_materials.get_mut(&h.0) {
+                    m.base_color = base;
+                    m.emissive = emissive;
+                }
+            }
+            if let Ok(h) = tails.get(*child) {
+                if let Some(mut m) = tail_materials.get_mut(&h.0) {
+                    m.color = tail_color;
+                }
             }
         }
+    }
+}
+
+/// Drives every 3D tail's animation clock (`params.z`) from the gameplay clock,
+/// so the ribbons flow in time with the song and freeze on pause.
+pub fn animate_note_tails_3d(
+    clock: Res<super::GameplayClock>,
+    mut materials: ResMut<Assets<NoteTail3dMaterial>>,
+) {
+    let t = clock.0 as f32;
+    for (_, material) in materials.iter_mut() {
+        material.params.z = t;
     }
 }
 
@@ -913,66 +937,3 @@ pub fn restore_camera(mut cameras: Query<(&mut Camera, &mut Transform), With<Cam
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn swept_mesh_has_expected_topology() {
-        // 16 segments, non-indexed triangle soup: per segment 4 faces * 2 tris *
-        // 3 verts = 24, plus 2 caps * 2 tris * 3 = 12.
-        let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, |_| (0.0, 0.0, 1.0));
-        let verts = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
-        assert_eq!(verts, 16 * 24 + 12);
-
-        // Flat normals require a non-indexed mesh, and must be populated.
-        assert!(mesh.indices().is_none());
-        assert!(mesh.attribute(Mesh::ATTRIBUTE_NORMAL).is_some());
-    }
-
-    #[test]
-    fn swept_mesh_more_segments_more_vertices() {
-        let n = |segs| {
-            swept_note_mesh(0.8, 0.18, 4.0, segs, |_| (0.0, 0.0, 1.0))
-                .attribute(Mesh::ATTRIBUTE_POSITION)
-                .unwrap()
-                .len()
-        };
-        assert!(n(48) > n(12));
-    }
-
-    #[test]
-    fn bend_ease_is_a_centered_sigmoid() {
-        // Anchored 0->1, symmetric, with flat plateaus outside the central band.
-        assert_eq!(bend_ease(0.0), 0.0);
-        assert_eq!(bend_ease(1.0), 1.0);
-        assert!((bend_ease(0.5) - 0.5).abs() < 1e-6);
-        assert_eq!(bend_ease(0.2), 0.0, "holds flat before the transition");
-        assert_eq!(bend_ease(0.8), 1.0, "holds flat after the transition");
-        // Monotonic non-decreasing.
-        let mut prev = -1.0;
-        for i in 0..=20 {
-            let v = bend_ease(i as f32 / 20.0);
-            assert!(v >= prev - 1e-6);
-            prev = v;
-        }
-    }
-
-    #[test]
-    fn bend_arcs_on_y_axis() {
-        // A positive bend lifts the body in +Y; a negative bend dips it in -Y.
-        let extreme_y = |dy_amp: f32, pick: fn(&[f32]) -> f32| {
-            let mesh = swept_note_mesh(0.8, 0.18, 4.0, 16, move |t| (0.0, dy_amp * t * t, 1.0));
-            let pos = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
-            if let bevy::render::mesh::VertexAttributeValues::Float32x3(v) = pos {
-                pick(&v.iter().map(|p| p[1]).collect::<Vec<_>>())
-            } else {
-                panic!("expected Float32x3 positions");
-            }
-        };
-        let max = |ys: &[f32]| ys.iter().copied().fold(f32::MIN, f32::max);
-        let min = |ys: &[f32]| ys.iter().copied().fold(f32::MAX, f32::min);
-        assert!(extreme_y(0.6, max) > extreme_y(0.0, max), "up-bend raises top");
-        assert!(extreme_y(-0.6, min) < extreme_y(0.0, min), "down-bend lowers bottom");
-    }
-}

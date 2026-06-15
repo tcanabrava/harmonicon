@@ -71,9 +71,9 @@ impl Plugin for AssetsManagementPlugin {
 }
 
 fn scan_note_themes(mut available: ResMut<AvailableNoteThemes>) {
-    let root = std::path::Path::new("assets/notes");
+    let root = std::path::Path::new("assets/notes/2d");
     let Ok(entries) = std::fs::read_dir(root) else {
-        warn!("No note themes directory at assets/notes/");
+        warn!("No note themes directory at assets/notes/2d/");
         return;
     };
     for entry in entries.flatten() {

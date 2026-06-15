@@ -7,6 +7,7 @@ mod jam_session;
 mod metronome_overlay;
 mod modifier_legend;
 mod note_shape_material;
+mod note_tail_3d;
 mod phrase_overlay;
 mod results;
 mod scoring;
@@ -46,6 +47,7 @@ impl Plugin for GameplayPlugin {
             metronome_overlay::MetronomePlugin,
             phrase_overlay::PhrasePlugin,
             note_shape_material::NoteShapePlugin,
+            note_tail_3d::NoteTail3dPlugin,
             song_progress_overlay::SongProgressPlugin,
         ))
         .init_resource::<GameplayClock>()
@@ -143,6 +145,8 @@ impl Plugin for GameplayPlugin {
                 Update,
                 (
                     gameplay_3d::update_notes_3d,
+                    gameplay_3d::update_note_visuals_3d,
+                    gameplay_3d::animate_note_tails_3d,
                     gameplay_3d::update_holes_3d,
                     gameplay_3d::groove_harmonica,
                 )
@@ -428,20 +432,6 @@ pub fn modifier_color(m: &crate::song::chart::Modifier) -> Color {
         Hold { .. } => Color::srgb(0.85, 0.85, 0.92),
         Overblow => Color::srgb(0.32, 0.88, 0.62),
         Overdraw => Color::srgb(0.96, 0.55, 0.30),
-    }
-}
-
-/// Short badge abbreviation for a modifier, shared by the note badges and the
-/// HUD legend so the two never drift apart.
-pub fn modifier_abbrev(m: &crate::song::chart::Modifier) -> &'static str {
-    use crate::song::chart::Modifier::*;
-    match m {
-        Bend { .. } => "\u{266D}",
-        Vibrato { .. } => "vib",
-        WahWah { .. } => "wah",
-        Hold { .. } => "hold",
-        Overblow => "ob",
-        Overdraw => "od",
     }
 }
 
