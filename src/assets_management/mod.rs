@@ -36,16 +36,32 @@ impl Default for SelectedHarmonicaModel {
     }
 }
 
-/// Note-drawing themes found under `assets/notes/<name>.png` (each paired with a
-/// `<name>.json` describing its comet tail). The string is the bare `<name>`.
+/// 2D note themes found under `assets/notes/2d/<name>.png` (each paired with a
+/// `<name>.json` tail layout). The string is the bare `<name>`.
 #[derive(Resource, Default)]
-pub struct AvailableNoteThemes(pub Vec<String>);
+pub struct AvailableNoteThemes2d(pub Vec<String>);
 
-/// The currently selected note theme (`<name>` of an `assets/notes/<name>.png`).
+/// 3D note themes found under `assets/notes/3d/<name>.glb` (each paired with a
+/// `<name>.json` cube layout). The string is the bare `<name>`.
+#[derive(Resource, Default)]
+pub struct AvailableNoteThemes3d(pub Vec<String>);
+
+/// The currently selected 2D note theme. 2D and 3D themes are chosen separately
+/// since the available drawings differ between the two views.
 #[derive(Resource)]
-pub struct SelectedNoteTheme(pub String);
+pub struct SelectedNoteTheme2d(pub String);
 
-impl Default for SelectedNoteTheme {
+impl Default for SelectedNoteTheme2d {
+    fn default() -> Self {
+        Self("circular".into())
+    }
+}
+
+/// The currently selected 3D note theme (the cube/glTF head).
+#[derive(Resource)]
+pub struct SelectedNoteTheme3d(pub String);
+
+impl Default for SelectedNoteTheme3d {
     fn default() -> Self {
         Self("circular".into())
     }
@@ -56,8 +72,10 @@ impl Plugin for AssetsManagementPlugin {
         app.init_resource::<AvailableSongs>()
             .init_resource::<AvailableHarmonicas>()
             .init_resource::<SelectedHarmonicaModel>()
-            .init_resource::<AvailableNoteThemes>()
-            .init_resource::<SelectedNoteTheme>()
+            .init_resource::<AvailableNoteThemes2d>()
+            .init_resource::<AvailableNoteThemes3d>()
+            .init_resource::<SelectedNoteTheme2d>()
+            .init_resource::<SelectedNoteTheme3d>()
             .add_systems(
                 Startup,
                 (
@@ -70,29 +88,34 @@ impl Plugin for AssetsManagementPlugin {
     }
 }
 
-fn scan_note_themes(mut available: ResMut<AvailableNoteThemes>) {
-    let root = std::path::Path::new("assets/notes/2d");
-    let Ok(entries) = std::fs::read_dir(root) else {
-        warn!("No note themes directory at assets/notes/2d/");
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        // A theme is a `<name>.png`; skip editor backups like `circular.png~`.
-        if path.extension().and_then(|e| e.to_str()) != Some("png") {
-            continue;
-        }
-        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-            available.0.push(stem.to_owned());
-        }
-    }
-    available.0.sort_unstable();
-    available.0.dedup();
+fn scan_note_themes(
+    mut available_2d: ResMut<AvailableNoteThemes2d>,
+    mut available_3d: ResMut<AvailableNoteThemes3d>,
+) {
+    available_2d.0 = scan_theme_dir("assets/notes/2d", "png");
+    available_3d.0 = scan_theme_dir("assets/notes/3d", "glb");
     info!(
-        "Found {} note theme(s): {:?}",
-        available.0.len(),
-        available.0
+        "Found note themes — 2D: {:?}  3D: {:?}",
+        available_2d.0, available_3d.0
     );
+}
+
+/// Collects the `<name>` stems of files with `ext` directly under `dir`.
+fn scan_theme_dir(dir: &str, ext: &str) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        warn!("No note themes directory at {dir}/");
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
+        .flatten()
+        .map(|e| e.path())
+        // Match the exact extension; skips editor backups like `circular.png~`.
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some(ext))
+        .filter_map(|p| p.file_stem().and_then(|s| s.to_str()).map(str::to_owned))
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    names
 }
 
 fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {

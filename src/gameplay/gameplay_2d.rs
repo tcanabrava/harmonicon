@@ -35,7 +35,7 @@ pub fn setup(
     mut shape_materials: ResMut<Assets<NoteShapeMaterial>>,
     fonts: Res<GlobalFonts>,
     asset_server: Res<AssetServer>,
-    note_theme: Res<crate::assets_management::SelectedNoteTheme>,
+    note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");

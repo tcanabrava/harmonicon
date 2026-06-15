@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    assets_management::{GlobalFonts, SelectedHarmonicaModel, SelectedNoteTheme},
+    assets_management::{GlobalFonts, SelectedHarmonicaModel, SelectedNoteTheme3d},
     menu::SelectedSong,
     song::SongManifest,
     song::chart::{Action, HarpChart},
@@ -405,7 +405,7 @@ pub fn setup(
     selected_model: Res<SelectedHarmonicaModel>,
     shape_materials: ResMut<Assets<NoteShapeMaterial>>,
     mut tail_materials: ResMut<Assets<NoteTail3dMaterial>>,
-    note_theme: Res<SelectedNoteTheme>,
+    note_theme: Res<SelectedNoteTheme3d>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
 ) {
     let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {

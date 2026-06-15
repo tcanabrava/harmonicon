@@ -4,11 +4,13 @@ use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
 use crate::assets_management::AvailableHarmonicas;
-use crate::assets_management::AvailableNoteThemes;
+use crate::assets_management::AvailableNoteThemes2d;
+use crate::assets_management::AvailableNoteThemes3d;
 use crate::assets_management::AvailableSongs;
 use crate::assets_management::GlobalFonts;
 use crate::assets_management::SelectedHarmonicaModel;
-use crate::assets_management::SelectedNoteTheme;
+use crate::assets_management::SelectedNoteTheme2d;
+use crate::assets_management::SelectedNoteTheme3d;
 use crate::song::SongManifest;
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
@@ -133,11 +135,15 @@ struct SliderFill(VolumeSlider);
 #[derive(Component)]
 struct SliderValueLabel(VolumeSlider);
 
-/// A note-theme choice button on the Options page; carries the theme name. Kept
-/// separate from `MenuButton` so its highlight reflects the current selection
-/// instead of the generic hover styling.
+/// A 2D note-theme choice button on the Options page; carries the theme name.
+/// Kept separate from `MenuButton` so its highlight reflects the current
+/// selection instead of the generic hover styling.
 #[derive(Component)]
-struct ThemeButton(String);
+struct NoteTheme2dButton(String);
+
+/// A 3D note-theme choice button on the Options page; carries the theme name.
+#[derive(Component)]
+struct NoteTheme3dButton(String);
 
 /// A harmonica-model choice button on the Options page; carries the model name.
 #[derive(Component)]
@@ -172,8 +178,10 @@ impl Plugin for MenuPlugin {
                 (
                     drag_sliders,
                     update_sliders,
-                    handle_theme_buttons,
-                    theme_button_visuals,
+                    handle_theme_buttons_2d,
+                    theme_button_visuals_2d,
+                    handle_theme_buttons_3d,
+                    theme_button_visuals_3d,
                     handle_harmonica_buttons,
                     harmonica_button_visuals,
                 )
@@ -413,7 +421,8 @@ fn setup_options_menu(
     mut commands: Commands,
     font: Res<GlobalFonts>,
     settings: Res<AudioSettings>,
-    themes: Res<AvailableNoteThemes>,
+    themes_2d: Res<AvailableNoteThemes2d>,
+    themes_3d: Res<AvailableNoteThemes3d>,
     harmonicas: Res<AvailableHarmonicas>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"));
@@ -434,8 +443,11 @@ fn setup_options_menu(
         settings.metronome_volume,
     );
 
-    spawn_selector_row(&mut commands, root, &font.gameplay, "Note theme", &themes.0, |name| {
-        ThemeButton(name.to_string())
+    spawn_selector_row(&mut commands, root, &font.gameplay, "2D notes", &themes_2d.0, |name| {
+        NoteTheme2dButton(name.to_string())
+    });
+    spawn_selector_row(&mut commands, root, &font.gameplay, "3D notes", &themes_3d.0, |name| {
+        NoteTheme3dButton(name.to_string())
     });
     spawn_selector_row(&mut commands, root, &font.gameplay, "Harmonica", &harmonicas.0, |name| {
         HarmonicaButton(name.to_string())
@@ -451,8 +463,8 @@ fn setup_options_menu(
 }
 
 /// A labelled row of selectable choice buttons, one per option. `make` attaches
-/// the marker component (e.g. `ThemeButton`) carrying the option name; the live
-/// selection highlight is applied by the matching `*_button_visuals` system.
+/// the marker component (e.g. `NoteTheme2dButton`) carrying the option name; the
+/// live selection highlight is applied by the matching `*_button_visuals` system.
 fn spawn_selector_row<M: Bundle>(
     commands: &mut Commands,
     parent: Entity,
@@ -511,10 +523,10 @@ fn spawn_selector_row<M: Bundle>(
     commands.entity(parent).add_child(row);
 }
 
-/// Apply a clicked theme button to the selected-theme resource.
-fn handle_theme_buttons(
-    buttons: Query<(&Interaction, &ThemeButton), Changed<Interaction>>,
-    mut selected: ResMut<SelectedNoteTheme>,
+/// Apply a clicked 2D-theme button to the selected 2D-theme resource.
+fn handle_theme_buttons_2d(
+    buttons: Query<(&Interaction, &NoteTheme2dButton), Changed<Interaction>>,
+    mut selected: ResMut<SelectedNoteTheme2d>,
 ) {
     for (interaction, button) in &buttons {
         if *interaction == Interaction::Pressed {
@@ -523,10 +535,32 @@ fn handle_theme_buttons(
     }
 }
 
-/// Highlight the selected theme button; the rest follow normal hover styling.
-fn theme_button_visuals(
-    selected: Res<SelectedNoteTheme>,
-    mut buttons: Query<(&Interaction, &ThemeButton, &mut BackgroundColor)>,
+/// Highlight the selected 2D-theme button; the rest follow normal hover styling.
+fn theme_button_visuals_2d(
+    selected: Res<SelectedNoteTheme2d>,
+    mut buttons: Query<(&Interaction, &NoteTheme2dButton, &mut BackgroundColor)>,
+) {
+    for (interaction, button, mut bg) in &mut buttons {
+        *bg = BackgroundColor(choice_button_color(button.0 == selected.0, interaction));
+    }
+}
+
+/// Apply a clicked 3D-theme button to the selected 3D-theme resource.
+fn handle_theme_buttons_3d(
+    buttons: Query<(&Interaction, &NoteTheme3dButton), Changed<Interaction>>,
+    mut selected: ResMut<SelectedNoteTheme3d>,
+) {
+    for (interaction, button) in &buttons {
+        if *interaction == Interaction::Pressed {
+            selected.0 = button.0.clone();
+        }
+    }
+}
+
+/// Highlight the selected 3D-theme button; the rest follow normal hover styling.
+fn theme_button_visuals_3d(
+    selected: Res<SelectedNoteTheme3d>,
+    mut buttons: Query<(&Interaction, &NoteTheme3dButton, &mut BackgroundColor)>,
 ) {
     for (interaction, button, mut bg) in &mut buttons {
         *bg = BackgroundColor(choice_button_color(button.0 == selected.0, interaction));
