@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::prelude::*;
+use bevy::asset::RenderAssetUsages;
+use bevy::camera::RenderTarget;
+use bevy::camera::visibility::RenderLayers;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use bevy::ui::RelativeCursorPosition;
 
 use crate::assets_management::AvailableHarmonicas;
@@ -149,6 +153,12 @@ struct NoteTheme3dButton(String);
 #[derive(Component)]
 struct HarmonicaButton(String);
 
+/// Marks a preview scene root (a `WorldAssetRoot`); the propagation system forces
+/// this `RenderLayers` onto all its descendants, since glTF scene children don't
+/// inherit it and would otherwise be invisible to the preview camera.
+#[derive(Component)]
+struct PreviewSceneLayer(RenderLayers);
+
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 impl Plugin for MenuPlugin {
@@ -184,6 +194,7 @@ impl Plugin for MenuPlugin {
                     theme_button_visuals_3d,
                     handle_harmonica_buttons,
                     harmonica_button_visuals,
+                    propagate_preview_layers,
                 )
                     .run_if(in_state(MenuPage::Options)),
             )
@@ -424,6 +435,9 @@ fn setup_options_menu(
     themes_2d: Res<AvailableNoteThemes2d>,
     themes_3d: Res<AvailableNoteThemes3d>,
     harmonicas: Res<AvailableHarmonicas>,
+    asset_server: Res<AssetServer>,
+    mut images: ResMut<Assets<Image>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"));
     spawn_volume_slider(
@@ -443,14 +457,66 @@ fn setup_options_menu(
         settings.metronome_volume,
     );
 
-    spawn_selector_row(&mut commands, root, &font.gameplay, "2D notes", &themes_2d.0, |name| {
-        NoteTheme2dButton(name.to_string())
+    // The blow-note tint, so the previews read like an in-game note.
+    let blow = Color::srgb(0.25, 0.55, 0.95);
+
+    // 2D previews: the theme PNG, tinted directly in the UI image.
+    let previews_2d: Vec<(Handle<Image>, String)> = themes_2d
+        .0
+        .iter()
+        .map(|t| (asset_server.load(format!("notes/2d/{t}.png")), t.clone()))
+        .collect();
+
+    // 3D previews: the theme's glTF cube rendered (blow-tinted) to a texture, one
+    // per theme on its own render layer, then shown as a UI image.
+    let previews_3d: Vec<(Handle<Image>, String)> = themes_3d
+        .0
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let handle = spawn_theme_3d_preview(
+                &mut commands,
+                &mut images,
+                &mut materials,
+                &asset_server,
+                t,
+                i + 1,
+                blow,
+            );
+            (handle, t.clone())
+        })
+        .collect();
+
+    // Harmonica previews: the model's glTF scene rendered to a texture (its own
+    // materials, no tint). Layers are assigned after the 3D-note layers so the
+    // preview cameras never capture each other's models.
+    let harmonica_base_layer = previews_3d.len() + 1;
+    let previews_harmonica: Vec<(Handle<Image>, String)> = harmonicas
+        .0
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let handle = spawn_harmonica_preview(
+                &mut commands,
+                &mut images,
+                &asset_server,
+                m,
+                harmonica_base_layer + i,
+            );
+            (handle, m.clone())
+        })
+        .collect();
+
+    // 2D previews are tinted here; 3D previews already baked the tint into the
+    // rendered texture, so they're shown untinted (white).
+    spawn_theme_row(&mut commands, root, &font.gameplay, "2D notes", &previews_2d, blow, |n| {
+        NoteTheme2dButton(n.to_string())
     });
-    spawn_selector_row(&mut commands, root, &font.gameplay, "3D notes", &themes_3d.0, |name| {
-        NoteTheme3dButton(name.to_string())
+    spawn_theme_row(&mut commands, root, &font.gameplay, "3D notes", &previews_3d, Color::WHITE, |n| {
+        NoteTheme3dButton(n.to_string())
     });
-    spawn_selector_row(&mut commands, root, &font.gameplay, "Harmonica", &harmonicas.0, |name| {
-        HarmonicaButton(name.to_string())
+    spawn_theme_row(&mut commands, root, &font.gameplay, "Harmonica", &previews_harmonica, Color::WHITE, |n| {
+        HarmonicaButton(n.to_string())
     });
 
     spawn_button(
@@ -462,15 +528,16 @@ fn setup_options_menu(
     );
 }
 
-/// A labelled row of selectable choice buttons, one per option. `make` attaches
-/// the marker component (e.g. `NoteTheme2dButton`) carrying the option name; the
-/// live selection highlight is applied by the matching `*_button_visuals` system.
-fn spawn_selector_row<M: Bundle>(
+/// A labelled row of theme buttons, each showing a preview image above its name.
+/// `tint` colours the preview image (used to blow-tint the 2D PNGs; the 3D
+/// previews bake the tint in, so they pass white).
+fn spawn_theme_row<M: Bundle>(
     commands: &mut Commands,
     parent: Entity,
     font: &FontSource,
     label: &str,
-    options: &[String],
+    previews: &[(Handle<Image>, String)],
+    tint: Color,
     make: impl Fn(&str) -> M,
 ) {
     let row = commands
@@ -496,21 +563,36 @@ fn spawn_selector_row<M: Bundle>(
             },
             TextColor(Color::WHITE),
         ));
-        for option in options {
+        for (image, name) in previews {
             r.spawn((
                 Button,
                 Node {
-                    padding: UiRect::axes(Val::Px(16.0), Val::Px(8.0)),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
+                    row_gap: Val::Px(4.0),
                     ..default()
                 },
                 BackgroundColor(btn_default()),
-                make(option),
+                make(name),
             ))
             .with_children(|b| {
                 b.spawn((
-                    Text::new(option.clone()),
+                    Node {
+                        width: Val::Px(54.0),
+                        height: Val::Px(54.0),
+                        ..default()
+                    },
+                    ImageNode {
+                        image: image.clone(),
+                        color: tint,
+                        ..default()
+                    },
+                ));
+                b.spawn((
+                    Text::new(name.clone()),
                     TextFont {
-                        font_size: FontSize::Px(18.0),
+                        font_size: FontSize::Px(16.0),
                         font: font.clone(),
                         ..default()
                     },
@@ -521,6 +603,172 @@ fn spawn_selector_row<M: Bundle>(
     });
 
     commands.entity(parent).add_child(row);
+}
+
+/// Renders a theme's 3D glTF cube (blow-tinted) to an off-screen texture so it
+/// can be shown in the Options UI. Each preview gets its own render layer + a
+/// camera, cube and light on it; all are `MenuRoot`-tagged so they're cleaned up
+/// when the page changes. Returns the texture handle for the UI image.
+fn spawn_theme_3d_preview(
+    commands: &mut Commands,
+    images: &mut Assets<Image>,
+    materials: &mut Assets<StandardMaterial>,
+    asset_server: &AssetServer,
+    theme: &str,
+    layer: usize,
+    tint: Color,
+) -> Handle<Image> {
+    let size = Extent3d {
+        width: 128,
+        height: 128,
+        depth_or_array_layers: 1,
+    };
+    let mut image = Image::new_fill(
+        size,
+        TextureDimension::D2,
+        &[0, 0, 0, 0],
+        TextureFormat::Bgra8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    image.texture_descriptor.usage =
+        TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT;
+    let handle = images.add(image);
+
+    let layers = RenderLayers::layer(layer);
+
+    // Camera that renders only this layer into the texture, transparent around it.
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
+            clear_color: ClearColorConfig::Custom(Color::NONE),
+            order: -1,
+            ..default()
+        },
+        RenderTarget::from(handle.clone()),
+        Transform::from_xyz(2.0, 1.5, 2.8).looking_at(Vec3::ZERO, Vec3::Y),
+        layers.clone(),
+        MenuRoot,
+    ));
+
+    // The cube head, blow-tinted, posed at a 3/4 angle so its form reads.
+    let mesh: Handle<Mesh> = asset_server.load(format!("notes/3d/{theme}.glb#Mesh0/Primitive0"));
+    let linear = tint.to_linear();
+    let material = materials.add(StandardMaterial {
+        base_color: tint,
+        emissive: LinearRgba::new(linear.red * 0.2, linear.green * 0.2, linear.blue * 0.2, 1.0),
+        ..default()
+    });
+    commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(material),
+        Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, 0.7, 0.5, 0.0)),
+        layers.clone(),
+        MenuRoot,
+    ));
+
+    // A light on the same layer so the cube is shaded rather than flat.
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 6000.0,
+            ..default()
+        },
+        Transform::from_xyz(3.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
+        layers,
+        MenuRoot,
+    ));
+
+    handle
+}
+
+/// Renders a harmonica model's glTF scene to an off-screen texture for the
+/// Options UI. Like the note preview, but the model is a multi-mesh scene with
+/// its own materials, so it's spawned via `WorldAssetRoot` and shown untinted;
+/// `propagate_preview_layers` pushes the render layer onto the scene's children.
+fn spawn_harmonica_preview(
+    commands: &mut Commands,
+    images: &mut Assets<Image>,
+    asset_server: &AssetServer,
+    model: &str,
+    layer: usize,
+) -> Handle<Image> {
+    let size = Extent3d {
+        width: 160,
+        height: 96,
+        depth_or_array_layers: 1,
+    };
+    let mut image = Image::new_fill(
+        size,
+        TextureDimension::D2,
+        &[0, 0, 0, 0],
+        TextureFormat::Bgra8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    image.texture_descriptor.usage =
+        TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT;
+    let handle = images.add(image);
+
+    let layers = RenderLayers::layer(layer);
+
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
+            clear_color: ClearColorConfig::Custom(Color::NONE),
+            order: -1,
+            ..default()
+        },
+        RenderTarget::from(handle.clone()),
+        Transform::from_xyz(0.0, 1.6, 4.2).looking_at(Vec3::ZERO, Vec3::Y),
+        layers.clone(),
+        MenuRoot,
+    ));
+
+    // The model scene, posed at a slight angle. Scene children get the render
+    // layer from `propagate_preview_layers` (they don't inherit it on spawn).
+    commands.spawn((
+        WorldAssetRoot(asset_server.load(format!("harmonicas/3d/{model}/harmonica.glb#Scene0"))),
+        Transform::from_scale(Vec3::splat(0.1))
+            .with_rotation(Quat::from_euler(EulerRot::YXZ, -0.5, 0.35, 0.0)),
+        Visibility::default(),
+        layers.clone(),
+        PreviewSceneLayer(layers.clone()),
+        MenuRoot,
+    ));
+
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 6000.0,
+            ..default()
+        },
+        Transform::from_xyz(3.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
+        layers,
+        MenuRoot,
+    ));
+
+    handle
+}
+
+/// Forces each preview scene's render layer onto all of its descendants. glTF
+/// scene children spawn a frame or two after the root and don't inherit
+/// `RenderLayers`, so without this the preview camera would never see them.
+fn propagate_preview_layers(
+    mut commands: Commands,
+    roots: Query<(Entity, &PreviewSceneLayer)>,
+    children: Query<&Children>,
+    already_layered: Query<(), With<RenderLayers>>,
+) {
+    for (root, layer) in &roots {
+        let mut stack = vec![root];
+        while let Some(entity) = stack.pop() {
+            if let Ok(kids) = children.get(entity) {
+                for child in kids {
+                    if already_layered.get(*child).is_err() {
+                        commands.entity(*child).insert(layer.0.clone());
+                    }
+                    stack.push(*child);
+                }
+            }
+        }
+    }
 }
 
 /// Apply a clicked 2D-theme button to the selected 2D-theme resource.
