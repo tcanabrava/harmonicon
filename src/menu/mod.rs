@@ -3,9 +3,11 @@
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
+use crate::assets_management::AvailableHarmonicas;
 use crate::assets_management::AvailableNoteThemes;
 use crate::assets_management::AvailableSongs;
 use crate::assets_management::GlobalFonts;
+use crate::assets_management::SelectedHarmonicaModel;
 use crate::assets_management::SelectedNoteTheme;
 use crate::song::SongManifest;
 
@@ -137,6 +139,10 @@ struct SliderValueLabel(VolumeSlider);
 #[derive(Component)]
 struct ThemeButton(String);
 
+/// A harmonica-model choice button on the Options page; carries the model name.
+#[derive(Component)]
+struct HarmonicaButton(String);
+
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 impl Plugin for MenuPlugin {
@@ -168,6 +174,8 @@ impl Plugin for MenuPlugin {
                     update_sliders,
                     handle_theme_buttons,
                     theme_button_visuals,
+                    handle_harmonica_buttons,
+                    harmonica_button_visuals,
                 )
                     .run_if(in_state(MenuPage::Options)),
             )
@@ -406,6 +414,7 @@ fn setup_options_menu(
     font: Res<GlobalFonts>,
     settings: Res<AudioSettings>,
     themes: Res<AvailableNoteThemes>,
+    harmonicas: Res<AvailableHarmonicas>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"));
     spawn_volume_slider(
@@ -425,7 +434,12 @@ fn setup_options_menu(
         settings.metronome_volume,
     );
 
-    spawn_theme_selector(&mut commands, root, &font.gameplay, &themes.0);
+    spawn_selector_row(&mut commands, root, &font.gameplay, "Note theme", &themes.0, |name| {
+        ThemeButton(name.to_string())
+    });
+    spawn_selector_row(&mut commands, root, &font.gameplay, "Harmonica", &harmonicas.0, |name| {
+        HarmonicaButton(name.to_string())
+    });
 
     spawn_button(
         &mut commands,
@@ -436,13 +450,16 @@ fn setup_options_menu(
     );
 }
 
-/// A "Note theme" row of selectable buttons, one per discovered theme. The
-/// current selection is shown by `theme_button_visuals`, not the spawn color.
-fn spawn_theme_selector(
+/// A labelled row of selectable choice buttons, one per option. `make` attaches
+/// the marker component (e.g. `ThemeButton`) carrying the option name; the live
+/// selection highlight is applied by the matching `*_button_visuals` system.
+fn spawn_selector_row<M: Bundle>(
     commands: &mut Commands,
     parent: Entity,
     font: &FontSource,
-    themes: &[String],
+    label: &str,
+    options: &[String],
+    make: impl Fn(&str) -> M,
 ) {
     let row = commands
         .spawn(Node {
@@ -459,7 +476,7 @@ fn spawn_theme_selector(
                 width: Val::Px(110.0),
                 ..default()
             },
-            Text::new("Note theme"),
+            Text::new(label.to_string()),
             TextFont {
                 font_size: FontSize::Px(20.0),
                 font: font.clone(),
@@ -467,7 +484,7 @@ fn spawn_theme_selector(
             },
             TextColor(Color::WHITE),
         ));
-        for theme in themes {
+        for option in options {
             r.spawn((
                 Button,
                 Node {
@@ -475,11 +492,11 @@ fn spawn_theme_selector(
                     ..default()
                 },
                 BackgroundColor(btn_default()),
-                ThemeButton(theme.clone()),
+                make(option),
             ))
             .with_children(|b| {
                 b.spawn((
-                    Text::new(theme.clone()),
+                    Text::new(option.clone()),
                     TextFont {
                         font_size: FontSize::Px(18.0),
                         font: font.clone(),
@@ -512,15 +529,43 @@ fn theme_button_visuals(
     mut buttons: Query<(&Interaction, &ThemeButton, &mut BackgroundColor)>,
 ) {
     for (interaction, button, mut bg) in &mut buttons {
-        *bg = BackgroundColor(if button.0 == selected.0 {
-            Color::srgb(0.25, 0.45, 0.30)
-        } else {
-            match interaction {
-                Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
-                Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-                Interaction::None => btn_default(),
-            }
-        });
+        *bg = BackgroundColor(choice_button_color(button.0 == selected.0, interaction));
+    }
+}
+
+/// Apply a clicked harmonica button to the selected-model resource.
+fn handle_harmonica_buttons(
+    buttons: Query<(&Interaction, &HarmonicaButton), Changed<Interaction>>,
+    mut selected: ResMut<SelectedHarmonicaModel>,
+) {
+    for (interaction, button) in &buttons {
+        if *interaction == Interaction::Pressed {
+            selected.0 = button.0.clone();
+        }
+    }
+}
+
+/// Highlight the selected harmonica button; the rest follow normal hover styling.
+fn harmonica_button_visuals(
+    selected: Res<SelectedHarmonicaModel>,
+    mut buttons: Query<(&Interaction, &HarmonicaButton, &mut BackgroundColor)>,
+) {
+    for (interaction, button, mut bg) in &mut buttons {
+        *bg = BackgroundColor(choice_button_color(button.0 == selected.0, interaction));
+    }
+}
+
+/// Background colour for a selector button: a green tint when it's the current
+/// choice, otherwise the usual hover styling.
+fn choice_button_color(selected: bool, interaction: &Interaction) -> Color {
+    if selected {
+        Color::srgb(0.25, 0.45, 0.30)
+    } else {
+        match interaction {
+            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
+            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
+            Interaction::None => btn_default(),
+        }
     }
 }
 
