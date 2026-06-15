@@ -7,6 +7,7 @@ use harmonicon::audio_system::pitch_detect::AudioFrame;
 use harmonicon::audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
 use harmonicon::gameplay::GameplayPlugin;
 use harmonicon::menu::{AppState, MenuPlugin};
+use harmonicon::settings::SettingsPlugin;
 use harmonicon::song::SongPlugin;
 use harmonicon::spectrogram::SpectrogramPlugin;
 
@@ -33,6 +34,7 @@ fn main() {
         MenuPlugin,
         GameplayPlugin,
         SpectrogramPlugin,
+        SettingsPlugin,
     ));
 
     #[cfg(feature = "inspector")]

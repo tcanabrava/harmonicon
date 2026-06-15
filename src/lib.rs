@@ -10,5 +10,6 @@ pub mod assets_management;
 pub mod audio_system;
 pub mod gameplay;
 pub mod menu;
+pub mod settings;
 pub mod song;
 pub mod spectrogram;
