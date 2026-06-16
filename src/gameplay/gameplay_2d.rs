@@ -476,11 +476,14 @@ fn spawn_highway(
                 },
                 ScheduledNote {
                     time: t,
+                    duration: item.duration,
                     hole: event.hole,
                     is_blow,
                     expected_pitch,
                     hit: false,
                     missed: false,
+                    held: 0.0,
+                    sustain_scored: false,
                     modifiers: modifiers.clone(),
                 },
             ))

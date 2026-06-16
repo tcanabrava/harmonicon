@@ -5,6 +5,12 @@ use super::HitQuality;
 pub const PERFECT_POINTS: u32 = 100;
 pub const GOOD_POINTS: u32 = 50;
 
+/// A note must be at least this long (seconds) to be a "sustain" note that
+/// rewards holding the pitch; shorter notes are scored on their onset alone.
+pub const SUSTAIN_MIN_DURATION: f64 = 0.5;
+/// Bonus points per second of a long note actually held.
+pub const SUSTAIN_POINTS_PER_SEC: f64 = 100.0;
+
 /// The outcome of evaluating a scheduled note at a given instant.
 #[derive(Debug, PartialEq)]
 pub enum NoteOutcome {
@@ -66,6 +72,17 @@ pub fn compute_points(quality: HitQuality, multiplier: f32) -> u32 {
     (base as f32 * multiplier) as u32
 }
 
+/// Bonus points for sustaining a long note. `held` is the seconds the expected
+/// pitch was held after the onset; `duration` is the note's length. Notes shorter
+/// than [`SUSTAIN_MIN_DURATION`] aren't sustain notes and earn nothing; held time
+/// is capped at the duration so over-holding can't over-score.
+pub fn sustain_points(held: f64, duration: f64) -> u32 {
+    if duration < SUSTAIN_MIN_DURATION {
+        return 0;
+    }
+    (held.clamp(0.0, duration) * SUSTAIN_POINTS_PER_SEC).round() as u32
+}
+
 /// True when the combo should reset due to inactivity.
 pub fn should_decay_combo(
     combo: u32,
@@ -98,6 +115,32 @@ pub fn combo_label(combo: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── sustain_points ────────────────────────────────────────────────────────
+
+    #[test]
+    fn short_notes_earn_no_sustain() {
+        // Below the threshold: it's an onset-only note.
+        assert_eq!(sustain_points(0.3, 0.3), 0);
+    }
+
+    #[test]
+    fn fully_held_long_note_scores_full_duration() {
+        // 1.6 s held fully → 160 points at 100 pts/s.
+        assert_eq!(sustain_points(1.6, 1.6), 160);
+    }
+
+    #[test]
+    fn partial_hold_scores_proportionally() {
+        // Held half of a 2 s note → 100 points.
+        assert_eq!(sustain_points(1.0, 2.0), 100);
+    }
+
+    #[test]
+    fn over_holding_is_capped_at_duration() {
+        // Holding past the note's end can't score beyond the full duration.
+        assert_eq!(sustain_points(5.0, 1.0), 100);
+    }
 
     // ── classify_note ─────────────────────────────────────────────────────────
 

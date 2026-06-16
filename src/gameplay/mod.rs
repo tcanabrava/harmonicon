@@ -18,6 +18,7 @@ mod twelve_bar_blues_overlay;
 use bevy::prelude::*;
 use scoring::{
     NoteOutcome, classify_note, combo_label, compute_multiplier, compute_points, should_decay_combo,
+    sustain_points,
 };
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -281,12 +282,18 @@ pub struct NoteVisual {
 #[derive(Component)]
 pub struct ScheduledNote {
     pub time: f64,
+    /// Note length in seconds; long notes reward sustaining the pitch.
+    pub duration: f64,
     pub hole: u8,
     pub is_blow: bool,
     /// The pitch string (e.g. "C4") this note expects, pre-computed at spawn.
     pub expected_pitch: String,
     pub hit: bool,
     pub missed: bool,
+    /// Seconds the expected pitch has been held since the onset was hit.
+    pub held: f64,
+    /// Set once the sustain window has closed and its bonus was awarded.
+    pub sustain_scored: bool,
     /// Technique modifiers from the chart (bend, vibrato, etc.).
     /// Used to trigger fx sounds when the note is hit.
     pub modifiers: Vec<Modifier>,
@@ -562,6 +569,8 @@ fn handle_loop_boundary(
         if note.time >= loop_cfg.start_time && note.time <= loop_cfg.end_time {
             note.hit = false;
             note.missed = false;
+            note.held = 0.0;
+            note.sustain_scored = false;
         }
     }
 }
@@ -594,6 +603,7 @@ fn update_active_targets(
 
 fn score_notes(
     clock: Res<GameplayClock>,
+    time: Res<Time>,
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
@@ -607,6 +617,7 @@ fn score_notes(
     if clock.0 < 0.0 {
         return;
     }
+    let dt = time.delta_secs_f64();
 
     if config.combo_enabled
         && should_decay_combo(score.combo, clock.0, score.last_hit_time, config.decay_secs)
@@ -626,7 +637,26 @@ fn score_notes(
     gate.release_absent(&harp_pitches);
 
     for mut note in &mut notes {
-        if note.hit || note.missed {
+        if note.missed {
+            continue;
+        }
+
+        // Already-hit notes are in their sustain phase: reward holding the pitch
+        // through the note's length, then award the bonus once when it ends.
+        if note.hit {
+            if note.sustain_scored {
+                continue;
+            }
+            if clock.0 < note.time + note.duration {
+                // The held pitch stays "consumed" by the gate, so checking the
+                // raw detected set keeps crediting this same note's sustain.
+                if harp_pitches.contains(&note.expected_pitch) {
+                    note.held += dt;
+                }
+            } else {
+                score.points += sustain_points(note.held, note.duration);
+                note.sustain_scored = true;
+            }
             continue;
         }
 
