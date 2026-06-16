@@ -505,8 +505,8 @@ fn setup_scoring_config(
 
     // Set up loop section if the chart requests repeat playback.
     *loop_cfg = LoopConfig::default();
-    if let Some(ls) = &chart.loop_section {
-        if ls.repeat == Some(true) {
+    if let Some(ls) = &chart.loop_section
+        && ls.repeat == Some(true) {
             let track = &chart.track;
             let si = ls.start_index;
             let ei = ls.end_index;
@@ -530,7 +530,6 @@ fn setup_scoring_config(
                 );
             }
         }
-    }
 
     // Song end = last note's end + a tail, so the results screen appears once the
     // content finishes. Looping songs never end.
@@ -542,9 +541,7 @@ fn setup_scoring_config(
 
     // Resolve fx_mapping: modifier name → DSP effect processor name.
     fx_mapping.0 = chart
-        .fx_mapping
-        .as_ref()
-        .map(|m| m.clone())
+        .fx_mapping.clone()
         .unwrap_or_default();
 
     info!(

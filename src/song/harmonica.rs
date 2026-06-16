@@ -148,11 +148,9 @@ impl Harmonica {
             Harmonica::Chromatic {
                 layout: Some(l), ..
             } => {
-                for opt in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide] {
-                    if let Some(notes) = opt {
-                        for n in notes {
-                            set.insert(n.clone());
-                        }
+                for notes in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide].into_iter().flatten() {
+                    for n in notes {
+                        set.insert(n.clone());
                     }
                 }
             }

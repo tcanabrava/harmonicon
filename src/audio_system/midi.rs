@@ -37,7 +37,7 @@ pub fn midi_to_note(midi: i32) -> String {
     const NAMES: [&str; 12] = [
         "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
     ];
-    let semitone = ((midi % 12) + 12) % 12;
+    let semitone = midi.rem_euclid(12);
     let octave = midi / 12 - 1;
     format!("{}{}", NAMES[semitone as usize], octave)
 }

@@ -268,8 +268,8 @@ fn map_pitch(target: u8, blow: &HashMap<u8, u8>, draw: &HashMap<u8, u8>) -> Mapp
     }
     // Draw bend: holes 1..=6 can bend the draw note down by 1..=3 semitones.
     for k in 1..=3u8 {
-        if let Some(&hole) = draw.get(&(target + k)) {
-            if (1..=6).contains(&hole) {
+        if let Some(&hole) = draw.get(&(target + k))
+            && (1..=6).contains(&hole) {
                 return Mapped {
                     hole,
                     action: "draw",
@@ -277,12 +277,11 @@ fn map_pitch(target: u8, blow: &HashMap<u8, u8>, draw: &HashMap<u8, u8>) -> Mapp
                     bend: Some(-(k as i32)),
                 };
             }
-        }
     }
     // Blow bend: high holes 8..=10 can bend the blow note down.
     for k in 1..=3u8 {
-        if let Some(&hole) = blow.get(&(target + k)) {
-            if (8..=10).contains(&hole) {
+        if let Some(&hole) = blow.get(&(target + k))
+            && (8..=10).contains(&hole) {
                 return Mapped {
                     hole,
                     action: "blow",
@@ -290,7 +289,6 @@ fn map_pitch(target: u8, blow: &HashMap<u8, u8>, draw: &HashMap<u8, u8>) -> Mapp
                     bend: Some(-(k as i32)),
                 };
             }
-        }
     }
     // Fallback: snap to the nearest playable natural note.
     let mut best_action = "blow";
