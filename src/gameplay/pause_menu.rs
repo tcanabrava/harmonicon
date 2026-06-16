@@ -170,3 +170,83 @@ pub(super) fn pause_button_hover(
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A fresh keyboard with Escape registered as just-pressed this frame.
+    fn escape_down() -> ButtonInput<KeyCode> {
+        let mut keys = ButtonInput::<KeyCode>::default();
+        keys.press(KeyCode::Escape);
+        keys
+    }
+
+    #[test]
+    fn escape_pauses_then_resumes() {
+        let mut world = World::new();
+        world.insert_resource(Paused(false));
+        world.insert_resource(escape_down());
+        let overlay = world.spawn((PauseMenuRoot, Visibility::Hidden)).id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(handle_pause_input);
+
+        // First Escape: pause + show overlay.
+        schedule.run(&mut world);
+        assert!(world.resource::<Paused>().0, "Escape should pause");
+        assert_eq!(*world.get::<Visibility>(overlay).unwrap(), Visibility::Visible);
+
+        // Second (fresh) Escape: resume + hide overlay.
+        world.insert_resource(escape_down());
+        schedule.run(&mut world);
+        assert!(!world.resource::<Paused>().0, "Escape again should resume");
+        assert_eq!(*world.get::<Visibility>(overlay).unwrap(), Visibility::Hidden);
+    }
+
+    fn world_with_pause_button(button: PauseButton) -> World {
+        let mut world = World::new();
+        world.insert_resource(Paused(true));
+        world.insert_resource(ReturnToSongList(false));
+        world.insert_resource(NextState::<AppState>::Unchanged);
+        world.spawn((PauseMenuRoot, Visibility::Visible));
+        world.spawn((Interaction::Pressed, button));
+        world
+    }
+
+    fn run_pause_buttons(world: &mut World) {
+        let mut schedule = Schedule::default();
+        schedule.add_systems(handle_pause_buttons);
+        schedule.run(world);
+    }
+
+    fn pending_state(world: &World) -> Option<AppState> {
+        match world.resource::<NextState<AppState>>() {
+            NextState::Pending(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn resume_button_unpauses_without_changing_state() {
+        let mut world = world_with_pause_button(PauseButton::Resume);
+        run_pause_buttons(&mut world);
+        assert!(!world.resource::<Paused>().0);
+        assert_eq!(pending_state(&world), None, "Resume stays in gameplay");
+    }
+
+    #[test]
+    fn restart_button_reloads_the_song() {
+        let mut world = world_with_pause_button(PauseButton::Restart);
+        run_pause_buttons(&mut world);
+        assert_eq!(pending_state(&world), Some(AppState::SongLoading));
+    }
+
+    #[test]
+    fn quit_song_returns_to_the_song_list() {
+        let mut world = world_with_pause_button(PauseButton::QuitSong);
+        run_pause_buttons(&mut world);
+        assert_eq!(pending_state(&world), Some(AppState::Menu));
+        assert!(world.resource::<ReturnToSongList>().0, "should land on the song list");
+    }
+}

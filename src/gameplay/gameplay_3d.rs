@@ -942,5 +942,31 @@ mod tests {
         assert_eq!(note_depth(0.0), 0.4); // tiny notes keep a visible minimum
         assert_eq!(note_depth(100.0), 12.0); // long notes are capped
     }
+
+    #[test]
+    fn leaving_3d_restores_the_2d_camera() {
+        // While in 3D the shared Camera2d is pushed behind (order 1) and stops
+        // clearing; restore_camera must return it to the menu's defaults.
+        let mut world = World::new();
+        let cam = world
+            .spawn((
+                Camera2d,
+                Camera {
+                    order: 1,
+                    clear_color: ClearColorConfig::None,
+                    ..default()
+                },
+                Transform::default(),
+            ))
+            .id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(restore_camera);
+        schedule.run(&mut world);
+
+        let camera = world.get::<Camera>(cam).unwrap();
+        assert_eq!(camera.order, 0);
+        assert!(matches!(camera.clear_color, ClearColorConfig::Default));
+    }
 }
 

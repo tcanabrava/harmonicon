@@ -341,6 +341,42 @@ fn setup_mode_select(mut commands: Commands, font: Res<GlobalFonts>) {
 
 // ── Input + hover ─────────────────────────────────────────────────────────────
 
+/// Where a menu button leads. Separated from the side effects (mode/artist/song
+/// selection) so the navigation graph — which page each action opens and which
+/// parent each "Back" closes to — is a pure, testable function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum MenuNav {
+    /// Switch to another menu page.
+    To(MenuPage),
+    /// Leave the menu for an app state (start loading the chosen song).
+    Enter(AppState),
+    /// Quit the game.
+    Quit,
+    /// Do nothing (e.g. unimplemented Credits).
+    Stay,
+}
+
+/// The navigation a button triggers. Forward buttons open deeper pages; `Back*`
+/// buttons close to the correct parent.
+pub(super) fn menu_nav(button: &MenuButton) -> MenuNav {
+    match button {
+        MenuButton::Play => MenuNav::To(MenuPage::Play),
+        MenuButton::Options => MenuNav::To(MenuPage::Options),
+        MenuButton::Credits => MenuNav::Stay,
+        MenuButton::Quit => MenuNav::Quit,
+        // The render mode is chosen up front, before picking a song.
+        MenuButton::PlaySong => MenuNav::To(MenuPage::ModeSelect),
+        MenuButton::JamSession => MenuNav::To(MenuPage::ArtistList),
+        MenuButton::PlayMode2D | MenuButton::PlayMode3D => MenuNav::To(MenuPage::ArtistList),
+        MenuButton::Artist(_) => MenuNav::To(MenuPage::SongList),
+        // The mode is already chosen — picking a song starts the game.
+        MenuButton::Song(_) => MenuNav::Enter(AppState::SongLoading),
+        MenuButton::BackToMain => MenuNav::To(MenuPage::Main),
+        MenuButton::BackToPlay => MenuNav::To(MenuPage::Play),
+        MenuButton::BackToArtistList => MenuNav::To(MenuPage::ArtistList),
+    }
+}
+
 fn handle_menu_input(
     buttons: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
     mut next_page: ResMut<NextState<MenuPage>>,
@@ -355,40 +391,26 @@ fn handle_menu_input(
         if *interaction != Interaction::Pressed {
             continue;
         }
+
+        // Selections that accompany a navigation.
         match button {
-            MenuButton::Play => next_page.set(MenuPage::Play),
-            MenuButton::Options => next_page.set(MenuPage::Options),
-            MenuButton::Credits => { /* TODO */ }
-            MenuButton::Quit => {
+            MenuButton::JamSession => *gameplay_mode = GameplayMode::JamSession,
+            MenuButton::PlayMode2D => *gameplay_mode = GameplayMode::Play2D,
+            MenuButton::PlayMode3D => *gameplay_mode = GameplayMode::Play3D,
+            MenuButton::Artist(a) => selected_artist.0 = a.clone(),
+            MenuButton::Song(path) => {
+                commands.insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
+            }
+            _ => {}
+        }
+
+        match menu_nav(button) {
+            MenuNav::To(page) => next_page.set(page),
+            MenuNav::Enter(state) => next_state.set(state),
+            MenuNav::Quit => {
                 app_exit.write(AppExit::Success);
             }
-            // The render mode is chosen up front, before picking a song.
-            MenuButton::PlaySong => next_page.set(MenuPage::ModeSelect),
-            MenuButton::JamSession => {
-                *gameplay_mode = GameplayMode::JamSession;
-                next_page.set(MenuPage::ArtistList);
-            }
-            MenuButton::PlayMode2D => {
-                *gameplay_mode = GameplayMode::Play2D;
-                next_page.set(MenuPage::ArtistList);
-            }
-            MenuButton::PlayMode3D => {
-                *gameplay_mode = GameplayMode::Play3D;
-                next_page.set(MenuPage::ArtistList);
-            }
-            MenuButton::Artist(a) => {
-                selected_artist.0 = a.clone();
-                next_page.set(MenuPage::SongList);
-            }
-            // The mode is already chosen — picking a song starts the game.
-            MenuButton::Song(path) => {
-                let handle = asset_server.load::<SongManifest>(path.clone());
-                commands.insert_resource(SelectedSong(handle));
-                next_state.set(AppState::SongLoading);
-            }
-            MenuButton::BackToMain => next_page.set(MenuPage::Main),
-            MenuButton::BackToPlay => next_page.set(MenuPage::Play),
-            MenuButton::BackToArtistList => next_page.set(MenuPage::ArtistList),
+            MenuNav::Stay => {}
         }
     }
 }
@@ -437,5 +459,72 @@ fn route_menu_entry(
     if ret.0 {
         ret.0 = false;
         next_page.set(MenuPage::SongList);
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::state::app::StatesPlugin;
+
+    #[test]
+    fn navigation_graph_opens_and_closes_to_the_right_pages() {
+        use MenuButton::*;
+        // Forward — each action opens the next page down the hierarchy.
+        assert_eq!(menu_nav(&Play), MenuNav::To(MenuPage::Play));
+        assert_eq!(menu_nav(&Options), MenuNav::To(MenuPage::Options));
+        assert_eq!(menu_nav(&PlaySong), MenuNav::To(MenuPage::ModeSelect));
+        assert_eq!(menu_nav(&PlayMode2D), MenuNav::To(MenuPage::ArtistList));
+        assert_eq!(menu_nav(&PlayMode3D), MenuNav::To(MenuPage::ArtistList));
+        assert_eq!(menu_nav(&JamSession), MenuNav::To(MenuPage::ArtistList));
+        assert_eq!(menu_nav(&Artist("x".into())), MenuNav::To(MenuPage::SongList));
+        assert_eq!(menu_nav(&Song("p".into())), MenuNav::Enter(AppState::SongLoading));
+        // Back — each closes to its correct parent.
+        assert_eq!(menu_nav(&BackToArtistList), MenuNav::To(MenuPage::ArtistList));
+        assert_eq!(menu_nav(&BackToPlay), MenuNav::To(MenuPage::Play));
+        assert_eq!(menu_nav(&BackToMain), MenuNav::To(MenuPage::Main));
+        // Terminal actions.
+        assert_eq!(menu_nav(&Quit), MenuNav::Quit);
+        assert_eq!(menu_nav(&Credits), MenuNav::Stay);
+    }
+
+    // Records page enter/exit so the close-then-open order can be asserted.
+    #[derive(Resource, Default)]
+    struct PageLog(Vec<String>);
+
+    fn track_page(app: &mut App, page: MenuPage, label: &'static str) {
+        app.add_systems(
+            OnEnter(page.clone()),
+            move |mut log: ResMut<PageLog>| log.0.push(format!("enter {label}")),
+        );
+        app.add_systems(
+            OnExit(page),
+            move |mut log: ResMut<PageLog>| log.0.push(format!("exit {label}")),
+        );
+    }
+
+    #[test]
+    fn changing_page_exits_the_old_before_entering_the_new() {
+        let mut app = App::new();
+        app.add_plugins(StatesPlugin)
+            .init_state::<AppState>()
+            .add_sub_state::<MenuPage>()
+            .init_resource::<PageLog>();
+        track_page(&mut app, MenuPage::Main, "Main");
+        track_page(&mut app, MenuPage::Play, "Play");
+
+        // Enter the menu → its default page (Main) opens.
+        app.world_mut().resource_mut::<NextState<AppState>>().set(AppState::Menu);
+        app.update();
+        // Open Play (Main must close first), then go Back to Main (Play closes).
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::Play);
+        app.update();
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::Main);
+        app.update();
+
+        let log = &app.world().resource::<PageLog>().0;
+        assert_eq!(
+            log,
+            &["enter Main", "exit Main", "enter Play", "exit Play", "enter Main"],
+        );
     }
 }

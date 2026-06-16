@@ -1064,4 +1064,24 @@ mod tests {
     fn style_bonus_is_zero_without_modifiers() {
         assert_eq!(style_bonus_points(&[], &bonus_table()), 0.0);
     }
+
+    // ── cleanup_gameplay ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn cleanup_despawns_only_gameplay_entities() {
+        // Leaving Playing must tear down the scene (every `GameplayRoot`) while
+        // leaving unrelated entities (e.g. the persistent camera) untouched.
+        let mut world = World::new();
+        let scene_a = world.spawn(GameplayRoot).id();
+        let scene_b = world.spawn((GameplayRoot, Transform::default())).id();
+        let keep = world.spawn_empty().id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(cleanup_gameplay);
+        schedule.run(&mut world);
+
+        assert!(!world.entities().contains(scene_a), "GameplayRoot should be despawned");
+        assert!(!world.entities().contains(scene_b), "GameplayRoot should be despawned");
+        assert!(world.entities().contains(keep), "unrelated entities must survive");
+    }
 }
