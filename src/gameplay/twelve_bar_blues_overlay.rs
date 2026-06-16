@@ -150,3 +150,22 @@ impl Plugin for TwelveBarBluesPlugin {
         );
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bar_bg_colours_the_one_four_five_chords_distinctly() {
+        // C 12-bar: bars are [I,I,I,I,IV,IV,I,I,V,IV,I,V] (0-indexed).
+        let i = bar_bg(0, "C"); // tonic
+        let iv = bar_bg(4, "C"); // subdominant
+        let v = bar_bg(8, "C"); // dominant
+        assert_ne!(i, iv);
+        assert_ne!(i, v);
+        assert_ne!(iv, v);
+        // The last bar is also the V chord, so it shares the dominant colour.
+        assert_eq!(bar_bg(11, "C"), v);
+        // The IV bars share the subdominant colour.
+        assert_eq!(bar_bg(9, "C"), iv);
+    }
+}

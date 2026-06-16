@@ -913,3 +913,34 @@ pub fn restore_camera(mut cameras: Query<(&mut Camera, &mut Transform), With<Cam
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lanes_are_centered_and_ordered() {
+        // The ten lanes straddle x = 0 symmetrically.
+        assert!((lane_x(1) + lane_x(HOLE_COUNT as u8)).abs() < 1e-6);
+        // ...and march left-to-right with hole number.
+        assert!(lane_x(2) > lane_x(1));
+        assert!(lane_x(HOLE_COUNT as u8) > lane_x(1));
+    }
+
+    #[test]
+    fn lane_spacing_is_one_lane_width() {
+        assert!((lane_x(2) - lane_x(1) - LANE_WIDTH).abs() < 1e-6);
+    }
+
+    #[test]
+    fn note_depth_scales_with_duration() {
+        // Half a lookahead of duration is proportional, inside the clamp band.
+        assert!((note_depth(0.3) - 6.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn note_depth_is_clamped() {
+        assert_eq!(note_depth(0.0), 0.4); // tiny notes keep a visible minimum
+        assert_eq!(note_depth(100.0), 12.0); // long notes are capped
+    }
+}
+

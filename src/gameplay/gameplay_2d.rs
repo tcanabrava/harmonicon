@@ -874,4 +874,68 @@ mod tests {
         assert_eq!(play_mode_label(Some(&PlayMode::Single)), None);
         assert_eq!(play_mode_label(None), None);
     }
+
+    // ── note_techniques ───────────────────────────────────────────────────────
+
+    #[test]
+    fn techniques_extract_each_dimension() {
+        let mods = [
+            Modifier::Vibrato { oscillation_hz: 5.0, intensity: Some(0.8) },
+            Modifier::Bend { semitones: -2.0, intensity: None },
+            Modifier::WahWah { oscillation_hz: 3.0, intensity: Some(0.4) },
+        ];
+        let (vib, shift, wah) = note_techniques(Some(&mods));
+        assert_eq!(vib, Some(0.8));
+        assert_eq!(shift, Some(-2.0));
+        assert_eq!(wah, Some(0.4));
+    }
+
+    #[test]
+    fn techniques_default_intensity_when_omitted() {
+        let (vib, _, _) = note_techniques(Some(&[Modifier::Vibrato {
+            oscillation_hz: 5.0,
+            intensity: None,
+        }]));
+        assert_eq!(vib, Some(0.5));
+    }
+
+    #[test]
+    fn overblow_overdraw_read_as_an_up_shift() {
+        assert_eq!(note_techniques(Some(&[Modifier::Overblow])).1, Some(1.0));
+        assert_eq!(note_techniques(Some(&[Modifier::Overdraw])).1, Some(1.0));
+    }
+
+    #[test]
+    fn no_modifiers_yield_no_techniques() {
+        assert_eq!(note_techniques(None), (None, None, None));
+        assert_eq!(note_techniques(Some(&[])), (None, None, None));
+    }
+
+    // ── note_anim_mode ────────────────────────────────────────────────────────
+
+    #[test]
+    fn anim_mode_maps_each_technique() {
+        assert_eq!(note_anim_mode(None), 0.0);
+        assert_eq!(note_anim_mode(Some(&[Modifier::Bend { semitones: -1.0, intensity: None }])), 1.0);
+        assert_eq!(note_anim_mode(Some(&[Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }])), 2.0);
+        assert_eq!(note_anim_mode(Some(&[Modifier::WahWah { oscillation_hz: 3.0, intensity: None }])), 3.0);
+        assert_eq!(note_anim_mode(Some(&[Modifier::Overblow])), 4.0);
+        assert_eq!(note_anim_mode(Some(&[Modifier::Overdraw])), 5.0);
+    }
+
+    #[test]
+    fn anim_mode_uses_the_first_modifier() {
+        let mods = [
+            Modifier::WahWah { oscillation_hz: 3.0, intensity: None },
+            Modifier::Bend { semitones: -1.0, intensity: None },
+        ];
+        assert_eq!(note_anim_mode(Some(&mods)), 3.0);
+    }
+
+    // ── note_rgb ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn blow_and_draw_have_distinct_colors() {
+        assert_ne!(note_rgb(true), note_rgb(false));
+    }
 }

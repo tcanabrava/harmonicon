@@ -414,6 +414,18 @@ pub fn resolve_item_time(item: &crate::song::chart::TrackItem, timing: &crate::s
     })
 }
 
+/// The latest moment any note finishes (start + duration) across the track, in
+/// seconds. Drives when the song's content ends. Zero for an empty track.
+pub fn last_note_end(
+    track: &[crate::song::chart::TrackItem],
+    timing: &crate::song::chart::Timing,
+) -> f64 {
+    track
+        .iter()
+        .map(|item| resolve_item_time(item, timing) + item.duration)
+        .fold(0.0_f64, f64::max)
+}
+
 /// The pitch the player must actually produce for a note. A `bend` shifts the
 /// note's natural pitch by its semitones (negative = down), so the bend is
 /// *validated* by scoring — playing the unbent note no longer counts. Notes
@@ -524,15 +536,10 @@ fn setup_scoring_config(
 
     // Song end = last note's end + a tail, so the results screen appears once the
     // content finishes. Looping songs never end.
-    let last_note_end = chart
-        .track
-        .iter()
-        .map(|item| resolve_item_time(item, &chart.timing) + item.duration)
-        .fold(0.0_f64, f64::max);
     song_end.0 = if loop_cfg.active {
         f64::INFINITY
     } else {
-        last_note_end + SONG_END_TAIL
+        last_note_end(&chart.track, &chart.timing) + SONG_END_TAIL
     };
 
     // Resolve fx_mapping: modifier name → DSP effect processor name.
@@ -911,6 +918,39 @@ mod tests {
     fn resolve_item_time_defaults_missing_tick_to_zero() {
         let item = track_item(None, None);
         assert_eq!(resolve_item_time(&item, &timing_120bpm()), 0.0);
+    }
+
+    // ── last_note_end ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn last_note_end_is_latest_finish() {
+        // Items at 0.0 and 2.0, each 0.5 s long → latest finish is 2.5 s.
+        let track = vec![track_item(Some(0.0), None), track_item(Some(2.0), None)];
+        assert!((last_note_end(&track, &timing_120bpm()) - 2.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn last_note_end_ignores_order() {
+        // The latest end wins even when the longest note isn't last in the track.
+        let track = vec![track_item(Some(5.0), None), track_item(Some(1.0), None)];
+        assert!((last_note_end(&track, &timing_120bpm()) - 5.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn last_note_end_empty_track_is_zero() {
+        assert_eq!(last_note_end(&[], &timing_120bpm()), 0.0);
+    }
+
+    // ── modifier_fx_key ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn modifier_fx_keys_match_technique_names() {
+        use crate::song::chart::Modifier::*;
+        assert_eq!(modifier_fx_key(&Bend { semitones: -1.0, intensity: None }), "bend");
+        assert_eq!(modifier_fx_key(&Vibrato { oscillation_hz: 5.0, intensity: None }), "vibrato");
+        assert_eq!(modifier_fx_key(&WahWah { oscillation_hz: 3.0, intensity: None }), "wah-wah");
+        assert_eq!(modifier_fx_key(&Overblow), "overblow");
+        assert_eq!(modifier_fx_key(&Overdraw), "overdraw");
     }
 
     // ── PitchGate (re-attack detection) ──────────────────────────────────────────
