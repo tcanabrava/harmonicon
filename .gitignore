@@ -3,3 +3,6 @@
 /server
 # Python tooling for the asset scripts
 scripts/.venv/
+.cargo
+.zed
+
