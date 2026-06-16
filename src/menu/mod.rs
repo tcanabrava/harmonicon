@@ -130,7 +130,11 @@ pub(super) fn btn_default() -> Color {
 
 /// Spawn a full-screen centred column with a title and optional subtitle.
 /// Returns the entity so the caller can add button children afterwards.
-pub(super) fn spawn_menu_root(commands: &mut Commands, title: &str, subtitle: Option<&str>) -> Entity {
+pub(super) fn spawn_menu_root(
+    commands: &mut Commands,
+    title: &str,
+    subtitle: Option<&str>,
+) -> Entity {
     let root = commands
         .spawn((
             Node {
@@ -399,7 +403,9 @@ fn handle_menu_input(
             MenuButton::PlayMode3D => *gameplay_mode = GameplayMode::Play3D,
             MenuButton::Artist(a) => selected_artist.0 = a.clone(),
             MenuButton::Song(path) => {
-                commands.insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
+                commands.insert_resource(SelectedSong(
+                    asset_server.load::<SongManifest>(path.clone()),
+                ));
             }
             _ => {}
         }
@@ -452,10 +458,7 @@ pub(super) fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<Men
 /// On entering the menu, jump straight to the song list if we just quit a song
 /// (so "Quit Song" returns to the list, not the main menu). Otherwise the menu
 /// opens on its default page (Main).
-fn route_menu_entry(
-    mut ret: ResMut<ReturnToSongList>,
-    mut next_page: ResMut<NextState<MenuPage>>,
-) {
+fn route_menu_entry(mut ret: ResMut<ReturnToSongList>, mut next_page: ResMut<NextState<MenuPage>>) {
     if ret.0 {
         ret.0 = false;
         next_page.set(MenuPage::SongList);
@@ -476,10 +479,19 @@ mod tests {
         assert_eq!(menu_nav(&PlayMode2D), MenuNav::To(MenuPage::ArtistList));
         assert_eq!(menu_nav(&PlayMode3D), MenuNav::To(MenuPage::ArtistList));
         assert_eq!(menu_nav(&JamSession), MenuNav::To(MenuPage::ArtistList));
-        assert_eq!(menu_nav(&Artist("x".into())), MenuNav::To(MenuPage::SongList));
-        assert_eq!(menu_nav(&Song("p".into())), MenuNav::Enter(AppState::SongLoading));
+        assert_eq!(
+            menu_nav(&Artist("x".into())),
+            MenuNav::To(MenuPage::SongList)
+        );
+        assert_eq!(
+            menu_nav(&Song("p".into())),
+            MenuNav::Enter(AppState::SongLoading)
+        );
         // Back — each closes to its correct parent.
-        assert_eq!(menu_nav(&BackToArtistList), MenuNav::To(MenuPage::ArtistList));
+        assert_eq!(
+            menu_nav(&BackToArtistList),
+            MenuNav::To(MenuPage::ArtistList)
+        );
         assert_eq!(menu_nav(&BackToPlay), MenuNav::To(MenuPage::Play));
         assert_eq!(menu_nav(&BackToMain), MenuNav::To(MenuPage::Main));
         // Terminal actions.
@@ -492,14 +504,12 @@ mod tests {
     struct PageLog(Vec<String>);
 
     fn track_page(app: &mut App, page: MenuPage, label: &'static str) {
-        app.add_systems(
-            OnEnter(page.clone()),
-            move |mut log: ResMut<PageLog>| log.0.push(format!("enter {label}")),
-        );
-        app.add_systems(
-            OnExit(page),
-            move |mut log: ResMut<PageLog>| log.0.push(format!("exit {label}")),
-        );
+        app.add_systems(OnEnter(page.clone()), move |mut log: ResMut<PageLog>| {
+            log.0.push(format!("enter {label}"))
+        });
+        app.add_systems(OnExit(page), move |mut log: ResMut<PageLog>| {
+            log.0.push(format!("exit {label}"))
+        });
     }
 
     #[test]
@@ -513,18 +523,30 @@ mod tests {
         track_page(&mut app, MenuPage::Play, "Play");
 
         // Enter the menu → its default page (Main) opens.
-        app.world_mut().resource_mut::<NextState<AppState>>().set(AppState::Menu);
+        app.world_mut()
+            .resource_mut::<NextState<AppState>>()
+            .set(AppState::Menu);
         app.update();
         // Open Play (Main must close first), then go Back to Main (Play closes).
-        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::Play);
+        app.world_mut()
+            .resource_mut::<NextState<MenuPage>>()
+            .set(MenuPage::Play);
         app.update();
-        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::Main);
+        app.world_mut()
+            .resource_mut::<NextState<MenuPage>>()
+            .set(MenuPage::Main);
         app.update();
 
         let log = &app.world().resource::<PageLog>().0;
         assert_eq!(
             log,
-            &["enter Main", "exit Main", "enter Play", "exit Play", "enter Main"],
+            &[
+                "enter Main",
+                "exit Main",
+                "enter Play",
+                "exit Play",
+                "enter Main"
+            ],
         );
     }
 }

@@ -12,20 +12,19 @@ use crate::{
     song::harmonica::twelve_bar,
 };
 
-use super::{
-    ActivePitches, ActiveTargets, COUNTDOWN, ComboText,
-    FeedbackText, GameplayRoot, HOLE_COUNT, HoleCell, HoleState, LOOKAHEAD,
-    MusicStarted, ScheduledNote, ScoreText, ValidHarpNotes,
-};
 use super::countdown_overlay::spawn_countdown;
 use super::gameplay_2d::{note_anim_mode, note_techniques};
-use super::song_progress_overlay::spawn_song_progress;
 use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
-use super::phrase_overlay::spawn_phrase_banner;
-use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_tail_3d::NoteTail3dMaterial;
+use super::phrase_overlay::spawn_phrase_banner;
+use super::song_progress_overlay::spawn_song_progress;
+use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
+use super::{
+    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HOLE_COUNT,
+    HoleCell, HoleState, LOOKAHEAD, MusicStarted, ScheduledNote, ScoreText, ValidHarpNotes,
+};
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
 
@@ -74,7 +73,10 @@ pub(super) struct NoteCube3dConfig {
 
 impl Default for NoteCube3dConfig {
     fn default() -> Self {
-        Self { head_scale: 0.8, tail_width: 0.6 }
+        Self {
+            head_scale: 0.8,
+            tail_width: 0.6,
+        }
     }
 }
 
@@ -140,8 +142,7 @@ fn load_model_config(model_name: &str) -> HarmonicaModelConfig {
 fn setup_camera_3d(commands: &mut Commands) {
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 14.0, 24.0)
-            .looking_at(Vec3::new(0.0, 0.0, HIT_Z - 18.0), Vec3::Y),
+        Transform::from_xyz(0.0, 14.0, 24.0).looking_at(Vec3::new(0.0, 0.0, HIT_Z - 18.0), Vec3::Y),
         GameplayCamera3D,
         GameplayRoot,
         Name::new("Camera3d (gameplay 3D)"),
@@ -259,7 +260,6 @@ fn create_hit_zone(
     ));
 }
 
-
 /// Spawns each note as a 3D comet: an elongated cube head (from the theme's glTF)
 /// tinted by blow/draw colour, trailing a flat ribbon that runs the technique's
 /// animation via [`NoteTail3dMaterial`] — the 3D twin of the 2D head+tail comet.
@@ -328,7 +328,11 @@ pub fn create_note_visuals(
                 .spawn((
                     Transform::from_xyz(note_x, LANE_Y + NOTE_H * 0.5, FAR_Z),
                     Visibility::default(),
-                    NoteVisual3D { time: t, head_depth, tail_len },
+                    NoteVisual3D {
+                        time: t,
+                        head_depth,
+                        tail_len,
+                    },
                     ScheduledNote {
                         time: t,
                         duration: item.duration,
@@ -405,7 +409,12 @@ pub fn setup(
 
     setup_camera_3d(&mut commands);
     setup_lighting(&mut commands);
-    setup_background(&mut commands, manifest.background.clone(), &mut meshes, &mut materials);
+    setup_background(
+        &mut commands,
+        manifest.background.clone(),
+        &mut meshes,
+        &mut materials,
+    );
 
     let holes = &model_cfg.holes;
     let left_edge = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
@@ -419,12 +428,24 @@ pub fn setup(
     let track_ctr_z = FAR_Z + track_len * 0.5;
 
     create_note_track(
-        &mut commands, &mut meshes, &mut materials,
-        total_width, lane_width, track_len, center_x, track_ctr_z,
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        total_width,
+        lane_width,
+        track_len,
+        center_x,
+        track_ctr_z,
         holes,
     );
 
-    create_hit_zone(&mut commands, &mut meshes, &mut materials, center_x, total_width);
+    create_hit_zone(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        center_x,
+        total_width,
+    );
 
     // Comet head mesh from the theme's glTF cube + its 3D tail layout.
     let head_mesh: Handle<Mesh> =
@@ -451,9 +472,21 @@ pub fn setup(
 
     let beats_per_bar = {
         let ts = chart.song.time_signature.as_deref().unwrap_or("4/4");
-        ts.split('/').next().and_then(|n| n.parse::<usize>().ok()).unwrap_or(4)
+        ts.split('/')
+            .next()
+            .and_then(|n| n.parse::<usize>().ok())
+            .unwrap_or(4)
     };
-    spawn_hud_overlay(&mut commands, chart, &chords, key, &font, chart.song.tempo_bpm, beats_per_bar, shape_materials);
+    spawn_hud_overlay(
+        &mut commands,
+        chart,
+        &chords,
+        key,
+        &font,
+        chart.song.tempo_bpm,
+        beats_per_bar,
+        shape_materials,
+    );
     spawn_song_progress(&mut commands);
     spawn_countdown(&mut commands, &font);
 }
@@ -531,7 +564,10 @@ fn spawn_hud_overlay(
         chart.song.time_signature.as_deref().unwrap_or("4/4"),
     );
     let harp_info = chart.harmonica.display();
-    let description = chart.metadata.as_ref().and_then(|m| m.description.as_deref());
+    let description = chart
+        .metadata
+        .as_ref()
+        .and_then(|m| m.description.as_deref());
     let chart_author = chart.metadata.as_ref().and_then(|m| m.author.as_deref());
 
     commands
@@ -557,21 +593,33 @@ fn spawn_hud_overlay(
             ] {
                 p.spawn((
                     Text::new(text.to_string()),
-                    TextFont { font_size: FontSize::Px(size), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(size),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(color),
                 ));
             }
             if let Some(desc) = description {
                 p.spawn((
                     Text::new(desc.to_string()),
-                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(10.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.50, 0.50, 0.55)),
                 ));
             }
             if let Some(author) = chart_author {
                 p.spawn((
                     Text::new(format!("Chart: {author}")),
-                    TextFont { font_size: FontSize::Px(9.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(9.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.40, 0.40, 0.45)),
                 ));
             }
@@ -600,12 +648,20 @@ fn spawn_hud_overlay(
             .with_children(|leg| {
                 leg.spawn((
                     Text::new("\u{25A0} BLOW"),
-                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(10.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 leg.spawn((
                     Text::new("\u{25A0} DRAW"),
-                    TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(10.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
             });
@@ -620,7 +676,6 @@ fn spawn_hud_overlay(
             .with_children(|metro| {
                 spawn_metronome(metro, beats_per_bar, bpm, font);
             });
-
 
             // Animated tail previews for the techniques legend (built up front so the UI
             // closures only borrow a ready slice, not the material store).
@@ -656,24 +711,35 @@ fn spawn_hud_overlay(
         .with_children(|p| {
             p.spawn((
                 Text::new("0"),
-                TextFont { font_size: FontSize::Px(30.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(30.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
                 ScoreText,
             ));
             p.spawn((
                 Text::new(""),
-                TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.90, 0.72, 0.20)),
                 ComboText,
             ));
             p.spawn((
                 Text::new(""),
-                TextFont { font_size: FontSize::Px(22.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(22.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
                 FeedbackText,
             ));
         });
-
 }
 
 // ── Per-frame systems ─────────────────────────────────────────────────────────
@@ -724,7 +790,11 @@ pub fn groove_harmonica(
 
     // Backbeat emphasis on beats 2 & 4 (the blues snare hits), the off-beats get
     // a stronger kick than the downbeats.
-    let backbeat = if (bi as i32).rem_euclid(2) == 1 { 1.0 } else { 0.6 };
+    let backbeat = if (bi as i32).rem_euclid(2) == 1 {
+        1.0
+    } else {
+        0.6
+    };
 
     // Triplet shuffle: a strong hit on the beat plus a lighter swung hit on the
     // last triplet (the "and-a"). This is what gives the bounce its blues swing
@@ -886,7 +956,11 @@ pub fn update_holes_3d(
             state.is_blow = is_blow;
         }
 
-        let factor = if target > state.brightness { attack } else { decay };
+        let factor = if target > state.brightness {
+            attack
+        } else {
+            decay
+        };
         state.brightness += (target - state.brightness) * factor;
         let b = state.brightness;
 
@@ -969,4 +1043,3 @@ mod tests {
         assert!(matches!(camera.clear_color, ClearColorConfig::Default));
     }
 }
-

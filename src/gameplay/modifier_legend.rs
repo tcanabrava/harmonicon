@@ -15,9 +15,27 @@ use crate::song::chart::Modifier;
 fn legend_techniques() -> [(Modifier, &'static str); 5] {
     use crate::song::chart::Modifier::*;
     [
-        (Bend { semitones: -1.0, intensity: None }, "bend"),
-        (Vibrato { oscillation_hz: 5.0, intensity: Some(0.9) }, "vibrato"),
-        (WahWah { oscillation_hz: 3.0, intensity: Some(0.9) }, "wah-wah"),
+        (
+            Bend {
+                semitones: -1.0,
+                intensity: None,
+            },
+            "bend",
+        ),
+        (
+            Vibrato {
+                oscillation_hz: 5.0,
+                intensity: Some(0.9),
+            },
+            "vibrato",
+        ),
+        (
+            WahWah {
+                oscillation_hz: 3.0,
+                intensity: Some(0.9),
+            },
+            "wah-wah",
+        ),
         (Overblow, "overblow"),
         (Overdraw, "overdraw"),
     ]
@@ -72,7 +90,11 @@ pub fn spawn_modifier_legend(
         .with_children(|col| {
             col.spawn((
                 Text::new("TECHNIQUES"),
-                TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(10.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.55, 0.55, 0.62)),
             ));
 
@@ -105,7 +127,11 @@ pub fn spawn_modifier_legend(
                         ));
                         row.spawn((
                             Text::new(*name),
-                            TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                            TextFont {
+                                font_size: FontSize::Px(10.0),
+                                font: font.clone(),
+                                ..default()
+                            },
                             TextColor(Color::srgb(0.70, 0.72, 0.78)),
                         ));
                     });

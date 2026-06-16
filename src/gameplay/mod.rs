@@ -17,8 +17,8 @@ mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
 use scoring::{
-    NoteOutcome, classify_note, combo_label, compute_multiplier, compute_points, should_decay_combo,
-    sustain_points,
+    NoteOutcome, classify_note, combo_label, compute_multiplier, compute_points,
+    should_decay_combo, sustain_points,
 };
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -53,117 +53,114 @@ impl Plugin for GameplayPlugin {
             song_progress_overlay::SongProgressPlugin,
         ))
         .init_resource::<GameplayClock>()
-            .init_resource::<ActivePitches>()
-            .init_resource::<PitchGate>()
-            .init_resource::<MusicStarted>()
-            .init_resource::<ValidHarpNotes>()
-            .init_resource::<Score>()
-            .init_resource::<SongStats>()
-            .init_resource::<SongEnd>()
-            .init_resource::<HitFeedback>()
-            .init_resource::<ScoringConfig>()
-            .init_resource::<ActiveTargets>()
-            .init_resource::<Paused>()
-            .init_resource::<LoopConfig>()
-            .init_resource::<FxMapping>()
-            // Setup: shared pause menu + mode-specific scenes
-            .add_systems(
-                OnEnter(AppState::Playing),
-                (
-                    reset_score,
-                    setup_scoring_config,
-                    pause_menu::setup_pause_menu,
-                    gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
-                    gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
-                    jam_session::setup
-                        .run_if(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+        .init_resource::<ActivePitches>()
+        .init_resource::<PitchGate>()
+        .init_resource::<MusicStarted>()
+        .init_resource::<ValidHarpNotes>()
+        .init_resource::<Score>()
+        .init_resource::<SongStats>()
+        .init_resource::<SongEnd>()
+        .init_resource::<HitFeedback>()
+        .init_resource::<ScoringConfig>()
+        .init_resource::<ActiveTargets>()
+        .init_resource::<Paused>()
+        .init_resource::<LoopConfig>()
+        .init_resource::<FxMapping>()
+        // Setup: shared pause menu + mode-specific scenes
+        .add_systems(
+            OnEnter(AppState::Playing),
+            (
+                reset_score,
+                setup_scoring_config,
+                pause_menu::setup_pause_menu,
+                gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
+                gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
+                jam_session::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+            ),
+        )
+        // Cleanup: shared entity despawn + restore camera on 3D exit
+        .add_systems(OnExit(AppState::Playing), cleanup_gameplay)
+        .add_systems(
+            OnExit(AppState::Playing),
+            gameplay_3d::restore_camera.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
+        )
+        // Pause input always runs during Playing (even when paused)
+        .add_systems(
+            Update,
+            (
+                pause_menu::handle_pause_input,
+                pause_menu::handle_pause_buttons,
+                pause_menu::pause_button_hover,
+            )
+                .run_if(in_state(AppState::Playing)),
+        )
+        // Apply live volume changes to the playing song (even while paused).
+        .add_systems(
+            Update,
+            apply_music_volume
+                .run_if(in_state(AppState::Playing).and_then(resource_changed::<AudioSettings>)),
+        )
+        // Gameplay-logic chains only run when not paused. This set ticks the
+        // clock, so every clock reader below must run after it — otherwise the
+        // executor may read a stale clock on some frames, making notes stutter.
+        .add_systems(
+            Update,
+            (
+                tick_clock,
+                handle_loop_boundary,
+                collect_pitches,
+                update_active_targets,
+                score_notes,
+                update_score_display,
+                detect_song_end,
+                note_tail_2d::animate_note_tails,
+            )
+                .chain()
+                .in_set(GameplayLogic)
+                .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+        )
+        // Results screen lifecycle.
+        .add_systems(OnEnter(AppState::Results), results::setup)
+        .add_systems(OnExit(AppState::Results), results::cleanup)
+        .add_systems(
+            Update,
+            (results::handle_buttons, results::button_hover).run_if(in_state(AppState::Results)),
+        )
+        // 2D update chain
+        .add_systems(
+            Update,
+            (
+                gameplay_2d::update_notes,
+                gameplay_2d::size_note_tails,
+                gameplay_2d::update_note_visuals,
+                gameplay_2d::update_holes,
+            )
+                .chain()
+                .after(GameplayLogic)
+                .run_if(
+                    in_state(AppState::Playing)
+                        .and_then(|p: Res<Paused>| !p.0)
+                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                 ),
+        )
+        // 3D update chain
+        .add_systems(
+            Update,
+            (
+                gameplay_3d::update_notes_3d,
+                gameplay_3d::update_note_visuals_3d,
+                gameplay_3d::animate_note_tails_3d,
+                gameplay_3d::update_holes_3d,
+                gameplay_3d::groove_harmonica,
             )
-            // Cleanup: shared entity despawn + restore camera on 3D exit
-            .add_systems(OnExit(AppState::Playing), cleanup_gameplay)
-            .add_systems(
-                OnExit(AppState::Playing),
-                gameplay_3d::restore_camera
-                    .run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
-            )
-            // Pause input always runs during Playing (even when paused)
-            .add_systems(
-                Update,
-                (
-                    pause_menu::handle_pause_input,
-                    pause_menu::handle_pause_buttons,
-                    pause_menu::pause_button_hover,
-                )
-                    .run_if(in_state(AppState::Playing)),
-            )
-            // Apply live volume changes to the playing song (even while paused).
-            .add_systems(
-                Update,
-                apply_music_volume
-                    .run_if(in_state(AppState::Playing).and_then(resource_changed::<AudioSettings>)),
-            )
-            // Gameplay-logic chains only run when not paused. This set ticks the
-            // clock, so every clock reader below must run after it — otherwise the
-            // executor may read a stale clock on some frames, making notes stutter.
-            .add_systems(
-                Update,
-                (
-                    tick_clock,
-                    handle_loop_boundary,
-                    collect_pitches,
-                    update_active_targets,
-                    score_notes,
-                    update_score_display,
-                    detect_song_end,
-                    note_tail_2d::animate_note_tails,
-                )
-                    .chain()
-                    .in_set(GameplayLogic)
-                    .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
-            )
-            // Results screen lifecycle.
-            .add_systems(OnEnter(AppState::Results), results::setup)
-            .add_systems(OnExit(AppState::Results), results::cleanup)
-            .add_systems(
-                Update,
-                (results::handle_buttons, results::button_hover)
-                    .run_if(in_state(AppState::Results)),
-            )
-            // 2D update chain
-            .add_systems(
-                Update,
-                (
-                    gameplay_2d::update_notes,
-                    gameplay_2d::size_note_tails,
-                    gameplay_2d::update_note_visuals,
-                    gameplay_2d::update_holes,
-                )
-                    .chain()
-                    .after(GameplayLogic)
-                    .run_if(
-                        in_state(AppState::Playing)
-                            .and_then(|p: Res<Paused>| !p.0)
-                            .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
-                    ),
-            )
-            // 3D update chain
-            .add_systems(
-                Update,
-                (
-                    gameplay_3d::update_notes_3d,
-                    gameplay_3d::update_note_visuals_3d,
-                    gameplay_3d::animate_note_tails_3d,
-                    gameplay_3d::update_holes_3d,
-                    gameplay_3d::groove_harmonica,
-                )
-                    .chain()
-                    .after(GameplayLogic)
-                    .run_if(
-                        in_state(AppState::Playing)
-                            .and_then(|p: Res<Paused>| !p.0)
-                            .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
-                    ),
-            );
+                .chain()
+                .after(GameplayLogic)
+                .run_if(
+                    in_state(AppState::Playing)
+                        .and_then(|p: Res<Paused>| !p.0)
+                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
+                ),
+        );
     }
 }
 
@@ -308,7 +305,6 @@ pub struct HoleState {
     pub is_blow: bool,
 }
 
-
 // Score HUD marker components
 #[derive(Component)]
 pub struct ScoreText;
@@ -407,7 +403,10 @@ pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
 
 /// Resolve a track item's start time in seconds, preferring an explicit `time`
 /// and falling back to converting its `tick` through the tempo map.
-pub fn resolve_item_time(item: &crate::song::chart::TrackItem, timing: &crate::song::chart::Timing) -> f64 {
+pub fn resolve_item_time(
+    item: &crate::song::chart::TrackItem,
+    timing: &crate::song::chart::Timing,
+) -> f64 {
     item.time.unwrap_or_else(|| {
         let tick = item.tick.unwrap_or(0);
         crate::song::chart::tick_to_seconds(tick, timing.resolution, &timing.tempo_map)
@@ -449,7 +448,6 @@ pub fn style_bonus_points(modifiers: &[Modifier], table: &HashMap<String, f32>) 
         .map(|m| table.get(modifier_fx_key(m)).copied().unwrap_or(0.0))
         .sum()
 }
-
 
 // ── Shared systems ────────────────────────────────────────────────────────────
 
@@ -807,7 +805,10 @@ fn detect_song_end(
 /// Push the current music level onto the playing song's sink whenever the
 /// `AudioSettings` resource changes, so dragging the Options slider is heard
 /// immediately. (Metronome clicks pick up their level when each click spawns.)
-fn apply_music_volume(audio: Res<AudioSettings>, mut sinks: Query<&mut AudioSink, With<MusicPlayer>>) {
+fn apply_music_volume(
+    audio: Res<AudioSettings>,
+    mut sinks: Query<&mut AudioSink, With<MusicPlayer>>,
+) {
     for mut sink in &mut sinks {
         sink.set_volume(Volume::Linear(audio.music_volume));
     }
@@ -896,7 +897,10 @@ mod tests {
     fn timing_120bpm() -> Timing {
         Timing {
             resolution: 480,
-            tempo_map: vec![TempoPoint { tick: 0, bpm: 120.0 }],
+            tempo_map: vec![TempoPoint {
+                tick: 0,
+                bpm: 120.0,
+            }],
             time_signature_map: None,
         }
     }
@@ -946,9 +950,27 @@ mod tests {
     #[test]
     fn modifier_fx_keys_match_technique_names() {
         use crate::song::chart::Modifier::*;
-        assert_eq!(modifier_fx_key(&Bend { semitones: -1.0, intensity: None }), "bend");
-        assert_eq!(modifier_fx_key(&Vibrato { oscillation_hz: 5.0, intensity: None }), "vibrato");
-        assert_eq!(modifier_fx_key(&WahWah { oscillation_hz: 3.0, intensity: None }), "wah-wah");
+        assert_eq!(
+            modifier_fx_key(&Bend {
+                semitones: -1.0,
+                intensity: None
+            }),
+            "bend"
+        );
+        assert_eq!(
+            modifier_fx_key(&Vibrato {
+                oscillation_hz: 5.0,
+                intensity: None
+            }),
+            "vibrato"
+        );
+        assert_eq!(
+            modifier_fx_key(&WahWah {
+                oscillation_hz: 3.0,
+                intensity: None
+            }),
+            "wah-wah"
+        );
         assert_eq!(modifier_fx_key(&Overblow), "overblow");
         assert_eq!(modifier_fx_key(&Overdraw), "overdraw");
     }
@@ -1013,27 +1035,39 @@ mod tests {
 
     #[test]
     fn bend_targets_the_bent_pitch() {
-        let bend = vec![Modifier::Bend { semitones: -1.0, intensity: None }];
+        let bend = vec![Modifier::Bend {
+            semitones: -1.0,
+            intensity: None,
+        }];
         // A 1-semitone draw bend on B4 must be played as A#4, not the natural B4.
         assert_eq!(target_pitch("B4", &bend), "A#4");
     }
 
     #[test]
     fn deeper_bend_targets_lower_pitch() {
-        let bend = vec![Modifier::Bend { semitones: -2.0, intensity: None }];
+        let bend = vec![Modifier::Bend {
+            semitones: -2.0,
+            intensity: None,
+        }];
         assert_eq!(target_pitch("B4", &bend), "A4");
     }
 
     #[test]
     fn non_bend_techniques_keep_the_natural_pitch() {
-        let vib = vec![Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }];
+        let vib = vec![Modifier::Vibrato {
+            oscillation_hz: 5.0,
+            intensity: None,
+        }];
         assert_eq!(target_pitch("D5", &vib), "D5");
         assert_eq!(target_pitch("D5", &[]), "D5");
     }
 
     #[test]
     fn unknown_pitch_name_is_left_alone() {
-        let bend = vec![Modifier::Bend { semitones: -1.0, intensity: None }];
+        let bend = vec![Modifier::Bend {
+            semitones: -1.0,
+            intensity: None,
+        }];
         assert_eq!(target_pitch("\u{2014}", &bend), "\u{2014}");
     }
 
@@ -1048,15 +1082,24 @@ mod tests {
     #[test]
     fn style_bonus_sums_matched_techniques() {
         let mods = vec![
-            Modifier::Bend { semitones: -1.0, intensity: None },
-            Modifier::Vibrato { oscillation_hz: 5.0, intensity: None },
+            Modifier::Bend {
+                semitones: -1.0,
+                intensity: None,
+            },
+            Modifier::Vibrato {
+                oscillation_hz: 5.0,
+                intensity: None,
+            },
         ];
         assert_eq!(style_bonus_points(&mods, &bonus_table()), 75.0);
     }
 
     #[test]
     fn style_bonus_ignores_techniques_absent_from_the_table() {
-        let mods = vec![Modifier::WahWah { oscillation_hz: 3.0, intensity: None }];
+        let mods = vec![Modifier::WahWah {
+            oscillation_hz: 3.0,
+            intensity: None,
+        }];
         assert_eq!(style_bonus_points(&mods, &bonus_table()), 0.0);
     }
 
@@ -1080,8 +1123,17 @@ mod tests {
         schedule.add_systems(cleanup_gameplay);
         schedule.run(&mut world);
 
-        assert!(!world.entities().contains(scene_a), "GameplayRoot should be despawned");
-        assert!(!world.entities().contains(scene_b), "GameplayRoot should be despawned");
-        assert!(world.entities().contains(keep), "unrelated entities must survive");
+        assert!(
+            !world.entities().contains(scene_a),
+            "GameplayRoot should be despawned"
+        );
+        assert!(
+            !world.entities().contains(scene_b),
+            "GameplayRoot should be despawned"
+        );
+        assert!(
+            world.entities().contains(keep),
+            "unrelated entities must survive"
+        );
     }
 }

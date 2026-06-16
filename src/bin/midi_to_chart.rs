@@ -21,12 +21,8 @@ use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use serde_json::{Value, json};
 
 // Standard C richter diatonic layout (holes 1..=10), matching the in-repo charts.
-const BLOW: [&str; 10] = [
-    "C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7",
-];
-const DRAW: [&str; 10] = [
-    "D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6",
-];
+const BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
+const DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
 
 const DEFAULT_TEMPO_US: u32 = 500_000; // 120 BPM if the file specifies none
 
@@ -128,7 +124,10 @@ fn find_track(smf: &Smf, name: &str) -> Option<usize> {
 }
 
 fn processed_path(original: &Path) -> PathBuf {
-    let stem = original.file_stem().and_then(|s| s.to_str()).unwrap_or("song");
+    let stem = original
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("song");
     let mut out = original.to_path_buf();
     out.set_file_name(format!("{stem}_processed.midi"));
     out
@@ -177,7 +176,8 @@ fn tick_to_seconds(tick: u64, tpq: u32, tempo: &[(u64, u32)]) -> f64 {
 fn first_time_signature(smf: &Smf) -> (u8, u8) {
     for track in &smf.tracks {
         for ev in track {
-            if let TrackEventKind::Meta(MetaMessage::TimeSignature(num, denom_pow, _, _)) = ev.kind {
+            if let TrackEventKind::Meta(MetaMessage::TimeSignature(num, denom_pow, _, _)) = ev.kind
+            {
                 return (num, 1u8 << denom_pow);
             }
         }
@@ -251,16 +251,31 @@ fn build_pitch_maps() -> (HashMap<u8, u8>, HashMap<u8, u8>) {
 fn map_pitch(target: u8, blow: &HashMap<u8, u8>, draw: &HashMap<u8, u8>) -> Mapped {
     // Directly playable.
     if let Some(&hole) = blow.get(&target) {
-        return Mapped { hole, action: "blow", natural: target, bend: None };
+        return Mapped {
+            hole,
+            action: "blow",
+            natural: target,
+            bend: None,
+        };
     }
     if let Some(&hole) = draw.get(&target) {
-        return Mapped { hole, action: "draw", natural: target, bend: None };
+        return Mapped {
+            hole,
+            action: "draw",
+            natural: target,
+            bend: None,
+        };
     }
     // Draw bend: holes 1..=6 can bend the draw note down by 1..=3 semitones.
     for k in 1..=3u8 {
         if let Some(&hole) = draw.get(&(target + k)) {
             if (1..=6).contains(&hole) {
-                return Mapped { hole, action: "draw", natural: target + k, bend: Some(-(k as i32)) };
+                return Mapped {
+                    hole,
+                    action: "draw",
+                    natural: target + k,
+                    bend: Some(-(k as i32)),
+                };
             }
         }
     }
@@ -268,7 +283,12 @@ fn map_pitch(target: u8, blow: &HashMap<u8, u8>, draw: &HashMap<u8, u8>) -> Mapp
     for k in 1..=3u8 {
         if let Some(&hole) = blow.get(&(target + k)) {
             if (8..=10).contains(&hole) {
-                return Mapped { hole, action: "blow", natural: target + k, bend: Some(-(k as i32)) };
+                return Mapped {
+                    hole,
+                    action: "blow",
+                    natural: target + k,
+                    bend: Some(-(k as i32)),
+                };
             }
         }
     }
@@ -286,8 +306,17 @@ fn map_pitch(target: u8, blow: &HashMap<u8, u8>, draw: &HashMap<u8, u8>) -> Mapp
             }
         }
     }
-    let hole = if best_action == "blow" { blow[&best_natural] } else { draw[&best_natural] };
-    Mapped { hole, action: best_action, natural: best_natural, bend: None }
+    let hole = if best_action == "blow" {
+        blow[&best_natural]
+    } else {
+        draw[&best_natural]
+    };
+    Mapped {
+        hole,
+        action: best_action,
+        natural: best_natural,
+        bend: None,
+    }
 }
 
 // ── Chart generation ─────────────────────────────────────────────────────────

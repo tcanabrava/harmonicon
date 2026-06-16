@@ -40,12 +40,20 @@ pub fn spawn_countdown(commands: &mut Commands, font: &FontSource) {
         .with_children(|ov| {
             ov.spawn((
                 Text::new("GET READY"),
-                TextFont { font_size: FontSize::Px(22.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(22.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
             ));
             ov.spawn((
                 Text::new("3"),
-                TextFont { font_size: FontSize::Px(120.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(120.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
                 CountdownText,
             ));
@@ -101,9 +109,7 @@ impl Plugin for CountdownPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            update_countdown.run_if(
-                in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0),
-            ),
+            update_countdown.run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         );
     }
 }

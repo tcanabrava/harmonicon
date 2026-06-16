@@ -60,14 +60,21 @@ fn song_assets_are_complete() {
     assert!(root.is_dir(), "missing asset directory: {}", root.display());
 
     // songs/<artist>/<song>/
-    let songs: Vec<PathBuf> = subdirs(root).iter().flat_map(|artist| subdirs(artist)).collect();
+    let songs: Vec<PathBuf> = subdirs(root)
+        .iter()
+        .flat_map(|artist| subdirs(artist))
+        .collect();
     assert!(!songs.is_empty(), "no songs found under {}", root.display());
 
     let mut report = String::new();
     for song in songs {
         let missing = missing_files(&song, &SONG_FILES);
         if !missing.is_empty() {
-            report.push_str(&format!("  {}: missing {}\n", label(&song), missing.join(", ")));
+            report.push_str(&format!(
+                "  {}: missing {}\n",
+                label(&song),
+                missing.join(", ")
+            ));
         }
     }
 
@@ -80,15 +87,26 @@ fn harmonica_model_assets_are_complete() {
     assert!(root.is_dir(), "missing asset directory: {}", root.display());
 
     let models = subdirs(root);
-    assert!(!models.is_empty(), "no harmonica models found under {}", root.display());
+    assert!(
+        !models.is_empty(),
+        "no harmonica models found under {}",
+        root.display()
+    );
 
     let mut report = String::new();
     for model in models {
         let missing = missing_files(&model, &MODEL_FILES);
         if !missing.is_empty() {
-            report.push_str(&format!("  {}: missing {}\n", label(&model), missing.join(", ")));
+            report.push_str(&format!(
+                "  {}: missing {}\n",
+                label(&model),
+                missing.join(", ")
+            ));
         }
     }
 
-    assert!(report.is_empty(), "Incomplete harmonica model assets:\n{report}");
+    assert!(
+        report.is_empty(),
+        "Incomplete harmonica model assets:\n{report}"
+    );
 }

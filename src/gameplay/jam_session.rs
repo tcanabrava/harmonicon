@@ -42,7 +42,10 @@ pub fn setup(
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     let beats_per_bar = {
         let ts = chart.song.time_signature.as_deref().unwrap_or("4/4");
-        ts.split('/').next().and_then(|n| n.parse::<usize>().ok()).unwrap_or(4)
+        ts.split('/')
+            .next()
+            .and_then(|n| n.parse::<usize>().ok())
+            .unwrap_or(4)
     };
 
     commands
@@ -82,7 +85,11 @@ pub fn setup(
             .with_children(|left| {
                 left.spawn((
                     Text::new(title),
-                    TextFont { font_size: FontSize::Px(20.0), font: fonts.gameplay.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(20.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
                     TextColor(Color::WHITE),
                 ));
                 left.spawn(Node {

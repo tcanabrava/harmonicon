@@ -144,9 +144,7 @@ impl Plugin for TwelveBarBluesPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            update_bar.run_if(
-                in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0),
-            ),
+            update_bar.run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         );
     }
 }

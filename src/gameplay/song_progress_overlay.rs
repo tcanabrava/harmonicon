@@ -67,8 +67,7 @@ impl Plugin for SongProgressPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            update_progress
-                .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+            update_progress.run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         );
     }
 }

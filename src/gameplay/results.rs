@@ -80,20 +80,35 @@ pub(super) fn setup(
         .with_children(|root| {
             root.spawn((
                 Text::new("SONG COMPLETE"),
-                TextFont { font_size: FontSize::Px(28.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(28.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.80, 0.82, 0.90)),
             ));
             // Big grade.
             root.spawn((
                 Text::new(g),
-                TextFont { font_size: FontSize::Px(120.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(120.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(grade_color(g)),
-                Node { margin: UiRect::bottom(Val::Px(8.0)), ..default() },
+                Node {
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                },
             ));
 
             // Stat lines.
             let rows = [
-                ("Biggest combo", score.max_combo, Color::srgb(0.90, 0.72, 0.20)),
+                (
+                    "Biggest combo",
+                    score.max_combo,
+                    Color::srgb(0.90, 0.72, 0.20),
+                ),
                 ("Perfect hits", stats.perfect, Color::srgb(1.00, 0.85, 0.20)),
                 ("Good hits", stats.good, Color::srgb(0.45, 1.00, 0.45)),
                 ("Hits", hits, Color::srgb(0.75, 0.85, 0.95)),
@@ -107,9 +122,16 @@ pub(super) fn setup(
             // Final score.
             root.spawn((
                 Text::new(format!("Score: {}", score.points)),
-                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
-                Node { margin: UiRect::top(Val::Px(8.0)), ..default() },
+                Node {
+                    margin: UiRect::top(Val::Px(8.0)),
+                    ..default()
+                },
             ));
 
             // Retry / Continue buttons.
@@ -147,7 +169,11 @@ fn spawn_results_button(
         .with_children(|b| {
             b.spawn((
                 Text::new(label.to_string()),
-                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
         });
@@ -170,12 +196,20 @@ fn spawn_stat_row(
         .with_children(|row| {
             row.spawn((
                 Text::new(label.to_string()),
-                TextFont { font_size: FontSize::Px(18.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(18.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.65, 0.68, 0.75)),
             ));
             row.spawn((
                 Text::new(format!("{value}")),
-                TextFont { font_size: FontSize::Px(18.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(18.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(color),
             ));
         });
@@ -209,7 +243,10 @@ pub(super) fn handle_buttons(
 }
 
 pub(super) fn button_hover(
-    mut buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<ResultsButton>)>,
+    mut buttons: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<ResultsButton>),
+    >,
 ) {
     for (interaction, mut bg) in &mut buttons {
         *bg = BackgroundColor(match interaction {
@@ -225,7 +262,12 @@ mod tests {
     use super::*;
 
     fn stats(perfect: u32, good: u32, delayed: u32, miss: u32) -> SongStats {
-        SongStats { perfect, good, delayed, miss }
+        SongStats {
+            perfect,
+            good,
+            delayed,
+            miss,
+        }
     }
 
     #[test]

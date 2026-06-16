@@ -21,8 +21,8 @@ use bevy::ui_render::prelude::UiMaterialPlugin;
 use crate::audio_system::pitch_detect::AudioFrame;
 use crate::menu::AppState;
 
-use oscilloscope::OscilloscopeMaterial;
 pub use oscilloscope::OscMaterial;
+use oscilloscope::OscilloscopeMaterial;
 
 /// Number of frequency bands the spectrum is reduced to.
 pub const NUM_BANDS: usize = 32;
@@ -45,7 +45,10 @@ pub struct Spectrum {
 
 impl Default for Spectrum {
     fn default() -> Self {
-        Self { bands: vec![0.0; NUM_BANDS], waveform: vec![0.0; WAVE_POINTS] }
+        Self {
+            bands: vec![0.0; NUM_BANDS],
+            waveform: vec![0.0; WAVE_POINTS],
+        }
     }
 }
 
@@ -114,7 +117,10 @@ impl Plugin for SpectrogramPlugin {
             .init_resource::<SpectrogramStyle>()
             .add_systems(Startup, oscilloscope::init_material)
             .add_systems(Update, analyze_audio.run_if(in_state(AppState::Playing)))
-            .add_systems(Update, switch_visualization.run_if(in_state(AppState::Playing)))
+            .add_systems(
+                Update,
+                switch_visualization.run_if(in_state(AppState::Playing)),
+            )
             .add_systems(
                 Update,
                 bars::update_bars.run_if(
@@ -152,7 +158,9 @@ fn switch_visualization(
             }
         }
         let handle = handle.clone();
-        commands.entity(root).with_children(move |c| spawn_content(c, style, &handle));
+        commands
+            .entity(root)
+            .with_children(move |c| spawn_content(c, style, &handle));
     }
 }
 
@@ -292,7 +300,11 @@ mod tests {
         let wave = compute_waveform(&samples, WAVE_POINTS);
         assert_eq!(wave.len(), WAVE_POINTS);
         // Trigger is a rising zero crossing, so the trace starts near zero rising.
-        assert!(wave[0].abs() < 0.2, "starts near the trigger, got {}", wave[0]);
+        assert!(
+            wave[0].abs() < 0.2,
+            "starts near the trigger, got {}",
+            wave[0]
+        );
         assert!(wave[1] >= wave[0], "rising after the trigger");
         // Auto-gain: a quarter-scale sine should still reach near full deflection.
         let peak = wave.iter().fold(0.0f32, |m, &v| m.max(v.abs()));

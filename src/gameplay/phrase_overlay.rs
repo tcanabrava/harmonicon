@@ -16,7 +16,11 @@ pub struct PhraseText;
 pub fn spawn_phrase_banner(parent: &mut ChildSpawnerCommands, font: &FontSource) {
     parent.spawn((
         Text::new(""),
-        TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+        TextFont {
+            font_size: FontSize::Px(13.0),
+            font: font.clone(),
+            ..default()
+        },
         TextColor(Color::srgb(0.80, 0.70, 0.95)),
         PhraseText,
     ));
@@ -160,12 +164,18 @@ mod tests {
 
     #[test]
     fn label_phrase_only() {
-        assert_eq!(format_phrase_label(Some("call_high"), None), "\u{266A} call high");
+        assert_eq!(
+            format_phrase_label(Some("call_high"), None),
+            "\u{266A} call high"
+        );
     }
 
     #[test]
     fn label_groove_only() {
-        assert_eq!(format_phrase_label(None, Some("shuffle")), "\u{266A} shuffle");
+        assert_eq!(
+            format_phrase_label(None, Some("shuffle")),
+            "\u{266A} shuffle"
+        );
     }
 
     #[test]

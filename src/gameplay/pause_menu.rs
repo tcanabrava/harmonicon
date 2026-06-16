@@ -195,13 +195,19 @@ mod tests {
         // First Escape: pause + show overlay.
         schedule.run(&mut world);
         assert!(world.resource::<Paused>().0, "Escape should pause");
-        assert_eq!(*world.get::<Visibility>(overlay).unwrap(), Visibility::Visible);
+        assert_eq!(
+            *world.get::<Visibility>(overlay).unwrap(),
+            Visibility::Visible
+        );
 
         // Second (fresh) Escape: resume + hide overlay.
         world.insert_resource(escape_down());
         schedule.run(&mut world);
         assert!(!world.resource::<Paused>().0, "Escape again should resume");
-        assert_eq!(*world.get::<Visibility>(overlay).unwrap(), Visibility::Hidden);
+        assert_eq!(
+            *world.get::<Visibility>(overlay).unwrap(),
+            Visibility::Hidden
+        );
     }
 
     fn world_with_pause_button(button: PauseButton) -> World {
@@ -247,6 +253,9 @@ mod tests {
         let mut world = world_with_pause_button(PauseButton::QuitSong);
         run_pause_buttons(&mut world);
         assert_eq!(pending_state(&world), Some(AppState::Menu));
-        assert!(world.resource::<ReturnToSongList>().0, "should land on the song list");
+        assert!(
+            world.resource::<ReturnToSongList>().0,
+            "should land on the song list"
+        );
     }
 }

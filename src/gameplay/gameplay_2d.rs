@@ -12,18 +12,18 @@ use crate::{
     song::harmonica::twelve_bar,
 };
 
-use super::{
-    ActivePitches, ActiveTargets, COUNTDOWN, ComboText,
-    FeedbackText, GameplayRoot, HIT_H_PCT, HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD,
-    MusicStarted, NoteVisual, ScheduledNote, ScoreText, ValidHarpNotes,
-};
 use super::countdown_overlay::spawn_countdown;
-use super::song_progress_overlay::spawn_song_progress;
 use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
-use super::phrase_overlay::spawn_phrase_banner;
-use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
+use super::phrase_overlay::spawn_phrase_banner;
+use super::song_progress_overlay::spawn_song_progress;
+use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
+use super::{
+    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HIT_H_PCT,
+    HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote,
+    ScoreText, ValidHarpNotes,
+};
 
 pub fn setup(
     mut commands: Commands,
@@ -107,7 +107,10 @@ pub fn setup(
 
     let beats_per_bar = {
         let ts = chart.song.time_signature.as_deref().unwrap_or("4/4");
-        ts.split('/').next().and_then(|n| n.parse::<usize>().ok()).unwrap_or(4)
+        ts.split('/')
+            .next()
+            .and_then(|n| n.parse::<usize>().ok())
+            .unwrap_or(4)
     };
 
     commands
@@ -190,97 +193,138 @@ pub fn setup(
             })
             .with_children(|right| {
                 // Song info
-                right.spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(3.0),
-                    ..default()
-                })
-                .with_children(|col| {
-                    col.spawn((
-                        Text::new(title),
-                        TextFont { font_size: FontSize::Px(18.0), font: fonts.gameplay.clone(), ..default() },
-                        TextColor(Color::WHITE),
-                    ));
-                    col.spawn((
-                        Text::new(info),
-                        TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
-                        TextColor(Color::srgb(0.60, 0.65, 0.75)),
-                    ));
-                    col.spawn((
-                        Text::new(harp_info),
-                        TextFont { font_size: FontSize::Px(11.0), font: fonts.gameplay.clone(), ..default() },
-                        TextColor(Color::srgb(0.45, 0.72, 0.55)),
-                    ));
-                    if let Some(desc) = description {
+                right
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(3.0),
+                        ..default()
+                    })
+                    .with_children(|col| {
                         col.spawn((
-                            Text::new(desc.to_string()),
-                            TextFont { font_size: FontSize::Px(10.0), font: fonts.gameplay.clone(), ..default() },
-                            TextColor(Color::srgb(0.50, 0.50, 0.55)),
+                            Text::new(title),
+                            TextFont {
+                                font_size: FontSize::Px(18.0),
+                                font: fonts.gameplay.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
                         ));
-                    }
-                    if let Some(author) = chart_author {
                         col.spawn((
-                            Text::new(format!("Chart: {author}")),
-                            TextFont { font_size: FontSize::Px(9.0), font: fonts.gameplay.clone(), ..default() },
-                            TextColor(Color::srgb(0.40, 0.40, 0.45)),
+                            Text::new(info),
+                            TextFont {
+                                font_size: FontSize::Px(12.0),
+                                font: fonts.gameplay.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.60, 0.65, 0.75)),
                         ));
-                    }
-                });
+                        col.spawn((
+                            Text::new(harp_info),
+                            TextFont {
+                                font_size: FontSize::Px(11.0),
+                                font: fonts.gameplay.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.45, 0.72, 0.55)),
+                        ));
+                        if let Some(desc) = description {
+                            col.spawn((
+                                Text::new(desc.to_string()),
+                                TextFont {
+                                    font_size: FontSize::Px(10.0),
+                                    font: fonts.gameplay.clone(),
+                                    ..default()
+                                },
+                                TextColor(Color::srgb(0.50, 0.50, 0.55)),
+                            ));
+                        }
+                        if let Some(author) = chart_author {
+                            col.spawn((
+                                Text::new(format!("Chart: {author}")),
+                                TextFont {
+                                    font_size: FontSize::Px(9.0),
+                                    font: fonts.gameplay.clone(),
+                                    ..default()
+                                },
+                                TextColor(Color::srgb(0.40, 0.40, 0.45)),
+                            ));
+                        }
+                    });
 
                 // Live phrase / groove banner (driven by phrase_overlay::update_phrase)
                 spawn_phrase_banner(right, &fonts.gameplay);
 
                 // 12-bar blues grid
-                right.spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(3.0),
-                    ..default()
-                })
-                .with_children(|grid| {
-                    spawn_12_bar_grid(grid, &chords, key, &fonts.gameplay, &GridConfig::for_2d());
-                });
+                right
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(3.0),
+                        ..default()
+                    })
+                    .with_children(|grid| {
+                        spawn_12_bar_grid(
+                            grid,
+                            &chords,
+                            key,
+                            &fonts.gameplay,
+                            &GridConfig::for_2d(),
+                        );
+                    });
 
                 // Metronome
-                right.spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(6.0),
-                    ..default()
-                })
-                .with_children(|metro| {
-                    spawn_metronome(metro, beats_per_bar, bpm, &fonts.gameplay);
-                });
+                right
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(6.0),
+                        ..default()
+                    })
+                    .with_children(|metro| {
+                        spawn_metronome(metro, beats_per_bar, bpm, &fonts.gameplay);
+                    });
 
                 // Technique colour legend
                 spawn_modifier_legend(right, &fonts.gameplay, &legend_materials);
 
                 // Score
-                right.spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(2.0),
-                    ..default()
-                })
-                .with_children(|p| {
-                    p.spawn((
-                        Text::new("0"),
-                        TextFont { font_size: FontSize::Px(28.0), font: fonts.gameplay.clone(), ..default() },
-                        TextColor(Color::WHITE),
-                        ScoreText,
-                    ));
-                    p.spawn((
-                        Text::new(""),
-                        TextFont { font_size: FontSize::Px(14.0), font: fonts.gameplay.clone(), ..default() },
-                        TextColor(Color::srgb(0.90, 0.72, 0.20)),
-                        ComboText,
-                    ));
-                    p.spawn((
-                        Text::new(""),
-                        TextFont { font_size: FontSize::Px(20.0), font: fonts.gameplay.clone(), ..default() },
-                        TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
-                        FeedbackText,
-                    ));
-                });
+                right
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(2.0),
+                        ..default()
+                    })
+                    .with_children(|p| {
+                        p.spawn((
+                            Text::new("0"),
+                            TextFont {
+                                font_size: FontSize::Px(28.0),
+                                font: fonts.gameplay.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                            ScoreText,
+                        ));
+                        p.spawn((
+                            Text::new(""),
+                            TextFont {
+                                font_size: FontSize::Px(14.0),
+                                font: fonts.gameplay.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.90, 0.72, 0.20)),
+                            ComboText,
+                        ));
+                        p.spawn((
+                            Text::new(""),
+                            TextFont {
+                                font_size: FontSize::Px(20.0),
+                                font: fonts.gameplay.clone(),
+                                ..default()
+                            },
+                            TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                            FeedbackText,
+                        ));
+                    });
             });
-
         });
     spawn_song_progress(&mut commands);
     spawn_countdown(&mut commands, &fonts.gameplay);
@@ -546,7 +590,10 @@ fn spawn_highway(
                             ..default()
                         },
                         Text::new(tag),
-                        TextFont { font_size: FontSize::Px(8.0), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(8.0),
+                            ..default()
+                        },
                         TextColor(Color::srgba(0.95, 0.95, 1.0, 0.75)),
                     ));
                 }
@@ -628,17 +675,29 @@ fn spawn_harmonica_strip(
             .with_children(|cell| {
                 cell.spawn((
                     Text::new(b),
-                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(11.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 cell.spawn((
                     Text::new(format!("{hole}")),
-                    TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(16.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::WHITE),
                 ));
                 cell.spawn((
                     Text::new(d),
-                    TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(11.0),
+                        font: font.clone(),
+                        ..default()
+                    },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
             });
@@ -654,12 +713,20 @@ fn spawn_harmonica_strip(
     .with_children(|leg| {
         leg.spawn((
             Text::new("\u{25A0} BLOW"),
-            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+            TextFont {
+                font_size: FontSize::Px(11.0),
+                font: font.clone(),
+                ..default()
+            },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
         leg.spawn((
             Text::new("\u{25A0} DRAW"),
-            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+            TextFont {
+                font_size: FontSize::Px(11.0),
+                font: font.clone(),
+                ..default()
+            },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));
     });
@@ -803,7 +870,11 @@ pub fn update_holes(
             state.is_blow = is_blow;
         }
 
-        let factor = if target > state.brightness { attack } else { decay };
+        let factor = if target > state.brightness {
+            attack
+        } else {
+            decay
+        };
         state.brightness += (target - state.brightness) * factor;
         let b = state.brightness;
 
@@ -855,7 +926,10 @@ mod tests {
     fn head_bottom_descends_over_time() {
         let b0 = note_head_bottom_pct(2.0, 0.0, LOOKAHEAD);
         let b1 = note_head_bottom_pct(2.0, 1.0, LOOKAHEAD);
-        assert!(b1 < b0, "head should fall (smaller bottom%) as time advances");
+        assert!(
+            b1 < b0,
+            "head should fall (smaller bottom%) as time advances"
+        );
     }
 
     #[test]
@@ -880,9 +954,18 @@ mod tests {
     #[test]
     fn techniques_extract_each_dimension() {
         let mods = [
-            Modifier::Vibrato { oscillation_hz: 5.0, intensity: Some(0.8) },
-            Modifier::Bend { semitones: -2.0, intensity: None },
-            Modifier::WahWah { oscillation_hz: 3.0, intensity: Some(0.4) },
+            Modifier::Vibrato {
+                oscillation_hz: 5.0,
+                intensity: Some(0.8),
+            },
+            Modifier::Bend {
+                semitones: -2.0,
+                intensity: None,
+            },
+            Modifier::WahWah {
+                oscillation_hz: 3.0,
+                intensity: Some(0.4),
+            },
         ];
         let (vib, shift, wah) = note_techniques(Some(&mods));
         assert_eq!(vib, Some(0.8));
@@ -916,9 +999,27 @@ mod tests {
     #[test]
     fn anim_mode_maps_each_technique() {
         assert_eq!(note_anim_mode(None), 0.0);
-        assert_eq!(note_anim_mode(Some(&[Modifier::Bend { semitones: -1.0, intensity: None }])), 1.0);
-        assert_eq!(note_anim_mode(Some(&[Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }])), 2.0);
-        assert_eq!(note_anim_mode(Some(&[Modifier::WahWah { oscillation_hz: 3.0, intensity: None }])), 3.0);
+        assert_eq!(
+            note_anim_mode(Some(&[Modifier::Bend {
+                semitones: -1.0,
+                intensity: None
+            }])),
+            1.0
+        );
+        assert_eq!(
+            note_anim_mode(Some(&[Modifier::Vibrato {
+                oscillation_hz: 5.0,
+                intensity: None
+            }])),
+            2.0
+        );
+        assert_eq!(
+            note_anim_mode(Some(&[Modifier::WahWah {
+                oscillation_hz: 3.0,
+                intensity: None
+            }])),
+            3.0
+        );
         assert_eq!(note_anim_mode(Some(&[Modifier::Overblow])), 4.0);
         assert_eq!(note_anim_mode(Some(&[Modifier::Overdraw])), 5.0);
     }
@@ -926,8 +1027,14 @@ mod tests {
     #[test]
     fn anim_mode_uses_the_first_modifier() {
         let mods = [
-            Modifier::WahWah { oscillation_hz: 3.0, intensity: None },
-            Modifier::Bend { semitones: -1.0, intensity: None },
+            Modifier::WahWah {
+                oscillation_hz: 3.0,
+                intensity: None,
+            },
+            Modifier::Bend {
+                semitones: -1.0,
+                intensity: None,
+            },
         ];
         assert_eq!(note_anim_mode(Some(&mods)), 3.0);
     }

@@ -18,7 +18,9 @@ use crate::assets_management::{
 };
 use crate::settings::AudioSettings;
 
-use super::{MenuButton, MenuPage, MenuRoot, btn_default, cleanup_menu, spawn_button, spawn_menu_root};
+use super::{
+    MenuButton, MenuPage, MenuRoot, btn_default, cleanup_menu, spawn_button, spawn_menu_root,
+};
 
 /// Owns the Options page: builds it on entry, tears it down on exit, and runs
 /// the slider/preview interaction systems while it's open.
@@ -172,15 +174,33 @@ fn setup_options_menu(
 
     // 2D previews are tinted here; 3D previews already baked the tint into the
     // rendered texture, so they're shown untinted (white).
-    spawn_theme_row(&mut commands, root, &font.gameplay, "2D notes", &previews_2d, blow, |n| {
-        NoteTheme2dButton(n.to_string())
-    });
-    spawn_theme_row(&mut commands, root, &font.gameplay, "3D notes", &previews_3d, Color::WHITE, |n| {
-        NoteTheme3dButton(n.to_string())
-    });
-    spawn_theme_row(&mut commands, root, &font.gameplay, "Harmonica", &previews_harmonica, Color::WHITE, |n| {
-        HarmonicaButton(n.to_string())
-    });
+    spawn_theme_row(
+        &mut commands,
+        root,
+        &font.gameplay,
+        "2D notes",
+        &previews_2d,
+        blow,
+        |n| NoteTheme2dButton(n.to_string()),
+    );
+    spawn_theme_row(
+        &mut commands,
+        root,
+        &font.gameplay,
+        "3D notes",
+        &previews_3d,
+        Color::WHITE,
+        |n| NoteTheme3dButton(n.to_string()),
+    );
+    spawn_theme_row(
+        &mut commands,
+        root,
+        &font.gameplay,
+        "Harmonica",
+        &previews_harmonica,
+        Color::WHITE,
+        |n| HarmonicaButton(n.to_string()),
+    );
 
     spawn_button(
         &mut commands,
@@ -351,8 +371,12 @@ fn spawn_harmonica_preview(
     // layer from `propagate_preview_layers` (they don't inherit it on spawn).
     commands.spawn((
         WorldAssetRoot(asset_server.load(format!("harmonicas/3d/{model}/harmonica.glb#Scene0"))),
-        Transform::from_scale(Vec3::splat(0.1))
-            .with_rotation(Quat::from_euler(EulerRot::YXZ, -0.5, 0.35, 0.0)),
+        Transform::from_scale(Vec3::splat(0.1)).with_rotation(Quat::from_euler(
+            EulerRot::YXZ,
+            -0.5,
+            0.35,
+            0.0,
+        )),
         Visibility::default(),
         layers.clone(),
         PreviewSceneLayer(layers.clone()),

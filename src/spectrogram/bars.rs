@@ -40,9 +40,17 @@ pub fn spawn(parent: &mut ChildSpawnerCommands) {
 }
 
 /// Drives bar heights and colors from the current [`Spectrum`].
-pub fn update_bars(spectrum: Res<Spectrum>, mut bars: Query<(&SpectrumBar, &mut Node, &mut BackgroundColor)>) {
+pub fn update_bars(
+    spectrum: Res<Spectrum>,
+    mut bars: Query<(&SpectrumBar, &mut Node, &mut BackgroundColor)>,
+) {
     for (bar, mut node, mut bg) in &mut bars {
-        let level = spectrum.bands.get(bar.0).copied().unwrap_or(0.0).clamp(0.0, 1.0);
+        let level = spectrum
+            .bands
+            .get(bar.0)
+            .copied()
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0);
         // Keep a 1% floor so idle bars stay visible as a baseline.
         node.height = Val::Percent(1.0 + level * 99.0);
         *bg = BackgroundColor(band_color(bar.0, level));

@@ -77,8 +77,16 @@ pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -
 /// too-short or silent input.
 pub fn analyze(samples: &[f32], sample_rate: u32, state: &mut FftState) -> Analysis {
     let n = samples.len();
-    let freq_res = if n > 0 { sample_rate as f32 / n as f32 } else { 0.0 };
-    let silent = Analysis { pitches: vec![], magnitudes: vec![], freq_res };
+    let freq_res = if n > 0 {
+        sample_rate as f32 / n as f32
+    } else {
+        0.0
+    };
+    let silent = Analysis {
+        pitches: vec![],
+        magnitudes: vec![],
+        freq_res,
+    };
 
     if n < 2 {
         return silent;
@@ -111,7 +119,11 @@ pub fn analyze(samples: &[f32], sample_rate: u32, state: &mut FftState) -> Analy
     let magnitudes: Vec<f32> = buffer[..half].iter().map(|c| c.norm()).collect();
     let pitches = pitches_from_magnitudes(&magnitudes, freq_res);
 
-    Analysis { pitches, magnitudes, freq_res }
+    Analysis {
+        pitches,
+        magnitudes,
+        freq_res,
+    }
 }
 
 /// Peak-picks fundamentals from a precomputed magnitude spectrum.
