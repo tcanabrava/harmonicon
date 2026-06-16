@@ -148,7 +148,10 @@ impl Harmonica {
             Harmonica::Chromatic {
                 layout: Some(l), ..
             } => {
-                for notes in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide].into_iter().flatten() {
+                for notes in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide]
+                    .into_iter()
+                    .flatten()
+                {
                     for n in notes {
                         set.insert(n.clone());
                     }

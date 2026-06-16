@@ -801,9 +801,10 @@ pub fn update_note_visuals(
                 head.color = tint;
             }
             if let Ok(tail) = tails.get(*child)
-                && let Some(mut material) = shape_materials.get_mut(&tail.0) {
-                    material.color = tint.to_linear();
-                }
+                && let Some(mut material) = shape_materials.get_mut(&tail.0)
+            {
+                material.color = tint.to_linear();
+            }
         }
     }
 }

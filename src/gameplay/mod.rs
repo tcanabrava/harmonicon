@@ -506,30 +506,31 @@ fn setup_scoring_config(
     // Set up loop section if the chart requests repeat playback.
     *loop_cfg = LoopConfig::default();
     if let Some(ls) = &chart.loop_section
-        && ls.repeat == Some(true) {
-            let track = &chart.track;
-            let si = ls.start_index;
-            let ei = ls.end_index;
-            if si < track.len() && ei < track.len() && si <= ei {
-                let resolve = |i: usize| -> f64 {
-                    track[i].time.unwrap_or_else(|| {
-                        let tick = track[i].tick.unwrap_or(0);
-                        crate::song::chart::tick_to_seconds(
-                            tick,
-                            chart.timing.resolution,
-                            &chart.timing.tempo_map,
-                        )
-                    })
-                };
-                loop_cfg.active = true;
-                loop_cfg.start_time = resolve(si);
-                loop_cfg.end_time = resolve(ei) + track[ei].duration;
-                info!(
-                    "Loop section ({:?}): {:.2}s – {:.2}s",
-                    ls.section_type, loop_cfg.start_time, loop_cfg.end_time,
-                );
-            }
+        && ls.repeat == Some(true)
+    {
+        let track = &chart.track;
+        let si = ls.start_index;
+        let ei = ls.end_index;
+        if si < track.len() && ei < track.len() && si <= ei {
+            let resolve = |i: usize| -> f64 {
+                track[i].time.unwrap_or_else(|| {
+                    let tick = track[i].tick.unwrap_or(0);
+                    crate::song::chart::tick_to_seconds(
+                        tick,
+                        chart.timing.resolution,
+                        &chart.timing.tempo_map,
+                    )
+                })
+            };
+            loop_cfg.active = true;
+            loop_cfg.start_time = resolve(si);
+            loop_cfg.end_time = resolve(ei) + track[ei].duration;
+            info!(
+                "Loop section ({:?}): {:.2}s – {:.2}s",
+                ls.section_type, loop_cfg.start_time, loop_cfg.end_time,
+            );
         }
+    }
 
     // Song end = last note's end + a tail, so the results screen appears once the
     // content finishes. Looping songs never end.
@@ -540,9 +541,7 @@ fn setup_scoring_config(
     };
 
     // Resolve fx_mapping: modifier name → DSP effect processor name.
-    fx_mapping.0 = chart
-        .fx_mapping.clone()
-        .unwrap_or_default();
+    fx_mapping.0 = chart.fx_mapping.clone().unwrap_or_default();
 
     info!(
         "Scoring config: perfect={:.0}ms good={:.0}ms miss={:.0}ms combo={} beats/bar={}",

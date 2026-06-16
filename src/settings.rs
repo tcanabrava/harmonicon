@@ -81,10 +81,11 @@ fn save_settings(settings: &Settings) {
         return;
     };
     if let Some(parent) = path.parent()
-        && let Err(err) = std::fs::create_dir_all(parent) {
-            warn!("Could not create config dir {}: {err}", parent.display());
-            return;
-        }
+        && let Err(err) = std::fs::create_dir_all(parent)
+    {
+        warn!("Could not create config dir {}: {err}", parent.display());
+        return;
+    }
     match serde_json::to_string_pretty(settings) {
         Ok(json) => {
             if let Err(err) = std::fs::write(&path, json) {

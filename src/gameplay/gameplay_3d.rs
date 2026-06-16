@@ -868,14 +868,16 @@ pub fn update_note_visuals_3d(
         };
         for child in children {
             if let Ok(h) = heads.get(*child)
-                && let Some(mut m) = std_materials.get_mut(&h.0) {
-                    m.base_color = base;
-                    m.emissive = emissive;
-                }
+                && let Some(mut m) = std_materials.get_mut(&h.0)
+            {
+                m.base_color = base;
+                m.emissive = emissive;
+            }
             if let Ok(h) = tails.get(*child)
-                && let Some(mut m) = tail_materials.get_mut(&h.0) {
-                    m.color = tail_color;
-                }
+                && let Some(mut m) = tail_materials.get_mut(&h.0)
+            {
+                m.color = tail_color;
+            }
         }
     }
 }
