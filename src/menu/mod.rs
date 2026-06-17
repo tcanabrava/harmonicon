@@ -6,6 +6,7 @@ use crate::assets_management::{AvailableSongs, GlobalFonts};
 use crate::song::SongManifest;
 
 mod calibration;
+mod credits;
 mod options;
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
@@ -42,6 +43,8 @@ pub enum AppState {
     Results,
     /// Latency calibration screen (outside the menu sub-state hierarchy).
     Calibration,
+    /// Credits screen with scrolling text and 3D harmonica background.
+    Credits,
 }
 
 // ── Menu sub-states (only active while AppState == Menu) ──────────────────────
@@ -109,6 +112,7 @@ impl Plugin for MenuPlugin {
             // The Options and Calibration pages own their own lifecycles.
             .add_plugins(options::OptionsPlugin)
             .add_plugins(calibration::CalibrationPlugin)
+            .add_plugins(credits::CreditsPlugin)
             .add_systems(OnEnter(AppState::Menu), route_menu_entry)
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main), setup_main_menu)
@@ -378,7 +382,7 @@ pub(super) fn menu_nav(button: &MenuButton) -> MenuNav {
     match button {
         MenuButton::Play => MenuNav::To(MenuPage::Play),
         MenuButton::Options => MenuNav::To(MenuPage::Options),
-        MenuButton::Credits => MenuNav::Stay,
+        MenuButton::Credits => MenuNav::Enter(AppState::Credits),
         MenuButton::Quit => MenuNav::Quit,
         // The render mode is chosen up front, before picking a song.
         MenuButton::PlaySong => MenuNav::To(MenuPage::ModeSelect),
@@ -516,7 +520,7 @@ mod tests {
         assert_eq!(menu_nav(&BackToMain), MenuNav::To(MenuPage::Main));
         // Terminal actions.
         assert_eq!(menu_nav(&Quit), MenuNav::Quit);
-        assert_eq!(menu_nav(&Credits), MenuNav::Stay);
+        assert_eq!(menu_nav(&Credits), MenuNav::Enter(AppState::Credits));
     }
 
     // Records page enter/exit so the close-then-open order can be asserted.
