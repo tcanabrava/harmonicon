@@ -229,18 +229,26 @@ pub fn compute_waveform(samples: &[f32], points: usize) -> Vec<f32> {
         .collect()
 }
 
+/// Smooth one band level toward `target`: fast `attack` when rising, slow `decay`
+/// when falling, so bands jump up with the sound and ease back down. `attack` and
+/// `decay` are per-frame interpolation factors in 0..1.
+fn smooth_toward(current: f32, target: f32, attack: f32, decay: f32) -> f32 {
+    let k = if target > current { attack } else { decay };
+    current + (target - current) * k
+}
+
 /// Reduces the published [`AudioFrame`] into [`Spectrum`]: bands are smoothed
 /// (fast attack, slow decay) so they rise sharply and fall gracefully; the
-/// waveform is taken instantaneously (the trigger keeps it steady).
-fn analyze_audio(frame: Res<AudioFrame>, time: Res<Time>, mut spectrum: ResMut<Spectrum>) {
+/// waveform is taken instantaneously (the trigger keeps it steady). Reuses the
+/// audio pipeline's FFT via [`AudioFrame`] — it never runs its own.
+fn analyze_audio(frame: Res<AudioFrame>, time: Res<Time<Real>>, mut spectrum: ResMut<Spectrum>) {
     let target = bands_from_magnitudes(&frame.magnitudes, frame.freq_res);
 
     let dt = time.delta_secs();
     let attack = 1.0 - (-dt * 30.0).exp();
     let decay = 1.0 - (-dt * 8.0).exp();
     for (cur, &tgt) in spectrum.bands.iter_mut().zip(target.iter()) {
-        let k = if tgt > *cur { attack } else { decay };
-        *cur += (tgt - *cur) * k;
+        *cur = smooth_toward(*cur, tgt, attack, decay);
     }
 
     spectrum.waveform = compute_waveform(&frame.samples, WAVE_POINTS);
@@ -309,5 +317,80 @@ mod tests {
         // Auto-gain: a quarter-scale sine should still reach near full deflection.
         let peak = wave.iter().fold(0.0f32, |m, &v| m.max(v.abs()));
         assert!(peak > 0.8, "auto-gain should fill the trace, peak {peak}");
+    }
+
+    // ── style switching (the V key) ───────────────────────────────────────────
+
+    #[test]
+    fn style_next_cycles_through_all_styles() {
+        // V cycles forward and returns to the start — every style is reachable and
+        // the cycle never gets stuck on one.
+        let start = SpectrogramStyle::default();
+        assert_eq!(start, SpectrogramStyle::Bars);
+        assert_eq!(start.next(), SpectrogramStyle::Oscilloscope);
+        assert_eq!(start.next().next(), start, "cycle returns to the start");
+    }
+
+    // ── band smoothing (reacts, doesn't freeze) ───────────────────────────────
+
+    #[test]
+    fn smoothing_rises_fast_and_falls_slow() {
+        // Same distance, but attack > decay: rising moves further than falling.
+        let up = smooth_toward(0.0, 1.0, 0.5, 0.1);
+        let down = smooth_toward(1.0, 0.0, 0.5, 0.1);
+        assert!((up - 0.5).abs() < 1e-6, "attack moves halfway up, got {up}");
+        assert!((down - 0.9).abs() < 1e-6, "decay eases down slowly, got {down}");
+    }
+
+    #[test]
+    fn smoothing_converges_toward_the_target() {
+        // Repeated frames keep moving toward the target (the bars never freeze).
+        let mut v = 0.0;
+        let mut prev = -1.0;
+        for _ in 0..20 {
+            v = smooth_toward(v, 1.0, 0.3, 0.1);
+            assert!(v > prev, "must keep rising toward the target");
+            prev = v;
+        }
+        assert!(v > 0.9, "approaches the target after enough frames, got {v}");
+    }
+
+    // ── analyze_audio: reacts to the shared frame, reuses its FFT ──────────────
+
+    #[test]
+    fn analyze_audio_reacts_to_the_shared_audio_frame() {
+        use std::time::Duration;
+
+        // A published frame: a magnitude spike (no FFT done here — the system
+        // consumes the pipeline's spectrum) plus a sine block for the waveform.
+        let freq_res = 10.0;
+        let mut magnitudes = vec![0.001f32; 512];
+        magnitudes[(440.0 / freq_res) as usize] = 1.0;
+        let samples: Vec<f32> = (0..4096)
+            .map(|i| (2.0 * std::f32::consts::PI * 200.0 * i as f32 / 44_100.0).sin() * 0.3)
+            .collect();
+
+        let mut world = World::new();
+        world.insert_resource(AudioFrame { samples, magnitudes, freq_res });
+        world.insert_resource(Spectrum::default());
+        let mut t = Time::<Real>::default();
+        t.advance_by(Duration::from_millis(16));
+        world.insert_resource(t);
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(analyze_audio);
+        schedule.run(&mut world);
+
+        let spectrum = world.resource::<Spectrum>();
+        // Bands moved off zero toward the spike (reacts to the captured audio).
+        assert!(
+            spectrum.bands.iter().any(|&b| b > 0.0),
+            "bands should react to the published spectrum"
+        );
+        // The waveform was filled from the frame's samples.
+        assert!(
+            spectrum.waveform.iter().any(|&v| v != 0.0),
+            "waveform should react to the published samples"
+        );
     }
 }
