@@ -226,6 +226,12 @@ pub struct SongStats {
     pub good: u32,
     pub delayed: u32,
     pub miss: u32,
+    /// Sum of compensated timing offsets (seconds) for every hit. Divide by hit
+    /// count (`perfect + good + delayed`) to get the mean offset. Positive means
+    /// the player is still sounding notes after the target time even with the
+    /// current `input_latency_ms` applied; increasing that setting by the mean
+    /// (in ms) should centre the distribution.
+    pub offset_sum: f64,
 }
 
 /// Gameplay-clock time at which the song's content ends (so the results screen
@@ -585,6 +591,7 @@ fn collect_pitches(mut reader: MessageReader<PitchEvent>, mut active: ResMut<Act
 fn update_active_targets(
     clock: Res<GameplayClock>,
     config: Res<ScoringConfig>,
+    audio: Res<AudioSettings>,
     notes: Query<&ScheduledNote>,
     mut targets: ResMut<ActiveTargets>,
 ) {
@@ -592,11 +599,15 @@ fn update_active_targets(
     if clock.0 < 0.0 {
         return;
     }
+    // Shift the judgment point back by the microphone pipeline latency so the
+    // highlighted hole tracks what the player is *actually* hearing, not what
+    // the raw clock says.
+    let judged = clock.0 - audio.input_latency_ms as f64 / 1000.0;
     for note in &notes {
         if note.hit || note.missed {
             continue;
         }
-        if (clock.0 - note.time).abs() <= config.good_window {
+        if (judged - note.time).abs() <= config.good_window {
             targets.0.push((note.hole, note.is_blow));
         }
     }
@@ -608,6 +619,7 @@ fn score_notes(
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
+    audio: Res<AudioSettings>,
     fx_mapping: Res<FxMapping>,
     mut notes: Query<&mut ScheduledNote>,
     mut score: ResMut<Score>,
@@ -619,6 +631,9 @@ fn score_notes(
         return;
     }
     let dt = time.delta_secs_f64();
+    // Compensate for microphone pipeline latency: a pitch detected at clock T
+    // was actually played at T - latency. Shift the judgment window accordingly.
+    let judged = clock.0 - audio.input_latency_ms as f64 / 1000.0;
 
     if config.combo_enabled
         && should_decay_combo(score.combo, clock.0, score.last_hit_time, config.decay_secs)
@@ -661,7 +676,7 @@ fn score_notes(
             continue;
         }
 
-        let offset = clock.0 - note.time;
+        let offset = judged - note.time;
         // A note counts as "playing" only on a fresh attack: the pitch must be
         // sounding and not already consumed by an earlier note in this sustain.
         let playing = gate.is_fresh(&note.expected_pitch, &harp_pitches);
@@ -692,6 +707,7 @@ fn score_notes(
                     HitQuality::Good if offset > 0.0 => stats.delayed += 1,
                     HitQuality::Good => stats.good += 1,
                 }
+                stats.offset_sum += offset;
                 score.last_hit_time = clock.0;
                 score.combo += 1;
                 score.max_combo = score.max_combo.max(score.combo);

@@ -24,6 +24,11 @@ use crate::assets_management::{SelectedHarmonicaModel, SelectedNoteTheme2d, Sele
 pub struct AudioSettings {
     pub music_volume: f32,
     pub metronome_volume: f32,
+    /// Milliseconds subtracted from the gameplay clock when judging whether
+    /// a detected pitch was played in time. Compensates for the microphone
+    /// input pipeline (FFT window ≈ 46 ms, OS buffer, cpal callback).
+    /// Typical values: 50–100 ms for USB/built-in microphones.
+    pub input_latency_ms: i32,
 }
 
 impl Default for AudioSettings {
@@ -31,6 +36,7 @@ impl Default for AudioSettings {
         Self {
             music_volume: 0.8,
             metronome_volume: 0.7,
+            input_latency_ms: 0,
         }
     }
 }
@@ -42,6 +48,7 @@ impl Default for AudioSettings {
 struct Settings {
     music_volume: f32,
     metronome_volume: f32,
+    input_latency_ms: i32,
     note_theme_2d: String,
     note_theme_3d: String,
     harmonica_model: String,
@@ -52,6 +59,7 @@ impl Default for Settings {
         Self {
             music_volume: 0.8,
             metronome_volume: 0.7,
+            input_latency_ms: 0,
             note_theme_2d: "circular".into(),
             note_theme_3d: "circular".into(),
             harmonica_model: "default".into(),
@@ -131,12 +139,14 @@ fn apply_loaded_settings(
     let settings = load_settings();
     audio.music_volume = settings.music_volume;
     audio.metronome_volume = settings.metronome_volume;
+    audio.input_latency_ms = settings.input_latency_ms;
     theme_2d.0 = settings.note_theme_2d;
     theme_3d.0 = settings.note_theme_3d;
     model.0 = settings.harmonica_model;
     info!(
-        "Loaded settings: music={:.2} metronome={:.2} themes(2d={}, 3d={}) harmonica={}",
-        audio.music_volume, audio.metronome_volume, theme_2d.0, theme_3d.0, model.0,
+        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={}",
+        audio.music_volume, audio.metronome_volume, audio.input_latency_ms,
+        theme_2d.0, theme_3d.0, model.0,
     );
 }
 
@@ -150,6 +160,7 @@ fn persist_settings(
     save_settings(&Settings {
         music_volume: audio.music_volume,
         metronome_volume: audio.metronome_volume,
+        input_latency_ms: audio.input_latency_ms,
         note_theme_2d: theme_2d.0.clone(),
         note_theme_3d: theme_3d.0.clone(),
         harmonica_model: model.0.clone(),

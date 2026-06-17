@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use crate::assets_management::{AvailableSongs, GlobalFonts};
 use crate::song::SongManifest;
 
+mod calibration;
 mod options;
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
@@ -21,6 +22,11 @@ pub enum GameplayMode {
 #[derive(Resource, Default)]
 pub struct ReturnToSongList(pub bool);
 
+/// Set to `true` by the calibration screen so that returning to `AppState::Menu`
+/// lands on the Options page (where the Input lag slider lives).
+#[derive(Resource, Default)]
+pub struct ReturnToOptions(pub bool);
+
 pub struct MenuPlugin;
 
 // ── App-level states ──────────────────────────────────────────────────────────
@@ -34,6 +40,8 @@ pub enum AppState {
     Playing,
     /// Post-song results / statistics screen.
     Results,
+    /// Latency calibration screen (outside the menu sub-state hierarchy).
+    Calibration,
 }
 
 // ── Menu sub-states (only active while AppState == Menu) ──────────────────────
@@ -84,6 +92,8 @@ pub(super) enum MenuButton {
     BackToMain,
     BackToPlay,
     BackToArtistList,
+    // Options utilities
+    Calibrate,
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
@@ -95,8 +105,10 @@ impl Plugin for MenuPlugin {
             .init_resource::<SelectedArtist>()
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
-            // The Options page owns its own lifecycle.
+            .init_resource::<ReturnToOptions>()
+            // The Options and Calibration pages own their own lifecycles.
             .add_plugins(options::OptionsPlugin)
+            .add_plugins(calibration::CalibrationPlugin)
             .add_systems(OnEnter(AppState::Menu), route_menu_entry)
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main), setup_main_menu)
@@ -378,6 +390,7 @@ pub(super) fn menu_nav(button: &MenuButton) -> MenuNav {
         MenuButton::BackToMain => MenuNav::To(MenuPage::Main),
         MenuButton::BackToPlay => MenuNav::To(MenuPage::Play),
         MenuButton::BackToArtistList => MenuNav::To(MenuPage::ArtistList),
+        MenuButton::Calibrate => MenuNav::Enter(AppState::Calibration),
     }
 }
 
@@ -457,11 +470,18 @@ pub(super) fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<Men
 
 /// On entering the menu, jump straight to the song list if we just quit a song
 /// (so "Quit Song" returns to the list, not the main menu). Otherwise the menu
-/// opens on its default page (Main).
-fn route_menu_entry(mut ret: ResMut<ReturnToSongList>, mut next_page: ResMut<NextState<MenuPage>>) {
-    if ret.0 {
-        ret.0 = false;
+/// opens on its default page (Main), unless a return-to flag says otherwise.
+fn route_menu_entry(
+    mut ret_song: ResMut<ReturnToSongList>,
+    mut ret_opts: ResMut<ReturnToOptions>,
+    mut next_page: ResMut<NextState<MenuPage>>,
+) {
+    if ret_song.0 {
+        ret_song.0 = false;
         next_page.set(MenuPage::SongList);
+    } else if ret_opts.0 {
+        ret_opts.0 = false;
+        next_page.set(MenuPage::Options);
     }
 }
 #[cfg(test)]

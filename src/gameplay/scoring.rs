@@ -209,6 +209,38 @@ mod tests {
         );
     }
 
+    // ── input latency offset ──────────────────────────────────────────────────
+
+    #[test]
+    fn latency_offset_turns_late_good_into_perfect() {
+        // Without compensation: a note at t=1.0 detected at clock=1.070 has
+        // offset +70 ms — just outside the ±60 ms perfect window.
+        let raw_offset = 1.070 - 1.0;
+        assert_eq!(
+            classify_note(raw_offset, true, 0.060, 0.130, 0.130),
+            NoteOutcome::Hit(HitQuality::Good),
+            "raw offset should be a late Good"
+        );
+
+        // With 70 ms compensation: judged = 1.070 - 0.070 = 1.000 → offset 0 ms.
+        let judged_offset = (1.070 - 0.070) - 1.0;
+        assert_eq!(
+            classify_note(judged_offset, true, 0.060, 0.130, 0.130),
+            NoteOutcome::Hit(HitQuality::Perfect),
+            "compensated offset should be Perfect"
+        );
+    }
+
+    #[test]
+    fn zero_latency_offset_changes_nothing() {
+        // offset = 0.0 → compensated offset = 0.0 - 0.0 = 0.0, still Perfect.
+        let offset = 0.020 - 0.0; // 20 ms early relative to note
+        assert_eq!(
+            classify_note(offset - 0.0, true, 0.060, 0.130, 0.130),
+            classify_note(offset, true, 0.060, 0.130, 0.130),
+        );
+    }
+
     // ── compute_multiplier ────────────────────────────────────────────────────
 
     #[test]

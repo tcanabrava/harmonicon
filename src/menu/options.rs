@@ -35,6 +35,8 @@ impl Plugin for OptionsPlugin {
                 (
                     drag_sliders,
                     update_sliders,
+                    drag_latency_slider,
+                    update_latency_slider,
                     handle_theme_buttons_2d,
                     theme_button_visuals_2d,
                     handle_theme_buttons_3d,
@@ -83,6 +85,18 @@ struct HarmonicaButton(String);
 #[derive(Component)]
 struct PreviewSceneLayer(RenderLayers);
 
+/// Marks the drag track of the input-latency slider.
+#[derive(Component)]
+struct LatencySlider;
+
+/// The fill bar inside the latency slider track.
+#[derive(Component)]
+struct LatencySliderFill;
+
+/// The "Xms" readout beside the latency slider.
+#[derive(Component)]
+struct LatencySliderLabel;
+
 /// Current level for a given slider kind.
 fn audio_level(settings: &AudioSettings, kind: VolumeSlider) -> f32 {
     match kind {
@@ -120,6 +134,12 @@ fn setup_options_menu(
         "Metronome",
         VolumeSlider::Metronome,
         settings.metronome_volume,
+    );
+    spawn_latency_slider(
+        &mut commands,
+        root,
+        &font.gameplay,
+        settings.input_latency_ms,
     );
 
     // The blow-note tint, so the previews read like an in-game note.
@@ -202,6 +222,13 @@ fn setup_options_menu(
         |n| HarmonicaButton(n.to_string()),
     );
 
+    spawn_button(
+        &mut commands,
+        root,
+        &font.gameplay,
+        "Calibrate input lag",
+        MenuButton::Calibrate,
+    );
     spawn_button(
         &mut commands,
         root,
@@ -603,6 +630,124 @@ fn spawn_volume_slider(
     });
 
     commands.entity(parent).add_child(row);
+}
+
+// ── Input-latency slider ──────────────────────────────────────────────────────
+
+const LATENCY_MAX_MS: i32 = 200;
+
+/// One labelled slider row for the mic input-latency offset.
+/// The track maps 0–200 ms linearly; the label shows "Xms".
+fn spawn_latency_slider(
+    commands: &mut Commands,
+    parent: Entity,
+    font: &FontSource,
+    value_ms: i32,
+) {
+    let frac = (value_ms as f32 / LATENCY_MAX_MS as f32).clamp(0.0, 1.0);
+
+    let row = commands
+        .spawn(Node {
+            width: Val::Px(420.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(14.0),
+            ..default()
+        })
+        .id();
+
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Node {
+                width: Val::Px(110.0),
+                ..default()
+            },
+            Text::new("Input lag"),
+            TextFont {
+                font_size: FontSize::Px(20.0),
+                font: font.clone(),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+
+        r.spawn((
+            Button,
+            Node {
+                width: Val::Px(220.0),
+                height: Val::Px(14.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
+            RelativeCursorPosition::default(),
+            LatencySlider,
+        ))
+        .with_children(|track| {
+            track.spawn((
+                Node {
+                    width: Val::Percent(frac * 100.0),
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.80, 0.55, 0.25)),
+                LatencySliderFill,
+            ));
+        });
+
+        r.spawn((
+            Node {
+                width: Val::Px(50.0),
+                ..default()
+            },
+            Text::new(format!("{}ms", value_ms)),
+            TextFont {
+                font_size: FontSize::Px(18.0),
+                font: font.clone(),
+                ..default()
+            },
+            TextColor(Color::srgb(0.6, 0.6, 0.7)),
+            LatencySliderLabel,
+        ));
+    });
+
+    commands.entity(parent).add_child(row);
+}
+
+/// While the latency track is pressed, set `input_latency_ms` from cursor position.
+fn drag_latency_slider(
+    mut settings: ResMut<AudioSettings>,
+    sliders: Query<(&Interaction, &RelativeCursorPosition), With<LatencySlider>>,
+) {
+    for (interaction, rel) in &sliders {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let Some(norm) = rel.normalized else {
+            continue;
+        };
+        let ms = ((norm.x + 0.5).clamp(0.0, 1.0) * LATENCY_MAX_MS as f32).round() as i32;
+        if settings.input_latency_ms != ms {
+            settings.input_latency_ms = ms;
+        }
+    }
+}
+
+/// Mirror `input_latency_ms` onto the fill bar and label.
+fn update_latency_slider(
+    settings: Res<AudioSettings>,
+    mut fills: Query<&mut Node, With<LatencySliderFill>>,
+    mut labels: Query<&mut Text, With<LatencySliderLabel>>,
+) {
+    if !settings.is_changed() {
+        return;
+    }
+    let frac = (settings.input_latency_ms as f32 / LATENCY_MAX_MS as f32).clamp(0.0, 1.0);
+    for mut node in &mut fills {
+        node.width = Val::Percent(frac * 100.0);
+    }
+    for mut text in &mut labels {
+        text.0 = format!("{}ms", settings.input_latency_ms);
+    }
 }
 
 /// While a slider track is pressed, set its level from the cursor's position
