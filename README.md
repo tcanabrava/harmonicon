@@ -207,7 +207,4 @@ cargo run        # play
 
 ## License
 
-No license file is currently included; treat the source as all-rights-reserved
-unless/until a license is added. The bundled song charts are example/educational
-material — the referenced songs and recordings remain the property of their
-respective rights holders.
+MIT 2.0
