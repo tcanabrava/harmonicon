@@ -49,13 +49,11 @@ fn main() {
 
     app.add_message::<PitchEvent>()
         .init_resource::<AudioFrame>()
-        .add_systems(Startup, (spawn_camera, initialize_game))
-        .add_systems(OnEnter(AppState::Playing), setup_audio)
+        .add_systems(Startup, (spawn_camera, initialize_game, setup_audio))
+        .add_systems(Update, process_audio)
         .add_systems(
             Update,
-            (process_audio, print_pitches)
-                .chain()
-                .run_if(in_state(AppState::Playing)),
+            print_pitches.run_if(in_state(AppState::Playing)),
         )
         .run();
 }
