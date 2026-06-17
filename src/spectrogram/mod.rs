@@ -339,7 +339,10 @@ mod tests {
         let up = smooth_toward(0.0, 1.0, 0.5, 0.1);
         let down = smooth_toward(1.0, 0.0, 0.5, 0.1);
         assert!((up - 0.5).abs() < 1e-6, "attack moves halfway up, got {up}");
-        assert!((down - 0.9).abs() < 1e-6, "decay eases down slowly, got {down}");
+        assert!(
+            (down - 0.9).abs() < 1e-6,
+            "decay eases down slowly, got {down}"
+        );
     }
 
     #[test]
@@ -352,7 +355,10 @@ mod tests {
             assert!(v > prev, "must keep rising toward the target");
             prev = v;
         }
-        assert!(v > 0.9, "approaches the target after enough frames, got {v}");
+        assert!(
+            v > 0.9,
+            "approaches the target after enough frames, got {v}"
+        );
     }
 
     // ── analyze_audio: reacts to the shared frame, reuses its FFT ──────────────
@@ -371,7 +377,11 @@ mod tests {
             .collect();
 
         let mut world = World::new();
-        world.insert_resource(AudioFrame { samples, magnitudes, freq_res });
+        world.insert_resource(AudioFrame {
+            samples,
+            magnitudes,
+            freq_res,
+        });
         world.insert_resource(Spectrum::default());
         let mut t = Time::<Real>::default();
         t.advance_by(Duration::from_millis(16));

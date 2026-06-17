@@ -155,15 +155,9 @@ pub(super) fn setup(
                 let new_latency = (audio.input_latency_ms + adjustment).max(0);
                 if adjustment.abs() >= 5 {
                     let hint = if adjustment > 0 {
-                        format!(
-                            "→ Increase Input lag to {}ms in Options",
-                            new_latency
-                        )
+                        format!("→ Increase Input lag to {}ms in Options", new_latency)
                     } else {
-                        format!(
-                            "→ Decrease Input lag to {}ms in Options",
-                            new_latency
-                        )
+                        format!("→ Decrease Input lag to {}ms in Options", new_latency)
                     };
                     root.spawn((
                         Text::new(hint),

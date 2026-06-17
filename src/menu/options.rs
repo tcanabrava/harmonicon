@@ -638,12 +638,7 @@ const LATENCY_MAX_MS: i32 = 200;
 
 /// One labelled slider row for the mic input-latency offset.
 /// The track maps 0–200 ms linearly; the label shows "Xms".
-fn spawn_latency_slider(
-    commands: &mut Commands,
-    parent: Entity,
-    font: &FontSource,
-    value_ms: i32,
-) {
+fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSource, value_ms: i32) {
     let frac = (value_ms as f32 / LATENCY_MAX_MS as f32).clamp(0.0, 1.0);
 
     let row = commands

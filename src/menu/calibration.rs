@@ -15,9 +15,7 @@ use bevy::{
 };
 
 use crate::{
-    assets_management::GlobalFonts,
-    audio_system::pitch_detect::PitchEvent,
-    settings::AudioSettings,
+    assets_management::GlobalFonts, audio_system::pitch_detect::PitchEvent, settings::AudioSettings,
 };
 
 use super::{AppState, ReturnToOptions, btn_default};
@@ -213,10 +211,7 @@ fn play_clicks(
 
 /// On each pitch attack (silence → sound), records the offset vs. the nearest
 /// beat if it's within HIT_WINDOW and past the warmup period.
-fn collect_hits(
-    mut pitches: MessageReader<PitchEvent>,
-    mut cal: ResMut<CalState>,
-) {
+fn collect_hits(mut pitches: MessageReader<PitchEvent>, mut cal: ResMut<CalState>) {
     if cal.phase != CalPhase::Recording {
         return;
     }
@@ -256,10 +251,7 @@ fn collect_hits(
 
 // ── Visual update systems ─────────────────────────────────────────────────────
 
-fn update_beat_dots(
-    cal: Res<CalState>,
-    mut dots: Query<(&BeatDot, &mut BackgroundColor)>,
-) {
+fn update_beat_dots(cal: Res<CalState>, mut dots: Query<(&BeatDot, &mut BackgroundColor)>) {
     let (active, phase_f) = if cal.phase == CalPhase::Recording {
         let pos = cal.clock / BEAT_DUR;
         (pos.floor() as usize % 4, pos.fract() as f32)
@@ -277,10 +269,7 @@ fn update_beat_dots(
     }
 }
 
-fn update_status(
-    cal: Res<CalState>,
-    mut texts: Query<&mut Text, With<CalStatusText>>,
-) {
+fn update_status(cal: Res<CalState>, mut texts: Query<&mut Text, With<CalStatusText>>) {
     if !cal.is_changed() {
         return;
     }
@@ -342,10 +331,18 @@ fn sync_phase_visibility(
     let show_w = cal.phase == CalPhase::Waiting;
     let show_d = cal.phase == CalPhase::Done;
     for mut v in &mut waiting {
-        *v = if show_w { Visibility::Inherited } else { Visibility::Hidden };
+        *v = if show_w {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
     for mut v in &mut done {
-        *v = if show_d { Visibility::Inherited } else { Visibility::Hidden };
+        *v = if show_d {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
 }
 
@@ -367,8 +364,7 @@ fn handle_buttons(
             }
             CalBtn::Apply => {
                 if let Some(ms) = cal.mean_offset_ms() {
-                    audio.input_latency_ms =
-                        (audio.input_latency_ms + ms.round() as i32).max(0);
+                    audio.input_latency_ms = (audio.input_latency_ms + ms.round() as i32).max(0);
                 }
                 return_to_options.0 = true;
                 next_state.set(AppState::Menu);
@@ -422,16 +418,27 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
         // Title
         p.spawn((
             Text::new("Latency Calibration"),
-            TextFont { font_size: FontSize::Px(44.0), font: font.clone(), ..default() },
+            TextFont {
+                font_size: FontSize::Px(44.0),
+                font: font.clone(),
+                ..default()
+            },
             TextColor(Color::WHITE),
         ));
 
         // Instructions / status (updated live)
         p.spawn((
             Text::new("Play any note on each beat.\nThe game measures your mic latency."),
-            TextFont { font_size: FontSize::Px(18.0), font: font.clone(), ..default() },
+            TextFont {
+                font_size: FontSize::Px(18.0),
+                font: font.clone(),
+                ..default()
+            },
             TextColor(Color::srgb(0.65, 0.68, 0.78)),
-            TextLayout { justify: Justify::Center, ..default() },
+            TextLayout {
+                justify: Justify::Center,
+                ..default()
+            },
             CalStatusText,
         ));
 
@@ -469,13 +476,21 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
         .with_children(|block| {
             block.spawn((
                 Text::new("Mean offset: —"),
-                TextFont { font_size: FontSize::Px(22.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(22.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.95, 0.62, 0.30)),
                 CalMeanText,
             ));
             block.spawn((
                 Text::new("Current: —   →   Suggested: —"),
-                TextFont { font_size: FontSize::Px(18.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(18.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.65, 0.68, 0.78)),
                 CalSuggestedText,
             ));
@@ -513,7 +528,12 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
     });
 }
 
-fn spawn_cal_button(parent: &mut ChildSpawnerCommands, font: &FontSource, label: &str, btn: CalBtn) {
+fn spawn_cal_button(
+    parent: &mut ChildSpawnerCommands,
+    font: &FontSource,
+    label: &str,
+    btn: CalBtn,
+) {
     parent
         .spawn((
             Button,
@@ -529,7 +549,11 @@ fn spawn_cal_button(parent: &mut ChildSpawnerCommands, font: &FontSource, label:
         .with_children(|b| {
             b.spawn((
                 Text::new(label.to_string()),
-                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    font: font.clone(),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
         });

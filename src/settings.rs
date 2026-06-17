@@ -145,8 +145,12 @@ fn apply_loaded_settings(
     model.0 = settings.harmonica_model;
     info!(
         "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={}",
-        audio.music_volume, audio.metronome_volume, audio.input_latency_ms,
-        theme_2d.0, theme_3d.0, model.0,
+        audio.music_volume,
+        audio.metronome_volume,
+        audio.input_latency_ms,
+        theme_2d.0,
+        theme_3d.0,
+        model.0,
     );
 }
 
