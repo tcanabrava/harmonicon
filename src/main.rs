@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
-use bevy::winit::WinitWindows;
-use winit::window::Icon;
 
 /// Reverse-DNS app id. On Wayland the icon comes from a matching desktop file
 /// (`<APP_ID>.desktop`); this sets the window's app_id so the compositor can find
