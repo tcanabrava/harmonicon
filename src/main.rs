@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
+use bevy::winit::WinitWindows;
+use winit::window::Icon;
+
+/// Reverse-DNS app id. On Wayland the icon comes from a matching desktop file
+/// (`<APP_ID>.desktop`); this sets the window's app_id so the compositor can find
+/// it. On X11/Windows/macOS the pixel icon set in `set_window_icon` is used.
+const APP_ID: &str = "io.github.tcanabrava.Harmonicon";
 
 use harmonicon::assets_management::AssetsManagementPlugin;
 use harmonicon::audio_system::pitch_detect::AudioFrame;
@@ -18,6 +26,8 @@ fn main() {
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     title: "Harmonicon".into(),
+                    // Wayland app_id / X11 WM_CLASS, so the desktop file's icon is matched.
+                    name: Some(APP_ID.into()),
                     ..default()
                 }),
                 ..default()
@@ -44,6 +54,7 @@ fn main() {
         .init_resource::<AudioFrame>()
         .add_systems(Startup, (spawn_camera, initialize_game))
         .add_systems(OnEnter(AppState::Playing), setup_audio)
+        .add_systems(Update, set_window_icon)
         .add_systems(
             Update,
             (process_audio, print_pitches)
@@ -55,6 +66,39 @@ fn main() {
 
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((Camera2d, Name::new("Camera2d (main)")));
+}
+
+/// Set the window icon from `assets/icons/icon.png` once the winit window exists.
+/// Runs every frame only until it succeeds (the window is created after startup),
+/// then no-ops. Note: native Wayland ignores per-window icons and uses the
+/// desktop file matched by `APP_ID` instead — this covers X11, Windows and macOS.
+fn set_window_icon(
+    mut done: Local<bool>,
+    windows: NonSend<WinitWindows>,
+    primary: Query<Entity, With<PrimaryWindow>>,
+) {
+    if *done {
+        return;
+    }
+    let Ok(entity) = primary.single() else {
+        return;
+    };
+    let Some(window) = windows.get_window(entity) else {
+        return; // window not created yet — try again next frame
+    };
+
+    *done = true; // attempt once; don't keep retrying on failure either
+    match image::open("assets/icons/icon.png") {
+        Ok(image) => {
+            let rgba = image.into_rgba8();
+            let (w, h) = rgba.dimensions();
+            match Icon::from_rgba(rgba.into_raw(), w, h) {
+                Ok(icon) => window.set_window_icon(Some(icon)),
+                Err(e) => warn!("window icon: invalid image data: {e}"),
+            }
+        }
+        Err(e) => warn!("window icon: could not load assets/icons/icon.png: {e}"),
+    }
 }
 
 fn initialize_game(mut next: ResMut<NextState<AppState>>) {

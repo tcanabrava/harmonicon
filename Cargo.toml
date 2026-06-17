@@ -16,6 +16,9 @@ thiserror = "2"
 midly = "0.5"
 figment = { version = "0.10", features = ["json"] }
 dirs = "5"
+# Window icon: winit must match Bevy's version; image decodes the PNG.
+winit = "0.30"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [dependencies.bevy-inspector-egui]
 version = "0.36"

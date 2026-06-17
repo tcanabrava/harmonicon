@@ -4206,12 +4206,14 @@ dependencies = [
  "crossbeam-channel",
  "dirs",
  "figment",
+ "image",
  "jsonschema",
  "midly",
  "rustfft",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "winit",
 ]
 
 [[package]]
