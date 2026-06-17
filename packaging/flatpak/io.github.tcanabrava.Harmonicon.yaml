@@ -1,0 +1,63 @@
+# Flatpak manifest for Harmonicon.
+#
+# Local build + install:
+#   flatpak install -y flathub org.freedesktop.Platform//24.08 \
+#       org.freedesktop.Sdk//24.08 org.freedesktop.Sdk.Extension.rust-stable//24.08
+#   flatpak-builder --user --install --force-clean build-dir \
+#       packaging/flatpak/io.github.tcanabrava.Harmonicon.yaml
+#   flatpak run io.github.tcanabrava.Harmonicon
+#
+# This manifest fetches crates from the network at build time (fine for local
+# builds). For an offline / Flathub build, vendor the dependencies — see
+# packaging/flatpak/README.md.
+id: io.github.tcanabrava.Harmonicon
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: harmonicon
+
+finish-args:
+  # Windowing + GPU (Bevy / wgpu).
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Audio output and microphone input (pitch detection records from the mic).
+  - --socket=pulseaudio
+
+modules:
+  - name: harmonicon
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/harmonicon/cargo
+      # Drop this for an offline (vendored) build.
+      build-args:
+        - --share=network
+    build-commands:
+      # The repo's .cargo/config.toml pins the `wild` linker + clang, neither of
+      # which ship in the SDK; remove it so cargo uses the toolchain defaults.
+      - rm -f .cargo/config.toml
+      - cargo build --release --bin harmonicon
+      # Real binary + a launcher that points Bevy and the CWD-relative reads at
+      # the bundled asset root.
+      - install -Dm755 target/release/harmonicon /app/bin/harmonicon.bin
+      - install -Dm755 packaging/flatpak/harmonicon.sh /app/bin/harmonicon
+      # Game data.
+      - mkdir -p /app/share/harmonicon
+      - cp -r assets /app/share/harmonicon/
+      - find /app/share/harmonicon/assets -name '*~' -delete
+      # Desktop integration.
+      - install -Dm644 packaging/flatpak/io.github.tcanabrava.Harmonicon.desktop -t /app/share/applications
+      - install -Dm644 packaging/flatpak/io.github.tcanabrava.Harmonicon.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 assets/icons/icon.png /app/share/icons/hicolor/1024x1024/apps/io.github.tcanabrava.Harmonicon.png
+    sources:
+      - type: git
+        url: https://github.com/tcanabrava/orin.git
+        branch: main
+      # Build from the local working tree instead (replace the git source above):
+      # - type: dir
+      #   path: ../..

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.tcanabrava.Harmonicon</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>Harmonicon</name>
+  <summary>Blues harmonica rhythm game</summary>
+
+  <description>
+    <p>
+      Harmonicon is a rhythm game for the diatonic blues harmonica. Notes scroll
+      toward a hit line and you play them on a real harmonica — the game listens
+      to your microphone, detects the pitches in real time, and scores your
+      timing and technique.
+    </p>
+    <p>It includes:</p>
+    <ul>
+      <li>Two render modes: a 2D note highway and a 3D harmonica view.</li>
+      <li>A free-play Jam Session over a rolling 12-bar blues.</li>
+      <li>Technique scoring for bends, vibrato, and wah-wah, plus sustained notes.</li>
+      <li>A live audio spectrogram.</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.tcanabrava.Harmonicon.desktop</launchable>
+
+  <categories>
+    <category>Game</category>
+    <category>ArcadeGame</category>
+  </categories>
+
+  <content_rating type="oars-1.1" />
+
+  <developer_name>Tomaz Canabrava</developer_name>
+  <url type="homepage">https://github.com/tcanabrava/orin</url>
+  <url type="bugtracker">https://github.com/tcanabrava/orin/issues</url>
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+
+  <releases>
+    <release version="0.1.0" date="2026-06-15" />
+  </releases>
+</component>

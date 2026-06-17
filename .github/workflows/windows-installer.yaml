@@ -1,0 +1,88 @@
+name: Windows Installer
+
+on:
+  push:
+    tags: ['*']
+  # Lets you build/test the installer from the Actions tab without tagging.
+  workflow_dispatch:
+
+permissions:
+  contents: write # upload the installer to the release on tag builds
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release --bin harmonicon --target x86_64-pc-windows-msvc
+
+      - name: Determine version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            v="${GITHUB_REF#refs/tags/}"
+          else
+            v="0.0.0-dev"
+          fi
+          echo "version=${v#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Stage files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path stage | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/harmonicon.exe stage/
+          Copy-Item -Recurse assets stage/assets
+          Copy-Item LICENSE stage/LICENSE.txt
+          # Drop editor backups so they don't ship.
+          Get-ChildItem -Recurse stage/assets -Filter *~ -ErrorAction SilentlyContinue | Remove-Item -Force
+
+      - name: Install ImageMagick + Inno Setup
+        shell: pwsh
+        run: |
+          choco install imagemagick.tool innosetup -y --no-progress
+
+      - name: Make icon.ico
+        shell: pwsh
+        run: |
+          magick assets/icons/icon.png -define icon:auto-resize=256,128,64,48,32,16 stage/icon.ico
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $stage = (Resolve-Path stage).Path
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & "$iscc" "/DMyAppVersion=${{ steps.ver.outputs.version }}" "/DStageDir=$stage" packaging\windows\harmonicon.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmonicon-windows-installer
+          path: packaging/windows/installer/*.exe
+          retention-days: 14
+
+      - name: Attach installer to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: packaging/windows/installer/*.exe
+          file_glob: true
+          tag: ${{ github.ref }}
+          overwrite: true
