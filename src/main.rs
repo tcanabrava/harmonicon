@@ -54,7 +54,6 @@ fn main() {
         .init_resource::<AudioFrame>()
         .add_systems(Startup, (spawn_camera, initialize_game))
         .add_systems(OnEnter(AppState::Playing), setup_audio)
-        .add_systems(Update, set_window_icon)
         .add_systems(
             Update,
             (process_audio, print_pitches)
@@ -66,39 +65,6 @@ fn main() {
 
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((Camera2d, Name::new("Camera2d (main)")));
-}
-
-/// Set the window icon from `assets/icons/icon.png` once the winit window exists.
-/// Runs every frame only until it succeeds (the window is created after startup),
-/// then no-ops. Note: native Wayland ignores per-window icons and uses the
-/// desktop file matched by `APP_ID` instead — this covers X11, Windows and macOS.
-fn set_window_icon(
-    mut done: Local<bool>,
-    windows: NonSend<WinitWindows>,
-    primary: Query<Entity, With<PrimaryWindow>>,
-) {
-    if *done {
-        return;
-    }
-    let Ok(entity) = primary.single() else {
-        return;
-    };
-    let Some(window) = windows.get_window(entity) else {
-        return; // window not created yet — try again next frame
-    };
-
-    *done = true; // attempt once; don't keep retrying on failure either
-    match image::open("assets/icons/icon.png") {
-        Ok(image) => {
-            let rgba = image.into_rgba8();
-            let (w, h) = rgba.dimensions();
-            match Icon::from_rgba(rgba.into_raw(), w, h) {
-                Ok(icon) => window.set_window_icon(Some(icon)),
-                Err(e) => warn!("window icon: invalid image data: {e}"),
-            }
-        }
-        Err(e) => warn!("window icon: could not load assets/icons/icon.png: {e}"),
-    }
 }
 
 fn initialize_game(mut next: ResMut<NextState<AppState>>) {
