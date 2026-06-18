@@ -15,7 +15,7 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::assets_management::{SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d};
+use crate::assets_management::{SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d, SelectedTheme};
 
 /// Player-tunable audio levels (0.0–1.0, linear), read by the audio spawners
 /// (song music, metronome clicks) and edited on the Options page. Persisted by
@@ -52,6 +52,7 @@ struct Settings {
     note_theme_2d: String,
     note_theme_3d: String,
     harmonica_model: String,
+    ui_theme: String,
 }
 
 impl Default for Settings {
@@ -63,6 +64,7 @@ impl Default for Settings {
             note_theme_2d: "circular".into(),
             note_theme_3d: "circular".into(),
             harmonica_model: "default".into(),
+            ui_theme: "default".into(),
         }
     }
 }
@@ -118,11 +120,13 @@ impl Plugin for SettingsPlugin {
                     |audio: Res<AudioSettings>,
                      theme_2d: Res<SelectedNoteTheme2d>,
                      theme_3d: Res<SelectedNoteTheme3d>,
-                     model: Res<SelectedHarmonicaModel>| {
+                     model: Res<SelectedHarmonicaModel>,
+                     ui_theme: Res<SelectedTheme>| {
                         audio.is_changed()
                             || theme_2d.is_changed()
                             || theme_3d.is_changed()
                             || model.is_changed()
+                            || ui_theme.is_changed()
                     },
                 ),
             );
@@ -135,6 +139,7 @@ fn apply_loaded_settings(
     mut theme_2d: ResMut<SelectedNoteTheme2d>,
     mut theme_3d: ResMut<SelectedNoteTheme3d>,
     mut model: ResMut<SelectedHarmonicaModel>,
+    mut ui_theme: ResMut<SelectedTheme>,
 ) {
     let settings = load_settings();
     audio.music_volume = settings.music_volume;
@@ -143,14 +148,16 @@ fn apply_loaded_settings(
     theme_2d.0 = settings.note_theme_2d;
     theme_3d.0 = settings.note_theme_3d;
     model.0 = settings.harmonica_model;
+    ui_theme.0 = settings.ui_theme;
     info!(
-        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={}",
+        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={}",
         audio.music_volume,
         audio.metronome_volume,
         audio.input_latency_ms,
         theme_2d.0,
         theme_3d.0,
         model.0,
+        ui_theme.0,
     );
 }
 
@@ -160,6 +167,7 @@ fn persist_settings(
     theme_2d: Res<SelectedNoteTheme2d>,
     theme_3d: Res<SelectedNoteTheme3d>,
     model: Res<SelectedHarmonicaModel>,
+    ui_theme: Res<SelectedTheme>,
 ) {
     save_settings(&Settings {
         music_volume: audio.music_volume,
@@ -168,5 +176,6 @@ fn persist_settings(
         note_theme_2d: theme_2d.0.clone(),
         note_theme_3d: theme_3d.0.clone(),
         harmonica_model: model.0.clone(),
+        ui_theme: ui_theme.0.clone(),
     });
 }

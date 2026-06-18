@@ -8,6 +8,7 @@ use crate::song::SongManifest;
 mod calibration;
 mod credits;
 mod options;
+mod theme_picker;
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
 pub enum GameplayMode {
@@ -59,6 +60,7 @@ pub(crate) enum MenuPage {
     SongList,
     ModeSelect,
     Options,
+    Theme,
 }
 
 // ── Public resources ──────────────────────────────────────────────────────────
@@ -97,6 +99,8 @@ pub(super) enum MenuButton {
     BackToArtistList,
     // Options utilities
     Calibrate,
+    Theme,
+    BackToOptions,
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
@@ -109,10 +113,11 @@ impl Plugin for MenuPlugin {
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
-            // The Options and Calibration pages own their own lifecycles.
+            // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(options::OptionsPlugin)
             .add_plugins(calibration::CalibrationPlugin)
             .add_plugins(credits::CreditsPlugin)
+            .add_plugins(theme_picker::ThemePickerPlugin)
             .add_systems(OnEnter(AppState::Menu), route_menu_entry)
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main), setup_main_menu)
@@ -395,6 +400,8 @@ pub(super) fn menu_nav(button: &MenuButton) -> MenuNav {
         MenuButton::BackToPlay => MenuNav::To(MenuPage::Play),
         MenuButton::BackToArtistList => MenuNav::To(MenuPage::ArtistList),
         MenuButton::Calibrate => MenuNav::Enter(AppState::Calibration),
+        MenuButton::Theme => MenuNav::To(MenuPage::Theme),
+        MenuButton::BackToOptions => MenuNav::To(MenuPage::Options),
     }
 }
 

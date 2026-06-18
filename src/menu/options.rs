@@ -226,6 +226,13 @@ fn setup_options_menu(
         &mut commands,
         root,
         &font.gameplay,
+        "Theme",
+        MenuButton::Theme,
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &font.gameplay,
         "Calibrate input lag",
         MenuButton::Calibrate,
     );

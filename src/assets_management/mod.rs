@@ -72,6 +72,20 @@ pub fn default_model_scale() -> f32 {
     1.0
 }
 
+/// UI themes found under `assets/themes/<name>/theme.json`.
+#[derive(Resource, Default)]
+pub struct AvailableThemes(pub Vec<String>);
+
+/// The currently selected UI theme name (subfolder under `assets/themes/`).
+#[derive(Resource)]
+pub struct SelectedTheme(pub String);
+
+impl Default for SelectedTheme {
+    fn default() -> Self {
+        Self("default".into())
+    }
+}
+
 /// 2D note themes found under `assets/notes/2d/<name>.png` (each paired with a
 /// `<name>.json` tail layout). The string is the bare `<name>`.
 #[derive(Resource, Default)]
@@ -112,12 +126,15 @@ impl Plugin for AssetsManagementPlugin {
             .init_resource::<AvailableNoteThemes3d>()
             .init_resource::<SelectedNoteTheme2d>()
             .init_resource::<SelectedNoteTheme3d>()
+            .init_resource::<AvailableThemes>()
+            .init_resource::<SelectedTheme>()
             .add_systems(
                 Startup,
                 (
                     scan_all_songs,
                     scan_harmonica_models,
                     scan_note_themes,
+                    scan_ui_themes,
                     load_global_fonts,
                 ),
             );
@@ -160,6 +177,29 @@ fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
         gameplay: FontSource::Handle(asset_server.load("fonts/UbuntuSansMono-Regular.otf")),
         symbols: FontSource::Handle(asset_server.load("fonts/NotoSansSymbols-Regular.ttf")),
     });
+}
+
+fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
+    let root = std::path::Path::new("assets/themes");
+    let Ok(entries) = std::fs::read_dir(root) else {
+        warn!("No themes directory at assets/themes/; defaulting to \"default\"");
+        available.0.push("default".into());
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        if !entry.path().join("theme.json").exists() {
+            continue;
+        }
+        available.0.push(entry.file_name().to_string_lossy().into_owned());
+    }
+    available.0.sort_unstable();
+    if available.0.is_empty() {
+        available.0.push("default".into());
+    }
+    info!("Found {} UI theme(s): {:?}", available.0.len(), available.0);
 }
 
 fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
