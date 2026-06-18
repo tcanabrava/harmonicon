@@ -4,11 +4,15 @@ use bevy::prelude::*;
 
 use crate::assets_management::{AvailableSongs, GlobalFonts};
 use crate::song::SongManifest;
+use crate::theme::LoadedTheme;
 
+pub(crate) mod button_material;
 mod calibration;
 mod credits;
 mod options;
 mod theme_picker;
+
+use button_material::{ButtonMaterialPlugin, ButtonMaterials, ButtonShaderLayer, ThemedButton};
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
 pub enum GameplayMode {
@@ -114,6 +118,7 @@ impl Plugin for MenuPlugin {
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
+            .add_plugins(ButtonMaterialPlugin)
             .add_plugins(options::OptionsPlugin)
             .add_plugins(calibration::CalibrationPlugin)
             .add_plugins(credits::CreditsPlugin)
@@ -151,10 +156,14 @@ pub(super) fn btn_default() -> Color {
 
 /// Spawn a full-screen centred column with a title and optional subtitle.
 /// Returns the entity so the caller can add button children afterwards.
+/// `menu_id` is matched against the theme's `menus` keys (e.g. "Main", "Play")
+/// to look up the per-menu background image.
 pub(super) fn spawn_menu_root(
     commands: &mut Commands,
     title: &str,
     subtitle: Option<&str>,
+    theme: &LoadedTheme,
+    menu_id: &str,
 ) -> Entity {
     let root = commands
         .spawn((
@@ -173,6 +182,21 @@ pub(super) fn spawn_menu_root(
         .id();
 
     commands.entity(root).with_children(|p| {
+        // Background image behind all other content (spawned first = lowest layer)
+        if let Some(bg) = theme.background_for(menu_id) {
+            p.spawn((
+                ImageNode::new(bg.clone()),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    right: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    bottom: Val::Px(0.0),
+                    ..default()
+                },
+            ));
+        }
+
         p.spawn((
             Text::new(title.to_string()),
             TextFont {
@@ -195,81 +219,148 @@ pub(super) fn spawn_menu_root(
     root
 }
 
-/// Spawn a single button as a child of `parent_entity`.
+/// Spawn a single button as a child of `parent`.
+/// When the theme has shaders the button gets a smoke-shader background layer,
+/// an optional icon, and plays audio on hover/click. Otherwise it falls back to
+/// a plain `BackgroundColor` button.
 pub(super) fn spawn_button(
     commands: &mut Commands,
     parent: Entity,
     font: &FontSource,
     label: &str,
     btn: MenuButton,
+    theme: &LoadedTheme,
+    btn_mats: &ButtonMaterials,
 ) {
-    let button = commands
-        .spawn((
-            Button,
-            Node {
-                min_width: Val::Px(260.0),
-                padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(btn_default()),
-            btn,
-        ))
-        .id();
+    let button = if theme.has_shaders {
+        let e = commands
+            .spawn((
+                Button,
+                Node {
+                    min_width: Val::Px(260.0),
+                    padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                btn,
+                ThemedButton,
+            ))
+            .id();
 
-    commands.entity(button).with_children(|b| {
-        b.spawn((
-            Text::new(label.to_string()),
-            TextFont {
-                font_size: FontSize::Px(20.0),
-                font: font.clone(),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
-    });
+        commands.entity(e).with_children(|b| {
+            // Smoke shader layer — absolute, behind content (spawned first)
+            b.spawn((
+                MaterialNode(btn_mats.idle.clone()),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    right: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    bottom: Val::Px(0.0),
+                    ..default()
+                },
+                ButtonShaderLayer,
+            ));
+
+            // Icon from theme (optional)
+            if let Some(ref icon) = theme.btn_icon {
+                b.spawn((
+                    Node {
+                        width: Val::Px(24.0),
+                        height: Val::Px(24.0),
+                        flex_shrink: 0.0,
+                        ..default()
+                    },
+                    ImageNode {
+                        image: icon.clone(),
+                        ..default()
+                    },
+                ));
+            }
+
+            // Text label
+            b.spawn((
+                Text::new(label.to_string()),
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    font: font.clone(),
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+        });
+
+        e
+    } else {
+        let e = commands
+            .spawn((
+                Button,
+                Node {
+                    min_width: Val::Px(260.0),
+                    padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+                BackgroundColor(btn_default()),
+                btn,
+            ))
+            .id();
+
+        commands.entity(e).with_children(|b| {
+            b.spawn((
+                Text::new(label.to_string()),
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    font: font.clone(),
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+        });
+
+        e
+    };
 
     commands.entity(parent).add_child(button);
 }
 
 // ── Menu pages ────────────────────────────────────────────────────────────────
 
-fn setup_main_menu(mut commands: Commands, font: Res<GlobalFonts>) {
-    let root = spawn_menu_root(&mut commands, "Harmonicon", None);
+fn setup_main_menu(
+    mut commands: Commands,
+    font: Res<GlobalFonts>,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+) {
+    let root = spawn_menu_root(&mut commands, "Harmonicon", None, &theme, "Main");
     let font = font.gameplay.clone();
-    spawn_button(&mut commands, root, &font, "Play", MenuButton::Play);
-    spawn_button(&mut commands, root, &font, "Options", MenuButton::Options);
-    spawn_button(&mut commands, root, &font, "Credits", MenuButton::Credits);
-    spawn_button(&mut commands, root, &font, "Quit", MenuButton::Quit);
+    spawn_button(&mut commands, root, &font, "Play", MenuButton::Play, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font, "Options", MenuButton::Options, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font, "Credits", MenuButton::Credits, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font, "Quit", MenuButton::Quit, &theme, &btn_mats);
 }
 
-fn setup_play_menu(mut commands: Commands, font: Res<GlobalFonts>) {
-    let root = spawn_menu_root(&mut commands, "Play", None);
-    spawn_button(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "Play Song",
-        MenuButton::PlaySong,
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "Jam Session",
-        MenuButton::JamSession,
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &font.symbols,
-        "\u{2190} Back",
-        MenuButton::BackToMain,
-    );
+fn setup_play_menu(
+    mut commands: Commands,
+    font: Res<GlobalFonts>,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+) {
+    let root = spawn_menu_root(&mut commands, "Play", None, &theme, "Play");
+    spawn_button(&mut commands, root, &font.gameplay, "Play Song", MenuButton::PlaySong, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.gameplay, "Jam Session", MenuButton::JamSession, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats);
 }
 
-fn setup_artist_list(mut commands: Commands, font: Res<GlobalFonts>, songs: Res<AvailableSongs>) {
-    let root = spawn_menu_root(&mut commands, "Select Artist", None);
+fn setup_artist_list(
+    mut commands: Commands,
+    font: Res<GlobalFonts>,
+    songs: Res<AvailableSongs>,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+) {
+    let root = spawn_menu_root(&mut commands, "Select Artist", None, &theme, "ArtistList");
 
     if songs.0.is_empty() {
         let msg = commands
@@ -290,22 +381,10 @@ fn setup_artist_list(mut commands: Commands, font: Res<GlobalFonts>, songs: Res<
         for artist in artists {
             let n = songs.0[artist].len();
             let label = format!("{artist}  ({n} song{})", if n == 1 { "" } else { "s" });
-            spawn_button(
-                &mut commands,
-                root,
-                &font.gameplay,
-                &label,
-                MenuButton::Artist(artist.clone()),
-            );
+            spawn_button(&mut commands, root, &font.gameplay, &label, MenuButton::Artist(artist.clone()), &theme, &btn_mats);
         }
     }
-    spawn_button(
-        &mut commands,
-        root,
-        &font.symbols,
-        "\u{2190} Back",
-        MenuButton::BackToPlay,
-    );
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToPlay, &theme, &btn_mats);
 }
 
 fn setup_song_list(
@@ -313,55 +392,32 @@ fn setup_song_list(
     songs: Res<AvailableSongs>,
     selected_artist: Res<SelectedArtist>,
     font: Res<GlobalFonts>,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
 ) {
     let subtitle = format!("by {}", selected_artist.0);
-    let root = spawn_menu_root(&mut commands, "Select Song", Some(&subtitle));
+    let root = spawn_menu_root(&mut commands, "Select Song", Some(&subtitle), &theme, "SongList");
 
     if let Some(artist_songs) = songs.0.get(&selected_artist.0) {
         let mut sorted = artist_songs.clone();
         sorted.sort_unstable_by(|a, b| a.name.cmp(&b.name));
         for song in &sorted {
-            spawn_button(
-                &mut commands,
-                root,
-                &font.gameplay,
-                &song.name,
-                MenuButton::Song(song.asset_path.clone()),
-            );
+            spawn_button(&mut commands, root, &font.gameplay, &song.name, MenuButton::Song(song.asset_path.clone()), &theme, &btn_mats);
         }
     }
-    spawn_button(
-        &mut commands,
-        root,
-        &font.symbols,
-        "\u{2190} Back",
-        MenuButton::BackToArtistList,
-    );
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToArtistList, &theme, &btn_mats);
 }
 
-fn setup_mode_select(mut commands: Commands, font: Res<GlobalFonts>) {
-    let root = spawn_menu_root(&mut commands, "Select Mode", None);
-    spawn_button(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "Play 2D",
-        MenuButton::PlayMode2D,
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "Play 3D",
-        MenuButton::PlayMode3D,
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &font.symbols,
-        "\u{2190} Back",
-        MenuButton::BackToPlay,
-    );
+fn setup_mode_select(
+    mut commands: Commands,
+    font: Res<GlobalFonts>,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+) {
+    let root = spawn_menu_root(&mut commands, "Select Mode", None, &theme, "ModeSelect");
+    spawn_button(&mut commands, root, &font.gameplay, "Play 2D", MenuButton::PlayMode2D, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.gameplay, "Play 3D", MenuButton::PlayMode3D, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToPlay, &theme, &btn_mats);
 }
 
 // ── Input + hover ─────────────────────────────────────────────────────────────
@@ -448,7 +504,7 @@ fn handle_menu_input(
 fn button_hover(
     mut buttons: Query<
         (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<MenuButton>),
+        (Changed<Interaction>, With<MenuButton>, Without<ThemedButton>),
     >,
 ) {
     for (interaction, mut bg) in &mut buttons {

@@ -15,6 +15,7 @@ use harmonicon::menu::{AppState, MenuPlugin};
 use harmonicon::settings::SettingsPlugin;
 use harmonicon::song::SongPlugin;
 use harmonicon::spectrogram::SpectrogramPlugin;
+use harmonicon::theme::ThemePlugin;
 
 fn main() {
     let mut app = App::new();
@@ -37,6 +38,7 @@ fn main() {
     )
     .add_plugins((
         AssetsManagementPlugin,
+        ThemePlugin,
         SongPlugin,
         MenuPlugin,
         GameplayPlugin,

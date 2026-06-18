@@ -18,8 +18,11 @@ use crate::assets_management::{
 };
 use crate::settings::AudioSettings;
 
+use crate::theme::LoadedTheme;
+
 use super::{
-    MenuButton, MenuPage, MenuRoot, btn_default, cleanup_menu, spawn_button, spawn_menu_root,
+    MenuButton, MenuPage, MenuRoot, btn_default, button_material::ButtonMaterials, cleanup_menu,
+    spawn_button, spawn_menu_root,
 };
 
 /// Owns the Options page: builds it on entry, tears it down on exit, and runs
@@ -117,8 +120,10 @@ fn setup_options_menu(
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
 ) {
-    let root = spawn_menu_root(&mut commands, "Options", Some("Audio"));
+    let root = spawn_menu_root(&mut commands, "Options", Some("Audio"), &theme, "Options");
     spawn_volume_slider(
         &mut commands,
         root,
@@ -222,27 +227,9 @@ fn setup_options_menu(
         |n| HarmonicaButton(n.to_string()),
     );
 
-    spawn_button(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "Theme",
-        MenuButton::Theme,
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "Calibrate input lag",
-        MenuButton::Calibrate,
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &font.symbols,
-        "\u{2190} Back",
-        MenuButton::BackToMain,
-    );
+    spawn_button(&mut commands, root, &font.gameplay, "Theme", MenuButton::Theme, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.gameplay, "Calibrate input lag", MenuButton::Calibrate, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats);
 }
 
 /// A labelled row of theme buttons, each showing a preview image above its name.
