@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "harmonicon/theme",
+  "title": "Harmonicon Theme",
+  "description": "Visual theme for menus, gameplay screens, and UI elements.",
+  "type": "object",
+  "required": ["name", "description", "default_menu_button", "default_background", "menus"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "image_with_shader": {
+      "type": "object",
+      "required": ["image_file"],
+      "additionalProperties": false,
+      "properties": {
+        "image_file":  { "type": "string", "description": "Path relative to the theme directory." },
+        "description": { "type": "string" },
+        "shader":      { "type": "string", "description": "Path to a GLSL shader applied to this image." }
+      }
+    },
+
+    "state_shaders": {
+      "description": "Per-interaction-state shader paths.",
+      "type": "object",
+      "required": ["hover", "click", "idle"],
+      "additionalProperties": false,
+      "properties": {
+        "hover": { "type": "string" },
+        "click": { "type": "string" },
+        "idle":  { "type": "string" }
+      }
+    },
+
+    "state_sounds": {
+      "description": "Per-interaction-state audio cue paths.",
+      "type": "object",
+      "required": ["hover", "click"],
+      "additionalProperties": false,
+      "properties": {
+        "hover": { "type": "string" },
+        "click": { "type": "string" }
+      }
+    },
+
+    "coords": {
+      "description": "Position and size in pixels.",
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "x":      { "type": "number" },
+        "y":      { "type": "number" },
+        "width":  { "type": "number", "minimum": 0 },
+        "height": { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "button_def": {
+      "description": "Full definition of a single button.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description":        { "type": "string" },
+        "background_image":   { "$ref": "#/$defs/image_with_shader" },
+        "icon": {
+          "type": "object",
+          "required": ["image_file"],
+          "additionalProperties": false,
+          "properties": {
+            "image_file":  { "type": "string" },
+            "description": { "type": "string" },
+            "shaders":     { "$ref": "#/$defs/state_shaders" }
+          }
+        },
+        "button_shaders": { "$ref": "#/$defs/state_shaders" },
+        "button_sounds":  { "$ref": "#/$defs/state_sounds" },
+        "coords":         { "$ref": "#/$defs/coords" }
+      }
+    },
+
+    "menu_def": {
+      "description": "One named menu screen.",
+      "type": "object",
+      "required": ["background_image", "buttons"],
+      "additionalProperties": false,
+      "properties": {
+        "background_image": {
+          "type": "string",
+          "description": "Path to the background image for this menu screen."
+        },
+        "buttons": {
+          "type": "array",
+          "description": "Ordered list of buttons shown on this menu screen.",
+          "items": { "$ref": "#/$defs/button_def" }
+        }
+      }
+    }
+  },
+
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable name of the theme."
+    },
+
+    "description": {
+      "type": "string",
+      "description": "Short description of the theme."
+    },
+
+    "default_menu_button": {
+      "description": "Fallback button appearance used when a specific button omits a field.",
+      "$ref": "#/$defs/button_def"
+    },
+
+    "default_background": {
+      "description": "Fallback background used by any screen that does not define its own.",
+      "type": "object",
+      "required": ["image"],
+      "additionalProperties": false,
+      "properties": {
+        "image":       { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+
+    "menus": {
+      "description": "Named menu screens. Keys are menu identifiers (e.g. Main, Play, Options).",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/menu_def" }
+    }
+  }
+}

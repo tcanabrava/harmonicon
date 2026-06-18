@@ -1,0 +1,45 @@
+{
+  "name": "Default",
+  "description": "The default theme for Harmonicon.",
+  "default_menu_button": {
+    "description": "Used if the inner definition of a button lacks a value",
+    "background_image": {
+      "image_file": "images/button_background.png",
+      "description": "Default background image for Buttons"
+    },
+    "icon": {
+      "image_file": "images/play_button.png",
+      "description": "Default icon for Buttons"
+    },
+    "button_shaders": {
+      "hover": "shaders/button_hover.wgsl",
+      "click": "shaders/button_click.wgsl",
+      "idle": "shaders/button_idle.wgsl"
+    },
+    "button_sounds": {
+      "hover": "sounds/button_hover.ogg",
+      "click": "sounds/button_click.ogg"
+    },
+    "coords": {
+      "x": 0,
+      "y": 0,
+      "width": 150,
+      "height": 50
+    }
+  },
+  "default_background": {
+    "image": "images/default_background.png",
+    "description": "Default background image for the application"
+  },
+  "menus": {
+    "Main": {
+      "background_image": "images/main_background.png"
+    },
+    "Play": {
+      "background_image": "images/play_background.png"
+    },
+    "Credits": {
+      "background_image": "images/credits_background.png"
+    }
+  }
+}
