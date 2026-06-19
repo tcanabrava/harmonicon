@@ -64,22 +64,54 @@ impl AssetLoader for SongChartLoader {
 
         // Materialise the parent path before calling load() to avoid holding
         // an immutable borrow on load_context across its mutable load() calls.
-        let parent = load_context
+        let song_folder = load_context
             .path()
             .path()
-            .parent()
+            .parent()   // songs/{artist}/{name}/song/
+            .unwrap_or(std::path::Path::new(""))
+            .parent()// songs/{artist}/{name}/
             .unwrap_or(std::path::Path::new(""))
             .to_path_buf();
 
-        let background = load_context.load::<Image>(parent.join("background.png"));
-        let music = load_context.load::<AudioSource>(parent.join("music.ogg"));
-        let elements = load_context.load::<Image>(parent.join("elements.png"));
+        let background = load_context.load::<Image>(song_folder.join("background.png"));
+        let music = load_context.load::<AudioSource>(song_folder.join("song/music.ogg"));
+        let elements = load_context.load::<Image>(song_folder.join("elements.png"));
+
+        let assets_2d = match load_context
+            .read_asset_bytes(song_folder.join("2d/note_2d.png"))
+            .await
+        {
+            Ok(_) => Some(load_context.load::<Image>(song_folder.join("2d/note_2d.png"))),
+            Err(_) => None,
+        };
+
+        // Try to read the note from the folder, if not, fall back to the default circular.json
+        let note_2d_json = match load_context.read_asset_bytes(song_folder.join("2d/note_2d.json"))
+            .await
+        {
+            Ok(bytes) => {
+                println!("Load correct json");
+                String::from_utf8_lossy(&bytes).to_string()
+            }
+            Err(_) => {
+                println!("Load default json");
+                let res = load_context.read_asset_bytes("notes/2d/circular.json").await;
+                let res = res.unwrap_or_default();
+                String::from_utf8_lossy(&res).to_string()
+            }
+        };
+
+        let assets_3d: Option<String> = None;
 
         Ok(SongManifest {
+            path: song_folder,
             chart,
             background,
             music,
             elements,
+            assets_2d,
+            assets_2d_config: serde_json::from_str(&note_2d_json).ok().expect("Could not parse note_2d.json"),
+            assets_3d,
         })
     }
 

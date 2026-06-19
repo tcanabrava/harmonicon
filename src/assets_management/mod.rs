@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fs::DirEntry,
+};
 
 #[derive(Resource)]
 pub struct GlobalFonts {
@@ -12,6 +15,7 @@ pub struct GlobalFonts {
 pub struct AssetsManagementPlugin;
 
 #[derive(Debug, Clone)]
+// Struct representing a song entry in the menu
 pub struct SongEntry {
     pub artist: String,
     pub name: String,
@@ -227,6 +231,38 @@ fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
     );
 }
 
+pub fn scan_artist_song(artist_dir: &DirEntry, available: &mut ResMut<AvailableSongs>) {
+    let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
+        return;
+    };
+
+    let artist = artist_dir.file_name().to_string_lossy().into_owned();
+    for song_dir in song_dirs.flatten() {
+        if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+
+        // Inside of the music directory, there may be a 3d, 2d models, and a song subfolder containing
+        // the actual song files and chart.harpchart metadata file.
+        if !song_dir.path().join("song/chart.harpchart").exists() {
+            continue;
+        }
+
+        let name = song_dir.file_name().to_string_lossy().into_owned();
+
+        available
+            .0
+            .entry(artist.clone())
+            .or_default()
+            .push(SongEntry {
+                asset_path: format!("songs/{artist}/{name}/song/chart.harpchart"),
+                artist: artist.clone(),
+                name,
+            });
+    }
+}
+
+// Scans the entire songs directory for harmonica models and songs, per artist.
 pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
     let songs_root = std::path::Path::new("assets/songs");
     let Ok(artists) = std::fs::read_dir(songs_root) else {
@@ -238,28 +274,7 @@ pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
         if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             continue;
         }
-        let artist = artist_dir.file_name().to_string_lossy().into_owned();
-        let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
-            continue;
-        };
-        for song_dir in song_dirs.flatten() {
-            if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                continue;
-            }
-            if !song_dir.path().join("chart.harpchart").exists() {
-                continue;
-            }
-            let name = song_dir.file_name().to_string_lossy().into_owned();
-            available
-                .0
-                .entry(artist.clone())
-                .or_default()
-                .push(SongEntry {
-                    asset_path: format!("songs/{artist}/{name}/chart.harpchart"),
-                    artist: artist.clone(),
-                    name,
-                });
-        }
+        scan_artist_song(&artist_dir, &mut available);
     }
 
     let total: usize = available.0.values().map(|v| v.len()).sum();

@@ -2,13 +2,14 @@
 
 use bevy::prelude::*;
 use bevy::ui::ComputedNode;
-
 use crate::{
     assets_management::GlobalFonts,
     menu::SelectedSong,
     song::SongManifest,
     song::chart::{Action, Modifier, PlayMode},
     song::harmonica::twelve_bar,
+    song::NoteHeadRect,
+    song::NoteThemeConfig,
 };
 
 use super::countdown_overlay::spawn_countdown;
@@ -41,10 +42,19 @@ pub fn setup(
         error!("SongManifest not ready when entering Playing state");
         return;
     };
+
     // Comet head: the selected theme's disc image (white interior tinted per note,
     // black rim kept), paired with its tail layout from `<theme>.json`.
-    let head_image: Handle<Image> = asset_server.load(format!("notes/2d/{}.png", note_theme.0));
-    let tail_cfg = load_note_theme_config(&note_theme.0);
+    let head_image: Handle<Image> = if let Some(assets_2d) = &manifest.assets_2d {
+        println!("Found Image for the 2d Asset:");
+        assets_2d.clone()
+    } else {
+        println!("Using default image for the 2d Asset:");
+        asset_server.load(format!("notes/2d/{}.png", note_theme.0))
+    };
+
+    let tail_cfg = manifest.assets_2d_config.clone();
+
     clock.0 = -COUNTDOWN;
     music_started.0 = false;
     valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
@@ -351,58 +361,6 @@ pub(super) struct NoteTail {
     duration_frac: f32,
 }
 
-/// Head image destination rect within the note's lane square, in percentages
-/// (0..100). Lets a theme position/resize the disc inside its cell when the
-/// source PNG isn't centred or doesn't fill the frame. `(0, 0, 100, 100)` fills
-/// the square (the default, matching a perfectly-cropped sprite).
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct NoteHeadRect {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-}
-
-impl Default for NoteHeadRect {
-    fn default() -> Self {
-        Self { x: 0.0, y: 0.0, width: 100.0, height: 100.0 }
-    }
-}
-
-/// fractions of the head image: `tail_x` is the tail's horizontal center,
-/// `tail_y` the vertical attach point on the head (0 = top, 1 = bottom), and
-/// `tail_width` the tail base width — all relative to the head's width/height.
-/// `head` positions/resizes the disc image within the lane square.
-#[derive(Debug, Clone, serde::Deserialize)]
-struct NoteThemeConfig {
-    tail_x: f32,
-    tail_y: f32,
-    tail_width: f32,
-    #[serde(default)]
-    head: NoteHeadRect,
-}
-
-impl Default for NoteThemeConfig {
-    fn default() -> Self {
-        Self {
-            tail_x: 0.5,
-            tail_y: 0.5,
-            tail_width: 0.45,
-            head: NoteHeadRect::default(),
-        }
-    }
-}
-
-fn load_note_theme_config(theme: &str) -> NoteThemeConfig {
-    let path = format!("assets/notes/2d/{theme}.json");
-    std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_else(|| {
-            warn!("No usable {path}; using default tail layout");
-            NoteThemeConfig::default()
-        })
-}
 
 /// The highway distance (in %) a note scrolls from entering at the top to its
 /// head reaching the hit line — i.e. the span covered in `LOOKAHEAD` seconds.

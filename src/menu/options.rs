@@ -14,7 +14,7 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::assets_management::{
     AvailableHarmonicas, AvailableNoteThemes2d, AvailableNoteThemes3d, GlobalFonts,
-    SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d,
+    SelectedHarmonicaModel
 };
 use crate::settings::AudioSettings;
 
@@ -40,10 +40,6 @@ impl Plugin for OptionsPlugin {
                     update_sliders,
                     drag_latency_slider,
                     update_latency_slider,
-                    handle_theme_buttons_2d,
-                    theme_button_visuals_2d,
-                    handle_theme_buttons_3d,
-                    theme_button_visuals_3d,
                     handle_harmonica_buttons,
                     harmonica_button_visuals,
                     propagate_preview_layers,
@@ -461,52 +457,6 @@ fn propagate_preview_layers(
                 }
             }
         }
-    }
-}
-
-// ── Theme / harmonica selection ─────────────────────────────────────────────
-
-/// Apply a clicked 2D-theme button to the selected 2D-theme resource.
-fn handle_theme_buttons_2d(
-    buttons: Query<(&Interaction, &NoteTheme2dButton), Changed<Interaction>>,
-    mut selected: ResMut<SelectedNoteTheme2d>,
-) {
-    for (interaction, button) in &buttons {
-        if *interaction == Interaction::Pressed {
-            selected.0 = button.0.clone();
-        }
-    }
-}
-
-/// Highlight the selected 2D-theme button; the rest follow normal hover styling.
-fn theme_button_visuals_2d(
-    selected: Res<SelectedNoteTheme2d>,
-    mut buttons: Query<(&Interaction, &NoteTheme2dButton, &mut BackgroundColor)>,
-) {
-    for (interaction, button, mut bg) in &mut buttons {
-        *bg = BackgroundColor(choice_button_color(button.0 == selected.0, interaction));
-    }
-}
-
-/// Apply a clicked 3D-theme button to the selected 3D-theme resource.
-fn handle_theme_buttons_3d(
-    buttons: Query<(&Interaction, &NoteTheme3dButton), Changed<Interaction>>,
-    mut selected: ResMut<SelectedNoteTheme3d>,
-) {
-    for (interaction, button) in &buttons {
-        if *interaction == Interaction::Pressed {
-            selected.0 = button.0.clone();
-        }
-    }
-}
-
-/// Highlight the selected 3D-theme button; the rest follow normal hover styling.
-fn theme_button_visuals_3d(
-    selected: Res<SelectedNoteTheme3d>,
-    mut buttons: Query<(&Interaction, &NoteTheme3dButton, &mut BackgroundColor)>,
-) {
-    for (interaction, button, mut bg) in &mut buttons {
-        *bg = BackgroundColor(choice_button_color(button.0 == selected.0, interaction));
     }
 }
 
