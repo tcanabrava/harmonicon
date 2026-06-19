@@ -219,10 +219,36 @@ pub(super) fn spawn_menu_root(
     root
 }
 
+/// Maps a `MenuButton` variant to the string id used in `theme.json`.
+/// Dynamic variants (Artist, Song) return `None` and fall back to flow layout.
+fn button_id(btn: &MenuButton) -> Option<&'static str> {
+    match btn {
+        MenuButton::Play => Some("Play"),
+        MenuButton::Options => Some("Options"),
+        MenuButton::Credits => Some("Credits"),
+        MenuButton::Quit => Some("Quit"),
+        MenuButton::PlaySong => Some("PlaySong"),
+        MenuButton::JamSession => Some("JamSession"),
+        MenuButton::PlayMode2D => Some("PlayMode2D"),
+        MenuButton::PlayMode3D => Some("PlayMode3D"),
+        MenuButton::BackToMain => Some("BackToMain"),
+        MenuButton::BackToPlay => Some("BackToPlay"),
+        MenuButton::BackToArtistList => Some("BackToArtistList"),
+        MenuButton::Calibrate => Some("Calibrate"),
+        MenuButton::Theme => Some("Theme"),
+        MenuButton::BackToOptions => Some("BackToOptions"),
+        MenuButton::Artist(_) | MenuButton::Song(_) => None,
+    }
+}
+
 /// Spawn a single button as a child of `parent`.
-/// When the theme has shaders the button gets a smoke-shader background layer,
-/// an optional icon, and plays audio on hover/click. Otherwise it falls back to
-/// a plain `BackgroundColor` button.
+///
+/// When the theme JSON defines coords for this button in `menu_id`, the button
+/// is absolutely positioned at those pixel coordinates. Otherwise it joins the
+/// normal flex flow of the parent.
+///
+/// When the theme has shaders the button also gets a smoke background layer,
+/// an optional icon, and audio on hover/click.
 pub(super) fn spawn_button(
     commands: &mut Commands,
     parent: Entity,
@@ -231,22 +257,36 @@ pub(super) fn spawn_button(
     btn: MenuButton,
     theme: &LoadedTheme,
     btn_mats: &ButtonMaterials,
+    menu_id: &str,
 ) {
+    // Resolve pixel coords from the theme JSON (if defined for this button).
+    let coords = button_id(&btn)
+        .and_then(|id| theme.button_coords(menu_id, id))
+        .cloned();
+
+    // Build the layout node: absolute when coords exist, flex-flow otherwise.
+    let node = match &coords {
+        Some(c) => Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(c.x),
+            top: Val::Px(c.y),
+            width: Val::Px(c.width),
+            height: Val::Px(c.height),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        None => Node {
+            min_width: Val::Px(260.0),
+            padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+    };
+
     let button = if theme.has_shaders {
-        let e = commands
-            .spawn((
-                Button,
-                Node {
-                    min_width: Val::Px(260.0),
-                    padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                btn,
-                ThemedButton,
-            ))
-            .id();
+        let e = commands.spawn((Button, node, btn, ThemedButton)).id();
 
         commands.entity(e).with_children(|b| {
             // Smoke shader layer — absolute, behind content (spawned first)
@@ -279,7 +319,6 @@ pub(super) fn spawn_button(
                 ));
             }
 
-            // Text label
             b.spawn((
                 Text::new(label.to_string()),
                 TextFont {
@@ -294,17 +333,7 @@ pub(super) fn spawn_button(
         e
     } else {
         let e = commands
-            .spawn((
-                Button,
-                Node {
-                    min_width: Val::Px(260.0),
-                    padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                BackgroundColor(btn_default()),
-                btn,
-            ))
+            .spawn((Button, node, BackgroundColor(btn_default()), btn))
             .id();
 
         commands.entity(e).with_children(|b| {
@@ -335,10 +364,10 @@ fn setup_main_menu(
 ) {
     let root = spawn_menu_root(&mut commands, "Harmonicon", None, &theme, "Main");
     let font = font.gameplay.clone();
-    spawn_button(&mut commands, root, &font, "Play", MenuButton::Play, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font, "Options", MenuButton::Options, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font, "Credits", MenuButton::Credits, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font, "Quit", MenuButton::Quit, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font, "Play", MenuButton::Play, &theme, &btn_mats, "Main");
+    spawn_button(&mut commands, root, &font, "Options", MenuButton::Options, &theme, &btn_mats, "Main");
+    spawn_button(&mut commands, root, &font, "Credits", MenuButton::Credits, &theme, &btn_mats, "Main");
+    spawn_button(&mut commands, root, &font, "Quit", MenuButton::Quit, &theme, &btn_mats, "Main");
 }
 
 fn setup_play_menu(
@@ -348,9 +377,9 @@ fn setup_play_menu(
     btn_mats: Res<ButtonMaterials>,
 ) {
     let root = spawn_menu_root(&mut commands, "Play", None, &theme, "Play");
-    spawn_button(&mut commands, root, &font.gameplay, "Play Song", MenuButton::PlaySong, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font.gameplay, "Jam Session", MenuButton::JamSession, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.gameplay, "Play Song", MenuButton::PlaySong, &theme, &btn_mats, "Play");
+    spawn_button(&mut commands, root, &font.gameplay, "Jam Session", MenuButton::JamSession, &theme, &btn_mats, "Play");
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats, "Play");
 }
 
 fn setup_artist_list(
@@ -381,10 +410,10 @@ fn setup_artist_list(
         for artist in artists {
             let n = songs.0[artist].len();
             let label = format!("{artist}  ({n} song{})", if n == 1 { "" } else { "s" });
-            spawn_button(&mut commands, root, &font.gameplay, &label, MenuButton::Artist(artist.clone()), &theme, &btn_mats);
+            spawn_button(&mut commands, root, &font.gameplay, &label, MenuButton::Artist(artist.clone()), &theme, &btn_mats, "ArtistList");
         }
     }
-    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToPlay, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToPlay, &theme, &btn_mats, "ArtistList");
 }
 
 fn setup_song_list(
@@ -402,10 +431,10 @@ fn setup_song_list(
         let mut sorted = artist_songs.clone();
         sorted.sort_unstable_by(|a, b| a.name.cmp(&b.name));
         for song in &sorted {
-            spawn_button(&mut commands, root, &font.gameplay, &song.name, MenuButton::Song(song.asset_path.clone()), &theme, &btn_mats);
+            spawn_button(&mut commands, root, &font.gameplay, &song.name, MenuButton::Song(song.asset_path.clone()), &theme, &btn_mats, "SongList");
         }
     }
-    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToArtistList, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToArtistList, &theme, &btn_mats, "SongList");
 }
 
 fn setup_mode_select(
@@ -415,9 +444,9 @@ fn setup_mode_select(
     btn_mats: Res<ButtonMaterials>,
 ) {
     let root = spawn_menu_root(&mut commands, "Select Mode", None, &theme, "ModeSelect");
-    spawn_button(&mut commands, root, &font.gameplay, "Play 2D", MenuButton::PlayMode2D, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font.gameplay, "Play 3D", MenuButton::PlayMode3D, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToPlay, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.gameplay, "Play 2D", MenuButton::PlayMode2D, &theme, &btn_mats, "ModeSelect");
+    spawn_button(&mut commands, root, &font.gameplay, "Play 3D", MenuButton::PlayMode3D, &theme, &btn_mats, "ModeSelect");
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToPlay, &theme, &btn_mats, "ModeSelect");
 }
 
 // ── Input + hover ─────────────────────────────────────────────────────────────

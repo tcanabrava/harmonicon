@@ -176,6 +176,7 @@ fn setup(
         MenuButton::BackToOptions,
         &theme,
         &btn_mats,
+        "Theme",
     );
 }
 

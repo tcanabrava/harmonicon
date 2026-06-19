@@ -62,13 +62,38 @@ struct BackgroundThemeJson {
 struct MenuThemeJson {
     #[serde(default)]
     background_image: Option<String>,
+    #[serde(default)]
+    buttons: Vec<ButtonEntryJson>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+struct ButtonEntryJson {
+    id: String,
+    coords: CoordsJson,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+struct CoordsJson {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
 }
 
 // ── Runtime resource ──────────────────────────────────────────────────────────
 
+/// Pixel rect for a single button, read from the theme JSON.
+#[derive(Clone, Debug)]
+pub struct ButtonCoords {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
 /// Theme assets resolved at startup from `themes/<selected>/theme.json`.
 /// Menus and buttons read this resource to apply backgrounds, icons, sounds,
-/// and the smoke-shader flag.
+/// shader flags, and per-button coordinates.
 #[derive(Resource, Default)]
 pub struct LoadedTheme {
     /// Background per named menu key (e.g. "Main", "Play", "Credits").
@@ -81,9 +106,11 @@ pub struct LoadedTheme {
     pub btn_sound_hover: Option<Handle<AudioSource>>,
     /// Sound played when a button is clicked.
     pub btn_sound_click: Option<Handle<AudioSource>>,
-    /// True when the theme ships the three smoke-shader WGSL files. When false
-    /// buttons fall back to a plain `BackgroundColor`.
+    /// True when the theme ships the three smoke-shader WGSL files.
     pub has_shaders: bool,
+    /// Per-menu, per-button pixel coordinates: `menu_id → button_id → coords`.
+    /// Button ids match the `MenuButton` variant names (e.g. "Play", "BackToMain").
+    pub button_coords: HashMap<String, HashMap<String, ButtonCoords>>,
 }
 
 impl LoadedTheme {
@@ -92,6 +119,11 @@ impl LoadedTheme {
         self.menu_backgrounds
             .get(menu_id)
             .or(self.default_background.as_ref())
+    }
+
+    /// Pixel rect for `button_id` on `menu_id`, or `None` if not specified.
+    pub fn button_coords(&self, menu_id: &str, button_id: &str) -> Option<&ButtonCoords> {
+        self.button_coords.get(menu_id)?.get(button_id)
     }
 }
 
@@ -143,6 +175,24 @@ fn load_theme(
                 menu_id.clone(),
                 asset_server.load(format!("{prefix}{bg}")),
             );
+        }
+        if !menu.buttons.is_empty() {
+            let coords: HashMap<String, ButtonCoords> = menu
+                .buttons
+                .iter()
+                .map(|b| {
+                    (
+                        b.id.clone(),
+                        ButtonCoords {
+                            x: b.coords.x,
+                            y: b.coords.y,
+                            width: b.coords.width,
+                            height: b.coords.height,
+                        },
+                    )
+                })
+                .collect();
+            theme.button_coords.insert(menu_id.clone(), coords);
         }
     }
 

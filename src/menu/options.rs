@@ -227,9 +227,9 @@ fn setup_options_menu(
         |n| HarmonicaButton(n.to_string()),
     );
 
-    spawn_button(&mut commands, root, &font.gameplay, "Theme", MenuButton::Theme, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font.gameplay, "Calibrate input lag", MenuButton::Calibrate, &theme, &btn_mats);
-    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats);
+    spawn_button(&mut commands, root, &font.gameplay, "Theme", MenuButton::Theme, &theme, &btn_mats, "Options");
+    spawn_button(&mut commands, root, &font.gameplay, "Calibrate input lag", MenuButton::Calibrate, &theme, &btn_mats, "Options");
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats, "Options");
 }
 
 /// A labelled row of theme buttons, each showing a preview image above its name.
