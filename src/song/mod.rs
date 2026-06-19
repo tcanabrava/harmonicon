@@ -19,9 +19,17 @@ pub struct SongManifest {
     pub background: Handle<Image>,
     pub music: Handle<AudioSource>,
     pub elements: Handle<Image>,
-    pub assets_2d: Option<Handle<Image>>,
+    /// Asset path of the song's own 2D note image, if it ships one. Stored as a
+    /// path (not a `Handle`) so the image is *not* a manifest dependency: it is
+    /// loaded lazily by `gameplay_2d::setup` only when entering a 2D game, and
+    /// freed when those note entities despawn on leaving. `None` → use the theme
+    /// default.
+    pub assets_2d: Option<PathBuf>,
     pub assets_2d_config: NoteThemeConfig,
-    pub assets_3d: Option<String>,
+    /// Asset path of the song's own 3D note GLB, if it ships one. Lazily loaded
+    /// by `gameplay_3d::setup` (with the `#Mesh0/Primitive0` label) the same way.
+    pub assets_3d: Option<PathBuf>,
+    pub assets_3d_config: NoteCube3dConfig,
 }
 
 /// Head image destination rect within the note's lane square, in percentages
@@ -62,6 +70,25 @@ impl Default for NoteThemeConfig {
             tail_y: 0.5,
             tail_width: 0.45,
             head: NoteHeadRect::default(),
+        }
+    }
+}
+
+/// Per-song 3D note layout. Loaded from the song's own `3d/note_3d.json` when it
+/// ships one, otherwise the default theme's `notes/3d/<theme>.json`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NoteCube3dConfig {
+    /// Uniform scale applied to the cube head (relative to a lane-wide note).
+    pub head_scale: f32,
+    /// Tail ribbon width as a fraction of the note width.
+    pub tail_width: f32,
+}
+
+impl Default for NoteCube3dConfig {
+    fn default() -> Self {
+        Self {
+            head_scale: 0.8,
+            tail_width: 0.6,
         }
     }
 }

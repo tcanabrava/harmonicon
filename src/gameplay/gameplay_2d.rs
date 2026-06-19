@@ -43,14 +43,14 @@ pub fn setup(
         return;
     };
 
-    // Comet head: the selected theme's disc image (white interior tinted per note,
-    // black rim kept), paired with its tail layout from `<theme>.json`.
-    let head_image: Handle<Image> = if let Some(assets_2d) = &manifest.assets_2d {
-        println!("Found Image for the 2d Asset:");
-        assets_2d.clone()
-    } else {
-        println!("Using default image for the 2d Asset:");
-        asset_server.load(format!("notes/2d/{}.png", note_theme.0))
+    // Comet head: the disc image (white interior tinted per note, black rim
+    // kept), paired with its tail layout. Loaded here — on entering the 2D game
+    // — from the song's own image if it ships one, else the selected theme's
+    // default. The handle lives only on the note entities, so it frees when they
+    // despawn on leaving the song.
+    let head_image: Handle<Image> = match &manifest.assets_2d {
+        Some(path) => asset_server.load(path.clone()),
+        None => asset_server.load(format!("notes/2d/{}.png", note_theme.0)),
     };
 
     let tail_cfg = manifest.assets_2d_config.clone();

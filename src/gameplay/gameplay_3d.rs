@@ -7,6 +7,7 @@ use crate::{
         GlobalFonts, HarmonicaModelConfig, HoleConfig, SelectedHarmonicaModel, SelectedNoteTheme3d,
     },
     menu::SelectedSong,
+    song::NoteCube3dConfig,
     song::SongManifest,
     song::chart::{Action, HarpChart},
     song::harmonica::twelve_bar,
@@ -61,35 +62,6 @@ pub(super) struct NoteTail3d;
 
 #[derive(Component)]
 pub(super) struct HoleMesh3D(Handle<StandardMaterial>);
-
-/// Per-theme 3D note layout, from `assets/notes/3d/<theme>.json`.
-#[derive(Debug, Clone, serde::Deserialize)]
-pub(super) struct NoteCube3dConfig {
-    /// Uniform scale applied to the cube head (relative to a lane-wide note).
-    head_scale: f32,
-    /// Tail ribbon width as a fraction of the note width.
-    tail_width: f32,
-}
-
-impl Default for NoteCube3dConfig {
-    fn default() -> Self {
-        Self {
-            head_scale: 0.8,
-            tail_width: 0.6,
-        }
-    }
-}
-
-fn load_note_cube_config(theme: &str) -> NoteCube3dConfig {
-    let path = format!("assets/notes/3d/{theme}.json");
-    std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_else(|| {
-            warn!("No usable {path}; using default 3D note layout");
-            NoteCube3dConfig::default()
-        })
-}
 
 /// Parent entity holding the GLB model and its hole overlays. Animated by
 /// `groove_harmonica` so the whole harmonica bobs in time with the music.
@@ -447,10 +419,15 @@ pub fn setup(
         total_width,
     );
 
-    // Comet head mesh from the theme's glTF cube + its 3D tail layout.
-    let head_mesh: Handle<Mesh> =
-        asset_server.load(format!("notes/3d/{}.glb#Mesh0/Primitive0", note_theme.0));
-    let note_cfg = load_note_cube_config(&note_theme.0);
+    // Comet head mesh + 3D tail layout: loaded here — on entering the 3D game —
+    // from the song's own GLB if it ships a `3d/` folder, else the selected
+    // theme's default. The handle lives only on the note entities, so it frees
+    // when they despawn on leaving the song.
+    let head_mesh: Handle<Mesh> = match &manifest.assets_3d {
+        Some(path) => asset_server.load(format!("{}#Mesh0/Primitive0", path.to_string_lossy())),
+        None => asset_server.load(format!("notes/3d/{}.glb#Mesh0/Primitive0", note_theme.0)),
+    };
+    let note_cfg = manifest.assets_3d_config.clone();
     create_note_visuals(
         &mut commands,
         &mut meshes,

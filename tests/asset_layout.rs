@@ -8,18 +8,20 @@
 //! every missing file, grouped by song or by model, for quick local diagnosis.
 //!
 //! Paths checked (per the design docs / asset conventions):
-//!   assets/songs/<artist>/<song>/{chart.harpchart, background.png, music.ogg, elements.png}
+//!   assets/songs/<artist>/<song>/{background.png, elements.png, song/chart.harpchart, song/music.ogg}
 //!   assets/harmonicas/3d/<model>/{harmonica.glb, holes.json}
 //!   assets/themes/<name>/{theme.json (valid against schema), preview.png, + all files listed in theme.json}
 
 use std::path::{Path, PathBuf};
 
-/// Files every `assets/songs/<artist>/<song>/` directory must contain.
+/// Files every `assets/songs/<artist>/<song>/` directory must contain. The chart
+/// and music live in a `song/` subfolder; the 2D/3D note asset folders are
+/// optional (gameplay falls back to theme defaults), so they are not required.
 const SONG_FILES: [&str; 4] = [
-    "chart.harpchart",
     "background.png",
-    "music.ogg",
     "elements.png",
+    "song/chart.harpchart",
+    "song/music.ogg",
 ];
 
 /// Files every `assets/harmonicas/3d/<model>/` directory must contain.

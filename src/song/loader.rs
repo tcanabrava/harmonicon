@@ -77,31 +77,53 @@ impl AssetLoader for SongChartLoader {
         let music = load_context.load::<AudioSource>(song_folder.join("song/music.ogg"));
         let elements = load_context.load::<Image>(song_folder.join("elements.png"));
 
-        let assets_2d = match load_context
-            .read_asset_bytes(song_folder.join("2d/note_2d.png"))
-            .await
-        {
-            Ok(_) => Some(load_context.load::<Image>(song_folder.join("2d/note_2d.png"))),
-            Err(_) => None,
-        };
+        // Note the song's own 2D image path if it ships one. We deliberately do
+        // NOT `load()` it here: that would make it a manifest dependency, kept
+        // resident for the whole song regardless of mode. gameplay_2d::setup
+        // loads it on demand when entering a 2D game (and it frees on exit).
+        let png_rel = song_folder.join("2d/note_2d.png");
+        let assets_2d: Option<std::path::PathBuf> =
+            match load_context.read_asset_bytes(png_rel.clone()).await {
+                Ok(_) => Some(png_rel),
+                Err(_) => None,
+            };
 
-        // Try to read the note from the folder, if not, fall back to the default circular.json
-        let note_2d_json = match load_context.read_asset_bytes(song_folder.join("2d/note_2d.json"))
+        // Try to read the note layout from the song's own folder; if it has none,
+        // fall back to the default circular.json layout.
+        let note_2d_json = match load_context
+            .read_asset_bytes(song_folder.join("2d/note_2d.json"))
             .await
         {
-            Ok(bytes) => {
-                println!("Load correct json");
-                String::from_utf8_lossy(&bytes).to_string()
-            }
+            Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
             Err(_) => {
-                println!("Load default json");
                 let res = load_context.read_asset_bytes("notes/2d/circular.json").await;
-                let res = res.unwrap_or_default();
-                String::from_utf8_lossy(&res).to_string()
+                String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
             }
         };
 
-        let assets_3d: Option<String> = None;
+        // Note the song's own 3D GLB path if present (without loading it, same
+        // reasoning as 2D above). gameplay_3d::setup loads it with the
+        // `#Mesh0/Primitive0` label when entering a 3D game; otherwise it falls
+        // back to the selected theme's default mesh.
+        let glb_rel = song_folder.join("3d/note_3d.glb");
+        let assets_3d: Option<std::path::PathBuf> =
+            match load_context.read_asset_bytes(glb_rel.clone()).await {
+                Ok(_) => Some(glb_rel),
+                Err(_) => None,
+            };
+
+        // 3D note layout: the song's own json if present, else the default
+        // circular.json layout. Mirrors the 2D path above.
+        let note_3d_json = match load_context
+            .read_asset_bytes(song_folder.join("3d/note_3d.json"))
+            .await
+        {
+            Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+            Err(_) => {
+                let res = load_context.read_asset_bytes("notes/3d/circular.json").await;
+                String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
+            }
+        };
 
         Ok(SongManifest {
             path: song_folder,
@@ -110,8 +132,9 @@ impl AssetLoader for SongChartLoader {
             music,
             elements,
             assets_2d,
-            assets_2d_config: serde_json::from_str(&note_2d_json).ok().expect("Could not parse note_2d.json"),
+            assets_2d_config: serde_json::from_str(&note_2d_json).unwrap_or_default(),
             assets_3d,
+            assets_3d_config: serde_json::from_str(&note_3d_json).unwrap_or_default(),
         })
     }
 
