@@ -114,6 +114,13 @@ impl EditorState {
 
 // ── Markers ─────────────────────────────────────────────────────────────────
 
+/// Footprint container (yellow hint) of a preview note; holds its tail length so
+/// its height can track the tail tip as `tail_y` changes.
+#[derive(Component)]
+struct NoteContainer {
+    tail_len: f32,
+}
+
 /// Tail shader node of every preview note.
 #[derive(Component)]
 struct PreviewTail;
@@ -152,6 +159,15 @@ const HEAD_IDLE: Color = Color::WHITE;
 /// `size_note_tails` applies in game, against the editor's reference height.
 fn tail_len_px(duration: f32) -> f32 {
     (SCROLL_SPAN / 100.0) * (duration / LOOKAHEAD as f32) * EDITOR_HW
+}
+
+/// Full vertical extent of a note, from the head box bottom to the tail tip. The
+/// tail attaches at `(1 - tail_y)` up the head box and extends `tail_len` higher,
+/// so the footprint is `(1 - tail_y)·NOTE_PX + tail_len` (never less than the
+/// head square itself). This is what the yellow hint must span so the tail tip
+/// meets its top edge.
+fn footprint_h(tail_y: f32, tail_len: f32) -> f32 {
+    ((1.0 - tail_y) * NOTE_PX + tail_len).max(NOTE_PX)
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -205,7 +221,7 @@ fn setup(
         .with_children(|row| {
             for (label, duration) in DEMO_NOTES {
                 let tail_len = tail_len_px(duration);
-                let cell_h = NOTE_PX + tail_len;
+                let cell_h = footprint_h(cfg.tail_y, tail_len);
 
                 // Each cell is a column: [note container] then [label].
                 row.spawn(Node {
@@ -217,12 +233,15 @@ fn setup(
                 .with_children(|cell| {
                     // Note container: full footprint (head + tail), relative so
                     // the yellow hint and head box stack inside it.
-                    cell.spawn(Node {
-                        width: Val::Px(NOTE_PX),
-                        height: Val::Px(cell_h),
-                        position_type: PositionType::Relative,
-                        ..default()
-                    })
+                    cell.spawn((
+                        Node {
+                            width: Val::Px(NOTE_PX),
+                            height: Val::Px(cell_h),
+                            position_type: PositionType::Relative,
+                            ..default()
+                        },
+                        NoteContainer { tail_len },
+                    ))
                     .with_children(|container| {
                         // Yellow full-note footprint hint.
                         container.spawn((
@@ -421,8 +440,9 @@ fn handle_input(
 
 fn sync_preview(
     state: Res<EditorState>,
-    mut tails: Query<&mut Node, (With<PreviewTail>, Without<PreviewHead>)>,
-    mut heads: Query<&mut Node, (With<PreviewHead>, Without<PreviewTail>)>,
+    mut tails: Query<&mut Node, (With<PreviewTail>, Without<PreviewHead>, Without<NoteContainer>)>,
+    mut heads: Query<&mut Node, (With<PreviewHead>, Without<PreviewTail>, Without<NoteContainer>)>,
+    mut containers: Query<(&NoteContainer, &mut Node), (Without<PreviewTail>, Without<PreviewHead>)>,
 ) {
     if !state.is_changed() {
         return;
@@ -440,6 +460,10 @@ fn sync_preview(
         node.top    = Val::Percent(c.head.y);
         node.width  = Val::Percent(c.head.width);
         node.height = Val::Percent(c.head.height);
+    }
+    // Keep the yellow footprint's top exactly at the tail tip as tail_y changes.
+    for (container, mut node) in &mut containers {
+        node.height = Val::Px(footprint_h(c.tail_y, container.tail_len));
     }
 }
 
