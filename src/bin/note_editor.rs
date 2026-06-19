@@ -33,7 +33,7 @@ use std::path::PathBuf;
 // ── Serialised config (matches gameplay_2d::NoteThemeConfig) ──────────────────
 
 /// Head destination rect within the lane square, in percentages (0..100).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct HeadRect {
     x: f32,
     y: f32,
@@ -62,6 +62,38 @@ impl Default for NoteConfig {
     }
 }
 
+impl NoteConfig {
+    /// Apply a directional nudge from arrow input to whichever element is
+    /// selected, in the current mode. `dx`/`dy` are unit directions (−1/0/+1);
+    /// `resize` chooses size-vs-position; `shift` picks the larger step. All
+    /// fields are clamped to their valid ranges. Pure so it can be unit-tested
+    /// without a running app.
+    fn nudge(&mut self, selected: Selected, resize: bool, shift: bool, dx: f32, dy: f32) {
+        match selected {
+            Selected::Tail => {
+                let s = if shift { 0.05 } else { 0.01 };
+                if resize {
+                    self.tail_width = (self.tail_width + dx * s).clamp(0.01, 1.0);
+                } else {
+                    self.tail_x = (self.tail_x + dx * s).clamp(0.0, 1.0);
+                    self.tail_y = (self.tail_y + dy * s).clamp(0.0, 1.0);
+                }
+            }
+            Selected::Head => {
+                let s = if shift { 5.0 } else { 1.0 };
+                let h = &mut self.head;
+                if resize {
+                    h.width  = (h.width  + dx * s).clamp(1.0, 200.0);
+                    h.height = (h.height + dy * s).clamp(1.0, 200.0);
+                } else {
+                    h.x = (h.x + dx * s).clamp(-50.0, 100.0);
+                    h.y = (h.y + dy * s).clamp(-50.0, 100.0);
+                }
+            }
+        }
+    }
+}
+
 // ── Resource ──────────────────────────────────────────────────────────────────
 
 #[derive(Resource)]
@@ -74,11 +106,21 @@ struct EditorState {
     dirty: bool,
 }
 
-#[derive(PartialEq, Clone, Copy, Default)]
+#[derive(PartialEq, Clone, Copy, Default, Debug)]
 enum Selected {
     #[default]
     Tail,
     Head,
+}
+
+impl Selected {
+    /// The other element — `Tab` flips between the two.
+    fn toggled(self) -> Self {
+        match self {
+            Selected::Tail => Selected::Head,
+            Selected::Head => Selected::Tail,
+        }
+    }
 }
 
 impl EditorState {
@@ -113,13 +155,6 @@ impl EditorState {
 }
 
 // ── Markers ─────────────────────────────────────────────────────────────────
-
-/// Footprint container (yellow hint) of a preview note; holds its tail length so
-/// its height can track the tail tip as `tail_y` changes.
-#[derive(Component)]
-struct NoteContainer {
-    tail_len: f32,
-}
 
 /// Tail shader node of every preview note.
 #[derive(Component)]
@@ -159,15 +194,6 @@ const HEAD_IDLE: Color = Color::WHITE;
 /// `size_note_tails` applies in game, against the editor's reference height.
 fn tail_len_px(duration: f32) -> f32 {
     (SCROLL_SPAN / 100.0) * (duration / LOOKAHEAD as f32) * EDITOR_HW
-}
-
-/// Full vertical extent of a note, from the head box bottom to the tail tip. The
-/// tail attaches at `(1 - tail_y)` up the head box and extends `tail_len` higher,
-/// so the footprint is `(1 - tail_y)·NOTE_PX + tail_len` (never less than the
-/// head square itself). This is what the yellow hint must span so the tail tip
-/// meets its top edge.
-fn footprint_h(tail_y: f32, tail_len: f32) -> f32 {
-    ((1.0 - tail_y) * NOTE_PX + tail_len).max(NOTE_PX)
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -221,7 +247,9 @@ fn setup(
         .with_children(|row| {
             for (label, duration) in DEMO_NOTES {
                 let tail_len = tail_len_px(duration);
-                let cell_h = footprint_h(cfg.tail_y, tail_len);
+                // Fixed footprint: head square + full tail length. Stays put as a
+                // reference so the tail can be positioned against it.
+                let cell_h = NOTE_PX + tail_len;
 
                 // Each cell is a column: [note container] then [label].
                 row.spawn(Node {
@@ -233,15 +261,12 @@ fn setup(
                 .with_children(|cell| {
                     // Note container: full footprint (head + tail), relative so
                     // the yellow hint and head box stack inside it.
-                    cell.spawn((
-                        Node {
-                            width: Val::Px(NOTE_PX),
-                            height: Val::Px(cell_h),
-                            position_type: PositionType::Relative,
-                            ..default()
-                        },
-                        NoteContainer { tail_len },
-                    ))
+                    cell.spawn(Node {
+                        width: Val::Px(NOTE_PX),
+                        height: Val::Px(cell_h),
+                        position_type: PositionType::Relative,
+                        ..default()
+                    })
                     .with_children(|container| {
                         // Yellow full-note footprint hint.
                         container.spawn((
@@ -363,10 +388,7 @@ fn handle_input(
     mut status: Query<&mut Text, With<StatusText>>,
 ) {
     if keys.just_pressed(KeyCode::Tab) {
-        state.selected = match state.selected {
-            Selected::Tail => Selected::Head,
-            Selected::Head => Selected::Tail,
-        };
+        state.selected = state.selected.toggled();
     }
 
     state.resize = keys.pressed(KeyCode::KeyR);
@@ -381,30 +403,8 @@ fn handle_input(
     if arrow_fires(KeyCode::ArrowDown,  &keys, dt, &mut rep.down)  { dy =  1.0; }
 
     if dx != 0.0 || dy != 0.0 {
-        let resize = state.resize;
-        match state.selected {
-            Selected::Tail => {
-                let s = if shift { 0.05 } else { 0.01 };
-                let c = &mut state.config;
-                if resize {
-                    c.tail_width = (c.tail_width + dx * s).clamp(0.01, 1.0);
-                } else {
-                    c.tail_x = (c.tail_x + dx * s).clamp(0.0, 1.0);
-                    c.tail_y = (c.tail_y + dy * s).clamp(0.0, 1.0);
-                }
-            }
-            Selected::Head => {
-                let s = if shift { 5.0 } else { 1.0 };
-                let h = &mut state.config.head;
-                if resize {
-                    h.width  = (h.width  + dx * s).clamp(1.0, 200.0);
-                    h.height = (h.height + dy * s).clamp(1.0, 200.0);
-                } else {
-                    h.x = (h.x + dx * s).clamp(-50.0, 100.0);
-                    h.y = (h.y + dy * s).clamp(-50.0, 100.0);
-                }
-            }
-        }
+        let (selected, resize) = (state.selected, state.resize);
+        state.config.nudge(selected, resize, shift, dx, dy);
         state.dirty = true;
     }
 
@@ -440,9 +440,8 @@ fn handle_input(
 
 fn sync_preview(
     state: Res<EditorState>,
-    mut tails: Query<&mut Node, (With<PreviewTail>, Without<PreviewHead>, Without<NoteContainer>)>,
-    mut heads: Query<&mut Node, (With<PreviewHead>, Without<PreviewTail>, Without<NoteContainer>)>,
-    mut containers: Query<(&NoteContainer, &mut Node), (Without<PreviewTail>, Without<PreviewHead>)>,
+    mut tails: Query<&mut Node, (With<PreviewTail>, Without<PreviewHead>)>,
+    mut heads: Query<&mut Node, (With<PreviewHead>, Without<PreviewTail>)>,
 ) {
     if !state.is_changed() {
         return;
@@ -460,10 +459,6 @@ fn sync_preview(
         node.top    = Val::Percent(c.head.y);
         node.width  = Val::Percent(c.head.width);
         node.height = Val::Percent(c.head.height);
-    }
-    // Keep the yellow footprint's top exactly at the tail tip as tail_y changes.
-    for (container, mut node) in &mut containers {
-        node.height = Val::Px(footprint_h(c.tail_y, container.tail_len));
     }
 }
 
@@ -493,5 +488,246 @@ fn tick_tail(time: Res<Time>, mut mats: ResMut<Assets<NoteTail2dMaterial>>) {
     let t = time.elapsed_secs();
     for (_, mat) in mats.iter_mut() {
         mat.params.z = t;
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── tail length scaling ──────────────────────────────────────────────────
+
+    #[test]
+    fn tail_length_is_proportional_to_duration() {
+        // Twice the duration → twice the on-screen tail length.
+        let short = tail_len_px(0.4);
+        let long = tail_len_px(0.8);
+        assert!((long - 2.0 * short).abs() < 1e-3, "short={short} long={long}");
+    }
+
+    #[test]
+    fn tail_length_matches_gameplay_formula() {
+        // Same scaling the game's `size_note_tails` applies, against EDITOR_HW.
+        let d = 1.0;
+        let expected = (SCROLL_SPAN / 100.0) * (d / LOOKAHEAD as f32) * EDITOR_HW;
+        assert!((tail_len_px(d) - expected).abs() < 1e-3);
+    }
+
+    #[test]
+    fn zero_duration_has_no_tail() {
+        assert_eq!(tail_len_px(0.0), 0.0);
+    }
+
+    // ── selection toggle ─────────────────────────────────────────────────────
+
+    #[test]
+    fn toggle_flips_and_round_trips() {
+        assert_eq!(Selected::Tail.toggled(), Selected::Head);
+        assert_eq!(Selected::Head.toggled(), Selected::Tail);
+        assert_eq!(Selected::Tail.toggled().toggled(), Selected::Tail);
+    }
+
+    // ── nudge: tail ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn nudge_moves_tail_attach_point() {
+        let mut c = NoteConfig::default(); // tail_x/y = 0.5
+        c.nudge(Selected::Tail, false, false, 1.0, 0.0);
+        assert!((c.tail_x - 0.51).abs() < 1e-6);
+        assert_eq!(c.tail_y, 0.5, "dx must not touch tail_y");
+        c.nudge(Selected::Tail, false, false, 0.0, -1.0);
+        assert!((c.tail_y - 0.49).abs() < 1e-6);
+    }
+
+    #[test]
+    fn shift_takes_the_larger_tail_step() {
+        let mut c = NoteConfig::default();
+        c.nudge(Selected::Tail, false, true, 1.0, 0.0); // shift
+        assert!((c.tail_x - 0.55).abs() < 1e-6);
+    }
+
+    #[test]
+    fn nudge_resizes_only_tail_width_in_resize_mode() {
+        let mut c = NoteConfig::default(); // tail_width = 0.45
+        c.nudge(Selected::Tail, true, false, 1.0, 0.0);
+        assert!((c.tail_width - 0.46).abs() < 1e-6);
+        assert_eq!(c.tail_x, 0.5, "resize must leave the attach point alone");
+        assert_eq!(c.tail_y, 0.5);
+    }
+
+    #[test]
+    fn tail_fractions_clamp_to_unit_range() {
+        let mut c = NoteConfig::default();
+        for _ in 0..500 {
+            c.nudge(Selected::Tail, false, true, 1.0, 1.0); // push hard to the max
+        }
+        assert_eq!(c.tail_x, 1.0);
+        assert_eq!(c.tail_y, 1.0);
+        for _ in 0..500 {
+            c.nudge(Selected::Tail, false, true, -1.0, -1.0);
+        }
+        assert_eq!(c.tail_x, 0.0);
+        assert_eq!(c.tail_y, 0.0);
+    }
+
+    #[test]
+    fn tail_width_never_collapses_to_zero() {
+        let mut c = NoteConfig::default();
+        for _ in 0..500 {
+            c.nudge(Selected::Tail, true, true, -1.0, 0.0);
+        }
+        assert_eq!(c.tail_width, 0.01);
+    }
+
+    // ── nudge: head ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn nudge_moves_head_in_percent_steps() {
+        let mut c = NoteConfig::default(); // head x/y = 0
+        c.nudge(Selected::Head, false, false, 1.0, 1.0);
+        assert_eq!(c.head.x, 1.0);
+        assert_eq!(c.head.y, 1.0);
+        c.nudge(Selected::Head, false, true, 1.0, 0.0); // shift = 5
+        assert_eq!(c.head.x, 6.0);
+    }
+
+    #[test]
+    fn nudge_resizes_head_without_moving_it() {
+        let mut c = NoteConfig::default(); // head w/h = 100, x/y = 0
+        c.nudge(Selected::Head, true, false, -1.0, 1.0);
+        assert_eq!(c.head.width, 99.0);
+        assert_eq!(c.head.height, 101.0);
+        assert_eq!(c.head.x, 0.0, "resize must not move the head");
+        assert_eq!(c.head.y, 0.0);
+    }
+
+    #[test]
+    fn head_rect_clamps_to_bounds() {
+        let mut c = NoteConfig::default();
+        for _ in 0..200 {
+            c.nudge(Selected::Head, false, true, 1.0, 1.0); // position max = 100
+            c.nudge(Selected::Head, true, true, 1.0, 1.0); // size max = 200
+        }
+        assert_eq!(c.head.x, 100.0);
+        assert_eq!(c.head.y, 100.0);
+        assert_eq!(c.head.width, 200.0);
+        assert_eq!(c.head.height, 200.0);
+        for _ in 0..200 {
+            c.nudge(Selected::Head, false, true, -1.0, -1.0); // position min = -50
+            c.nudge(Selected::Head, true, true, -1.0, -1.0); // size min = 1
+        }
+        assert_eq!(c.head.x, -50.0);
+        assert_eq!(c.head.y, -50.0);
+        assert_eq!(c.head.width, 1.0);
+        assert_eq!(c.head.height, 1.0);
+    }
+
+    #[test]
+    fn selecting_tail_leaves_head_untouched_and_vice_versa() {
+        let mut c = NoteConfig::default();
+        c.nudge(Selected::Tail, false, false, 1.0, 1.0);
+        assert_eq!(c.head, HeadRect::default(), "tail edits must not touch head");
+
+        let mut c = NoteConfig::default();
+        c.nudge(Selected::Head, false, false, 1.0, 1.0);
+        assert_eq!((c.tail_x, c.tail_y, c.tail_width), (0.5, 0.5, 0.45));
+    }
+
+    // ── key repeat (long press) ──────────────────────────────────────────────
+
+    /// Drives `arrow_fires` over simulated frames, counting how many times it
+    /// fires. `clear()` mimics the end-of-frame reset the input plugin does.
+    fn count_fires(hold_secs: f32, dt: f32) -> u32 {
+        let key = KeyCode::ArrowRight;
+        let mut input = ButtonInput::<KeyCode>::default();
+        let mut cooldown = 0.0;
+        let mut fires = 0;
+
+        // First frame: the press.
+        input.press(key);
+        if arrow_fires(key, &input, dt, &mut cooldown) {
+            fires += 1;
+        }
+        input.clear(); // press is no longer "just"; still held
+
+        let mut elapsed = 0.0;
+        while elapsed < hold_secs {
+            if arrow_fires(key, &input, dt, &mut cooldown) {
+                fires += 1;
+            }
+            elapsed += dt;
+        }
+        fires
+    }
+
+    #[test]
+    fn tap_fires_exactly_once() {
+        // Pressed then released within a frame → a single nudge.
+        let key = KeyCode::ArrowRight;
+        let mut input = ButtonInput::<KeyCode>::default();
+        let mut cooldown = 0.0;
+
+        input.press(key);
+        assert!(arrow_fires(key, &input, 0.016, &mut cooldown));
+        input.clear();
+        input.release(key);
+        assert!(!arrow_fires(key, &input, 0.016, &mut cooldown));
+    }
+
+    #[test]
+    fn brief_hold_under_delay_does_not_repeat() {
+        // Held for less than REPEAT_DELAY → still just the initial fire.
+        let fires = count_fires(REPEAT_DELAY * 0.5, 0.016);
+        assert_eq!(fires, 1, "no repeat should kick in before the delay");
+    }
+
+    #[test]
+    fn long_press_repeats_after_the_delay() {
+        let hold = 1.0;
+        let dt = 0.016;
+        let fires = count_fires(hold, dt);
+        // 1 initial + roughly (hold - delay) / rate repeats.
+        let expected_repeats = ((hold - REPEAT_DELAY) / REPEAT_RATE).floor() as u32;
+        assert!(fires > 1, "a long press must auto-repeat, got {fires}");
+        // Allow a small slop for frame quantisation.
+        let diff = (fires as i32 - (1 + expected_repeats) as i32).abs();
+        assert!(diff <= 2, "fires={fires}, expected≈{}", 1 + expected_repeats);
+    }
+
+    // ── serde / config schema ─────────────────────────────────────────────────
+
+    #[test]
+    fn config_round_trips_through_json() {
+        let c = NoteConfig { tail_x: 0.3, tail_y: 0.7, tail_width: 0.2, head: HeadRect { x: 5.0, y: -10.0, width: 80.0, height: 120.0 } };
+        let json = serde_json::to_string(&c).unwrap();
+        let back: NoteConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tail_x, c.tail_x);
+        assert_eq!(back.tail_y, c.tail_y);
+        assert_eq!(back.tail_width, c.tail_width);
+        assert_eq!(back.head, c.head);
+    }
+
+    #[test]
+    fn missing_head_falls_back_to_default_fill() {
+        // Older files without a `head` block parse, defaulting to fill.
+        let c: NoteConfig =
+            serde_json::from_str(r#"{ "tail_x": 0.5, "tail_y": 0.5, "tail_width": 0.45 }"#).unwrap();
+        assert_eq!(c.head, HeadRect::default());
+        assert_eq!(c.head.width, 100.0);
+    }
+
+    #[test]
+    fn shipped_note_assets_parse() {
+        // Guards against the JSON drifting out of sync with the editor struct.
+        for theme in ["circular", "square"] {
+            let path = format!("assets/notes/2d/{theme}.json");
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("read {path}: {e}"));
+            let cfg: NoteConfig = serde_json::from_str(&text)
+                .unwrap_or_else(|e| panic!("parse {path}: {e}"));
+            assert!(cfg.tail_width > 0.0, "{theme}: tail_width should be positive");
+        }
     }
 }
