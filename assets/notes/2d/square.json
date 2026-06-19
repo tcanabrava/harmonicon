@@ -1,5 +1,6 @@
 {
   "tail_x": 0.5,
   "tail_y": 0.5,
-  "tail_width": 0.6
+  "tail_width": 0.6,
+  "head": { "x": 0, "y": 0, "width": 100, "height": 100 }
 }

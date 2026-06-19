@@ -2,7 +2,6 @@
 
 use bevy::prelude::*;
 use bevy::ui::ComputedNode;
-use bevy::ui_render::prelude::MaterialNode;
 
 use crate::{
     assets_management::GlobalFonts,
@@ -16,6 +15,7 @@ use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
+use super::note_visual_2d::{NoteChildConfig, spawn_note_children};
 use super::phrase_overlay::spawn_phrase_banner;
 use super::song_progress_overlay::spawn_song_progress;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
@@ -351,15 +351,35 @@ pub(super) struct NoteTail {
     duration_frac: f32,
 }
 
-/// Per-theme tail layout, loaded from `assets/notes/<theme>.json`. Values are
+/// Head image destination rect within the note's lane square, in percentages
+/// (0..100). Lets a theme position/resize the disc inside its cell when the
+/// source PNG isn't centred or doesn't fill the frame. `(0, 0, 100, 100)` fills
+/// the square (the default, matching a perfectly-cropped sprite).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NoteHeadRect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Default for NoteHeadRect {
+    fn default() -> Self {
+        Self { x: 0.0, y: 0.0, width: 100.0, height: 100.0 }
+    }
+}
+
 /// fractions of the head image: `tail_x` is the tail's horizontal center,
 /// `tail_y` the vertical attach point on the head (0 = top, 1 = bottom), and
 /// `tail_width` the tail base width — all relative to the head's width/height.
+/// `head` positions/resizes the disc image within the lane square.
 #[derive(Debug, Clone, serde::Deserialize)]
 struct NoteThemeConfig {
     tail_x: f32,
     tail_y: f32,
     tail_width: f32,
+    #[serde(default)]
+    head: NoteHeadRect,
 }
 
 impl Default for NoteThemeConfig {
@@ -368,6 +388,7 @@ impl Default for NoteThemeConfig {
             tail_x: 0.5,
             tail_y: 0.5,
             tail_width: 0.45,
+            head: NoteHeadRect::default(),
         }
     }
 }
@@ -532,54 +553,40 @@ fn spawn_highway(
                 },
             ))
             .with_children(|note| {
-                // Tail: width and attach point come from the theme; length set
-                // each frame by `size_note_tails` to be time-accurate. Anchored by
-                // its bottom at the attach point and extending upward. Drawn first
-                // → the head image covers its base.
-                note.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Percent((tail_cfg.tail_x - tail_cfg.tail_width * 0.5) * 100.0),
-                        bottom: Val::Percent((1.0 - tail_cfg.tail_y) * 100.0),
-                        width: Val::Percent(tail_cfg.tail_width * 100.0),
-                        height: Val::Percent(100.0), // placeholder; set in size_note_tails
-                        ..default()
+                // Tail + head layout shared with the note_editor binary via
+                // note_visual_2d::spawn_note_children. Game-specific markers and
+                // the direction arrow are added in the callbacks.
+                spawn_note_children(
+                    note,
+                    &NoteChildConfig {
+                        tail_x: tail_cfg.tail_x,
+                        tail_y: tail_cfg.tail_y,
+                        tail_width: tail_cfg.tail_width,
+                        // Placeholder height; resized each frame by size_note_tails.
+                        tail_height: Val::Percent(100.0),
+                        tail_material: material,
+                        head_image: head_image.clone(),
+                        head_color: note_color,
+                        head_left: tail_cfg.head.x,
+                        head_top: tail_cfg.head.y,
+                        head_width: tail_cfg.head.width,
+                        head_height: tail_cfg.head.height,
                     },
-                    MaterialNode(material),
-                    NoteTail { duration_frac },
-                ));
-
-                // Head: the theme disc filling the square, tinted by the note
-                // colour (white interior → colour, black rim preserved).
-                note.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        top: Val::Px(0.0),
-                        left: Val::Px(0.0),
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
-                        align_items: AlignItems::Center,
-                        justify_content: JustifyContent::Center,
-                        ..default()
+                    |cmd| { cmd.insert(NoteTail { duration_frac }); },
+                    |cmd| {
+                        cmd.insert(NoteHead).with_children(|head| {
+                            head.spawn((
+                                Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
+                                TextFont {
+                                    font_size: FontSize::Px(13.0),
+                                    font: font.clone(),
+                                    ..default()
+                                },
+                                TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
+                            ));
+                        });
                     },
-                    ImageNode {
-                        image: head_image.clone(),
-                        color: note_color,
-                        ..default()
-                    },
-                    NoteHead,
-                ))
-                .with_children(|head| {
-                    head.spawn((
-                        Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
-                        TextFont {
-                            font_size: FontSize::Px(13.0),
-                            font: font.clone(),
-                            ..default()
-                        },
-                        TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
-                    ));
-                });
+                );
 
                 // Chord / split play-mode badge, pinned to the bottom edge.
                 if let Some(tag) = play_mode_label(play_mode) {
