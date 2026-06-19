@@ -20,7 +20,7 @@
     },
 
     "state_shaders": {
-      "description": "Per-interaction-state shader paths.",
+      "description": "Per-interaction-state shader paths (WGSL, relative to the theme directory).",
       "type": "object",
       "required": ["hover", "click", "idle"],
       "additionalProperties": false,
@@ -32,7 +32,7 @@
     },
 
     "state_sounds": {
-      "description": "Per-interaction-state audio cue paths.",
+      "description": "Per-interaction-state audio cue paths (relative to the theme directory).",
       "type": "object",
       "required": ["hover", "click"],
       "additionalProperties": false,
@@ -43,7 +43,7 @@
     },
 
     "coords": {
-      "description": "Position and size in pixels.",
+      "description": "Absolute position and size in pixels for a UI element.",
       "type": "object",
       "required": ["x", "y", "width", "height"],
       "additionalProperties": false,
@@ -56,12 +56,16 @@
     },
 
     "button_def": {
-      "description": "Full definition of a single button.",
+      "description": "Appearance of a single button.  Used both for default_menu_button and for per-menu button overrides.  All fields are optional so a per-menu entry only needs to specify what differs from the default.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "description":        { "type": "string" },
-        "background_image":   { "$ref": "#/$defs/image_with_shader" },
+        "id": {
+          "type": "string",
+          "description": "Button identifier.  Must match a MenuButton enum variant name (e.g. Play, BackToMain).  Required for per-menu buttons; omitted on default_menu_button."
+        },
+        "description":      { "type": "string" },
+        "background_image": { "$ref": "#/$defs/image_with_shader" },
         "icon": {
           "type": "object",
           "required": ["image_file"],
@@ -79,18 +83,17 @@
     },
 
     "menu_def": {
-      "description": "One named menu screen.",
+      "description": "One named menu screen.  Both background_image and buttons are optional: a screen can have only a background (e.g. Credits), only buttons (e.g. ArtistList), or both.",
       "type": "object",
-      "required": ["background_image", "buttons"],
       "additionalProperties": false,
       "properties": {
         "background_image": {
           "type": "string",
-          "description": "Path to the background image for this menu screen."
+          "description": "Path to the background image for this menu screen, relative to the theme directory."
         },
         "buttons": {
           "type": "array",
-          "description": "Ordered list of buttons shown on this menu screen.",
+          "description": "Ordered list of buttons with fixed pixel positions on this screen.",
           "items": { "$ref": "#/$defs/button_def" }
         }
       }
@@ -100,7 +103,7 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "Human-readable name of the theme."
+      "description": "Human-readable name of the theme shown in the theme picker."
     },
 
     "description": {
@@ -109,7 +112,7 @@
     },
 
     "default_menu_button": {
-      "description": "Fallback button appearance used when a specific button omits a field.",
+      "description": "Fallback button appearance used when a per-menu button entry omits a field.",
       "$ref": "#/$defs/button_def"
     },
 
@@ -125,7 +128,7 @@
     },
 
     "menus": {
-      "description": "Named menu screens. Keys are menu identifiers (e.g. Main, Play, Options).",
+      "description": "Named menu screens.  Keys are menu identifiers (Main, Play, Options, …).",
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/menu_def" }
     }

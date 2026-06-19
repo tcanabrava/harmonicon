@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use bevy::image::ImageSamplerDescriptor;
 use bevy::prelude::*;
 
 /// Reverse-DNS app id. On Wayland the icon comes from a matching desktop file
@@ -34,6 +35,12 @@ fn main() {
             .set(bevy::log::LogPlugin {
                 filter: "warn,bevy_render::camera=error".into(),
                 ..default()
+            })
+            // Linear filtering on all three stages (mag, min, mipmap) so that
+            // assets scaled down from their source resolution stay sharp instead
+            // of aliasing or blurring without mip interpolation.
+            .set(ImagePlugin {
+                default_sampler: ImageSamplerDescriptor::linear(),
             }),
     )
     .add_plugins((
