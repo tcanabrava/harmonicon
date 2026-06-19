@@ -585,6 +585,40 @@ mod tests {
     use super::*;
     use bevy::state::app::StatesPlugin;
 
+    // ── button_id ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn button_id_maps_every_static_variant_to_its_json_id() {
+        use MenuButton::*;
+        let cases = [
+            (Play,            "Play"),
+            (Options,         "Options"),
+            (Credits,         "Credits"),
+            (Quit,            "Quit"),
+            (PlaySong,        "PlaySong"),
+            (JamSession,      "JamSession"),
+            (PlayMode2D,      "PlayMode2D"),
+            (PlayMode3D,      "PlayMode3D"),
+            (BackToMain,      "BackToMain"),
+            (BackToPlay,      "BackToPlay"),
+            (BackToArtistList,"BackToArtistList"),
+            (Calibrate,       "Calibrate"),
+            (Theme,           "Theme"),
+            (BackToOptions,   "BackToOptions"),
+        ];
+        for (btn, expected) in cases {
+            assert_eq!(button_id(&btn), Some(expected), "variant {expected}");
+        }
+    }
+
+    #[test]
+    fn button_id_returns_none_for_dynamic_variants() {
+        assert!(button_id(&MenuButton::Artist("x".into())).is_none());
+        assert!(button_id(&MenuButton::Song("path/to.toml".into())).is_none());
+    }
+
+    // ── navigation_graph ──────────────────────────────────────────────────
+
     #[test]
     fn navigation_graph_opens_and_closes_to_the_right_pages() {
         use MenuButton::*;

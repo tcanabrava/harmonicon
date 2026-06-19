@@ -134,7 +134,16 @@ pub struct ThemePlugin;
 impl Plugin for ThemePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<LoadedTheme>()
-            .add_systems(Startup, load_theme);
+            // PreUpdate runs before StateTransition, so when the player
+            // navigates back to a menu after changing themes the OnEnter
+            // setup system will see the already-refreshed LoadedTheme.
+            // resource_changed fires on the frame after SelectedTheme is
+            // written — including the first frame after Startup, when
+            // apply_loaded_settings restores the saved theme name.
+            .add_systems(
+                PreUpdate,
+                load_theme.run_if(|s: Res<SelectedTheme>| s.is_changed()),
+            );
     }
 }
 
@@ -143,6 +152,9 @@ fn load_theme(
     selected: Res<SelectedTheme>,
     asset_server: Res<AssetServer>,
 ) {
+    // Clear previous theme data so no stale entries from the old theme survive.
+    *theme = LoadedTheme::default();
+
     let json_path = format!("assets/themes/{}/theme.json", selected.0);
 
     let text = match std::fs::read_to_string(&json_path) {
@@ -210,4 +222,206 @@ fn load_theme(
     theme.has_shaders = data.default_menu_button.button_shaders.is_some();
 
     info!("Loaded theme '{}' from {json_path}", data.name);
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── JSON parsing ──────────────────────────────────────────────────────
+
+    #[test]
+    fn theme_json_parses_button_coords() {
+        let json = r#"{
+            "name": "Test",
+            "default_background": { "image": "" },
+            "menus": {
+                "Main": {
+                    "buttons": [
+                        { "id": "Play",    "coords": { "x": 510, "y": 260, "width": 260, "height": 50 } },
+                        { "id": "Options", "coords": { "x": 510, "y": 326, "width": 260, "height": 50 } }
+                    ]
+                }
+            }
+        }"#;
+        let data: ThemeJson = serde_json::from_str(json).unwrap();
+        let main = data.menus.get("Main").unwrap();
+        assert_eq!(main.buttons.len(), 2);
+        let play = &main.buttons[0];
+        assert_eq!(play.id, "Play");
+        assert_eq!(play.coords.x, 510.0);
+        assert_eq!(play.coords.y, 260.0);
+        assert_eq!(play.coords.width, 260.0);
+        assert_eq!(play.coords.height, 50.0);
+    }
+
+    #[test]
+    fn theme_json_shaders_field_is_optional() {
+        let with_shaders = r#"{
+            "name": "T",
+            "default_background": { "image": "" },
+            "default_menu_button": {
+                "button_shaders": { "idle": "i.wgsl", "hover": "h.wgsl", "click": "c.wgsl" }
+            }
+        }"#;
+        let d: ThemeJson = serde_json::from_str(with_shaders).unwrap();
+        assert!(d.default_menu_button.button_shaders.is_some());
+
+        let without = r#"{ "name": "T", "default_background": { "image": "" } }"#;
+        let d: ThemeJson = serde_json::from_str(without).unwrap();
+        assert!(d.default_menu_button.button_shaders.is_none());
+    }
+
+    #[test]
+    fn theme_json_missing_menus_defaults_to_empty_map() {
+        let json = r#"{ "name": "T", "default_background": { "image": "" } }"#;
+        let d: ThemeJson = serde_json::from_str(json).unwrap();
+        assert!(d.menus.is_empty());
+    }
+
+    #[test]
+    fn theme_json_menu_without_buttons_defaults_to_empty_vec() {
+        let json = r#"{
+            "name": "T",
+            "default_background": { "image": "" },
+            "menus": { "Credits": { "background_image": "bg.png" } }
+        }"#;
+        let d: ThemeJson = serde_json::from_str(json).unwrap();
+        assert!(d.menus["Credits"].buttons.is_empty());
+        assert_eq!(d.menus["Credits"].background_image.as_deref(), Some("bg.png"));
+    }
+
+    // ── LoadedTheme::button_coords ────────────────────────────────────────
+
+    fn theme_with_main_buttons() -> LoadedTheme {
+        let mut theme = LoadedTheme::default();
+        let mut btns = HashMap::new();
+        btns.insert("Play".into(), ButtonCoords { x: 510.0, y: 260.0, width: 260.0, height: 50.0 });
+        btns.insert("Quit".into(), ButtonCoords { x: 510.0, y: 458.0, width: 260.0, height: 50.0 });
+        theme.button_coords.insert("Main".into(), btns);
+        theme
+    }
+
+    #[test]
+    fn button_coords_returns_correct_values() {
+        let theme = theme_with_main_buttons();
+        let c = theme.button_coords("Main", "Play").unwrap();
+        assert_eq!(c.x, 510.0);
+        assert_eq!(c.y, 260.0);
+        assert_eq!(c.width, 260.0);
+        assert_eq!(c.height, 50.0);
+    }
+
+    #[test]
+    fn button_coords_returns_none_for_unknown_menu() {
+        let theme = theme_with_main_buttons();
+        assert!(theme.button_coords("Play", "Play").is_none());
+    }
+
+    #[test]
+    fn button_coords_returns_none_for_unknown_button() {
+        let theme = theme_with_main_buttons();
+        assert!(theme.button_coords("Main", "BackToMain").is_none());
+    }
+
+    // ── LoadedTheme::background_for ───────────────────────────────────────
+
+    #[test]
+    fn background_for_returns_none_when_no_backgrounds_configured() {
+        let theme = LoadedTheme::default();
+        assert!(theme.background_for("Main").is_none());
+        assert!(theme.background_for("Unknown").is_none());
+    }
+
+    #[test]
+    fn background_for_falls_back_to_default_for_unconfigured_menu() {
+        let mut theme = LoadedTheme::default();
+        theme.default_background = Some(Handle::default());
+        // "Unknown" has no per-menu entry → falls back to default_background
+        assert!(theme.background_for("Unknown").is_some());
+    }
+
+    #[test]
+    fn background_for_returns_some_for_menu_with_explicit_entry() {
+        let mut theme = LoadedTheme::default();
+        theme.menu_backgrounds.insert("Main".into(), Handle::default());
+        assert!(theme.background_for("Main").is_some());
+    }
+
+    #[test]
+    fn background_for_uses_menu_entry_when_both_are_set() {
+        let mut theme = LoadedTheme::default();
+        // Insert handles with distinct UUIDs so we can tell them apart.
+        let default_h: Handle<Image> = bevy::asset::uuid::Uuid::from_u128(1).into();
+        let main_h: Handle<Image> = bevy::asset::uuid::Uuid::from_u128(2).into();
+        theme.default_background = Some(default_h.clone());
+        theme.menu_backgrounds.insert("Main".into(), main_h.clone());
+
+        // Menu-specific handle is returned for "Main".
+        assert_eq!(theme.background_for("Main"), Some(&main_h));
+        // Any other menu falls back to the default.
+        assert_eq!(theme.background_for("Play"), Some(&default_h));
+    }
+
+    // ── Reactive reload behavior ──────────────────────────────────────────
+
+    /// Counter resource incremented by a stub that uses the same run condition
+    /// as the real load_theme. Verifies the condition fires exactly when
+    /// SelectedTheme changes and is quiet otherwise.
+    #[derive(Resource, Default)]
+    struct ReloadCount(u32);
+
+    fn count_reloads(mut c: ResMut<ReloadCount>) {
+        c.0 += 1;
+    }
+
+    #[test]
+    fn load_condition_fires_once_on_insert_then_only_on_change() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(SelectedTheme("default".into()))
+            .init_resource::<ReloadCount>()
+            .add_systems(
+                PreUpdate,
+                count_reloads.run_if(|s: Res<SelectedTheme>| s.is_changed()),
+            );
+
+        // First update: SelectedTheme was just inserted → is_changed fires.
+        app.update();
+        assert_eq!(app.world().resource::<ReloadCount>().0, 1, "should fire on insert");
+
+        // No change → silent.
+        app.update();
+        assert_eq!(app.world().resource::<ReloadCount>().0, 1, "should not fire without change");
+
+        // Change the theme → fires again.
+        app.world_mut().resource_mut::<SelectedTheme>().0 = "dark".into();
+        app.update();
+        assert_eq!(app.world().resource::<ReloadCount>().0, 2, "should fire when theme changes");
+
+        // No further change → silent.
+        app.update();
+        assert_eq!(app.world().resource::<ReloadCount>().0, 2, "should not fire without change");
+    }
+
+    #[test]
+    fn load_condition_fires_for_each_distinct_change() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(SelectedTheme("default".into()))
+            .init_resource::<ReloadCount>()
+            .add_systems(
+                PreUpdate,
+                count_reloads.run_if(|s: Res<SelectedTheme>| s.is_changed()),
+            );
+
+        app.update(); // insert fires once
+        for theme in ["dark", "light", "neon", "default"] {
+            app.world_mut().resource_mut::<SelectedTheme>().0 = theme.into();
+            app.update();
+        }
+        assert_eq!(app.world().resource::<ReloadCount>().0, 5);
+    }
 }
