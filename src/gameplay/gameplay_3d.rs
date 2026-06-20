@@ -141,25 +141,20 @@ fn setup_lighting(commands: &mut Commands) {
     ));
 }
 
-pub fn setup_background(
-    commands: &mut Commands,
-    background: Handle<Image>,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-) {
-    let backdrop_mat = materials.add(StandardMaterial {
-        base_color_texture: Some(background.clone()),
-        unlit: true,
-        cull_mode: None,
-        ..default()
+pub fn setup_background(commands: &mut Commands, background: Handle<Image>) {
+    // Mesh and material are built inline with `asset_value`, so the scene adds
+    // them via the `AssetServer` at spawn time — no `Assets` params to thread.
+    commands.spawn_scene(bsn! {
+        Mesh3d({asset_value(Rectangle::new(200.0, 140.0))})
+        MeshMaterial3d::<StandardMaterial>({asset_value(StandardMaterial {
+            base_color_texture: Some(background),
+            unlit: true,
+            cull_mode: None,
+            ..default()
+        })})
+        Transform { translation: {Vec3::new(0.0, 14.0, FAR_Z - 2.0)} }
+        GameplayRoot
     });
-    let backdrop_mesh = meshes.add(Rectangle::new(200.0, 140.0));
-    commands.spawn((
-        Mesh3d(backdrop_mesh),
-        MeshMaterial3d(backdrop_mat),
-        Transform::from_xyz(0.0, 14.0, FAR_Z - 2.0),
-        GameplayRoot,
-    ));
 }
 
 fn create_note_track(
@@ -173,22 +168,22 @@ fn create_note_track(
     track_ctr_z: f32,
     holes: &[HoleConfig],
 ) {
-    // Semi-translucent so notes dipping below the lane (downward bends) stay visible.
-    let lane_mat = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.08, 0.08, 0.12, 0.5),
-        alpha_mode: AlphaMode::Blend,
-        metallic: 0.3,
-        perceptual_roughness: 0.8,
-        ..default()
+    // Semi-translucent floor so notes dipping below the lane (downward bends)
+    // stay visible. Mesh + material built inline via `asset_value`.
+    commands.spawn_scene(bsn! {
+        Mesh3d({asset_value(Cuboid::new(total_width, 0.05, track_len))})
+        MeshMaterial3d::<StandardMaterial>({asset_value(StandardMaterial {
+            base_color: Color::srgba(0.08, 0.08, 0.12, 0.5),
+            alpha_mode: AlphaMode::Blend,
+            metallic: 0.3,
+            perceptual_roughness: 0.8,
+            ..default()
+        })})
+        Transform { translation: {Vec3::new(center_x, LANE_Y - 0.025, track_ctr_z)} }
+        GameplayRoot
     });
-    let floor_mesh = meshes.add(Cuboid::new(total_width, 0.05, track_len));
-    commands.spawn((
-        Mesh3d(floor_mesh),
-        MeshMaterial3d(lane_mat.clone()),
-        Transform::from_xyz(center_x, LANE_Y - 0.025, track_ctr_z),
-        GameplayRoot,
-    ));
 
+    // Alternating-lane shading is per-hole (a loop), so it stays imperative.
     for (i, hole) in holes.iter().enumerate() {
         if i % 2 == 1 {
             continue;
@@ -209,27 +204,19 @@ fn create_note_track(
     }
 }
 
-fn create_hit_zone(
-    commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-    center_x: f32,
-    total_width: f32,
-) {
-    let hit_mat = materials.add(StandardMaterial {
-        base_color: Color::srgba(1.0, 1.0, 0.6, 0.15),
-        emissive: LinearRgba::new(0.8, 0.8, 0.2, 1.0),
-        alpha_mode: AlphaMode::Blend,
-        unlit: true,
-        ..default()
+fn create_hit_zone(commands: &mut Commands, center_x: f32, total_width: f32) {
+    commands.spawn_scene(bsn! {
+        Mesh3d({asset_value(Cuboid::new(total_width, 0.06, 2.8))})
+        MeshMaterial3d::<StandardMaterial>({asset_value(StandardMaterial {
+            base_color: Color::srgba(1.0, 1.0, 0.6, 0.15),
+            emissive: LinearRgba::new(0.8, 0.8, 0.2, 1.0),
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            ..default()
+        })})
+        Transform { translation: {Vec3::new(center_x, LANE_Y + 0.03, HIT_Z)} }
+        GameplayRoot
     });
-    let hit_mesh = meshes.add(Cuboid::new(total_width, 0.06, 2.8));
-    commands.spawn((
-        Mesh3d(hit_mesh),
-        MeshMaterial3d(hit_mat),
-        Transform::from_xyz(center_x, LANE_Y + 0.03, HIT_Z),
-        GameplayRoot,
-    ));
 }
 
 /// Spawns each note as a 3D comet: an elongated cube head (from the theme's glTF)
@@ -381,12 +368,7 @@ pub fn setup(
 
     setup_camera_3d(&mut commands);
     setup_lighting(&mut commands);
-    setup_background(
-        &mut commands,
-        manifest.background.clone(),
-        &mut meshes,
-        &mut materials,
-    );
+    setup_background(&mut commands, manifest.background.clone());
 
     let holes = &model_cfg.holes;
     let left_edge = holes.first().map(|h| h.x - h.w * 0.5).unwrap_or(-5.0);
@@ -411,13 +393,7 @@ pub fn setup(
         holes,
     );
 
-    create_hit_zone(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        center_x,
-        total_width,
-    );
+    create_hit_zone(&mut commands, center_x, total_width);
 
     // Comet head mesh + 3D tail layout: loaded here — on entering the 3D game —
     // from the song's own GLB if it ships a `3d/` folder, else the selected
