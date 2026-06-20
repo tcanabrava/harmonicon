@@ -304,6 +304,7 @@ pub struct ScheduledNote {
 }
 
 #[derive(Component)]
+#[require(HoleState)]
 pub struct HoleCell(pub u8);
 
 #[derive(Component, Default)]

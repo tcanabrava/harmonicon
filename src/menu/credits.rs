@@ -155,7 +155,7 @@ fn spawn_3d_scene(
         WorldAssetRoot(asset_server.load(scene_path)),
         Transform::from_scale(Vec3::splat(0.14))
             .with_rotation(Quat::from_euler(EulerRot::YXZ, -0.4, 0.2, 0.0)),
-        Visibility::default(),
+        // Visibility is auto-inserted by WorldAssetRoot's `#[require(Visibility)]`.
         layers.clone(),
         CreditsSceneLayer(layers.clone()),
         CreditsHarmonica,

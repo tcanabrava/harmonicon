@@ -635,7 +635,6 @@ fn spawn_harmonica_strip(
                 BackgroundColor(Color::srgb(0.10, 0.12, 0.16)),
                 BorderColor::all(Color::srgb(0.28, 0.30, 0.40)),
                 HoleCell(hole),
-                HoleState::default(),
             ))
             .with_children(|cell| {
                 cell.spawn((

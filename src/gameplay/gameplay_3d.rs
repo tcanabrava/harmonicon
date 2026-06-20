@@ -44,6 +44,7 @@ const HARP_Z: f32 = HIT_Z + 2.2;
 pub struct GameplayCamera3D;
 
 #[derive(Component)]
+#[require(Transform, Visibility)]
 pub(super) struct NoteVisual3D {
     time: f64,
     /// Z length of the cube head, used to land its front face on the hit line.
@@ -66,6 +67,7 @@ pub(super) struct HoleMesh3D(Handle<StandardMaterial>);
 /// Parent entity holding the GLB model and its hole overlays. Animated by
 /// `groove_harmonica` so the whole harmonica bobs in time with the music.
 #[derive(Component)]
+#[require(Transform, Visibility)]
 pub(super) struct HarmonicaGroove;
 
 fn lane_x(hole: u8) -> f32 {
@@ -286,7 +288,6 @@ pub fn create_note_visuals(
             commands
                 .spawn((
                     Transform::from_xyz(note_x, LANE_Y + NOTE_H * 0.5, FAR_Z),
-                    Visibility::default(),
                     NoteVisual3D {
                         time: t,
                         head_depth,
@@ -458,12 +459,7 @@ fn spawn_harmonica_3d(
     // nudges this parent's Transform; children (model + holes) inherit the motion
     // so the hole overlays stay glued to the model face.
     commands
-        .spawn((
-            Transform::default(),
-            Visibility::default(),
-            HarmonicaGroove,
-            GameplayRoot,
-        ))
+        .spawn((HarmonicaGroove, GameplayRoot))
         .with_children(|groove| {
             groove.spawn((
                 WorldAssetRoot(
@@ -492,7 +488,6 @@ fn spawn_harmonica_3d(
                     MeshMaterial3d(hole_mat),
                     Transform::from_xyz(hole_cfg.x, hole_cfg.y, hole_cfg.z),
                     HoleCell(hole),
-                    HoleState::default(),
                     HoleMesh3D(mat_handle),
                 ));
             }
