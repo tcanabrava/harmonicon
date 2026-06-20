@@ -23,7 +23,7 @@
 //!   Shift          larger step
 //!   S              save to assets/notes/2d/<theme>.json
 
-use bevy::{input::ButtonInput, prelude::*, ui_render::prelude::UiMaterialPlugin};
+use bevy::{asset::AssetPath, input::ButtonInput, prelude::*, ui_render::prelude::UiMaterialPlugin};
 use harmonicon::gameplay::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use harmonicon::gameplay::note_visual_2d::{NoteChildConfig, spawn_note_children};
 use harmonicon::gameplay::{HIT_H_PCT, LOOKAHEAD};
@@ -224,11 +224,12 @@ fn setup(
     mut commands: Commands,
     mut tail_mats: ResMut<Assets<NoteTail2dMaterial>>,
     state: Res<EditorState>,
-    asset_server: Res<AssetServer>,
 ) {
     commands.spawn(Camera2d);
 
-    let png: Handle<Image> = asset_server.load(format!("notes/2d/{}.png", state.theme));
+    // The head node loads its image by path through its `bsn!` scene, so we just
+    // hand `spawn_note_children` the path — no `Handle`/`AssetServer` needed here.
+    let head_path: AssetPath<'static> = format!("notes/2d/{}.png", state.theme).into();
     let cfg = &state.config;
 
     // Root: a centred row of note cells, bottom-aligned so every head sits on
@@ -308,7 +309,7 @@ fn setup(
                                         tail_width: cfg.tail_width,
                                         tail_height: Val::Px(tail_len),
                                         tail_material: mat,
-                                        head_image: png.clone(),
+                                        head_image: head_path.clone(),
                                         head_color: HEAD_IDLE,
                                         head_left: cfg.head.x,
                                         head_top: cfg.head.y,

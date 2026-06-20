@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use bevy::asset::AssetPath;
 use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use crate::{
@@ -35,7 +36,6 @@ pub fn setup(
     mut valid_notes: ResMut<ValidHarpNotes>,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
     fonts: Res<GlobalFonts>,
-    asset_server: Res<AssetServer>,
     note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -44,13 +44,13 @@ pub fn setup(
     };
 
     // Comet head: the disc image (white interior tinted per note, black rim
-    // kept), paired with its tail layout. Loaded here — on entering the 2D game
-    // — from the song's own image if it ships one, else the selected theme's
-    // default. The handle lives only on the note entities, so it frees when they
+    // kept), paired with its tail layout. We resolve only the *path* — the
+    // song's own image if it ships one, else the selected theme's default — and
+    // the head's `bsn!` scene loads it. The image frees when the note entities
     // despawn on leaving the song.
-    let head_image: Handle<Image> = match &manifest.assets_2d {
-        Some(path) => asset_server.load(path.clone()),
-        None => asset_server.load(format!("notes/2d/{}.png", note_theme.0)),
+    let head_image: AssetPath<'static> = match &manifest.assets_2d {
+        Some(path) => path.clone().into(),
+        None => format!("notes/2d/{}.png", note_theme.0).into(),
     };
 
     let tail_cfg = manifest.assets_2d_config.clone();
@@ -396,7 +396,7 @@ fn spawn_highway(
     font: &FontSource,
     chart: &crate::song::chart::HarpChart,
     note_materials: &[Handle<NoteTail2dMaterial>],
-    head_image: &Handle<Image>,
+    head_image: &AssetPath<'static>,
     tail_cfg: &NoteThemeConfig,
 ) {
     use crate::song::chart::Action;

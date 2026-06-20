@@ -5,7 +5,7 @@
 //! Both `gameplay_2d` (in-game notes) and the `note_editor` binary use
 //! [`spawn_note_children`] so any layout change here is reflected everywhere.
 
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::{asset::AssetPath, ecs::system::EntityCommands, prelude::*};
 use bevy::ui_render::prelude::MaterialNode;
 use super::note_tail_2d::NoteTail2dMaterial;
 
@@ -21,10 +21,13 @@ pub struct NoteChildConfig {
     /// Gameplay uses `Val::Percent(100.0)` (resized each frame by `size_note_tails`).
     /// The editor uses `Val::Px(n)` for a fixed preview height.
     pub tail_height: Val,
-    /// Already-allocated material handle for the tail shader.
+    /// Already-allocated material handle for the tail shader. (Procedural per
+    /// note, so it stays a handle — there's no asset path for it.)
     pub tail_material: Handle<NoteTail2dMaterial>,
-    /// Head PNG image.
-    pub head_image: Handle<Image>,
+    /// Asset path of the head PNG. The head node is a `bsn!` scene, so the image
+    /// is loaded by path through the scene's `AssetServer` — callers pass a path
+    /// (song-specific or theme default), not a pre-loaded `Handle`.
+    pub head_image: AssetPath<'static>,
     /// Tint applied to the head image (use `Color::WHITE` for no tint).
     pub head_color: Color,
     /// Head destination rect within the note square, as percentages (0..100).
@@ -65,22 +68,23 @@ pub fn spawn_note_children(
     ));
     on_tail(&mut tail_cmd);
 
-    let mut head_cmd = parent.spawn((
+    // Head node as a `bsn!` scene: the image loads by asset path via the scene's
+    // `AssetServer`, so no `Handle` (or `AssetServer`) has to be threaded in.
+    let mut head_cmd = parent.spawn_empty();
+    head_cmd.apply_scene(bsn! {
         Node {
-            position_type: PositionType::Absolute,
-            top: Val::Percent(cfg.head_top),
-            left: Val::Percent(cfg.head_left),
-            width: Val::Percent(cfg.head_width),
-            height: Val::Percent(cfg.head_height),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
+            position_type: {PositionType::Absolute},
+            top: {Val::Percent(cfg.head_top)},
+            left: {Val::Percent(cfg.head_left)},
+            width: {Val::Percent(cfg.head_width)},
+            height: {Val::Percent(cfg.head_height)},
+            align_items: {AlignItems::Center},
+            justify_content: {JustifyContent::Center},
+        }
         ImageNode {
-            image: cfg.head_image.clone(),
-            color: cfg.head_color,
-            ..default()
-        },
-    ));
+            image: {cfg.head_image.clone()},
+            color: {cfg.head_color},
+        }
+    });
     on_head(&mut head_cmd);
 }
