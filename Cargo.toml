@@ -5,7 +5,7 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-bevy = { version = "0.19.0-rc.3", features = ["dev"] }
+bevy = { version = "0.19.0", features = ["dev"] }
 cpal = "0.15"
 rustfft = "6.4"
 crossbeam-channel = "0.5"
