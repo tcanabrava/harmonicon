@@ -269,7 +269,7 @@ pub enum HitQuality {
 
 // ── Shared components ─────────────────────────────────────────────────────────
 
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub struct GameplayRoot;
 
 #[derive(Component)]

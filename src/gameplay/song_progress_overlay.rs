@@ -11,37 +11,34 @@ use crate::menu::AppState;
 use super::{GameplayClock, GameplayRoot, Paused, SongEnd};
 
 /// The growing fill of the progress bar; its width is driven each frame.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub struct ProgressFill;
 
 /// Spawns the full-width progress bar at the very top of the screen. Tagged
 /// `GameplayRoot` so it is torn down with the rest of the scene.
 pub fn spawn_song_progress(commands: &mut Commands) {
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                top: Val::Px(0.0),
-                left: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                height: Val::Px(6.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-            GlobalZIndex(50),
-            GameplayRoot,
-        ))
-        .with_children(|track| {
-            track.spawn((
+    commands.spawn_scene(bsn! {
+        Node {
+            position_type: {PositionType::Absolute},
+            top: {Val::Px(0.0)},
+            left: {Val::Px(0.0)},
+            width: {Val::Percent(100.0)},
+            height: {Val::Px(6.0)},
+        }
+        BackgroundColor({Color::srgba(0.0, 0.0, 0.0, 0.55)})
+        GlobalZIndex(50)
+        GameplayRoot
+        Children [
+            (
                 Node {
-                    width: Val::Percent(0.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
-                ProgressFill,
-            ));
-        });
+                    width: {Val::Percent(0.0)},
+                    height: {Val::Percent(100.0)},
+                }
+                BackgroundColor({Color::srgb(0.35, 0.75, 1.0)})
+                ProgressFill
+            )
+        ]
+    });
 }
 
 /// Fills the bar from 0 at the song start to full at its end. Stays empty during

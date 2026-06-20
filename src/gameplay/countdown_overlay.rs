@@ -13,31 +13,34 @@ use crate::{
 
 use super::{GameplayClock, GameplayRoot, MusicPlayer, MusicStarted, Paused};
 
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub struct CountdownOverlay;
 
 #[derive(Component)]
 pub struct CountdownText;
 
 pub fn spawn_countdown(commands: &mut Commands, font: &FontSource) {
-    commands
-        .spawn((
+    // The full-screen overlay shell is static and font/handle-free, so it's a
+    // `bsn!` scene. The countdown text children carry a custom `FontSource`,
+    // which `bsn!` can't take directly in 0.19-rc.3, so they stay imperative.
+    let overlay = commands
+        .spawn_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(12.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.05, 0.55)),
-            GlobalZIndex(100),
-            CountdownOverlay,
-            GameplayRoot,
-        ))
-        .with_children(|ov| {
+                position_type: {PositionType::Absolute},
+                width: {Val::Percent(100.0)},
+                height: {Val::Percent(100.0)},
+                flex_direction: {FlexDirection::Column},
+                align_items: {AlignItems::Center},
+                justify_content: {JustifyContent::Center},
+                row_gap: {Val::Px(12.0)},
+            }
+            BackgroundColor({Color::srgba(0.0, 0.0, 0.05, 0.55)})
+            GlobalZIndex(100)
+            CountdownOverlay
+            GameplayRoot
+        })
+        .id();
+    commands.entity(overlay).with_children(|ov| {
             ov.spawn((
                 Text::new("GET READY"),
                 TextFont {

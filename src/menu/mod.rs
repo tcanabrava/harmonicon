@@ -78,7 +78,7 @@ struct SelectedArtist(String);
 
 /// Marks every entity that belongs to a menu screen so `cleanup_menu` can
 /// remove it in one sweep when the page changes. Shared with the `options` page.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub(super) struct MenuRoot;
 
 #[derive(Component)]
@@ -158,6 +158,32 @@ pub(super) fn btn_default() -> Color {
 /// Returns the entity so the caller can add button children afterwards.
 /// `menu_id` is matched against the theme's `menus` keys (e.g. "Main", "Play")
 /// to look up the per-menu background image.
+/// The menu root container as a `bsn!` [`Scene`]: a full-screen centred column.
+fn menu_root_scene() -> impl Scene {
+    bsn! {
+        Node {
+            width: {Val::Percent(100.0)},
+            height: {Val::Percent(100.0)},
+            flex_direction: {FlexDirection::Column},
+            align_items: {AlignItems::Center},
+            justify_content: {JustifyContent::Center},
+            row_gap: {Val::Px(16.0)},
+        }
+        BackgroundColor({menu_bg()})
+        MenuRoot
+    }
+}
+
+/// A heading text line as a `bsn!` [`Scene`]. Uses the default font (no custom
+/// `FontSource`, which `bsn!` can't take directly in 0.19-rc.3).
+fn heading_scene(text: String, size: f32, color: Color) -> impl Scene {
+    bsn! {
+        Text({text})
+        TextFont { font_size: {FontSize::Px(size)} }
+        TextColor({color})
+    }
+}
+
 pub(super) fn spawn_menu_root(
     commands: &mut Commands,
     title: &str,
@@ -165,26 +191,34 @@ pub(super) fn spawn_menu_root(
     theme: &LoadedTheme,
     menu_id: &str,
 ) -> Entity {
-    let root = commands
-        .spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(16.0),
-                ..default()
-            },
-            BackgroundColor(menu_bg()),
-            MenuRoot,
-        ))
-        .id();
+    // Root container + title (+ optional subtitle) as one composed scene. The
+    // subtitle is conditional, so the two `Children [...]` shapes are spawned in
+    // separate branches (each `bsn!` is a distinct concrete `Scene` type).
+    let title = title.to_string();
+    let root = if let Some(sub) = subtitle {
+        commands
+            .spawn_scene(bsn! {
+                menu_root_scene()
+                Children [
+                    heading_scene(title, 52.0, Color::WHITE),
+                    heading_scene(sub.to_string(), 20.0, Color::srgb(0.6, 0.6, 0.7)),
+                ]
+            })
+            .id()
+    } else {
+        commands
+            .spawn_scene(bsn! {
+                menu_root_scene()
+                Children [ heading_scene(title, 52.0, Color::WHITE) ]
+            })
+            .id()
+    };
 
-    commands.entity(root).with_children(|p| {
-        // Background image behind all other content (spawned first = lowest layer)
-        if let Some(bg) = theme.background_for(menu_id) {
-            p.spawn((
+    // Background image behind all other content. Inserted at index 0 so it stays
+    // the lowest layer regardless of when this command is applied.
+    if let Some(bg) = theme.background_for(menu_id) {
+        let bg_layer = commands
+            .spawn((
                 ImageNode::new(bg.clone()),
                 Node {
                     position_type: PositionType::Absolute,
@@ -194,28 +228,10 @@ pub(super) fn spawn_menu_root(
                     bottom: Val::Px(0.0),
                     ..default()
                 },
-            ));
-        }
-
-        p.spawn((
-            Text::new(title.to_string()),
-            TextFont {
-                font_size: FontSize::Px(52.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
-        if let Some(sub) = subtitle {
-            p.spawn((
-                Text::new(sub.to_string()),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.6, 0.6, 0.7)),
-            ));
-        }
-    });
+            ))
+            .id();
+        commands.entity(root).insert_children(0, &[bg_layer]);
+    }
     root
 }
 
@@ -392,6 +408,9 @@ fn setup_artist_list(
     let root = spawn_menu_root(&mut commands, "Select Artist", None, &theme, "ArtistList");
 
     if songs.0.is_empty() {
+        // NOTE: kept imperative — `TextFont.font` is a templated `FontSource`
+        // (derives `FromTemplate`) with no `From<FontSource>` for its generated
+        // template type, so `bsn!` can't take our `FontSource` handle directly.
         let msg = commands
             .spawn((
                 Text::new("No songs found. Add folders under assets/songs/<artist>/<song>/"),
