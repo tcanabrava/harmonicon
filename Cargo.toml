@@ -9,6 +9,9 @@ bevy = { version = "0.19.0", features = ["dev"] }
 cpal = "0.15"
 rustfft = "6.4"
 crossbeam-channel = "0.5"
+# Audio decode for Song Editor tempo analysis (ogg via lewton; matches the
+# version bevy_audio already pulls in, so no duplicate rodio).
+rodio = { version = "0.22", default-features = false, features = ["vorbis"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jsonschema = "0.28"

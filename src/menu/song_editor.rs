@@ -9,11 +9,12 @@
 //! don't depend on a native dialog. Later steps add audio analysis, note
 //! editing in the grid, and saving to a `.harpchart`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
+use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
 use crate::assets_management::GlobalFonts;
 use crate::song::harmonica::twelve_bar;
@@ -78,6 +79,10 @@ impl TextFieldId {
 #[derive(Resource, Default)]
 struct FocusedField(Option<TextFieldId>);
 
+/// The in-flight tempo-analysis task, if a file is being analysed.
+#[derive(Resource, Default)]
+struct TempoTask(Option<Task<Option<f32>>>);
+
 /// The 12 chromatic keys, cycled by the harp-key button.
 const KEYS: [&str; 12] = [
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
@@ -110,6 +115,8 @@ struct TwelveBarGrid;
 struct FileBrowserRoot;
 #[derive(Component)]
 struct FileEntryButton(PathBuf);
+#[derive(Component)]
+struct AnalyzeStatusText;
 
 // ── Colours ─────────────────────────────────────────────────────────────────
 
@@ -173,6 +180,13 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
             .with_children(|grid| {
                 build_twelve_bar_cells(grid, &twelve_bar(&data.harp_key), &font);
             });
+
+            root.spawn((
+                Text::new(String::new()),
+                TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                TextColor(ACCENT),
+                AnalyzeStatusText,
+            ));
 
             root.spawn((
                 Text::new("Click a field to edit  \u{00B7}  Esc to go back"),
@@ -344,6 +358,101 @@ fn build_twelve_bar_cells(parent: &mut ChildSpawnerCommands, chords: &[String], 
                 ));
             });
     }
+}
+
+// ── Tempo analysis ────────────────────────────────────────────────────────────
+
+/// Decode `path` (ogg) to mono and estimate its tempo in BPM. Returns `None` if
+/// the file can't be decoded or no clear tempo is found, so the caller can fall
+/// back to manual entry. Runs on a background task — it decodes the whole file.
+fn analyze_tempo(path: &Path) -> Option<f32> {
+    use rodio::Source;
+    let file = std::fs::File::open(path).ok()?;
+    let decoder = rodio::Decoder::try_from(file).ok()?;
+    let sample_rate = decoder.sample_rate().get() as f32;
+    let channels = decoder.channels().get() as usize;
+    if channels == 0 {
+        return None;
+    }
+
+    // Downmix to mono, capped to ~90s — plenty for a steady tempo.
+    let cap = (sample_rate as usize) * channels * 90;
+    let mut mono = Vec::new();
+    let mut acc = 0.0f32;
+    let mut c = 0usize;
+    for (i, s) in decoder.enumerate() {
+        if i >= cap {
+            break;
+        }
+        acc += s;
+        c += 1;
+        if c == channels {
+            mono.push(acc / channels as f32);
+            acc = 0.0;
+            c = 0;
+        }
+    }
+    estimate_bpm(&mono, sample_rate)
+}
+
+/// Autocorrelation tempo estimate over an onset-energy envelope. Pure, so it can
+/// be unit-tested on synthetic signals.
+fn estimate_bpm(mono: &[f32], sample_rate: f32) -> Option<f32> {
+    const HOP: usize = 512;
+    let n_frames = mono.len() / HOP;
+    if n_frames < 32 || sample_rate <= 0.0 {
+        return None;
+    }
+
+    // Per-hop energy, then a half-wave-rectified difference = onset envelope.
+    let energy: Vec<f32> = (0..n_frames)
+        .map(|f| mono[f * HOP..(f + 1) * HOP].iter().map(|x| x * x).sum())
+        .collect();
+    let mut onset: Vec<f32> = std::iter::once(0.0)
+        .chain((1..n_frames).map(|i| (energy[i] - energy[i - 1]).max(0.0)))
+        .collect();
+    let mean = onset.iter().sum::<f32>() / onset.len() as f32;
+    if mean <= f32::EPSILON {
+        return None; // silence / no onsets
+    }
+    for v in &mut onset {
+        *v -= mean;
+    }
+
+    let frame_rate = sample_rate / HOP as f32; // envelope frames per second
+    let lag_min = (frame_rate * 60.0 / 200.0).floor().max(1.0) as usize;
+    let lag_max = ((frame_rate * 60.0 / 50.0).ceil() as usize).min(onset.len() / 2);
+    if lag_min >= lag_max {
+        return None;
+    }
+
+    let mut best_lag = 0usize;
+    let mut best = f32::MIN;
+    let mut total = 0.0f32;
+    let mut count = 0u32;
+    for lag in lag_min..=lag_max {
+        let sum: f32 = (lag..onset.len()).map(|i| onset[i] * onset[i - lag]).sum();
+        total += sum;
+        count += 1;
+        if sum > best {
+            best = sum;
+            best_lag = lag;
+        }
+    }
+    // Require a peak clearly above the average autocorrelation, else "no tempo".
+    let avg = total / count.max(1) as f32;
+    if best_lag == 0 || best <= avg * 1.5 {
+        return None;
+    }
+
+    let mut bpm = 60.0 * frame_rate / best_lag as f32;
+    while bpm < 70.0 {
+        bpm *= 2.0;
+    }
+    while bpm > 180.0 {
+        bpm /= 2.0;
+    }
+    Some(bpm)
 }
 
 fn music_label(path: &Option<PathBuf>) -> String {
@@ -585,6 +694,8 @@ fn pick_file(
     entries: Query<(&Interaction, &FileEntryButton), Changed<Interaction>>,
     browser: Query<Entity, With<FileBrowserRoot>>,
     mut data: ResMut<SongEditorData>,
+    mut task: ResMut<TempoTask>,
+    mut status: Query<&mut Text, With<AnalyzeStatusText>>,
     mut commands: Commands,
 ) {
     for (interaction, entry) in &entries {
@@ -593,8 +704,42 @@ fn pick_file(
             for e in &browser {
                 commands.entity(e).despawn();
             }
+            // Kick off background tempo analysis (Step 3).
+            let path = entry.0.clone();
+            let pool = AsyncComputeTaskPool::get();
+            task.0 = Some(pool.spawn(async move { analyze_tempo(&path) }));
+            if let Ok(mut text) = status.single_mut() {
+                **text = "Analyzing tempo\u{2026}".to_string();
+            }
             return;
         }
+    }
+}
+
+/// Poll the background tempo analysis; on success fill the tempo field, else
+/// leave it for manual entry. The status line reflects the outcome.
+fn poll_tempo(
+    mut task: ResMut<TempoTask>,
+    mut data: ResMut<SongEditorData>,
+    mut status: Query<&mut Text, With<AnalyzeStatusText>>,
+) {
+    let Some(t) = task.0.as_mut() else {
+        return;
+    };
+    let Some(result) = future::block_on(future::poll_once(t)) else {
+        return; // still running
+    };
+    task.0 = None;
+    let msg = match result {
+        Some(bpm) => {
+            let bpm = bpm.round() as u32;
+            data.tempo_bpm = bpm.to_string();
+            format!("Tempo auto-detected: {bpm} BPM (edit if wrong)")
+        }
+        None => "Couldn't detect tempo \u{2014} enter it manually".to_string(),
+    };
+    if let Ok(mut text) = status.single_mut() {
+        **text = msg;
     }
 }
 
@@ -624,11 +769,13 @@ fn cleanup(
     mut commands: Commands,
     roots: Query<Entity, Or<(With<SongEditorRoot>, With<FileBrowserRoot>)>>,
     mut focused: ResMut<FocusedField>,
+    mut task: ResMut<TempoTask>,
 ) {
     for e in &roots {
         commands.entity(e).despawn();
     }
     focused.0 = None;
+    task.0 = None;
 }
 
 pub struct SongEditorPlugin;
@@ -637,6 +784,7 @@ impl Plugin for SongEditorPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SongEditorData>()
             .init_resource::<FocusedField>()
+            .init_resource::<TempoTask>()
             .add_systems(OnEnter(AppState::SongEditor), setup)
             .add_systems(OnExit(AppState::SongEditor), cleanup)
             .add_systems(
@@ -648,6 +796,7 @@ impl Plugin for SongEditorPlugin {
                     harp_key_clicks,
                     open_browser,
                     pick_file,
+                    poll_tempo,
                     update_field_views,
                 )
                     .run_if(in_state(AppState::SongEditor)),
@@ -678,6 +827,28 @@ mod tests {
             music_label(&Some(PathBuf::from("/a/b/song.ogg"))),
             "song.ogg"
         );
+    }
+
+    #[test]
+    fn estimate_bpm_finds_a_click_train_tempo() {
+        let sr = 44100.0;
+        let period = (60.0 / 120.0 * sr) as usize; // 120 BPM → 22050 samples
+        let n = period * 20;
+        let mut sig = vec![0.0f32; n];
+        for beat in 0..20 {
+            for k in 0..256 {
+                if beat * period + k < n {
+                    sig[beat * period + k] = 1.0;
+                }
+            }
+        }
+        let est = estimate_bpm(&sig, sr).expect("a steady click train has a tempo");
+        assert!((est - 120.0).abs() < 6.0, "got {est}");
+    }
+
+    #[test]
+    fn estimate_bpm_rejects_silence() {
+        assert!(estimate_bpm(&vec![0.0f32; 44100 * 2], 44100.0).is_none());
     }
 
     #[test]
