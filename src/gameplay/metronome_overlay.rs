@@ -24,6 +24,24 @@ pub struct MetronomeMuteButton;
 #[derive(Component)]
 pub struct MetronomeMuteLabel;
 
+/// Marks the straight/shuffle feel toggle button.
+#[derive(Component)]
+pub struct MetronomeFeelButton;
+
+/// Marks the text inside the feel toggle so it can be rewritten.
+#[derive(Component)]
+pub struct MetronomeFeelLabel;
+
+/// Click subdivision. `Straight` clicks plain quarters; `Shuffle` splits each
+/// beat into triplets and clicks the beat + the swung "and" (the long-short
+/// "loping" blues groove). Defaults to shuffle since the songs are blues.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MetronomeFeel {
+    Straight,
+    #[default]
+    Shuffle,
+}
+
 /// Click samples, loaded once at startup. The downbeat carries the accent.
 #[derive(Resource)]
 pub struct MetronomeSounds {
@@ -35,9 +53,10 @@ pub struct MetronomeSounds {
 #[derive(Resource, Default)]
 pub struct MetronomeMuted(pub bool);
 
-/// The last beat index a click was played for, so each beat clicks once.
+/// The last tick index a click was played for, so each tick clicks once. A tick
+/// is a beat in straight feel, or a triplet-eighth in shuffle feel.
 #[derive(Resource, Default)]
-pub struct LastClickedBeat(pub Option<i64>);
+pub struct LastClickedTick(pub Option<i64>);
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
@@ -53,6 +72,36 @@ pub fn beat_index(clock: f64, bpm: f64) -> Option<i64> {
 pub fn is_downbeat(beat: i64, beats_per_bar: f64) -> bool {
     let beats = (beats_per_bar.max(1.0)) as i64;
     beat.rem_euclid(beats) == 0
+}
+
+/// Index of the current click subdivision ("tick"), or `None` before the song
+/// starts. A tick is a whole beat in `Straight` feel, or a triplet-eighth (three
+/// per beat) in `Shuffle` feel.
+pub fn tick_index(clock: f64, bpm: f64, feel: MetronomeFeel) -> Option<i64> {
+    if clock < 0.0 || bpm <= 0.0 {
+        return None;
+    }
+    let beat_dur = 60.0 / bpm;
+    let div = match feel {
+        MetronomeFeel::Straight => beat_dur,
+        MetronomeFeel::Shuffle => beat_dur / 3.0,
+    };
+    Some((clock / div).floor() as i64)
+}
+
+/// What to play for a given tick: `Some((accent, gain))` or `None` for a silent
+/// subdivision. In shuffle feel a beat is three triplet-eighths; we click the
+/// beat (sub 0, accented on the downbeat) and the swung "and" (sub 2, softer),
+/// and stay silent on the middle triplet — the classic long-short shuffle.
+pub fn click_for_tick(tick: i64, beats_per_bar: f64, feel: MetronomeFeel) -> Option<(bool, f32)> {
+    match feel {
+        MetronomeFeel::Straight => Some((is_downbeat(tick, beats_per_bar), 1.0)),
+        MetronomeFeel::Shuffle => match tick.rem_euclid(3) {
+            0 => Some((is_downbeat(tick.div_euclid(3), beats_per_bar), 1.0)),
+            2 => Some((false, 0.55)),
+            _ => None,
+        },
+    }
 }
 
 // ── UI ────────────────────────────────────────────────────────────────────────
@@ -102,6 +151,31 @@ pub fn spawn_metronome(
                     },
                     TextColor(Color::srgb(0.65, 0.65, 0.70)),
                     MetronomeMuteLabel,
+                ));
+            });
+
+            // Straight ↔ shuffle feel toggle (also bound to the F key).
+            row.spawn((
+                Button,
+                Node {
+                    padding: UiRect::axes(Val::Px(6.0), Val::Px(2.0)),
+                    border: UiRect::all(Val::Px(1.5)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9)),
+                BorderColor::all(Color::srgb(0.35, 0.35, 0.50)),
+                MetronomeFeelButton,
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    Text::new("feel: shuffle"),
+                    TextFont {
+                        font_size: FontSize::Px(11.0),
+                        font: font.clone(),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.65, 0.65, 0.70)),
+                    MetronomeFeelLabel,
                 ));
             });
         });
@@ -177,27 +251,30 @@ fn load_metronome_sounds(mut commands: Commands, asset_server: Res<AssetServer>)
     });
 }
 
-fn reset_click_tracking(mut last: ResMut<LastClickedBeat>) {
+fn reset_click_tracking(mut last: ResMut<LastClickedTick>) {
     last.0 = None;
 }
 
-/// Plays one click per beat, accented on the downbeat. Follows the gameplay
-/// clock, so it stays in sync through pause/resume and loop-region jumps.
+/// Plays the metronome clicks: plain quarters in straight feel, or the swung
+/// long-short pattern in shuffle feel (beat + the "and", accent on the
+/// downbeat). Follows the gameplay clock, so it stays in sync through
+/// pause/resume and loop-region jumps.
 fn click_metronome(
     clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     config: Res<ScoringConfig>,
     muted: Res<MetronomeMuted>,
+    feel: Res<MetronomeFeel>,
     sounds: Res<MetronomeSounds>,
     audio: Res<AudioSettings>,
-    mut last: ResMut<LastClickedBeat>,
+    mut last: ResMut<LastClickedTick>,
     mut commands: Commands,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
-    let Some(current) = beat_index(clock.0, manifest.chart.song.tempo_bpm as f64) else {
+    let Some(current) = tick_index(clock.0, manifest.chart.song.tempo_bpm as f64, *feel) else {
         return;
     };
     if last.0 == Some(current) {
@@ -208,14 +285,18 @@ fn click_metronome(
     if muted.0 {
         return;
     }
-    let sample = if is_downbeat(current, config.beats_per_bar) {
+    // Silent subdivisions (the skipped middle triplet of a shuffle) play nothing.
+    let Some((accent, gain)) = click_for_tick(current, config.beats_per_bar, *feel) else {
+        return;
+    };
+    let sample = if accent {
         sounds.downbeat.clone()
     } else {
         sounds.beat.clone()
     };
     commands.spawn((
         AudioPlayer::<AudioSource>(sample),
-        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.metronome_volume)),
+        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.metronome_volume * gain)),
     ));
 }
 
@@ -276,7 +357,8 @@ pub struct MetronomePlugin;
 impl Plugin for MetronomePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MetronomeMuted>()
-            .init_resource::<LastClickedBeat>()
+            .init_resource::<LastClickedTick>()
+            .init_resource::<MetronomeFeel>()
             .add_systems(Startup, load_metronome_sounds)
             .add_systems(OnEnter(AppState::Playing), reset_click_tracking)
             .add_systems(
