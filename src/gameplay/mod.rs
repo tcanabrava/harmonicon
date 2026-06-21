@@ -120,6 +120,15 @@ impl Plugin for GameplayPlugin {
                 .in_set(GameplayLogic)
                 .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         )
+        // Jam Session: live harmonica hole-map feedback from the mic.
+        .add_systems(
+            Update,
+            jam_session::update_hole_map.run_if(
+                in_state(AppState::Playing)
+                    .and_then(|p: Res<Paused>| !p.0)
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+            ),
+        )
         // Results screen lifecycle.
         .add_systems(OnEnter(AppState::Results), results::setup)
         .add_systems(OnExit(AppState::Results), results::cleanup)

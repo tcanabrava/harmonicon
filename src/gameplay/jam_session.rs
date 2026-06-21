@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: MIT
 
+use std::collections::{HashMap, HashSet};
+
 use bevy::prelude::*;
 
 use crate::{
-    assets_management::GlobalFonts, menu::SelectedSong, song::SongManifest,
-    song::harmonica::twelve_bar,
+    assets_management::GlobalFonts,
+    menu::SelectedSong,
+    song::SongManifest,
+    song::chart::Action,
+    song::harmonica::{Harmonica, semitone, twelve_bar},
 };
 
 use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
@@ -12,7 +17,7 @@ use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::{COUNTDOWN, GameplayRoot, MusicStarted};
+use super::{ActivePitches, COUNTDOWN, GameplayRoot, MusicStarted};
 
 /// Free-play screen: left half shows the 12-bar chart and the metronome stacked
 /// vertically; the right half is reserved for a future jam feature. The shared
@@ -47,6 +52,10 @@ pub fn setup(
             .and_then(|n| n.parse::<usize>().ok())
             .unwrap_or(4)
     };
+
+    // Per-hole note labels + the lookup the live feedback system uses to light
+    // the hole(s) the player is currently sounding, coloured by blues-scale fit.
+    let (holes_info, guide) = build_hole_guide(&chart.harmonica, key);
 
     commands
         .spawn((
@@ -111,16 +120,254 @@ pub fn setup(
                 });
             });
 
-            // ── Right half: live spectrogram of the harmonica input ──────────
+            // ── Right half: live spectrogram (top) + harmonica hole map ──────
             root.spawn(Node {
                 width: Val::Percent(50.0),
                 height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
                 ..default()
             })
             .with_children(|right| {
-                spawn_spectrogram(right, *spectrogram_style, &osc_material.0);
+                right
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_grow: 1.0,
+                        ..default()
+                    })
+                    .with_children(|spec| {
+                        spawn_spectrogram(spec, *spectrogram_style, &osc_material.0);
+                    });
+                spawn_hole_map(right, &holes_info, &fonts.gameplay);
             });
         });
 
+    commands.insert_resource(guide);
     spawn_countdown(&mut commands, &fonts.gameplay);
+}
+
+// ── Live harmonica hole map ─────────────────────────────────────────────────────
+
+/// Lookup driving the live hole feedback, rebuilt for each jam: which holes can
+/// sound a given `note+octave`, and which note classes are in the song's blues
+/// scale (so a sounding note can be coloured "in scale" vs "outside").
+#[derive(Resource)]
+pub struct JamHoleGuide {
+    note_to_holes: HashMap<String, Vec<u8>>,
+    scale_classes: HashSet<String>,
+}
+
+/// One hole cell in the map; its background is tinted each frame by play state.
+#[derive(Component)]
+pub struct JamHoleCell {
+    hole: u8,
+}
+
+/// Static rendering data for one hole: its blow/draw notes and whether each sits
+/// in the blues scale (for the green "safe note" hint).
+struct HoleInfo {
+    hole: u8,
+    blow: String,
+    draw: String,
+    blow_in_scale: bool,
+    draw_in_scale: bool,
+}
+
+const HOLE_DEFAULT: Color = Color::srgba(0.12, 0.12, 0.16, 0.9);
+const PLAY_IN_SCALE: Color = Color::srgb(0.20, 0.80, 0.35);
+const PLAY_OUT_SCALE: Color = Color::srgb(0.90, 0.55, 0.15);
+const LABEL_IN_SCALE: Color = Color::srgb(0.45, 0.85, 0.50);
+const LABEL_OUT_SCALE: Color = Color::srgb(0.50, 0.50, 0.55);
+
+/// The note class (drop the trailing octave digit) of e.g. `"D#5"` → `"D#"`.
+fn note_class(note: &str) -> &str {
+    note.trim_end_matches(|c: char| c.is_ascii_digit())
+}
+
+/// The six note classes of the blues scale rooted on `key` (1, b3, 4, b5, 5, b7).
+fn blues_scale_classes(key: &str) -> HashSet<String> {
+    [0, 3, 5, 6, 7, 10].iter().map(|&n| semitone(key, n)).collect()
+}
+
+/// Build the per-hole render data and the live-feedback lookup from the harp
+/// layout and the song key.
+fn build_hole_guide(harp: &Harmonica, key: &str) -> (Vec<HoleInfo>, JamHoleGuide) {
+    let dash = "\u{2014}";
+    let scale_classes = blues_scale_classes(key);
+    let mut note_to_holes: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut holes = Vec::new();
+
+    for hole in 1..=10u8 {
+        let blow = harp.wind_direction_label(hole, &Action::Blow);
+        let draw = harp.wind_direction_label(hole, &Action::Draw);
+        if blow == dash && draw == dash {
+            continue;
+        }
+        if blow != dash {
+            note_to_holes.entry(blow.clone()).or_default().push(hole);
+        }
+        if draw != dash {
+            note_to_holes.entry(draw.clone()).or_default().push(hole);
+        }
+        holes.push(HoleInfo {
+            hole,
+            blow_in_scale: scale_classes.contains(note_class(&blow)),
+            draw_in_scale: scale_classes.contains(note_class(&draw)),
+            blow,
+            draw,
+        });
+    }
+
+    (holes, JamHoleGuide { note_to_holes, scale_classes })
+}
+
+/// Spawn the bottom-strip hole map: a row of cells (blow note, hole number, draw
+/// note), with in-scale notes tinted green as a static guide.
+fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], font: &FontSource) {
+    parent
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(6.0),
+            padding: UiRect::all(Val::Px(12.0)),
+            ..default()
+        })
+        .with_children(|col| {
+            col.spawn((
+                Text::new("Your harmonica  \u{00B7}  green = blues-scale note  \u{00B7}  top blow / bottom draw"),
+                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextColor(Color::srgb(0.70, 0.70, 0.80)),
+            ));
+            col.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(4.0),
+                ..default()
+            })
+            .with_children(|row| {
+                for h in holes {
+                    row.spawn((
+                        Node {
+                            width: Val::Px(40.0),
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Center,
+                            row_gap: Val::Px(2.0),
+                            padding: UiRect::all(Val::Px(4.0)),
+                            ..default()
+                        },
+                        BackgroundColor(HOLE_DEFAULT),
+                        JamHoleCell { hole: h.hole },
+                    ))
+                    .with_children(|cell| {
+                        cell.spawn((
+                            Text::new(note_class(&h.blow).to_string()),
+                            TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                            TextColor(if h.blow_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
+                        ));
+                        cell.spawn((
+                            Text::new(h.hole.to_string()),
+                            TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                            TextColor(Color::WHITE),
+                        ));
+                        cell.spawn((
+                            Text::new(note_class(&h.draw).to_string()),
+                            TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                            TextColor(if h.draw_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
+                        ));
+                    });
+                }
+            });
+        });
+}
+
+/// Tint each hole cell from the live mic pitches: bright green if the sounding
+/// note is in the blues scale, amber if outside, default when silent. Reuses the
+/// same `ActivePitches` the scored modes detect.
+pub fn update_hole_map(
+    active: Res<ActivePitches>,
+    guide: Option<Res<JamHoleGuide>>,
+    mut cells: Query<(&JamHoleCell, &mut BackgroundColor)>,
+) {
+    let Some(guide) = guide else {
+        return;
+    };
+
+    // Map each currently-lit hole to whether the note sounding it is in scale.
+    let mut lit: HashMap<u8, bool> = HashMap::new();
+    for p in &active.0 {
+        let note = format!("{}{}", p.note, p.octave);
+        if let Some(holes) = guide.note_to_holes.get(&note) {
+            let in_scale = guide.scale_classes.contains(&p.note);
+            for &h in holes {
+                lit.entry(h).and_modify(|v| *v |= in_scale).or_insert(in_scale);
+            }
+        }
+    }
+
+    for (cell, mut bg) in &mut cells {
+        bg.0 = match lit.get(&cell.hole) {
+            Some(true) => PLAY_IN_SCALE,
+            Some(false) => PLAY_OUT_SCALE,
+            None => HOLE_DEFAULT,
+        };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Standard Richter C diatonic, matching `harmonica.rs`'s test layout.
+    fn c_harp() -> Harmonica {
+        serde_json::from_str(
+            r#"{"type":"diatonic","holes":10,"bending_profile":"richter_standard",
+                "layout":{"blow":["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+                          "draw":["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]}}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn note_class_drops_octave() {
+        assert_eq!(note_class("C4"), "C");
+        assert_eq!(note_class("D#5"), "D#");
+        assert_eq!(note_class("A6"), "A");
+    }
+
+    #[test]
+    fn blues_scale_is_the_six_classes() {
+        // C blues: C, Eb(=D#), F, Gb(=F#), G, Bb(=A#).
+        let s = blues_scale_classes("C");
+        for c in ["C", "D#", "F", "F#", "G", "A#"] {
+            assert!(s.contains(c), "missing {c}");
+        }
+        assert_eq!(s.len(), 6);
+        assert!(!s.contains("D"), "major 2nd is not in the blues scale");
+        assert!(!s.contains("E"), "major 3rd is not in the blues scale");
+    }
+
+    #[test]
+    fn guide_maps_a_shared_note_to_every_hole_that_sounds_it() {
+        // On a C harp, G4 is both draw-2 and blow-3 — both holes should light.
+        let (_, guide) = build_hole_guide(&c_harp(), "C");
+        let mut holes = guide.note_to_holes.get("G4").cloned().unwrap_or_default();
+        holes.sort_unstable();
+        assert_eq!(holes, vec![2, 3]);
+    }
+
+    #[test]
+    fn guide_marks_scale_membership_per_direction() {
+        let (holes, _) = build_hole_guide(&c_harp(), "C");
+        let hole1 = holes.iter().find(|h| h.hole == 1).unwrap();
+        assert!(hole1.blow_in_scale, "blow C4 is the root → in scale");
+        assert!(!hole1.draw_in_scale, "draw D4 (major 2nd) → outside");
+        let hole2 = holes.iter().find(|h| h.hole == 2).unwrap();
+        assert!(hole2.draw_in_scale, "draw G4 (the 5th) → in scale");
+    }
+
+    #[test]
+    fn guide_covers_all_ten_holes() {
+        let (holes, _) = build_hole_guide(&c_harp(), "C");
+        assert_eq!(holes.len(), 10);
+    }
 }
