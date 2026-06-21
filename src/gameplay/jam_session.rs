@@ -108,6 +108,7 @@ pub fn setup(
                 })
                 .with_children(|grid| {
                     spawn_12_bar_grid(grid, &chords, key, &fonts.gameplay, &GridConfig::for_2d());
+                    spawn_hole_map(grid, &holes_info, &fonts.gameplay);
                 });
                 left.spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -120,7 +121,7 @@ pub fn setup(
                 });
             });
 
-            // ── Right half: live spectrogram (top) + harmonica hole map ──────
+            // ── Right half: live spectrogram (top)  ──────
             root.spawn(Node {
                 width: Val::Percent(50.0),
                 height: Val::Percent(100.0),
@@ -137,7 +138,6 @@ pub fn setup(
                     .with_children(|spec| {
                         spawn_spectrogram(spec, *spectrogram_style, &osc_material.0);
                     });
-                spawn_hole_map(right, &holes_info, &fonts.gameplay);
             });
         });
 
