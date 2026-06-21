@@ -10,6 +10,7 @@ pub(crate) mod button_material;
 mod calibration;
 mod credits;
 mod options;
+mod song_editor;
 mod theme_picker;
 
 use button_material::{ButtonMaterialPlugin, ButtonMaterials, ButtonShaderLayer, ThemedButton};
@@ -50,6 +51,8 @@ pub enum AppState {
     Calibration,
     /// Credits screen with scrolling text and 3D harmonica background.
     Credits,
+    /// Song authoring tool, launched from the main menu.
+    SongEditor,
 }
 
 // ── Menu sub-states (only active while AppState == Menu) ──────────────────────
@@ -85,6 +88,7 @@ pub(super) struct MenuRoot;
 pub(super) enum MenuButton {
     // Main menu
     Play,
+    SongEditor,
     Options,
     Credits,
     Quit,
@@ -122,6 +126,7 @@ impl Plugin for MenuPlugin {
             .add_plugins(options::OptionsPlugin)
             .add_plugins(calibration::CalibrationPlugin)
             .add_plugins(credits::CreditsPlugin)
+            .add_plugins(song_editor::SongEditorPlugin)
             .add_plugins(theme_picker::ThemePickerPlugin)
             .add_systems(OnEnter(AppState::Menu), route_menu_entry)
             // Each page manages its own lifetime.
@@ -240,6 +245,7 @@ pub(super) fn spawn_menu_root(
 fn button_id(btn: &MenuButton) -> Option<&'static str> {
     match btn {
         MenuButton::Play => Some("Play"),
+        MenuButton::SongEditor => Some("SongEditor"),
         MenuButton::Options => Some("Options"),
         MenuButton::Credits => Some("Credits"),
         MenuButton::Quit => Some("Quit"),
@@ -381,6 +387,7 @@ fn setup_main_menu(
     let root = spawn_menu_root(&mut commands, "Harmonicon", None, &theme, "Main");
     let font = font.gameplay.clone();
     spawn_button(&mut commands, root, &font, "Play", MenuButton::Play, &theme, &btn_mats, "Main");
+    spawn_button(&mut commands, root, &font, "Song Editor", MenuButton::SongEditor, &theme, &btn_mats, "Main");
     spawn_button(&mut commands, root, &font, "Options", MenuButton::Options, &theme, &btn_mats, "Main");
     spawn_button(&mut commands, root, &font, "Credits", MenuButton::Credits, &theme, &btn_mats, "Main");
     spawn_button(&mut commands, root, &font, "Quit", MenuButton::Quit, &theme, &btn_mats, "Main");
@@ -490,6 +497,7 @@ pub(super) enum MenuNav {
 pub(super) fn menu_nav(button: &MenuButton) -> MenuNav {
     match button {
         MenuButton::Play => MenuNav::To(MenuPage::Play),
+        MenuButton::SongEditor => MenuNav::Enter(AppState::SongEditor),
         MenuButton::Options => MenuNav::To(MenuPage::Options),
         MenuButton::Credits => MenuNav::Enter(AppState::Credits),
         MenuButton::Quit => MenuNav::Quit,
@@ -611,6 +619,7 @@ mod tests {
         use MenuButton::*;
         let cases = [
             (Play,            "Play"),
+            (SongEditor,      "SongEditor"),
             (Options,         "Options"),
             (Credits,         "Credits"),
             (Quit,            "Quit"),
@@ -666,6 +675,7 @@ mod tests {
         // Terminal actions.
         assert_eq!(menu_nav(&Quit), MenuNav::Quit);
         assert_eq!(menu_nav(&Credits), MenuNav::Enter(AppState::Credits));
+        assert_eq!(menu_nav(&SongEditor), MenuNav::Enter(AppState::SongEditor));
     }
 
     // Records page enter/exit so the close-then-open order can be asserted.
