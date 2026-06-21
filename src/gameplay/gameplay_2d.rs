@@ -337,7 +337,8 @@ pub fn setup(
             });
         });
     spawn_song_progress(&mut commands);
-    spawn_countdown(&mut commands, &fonts.gameplay);
+    let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
+    spawn_countdown(&mut commands, &fonts.gameplay, Some(&harp_hint));
 }
 
 fn note_height_pct(duration: f64) -> f32 {

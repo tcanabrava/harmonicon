@@ -46,6 +46,24 @@ pub fn twelve_bar(key: &str) -> [String; 12] {
     ]
 }
 
+/// One-line "which harp to grab" hint. A Richter diatonic's key is its hole-1
+/// blow note, so it's derived from the layout and paired with the song's
+/// position and key — e.g. `"Use a C harmonica · 2nd position · key of G"`.
+/// Falls back to just the key when the harp key can't be determined.
+pub fn harp_banner(harp: &Harmonica, song_key: &str) -> String {
+    let blow1 = harp.wind_direction_label(1, &Action::Blow);
+    let harp_key = blow1.trim_end_matches(|c: char| c.is_ascii_digit());
+    if harp_key.is_empty() || harp_key == "\u{2014}" {
+        return format!("Playing in {song_key}");
+    }
+    match harp.position() {
+        Some(pos) => {
+            format!("Use a {harp_key} harmonica  \u{00B7}  {pos} position  \u{00B7}  key of {song_key}")
+        }
+        None => format!("Use a {harp_key} harmonica  \u{00B7}  key of {song_key}"),
+    }
+}
+
 // Returns the semitone label for the given root and offset.
 pub fn semitone(root: &str, n: i32) -> String {
     const NOTES: [&str; 12] = [
@@ -85,6 +103,15 @@ impl Harmonica {
         };
 
         n.clone()
+    }
+
+    /// The configured playing position label (e.g. `"1st"`, `"2nd"`), if any.
+    pub fn position(&self) -> Option<&str> {
+        match self {
+            Harmonica::Diatonic { position, .. } | Harmonica::Chromatic { position, .. } => {
+                position.as_deref()
+            }
+        }
     }
 
     // Returns a human-readable string describing the harmonica type and settings.

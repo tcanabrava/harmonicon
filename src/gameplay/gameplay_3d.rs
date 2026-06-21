@@ -442,7 +442,8 @@ pub fn setup(
         shape_materials,
     );
     spawn_song_progress(&mut commands);
-    spawn_countdown(&mut commands, &font);
+    let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
+    spawn_countdown(&mut commands, &font, Some(&harp_hint));
 }
 
 fn spawn_harmonica_3d(

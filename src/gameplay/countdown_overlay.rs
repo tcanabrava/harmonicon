@@ -19,7 +19,7 @@ pub struct CountdownOverlay;
 #[derive(Component)]
 pub struct CountdownText;
 
-pub fn spawn_countdown(commands: &mut Commands, font: &FontSource) {
+pub fn spawn_countdown(commands: &mut Commands, font: &FontSource, harp_hint: Option<&str>) {
     // The full-screen overlay shell is static and font/handle-free, so it's a
     // `bsn!` scene. The countdown text children carry a custom `FontSource`,
     // which `bsn!` can't take directly in 0.19-rc.3, so they stay imperative.
@@ -50,6 +50,18 @@ pub fn spawn_countdown(commands: &mut Commands, font: &FontSource) {
                 },
                 TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
             ));
+            // Which physical harp to grab (2D/3D pass this; jam shows it elsewhere).
+            if let Some(hint) = harp_hint {
+                ov.spawn((
+                    Text::new(hint.to_string()),
+                    TextFont {
+                        font_size: FontSize::Px(16.0),
+                        font: font.clone(),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.95, 0.80, 0.35)),
+                ));
+            }
             ov.spawn((
                 Text::new("3"),
                 TextFont {

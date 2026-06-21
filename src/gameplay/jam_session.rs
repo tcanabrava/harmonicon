@@ -9,7 +9,7 @@ use crate::{
     menu::SelectedSong,
     song::SongManifest,
     song::chart::Action,
-    song::harmonica::{Harmonica, semitone, twelve_bar},
+    song::harmonica::{Harmonica, harp_banner, semitone, twelve_bar},
 };
 
 use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
@@ -57,6 +57,9 @@ pub fn setup(
     // the hole(s) the player is currently sounding, coloured by blues-scale fit.
     let (holes_info, guide) = build_hole_guide(&chart.harmonica, key);
 
+    // Which physical harp to grab: a Richter harp's key is its hole-1 blow note.
+    let harp_hint = harp_banner(&chart.harmonica, key);
+
     commands
         .spawn((
             Node {
@@ -101,6 +104,15 @@ pub fn setup(
                     },
                     TextColor(Color::WHITE),
                 ));
+                left.spawn((
+                    Text::new(harp_hint),
+                    TextFont {
+                        font_size: FontSize::Px(15.0),
+                        font: fonts.gameplay.clone(),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.95, 0.80, 0.35)),
+                ));
                 left.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(4.0),
@@ -142,7 +154,9 @@ pub fn setup(
         });
 
     commands.insert_resource(guide);
-    spawn_countdown(&mut commands, &fonts.gameplay);
+    // Jam already shows the harp hint on the persistent left panel, so the
+    // countdown doesn't repeat it.
+    spawn_countdown(&mut commands, &fonts.gameplay, None);
 }
 
 // ── Live harmonica hole map ─────────────────────────────────────────────────────
@@ -369,5 +383,26 @@ mod tests {
     fn guide_covers_all_ten_holes() {
         let (holes, _) = build_hole_guide(&c_harp(), "C");
         assert_eq!(holes.len(), 10);
+    }
+
+    #[test]
+    fn banner_derives_harp_key_from_hole_1_blow() {
+        // c_harp() has no position field → the "no position" wording.
+        assert_eq!(harp_banner(&c_harp(), "G"), "Use a C harmonica  \u{00B7}  key of G");
+    }
+
+    #[test]
+    fn banner_includes_position_when_present() {
+        let harp: Harmonica = serde_json::from_str(
+            r#"{"type":"diatonic","holes":10,"bending_profile":"richter_standard","position":"2nd",
+                "layout":{"blow":["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+                          "draw":["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]}}"#,
+        )
+        .unwrap();
+        // C harp, 2nd position → you play in G: the canonical cross-harp setup.
+        assert_eq!(
+            harp_banner(&harp, "G"),
+            "Use a C harmonica  \u{00B7}  2nd position  \u{00B7}  key of G"
+        );
     }
 }
