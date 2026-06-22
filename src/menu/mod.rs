@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::assets_management::{AvailableSongs, GlobalFonts};
@@ -84,7 +85,7 @@ struct SelectedArtist(String);
 #[derive(Component, Default, Clone)]
 pub(super) struct MenuRoot;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(super) enum MenuButton {
     // Main menu
     Play,
@@ -140,9 +141,8 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::SongList), cleanup_menu)
             .add_systems(OnEnter(MenuPage::ModeSelect), setup_mode_select)
             .add_systems(OnExit(MenuPage::ModeSelect), cleanup_menu)
-            // Input and hover are independent — two separate registrations.
-            .add_systems(Update, handle_menu_input.run_if(in_state(AppState::Menu)))
-            .add_systems(Update, button_hover.run_if(in_state(AppState::Menu)))
+            // Button clicks/hover are wired per-button as observers in
+            // `spawn_button`, so there's no central interaction system here.
             // Wait for the asset to finish loading before starting gameplay.
             .add_systems(
                 Update,
@@ -307,6 +307,9 @@ pub(super) fn spawn_button(
         },
     };
 
+    // Captured by the click observer below; `btn` itself is moved into the entity.
+    let btn_action = btn.clone();
+
     let button = if theme.has_shaders {
         let e = commands.spawn((Button, node, btn, ThemedButton)).id();
 
@@ -370,8 +373,54 @@ pub(super) fn spawn_button(
             ));
         });
 
+        // Plain buttons highlight on hover via observers (themed buttons get
+        // their hover from the shader system in button_material).
+        commands.entity(e).observe(move |_: On<Pointer<Over>>, mut q: Query<&mut BackgroundColor>| {
+            if let Ok(mut bg) = q.get_mut(e) {
+                *bg = BackgroundColor(Color::srgb(0.20, 0.20, 0.32));
+            }
+        });
+        commands.entity(e).observe(move |_: On<Pointer<Out>>, mut q: Query<&mut BackgroundColor>| {
+            if let Ok(mut bg) = q.get_mut(e) {
+                *bg = BackgroundColor(btn_default());
+            }
+        });
+
         e
     };
+
+    // Clicking the button performs its navigation/selection (observer style,
+    // no central Changed<Interaction> system).
+    commands.entity(button).observe(
+        move |_: On<Pointer<Click>>,
+              mut next_page: ResMut<NextState<MenuPage>>,
+              mut next_state: ResMut<NextState<AppState>>,
+              mut selected_artist: ResMut<SelectedArtist>,
+              mut gameplay_mode: ResMut<GameplayMode>,
+              asset_server: Res<AssetServer>,
+              mut app_exit: MessageWriter<AppExit>,
+              mut commands: Commands| {
+            // Selections that accompany a navigation.
+            match &btn_action {
+                MenuButton::JamSession => *gameplay_mode = GameplayMode::JamSession,
+                MenuButton::PlayMode2D => *gameplay_mode = GameplayMode::Play2D,
+                MenuButton::PlayMode3D => *gameplay_mode = GameplayMode::Play3D,
+                MenuButton::Artist(a) => selected_artist.0 = a.clone(),
+                MenuButton::Song(path) => {
+                    commands.insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
+                }
+                _ => {}
+            }
+            match menu_nav(&btn_action) {
+                MenuNav::To(page) => next_page.set(page),
+                MenuNav::Enter(state) => next_state.set(state),
+                MenuNav::Quit => {
+                    app_exit.write(AppExit::Success);
+                }
+                MenuNav::Stay => {}
+            }
+        },
+    );
 
     commands.entity(parent).add_child(button);
 }
@@ -517,60 +566,6 @@ pub(super) fn menu_nav(button: &MenuButton) -> MenuNav {
     }
 }
 
-fn handle_menu_input(
-    buttons: Query<(&Interaction, &MenuButton), Changed<Interaction>>,
-    mut next_page: ResMut<NextState<MenuPage>>,
-    mut next_state: ResMut<NextState<AppState>>,
-    mut selected_artist: ResMut<SelectedArtist>,
-    mut gameplay_mode: ResMut<GameplayMode>,
-    asset_server: Res<AssetServer>,
-    mut commands: Commands,
-    mut app_exit: MessageWriter<AppExit>,
-) {
-    for (interaction, button) in &buttons {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-
-        // Selections that accompany a navigation.
-        match button {
-            MenuButton::JamSession => *gameplay_mode = GameplayMode::JamSession,
-            MenuButton::PlayMode2D => *gameplay_mode = GameplayMode::Play2D,
-            MenuButton::PlayMode3D => *gameplay_mode = GameplayMode::Play3D,
-            MenuButton::Artist(a) => selected_artist.0 = a.clone(),
-            MenuButton::Song(path) => {
-                commands.insert_resource(SelectedSong(
-                    asset_server.load::<SongManifest>(path.clone()),
-                ));
-            }
-            _ => {}
-        }
-
-        match menu_nav(button) {
-            MenuNav::To(page) => next_page.set(page),
-            MenuNav::Enter(state) => next_state.set(state),
-            MenuNav::Quit => {
-                app_exit.write(AppExit::Success);
-            }
-            MenuNav::Stay => {}
-        }
-    }
-}
-
-fn button_hover(
-    mut buttons: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<MenuButton>, Without<ThemedButton>),
-    >,
-) {
-    for (interaction, mut bg) in &mut buttons {
-        *bg = BackgroundColor(match interaction {
-            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
-            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-            Interaction::None => btn_default(),
-        });
-    }
-}
 
 // ── Loading + cleanup ─────────────────────────────────────────────────────────
 
