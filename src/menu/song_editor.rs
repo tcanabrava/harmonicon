@@ -551,7 +551,9 @@ fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &st
                 Node {
                     flex_grow: 1.0,
                     min_width: Val::Px(260.0),
-                    padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
+                    height: Val::Px(30.0),
+                    align_items: AlignItems::Center,
+                    padding: UiRect::horizontal(Val::Px(8.0)),
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
@@ -596,7 +598,9 @@ fn text_field(
                 Node {
                     flex_grow: 1.0,
                     min_width: Val::Px(260.0),
-                    padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
+                    height: Val::Px(30.0),
+                    align_items: AlignItems::Center,
+                    padding: UiRect::horizontal(Val::Px(8.0)),
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
@@ -640,8 +644,11 @@ fn music_field(parent: &mut ChildSpawnerCommands, font: &FontSource, path: &Opti
             row.spawn((
                 Button,
                 Node {
-                    padding: UiRect::axes(Val::Px(10.0), Val::Px(4.0)),
+                    height: Val::Px(30.0),
+                    padding: UiRect::horizontal(Val::Px(10.0)),
                     border: UiRect::all(Val::Px(1.0)),
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
                     ..default()
                 },
                 BackgroundColor(BTN_BG),
@@ -677,8 +684,10 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
                 Button,
                 Node {
                     width: Val::Px(70.0),
-                    padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
+                    height: Val::Px(30.0),
+                    padding: UiRect::horizontal(Val::Px(8.0)),
                     border: UiRect::all(Val::Px(1.0)),
+                    align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
