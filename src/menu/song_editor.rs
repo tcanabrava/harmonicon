@@ -249,6 +249,8 @@ struct NoteDurationText;
 #[derive(Component)]
 struct NoteWidget(usize);
 #[derive(Component)]
+struct SaveButton;
+#[derive(Component)]
 struct FileBrowserRoot;
 #[derive(Component)]
 struct FileEntryButton(PathBuf);
@@ -329,6 +331,26 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
             ))
             .with_children(|grid| {
                 build_grid(grid, &data, &fonts);
+            });
+
+            root.spawn((
+                Button,
+                Node {
+                    margin: UiRect::top(Val::Px(8.0)),
+                    padding: UiRect::axes(Val::Px(18.0), Val::Px(6.0)),
+                    border: UiRect::all(Val::Px(1.5)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.16, 0.22, 0.16, 0.95)),
+                BorderColor::all(Color::srgb(0.40, 0.65, 0.40)),
+                SaveButton,
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    Text::new("Save Song"),
+                    TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                    TextColor(Color::srgb(0.7, 0.95, 0.7)),
+                ));
             });
 
             root.spawn((
@@ -1179,6 +1201,134 @@ fn poll_tempo(
     }
 }
 
+// ── Saving to a .harpchart ────────────────────────────────────────────────────
+
+/// The standard Richter C-harp layout, transposed for other keys.
+const C_BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
+const C_DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
+
+/// Blow/draw note layout for a harp in `key`, transposed from the C reference.
+fn harp_layout(key: &str) -> (Vec<String>, Vec<String>) {
+    use crate::audio_system::midi::{midi_to_note, note_to_midi};
+    let off = KEYS.iter().position(|&k| k == key).unwrap_or(0) as i32;
+    let tr = |n: &str| midi_to_note(note_to_midi(n).unwrap_or(60) + off);
+    (
+        C_BLOW.iter().map(|n| tr(n)).collect(),
+        C_DRAW.iter().map(|n| tr(n)).collect(),
+    )
+}
+
+/// Replace characters awkward in a folder name with underscores.
+fn sanitize(name: &str) -> String {
+    let cleaned: String = name
+        .trim()
+        .chars()
+        .map(|c| if c.is_alphanumeric() || " -_".contains(c) { c } else { '_' })
+        .collect();
+    if cleaned.is_empty() {
+        "Untitled".to_string()
+    } else {
+        cleaned
+    }
+}
+
+/// Build the `.harpchart` JSON from the editor state.
+fn build_chart_json(data: &SongEditorData) -> serde_json::Value {
+    use serde_json::json;
+    let bpm = bpm_of(data);
+    let bpb = beats_per_bar_of(data);
+    let beat_secs = 60.0 / bpm as f64;
+    let (blow, draw) = harp_layout(&data.harp_key);
+
+    let mut track = Vec::new();
+    let mut t = 0.0f64;
+    for n in &data.notes {
+        let dur = n.beats as f64 * beat_secs;
+        track.push(json!({
+            "time": t,
+            "duration": dur,
+            "events": [ { "hole": n.hole, "action": if n.is_blow { "blow" } else { "draw" } } ],
+        }));
+        t += dur;
+    }
+
+    let title = if data.song_name.trim().is_empty() { "Untitled" } else { data.song_name.trim() };
+    let artist = if data.artist.trim().is_empty() { "Unknown" } else { data.artist.trim() };
+
+    json!({
+        "song": {
+            "title": title,
+            "artist": artist,
+            "tempo_bpm": bpm,
+            "key": data.harp_key,
+            "time_signature": format!("{bpb}/4"),
+            "difficulty": "easy",
+        },
+        "timing": { "resolution": 480, "tempo_map": [ { "tick": 0, "bpm": bpm } ] },
+        "harmonica": {
+            "type": "diatonic",
+            "holes": 10,
+            "bending_profile": "richter_standard",
+            "position": "1st",
+            "layout": { "blow": blow, "draw": draw },
+        },
+        "track": track,
+        "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 },
+    })
+}
+
+/// Write the song to `assets/songs/<artist>/<song>/`: the chart, a copy of the
+/// chosen music as `song/music.ogg`, and placeholder background/elements images
+/// so the song is immediately loadable. Returns a status message.
+fn save_song(data: &SongEditorData) -> String {
+    let Some(music) = data.music_path.clone() else {
+        return "Pick a music file before saving".to_string();
+    };
+    let chart = build_chart_json(data);
+
+    let dir = std::path::Path::new("assets/songs")
+        .join(sanitize(&data.artist))
+        .join(sanitize(&data.song_name));
+    let song_dir = dir.join("song");
+    if let Err(e) = std::fs::create_dir_all(&song_dir) {
+        return format!("Couldn't create folder: {e}");
+    }
+
+    let chart_json = match serde_json::to_string_pretty(&chart) {
+        Ok(s) => s,
+        Err(e) => return format!("Couldn't serialize chart: {e}"),
+    };
+    if let Err(e) = std::fs::write(song_dir.join("chart.harpchart"), chart_json) {
+        return format!("Couldn't write chart: {e}");
+    }
+    if let Err(e) = std::fs::copy(&music, song_dir.join("music.ogg")) {
+        return format!("Couldn't copy music: {e}");
+    }
+
+    // Placeholder art so the loader's required images resolve.
+    let bg = image::RgbaImage::from_pixel(64, 64, image::Rgba([18, 18, 26, 255]));
+    let _ = bg.save(dir.join("background.png"));
+    let elements = image::RgbaImage::from_pixel(64, 64, image::Rgba([0, 0, 0, 0]));
+    let _ = elements.save(dir.join("elements.png"));
+
+    format!("Saved to {}", dir.display())
+}
+
+/// Save the song when the Save button is clicked, reporting the result.
+fn save_clicks(
+    interactions: Query<&Interaction, (Changed<Interaction>, With<SaveButton>)>,
+    data: Res<SongEditorData>,
+    mut status: Query<&mut Text, With<AnalyzeStatusText>>,
+) {
+    if !interactions.iter().any(|i| *i == Interaction::Pressed) {
+        return;
+    }
+    let msg = save_song(&data);
+    if let Ok(mut text) = status.single_mut() {
+        **text = msg;
+    }
+}
+
 // ── Escape / lifecycle ─────────────────────────────────────────────────────────
 
 /// Esc: close the browser if open, else blur a focused field, else go back.
@@ -1235,6 +1385,7 @@ impl Plugin for SongEditorPlugin {
                     open_browser,
                     pick_file,
                     poll_tempo,
+                    save_clicks,
                     update_field_views,
                     update_note_views,
                     rebuild_grid,
@@ -1327,6 +1478,47 @@ mod tests {
         let bars = notes_by_bar(&[half, half, q], 4);
         assert_eq!(bars[0], vec![0, 1]);
         assert_eq!(bars[1], vec![2]);
+    }
+
+    #[test]
+    fn harp_layout_transposes_from_c() {
+        assert_eq!(harp_layout("C").0[0], "C4");
+        assert_eq!(harp_layout("G").0[0], "G4"); // C4 + 7 semitones
+        assert_eq!(harp_layout("A").0[0], "A4");
+    }
+
+    #[test]
+    fn sanitize_strips_path_separators() {
+        assert_eq!(sanitize("AC/DC"), "AC_DC");
+        assert_eq!(sanitize("  "), "Untitled");
+        assert_eq!(sanitize("Blues 1-2_3"), "Blues 1-2_3");
+    }
+
+    #[test]
+    fn built_chart_validates_and_deserializes() {
+        use crate::song::chart::HarpChart;
+        let data = SongEditorData {
+            artist: "Test".into(),
+            song_name: "Song".into(),
+            notes: vec![
+                EditorNote { hole: 4, is_blow: false, beats: 1.0 },
+                EditorNote { hole: 4, is_blow: true, beats: 0.5 },
+            ],
+            ..Default::default()
+        };
+        let chart = build_chart_json(&data);
+
+        // Matches the shipped schema the loader validates against.
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../../assets/song_schema.dtd.json")).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        let errors: Vec<String> = validator.iter_errors(&chart).map(|e| e.to_string()).collect();
+        assert!(errors.is_empty(), "schema errors: {errors:?}");
+
+        // And deserializes into the real chart type.
+        let parsed: HarpChart = serde_json::from_value(chart).unwrap();
+        assert_eq!(parsed.track.len(), 2);
+        assert_eq!(parsed.song.artist, "Test");
     }
 
     #[test]
