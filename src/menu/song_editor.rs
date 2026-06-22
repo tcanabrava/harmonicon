@@ -26,13 +26,102 @@ use super::AppState;
 
 /// One authored event: either a hole played blow (exhale) or draw (inhale), or a
 /// silence (`rest`). Duration is in beats (quarter = 1.0). For a rest, `hole`
-/// and `is_blow` are unused.
+/// and `is_blow` are unused. `mods` is a bitmask of [`NoteMod`]s.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct EditorNote {
     pub hole: u8,
     pub is_blow: bool,
     pub beats: f32,
     pub rest: bool,
+    pub mods: u8,
+}
+
+/// A technique applied to a note. Stored as bits in [`EditorNote::mods`]. (There
+/// is no "slide" — that's a chromatic-harp control with no chart modifier.)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum NoteMod {
+    Bend,
+    Overblow,
+    Overdraw,
+    Vibrato,
+    WahWah,
+}
+
+impl NoteMod {
+    const ALL: [NoteMod; 5] = [
+        NoteMod::Bend,
+        NoteMod::Overblow,
+        NoteMod::Overdraw,
+        NoteMod::Vibrato,
+        NoteMod::WahWah,
+    ];
+
+    fn bit(self) -> u8 {
+        match self {
+            NoteMod::Bend => 1,
+            NoteMod::Overblow => 2,
+            NoteMod::Overdraw => 4,
+            NoteMod::Vibrato => 8,
+            NoteMod::WahWah => 16,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            NoteMod::Bend => "Bend",
+            NoteMod::Overblow => "Overblow",
+            NoteMod::Overdraw => "Overdraw",
+            NoteMod::Vibrato => "Vibrato",
+            NoteMod::WahWah => "Wah",
+        }
+    }
+
+    /// Short tag shown on a note that carries this modifier.
+    fn tag(self) -> &'static str {
+        match self {
+            NoteMod::Bend => "b",
+            NoteMod::Overblow => "o",
+            NoteMod::Overdraw => "O",
+            NoteMod::Vibrato => "v",
+            NoteMod::WahWah => "w",
+        }
+    }
+
+    /// The chart-format JSON for this modifier (sensible default parameters).
+    fn json(self) -> serde_json::Value {
+        use serde_json::json;
+        match self {
+            NoteMod::Bend => json!({ "type": "bend", "semitones": -1.0 }),
+            NoteMod::Overblow => json!({ "type": "overblow" }),
+            NoteMod::Overdraw => json!({ "type": "overdraw" }),
+            NoteMod::Vibrato => json!({ "type": "vibrato", "oscillation_hz": 5.0 }),
+            NoteMod::WahWah => json!({ "type": "wah-wah", "oscillation_hz": 4.0 }),
+        }
+    }
+}
+
+/// Whether `m` is physically possible on `note` ("where possible"): draw bends
+/// on holes 1-6 and blow bends on 7-10; overblow on blow holes 1-6; overdraw on
+/// draw holes 7-10; vibrato/wah on any sounded note; nothing on a rest.
+fn mod_valid(note: &EditorNote, m: NoteMod) -> bool {
+    if note.rest {
+        return false;
+    }
+    match m {
+        NoteMod::Bend => (note.is_blow && note.hole >= 7) || (!note.is_blow && note.hole <= 6),
+        NoteMod::Overblow => note.is_blow && note.hole <= 6,
+        NoteMod::Overdraw => !note.is_blow && note.hole >= 7,
+        NoteMod::Vibrato | NoteMod::WahWah => true,
+    }
+}
+
+/// The modifier tags carried by a note, concatenated (e.g. `"bv"`), or empty.
+fn mods_tag(mods: u8) -> String {
+    NoteMod::ALL
+        .iter()
+        .filter(|m| mods & m.bit() != 0)
+        .map(|m| m.tag())
+        .collect()
 }
 
 /// The song being authored. Strings are kept as typed text and parsed on save.
@@ -46,8 +135,13 @@ pub struct SongEditorData {
     pub harp_key: String,
     /// Authored notes, in play order.
     pub notes: Vec<EditorNote>,
-    /// Currently selected note (for edit/delete), if any.
-    pub selected: Option<usize>,
+    /// Selected note indices (sorted), for batch edit/delete/modifier ops.
+    pub selected: Vec<usize>,
+    /// The focused note — the moving end of a shift range and the one Enter
+    /// edits / whose spec is loaded into `note_input`.
+    pub cursor: Option<usize>,
+    /// The fixed end of a shift-extended range.
+    pub anchor: Option<usize>,
     /// The note being typed, e.g. `"-4 q"`.
     pub note_input: String,
 }
@@ -62,7 +156,9 @@ impl Default for SongEditorData {
             beats_per_bar: "4".into(),
             harp_key: "C".into(),
             notes: Vec::new(),
-            selected: None,
+            selected: Vec::new(),
+            cursor: None,
+            anchor: None,
             note_input: String::new(),
         }
     }
@@ -118,7 +214,7 @@ fn parse_note(input: &str) -> Option<EditorNote> {
             Some(c) => dur_beats(c.to_ascii_lowercase())?,
             None => 1.0,
         };
-        return Some(EditorNote { hole: 0, is_blow: true, beats, rest: true });
+        return Some(EditorNote { hole: 0, is_blow: true, beats, rest: true, mods: 0 });
     }
     let (is_blow, rest) = match s.strip_prefix('-') {
         Some(r) => (false, r.trim_start()),
@@ -137,7 +233,7 @@ fn parse_note(input: &str) -> Option<EditorNote> {
         Some(c) => dur_beats(c.to_ascii_lowercase())?,
         None => 1.0,
     };
-    Some(EditorNote { hole, is_blow, beats, rest: false })
+    Some(EditorNote { hole, is_blow, beats, rest: false, mods: 0 })
 }
 
 /// Format a note back to its spec text, e.g. `"-4 q"` or `"r h"` for a rest.
@@ -264,6 +360,8 @@ struct NoteDurationText;
 #[derive(Component)]
 struct NoteWidget(usize);
 #[derive(Component)]
+struct ModButton(NoteMod);
+#[derive(Component)]
 struct SaveButton;
 #[derive(Component)]
 struct AnalyzeStatusText;
@@ -326,10 +424,28 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
                 NoteDurationText,
             ));
             root.spawn((
-                Text::new("Note: \"-4 q\" (draw 4, quarter), \"4 e\" (blow 4, eighth), \"r h\" (half-rest silence)  \u{00B7}  Enter add/edit  \u{00B7}  \u{2190}/\u{2192} select  \u{00B7}  Backspace delete"),
+                Text::new("Note: \"-4 q\" (draw 4, quarter), \"4 e\" (blow 4, eighth), \"r h\" (half-rest silence)  \u{00B7}  Enter add/edit  \u{00B7}  \u{2190}/\u{2192} select (Shift=range, Ctrl=add)  \u{00B7}  Backspace delete"),
                 TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
+
+            // Modifier toolbar — applies to the current selection where possible.
+            root.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(6.0),
+                ..default()
+            })
+            .with_children(|row| {
+                row.spawn((
+                    Text::new("Mark selected:"),
+                    TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                    TextColor(LABEL),
+                ));
+                for m in NoteMod::ALL {
+                    mod_button(row, &font, m);
+                }
+            });
 
             root.spawn((
                 Node {
@@ -380,6 +496,29 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
 }
 
 /// The note-entry row: a label and a click-to-focus box for the note spec.
+/// A modifier toolbar button that toggles `m` on the selection.
+fn mod_button(parent: &mut ChildSpawnerCommands, font: &FontSource, m: NoteMod) {
+    parent
+        .spawn((
+            Button,
+            Node {
+                padding: UiRect::axes(Val::Px(8.0), Val::Px(3.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(BTN_BG),
+            BorderColor::all(Color::srgb(0.35, 0.35, 0.50)),
+            ModButton(m),
+        ))
+        .with_children(|b| {
+            b.spawn((
+                Text::new(m.label()),
+                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.95)),
+            ));
+        });
+}
+
 fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &str) {
     parent
         .spawn(Node {
@@ -620,7 +759,8 @@ fn build_bar_cell(
             .with_children(|notes_row| {
                 for &ni in note_indices {
                     let n = data.notes[ni];
-                    let selected = data.selected == Some(ni);
+                    let selected = data.selected.contains(&ni);
+                    let is_cursor = data.cursor == Some(ni);
                     let frac = (n.beats / beats_per_bar as f32).clamp(0.12, 1.0);
                     notes_row
                         .spawn((
@@ -632,7 +772,7 @@ fn build_bar_cell(
                                 flex_direction: FlexDirection::Column,
                                 align_items: AlignItems::Center,
                                 justify_content: JustifyContent::Center,
-                                border: UiRect::all(Val::Px(if selected { 2.0 } else { 1.0 })),
+                                border: UiRect::all(Val::Px(if is_cursor { 2.0 } else { 1.0 })),
                                 ..default()
                             },
                             BackgroundColor(if selected {
@@ -642,7 +782,13 @@ fn build_bar_cell(
                             } else {
                                 Color::srgba(0.16, 0.16, 0.20, 0.95)
                             }),
-                            BorderColor::all(if selected { ACCENT } else { Color::srgb(0.30, 0.30, 0.40) }),
+                            BorderColor::all(if is_cursor {
+                                ACCENT
+                            } else if selected {
+                                Color::srgb(0.70, 0.62, 0.30)
+                            } else {
+                                Color::srgb(0.30, 0.30, 0.40)
+                            }),
                             NoteWidget(ni),
                         ))
                         .with_children(|w| {
@@ -671,6 +817,14 @@ fn build_bar_cell(
                                     Text::new(n.hole.to_string()),
                                     TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
                                     TextColor(Color::WHITE),
+                                ));
+                            }
+                            // Modifier tags (e.g. "bv"), shown small at the bottom.
+                            if n.mods != 0 {
+                                w.spawn((
+                                    Text::new(mods_tag(n.mods)),
+                                    TextFont { font_size: FontSize::Px(9.0), font: fonts.gameplay.clone(), ..default() },
+                                    TextColor(Color::srgb(0.95, 0.80, 0.35)),
                                 ));
                             }
                         });
@@ -934,10 +1088,12 @@ fn harp_key_clicks(
 // ── Interaction: notes ──────────────────────────────────────────────────────
 
 /// Keyboard handling while the note box is focused: type the spec, Enter to
-/// add/edit, Backspace to erase a char (or delete the note when empty),
-/// arrows to select.
+/// add/edit, Backspace to erase a char (or delete the selection when empty),
+/// arrows to move the cursor. Shift+arrow extends a contiguous selection;
+/// Ctrl+arrow adds the focused note to a non-contiguous selection.
 fn note_input_keys(
     mut keys: MessageReader<KeyboardInput>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     focused: Res<FocusedField>,
     mut data: ResMut<SongEditorData>,
 ) {
@@ -945,6 +1101,8 @@ fn note_input_keys(
         keys.clear();
         return;
     }
+    let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+    let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     for ev in keys.read() {
         if ev.state != ButtonState::Pressed {
             continue;
@@ -960,79 +1118,173 @@ fn note_input_keys(
             Key::Space => data.note_input.push(' '),
             Key::Backspace => {
                 if data.note_input.pop().is_none() {
-                    delete_selected_note(&mut data);
+                    delete_selected_notes(&mut data);
                 }
             }
             Key::Enter => commit_note(&mut data),
-            Key::ArrowLeft => select_note(&mut data, -1),
-            Key::ArrowRight => select_note(&mut data, 1),
+            Key::ArrowLeft => move_cursor(&mut data, -1, shift, ctrl),
+            Key::ArrowRight => move_cursor(&mut data, 1, shift, ctrl),
             _ => {}
         }
     }
 }
 
-/// Commit the typed spec: replace the selected note, or append a new one.
+/// Commit the typed spec: replace the focused note (keeping its modifiers), or
+/// append a new one.
 fn commit_note(data: &mut SongEditorData) {
-    let Some(note) = parse_note(&data.note_input) else {
+    let Some(mut note) = parse_note(&data.note_input) else {
         return;
     };
-    match data.selected {
-        Some(i) if i < data.notes.len() => data.notes[i] = note,
-        _ => data.notes.push(note),
+    match data.cursor {
+        Some(i) if i < data.notes.len() => {
+            note.mods = data.notes[i].mods; // editing the spec keeps modifiers
+            data.notes[i] = note;
+        }
+        _ => {
+            data.notes.push(note);
+            data.cursor = None;
+            data.selected.clear();
+            data.anchor = None;
+        }
     }
     data.note_input.clear();
 }
 
-/// Delete the selected note (or the last one), keeping selection sensible.
-fn delete_selected_note(data: &mut SongEditorData) {
-    let Some(i) = data.selected.or_else(|| data.notes.len().checked_sub(1)) else {
-        return;
+/// Delete every selected note (or the focused/last one when nothing is
+/// selected), then settle the cursor.
+fn delete_selected_notes(data: &mut SongEditorData) {
+    let mut targets = if data.selected.is_empty() {
+        match data.cursor.or_else(|| data.notes.len().checked_sub(1)) {
+            Some(i) => vec![i],
+            None => return,
+        }
+    } else {
+        data.selected.clone()
     };
-    if i >= data.notes.len() {
-        return;
+    targets.sort_unstable();
+    targets.dedup();
+    for &i in targets.iter().rev() {
+        if i < data.notes.len() {
+            data.notes.remove(i);
+        }
     }
-    data.notes.remove(i);
-    data.selected = if data.notes.is_empty() {
+    data.selected.clear();
+    data.anchor = None;
+    data.cursor = if data.notes.is_empty() {
         None
     } else {
-        Some(i.min(data.notes.len() - 1))
+        Some(targets[0].min(data.notes.len() - 1))
     };
-    data.note_input.clear();
-}
-
-/// Move the selection by `dir` (−1 prev / +1 next). Moving past the end clears
-/// the selection (ready to add a fresh note); selecting loads its spec to edit.
-fn select_note(data: &mut SongEditorData, dir: i32) {
-    if data.notes.is_empty() {
-        return;
-    }
-    let last = data.notes.len() - 1;
-    let new = match (data.selected, dir) {
-        (None, 1) => Some(0),
-        (None, _) => Some(last),
-        (Some(i), -1) => Some(i.saturating_sub(1)),
-        (Some(i), _) if i < last => Some(i + 1),
-        (Some(_), _) => None, // past the end → deselect
-    };
-    data.selected = new;
-    data.note_input = match new {
-        Some(i) => format_note_spec(&data.notes[i]),
+    data.note_input = match data.cursor {
+        Some(c) => format_note_spec(&data.notes[c]),
         None => String::new(),
     };
 }
 
-/// Clicking a note arrow selects it for editing.
+/// Move the focused note by `dir`. `shift` extends a contiguous range from the
+/// anchor; `ctrl` adds the new focus to the existing selection.
+fn move_cursor(data: &mut SongEditorData, dir: i32, shift: bool, ctrl: bool) {
+    if data.notes.is_empty() {
+        return;
+    }
+    let last = data.notes.len() - 1;
+    let next = match data.cursor {
+        None => if dir > 0 { 0 } else { last },
+        Some(i) if dir < 0 => i.saturating_sub(1),
+        Some(i) => (i + 1).min(last),
+    };
+    data.cursor = Some(next);
+    if shift {
+        let a = data.anchor.unwrap_or(next);
+        data.anchor = Some(a);
+        data.selected = (a.min(next)..=a.max(next)).collect();
+    } else if ctrl {
+        if !data.selected.contains(&next) {
+            data.selected.push(next);
+            data.selected.sort_unstable();
+        }
+    } else {
+        data.selected = vec![next];
+        data.anchor = Some(next);
+    }
+    data.note_input = format_note_spec(&data.notes[next]);
+}
+
+/// Clicking a note selects it; Ctrl+click toggles it; Shift+click extends a
+/// range from the anchor.
 fn note_widget_clicks(
     widgets: Query<(&Interaction, &NoteWidget), Changed<Interaction>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     mut data: ResMut<SongEditorData>,
     mut focused: ResMut<FocusedField>,
 ) {
+    let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+    let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     for (interaction, w) in &widgets {
-        if *interaction == Interaction::Pressed && w.0 < data.notes.len() {
-            data.selected = Some(w.0);
-            data.note_input = format_note_spec(&data.notes[w.0]);
-            focused.0 = Focus::Note;
+        if *interaction != Interaction::Pressed || w.0 >= data.notes.len() {
+            continue;
         }
+        let i = w.0;
+        if ctrl {
+            match data.selected.iter().position(|&x| x == i) {
+                Some(pos) => {
+                    data.selected.remove(pos);
+                }
+                None => {
+                    data.selected.push(i);
+                    data.selected.sort_unstable();
+                }
+            }
+        } else if shift {
+            let a = data.anchor.unwrap_or(i);
+            data.anchor = Some(a);
+            data.selected = (a.min(i)..=a.max(i)).collect();
+        } else {
+            data.selected = vec![i];
+            data.anchor = Some(i);
+        }
+        data.cursor = Some(i);
+        data.note_input = format_note_spec(&data.notes[i]);
+        focused.0 = Focus::Note;
+    }
+}
+
+/// Apply (toggle) a modifier on every selected note where it's physically
+/// possible. Reports the result in the status line.
+fn apply_modifier_clicks(
+    clicks: Query<(&Interaction, &ModButton), Changed<Interaction>>,
+    mut data: ResMut<SongEditorData>,
+    mut status: Query<&mut Text, With<AnalyzeStatusText>>,
+) {
+    for (interaction, mb) in &clicks {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let m = mb.0;
+        let targets: Vec<usize> = data
+            .selected
+            .iter()
+            .copied()
+            .filter(|&i| i < data.notes.len() && mod_valid(&data.notes[i], m))
+            .collect();
+        let msg = if targets.is_empty() {
+            format!("No selected note can take {}", m.label())
+        } else {
+            let all_have = targets.iter().all(|&i| data.notes[i].mods & m.bit() != 0);
+            for &i in &targets {
+                if all_have {
+                    data.notes[i].mods &= !m.bit();
+                } else {
+                    data.notes[i].mods |= m.bit();
+                }
+            }
+            let verb = if all_have { "Removed" } else { "Applied" };
+            format!("{verb} {} on {} note(s)", m.label(), targets.len())
+        };
+        if let Ok(mut text) = status.single_mut() {
+            **text = msg;
+        }
+        return;
     }
 }
 
@@ -1173,11 +1425,19 @@ fn build_chart_json(data: &SongEditorData) -> serde_json::Value {
         let dur = n.beats as f64 * beat_secs;
         // A rest is just a gap: advance the clock, emit no track item.
         if !n.rest {
-            track.push(json!({
-                "time": t,
-                "duration": dur,
-                "events": [ { "hole": n.hole, "action": if n.is_blow { "blow" } else { "draw" } } ],
-            }));
+            let mut event = json!({
+                "hole": n.hole,
+                "action": if n.is_blow { "blow" } else { "draw" },
+            });
+            let mods: Vec<serde_json::Value> = NoteMod::ALL
+                .iter()
+                .filter(|m| n.mods & m.bit() != 0)
+                .map(|m| m.json())
+                .collect();
+            if !mods.is_empty() {
+                event["modifiers"] = serde_json::Value::Array(mods);
+            }
+            track.push(json!({ "time": t, "duration": dur, "events": [event] }));
         }
         t += dur;
     }
@@ -1309,6 +1569,7 @@ impl Plugin for SongEditorPlugin {
                     type_into_focused,
                     note_input_keys,
                     note_widget_clicks,
+                    apply_modifier_clicks,
                     harp_key_clicks,
                     open_browser,
                     pick_file,
@@ -1401,9 +1662,9 @@ mod tests {
         // quarter note, half rest, quarter note at 120 BPM (beat = 0.5s).
         let data = SongEditorData {
             notes: vec![
-                EditorNote { hole: 4, is_blow: true, beats: 1.0, rest: false },
-                EditorNote { hole: 0, is_blow: true, beats: 2.0, rest: true },
-                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false },
+                EditorNote { hole: 4, is_blow: true, beats: 1.0, rest: false, mods: 0 },
+                EditorNote { hole: 0, is_blow: true, beats: 2.0, rest: true, mods: 0 },
+                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false, mods: 0 },
             ],
             ..Default::default()
         };
@@ -1417,7 +1678,7 @@ mod tests {
 
     #[test]
     fn notes_flow_into_bars_by_beats() {
-        let q = |hole, blow| EditorNote { hole, is_blow: blow, beats: 1.0, rest: false };
+        let q = |hole, blow| EditorNote { hole, is_blow: blow, beats: 1.0, rest: false, mods: 0 };
         // Five quarter notes in 4/4 → first bar holds 4, the fifth spills over.
         let notes: Vec<_> = (0..5).map(|i| q(i + 1, true)).collect();
         let bars = notes_by_bar(&notes, 4);
@@ -1428,8 +1689,8 @@ mod tests {
 
     #[test]
     fn a_half_note_uses_two_of_four_beats() {
-        let half = EditorNote { hole: 2, is_blow: false, beats: 2.0, rest: false };
-        let q = EditorNote { hole: 3, is_blow: true, beats: 1.0, rest: false };
+        let half = EditorNote { hole: 2, is_blow: false, beats: 2.0, rest: false, mods: 0 };
+        let q = EditorNote { hole: 3, is_blow: true, beats: 1.0, rest: false, mods: 0 };
         // half + half + quarter → bar1 holds both halves (4 beats), quarter spills.
         let bars = notes_by_bar(&[half, half, q], 4);
         assert_eq!(bars[0], vec![0, 1]);
@@ -1457,8 +1718,8 @@ mod tests {
             artist: "Test".into(),
             song_name: "Song".into(),
             notes: vec![
-                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false },
-                EditorNote { hole: 4, is_blow: true, beats: 0.5, rest: false },
+                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false, mods: NoteMod::Bend.bit() },
+                EditorNote { hole: 4, is_blow: true, beats: 0.5, rest: false, mods: 0 },
             ],
             ..Default::default()
         };
@@ -1471,10 +1732,36 @@ mod tests {
         let errors: Vec<String> = validator.iter_errors(&chart).map(|e| e.to_string()).collect();
         assert!(errors.is_empty(), "schema errors: {errors:?}");
 
-        // And deserializes into the real chart type.
+        // And deserializes into the real chart type, modifiers included.
         let parsed: HarpChart = serde_json::from_value(chart).unwrap();
         assert_eq!(parsed.track.len(), 2);
         assert_eq!(parsed.song.artist, "Test");
+        assert!(parsed.track[0].events[0].modifiers.is_some(), "bend should serialize");
+    }
+
+    #[test]
+    fn mod_valid_follows_harp_physics() {
+        let mk = |hole, is_blow| EditorNote { hole, is_blow, beats: 1.0, rest: false, mods: 0 };
+        let draw4 = mk(4, false);
+        assert!(mod_valid(&draw4, NoteMod::Bend)); // draw bends on 1-6
+        assert!(!mod_valid(&draw4, NoteMod::Overblow));
+        let blow3 = mk(3, true);
+        assert!(mod_valid(&blow3, NoteMod::Overblow)); // overblow on blow 1-6
+        assert!(!mod_valid(&blow3, NoteMod::Bend)); // blow bends are 7-10
+        let draw8 = mk(8, false);
+        assert!(mod_valid(&draw8, NoteMod::Overdraw)); // overdraw on draw 7-10
+        assert!(!mod_valid(&draw8, NoteMod::Bend));
+        assert!(mod_valid(&draw8, NoteMod::Vibrato)); // vibrato anywhere
+        // Rests take nothing.
+        let rest = EditorNote { hole: 0, is_blow: true, beats: 1.0, rest: true, mods: 0 };
+        assert!(NoteMod::ALL.iter().all(|&m| !mod_valid(&rest, m)));
+    }
+
+    #[test]
+    fn mods_tag_lists_applied_techniques() {
+        let mods = NoteMod::Bend.bit() | NoteMod::Vibrato.bit();
+        assert_eq!(mods_tag(mods), "bv");
+        assert_eq!(mods_tag(0), "");
     }
 
     #[test]
