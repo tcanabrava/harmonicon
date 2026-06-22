@@ -24,13 +24,15 @@ use super::AppState;
 
 // ── Model ───────────────────────────────────────────────────────────────────
 
-/// One authored note: a hole played blow (exhale) or draw (inhale) for a
-/// duration measured in beats (quarter = 1.0).
+/// One authored event: either a hole played blow (exhale) or draw (inhale), or a
+/// silence (`rest`). Duration is in beats (quarter = 1.0). For a rest, `hole`
+/// and `is_blow` are unused.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct EditorNote {
     pub hole: u8,
     pub is_blow: bool,
     pub beats: f32,
+    pub rest: bool,
 }
 
 /// The song being authored. Strings are kept as typed text and parsed on save.
@@ -103,11 +105,20 @@ fn dur_name(beats: f32) -> &'static str {
 }
 
 /// Parse a note spec like `"-4 q"`, `"4 e"`, or `"3"` (defaults to a quarter).
-/// `-` prefix = draw (inhale); otherwise blow (exhale). Hole 1..=10.
+/// `-` prefix = draw (inhale); otherwise blow (exhale). Hole 1..=10. A spec
+/// starting with `r` is a silence/rest, e.g. `"r q"` or `"r"`.
 fn parse_note(input: &str) -> Option<EditorNote> {
     let s = input.trim();
     if s.is_empty() {
         return None;
+    }
+    // Rest: "r" + optional duration letter.
+    if matches!(s.chars().next(), Some('r' | 'R')) {
+        let beats = match s[1..].trim_start().chars().next() {
+            Some(c) => dur_beats(c.to_ascii_lowercase())?,
+            None => 1.0,
+        };
+        return Some(EditorNote { hole: 0, is_blow: true, beats, rest: true });
     }
     let (is_blow, rest) = match s.strip_prefix('-') {
         Some(r) => (false, r.trim_start()),
@@ -126,11 +137,14 @@ fn parse_note(input: &str) -> Option<EditorNote> {
         Some(c) => dur_beats(c.to_ascii_lowercase())?,
         None => 1.0,
     };
-    Some(EditorNote { hole, is_blow, beats })
+    Some(EditorNote { hole, is_blow, beats, rest: false })
 }
 
-/// Format a note back to its spec text, e.g. `"-4 q"`.
+/// Format a note back to its spec text, e.g. `"-4 q"` or `"r h"` for a rest.
 fn format_note_spec(n: &EditorNote) -> String {
+    if n.rest {
+        return format!("r {}", beats_letter(n.beats));
+    }
     let sign = if n.is_blow { "" } else { "-" };
     format!("{sign}{} {}", n.hole, beats_letter(n.beats))
 }
@@ -312,7 +326,7 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
                 NoteDurationText,
             ));
             root.spawn((
-                Text::new("Note: e.g. \"-4 q\" (draw 4, quarter) or \"4 e\" (blow 4, eighth)  \u{00B7}  Enter add/edit  \u{00B7}  \u{2190}/\u{2192} select  \u{00B7}  Backspace delete"),
+                Text::new("Note: \"-4 q\" (draw 4, quarter), \"4 e\" (blow 4, eighth), \"r h\" (half-rest silence)  \u{00B7}  Enter add/edit  \u{00B7}  \u{2190}/\u{2192} select  \u{00B7}  Backspace delete"),
                 TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
@@ -608,11 +622,6 @@ fn build_bar_cell(
                     let n = data.notes[ni];
                     let selected = data.selected == Some(ni);
                     let frac = (n.beats / beats_per_bar as f32).clamp(0.12, 1.0);
-                    let (arrow, color) = if n.is_blow {
-                        ("\u{2191}", Color::srgb(0.30, 0.60, 0.95))
-                    } else {
-                        ("\u{2193}", Color::srgb(0.95, 0.45, 0.20))
-                    };
                     notes_row
                         .spawn((
                             Button,
@@ -628,6 +637,8 @@ fn build_bar_cell(
                             },
                             BackgroundColor(if selected {
                                 Color::srgba(0.30, 0.30, 0.12, 0.95)
+                            } else if n.rest {
+                                Color::srgba(0.10, 0.10, 0.12, 0.95)
                             } else {
                                 Color::srgba(0.16, 0.16, 0.20, 0.95)
                             }),
@@ -635,16 +646,33 @@ fn build_bar_cell(
                             NoteWidget(ni),
                         ))
                         .with_children(|w| {
-                            w.spawn((
-                                Text::new(arrow),
-                                TextFont { font_size: FontSize::Px(16.0), font: fonts.symbols.clone(), ..default() },
-                                TextColor(color),
-                            ));
-                            w.spawn((
-                                Text::new(n.hole.to_string()),
-                                TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
-                                TextColor(Color::WHITE),
-                            ));
+                            if n.rest {
+                                // A silence: a centered dim bar, no arrow/number.
+                                w.spawn((
+                                    Node {
+                                        width: Val::Percent(55.0),
+                                        height: Val::Px(2.0),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgb(0.5, 0.5, 0.55)),
+                                ));
+                            } else {
+                                let (arrow, color) = if n.is_blow {
+                                    ("\u{2191}", Color::srgb(0.30, 0.60, 0.95))
+                                } else {
+                                    ("\u{2193}", Color::srgb(0.95, 0.45, 0.20))
+                                };
+                                w.spawn((
+                                    Text::new(arrow),
+                                    TextFont { font_size: FontSize::Px(16.0), font: fonts.symbols.clone(), ..default() },
+                                    TextColor(color),
+                                ));
+                                w.spawn((
+                                    Text::new(n.hole.to_string()),
+                                    TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
+                                    TextColor(Color::WHITE),
+                                ));
+                            }
                         });
                 }
             });
@@ -865,13 +893,20 @@ fn update_note_views(
     if let Ok(mut text) = duration.single_mut() {
         **text = match parse_note(&data.note_input) {
             Some(n) => {
-                let dir = if n.is_blow { "blow" } else { "draw" };
                 let secs = n.beats * 60.0 / bpm_of(&data);
-                format!(
-                    "\u{2192} {dir} hole {}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
-                    n.hole,
-                    dur_name(n.beats),
-                )
+                if n.rest {
+                    format!(
+                        "\u{2192} silence  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
+                        dur_name(n.beats),
+                    )
+                } else {
+                    let dir = if n.is_blow { "blow" } else { "draw" };
+                    format!(
+                        "\u{2192} {dir} hole {}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
+                        n.hole,
+                        dur_name(n.beats),
+                    )
+                }
             }
             None => String::new(),
         };
@@ -1136,11 +1171,14 @@ fn build_chart_json(data: &SongEditorData) -> serde_json::Value {
     let mut t = 0.0f64;
     for n in &data.notes {
         let dur = n.beats as f64 * beat_secs;
-        track.push(json!({
-            "time": t,
-            "duration": dur,
-            "events": [ { "hole": n.hole, "action": if n.is_blow { "blow" } else { "draw" } } ],
-        }));
+        // A rest is just a gap: advance the clock, emit no track item.
+        if !n.rest {
+            track.push(json!({
+                "time": t,
+                "duration": dur,
+                "events": [ { "hole": n.hole, "action": if n.is_blow { "blow" } else { "draw" } } ],
+            }));
+        }
         t += dur;
     }
 
@@ -1342,16 +1380,44 @@ mod tests {
     }
 
     #[test]
+    fn parse_note_handles_rests() {
+        let r = parse_note("r h").unwrap();
+        assert!(r.rest && r.beats == 2.0);
+        // "r" alone defaults to a quarter rest.
+        assert_eq!(parse_note("r").unwrap().beats, 1.0);
+        assert!(parse_note("R q").unwrap().rest);
+    }
+
+    #[test]
     fn note_spec_round_trips() {
-        for spec in ["-4 q", "4 e", "2 h", "-1 w", "10 s"] {
+        for spec in ["-4 q", "4 e", "2 h", "-1 w", "10 s", "r q", "r h"] {
             let n = parse_note(spec).unwrap();
             assert_eq!(format_note_spec(&n), spec, "round-trip {spec}");
         }
     }
 
     #[test]
+    fn rests_create_gaps_without_track_items() {
+        // quarter note, half rest, quarter note at 120 BPM (beat = 0.5s).
+        let data = SongEditorData {
+            notes: vec![
+                EditorNote { hole: 4, is_blow: true, beats: 1.0, rest: false },
+                EditorNote { hole: 0, is_blow: true, beats: 2.0, rest: true },
+                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false },
+            ],
+            ..Default::default()
+        };
+        let chart = build_chart_json(&data);
+        let track = chart["track"].as_array().unwrap();
+        // The rest emits no item — only the two real notes.
+        assert_eq!(track.len(), 2);
+        // Second note starts after note(0.5s) + rest(1.0s) = 1.5s.
+        assert_eq!(track[1]["time"].as_f64().unwrap(), 1.5);
+    }
+
+    #[test]
     fn notes_flow_into_bars_by_beats() {
-        let q = |hole, blow| EditorNote { hole, is_blow: blow, beats: 1.0 };
+        let q = |hole, blow| EditorNote { hole, is_blow: blow, beats: 1.0, rest: false };
         // Five quarter notes in 4/4 → first bar holds 4, the fifth spills over.
         let notes: Vec<_> = (0..5).map(|i| q(i + 1, true)).collect();
         let bars = notes_by_bar(&notes, 4);
@@ -1362,8 +1428,8 @@ mod tests {
 
     #[test]
     fn a_half_note_uses_two_of_four_beats() {
-        let half = EditorNote { hole: 2, is_blow: false, beats: 2.0 };
-        let q = EditorNote { hole: 3, is_blow: true, beats: 1.0 };
+        let half = EditorNote { hole: 2, is_blow: false, beats: 2.0, rest: false };
+        let q = EditorNote { hole: 3, is_blow: true, beats: 1.0, rest: false };
         // half + half + quarter → bar1 holds both halves (4 beats), quarter spills.
         let bars = notes_by_bar(&[half, half, q], 4);
         assert_eq!(bars[0], vec![0, 1]);
@@ -1391,8 +1457,8 @@ mod tests {
             artist: "Test".into(),
             song_name: "Song".into(),
             notes: vec![
-                EditorNote { hole: 4, is_blow: false, beats: 1.0 },
-                EditorNote { hole: 4, is_blow: true, beats: 0.5 },
+                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false },
+                EditorNote { hole: 4, is_blow: true, beats: 0.5, rest: false },
             ],
             ..Default::default()
         };
