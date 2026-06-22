@@ -62,6 +62,13 @@ struct FileButtonEntry(PathBuf);
 #[derive(Component)]
 struct DialogCancelButton;
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, States)]
+enum FileDialogState {
+    #[default]
+    Closed,
+    Open,
+}
+
 const PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.11, 0.98);
 const ENTRY_BG: Color = Color::srgba(0.14, 0.14, 0.20, 0.95);
 const DIR_COLOR: Color = Color::srgb(0.55, 0.78, 1.0);
@@ -69,6 +76,8 @@ const FILE_COLOR: Color = Color::srgb(0.85, 0.85, 0.92);
 
 /// Directories then matching files in `dir`, sorted, hidden entries skipped.
 fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    println!("Retrieving files for {:?}", dir);
+
     let mut dirs = Vec::new();
     let mut files = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -102,9 +111,12 @@ fn handle_open(
     mut dialog: ResMut<FileDialog>,
     existing: Query<Entity, With<FileDialogRoot>>,
     fonts: Res<GlobalFonts>,
+    mut next_state: ResMut<NextState<FileDialogState>>,
     mut commands: Commands,
 ) {
+    println!("Trying to open the file dialog.");
     let Some(req) = requests.read().last() else {
+        println!("No request to handle.");
         return;
     };
     // Replace any open dialog.
@@ -189,6 +201,8 @@ fn handle_open(
                 ));
             });
         });
+    next_state.set(FileDialogState::Open);
+    println!("File dialog open.")
 }
 
 /// Rebuild the entry list and path label whenever the current folder changes.
@@ -199,7 +213,9 @@ fn refresh(
     mut path_text: Query<&mut Text, With<DialogPathText>>,
     mut commands: Commands,
 ) {
+    println!("Refreshing file dialog.");
     if !dialog.open || !dialog.dirty {
+        println!("No need to refresh.");
         return;
     }
     dialog.dirty = false;
@@ -229,6 +245,7 @@ fn refresh(
             }
         });
     }
+    println!("File dialog refreshed.");
 }
 
 fn file_name(p: &std::path::Path) -> String {
@@ -287,6 +304,7 @@ fn choose(
     mut dialog: ResMut<FileDialog>,
     mut chosen: MessageWriter<FileChosen>,
     roots: Query<Entity, With<FileDialogRoot>>,
+    mut next_state: ResMut<NextState<FileDialogState>>,
     mut commands: Commands,
 ) {
     for (interaction, file) in &clicks {
@@ -294,7 +312,7 @@ fn choose(
             if let Some(purpose) = dialog.purpose {
                 chosen.write(FileChosen { purpose, path: file.0.clone() });
             }
-            close(&mut dialog, &roots, &mut commands);
+            close(&mut dialog, &roots, next_state, &mut commands);
             return;
         }
     }
@@ -305,10 +323,11 @@ fn cancel_click(
     clicks: Query<&Interaction, (Changed<Interaction>, With<DialogCancelButton>)>,
     mut dialog: ResMut<FileDialog>,
     roots: Query<Entity, With<FileDialogRoot>>,
+    mut next_state: ResMut<NextState<FileDialogState>>,
     mut commands: Commands,
 ) {
     if clicks.iter().any(|i| *i == Interaction::Pressed) {
-        close(&mut dialog, &roots, &mut commands);
+        close(&mut dialog, &roots, next_state, &mut commands);
     }
 }
 
@@ -318,6 +337,7 @@ fn dialog_keys(
     mut keyboard: ResMut<ButtonInput<KeyCode>>,
     mut dialog: ResMut<FileDialog>,
     roots: Query<Entity, With<FileDialogRoot>>,
+    mut next_state: ResMut<NextState<FileDialogState>>,
     mut commands: Commands,
 ) {
     if !dialog.open {
@@ -325,7 +345,7 @@ fn dialog_keys(
     }
     if keyboard.just_pressed(KeyCode::Escape) {
         keyboard.clear_just_pressed(KeyCode::Escape);
-        close(&mut dialog, &roots, &mut commands);
+        close(&mut dialog, &roots, next_state, &mut commands, );
     } else if keyboard.just_pressed(KeyCode::Backspace) {
         if let Some(parent) = dialog.dir.parent() {
             dialog.dir = parent.to_path_buf();
@@ -337,6 +357,7 @@ fn dialog_keys(
 fn close(
     dialog: &mut FileDialog,
     roots: &Query<Entity, With<FileDialogRoot>>,
+    mut next_state: ResMut<NextState<FileDialogState>>,
     commands: &mut Commands,
 ) {
     dialog.open = false;
@@ -344,6 +365,7 @@ fn close(
     for e in roots {
         commands.entity(e).despawn();
     }
+    next_state.set(FileDialogState::Closed);
 }
 
 pub struct DialogsPlugin;
@@ -353,10 +375,12 @@ impl Plugin for DialogsPlugin {
         app.add_message::<OpenFileDialog>()
             .add_message::<FileChosen>()
             .init_resource::<FileDialog>()
+            .init_state::<FileDialogState>()
             .add_systems(
                 Update,
-                (handle_open, refresh, navigate, choose, cancel_click, dialog_keys),
-            );
+                handle_open.run_if(in_state(FileDialogState::Closed)))
+            .add_systems(Update,
+                (refresh, navigate, choose, cancel_click, dialog_keys).run_if(in_state(FileDialogState::Open)));
     }
 }
 
