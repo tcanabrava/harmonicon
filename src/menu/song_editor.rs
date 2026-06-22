@@ -259,6 +259,12 @@ fn bpm_of(data: &SongEditorData) -> f32 {
     data.tempo_bpm.trim().parse::<f32>().unwrap_or(120.0).max(1.0)
 }
 
+/// The song's key in 2nd position (cross harp): a perfect fifth above the harp
+/// key — e.g. a C harp plays in G.
+fn song_key_of(harp_key: &str) -> String {
+    crate::song::harmonica::semitone(harp_key, 7)
+}
+
 /// Which bar each note falls in: notes fill a bar's beats, then spill to the
 /// next. Returns one bucket of note indices per used bar (at least the notes
 /// given; empty when there are none).
@@ -349,6 +355,8 @@ struct TextFieldText(TextFieldId);
 struct HarpKeyButton;
 #[derive(Component)]
 struct HarpKeyText;
+#[derive(Component)]
+struct HarpPlaysText;
 #[derive(Component)]
 struct MusicPickButton;
 #[derive(Component)]
@@ -687,9 +695,10 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
                 ));
             });
             row.spawn((
-                Text::new("(click to cycle)"),
+                Text::new(format!("click to cycle  \u{00B7}  plays in {} (2nd position)", song_key_of(key))),
                 TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
                 TextColor(Color::srgb(0.5, 0.5, 0.6)),
+                HarpPlaysText,
             ));
         });
 }
@@ -698,7 +707,10 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
 /// showing its chord and the notes that fall in it (arrows sized by duration).
 fn build_grid(parent: &mut ChildSpawnerCommands, data: &SongEditorData, fonts: &GlobalFonts) {
     let bpb = beats_per_bar_of(data);
-    let chords = twelve_bar(&data.harp_key);
+    // 2nd position: the song's key (and its I/IV/V chords) is a fifth above the
+    // harp key, so the preview shows the key you actually play in.
+    let song_key = song_key_of(&data.harp_key);
+    let chords = twelve_bar(&song_key);
     let bars = notes_by_bar(&data.notes, bpb);
     let pages = (bars.len().div_ceil(12)).max(1);
 
@@ -716,7 +728,7 @@ fn build_grid(parent: &mut ChildSpawnerCommands, data: &SongEditorData, fonts: &
                     let bar_notes = bars.get(bar_global).unwrap_or(&empty);
                     // Reuse the gameplay grid's I/IV/V chord colouring so the
                     // editor preview matches the real 12-bar blues view.
-                    let bg = bar_bg(col, &data.harp_key);
+                    let bg = bar_bg(col, &song_key);
                     build_bar_cell(row, col + 1, &chords[col], bg, bar_notes, data, bpb, fonts);
                 }
             });
@@ -1082,7 +1094,8 @@ fn update_note_views(
 fn harp_key_clicks(
     interactions: Query<&Interaction, (Changed<Interaction>, With<HarpKeyButton>)>,
     mut data: ResMut<SongEditorData>,
-    mut key_texts: Query<&mut Text, With<HarpKeyText>>,
+    mut key_texts: Query<&mut Text, (With<HarpKeyText>, Without<HarpPlaysText>)>,
+    mut plays_texts: Query<&mut Text, (With<HarpPlaysText>, Without<HarpKeyText>)>,
 ) {
     if !interactions.iter().any(|i| *i == Interaction::Pressed) {
         return;
@@ -1090,6 +1103,9 @@ fn harp_key_clicks(
     data.harp_key = next_key(&data.harp_key);
     for mut t in &mut key_texts {
         **t = data.harp_key.clone();
+    }
+    for mut t in &mut plays_texts {
+        **t = format!("click to cycle  \u{00B7}  plays in {} (2nd position)", song_key_of(&data.harp_key));
     }
 }
 
@@ -1466,7 +1482,7 @@ fn build_chart(data: &SongEditorData) -> HarpChart {
             title: title.to_string(),
             artist: artist.to_string(),
             tempo_bpm: bpm,
-            key: data.harp_key.clone(),
+            key: song_key_of(&data.harp_key),
             time_signature: Some(format!("{bpb}/4")),
             difficulty: Difficulty::Easy,
         },
@@ -1478,7 +1494,7 @@ fn build_chart(data: &SongEditorData) -> HarpChart {
         harmonica: Harmonica::Diatonic {
             holes: 10,
             bending_profile: BendingProfile::RichterStandard,
-            position: Some("1st".to_string()),
+            position: Some("2nd".to_string()),
             layout: Some(DiatonicLayout { blow: Some(blow), draw: Some(draw) }),
         },
         track,
@@ -1786,6 +1802,16 @@ mod tests {
         assert_eq!(parsed.track.len(), 2);
         assert_eq!(parsed.song.artist, "Test");
         assert!(parsed.track[0].events[0].modifiers.is_some(), "bend should serialize");
+        // 2nd position: a C harp (default) plays the song in G.
+        assert_eq!(parsed.song.key, "G");
+        assert_eq!(parsed.harmonica.position(), Some("2nd"));
+    }
+
+    #[test]
+    fn song_key_is_a_fifth_above_the_harp() {
+        assert_eq!(song_key_of("C"), "G");
+        assert_eq!(song_key_of("A"), "E");
+        assert_eq!(song_key_of("G"), "D");
     }
 
     #[test]
