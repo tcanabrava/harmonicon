@@ -51,6 +51,7 @@ fn main() {
         GameplayPlugin,
         SpectrogramPlugin,
         SettingsPlugin,
+        harmonicon::dialogs::DialogsPlugin,
     ));
 
     #[cfg(feature = "inspector")]

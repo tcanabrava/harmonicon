@@ -17,6 +17,7 @@ use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
 use crate::assets_management::GlobalFonts;
+use crate::dialogs::{DialogId, FileChosen, FileDialog, OpenFileDialog};
 use crate::song::harmonica::twelve_bar;
 
 use super::AppState;
@@ -250,10 +251,6 @@ struct NoteDurationText;
 struct NoteWidget(usize);
 #[derive(Component)]
 struct SaveButton;
-#[derive(Component)]
-struct FileBrowserRoot;
-#[derive(Component)]
-struct FileEntryButton(PathBuf);
 #[derive(Component)]
 struct AnalyzeStatusText;
 
@@ -1025,151 +1022,46 @@ fn rebuild_grid(
     }
 }
 
-// ── File browser ──────────────────────────────────────────────────────────────
+// ── Music file picking (via the reusable file dialog) ──────────────────────────
 
-/// Recursively collect up to `limit` ogg/mp3 files under `dir` (depth-bounded,
-/// skipping hidden folders), appending to `out`.
-fn collect_audio(dir: &std::path::Path, depth: u8, limit: usize, out: &mut Vec<PathBuf>) {
-    if out.len() >= limit || depth == 0 {
-        return;
-    }
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        if out.len() >= limit {
-            return;
-        }
-        let path = entry.path();
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if name.starts_with('.') {
-            continue;
-        }
-        if path.is_dir() {
-            collect_audio(&path, depth - 1, limit, out);
-        } else if matches!(
-            path.extension().and_then(|e| e.to_str()),
-            Some("ogg" | "mp3")
-        ) {
-            out.push(path);
-        }
-    }
-}
+/// Identifies this screen's requests to the shared file dialog.
+const MUSIC_DIALOG: DialogId = DialogId("song_editor_music");
 
-/// Scan a few common locations for audio files to offer in the picker.
-fn scan_audio_files() -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = vec![PathBuf::from("assets"), PathBuf::from(".")];
-    if let Some(home) = dirs::home_dir() {
-        roots.push(home.join("Music"));
-        roots.push(home);
-    }
-    let mut found = Vec::new();
-    for root in roots {
-        collect_audio(&root, 3, 120, &mut found);
-    }
-    found.sort();
-    found.dedup();
-    found
-}
-
-/// Open the file browser overlay when Browse is clicked (if not already open).
+/// Open the navigable file dialog when Browse is clicked.
 fn open_browser(
     interactions: Query<&Interaction, (Changed<Interaction>, With<MusicPickButton>)>,
-    open: Query<Entity, With<FileBrowserRoot>>,
     mut focused: ResMut<FocusedField>,
-    fonts: Res<GlobalFonts>,
-    mut commands: Commands,
+    mut open: MessageWriter<OpenFileDialog>,
 ) {
-    if !interactions.iter().any(|i| *i == Interaction::Pressed) || !open.is_empty() {
+    if !interactions.iter().any(|i| *i == Interaction::Pressed) {
         return;
     }
     focused.0 = Focus::None;
-    let font = fonts.gameplay.clone();
-    let files = scan_audio_files();
-
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(0.0),
-                top: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(8.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.82)),
-            GlobalZIndex(200),
-            FileBrowserRoot,
-        ))
-        .with_children(|panel| {
-            panel.spawn((
-                Text::new(if files.is_empty() {
-                    "No .ogg/.mp3 files found in assets, ., or your Music folder"
-                } else {
-                    "Select a music file  (Esc to cancel)"
-                }),
-                TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
-                TextColor(Color::srgb(0.85, 0.85, 0.9)),
-            ));
-            panel
-                .spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(2.0),
-                    max_height: Val::Percent(75.0),
-                    overflow: Overflow::clip(),
-                    ..default()
-                })
-                .with_children(|list| {
-                    for path in files {
-                        list.spawn((
-                            Button,
-                            Node {
-                                padding: UiRect::axes(Val::Px(10.0), Val::Px(3.0)),
-                                ..default()
-                            },
-                            BackgroundColor(BTN_BG),
-                            FileEntryButton(path.clone()),
-                        ))
-                        .with_children(|b| {
-                            b.spawn((
-                                Text::new(path.to_string_lossy().to_string()),
-                                TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
-                                TextColor(Color::srgb(0.8, 0.85, 0.95)),
-                            ));
-                        });
-                    }
-                });
-        });
+    open.write(OpenFileDialog {
+        purpose: MUSIC_DIALOG,
+        title: "Select a music file (ogg/mp3)".to_string(),
+        extensions: vec!["ogg".into(), "mp3".into()],
+        start_dir: dirs::home_dir(),
+    });
 }
 
-/// Pick a file from the browser: set the path and close the overlay.
+/// Receive the dialog's chosen file: set the path and kick off tempo analysis.
 fn pick_file(
-    entries: Query<(&Interaction, &FileEntryButton), Changed<Interaction>>,
-    browser: Query<Entity, With<FileBrowserRoot>>,
+    mut chosen: MessageReader<FileChosen>,
     mut data: ResMut<SongEditorData>,
     mut task: ResMut<TempoTask>,
     mut status: Query<&mut Text, With<AnalyzeStatusText>>,
-    mut commands: Commands,
 ) {
-    for (interaction, entry) in &entries {
-        if *interaction == Interaction::Pressed {
-            data.music_path = Some(entry.0.clone());
-            for e in &browser {
-                commands.entity(e).despawn();
-            }
-            // Kick off background tempo analysis (Step 3).
-            let path = entry.0.clone();
-            let pool = AsyncComputeTaskPool::get();
-            task.0 = Some(pool.spawn(async move { analyze_tempo(&path) }));
-            if let Ok(mut text) = status.single_mut() {
-                **text = "Analyzing tempo\u{2026}".to_string();
-            }
-            return;
+    for ev in chosen.read() {
+        if ev.purpose != MUSIC_DIALOG {
+            continue;
+        }
+        data.music_path = Some(ev.path.clone());
+        let path = ev.path.clone();
+        let pool = AsyncComputeTaskPool::get();
+        task.0 = Some(pool.spawn(async move { analyze_tempo(&path) }));
+        if let Ok(mut text) = status.single_mut() {
+            **text = "Analyzing tempo\u{2026}".to_string();
         }
     }
 }
@@ -1331,20 +1223,18 @@ fn save_clicks(
 
 // ── Escape / lifecycle ─────────────────────────────────────────────────────────
 
-/// Esc: close the browser if open, else blur a focused field, else go back.
+/// Esc: blur a focused field, else go back. While the file dialog is open it
+/// owns Esc (and consumes it), so we stay out of its way.
 fn handle_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
-    browser: Query<Entity, With<FileBrowserRoot>>,
+    dialog: Res<FileDialog>,
     mut focused: ResMut<FocusedField>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut commands: Commands,
 ) {
-    if !keyboard.just_pressed(KeyCode::Escape) {
+    if dialog.open || !keyboard.just_pressed(KeyCode::Escape) {
         return;
     }
-    if let Some(e) = browser.iter().next() {
-        commands.entity(e).despawn();
-    } else if focused.0 != Focus::None {
+    if focused.0 != Focus::None {
         focused.0 = Focus::None;
     } else {
         next_state.set(AppState::Menu);
@@ -1353,7 +1243,7 @@ fn handle_escape(
 
 fn cleanup(
     mut commands: Commands,
-    roots: Query<Entity, Or<(With<SongEditorRoot>, With<FileBrowserRoot>)>>,
+    roots: Query<Entity, With<SongEditorRoot>>,
     mut focused: ResMut<FocusedField>,
     mut task: ResMut<TempoTask>,
 ) {
@@ -1524,15 +1414,5 @@ mod tests {
     #[test]
     fn estimate_bpm_rejects_silence() {
         assert!(estimate_bpm(&vec![0.0f32; 44100 * 2], 44100.0).is_none());
-    }
-
-    #[test]
-    fn collect_audio_finds_only_ogg_mp3() {
-        // The shipped songs include music.ogg files; scanning assets finds some.
-        let mut found = Vec::new();
-        collect_audio(std::path::Path::new("assets/songs"), 4, 50, &mut found);
-        assert!(found.iter().all(|p| {
-            matches!(p.extension().and_then(|e| e.to_str()), Some("ogg" | "mp3"))
-        }));
     }
 }
