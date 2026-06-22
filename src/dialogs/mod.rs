@@ -8,12 +8,15 @@
 //! messages whose `purpose` matches your id. The dialog handles folder
 //! navigation (into subfolders and up via "..") and closes on pick, Cancel, or
 //! Esc.
+//!
+//! The UI is authored with the `bsn!` macro, and each clickable row carries its
+//! behaviour as an `on(...)` / `observe(...)` callback rather than a polling
+//! system.
 
 use std::path::PathBuf;
 
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
-
-use crate::assets_management::GlobalFonts;
 
 /// Identifies who opened a dialog, so a caller only reacts to its own results.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -52,18 +55,12 @@ pub struct FileDialog {
     title: String,
 }
 
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct FileDialogRoot;
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct FileDialogList;
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct DialogPathText;
-#[derive(Component)]
-struct DirButton(PathBuf);
-#[derive(Component)]
-struct FileButtonEntry(PathBuf);
-#[derive(Component)]
-struct DialogCancelButton;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, States)]
 enum FileDialogState {
@@ -105,12 +102,15 @@ fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<
     (dirs, files)
 }
 
+fn file_name(p: &std::path::Path) -> String {
+    p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+}
+
 /// Open the dialog when an [`OpenFileDialog`] arrives: set state and spawn the
-/// modal shell (the list is filled by `refresh`).
+/// `bsn!` modal shell. The entry list is filled by `refresh`.
 fn handle_open(
     mut requests: MessageReader<OpenFileDialog>,
     mut dialog: ResMut<FileDialog>,
-    fonts: Res<GlobalFonts>,
     mut next_state: ResMut<NextState<FileDialogState>>,
     mut refresh_req: MessageWriter<RefreshFileList>,
     mut commands: Commands,
@@ -130,70 +130,70 @@ fn handle_open(
     dialog.purpose = Some(req.purpose);
     dialog.title = req.title.clone();
 
-    let font = fonts.gameplay.clone();
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(0.0),
-                top: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(6.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.78)),
-            GlobalZIndex(300),
-            FileDialogRoot,
-        ))
-        .with_children(|root| {
-            root.spawn((
-                Text::new(dialog.title.clone()),
-                TextFont { font_size: FontSize::Px(18.0), font: font.clone(), ..default() },
-                TextColor(Color::WHITE),
-            ));
-            root.spawn((
-                Text::new(String::new()),
-                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
-                TextColor(Color::srgb(0.6, 0.6, 0.7)),
-                DialogPathText,
-            ));
-            root.spawn((
+    let title = dialog.title.clone();
+    commands.spawn_scene(bsn! {
+        Node {
+            position_type: {PositionType::Absolute},
+            left: {Val::Px(0.0)},
+            top: {Val::Px(0.0)},
+            width: {Val::Percent(100.0)},
+            height: {Val::Percent(100.0)},
+            flex_direction: {FlexDirection::Column},
+            align_items: {AlignItems::Center},
+            justify_content: {JustifyContent::Center},
+            row_gap: {Val::Px(6.0)},
+        }
+        BackgroundColor({Color::srgba(0.0, 0.0, 0.0, 0.78)})
+        GlobalZIndex(300)
+        FileDialogRoot
+        Children [
+            (
+                Text({title})
+                TextFont { font_size: {FontSize::Px(18.0)} }
+                TextColor({Color::WHITE})
+            ),
+            (
+                Text({String::new()})
+                TextFont { font_size: {FontSize::Px(12.0)} }
+                TextColor({Color::srgb(0.6, 0.6, 0.7)})
+                DialogPathText
+            ),
+            (
                 Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(2.0),
-                    width: Val::Px(640.0),
-                    max_height: Val::Percent(64.0),
-                    overflow: Overflow::clip(),
-                    padding: UiRect::all(Val::Px(6.0)),
-                    ..default()
-                },
-                BackgroundColor(PANEL_BG),
-                FileDialogList,
-            ));
-            root.spawn((
-                Button,
+                    flex_direction: {FlexDirection::Column},
+                    row_gap: {Val::Px(2.0)},
+                    width: {Val::Px(640.0)},
+                    max_height: {Val::Percent(64.0)},
+                    overflow: {Overflow::clip()},
+                    padding: {UiRect::all(Val::Px(6.0))},
+                }
+                BackgroundColor({PANEL_BG})
+                FileDialogList
+            ),
+            (
+                Button
                 Node {
-                    padding: UiRect::axes(Val::Px(14.0), Val::Px(5.0)),
-                    border: UiRect::all(Val::Px(1.0)),
-                    margin: UiRect::top(Val::Px(4.0)),
-                    ..default()
-                },
-                BackgroundColor(ENTRY_BG),
-                BorderColor::all(Color::srgb(0.4, 0.4, 0.5)),
-                DialogCancelButton,
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new("Cancel  (Esc)"),
-                    TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
-                    TextColor(Color::srgb(0.85, 0.7, 0.7)),
-                ));
-            });
-        });
+                    padding: {UiRect::axes(Val::Px(14.0), Val::Px(5.0))},
+                    margin: {UiRect::top(Val::Px(4.0))},
+                }
+                BackgroundColor({ENTRY_BG})
+                on(|_: On<Pointer<Click>>,
+                   mut dialog: ResMut<FileDialog>,
+                   roots: Query<Entity, With<FileDialogRoot>>,
+                   next: ResMut<NextState<FileDialogState>>,
+                   mut commands: Commands| {
+                    close(&mut dialog, &roots, next, &mut commands);
+                })
+                Children [
+                    (
+                        Text({"Cancel  (Esc)".to_string()})
+                        TextFont { font_size: {FontSize::Px(13.0)} }
+                        TextColor({Color::srgb(0.85, 0.7, 0.7)})
+                    )
+                ]
+            ),
+        ]
+    });
     next_state.set(FileDialogState::Open);
     refresh_req.write(RefreshFileList);
 }
@@ -203,7 +203,6 @@ fn handle_open(
 fn refresh(
     mut requests: MessageReader<RefreshFileList>,
     dialog: Res<FileDialog>,
-    fonts: Res<GlobalFonts>,
     lists: Query<(Entity, Option<&Children>), With<FileDialogList>>,
     mut path_text: Query<&mut Text, With<DialogPathText>>,
     mut commands: Commands,
@@ -218,7 +217,6 @@ fn refresh(
     }
 
     let (dirs, files) = list_dir(&dialog.dir, &dialog.extensions);
-    let font = fonts.gameplay.clone();
     for (list, children) in &lists {
         if let Some(children) = children {
             for &c in children {
@@ -227,100 +225,70 @@ fn refresh(
         }
         commands.entity(list).with_children(|l| {
             if let Some(parent) = dialog.dir.parent() {
-                entry_row(l, &font, "\u{1F4C1} ..", DIR_COLOR, Some(parent.to_path_buf()), None);
+                spawn_dir_entry(l, "\u{1F4C1} ..".to_string(), parent.to_path_buf());
             }
             for d in &dirs {
-                let name = format!("\u{1F4C1} {}", file_name(d));
-                entry_row(l, &font, &name, DIR_COLOR, Some(d.clone()), None);
+                spawn_dir_entry(l, format!("\u{1F4C1} {}", file_name(d)), d.clone());
             }
             for f in &files {
-                entry_row(l, &font, &file_name(f), FILE_COLOR, None, Some(f.clone()));
+                spawn_file_entry(l, file_name(f), f.clone());
             }
         });
     }
 }
 
-fn file_name(p: &std::path::Path) -> String {
-    p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+/// A folder row: `bsn!` widget + an `observe` callback that navigates into it.
+fn spawn_dir_entry(parent: &mut ChildSpawnerCommands, label: String, path: PathBuf) {
+    parent
+        .spawn_empty()
+        .apply_scene(entry_scene(label, DIR_COLOR))
+        .observe(
+            move |_: On<Pointer<Click>>,
+                  mut dialog: ResMut<FileDialog>,
+                  mut refresh_req: MessageWriter<RefreshFileList>| {
+                dialog.dir = path.clone();
+                refresh_req.write(RefreshFileList);
+            },
+        );
 }
 
-/// Spawn one clickable row — a folder (`dir`) or a file (`file`).
-fn entry_row(
-    parent: &mut ChildSpawnerCommands,
-    font: &FontSource,
-    label: &str,
-    color: Color,
-    dir: Option<PathBuf>,
-    file: Option<PathBuf>,
-) {
-    let mut cmd = parent.spawn((
-        Button,
+/// A file row: `bsn!` widget + an `observe` callback that picks it and closes.
+fn spawn_file_entry(parent: &mut ChildSpawnerCommands, label: String, path: PathBuf) {
+    parent
+        .spawn_empty()
+        .apply_scene(entry_scene(label, FILE_COLOR))
+        .observe(
+            move |_: On<Pointer<Click>>,
+                  mut dialog: ResMut<FileDialog>,
+                  mut chosen: MessageWriter<FileChosen>,
+                  roots: Query<Entity, With<FileDialogRoot>>,
+                  next: ResMut<NextState<FileDialogState>>,
+                  mut commands: Commands| {
+                if let Some(purpose) = dialog.purpose {
+                    chosen.write(FileChosen { purpose, path: path.clone() });
+                }
+                close(&mut dialog, &roots, next, &mut commands);
+            },
+        );
+}
+
+/// The shared `bsn!` scene for one clickable entry row. (Uses the default font:
+/// `TextFont.font` can't be set through `bsn!` in 0.19.)
+fn entry_scene(label: String, color: Color) -> impl Scene {
+    bsn! {
+        Button
         Node {
-            width: Val::Percent(100.0),
-            padding: UiRect::axes(Val::Px(8.0), Val::Px(3.0)),
-            ..default()
-        },
-        BackgroundColor(ENTRY_BG),
-    ));
-    if let Some(d) = dir {
-        cmd.insert(DirButton(d));
-    }
-    if let Some(f) = file {
-        cmd.insert(FileButtonEntry(f));
-    }
-    cmd.with_children(|b| {
-        b.spawn((
-            Text::new(label.to_string()),
-            TextFont { font_size: FontSize::Px(14.0), font: font.clone(), ..default() },
-            TextColor(color),
-        ));
-    });
-}
-
-/// Click a folder (or "..") to navigate into it.
-fn navigate(
-    clicks: Query<(&Interaction, &DirButton), Changed<Interaction>>,
-    mut dialog: ResMut<FileDialog>,
-    mut refresh_req: MessageWriter<RefreshFileList>,
-) {
-    for (interaction, dir) in &clicks {
-        if *interaction == Interaction::Pressed {
-            dialog.dir = dir.0.clone();
-            refresh_req.write(RefreshFileList);
+            width: {Val::Percent(100.0)},
+            padding: {UiRect::axes(Val::Px(8.0), Val::Px(3.0))},
         }
-    }
-}
-
-/// Click a file to choose it: emit the result and close.
-fn choose(
-    clicks: Query<(&Interaction, &FileButtonEntry), Changed<Interaction>>,
-    mut dialog: ResMut<FileDialog>,
-    mut chosen: MessageWriter<FileChosen>,
-    roots: Query<Entity, With<FileDialogRoot>>,
-    next_state: ResMut<NextState<FileDialogState>>,
-    mut commands: Commands,
-) {
-    for (interaction, file) in &clicks {
-        if *interaction == Interaction::Pressed {
-            if let Some(purpose) = dialog.purpose {
-                chosen.write(FileChosen { purpose, path: file.0.clone() });
-            }
-            close(&mut dialog, &roots, next_state, &mut commands);
-            return;
-        }
-    }
-}
-
-/// Cancel button closes without a result.
-fn cancel_click(
-    clicks: Query<&Interaction, (Changed<Interaction>, With<DialogCancelButton>)>,
-    mut dialog: ResMut<FileDialog>,
-    roots: Query<Entity, With<FileDialogRoot>>,
-    next_state: ResMut<NextState<FileDialogState>>,
-    mut commands: Commands,
-) {
-    if clicks.iter().any(|i| *i == Interaction::Pressed) {
-        close(&mut dialog, &roots, next_state, &mut commands);
+        BackgroundColor({ENTRY_BG})
+        Children [
+            (
+                Text({label})
+                TextFont { font_size: {FontSize::Px(14.0)} }
+                TextColor({color})
+            )
+        ]
     }
 }
 
@@ -368,11 +336,11 @@ impl Plugin for DialogsPlugin {
             .add_message::<RefreshFileList>()
             .init_resource::<FileDialog>()
             .init_state::<FileDialogState>()
+            .add_systems(Update, handle_open.run_if(in_state(FileDialogState::Closed)))
             .add_systems(
                 Update,
-                handle_open.run_if(in_state(FileDialogState::Closed)))
-            .add_systems(Update,
-                (refresh, navigate, choose, cancel_click, dialog_keys).run_if(in_state(FileDialogState::Open)));
+                (refresh, dialog_keys).run_if(in_state(FileDialogState::Open)),
+            );
     }
 }
 
