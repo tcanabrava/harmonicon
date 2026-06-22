@@ -1,18 +1,18 @@
-# Flatpak manifest for Harmonicon.
+# Flatpak manifest for harmonicon.
 #
 # Local build + install:
 #   flatpak install -y flathub org.freedesktop.Platform//24.08 \
 #       org.freedesktop.Sdk//24.08 org.freedesktop.Sdk.Extension.rust-stable//24.08
 #   flatpak-builder --user --install --force-clean build-dir \
-#       packaging/flatpak/io.github.tcanabrava.Harmonicon.yaml
-#   flatpak run io.github.tcanabrava.Harmonicon
+#       packaging/flatpak/io.github.tcanabrava.harmonicon.yaml
+#   flatpak run io.github.tcanabrava.harmonicon
 #
 # This manifest fetches crates from the network at build time (fine for local
 # builds). For an offline / Flathub build, vendor the dependencies — see
 # packaging/flatpak/README.md.
-id: io.github.tcanabrava.Harmonicon
+id: io.github.tcanabrava.harmonicon
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -51,9 +51,9 @@ modules:
       - cp -r assets /app/share/harmonicon/
       - find /app/share/harmonicon/assets -name '*~' -delete
       # Desktop integration.
-      - install -Dm644 packaging/flatpak/io.github.tcanabrava.Harmonicon.desktop -t /app/share/applications
-      - install -Dm644 packaging/flatpak/io.github.tcanabrava.Harmonicon.metainfo.xml -t /app/share/metainfo
-      - install -Dm644 assets/icons/icon.png /app/share/icons/hicolor/1024x1024/apps/io.github.tcanabrava.Harmonicon.png
+      - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.desktop -t /app/share/applications
+      - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 assets/icons/icon.png /app/share/icons/hicolor/1024x1024/apps/io.github.tcanabrava.harmonicon.png
     sources:
       - type: git
         url: https://github.com/tcanabrava/orin.git
