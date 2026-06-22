@@ -23,6 +23,15 @@ use super::AppState;
 
 // ── Model ───────────────────────────────────────────────────────────────────
 
+/// One authored note: a hole played blow (exhale) or draw (inhale) for a
+/// duration measured in beats (quarter = 1.0).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct EditorNote {
+    pub hole: u8,
+    pub is_blow: bool,
+    pub beats: f32,
+}
+
 /// The song being authored. Strings are kept as typed text and parsed on save.
 #[derive(Resource)]
 pub struct SongEditorData {
@@ -32,6 +41,12 @@ pub struct SongEditorData {
     pub tempo_bpm: String,
     pub beats_per_bar: String,
     pub harp_key: String,
+    /// Authored notes, in play order.
+    pub notes: Vec<EditorNote>,
+    /// Currently selected note (for edit/delete), if any.
+    pub selected: Option<usize>,
+    /// The note being typed, e.g. `"-4 q"`.
+    pub note_input: String,
 }
 
 impl Default for SongEditorData {
@@ -43,8 +58,113 @@ impl Default for SongEditorData {
             tempo_bpm: "120".into(),
             beats_per_bar: "4".into(),
             harp_key: "C".into(),
+            notes: Vec::new(),
+            selected: None,
+            note_input: String::new(),
         }
     }
+}
+
+// ── Note parsing / durations ────────────────────────────────────────────────
+
+/// Beats for a duration letter: whole/half/quarter/eighth/sixteenth.
+fn dur_beats(letter: char) -> Option<f32> {
+    match letter {
+        'w' => Some(4.0),
+        'h' => Some(2.0),
+        'q' => Some(1.0),
+        'e' => Some(0.5),
+        's' => Some(0.25),
+        _ => None,
+    }
+}
+
+/// The duration letter closest to a beat count (for round-tripping/formatting).
+fn beats_letter(beats: f32) -> char {
+    match beats {
+        b if b >= 4.0 => 'w',
+        b if b >= 2.0 => 'h',
+        b if b >= 1.0 => 'q',
+        b if b >= 0.5 => 'e',
+        _ => 's',
+    }
+}
+
+/// Human name of a duration in beats.
+fn dur_name(beats: f32) -> &'static str {
+    match beats_letter(beats) {
+        'w' => "whole",
+        'h' => "half",
+        'q' => "quarter",
+        'e' => "eighth",
+        _ => "sixteenth",
+    }
+}
+
+/// Parse a note spec like `"-4 q"`, `"4 e"`, or `"3"` (defaults to a quarter).
+/// `-` prefix = draw (inhale); otherwise blow (exhale). Hole 1..=10.
+fn parse_note(input: &str) -> Option<EditorNote> {
+    let s = input.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let (is_blow, rest) = match s.strip_prefix('-') {
+        Some(r) => (false, r.trim_start()),
+        None => (true, s),
+    };
+    let mut chars = rest.trim_start();
+    // Leading digits → hole.
+    let digits: String = chars.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let hole: u8 = digits.parse().ok()?;
+    if !(1..=10).contains(&hole) {
+        return None;
+    }
+    chars = chars[digits.len()..].trim_start();
+    // Optional duration letter (defaults to a quarter note).
+    let beats = match chars.chars().next() {
+        Some(c) => dur_beats(c.to_ascii_lowercase())?,
+        None => 1.0,
+    };
+    Some(EditorNote { hole, is_blow, beats })
+}
+
+/// Format a note back to its spec text, e.g. `"-4 q"`.
+fn format_note_spec(n: &EditorNote) -> String {
+    let sign = if n.is_blow { "" } else { "-" };
+    format!("{sign}{} {}", n.hole, beats_letter(n.beats))
+}
+
+/// Parsed beats-per-bar (the bar capacity), at least 1.
+fn beats_per_bar_of(data: &SongEditorData) -> usize {
+    data.beats_per_bar.trim().parse::<usize>().unwrap_or(4).max(1)
+}
+
+/// Parsed tempo in BPM (for the seconds readout), at least 1.
+fn bpm_of(data: &SongEditorData) -> f32 {
+    data.tempo_bpm.trim().parse::<f32>().unwrap_or(120.0).max(1.0)
+}
+
+/// Which bar each note falls in: notes fill a bar's beats, then spill to the
+/// next. Returns one bucket of note indices per used bar (at least the notes
+/// given; empty when there are none).
+fn notes_by_bar(notes: &[EditorNote], beats_per_bar: usize) -> Vec<Vec<usize>> {
+    let cap = beats_per_bar as f32;
+    let mut bars: Vec<Vec<usize>> = Vec::new();
+    let mut used = 0.0f32;
+    for (i, n) in notes.iter().enumerate() {
+        if bars.is_empty() {
+            bars.push(Vec::new());
+        }
+        // If this note won't fit the remaining space and the bar already has
+        // something, start a new bar.
+        if used > 0.0 && used + n.beats > cap {
+            bars.push(Vec::new());
+            used = 0.0;
+        }
+        bars.last_mut().unwrap().push(i);
+        used += n.beats;
+    }
+    bars
 }
 
 /// The four free-text fields. (Harp key cycles; music path is picked.)
@@ -75,9 +195,18 @@ impl TextFieldId {
     }
 }
 
-/// Which text field currently receives typing.
+/// What currently receives keyboard input.
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum Focus {
+    #[default]
+    None,
+    Field(TextFieldId),
+    Note,
+}
+
+/// Which input target currently has focus.
 #[derive(Resource, Default)]
-struct FocusedField(Option<TextFieldId>);
+struct FocusedField(Focus);
 
 /// The in-flight tempo-analysis task, if a file is being analysed.
 #[derive(Resource, Default)]
@@ -111,6 +240,14 @@ struct MusicPickButton;
 struct MusicPathText;
 #[derive(Component)]
 struct TwelveBarGrid;
+#[derive(Component)]
+struct NoteEntryBox;
+#[derive(Component)]
+struct NoteEntryText;
+#[derive(Component)]
+struct NoteDurationText;
+#[derive(Component)]
+struct NoteWidget(usize);
 #[derive(Component)]
 struct FileBrowserRoot;
 #[derive(Component)]
@@ -166,19 +303,32 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
                 text_field(form, &font, "Music Tempo  \u{2669} =", TextFieldId::Tempo, &data.tempo_bpm);
                 text_field(form, &font, "Beats per Bar", TextFieldId::BeatsPerBar, &data.beats_per_bar);
                 harp_field(form, &font, &data.harp_key);
+                note_field(form, &font, &data.note_input);
             });
 
             root.spawn((
+                Text::new(String::new()),
+                TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                TextColor(Color::srgb(0.7, 0.85, 1.0)),
+                NoteDurationText,
+            ));
+            root.spawn((
+                Text::new("Note: e.g. \"-4 q\" (draw 4, quarter) or \"4 e\" (blow 4, eighth)  \u{00B7}  Enter add/edit  \u{00B7}  \u{2190}/\u{2192} select  \u{00B7}  Backspace delete"),
+                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextColor(Color::srgb(0.55, 0.55, 0.65)),
+            ));
+
+            root.spawn((
                 Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(3.0),
-                    margin: UiRect::top(Val::Px(10.0)),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(4.0),
+                    margin: UiRect::top(Val::Px(8.0)),
                     ..default()
                 },
                 TwelveBarGrid,
             ))
             .with_children(|grid| {
-                build_twelve_bar_cells(grid, &twelve_bar(&data.harp_key), &font);
+                build_grid(grid, &data, &fonts);
             });
 
             root.spawn((
@@ -193,6 +343,46 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
                 TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
+        });
+}
+
+/// The note-entry row: a label and a click-to-focus box for the note spec.
+fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &str) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(10.0),
+            ..default()
+        })
+        .with_children(|row| {
+            row.spawn((
+                Node { width: Val::Px(160.0), ..default() },
+                Text::new("Add / Edit Note:"),
+                TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                TextColor(LABEL),
+            ));
+            row.spawn((
+                Button,
+                Node {
+                    flex_grow: 1.0,
+                    min_width: Val::Px(260.0),
+                    padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(FIELD_BG),
+                BorderColor::all(Color::srgb(0.30, 0.30, 0.42)),
+                NoteEntryBox,
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    Text::new(initial.to_string()),
+                    TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                    TextColor(Color::WHITE),
+                    NoteEntryText,
+                ));
+            });
         });
 }
 
@@ -328,36 +518,118 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
         });
 }
 
-/// Spawn the 12 bar cells with their I/IV/V chord labels.
-fn build_twelve_bar_cells(parent: &mut ChildSpawnerCommands, chords: &[String], font: &FontSource) {
-    for (i, chord) in chords.iter().enumerate() {
+/// Build the 12-bar grid as one or more pages (rows of 12 bars), each bar
+/// showing its chord and the notes that fall in it (arrows sized by duration).
+fn build_grid(parent: &mut ChildSpawnerCommands, data: &SongEditorData, fonts: &GlobalFonts) {
+    let bpb = beats_per_bar_of(data);
+    let chords = twelve_bar(&data.harp_key);
+    let bars = notes_by_bar(&data.notes, bpb);
+    let pages = (bars.len().div_ceil(12)).max(1);
+
+    for page in 0..pages {
         parent
-            .spawn((
-                Node {
-                    width: Val::Px(64.0),
-                    height: Val::Px(56.0),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    border: UiRect::all(Val::Px(1.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.10, 0.11, 0.15, 0.95)),
-                BorderColor::all(Color::srgb(0.30, 0.32, 0.42)),
-            ))
-            .with_children(|cell| {
-                cell.spawn((
-                    Text::new(format!("{}", i + 1)),
-                    TextFont { font_size: FontSize::Px(9.0), font: font.clone(), ..default() },
-                    TextColor(Color::srgb(0.45, 0.45, 0.55)),
-                ));
-                cell.spawn((
-                    Text::new(chord.clone()),
-                    TextFont { font_size: FontSize::Px(17.0), font: font.clone(), ..default() },
-                    TextColor(Color::WHITE),
-                ));
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(3.0),
+                ..default()
+            })
+            .with_children(|row| {
+                for col in 0..12 {
+                    let bar_global = page * 12 + col;
+                    let empty = Vec::new();
+                    let bar_notes = bars.get(bar_global).unwrap_or(&empty);
+                    build_bar_cell(row, col + 1, &chords[col], bar_notes, data, bpb, fonts);
+                }
             });
     }
+}
+
+/// One bar cell: chord/bar-number header plus its notes as arrow widgets.
+fn build_bar_cell(
+    parent: &mut ChildSpawnerCommands,
+    bar_num: usize,
+    chord: &str,
+    note_indices: &[usize],
+    data: &SongEditorData,
+    beats_per_bar: usize,
+    fonts: &GlobalFonts,
+) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Px(88.0),
+                height: Val::Px(72.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                padding: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.10, 0.11, 0.15, 0.95)),
+            BorderColor::all(Color::srgb(0.30, 0.32, 0.42)),
+        ))
+        .with_children(|cell| {
+            cell.spawn((
+                Text::new(format!("{bar_num}  {chord}")),
+                TextFont { font_size: FontSize::Px(10.0), font: fonts.gameplay.clone(), ..default() },
+                TextColor(Color::srgb(0.55, 0.55, 0.65)),
+            ));
+            // Row of note arrows, widths proportional to each note's beats.
+            cell.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::FlexEnd,
+                justify_content: JustifyContent::Center,
+                width: Val::Percent(100.0),
+                flex_grow: 1.0,
+                column_gap: Val::Px(1.0),
+                ..default()
+            })
+            .with_children(|notes_row| {
+                for &ni in note_indices {
+                    let n = data.notes[ni];
+                    let selected = data.selected == Some(ni);
+                    let frac = (n.beats / beats_per_bar as f32).clamp(0.12, 1.0);
+                    let (arrow, color) = if n.is_blow {
+                        ("\u{2191}", Color::srgb(0.30, 0.60, 0.95))
+                    } else {
+                        ("\u{2193}", Color::srgb(0.95, 0.45, 0.20))
+                    };
+                    notes_row
+                        .spawn((
+                            Button,
+                            Node {
+                                width: Val::Percent(frac * 100.0),
+                                height: Val::Percent(100.0),
+                                min_width: Val::Px(14.0),
+                                flex_direction: FlexDirection::Column,
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                border: UiRect::all(Val::Px(if selected { 2.0 } else { 1.0 })),
+                                ..default()
+                            },
+                            BackgroundColor(if selected {
+                                Color::srgba(0.30, 0.30, 0.12, 0.95)
+                            } else {
+                                Color::srgba(0.16, 0.16, 0.20, 0.95)
+                            }),
+                            BorderColor::all(if selected { ACCENT } else { Color::srgb(0.30, 0.30, 0.40) }),
+                            NoteWidget(ni),
+                        ))
+                        .with_children(|w| {
+                            w.spawn((
+                                Text::new(arrow),
+                                TextFont { font_size: FontSize::Px(16.0), font: fonts.symbols.clone(), ..default() },
+                                TextColor(color),
+                            ));
+                            w.spawn((
+                                Text::new(n.hole.to_string()),
+                                TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
+                                TextColor(Color::WHITE),
+                            ));
+                        });
+                }
+            });
+        });
 }
 
 // ── Tempo analysis ────────────────────────────────────────────────────────────
@@ -467,15 +739,19 @@ fn music_label(path: &Option<PathBuf>) -> String {
 
 // ── Interaction: focus + typing ───────────────────────────────────────────────
 
-/// Clicking a text field focuses it for typing.
+/// Clicking a metadata field or the note box focuses it for typing.
 fn focus_clicks(
-    boxes: Query<(&Interaction, &TextFieldBox), Changed<Interaction>>,
+    text_boxes: Query<(&Interaction, &TextFieldBox), Changed<Interaction>>,
+    note_boxes: Query<&Interaction, (Changed<Interaction>, With<NoteEntryBox>)>,
     mut focused: ResMut<FocusedField>,
 ) {
-    for (interaction, field) in &boxes {
+    for (interaction, field) in &text_boxes {
         if *interaction == Interaction::Pressed {
-            focused.0 = Some(field.0);
+            focused.0 = Focus::Field(field.0);
         }
+    }
+    if note_boxes.iter().any(|i| *i == Interaction::Pressed) {
+        focused.0 = Focus::Note;
     }
 }
 
@@ -486,7 +762,7 @@ fn type_into_focused(
     focused: Res<FocusedField>,
     mut data: ResMut<SongEditorData>,
 ) {
-    let Some(field) = focused.0 else {
+    let Focus::Field(field) = focused.0 else {
         keys.clear();
         return;
     };
@@ -523,29 +799,74 @@ fn update_field_views(
 ) {
     for (field, mut text) in &mut texts {
         let mut s = field.0.value(&data).to_string();
-        if focused.0 == Some(field.0) {
+        if focused.0 == Focus::Field(field.0) {
             s.push('_');
         }
         **text = s;
     }
     for (field, mut bg) in &mut boxes {
-        bg.0 = if focused.0 == Some(field.0) { FIELD_BG_FOCUS } else { FIELD_BG };
+        bg.0 = if focused.0 == Focus::Field(field.0) { FIELD_BG_FOCUS } else { FIELD_BG };
     }
     if let Ok(mut text) = music.single_mut() {
         **text = music_label(&data.music_path);
     }
 }
 
+/// Mirror the note buffer into its box (caret when focused) and show the parsed
+/// note's musical + seconds duration.
+fn update_note_views(
+    data: Res<SongEditorData>,
+    focused: Res<FocusedField>,
+    mut entry: Query<
+        &mut Text,
+        (With<NoteEntryText>, Without<TextFieldText>, Without<MusicPathText>),
+    >,
+    mut duration: Query<
+        &mut Text,
+        (
+            With<NoteDurationText>,
+            Without<NoteEntryText>,
+            Without<TextFieldText>,
+            Without<MusicPathText>,
+        ),
+    >,
+    mut boxes: Query<&mut BackgroundColor, With<NoteEntryBox>>,
+) {
+    let focused_note = focused.0 == Focus::Note;
+    if let Ok(mut text) = entry.single_mut() {
+        let mut s = data.note_input.clone();
+        if focused_note {
+            s.push('_');
+        }
+        **text = s;
+    }
+    if let Ok(mut bg) = boxes.single_mut() {
+        bg.0 = if focused_note { FIELD_BG_FOCUS } else { FIELD_BG };
+    }
+    if let Ok(mut text) = duration.single_mut() {
+        **text = match parse_note(&data.note_input) {
+            Some(n) => {
+                let dir = if n.is_blow { "blow" } else { "draw" };
+                let secs = n.beats * 60.0 / bpm_of(&data);
+                format!(
+                    "\u{2192} {dir} hole {}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
+                    n.hole,
+                    dur_name(n.beats),
+                )
+            }
+            None => String::new(),
+        };
+    }
+}
+
 // ── Interaction: harmonica key ────────────────────────────────────────────────
 
-/// Cycle the harp key on click, update its label, and rebuild the 12-bar grid.
+/// Cycle the harp key on click and update its label. The grid is rebuilt by
+/// `rebuild_grid` (the key change marks the data as changed).
 fn harp_key_clicks(
     interactions: Query<&Interaction, (Changed<Interaction>, With<HarpKeyButton>)>,
     mut data: ResMut<SongEditorData>,
-    fonts: Res<GlobalFonts>,
     mut key_texts: Query<&mut Text, With<HarpKeyText>>,
-    grids: Query<(Entity, Option<&Children>), With<TwelveBarGrid>>,
-    mut commands: Commands,
 ) {
     if !interactions.iter().any(|i| *i == Interaction::Pressed) {
         return;
@@ -554,16 +875,131 @@ fn harp_key_clicks(
     for mut t in &mut key_texts {
         **t = data.harp_key.clone();
     }
-    let chords = twelve_bar(&data.harp_key);
+}
+
+// ── Interaction: notes ──────────────────────────────────────────────────────
+
+/// Keyboard handling while the note box is focused: type the spec, Enter to
+/// add/edit, Backspace to erase a char (or delete the note when empty),
+/// arrows to select.
+fn note_input_keys(
+    mut keys: MessageReader<KeyboardInput>,
+    focused: Res<FocusedField>,
+    mut data: ResMut<SongEditorData>,
+) {
+    if focused.0 != Focus::Note {
+        keys.clear();
+        return;
+    }
+    for ev in keys.read() {
+        if ev.state != ButtonState::Pressed {
+            continue;
+        }
+        match &ev.logical_key {
+            Key::Character(s) => {
+                for c in s.chars() {
+                    if !c.is_control() {
+                        data.note_input.push(c);
+                    }
+                }
+            }
+            Key::Space => data.note_input.push(' '),
+            Key::Backspace => {
+                if data.note_input.pop().is_none() {
+                    delete_selected_note(&mut data);
+                }
+            }
+            Key::Enter => commit_note(&mut data),
+            Key::ArrowLeft => select_note(&mut data, -1),
+            Key::ArrowRight => select_note(&mut data, 1),
+            _ => {}
+        }
+    }
+}
+
+/// Commit the typed spec: replace the selected note, or append a new one.
+fn commit_note(data: &mut SongEditorData) {
+    let Some(note) = parse_note(&data.note_input) else {
+        return;
+    };
+    match data.selected {
+        Some(i) if i < data.notes.len() => data.notes[i] = note,
+        _ => data.notes.push(note),
+    }
+    data.note_input.clear();
+}
+
+/// Delete the selected note (or the last one), keeping selection sensible.
+fn delete_selected_note(data: &mut SongEditorData) {
+    let Some(i) = data.selected.or_else(|| data.notes.len().checked_sub(1)) else {
+        return;
+    };
+    if i >= data.notes.len() {
+        return;
+    }
+    data.notes.remove(i);
+    data.selected = if data.notes.is_empty() {
+        None
+    } else {
+        Some(i.min(data.notes.len() - 1))
+    };
+    data.note_input.clear();
+}
+
+/// Move the selection by `dir` (−1 prev / +1 next). Moving past the end clears
+/// the selection (ready to add a fresh note); selecting loads its spec to edit.
+fn select_note(data: &mut SongEditorData, dir: i32) {
+    if data.notes.is_empty() {
+        return;
+    }
+    let last = data.notes.len() - 1;
+    let new = match (data.selected, dir) {
+        (None, 1) => Some(0),
+        (None, _) => Some(last),
+        (Some(i), -1) => Some(i.saturating_sub(1)),
+        (Some(i), _) if i < last => Some(i + 1),
+        (Some(_), _) => None, // past the end → deselect
+    };
+    data.selected = new;
+    data.note_input = match new {
+        Some(i) => format_note_spec(&data.notes[i]),
+        None => String::new(),
+    };
+}
+
+/// Clicking a note arrow selects it for editing.
+fn note_widget_clicks(
+    widgets: Query<(&Interaction, &NoteWidget), Changed<Interaction>>,
+    mut data: ResMut<SongEditorData>,
+    mut focused: ResMut<FocusedField>,
+) {
+    for (interaction, w) in &widgets {
+        if *interaction == Interaction::Pressed && w.0 < data.notes.len() {
+            data.selected = Some(w.0);
+            data.note_input = format_note_spec(&data.notes[w.0]);
+            focused.0 = Focus::Note;
+        }
+    }
+}
+
+/// Rebuild the 12-bar grid whenever the song data changes (notes, selection,
+/// key, or beats-per-bar).
+fn rebuild_grid(
+    data: Res<SongEditorData>,
+    fonts: Res<GlobalFonts>,
+    grids: Query<(Entity, Option<&Children>), With<TwelveBarGrid>>,
+    mut commands: Commands,
+) {
+    if !data.is_changed() {
+        return;
+    }
     for (grid, children) in &grids {
         if let Some(children) = children {
             for &c in children {
                 commands.entity(c).despawn();
             }
         }
-        commands.entity(grid).with_children(|g| {
-            build_twelve_bar_cells(g, &chords, &fonts.gameplay);
-        });
+        commands.entity(grid).with_children(|g| build_grid(g, &data, &fonts));
     }
 }
 
@@ -626,7 +1062,7 @@ fn open_browser(
     if !interactions.iter().any(|i| *i == Interaction::Pressed) || !open.is_empty() {
         return;
     }
-    focused.0 = None;
+    focused.0 = Focus::None;
     let font = fonts.gameplay.clone();
     let files = scan_audio_files();
 
@@ -758,8 +1194,8 @@ fn handle_escape(
     }
     if let Some(e) = browser.iter().next() {
         commands.entity(e).despawn();
-    } else if focused.0.is_some() {
-        focused.0 = None;
+    } else if focused.0 != Focus::None {
+        focused.0 = Focus::None;
     } else {
         next_state.set(AppState::Menu);
     }
@@ -774,7 +1210,7 @@ fn cleanup(
     for e in &roots {
         commands.entity(e).despawn();
     }
-    focused.0 = None;
+    focused.0 = Focus::None;
     task.0 = None;
 }
 
@@ -793,11 +1229,15 @@ impl Plugin for SongEditorPlugin {
                     handle_escape,
                     focus_clicks,
                     type_into_focused,
+                    note_input_keys,
+                    note_widget_clicks,
                     harp_key_clicks,
                     open_browser,
                     pick_file,
                     poll_tempo,
                     update_field_views,
+                    update_note_views,
+                    rebuild_grid,
                 )
                     .run_if(in_state(AppState::SongEditor)),
             );
@@ -844,6 +1284,49 @@ mod tests {
         }
         let est = estimate_bpm(&sig, sr).expect("a steady click train has a tempo");
         assert!((est - 120.0).abs() < 6.0, "got {est}");
+    }
+
+    #[test]
+    fn parse_note_handles_draw_blow_and_durations() {
+        let draw = parse_note("-4 q").unwrap();
+        assert_eq!((draw.hole, draw.is_blow, draw.beats), (4, false, 1.0));
+        let blow = parse_note("4 e").unwrap();
+        assert_eq!((blow.hole, blow.is_blow, blow.beats), (4, true, 0.5));
+        // No duration letter defaults to a quarter.
+        assert_eq!(parse_note("3").unwrap().beats, 1.0);
+        // Out-of-range hole / empty are rejected.
+        assert!(parse_note("0 q").is_none());
+        assert!(parse_note("11 q").is_none());
+        assert!(parse_note("").is_none());
+    }
+
+    #[test]
+    fn note_spec_round_trips() {
+        for spec in ["-4 q", "4 e", "2 h", "-1 w", "10 s"] {
+            let n = parse_note(spec).unwrap();
+            assert_eq!(format_note_spec(&n), spec, "round-trip {spec}");
+        }
+    }
+
+    #[test]
+    fn notes_flow_into_bars_by_beats() {
+        let q = |hole, blow| EditorNote { hole, is_blow: blow, beats: 1.0 };
+        // Five quarter notes in 4/4 → first bar holds 4, the fifth spills over.
+        let notes: Vec<_> = (0..5).map(|i| q(i + 1, true)).collect();
+        let bars = notes_by_bar(&notes, 4);
+        assert_eq!(bars.len(), 2);
+        assert_eq!(bars[0], vec![0, 1, 2, 3]);
+        assert_eq!(bars[1], vec![4]);
+    }
+
+    #[test]
+    fn a_half_note_uses_two_of_four_beats() {
+        let half = EditorNote { hole: 2, is_blow: false, beats: 2.0 };
+        let q = EditorNote { hole: 3, is_blow: true, beats: 1.0 };
+        // half + half + quarter → bar1 holds both halves (4 beats), quarter spills.
+        let bars = notes_by_bar(&[half, half, q], 4);
+        assert_eq!(bars[0], vec![0, 1]);
+        assert_eq!(bars[1], vec![2]);
     }
 
     #[test]
