@@ -14,7 +14,7 @@ mod phrase_overlay;
 mod results;
 mod scoring;
 mod song_progress_overlay;
-mod twelve_bar_blues_overlay;
+pub mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
 use scoring::{

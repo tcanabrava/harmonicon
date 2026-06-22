@@ -37,6 +37,10 @@ pub struct FileChosen {
     pub path: PathBuf,
 }
 
+/// Internal: request a rebuild of the entry list (on open or after navigating).
+#[derive(Message)]
+struct RefreshFileList;
+
 /// Live dialog state. `open` lets callers suppress their own input (e.g. Esc)
 /// while the modal is up.
 #[derive(Resource, Default)]
@@ -46,7 +50,6 @@ pub struct FileDialog {
     extensions: Vec<String>,
     purpose: Option<DialogId>,
     title: String,
-    dirty: bool,
 }
 
 #[derive(Component)]
@@ -76,8 +79,6 @@ const FILE_COLOR: Color = Color::srgb(0.85, 0.85, 0.92);
 
 /// Directories then matching files in `dir`, sorted, hidden entries skipped.
 fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<PathBuf>) {
-    println!("Retrieving files for {:?}", dir);
-
     let mut dirs = Vec::new();
     let mut files = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -109,21 +110,14 @@ fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<
 fn handle_open(
     mut requests: MessageReader<OpenFileDialog>,
     mut dialog: ResMut<FileDialog>,
-    existing: Query<Entity, With<FileDialogRoot>>,
     fonts: Res<GlobalFonts>,
     mut next_state: ResMut<NextState<FileDialogState>>,
+    mut refresh_req: MessageWriter<RefreshFileList>,
     mut commands: Commands,
 ) {
-    println!("Trying to open the file dialog.");
     let Some(req) = requests.read().last() else {
-        println!("No request to handle.");
         return;
     };
-    // Replace any open dialog.
-    for e in &existing {
-        commands.entity(e).despawn();
-    }
-
     let start = req
         .start_dir
         .clone()
@@ -135,7 +129,6 @@ fn handle_open(
     dialog.extensions = req.extensions.clone();
     dialog.purpose = Some(req.purpose);
     dialog.title = req.title.clone();
-    dialog.dirty = true;
 
     let font = fonts.gameplay.clone();
     commands
@@ -202,23 +195,23 @@ fn handle_open(
             });
         });
     next_state.set(FileDialogState::Open);
-    println!("File dialog open.")
+    refresh_req.write(RefreshFileList);
 }
 
-/// Rebuild the entry list and path label whenever the current folder changes.
+/// Rebuild the entry list and path label, only when a [`RefreshFileList`] is
+/// requested (on open or after navigating) — not every frame.
 fn refresh(
-    mut dialog: ResMut<FileDialog>,
+    mut requests: MessageReader<RefreshFileList>,
+    dialog: Res<FileDialog>,
     fonts: Res<GlobalFonts>,
     lists: Query<(Entity, Option<&Children>), With<FileDialogList>>,
     mut path_text: Query<&mut Text, With<DialogPathText>>,
     mut commands: Commands,
 ) {
-    println!("Refreshing file dialog.");
-    if !dialog.open || !dialog.dirty {
-        println!("No need to refresh.");
+    if requests.is_empty() {
         return;
     }
-    dialog.dirty = false;
+    requests.clear();
 
     if let Ok(mut text) = path_text.single_mut() {
         **text = dialog.dir.display().to_string();
@@ -245,7 +238,6 @@ fn refresh(
             }
         });
     }
-    println!("File dialog refreshed.");
 }
 
 fn file_name(p: &std::path::Path) -> String {
@@ -289,11 +281,12 @@ fn entry_row(
 fn navigate(
     clicks: Query<(&Interaction, &DirButton), Changed<Interaction>>,
     mut dialog: ResMut<FileDialog>,
+    mut refresh_req: MessageWriter<RefreshFileList>,
 ) {
     for (interaction, dir) in &clicks {
         if *interaction == Interaction::Pressed {
             dialog.dir = dir.0.clone();
-            dialog.dirty = true;
+            refresh_req.write(RefreshFileList);
         }
     }
 }
@@ -304,7 +297,7 @@ fn choose(
     mut dialog: ResMut<FileDialog>,
     mut chosen: MessageWriter<FileChosen>,
     roots: Query<Entity, With<FileDialogRoot>>,
-    mut next_state: ResMut<NextState<FileDialogState>>,
+    next_state: ResMut<NextState<FileDialogState>>,
     mut commands: Commands,
 ) {
     for (interaction, file) in &clicks {
@@ -323,7 +316,7 @@ fn cancel_click(
     clicks: Query<&Interaction, (Changed<Interaction>, With<DialogCancelButton>)>,
     mut dialog: ResMut<FileDialog>,
     roots: Query<Entity, With<FileDialogRoot>>,
-    mut next_state: ResMut<NextState<FileDialogState>>,
+    next_state: ResMut<NextState<FileDialogState>>,
     mut commands: Commands,
 ) {
     if clicks.iter().any(|i| *i == Interaction::Pressed) {
@@ -337,19 +330,17 @@ fn dialog_keys(
     mut keyboard: ResMut<ButtonInput<KeyCode>>,
     mut dialog: ResMut<FileDialog>,
     roots: Query<Entity, With<FileDialogRoot>>,
-    mut next_state: ResMut<NextState<FileDialogState>>,
+    next_state: ResMut<NextState<FileDialogState>>,
+    mut refresh_req: MessageWriter<RefreshFileList>,
     mut commands: Commands,
 ) {
-    if !dialog.open {
-        return;
-    }
     if keyboard.just_pressed(KeyCode::Escape) {
         keyboard.clear_just_pressed(KeyCode::Escape);
-        close(&mut dialog, &roots, next_state, &mut commands, );
+        close(&mut dialog, &roots, next_state, &mut commands);
     } else if keyboard.just_pressed(KeyCode::Backspace) {
         if let Some(parent) = dialog.dir.parent() {
             dialog.dir = parent.to_path_buf();
-            dialog.dirty = true;
+            refresh_req.write(RefreshFileList);
         }
     }
 }
@@ -374,6 +365,7 @@ impl Plugin for DialogsPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<OpenFileDialog>()
             .add_message::<FileChosen>()
+            .add_message::<RefreshFileList>()
             .init_resource::<FileDialog>()
             .init_state::<FileDialogState>()
             .add_systems(

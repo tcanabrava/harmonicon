@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 use crate::song::harmonica::Harmonica;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HarpChart {
     pub metadata: Option<Metadata>,
     pub song: Song,
@@ -17,7 +17,7 @@ pub struct HarpChart {
     pub fx_mapping: Option<HashMap<String, String>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     pub format_version: Option<String>,
     pub author: Option<String>,
@@ -26,7 +26,7 @@ pub struct Metadata {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Song {
     pub title: String,
     pub artist: String,
@@ -36,7 +36,7 @@ pub struct Song {
     pub difficulty: Difficulty,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Difficulty {
     Easy,
@@ -45,39 +45,39 @@ pub enum Difficulty {
     Expert,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Timing {
     pub resolution: u32,
     pub tempo_map: Vec<TempoPoint>,
     pub time_signature_map: Option<Vec<TimeSigPoint>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TempoPoint {
     pub tick: u64,
     pub bpm: f32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeSigPoint {
     pub tick: u64,
     pub time_signature: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BendingProfile {
     RichterStandard,
     CountryTuned,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiatonicLayout {
     pub blow: Option<Vec<String>>,
     pub draw: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChromaticLayout {
     pub blow: Option<Vec<String>>,
     pub draw: Option<Vec<String>>,
@@ -85,7 +85,7 @@ pub struct ChromaticLayout {
     pub draw_slide: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackItem {
     pub id: Option<String>,
     pub time: Option<f64>,
@@ -97,7 +97,7 @@ pub struct TrackItem {
     pub events: Vec<NoteEvent>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PlayMode {
     Single,
@@ -105,7 +105,7 @@ pub enum PlayMode {
     Split,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoteEvent {
     pub hole: u8,
     pub action: Action,
@@ -113,14 +113,14 @@ pub struct NoteEvent {
     pub modifiers: Option<Vec<Modifier>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Action {
     Blow,
     Draw,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Modifier {
     #[serde(rename = "bend")]
@@ -144,7 +144,7 @@ pub enum Modifier {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoopSection {
     pub start_index: usize,
     pub end_index: usize,
@@ -153,7 +153,7 @@ pub struct LoopSection {
     pub repeat: Option<bool>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LoopType {
     Intro,
@@ -164,7 +164,7 @@ pub enum LoopType {
     Full,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scoring {
     pub perfect_window_ms: u32,
     pub good_window_ms: u32,
@@ -173,7 +173,7 @@ pub struct Scoring {
     pub style_bonus: Option<HashMap<String, f32>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Combo {
     pub enabled: bool,
     pub base_multiplier: f32,

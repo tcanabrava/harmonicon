@@ -18,7 +18,12 @@ use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
 use crate::assets_management::GlobalFonts;
 use crate::dialogs::{DialogId, FileChosen, FileDialog, OpenFileDialog};
-use crate::song::harmonica::twelve_bar;
+use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
+use crate::song::chart::{
+    Action, BendingProfile, DiatonicLayout, Difficulty, HarpChart, Modifier, NoteEvent, Scoring,
+    Song, TempoPoint, Timing, TrackItem,
+};
+use crate::song::harmonica::{Harmonica, twelve_bar};
 
 use super::AppState;
 
@@ -87,15 +92,14 @@ impl NoteMod {
         }
     }
 
-    /// The chart-format JSON for this modifier (sensible default parameters).
-    fn json(self) -> serde_json::Value {
-        use serde_json::json;
+    /// The chart-format modifier for this technique (sensible default params).
+    fn to_modifier(self) -> Modifier {
         match self {
-            NoteMod::Bend => json!({ "type": "bend", "semitones": -1.0 }),
-            NoteMod::Overblow => json!({ "type": "overblow" }),
-            NoteMod::Overdraw => json!({ "type": "overdraw" }),
-            NoteMod::Vibrato => json!({ "type": "vibrato", "oscillation_hz": 5.0 }),
-            NoteMod::WahWah => json!({ "type": "wah-wah", "oscillation_hz": 4.0 }),
+            NoteMod::Bend => Modifier::Bend { semitones: -1.0, intensity: None },
+            NoteMod::Overblow => Modifier::Overblow,
+            NoteMod::Overdraw => Modifier::Overdraw,
+            NoteMod::Vibrato => Modifier::Vibrato { oscillation_hz: 5.0, intensity: None },
+            NoteMod::WahWah => Modifier::WahWah { oscillation_hz: 4.0, intensity: None },
         }
     }
 }
@@ -710,7 +714,10 @@ fn build_grid(parent: &mut ChildSpawnerCommands, data: &SongEditorData, fonts: &
                     let bar_global = page * 12 + col;
                     let empty = Vec::new();
                     let bar_notes = bars.get(bar_global).unwrap_or(&empty);
-                    build_bar_cell(row, col + 1, &chords[col], bar_notes, data, bpb, fonts);
+                    // Reuse the gameplay grid's I/IV/V chord colouring so the
+                    // editor preview matches the real 12-bar blues view.
+                    let bg = bar_bg(col, &data.harp_key);
+                    build_bar_cell(row, col + 1, &chords[col], bg, bar_notes, data, bpb, fonts);
                 }
             });
     }
@@ -721,6 +728,7 @@ fn build_bar_cell(
     parent: &mut ChildSpawnerCommands,
     bar_num: usize,
     chord: &str,
+    bg: Color,
     note_indices: &[usize],
     data: &SongEditorData,
     beats_per_bar: usize,
@@ -737,7 +745,7 @@ fn build_bar_cell(
                 padding: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.10, 0.11, 0.15, 0.95)),
+            BackgroundColor(bg),
             BorderColor::all(Color::srgb(0.30, 0.32, 0.42)),
         ))
         .with_children(|cell| {
@@ -1411,9 +1419,9 @@ fn sanitize(name: &str) -> String {
     }
 }
 
-/// Build the `.harpchart` JSON from the editor state.
-fn build_chart_json(data: &SongEditorData) -> serde_json::Value {
-    use serde_json::json;
+/// Build a typed [`HarpChart`] from the editor state, reusing the `song::chart`
+/// definitions instead of hand-rolled JSON.
+fn build_chart(data: &SongEditorData) -> HarpChart {
     let bpm = bpm_of(data);
     let bpb = beats_per_bar_of(data);
     let beat_secs = 60.0 / bpm as f64;
@@ -1425,19 +1433,26 @@ fn build_chart_json(data: &SongEditorData) -> serde_json::Value {
         let dur = n.beats as f64 * beat_secs;
         // A rest is just a gap: advance the clock, emit no track item.
         if !n.rest {
-            let mut event = json!({
-                "hole": n.hole,
-                "action": if n.is_blow { "blow" } else { "draw" },
-            });
-            let mods: Vec<serde_json::Value> = NoteMod::ALL
+            let modifiers: Vec<Modifier> = NoteMod::ALL
                 .iter()
                 .filter(|m| n.mods & m.bit() != 0)
-                .map(|m| m.json())
+                .map(|m| m.to_modifier())
                 .collect();
-            if !mods.is_empty() {
-                event["modifiers"] = serde_json::Value::Array(mods);
-            }
-            track.push(json!({ "time": t, "duration": dur, "events": [event] }));
+            track.push(TrackItem {
+                id: None,
+                time: Some(t),
+                tick: None,
+                duration: dur,
+                phrase: None,
+                groove: None,
+                play_mode: None,
+                events: vec![NoteEvent {
+                    hole: n.hole,
+                    action: if n.is_blow { Action::Blow } else { Action::Draw },
+                    note: None,
+                    modifiers: (!modifiers.is_empty()).then_some(modifiers),
+                }],
+            });
         }
         t += dur;
     }
@@ -1445,26 +1460,60 @@ fn build_chart_json(data: &SongEditorData) -> serde_json::Value {
     let title = if data.song_name.trim().is_empty() { "Untitled" } else { data.song_name.trim() };
     let artist = if data.artist.trim().is_empty() { "Unknown" } else { data.artist.trim() };
 
-    json!({
-        "song": {
-            "title": title,
-            "artist": artist,
-            "tempo_bpm": bpm,
-            "key": data.harp_key,
-            "time_signature": format!("{bpb}/4"),
-            "difficulty": "easy",
+    HarpChart {
+        metadata: None,
+        song: Song {
+            title: title.to_string(),
+            artist: artist.to_string(),
+            tempo_bpm: bpm,
+            key: data.harp_key.clone(),
+            time_signature: Some(format!("{bpb}/4")),
+            difficulty: Difficulty::Easy,
         },
-        "timing": { "resolution": 480, "tempo_map": [ { "tick": 0, "bpm": bpm } ] },
-        "harmonica": {
-            "type": "diatonic",
-            "holes": 10,
-            "bending_profile": "richter_standard",
-            "position": "1st",
-            "layout": { "blow": blow, "draw": draw },
+        timing: Timing {
+            resolution: 480,
+            tempo_map: vec![TempoPoint { tick: 0, bpm }],
+            time_signature_map: None,
         },
-        "track": track,
-        "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 },
-    })
+        harmonica: Harmonica::Diatonic {
+            holes: 10,
+            bending_profile: BendingProfile::RichterStandard,
+            position: Some("1st".to_string()),
+            layout: Some(DiatonicLayout { blow: Some(blow), draw: Some(draw) }),
+        },
+        track,
+        loop_section: None,
+        scoring: Scoring {
+            perfect_window_ms: 50,
+            good_window_ms: 100,
+            miss_window_ms: 130,
+            combo: None,
+            style_bonus: None,
+        },
+        fx_mapping: None,
+    }
+}
+
+/// The chart as schema-clean JSON: serialize the typed chart, then drop `null`
+/// fields (unset optionals) so the output matches the song schema.
+fn build_chart_json(data: &SongEditorData) -> serde_json::Value {
+    let mut value = serde_json::to_value(build_chart(data)).unwrap_or(serde_json::Value::Null);
+    strip_nulls(&mut value);
+    value
+}
+
+/// Recursively remove `null`-valued object entries.
+fn strip_nulls(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.retain(|_, v| !v.is_null());
+            for v in map.values_mut() {
+                strip_nulls(v);
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(strip_nulls),
+        _ => {}
+    }
 }
 
 /// Write the song to `assets/songs/<artist>/<song>/`: the chart, a copy of the

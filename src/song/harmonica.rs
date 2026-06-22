@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::song::chart::{Action, BendingProfile};
 
@@ -10,7 +10,7 @@ use crate::audio_system::midi::{midi_to_note, note_to_midi};
 
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Harmonica {
     Diatonic {
