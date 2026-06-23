@@ -22,12 +22,19 @@ pub enum PitchAlgorithm {
     Fft,
     /// YIN cumulative-mean-difference detector. Monophonic (one pitch).
     Yin,
+    /// Probabilistic YIN: aggregates YIN over a Beta-weighted range of
+    /// thresholds. Monophonic (one pitch).
+    Pyin,
 }
 
 impl PitchAlgorithm {
     /// All selectable algorithms, in display order.
     pub fn all() -> &'static [PitchAlgorithm] {
-        &[PitchAlgorithm::Fft, PitchAlgorithm::Yin]
+        &[
+            PitchAlgorithm::Fft,
+            PitchAlgorithm::Yin,
+            PitchAlgorithm::Pyin,
+        ]
     }
 
     /// Short label for the Options selector.
@@ -35,6 +42,7 @@ impl PitchAlgorithm {
         match self {
             PitchAlgorithm::Fft => "FFT",
             PitchAlgorithm::Yin => "YIN",
+            PitchAlgorithm::Pyin => "pYIN",
         }
     }
 }
@@ -159,6 +167,7 @@ pub fn analyze(
     let pitches = match algorithm {
         PitchAlgorithm::Fft => pitches_from_magnitudes(&magnitudes, freq_res),
         PitchAlgorithm::Yin => mono_pitch(yin_pitch(samples, sample_rate)),
+        PitchAlgorithm::Pyin => mono_pitch(pyin_pitch(samples, sample_rate)),
     };
 
     Analysis {
@@ -275,6 +284,16 @@ const YIN_THRESHOLD: f32 = 0.15;
 /// Estimate the fundamental frequency of `samples` with YIN, or `None` if the
 /// block is too short or has no clear pitch in the harmonica range.
 fn yin_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    let (cmnd, tau_min, tau_max) = yin_cmnd(samples, sample_rate)?;
+    // First τ whose d' dips below the absolute threshold (no dip → unvoiced).
+    let tau = first_dip_below(&cmnd, tau_min, tau_max, YIN_THRESHOLD)?;
+    cmnd_to_freq(&cmnd, tau, sample_rate)
+}
+
+/// Build YIN's cumulative-mean-normalized difference function d'(τ) over the
+/// harmonica's τ range. Returns `(d', tau_min, tau_max)`, or `None` if the
+/// block is too short. Shared by YIN and pYIN.
+fn yin_cmnd(samples: &[f32], sample_rate: u32) -> Option<(Vec<f32>, usize, usize)> {
     let sr = sample_rate as f32;
     let tau_min = ((sr / MAX_FREQ).floor() as usize).max(2);
     let tau_max = (sr / MIN_FREQ).ceil() as usize;
@@ -285,7 +304,6 @@ fn yin_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
     // Comparison window: each τ compares this many sample pairs.
     let w = n - tau_max;
 
-    // Step 1+2: difference function d(τ) and its cumulative mean normalization.
     // d'(τ) = d(τ) · τ / Σ_{j=1..τ} d(j); d'(0) ≡ 1.
     let mut cmnd = vec![1.0f32; tau_max + 1];
     let mut running = 0.0f32;
@@ -302,27 +320,71 @@ fn yin_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
             1.0
         };
     }
+    Some((cmnd, tau_min, tau_max))
+}
 
-    // Step 3: first τ (in range) whose d' dips below the threshold, descended to
-    // the bottom of that dip. No dip → unvoiced / no clear pitch.
+/// First τ in `[tau_min, tau_max]` whose d' dips below `threshold`, descended to
+/// the bottom of that dip. `None` if it never crosses the threshold.
+fn first_dip_below(cmnd: &[f32], tau_min: usize, tau_max: usize, threshold: f32) -> Option<usize> {
     let mut tau = tau_min;
-    let mut found = None;
     while tau <= tau_max {
-        if cmnd[tau] < YIN_THRESHOLD {
+        if cmnd[tau] < threshold {
             while tau + 1 <= tau_max && cmnd[tau + 1] < cmnd[tau] {
                 tau += 1;
             }
-            found = Some(tau);
-            break;
+            return Some(tau);
         }
         tau += 1;
     }
-    let tau = found?;
+    None
+}
 
-    // Step 4: parabolic interpolation around the dip for sub-sample accuracy.
-    let refined = parabolic_min(&cmnd, tau);
-    let f0 = sr / refined;
+/// Parabolic-refine the chosen lag and convert to a frequency, gated to the
+/// harmonica range.
+fn cmnd_to_freq(cmnd: &[f32], tau: usize, sample_rate: u32) -> Option<f32> {
+    let refined = parabolic_min(cmnd, tau);
+    let f0 = sample_rate as f32 / refined;
     (MIN_FREQ..=MAX_FREQ).contains(&f0).then_some(f0)
+}
+
+// ── pYIN (probabilistic YIN) ──────────────────────────────────────────────────
+//
+// pYIN (Mauch & Dixon, 2014) runs YIN under many thresholds rather than one,
+// weighting each by a prior, to get a distribution over pitch candidates. The
+// full method then tracks the best path across frames with an HMM; here
+// `analyze` is stateless per audio chunk, so we keep pYIN's per-frame core
+// (Beta-weighted threshold sweep) and pick the most probable candidate.
+
+// Number of thresholds swept across (0, 1).
+const PYIN_THRESHOLDS: usize = 100;
+
+/// Estimate f0 with the per-frame pYIN threshold sweep, or `None` if no
+/// candidate accumulates any probability.
+fn pyin_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    let (cmnd, tau_min, tau_max) = yin_cmnd(samples, sample_rate)?;
+
+    // Accumulate prior probability onto whichever τ each threshold selects.
+    let mut prob = vec![0.0f32; tau_max + 1];
+    for k in 0..PYIN_THRESHOLDS {
+        let threshold = (k as f32 + 0.5) / PYIN_THRESHOLDS as f32;
+        if let Some(tau) = first_dip_below(&cmnd, tau_min, tau_max, threshold) {
+            prob[tau] += beta_weight(threshold);
+        }
+    }
+
+    let best = (tau_min..=tau_max)
+        .max_by(|&a, &b| prob[a].partial_cmp(&prob[b]).unwrap_or(std::cmp::Ordering::Equal))?;
+    if prob[best] <= 0.0 {
+        return None;
+    }
+    cmnd_to_freq(&cmnd, best, sample_rate)
+}
+
+/// Unnormalized Beta(2, 18) density — pYIN's default prior over the YIN
+/// threshold (mean ≈ 0.1). The B(a,b) constant is dropped since only relative
+/// weights matter.
+fn beta_weight(s: f32) -> f32 {
+    s * (1.0 - s).powi(17)
 }
 
 /// Sub-sample lag refinement: fit a parabola to d'(τ-1..τ+1) and return its
@@ -420,6 +482,22 @@ mod tests {
     fn yin_rejects_silence_and_noise() {
         // Flat silence: no period.
         assert_eq!(yin_pitch(&vec![0.0f32; 4096], 44100), None);
+    }
+
+    #[test]
+    fn pyin_detects_440hz() {
+        let sample_rate = 44100u32;
+        let n = 4096;
+        let samples: Vec<f32> = (0..n)
+            .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+        let f0 = pyin_pitch(&samples, sample_rate).expect("expected a pitch");
+        assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
+    }
+
+    #[test]
+    fn pyin_rejects_silence() {
+        assert_eq!(pyin_pitch(&vec![0.0f32; 4096], 44100), None);
     }
 
     #[test]
