@@ -101,8 +101,6 @@ impl Plugin for MenuPlugin {
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
-            // UiWidgetsPlugins (Button → Activate, Slider → ValueChange) is
-            // already registered by DefaultPlugins via the `ui` feature.
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(ButtonMaterialPlugin)
             .add_plugins(options::OptionsPlugin)
@@ -122,9 +120,6 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::SongList), cleanup_menu)
             .add_systems(OnEnter(MenuPage::ModeSelect), setup_mode_select)
             .add_systems(OnExit(MenuPage::ModeSelect), cleanup_menu)
-            // Button clicks/hover are wired per-button as observers in
-            // `spawn_button`, so there's no central interaction system here.
-            // Wait for the asset to finish loading before starting gameplay.
             .add_systems(
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
