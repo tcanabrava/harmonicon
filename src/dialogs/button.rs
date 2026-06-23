@@ -30,6 +30,9 @@ pub fn default<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointe
             min_width: {Val::Px(220.0)},
             padding: {UiRect::axes(Val::Px(28.0), Val::Px(12.0))},
             justify_content: {JustifyContent::Center},
+            // Keep natural size inside height-constrained scroll lists (the file
+            // dialog) instead of being compressed to fit.
+            flex_shrink: {0.0},
         }
         Children [
             (

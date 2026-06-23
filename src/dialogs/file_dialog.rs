@@ -17,6 +17,7 @@ use std::path::PathBuf;
 
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy::ui_widgets::ScrollArea;
 
 use crate::dialogs::button;
 
@@ -164,11 +165,13 @@ fn handle_open(
                     row_gap: {Val::Px(2.0)},
                     width: {Val::Px(640.0)},
                     max_height: {Val::Percent(64.0)},
-                    overflow: {Overflow::clip()},
+                    overflow: {Overflow::scroll_y()},
                     padding: {UiRect::all(Val::Px(6.0))},
                 }
                 BackgroundColor({PANEL_BG})
                 FileDialogList
+                // Wheel/trackpad scrolling for the (potentially long) entry list.
+                ScrollArea
             ),
             (
                 Button
