@@ -8,6 +8,8 @@
 
 use bevy::{
     camera::visibility::RenderLayers,
+    picking::Pickable,
+    picking::events::{Click, Out, Over, Pointer},
     prelude::*,
 };
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
@@ -15,6 +17,9 @@ use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use crate::assets_management::{GlobalFonts, SelectedHarmonicaModel};
 
 use super::AppState;
+
+const BACK_IDLE: Color = Color::srgba(0.10, 0.10, 0.18, 0.90);
+const BACK_HOVER: Color = Color::srgba(0.18, 0.18, 0.30, 0.95);
 
 // The credits 3D scene lives on its own render layer so it never touches the
 // gameplay or options-preview layers.
@@ -29,7 +34,7 @@ const SCROLL_START: f32 = 1000.0;
 // ── Components ────────────────────────────────────────────────────────────────
 
 /// Marks every entity that belongs to the credits screen.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct CreditsRoot;
 
 /// The rotating harmonica in the 3D background.
@@ -48,10 +53,6 @@ struct CreditsScroll {
     offset: f32,
 }
 
-/// The fixed "Back to Menu" button.
-#[derive(Component)]
-struct CreditsBackButton;
-
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 pub struct CreditsPlugin;
@@ -67,7 +68,6 @@ impl Plugin for CreditsPlugin {
                     scroll_credits,
                     propagate_scene_layers,
                     handle_input,
-                    back_button_hover,
                 )
                     .run_if(in_state(AppState::Credits)),
             );
@@ -211,30 +211,35 @@ fn spawn_ui(commands: &mut Commands, fonts: &GlobalFonts) {
         }
     });
 
-    // "Back to Menu" button — fixed at the bottom-right of the overlay.
-    commands
-        .spawn((
-            Button,
-            Node {
-                position_type: PositionType::Absolute,
-                bottom: Val::Px(20.0),
-                right: Val::Px(20.0),
-                padding: UiRect::axes(Val::Px(22.0), Val::Px(10.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.10, 0.10, 0.18, 0.90)),
-            GlobalZIndex(20),
-            CreditsBackButton,
-            CreditsRoot,
-        ))
-        .with_children(|b| {
-            b.spawn((
-                Text::new("\u{2190} Back to Menu"),
-                TextFont { font_size: FontSize::Px(18.0), font: font.clone(), ..default() },
-                TextColor(Color::srgb(0.75, 0.78, 0.90)),
-            ));
-        });
+    // "Back to Menu" button — fixed at the bottom-right of the overlay. Its
+    // click/hover behaviour rides along as inline on(...) observers. (Default
+    // font: bsn! can't set TextFont.font in 0.19.)
+    commands.spawn_scene(bsn! {
+        Button
+        Node {
+            position_type: {PositionType::Absolute},
+            bottom: {Val::Px(20.0)},
+            right: {Val::Px(20.0)},
+            padding: {UiRect::axes(Val::Px(22.0), Val::Px(10.0))},
+            justify_content: {JustifyContent::Center},
+        }
+        BackgroundColor({BACK_IDLE})
+        GlobalZIndex(20)
+        CreditsRoot
+        on(|_: On<Pointer<Click>>, mut next_state: ResMut<NextState<AppState>>| {
+            next_state.set(AppState::Menu);
+        })
+        on(back_over)
+        on(back_out)
+        Children [
+            (
+                Text({"\u{2190} Back to Menu".to_string()})
+                TextFont { font_size: {FontSize::Px(18.0)} }
+                TextColor({Color::srgb(0.75, 0.78, 0.90)})
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    });
 }
 
 // ── Credit line definitions ───────────────────────────────────────────────────
@@ -430,30 +435,24 @@ fn propagate_scene_layers(
     }
 }
 
+/// Esc leaves the credits screen (the Back button does it via its own on()).
 fn handle_input(
     keyboard: Res<ButtonInput<KeyCode>>,
-    back_buttons: Query<&Interaction, (Changed<Interaction>, With<CreditsBackButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     if keyboard.just_pressed(KeyCode::Escape) {
         next_state.set(AppState::Menu);
-        return;
-    }
-    for interaction in &back_buttons {
-        if *interaction == Interaction::Pressed {
-            next_state.set(AppState::Menu);
-        }
     }
 }
 
-fn back_button_hover(
-    mut buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<CreditsBackButton>)>,
-) {
-    for (interaction, mut bg) in &mut buttons {
-        bg.0 = match interaction {
-            Interaction::Pressed => Color::srgba(0.25, 0.25, 0.40, 0.95),
-            Interaction::Hovered => Color::srgba(0.18, 0.18, 0.30, 0.95),
-            Interaction::None   => Color::srgba(0.10, 0.10, 0.18, 0.90),
-        };
+fn back_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(BACK_HOVER);
+    }
+}
+
+fn back_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(BACK_IDLE);
     }
 }
