@@ -5,7 +5,7 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-bevy = { version = "0.19.0", features = ["dev"] }
+bevy = { version = "0.19.0", features = ["dev", "dynamic_linking"] }
 cpal = "0.15"
 rustfft = "6.4"
 crossbeam-channel = "0.5"
@@ -23,13 +23,6 @@ pulldown-cmark = { version = "0.12", default-features = false }
 # Window icon: winit must match Bevy's version; image decodes the PNG.
 winit = "0.30"
 image = { version = "0.25", default-features = false, features = ["png"] }
-
-[dependencies.bevy-inspector-egui]
-version = "0.36"
-optional = true
-
-[features]
-inspector = ["bevy-inspector-egui"]
 
 [[bin]]
 name = "hole-editor"

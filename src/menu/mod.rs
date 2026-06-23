@@ -128,6 +128,8 @@ impl Plugin for MenuPlugin {
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
+            // Headless widget logic (Button → Activate, Slider → ValueChange, …).
+            .add_plugins(UiWidgetsPlugins)
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(ButtonMaterialPlugin)
             .add_plugins(options::OptionsPlugin)
