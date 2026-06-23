@@ -128,7 +128,7 @@ pub fn analyze(samples: &[f32], sample_rate: u32, state: &mut FftState) -> Analy
 
 /// Peak-picks fundamentals from a precomputed magnitude spectrum.
 fn pitches_from_magnitudes(magnitudes: &[f32], freq_res: f32) -> Vec<PitchInfo> {
-    let half = magnitudes.len();
+    let n_bins = magnitudes.len();
     let max_mag = magnitudes.iter().cloned().fold(0.0f32, f32::max);
     if max_mag < 1e-9 || freq_res <= 0.0 {
         return vec![];
@@ -136,7 +136,7 @@ fn pitches_from_magnitudes(magnitudes: &[f32], freq_res: f32) -> Vec<PitchInfo> 
 
     let threshold = max_mag * PEAK_THRESHOLD_RATIO;
     let min_bin = (MIN_FREQ / freq_res) as usize;
-    let max_bin = ((MAX_FREQ / freq_res) as usize).min(half.saturating_sub(2));
+    let max_bin = ((MAX_FREQ / freq_res) as usize).min(n_bins.saturating_sub(2));
 
     // Collect local maxima — use parabolic interpolation for sub-bin accuracy.
     let mut raw_peaks: Vec<(f32, f32)> = Vec::new();
