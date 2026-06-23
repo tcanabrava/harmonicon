@@ -9,7 +9,6 @@ use crate::{
     song::SongManifest,
     song::chart::{Action, Modifier, PlayMode},
     song::harmonica::twelve_bar,
-    song::NoteHeadRect,
     song::NoteThemeConfig,
 };
 

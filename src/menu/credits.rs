@@ -8,18 +8,15 @@
 
 use bevy::{
     camera::visibility::RenderLayers,
-    picking::Pickable,
-    picking::events::{Click, Out, Over, Pointer},
+    picking::events::{Click, Pointer},
     prelude::*,
 };
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 use crate::assets_management::{GlobalFonts, SelectedHarmonicaModel};
+use crate::dialogs::button;
 
 use super::AppState;
-
-const BACK_IDLE: Color = Color::srgba(0.10, 0.10, 0.18, 0.90);
-const BACK_HOVER: Color = Color::srgba(0.18, 0.18, 0.30, 0.95);
 
 // The credits 3D scene lives on its own render layer so it never touches the
 // gameplay or options-preview layers.
@@ -214,32 +211,10 @@ fn spawn_ui(commands: &mut Commands, fonts: &GlobalFonts) {
     // "Back to Menu" button — fixed at the bottom-right of the overlay. Its
     // click/hover behaviour rides along as inline on(...) observers. (Default
     // font: bsn! can't set TextFont.font in 0.19.)
-    commands.spawn_scene(bsn! {
-        Button
-        Node {
-            position_type: {PositionType::Absolute},
-            bottom: {Val::Px(20.0)},
-            right: {Val::Px(20.0)},
-            padding: {UiRect::axes(Val::Px(22.0), Val::Px(10.0))},
-            justify_content: {JustifyContent::Center},
-        }
-        BackgroundColor({BACK_IDLE})
-        GlobalZIndex(20)
-        CreditsRoot
-        on(|_: On<Pointer<Click>>, mut next_state: ResMut<NextState<AppState>>| {
+    commands.spawn_scene(button::default("Back to Menu",
+        |_: On<Pointer<Click>>, mut next_state: ResMut<NextState<AppState>>| {
             next_state.set(AppState::Menu);
-        })
-        on(back_over)
-        on(back_out)
-        Children [
-            (
-                Text({"\u{2190} Back to Menu".to_string()})
-                TextFont { font_size: {FontSize::Px(18.0)} }
-                TextColor({Color::srgb(0.75, 0.78, 0.90)})
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-            )
-        ]
-    });
+        }));
 }
 
 // ── Credit line definitions ───────────────────────────────────────────────────
@@ -442,17 +417,5 @@ fn handle_input(
 ) {
     if keyboard.just_pressed(KeyCode::Escape) {
         next_state.set(AppState::Menu);
-    }
-}
-
-fn back_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(BACK_HOVER);
-    }
-}
-
-fn back_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(BACK_IDLE);
     }
 }

@@ -4,17 +4,12 @@
 //! toggled with Escape. Shares the gameplay [`Paused`] flag (every gameplay
 //! chain gates on it) and pauses/resumes the song's audio sink.
 
-use bevy::ecs::system::IntoObserverSystem;
-use bevy::picking::Pickable;
-use bevy::picking::events::{Click, Out, Over, Pointer};
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use crate::menu::{AppState, ReturnToSongList};
 use crate::dialogs::button;
 use super::{GameplayRoot, MusicPlayer, Paused};
-
-const BTN_IDLE: Color = Color::srgb(0.14, 0.14, 0.22);
-const BTN_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 /// Root of the pause overlay; toggled between hidden/visible.
 #[derive(Component, Default, Clone)]

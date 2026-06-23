@@ -2,14 +2,12 @@
 
 //! Post-song results screen: the hit breakdown and a letter grade.
 
-use bevy::ecs::system::IntoObserverSystem;
-use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::assets_management::GlobalFonts;
 use crate::menu::{AppState, ReturnToSongList};
-
+use crate::dialogs::button;
 use crate::settings::AudioSettings;
 
 use super::{Score, SongStats};
@@ -195,40 +193,11 @@ pub(super) fn setup(
             })
             .with_children(|row| {
                 row.spawn_empty()
-                    .apply_scene(results_button("Retry".to_string(), on_retry));
+                    .apply_scene(button::default("Retry", on_retry));
                 row.spawn_empty()
-                    .apply_scene(results_button("Continue".to_string(), on_continue));
+                    .apply_scene(button::default("Continue", on_continue));
             });
         });
-}
-
-/// One results button: shared shell + label, wired with its own dedicated
-/// click callback and the shared hover highlight — all inline `on(...)`.
-/// (Default font: `bsn!` can't set `TextFont.font` in 0.19.)
-fn results_button<M: 'static>(
-    label: String,
-    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
-) -> impl Scene {
-    bsn! {
-        Button
-        Node {
-            min_width: {Val::Px(180.0)},
-            padding: {UiRect::axes(Val::Px(28.0), Val::Px(12.0))},
-            justify_content: {JustifyContent::Center},
-        }
-        BackgroundColor({BTN_IDLE})
-        on(on_click)
-        on(highlight_on_over)
-        on(reset_on_out)
-        Children [
-            (
-                Text({label})
-                TextFont { font_size: {FontSize::Px(20.0)} }
-                TextColor({Color::WHITE})
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-            )
-        ]
-    }
 }
 
 fn spawn_text_row(
@@ -324,18 +293,6 @@ fn on_continue(
 ) {
     return_to_song_list.0 = true;
     next_state.set(AppState::Menu);
-}
-
-fn highlight_on_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(BTN_HOVER);
-    }
-}
-
-fn reset_on_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(BTN_IDLE);
-    }
 }
 
 #[cfg(test)]

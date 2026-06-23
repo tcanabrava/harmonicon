@@ -435,18 +435,6 @@ fn cancel_calibration(
     next_state.set(AppState::Menu);
 }
 
-fn cal_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(CAL_HOVER);
-    }
-}
-
-fn cal_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(button::color_default());
-    }
-}
-
 // ── UI construction ───────────────────────────────────────────────────────────
 
 fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
@@ -681,33 +669,7 @@ fn spawn_cal_button<M: 'static>(
 ) {
     parent
         .spawn_empty()
-        .apply_scene(cal_button_scene(label.to_string(), on_click));
-}
-
-fn cal_button_scene<M: 'static>(
-    label: String,
-    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
-) -> impl Scene {
-    bsn! {
-        Button
-        Node {
-            min_width: {Val::Px(150.0)},
-            padding: {UiRect::axes(Val::Px(24.0), Val::Px(12.0))},
-            justify_content: {JustifyContent::Center},
-        }
-        BackgroundColor({button::color_default()})
-        on(on_click)
-        on(cal_over)
-        on(cal_out)
-        Children [
-            (
-                Text({label})
-                TextFont { font_size: {FontSize::Px(19.0)} }
-                TextColor({Color::WHITE})
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-            )
-        ]
-    }
+        .apply_scene(button::default(&label, on_click));
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
