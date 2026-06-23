@@ -25,6 +25,9 @@ pub enum PitchAlgorithm {
     /// Probabilistic YIN: aggregates YIN over a Beta-weighted range of
     /// thresholds. Monophonic (one pitch).
     Pyin,
+    /// McLeod Pitch Method (MPM): normalized square difference function with
+    /// key-maximum peak picking. Monophonic (one pitch).
+    Mcleod,
 }
 
 impl PitchAlgorithm {
@@ -34,6 +37,7 @@ impl PitchAlgorithm {
             PitchAlgorithm::Fft,
             PitchAlgorithm::Yin,
             PitchAlgorithm::Pyin,
+            PitchAlgorithm::Mcleod,
         ]
     }
 
@@ -43,6 +47,7 @@ impl PitchAlgorithm {
             PitchAlgorithm::Fft => "FFT",
             PitchAlgorithm::Yin => "YIN",
             PitchAlgorithm::Pyin => "pYIN",
+            PitchAlgorithm::Mcleod => "MPM",
         }
     }
 }
@@ -168,6 +173,7 @@ pub fn analyze(
         PitchAlgorithm::Fft => pitches_from_magnitudes(&magnitudes, freq_res),
         PitchAlgorithm::Yin => mono_pitch(yin_pitch(samples, sample_rate)),
         PitchAlgorithm::Pyin => mono_pitch(pyin_pitch(samples, sample_rate)),
+        PitchAlgorithm::Mcleod => mono_pitch(mpm_pitch(samples, sample_rate)),
     };
 
     Analysis {
@@ -342,7 +348,7 @@ fn first_dip_below(cmnd: &[f32], tau_min: usize, tau_max: usize, threshold: f32)
 /// Parabolic-refine the chosen lag and convert to a frequency, gated to the
 /// harmonica range.
 fn cmnd_to_freq(cmnd: &[f32], tau: usize, sample_rate: u32) -> Option<f32> {
-    let refined = parabolic_min(cmnd, tau);
+    let refined = parabolic_vertex(cmnd, tau);
     let f0 = sample_rate as f32 / refined;
     (MIN_FREQ..=MAX_FREQ).contains(&f0).then_some(f0)
 }
@@ -387,9 +393,9 @@ fn beta_weight(s: f32) -> f32 {
     s * (1.0 - s).powi(17)
 }
 
-/// Sub-sample lag refinement: fit a parabola to d'(τ-1..τ+1) and return its
-/// minimum's abscissa.
-fn parabolic_min(c: &[f32], tau: usize) -> f32 {
+/// Sub-sample lag refinement: fit a parabola to `c[τ-1..τ+1]` and return its
+/// vertex's abscissa (works for a dip in YIN/pYIN or a peak in MPM).
+fn parabolic_vertex(c: &[f32], tau: usize) -> f32 {
     if tau == 0 || tau + 1 >= c.len() {
         return tau as f32;
     }
@@ -400,6 +406,75 @@ fn parabolic_min(c: &[f32], tau: usize) -> f32 {
     } else {
         tau as f32 + 0.5 * (a - g) / denom
     }
+}
+
+// ── McLeod Pitch Method (MPM) ─────────────────────────────────────────────────
+//
+// MPM (McLeod & Wyvill, 2005): the normalized square difference function
+//   n(τ) = 2·Σ x[j]·x[j+τ] / Σ (x[j]² + x[j+τ]²)   ∈ [-1, 1]
+// peaks at periodic lags. We collect the "key maxima" (the highest point of each
+// positive hump after the τ=0 lobe) and pick the first whose clarity reaches
+// `MPM_CLARITY` of the strongest — favouring the fundamental over its octave.
+
+const MPM_CLARITY: f32 = 0.9;
+
+/// Estimate f0 with MPM, or `None` if the block is too short or no key maximum
+/// lands a clear pitch in the harmonica range.
+fn mpm_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    let sr = sample_rate as f32;
+    let tau_min = ((sr / MAX_FREQ).floor() as usize).max(2);
+    let tau_max = (sr / MIN_FREQ).ceil() as usize;
+    let n = samples.len();
+    if tau_max < tau_min || n < tau_max + 2 {
+        return None;
+    }
+
+    // Normalized square difference function over the τ range.
+    let mut nsdf = vec![0.0f32; tau_max + 1];
+    for tau in 0..=tau_max {
+        let mut acf = 0.0f32; // Σ x[j]·x[j+τ]
+        let mut norm = 0.0f32; // Σ x[j]² + x[j+τ]²
+        for j in 0..(n - tau) {
+            let (a, b) = (samples[j], samples[j + tau]);
+            acf += a * b;
+            norm += a * a + b * b;
+        }
+        nsdf[tau] = if norm > 0.0 { 2.0 * acf / norm } else { 0.0 };
+    }
+
+    // Key maxima: skip the τ=0 lobe, then take the peak of each positive hump.
+    let mut maxima: Vec<usize> = Vec::new();
+    let mut tau = 1;
+    while tau <= tau_max && nsdf[tau] > 0.0 {
+        tau += 1; // descend off the τ=0 lobe to the first negative
+    }
+    while tau <= tau_max {
+        while tau <= tau_max && nsdf[tau] <= 0.0 {
+            tau += 1; // skip to the next positive zero crossing
+        }
+        let mut best = tau;
+        while tau <= tau_max && nsdf[tau] > 0.0 {
+            if nsdf[tau] > nsdf[best] {
+                best = tau;
+            }
+            tau += 1;
+        }
+        if best >= tau_min && best <= tau_max {
+            maxima.push(best);
+        }
+    }
+
+    // Pick the first key maximum within MPM_CLARITY of the strongest one.
+    let strongest = maxima.iter().map(|&t| nsdf[t]).fold(f32::MIN, f32::max);
+    if strongest <= 0.0 {
+        return None;
+    }
+    let threshold = MPM_CLARITY * strongest;
+    let chosen = *maxima.iter().find(|&&t| nsdf[t] >= threshold)?;
+
+    let refined = parabolic_vertex(&nsdf, chosen);
+    let f0 = sr / refined;
+    (MIN_FREQ..=MAX_FREQ).contains(&f0).then_some(f0)
 }
 
 fn freq_to_note(freq: f32) -> Option<(String, i32)> {
@@ -498,6 +573,42 @@ mod tests {
     #[test]
     fn pyin_rejects_silence() {
         assert_eq!(pyin_pitch(&vec![0.0f32; 4096], 44100), None);
+    }
+
+    #[test]
+    fn mpm_detects_440hz() {
+        let sample_rate = 44100u32;
+        let n = 4096;
+        let samples: Vec<f32> = (0..n)
+            .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+        let f0 = mpm_pitch(&samples, sample_rate).expect("expected a pitch");
+        assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
+    }
+
+    #[test]
+    fn mpm_rejects_silence() {
+        assert_eq!(mpm_pitch(&vec![0.0f32; 4096], 44100), None);
+    }
+
+    #[test]
+    fn all_algorithms_agree_on_a_clean_tone() {
+        // A 330 Hz tone (E4) should read the same through every detector.
+        let sample_rate = 44100u32;
+        let n = 4096;
+        let samples: Vec<f32> = (0..n)
+            .map(|i| 0.4 * (2.0 * PI * 330.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+        let mut state = FftState::default();
+        for algo in PitchAlgorithm::all() {
+            let pitches = analyze(&samples, sample_rate, &mut state, *algo).pitches;
+            assert!(
+                pitches.iter().any(|p| p.note == "E" && p.octave == 4),
+                "{:?} should detect E4, got {:?}",
+                algo,
+                pitches
+            );
+        }
     }
 
     #[test]
