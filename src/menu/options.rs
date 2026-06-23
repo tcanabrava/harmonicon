@@ -9,11 +9,17 @@ use bevy::asset::RenderAssetUsages;
 use bevy::camera::RenderTarget;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::Pickable;
+use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use bevy::ui_widgets::{
     Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange, slider_self_update,
 };
+
+const TRACK_BG: Color = Color::srgb(0.14, 0.14, 0.22);
+const CHOICE_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
+const CHOICE_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 use crate::assets_management::{
     AvailableHarmonicas, GlobalFonts,
@@ -39,12 +45,14 @@ impl Plugin for OptionsPlugin {
             // Keep each slider's own SliderValue in sync as it's dragged or
             // stepped, so keyboard adjustment works from the current value.
             .add_observer(slider_self_update)
+            // Sliders and harmonica buttons carry their own change/click/hover
+            // behaviour as inline on(...) observers; these systems only mirror
+            // settings/selection onto the visuals.
             .add_systems(
                 Update,
                 (
                     update_sliders,
                     update_latency_slider,
-                    handle_harmonica_buttons,
                     harmonica_button_visuals,
                     propagate_preview_layers,
                 )
@@ -56,14 +64,15 @@ impl Plugin for OptionsPlugin {
 // ── Components ──────────────────────────────────────────────────────────────
 
 /// Which audio level a slider controls.
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Default)]
 enum VolumeSlider {
+    #[default]
     Music,
     Metronome,
 }
 
 /// The growing fill of a slider track; its width mirrors the bound level.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct SliderFill(VolumeSlider);
 
 /// The "NN%" readout beside a slider.
@@ -79,7 +88,7 @@ struct NoteTheme2dButton(String);
 struct NoteTheme3dButton(String);
 
 /// A harmonica-model choice button; carries the model name.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct HarmonicaButton(String);
 
 /// Marks a preview scene root (a `WorldAssetRoot`); the propagation system forces
@@ -89,11 +98,11 @@ struct HarmonicaButton(String);
 struct PreviewSceneLayer(RenderLayers);
 
 /// Marks the drag track of the input-latency slider.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct LatencySlider;
 
 /// The fill bar inside the latency slider track.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct LatencySliderFill;
 
 /// The "Xms" readout beside the latency slider.
@@ -115,6 +124,7 @@ fn setup_options_menu(
     font: Res<GlobalFonts>,
     settings: Res<AudioSettings>,
     harmonicas: Res<AvailableHarmonicas>,
+    selected_harmonica: Res<SelectedHarmonicaModel>,
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
     theme: Res<LoadedTheme>,
@@ -128,6 +138,7 @@ fn setup_options_menu(
         "Music",
         VolumeSlider::Music,
         settings.music_volume,
+        set_music_volume,
     );
     spawn_volume_slider(
         &mut commands,
@@ -136,6 +147,7 @@ fn setup_options_menu(
         "Metronome",
         VolumeSlider::Metronome,
         settings.metronome_volume,
+        set_metronome_volume,
     );
     spawn_latency_slider(
         &mut commands,
@@ -164,14 +176,12 @@ fn setup_options_menu(
         })
         .collect();
 
-    spawn_theme_row(
+    spawn_harmonica_row(
         &mut commands,
         root,
         &font.gameplay,
-        "Harmonica",
         &previews_harmonica,
-        Color::WHITE,
-        |n| HarmonicaButton(n.to_string()),
+        &selected_harmonica.0,
     );
 
     spawn_button(&mut commands, root, &font.gameplay, "Theme", MenuButton::Theme, &theme, &btn_mats, "Options");
@@ -179,17 +189,16 @@ fn setup_options_menu(
     spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats, "Options");
 }
 
-/// A labelled row of theme buttons, each showing a preview image above its name.
-/// `tint` colours the preview image (used to blow-tint the 2D PNGs; the 3D
-/// previews bake the tint in, so they pass white).
-fn spawn_theme_row<M: Bundle>(
+/// A labelled row of harmonica-model choice buttons, each showing a rendered
+/// preview above its name. Each button is a `bsn!` scene carrying its own
+/// dedicated "select this model" click callback plus hover; the row label keeps
+/// the custom font (imperative), which `bsn!` can't set in 0.19.
+fn spawn_harmonica_row(
     commands: &mut Commands,
     parent: Entity,
     font: &FontSource,
-    label: &str,
     previews: &[(Handle<Image>, String)],
-    tint: Color,
-    make: impl Fn(&str) -> M,
+    selected: &str,
 ) {
     let row = commands
         .spawn(Node {
@@ -206,7 +215,7 @@ fn spawn_theme_row<M: Bundle>(
                 width: Val::Px(110.0),
                 ..default()
             },
-            Text::new(label.to_string()),
+            Text::new("Harmonica"),
             TextFont {
                 font_size: FontSize::Px(20.0),
                 font: font.clone(),
@@ -215,45 +224,51 @@ fn spawn_theme_row<M: Bundle>(
             TextColor(Color::WHITE),
         ));
         for (image, name) in previews {
-            r.spawn((
-                Button,
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
-                    row_gap: Val::Px(4.0),
-                    ..default()
-                },
-                BackgroundColor(btn_default()),
-                make(name),
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Node {
-                        width: Val::Px(54.0),
-                        height: Val::Px(54.0),
-                        ..default()
-                    },
-                    ImageNode {
-                        image: image.clone(),
-                        color: tint,
-                        ..default()
-                    },
-                ));
-                b.spawn((
-                    Text::new(name.clone()),
-                    TextFont {
-                        font_size: FontSize::Px(16.0),
-                        font: font.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                ));
-            });
+            let is_selected = name == selected;
+            r.spawn_empty()
+                .apply_scene(harmonica_button_scene(image.clone(), name.clone(), is_selected));
         }
     });
 
     commands.entity(parent).add_child(row);
+}
+
+/// One harmonica choice button: preview image + name, its dedicated "select
+/// this model" click callback (capturing the name), and hover — all inline
+/// `on(...)`. (Default font for the name label: `bsn!` can't set it in 0.19.)
+fn harmonica_button_scene(image: Handle<Image>, name: String, is_selected: bool) -> impl Scene {
+    let color = if is_selected { CHOICE_SELECTED } else { btn_default() };
+    let label = name.clone();
+    let pick = name.clone();
+    bsn! {
+        Button
+        Node {
+            flex_direction: {FlexDirection::Column},
+            align_items: {AlignItems::Center},
+            padding: {UiRect::axes(Val::Px(8.0), Val::Px(6.0))},
+            row_gap: {Val::Px(4.0)},
+        }
+        BackgroundColor({color})
+        HarmonicaButton({name})
+        on(move |_: On<Pointer<Click>>, mut selected: ResMut<SelectedHarmonicaModel>| {
+            selected.0 = pick.clone();
+        })
+        on(harm_over)
+        on(harm_out)
+        Children [
+            (
+                Node { width: {Val::Px(54.0)}, height: {Val::Px(54.0)} }
+                ImageNode { image: {image}, color: {Color::WHITE} }
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            ),
+            (
+                Text({label})
+                TextFont { font_size: {FontSize::Px(16.0)} }
+                TextColor({Color::WHITE})
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
 }
 
 // ── 3D model previews (render-to-texture) ──────────────────────────────────────
@@ -362,54 +377,76 @@ fn propagate_preview_layers(
     }
 }
 
-/// Apply a clicked harmonica button to the selected-model resource.
-fn handle_harmonica_buttons(
-    buttons: Query<(&Interaction, &HarmonicaButton), Changed<Interaction>>,
-    mut selected: ResMut<SelectedHarmonicaModel>,
+/// Hover highlight for harmonica buttons, never overriding the green selection.
+fn harm_over(
+    ev: On<Pointer<Over>>,
+    selected: Res<SelectedHarmonicaModel>,
+    mut buttons: Query<(&HarmonicaButton, &mut BackgroundColor)>,
 ) {
-    for (interaction, button) in &buttons {
-        if *interaction == Interaction::Pressed {
-            selected.0 = button.0.clone();
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
+        if btn.0 != selected.0 {
+            *bg = BackgroundColor(CHOICE_HOVER);
         }
     }
 }
 
-/// Highlight the selected harmonica button; the rest follow normal hover styling.
+fn harm_out(
+    ev: On<Pointer<Out>>,
+    selected: Res<SelectedHarmonicaModel>,
+    mut buttons: Query<(&HarmonicaButton, &mut BackgroundColor)>,
+) {
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
+        if btn.0 != selected.0 {
+            *bg = BackgroundColor(btn_default());
+        }
+    }
+}
+
+/// Recolour the harmonica buttons when the selection changes (green = chosen).
 fn harmonica_button_visuals(
     selected: Res<SelectedHarmonicaModel>,
-    mut buttons: Query<(&Interaction, &HarmonicaButton, &mut BackgroundColor)>,
+    mut buttons: Query<(&HarmonicaButton, &mut BackgroundColor)>,
 ) {
-    for (interaction, button, mut bg) in &mut buttons {
-        *bg = BackgroundColor(choice_button_color(button.0 == selected.0, interaction));
+    if !selected.is_changed() {
+        return;
+    }
+    for (button, mut bg) in &mut buttons {
+        bg.0 = if button.0 == selected.0 {
+            CHOICE_SELECTED
+        } else {
+            btn_default()
+        };
     }
 }
 
-/// Background colour for a selector button: a green tint when it's the current
-/// choice, otherwise the usual hover styling.
-fn choice_button_color(selected: bool, interaction: &Interaction) -> Color {
-    if selected {
-        Color::srgb(0.25, 0.45, 0.30)
-    } else {
-        match interaction {
-            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
-            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-            Interaction::None => btn_default(),
-        }
-    }
+// ── Dedicated slider callbacks ────────────────────────────────────────────────
+
+fn set_music_volume(ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSettings>) {
+    settings.music_volume = ev.value;
+}
+
+fn set_metronome_volume(ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSettings>) {
+    settings.metronome_volume = ev.value;
+}
+
+fn set_input_latency(ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSettings>) {
+    settings.input_latency_ms = ev.value.round() as i32;
 }
 
 // ── Volume sliders ──────────────────────────────────────────────────────────
 
-/// One labelled slider row: `<name>  [====       ]  NN%`. The track is a `Button`
-/// so it reports `Interaction`, and carries `RelativeCursorPosition` so the drag
-/// system can read the cursor's position along it.
-fn spawn_volume_slider(
+/// One labelled volume row: `<name>  [====    ]  NN%`. The track is authored as
+/// a `bsn!` `Slider` whose value change is handled by the given dedicated `on`
+/// callback; the label/readout stay imperative (they carry the custom font,
+/// which `bsn!` can't set in 0.19).
+fn spawn_volume_slider<M: 'static>(
     commands: &mut Commands,
     parent: Entity,
     font: &FontSource,
     label: &str,
     kind: VolumeSlider,
     value: f32,
+    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Send + Sync + 'static,
 ) {
     let row = commands
         .spawn(Node {
@@ -435,42 +472,17 @@ fn spawn_volume_slider(
             },
             TextColor(Color::WHITE),
         ));
+    });
 
-        r.spawn((
-            Slider {
-                track_click: TrackClick::Snap,
-                ..default()
-            },
-            SliderValue(value),
-            SliderRange::new(0.0, 1.0),
-            SliderStep(0.01),
-            Node {
-                width: Val::Px(220.0),
-                height: Val::Px(14.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-        ))
-        .with_children(|track| {
-            track.spawn((
-                Node {
-                    width: Val::Percent(value * 100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
-                SliderFill(kind),
-                // Don't let the fill steal the slider's pointer events.
-                Pickable::IGNORE,
-            ));
-        })
-        .observe(move |ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSettings>| {
-            match kind {
-                VolumeSlider::Music => settings.music_volume = ev.value,
-                VolumeSlider::Metronome => settings.metronome_volume = ev.value,
-            }
-        });
+    // SliderRange/SliderStep have no Default, so they can't be bsn! patches —
+    // insert them after the scene is spawned.
+    let track = commands
+        .spawn_scene(volume_slider_scene(kind, value, on_change))
+        .insert((SliderRange::new(0.0, 1.0), SliderStep(0.01)))
+        .id();
+    commands.entity(row).add_child(track);
 
+    commands.entity(row).with_children(|r| {
         r.spawn((
             Node {
                 width: Val::Px(50.0),
@@ -488,6 +500,31 @@ fn spawn_volume_slider(
     });
 
     commands.entity(parent).add_child(row);
+}
+
+/// The volume slider track itself: a `bsn!` `Slider` with its fill, wired to the
+/// given value-change callback inline via `on(...)`.
+fn volume_slider_scene<M: 'static>(
+    kind: VolumeSlider,
+    value: f32,
+    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Send + Sync + 'static,
+) -> impl Scene {
+    bsn! {
+        Slider { track_click: {TrackClick::Snap} }
+        SliderValue({value})
+        Node { width: {Val::Px(220.0)}, height: {Val::Px(14.0)} }
+        BackgroundColor({TRACK_BG})
+        on(on_change)
+        Children [
+            (
+                Node { width: {Val::Percent(value * 100.0)}, height: {Val::Percent(100.0)} }
+                BackgroundColor({Color::srgb(0.35, 0.75, 1.0)})
+                SliderFill({kind})
+                // Don't let the fill steal the slider's pointer events.
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
 }
 
 // ── Input-latency slider ──────────────────────────────────────────────────────
@@ -523,39 +560,15 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSour
             },
             TextColor(Color::WHITE),
         ));
+    });
 
-        r.spawn((
-            Slider {
-                track_click: TrackClick::Snap,
-                ..default()
-            },
-            SliderValue(value_ms as f32),
-            SliderRange::new(0.0, LATENCY_MAX_MS as f32),
-            SliderStep(1.0),
-            Node {
-                width: Val::Px(220.0),
-                height: Val::Px(14.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-            LatencySlider,
-        ))
-        .with_children(|track| {
-            track.spawn((
-                Node {
-                    width: Val::Percent(frac * 100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.80, 0.55, 0.25)),
-                LatencySliderFill,
-                Pickable::IGNORE,
-            ));
-        })
-        .observe(|ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSettings>| {
-            settings.input_latency_ms = ev.value.round() as i32;
-        });
+    let track = commands
+        .spawn_scene(latency_slider_scene(value_ms as f32, frac))
+        .insert((SliderRange::new(0.0, LATENCY_MAX_MS as f32), SliderStep(1.0)))
+        .id();
+    commands.entity(row).add_child(track);
 
+    commands.entity(row).with_children(|r| {
         r.spawn((
             Node {
                 width: Val::Px(50.0),
@@ -573,6 +586,26 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSour
     });
 
     commands.entity(parent).add_child(row);
+}
+
+/// The latency slider track: a `bsn!` `Slider` + fill, wired to `set_input_latency`.
+fn latency_slider_scene(value: f32, frac: f32) -> impl Scene {
+    bsn! {
+        Slider { track_click: {TrackClick::Snap} }
+        SliderValue({value})
+        Node { width: {Val::Px(220.0)}, height: {Val::Px(14.0)} }
+        BackgroundColor({TRACK_BG})
+        LatencySlider
+        on(set_input_latency)
+        Children [
+            (
+                Node { width: {Val::Percent(frac * 100.0)}, height: {Val::Percent(100.0)} }
+                BackgroundColor({Color::srgb(0.80, 0.55, 0.25)})
+                LatencySliderFill
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
 }
 
 /// Mirror `input_latency_ms` onto the fill bar and label.
