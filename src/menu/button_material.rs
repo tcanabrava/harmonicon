@@ -8,9 +8,7 @@
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
-use bevy::ui_render::prelude::{UiMaterial, UiMaterialPlugin};
-
-use crate::theme::LoadedTheme;
+use bevy::ui_render::prelude::{MaterialNode, UiMaterial, UiMaterialPlugin};
 
 // ── Material types ────────────────────────────────────────────────────────────
 
@@ -81,10 +79,7 @@ impl Plugin for ButtonMaterialPlugin {
             .add_plugins(UiMaterialPlugin::<ButtonHoverMaterial>::default())
             .add_plugins(UiMaterialPlugin::<ButtonClickMaterial>::default())
             .add_systems(Startup, setup_button_materials)
-            .add_systems(
-                Update,
-                (tick_button_materials, handle_themed_button_interaction),
-            );
+            .add_systems(Update, tick_button_materials);
     }
 }
 
@@ -123,61 +118,33 @@ fn tick_button_materials(
     }
 }
 
-/// Swap the shader material on a button's `ButtonShaderLayer` child when the
-/// interaction state changes, and play the matching sound.
-fn handle_themed_button_interaction(
-    mut commands: Commands,
-    mats: Option<Res<ButtonMaterials>>,
-    theme: Res<LoadedTheme>,
-    buttons: Query<
-        (Entity, &Interaction, &Children),
-        (Changed<Interaction>, With<ThemedButton>),
-    >,
-    shader_layers: Query<(), With<ButtonShaderLayer>>,
+/// The three visual states a themed button's shader layer can be in.
+#[derive(Clone, Copy)]
+pub enum ButtonVisual {
+    Idle,
+    Hover,
+    Click,
+}
+
+/// Swap the shader material on a themed button's `ButtonShaderLayer` child.
+///
+/// Called from the per-button pointer observers in `spawn_button` (the `.on()`
+/// style) rather than a central `Changed<Interaction>` system.
+pub fn set_button_visual(
+    commands: &mut Commands,
+    layer: Entity,
+    visual: ButtonVisual,
+    mats: &ButtonMaterials,
 ) {
-    let Some(mats) = mats else { return };
+    let mut layer = commands.entity(layer);
+    layer
+        .remove::<MaterialNode<ButtonIdleMaterial>>()
+        .remove::<MaterialNode<ButtonHoverMaterial>>()
+        .remove::<MaterialNode<ButtonClickMaterial>>();
 
-    for (_entity, interaction, children) in &buttons {
-        // children.iter() yields Entity; find passes &Entity to the closure
-        let Some(layer) = children.iter().find(|&c| shader_layers.contains(c))
-        else {
-            continue;
-        };
-
-        commands
-            .entity(layer)
-            .remove::<MaterialNode<ButtonIdleMaterial>>()
-            .remove::<MaterialNode<ButtonHoverMaterial>>()
-            .remove::<MaterialNode<ButtonClickMaterial>>();
-
-        match interaction {
-            Interaction::None => {
-                commands
-                    .entity(layer)
-                    .insert(MaterialNode(mats.idle.clone()));
-            }
-            Interaction::Hovered => {
-                commands
-                    .entity(layer)
-                    .insert(MaterialNode(mats.hover.clone()));
-                if let Some(ref snd) = theme.btn_sound_hover {
-                    commands.spawn((
-                        AudioPlayer::<AudioSource>(snd.clone()),
-                        PlaybackSettings::DESPAWN,
-                    ));
-                }
-            }
-            Interaction::Pressed => {
-                commands
-                    .entity(layer)
-                    .insert(MaterialNode(mats.click.clone()));
-                if let Some(ref snd) = theme.btn_sound_click {
-                    commands.spawn((
-                        AudioPlayer::<AudioSource>(snd.clone()),
-                        PlaybackSettings::DESPAWN,
-                    ));
-                }
-            }
-        }
-    }
+    match visual {
+        ButtonVisual::Idle => layer.insert(MaterialNode(mats.idle.clone())),
+        ButtonVisual::Hover => layer.insert(MaterialNode(mats.hover.clone())),
+        ButtonVisual::Click => layer.insert(MaterialNode(mats.click.clone())),
+    };
 }

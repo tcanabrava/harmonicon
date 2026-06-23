@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-use bevy::picking::events::{Click, Out, Over, Pointer};
+use bevy::audio::AudioSource;
+use bevy::picking::Pickable;
+use bevy::picking::events::{Out, Over, Pointer, Press};
 use bevy::prelude::*;
+use bevy::ui_widgets::{Activate, Button as WidgetButton, UiWidgetsPlugins};
 
 use crate::assets_management::{AvailableSongs, GlobalFonts};
 use crate::song::SongManifest;
@@ -14,7 +17,10 @@ mod options;
 mod song_editor;
 mod theme_picker;
 
-use button_material::{ButtonMaterialPlugin, ButtonMaterials, ButtonShaderLayer, ThemedButton};
+use button_material::{
+    ButtonMaterialPlugin, ButtonMaterials, ButtonShaderLayer, ButtonVisual, ThemedButton,
+    set_button_visual,
+};
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]
 pub enum GameplayMode {
@@ -122,6 +128,8 @@ impl Plugin for MenuPlugin {
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
+            // Headless widget logic (Button → Activate, Slider → ValueChange, …).
+            .add_plugins(UiWidgetsPlugins)
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(ButtonMaterialPlugin)
             .add_plugins(options::OptionsPlugin)
@@ -310,12 +318,19 @@ pub(super) fn spawn_button(
     // Captured by the click observer below; `btn` itself is moved into the entity.
     let btn_action = btn.clone();
 
+    // Children are `Pickable::IGNORE` so the pointer always hits the button
+    // itself (not the text/icon), keeping the hover/press observers below
+    // robust — otherwise picking would target a child and the button would
+    // flicker between hovered/unhovered.
     let button = if theme.has_shaders {
-        let e = commands.spawn((Button, node, btn, ThemedButton)).id();
+        let e = commands
+            .spawn((WidgetButton, node, btn, ThemedButton))
+            .id();
 
-        commands.entity(e).with_children(|b| {
-            // Smoke shader layer — absolute, behind content (spawned first)
-            b.spawn((
+        // Smoke shader layer — absolute, behind content. Keep its entity so the
+        // pointer observers can swap its material.
+        let layer = commands
+            .spawn((
                 MaterialNode(btn_mats.idle.clone()),
                 Node {
                     position_type: PositionType::Absolute,
@@ -326,8 +341,12 @@ pub(super) fn spawn_button(
                     ..default()
                 },
                 ButtonShaderLayer,
-            ));
+                Pickable::IGNORE,
+            ))
+            .id();
+        commands.entity(e).add_child(layer);
 
+        commands.entity(e).with_children(|b| {
             // Icon from theme (optional)
             if let Some(ref icon) = theme.btn_icon {
                 b.spawn((
@@ -341,6 +360,7 @@ pub(super) fn spawn_button(
                         image: icon.clone(),
                         ..default()
                     },
+                    Pickable::IGNORE,
                 ));
             }
 
@@ -352,13 +372,50 @@ pub(super) fn spawn_button(
                     ..default()
                 },
                 TextColor(Color::WHITE),
+                Pickable::IGNORE,
             ));
         });
+
+        // Themed hover/press visuals via observers (replaces the old
+        // Changed<Interaction> system in button_material).
+        commands.entity(e).observe(
+            move |_: On<Pointer<Over>>,
+                  mats: Res<ButtonMaterials>,
+                  theme: Res<LoadedTheme>,
+                  mut commands: Commands| {
+                set_button_visual(&mut commands, layer, ButtonVisual::Hover, &mats);
+                if let Some(ref snd) = theme.btn_sound_hover {
+                    commands.spawn((
+                        AudioPlayer::<AudioSource>(snd.clone()),
+                        PlaybackSettings::DESPAWN,
+                    ));
+                }
+            },
+        );
+        commands.entity(e).observe(
+            move |_: On<Pointer<Out>>, mats: Res<ButtonMaterials>, mut commands: Commands| {
+                set_button_visual(&mut commands, layer, ButtonVisual::Idle, &mats);
+            },
+        );
+        commands.entity(e).observe(
+            move |_: On<Pointer<Press>>,
+                  mats: Res<ButtonMaterials>,
+                  theme: Res<LoadedTheme>,
+                  mut commands: Commands| {
+                set_button_visual(&mut commands, layer, ButtonVisual::Click, &mats);
+                if let Some(ref snd) = theme.btn_sound_click {
+                    commands.spawn((
+                        AudioPlayer::<AudioSource>(snd.clone()),
+                        PlaybackSettings::DESPAWN,
+                    ));
+                }
+            },
+        );
 
         e
     } else {
         let e = commands
-            .spawn((Button, node, BackgroundColor(btn_default()), btn))
+            .spawn((WidgetButton, node, BackgroundColor(btn_default()), btn))
             .id();
 
         commands.entity(e).with_children(|b| {
@@ -370,11 +427,11 @@ pub(super) fn spawn_button(
                     ..default()
                 },
                 TextColor(Color::WHITE),
+                Pickable::IGNORE,
             ));
         });
 
-        // Plain buttons highlight on hover via observers (themed buttons get
-        // their hover from the shader system in button_material).
+        // Plain buttons highlight on hover via observers.
         commands.entity(e).observe(move |_: On<Pointer<Over>>, mut q: Query<&mut BackgroundColor>| {
             if let Ok(mut bg) = q.get_mut(e) {
                 *bg = BackgroundColor(Color::srgb(0.20, 0.20, 0.32));
@@ -389,10 +446,11 @@ pub(super) fn spawn_button(
         e
     };
 
-    // Clicking the button performs its navigation/selection (observer style,
-    // no central Changed<Interaction> system).
+    // Activating the button (ui_widgets::Button emits `Activate` on click or
+    // keyboard) performs its navigation/selection — observer style, no central
+    // Changed<Interaction> system.
     commands.entity(button).observe(
-        move |_: On<Pointer<Click>>,
+        move |_: On<Activate>,
               mut next_page: ResMut<NextState<MenuPage>>,
               mut next_state: ResMut<NextState<AppState>>,
               mut selected_artist: ResMut<SelectedArtist>,
