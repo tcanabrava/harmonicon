@@ -22,11 +22,13 @@
 
 use bevy::{
     audio::{AudioSource, Volume},
+    ecs::system::IntoObserverSystem,
     picking::Pickable,
-    picking::events::{Out, Over, Pointer},
+    picking::events::{Click, Out, Over, Pointer},
     prelude::*,
-    ui_widgets::{Activate, Button as WidgetButton},
 };
+
+const CAL_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 use crate::{
     assets_management::GlobalFonts,
@@ -90,8 +92,6 @@ struct CalSounds { downbeat: Handle<AudioSource>, beat: Handle<AudioSource> }
 #[derive(Component)]
 struct CalRoot;
 
-#[derive(Component, PartialEq, Clone, Copy)]
-enum CalBtn { Start, Apply, TryAgain, Cancel }
 
 #[derive(Component)]
 struct BeatDot(usize);
@@ -401,36 +401,48 @@ fn sync_phase_visibility(
     for mut v in &mut done    { *v = if show_d { Visibility::Inherited } else { Visibility::Hidden }; }
 }
 
-/// Run a calibration button's action. Called from the button's `On<Activate>`
-/// observer (set up in `spawn_cal_button`) rather than a `Changed<Interaction>`
-/// system.
-fn run_cal_button(
-    btn: CalBtn,
-    cal: &mut CalState,
-    audio: &mut AudioSettings,
-    next_state: &mut NextState<AppState>,
-    return_to_options: &mut ReturnToOptions,
+// ── Dedicated button callbacks ────────────────────────────────────────────────
+
+/// Start / Try Again: reset and begin a fresh recording pass.
+fn begin_recording(_: On<Pointer<Click>>, mut cal: ResMut<CalState>) {
+    cal.reset();
+    cal.phase = CalPhase::Recording;
+}
+
+/// Apply: fold the measured offset into the input-latency setting, then leave.
+fn apply_calibration(
+    _: On<Pointer<Click>>,
+    cal: Res<CalState>,
+    mut audio: ResMut<AudioSettings>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut return_to_options: ResMut<ReturnToOptions>,
 ) {
-    match btn {
-        CalBtn::Start => {
-            cal.reset();
-            cal.phase = CalPhase::Recording;
-        }
-        CalBtn::Apply => {
-            if let Some(ms) = cal.mean_offset_ms() {
-                audio.input_latency_ms = (audio.input_latency_ms + ms.round() as i32).max(0);
-            }
-            return_to_options.0 = true;
-            next_state.set(AppState::Menu);
-        }
-        CalBtn::TryAgain => {
-            cal.reset();
-            cal.phase = CalPhase::Recording;
-        }
-        CalBtn::Cancel => {
-            return_to_options.0 = true;
-            next_state.set(AppState::Menu);
-        }
+    if let Some(ms) = cal.mean_offset_ms() {
+        audio.input_latency_ms = (audio.input_latency_ms + ms.round() as i32).max(0);
+    }
+    return_to_options.0 = true;
+    next_state.set(AppState::Menu);
+}
+
+/// Cancel: leave without changing the latency setting.
+fn cancel_calibration(
+    _: On<Pointer<Click>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut return_to_options: ResMut<ReturnToOptions>,
+) {
+    return_to_options.0 = true;
+    next_state.set(AppState::Menu);
+}
+
+fn cal_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(CAL_HOVER);
+    }
+}
+
+fn cal_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(btn_default());
     }
 }
 
@@ -588,7 +600,7 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
             Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(14.0), ..default() },
             ShowWaiting,
         )).with_children(|row| {
-            spawn_cal_button(row, &font, "Start", CalBtn::Start);
+            spawn_cal_button(row, "Start", begin_recording);
         });
 
         // Done-only row
@@ -597,14 +609,14 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
             Visibility::Hidden,
             ShowDone,
         )).with_children(|row| {
-            spawn_cal_button(row, &font, "Apply", CalBtn::Apply);
-            spawn_cal_button(row, &font, "Try Again", CalBtn::TryAgain);
+            spawn_cal_button(row, "Apply", apply_calibration);
+            spawn_cal_button(row, "Try Again", begin_recording);
         });
 
         // Cancel — always visible regardless of phase
         p.spawn(Node::default())
          .with_children(|row| {
-             spawn_cal_button(row, &font, "\u{2190} Cancel", CalBtn::Cancel);
+             spawn_cal_button(row, "\u{2190} Cancel", cancel_calibration);
          });
     });
 }
@@ -658,54 +670,43 @@ fn spawn_timing_zones(bar: &mut ChildSpawnerCommands) {
     ));
 }
 
-fn spawn_cal_button(
+/// One calibration button: shared shell + label, wired with its own dedicated
+/// click callback plus the shared hover highlight — all inline `on(...)`.
+/// (Default font: `bsn!` can't set `TextFont.font` in 0.19.)
+fn spawn_cal_button<M: 'static>(
     parent: &mut ChildSpawnerCommands,
-    font: &FontSource,
     label: &str,
-    btn: CalBtn,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
 ) {
-    let mut ec = parent.spawn((
-        WidgetButton,
-        Node {
-            min_width:       Val::Px(150.0),
-            padding:         UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
-        BackgroundColor(btn_default()),
-        btn,
-    ));
-    ec.with_children(|b| {
-        b.spawn((
-            Text::new(label.to_string()),
-            TextFont { font_size: FontSize::Px(19.0), font: font.clone(), ..default() },
-            TextColor(Color::WHITE),
-            // Keep the pointer on the button itself, not the label.
-            Pickable::IGNORE,
-        ));
-    });
+    parent
+        .spawn_empty()
+        .apply_scene(cal_button_scene(label.to_string(), on_click));
+}
 
-    // Hover highlight + activation, attached per-button (the `.on()` style).
-    let e = ec.id();
-    ec.observe(move |_: On<Pointer<Over>>, mut q: Query<&mut BackgroundColor>| {
-        if let Ok(mut bg) = q.get_mut(e) {
-            *bg = BackgroundColor(Color::srgb(0.20, 0.20, 0.32));
+fn cal_button_scene<M: 'static>(
+    label: String,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
+) -> impl Scene {
+    bsn! {
+        Button
+        Node {
+            min_width: {Val::Px(150.0)},
+            padding: {UiRect::axes(Val::Px(24.0), Val::Px(12.0))},
+            justify_content: {JustifyContent::Center},
         }
-    })
-    .observe(move |_: On<Pointer<Out>>, mut q: Query<&mut BackgroundColor>| {
-        if let Ok(mut bg) = q.get_mut(e) {
-            *bg = BackgroundColor(btn_default());
-        }
-    })
-    .observe(
-        move |_: On<Activate>,
-              mut cal: ResMut<CalState>,
-              mut audio: ResMut<AudioSettings>,
-              mut next_state: ResMut<NextState<AppState>>,
-              mut return_to_options: ResMut<ReturnToOptions>| {
-            run_cal_button(btn, &mut cal, &mut audio, &mut next_state, &mut return_to_options);
-        },
-    );
+        BackgroundColor({btn_default()})
+        on(on_click)
+        on(cal_over)
+        on(cal_out)
+        Children [
+            (
+                Text({label})
+                TextFont { font_size: {FontSize::Px(19.0)} }
+                TextColor({Color::WHITE})
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
