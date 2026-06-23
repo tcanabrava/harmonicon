@@ -16,7 +16,7 @@ use bevy::ui_widgets::{
 };
 
 use crate::assets_management::{
-    AvailableHarmonicas, AvailableNoteThemes2d, AvailableNoteThemes3d, GlobalFonts,
+    AvailableHarmonicas, GlobalFonts,
     SelectedHarmonicaModel
 };
 use crate::settings::AudioSettings;
@@ -114,12 +114,9 @@ fn setup_options_menu(
     mut commands: Commands,
     font: Res<GlobalFonts>,
     settings: Res<AudioSettings>,
-    themes_2d: Res<AvailableNoteThemes2d>,
-    themes_3d: Res<AvailableNoteThemes3d>,
     harmonicas: Res<AvailableHarmonicas>,
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
 ) {
@@ -147,40 +144,10 @@ fn setup_options_menu(
         settings.input_latency_ms,
     );
 
-    // The blow-note tint, so the previews read like an in-game note.
-    let blow = Color::srgb(0.25, 0.55, 0.95);
-
-    // 2D previews: the theme PNG, tinted directly in the UI image.
-    let previews_2d: Vec<(Handle<Image>, String)> = themes_2d
-        .0
-        .iter()
-        .map(|t| (asset_server.load(format!("notes/2d/{t}.png")), t.clone()))
-        .collect();
-
-    // 3D previews: the theme's glTF cube rendered (blow-tinted) to a texture, one
-    // per theme on its own render layer, then shown as a UI image.
-    let previews_3d: Vec<(Handle<Image>, String)> = themes_3d
-        .0
-        .iter()
-        .enumerate()
-        .map(|(i, t)| {
-            let handle = spawn_theme_3d_preview(
-                &mut commands,
-                &mut images,
-                &mut materials,
-                &asset_server,
-                t,
-                i + 1,
-                blow,
-            );
-            (handle, t.clone())
-        })
-        .collect();
-
     // Harmonica previews: the model's glTF scene rendered to a texture (its own
     // materials, no tint). Layers are assigned after the 3D-note layers so the
     // preview cameras never capture each other's models.
-    let harmonica_base_layer = previews_3d.len() + 1;
+    let harmonica_base_layer = 1;
     let previews_harmonica: Vec<(Handle<Image>, String)> = harmonicas
         .0
         .iter()
@@ -197,26 +164,6 @@ fn setup_options_menu(
         })
         .collect();
 
-    // 2D previews are tinted here; 3D previews already baked the tint into the
-    // rendered texture, so they're shown untinted (white).
-    spawn_theme_row(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "2D notes",
-        &previews_2d,
-        blow,
-        |n| NoteTheme2dButton(n.to_string()),
-    );
-    spawn_theme_row(
-        &mut commands,
-        root,
-        &font.gameplay,
-        "3D notes",
-        &previews_3d,
-        Color::WHITE,
-        |n| NoteTheme3dButton(n.to_string()),
-    );
     spawn_theme_row(
         &mut commands,
         root,
@@ -311,55 +258,6 @@ fn spawn_theme_row<M: Bundle>(
 
 // ── 3D model previews (render-to-texture) ──────────────────────────────────────
 
-/// Renders a theme's 3D glTF cube (blow-tinted) to an off-screen texture so it
-/// can be shown in the Options UI. Each preview gets its own render layer + a
-/// camera, cube and light on it; all are `MenuRoot`-tagged so they're cleaned up
-/// when the page changes. Returns the texture handle for the UI image.
-fn spawn_theme_3d_preview(
-    commands: &mut Commands,
-    images: &mut Assets<Image>,
-    materials: &mut Assets<StandardMaterial>,
-    asset_server: &AssetServer,
-    theme: &str,
-    layer: usize,
-    tint: Color,
-) -> Handle<Image> {
-    let handle = preview_target(images);
-    let layers = RenderLayers::layer(layer);
-
-    // Camera that renders only this layer into the texture, transparent around it.
-    commands.spawn((
-        Camera3d::default(),
-        Camera {
-            clear_color: ClearColorConfig::Custom(Color::NONE),
-            order: -1,
-            ..default()
-        },
-        RenderTarget::from(handle.clone()),
-        Transform::from_xyz(2.0, 1.5, 2.8).looking_at(Vec3::ZERO, Vec3::Y),
-        layers.clone(),
-        MenuRoot,
-    ));
-
-    // The cube head, blow-tinted, posed at a 3/4 angle so its form reads.
-    let mesh: Handle<Mesh> = asset_server.load(format!("notes/3d/{theme}.glb#Mesh0/Primitive0"));
-    let linear = tint.to_linear();
-    let material = materials.add(StandardMaterial {
-        base_color: tint,
-        emissive: LinearRgba::new(linear.red * 0.2, linear.green * 0.2, linear.blue * 0.2, 1.0),
-        ..default()
-    });
-    commands.spawn((
-        Mesh3d(mesh),
-        MeshMaterial3d(material),
-        Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, 0.7, 0.5, 0.0)),
-        layers.clone(),
-        MenuRoot,
-    ));
-
-    spawn_preview_light(commands, layers);
-    handle
-}
 
 /// Renders a harmonica model's glTF scene to an off-screen texture for the
 /// Options UI. Like the note preview, but the model is a multi-mesh scene with
