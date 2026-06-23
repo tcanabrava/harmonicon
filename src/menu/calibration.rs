@@ -22,7 +22,10 @@
 
 use bevy::{
     audio::{AudioSource, Volume},
+    picking::Pickable,
+    picking::events::{Out, Over, Pointer},
     prelude::*,
+    ui_widgets::{Activate, Button as WidgetButton},
 };
 
 use crate::{
@@ -146,8 +149,6 @@ impl Plugin for CalibrationPlugin {
                     update_status,
                     update_result_block,
                     sync_phase_visibility,
-                    handle_buttons,
-                    button_hover,
                 )
                     .run_if(in_state(AppState::Calibration)),
             );
@@ -400,48 +401,36 @@ fn sync_phase_visibility(
     for mut v in &mut done    { *v = if show_d { Visibility::Inherited } else { Visibility::Hidden }; }
 }
 
-fn handle_buttons(
-    buttons: Query<(&Interaction, &CalBtn), Changed<Interaction>>,
-    mut cal: ResMut<CalState>,
-    mut audio: ResMut<AudioSettings>,
-    mut next_state: ResMut<NextState<AppState>>,
-    mut return_to_options: ResMut<ReturnToOptions>,
+/// Run a calibration button's action. Called from the button's `On<Activate>`
+/// observer (set up in `spawn_cal_button`) rather than a `Changed<Interaction>`
+/// system.
+fn run_cal_button(
+    btn: CalBtn,
+    cal: &mut CalState,
+    audio: &mut AudioSettings,
+    next_state: &mut NextState<AppState>,
+    return_to_options: &mut ReturnToOptions,
 ) {
-    for (interaction, btn) in &buttons {
-        if *interaction != Interaction::Pressed { continue; }
-        match btn {
-            CalBtn::Start => {
-                cal.reset();
-                cal.phase = CalPhase::Recording;
-            }
-            CalBtn::Apply => {
-                if let Some(ms) = cal.mean_offset_ms() {
-                    audio.input_latency_ms = (audio.input_latency_ms + ms.round() as i32).max(0);
-                }
-                return_to_options.0 = true;
-                next_state.set(AppState::Menu);
-            }
-            CalBtn::TryAgain => {
-                cal.reset();
-                cal.phase = CalPhase::Recording;
-            }
-            CalBtn::Cancel => {
-                return_to_options.0 = true;
-                next_state.set(AppState::Menu);
-            }
+    match btn {
+        CalBtn::Start => {
+            cal.reset();
+            cal.phase = CalPhase::Recording;
         }
-    }
-}
-
-fn button_hover(
-    mut buttons: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<CalBtn>)>,
-) {
-    for (interaction, mut bg) in &mut buttons {
-        *bg = BackgroundColor(match interaction {
-            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
-            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-            Interaction::None    => btn_default(),
-        });
+        CalBtn::Apply => {
+            if let Some(ms) = cal.mean_offset_ms() {
+                audio.input_latency_ms = (audio.input_latency_ms + ms.round() as i32).max(0);
+            }
+            return_to_options.0 = true;
+            next_state.set(AppState::Menu);
+        }
+        CalBtn::TryAgain => {
+            cal.reset();
+            cal.phase = CalPhase::Recording;
+        }
+        CalBtn::Cancel => {
+            return_to_options.0 = true;
+            next_state.set(AppState::Menu);
+        }
     }
 }
 
@@ -675,8 +664,8 @@ fn spawn_cal_button(
     label: &str,
     btn: CalBtn,
 ) {
-    parent.spawn((
-        Button,
+    let mut ec = parent.spawn((
+        WidgetButton,
         Node {
             min_width:       Val::Px(150.0),
             padding:         UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
@@ -685,13 +674,38 @@ fn spawn_cal_button(
         },
         BackgroundColor(btn_default()),
         btn,
-    )).with_children(|b| {
+    ));
+    ec.with_children(|b| {
         b.spawn((
             Text::new(label.to_string()),
             TextFont { font_size: FontSize::Px(19.0), font: font.clone(), ..default() },
             TextColor(Color::WHITE),
+            // Keep the pointer on the button itself, not the label.
+            Pickable::IGNORE,
         ));
     });
+
+    // Hover highlight + activation, attached per-button (the `.on()` style).
+    let e = ec.id();
+    ec.observe(move |_: On<Pointer<Over>>, mut q: Query<&mut BackgroundColor>| {
+        if let Ok(mut bg) = q.get_mut(e) {
+            *bg = BackgroundColor(Color::srgb(0.20, 0.20, 0.32));
+        }
+    })
+    .observe(move |_: On<Pointer<Out>>, mut q: Query<&mut BackgroundColor>| {
+        if let Ok(mut bg) = q.get_mut(e) {
+            *bg = BackgroundColor(btn_default());
+        }
+    })
+    .observe(
+        move |_: On<Activate>,
+              mut cal: ResMut<CalState>,
+              mut audio: ResMut<AudioSettings>,
+              mut next_state: ResMut<NextState<AppState>>,
+              mut return_to_options: ResMut<ReturnToOptions>| {
+            run_cal_button(btn, &mut cal, &mut audio, &mut next_state, &mut return_to_options);
+        },
+    );
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

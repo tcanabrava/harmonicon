@@ -9,8 +9,11 @@ use bevy::asset::RenderAssetUsages;
 use bevy::camera::RenderTarget;
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
+use bevy::picking::Pickable;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
-use bevy::ui::RelativeCursorPosition;
+use bevy::ui_widgets::{
+    Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange, slider_self_update,
+};
 
 use crate::assets_management::{
     AvailableHarmonicas, AvailableNoteThemes2d, AvailableNoteThemes3d, GlobalFonts,
@@ -33,12 +36,13 @@ impl Plugin for OptionsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(MenuPage::Options), setup_options_menu)
             .add_systems(OnExit(MenuPage::Options), cleanup_menu)
+            // Keep each slider's own SliderValue in sync as it's dragged or
+            // stepped, so keyboard adjustment works from the current value.
+            .add_observer(slider_self_update)
             .add_systems(
                 Update,
                 (
-                    drag_sliders,
                     update_sliders,
-                    drag_latency_slider,
                     update_latency_slider,
                     handle_harmonica_buttons,
                     harmonica_button_visuals,
@@ -535,15 +539,19 @@ fn spawn_volume_slider(
         ));
 
         r.spawn((
-            Button,
+            Slider {
+                track_click: TrackClick::Snap,
+                ..default()
+            },
+            SliderValue(value),
+            SliderRange::new(0.0, 1.0),
+            SliderStep(0.01),
             Node {
                 width: Val::Px(220.0),
                 height: Val::Px(14.0),
                 ..default()
             },
             BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-            RelativeCursorPosition::default(),
-            kind,
         ))
         .with_children(|track| {
             track.spawn((
@@ -554,7 +562,15 @@ fn spawn_volume_slider(
                 },
                 BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
                 SliderFill(kind),
+                // Don't let the fill steal the slider's pointer events.
+                Pickable::IGNORE,
             ));
+        })
+        .observe(move |ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSettings>| {
+            match kind {
+                VolumeSlider::Music => settings.music_volume = ev.value,
+                VolumeSlider::Metronome => settings.metronome_volume = ev.value,
+            }
         });
 
         r.spawn((
@@ -611,14 +627,19 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSour
         ));
 
         r.spawn((
-            Button,
+            Slider {
+                track_click: TrackClick::Snap,
+                ..default()
+            },
+            SliderValue(value_ms as f32),
+            SliderRange::new(0.0, LATENCY_MAX_MS as f32),
+            SliderStep(1.0),
             Node {
                 width: Val::Px(220.0),
                 height: Val::Px(14.0),
                 ..default()
             },
             BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-            RelativeCursorPosition::default(),
             LatencySlider,
         ))
         .with_children(|track| {
@@ -630,7 +651,11 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSour
                 },
                 BackgroundColor(Color::srgb(0.80, 0.55, 0.25)),
                 LatencySliderFill,
+                Pickable::IGNORE,
             ));
+        })
+        .observe(|ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSettings>| {
+            settings.input_latency_ms = ev.value.round() as i32;
         });
 
         r.spawn((
@@ -652,25 +677,6 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSour
     commands.entity(parent).add_child(row);
 }
 
-/// While the latency track is pressed, set `input_latency_ms` from cursor position.
-fn drag_latency_slider(
-    mut settings: ResMut<AudioSettings>,
-    sliders: Query<(&Interaction, &RelativeCursorPosition), With<LatencySlider>>,
-) {
-    for (interaction, rel) in &sliders {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-        let Some(norm) = rel.normalized else {
-            continue;
-        };
-        let ms = ((norm.x + 0.5).clamp(0.0, 1.0) * LATENCY_MAX_MS as f32).round() as i32;
-        if settings.input_latency_ms != ms {
-            settings.input_latency_ms = ms;
-        }
-    }
-}
-
 /// Mirror `input_latency_ms` onto the fill bar and label.
 fn update_latency_slider(
     settings: Res<AudioSettings>,
@@ -686,31 +692,6 @@ fn update_latency_slider(
     }
     for mut text in &mut labels {
         text.0 = format!("{}ms", settings.input_latency_ms);
-    }
-}
-
-/// While a slider track is pressed, set its level from the cursor's position
-/// along the track. Only writes when the value actually changes so resting on a
-/// pressed slider doesn't re-trigger downstream change detection every frame.
-fn drag_sliders(
-    mut settings: ResMut<AudioSettings>,
-    sliders: Query<(&Interaction, &RelativeCursorPosition, &VolumeSlider)>,
-) {
-    for (interaction, rel, kind) in &sliders {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-        let Some(norm) = rel.normalized else {
-            continue;
-        };
-        let frac = (norm.x + 0.5).clamp(0.0, 1.0);
-        if (audio_level(&settings, *kind) - frac).abs() <= f32::EPSILON {
-            continue;
-        }
-        match kind {
-            VolumeSlider::Music => settings.music_volume = frac,
-            VolumeSlider::Metronome => settings.metronome_volume = frac,
-        }
     }
 }
 
