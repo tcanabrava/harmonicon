@@ -10,7 +10,7 @@ use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::menu::{AppState, ReturnToSongList};
-
+use crate::dialogs::button;
 use super::{GameplayRoot, MusicPlayer, Paused};
 
 const BTN_IDLE: Color = Color::srgb(0.14, 0.14, 0.22);
@@ -42,61 +42,20 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
             PauseMenuRoot
             Children [
                 (
-                    Text({"PAUSED".to_string()})
+                    Text({"PAUSED"})
                     TextFont { font_size: {FontSize::Px(52.0)} }
                     TextColor({Color::WHITE})
                 ),
-                pause_button("Resume".to_string(), on_resume),
-                pause_button("Restart".to_string(), on_restart),
-                pause_button("Quit Song".to_string(), on_quit),
+                button::default("Resume", on_resume),
+                button::default("Restart", on_restart),
+                button::default("Quit Song", on_quit),
             ]
         })
         // bsn! can't express the `Visibility::Hidden` enum variant; set it here.
         .insert(Visibility::Hidden);
 }
 
-/// One pause button: shared shell + label, wired with its own dedicated click
-/// callback plus the shared hover highlight — all inline `on(...)`.
-fn pause_button<M: 'static>(
-    label: String,
-    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
-) -> impl Scene {
-    bsn! {
-        Button
-        Node {
-            min_width: {Val::Px(220.0)},
-            padding: {UiRect::axes(Val::Px(28.0), Val::Px(12.0))},
-            justify_content: {JustifyContent::Center},
-        }
-        BackgroundColor({BTN_IDLE})
-        on(on_click)
-        on(highlight_on_over)
-        on(reset_on_out)
-        Children [
-            (
-                Text({label})
-                TextFont { font_size: {FontSize::Px(20.0)} }
-                TextColor({Color::WHITE})
-                // Keep the pointer on the button, not the label.
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-            )
-        ]
-    }
-}
-
 // ── Dedicated button callbacks ────────────────────────────────────────────────
-
-fn highlight_on_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(BTN_HOVER);
-    }
-}
-
-fn reset_on_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(BTN_IDLE);
-    }
-}
 
 fn on_resume(
     _: On<Pointer<Click>>,
