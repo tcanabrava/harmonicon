@@ -126,13 +126,10 @@ impl Plugin for GameplayPlugin {
                     .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
             ),
         )
-        // Results screen lifecycle.
+        // Results screen lifecycle. The Retry/Continue buttons carry their own
+        // click/hover behaviour as inline on(...) observers (see results::setup).
         .add_systems(OnEnter(AppState::Results), results::setup)
         .add_systems(OnExit(AppState::Results), results::cleanup)
-        .add_systems(
-            Update,
-            (results::handle_buttons, results::button_hover).run_if(in_state(AppState::Results)),
-        )
         // 2D update chain
         .add_systems(
             Update,
