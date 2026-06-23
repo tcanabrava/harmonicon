@@ -88,14 +88,20 @@ fn setup_audio(world: &mut World) {
 
 fn process_audio(
     capture: Option<Res<audio_input::AudioCapture>>,
+    settings: Res<harmonicon::settings::AudioSettings>,
     mut writer: MessageWriter<PitchEvent>,
     mut frame: ResMut<AudioFrame>,
     mut fft: Local<pitch_detect::FftState>,
 ) {
     let Some(capture) = capture else { return };
     while let Ok(samples) = capture.receiver.try_recv() {
-        // One FFT per chunk: pitches and the magnitude spectrum come out together.
-        let analysis = pitch_detect::analyze(&samples, capture.sample_rate, &mut fft);
+        // One FFT per chunk for the spectrum; pitches use the chosen algorithm.
+        let analysis = pitch_detect::analyze(
+            &samples,
+            capture.sample_rate,
+            &mut fft,
+            settings.pitch_algorithm,
+        );
         writer.write(PitchEvent(analysis.pitches));
         // Publish the frame so visualizers reuse this FFT (freq) or the raw
         // waveform (time) without re-analysing.

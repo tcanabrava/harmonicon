@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::assets_management::{SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d, SelectedTheme};
+use crate::audio_system::pitch_detect::PitchAlgorithm;
 
 /// Player-tunable audio levels (0.0–1.0, linear), read by the audio spawners
 /// (song music, metronome clicks) and edited on the Options page. Persisted by
@@ -29,6 +30,8 @@ pub struct AudioSettings {
     /// input pipeline (FFT window ≈ 46 ms, OS buffer, cpal callback).
     /// Typical values: 50–100 ms for USB/built-in microphones.
     pub input_latency_ms: i32,
+    /// Which algorithm the audio pipeline uses to detect played pitches.
+    pub pitch_algorithm: PitchAlgorithm,
 }
 
 impl Default for AudioSettings {
@@ -37,6 +40,7 @@ impl Default for AudioSettings {
             music_volume: 0.8,
             metronome_volume: 0.7,
             input_latency_ms: 0,
+            pitch_algorithm: PitchAlgorithm::default(),
         }
     }
 }
@@ -53,6 +57,7 @@ struct Settings {
     note_theme_3d: String,
     harmonica_model: String,
     ui_theme: String,
+    pitch_algorithm: PitchAlgorithm,
 }
 
 impl Default for Settings {
@@ -65,6 +70,7 @@ impl Default for Settings {
             note_theme_3d: "circular".into(),
             harmonica_model: "default".into(),
             ui_theme: "default".into(),
+            pitch_algorithm: PitchAlgorithm::default(),
         }
     }
 }
@@ -145,6 +151,7 @@ fn apply_loaded_settings(
     audio.music_volume = settings.music_volume;
     audio.metronome_volume = settings.metronome_volume;
     audio.input_latency_ms = settings.input_latency_ms;
+    audio.pitch_algorithm = settings.pitch_algorithm;
     theme_2d.0 = settings.note_theme_2d;
     theme_3d.0 = settings.note_theme_3d;
     model.0 = settings.harmonica_model;
@@ -173,6 +180,7 @@ fn persist_settings(
         music_volume: audio.music_volume,
         metronome_volume: audio.metronome_volume,
         input_latency_ms: audio.input_latency_ms,
+        pitch_algorithm: audio.pitch_algorithm,
         note_theme_2d: theme_2d.0.clone(),
         note_theme_3d: theme_3d.0.clone(),
         harmonica_model: model.0.clone(),
