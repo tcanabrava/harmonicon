@@ -13,6 +13,8 @@
 //!   │                      ← Back to Options                   │
 //!   └─────────────────────────────────────────────────────────┘
 
+use bevy::picking::Pickable;
+use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::assets_management::{AvailableThemes, GlobalFonts, SelectedTheme};
@@ -23,16 +25,20 @@ use super::{
     spawn_button,
 };
 
+const THEME_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
+const THEME_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
+
 pub struct ThemePickerPlugin;
 
 impl Plugin for ThemePickerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(MenuPage::Theme), setup)
             .add_systems(OnExit(MenuPage::Theme), cleanup_menu)
+            // Theme buttons carry their own select/hover behaviour as inline
+            // on(...) observers; these systems only react to the selection.
             .add_systems(
                 Update,
-                (handle_buttons, update_button_visuals, update_preview)
-                    .run_if(in_state(MenuPage::Theme)),
+                (update_button_visuals, update_preview).run_if(in_state(MenuPage::Theme)),
             );
     }
 }
@@ -40,7 +46,7 @@ impl Plugin for ThemePickerPlugin {
 // ── Components ─────────────────────────────────────────────────────────────────
 
 /// Carries the theme name for each list button.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 struct ThemeButton(String);
 
 /// Marks the preview `ImageNode` so `update_preview` can swap its handle.
@@ -112,34 +118,13 @@ fn setup(
         .id();
     commands.entity(content).add_child(left);
 
-    for name in &themes.0 {
-        let is_selected = *name == selected.0;
-        let btn = commands
-            .spawn((
-                Button,
-                Node {
-                    width: Val::Percent(100.0),
-                    padding: UiRect::axes(Val::Px(16.0), Val::Px(10.0)),
-                    justify_content: JustifyContent::FlexStart,
-                    ..default()
-                },
-                BackgroundColor(if is_selected {
-                    Color::srgb(0.25, 0.45, 0.30)
-                } else {
-                    btn_default()
-                }),
-                ThemeButton(name.clone()),
-            ))
-            .id();
-        commands.entity(btn).with_children(|b| {
-            b.spawn((
-                Text::new(name.clone()),
-                TextFont { font_size: FontSize::Px(19.0), font: font.clone(), ..default() },
-                TextColor(Color::WHITE),
-            ));
-        });
-        commands.entity(left).add_child(btn);
-    }
+    commands.entity(left).with_children(|l| {
+        for name in &themes.0 {
+            let is_selected = *name == selected.0;
+            l.spawn_empty()
+                .apply_scene(theme_button_scene(name.clone(), is_selected));
+        }
+    });
 
     // Right panel — preview image
     let right = commands
@@ -182,32 +167,76 @@ fn setup(
 
 // ── Update systems ─────────────────────────────────────────────────────────────
 
-fn handle_buttons(
-    buttons: Query<(&Interaction, &ThemeButton), Changed<Interaction>>,
-    mut selected: ResMut<SelectedTheme>,
+/// One theme-list button: its label, its dedicated "select this theme" click
+/// callback (capturing the name), and hover highlight — all inline `on(...)`.
+/// (Default font: `bsn!` can't set `TextFont.font` in 0.19.)
+fn theme_button_scene(name: String, is_selected: bool) -> impl Scene {
+    let color = if is_selected { THEME_SELECTED } else { btn_default() };
+    let label = name.clone();
+    let pick = name.clone();
+    bsn! {
+        Button
+        Node {
+            width: {Val::Percent(100.0)},
+            padding: {UiRect::axes(Val::Px(16.0), Val::Px(10.0))},
+            justify_content: {JustifyContent::FlexStart},
+        }
+        BackgroundColor({color})
+        ThemeButton({name})
+        on(move |_: On<Pointer<Click>>, mut selected: ResMut<SelectedTheme>| {
+            selected.0 = pick.clone();
+        })
+        on(theme_over)
+        on(theme_out)
+        Children [
+            (
+                Text({label})
+                TextFont { font_size: {FontSize::Px(19.0)} }
+                TextColor({Color::WHITE})
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
+}
+
+/// Hover highlight, but never override the green of the currently-selected theme.
+fn theme_over(
+    ev: On<Pointer<Over>>,
+    selected: Res<SelectedTheme>,
+    mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
 ) {
-    for (interaction, btn) in &buttons {
-        if *interaction == Interaction::Pressed {
-            selected.0 = btn.0.clone();
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
+        if btn.0 != selected.0 {
+            *bg = BackgroundColor(THEME_HOVER);
         }
     }
 }
 
+fn theme_out(
+    ev: On<Pointer<Out>>,
+    selected: Res<SelectedTheme>,
+    mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
+) {
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
+        if btn.0 != selected.0 {
+            *bg = BackgroundColor(btn_default());
+        }
+    }
+}
+
+/// Recolour the list whenever the selection changes (green for the chosen one).
 fn update_button_visuals(
     selected: Res<SelectedTheme>,
-    mut buttons: Query<(&Interaction, &ThemeButton, &mut BackgroundColor)>,
+    mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
 ) {
     if !selected.is_changed() {
         return;
     }
-    for (interaction, btn, mut bg) in &mut buttons {
+    for (btn, mut bg) in &mut buttons {
         bg.0 = if btn.0 == selected.0 {
-            Color::srgb(0.25, 0.45, 0.30)
+            THEME_SELECTED
         } else {
-            match interaction {
-                Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-                _ => btn_default(),
-            }
+            btn_default()
         };
     }
 }
