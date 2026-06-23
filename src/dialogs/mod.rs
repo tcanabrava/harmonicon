@@ -15,6 +15,7 @@
 
 use std::path::PathBuf;
 
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
@@ -237,44 +238,49 @@ fn refresh(
     }
 }
 
-/// A folder row: `bsn!` widget + an `observe` callback that navigates into it.
+/// A folder row: its "navigate into this folder" click callback rides along
+/// inline as `on(...)`.
 fn spawn_dir_entry(parent: &mut ChildSpawnerCommands, label: String, path: PathBuf) {
-    parent
-        .spawn_empty()
-        .apply_scene(entry_scene(label, DIR_COLOR))
-        .observe(
-            move |_: On<Pointer<Click>>,
-                  mut dialog: ResMut<FileDialog>,
-                  mut refresh_req: MessageWriter<RefreshFileList>| {
-                dialog.dir = path.clone();
-                refresh_req.write(RefreshFileList);
-            },
-        );
+    parent.spawn_empty().apply_scene(entry_scene(
+        label,
+        DIR_COLOR,
+        move |_: On<Pointer<Click>>,
+              mut dialog: ResMut<FileDialog>,
+              mut refresh_req: MessageWriter<RefreshFileList>| {
+            dialog.dir = path.clone();
+            refresh_req.write(RefreshFileList);
+        },
+    ));
 }
 
-/// A file row: `bsn!` widget + an `observe` callback that picks it and closes.
+/// A file row: its "pick this file and close" click callback rides along inline
+/// as `on(...)`.
 fn spawn_file_entry(parent: &mut ChildSpawnerCommands, label: String, path: PathBuf) {
-    parent
-        .spawn_empty()
-        .apply_scene(entry_scene(label, FILE_COLOR))
-        .observe(
-            move |_: On<Pointer<Click>>,
-                  mut dialog: ResMut<FileDialog>,
-                  mut chosen: MessageWriter<FileChosen>,
-                  roots: Query<Entity, With<FileDialogRoot>>,
-                  next: ResMut<NextState<FileDialogState>>,
-                  mut commands: Commands| {
-                if let Some(purpose) = dialog.purpose {
-                    chosen.write(FileChosen { purpose, path: path.clone() });
-                }
-                close(&mut dialog, &roots, next, &mut commands);
-            },
-        );
+    parent.spawn_empty().apply_scene(entry_scene(
+        label,
+        FILE_COLOR,
+        move |_: On<Pointer<Click>>,
+              mut dialog: ResMut<FileDialog>,
+              mut chosen: MessageWriter<FileChosen>,
+              roots: Query<Entity, With<FileDialogRoot>>,
+              next: ResMut<NextState<FileDialogState>>,
+              mut commands: Commands| {
+            if let Some(purpose) = dialog.purpose {
+                chosen.write(FileChosen { purpose, path: path.clone() });
+            }
+            close(&mut dialog, &roots, next, &mut commands);
+        },
+    ));
 }
 
-/// The shared `bsn!` scene for one clickable entry row. (Uses the default font:
-/// `TextFont.font` can't be set through `bsn!` in 0.19.)
-fn entry_scene(label: String, color: Color) -> impl Scene {
+/// The shared `bsn!` scene for one clickable entry row, with its click callback
+/// wired inline. (Uses the default font: `TextFont.font` can't be set through
+/// `bsn!` in 0.19.)
+fn entry_scene<M: 'static>(
+    label: String,
+    color: Color,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
+) -> impl Scene {
     bsn! {
         Button
         Node {
@@ -282,6 +288,7 @@ fn entry_scene(label: String, color: Color) -> impl Scene {
             padding: {UiRect::axes(Val::Px(8.0), Val::Px(3.0))},
         }
         BackgroundColor({ENTRY_BG})
+        on(on_click)
         Children [
             (
                 Text({label})
