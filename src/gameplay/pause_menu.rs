@@ -4,91 +4,153 @@
 //! toggled with Escape. Shares the gameplay [`Paused`] flag (every gameplay
 //! chain gates on it) and pauses/resumes the song's audio sink.
 
+use bevy::ecs::system::IntoObserverSystem;
+use bevy::picking::Pickable;
+use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
-use crate::assets_management::GlobalFonts;
 use crate::menu::{AppState, ReturnToSongList};
 
 use super::{GameplayRoot, MusicPlayer, Paused};
 
+const BTN_IDLE: Color = Color::srgb(0.14, 0.14, 0.22);
+const BTN_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
+
 /// Root of the pause overlay; toggled between hidden/visible.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub(super) struct PauseMenuRoot;
 
-#[derive(Component)]
-pub(super) enum PauseButton {
-    Resume,
-    Restart,
-    QuitSong,
-}
-
 /// Spawns the (initially hidden) pause overlay. Tagged `GameplayRoot` so it is
-/// torn down with the rest of the scene.
-pub(super) fn setup_pause_menu(mut commands: Commands, fonts: Res<GlobalFonts>) {
-    let font = fonts.gameplay.clone();
+/// torn down with the rest of the scene. The whole tree — including each
+/// button's click/hover behaviour — is authored declaratively with `bsn!`.
+/// (Labels use the default font: `bsn!` can't set `TextFont.font` in 0.19.)
+pub(super) fn setup_pause_menu(mut commands: Commands) {
     commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(20.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.65)),
-            GlobalZIndex(200),
-            Visibility::Hidden,
-            GameplayRoot,
-            PauseMenuRoot,
-        ))
-        .with_children(|p| {
-            p.spawn((
-                Text::new("PAUSED"),
-                TextFont {
-                    font_size: FontSize::Px(52.0),
-                    font: font.clone(),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-            spawn_pause_button(p, "Resume", PauseButton::Resume, &font);
-            spawn_pause_button(p, "Restart", PauseButton::Restart, &font);
-            spawn_pause_button(p, "Quit Song", PauseButton::QuitSong, &font);
-        });
+                position_type: {PositionType::Absolute},
+                width: {Val::Percent(100.0)},
+                height: {Val::Percent(100.0)},
+                flex_direction: {FlexDirection::Column},
+                align_items: {AlignItems::Center},
+                justify_content: {JustifyContent::Center},
+                row_gap: {Val::Px(20.0)},
+            }
+            BackgroundColor({Color::srgba(0.0, 0.0, 0.0, 0.65)})
+            GlobalZIndex(200)
+            GameplayRoot
+            PauseMenuRoot
+            Children [
+                (
+                    Text({"PAUSED".to_string()})
+                    TextFont { font_size: {FontSize::Px(52.0)} }
+                    TextColor({Color::WHITE})
+                ),
+                pause_button("Resume".to_string(), on_resume),
+                pause_button("Restart".to_string(), on_restart),
+                pause_button("Quit Song".to_string(), on_quit),
+            ]
+        })
+        // bsn! can't express the `Visibility::Hidden` enum variant; set it here.
+        .insert(Visibility::Hidden);
 }
 
-fn spawn_pause_button(
-    parent: &mut ChildSpawnerCommands,
-    label: &str,
-    btn: PauseButton,
-    font: &FontSource,
+/// One pause button: shared shell + label, wired with its own dedicated click
+/// callback plus the shared hover highlight — all inline `on(...)`.
+fn pause_button<M: 'static>(
+    label: String,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
+) -> impl Scene {
+    bsn! {
+        Button
+        Node {
+            min_width: {Val::Px(220.0)},
+            padding: {UiRect::axes(Val::Px(28.0), Val::Px(12.0))},
+            justify_content: {JustifyContent::Center},
+        }
+        BackgroundColor({BTN_IDLE})
+        on(on_click)
+        on(highlight_on_over)
+        on(reset_on_out)
+        Children [
+            (
+                Text({label})
+                TextFont { font_size: {FontSize::Px(20.0)} }
+                TextColor({Color::WHITE})
+                // Keep the pointer on the button, not the label.
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
+}
+
+// ── Dedicated button callbacks ────────────────────────────────────────────────
+
+fn highlight_on_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(BTN_HOVER);
+    }
+}
+
+fn reset_on_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(BTN_IDLE);
+    }
+}
+
+fn on_resume(
+    _: On<Pointer<Click>>,
+    mut paused: ResMut<Paused>,
+    mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    parent
-        .spawn((
-            Button,
-            Node {
-                min_width: Val::Px(220.0),
-                padding: UiRect::axes(Val::Px(28.0), Val::Px(12.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-            btn,
-        ))
-        .with_children(|b| {
-            b.spawn((
-                Text::new(label.to_string()),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    font: font.clone(),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-        });
+    apply_resume(&mut paused);
+    for mut vis in &mut overlay {
+        *vis = Visibility::Hidden;
+    }
+    for sink in &sinks {
+        sink.play();
+    }
+}
+
+fn on_restart(
+    _: On<Pointer<Click>>,
+    mut paused: ResMut<Paused>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    apply_restart(&mut paused, &mut next_state);
+}
+
+fn on_quit(
+    _: On<Pointer<Click>>,
+    mut paused: ResMut<Paused>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut return_to_song_list: ResMut<ReturnToSongList>,
+) {
+    apply_quit(&mut paused, &mut next_state, &mut return_to_song_list);
+}
+
+// Pure effects, split out so they can be unit-tested without the UI/observers.
+fn apply_resume(paused: &mut Paused) {
+    paused.0 = false;
+}
+
+fn apply_restart(paused: &mut Paused, next_state: &mut NextState<AppState>) {
+    paused.0 = false;
+    // Re-enter via SongLoading so the whole song setup runs fresh (the asset is
+    // already loaded, so it resumes immediately).
+    next_state.set(AppState::SongLoading);
+}
+
+fn apply_quit(
+    paused: &mut Paused,
+    next_state: &mut NextState<AppState>,
+    return_to_song_list: &mut ReturnToSongList,
+) {
+    paused.0 = false;
+    // Land back on the song list, not the main menu.
+    return_to_song_list.0 = true;
+    next_state.set(AppState::Menu);
 }
 
 /// Escape toggles the pause state, the overlay's visibility, and the song audio.
@@ -115,59 +177,6 @@ pub(super) fn handle_pause_input(
         } else {
             sink.play();
         }
-    }
-}
-
-pub(super) fn handle_pause_buttons(
-    buttons: Query<(&Interaction, &PauseButton), Changed<Interaction>>,
-    mut paused: ResMut<Paused>,
-    mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
-    mut next_state: ResMut<NextState<AppState>>,
-    mut return_to_song_list: ResMut<ReturnToSongList>,
-    sinks: Query<&AudioSink, With<MusicPlayer>>,
-) {
-    for (interaction, button) in &buttons {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-        match button {
-            PauseButton::Resume => {
-                paused.0 = false;
-                for mut vis in &mut overlay {
-                    *vis = Visibility::Hidden;
-                }
-                for sink in &sinks {
-                    sink.play();
-                }
-            }
-            PauseButton::Restart => {
-                paused.0 = false;
-                // Re-enter via SongLoading so the whole song setup runs fresh
-                // (the asset is already loaded, so it resumes immediately).
-                next_state.set(AppState::SongLoading);
-            }
-            PauseButton::QuitSong => {
-                paused.0 = false;
-                // Land back on the song list, not the main menu.
-                return_to_song_list.0 = true;
-                next_state.set(AppState::Menu);
-            }
-        }
-    }
-}
-
-pub(super) fn pause_button_hover(
-    mut buttons: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<PauseButton>),
-    >,
-) {
-    for (interaction, mut bg) in &mut buttons {
-        *bg = BackgroundColor(match interaction {
-            Interaction::Pressed => Color::srgb(0.25, 0.25, 0.40),
-            Interaction::Hovered => Color::srgb(0.20, 0.20, 0.32),
-            Interaction::None => Color::srgb(0.14, 0.14, 0.22),
-        });
     }
 }
 
@@ -210,24 +219,8 @@ mod tests {
         );
     }
 
-    fn world_with_pause_button(button: PauseButton) -> World {
-        let mut world = World::new();
-        world.insert_resource(Paused(true));
-        world.insert_resource(ReturnToSongList(false));
-        world.insert_resource(NextState::<AppState>::Unchanged);
-        world.spawn((PauseMenuRoot, Visibility::Visible));
-        world.spawn((Interaction::Pressed, button));
-        world
-    }
-
-    fn run_pause_buttons(world: &mut World) {
-        let mut schedule = Schedule::default();
-        schedule.add_systems(handle_pause_buttons);
-        schedule.run(world);
-    }
-
-    fn pending_state(world: &World) -> Option<AppState> {
-        match world.resource::<NextState<AppState>>() {
+    fn pending_state(next: &NextState<AppState>) -> Option<AppState> {
+        match next {
             NextState::Pending(s) => Some(s.clone()),
             _ => None,
         }
@@ -235,27 +228,28 @@ mod tests {
 
     #[test]
     fn resume_button_unpauses_without_changing_state() {
-        let mut world = world_with_pause_button(PauseButton::Resume);
-        run_pause_buttons(&mut world);
-        assert!(!world.resource::<Paused>().0);
-        assert_eq!(pending_state(&world), None, "Resume stays in gameplay");
+        let mut paused = Paused(true);
+        apply_resume(&mut paused);
+        assert!(!paused.0);
     }
 
     #[test]
     fn restart_button_reloads_the_song() {
-        let mut world = world_with_pause_button(PauseButton::Restart);
-        run_pause_buttons(&mut world);
-        assert_eq!(pending_state(&world), Some(AppState::SongLoading));
+        let mut paused = Paused(true);
+        let mut next = NextState::<AppState>::Unchanged;
+        apply_restart(&mut paused, &mut next);
+        assert!(!paused.0);
+        assert_eq!(pending_state(&next), Some(AppState::SongLoading));
     }
 
     #[test]
     fn quit_song_returns_to_the_song_list() {
-        let mut world = world_with_pause_button(PauseButton::QuitSong);
-        run_pause_buttons(&mut world);
-        assert_eq!(pending_state(&world), Some(AppState::Menu));
-        assert!(
-            world.resource::<ReturnToSongList>().0,
-            "should land on the song list"
-        );
+        let mut paused = Paused(true);
+        let mut next = NextState::<AppState>::Unchanged;
+        let mut rtsl = ReturnToSongList(false);
+        apply_quit(&mut paused, &mut next, &mut rtsl);
+        assert!(!paused.0);
+        assert_eq!(pending_state(&next), Some(AppState::Menu));
+        assert!(rtsl.0, "should land on the song list");
     }
 }

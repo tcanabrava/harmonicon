@@ -85,15 +85,12 @@ impl Plugin for GameplayPlugin {
             OnExit(AppState::Playing),
             gameplay_3d::restore_camera.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
         )
-        // Pause input always runs during Playing (even when paused)
+        // Pause input always runs during Playing (even when paused). The pause
+        // buttons carry their own click/hover behaviour as inline `on(...)`
+        // observers (see `setup_pause_menu`), so no button systems here.
         .add_systems(
             Update,
-            (
-                pause_menu::handle_pause_input,
-                pause_menu::handle_pause_buttons,
-                pause_menu::pause_button_hover,
-            )
-                .run_if(in_state(AppState::Playing)),
+            pause_menu::handle_pause_input.run_if(in_state(AppState::Playing)),
         )
         // Apply live volume changes to the playing song (even while paused).
         .add_systems(
