@@ -21,8 +21,7 @@ use crate::assets_management::{AvailableThemes, GlobalFonts, SelectedTheme};
 use crate::theme::LoadedTheme;
 
 use super::{
-    MenuButton, MenuPage, MenuRoot, btn_default, button_material::ButtonMaterials, cleanup_menu,
-    spawn_button,
+    MenuPage, MenuRoot, btn_default, button_material::ButtonMaterials, cleanup_menu, spawn_button,
 };
 
 const THEME_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
@@ -158,10 +157,11 @@ fn setup(
         root,
         &fonts.symbols,
         "\u{2190} Back to Options",
-        MenuButton::BackToOptions,
+        Some("BackToOptions"),
         &theme,
         &btn_mats,
         "Theme",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Options),
     );
 }
 

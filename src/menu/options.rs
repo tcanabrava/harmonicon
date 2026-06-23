@@ -30,7 +30,7 @@ use crate::settings::AudioSettings;
 use crate::theme::LoadedTheme;
 
 use super::{
-    MenuButton, MenuPage, MenuRoot, btn_default, button_material::ButtonMaterials, cleanup_menu,
+    AppState, MenuPage, MenuRoot, btn_default, button_material::ButtonMaterials, cleanup_menu,
     spawn_button, spawn_menu_root,
 };
 
@@ -184,9 +184,12 @@ fn setup_options_menu(
         &selected_harmonica.0,
     );
 
-    spawn_button(&mut commands, root, &font.gameplay, "Theme", MenuButton::Theme, &theme, &btn_mats, "Options");
-    spawn_button(&mut commands, root, &font.gameplay, "Calibrate input lag", MenuButton::Calibrate, &theme, &btn_mats, "Options");
-    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", MenuButton::BackToMain, &theme, &btn_mats, "Options");
+    spawn_button(&mut commands, root, &font.gameplay, "Theme", Some("Theme"), &theme, &btn_mats, "Options",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme));
+    spawn_button(&mut commands, root, &font.gameplay, "Calibrate input lag", Some("Calibrate"), &theme, &btn_mats, "Options",
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::Calibration));
+    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", Some("BackToMain"), &theme, &btn_mats, "Options",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main));
 }
 
 /// A labelled row of harmonica-model choice buttons, each showing a rendered
