@@ -2,6 +2,8 @@
 
 use bevy::{
     audio::{AudioSource, Volume},
+    picking::Pickable,
+    picking::events::{Click, Out, Over, Pointer},
     prelude::*,
 };
 
@@ -151,8 +153,13 @@ pub fn spawn_metronome(
                     },
                     TextColor(Color::srgb(0.65, 0.65, 0.70)),
                     MetronomeMuteLabel,
+                    // Keep the pointer on the button, not the label.
+                    Pickable::IGNORE,
                 ));
-            });
+            })
+            .observe(toggle_mute)
+            .observe(mute_over)
+            .observe(mute_out);
 
             // Straight ↔ shuffle feel toggle (also bound to the F key).
             row.spawn((
@@ -308,29 +315,20 @@ fn toggle_mute_key(keyboard: Res<ButtonInput<KeyCode>>, mut muted: ResMut<Metron
     }
 }
 
-fn handle_mute_button(
-    buttons: Query<&Interaction, (Changed<Interaction>, With<MetronomeMuteButton>)>,
-    mut muted: ResMut<MetronomeMuted>,
-) {
-    for interaction in &buttons {
-        if *interaction == Interaction::Pressed {
-            muted.0 = !muted.0;
-        }
+// Mute-button behaviour, wired inline as on(...) observers at spawn.
+fn toggle_mute(_: On<Pointer<Click>>, mut muted: ResMut<MetronomeMuted>) {
+    muted.0 = !muted.0;
+}
+
+fn mute_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(Color::srgba(0.20, 0.20, 0.32, 0.9));
     }
 }
 
-fn mute_button_hover(
-    mut buttons: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<MetronomeMuteButton>),
-    >,
-) {
-    for (interaction, mut bg) in &mut buttons {
-        *bg = BackgroundColor(match interaction {
-            Interaction::Pressed => Color::srgba(0.25, 0.25, 0.40, 0.9),
-            Interaction::Hovered => Color::srgba(0.20, 0.20, 0.32, 0.9),
-            Interaction::None => Color::srgba(0.12, 0.12, 0.16, 0.9),
-        });
+fn mute_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
+    if let Ok(mut bg) = colors.get_mut(ev.entity) {
+        *bg = BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9));
     }
 }
 
@@ -367,15 +365,12 @@ impl Plugin for MetronomePlugin {
                     .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
             )
             // The toggle stays responsive even while paused, like the pause menu.
+            // The mute button's click/hover ride along as inline on(...)
+            // observers (see setup); only the keyboard shortcut and the label
+            // refresh are systems here.
             .add_systems(
                 Update,
-                (
-                    toggle_mute_key,
-                    handle_mute_button,
-                    mute_button_hover,
-                    update_mute_label,
-                )
-                    .run_if(in_state(AppState::Playing)),
+                (toggle_mute_key, update_mute_label).run_if(in_state(AppState::Playing)),
             );
     }
 }
