@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
 use crate::assets_management::GlobalFonts;
-use crate::dialogs::{DialogId, FileChosen, FileDialog, OpenFileDialog};
+use crate::dialogs::file_dialog::{DialogId, FileChosen, FileDialog, OpenFileDialog};
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
 use crate::song::chart::{
     Action, BendingProfile, DiatonicLayout, Difficulty, HarpChart, Modifier, NoteEvent, Scoring,

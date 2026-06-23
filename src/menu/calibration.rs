@@ -34,9 +34,10 @@ use crate::{
     assets_management::GlobalFonts,
     audio_system::pitch_detect::PitchEvent,
     settings::AudioSettings,
+    dialogs::button
 };
 
-use super::{AppState, ReturnToOptions, btn_default};
+use super::{AppState, ReturnToOptions};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -442,7 +443,7 @@ fn cal_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
 
 fn cal_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
     if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(btn_default());
+        *bg = BackgroundColor(button::color_default());
     }
 }
 
@@ -694,7 +695,7 @@ fn cal_button_scene<M: 'static>(
             padding: {UiRect::axes(Val::Px(24.0), Val::Px(12.0))},
             justify_content: {JustifyContent::Center},
         }
-        BackgroundColor({btn_default()})
+        BackgroundColor({button::color_default()})
         on(on_click)
         on(cal_over)
         on(cal_out)

@@ -10,14 +10,15 @@ use crate::assets_management::{AvailableSongs, GlobalFonts};
 use crate::song::SongManifest;
 use crate::theme::LoadedTheme;
 
-pub(crate) mod button_material;
+use super::dialogs::button;
+
 mod calibration;
 mod credits;
 mod options;
 mod song_editor;
 mod theme_picker;
 
-use button_material::{
+use super::dialogs::button_material::{
     ButtonMaterialPlugin, ButtonMaterials, ButtonShaderLayer, ButtonVisual, ThemedButton,
     set_button_visual,
 };
@@ -130,9 +131,6 @@ impl Plugin for MenuPlugin {
 
 fn menu_bg() -> Color {
     Color::srgb(0.05, 0.05, 0.08)
-}
-pub(super) fn btn_default() -> Color {
-    Color::srgb(0.14, 0.14, 0.22)
 }
 
 /// Spawn a full-screen centred column with a title and optional subtitle.
@@ -371,36 +369,10 @@ pub(super) fn spawn_button<M: 'static>(
         // Plain button: authored declaratively; click + hover ride along as
         // inline on(...). (Default font: bsn! can't set TextFont.font in 0.19.)
         let e = commands
-            .spawn_scene(bsn! {
-                Button
-                BackgroundColor({btn_default()})
-                on(on_click)
-                on(plain_over)
-                on(plain_out)
-                Children [
-                    (
-                        Text({label.to_string()})
-                        TextFont { font_size: {FontSize::Px(20.0)} }
-                        TextColor({Color::WHITE})
-                        Pickable { should_block_lower: {false}, is_hoverable: {false} }
-                    )
-                ]
-            })
+            .spawn_scene(button::default(label, on_click))
             .insert(node)
             .id();
         commands.entity(parent).add_child(e);
-    }
-}
-
-fn plain_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(Color::srgb(0.20, 0.20, 0.32));
-    }
-}
-
-fn plain_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
-    if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(btn_default());
     }
 }
 

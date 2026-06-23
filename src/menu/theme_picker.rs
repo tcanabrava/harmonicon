@@ -19,9 +19,11 @@ use bevy::prelude::*;
 
 use crate::assets_management::{AvailableThemes, GlobalFonts, SelectedTheme};
 use crate::theme::LoadedTheme;
+use crate::dialogs::button;
+use crate::dialogs::button_material::ButtonMaterials;
 
 use super::{
-    MenuPage, MenuRoot, btn_default, button_material::ButtonMaterials, cleanup_menu, spawn_button,
+    MenuPage, MenuRoot,  cleanup_menu, spawn_button,
 };
 
 const THEME_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
@@ -171,7 +173,7 @@ fn setup(
 /// callback (capturing the name), and hover highlight — all inline `on(...)`.
 /// (Default font: `bsn!` can't set `TextFont.font` in 0.19.)
 fn theme_button_scene(name: String, is_selected: bool) -> impl Scene {
-    let color = if is_selected { THEME_SELECTED } else { btn_default() };
+    let color = if is_selected { THEME_SELECTED } else { button::color_default() };
     let label = name.clone();
     let pick = name.clone();
     bsn! {
@@ -219,7 +221,7 @@ fn theme_out(
 ) {
     if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
         if btn.0 != selected.0 {
-            *bg = BackgroundColor(btn_default());
+            *bg = BackgroundColor(button::color_default());
         }
     }
 }
@@ -236,7 +238,7 @@ fn update_button_visuals(
         bg.0 = if btn.0 == selected.0 {
             THEME_SELECTED
         } else {
-            btn_default()
+            button::color_default()
         };
     }
 }
