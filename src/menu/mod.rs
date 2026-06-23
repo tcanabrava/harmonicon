@@ -4,7 +4,7 @@ use bevy::audio::AudioSource;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Out, Over, Pointer, Press};
 use bevy::prelude::*;
-use bevy::ui_widgets::{Activate, Button as WidgetButton, UiWidgetsPlugins};
+use bevy::ui_widgets::{Activate, Button as WidgetButton};
 
 use crate::assets_management::{AvailableSongs, GlobalFonts};
 use crate::song::SongManifest;
@@ -128,8 +128,8 @@ impl Plugin for MenuPlugin {
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
-            // Headless widget logic (Button → Activate, Slider → ValueChange, …).
-            .add_plugins(UiWidgetsPlugins)
+            // UiWidgetsPlugins (Button → Activate, Slider → ValueChange) is
+            // already registered by DefaultPlugins via the `ui` feature.
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(ButtonMaterialPlugin)
             .add_plugins(options::OptionsPlugin)
