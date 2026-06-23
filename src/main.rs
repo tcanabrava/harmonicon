@@ -54,9 +54,6 @@ fn main() {
         harmonicon::dialogs::file_dialog::FileDialogsPlugin,
     ));
 
-    #[cfg(feature = "inspector")]
-    app.add_plugins(bevy_inspector_egui::quick::WorldInspectorPlugin::new());
-
     app.add_message::<PitchEvent>()
         .init_resource::<AudioFrame>()
         .add_systems(Startup, (spawn_camera, initialize_game, setup_audio))

@@ -2,7 +2,7 @@
 
 //! Post-song results screen: the hit breakdown and a letter grade.
 
-use bevy::picking::events::{Click, Out, Over, Pointer};
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use crate::assets_management::GlobalFonts;
@@ -11,9 +11,6 @@ use crate::dialogs::button;
 use crate::settings::AudioSettings;
 
 use super::{Score, SongStats};
-
-const BTN_IDLE: Color = Color::srgb(0.14, 0.14, 0.22);
-const BTN_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 #[derive(Component)]
 pub(super) struct ResultsRoot;

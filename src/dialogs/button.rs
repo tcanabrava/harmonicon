@@ -1,5 +1,5 @@
 use bevy::picking::Pickable;
-use bevy::picking::events::{Click, Out, Over, Pointer, Press};
+use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 use bevy::ecs::system::IntoObserverSystem;
 
@@ -19,7 +19,7 @@ fn mouse_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
     }
 }
 
-pub fn default<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static) -> impl Scene {
+pub fn default<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static) -> impl Scene {
     bsn! {
         Button
         BackgroundColor({color_default()})

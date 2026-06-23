@@ -23,12 +23,9 @@
 use bevy::{
     audio::{AudioSource, Volume},
     ecs::system::IntoObserverSystem,
-    picking::Pickable,
-    picking::events::{Click, Out, Over, Pointer},
+    picking::events::{Click, Pointer},
     prelude::*,
 };
-
-const CAL_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 use crate::{
     assets_management::GlobalFonts,
@@ -665,11 +662,11 @@ fn spawn_timing_zones(bar: &mut ChildSpawnerCommands) {
 fn spawn_cal_button<M: 'static>(
     parent: &mut ChildSpawnerCommands,
     label: &str,
-    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
 ) {
     parent
         .spawn_empty()
-        .apply_scene(button::default(&label, on_click));
+        .apply_scene(button::default(label, on_click));
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -83,14 +83,6 @@ struct SliderFill(VolumeSlider);
 #[derive(Component)]
 struct SliderValueLabel(VolumeSlider);
 
-/// A 2D note-theme choice button; carries the theme name.
-#[derive(Component)]
-struct NoteTheme2dButton(String);
-
-/// A 3D note-theme choice button; carries the theme name.
-#[derive(Component)]
-struct NoteTheme3dButton(String);
-
 /// A harmonica-model choice button; carries the model name.
 #[derive(Component, Default, Clone)]
 struct HarmonicaButton(String);
@@ -390,11 +382,10 @@ fn harm_over(
     selected: Res<SelectedHarmonicaModel>,
     mut buttons: Query<(&HarmonicaButton, &mut BackgroundColor)>,
 ) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
-        if btn.0 != selected.0 {
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
+        && btn.0 != selected.0 {
             *bg = BackgroundColor(CHOICE_HOVER);
         }
-    }
 }
 
 fn harm_out(
@@ -402,11 +393,10 @@ fn harm_out(
     selected: Res<SelectedHarmonicaModel>,
     mut buttons: Query<(&HarmonicaButton, &mut BackgroundColor)>,
 ) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
-        if btn.0 != selected.0 {
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
+        && btn.0 != selected.0 {
             *bg = BackgroundColor(button::color_default());
         }
-    }
 }
 
 /// Recolour the harmonica buttons when the selection changes (green = chosen).
@@ -453,7 +443,7 @@ fn spawn_volume_slider<M: 'static>(
     label: &str,
     kind: VolumeSlider,
     value: f32,
-    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Send + Sync + 'static,
+    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Sync + 'static,
 ) {
     let row = commands
         .spawn(Node {
@@ -514,7 +504,7 @@ fn spawn_volume_slider<M: 'static>(
 fn volume_slider_scene<M: 'static>(
     kind: VolumeSlider,
     value: f32,
-    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Send + Sync + 'static,
+    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Sync + 'static,
 ) -> impl Scene {
     bsn! {
         Slider { track_click: {TrackClick::Snap} }

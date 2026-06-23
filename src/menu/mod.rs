@@ -236,7 +236,7 @@ pub(super) fn spawn_button<M: 'static>(
     theme: &LoadedTheme,
     btn_mats: &ButtonMaterials,
     menu_id: &str,
-    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Send + Sync + 'static,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
 ) {
     // Resolve pixel coords from the theme JSON (if defined for this button).
     let coords = coord_id

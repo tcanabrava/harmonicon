@@ -207,11 +207,10 @@ fn theme_over(
     selected: Res<SelectedTheme>,
     mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
 ) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
-        if btn.0 != selected.0 {
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
+        && btn.0 != selected.0 {
             *bg = BackgroundColor(THEME_HOVER);
         }
-    }
 }
 
 fn theme_out(
@@ -219,11 +218,10 @@ fn theme_out(
     selected: Res<SelectedTheme>,
     mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
 ) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity) {
-        if btn.0 != selected.0 {
+    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
+        && btn.0 != selected.0 {
             *bg = BackgroundColor(button::color_default());
         }
-    }
 }
 
 /// Recolour the list whenever the selection changes (green for the chosen one).

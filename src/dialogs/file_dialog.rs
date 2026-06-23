@@ -15,7 +15,6 @@
 
 use std::path::PathBuf;
 
-use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
@@ -74,8 +73,6 @@ enum FileDialogState {
 
 const PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.11, 0.98);
 const ENTRY_BG: Color = Color::srgba(0.14, 0.14, 0.20, 0.95);
-const DIR_COLOR: Color = Color::srgb(0.55, 0.78, 1.0);
-const FILE_COLOR: Color = Color::srgb(0.85, 0.85, 0.92);
 
 /// Directories then matching files in `dir`, sorted, hidden entries skipped.
 fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<PathBuf>) {
@@ -286,12 +283,11 @@ fn dialog_keys(
     if keyboard.just_pressed(KeyCode::Escape) {
         keyboard.clear_just_pressed(KeyCode::Escape);
         close(&mut dialog, &roots, next_state, &mut commands);
-    } else if keyboard.just_pressed(KeyCode::Backspace) {
-        if let Some(parent) = dialog.dir.parent() {
+    } else if keyboard.just_pressed(KeyCode::Backspace)
+        && let Some(parent) = dialog.dir.parent() {
             dialog.dir = parent.to_path_buf();
             refresh_req.write(RefreshFileList);
         }
-    }
 }
 
 fn close(
