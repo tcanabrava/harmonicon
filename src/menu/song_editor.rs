@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
@@ -490,7 +491,8 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
                     TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
                     TextColor(Color::srgb(0.7, 0.95, 0.7)),
                 ));
-            });
+            })
+            .observe(save_song_click);
 
             root.spawn((
                 Text::new(String::new()),
@@ -528,7 +530,14 @@ fn mod_button(parent: &mut ChildSpawnerCommands, font: &FontSource, m: NoteMod) 
                 TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
                 TextColor(Color::srgb(0.85, 0.85, 0.95)),
             ));
-        });
+        })
+        .observe(
+            move |_: On<Pointer<Click>>,
+                  mut data: ResMut<SongEditorData>,
+                  mut status: Query<&mut Text, With<AnalyzeStatusText>>| {
+                apply_modifier(m, &mut data, &mut status);
+            },
+        );
 }
 
 fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &str) {
@@ -568,7 +577,8 @@ fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &st
                     TextColor(Color::WHITE),
                     NoteEntryText,
                 ));
-            });
+            })
+            .observe(focus_note);
         });
 }
 
@@ -615,6 +625,9 @@ fn text_field(
                     TextColor(Color::WHITE),
                     TextFieldText(id),
                 ));
+            })
+            .observe(move |_: On<Pointer<Click>>, mut focused: ResMut<FocusedField>| {
+                focused.0 = Focus::Field(id);
             });
         });
 }
@@ -661,7 +674,8 @@ fn music_field(parent: &mut ChildSpawnerCommands, font: &FontSource, path: &Opti
                     TextFont { font_size: FontSize::Px(14.0), font: font.clone(), ..default() },
                     TextColor(ACCENT),
                 ));
-            });
+            })
+            .observe(browse_music);
         });
 }
 
@@ -702,7 +716,8 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
                     TextColor(ACCENT),
                     HarpKeyText,
                 ));
-            });
+            })
+            .observe(cycle_harp_key);
             row.spawn((
                 Text::new(format!("click to cycle  \u{00B7}  plays in {} (2nd position)", song_key_of(key))),
                 TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
@@ -856,7 +871,15 @@ fn build_bar_cell(
                                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                                 ));
                             }
-                        });
+                        })
+                        .observe(
+                            move |_: On<Pointer<Click>>,
+                                  keyboard: Res<ButtonInput<KeyCode>>,
+                                  mut data: ResMut<SongEditorData>,
+                                  mut focused: ResMut<FocusedField>| {
+                                select_note(ni, &keyboard, &mut data, &mut focused);
+                            },
+                        );
                 }
             });
         });
@@ -969,20 +992,10 @@ fn music_label(path: &Option<PathBuf>) -> String {
 
 // ── Interaction: focus + typing ───────────────────────────────────────────────
 
-/// Clicking a metadata field or the note box focuses it for typing.
-fn focus_clicks(
-    text_boxes: Query<(&Interaction, &TextFieldBox), Changed<Interaction>>,
-    note_boxes: Query<&Interaction, (Changed<Interaction>, With<NoteEntryBox>)>,
-    mut focused: ResMut<FocusedField>,
-) {
-    for (interaction, field) in &text_boxes {
-        if *interaction == Interaction::Pressed {
-            focused.0 = Focus::Field(field.0);
-        }
-    }
-    if note_boxes.iter().any(|i| *i == Interaction::Pressed) {
-        focused.0 = Focus::Note;
-    }
+/// Clicking the note box focuses it for typing. (Metadata fields focus via a
+/// per-field closure that captures their id; see `text_field`.)
+fn focus_note(_: On<Pointer<Click>>, mut focused: ResMut<FocusedField>) {
+    focused.0 = Focus::Note;
 }
 
 /// Route typed characters into the focused field. No-op while a field isn't
@@ -1100,15 +1113,12 @@ fn update_note_views(
 
 /// Cycle the harp key on click and update its label. The grid is rebuilt by
 /// `rebuild_grid` (the key change marks the data as changed).
-fn harp_key_clicks(
-    interactions: Query<&Interaction, (Changed<Interaction>, With<HarpKeyButton>)>,
+fn cycle_harp_key(
+    _: On<Pointer<Click>>,
     mut data: ResMut<SongEditorData>,
     mut key_texts: Query<&mut Text, (With<HarpKeyText>, Without<HarpPlaysText>)>,
     mut plays_texts: Query<&mut Text, (With<HarpPlaysText>, Without<HarpKeyText>)>,
 ) {
-    if !interactions.iter().any(|i| *i == Interaction::Pressed) {
-        return;
-    }
     data.harp_key = next_key(&data.harp_key);
     for mut t in &mut key_texts {
         **t = data.harp_key.clone();
@@ -1244,20 +1254,20 @@ fn move_cursor(data: &mut SongEditorData, dir: i32, shift: bool, ctrl: bool) {
 }
 
 /// Clicking a note selects it; Ctrl+click toggles it; Shift+click extends a
-/// range from the anchor.
-fn note_widget_clicks(
-    widgets: Query<(&Interaction, &NoteWidget), Changed<Interaction>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut data: ResMut<SongEditorData>,
-    mut focused: ResMut<FocusedField>,
+/// range from the anchor. Each note widget carries this as a dedicated `on()`
+/// closure capturing its index (see `build_bar_cell`).
+fn select_note(
+    i: usize,
+    keyboard: &ButtonInput<KeyCode>,
+    data: &mut SongEditorData,
+    focused: &mut FocusedField,
 ) {
     let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
-    for (interaction, w) in &widgets {
-        if *interaction != Interaction::Pressed || w.0 >= data.notes.len() {
-            continue;
-        }
-        let i = w.0;
+    if i >= data.notes.len() {
+        return;
+    }
+    {
         if ctrl {
             match data.selected.iter().position(|&x| x == i) {
                 Some(pos) => {
@@ -1283,41 +1293,35 @@ fn note_widget_clicks(
 }
 
 /// Apply (toggle) a modifier on every selected note where it's physically
-/// possible. Reports the result in the status line.
-fn apply_modifier_clicks(
-    clicks: Query<(&Interaction, &ModButton), Changed<Interaction>>,
-    mut data: ResMut<SongEditorData>,
-    mut status: Query<&mut Text, With<AnalyzeStatusText>>,
+/// possible. Reports the result in the status line. Each toolbar button carries
+/// this as a dedicated `on()` closure capturing its modifier (see `mod_button`).
+fn apply_modifier(
+    m: NoteMod,
+    data: &mut SongEditorData,
+    status: &mut Query<&mut Text, With<AnalyzeStatusText>>,
 ) {
-    for (interaction, mb) in &clicks {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-        let m = mb.0;
-        let targets: Vec<usize> = data
-            .selected
-            .iter()
-            .copied()
-            .filter(|&i| i < data.notes.len() && mod_valid(&data.notes[i], m))
-            .collect();
-        let msg = if targets.is_empty() {
-            format!("No selected note can take {}", m.label())
-        } else {
-            let all_have = targets.iter().all(|&i| data.notes[i].mods & m.bit() != 0);
-            for &i in &targets {
-                if all_have {
-                    data.notes[i].mods &= !m.bit();
-                } else {
-                    data.notes[i].mods |= m.bit();
-                }
+    let targets: Vec<usize> = data
+        .selected
+        .iter()
+        .copied()
+        .filter(|&i| i < data.notes.len() && mod_valid(&data.notes[i], m))
+        .collect();
+    let msg = if targets.is_empty() {
+        format!("No selected note can take {}", m.label())
+    } else {
+        let all_have = targets.iter().all(|&i| data.notes[i].mods & m.bit() != 0);
+        for &i in &targets {
+            if all_have {
+                data.notes[i].mods &= !m.bit();
+            } else {
+                data.notes[i].mods |= m.bit();
             }
-            let verb = if all_have { "Removed" } else { "Applied" };
-            format!("{verb} {} on {} note(s)", m.label(), targets.len())
-        };
-        if let Ok(mut text) = status.single_mut() {
-            **text = msg;
         }
-        return;
+        let verb = if all_have { "Removed" } else { "Applied" };
+        format!("{verb} {} on {} note(s)", m.label(), targets.len())
+    };
+    if let Ok(mut text) = status.single_mut() {
+        **text = msg;
     }
 }
 
@@ -1348,14 +1352,11 @@ fn rebuild_grid(
 const MUSIC_DIALOG: DialogId = DialogId("song_editor_music");
 
 /// Open the navigable file dialog when Browse is clicked.
-fn open_browser(
-    interactions: Query<&Interaction, (Changed<Interaction>, With<MusicPickButton>)>,
+fn browse_music(
+    _: On<Pointer<Click>>,
     mut focused: ResMut<FocusedField>,
     mut open: MessageWriter<OpenFileDialog>,
 ) {
-    if !interactions.iter().any(|i| *i == Interaction::Pressed) {
-        return;
-    }
     focused.0 = Focus::None;
     open.write(OpenFileDialog {
         purpose: MUSIC_DIALOG,
@@ -1579,14 +1580,11 @@ fn save_song(data: &SongEditorData) -> String {
 }
 
 /// Save the song when the Save button is clicked, reporting the result.
-fn save_clicks(
-    interactions: Query<&Interaction, (Changed<Interaction>, With<SaveButton>)>,
+fn save_song_click(
+    _: On<Pointer<Click>>,
     data: Res<SongEditorData>,
     mut status: Query<&mut Text, With<AnalyzeStatusText>>,
 ) {
-    if !interactions.iter().any(|i| *i == Interaction::Pressed) {
-        return;
-    }
     let msg = save_song(&data);
     if let Ok(mut text) = status.single_mut() {
         **text = msg;
@@ -1638,17 +1636,14 @@ impl Plugin for SongEditorPlugin {
             .add_systems(
                 Update,
                 (
+                    // Widget clicks (focus, harp cycle, note select, modifiers,
+                    // browse, save) ride along as inline on(...) observers wired
+                    // at spawn — see the spawn helpers and build_grid.
                     handle_escape,
-                    focus_clicks,
                     type_into_focused,
                     note_input_keys,
-                    note_widget_clicks,
-                    apply_modifier_clicks,
-                    harp_key_clicks,
-                    open_browser,
                     pick_file,
                     poll_tempo,
-                    save_clicks,
                     update_field_views,
                     update_note_views,
                     rebuild_grid,
