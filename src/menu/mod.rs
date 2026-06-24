@@ -30,6 +30,9 @@ pub enum GameplayMode {
     Play3D,
     /// Free-play: the 12-bar chart + metronome, no falling notes.
     JamSession,
+    /// Bending practice: the harmonica bend diagram + metronome, no backing
+    /// track, no falling notes.
+    BendingTrainer,
 }
 
 /// Set to `true` by the pause menu's "Quit Song" button so that re-entering
@@ -411,6 +414,11 @@ fn setup_play_menu(
     spawn_button(&mut commands, root, &font.gameplay, "Jam Session", Some("JamSession"), &theme, &btn_mats, "Play",
         |_: On<Pointer<Click>>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
             *mode = GameplayMode::JamSession;
+            page.set(MenuPage::ArtistList);
+        });
+    spawn_button(&mut commands, root, &font.gameplay, "Bending Trainer", Some("BendingTrainer"), &theme, &btn_mats, "Play",
+        |_: On<Pointer<Click>>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
+            *mode = GameplayMode::BendingTrainer;
             page.set(MenuPage::ArtistList);
         });
     spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", Some("BackToMain"), &theme, &btn_mats, "Play",

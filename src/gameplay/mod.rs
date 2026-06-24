@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+mod bending_trainer;
 mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;
@@ -78,6 +79,8 @@ impl Plugin for GameplayPlugin {
                 gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                 gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 jam_session::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+                bending_trainer::setup
+                    .run_if(|m: Res<GameplayMode>| *m == GameplayMode::BendingTrainer),
             ),
         )
         // Cleanup: shared entity despawn + restore camera on 3D exit
@@ -118,18 +121,25 @@ impl Plugin for GameplayPlugin {
                 .in_set(GameplayLogic)
                 .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         )
-        // Jam Session: live harmonica hole-map + bend-diagram feedback from the mic.
+        // Jam Session: live harmonica hole-map feedback from the mic.
         .add_systems(
             Update,
-            (
-                jam_session::update_hole_map,
-                harmonica_overlay::update_harmonica_overlay,
-            )
-                .run_if(
-                    in_state(AppState::Playing)
-                        .and_then(|p: Res<Paused>| !p.0)
-                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
-                ),
+            jam_session::update_hole_map.run_if(
+                in_state(AppState::Playing)
+                    .and_then(|p: Res<Paused>| !p.0)
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+            ),
+        )
+        // Live bend-diagram feedback: Jam Session and the Bending Trainer both show it.
+        .add_systems(
+            Update,
+            harmonica_overlay::update_harmonica_overlay.run_if(
+                in_state(AppState::Playing)
+                    .and_then(|p: Res<Paused>| !p.0)
+                    .and_then(|m: Res<GameplayMode>| {
+                        matches!(*m, GameplayMode::JamSession | GameplayMode::BendingTrainer)
+                    }),
+            ),
         )
         // Results screen lifecycle. The Retry/Continue buttons carry their own
         // click/hover behaviour as inline on(...) observers (see results::setup).
@@ -816,7 +826,10 @@ fn detect_song_end(
     mode: Res<GameplayMode>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    if *mode == GameplayMode::JamSession || !music_started.0 {
+    // Jam Session and the Bending Trainer are open-ended — never end the song.
+    if matches!(*mode, GameplayMode::JamSession | GameplayMode::BendingTrainer)
+        || !music_started.0
+    {
         return;
     }
     if clock.0 >= song_end.0 {
