@@ -28,6 +28,9 @@ pub enum PitchAlgorithm {
     /// McLeod Pitch Method (MPM): normalized square difference function with
     /// key-maximum peak picking. Monophonic (one pitch).
     Mcleod,
+    /// Template NMF: decompose the FFT spectrum onto a dictionary of harmonic
+    /// note templates. Polyphonic — reports all notes of a chord.
+    Nmf,
 }
 
 impl PitchAlgorithm {
@@ -38,6 +41,7 @@ impl PitchAlgorithm {
             PitchAlgorithm::Yin,
             PitchAlgorithm::Pyin,
             PitchAlgorithm::Mcleod,
+            PitchAlgorithm::Nmf,
         ]
     }
 
@@ -48,6 +52,7 @@ impl PitchAlgorithm {
             PitchAlgorithm::Yin => "YIN",
             PitchAlgorithm::Pyin => "pYIN",
             PitchAlgorithm::Mcleod => "MPM",
+            PitchAlgorithm::Nmf => "NMF",
         }
     }
 }
@@ -98,6 +103,8 @@ pub struct FftState {
     planner: FftPlanner<f32>,
     plan: Option<Arc<dyn Fft<f32>>>,
     last_size: usize,
+    /// Cached NMF note dictionary, rebuilt when the spectrum size / rate change.
+    nmf_dict: Option<NmfDict>,
 }
 
 impl Default for FftState {
@@ -106,6 +113,7 @@ impl Default for FftState {
             planner: FftPlanner::new(),
             plan: None,
             last_size: 0,
+            nmf_dict: None,
         }
     }
 }
@@ -174,6 +182,17 @@ pub fn analyze(
         PitchAlgorithm::Yin => mono_pitch(yin_pitch(samples, sample_rate)),
         PitchAlgorithm::Pyin => mono_pitch(pyin_pitch(samples, sample_rate)),
         PitchAlgorithm::Mcleod => mono_pitch(mpm_pitch(samples, sample_rate)),
+        PitchAlgorithm::Nmf => {
+            let n_bins = magnitudes.len();
+            let stale = match &state.nmf_dict {
+                Some(d) => d.n_bins != n_bins || d.sample_rate != sample_rate,
+                None => true,
+            };
+            if stale {
+                state.nmf_dict = Some(build_nmf_dict(sample_rate, n_bins));
+            }
+            nmf_pitches(&magnitudes, state.nmf_dict.as_ref().unwrap())
+        }
     };
 
     Analysis {
@@ -477,6 +496,154 @@ fn mpm_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
     (MIN_FREQ..=MAX_FREQ).contains(&f0).then_some(f0)
 }
 
+// ── Template NMF (polyphonic) ─────────────────────────────────────────────────
+//
+// Decompose the observed magnitude spectrum y onto a fixed dictionary D whose
+// columns are synthetic harmonic templates, one per chromatic note in the
+// harmonica range: y ≈ D·a, a ≥ 0. The notes whose activations a are strongest
+// are the ones sounding — so unlike the YIN/MPM family this reports a whole
+// chord. Activations are solved with non-negative multiplicative updates (NMF
+// with a fixed basis), which need no model files and run on the FFT we already
+// compute. The harmonic templates also damp octave confusion: a low note
+// explains its own upper partials, so energy isn't double-counted as a 2nd note.
+
+// Harmonics per note template, amplitude rolling off as 1/h.
+const NMF_HARMONICS: usize = 8;
+// Iterations of the multiplicative activation update per frame.
+const NMF_ITERS: usize = 50;
+// A note is "playing" when its activation reaches this fraction of the loudest.
+const NMF_ACTIVATION_RATIO: f32 = 0.22;
+// Cap on simultaneously reported notes (a harmonica chord is only so wide).
+const NMF_MAX_NOTES: usize = 6;
+
+/// A fixed harmonic-template dictionary over the chromatic notes in range, with
+/// `DᵀD` precomputed for the activation updates. Tied to one spectrum size +
+/// sample rate (rebuilt when those change).
+struct NmfDict {
+    sample_rate: u32,
+    n_bins: usize,
+    n_notes: usize,
+    /// Fundamental frequency of each note (dictionary column).
+    freqs: Vec<f32>,
+    /// `n_notes` columns, each a length-`n_bins` magnitude template.
+    columns: Vec<Vec<f32>>,
+    /// `DᵀD` (`n_notes × n_notes`), the constant part of the update denominator.
+    dtd: Vec<Vec<f32>>,
+}
+
+/// Build the harmonic-template dictionary for a given spectrum size / rate.
+fn build_nmf_dict(sample_rate: u32, n_bins: usize) -> NmfDict {
+    let nyquist = sample_rate as f32 / 2.0;
+    // magnitudes span DC..Nyquist over n_bins, so each bin is this wide.
+    let freq_res = nyquist / n_bins.max(1) as f32;
+
+    let midi_lo = (12.0 * (MIN_FREQ / 440.0).log2() + 69.0).ceil() as i32;
+    let midi_hi = (12.0 * (MAX_FREQ / 440.0).log2() + 69.0).floor() as i32;
+
+    let mut freqs = Vec::new();
+    let mut columns: Vec<Vec<f32>> = Vec::new();
+    for midi in midi_lo..=midi_hi {
+        let f = 440.0 * 2f32.powf((midi - 69) as f32 / 12.0);
+        let mut col = vec![0.0f32; n_bins];
+        for h in 1..=NMF_HARMONICS {
+            let fh = f * h as f32;
+            if fh >= nyquist {
+                break;
+            }
+            let center = fh / freq_res;
+            let amp = 1.0 / h as f32;
+            // Gaussian smear (~Hanning main-lobe width) so slight detuning still hits.
+            let lo = (center.floor() as i32 - 2).max(0);
+            let hi = (center.ceil() as i32 + 2).min(n_bins as i32 - 1);
+            for b in lo..=hi {
+                let d = b as f32 - center;
+                col[b as usize] += amp * (-(d * d) / 2.0).exp();
+            }
+        }
+        // L2-normalize so DᵀD has a unit diagonal (notes compete fairly).
+        let norm = col.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in col.iter_mut() {
+                *v /= norm;
+            }
+        }
+        freqs.push(f);
+        columns.push(col);
+    }
+
+    let n_notes = columns.len();
+    let mut dtd = vec![vec![0.0f32; n_notes]; n_notes];
+    for i in 0..n_notes {
+        for j in i..n_notes {
+            let s: f32 = (0..n_bins).map(|b| columns[i][b] * columns[j][b]).sum();
+            dtd[i][j] = s;
+            dtd[j][i] = s;
+        }
+    }
+
+    NmfDict {
+        sample_rate,
+        n_bins,
+        n_notes,
+        freqs,
+        columns,
+        dtd,
+    }
+}
+
+/// Solve `y ≈ D·a` (a ≥ 0) with multiplicative updates and report the notes
+/// whose activation clears the threshold, strongest first.
+fn nmf_pitches(magnitudes: &[f32], dict: &NmfDict) -> Vec<PitchInfo> {
+    let n = dict.n_notes;
+    if n == 0 || dict.n_bins == 0 {
+        return vec![];
+    }
+
+    // Dᵀy: correlation of each template with the observed spectrum.
+    let dty: Vec<f32> = (0..n)
+        .map(|k| {
+            (0..dict.n_bins)
+                .map(|b| dict.columns[k][b] * magnitudes[b])
+                .sum()
+        })
+        .collect();
+
+    // a ← a · (Dᵀy) / (DᵀD·a). Start uniform-positive so every note can grow.
+    let mut a = vec![1.0f32; n];
+    for _ in 0..NMF_ITERS {
+        let dtda: Vec<f32> = (0..n)
+            .map(|k| (0..n).map(|j| dict.dtd[k][j] * a[j]).sum::<f32>())
+            .collect();
+        for k in 0..n {
+            a[k] *= dty[k] / (dtda[k] + 1e-9);
+        }
+    }
+
+    let max_a = a.iter().cloned().fold(0.0f32, f32::max);
+    if max_a <= 0.0 {
+        return vec![];
+    }
+    let threshold = max_a * NMF_ACTIVATION_RATIO;
+
+    let mut active: Vec<(f32, f32)> = (0..n)
+        .filter(|&k| a[k] >= threshold)
+        .map(|k| (dict.freqs[k], a[k]))
+        .collect();
+    active.sort_by(|x, y| y.1.partial_cmp(&x.1).unwrap_or(std::cmp::Ordering::Equal));
+    active.truncate(NMF_MAX_NOTES);
+
+    active
+        .into_iter()
+        .filter_map(|(f, _)| {
+            freq_to_note(f).map(|(note, octave)| PitchInfo {
+                note,
+                octave,
+                frequency: f,
+            })
+        })
+        .collect()
+}
+
 fn freq_to_note(freq: f32) -> Option<(String, i32)> {
     if freq <= 0.0 {
         return None;
@@ -589,6 +756,51 @@ mod tests {
     #[test]
     fn mpm_rejects_silence() {
         assert_eq!(mpm_pitch(&vec![0.0f32; 4096], 44100), None);
+    }
+
+    // Render the FFT magnitude spectrum of a sum of sine tones, the way
+    // `analyze` would, so the NMF detector can be tested directly.
+    fn magnitudes_of(freqs: &[f32], sample_rate: u32, n: usize) -> Vec<f32> {
+        let samples: Vec<f32> = (0..n)
+            .map(|i| {
+                freqs
+                    .iter()
+                    .map(|&f| 0.4 * (2.0 * PI * f * i as f32 / sample_rate as f32).sin())
+                    .sum()
+            })
+            .collect();
+        let mut state = FftState::default();
+        analyze(&samples, sample_rate, &mut state, PitchAlgorithm::Fft).magnitudes
+    }
+
+    #[test]
+    fn nmf_detects_a_two_note_chord() {
+        let sample_rate = 44100u32;
+        let n = 4096;
+        // A4 (440) + C#5 (554.37): a major third.
+        let mags = magnitudes_of(&[440.0, 554.37], sample_rate, n);
+        let dict = build_nmf_dict(sample_rate, mags.len());
+        let pitches = nmf_pitches(&mags, &dict);
+        assert!(
+            pitches.iter().any(|p| p.note == "A" && p.octave == 4),
+            "expected A4, got {pitches:?}"
+        );
+        assert!(
+            pitches.iter().any(|p| p.note == "C#" && p.octave == 5),
+            "expected C#5, got {pitches:?}"
+        );
+    }
+
+    #[test]
+    fn nmf_single_tone_is_one_note() {
+        let sample_rate = 44100u32;
+        let mags = magnitudes_of(&[440.0], sample_rate, 4096);
+        let dict = build_nmf_dict(sample_rate, mags.len());
+        let pitches = nmf_pitches(&mags, &dict);
+        assert!(
+            pitches.iter().any(|p| p.note == "A" && p.octave == 4),
+            "expected A4 among {pitches:?}"
+        );
     }
 
     #[test]
