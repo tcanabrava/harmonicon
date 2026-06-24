@@ -3,6 +3,7 @@
 mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;
+mod harmonica_overlay;
 mod jam_session;
 mod metronome_overlay;
 mod modifier_legend;
@@ -117,14 +118,18 @@ impl Plugin for GameplayPlugin {
                 .in_set(GameplayLogic)
                 .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         )
-        // Jam Session: live harmonica hole-map feedback from the mic.
+        // Jam Session: live harmonica hole-map + bend-diagram feedback from the mic.
         .add_systems(
             Update,
-            jam_session::update_hole_map.run_if(
-                in_state(AppState::Playing)
-                    .and_then(|p: Res<Paused>| !p.0)
-                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
-            ),
+            (
+                jam_session::update_hole_map,
+                harmonica_overlay::update_harmonica_overlay,
+            )
+                .run_if(
+                    in_state(AppState::Playing)
+                        .and_then(|p: Res<Paused>| !p.0)
+                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+                ),
         )
         // Results screen lifecycle. The Retry/Continue buttons carry their own
         // click/hover behaviour as inline on(...) observers (see results::setup).

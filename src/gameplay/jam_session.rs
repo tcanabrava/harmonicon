@@ -15,6 +15,7 @@ use crate::{
 use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 
 use super::countdown_overlay::spawn_countdown;
+use super::harmonica_overlay::spawn_harmonica_overlay;
 use super::metronome_overlay::spawn_metronome;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{ActivePitches, COUNTDOWN, GameplayRoot, MusicStarted};
@@ -133,14 +134,16 @@ pub fn setup(
                 });
             });
 
-            // ── Right half: live spectrogram (top)  ──────
+            // ── Right half: harmonica bend diagram (top) + live spectrogram ──
             root.spawn(Node {
                 width: Val::Percent(50.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
                 ..default()
             })
             .with_children(|right| {
+                spawn_harmonica_overlay(right, &chart.harmonica, &fonts.gameplay);
                 right
                     .spawn(Node {
                         width: Val::Percent(100.0),
