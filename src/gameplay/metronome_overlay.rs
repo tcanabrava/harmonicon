@@ -13,7 +13,40 @@ use crate::{
     song::SongManifest,
 };
 
-use super::{GameplayClock, Paused, ScoringConfig};
+use super::{GameplayClock, Paused};
+
+/// The metronome's tempo, decoupled from the song so it can be driven by the
+/// gameplay screens (set from the chart) or the standalone Bending Trainer (set
+/// from its key/BPM controls).
+#[derive(Resource)]
+pub struct MetronomeTempo {
+    pub bpm: f32,
+    pub beats_per_bar: usize,
+}
+
+impl Default for MetronomeTempo {
+    fn default() -> Self {
+        Self {
+            bpm: 90.0,
+            beats_per_bar: 4,
+        }
+    }
+}
+
+/// Run condition: the metronome clicks/animates during gameplay (when not
+/// paused) and in the Bending Trainer.
+fn metronome_running(state: Res<State<AppState>>, paused: Res<Paused>) -> bool {
+    match state.get() {
+        AppState::Playing => !paused.0,
+        AppState::BendingTrainer => true,
+        _ => false,
+    }
+}
+
+/// Run condition for the always-responsive bits (toggles, label refreshes).
+fn metronome_ui_active(state: Res<State<AppState>>) -> bool {
+    matches!(state.get(), AppState::Playing | AppState::BendingTrainer)
+}
 
 #[derive(Component)]
 pub struct MetronomeBeat(pub usize);
@@ -33,6 +66,10 @@ pub struct MetronomeFeelButton;
 /// Marks the text inside the feel toggle so it can be rewritten.
 #[derive(Component, Default, Clone)]
 pub struct MetronomeFeelLabel;
+
+/// Marks the "♩ = NN" tempo readout so it tracks `MetronomeTempo` live.
+#[derive(Component, Default, Clone)]
+pub struct MetronomeTempoLabel;
 
 // The two little HUD pill buttons share these idle/hover colours.
 const PILL_IDLE: Color = Color::srgba(0.12, 0.12, 0.16, 0.9);
@@ -135,6 +172,8 @@ pub fn spawn_metronome(
                     ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.65, 0.70)),
+                // Refreshed live from MetronomeTempo (the trainer's BPM control).
+                MetronomeTempoLabel,
             ));
 
             // Click on/off toggle. Authored with bsn!; click + hover ride along
@@ -216,21 +255,16 @@ pub fn spawn_metronome(
 
 pub fn update_metronome(
     clock: Res<GameplayClock>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    config: Res<ScoringConfig>,
+    tempo: Res<MetronomeTempo>,
     mut beats: Query<(&MetronomeBeat, &mut BackgroundColor)>,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else {
-        return;
-    };
     if clock.0 < 0.0 {
         return;
     }
 
-    let bpm = manifest.chart.song.tempo_bpm as f64;
+    let bpm = tempo.bpm as f64;
     let beat_dur = 60.0 / bpm;
-    let beats_per_bar = config.beats_per_bar as usize;
+    let beats_per_bar = tempo.beats_per_bar;
     let beat_pos = clock.0 / beat_dur;
     let current = beat_pos.floor() as usize % beats_per_bar;
     let phase = beat_pos.fract() as f32;
@@ -271,9 +305,7 @@ fn reset_click_tracking(mut last: ResMut<LastClickedTick>) {
 /// pause/resume and loop-region jumps.
 fn click_metronome(
     clock: Res<GameplayClock>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    config: Res<ScoringConfig>,
+    tempo: Res<MetronomeTempo>,
     muted: Res<MetronomeMuted>,
     feel: Res<MetronomeFeel>,
     sounds: Res<MetronomeSounds>,
@@ -281,10 +313,7 @@ fn click_metronome(
     mut last: ResMut<LastClickedTick>,
     mut commands: Commands,
 ) {
-    let Some(manifest) = manifests.get(&selected.0) else {
-        return;
-    };
-    let Some(current) = tick_index(clock.0, manifest.chart.song.tempo_bpm as f64, *feel) else {
+    let Some(current) = tick_index(clock.0, tempo.bpm as f64, *feel) else {
         return;
     };
     if last.0 == Some(current) {
@@ -296,7 +325,7 @@ fn click_metronome(
         return;
     }
     // Silent subdivisions (the skipped middle triplet of a shuffle) play nothing.
-    let Some((accent, gain)) = click_for_tick(current, config.beats_per_bar, *feel) else {
+    let Some((accent, gain)) = click_for_tick(current, tempo.beats_per_bar as f64, *feel) else {
         return;
     };
     let sample = if accent {
@@ -345,6 +374,35 @@ fn pill_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
     }
 }
 
+/// On entering gameplay, seed the metronome tempo from the chosen song's chart.
+/// (The Bending Trainer sets `MetronomeTempo` itself, from its own controls.)
+fn set_tempo_from_song(
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut tempo: ResMut<MetronomeTempo>,
+) {
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    tempo.bpm = manifest.chart.song.tempo_bpm;
+    let ts = manifest.chart.song.time_signature.as_deref().unwrap_or("4/4");
+    tempo.beats_per_bar = ts
+        .split('/')
+        .next()
+        .and_then(|n| n.parse::<usize>().ok())
+        .unwrap_or(4);
+}
+
+/// Keep the "♩ = NN" readout in step with the live tempo.
+fn update_tempo_label(
+    tempo: Res<MetronomeTempo>,
+    mut labels: Query<&mut Text, With<MetronomeTempoLabel>>,
+) {
+    for mut text in &mut labels {
+        *text = Text::new(format!("\u{2669} = {}", tempo.bpm as u32));
+    }
+}
+
 /// Mirror the current feel onto its button label (written every frame, like
 /// `update_mute_label`, so a freshly spawned label isn't stale across songs).
 fn update_feel_label(
@@ -385,21 +443,30 @@ impl Plugin for MetronomePlugin {
         app.init_resource::<MetronomeMuted>()
             .init_resource::<LastClickedTick>()
             .init_resource::<MetronomeFeel>()
+            .init_resource::<MetronomeTempo>()
             .add_systems(Startup, load_metronome_sounds)
-            .add_systems(OnEnter(AppState::Playing), reset_click_tracking)
             .add_systems(
-                Update,
-                (update_metronome, click_metronome)
-                    .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+                OnEnter(AppState::Playing),
+                (reset_click_tracking, set_tempo_from_song),
             )
-            // The toggles stay responsive even while paused, like the pause
-            // menu. The buttons' click/hover ride along as inline on(...)
-            // observers (see spawn_metronome); only the keyboard shortcut and
-            // the label refreshes are systems here.
+            .add_systems(OnEnter(AppState::BendingTrainer), reset_click_tracking)
+            // Clicks/beat animation: gameplay (unpaused) and the Bending Trainer.
             .add_systems(
                 Update,
-                (toggle_mute_key, update_mute_label, update_feel_label)
-                    .run_if(in_state(AppState::Playing)),
+                (update_metronome, click_metronome).run_if(metronome_running),
+            )
+            // Toggles + label refreshes stay responsive even while paused. The
+            // buttons' click/hover ride along as inline on(...) observers (see
+            // spawn_metronome).
+            .add_systems(
+                Update,
+                (
+                    toggle_mute_key,
+                    update_mute_label,
+                    update_feel_label,
+                    update_tempo_label,
+                )
+                    .run_if(metronome_ui_active),
             );
     }
 }

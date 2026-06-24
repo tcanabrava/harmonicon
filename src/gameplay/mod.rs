@@ -69,6 +69,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<Paused>()
         .init_resource::<LoopConfig>()
         .init_resource::<FxMapping>()
+        .init_resource::<bending_trainer::TrainerKey>()
         // Setup: shared pause menu + mode-specific scenes
         .add_systems(
             OnEnter(AppState::Playing),
@@ -79,9 +80,22 @@ impl Plugin for GameplayPlugin {
                 gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                 gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 jam_session::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
-                bending_trainer::setup
-                    .run_if(|m: Res<GameplayMode>| *m == GameplayMode::BendingTrainer),
             ),
+        )
+        // Standalone Bending Trainer (its own AppState, no song).
+        .add_systems(OnEnter(AppState::BendingTrainer), bending_trainer::setup)
+        .add_systems(OnExit(AppState::BendingTrainer), cleanup_gameplay)
+        .add_systems(
+            Update,
+            (
+                bending_trainer::tick_clock,
+                collect_pitches,
+                harmonica_overlay::update_harmonica_overlay,
+                bending_trainer::rebuild_overlay,
+                bending_trainer::update_key_label,
+                bending_trainer::handle_escape,
+            )
+                .run_if(in_state(AppState::BendingTrainer)),
         )
         // Cleanup: shared entity despawn + restore camera on 3D exit
         .add_systems(OnExit(AppState::Playing), cleanup_gameplay)
@@ -130,15 +144,14 @@ impl Plugin for GameplayPlugin {
                     .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
             ),
         )
-        // Live bend-diagram feedback: Jam Session and the Bending Trainer both show it.
+        // Live bend-diagram feedback during Jam Session (the Bending Trainer
+        // runs its own copy in its own AppState).
         .add_systems(
             Update,
             harmonica_overlay::update_harmonica_overlay.run_if(
                 in_state(AppState::Playing)
                     .and_then(|p: Res<Paused>| !p.0)
-                    .and_then(|m: Res<GameplayMode>| {
-                        matches!(*m, GameplayMode::JamSession | GameplayMode::BendingTrainer)
-                    }),
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
             ),
         )
         // Results screen lifecycle. The Retry/Continue buttons carry their own
@@ -826,10 +839,7 @@ fn detect_song_end(
     mode: Res<GameplayMode>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    // Jam Session and the Bending Trainer are open-ended — never end the song.
-    if matches!(*mode, GameplayMode::JamSession | GameplayMode::BendingTrainer)
-        || !music_started.0
-    {
+    if *mode == GameplayMode::JamSession || !music_started.0 {
         return;
     }
     if clock.0 >= song_end.0 {

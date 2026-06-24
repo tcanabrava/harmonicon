@@ -30,9 +30,6 @@ pub enum GameplayMode {
     Play3D,
     /// Free-play: the 12-bar chart + metronome, no falling notes.
     JamSession,
-    /// Bending practice: the harmonica bend diagram + metronome, no backing
-    /// track, no falling notes.
-    BendingTrainer,
 }
 
 /// Set to `true` by the pause menu's "Quit Song" button so that re-entering
@@ -64,6 +61,9 @@ pub enum AppState {
     Credits,
     /// Song authoring tool, launched from the main menu.
     SongEditor,
+    /// Standalone bending practice: harmonica bend diagram + metronome, with a
+    /// directly pickable key and adjustable tempo (no song).
+    BendingTrainer,
 }
 
 // ── Menu sub-states (only active while AppState == Menu) ──────────────────────
@@ -417,10 +417,7 @@ fn setup_play_menu(
             page.set(MenuPage::ArtistList);
         });
     spawn_button(&mut commands, root, &font.gameplay, "Bending Trainer", Some("BendingTrainer"), &theme, &btn_mats, "Play",
-        |_: On<Pointer<Click>>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
-            *mode = GameplayMode::BendingTrainer;
-            page.set(MenuPage::ArtistList);
-        });
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::BendingTrainer));
     spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", Some("BackToMain"), &theme, &btn_mats, "Play",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main));
 }

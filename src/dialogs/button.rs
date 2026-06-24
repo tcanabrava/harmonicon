@@ -19,6 +19,31 @@ fn mouse_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
     }
 }
 
+/// A compact button (no 220px min-width, smaller padding/font) for HUD-style
+/// controls. Same colours/hover as [`default`].
+pub fn small<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static) -> impl Scene {
+    bsn! {
+        Button
+        BackgroundColor({color_default()})
+        on(on_click)
+        on(mouse_over)
+        on(mouse_out)
+        Node {
+            padding: {UiRect::axes(Val::Px(12.0), Val::Px(6.0))},
+            justify_content: {JustifyContent::Center},
+            flex_shrink: {0.0},
+        }
+        Children [
+            (
+                Text({label.to_string()})
+                TextFont { font_size: {FontSize::Px(15.0)} }
+                TextColor({Color::WHITE})
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
+}
+
 pub fn default<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static) -> impl Scene {
     bsn! {
         Button
