@@ -17,7 +17,6 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
-use crate::assets_management::GlobalFonts;
 use crate::dialogs::file_dialog::{DialogId, FileChosen, FileDialog, OpenFileDialog};
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
 use crate::song::chart::{
@@ -194,14 +193,16 @@ fn beats_letter(beats: f32) -> char {
     }
 }
 
-/// Human name of a duration in beats.
-fn dur_name(beats: f32) -> &'static str {
+/// Music-notation glyph for a duration in beats. Quarter/eighth/sixteenth use
+/// the widely-supported BMP note symbols; whole/half use the Musical Symbols
+/// block (rendered by the bundled symbols font).
+fn dur_symbol(beats: f32) -> &'static str {
     match beats_letter(beats) {
-        'w' => "whole",
-        'h' => "half",
-        'q' => "quarter",
-        'e' => "eighth",
-        _ => "sixteenth",
+        'w' => "\u{1D15D}", // 𝅝 whole note
+        'h' => "\u{1D15E}", // 𝅗𝅥 half note
+        'q' => "\u{2669}",  // ♩ quarter note
+        'e' => "\u{266A}",  // ♪ eighth note
+        _ => "\u{266C}",    // ♬ sixteenth (beamed)
     }
 }
 
@@ -389,8 +390,7 @@ const LABEL: Color = Color::srgb(0.75, 0.75, 0.82);
 
 // ── Setup ───────────────────────────────────────────────────────────────────
 
-fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorData>) {
-    let font = fonts.gameplay.clone();
+fn setup(mut commands: Commands, data: Res<SongEditorData>) {
 
     commands
         .spawn((
@@ -410,7 +410,7 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
         .with_children(|root| {
             root.spawn((
                 Text::new("Song Editor"),
-                TextFont { font_size: FontSize::Px(34.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(34.0), ..default() },
                 TextColor(Color::WHITE),
             ));
 
@@ -421,24 +421,24 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
                 ..default()
             })
             .with_children(|form| {
-                text_field(form, &font, "Artist", TextFieldId::Artist, &data.artist);
-                text_field(form, &font, "Song Name", TextFieldId::SongName, &data.song_name);
-                music_field(form, &font, &data.music_path);
-                text_field(form, &font, "Music Tempo  \u{2669} =", TextFieldId::Tempo, &data.tempo_bpm);
-                text_field(form, &font, "Beats per Bar", TextFieldId::BeatsPerBar, &data.beats_per_bar);
-                harp_field(form, &font, &data.harp_key);
-                note_field(form, &font, &data.note_input);
+                text_field(form, "Artist", TextFieldId::Artist, &data.artist);
+                text_field(form, "Song Name", TextFieldId::SongName, &data.song_name);
+                music_field(form, &data.music_path);
+                text_field(form, "Music Tempo  \u{2669} =", TextFieldId::Tempo, &data.tempo_bpm);
+                text_field(form, "Beats per Bar", TextFieldId::BeatsPerBar, &data.beats_per_bar);
+                harp_field(form, &data.harp_key);
+                note_field(form, &data.note_input);
             });
 
             root.spawn((
                 Text::new(String::new()),
-                TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
                 TextColor(Color::srgb(0.7, 0.85, 1.0)),
                 NoteDurationText,
             ));
             root.spawn((
                 Text::new("Note: \"-4 q\" (draw 4, quarter), \"4 e\" (blow 4, eighth), \"r h\" (half-rest silence)  \u{00B7}  Enter add/edit  \u{00B7}  \u{2190}/\u{2192} select (Shift=range, Ctrl=add)  \u{00B7}  Backspace delete"),
-                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
 
@@ -452,11 +452,11 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
             .with_children(|row| {
                 row.spawn((
                     Text::new("Mark selected:"),
-                    TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                    TextFont { font_size: FontSize::Px(13.0), ..default() },
                     TextColor(LABEL),
                 ));
                 for m in NoteMod::ALL {
-                    mod_button(row, &font, m);
+                    mod_button(row, m);
                 }
             });
 
@@ -470,7 +470,7 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
                 TwelveBarGrid,
             ))
             .with_children(|grid| {
-                build_grid(grid, &data, &fonts);
+                build_grid(grid, &data);
             });
 
             root.spawn((
@@ -488,7 +488,7 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
             .with_children(|b| {
                 b.spawn((
                     Text::new("Save Song"),
-                    TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                    TextFont { font_size: FontSize::Px(16.0), ..default() },
                     TextColor(Color::srgb(0.7, 0.95, 0.7)),
                 ));
             })
@@ -496,14 +496,14 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
 
             root.spawn((
                 Text::new(String::new()),
-                TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
                 TextColor(ACCENT),
                 AnalyzeStatusText,
             ));
 
             root.spawn((
                 Text::new("Click a field to edit  \u{00B7}  Esc to go back"),
-                TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
         });
@@ -511,7 +511,7 @@ fn setup(mut commands: Commands, fonts: Res<GlobalFonts>, data: Res<SongEditorDa
 
 /// The note-entry row: a label and a click-to-focus box for the note spec.
 /// A modifier toolbar button that toggles `m` on the selection.
-fn mod_button(parent: &mut ChildSpawnerCommands, font: &FontSource, m: NoteMod) {
+fn mod_button(parent: &mut ChildSpawnerCommands, m: NoteMod) {
     parent
         .spawn((
             Button,
@@ -527,7 +527,7 @@ fn mod_button(parent: &mut ChildSpawnerCommands, font: &FontSource, m: NoteMod) 
         .with_children(|b| {
             b.spawn((
                 Text::new(m.label()),
-                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
                 TextColor(Color::srgb(0.85, 0.85, 0.95)),
             ));
         })
@@ -540,7 +540,7 @@ fn mod_button(parent: &mut ChildSpawnerCommands, font: &FontSource, m: NoteMod) 
         );
 }
 
-fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &str) {
+fn note_field(parent: &mut ChildSpawnerCommands, initial: &str) {
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -552,7 +552,7 @@ fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &st
             row.spawn((
                 Node { width: Val::Px(160.0), ..default() },
                 Text::new("Add / Edit Note:"),
-                TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(LABEL),
             ));
             row.spawn((
@@ -573,7 +573,7 @@ fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &st
             .with_children(|b| {
                 b.spawn((
                     Text::new(initial.to_string()),
-                    TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                    TextFont { font_size: FontSize::Px(15.0), ..default() },
                     TextColor(Color::WHITE),
                     NoteEntryText,
                 ));
@@ -584,7 +584,6 @@ fn note_field(parent: &mut ChildSpawnerCommands, font: &FontSource, initial: &st
 
 fn text_field(
     parent: &mut ChildSpawnerCommands,
-    font: &FontSource,
     label: &str,
     id: TextFieldId,
     initial: &str,
@@ -600,7 +599,7 @@ fn text_field(
             row.spawn((
                 Node { width: Val::Px(160.0), ..default() },
                 Text::new(format!("{label}:")),
-                TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(LABEL),
             ));
             row.spawn((
@@ -621,7 +620,7 @@ fn text_field(
             .with_children(|b| {
                 b.spawn((
                     Text::new(initial.to_string()),
-                    TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                    TextFont { font_size: FontSize::Px(15.0), ..default() },
                     TextColor(Color::WHITE),
                     TextFieldText(id),
                 ));
@@ -632,7 +631,7 @@ fn text_field(
         });
 }
 
-fn music_field(parent: &mut ChildSpawnerCommands, font: &FontSource, path: &Option<PathBuf>) {
+fn music_field(parent: &mut ChildSpawnerCommands, path: &Option<PathBuf>) {
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -644,13 +643,13 @@ fn music_field(parent: &mut ChildSpawnerCommands, font: &FontSource, path: &Opti
             row.spawn((
                 Node { width: Val::Px(160.0), ..default() },
                 Text::new("Music Background:"),
-                TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(LABEL),
             ));
             row.spawn((
                 Node { flex_grow: 1.0, min_width: Val::Px(180.0), ..default() },
                 Text::new(music_label(path)),
-                TextFont { font_size: FontSize::Px(14.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
                 TextColor(Color::srgb(0.85, 0.85, 0.9)),
                 MusicPathText,
             ));
@@ -671,7 +670,7 @@ fn music_field(parent: &mut ChildSpawnerCommands, font: &FontSource, path: &Opti
             .with_children(|b| {
                 b.spawn((
                     Text::new("Browse\u{2026}"),
-                    TextFont { font_size: FontSize::Px(14.0), font: font.clone(), ..default() },
+                    TextFont { font_size: FontSize::Px(14.0), ..default() },
                     TextColor(ACCENT),
                 ));
             })
@@ -679,7 +678,7 @@ fn music_field(parent: &mut ChildSpawnerCommands, font: &FontSource, path: &Opti
         });
 }
 
-fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
+fn harp_field(parent: &mut ChildSpawnerCommands, key: &str) {
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -691,7 +690,7 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
             row.spawn((
                 Node { width: Val::Px(160.0), ..default() },
                 Text::new("Harmonica Key:"),
-                TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(LABEL),
             ));
             row.spawn((
@@ -712,7 +711,7 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
             .with_children(|b| {
                 b.spawn((
                     Text::new(key.to_string()),
-                    TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                    TextFont { font_size: FontSize::Px(16.0), ..default() },
                     TextColor(ACCENT),
                     HarpKeyText,
                 ));
@@ -720,7 +719,7 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
             .observe(cycle_harp_key);
             row.spawn((
                 Text::new(format!("click to cycle  \u{00B7}  plays in {} (2nd position)", song_key_of(key))),
-                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
                 TextColor(Color::srgb(0.5, 0.5, 0.6)),
                 HarpPlaysText,
             ));
@@ -729,7 +728,7 @@ fn harp_field(parent: &mut ChildSpawnerCommands, font: &FontSource, key: &str) {
 
 /// Build the 12-bar grid as one or more pages (rows of 12 bars), each bar
 /// showing its chord and the notes that fall in it (arrows sized by duration).
-fn build_grid(parent: &mut ChildSpawnerCommands, data: &SongEditorData, fonts: &GlobalFonts) {
+fn build_grid(parent: &mut ChildSpawnerCommands, data: &SongEditorData) {
     let bpb = beats_per_bar_of(data);
     // 2nd position: the song's key (and its I/IV/V chords) is a fifth above the
     // harp key, so the preview shows the key you actually play in.
@@ -753,7 +752,7 @@ fn build_grid(parent: &mut ChildSpawnerCommands, data: &SongEditorData, fonts: &
                     // Reuse the gameplay grid's I/IV/V chord colouring so the
                     // editor preview matches the real 12-bar blues view.
                     let bg = bar_bg(col, &song_key);
-                    build_bar_cell(row, col + 1, &chords[col], bg, bar_notes, data, bpb, fonts);
+                    build_bar_cell(row, col + 1, &chords[col], bg, bar_notes, data, bpb);
                 }
             });
     }
@@ -768,7 +767,6 @@ fn build_bar_cell(
     note_indices: &[usize],
     data: &SongEditorData,
     beats_per_bar: usize,
-    fonts: &GlobalFonts,
 ) {
     parent
         .spawn((
@@ -787,7 +785,7 @@ fn build_bar_cell(
         .with_children(|cell| {
             cell.spawn((
                 Text::new(format!("{bar_num}  {chord}")),
-                TextFont { font_size: FontSize::Px(10.0), font: fonts.gameplay.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(10.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
             // Row of note arrows, widths proportional to each note's beats.
@@ -854,12 +852,12 @@ fn build_bar_cell(
                                 };
                                 w.spawn((
                                     Text::new(arrow),
-                                    TextFont { font_size: FontSize::Px(16.0), font: fonts.symbols.clone(), ..default() },
+                                    TextFont { font_size: FontSize::Px(16.0), ..default() },
                                     TextColor(color),
                                 ));
                                 w.spawn((
                                     Text::new(n.hole.to_string()),
-                                    TextFont { font_size: FontSize::Px(12.0), font: fonts.gameplay.clone(), ..default() },
+                                    TextFont { font_size: FontSize::Px(12.0), ..default() },
                                     TextColor(Color::WHITE),
                                 ));
                             }
@@ -867,7 +865,7 @@ fn build_bar_cell(
                             if n.mods != 0 {
                                 w.spawn((
                                     Text::new(mods_tag(n.mods)),
-                                    TextFont { font_size: FontSize::Px(9.0), font: fonts.gameplay.clone(), ..default() },
+                                    TextFont { font_size: FontSize::Px(9.0), ..default() },
                                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                                 ));
                             }
@@ -1093,14 +1091,14 @@ fn update_note_views(
                 if n.rest {
                     format!(
                         "\u{2192} silence  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
-                        dur_name(n.beats),
+                        dur_symbol(n.beats),
                     )
                 } else {
                     let dir = if n.is_blow { "blow" } else { "draw" };
                     format!(
                         "\u{2192} {dir} hole {}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
                         n.hole,
-                        dur_name(n.beats),
+                        dur_symbol(n.beats),
                     )
                 }
             }
@@ -1329,7 +1327,6 @@ fn apply_modifier(
 /// key, or beats-per-bar).
 fn rebuild_grid(
     data: Res<SongEditorData>,
-    fonts: Res<GlobalFonts>,
     grids: Query<(Entity, Option<&Children>), With<TwelveBarGrid>>,
     mut commands: Commands,
 ) {
@@ -1342,7 +1339,7 @@ fn rebuild_grid(
                 commands.entity(c).despawn();
             }
         }
-        commands.entity(grid).with_children(|g| build_grid(g, &data, &fonts));
+        commands.entity(grid).with_children(|g| build_grid(g, &data));
     }
 }
 

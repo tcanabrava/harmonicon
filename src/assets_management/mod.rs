@@ -140,6 +140,7 @@ impl Plugin for AssetsManagementPlugin {
                     scan_note_themes,
                     scan_ui_themes,
                     load_global_fonts,
+                    override_default_font,
                 ),
             );
     }
@@ -181,6 +182,17 @@ fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
         gameplay: FontSource::Handle(asset_server.load("fonts/UbuntuSansMono-Regular.otf")),
         symbols: FontSource::Handle(asset_server.load("fonts/NotoSansSymbols-Regular.ttf")),
     });
+}
+
+/// Replace Bevy's built-in default font (FiraMono) with the bundled symbols
+/// font, so text spawned without an explicit `TextFont.font` — including `bsn!`
+/// UI, which can't set it in 0.19 — renders with our glyphs (music notation,
+/// arrows, …). Embedded so it's available the moment the app starts.
+fn override_default_font(mut fonts: ResMut<Assets<Font>>) {
+    const BYTES: &[u8] = include_bytes!("../../assets/fonts/NotoSansSymbols-Regular.ttf");
+    if let Err(err) = fonts.insert(&Handle::<Font>::default(), Font::from_bytes(BYTES.to_vec())) {
+        warn!("Could not install default font: {err}");
+    }
 }
 
 fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
