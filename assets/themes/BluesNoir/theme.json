@@ -38,7 +38,8 @@
         { "id": "Play",    "coords": { "x": 410, "y": 260, "width": 260, "height": 50 } },
         { "id": "Options", "coords": { "x": 510, "y": 326, "width": 260, "height": 50 } },
         { "id": "Credits", "coords": { "x": 610, "y": 392, "width": 260, "height": 50 } },
-        { "id": "Quit",    "coords": { "x": 710, "y": 458, "width": 260, "height": 50 } }
+        { "id": "SongEditor", "coords": { "x": 710, "y": 458, "width": 260, "height": 50 } },
+        { "id": "Quit",    "coords": { "x": 810, "y": 522, "width": 260, "height": 50 } }
       ]
     },
     "Play": {
