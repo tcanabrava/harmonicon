@@ -141,6 +141,7 @@ impl Plugin for AssetsManagementPlugin {
                     scan_ui_themes,
                     load_global_fonts,
                     override_default_font,
+                    load_fallback_fonts,
                 ),
             );
     }
@@ -184,15 +185,31 @@ fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 }
 
-/// Replace Bevy's built-in default font (FiraMono) with the bundled symbols
-/// font, so text spawned without an explicit `TextFont.font` — including `bsn!`
-/// UI, which can't set it in 0.19 — renders with our glyphs (music notation,
-/// arrows, …). Embedded so it's available the moment the app starts.
+/// Keeps the fallback font assets loaded so parley's collection can reach their
+/// glyphs (music notation, extra symbols) when the default text font lacks them.
+#[derive(Resource)]
+struct FallbackFonts(#[allow(dead_code)] Vec<Handle<Font>>);
+
+/// Replace Bevy's built-in default font (FiraMono) with full-coverage Noto Sans,
+/// so text spawned without an explicit `TextFont.font` — including `bsn!` UI,
+/// which can't set it in 0.19 — renders normally. Embedded so it's available the
+/// moment the app starts. No single font has both Latin and the Musical Symbols
+/// block, so `load_fallback_fonts` keeps Noto Music + Noto Sans Symbols loaded;
+/// parley falls back to them per-glyph for `♩`, `𝅝`, arrows, etc.
 fn override_default_font(mut fonts: ResMut<Assets<Font>>) {
-    const BYTES: &[u8] = include_bytes!("../../assets/fonts/NotoSansSymbols-Regular.ttf");
+    const BYTES: &[u8] = include_bytes!("../../assets/fonts/NotoSans-Regular.ttf");
     if let Err(err) = fonts.insert(&Handle::<Font>::default(), Font::from_bytes(BYTES.to_vec())) {
         warn!("Could not install default font: {err}");
     }
+}
+
+/// Load the symbol/music fonts and hold their handles so they stay in parley's
+/// collection as per-glyph fallbacks for the default text font.
+fn load_fallback_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(FallbackFonts(vec![
+        asset_server.load("fonts/NotoMusic-Regular.ttf"),
+        asset_server.load("fonts/NotoSansSymbols-Regular.ttf"),
+    ]));
 }
 
 fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
