@@ -19,20 +19,25 @@ use super::{GameplayClock, Paused, ScoringConfig};
 pub struct MetronomeBeat(pub usize);
 
 /// Marks the click on/off toggle button in the metronome HUD block.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub struct MetronomeMuteButton;
 
 /// Marks the text inside the toggle button so it can be rewritten.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub struct MetronomeMuteLabel;
 
 /// Marks the straight/shuffle feel toggle button.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub struct MetronomeFeelButton;
 
 /// Marks the text inside the feel toggle so it can be rewritten.
-#[derive(Component)]
+#[derive(Component, Default, Clone)]
 pub struct MetronomeFeelLabel;
+
+// The two little HUD pill buttons share these idle/hover colours.
+const PILL_IDLE: Color = Color::srgba(0.12, 0.12, 0.16, 0.9);
+const PILL_HOVER: Color = Color::srgba(0.20, 0.20, 0.32, 0.9);
+const PILL_BORDER: Color = Color::srgb(0.35, 0.35, 0.50);
 
 /// Click subdivision. `Straight` clicks plain quarters; `Shuffle` splits each
 /// beat into triplets and clicks the beat + the swung "and" (the long-short
@@ -132,59 +137,57 @@ pub fn spawn_metronome(
                 TextColor(Color::srgb(0.65, 0.65, 0.70)),
             ));
 
-            row.spawn((
-                Button,
-                Node {
-                    padding: UiRect::axes(Val::Px(6.0), Val::Px(2.0)),
-                    border: UiRect::all(Val::Px(1.5)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9)),
-                BorderColor::all(Color::srgb(0.35, 0.35, 0.50)),
-                MetronomeMuteButton,
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new("click: on"),
-                    TextFont {
-                        font_size: FontSize::Px(11.0),
-                        font: font.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.65, 0.65, 0.70)),
-                    MetronomeMuteLabel,
-                    // Keep the pointer on the button, not the label.
-                    Pickable::IGNORE,
-                ));
-            })
-            .observe(toggle_mute)
-            .observe(mute_over)
-            .observe(mute_out);
+            // Click on/off toggle. Authored with bsn!; click + hover ride along
+            // inline as on(...). The border colour is inserted after (bsn! can't
+            // express BorderColor::all), and the label uses the default font.
+            row.spawn_empty()
+                .apply_scene(bsn! {
+                    Button
+                    Node {
+                        padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
+                        border: {UiRect::all(Val::Px(1.5))},
+                    }
+                    BackgroundColor({PILL_IDLE})
+                    MetronomeMuteButton
+                    on(toggle_mute)
+                    on(pill_over)
+                    on(pill_out)
+                    Children [
+                        (
+                            Text({"click: on".to_string()})
+                            TextFont { font_size: {FontSize::Px(11.0)} }
+                            TextColor({Color::srgb(0.65, 0.65, 0.70)})
+                            MetronomeMuteLabel
+                            Pickable { should_block_lower: {false}, is_hoverable: {false} }
+                        )
+                    ]
+                })
+                .insert(BorderColor::all(PILL_BORDER));
 
-            // Straight ↔ shuffle feel toggle (also bound to the F key).
-            row.spawn((
-                Button,
-                Node {
-                    padding: UiRect::axes(Val::Px(6.0), Val::Px(2.0)),
-                    border: UiRect::all(Val::Px(1.5)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9)),
-                BorderColor::all(Color::srgb(0.35, 0.35, 0.50)),
-                MetronomeFeelButton,
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new("feel: shuffle"),
-                    TextFont {
-                        font_size: FontSize::Px(11.0),
-                        font: font.clone(),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.65, 0.65, 0.70)),
-                    MetronomeFeelLabel,
-                ));
-            });
+            // Straight ↔ shuffle feel toggle.
+            row.spawn_empty()
+                .apply_scene(bsn! {
+                    Button
+                    Node {
+                        padding: {UiRect::axes(Val::Px(6.0), Val::Px(2.0))},
+                        border: {UiRect::all(Val::Px(1.5))},
+                    }
+                    BackgroundColor({PILL_IDLE})
+                    MetronomeFeelButton
+                    on(toggle_feel)
+                    on(pill_over)
+                    on(pill_out)
+                    Children [
+                        (
+                            Text({"feel: shuffle".to_string()})
+                            TextFont { font_size: {FontSize::Px(11.0)} }
+                            TextColor({Color::srgb(0.65, 0.65, 0.70)})
+                            MetronomeFeelLabel
+                            Pickable { should_block_lower: {false}, is_hoverable: {false} }
+                        )
+                    ]
+                })
+                .insert(BorderColor::all(PILL_BORDER));
         });
 
     parent
@@ -307,7 +310,7 @@ fn click_metronome(
     ));
 }
 
-// ── Mute toggle ───────────────────────────────────────────────────────────────
+// ── Toggles (mute + feel) ──────────────────────────────────────────────────────
 
 fn toggle_mute_key(keyboard: Res<ButtonInput<KeyCode>>, mut muted: ResMut<MetronomeMuted>) {
     if keyboard.just_pressed(KeyCode::KeyM) {
@@ -315,20 +318,45 @@ fn toggle_mute_key(keyboard: Res<ButtonInput<KeyCode>>, mut muted: ResMut<Metron
     }
 }
 
-// Mute-button behaviour, wired inline as on(...) observers at spawn.
+// Button behaviour, wired inline as on(...) observers at spawn.
 fn toggle_mute(_: On<Pointer<Click>>, mut muted: ResMut<MetronomeMuted>) {
     muted.0 = !muted.0;
 }
 
-fn mute_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
+/// Flip the click subdivision between straight and shuffle. The label follows
+/// via `update_feel_label`.
+fn toggle_feel(_: On<Pointer<Click>>, mut feel: ResMut<MetronomeFeel>) {
+    *feel = match *feel {
+        MetronomeFeel::Shuffle => MetronomeFeel::Straight,
+        MetronomeFeel::Straight => MetronomeFeel::Shuffle,
+    };
+}
+
+/// Shared hover highlight for the small HUD pill buttons.
+fn pill_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
     if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(Color::srgba(0.20, 0.20, 0.32, 0.9));
+        *bg = BackgroundColor(PILL_HOVER);
     }
 }
 
-fn mute_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
+fn pill_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
     if let Ok(mut bg) = colors.get_mut(ev.entity) {
-        *bg = BackgroundColor(Color::srgba(0.12, 0.12, 0.16, 0.9));
+        *bg = BackgroundColor(PILL_IDLE);
+    }
+}
+
+/// Mirror the current feel onto its button label (written every frame, like
+/// `update_mute_label`, so a freshly spawned label isn't stale across songs).
+fn update_feel_label(
+    feel: Res<MetronomeFeel>,
+    mut labels: Query<&mut Text, With<MetronomeFeelLabel>>,
+) {
+    let label = match *feel {
+        MetronomeFeel::Straight => "feel: straight",
+        MetronomeFeel::Shuffle => "feel: shuffle",
+    };
+    for mut text in &mut labels {
+        *text = Text::new(label);
     }
 }
 
@@ -364,13 +392,14 @@ impl Plugin for MetronomePlugin {
                 (update_metronome, click_metronome)
                     .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
             )
-            // The toggle stays responsive even while paused, like the pause menu.
-            // The mute button's click/hover ride along as inline on(...)
-            // observers (see setup); only the keyboard shortcut and the label
-            // refresh are systems here.
+            // The toggles stay responsive even while paused, like the pause
+            // menu. The buttons' click/hover ride along as inline on(...)
+            // observers (see spawn_metronome); only the keyboard shortcut and
+            // the label refreshes are systems here.
             .add_systems(
                 Update,
-                (toggle_mute_key, update_mute_label).run_if(in_state(AppState::Playing)),
+                (toggle_mute_key, update_mute_label, update_feel_label)
+                    .run_if(in_state(AppState::Playing)),
             );
     }
 }
