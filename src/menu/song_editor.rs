@@ -193,16 +193,16 @@ fn beats_letter(beats: f32) -> char {
     }
 }
 
-/// Music-notation glyph for a duration in beats. Quarter/eighth/sixteenth use
-/// the widely-supported BMP note symbols; whole/half use the Musical Symbols
-/// block (rendered by the bundled symbols font).
+/// Note glyph for a duration in beats. Quarter/eighth/sixteenth use the BMP note
+/// symbols the sans default font renders; whole/half have no glyph in any sans
+/// font (they live in the Musical Symbols block), so they show a short word.
 fn dur_symbol(beats: f32) -> &'static str {
     match beats_letter(beats) {
-        'w' => "\u{1D15D}", // 𝅝 whole note
-        'h' => "\u{1D15E}", // 𝅗𝅥 half note
-        'q' => "\u{2669}",  // ♩ quarter note
-        'e' => "\u{266A}",  // ♪ eighth note
-        _ => "\u{266C}",    // ♬ sixteenth (beamed)
+        'w' => "whole",
+        'h' => "half",
+        'q' => "\u{2669}", // ♩ quarter note
+        'e' => "\u{266A}", // ♪ eighth note
+        _ => "\u{266C}",   // ♬ sixteenth (beamed)
     }
 }
 

@@ -184,14 +184,15 @@ fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 }
 
-/// Replace Bevy's built-in default font (FiraMono) with GNU FreeSerif, so text
+/// Replace Bevy's built-in default font (FiraMono) with GNU FreeSans, so text
 /// spawned without an explicit `TextFont.font` — including `bsn!` UI, which can't
-/// set it in 0.19 — renders normally. FreeSerif is one of the few single fonts
-/// covering everything we need in the same face: full Latin, arrows, and the
-/// music-notation glyphs (`♩ ♪ 𝅝 𝅗𝅥` …), so mixed text+symbol runs render without
-/// relying on parley's per-glyph fallback. Embedded so it's ready at startup.
+/// set it in 0.19 — renders normally. FreeSans covers, in one sans face, full
+/// Latin, arrows, and the common BMP note glyphs (`♩ ♪ ♫ ♬`), so mixed
+/// text+symbol runs render without relying on parley's per-glyph fallback. (The
+/// SMP whole/half note glyphs aren't in any sans font, so those durations show a
+/// word instead — see `dur_symbol`.) Embedded so it's ready at startup.
 fn override_default_font(mut fonts: ResMut<Assets<Font>>) {
-    const BYTES: &[u8] = include_bytes!("../../assets/fonts/FreeSerif.otf");
+    const BYTES: &[u8] = include_bytes!("../../assets/fonts/FreeSans.otf");
     if let Err(err) = fonts.insert(&Handle::<Font>::default(), Font::from_bytes(BYTES.to_vec())) {
         warn!("Could not install default font: {err}");
     }
