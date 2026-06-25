@@ -108,10 +108,10 @@ impl NoteMod {
 // --------------------------------------
 // Events.
 #[derive(Event)]
-struct SongEditorUpdateNoteViews;
+struct SongEditorChangeFocusedField;
 
 #[derive(Event)]
-struct SongEditorChangeFocusedField;
+struct UpdateTextFields;
 
 /// Whether `m` is physically possible on `note` ("where possible"): draw bends
 /// on holes 1-6 and blow bends on 7-10; overblow on blow holes 1-6; overdraw on
@@ -1025,6 +1025,7 @@ fn focus_note(_: On<Pointer<Click>>, mut focused: ResMut<FocusedField>) {
 /// Route typed characters into the focused field. No-op while a field isn't
 /// focused (e.g. the file browser is open and clears focus).
 fn type_into_focused(
+    mut commands: Commands,
     mut keys: MessageReader<KeyboardInput>,
     focused: Res<FocusedField>,
     mut data: ResMut<SongEditorData>,
@@ -1041,12 +1042,17 @@ fn type_into_focused(
         match &ev.logical_key {
             Key::Backspace => {
                 value.pop();
+                commands.trigger(UpdateTextFields{});
             }
-            Key::Space => value.push(' '),
+            Key::Space => {
+                value.push(' ');
+                commands.trigger(UpdateTextFields{});
+            }
             Key::Character(s) => {
                 for c in s.chars() {
                     if !c.is_control() {
                         value.push(c);
+                        commands.trigger(UpdateTextFields{});
                     }
                 }
             }
@@ -1058,6 +1064,7 @@ fn type_into_focused(
 /// Mirror the model into the field texts (with a caret on the focused one) and
 /// highlight the focused box.
 fn update_field_views(
+    _trigger: On<UpdateTextFields>,
     data: Res<SongEditorData>,
     mut music: Query<&mut Text, (With<MusicPathText>, Without<TextFieldText>)>,
 ) {
@@ -1088,7 +1095,7 @@ fn change_focused_field(
 /// Mirror the note buffer into its box (caret when focused) and show the parsed
 /// note's musical + seconds duration.
 fn update_note_views(
-    _trigger: On<SongEditorUpdateNoteViews>,
+    _trigger: On<UpdateTextFields>,
     data: Res<SongEditorData>,
     mut duration: Query<&mut Text, With<NoteDurationText>>
 ) {
@@ -1657,7 +1664,6 @@ impl Plugin for SongEditorPlugin {
                     note_input_keys,
                     pick_file,
                     poll_tempo,
-                    update_field_views,
                     rebuild_grid,
                 )
                     .run_if(in_state(AppState::SongEditor)),
