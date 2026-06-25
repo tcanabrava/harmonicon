@@ -110,6 +110,9 @@ impl NoteMod {
 #[derive(Event)]
 struct SongEditorUpdateNoteViews;
 
+#[derive(Event)]
+struct SongEditorChangeFocusedField;
+
 /// Whether `m` is physically possible on `note` ("where possible"): draw bends
 /// on holes 1-6 and blow bends on 7-10; overblow on blow holes 1-6; overdraw on
 /// draw holes 7-10; vibrato/wah on any sounded note; nothing on a rest.
@@ -647,8 +650,9 @@ fn text_field(
                     TextFieldText(id),
                 ));
             })
-            .observe(move |_: On<Pointer<Click>>, mut focused: ResMut<FocusedField>| {
+            .observe(move |_: On<Pointer<Click>>, mut commands: Commands,mut focused: ResMut<FocusedField>| {
                 focused.0 = Focus::Field(id);
+                commands.trigger(SongEditorChangeFocusedField{});
             });
         });
 }
@@ -1055,10 +1059,19 @@ fn type_into_focused(
 /// highlight the focused box.
 fn update_field_views(
     data: Res<SongEditorData>,
-    focused: Res<FocusedField>,
+    mut music: Query<&mut Text, (With<MusicPathText>, Without<TextFieldText>)>,
+) {
+    if let Ok(mut text) = music.single_mut() {
+        **text = music_label(&data.music_path);
+    }
+}
+
+fn change_focused_field(
+    _trigger: On<SongEditorChangeFocusedField>,
+    focused: ResMut<FocusedField>,
     mut texts: Query<(&TextFieldText, &mut Text)>,
     mut boxes: Query<(&TextFieldBox, &mut BackgroundColor)>,
-    mut music: Query<&mut Text, (With<MusicPathText>, Without<TextFieldText>)>,
+    data: Res<SongEditorData>,
 ) {
     for (field, mut text) in &mut texts {
         let mut s = field.0.value(&data).to_string();
@@ -1070,9 +1083,6 @@ fn update_field_views(
     for (field, mut bg) in &mut boxes {
         bg.0 = if focused.0 == Focus::Field(field.0) { FIELD_BG_FOCUS } else { FIELD_BG };
     }
-    if let Ok(mut text) = music.single_mut() {
-        **text = music_label(&data.music_path);
-    }
 }
 
 /// Mirror the note buffer into its box (caret when focused) and show the parsed
@@ -1080,35 +1090,8 @@ fn update_field_views(
 fn update_note_views(
     _trigger: On<SongEditorUpdateNoteViews>,
     data: Res<SongEditorData>,
-    focused: Res<FocusedField>,
-    mut entry: Query<
-        &mut Text,
-        (With<NoteEntryText>, Without<TextFieldText>, Without<MusicPathText>),
-    >,
-    mut duration: Query<
-        &mut Text,
-        (
-            With<NoteDurationText>,
-            Without<NoteEntryText>,
-            Without<TextFieldText>,
-            Without<MusicPathText>,
-        ),
-    >,
-    mut boxes: Query<&mut BackgroundColor, With<NoteEntryBox>>,
+    mut duration: Query<&mut Text, With<NoteDurationText>>
 ) {
-    let focused_note = focused.0 == Focus::Note;
-    if let Ok(mut text) = entry.single_mut() {
-        let mut s = data.note_input.clone();
-        if focused_note {
-            s.push('_');
-        }
-        **text = s;
-    }
-
-    if let Ok(mut bg) = boxes.single_mut() {
-        bg.0 = if focused_note { FIELD_BG_FOCUS } else { FIELD_BG };
-    }
-
     if let Ok(mut text) = duration.single_mut() {
         **text = input_to_notes_text(&data);
     }
@@ -1681,6 +1664,7 @@ impl Plugin for SongEditorPlugin {
             );
 
         app.add_observer(update_note_views);
+        app.add_observer(change_focused_field);
     }
 }
 
