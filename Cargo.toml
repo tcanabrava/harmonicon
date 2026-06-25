@@ -23,6 +23,7 @@ pulldown-cmark = { version = "0.12", default-features = false }
 # Window icon: winit must match Bevy's version; image decodes the PNG.
 winit = "0.30"
 image = { version = "0.25", default-features = false, features = ["png"] }
+bevy_fluent = "0.15.0"
 
 [[bin]]
 name = "hole-editor"
