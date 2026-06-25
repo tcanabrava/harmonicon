@@ -1157,14 +1157,12 @@ fn note_input_keys(
                 }
             }
             Key::Space => data.note_input.push(' '),
-            Key::Backspace => {
-                if data.note_input.pop().is_none() {
-                    delete_selected_notes(&mut data);
-                }
-            }
+            Key::Backspace => {data.note_input.pop(); ()},
+            Key::Delete => delete_selected_notes(&mut data),
             Key::Enter => commit_note(&mut data),
             Key::ArrowLeft => move_cursor(&mut data, -1, shift, ctrl),
             Key::ArrowRight => move_cursor(&mut data, 1, shift, ctrl),
+            // Key Escape is handled by handle_escape
             _ => {}
         }
     }
@@ -1595,13 +1593,18 @@ fn save_song_click(
 fn handle_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     dialog: Res<FileDialog>,
+    mut data: ResMut<SongEditorData>,
     mut focused: ResMut<FocusedField>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     if dialog.open || !keyboard.just_pressed(KeyCode::Escape) {
         return;
     }
-    if focused.0 != Focus::None {
+
+    if !data.selected.is_empty() {
+        data.cursor = None;
+        data.selected.clear();
+    } else if focused.0 != Focus::None {
         focused.0 = Focus::None;
     } else {
         next_state.set(AppState::Menu);
