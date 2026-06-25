@@ -1149,24 +1149,23 @@ fn note_input_keys(
 /// Commit the typed spec: replace the focused note (keeping its modifiers), or
 /// append a new one.
 fn commit_note(data: &mut SongEditorData) {
-    _ = parse_notes(&data.note_input);
-    let Some(mut note) = parse_note(&data.note_input) else {
-        return;
-    };
+    let notes = parse_notes(&data.note_input);
 
-    match data.cursor {
-        Some(i) if i < data.notes.len() => {
-            note.mods = data.notes[i].mods; // editing the spec keeps modifiers
-            data.notes[i] = note;
+    for mut note in notes {
+        match data.cursor {
+            Some(i) if i < data.notes.len() => {
+                note.mods = data.notes[i].mods; // editing the spec keeps modifiers
+                data.notes[i] = note;
+            }
+            _ => {
+                data.notes.push(note);
+                data.cursor = None;
+                data.selected.clear();
+                data.anchor = None;
+            }
         }
-        _ => {
-            data.notes.push(note);
-            data.cursor = None;
-            data.selected.clear();
-            data.anchor = None;
-        }
+        data.note_input.clear();
     }
-    data.note_input.clear();
 }
 
 /// Delete every selected note (or the focused/last one when nothing is
