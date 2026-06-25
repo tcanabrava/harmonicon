@@ -2,6 +2,8 @@
 
 pub mod chart;
 pub mod harmonica;
+pub mod note_parser;
+
 mod loader;
 
 use std::path::PathBuf;
