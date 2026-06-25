@@ -215,12 +215,19 @@ fn dur_symbol(beats: f32) -> &'static str {
     }
 }
 
+const NOTE_REGEX: &str = r"^(?:(?:-?(?:[1-9]|10)|r)(?:[whqe])?)(?:\s+(?:-?(?:[1-9]|10)|r)(?:[whqe])?)*$";
+
+fn is_valid_note_input(input: &str) -> bool {
+    let reg = Regex::new(NOTE_REGEX).unwrap();
+    reg.is_match(input)
+}
+
 fn parse_notes(input: &str) -> Vec<EditorNote> {
     if input.is_empty() {
         return Vec::new();
     }
 
-    let reg = Regex::new(r"^(?:(?:-?(?:[1-9]|10)|r)(?:[whqe])?)(?:\s+(?:-?(?:[1-9]|10)|r)(?:[whqe])?)*$").unwrap();
+    let reg = Regex::new(NOTE_REGEX).unwrap();
     if !reg.is_match(input) {
         return Vec::new();
     }
@@ -1120,7 +1127,14 @@ fn note_input_keys(
             Key::Character(s) => {
                 for c in s.chars() {
                     if !c.is_control() {
-                        data.note_input.push(c);
+                        let mut val = data.note_input.clone();
+                        val.push(c);
+
+                        if ! is_valid_note_input(&val) {
+                            return;
+                        }
+
+                        data.note_input = val;
                     }
                 }
             }
