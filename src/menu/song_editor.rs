@@ -316,12 +316,13 @@ fn notes_by_bar(notes: &[EditorNote], beats_per_bar: usize) -> Vec<Vec<usize>> {
 }
 
 /// The four free-text fields. (Harp key cycles; music path is picked.)
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum TextFieldId {
     Artist,
     SongName,
     Tempo,
     BeatsPerBar,
+    Notes,
 }
 
 impl TextFieldId {
@@ -331,6 +332,7 @@ impl TextFieldId {
             TextFieldId::SongName => &mut d.song_name,
             TextFieldId::Tempo => &mut d.tempo_bpm,
             TextFieldId::BeatsPerBar => &mut d.beats_per_bar,
+            TextFieldId::Notes => &mut d.note_input,
         }
     }
     fn value<'a>(&self, d: &'a SongEditorData) -> &'a str {
@@ -339,12 +341,13 @@ impl TextFieldId {
             TextFieldId::SongName => &d.song_name,
             TextFieldId::Tempo => &d.tempo_bpm,
             TextFieldId::BeatsPerBar => &d.beats_per_bar,
+            TextFieldId::Notes => &d.note_input,
         }
     }
 }
 
 /// What currently receives keyboard input.
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 enum Focus {
     #[default]
     None,
@@ -353,7 +356,7 @@ enum Focus {
 }
 
 /// Which input target currently has focus.
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Debug)]
 struct FocusedField(Focus);
 
 /// The in-flight tempo-analysis task, if a file is being analysed.
@@ -390,10 +393,6 @@ struct MusicPickButton;
 struct MusicPathText;
 #[derive(Component)]
 struct TwelveBarGrid;
-#[derive(Component)]
-struct NoteEntryBox;
-#[derive(Component)]
-struct NoteEntryText;
 #[derive(Component)]
 struct NoteDurationText;
 #[derive(Component)]
@@ -452,7 +451,7 @@ fn setup(mut commands: Commands, data: Res<SongEditorData>) {
                 text_field(form, "Music Tempo  \u{2669} =", TextFieldId::Tempo, &data.tempo_bpm);
                 text_field(form, "Beats per Bar", TextFieldId::BeatsPerBar, &data.beats_per_bar);
                 harp_field(form, &data.harp_key);
-                note_field(form, &data.note_input);
+                text_field(form, "Add / Edit Note:", TextFieldId::Notes, &data.note_input);
             });
 
             root.spawn((
@@ -563,48 +562,6 @@ fn mod_button(parent: &mut ChildSpawnerCommands, m: NoteMod) {
                 apply_modifier(m, &mut data, &mut status);
             },
         );
-}
-
-fn note_field(parent: &mut ChildSpawnerCommands, initial: &str) {
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn((
-                Node { width: Val::Px(160.0), ..default() },
-                Text::new("Add / Edit Note:"),
-                TextFont { font_size: FontSize::Px(15.0), ..default() },
-                TextColor(LABEL),
-            ));
-            row.spawn((
-                Button,
-                Node {
-                    flex_grow: 1.0,
-                    min_width: Val::Px(260.0),
-                    height: Val::Px(30.0),
-                    align_items: AlignItems::Center,
-                    padding: UiRect::horizontal(Val::Px(8.0)),
-                    border: UiRect::all(Val::Px(1.0)),
-                    ..default()
-                },
-                BackgroundColor(FIELD_BG),
-                BorderColor::all(Color::srgb(0.30, 0.30, 0.42)),
-                NoteEntryBox,
-            ))
-            .with_children(|b| {
-                b.spawn((
-                    Text::new(initial.to_string()),
-                    TextFont { font_size: FontSize::Px(15.0), ..default() },
-                    TextColor(Color::WHITE),
-                    NoteEntryText,
-                ));
-            })
-            .observe(focus_note);
-        });
 }
 
 fn text_field(
@@ -1016,17 +973,12 @@ fn music_label(path: &Option<PathBuf>) -> String {
 
 // ── Interaction: focus + typing ───────────────────────────────────────────────
 
-/// Clicking the note box focuses it for typing. (Metadata fields focus via a
-/// per-field closure that captures their id; see `text_field`.)
-fn focus_note(_: On<Pointer<Click>>, mut focused: ResMut<FocusedField>) {
-    focused.0 = Focus::Note;
-}
-
 /// Route typed characters into the focused field. No-op while a field isn't
 /// focused (e.g. the file browser is open and clears focus).
 fn type_into_focused(
     mut commands: Commands,
     mut keys: MessageReader<KeyboardInput>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     focused: Res<FocusedField>,
     mut data: ResMut<SongEditorData>,
 ) {
@@ -1034,6 +986,12 @@ fn type_into_focused(
         keys.clear();
         return;
     };
+
+    if field == TextFieldId::Notes {
+        note_input_keys(commands, keys, keyboard, data);
+        return;
+    }
+
     for ev in keys.read() {
         if ev.state != ButtonState::Pressed {
             continue;
@@ -1066,10 +1024,11 @@ fn type_into_focused(
 fn update_field_views(
     _trigger: On<UpdateTextFields>,
     data: Res<SongEditorData>,
-    mut music: Query<&mut Text, (With<MusicPathText>, Without<TextFieldText>)>,
+    mut texts: Query<(&TextFieldText, &mut Text)>,
 ) {
-    if let Ok(mut text) = music.single_mut() {
-        **text = music_label(&data.music_path);
+    println!("Updating field views.");
+    for (field, mut text) in &mut texts {
+        **text = field.0.value(&data).to_string();
     }
 }
 
@@ -1080,6 +1039,8 @@ fn change_focused_field(
     mut boxes: Query<(&TextFieldBox, &mut BackgroundColor)>,
     data: Res<SongEditorData>,
 ) {
+    println!("Changing Focused Field");
+
     for (field, mut text) in &mut texts {
         let mut s = field.0.value(&data).to_string();
         if focused.0 == Focus::Field(field.0) {
@@ -1087,20 +1048,9 @@ fn change_focused_field(
         }
         **text = s;
     }
+
     for (field, mut bg) in &mut boxes {
         bg.0 = if focused.0 == Focus::Field(field.0) { FIELD_BG_FOCUS } else { FIELD_BG };
-    }
-}
-
-/// Mirror the note buffer into its box (caret when focused) and show the parsed
-/// note's musical + seconds duration.
-fn update_note_views(
-    _trigger: On<UpdateTextFields>,
-    data: Res<SongEditorData>,
-    mut duration: Query<&mut Text, With<NoteDurationText>>
-) {
-    if let Ok(mut text) = duration.single_mut() {
-        **text = input_to_notes_text(&data);
     }
 }
 
@@ -1151,15 +1101,15 @@ fn cycle_harp_key(
 /// arrows to move the cursor. Shift+arrow extends a contiguous selection;
 /// Ctrl+arrow adds the focused note to a non-contiguous selection.
 fn note_input_keys(
+    mut commands: Commands,
     mut keys: MessageReader<KeyboardInput>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    focused: Res<FocusedField>,
     mut data: ResMut<SongEditorData>,
 ) {
-    if focused.0 != Focus::Note {
-        keys.clear();
+    if keys.is_empty() {
         return;
     }
+
     let shift = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     let ctrl = keyboard.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     for ev in keys.read() {
@@ -1184,6 +1134,7 @@ fn note_input_keys(
             _ => {}
         }
     }
+    commands.trigger(UpdateTextFields{});
 }
 
 /// Commit the typed spec: replace the focused note (keeping its modifiers), or
@@ -1661,7 +1612,6 @@ impl Plugin for SongEditorPlugin {
                     // at spawn — see the spawn helpers and build_grid.
                     handle_escape,
                     type_into_focused,
-                    note_input_keys,
                     pick_file,
                     poll_tempo,
                     rebuild_grid,
@@ -1669,8 +1619,9 @@ impl Plugin for SongEditorPlugin {
                     .run_if(in_state(AppState::SongEditor)),
             );
 
-        app.add_observer(update_note_views);
+        app.add_observer(update_field_views);
         app.add_observer(change_focused_field);
+
     }
 }
 
