@@ -55,6 +55,37 @@ impl PitchAlgorithm {
             PitchAlgorithm::Nmf => "NMF",
         }
     }
+
+    /// A short, player-facing explanation shown next to the selector.
+    pub fn description(self) -> &'static str {
+        match self {
+            PitchAlgorithm::Fft => {
+                "Fast Fourier Transform peak-picking with harmonic suppression. \
+                 Reports several notes at once (polyphonic-ish) and is cheap, but \
+                 less precise on a single bent note. A solid all-round default."
+            }
+            PitchAlgorithm::Yin => {
+                "YIN: a time-domain detector that finds the period that best makes \
+                 the signal repeat. Monophonic (one note) and very accurate on \
+                 clean single notes, with few octave errors — good for bends."
+            }
+            PitchAlgorithm::Pyin => {
+                "Probabilistic YIN: runs YIN over many thresholds weighted by a \
+                 prior and keeps the most likely pitch. Monophonic; steadier than \
+                 plain YIN on quiet or noisy input, at a little more cost."
+            }
+            PitchAlgorithm::Mcleod => {
+                "McLeod Pitch Method (MPM): normalized square-difference with \
+                 clarity-based peak picking. Monophonic; fast and robust against \
+                 octave jumps, a strong choice for live single-note playing."
+            }
+            PitchAlgorithm::Nmf => {
+                "Template NMF: matches the spectrum against harmonic templates for \
+                 every note. Polyphonic — it can report the notes of a chord — but \
+                 heavier and the most experimental option here."
+            }
+        }
+    }
 }
 
 // A peak must exceed this fraction of the strongest peak to be reported.

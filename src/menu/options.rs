@@ -60,6 +60,7 @@ impl Plugin for OptionsPlugin {
                     update_latency_slider,
                     harmonica_button_visuals,
                     algo_button_visuals,
+                    update_algo_explanation,
                     propagate_preview_layers,
                 )
                     .run_if(in_state(MenuPage::Options)),
@@ -92,6 +93,10 @@ struct HarmonicaButton(String);
 /// A pitch-algorithm choice button; carries the algorithm it selects.
 #[derive(Component, Default, Clone)]
 struct AlgoButton(PitchAlgorithm);
+
+/// The explanation text describing the currently selected pitch algorithm.
+#[derive(Component)]
+struct AlgoExplanation;
 
 /// Marks a preview scene root (a `WorldAssetRoot`); the propagation system forces
 /// this `RenderLayers` onto all its descendants, since glTF scene children don't
@@ -186,7 +191,8 @@ fn setup_options_menu(
         &selected_harmonica.0,
     );
 
-    spawn_algo_row(&mut commands, root,  settings.pitch_algorithm);
+    spawn_algo_row(&mut commands, root, settings.pitch_algorithm);
+    spawn_algo_explanation(&mut commands, root, settings.pitch_algorithm);
 
     spawn_button(&mut commands, root, "Theme", Some("Theme"), &theme, &btn_mats, "Options",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme));
@@ -533,6 +539,45 @@ fn algo_button_visuals(
         } else {
             button::color_default()
         };
+    }
+}
+
+/// A read-only box explaining the currently selected pitch algorithm.
+fn spawn_algo_explanation(commands: &mut Commands, parent: Entity, selected: PitchAlgorithm) {
+    let panel = commands
+        .spawn((
+            Node {
+                width: Val::Px(560.0),
+                padding: UiRect::all(Val::Px(10.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
+        ))
+        .id();
+    commands.entity(panel).with_children(|p| {
+        p.spawn((
+            Text::new(selected.description()),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.75, 0.78, 0.88)),
+            AlgoExplanation,
+        ));
+    });
+    commands.entity(parent).add_child(panel);
+}
+
+/// Keep the explanation box in step with the chosen algorithm.
+fn update_algo_explanation(
+    settings: Res<AudioSettings>,
+    mut texts: Query<&mut Text, With<AlgoExplanation>>,
+) {
+    if !settings.is_changed() {
+        return;
+    }
+    for mut text in &mut texts {
+        *text = Text::new(settings.pitch_algorithm.description());
     }
 }
 
