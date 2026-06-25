@@ -10,35 +10,43 @@ enum State {
     Failed,         // Invalid sequence encountered
 }
 
-struct MatchResult {
-    matched: bool,
-    hit_end: bool,
+pub struct MatchResult {
+    pub matched: bool,
+    pub is_valid: bool,
 }
 
-fn analyze_notes(bytes: &[u8]) -> MatchResult {
+pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
     if bytes.is_empty() {
         // Regex uses ^...$, and while the internal groups are optional,
         // it requires at least one note base to start. Empty string fails.
-        return MatchResult { matched: false, hit_end: true };
+        println!("Empty notes to analyze");
+        return MatchResult { matched: false, is_valid: false };
     }
+    let input = str::from_utf8(bytes).unwrap().to_string();
+    println!("Analyzing {}", input);
 
     let mut state = State::Start;
     let mut current_num: u32 = 0;
     let mut last_bend = 0;
+    let mut has_minus = false;
 
     for &b in bytes {
         state = match state {
             State::Start => match b {
-                b'-' => State::Minus,
+                b'-' => {
+                    has_minus = true;
+                    State::Minus
+                },
                 b'r' => State::Rest,
-                b'1'..=b'9' => {
+                b'0'..=b'9' => {
                     current_num = (b - b'0') as u32;
                     State::Number
                 }
                 _ => State::Failed,
             },
             State::Minus => match b {
-                b'1'..=b'9' => {
+                b'0'..=b'9' => {
+                    has_minus = false;
                     current_num = (b - b'0') as u32;
                     State::Number
                 }
@@ -84,7 +92,10 @@ fn analyze_notes(bytes: &[u8]) -> MatchResult {
             State::Space => match b {
                 // Absorb consecutive spaces, or transition to a new note token
                 b' ' => State::Space,
-                b'-' => State::Minus,
+                b'-' => {
+                    has_minus = true;
+                    State::Minus
+                },
                 b'r' => State::Rest,
                 b'1'..=b'9' => {
                     current_num = (b - b'0') as u32;
@@ -96,27 +107,26 @@ fn analyze_notes(bytes: &[u8]) -> MatchResult {
         };
 
         if state == State::Failed {
-            return MatchResult { matched: false, hit_end: false };
+            println!("Failed to parse note at byte {:?}", b);
+            return MatchResult { matched: false, is_valid: false };
         }
     }
 
     // Evaluate final state when stream terminates
-    match state {
+    let res = match state {
         // Safe terminal positions that represent a complete, valid string
-        State::Number | State::Rest | State::Duration | State::Bend => MatchResult {
-            matched: true,
-            hit_end: true // True because appending 'w', 'h', 'q', 'e', or ' [note]' is valid!
-        },
-        // Mid-token positions
-        State::Start | State::Minus | State::Space => MatchResult {
-            matched: false,
-            hit_end: true
-        },
         State::Failed => MatchResult {
             matched: false,
-            hit_end: false
+            is_valid: false,
         },
-    }
+        _ => MatchResult {
+            matched: true,
+            is_valid: !has_minus,
+        },
+    };
+
+    println!("Analyzed notes: matched={} is_valid={}", res.matched, res.is_valid);
+    res
 }
 
 #[cfg(test)]
@@ -125,15 +135,15 @@ mod tests {
 
     // Helper macro to clean up test assertions
     macro_rules! assert_analysis {
-        ($input:expr, $matched:expr, $hit_end:expr) => {
+        ($input:expr, $matched:expr, $is_valid:expr) => {
             let res = analyze_notes($input.as_bytes());
             assert_eq!(
                 res.matched, $matched,
                 "Expected matched={} for {:?}", $matched, $input
             );
             assert_eq!(
-                res.hit_end, $hit_end,
-                "Expected hit_end={} for {:?}", $hit_end, $input
+                res.is_valid, $is_valid,
+                "Expected is_valid={} for {:?}", $is_valid, $input
             );
         };
     }
@@ -141,7 +151,7 @@ mod tests {
     #[test]
     fn test_empty_input() {
         // Empty string can't match, but adding text can make it match
-        assert_analysis!("", false, true);
+        assert_analysis!("", false, false);
     }
 
     #[test]
@@ -152,6 +162,9 @@ mod tests {
         assert_analysis!("-3", true, true);
         assert_analysis!("-10", true, true);
         assert_analysis!("r", true, true);
+        assert_analysis!("-", true, false);
+        assert_analysis!("0", true, true);
+        assert_analysis!("-0", true, true);
 
         // Single values with duration suffixes
         assert_analysis!("5w", true, true);
@@ -172,15 +185,15 @@ mod tests {
     #[test]
     fn test_partial_matches_hit_end() {
         // Cut off mid-token on minus sign
-        assert_analysis!("-", false, true);
-        assert_analysis!("5w -", false, true);
+        assert_analysis!("-", true, false);
+        assert_analysis!("5w -", true, false);
 
         // Cut off while parsing a number that could become 10
         assert_analysis!("1", true, true); // Valid '1', but '0' could follow
 
         // Cut off on trailing spaces (expecting another note)
-        assert_analysis!("5' ", false, true);
-        assert_analysis!("r ", false, true);
+        assert_analysis!("5' ", true, true);
+        assert_analysis!("r ", true, true);
     }
 
     #[test]
@@ -189,10 +202,6 @@ mod tests {
         assert_analysis!("11", false, false);
         assert_analysis!("-12", false, false);
         assert_analysis!("5 25", false, false);
-
-        // Zero is invalid based on [1-9]|10
-        assert_analysis!("0", false, false);
-        assert_analysis!("-0", false, false);
 
         // Invalid duration suffix characters
         assert_analysis!("5x", false, false);

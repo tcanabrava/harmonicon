@@ -23,7 +23,9 @@ use crate::song::chart::{
     Action, BendingProfile, DiatonicLayout, Difficulty, HarpChart, Modifier, NoteEvent, Scoring,
     Song, TempoPoint, Timing, TrackItem,
 };
-use crate::song::harmonica::{Harmonica, twelve_bar};
+use crate::song::{
+    note_parser,
+    harmonica::{Harmonica, twelve_bar}};
 use regex::Regex;
 
 use super::AppState;
@@ -215,20 +217,13 @@ fn dur_symbol(beats: f32) -> &'static str {
     }
 }
 
-const NOTE_REGEX: &str = r"^(?:(?:-?(?:[1-9]|10)|r)(?:[whqe])?)(?:\s+(?:-?(?:[1-9]|10)|r)(?:[whqe])?)*$";
-
-fn is_valid_note_input(input: &str) -> bool {
-    let reg = Regex::new(NOTE_REGEX).unwrap();
-    reg.is_match(input)
-}
-
 fn parse_notes(input: &str) -> Vec<EditorNote> {
-    if input.is_empty() {
+    let result = note_parser::analyze_notes(input.as_bytes());
+    if !result.matched {
         return Vec::new();
     }
 
-    let reg = Regex::new(NOTE_REGEX).unwrap();
-    if !reg.is_match(input) {
+    if !result.is_valid {
         return Vec::new();
     }
 
@@ -1130,7 +1125,7 @@ fn note_input_keys(
                         let mut val = data.note_input.clone();
                         val.push(c);
 
-                        if ! is_valid_note_input(&val) {
+                        if ! note_parser::analyze_notes(val.as_bytes() ).matched {
                             return;
                         }
 
