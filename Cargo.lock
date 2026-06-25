@@ -3214,6 +3214,7 @@ dependencies = [
  "jsonschema",
  "midly",
  "pulldown-cmark",
+ "regex",
  "rodio",
  "rustfft",
  "serde",

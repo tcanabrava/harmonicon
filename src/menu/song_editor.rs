@@ -24,6 +24,7 @@ use crate::song::chart::{
     Song, TempoPoint, Timing, TrackItem,
 };
 use crate::song::harmonica::{Harmonica, twelve_bar};
+use regex::Regex;
 
 use super::AppState;
 
@@ -103,6 +104,11 @@ impl NoteMod {
         }
     }
 }
+
+// --------------------------------------
+// Events.
+#[derive(Event)]
+struct SongEditorUpdateNoteViews;
 
 /// Whether `m` is physically possible on `note` ("where possible"): draw bends
 /// on holes 1-6 and blow bends on 7-10; overblow on blow holes 1-6; overdraw on
@@ -204,6 +210,22 @@ fn dur_symbol(beats: f32) -> &'static str {
         'e' => "\u{266A}", // ♪ eighth note
         _ => "\u{266C}",   // ♬ sixteenth (beamed)
     }
+}
+
+fn parse_notes(input: &str) -> Vec<EditorNote> {
+    if input.is_empty() {
+        return Vec::new();
+    }
+
+    let reg = Regex::new(r"^(?:(?:-?(?:[1-9]|10)|r)(?:[whqe])?)(?:\s+(?:-?(?:[1-9]|10)|r)(?:[whqe])?)*$").unwrap();
+    if !reg.is_match(input) {
+        return Vec::new();
+    }
+
+    input
+        .split_whitespace()
+        .filter_map(|s| parse_note(s))
+        .collect()
 }
 
 /// Parse a note spec like `"-4 q"`, `"4 e"`, or `"3"` (defaults to a quarter).
@@ -1056,6 +1078,7 @@ fn update_field_views(
 /// Mirror the note buffer into its box (caret when focused) and show the parsed
 /// note's musical + seconds duration.
 fn update_note_views(
+    _trigger: On<SongEditorUpdateNoteViews>,
     data: Res<SongEditorData>,
     focused: Res<FocusedField>,
     mut entry: Query<
@@ -1081,30 +1104,35 @@ fn update_note_views(
         }
         **text = s;
     }
+
     if let Ok(mut bg) = boxes.single_mut() {
         bg.0 = if focused_note { FIELD_BG_FOCUS } else { FIELD_BG };
     }
+
     if let Ok(mut text) = duration.single_mut() {
-        **text = match parse_note(&data.note_input) {
-            Some(n) => {
-                let secs = n.beats * 60.0 / bpm_of(&data);
-                if n.rest {
-                    format!(
-                        "\u{2192} silence  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
-                        dur_symbol(n.beats),
-                    )
-                } else {
-                    let dir = if n.is_blow { "blow" } else { "draw" };
-                    format!(
-                        "\u{2192} {dir} hole {}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
-                        n.hole,
-                        dur_symbol(n.beats),
-                    )
-                }
-            }
-            None => String::new(),
-        };
+        **text = input_to_notes_text(&data);
     }
+}
+
+fn input_to_notes_text(data: &SongEditorData) -> String {
+    let notes = parse_notes(&data.note_input);
+    let strings = notes.iter().map(|n| {
+        let secs = n.beats * 60.0 / bpm_of(&data);
+        if n.rest {
+            format!(
+                "\u{2192} silence  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
+                dur_symbol(n.beats),
+            )
+        } else {
+            let dir = if n.is_blow { "blow" } else { "draw" };
+            format!(
+                "\u{2192} {dir} hole {}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
+                n.hole,
+                dur_symbol(n.beats),
+            )
+        }
+    }).collect::<Vec<String>>().join("\n");
+    strings
 }
 
 // ── Interaction: harmonica key ────────────────────────────────────────────────
@@ -1171,9 +1199,11 @@ fn note_input_keys(
 /// Commit the typed spec: replace the focused note (keeping its modifiers), or
 /// append a new one.
 fn commit_note(data: &mut SongEditorData) {
+    _ = parse_notes(&data.note_input);
     let Some(mut note) = parse_note(&data.note_input) else {
         return;
     };
+
     match data.cursor {
         Some(i) if i < data.notes.len() => {
             note.mods = data.notes[i].mods; // editing the spec keeps modifiers
@@ -1645,11 +1675,12 @@ impl Plugin for SongEditorPlugin {
                     pick_file,
                     poll_tempo,
                     update_field_views,
-                    update_note_views,
                     rebuild_grid,
                 )
                     .run_if(in_state(AppState::SongEditor)),
             );
+
+        app.add_observer(update_note_views);
     }
 }
 
