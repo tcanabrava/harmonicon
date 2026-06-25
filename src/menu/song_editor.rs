@@ -1171,6 +1171,8 @@ fn commit_note(data: &mut SongEditorData) {
 /// Delete every selected note (or the focused/last one when nothing is
 /// selected), then settle the cursor.
 fn delete_selected_notes(data: &mut SongEditorData) {
+    println!("Trying to delete selected notes.");
+
     let mut targets = if data.selected.is_empty() {
         match data.cursor.or_else(|| data.notes.len().checked_sub(1)) {
             Some(i) => vec![i],
