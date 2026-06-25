@@ -455,7 +455,7 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
         // ── Title ─────────────────────────────────────────────────────────────
         p.spawn((
             Text::new("Latency Calibration"),
-            TextFont { font_size: FontSize::Px(38.0), font: font.clone(), ..default() },
+            TextFont { font_size: FontSize::Px(38.0), ..default() },
             TextColor(Color::WHITE),
         ));
 
@@ -463,7 +463,7 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
         p.spawn((
             Text::new("Play any note on each beat — the game measures how late \
                        your mic detects sound."),
-            TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+            TextFont { font_size: FontSize::Px(16.0), ..default() },
             TextColor(Color::srgb(0.62, 0.65, 0.80)),
             TextLayout { justify: Justify::Center, ..default() },
             Node { max_width: Val::Px(480.0), ..default() },
@@ -491,7 +491,7 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
         }).with_children(|row| {
             row.spawn((
                 Text::new("Mic"),
-                TextFont { font_size: FontSize::Px(15.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.58, 0.68)),
             ));
             // Track
@@ -536,7 +536,7 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
                     for txt in ["-200ms", "0", "+200ms"] {
                         labels.spawn((
                             Text::new(txt),
-                            TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+                            TextFont { font_size: FontSize::Px(11.0), ..default() },
                             TextColor(Color::srgb(0.40, 0.42, 0.52)),
                         ));
                     }
@@ -545,7 +545,7 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
              // Per-hit offset summary text
              col.spawn((
                  Text::new(""),
-                 TextFont { font_size: FontSize::Px(14.0), font: font.clone(), ..default() },
+                 TextFont { font_size: FontSize::Px(14.0), ..default() },
                  TextColor(Color::srgb(0.70, 0.72, 0.85)),
                  Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
                  HitOffsetsSummary,
@@ -560,13 +560,13 @@ fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
         )).with_children(|block| {
             block.spawn((
                 Text::new("Mean offset: —"),
-                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
                 TextColor(Color::srgb(0.95, 0.62, 0.30)),
                 CalMeanText,
             ));
             block.spawn((
                 Text::new("Current: —   →   Suggested: —"),
-                TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(16.0), ..default() },
                 TextColor(Color::srgb(0.62, 0.65, 0.80)),
                 CalSuggestedText,
             ));

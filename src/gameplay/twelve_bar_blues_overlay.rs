@@ -94,8 +94,7 @@ pub fn spawn_12_bar_grid(
                             Text::new(chords[idx].clone()),
                             TextFont {
                                 font_size: FontSize::Px(cfg.chord_font_size),
-                                font: font.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::WHITE),
                         ));
@@ -103,8 +102,7 @@ pub fn spawn_12_bar_grid(
                             Text::new(format!("{}", idx + 1)),
                             TextFont {
                                 font_size: FontSize::Px(cfg.bar_num_font_size),
-                                font: font.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::srgb(0.45, 0.45, 0.55)),
                         ));

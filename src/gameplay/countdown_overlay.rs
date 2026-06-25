@@ -45,8 +45,7 @@ pub fn spawn_countdown(commands: &mut Commands, font: &FontSource, harp_hint: Op
                 Text::new("GET READY"),
                 TextFont {
                     font_size: FontSize::Px(22.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
             ));
@@ -56,8 +55,7 @@ pub fn spawn_countdown(commands: &mut Commands, font: &FontSource, harp_hint: Op
                     Text::new(hint.to_string()),
                     TextFont {
                         font_size: FontSize::Px(16.0),
-                        font: font.clone(),
-                        ..default()
+                                                ..default()
                     },
                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                 ));
@@ -66,8 +64,7 @@ pub fn spawn_countdown(commands: &mut Commands, font: &FontSource, harp_hint: Op
                 Text::new("3"),
                 TextFont {
                     font_size: FontSize::Px(120.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::WHITE),
                 CountdownText,

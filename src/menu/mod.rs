@@ -321,8 +321,7 @@ pub(super) fn spawn_button<M: 'static>(
                 Text::new(label.to_string()),
                 TextFont {
                     font_size: FontSize::Px(20.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
@@ -440,8 +439,7 @@ fn setup_artist_list(
                 Text::new("No songs found. Add folders under assets/songs/<artist>/<song>/"),
                 TextFont {
                     font_size: FontSize::Px(16.0),
-                    font: font.gameplay.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::srgb(0.8, 0.4, 0.4)),
             ))

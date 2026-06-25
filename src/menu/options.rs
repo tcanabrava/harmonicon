@@ -225,8 +225,7 @@ fn spawn_harmonica_row(
             Text::new("Harmonica"),
             TextFont {
                 font_size: FontSize::Px(20.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::WHITE),
         ));
@@ -453,8 +452,7 @@ fn spawn_algo_row(
             Text::new("Pitch detect"),
             TextFont {
                 font_size: FontSize::Px(20.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::WHITE),
         ));
@@ -587,8 +585,7 @@ fn spawn_volume_slider<M: 'static>(
             Text::new(label.to_string()),
             TextFont {
                 font_size: FontSize::Px(20.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::WHITE),
         ));
@@ -611,8 +608,7 @@ fn spawn_volume_slider<M: 'static>(
             Text::new(format!("{:.0}%", value * 100.0)),
             TextFont {
                 font_size: FontSize::Px(18.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::srgb(0.6, 0.6, 0.7)),
             SliderValueLabel(kind),
@@ -675,8 +671,7 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSour
             Text::new("Input lag"),
             TextFont {
                 font_size: FontSize::Px(20.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::WHITE),
         ));
@@ -697,8 +692,7 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSour
             Text::new(format!("{}ms", value_ms)),
             TextFont {
                 font_size: FontSize::Px(18.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::srgb(0.6, 0.6, 0.7)),
             LatencySliderLabel,

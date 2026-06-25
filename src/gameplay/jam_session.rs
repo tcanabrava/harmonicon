@@ -100,8 +100,7 @@ pub fn setup(
                     Text::new(title),
                     TextFont {
                         font_size: FontSize::Px(20.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
+                                                ..default()
                     },
                     TextColor(Color::WHITE),
                 ));
@@ -109,8 +108,7 @@ pub fn setup(
                     Text::new(harp_hint),
                     TextFont {
                         font_size: FontSize::Px(15.0),
-                        font: fonts.gameplay.clone(),
-                        ..default()
+                                                ..default()
                     },
                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                 ));
@@ -252,7 +250,7 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], font: &
         .with_children(|col| {
             col.spawn((
                 Text::new("Your harmonica  \u{00B7}  green = blues-scale note  \u{00B7}  top blow / bottom draw"),
-                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
             ));
             col.spawn(Node {
@@ -278,17 +276,17 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], font: &
                     .with_children(|cell| {
                         cell.spawn((
                             Text::new(note_class(&h.blow).to_string()),
-                            TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                            TextFont { font_size: FontSize::Px(10.0), ..default() },
                             TextColor(if h.blow_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
                         ));
                         cell.spawn((
                             Text::new(h.hole.to_string()),
-                            TextFont { font_size: FontSize::Px(16.0), font: font.clone(), ..default() },
+                            TextFont { font_size: FontSize::Px(16.0), ..default() },
                             TextColor(Color::WHITE),
                         ));
                         cell.spawn((
                             Text::new(note_class(&h.draw).to_string()),
-                            TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+                            TextFont { font_size: FontSize::Px(10.0), ..default() },
                             TextColor(if h.draw_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
                         ));
                     });

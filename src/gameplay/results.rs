@@ -93,8 +93,7 @@ pub(super) fn setup(
                 Text::new("SONG COMPLETE"),
                 TextFont {
                     font_size: FontSize::Px(28.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::srgb(0.80, 0.82, 0.90)),
             ));
@@ -103,8 +102,7 @@ pub(super) fn setup(
                 Text::new(g),
                 TextFont {
                     font_size: FontSize::Px(120.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(grade_color(g)),
                 Node {
@@ -158,8 +156,7 @@ pub(super) fn setup(
                         Text::new(hint),
                         TextFont {
                             font_size: FontSize::Px(15.0),
-                            font: font.clone(),
-                            ..default()
+                                                        ..default()
                         },
                         TextColor(Color::srgb(0.60, 0.65, 0.75)),
                     ));
@@ -171,8 +168,7 @@ pub(super) fn setup(
                 Text::new(format!("Score: {}", score.points)),
                 TextFont {
                     font_size: FontSize::Px(20.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::WHITE),
                 Node {
@@ -216,8 +212,7 @@ fn spawn_text_row(
                 Text::new(label.to_string()),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.68, 0.75)),
             ));
@@ -225,8 +220,7 @@ fn spawn_text_row(
                 Text::new(value.to_string()),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(color),
             ));
@@ -252,8 +246,7 @@ fn spawn_stat_row(
                 Text::new(label.to_string()),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.68, 0.75)),
             ));
@@ -261,8 +254,7 @@ fn spawn_stat_row(
                 Text::new(format!("{value}")),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(color),
             ));

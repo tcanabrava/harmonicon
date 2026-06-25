@@ -168,7 +168,7 @@ pub fn spawn_harmonica_overlay(
         .with_children(|panel| {
             panel.spawn((
                 Text::new("Harmonica  \u{00B7}  lights up as you play"),
-                TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
             ));
 
@@ -234,7 +234,7 @@ fn spawn_note_cell(row: &mut ChildSpawnerCommands, font: &FontSource, note: &str
         .with_children(|c| {
             c.spawn((
                 Text::new(note_class(note).to_string()),
-                TextFont { font_size: FontSize::Px(11.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(11.0), ..default() },
                 TextColor(color),
             ));
         });
@@ -245,7 +245,7 @@ fn spawn_text_cell(row: &mut ChildSpawnerCommands, font: &FontSource, text: &str
     cell(row, Color::NONE).with_children(|c| {
         c.spawn((
             Text::new(text.to_string()),
-            TextFont { font_size: FontSize::Px(12.0), font: font.clone(), ..default() },
+            TextFont { font_size: FontSize::Px(12.0), ..default() },
             TextColor(color),
         ));
     });
@@ -264,7 +264,7 @@ fn spawn_label(row: &mut ChildSpawnerCommands, font: &FontSource, text: &str) {
     .with_children(|c| {
         c.spawn((
             Text::new(text.to_string()),
-            TextFont { font_size: FontSize::Px(10.0), font: font.clone(), ..default() },
+            TextFont { font_size: FontSize::Px(10.0), ..default() },
             TextColor(LABEL_COLOR),
         ));
     });

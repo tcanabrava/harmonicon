@@ -124,7 +124,7 @@ pub fn setup(
         .with_children(|root| {
             root.spawn((
                 Text::new("Bending Trainer"),
-                TextFont { font_size: FontSize::Px(26.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(26.0), ..default() },
                 TextColor(Color::WHITE),
             ));
 
@@ -146,7 +146,7 @@ pub fn setup(
                 row.spawn((
                     Node { width: Val::Px(110.0), justify_content: JustifyContent::Center, ..default() },
                     Text::new(format!("Key: {}", key.0)),
-                    TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                    TextFont { font_size: FontSize::Px(20.0), ..default() },
                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                     KeyLabel,
                 ));
@@ -200,7 +200,7 @@ pub fn setup(
 
             root.spawn((
                 Text::new("Esc to go back  \u{00B7}  M mutes the click  \u{00B7}  feel toggles straight/shuffle"),
-                TextFont { font_size: FontSize::Px(13.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
         });

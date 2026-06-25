@@ -213,8 +213,7 @@ pub fn setup(
                             Text::new(title),
                             TextFont {
                                 font_size: FontSize::Px(18.0),
-                                font: fonts.gameplay.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::WHITE),
                         ));
@@ -222,8 +221,7 @@ pub fn setup(
                             Text::new(info),
                             TextFont {
                                 font_size: FontSize::Px(12.0),
-                                font: fonts.gameplay.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::srgb(0.60, 0.65, 0.75)),
                         ));
@@ -231,8 +229,7 @@ pub fn setup(
                             Text::new(harp_info),
                             TextFont {
                                 font_size: FontSize::Px(11.0),
-                                font: fonts.gameplay.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::srgb(0.45, 0.72, 0.55)),
                         ));
@@ -241,8 +238,7 @@ pub fn setup(
                                 Text::new(desc.to_string()),
                                 TextFont {
                                     font_size: FontSize::Px(10.0),
-                                    font: fonts.gameplay.clone(),
-                                    ..default()
+                                                                        ..default()
                                 },
                                 TextColor(Color::srgb(0.50, 0.50, 0.55)),
                             ));
@@ -252,8 +248,7 @@ pub fn setup(
                                 Text::new(format!("Chart: {author}")),
                                 TextFont {
                                     font_size: FontSize::Px(9.0),
-                                    font: fonts.gameplay.clone(),
-                                    ..default()
+                                                                        ..default()
                                 },
                                 TextColor(Color::srgb(0.40, 0.40, 0.45)),
                             ));
@@ -306,8 +301,7 @@ pub fn setup(
                             Text::new("0"),
                             TextFont {
                                 font_size: FontSize::Px(28.0),
-                                font: fonts.gameplay.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::WHITE),
                             ScoreText,
@@ -316,8 +310,7 @@ pub fn setup(
                             Text::new(""),
                             TextFont {
                                 font_size: FontSize::Px(14.0),
-                                font: fonts.gameplay.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::srgb(0.90, 0.72, 0.20)),
                             ComboText,
@@ -326,8 +319,7 @@ pub fn setup(
                             Text::new(""),
                             TextFont {
                                 font_size: FontSize::Px(20.0),
-                                font: fonts.gameplay.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
                             FeedbackText,
@@ -537,8 +529,7 @@ fn spawn_highway(
                                 Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
                                 TextFont {
                                     font_size: FontSize::Px(13.0),
-                                    font: font.clone(),
-                                    ..default()
+                                                                        ..default()
                                 },
                                 TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
                             ));
@@ -641,8 +632,7 @@ fn spawn_harmonica_strip(
                     Text::new(b),
                     TextFont {
                         font_size: FontSize::Px(11.0),
-                        font: font.clone(),
-                        ..default()
+                                                ..default()
                     },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
@@ -650,8 +640,7 @@ fn spawn_harmonica_strip(
                     Text::new(format!("{hole}")),
                     TextFont {
                         font_size: FontSize::Px(16.0),
-                        font: font.clone(),
-                        ..default()
+                                                ..default()
                     },
                     TextColor(Color::WHITE),
                 ));
@@ -659,8 +648,7 @@ fn spawn_harmonica_strip(
                     Text::new(d),
                     TextFont {
                         font_size: FontSize::Px(11.0),
-                        font: font.clone(),
-                        ..default()
+                                                ..default()
                     },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
@@ -679,8 +667,7 @@ fn spawn_harmonica_strip(
             Text::new("\u{25A0} BLOW"),
             TextFont {
                 font_size: FontSize::Px(11.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
@@ -688,8 +675,7 @@ fn spawn_harmonica_strip(
             Text::new("\u{25A0} DRAW"),
             TextFont {
                 font_size: FontSize::Px(11.0),
-                font: font.clone(),
-                ..default()
+                                ..default()
             },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));

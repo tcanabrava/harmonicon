@@ -18,8 +18,7 @@ pub fn spawn_phrase_banner(parent: &mut ChildSpawnerCommands, font: &FontSource)
         Text::new(""),
         TextFont {
             font_size: FontSize::Px(13.0),
-            font: font.clone(),
-            ..default()
+                        ..default()
         },
         TextColor(Color::srgb(0.80, 0.70, 0.95)),
         PhraseText,

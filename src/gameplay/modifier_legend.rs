@@ -92,8 +92,7 @@ pub fn spawn_modifier_legend(
                 Text::new("TECHNIQUES"),
                 TextFont {
                     font_size: FontSize::Px(10.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::srgb(0.55, 0.55, 0.62)),
             ));
@@ -129,8 +128,7 @@ pub fn spawn_modifier_legend(
                             Text::new(*name),
                             TextFont {
                                 font_size: FontSize::Px(10.0),
-                                font: font.clone(),
-                                ..default()
+                                                                ..default()
                             },
                             TextColor(Color::srgb(0.70, 0.72, 0.78)),
                         ));

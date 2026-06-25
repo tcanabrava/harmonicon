@@ -310,7 +310,7 @@ fn spawn_credit_line(parent: &mut ChildSpawnerCommands, font: &FontSource, item:
         CreditLine::BigTitle(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(38.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(38.0), ..default() },
                 TextColor(Color::WHITE),
                 Node { margin: UiRect::bottom(Val::Px(6.0)), ..default() },
             ));
@@ -318,14 +318,14 @@ fn spawn_credit_line(parent: &mut ChildSpawnerCommands, font: &FontSource, item:
         CreditLine::Subtitle(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(18.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(18.0), ..default() },
                 TextColor(Color::srgb(0.62, 0.65, 0.80)),
             ));
         }
         CreditLine::Heading(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(20.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
                 TextColor(Color::srgb(0.85, 0.72, 0.35)),
                 Node { margin: UiRect::bottom(Val::Px(8.0)), ..default() },
             ));
@@ -333,7 +333,7 @@ fn spawn_credit_line(parent: &mut ChildSpawnerCommands, font: &FontSource, item:
         CreditLine::Body(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(17.0), font: font.clone(), ..default() },
+                TextFont { font_size: FontSize::Px(17.0), ..default() },
                 TextColor(Color::srgb(0.78, 0.80, 0.88)),
                 Node { margin: UiRect::bottom(Val::Px(4.0)), ..default() },
             ));

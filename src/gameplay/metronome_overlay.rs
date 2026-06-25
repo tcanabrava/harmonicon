@@ -168,8 +168,7 @@ pub fn spawn_metronome(
                 Text::new(format!("\u{2669} = {}", bpm as u32)),
                 TextFont {
                     font_size: FontSize::Px(13.0),
-                    font: font.clone(),
-                    ..default()
+                                        ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.65, 0.70)),
                 // Refreshed live from MetronomeTempo (the trainer's BPM control).

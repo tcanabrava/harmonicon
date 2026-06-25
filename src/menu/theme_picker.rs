@@ -88,7 +88,7 @@ fn setup(
     let title = commands
         .spawn((
             Text::new("Theme"),
-            TextFont { font_size: FontSize::Px(48.0), font: font.clone(), ..default() },
+            TextFont { font_size: FontSize::Px(48.0), ..default() },
             TextColor(Color::WHITE),
         ))
         .id();
