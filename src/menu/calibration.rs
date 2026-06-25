@@ -28,7 +28,6 @@ use bevy::{
 };
 
 use crate::{
-    assets_management::GlobalFonts,
     audio_system::pitch_detect::PitchEvent,
     settings::AudioSettings,
     dialogs::button
@@ -434,9 +433,7 @@ fn cancel_calibration(
 
 // ── UI construction ───────────────────────────────────────────────────────────
 
-fn setup_ui(mut commands: Commands, fonts: Res<GlobalFonts>) {
-    let font = fonts.gameplay.clone();
-
+fn setup_ui(mut commands: Commands) {
     let root = commands.spawn((
         Node {
             width:            Val::Percent(100.0),
@@ -658,7 +655,6 @@ fn spawn_timing_zones(bar: &mut ChildSpawnerCommands) {
 
 /// One calibration button: shared shell + label, wired with its own dedicated
 /// click callback plus the shared hover highlight — all inline `on(...)`.
-/// (Default font: `bsn!` can't set `TextFont.font` in 0.19.)
 fn spawn_cal_button<M: 'static>(
     parent: &mut ChildSpawnerCommands,
     label: &str,

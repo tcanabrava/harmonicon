@@ -17,7 +17,7 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
-use crate::assets_management::{AvailableThemes, GlobalFonts, SelectedTheme};
+use crate::assets_management::{AvailableThemes, SelectedTheme};
 use crate::theme::LoadedTheme;
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
@@ -58,15 +58,12 @@ struct ThemePreviewImage;
 
 fn setup(
     mut commands: Commands,
-    fonts: Res<GlobalFonts>,
     themes: Res<AvailableThemes>,
     selected: Res<SelectedTheme>,
     asset_server: Res<AssetServer>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
 ) {
-    let font = fonts.gameplay.clone();
-
     // ── Root: full-screen column ───────────────────────────────────────────────
     let root = commands
         .spawn((
@@ -170,7 +167,6 @@ fn setup(
 
 /// One theme-list button: its label, its dedicated "select this theme" click
 /// callback (capturing the name), and hover highlight — all inline `on(...)`.
-/// (Default font: `bsn!` can't set `TextFont.font` in 0.19.)
 fn theme_button_scene(name: String, is_selected: bool) -> impl Scene {
     let color = if is_selected { THEME_SELECTED } else { button::color_default() };
     let label = name.clone();

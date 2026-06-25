@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::{
     assets_management::{
-        GlobalFonts, HarmonicaModelConfig, HoleConfig, SelectedHarmonicaModel, SelectedNoteTheme3d,
+        HarmonicaModelConfig, HoleConfig, SelectedHarmonicaModel, SelectedNoteTheme3d,
     },
     menu::SelectedSong,
     song::NoteCube3dConfig,
@@ -340,7 +340,6 @@ pub fn setup(
     mut valid_notes: ResMut<ValidHarpNotes>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    fonts: Res<GlobalFonts>,
     asset_server: Res<AssetServer>,
     selected_model: Res<SelectedHarmonicaModel>,
     shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
@@ -364,7 +363,6 @@ pub fn setup(
     let chart = &manifest.chart;
     let key = chart.song.key.as_str();
     let chords = twelve_bar(key);
-    let font = fonts.gameplay.clone();
     let model_cfg = load_model_config(&selected_model.0);
 
     setup_camera_3d(&mut commands);
@@ -436,7 +434,6 @@ pub fn setup(
         chart,
         &chords,
         key,
-        &font,
         chart.song.tempo_bpm,
         beats_per_bar,
         shape_materials,
@@ -500,7 +497,7 @@ fn spawn_hud_overlay(
     chart: &crate::song::chart::HarpChart,
     chords: &[String],
     key: &str,
-    font: &FontSource,
+
     bpm: f32,
     beats_per_bar: usize,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,

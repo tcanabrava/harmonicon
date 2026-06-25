@@ -22,7 +22,7 @@ const CHOICE_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
 const CHOICE_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 use crate::assets_management::{
-    AvailableHarmonicas, GlobalFonts,
+    AvailableHarmonicas,
     SelectedHarmonicaModel
 };
 use crate::audio_system::pitch_detect::PitchAlgorithm;
@@ -123,7 +123,7 @@ fn audio_level(settings: &AudioSettings, kind: VolumeSlider) -> f32 {
 
 fn setup_options_menu(
     mut commands: Commands,
-    font: Res<GlobalFonts>,
+
     settings: Res<AudioSettings>,
     harmonicas: Res<AvailableHarmonicas>,
     selected_harmonica: Res<SelectedHarmonicaModel>,
@@ -136,7 +136,7 @@ fn setup_options_menu(
     spawn_volume_slider(
         &mut commands,
         root,
-        &font.gameplay,
+
         "Music",
         VolumeSlider::Music,
         settings.music_volume,
@@ -145,7 +145,7 @@ fn setup_options_menu(
     spawn_volume_slider(
         &mut commands,
         root,
-        &font.gameplay,
+
         "Metronome",
         VolumeSlider::Metronome,
         settings.metronome_volume,
@@ -154,7 +154,7 @@ fn setup_options_menu(
     spawn_latency_slider(
         &mut commands,
         root,
-        &font.gameplay,
+
         settings.input_latency_ms,
     );
 
@@ -181,12 +181,12 @@ fn setup_options_menu(
     spawn_harmonica_row(
         &mut commands,
         root,
-        &font.gameplay,
+
         &previews_harmonica,
         &selected_harmonica.0,
     );
 
-    spawn_algo_row(&mut commands, root, &font.gameplay, settings.pitch_algorithm);
+    spawn_algo_row(&mut commands, root,  settings.pitch_algorithm);
 
     spawn_button(&mut commands, root, "Theme", Some("Theme"), &theme, &btn_mats, "Options",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme));
@@ -198,12 +198,11 @@ fn setup_options_menu(
 
 /// A labelled row of harmonica-model choice buttons, each showing a rendered
 /// preview above its name. Each button is a `bsn!` scene carrying its own
-/// dedicated "select this model" click callback plus hover; the row label keeps
-/// the custom font (imperative), which `bsn!` can't set in 0.19.
+/// dedicated "select this model" click callback plus hover;
 fn spawn_harmonica_row(
     commands: &mut Commands,
     parent: Entity,
-    font: &FontSource,
+
     previews: &[(Handle<Image>, String)],
     selected: &str,
 ) {
@@ -241,7 +240,7 @@ fn spawn_harmonica_row(
 
 /// One harmonica choice button: preview image + name, its dedicated "select
 /// this model" click callback (capturing the name), and hover — all inline
-/// `on(...)`. (Default font for the name label: `bsn!` can't set it in 0.19.)
+/// `on(...)`.
 fn harmonica_button_scene(image: Handle<Image>, name: String, is_selected: bool) -> impl Scene {
     let color = if is_selected { CHOICE_SELECTED } else { button::color_default() };
     let label = name.clone();
@@ -431,7 +430,7 @@ fn harmonica_button_visuals(
 fn spawn_algo_row(
     commands: &mut Commands,
     parent: Entity,
-    font: &FontSource,
+
     selected: PitchAlgorithm,
 ) {
     let row = commands
@@ -560,7 +559,7 @@ fn set_input_latency(ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSetting
 fn spawn_volume_slider<M: 'static>(
     commands: &mut Commands,
     parent: Entity,
-    font: &FontSource,
+
     label: &str,
     kind: VolumeSlider,
     value: f32,
@@ -649,7 +648,7 @@ const LATENCY_MAX_MS: i32 = 200;
 
 /// One labelled slider row for the mic input-latency offset.
 /// The track maps 0–200 ms linearly; the label shows "Xms".
-fn spawn_latency_slider(commands: &mut Commands, parent: Entity, font: &FontSource, value_ms: i32) {
+fn spawn_latency_slider(commands: &mut Commands, parent: Entity,  value_ms: i32) {
     let frac = (value_ms as f32 / LATENCY_MAX_MS as f32).clamp(0.0, 1.0);
 
     let row = commands

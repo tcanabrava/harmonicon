@@ -4,7 +4,6 @@ use bevy::asset::AssetPath;
 use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use crate::{
-    assets_management::GlobalFonts,
     menu::SelectedSong,
     song::SongManifest,
     song::chart::{Action, Modifier, PlayMode},
@@ -34,7 +33,6 @@ pub fn setup(
     mut music_started: ResMut<MusicStarted>,
     mut valid_notes: ResMut<ValidHarpNotes>,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
-    fonts: Res<GlobalFonts>,
     note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -170,7 +168,6 @@ pub fn setup(
                 .with_children(|hw| {
                     spawn_highway(
                         hw,
-                        &fonts.symbols,
                         chart,
                         &note_materials,
                         &head_image,
@@ -187,7 +184,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|col| {
-                    spawn_harmonica_strip(col, chart, &fonts.gameplay);
+                    spawn_harmonica_strip(col, chart);
                 });
             });
 
@@ -384,7 +381,7 @@ pub fn note_head_bottom_pct(note_time: f64, elapsed: f64, lookahead: f64) -> f32
 
 fn spawn_highway(
     hw: &mut ChildSpawnerCommands,
-    font: &FontSource,
+
     chart: &crate::song::chart::HarpChart,
     note_materials: &[Handle<NoteTail2dMaterial>],
     head_image: &AssetPath<'static>,
@@ -601,7 +598,6 @@ fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
 fn spawn_harmonica_strip(
     col: &mut ChildSpawnerCommands,
     chart: &crate::song::chart::HarpChart,
-    font: &FontSource,
 ) {
     col.spawn(Node {
         flex_direction: FlexDirection::Row,

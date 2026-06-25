@@ -13,7 +13,7 @@ use bevy::{
 };
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use crate::assets_management::{GlobalFonts, SelectedHarmonicaModel};
+use crate::assets_management::{SelectedHarmonicaModel};
 use crate::dialogs::button;
 
 use super::AppState;
@@ -75,7 +75,6 @@ impl Plugin for CreditsPlugin {
 
 fn setup(
     mut commands: Commands,
-    fonts: Res<GlobalFonts>,
     harmonica_model: Res<SelectedHarmonicaModel>,
     asset_server: Res<AssetServer>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
@@ -89,7 +88,7 @@ fn setup(
 
     let layers = RenderLayers::layer(CREDITS_LAYER);
     spawn_3d_scene(&mut commands, &asset_server, &harmonica_model.0, &layers);
-    spawn_ui(&mut commands, &fonts);
+    spawn_ui(&mut commands);
 }
 
 fn cleanup(mut commands: Commands, roots: Query<Entity, With<CreditsRoot>>) {
@@ -162,9 +161,7 @@ fn spawn_3d_scene(
 
 // ── UI overlay ────────────────────────────────────────────────────────────────
 
-fn spawn_ui(commands: &mut Commands, fonts: &GlobalFonts) {
-    let font = fonts.gameplay.clone();
-
+fn spawn_ui(commands: &mut Commands) {
     // Full-screen dark overlay that clips the scrolling text.
     let overlay = commands
         .spawn((
@@ -204,7 +201,7 @@ fn spawn_ui(commands: &mut Commands, fonts: &GlobalFonts) {
 
     commands.entity(scroller).with_children(|col| {
         for item in load_credits() {
-            spawn_credit_line(col, &font, item);
+            spawn_credit_line(col, item);
         }
     });
 
@@ -305,7 +302,7 @@ fn parse_credits(markdown: &str) -> Vec<CreditLine> {
     out
 }
 
-fn spawn_credit_line(parent: &mut ChildSpawnerCommands, font: &FontSource, item: CreditLine) {
+fn spawn_credit_line(parent: &mut ChildSpawnerCommands,  item: CreditLine) {
     match item {
         CreditLine::BigTitle(text) => {
             parent.spawn((

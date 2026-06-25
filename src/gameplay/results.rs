@@ -5,7 +5,6 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use crate::assets_management::GlobalFonts;
 use crate::menu::{AppState, ReturnToSongList};
 use crate::dialogs::button;
 use crate::settings::AudioSettings;
@@ -62,7 +61,6 @@ fn grade_color(grade: &str) -> Color {
 
 pub(super) fn setup(
     mut commands: Commands,
-    fonts: Res<GlobalFonts>,
     score: Res<Score>,
     stats: Res<SongStats>,
     audio: Res<AudioSettings>,
@@ -70,7 +68,6 @@ pub(super) fn setup(
     let acc = accuracy(&stats);
     let g = grade(acc);
     let hits = stats.perfect + stats.good + stats.delayed;
-    let font = fonts.gameplay.clone();
     let mean_ms = mean_offset_ms(&stats);
 
     commands
@@ -125,7 +122,7 @@ pub(super) fn setup(
                 ("Misses", stats.miss, Color::srgb(0.95, 0.35, 0.35)),
             ];
             for (label, value, color) in rows {
-                spawn_stat_row(root, &font, label, value, color);
+                spawn_stat_row(root, label, value, color);
             }
 
             // Timing offset row + calibration hint.
@@ -138,7 +135,6 @@ pub(super) fn setup(
                 };
                 spawn_text_row(
                     root,
-                    &font,
                     "Avg timing offset",
                     &format!("{sign}{ms:.0}ms"),
                     offset_color,
@@ -195,7 +191,7 @@ pub(super) fn setup(
 
 fn spawn_text_row(
     parent: &mut ChildSpawnerCommands,
-    font: &FontSource,
+
     label: &str,
     value: &str,
     color: Color,
@@ -229,7 +225,7 @@ fn spawn_text_row(
 
 fn spawn_stat_row(
     parent: &mut ChildSpawnerCommands,
-    font: &FontSource,
+
     label: &str,
     value: u32,
     color: Color,

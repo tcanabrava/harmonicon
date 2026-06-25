@@ -6,7 +6,7 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Out, Over, Pointer, Press};
 use bevy::prelude::*;
 
-use crate::assets_management::{AvailableSongs, GlobalFonts};
+use crate::assets_management::{AvailableSongs};
 use crate::song::SongManifest;
 use crate::theme::LoadedTheme;
 
@@ -156,8 +156,6 @@ fn menu_root_scene() -> impl Scene {
     }
 }
 
-/// A heading text line as a `bsn!` [`Scene`]. Uses the default font (no custom
-/// `FontSource`, which `bsn!` can't take directly in 0.19-rc.3).
 fn heading_scene(text: String, size: f32, color: Color) -> impl Scene {
     bsn! {
         Text({text})
@@ -368,7 +366,7 @@ pub(super) fn spawn_button<M: 'static>(
         commands.entity(parent).add_child(e);
     } else {
         // Plain button: authored declaratively; click + hover ride along as
-        // inline on(...). (Default font: bsn! can't set TextFont.font in 0.19.)
+        // inline on(...)
         let e = commands
             .spawn_scene(button::default(label, on_click))
             .insert(node)
@@ -381,12 +379,11 @@ pub(super) fn spawn_button<M: 'static>(
 
 fn setup_main_menu(
     mut commands: Commands,
-    font: Res<GlobalFonts>,
+
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
 ) {
     let root = spawn_menu_root(&mut commands, "Harmonicon", None, &theme, "Main");
-    let font = font.gameplay.clone();
     spawn_button(&mut commands, root, "Play", Some("Play"), &theme, &btn_mats, "Main",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play));
     spawn_button(&mut commands, root, "Song Editor", Some("SongEditor"), &theme, &btn_mats, "Main",
@@ -401,7 +398,7 @@ fn setup_main_menu(
 
 fn setup_play_menu(
     mut commands: Commands,
-    font: Res<GlobalFonts>,
+
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
 ) {
@@ -422,7 +419,7 @@ fn setup_play_menu(
 
 fn setup_artist_list(
     mut commands: Commands,
-    font: Res<GlobalFonts>,
+
     songs: Res<AvailableSongs>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
@@ -430,9 +427,6 @@ fn setup_artist_list(
     let root = spawn_menu_root(&mut commands, "Select Artist", None, &theme, "ArtistList");
 
     if songs.0.is_empty() {
-        // NOTE: kept imperative — `TextFont.font` is a templated `FontSource`
-        // (derives `FromTemplate`) with no `From<FontSource>` for its generated
-        // template type, so `bsn!` can't take our `FontSource` handle directly.
         let msg = commands
             .spawn((
                 Text::new("No songs found. Add folders under assets/songs/<artist>/<song>/"),
@@ -466,7 +460,6 @@ fn setup_song_list(
     mut commands: Commands,
     songs: Res<AvailableSongs>,
     selected_artist: Res<SelectedArtist>,
-    font: Res<GlobalFonts>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
 ) {
@@ -497,7 +490,7 @@ fn setup_song_list(
 
 fn setup_mode_select(
     mut commands: Commands,
-    font: Res<GlobalFonts>,
+
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
 ) {

@@ -12,7 +12,6 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use crate::assets_management::GlobalFonts;
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::dialogs::button;
 use crate::menu::AppState;
@@ -97,7 +96,6 @@ pub fn setup(
     mut clock: ResMut<GameplayClock>,
     mut tempo: ResMut<MetronomeTempo>,
     key: Res<TrainerKey>,
-    fonts: Res<GlobalFonts>,
 ) {
     clock.0 = 0.0;
     tempo.beats_per_bar = 4;
@@ -106,7 +104,6 @@ pub fn setup(
         tempo.bpm = 90.0;
     }
 
-    let font = fonts.gameplay.clone();
     commands
         .spawn((
             Node {
@@ -214,7 +211,6 @@ pub fn tick_clock(mut clock: ResMut<GameplayClock>, time: Res<Time>) {
 /// Rebuild the bend diagram when the key changes.
 pub fn rebuild_overlay(
     key: Res<TrainerKey>,
-    fonts: Res<GlobalFonts>,
     hosts: Query<(Entity, Option<&Children>), With<OverlayHost>>,
     mut commands: Commands,
 ) {

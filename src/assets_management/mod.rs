@@ -6,12 +6,6 @@ use std::{
     fs::DirEntry,
 };
 
-#[derive(Resource)]
-pub struct GlobalFonts {
-    pub gameplay: FontSource,
-    pub symbols: FontSource,
-}
-
 pub struct AssetsManagementPlugin;
 
 #[derive(Debug, Clone)]
@@ -139,7 +133,6 @@ impl Plugin for AssetsManagementPlugin {
                     scan_harmonica_models,
                     scan_note_themes,
                     scan_ui_themes,
-                    load_global_fonts,
                     override_default_font,
                 ),
             );
@@ -174,14 +167,6 @@ fn scan_theme_dir(dir: &str, ext: &str) -> Vec<String> {
     names.sort_unstable();
     names.dedup();
     names
-}
-
-fn load_global_fonts(mut commands: Commands, asset_server: Res<AssetServer>) {
-    info!("Loading global fonts...");
-    commands.insert_resource(GlobalFonts {
-        gameplay: FontSource::Handle(asset_server.load("fonts/UbuntuSansMono-Regular.otf")),
-        symbols: FontSource::Handle(asset_server.load("fonts/NotoSansSymbols-Regular.ttf")),
-    });
 }
 
 /// Replace Bevy's built-in default font (FiraMono) with GNU FreeSans, so text

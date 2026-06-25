@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 
 use crate::{
-    assets_management::GlobalFonts,
     menu::SelectedSong,
     song::SongManifest,
     song::chart::Action,
@@ -32,7 +31,6 @@ pub fn setup(
     mut music_started: ResMut<MusicStarted>,
     spectrogram_style: Res<SpectrogramStyle>,
     osc_material: Res<OscMaterial>,
-    fonts: Res<GlobalFonts>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Jam Session");
@@ -119,7 +117,7 @@ pub fn setup(
                 })
                 .with_children(|grid| {
                     spawn_12_bar_grid(grid, &chords, key, &GridConfig::for_2d());
-                    spawn_hole_map(grid, &holes_info, &fonts.gameplay);
+                    spawn_hole_map(grid, &holes_info);
                 });
                 left.spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -237,7 +235,7 @@ fn build_hole_guide(harp: &Harmonica, key: &str) -> (Vec<HoleInfo>, JamHoleGuide
 
 /// Spawn the bottom-strip hole map: a row of cells (blow note, hole number, draw
 /// note), with in-scale notes tinted green as a static guide.
-fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], font: &FontSource) {
+fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
