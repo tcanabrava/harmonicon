@@ -443,7 +443,7 @@ pub fn setup(
     );
     spawn_song_progress(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
-    spawn_countdown(&mut commands, &font, Some(&harp_hint));
+    spawn_countdown(&mut commands, Some(&harp_hint));
 }
 
 fn spawn_harmonica_3d(
@@ -571,7 +571,7 @@ fn spawn_hud_overlay(
             }
 
             // Live phrase / groove banner (driven by phrase_overlay::update_phrase)
-            spawn_phrase_banner(p, font);
+            spawn_phrase_banner(p);
 
             // 12-bar blues grid
             p.spawn(Node {
@@ -581,7 +581,7 @@ fn spawn_hud_overlay(
                 ..default()
             })
             .with_children(|grid| {
-                spawn_12_bar_grid(grid, chords, key, font, &GridConfig::for_3d());
+                spawn_12_bar_grid(grid, chords, key, &GridConfig::for_3d());
             });
 
             // Blow/draw legend
@@ -618,7 +618,7 @@ fn spawn_hud_overlay(
                 ..default()
             })
             .with_children(|metro| {
-                spawn_metronome(metro, beats_per_bar, bpm, font);
+                spawn_metronome(metro, beats_per_bar, bpm);
             });
 
             // Animated tail previews for the techniques legend (built up front so the UI
@@ -631,7 +631,7 @@ fn spawn_hud_overlay(
                 ..default()
             })
             .with_children(|leg| {
-                spawn_modifier_legend(leg, font, &legend_materials);
+                spawn_modifier_legend(leg, &legend_materials);
             });
         });
 

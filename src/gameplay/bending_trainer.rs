@@ -162,7 +162,7 @@ pub fn setup(
             // ── The bend diagram (rebuilt on key change) ────────────────────
             root.spawn((Node::default(), OverlayHost))
                 .with_children(|host| {
-                    spawn_harmonica_overlay(host, &richter_harp(&key.0), &font);
+                    spawn_harmonica_overlay(host, &richter_harp(&key.0));
                 });
 
             // ── Tempo control: −  ♩ = NN (in the metronome)  + ──────────────
@@ -187,7 +187,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|metro| {
-                    spawn_metronome(metro, tempo.beats_per_bar, tempo.bpm, &font);
+                    spawn_metronome(metro, tempo.beats_per_bar, tempo.bpm);
                 });
                 row.spawn_empty().apply_scene(button::small(
                     "+",
@@ -230,7 +230,7 @@ pub fn rebuild_overlay(
         }
         commands
             .entity(host)
-            .with_children(|h| spawn_harmonica_overlay(h, &harp, &fonts.gameplay));
+            .with_children(|h| spawn_harmonica_overlay(h, &harp));
     }
 }
 

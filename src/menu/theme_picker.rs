@@ -157,7 +157,6 @@ fn setup(
     spawn_button(
         &mut commands,
         root,
-        &fonts.symbols,
         "\u{2190} Back to Options",
         Some("BackToOptions"),
         &theme,

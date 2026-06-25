@@ -78,7 +78,6 @@ pub fn build_legend_materials(
 /// the 2D and 3D HUDs. `entries` come from [`build_legend_materials`].
 pub fn spawn_modifier_legend(
     parent: &mut ChildSpawnerCommands,
-    font: &FontSource,
     entries: &[(Handle<NoteTail2dMaterial>, &'static str)],
 ) {
     parent

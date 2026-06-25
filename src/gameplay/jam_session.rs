@@ -118,7 +118,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|grid| {
-                    spawn_12_bar_grid(grid, &chords, key, &fonts.gameplay, &GridConfig::for_2d());
+                    spawn_12_bar_grid(grid, &chords, key, &GridConfig::for_2d());
                     spawn_hole_map(grid, &holes_info, &fonts.gameplay);
                 });
                 left.spawn(Node {
@@ -128,7 +128,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|metro| {
-                    spawn_metronome(metro, beats_per_bar, bpm, &fonts.gameplay);
+                    spawn_metronome(metro, beats_per_bar, bpm);
                 });
             });
 
@@ -141,7 +141,7 @@ pub fn setup(
                 ..default()
             })
             .with_children(|right| {
-                spawn_harmonica_overlay(right, &chart.harmonica, &fonts.gameplay);
+                spawn_harmonica_overlay(right, &chart.harmonica);
                 right
                     .spawn(Node {
                         width: Val::Percent(100.0),
@@ -157,7 +157,7 @@ pub fn setup(
     commands.insert_resource(guide);
     // Jam already shows the harp hint on the persistent left panel, so the
     // countdown doesn't repeat it.
-    spawn_countdown(&mut commands, &fonts.gameplay, None);
+    spawn_countdown(&mut commands, None);
 }
 
 // ── Live harmonica hole map ─────────────────────────────────────────────────────

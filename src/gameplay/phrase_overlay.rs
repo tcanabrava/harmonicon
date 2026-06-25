@@ -13,7 +13,7 @@ use super::{GameplayClock, Paused, resolve_item_time};
 #[derive(Component)]
 pub struct PhraseText;
 
-pub fn spawn_phrase_banner(parent: &mut ChildSpawnerCommands, font: &FontSource) {
+pub fn spawn_phrase_banner(parent: &mut ChildSpawnerCommands) {
     parent.spawn((
         Text::new(""),
         TextFont {

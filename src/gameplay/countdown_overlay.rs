@@ -19,7 +19,7 @@ pub struct CountdownOverlay;
 #[derive(Component)]
 pub struct CountdownText;
 
-pub fn spawn_countdown(commands: &mut Commands, font: &FontSource, harp_hint: Option<&str>) {
+pub fn spawn_countdown(commands: &mut Commands, harp_hint: Option<&str>) {
     // The full-screen overlay shell is static and font/handle-free, so it's a
     // `bsn!` scene. The countdown text children carry a custom `FontSource`,
     // which `bsn!` can't take directly in 0.19-rc.3, so they stay imperative.

@@ -188,11 +188,11 @@ fn setup_options_menu(
 
     spawn_algo_row(&mut commands, root, &font.gameplay, settings.pitch_algorithm);
 
-    spawn_button(&mut commands, root, &font.gameplay, "Theme", Some("Theme"), &theme, &btn_mats, "Options",
+    spawn_button(&mut commands, root, "Theme", Some("Theme"), &theme, &btn_mats, "Options",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme));
-    spawn_button(&mut commands, root, &font.gameplay, "Calibrate input lag", Some("Calibrate"), &theme, &btn_mats, "Options",
+    spawn_button(&mut commands, root, "Calibrate input lag", Some("Calibrate"), &theme, &btn_mats, "Options",
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::Calibration));
-    spawn_button(&mut commands, root, &font.symbols, "\u{2190} Back", Some("BackToMain"), &theme, &btn_mats, "Options",
+    spawn_button(&mut commands, root, "\u{2190} Back", Some("BackToMain"), &theme, &btn_mats, "Options",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main));
 }
 

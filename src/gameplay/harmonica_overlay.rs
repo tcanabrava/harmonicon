@@ -153,7 +153,6 @@ fn row_color(row: Row) -> Color {
 pub fn spawn_harmonica_overlay(
     parent: &mut ChildSpawnerCommands,
     harp: &Harmonica,
-    font: &FontSource,
 ) {
     let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
 
@@ -186,9 +185,9 @@ pub fn spawn_harmonica_overlay(
                         ..default()
                     })
                     .with_children(|row| {
-                        spawn_label(row, font, "");
+                        spawn_label(row, "");
                         for hole in 1..=10u8 {
-                            spawn_text_cell(row, font, &hole.to_string(), Color::WHITE);
+                            spawn_text_cell(row, &hole.to_string(), Color::WHITE);
                         }
                     });
 
@@ -200,10 +199,10 @@ pub fn spawn_harmonica_overlay(
                             ..default()
                         })
                         .with_children(|row| {
-                            spawn_label(row, font, label);
+                            spawn_label(row, label);
                             for h in &holes {
                                 match note_for(h, kind) {
-                                    Some(note) => spawn_note_cell(row, font, note, row_color(kind)),
+                                    Some(note) => spawn_note_cell(row, note, row_color(kind)),
                                     None => spawn_empty(row),
                                 }
                             }
@@ -228,7 +227,7 @@ fn cell<'a>(row: &'a mut ChildSpawnerCommands, bg: Color) -> EntityCommands<'a> 
 }
 
 /// A note cell: shows the note class, lights up live (carries `HarpOverlayCell`).
-fn spawn_note_cell(row: &mut ChildSpawnerCommands, font: &FontSource, note: &str, color: Color) {
+fn spawn_note_cell(row: &mut ChildSpawnerCommands, note: &str, color: Color) {
     cell(row, CELL_DEFAULT)
         .insert(HarpOverlayCell { note: note.to_string() })
         .with_children(|c| {
@@ -241,7 +240,7 @@ fn spawn_note_cell(row: &mut ChildSpawnerCommands, font: &FontSource, note: &str
 }
 
 /// A static text cell (header numbers), no highlight.
-fn spawn_text_cell(row: &mut ChildSpawnerCommands, font: &FontSource, text: &str, color: Color) {
+fn spawn_text_cell(row: &mut ChildSpawnerCommands, text: &str, color: Color) {
     cell(row, Color::NONE).with_children(|c| {
         c.spawn((
             Text::new(text.to_string()),
@@ -252,7 +251,7 @@ fn spawn_text_cell(row: &mut ChildSpawnerCommands, font: &FontSource, text: &str
 }
 
 /// The left-hand row label (narrower than a hole cell).
-fn spawn_label(row: &mut ChildSpawnerCommands, font: &FontSource, text: &str) {
+fn spawn_label(row: &mut ChildSpawnerCommands, text: &str) {
     row.spawn(Node {
         width: Val::Px(40.0),
         height: Val::Px(22.0),

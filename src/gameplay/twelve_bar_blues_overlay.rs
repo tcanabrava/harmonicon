@@ -62,7 +62,6 @@ pub fn spawn_12_bar_grid(
     parent: &mut ChildSpawnerCommands,
     chords: &[String],
     key: &str,
-    font: &FontSource,
     cfg: &GridConfig,
 ) {
     for row in 0..3usize {

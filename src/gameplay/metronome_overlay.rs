@@ -154,7 +154,6 @@ pub fn spawn_metronome(
     parent: &mut ChildSpawnerCommands,
     beats_per_bar: usize,
     bpm: f32,
-    font: &FontSource,
 ) {
     parent
         .spawn(Node {

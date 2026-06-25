@@ -256,7 +256,7 @@ pub fn setup(
                     });
 
                 // Live phrase / groove banner (driven by phrase_overlay::update_phrase)
-                spawn_phrase_banner(right, &fonts.gameplay);
+                spawn_phrase_banner(right);
 
                 // 12-bar blues grid
                 right
@@ -270,7 +270,6 @@ pub fn setup(
                             grid,
                             &chords,
                             key,
-                            &fonts.gameplay,
                             &GridConfig::for_2d(),
                         );
                     });
@@ -283,11 +282,11 @@ pub fn setup(
                         ..default()
                     })
                     .with_children(|metro| {
-                        spawn_metronome(metro, beats_per_bar, bpm, &fonts.gameplay);
+                        spawn_metronome(metro, beats_per_bar, bpm);
                     });
 
                 // Technique colour legend
-                spawn_modifier_legend(right, &fonts.gameplay, &legend_materials);
+                spawn_modifier_legend(right, &legend_materials);
 
                 // Score
                 right
@@ -329,7 +328,7 @@ pub fn setup(
         });
     spawn_song_progress(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
-    spawn_countdown(&mut commands, &fonts.gameplay, Some(&harp_hint));
+    spawn_countdown(&mut commands, Some(&harp_hint));
 }
 
 fn note_height_pct(duration: f64) -> f32 {
