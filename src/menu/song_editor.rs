@@ -232,9 +232,10 @@ fn parse_notes(input: &str) -> Vec<EditorNote> {
         .collect()
 }
 
-/// Parse a note spec like `"-4 q"`, `"4 e"`, or `"3"` (defaults to a quarter).
-/// `-` prefix = draw (inhale); otherwise blow (exhale). Hole 1..=10. A spec
-/// starting with `r` is a silence/rest, e.g. `"r q"` or `"r"`.
+/// Parse a single note token like `"-4q"`, `"4e"`, or `"3"` (defaults to a
+/// quarter). `-` prefix = draw (inhale); otherwise blow (exhale). Hole 1..=10. A
+/// token starting with `r` is a silence/rest, e.g. `"rq"` or `"r"`. Whitespace
+/// around the parts is tolerated, but `parse_notes` already splits on it.
 fn parse_note(input: &str) -> Option<EditorNote> {
     let s = input.trim();
     if s.is_empty() {
@@ -268,13 +269,18 @@ fn parse_note(input: &str) -> Option<EditorNote> {
     Some(EditorNote { hole, is_blow, beats, rest: false, mods: 0 })
 }
 
-/// Format a note back to its spec text, e.g. `"-4 q"` or `"r h"` for a rest.
+/// Format a note back to its spec text, e.g. `"-4q"` or `"rh"` for a rest.
+///
+/// Tokens are space-free so they round-trip through [`note_parser::analyze_notes`],
+/// which treats a space purely as the separator between notes (a space inside a
+/// token would split it). Modifiers (bend, overblow, …) are not part of the spec
+/// text; they live in [`EditorNote::mods`] and are preserved across edits.
 fn format_note_spec(n: &EditorNote) -> String {
     if n.rest {
-        return format!("r {}", beats_letter(n.beats));
+        return format!("r{}", beats_letter(n.beats));
     }
     let sign = if n.is_blow { "" } else { "-" };
-    format!("{sign}{} {}", n.hole, beats_letter(n.beats))
+    format!("{sign}{}{}", n.hole, beats_letter(n.beats))
 }
 
 /// Parsed beats-per-bar (the bar capacity), at least 1.
@@ -1698,7 +1704,7 @@ mod tests {
 
     #[test]
     fn note_spec_round_trips() {
-        for spec in ["-4 q", "4 e", "2 h", "-1 w", "10 s", "r q", "r h"] {
+        for spec in ["-4q", "4e", "2h", "-1w", "10s", "rq", "rh"] {
             let n = parse_note(spec).unwrap();
             assert_eq!(format_note_spec(&n), spec, "round-trip {spec}");
         }

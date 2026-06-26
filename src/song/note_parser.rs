@@ -1,12 +1,16 @@
+use bevy::{core_pipeline::deferred::DEFERRED_LIGHTING_PASS_ID_FORMAT, material::bind_group_layout_entries};
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum State {
     Start,          // Beginning of the string or right after a space
     Minus,          // Saw a '-' sign, expecting a digit
     Number,         // Parsing a number (1-9 or 10)
     Rest,           // Saw 'r'
-    Duration,       // Saw 'w', 'h', 'q', or 'e'
+    OpenParenthesis, // Saw '('
+    Comma,          // Saw ','
+    CloseParenthesis, // Saw ')'
+    Duration,       // Saw 'w', 'h', 'q', 'e', or 's'
     Space,          // Saw a valid space, expecting a new note
-    Bend,            // Saw a Bend ', expecting a new note or a bend.
     Failed,         // Invalid sequence encountered
 }
 
@@ -27,8 +31,8 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
 
     let mut state = State::Start;
     let mut current_num: u32 = 0;
-    let mut last_bend = 0;
     let mut has_minus = false;
+    let mut in_parentheses = false;
 
     for &b in bytes {
         state = match state {
@@ -38,18 +42,27 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
                     State::Minus
                 },
                 b'r' => State::Rest,
-                b'0'..=b'9' => {
+                // Holes are 1-10, so a token never starts with 0.
+                b'1'..=b'9' => {
                     current_num = (b - b'0') as u32;
                     State::Number
                 }
+                b'(' => {
+                    in_parentheses = true;
+                    State::OpenParenthesis
+                },
                 _ => State::Failed,
             },
             State::Minus => match b {
-                b'0'..=b'9' => {
+                b'1'..=b'9' => {
                     has_minus = false;
                     current_num = (b - b'0') as u32;
                     State::Number
                 }
+                b'(' => {
+                    in_parentheses = true;
+                    State::OpenParenthesis
+                },
                 _ => State::Failed,
             },
             State::Number => match b {
@@ -62,31 +75,48 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
                         State::Failed // Out of bounds (> 10)
                     }
                 }
-                b'\''=> State::Bend,
-                b'w' | b'h' | b'q' | b'e' => State::Duration,
+                b'w' | b'h' | b'q' | b'e' | b's' => State::Duration,
+                b',' => {
+                    if in_parentheses {
+                        State::Comma
+                    } else {
+                        State::Failed
+                    }
+                }
+                b')' => {
+                    in_parentheses = false;
+                    has_minus = false;
+                    State::CloseParenthesis
+                }
                 b' ' => State::Space, // whitespace group \s
                 _ => State::Failed,
             },
+            State::OpenParenthesis => match b {
+                b'1'..=b'9' => {
+                    current_num = (b - b'0') as u32;
+                    State::Number
+                }
+                _ => State::Failed,
+            },
+            State::Comma => match b {
+                b'1'..=b'9' => {
+                    current_num = (b - b'0') as u32;
+                    State::Number
+                }
+                _ => State::Failed,
+            },
+            State::CloseParenthesis => match b {
+                b' ' => State::Space,
+                b'w' | b'h' | b'q' | b'e' | b's' => State::Duration,
+                _ => State::Failed,
+            },
             State::Rest => match b {
-                b'w' | b'h' | b'q' | b'e' => State::Duration,
+                b'w' | b'h' | b'q' | b'e' | b's' => State::Duration,
                 b' ' => State::Space,
                 _ => State::Failed,
             },
             State::Duration => match b {
                 b' ' => State::Space,
-                b'\'' => State::Bend,
-                _ => State::Failed,
-            },
-            State::Bend => match b {
-                b' ' => State::Space,
-                b'\'' => {
-                    last_bend += 1;
-                    if last_bend == 2 {
-                        State::Failed
-                    } else {
-                        State::Bend
-                    }
-                }
                 _ => State::Failed,
             },
             State::Space => match b {
@@ -163,14 +193,19 @@ mod tests {
         assert_analysis!("-10", true, true);
         assert_analysis!("r", true, true);
         assert_analysis!("-", true, false);
-        assert_analysis!("0", true, true);
-        assert_analysis!("-0", true, true);
 
-        // Single values with duration suffixes
+        // Single values with duration suffixes (w/h/q/e/s)
         assert_analysis!("5w", true, true);
         assert_analysis!("10h", true, true);
         assert_analysis!("-3q", true, true);
+        assert_analysis!("4s", true, true);
         assert_analysis!("re", true, true);
+        assert_analysis!("(1)", true, true);
+        assert_analysis!("(1,3)", true, true);
+        assert_analysis!("(1,2,3)", true, true);
+        assert_analysis!("-(1)", true, true);
+        assert_analysis!("-(1,3)", true, true);
+        assert_analysis!("-(1,2,3)", true, true);
     }
 
     #[test]
@@ -179,7 +214,10 @@ mod tests {
         assert_analysis!("5 -10w r", true, true);
         assert_analysis!("r 10e -1 2h", true, true);
         // Consecutive spacing tokens (\s+)
-        assert_analysis!("5   -3''   r", true, true);
+        assert_analysis!("5   -3   r", true, true);
+        assert_analysis!("4 -(1)", true, true);
+        assert_analysis!("1 -(1,3) 4 ", true, true);
+        assert_analysis!("1 -(1,2,3)h 5", true, true);
     }
 
     #[test]
@@ -192,7 +230,7 @@ mod tests {
         assert_analysis!("1", true, true); // Valid '1', but '0' could follow
 
         // Cut off on trailing spaces (expecting another note)
-        assert_analysis!("5' ", true, true);
+        assert_analysis!("5 ", true, true);
         assert_analysis!("r ", true, true);
     }
 
@@ -202,6 +240,14 @@ mod tests {
         assert_analysis!("11", false, false);
         assert_analysis!("-12", false, false);
         assert_analysis!("5 25", false, false);
+
+        // Hole 0 doesn't exist (valid range is 1-10).
+        assert_analysis!("0", false, false);
+        assert_analysis!("-0", false, false);
+
+        // Bends are a note modifier (applied in the editor), not part of the
+        // tab text, so an apostrophe is not a valid character here.
+        assert_analysis!("5'", false, false);
 
         // Invalid duration suffix characters
         assert_analysis!("5x", false, false);
