@@ -34,9 +34,9 @@ use super::AppState;
 /// One authored event: either a hole played blow (exhale) or draw (inhale), or a
 /// silence (`rest`). Duration is in beats (quarter = 1.0). For a rest, `hole`
 /// and `is_blow` are unused. `mods` is a bitmask of [`NoteMod`]s.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone,  PartialEq, Debug)]
 pub struct EditorNote {
-    pub hole: u8,
+    pub holes: Vec<u8>,
     pub is_blow: bool,
     pub beats: f32,
     pub rest: bool,
@@ -121,10 +121,14 @@ fn mod_valid(note: &EditorNote, m: NoteMod) -> bool {
     if note.rest {
         return false;
     }
+
+    let has_note_above_equals_7 = note.holes.iter().any(|h| *h >= 7);
+    let has_note_below_equals_6 = note.holes.iter().any(|h| *h <= 6);
+
     match m {
-        NoteMod::Bend => (note.is_blow && note.hole >= 7) || (!note.is_blow && note.hole <= 6),
-        NoteMod::Overblow => note.is_blow && note.hole <= 6,
-        NoteMod::Overdraw => !note.is_blow && note.hole >= 7,
+        NoteMod::Bend => (note.is_blow && has_note_above_equals_7) || (!note.is_blow && has_note_below_equals_6),
+        NoteMod::Overblow => note.is_blow && has_note_below_equals_6,
+        NoteMod::Overdraw => !note.is_blow && has_note_above_equals_7,
         NoteMod::Vibrato | NoteMod::WahWah => true,
     }
 }
@@ -241,32 +245,76 @@ fn parse_note(input: &str) -> Option<EditorNote> {
     if s.is_empty() {
         return None;
     }
-    // Rest: "r" + optional duration letter.
+
+    // Rest: "r" + optional duration.
     if matches!(s.chars().next(), Some('r' | 'R')) {
         let beats = match s[1..].trim_start().chars().next() {
             Some(c) => dur_beats(c.to_ascii_lowercase())?,
             None => 1.0,
         };
-        return Some(EditorNote { hole: 0, is_blow: true, beats, rest: true, mods: 0 });
+        return Some(EditorNote {
+            holes: vec![],
+            is_blow: true,
+            beats,
+            rest: true,
+            mods: 0,
+        });
     }
-    let (is_blow, rest) = match s.strip_prefix('-') {
+
+    let (is_blow, mut rest) = match s.strip_prefix('-') {
         Some(r) => (false, r.trim_start()),
         None => (true, s),
     };
-    let mut chars = rest.trim_start();
-    // Leading digits → hole.
-    let digits: String = chars.chars().take_while(|c| c.is_ascii_digit()).collect();
-    let hole: u8 = digits.parse().ok()?;
-    if !(1..=10).contains(&hole) {
-        return None;
+
+    let holes: Vec<u8>;
+
+    if let Some(after_open) = rest.strip_prefix('(') {
+        // Find closing paren.
+        let end = after_open.find(')')?;
+        let inside = &after_open[..end];
+
+        holes = inside
+            .split(',')
+            .map(|x| x.trim().parse::<u8>().ok())
+            .collect::<Option<Vec<_>>>()?;
+
+        if holes.is_empty() || holes.iter().any(|h| !(1..=10).contains(h)) {
+            return None;
+        }
+
+        rest = after_open[end + 1..].trim_start();
+    } else {
+        // Single hole.
+        let digits: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+
+        if digits.is_empty() {
+            return None;
+        }
+
+        let hole: u8 = digits.parse().ok()?;
+        if !(1..=10).contains(&hole) {
+            return None;
+        }
+
+        holes = vec![hole];
+        rest = rest[digits.len()..].trim_start();
     }
-    chars = chars[digits.len()..].trim_start();
-    // Optional duration letter (defaults to a quarter note).
-    let beats = match chars.chars().next() {
+
+    let beats = match rest.chars().next() {
         Some(c) => dur_beats(c.to_ascii_lowercase())?,
         None => 1.0,
     };
-    Some(EditorNote { hole, is_blow, beats, rest: false, mods: 0 })
+
+    Some(EditorNote {
+        holes: holes,
+        is_blow,
+        beats,
+        rest: false,
+        mods: 0,
+    })
 }
 
 /// Format a note back to its spec text, e.g. `"-4q"` or `"rh"` for a rest.
@@ -280,7 +328,7 @@ fn format_note_spec(n: &EditorNote) -> String {
         return format!("r{}", beats_letter(n.beats));
     }
     let sign = if n.is_blow { "" } else { "-" };
-    format!("{sign}{}{}", n.hole, beats_letter(n.beats))
+    format!("{sign}{}{}", n.holes.iter().map(|h| h.to_string()).collect::<String>(), beats_letter(n.beats))
 }
 
 /// Parsed beats-per-bar (the bar capacity), at least 1.
@@ -791,7 +839,7 @@ fn build_bar_cell(
             })
             .with_children(|notes_row| {
                 for &ni in note_indices {
-                    let n = data.notes[ni];
+                    let n = &data.notes[ni];
                     let selected = data.selected.contains(&ni);
                     let is_cursor = data.cursor == Some(ni);
                     let frac = (n.beats / beats_per_bar as f32).clamp(0.12, 1.0);
@@ -847,7 +895,10 @@ fn build_bar_cell(
                                     TextColor(color),
                                 ));
                                 w.spawn((
-                                    Text::new(n.hole.to_string()),
+                                    Text::new(format!("{}", n.holes.iter()
+                                        .map(u8::to_string)
+                                        .collect::<Vec<_>>()
+                                        .join(","))),
                                     TextFont { font_size: FontSize::Px(12.0), ..default() },
                                     TextColor(Color::WHITE),
                                 ));
@@ -1074,8 +1125,8 @@ fn input_to_notes_text(data: &SongEditorData) -> String {
         } else {
             let dir = if n.is_blow { "blow" } else { "draw" };
             format!(
-                "\u{2192} {dir} hole {}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
-                n.hole,
+                "\u{2192} {dir} holes {:?}  \u{00B7}  {}  \u{00B7}  {secs:.2}s",
+                n.holes,
                 dur_symbol(n.beats),
             )
         }
@@ -1446,6 +1497,17 @@ fn build_chart(data: &SongEditorData) -> HarpChart {
                 .filter(|m| n.mods & m.bit() != 0)
                 .map(|m| m.to_modifier())
                 .collect();
+
+            let m = if !modifiers.is_empty() { Some(modifiers) } else { None };
+
+            let events = n.holes.iter().map(|h|
+                NoteEvent {
+                hole: *h,
+                action: if n.is_blow { Action::Blow } else { Action::Draw },
+                note: None,
+                modifiers: m.clone(),
+            }).collect::<Vec<_>>();
+
             track.push(TrackItem {
                 id: None,
                 time: Some(t),
@@ -1454,12 +1516,7 @@ fn build_chart(data: &SongEditorData) -> HarpChart {
                 phrase: None,
                 groove: None,
                 play_mode: None,
-                events: vec![NoteEvent {
-                    hole: n.hole,
-                    action: if n.is_blow { Action::Blow } else { Action::Draw },
-                    note: None,
-                    modifiers: (!modifiers.is_empty()).then_some(modifiers),
-                }],
+                events,
             });
         }
         t += dur;
@@ -1682,9 +1739,9 @@ mod tests {
     #[test]
     fn parse_note_handles_draw_blow_and_durations() {
         let draw = parse_note("-4 q").unwrap();
-        assert_eq!((draw.hole, draw.is_blow, draw.beats), (4, false, 1.0));
+        assert_eq!((draw.holes, draw.is_blow, draw.beats), (vec![4], false, 1.0));
         let blow = parse_note("4 e").unwrap();
-        assert_eq!((blow.hole, blow.is_blow, blow.beats), (4, true, 0.5));
+        assert_eq!((blow.holes, blow.is_blow, blow.beats), (vec![4], true, 0.5));
         // No duration letter defaults to a quarter.
         assert_eq!(parse_note("3").unwrap().beats, 1.0);
         // Out-of-range hole / empty are rejected.
@@ -1715,9 +1772,9 @@ mod tests {
         // quarter note, half rest, quarter note at 120 BPM (beat = 0.5s).
         let data = SongEditorData {
             notes: vec![
-                EditorNote { hole: 4, is_blow: true, beats: 1.0, rest: false, mods: 0 },
-                EditorNote { hole: 0, is_blow: true, beats: 2.0, rest: true, mods: 0 },
-                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false, mods: 0 },
+                EditorNote { holes: vec![4], is_blow: true, beats: 1.0, rest: false, mods: 0 },
+                EditorNote { holes: vec![0], is_blow: true, beats: 2.0, rest: true, mods: 0 },
+                EditorNote { holes: vec![4], is_blow: false, beats: 1.0, rest: false, mods: 0 },
             ],
             ..Default::default()
         };
@@ -1731,7 +1788,7 @@ mod tests {
 
     #[test]
     fn notes_flow_into_bars_by_beats() {
-        let q = |hole, blow| EditorNote { hole, is_blow: blow, beats: 1.0, rest: false, mods: 0 };
+        let q = |hole, blow| EditorNote { holes: vec![hole], is_blow: blow, beats: 1.0, rest: false, mods: 0 };
         // Five quarter notes in 4/4 → first bar holds 4, the fifth spills over.
         let notes: Vec<_> = (0..5).map(|i| q(i + 1, true)).collect();
         let bars = notes_by_bar(&notes, 4);
@@ -1742,10 +1799,10 @@ mod tests {
 
     #[test]
     fn a_half_note_uses_two_of_four_beats() {
-        let half = EditorNote { hole: 2, is_blow: false, beats: 2.0, rest: false, mods: 0 };
-        let q = EditorNote { hole: 3, is_blow: true, beats: 1.0, rest: false, mods: 0 };
+        let half = EditorNote { holes: vec![2], is_blow: false, beats: 2.0, rest: false, mods: 0 };
+        let q = EditorNote { holes: vec![3], is_blow: true, beats: 1.0, rest: false, mods: 0 };
         // half + half + quarter → bar1 holds both halves (4 beats), quarter spills.
-        let bars = notes_by_bar(&[half, half, q], 4);
+        let bars = notes_by_bar(&[half.clone(), half.clone(), q], 4);
         assert_eq!(bars[0], vec![0, 1]);
         assert_eq!(bars[1], vec![2]);
     }
@@ -1771,8 +1828,8 @@ mod tests {
             artist: "Test".into(),
             song_name: "Song".into(),
             notes: vec![
-                EditorNote { hole: 4, is_blow: false, beats: 1.0, rest: false, mods: NoteMod::Bend.bit() },
-                EditorNote { hole: 4, is_blow: true, beats: 0.5, rest: false, mods: 0 },
+                EditorNote { holes: vec![4], is_blow: false, beats: 1.0, rest: false, mods: NoteMod::Bend.bit() },
+                EditorNote { holes: vec![4], is_blow: true, beats: 0.5, rest: false, mods: 0 },
             ],
             ..Default::default()
         };
@@ -1804,7 +1861,7 @@ mod tests {
 
     #[test]
     fn mod_valid_follows_harp_physics() {
-        let mk = |hole, is_blow| EditorNote { hole, is_blow, beats: 1.0, rest: false, mods: 0 };
+        let mk = |hole, is_blow| EditorNote { holes: vec![hole], is_blow, beats: 1.0, rest: false, mods: 0 };
         let draw4 = mk(4, false);
         assert!(mod_valid(&draw4, NoteMod::Bend)); // draw bends on 1-6
         assert!(!mod_valid(&draw4, NoteMod::Overblow));
@@ -1816,7 +1873,7 @@ mod tests {
         assert!(!mod_valid(&draw8, NoteMod::Bend));
         assert!(mod_valid(&draw8, NoteMod::Vibrato)); // vibrato anywhere
         // Rests take nothing.
-        let rest = EditorNote { hole: 0, is_blow: true, beats: 1.0, rest: true, mods: 0 };
+        let rest = EditorNote { holes: vec![0], is_blow: true, beats: 1.0, rest: true, mods: 0 };
         assert!(NoteMod::ALL.iter().all(|&m| !mod_valid(&rest, m)));
     }
 
