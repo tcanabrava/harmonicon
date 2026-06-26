@@ -15,6 +15,7 @@ use harmonicon::assets_management::AssetsManagementPlugin;
 use harmonicon::audio_system::pitch_detect::AudioFrame;
 use harmonicon::audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
 use harmonicon::gameplay::GameplayPlugin;
+use harmonicon::localization::LocalizationPlugin;
 use harmonicon::menu::{AppState, MenuPlugin};
 use harmonicon::settings::SettingsPlugin;
 use harmonicon::song::SongPlugin;
@@ -50,6 +51,7 @@ fn main() {
     .add_plugins((
         AssetsManagementPlugin,
         ThemePlugin,
+        LocalizationPlugin,
         SongPlugin,
         MenuPlugin,
         GameplayPlugin,
@@ -65,7 +67,15 @@ fn main() {
             target_scale: 1.0,
             target_time: Timer::new(Duration::from_millis(SCALE_TIME), TimerMode::Once),
         })
-        .add_systems(Startup, (spawn_camera, initialize_game, setup_audio))
+        .add_systems(Startup, (spawn_camera, setup_audio))
+        // Hold on the Startup state until the locale folder has loaded, so the
+        // menu's first frame shows translated labels rather than raw Fluent keys.
+        .add_systems(
+            Update,
+            enter_menu_when_localized
+                .run_if(in_state(AppState::Startup))
+                .run_if(harmonicon::localization::localization_ready),
+        )
         .add_systems(Update, process_audio)
         .add_systems(
             Update,
@@ -82,7 +92,7 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn((Camera2d, Name::new("Camera2d (main)")));
 }
 
-fn initialize_game(mut next: ResMut<NextState<AppState>>) {
+fn enter_menu_when_localized(mut next: ResMut<NextState<AppState>>) {
     next.set(AppState::Menu);
 }
 

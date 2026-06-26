@@ -24,6 +24,12 @@ pulldown-cmark = { version = "0.12", default-features = false }
 winit = "0.30"
 image = { version = "0.25", default-features = false, features = ["png"] }
 bevy_fluent = "0.15.0"
+# The `Content` trait used to resolve Fluent message keys; bevy_fluent builds on
+# this same version but does not re-export the trait.
+fluent_content = "0.0.5"
+unic-langid = "0.9"
+# Detect the OS UI language so the game starts in the player's locale.
+sys-locale = "0.3"
 regex = "1.12.4"
 
 [[bin]]

@@ -26,7 +26,6 @@ use crate::song::chart::{
 use crate::song::{
     note_parser,
     harmonica::{Harmonica, twelve_bar}};
-use regex::Regex;
 
 use super::AppState;
 
@@ -561,6 +560,7 @@ fn mod_button(parent: &mut ChildSpawnerCommands, m: NoteMod) {
             move |_: On<Pointer<Click>>,
                   mut data: ResMut<SongEditorData>,
                   mut status: Query<&mut Text, With<AnalyzeStatusText>>| {
+                      println!("Appluing modifier {:?}", m);
                 apply_modifier(m, &mut data, &mut status);
             },
         );
@@ -1617,9 +1617,6 @@ impl Plugin for SongEditorPlugin {
             .add_systems(
                 Update,
                 (
-                    // Widget clicks (focus, harp cycle, note select, modifiers,
-                    // browse, save) ride along as inline on(...) observers wired
-                    // at spawn — see the spawn helpers and build_grid.
                     handle_escape,
                     type_into_focused,
                     pick_file,
@@ -1631,7 +1628,6 @@ impl Plugin for SongEditorPlugin {
 
         app.add_observer(update_field_views);
         app.add_observer(change_focused_field);
-
     }
 }
 

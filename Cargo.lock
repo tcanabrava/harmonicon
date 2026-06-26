@@ -3210,6 +3210,7 @@ dependencies = [
  "crossbeam-channel",
  "dirs",
  "figment",
+ "fluent_content",
  "image",
  "jsonschema",
  "midly",
@@ -3219,7 +3220,9 @@ dependencies = [
  "rustfft",
  "serde",
  "serde_json",
+ "sys-locale",
  "thiserror 2.0.18",
+ "unic-langid",
  "winit",
 ]
 
