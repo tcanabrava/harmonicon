@@ -76,12 +76,54 @@ fn draw_vertical_harmonica_holes(mut commands: &mut Commands,
         ));
     }
 }
+
+#[derive(Resource)]
+struct MusicGrid {
+    beat_spacing: f32,   // pixels per beat on X axis
+}
+
+impl MusicGrid {
+    fn beat_to_x(&self, beat: f32) -> f32 {
+        beat * self.beat_spacing
+    }
+}
+
+fn spawn_beat_grid(
+    commands: &mut Commands,
+    grid: Res<MusicGrid>,
+    mut meshes: &mut ResMut<Assets<Mesh>>,
+    mut materials: &mut ResMut<Assets<ColorMaterial>>,
+) {
+    let hole_step = HOLE_SIZE + VERTICAL_SPACING;
+
+    let total_height = (ROW_COUNT as f32 - 1.0) * hole_step + HOLE_SIZE;
+    let start_y = -total_height / 2.0;
+
+    for i in 0..200 {
+        let x = grid.beat_to_x(i as f32);
+
+        let is_bar = i % 4 == 0;
+
+        commands.spawn((
+            Mesh2d(meshes.add(Rectangle::new(1.0, total_height))),
+            MeshMaterial2d(materials.add(Color::srgb(
+                if is_bar { 0.8 } else { 0.4 },
+                0.4,
+                0.4,
+            ))),
+            Transform::from_xyz(x, 0.0, 0.0),
+        ));
+    }
+}
+
 fn setup(mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>)
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    grid: Res<MusicGrid>)
 {
     draw_vertical_harmonica_holes(&mut commands, &mut meshes, &mut materials);
     spawn_harmonica_lane(&mut commands, &mut meshes, &mut materials);
+    spawn_beat_grid(&mut commands, grid, &mut meshes, &mut materials);
 }
 
 fn cleanup(mut commands: Commands) {
@@ -91,7 +133,10 @@ pub struct SongEditor2Plugin;
 
 impl Plugin for SongEditor2Plugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::SongEditor2), setup)
-            .add_systems(OnExit(AppState::SongEditor2), cleanup);
+        app.insert_resource(MusicGrid {
+            beat_spacing: 20.0,
+        })
+        .add_systems(OnEnter(AppState::SongEditor2), setup)
+        .add_systems(OnExit(AppState::SongEditor2), cleanup);
     }
 }
