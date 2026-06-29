@@ -9,6 +9,7 @@ app-title = Harmonicon
 # Main menu
 menu-play = Play
 menu-song-editor = Song Editor
+menu-song-editor-2 = Song Editor 2
 menu-options = Options
 menu-credits = Credits
 menu-quit = Quit

@@ -872,46 +872,7 @@ fn build_bar_cell(
                             }),
                             NoteWidget(ni),
                         ))
-                        .with_children(|w| {
-                            if n.rest {
-                                // A silence: a centered dim bar, no arrow/number.
-                                w.spawn((
-                                    Node {
-                                        width: Val::Percent(55.0),
-                                        height: Val::Px(2.0),
-                                        ..default()
-                                    },
-                                    BackgroundColor(Color::srgb(0.5, 0.5, 0.55)),
-                                ));
-                            } else {
-                                let (arrow, color) = if n.is_blow {
-                                    ("\u{2191}", Color::srgb(0.30, 0.60, 0.95))
-                                } else {
-                                    ("\u{2193}", Color::srgb(0.95, 0.45, 0.20))
-                                };
-                                w.spawn((
-                                    Text::new(arrow),
-                                    TextFont { font_size: FontSize::Px(16.0), ..default() },
-                                    TextColor(color),
-                                ));
-                                w.spawn((
-                                    Text::new(format!("{}", n.holes.iter()
-                                        .map(u8::to_string)
-                                        .collect::<Vec<_>>()
-                                        .join(","))),
-                                    TextFont { font_size: FontSize::Px(12.0), ..default() },
-                                    TextColor(Color::WHITE),
-                                ));
-                            }
-                            // Modifier tags (e.g. "bv"), shown small at the bottom.
-                            if n.mods != 0 {
-                                w.spawn((
-                                    Text::new(mods_tag(n.mods)),
-                                    TextFont { font_size: FontSize::Px(9.0), ..default() },
-                                    TextColor(Color::srgb(0.95, 0.80, 0.35)),
-                                ));
-                            }
-                        })
+                        .with_children(|w| text_inside_note(w, n))
                         .observe(
                             move |_: On<Pointer<Click>>,
                                   keyboard: Res<ButtonInput<KeyCode>>,
@@ -923,6 +884,47 @@ fn build_bar_cell(
                 }
             });
         });
+}
+
+fn text_inside_note(w: &mut ChildSpawnerCommands, n: &EditorNote) {
+    if n.rest {
+        // A silence: a centered dim bar, no arrow/number.
+        w.spawn((
+            Node {
+                width: Val::Percent(55.0),
+                height: Val::Px(2.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.5, 0.5, 0.55)),
+        ));
+    } else {
+        let (arrow, color) = if n.is_blow {
+            ("\u{2191}", Color::srgb(0.30, 0.60, 0.95))
+        } else {
+            ("\u{2193}", Color::srgb(0.95, 0.45, 0.20))
+        };
+        w.spawn((
+            Text::new(arrow),
+            TextFont { font_size: FontSize::Px(16.0), ..default() },
+            TextColor(color),
+        ));
+        w.spawn((
+            Text::new(format!("{}", n.holes.iter()
+                .map(u8::to_string)
+                .collect::<Vec<_>>()
+                .join("\n"))),
+            TextFont { font_size: FontSize::Px(12.0), ..default() },
+            TextColor(Color::WHITE),
+        ));
+    }
+    // Modifier tags (e.g. "bv"), shown small at the bottom.
+    if n.mods != 0 {
+        w.spawn((
+            Text::new(mods_tag(n.mods)),
+            TextFont { font_size: FontSize::Px(9.0), ..default() },
+            TextColor(Color::srgb(0.95, 0.80, 0.35)),
+        ));
+    }
 }
 
 // ── Tempo analysis ────────────────────────────────────────────────────────────
