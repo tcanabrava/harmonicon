@@ -17,6 +17,9 @@
 //!   * scroll/pan horizontally with the mouse wheel or the ← → keys,
 //!   * left-click an empty cell to add a note on that hole/beat,
 //!   * left-click a note to select it, then apply modifiers from the panel,
+//!   * drag a note's body to move it (a yellow ghost previews the drop target,
+//!     red when the spot is taken; the move only commits on a free spot),
+//!   * drag a note's left/right edge to change its duration,
 //!   * `Delete` removes the selected note.
 //!
 //! A note carries one *pitch* technique (Normal, Bend 0.5/1.0/1.5, Overblow,
@@ -69,6 +72,8 @@ const BTN_BG: Color = Color::srgb(0.16, 0.16, 0.24);
 const BTN_ACTIVE: Color = Color::srgb(0.28, 0.42, 0.30);
 const FIELD_BG: Color = Color::srgba(0.10, 0.10, 0.14, 1.0);
 const FIELD_BG_FOCUS: Color = Color::srgba(0.16, 0.16, 0.24, 1.0);
+const GHOST_OK: Color = Color::srgb(0.98, 0.85, 0.20); // move preview on a free spot
+const GHOST_BAD: Color = Color::srgb(0.90, 0.25, 0.20); // …on an occupied spot
 
 // ── Note model ───────────────────────────────────────────────────────────────
 
@@ -149,14 +154,51 @@ enum Edge {
     Right,
 }
 
-/// A resize gesture in progress. Recorded at `DragStart` so each `Drag` event can
-/// be applied relative to the note's size when the drag began.
+/// Whether a drag moves the whole note or resizes one of its edges.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum DragKind {
+    Move,
+    Resize(Edge),
+}
+
+/// A drag gesture in progress. Recorded at `DragStart` so each `Drag` event can be
+/// applied relative to where the note was when the drag began.
 #[derive(Clone, Copy)]
 struct DragState {
     id: u32,
+    kind: DragKind,
     start_beat: usize,
     start_len: usize,
     start_hole: u8,
+    /// For a Move: the live snapped destination and whether it's free to drop on.
+    target_hole: u8,
+    target_beat: usize,
+    valid: bool,
+}
+
+impl DragState {
+    fn new(id: u32, kind: DragKind, note: &GridNote) -> Self {
+        Self {
+            id,
+            kind,
+            start_beat: note.beat,
+            start_len: note.len,
+            start_hole: note.hole,
+            target_hole: note.hole,
+            target_beat: note.beat,
+            valid: true,
+        }
+    }
+}
+
+/// Snapped destination `(hole, beat)` for a move drag, from the start position and
+/// the pixel drag distance. The hole is clamped to 1..=ROWS, the beat to >= 0.
+fn move_target(start_hole: u8, start_beat: usize, dist_x: f32, dist_y: f32) -> (u8, usize) {
+    let steps_x = (dist_x / BEAT_W).round() as i32;
+    let steps_y = (dist_y / ROW_H).round() as i32;
+    let hole = (start_hole as i32 + steps_y).clamp(1, ROWS as i32) as u8;
+    let beat = (start_beat as i32 + steps_x).max(0) as usize;
+    (hole, beat)
 }
 
 /// Can a note of length `len` sit at (`hole`, `beat`) without overlapping another
@@ -392,6 +434,11 @@ struct GridItem;
 #[derive(Component)]
 struct NoteView(u32);
 
+/// The yellow rectangle shown at a note's snapped destination while moving it.
+/// One persistent entity, hidden unless a move drag is in progress.
+#[derive(Component)]
+struct MoveGhost;
+
 /// A modifier-panel button, tagged with the technique it toggles.
 #[derive(Component, Clone, Copy, PartialEq)]
 enum ModButton {
@@ -432,6 +479,7 @@ impl Plugin for SongEditor2Plugin {
                     type_into_field,
                     rebuild_grid.run_if(resource_exists_and_changed::<EditorState>),
                     live_resize,
+                    update_move_ghost,
                     update_mod_panel,
                     update_meta_fields,
                     animate_note_shaders,
@@ -480,7 +528,26 @@ fn setup(mut commands: Commands) {
                         overflow: Overflow::clip(),
                         ..default()
                     },
-                ));
+                ))
+                .with_children(|ga| {
+                    // The move-preview ghost: a persistent, normally-hidden yellow
+                    // rect drawn above the notes (ZIndex 2) at the drop target.
+                    ga.spawn((
+                        MoveGhost,
+                        ZIndex(2),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            width: Val::Px(BEAT_W - 2.0),
+                            height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
+                            border: UiRect::all(Val::Px(2.0)),
+                            ..default()
+                        },
+                        BackgroundColor(GHOST_OK.with_alpha(0.30)),
+                        BorderColor::all(GHOST_OK),
+                        Visibility::Hidden,
+                        Pickable::IGNORE,
+                    ));
+                });
             });
 
             spawn_mod_panel(root);
@@ -831,6 +898,45 @@ fn spawn_note(
         .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
             state.selected = Some(id);
         })
+        // Dragging the body (the middle of the note) moves it on both axes. A
+        // drag that started on an edge handle bubbles up here too, so yield if a
+        // drag is already in progress (the handle's resize owns it).
+        .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
+            if state.dragging.is_some() {
+                return;
+            }
+            if let Some(n) = state.note_by_id(id).copied() {
+                state.selected = Some(id);
+                state.dragging = Some(DragState::new(id, DragKind::Move, &n));
+            }
+        })
+        .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>| {
+            let Some(drag) = state.dragging else { return };
+            if drag.id != id || drag.kind != DragKind::Move {
+                return;
+            }
+            // Snap to a target cell, but only mark it droppable when that hole is
+            // free there — the note itself doesn't move until release.
+            let (hole, beat) = move_target(drag.start_hole, drag.start_beat, ev.distance.x, ev.distance.y);
+            let valid = can_place(&state.notes, id, hole, beat, drag.start_len);
+            if let Some(d) = state.dragging.as_mut() {
+                d.target_hole = hole;
+                d.target_beat = beat;
+                d.valid = valid;
+            }
+        })
+        .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
+            let Some(drag) = state.dragging.take() else { return };
+            // Commit the move only if it landed on a free spot; otherwise the note
+            // stays put. Resize drags are finalised by the handle, not here.
+            if drag.kind == DragKind::Move && drag.valid {
+                if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
+                    n.hole = drag.target_hole;
+                    n.beat = drag.target_beat;
+                }
+                enforce_direction(&mut state, id);
+            }
+        })
         .id();
 
     // Background: flat colour, or the animated note shader for Wah/Vibrato.
@@ -887,15 +993,15 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
         .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
             if let Some(n) = state.note_by_id(id).copied() {
                 state.selected = Some(id);
-                state.dragging = Some(DragState { id, start_beat: n.beat, start_len: n.len, start_hole: n.hole });
+                state.dragging = Some(DragState::new(id, DragKind::Resize(edge), &n));
             }
         })
         .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>| {
             let Some(drag) = state.dragging else { return };
-            if drag.id != id {
+            if drag.id != id || drag.kind != DragKind::Resize(edge) {
                 return;
             }
-            let Some(hole) = state.note_by_id(id).map(|n| n.hole) else { return };
+            let hole = drag.start_hole;
             // Bound the resize by the neighbouring notes on this hole so two notes
             // on the same row can never overlap. Neighbours are taken relative to
             // the drag's start position (they don't move during the gesture).
@@ -912,17 +1018,6 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
                 }
             }
 
-            let new_row = (drag.start_hole as i8 + (ev.distance.y / ROW_H).round() as i8)
-                .clamp(0, 10) as u8;
-
-            if new_row != hole {
-                if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
-                    n.hole = new_row;
-                    println!("Setting the new hole to: {}", new_row);
-                    return;
-                }
-            }
-
             let steps = (ev.distance.x / BEAT_W).round() as i32;
             let (beat, len) =
                 apply_resize(drag.start_beat, drag.start_len, edge, steps, left_bound, right_bound);
@@ -932,17 +1027,25 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
             }
         })
         .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
-            state.dragging = None;
-            // Resizing may have pulled this note over notes of the opposite
-            // breath direction; unify them (the dragged note wins).
-            enforce_direction(&mut state, id);
+            // Only finalise a resize here; a move that bubbled up is owned by the
+            // body's DragEnd (which runs after this and finds `dragging` taken).
+            if matches!(state.dragging, Some(d) if d.id == id && matches!(d.kind, DragKind::Resize(_))) {
+                state.dragging = None;
+                // Resizing may have pulled this note over notes of the opposite
+                // breath direction; unify them (the dragged note wins).
+                enforce_direction(&mut state, id);
+            }
         });
 }
 
-/// While an edge-drag is active, reposition/resize the dragged note's entity
-/// directly (the grid rebuild is paused, so this is the only thing that moves).
+/// While an edge *resize* drag is active, reposition/resize the dragged note's
+/// entity directly (the grid rebuild is paused). A *move* drag leaves the note in
+/// place and is previewed by the ghost instead, so it's skipped here.
 fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, &mut Node)>) {
     let Some(drag) = state.dragging else { return };
+    if !matches!(drag.kind, DragKind::Resize(_)) {
+        return;
+    }
     let Some(note) = state.note_by_id(drag.id) else { return };
     let (left, _top, width, _height) = note_rect(note, state.scroll_beat);
     for (view, mut node) in &mut notes {
@@ -950,6 +1053,29 @@ fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, &mut Node)>
             node.left = Val::Px(left);
             node.width = Val::Px(width);
         }
+    }
+}
+
+/// Show the yellow move-preview ghost at the drop target while a move drag is
+/// active (red when the spot is occupied), and hide it otherwise.
+fn update_move_ghost(
+    state: Res<EditorState>,
+    mut ghost: Query<(&mut Node, &mut Visibility, &mut BackgroundColor, &mut BorderColor), With<MoveGhost>>,
+) {
+    let Ok((mut node, mut vis, mut bg, mut border)) = ghost.single_mut() else { return };
+    match state.dragging {
+        Some(drag) if drag.kind == DragKind::Move => {
+            let left = (drag.target_beat as f32 - state.scroll_beat as f32) * BEAT_W + 1.0;
+            let top = HEADER_H + (drag.target_hole as f32 - 1.0) * ROW_H + NOTE_PAD;
+            node.left = Val::Px(left);
+            node.top = Val::Px(top);
+            node.width = Val::Px(drag.start_len as f32 * BEAT_W - 2.0);
+            *vis = Visibility::Inherited;
+            let color = if drag.valid { GHOST_OK } else { GHOST_BAD };
+            bg.0 = color.with_alpha(0.30);
+            *border = BorderColor::all(color);
+        }
+        _ => *vis = Visibility::Hidden,
     }
 }
 
@@ -1350,6 +1476,30 @@ mod tests {
         assert_eq!(apply_resize(4, 2, Edge::Left, 9, 0, None), (5, 1));
         // …nor goes before beat 0.
         assert_eq!(apply_resize(1, 2, Edge::Left, -9, 0, None), (0, 3));
+    }
+
+    #[test]
+    fn move_target_snaps_and_clamps() {
+        // No movement → same cell.
+        assert_eq!(move_target(5, 4, 0.0, 0.0), (5, 4));
+        // One column right, two rows down.
+        assert_eq!(move_target(5, 4, BEAT_W, 2.0 * ROW_H), (7, 5));
+        // Rows clamp to 1..=ROWS, beats never go below 0.
+        assert_eq!(move_target(1, 0, -5.0 * BEAT_W, -5.0 * ROW_H), (1, 0));
+        assert_eq!(move_target(10, 2, 0.0, 5.0 * ROW_H), (10, 2));
+    }
+
+    #[test]
+    fn move_is_blocked_where_a_note_already_sits() {
+        let notes = vec![
+            GridNote { id: 0, hole: 3, beat: 0, len: 2, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote { id: 1, hole: 3, beat: 5, len: 1, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
+        ];
+        // Moving note 1 onto beat 1 of hole 3 overlaps note 0 → not placeable.
+        assert!(!can_place(&notes, 1, 3, 1, 1));
+        // Beat 2 is free (note 0 spans 0..2), and a different hole is free too.
+        assert!(can_place(&notes, 1, 3, 2, 1));
+        assert!(can_place(&notes, 1, 4, 0, 1));
     }
 
     #[test]
