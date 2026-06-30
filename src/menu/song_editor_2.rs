@@ -439,16 +439,32 @@ impl EditorState {
     }
 }
 
+/// Continuous horizontal scroll, in pixels (>= 0). Kept out of [`EditorState`] so
+/// scrolling doesn't trigger a grid rebuild; `EditorState::scroll_beat` is derived
+/// from it as the integer base beat and only changes (→ rebuild) at beat crossings.
+#[derive(Resource, Default)]
+struct Scroll {
+    px: f32,
+}
+
 // ── Components ───────────────────────────────────────────────────────────────
 
 #[derive(Component)]
 struct EditorRoot;
 
-/// The clipped viewport the visible grid cells live in.
+/// The clipped viewport the visible grid lives in.
 #[derive(Component)]
 struct GridArea;
 
-/// A transient grid entity (cell, header, line, note) rebuilt each scroll/edit.
+/// The scrolling layer inside [`GridArea`]: holds the cells, lines, notes, ghost
+/// and playhead, all positioned in *absolute* beat/tick coordinates. Horizontal
+/// scrolling just shifts this node's `left`, so the existing nodes slide instead
+/// of being respawned.
+#[derive(Component)]
+struct GridContent;
+
+/// A transient grid entity (cell, header, line, note) rebuilt only when the
+/// visible beat window or the notes change — not on every scroll step.
 #[derive(Component)]
 struct GridItem;
 
@@ -493,22 +509,31 @@ impl Plugin for SongEditor2Plugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::SongEditor2), (reset_state, setup).chain())
             .add_systems(OnExit(AppState::SongEditor2), cleanup)
+            .init_resource::<Scroll>()
             .add_systems(
                 Update,
                 (
-                    pan_keys,
-                    pan_wheel,
+                    // Scroll/playback pipeline, ordered: advance the clock, gather
+                    // pan + auto-follow into `Scroll`, apply it (which may bump the
+                    // base beat), then cull-rebuild only if that base moved.
+                    (
+                        advance_playhead,
+                        auto_scroll,
+                        pan_keys,
+                        pan_wheel,
+                        apply_scroll,
+                        rebuild_grid.run_if(resource_exists_and_changed::<EditorState>),
+                    )
+                        .chain(),
+                    update_playhead_view.after(advance_playhead),
+                    update_progress_bar.after(advance_playhead),
                     grid_keys,
                     type_into_field,
-                    rebuild_grid.run_if(resource_exists_and_changed::<EditorState>),
                     live_resize,
                     update_move_ghost,
                     update_mod_panel,
                     update_meta_fields,
                     animate_note_shaders,
-                    advance_playhead,
-                    update_playhead_view,
-                    update_progress_bar,
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             );
@@ -518,6 +543,7 @@ impl Plugin for SongEditor2Plugin {
 fn reset_state(mut commands: Commands) {
     commands.insert_resource(EditorState::default());
     commands.insert_resource(Playhead::default());
+    commands.insert_resource(Scroll::default());
 }
 
 // ── Setup: the static shell (hole column, grid viewport, panel, fields) ───────
@@ -576,39 +602,53 @@ fn setup(mut commands: Commands) {
                     },
                 ))
                 .with_children(|ga| {
-                    // The move-preview ghost: a persistent, normally-hidden yellow
-                    // rect drawn above the notes (ZIndex 2) at the drop target.
+                    // The scrolling layer. Its `left` is the (negated) scroll
+                    // offset, so shifting it slides the whole grid cheaply.
                     ga.spawn((
-                        MoveGhost,
-                        ZIndex(2),
+                        GridContent,
                         Node {
                             position_type: PositionType::Absolute,
-                            width: Val::Px(BEAT_W - 2.0),
-                            height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
-                            border: UiRect::all(Val::Px(2.0)),
-                            ..default()
-                        },
-                        BackgroundColor(GHOST_OK.with_alpha(0.30)),
-                        BorderColor::all(GHOST_OK),
-                        Visibility::Hidden,
-                        Pickable::IGNORE,
-                    ));
-                    // The playback cursor: a thin red line above everything
-                    // (ZIndex 3), normally hidden.
-                    ga.spawn((
-                        PlayheadLine,
-                        ZIndex(3),
-                        Node {
-                            position_type: PositionType::Absolute,
+                            left: Val::Px(0.0),
                             top: Val::Px(0.0),
-                            width: Val::Px(2.0),
                             height: Val::Px(grid_height()),
                             ..default()
                         },
-                        BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
-                        Visibility::Hidden,
-                        Pickable::IGNORE,
-                    ));
+                    ))
+                    .with_children(|content| {
+                        // The move-preview ghost: a persistent, normally-hidden
+                        // yellow rect above the notes (ZIndex 2) at the drop target.
+                        content.spawn((
+                            MoveGhost,
+                            ZIndex(2),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                width: Val::Px(BEAT_W - 2.0),
+                                height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
+                                border: UiRect::all(Val::Px(2.0)),
+                                ..default()
+                            },
+                            BackgroundColor(GHOST_OK.with_alpha(0.30)),
+                            BorderColor::all(GHOST_OK),
+                            Visibility::Hidden,
+                            Pickable::IGNORE,
+                        ));
+                        // The playback cursor: a thin red line above everything
+                        // (ZIndex 3), normally hidden.
+                        content.spawn((
+                            PlayheadLine,
+                            ZIndex(3),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                top: Val::Px(0.0),
+                                width: Val::Px(2.0),
+                                height: Val::Px(grid_height()),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
+                            Visibility::Hidden,
+                            Pickable::IGNORE,
+                        ));
+                    });
                 });
             });
 
@@ -878,12 +918,13 @@ fn visible_beats(win_w: f32) -> usize {
 }
 
 /// Tear down the previous grid window and spawn the cells, lines, headers and
-/// notes for the beats currently on screen. Runs whenever the state changes
-/// (scroll, selection or an edit), so off-screen beats are never spawned.
+/// notes for the beats currently in view. Everything is placed in *absolute*
+/// beat/tick coordinates inside [`GridContent`]; scrolling slides that node, so
+/// this only re-runs when the visible beat window or the notes change.
 fn rebuild_grid(
     mut commands: Commands,
     state: Res<EditorState>,
-    area: Query<Entity, With<GridArea>>,
+    content: Query<Entity, With<GridContent>>,
     old: Query<Entity, With<GridItem>>,
     windows: Query<&Window>,
     mut tail_mats: ResMut<Assets<NoteTail2dMaterial>>,
@@ -896,15 +937,16 @@ fn rebuild_grid(
     for e in &old {
         commands.entity(e).despawn();
     }
-    let Ok(area) = area.single() else { return };
+    let Ok(content) = content.single() else { return };
     let win_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0);
     let cols = visible_beats(win_w);
 
     let mut items: Vec<Entity> = Vec::new();
 
-    for col in 0..cols {
+    // One extra column on the right so a partial beat is covered while scrolling.
+    for col in 0..=cols {
         let beat = state.scroll_beat + col;
-        let x = col as f32 * BEAT_W;
+        let x = beat as f32 * BEAT_W; // absolute; GridContent's offset does the scroll
         let is_bar = beat % BEATS_PER_BAR == 0;
 
         // Vertical beat / bar line.
@@ -1027,22 +1069,21 @@ fn rebuild_grid(
     // several columns and intercept clicks across its whole width. Only notes
     // intersecting the visible window (in ticks) are spawned.
     let first_tick = state.scroll_beat * TICKS_PER_BEAT;
-    let last_tick = (state.scroll_beat + cols) * TICKS_PER_BEAT;
+    let last_tick = (state.scroll_beat + cols + 1) * TICKS_PER_BEAT;
     for note in &state.notes {
         if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.selected == Some(note.id);
-            items.push(spawn_note(&mut commands, *note, selected, state.scroll_beat, &mut tail_mats));
+            items.push(spawn_note(&mut commands, *note, selected, &mut tail_mats));
         }
     }
 
-    commands.entity(area).add_children(&items);
+    commands.entity(content).add_children(&items);
 }
 
-/// Pixel rect (left, top, width, height) of a note within the grid viewport,
-/// given the current horizontal scroll.
-fn note_rect(note: &GridNote, scroll_beat: usize) -> (f32, f32, f32, f32) {
-    let scroll_tick = scroll_beat * TICKS_PER_BEAT;
-    let left = (note.tick as f32 - scroll_tick as f32) * TICK_W + 1.0;
+/// Absolute pixel rect (left, top, width, height) of a note inside [`GridContent`].
+/// The horizontal scroll is applied by the parent's offset, not here.
+fn note_rect(note: &GridNote) -> (f32, f32, f32, f32) {
+    let left = note.tick as f32 * TICK_W + 1.0;
     let top = HEADER_H + (note.hole as f32 - 1.0) * ROW_H + NOTE_PAD;
     let width = note.len as f32 * TICK_W - 2.0;
     let height = ROW_H - 2.0 * NOTE_PAD;
@@ -1058,10 +1099,9 @@ fn spawn_note(
     commands: &mut Commands,
     note: GridNote,
     selected: bool,
-    scroll_beat: usize,
     tail_mats: &mut Assets<NoteTail2dMaterial>,
 ) -> Entity {
-    let (left, top, width, height) = note_rect(&note, scroll_beat);
+    let (left, top, width, height) = note_rect(&note);
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { ACCENT } else { Color::NONE };
     let id = note.id;
@@ -1238,7 +1278,7 @@ fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, &mut Node)>
         return;
     }
     let Some(note) = state.note_by_id(drag.id) else { return };
-    let (left, _top, width, _height) = note_rect(note, state.scroll_beat);
+    let (left, _top, width, _height) = note_rect(note);
     for (view, mut node) in &mut notes {
         if view.0 == drag.id {
             node.left = Val::Px(left);
@@ -1256,8 +1296,7 @@ fn update_move_ghost(
     let Ok((mut node, mut vis, mut bg, mut border)) = ghost.single_mut() else { return };
     match state.dragging {
         Some(drag) if drag.kind == DragKind::Move => {
-            let scroll_tick = state.scroll_beat * TICKS_PER_BEAT;
-            let left = (drag.target_tick as f32 - scroll_tick as f32) * TICK_W + 1.0;
+            let left = drag.target_tick as f32 * TICK_W + 1.0;
             let top = HEADER_H + (drag.target_hole as f32 - 1.0) * ROW_H + NOTE_PAD;
             node.left = Val::Px(left);
             node.top = Val::Px(top);
@@ -1372,32 +1411,63 @@ fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     }
 }
 
-fn pan_keys(keyboard: Res<ButtonInput<KeyCode>>, mut state: ResMut<EditorState>) {
+fn pan_keys(keyboard: Res<ButtonInput<KeyCode>>, state: Res<EditorState>, mut scroll: ResMut<Scroll>) {
     if state.focus.is_some() {
         return;
     }
     if keyboard.just_pressed(KeyCode::ArrowRight) {
-        state.scroll_beat += 1;
+        scroll.px += BEAT_W;
     }
-    if keyboard.just_pressed(KeyCode::ArrowLeft) && state.scroll_beat > 0 {
-        state.scroll_beat -= 1;
+    if keyboard.just_pressed(KeyCode::ArrowLeft) {
+        scroll.px = (scroll.px - BEAT_W).max(0.0);
     }
 }
 
-fn pan_wheel(mut wheel: MessageReader<MouseWheel>, mut state: ResMut<EditorState>) {
+fn pan_wheel(mut wheel: MessageReader<MouseWheel>, mut scroll: ResMut<Scroll>) {
     let mut delta = 0.0;
     for ev in wheel.read() {
         // Either axis pans horizontally; a vertical wheel is the common case.
         delta += if ev.y != 0.0 { ev.y } else { ev.x };
     }
-    if delta == 0.0 {
+    if delta != 0.0 {
+        scroll.px = (scroll.px - delta * BEAT_W).max(0.0);
+    }
+}
+
+/// Apply the continuous scroll to the grid: slide [`GridContent`] and, when the
+/// base beat changes, update `scroll_beat` so the cull-rebuild re-runs (only then).
+fn apply_scroll(
+    scroll: Res<Scroll>,
+    mut state: ResMut<EditorState>,
+    mut content: Query<&mut Node, With<GridContent>>,
+) {
+    if let Ok(mut node) = content.single_mut() {
+        node.left = Val::Px(-scroll.px);
+    }
+    let base = (scroll.px / BEAT_W) as usize;
+    // Only write (→ trigger a rebuild) when the integer base beat actually moves.
+    if state.scroll_beat != base {
+        state.scroll_beat = base;
+    }
+}
+
+/// During playback, scroll forward just enough to keep the playhead from passing
+/// `FOLLOW_LEAD` of the way across the viewport. It never scrolls backward, so a
+/// section in the left part of the view stays put until the playhead reaches it.
+fn auto_scroll(
+    playhead: Res<Playhead>,
+    windows: Query<&Window>,
+    mut scroll: ResMut<Scroll>,
+) {
+    if !playhead.playing || playhead.secs_per_tick <= 0.0 {
         return;
     }
-    let steps = delta.abs().ceil() as usize;
-    if delta < 0.0 {
-        state.scroll_beat += steps;
-    } else {
-        state.scroll_beat = state.scroll_beat.saturating_sub(steps);
+    const FOLLOW_LEAD: f32 = 0.7;
+    let view_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0) - HOLE_COL_W;
+    let head_px = playhead.elapsed / playhead.secs_per_tick * TICK_W;
+    let target = head_px - FOLLOW_LEAD * view_w;
+    if target > scroll.px {
+        scroll.px = target;
     }
 }
 
@@ -1563,12 +1633,11 @@ fn advance_playhead(time: Res<Time>, mut playhead: ResMut<Playhead>) {
     }
 }
 
-/// Position the playhead line at the current playback tick, hiding it when idle
-/// or scrolled out of view.
+/// Position the playhead line at the current playback tick (absolute, inside
+/// [`GridContent`], so it scrolls with the grid), hiding it when idle. Anything
+/// off-screen is clipped by [`GridArea`].
 fn update_playhead_view(
     playhead: Res<Playhead>,
-    state: Res<EditorState>,
-    windows: Query<&Window>,
     mut line: Query<(&mut Node, &mut Visibility), With<PlayheadLine>>,
 ) {
     let Ok((mut node, mut vis)) = line.single_mut() else { return };
@@ -1577,15 +1646,8 @@ fn update_playhead_view(
         return;
     }
     let cur_tick = playhead.elapsed / playhead.secs_per_tick;
-    let scroll_tick = (state.scroll_beat * TICKS_PER_BEAT) as f32;
-    let left = (cur_tick - scroll_tick) * TICK_W;
-    let view_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0) - HOLE_COL_W;
-    if (0.0..=view_w).contains(&left) {
-        node.left = Val::Px(left);
-        *vis = Visibility::Inherited;
-    } else {
-        *vis = Visibility::Hidden;
-    }
+    node.left = Val::Px(cur_tick * TICK_W);
+    *vis = Visibility::Inherited;
 }
 
 /// Render sample rate for the synthesised preview.
