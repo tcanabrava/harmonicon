@@ -156,6 +156,15 @@ struct DragState {
     id: u32,
     start_beat: usize,
     start_len: usize,
+    start_hole: u8,
+}
+
+/// Can a note of length `len` sit at (`hole`, `beat`) without overlapping another
+/// note on the same hole? `id` (the note being moved) is excluded from the check.
+fn can_place(notes: &[GridNote], id: u32, hole: u8, beat: usize, len: usize) -> bool {
+    !notes
+        .iter()
+        .any(|n| n.id != id && n.hole == hole && n.beat < beat + len && beat < n.beat + n.len)
 }
 
 /// New `(beat, len)` after dragging an edge by `steps` whole beats (positive =
