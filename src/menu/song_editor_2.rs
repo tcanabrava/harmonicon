@@ -47,6 +47,8 @@ const ROW_H: f32 = 34.0; // height of one hole lane
 const BEAT_W: f32 = 60.0; // width of one beat column
 const ROWS: u8 = 10; // harmonica holes 1..=10
 const BEATS_PER_BAR: usize = 4;
+const NOTE_PAD: f32 = 4.0; // vertical inset of a note tile within its lane
+const HANDLE_W: f32 = 8.0; // width of the left/right drag-to-resize handles
 
 fn grid_height() -> f32 {
     HEADER_H + ROW_H * ROWS as f32
@@ -107,11 +109,15 @@ impl Dir {
     }
 }
 
-/// One placed note: a hole (1..=10) at an integer beat, plus its techniques.
+/// One placed note: a hole (1..=10) starting at an integer beat and lasting
+/// `len` beats, plus its techniques. `id` is a stable handle so the note keeps
+/// its identity while its `beat`/`len` change under an edge-drag.
 #[derive(Clone, Copy, PartialEq, Debug)]
 struct GridNote {
+    id: u32,
     hole: u8,
     beat: usize,
+    len: usize,
     dir: Dir,
     pitch: Pitch,
     expr: Expr,
@@ -132,6 +138,38 @@ impl GridNote {
             Pitch::Normal => 0.0,
             Pitch::Bend(a) => -a,
             Pitch::Overblow | Pitch::Overdraw => 1.0,
+        }
+    }
+}
+
+/// Which edge of a note is being dragged to resize it.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Edge {
+    Left,
+    Right,
+}
+
+/// A resize gesture in progress. Recorded at `DragStart` so each `Drag` event can
+/// be applied relative to the note's size when the drag began.
+#[derive(Clone, Copy)]
+struct DragState {
+    id: u32,
+    start_beat: usize,
+    start_len: usize,
+}
+
+/// New `(beat, len)` after dragging an edge by `steps` whole beats (positive =
+/// dragged rightward). The right edge changes length; the left edge moves the
+/// start and changes length inversely. A note never shrinks below one beat or
+/// starts before beat 0.
+fn apply_resize(beat: usize, len: usize, edge: Edge, steps: i32) -> (usize, usize) {
+    match edge {
+        Edge::Right => (beat, (len as i32 + steps).max(1) as usize),
+        Edge::Left => {
+            // The left edge can move right at most len-1 beats (keeps len >= 1),
+            // and left at most `beat` beats (keeps the start at >= 0).
+            let move_beats = steps.clamp(-(beat as i32), len as i32 - 1);
+            ((beat as i32 + move_beats) as usize, (len as i32 - move_beats) as usize)
         }
     }
 }
@@ -194,10 +232,15 @@ const FIELDS: [(Field, &str); 4] = [
 #[derive(Resource)]
 struct EditorState {
     notes: Vec<GridNote>,
-    /// The selected note's identity (hole, beat), if any.
-    selected: Option<(u8, usize)>,
+    /// `id` of the next note to be added.
+    next_id: u32,
+    /// The selected note's stable `id`, if any.
+    selected: Option<u32>,
     /// Index of the leftmost visible beat.
     scroll_beat: usize,
+    /// An in-progress edge-drag; while set, the grid is not rebuilt so the
+    /// dragged entity survives the gesture.
+    dragging: Option<DragState>,
     tempo: String,
     music: String,
     name: String,
@@ -210,8 +253,10 @@ impl Default for EditorState {
     fn default() -> Self {
         Self {
             notes: Vec::new(),
+            next_id: 0,
             selected: None,
             scroll_beat: 0,
+            dragging: None,
             tempo: "120".into(),
             music: String::new(),
             name: String::new(),
@@ -222,13 +267,23 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    fn note_index(&self, hole: u8, beat: usize) -> Option<usize> {
-        self.notes.iter().position(|n| n.hole == hole && n.beat == beat)
+    /// The note that starts exactly at this cell, if any. Used to decide whether
+    /// a click on an empty cell should add a note.
+    fn note_at(&self, hole: u8, beat: usize) -> Option<&GridNote> {
+        self.notes.iter().find(|n| n.hole == hole && n.beat == beat)
+    }
+
+    fn note_by_id(&self, id: u32) -> Option<&GridNote> {
+        self.notes.iter().find(|n| n.id == id)
+    }
+
+    fn selected_note(&self) -> Option<&GridNote> {
+        self.selected.and_then(|id| self.note_by_id(id))
     }
 
     fn selected_note_mut(&mut self) -> Option<&mut GridNote> {
-        let (h, b) = self.selected?;
-        self.notes.iter_mut().find(|n| n.hole == h && n.beat == b)
+        let id = self.selected?;
+        self.notes.iter_mut().find(|n| n.id == id)
     }
 
     fn field_text(&self, field: Field) -> &str {
@@ -262,6 +317,11 @@ struct GridArea;
 /// A transient grid entity (cell, header, line, note) rebuilt each scroll/edit.
 #[derive(Component)]
 struct GridItem;
+
+/// A note-overlay root entity, tagged with its note's stable `id` so the live
+/// resize system can find and reposition it during a drag.
+#[derive(Component)]
+struct NoteView(u32);
 
 /// A modifier-panel button, tagged with the technique it toggles.
 #[derive(Component, Clone, Copy, PartialEq)]
@@ -302,6 +362,7 @@ impl Plugin for SongEditor2Plugin {
                     grid_keys,
                     type_into_field,
                     rebuild_grid.run_if(resource_exists_and_changed::<EditorState>),
+                    live_resize,
                     update_mod_panel,
                     update_meta_fields,
                     animate_note_shaders,
@@ -553,6 +614,11 @@ fn rebuild_grid(
     windows: Query<&Window>,
     mut tail_mats: ResMut<Assets<NoteTail2dMaterial>>,
 ) {
+    // While an edge is being dragged the note entity must survive the gesture,
+    // so the whole grid is left in place; `live_resize` updates it instead.
+    if state.dragging.is_some() {
+        return;
+    }
     for e in &old {
         commands.entity(e).despawn();
     }
@@ -628,47 +694,80 @@ fn rebuild_grid(
             cell.observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
                 select_or_add(&mut state, hole, beat);
             });
-
-            if let Some(idx) = state.note_index(hole, beat) {
-                let note = state.notes[idx];
-                let selected = state.selected == Some((hole, beat));
-                cell.with_children(|c| spawn_note_visual(c, note, selected, &mut tail_mats));
-            }
             items.push(cell.id());
+        }
+    }
+
+    // Notes are a separate overlay above the cells (ZIndex 1) so a multi-beat
+    // note can both span several columns and intercept clicks across its whole
+    // width. Only notes intersecting the visible window are spawned.
+    let last_beat = state.scroll_beat + cols;
+    for note in &state.notes {
+        if note.beat < last_beat && note.beat + note.len > state.scroll_beat {
+            let selected = state.selected == Some(note.id);
+            items.push(spawn_note(&mut commands, *note, selected, state.scroll_beat, &mut tail_mats));
         }
     }
 
     commands.entity(area).add_children(&items);
 }
 
-/// Spawn the coloured note tile inside its cell. Plain pitches are flat-coloured;
-/// Wah/Vibrato instead render through the gameplay note shader so the tile
-/// visibly pulses (wah) or wobbles (vibrato).
-fn spawn_note_visual(
-    cell: &mut ChildSpawnerCommands,
+/// Pixel rect (left, top, width, height) of a note within the grid viewport,
+/// given the current horizontal scroll.
+fn note_rect(note: &GridNote, scroll_beat: usize) -> (f32, f32, f32, f32) {
+    let left = (note.beat as f32 - scroll_beat as f32) * BEAT_W + 1.0;
+    let top = HEADER_H + (note.hole as f32 - 1.0) * ROW_H + NOTE_PAD;
+    let width = note.len as f32 * BEAT_W - 2.0;
+    let height = ROW_H - 2.0 * NOTE_PAD;
+    (left, top, width, height)
+}
+
+/// Spawn a note as an overlay entity above the grid cells. The root is the
+/// clickable/selectable body (spanning `len` beats); two thin children at its
+/// left and right edges are the drag-to-resize handles. Plain pitches are
+/// flat-coloured; Wah/Vibrato render through the gameplay note shader so the
+/// tile visibly pulses (wah) or wobbles (vibrato).
+fn spawn_note(
+    commands: &mut Commands,
     note: GridNote,
     selected: bool,
+    scroll_beat: usize,
     tail_mats: &mut Assets<NoteTail2dMaterial>,
-) {
-    let border = if selected { 2.5 } else { 0.0 };
+) -> Entity {
+    let (left, top, width, height) = note_rect(&note, scroll_beat);
+    let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { ACCENT } else { Color::NONE };
+    let id = note.id;
 
-    let mut tile = cell.spawn((
-        Node {
-            width: Val::Px(BEAT_W - 10.0),
-            height: Val::Px(ROW_H - 8.0),
-            border: UiRect::all(Val::Px(border)),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
-        BorderColor::all(border_color),
-        Pickable::IGNORE,
-    ));
+    let root = commands
+        .spawn((
+            GridItem,
+            NoteView(id),
+            Button,
+            ZIndex(1),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(left),
+                top: Val::Px(top),
+                width: Val::Px(width),
+                height: Val::Px(height),
+                border: UiRect::all(Val::Px(border)),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BorderColor::all(border_color),
+        ))
+        .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+            state.selected = Some(id);
+        })
+        .id();
 
+    // Background: flat colour, or the animated note shader for Wah/Vibrato.
     match note.expr {
         Expr::None => {
-            tile.insert(BackgroundColor(pitch_color(note.pitch)));
+            commands.entity(root).insert(BackgroundColor(pitch_color(note.pitch)));
         }
         Expr::Wah | Expr::Vibrato => {
             let (vibrato, wah) = match note.expr {
@@ -681,43 +780,108 @@ fn spawn_note_visual(
                 params,
                 wah: wah_v,
             });
-            tile.insert(MaterialNode(mat));
+            commands.entity(root).insert(MaterialNode(mat));
         }
     }
 
-    // Breath-direction arrow (↑ blow / ↓ draw), centered on the tile.
-    tile.with_children(|t| {
-        t.spawn((
+    commands.entity(root).with_children(|r| {
+        // Breath-direction arrow (↑ blow / ↓ draw), centered on the tile.
+        r.spawn((
             Text::new(note.dir.arrow()),
             TextFont { font_size: FontSize::Px(15.0), ..default() },
             TextColor(Color::WHITE),
             Pickable::IGNORE,
         ));
+        spawn_resize_handle(r, id, Edge::Left);
+        spawn_resize_handle(r, id, Edge::Right);
     });
+
+    root
+}
+
+/// One edge handle: a thin strip pinned to the note's left or right edge that,
+/// when dragged, resizes the note in whole-beat steps (see [`apply_resize`]).
+fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
+    let mut node = Node {
+        position_type: PositionType::Absolute,
+        top: Val::Px(0.0),
+        bottom: Val::Px(0.0),
+        width: Val::Px(HANDLE_W),
+        ..default()
+    };
+    match edge {
+        Edge::Left => node.left = Val::Px(0.0),
+        Edge::Right => node.right = Val::Px(0.0),
+    }
+    parent
+        .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.25))))
+        .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
+            if let Some(n) = state.note_by_id(id).copied() {
+                state.selected = Some(id);
+                state.dragging = Some(DragState { id, start_beat: n.beat, start_len: n.len });
+            }
+        })
+        .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>| {
+            let Some(drag) = state.dragging else { return };
+            if drag.id != id {
+                return;
+            }
+            let steps = (ev.distance.x / BEAT_W).round() as i32;
+            let (beat, len) = apply_resize(drag.start_beat, drag.start_len, edge, steps);
+            if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
+                n.beat = beat;
+                n.len = len;
+            }
+        })
+        .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
+            state.dragging = None;
+        });
+}
+
+/// While an edge-drag is active, reposition/resize the dragged note's entity
+/// directly (the grid rebuild is paused, so this is the only thing that moves).
+fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, &mut Node)>) {
+    let Some(drag) = state.dragging else { return };
+    let Some(note) = state.note_by_id(drag.id) else { return };
+    let (left, _top, width, _height) = note_rect(note, state.scroll_beat);
+    for (view, mut node) in &mut notes {
+        if view.0 == drag.id {
+            node.left = Val::Px(left);
+            node.width = Val::Px(width);
+        }
+    }
 }
 
 // ── Interaction ──────────────────────────────────────────────────────────────
 
 fn select_or_add(state: &mut EditorState, hole: u8, beat: usize) {
-    if state.note_index(hole, beat).is_some() {
-        state.selected = Some((hole, beat));
+    if let Some(existing) = state.note_at(hole, beat) {
+        state.selected = Some(existing.id);
     } else {
+        let id = state.next_id;
+        state.next_id += 1;
         state.notes.push(GridNote {
+            id,
             hole,
             beat,
+            len: 1,
             dir: Dir::Blow,
             pitch: Pitch::Normal,
             expr: Expr::None,
         });
-        state.selected = Some((hole, beat));
+        state.selected = Some(id);
+    }
+}
+
+fn delete_selected(state: &mut EditorState) {
+    if let Some(id) = state.selected.take() {
+        state.notes.retain(|n| n.id != id);
     }
 }
 
 fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     if kind == ModButton::Delete {
-        if let Some((h, b)) = state.selected.take() {
-            state.notes.retain(|n| !(n.hole == h && n.beat == b));
-        }
+        delete_selected(state);
         return;
     }
     let Some(note) = state.selected_note_mut() else { return };
@@ -791,9 +955,7 @@ fn grid_keys(keyboard: Res<ButtonInput<KeyCode>>, mut state: ResMut<EditorState>
         return;
     }
     if keyboard.just_pressed(KeyCode::Delete) || keyboard.just_pressed(KeyCode::Backspace) {
-        if let Some((h, b)) = state.selected.take() {
-            state.notes.retain(|n| !(n.hole == h && n.beat == b));
-        }
+        delete_selected(&mut state);
     }
     if keyboard.just_pressed(KeyCode::Escape) {
         state.selected = None;
@@ -837,9 +999,7 @@ fn update_mod_panel(
     mut buttons: Query<(&ModButton, &mut BackgroundColor)>,
     mut dot: Query<&mut Visibility, With<BendDot>>,
 ) {
-    let selected = state.selected.and_then(|(h, b)| {
-        state.notes.iter().find(|n| n.hole == h && n.beat == b).copied()
-    });
+    let selected = state.selected_note().copied();
 
     for (kind, mut bg) in &mut buttons {
         let active = selected.is_some_and(|n| match kind {
@@ -902,10 +1062,13 @@ mod tests {
         let mut s = EditorState::default();
         select_or_add(&mut s, 4, 2);
         assert_eq!(s.notes.len(), 1);
-        assert_eq!(s.selected, Some((4, 2)));
+        let added = s.notes[0];
+        assert_eq!(s.selected, Some(added.id));
+        assert_eq!((added.hole, added.beat, added.len), (4, 2, 1)); // new notes are one beat
         // Clicking the same cell selects the existing note, doesn't add another.
         select_or_add(&mut s, 4, 2);
         assert_eq!(s.notes.len(), 1);
+        assert_eq!(s.selected, Some(added.id));
     }
 
     #[test]
@@ -925,10 +1088,11 @@ mod tests {
     fn unbendable_hole_ignores_bend() {
         let mut s = EditorState::default();
         select_or_add(&mut s, 5, 0); // hole 5 max = 0.5 (bendable)
+        let hole5 = s.notes[0].id;
         select_or_add(&mut s, 7, 0); // hole 7 max = 0.5
         // A non-bendable hole would stay Normal; pick one with max 0 — none here,
         // so verify the cap instead: hole 5 allows exactly one 0.5 step.
-        s.selected = Some((5, 0));
+        s.selected = Some(hole5);
         apply_modifier(&mut s, ModButton::Bend);
         assert_eq!(s.notes.iter().find(|n| n.hole == 5).unwrap().pitch, Pitch::Bend(0.5));
         apply_modifier(&mut s, ModButton::Bend); // 1.0 > 0.5 max → wrap
@@ -982,5 +1146,25 @@ mod tests {
         apply_modifier(&mut s, ModButton::Delete);
         assert!(s.notes.is_empty());
         assert_eq!(s.selected, None);
+    }
+
+    #[test]
+    fn right_edge_resizes_length_and_clamps_to_one() {
+        // A note at beat 4, length 1.
+        assert_eq!(apply_resize(4, 1, Edge::Right, 2), (4, 3)); // drag right → longer
+        assert_eq!(apply_resize(4, 3, Edge::Right, -1), (4, 2)); // drag left → shorter
+        assert_eq!(apply_resize(4, 2, Edge::Right, -5), (4, 1)); // never below one beat
+    }
+
+    #[test]
+    fn left_edge_moves_start_and_resizes_inversely() {
+        // Dragging the left edge right shortens and pushes the start later.
+        assert_eq!(apply_resize(4, 3, Edge::Left, 1), (5, 2));
+        // Dragging it left lengthens and pulls the start earlier.
+        assert_eq!(apply_resize(4, 2, Edge::Left, -2), (2, 4));
+        // The start never passes the right edge (len stays >= 1)…
+        assert_eq!(apply_resize(4, 2, Edge::Left, 9), (5, 1));
+        // …nor goes before beat 0.
+        assert_eq!(apply_resize(1, 2, Edge::Left, -9), (0, 3));
     }
 }
