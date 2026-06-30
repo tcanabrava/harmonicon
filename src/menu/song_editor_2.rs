@@ -160,16 +160,35 @@ struct DragState {
 
 /// New `(beat, len)` after dragging an edge by `steps` whole beats (positive =
 /// dragged rightward). The right edge changes length; the left edge moves the
-/// start and changes length inversely. A note never shrinks below one beat or
-/// starts before beat 0.
-fn apply_resize(beat: usize, len: usize, edge: Edge, steps: i32) -> (usize, usize) {
+/// start and changes length inversely.
+///
+/// A note never shrinks below one beat, and it cannot overlap its neighbours on
+/// the same hole: `left_bound` is the earliest beat the start may reach (the
+/// previous note's end, or 0) and `right_bound` is the latest beat the end may
+/// reach (the next note's start, if any).
+fn apply_resize(
+    beat: usize,
+    len: usize,
+    edge: Edge,
+    steps: i32,
+    left_bound: usize,
+    right_bound: Option<usize>,
+) -> (usize, usize) {
     match edge {
-        Edge::Right => (beat, (len as i32 + steps).max(1) as usize),
+        Edge::Right => {
+            let mut end = (beat + len) as i32 + steps;
+            end = end.max((beat + 1) as i32); // keep at least one beat
+            if let Some(rb) = right_bound {
+                end = end.min(rb as i32); // don't cross the next note on this hole
+            }
+            (beat, end as usize - beat)
+        }
         Edge::Left => {
-            // The left edge can move right at most len-1 beats (keeps len >= 1),
-            // and left at most `beat` beats (keeps the start at >= 0).
-            let move_beats = steps.clamp(-(beat as i32), len as i32 - 1);
-            ((beat as i32 + move_beats) as usize, (len as i32 - move_beats) as usize)
+            let end = beat + len; // the right edge is fixed while dragging the left
+            let mut start = beat as i32 + steps;
+            start = start.min((end - 1) as i32); // keep at least one beat
+            start = start.max(left_bound as i32); // don't cross the previous note (>= 0)
+            (start as usize, end - start as usize)
         }
     }
 }
@@ -300,8 +319,8 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    /// The note that starts exactly at this cell, if any. Used to decide whether
-    /// a click on an empty cell should add a note.
+    /// The note that starts exactly at this cell, if any. (Test helper.)
+    #[cfg(test)]
     fn note_at(&self, hole: u8, beat: usize) -> Option<&GridNote> {
         self.notes.iter().find(|n| n.hole == hole && n.beat == beat)
     }
@@ -867,8 +886,25 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
             if drag.id != id {
                 return;
             }
+            let Some(hole) = state.note_by_id(id).map(|n| n.hole) else { return };
+            // Bound the resize by the neighbouring notes on this hole so two notes
+            // on the same row can never overlap. Neighbours are taken relative to
+            // the drag's start position (they don't move during the gesture).
+            let mut left_bound = 0usize;
+            let mut right_bound: Option<usize> = None;
+            for n in &state.notes {
+                if n.id == id || n.hole != hole {
+                    continue;
+                }
+                if n.beat < drag.start_beat {
+                    left_bound = left_bound.max(n.beat + n.len);
+                } else {
+                    right_bound = Some(right_bound.map_or(n.beat, |r| r.min(n.beat)));
+                }
+            }
             let steps = (ev.distance.x / BEAT_W).round() as i32;
-            let (beat, len) = apply_resize(drag.start_beat, drag.start_len, edge, steps);
+            let (beat, len) =
+                apply_resize(drag.start_beat, drag.start_len, edge, steps, left_bound, right_bound);
             if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                 n.beat = beat;
                 n.len = len;
@@ -899,7 +935,13 @@ fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, &mut Node)>
 // ── Interaction ──────────────────────────────────────────────────────────────
 
 fn select_or_add(state: &mut EditorState, hole: u8, beat: usize) {
-    if let Some(existing) = state.note_at(hole, beat) {
+    // Select any note on this hole that already covers the clicked beat — a hole
+    // sounds one note at a time, so we never stack a second note onto it.
+    if let Some(existing) = state
+        .notes
+        .iter()
+        .find(|n| n.hole == hole && n.beat <= beat && beat < n.beat + n.len)
+    {
         state.selected = Some(existing.id);
         return;
     }
@@ -1208,6 +1250,19 @@ mod tests {
     }
 
     #[test]
+    fn clicking_a_covered_beat_selects_rather_than_stacks() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 4, 0);
+        // Grow it to span beats 0..3.
+        let id = s.notes[0].id;
+        s.notes[0].len = 3;
+        // Clicking beat 2 on the same hole hits the existing note, not a new one.
+        select_or_add(&mut s, 4, 2);
+        assert_eq!(s.notes.len(), 1);
+        assert_eq!(s.selected, Some(id));
+    }
+
+    #[test]
     fn new_note_adopts_direction_sounding_at_that_beat() {
         let mut s = EditorState::default();
         select_or_add(&mut s, 2, 0);
@@ -1258,21 +1313,29 @@ mod tests {
 
     #[test]
     fn right_edge_resizes_length_and_clamps_to_one() {
-        // A note at beat 4, length 1.
-        assert_eq!(apply_resize(4, 1, Edge::Right, 2), (4, 3)); // drag right → longer
-        assert_eq!(apply_resize(4, 3, Edge::Right, -1), (4, 2)); // drag left → shorter
-        assert_eq!(apply_resize(4, 2, Edge::Right, -5), (4, 1)); // never below one beat
+        // A note at beat 4, length 1, with no neighbours (0, None).
+        assert_eq!(apply_resize(4, 1, Edge::Right, 2, 0, None), (4, 3)); // drag right → longer
+        assert_eq!(apply_resize(4, 3, Edge::Right, -1, 0, None), (4, 2)); // drag left → shorter
+        assert_eq!(apply_resize(4, 2, Edge::Right, -5, 0, None), (4, 1)); // never below one beat
     }
 
     #[test]
     fn left_edge_moves_start_and_resizes_inversely() {
         // Dragging the left edge right shortens and pushes the start later.
-        assert_eq!(apply_resize(4, 3, Edge::Left, 1), (5, 2));
+        assert_eq!(apply_resize(4, 3, Edge::Left, 1, 0, None), (5, 2));
         // Dragging it left lengthens and pulls the start earlier.
-        assert_eq!(apply_resize(4, 2, Edge::Left, -2), (2, 4));
+        assert_eq!(apply_resize(4, 2, Edge::Left, -2, 0, None), (2, 4));
         // The start never passes the right edge (len stays >= 1)…
-        assert_eq!(apply_resize(4, 2, Edge::Left, 9), (5, 1));
+        assert_eq!(apply_resize(4, 2, Edge::Left, 9, 0, None), (5, 1));
         // …nor goes before beat 0.
-        assert_eq!(apply_resize(1, 2, Edge::Left, -9), (0, 3));
+        assert_eq!(apply_resize(1, 2, Edge::Left, -9, 0, None), (0, 3));
+    }
+
+    #[test]
+    fn resize_stops_at_neighbour_on_same_hole() {
+        // Right edge can't grow past the next note's start (right_bound = 3).
+        assert_eq!(apply_resize(0, 1, Edge::Right, 10, 0, Some(3)), (0, 3));
+        // Left edge can't move before the previous note's end (left_bound = 2).
+        assert_eq!(apply_resize(4, 2, Edge::Left, -10, 2, None), (2, 4));
     }
 }
