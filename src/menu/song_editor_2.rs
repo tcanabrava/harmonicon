@@ -887,7 +887,7 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
         .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
             if let Some(n) = state.note_by_id(id).copied() {
                 state.selected = Some(id);
-                state.dragging = Some(DragState { id, start_beat: n.beat, start_len: n.len });
+                state.dragging = Some(DragState { id, start_beat: n.beat, start_len: n.len, start_hole: n.hole });
             }
         })
         .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>| {
@@ -911,6 +911,18 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
                     right_bound = Some(right_bound.map_or(n.beat, |r| r.min(n.beat)));
                 }
             }
+
+            let new_row = (drag.start_hole as i8 + (ev.distance.y / ROW_H).round() as i8)
+                .clamp(0, 10) as u8;
+
+            if new_row != hole {
+                if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
+                    n.hole = new_row;
+                    println!("Setting the new hole to: {}", new_row);
+                    return;
+                }
+            }
+
             let steps = (ev.distance.x / BEAT_W).round() as i32;
             let (beat, len) =
                 apply_resize(drag.start_beat, drag.start_len, edge, steps, left_bound, right_bound);
