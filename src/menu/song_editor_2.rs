@@ -20,7 +20,9 @@
 //!   * drag a note's body to move it (a yellow ghost previews the drop target,
 //!     red when the spot is taken; the move only commits on a free spot),
 //!   * drag a note's left/right edge to change its duration,
-//!   * `Delete` removes the selected note.
+//!   * `Delete` removes the selected note,
+//!   * Play synthesises the authored notes (a C-harp sine preview at the chosen
+//!     tempo) and, if the Music field names a readable audio file, plays it too.
 //!
 //! A note carries one *pitch* technique (Normal, Bend 0.5/1.0/1.5, Overblow,
 //! Overdraw) and one optional *expression* (Wah or Vibrato) that stacks on top.
@@ -30,6 +32,7 @@
 //! The grid only ever spawns the cells currently on screen — scrolling rebuilds
 //! the visible window, so off-screen notes cost nothing to draw.
 
+use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
 use bevy::input::ButtonState;
@@ -38,8 +41,11 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::prelude::MaterialNode;
+use std::f32::consts::TAU;
 
+use crate::audio_system::midi::note_to_midi;
 use crate::gameplay::note_tail_2d::{NoteTail2dMaterial, tail_params};
+use crate::settings::AudioSettings;
 
 use super::AppState;
 
@@ -328,13 +334,15 @@ fn pitch_color(pitch: Pitch) -> Color {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Field {
     Tempo,
+    Key,
     Music,
     Name,
     Author,
 }
 
-const FIELDS: [(Field, &str); 4] = [
+const FIELDS: [(Field, &str); 5] = [
     (Field::Tempo, "Music Tempo"),
+    (Field::Key, "Harp Key"),
     (Field::Music, "Background Music"),
     (Field::Name, "Name"),
     (Field::Author, "Author"),
@@ -355,6 +363,8 @@ struct EditorState {
     /// dragged entity survives the gesture.
     dragging: Option<DragState>,
     tempo: String,
+    /// Harp key (e.g. "C", "G", "A"); transposes the synthesised pitches.
+    key: String,
     music: String,
     name: String,
     author: String,
@@ -371,6 +381,7 @@ impl Default for EditorState {
             scroll_beat: 0,
             dragging: None,
             tempo: "120".into(),
+            key: "C".into(),
             music: String::new(),
             name: String::new(),
             author: String::new(),
@@ -410,6 +421,7 @@ impl EditorState {
     fn field_text(&self, field: Field) -> &str {
         match field {
             Field::Tempo => &self.tempo,
+            Field::Key => &self.key,
             Field::Music => &self.music,
             Field::Name => &self.name,
             Field::Author => &self.author,
@@ -419,6 +431,7 @@ impl EditorState {
     fn field_text_mut(&mut self, field: Field) -> &mut String {
         match field {
             Field::Tempo => &mut self.tempo,
+            Field::Key => &mut self.key,
             Field::Music => &mut self.music,
             Field::Name => &mut self.name,
             Field::Author => &mut self.author,
@@ -493,6 +506,9 @@ impl Plugin for SongEditor2Plugin {
                     update_mod_panel,
                     update_meta_fields,
                     animate_note_shaders,
+                    advance_playhead,
+                    update_playhead_view,
+                    update_progress_bar,
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             );
@@ -501,6 +517,7 @@ impl Plugin for SongEditor2Plugin {
 
 fn reset_state(mut commands: Commands) {
     commands.insert_resource(EditorState::default());
+    commands.insert_resource(Playhead::default());
 }
 
 // ── Setup: the static shell (hole column, grid viewport, panel, fields) ───────
@@ -518,6 +535,25 @@ fn setup(mut commands: Commands) {
             BackgroundColor(EDITOR_BG),
         ))
         .with_children(|root| {
+            // A thin overall-progress bar at the very top — it shows where playback
+            // is even when the grid playhead has scrolled out of view.
+            root.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(5.0),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+            ))
+            .with_children(|bar| {
+                bar.spawn((
+                    EditorProgressFill,
+                    Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+                    BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
+                ));
+            });
+
             // Editor row: fixed hole column + scrolling grid viewport.
             root.spawn(Node {
                 width: Val::Percent(100.0),
@@ -554,6 +590,22 @@ fn setup(mut commands: Commands) {
                         },
                         BackgroundColor(GHOST_OK.with_alpha(0.30)),
                         BorderColor::all(GHOST_OK),
+                        Visibility::Hidden,
+                        Pickable::IGNORE,
+                    ));
+                    // The playback cursor: a thin red line above everything
+                    // (ZIndex 3), normally hidden.
+                    ga.spawn((
+                        PlayheadLine,
+                        ZIndex(3),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            top: Val::Px(0.0),
+                            width: Val::Px(2.0),
+                            height: Val::Px(grid_height()),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
                         Visibility::Hidden,
                         Pickable::IGNORE,
                     ));
@@ -626,13 +678,13 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands) {
         BackgroundColor(PANEL_BG),
     ))
     .with_children(|panel| {
+        // Transport: play the authored song / stop playback.
+        spawn_transport(panel);
+        panel_separator(panel);
         mod_button(panel, ModButton::Blow, "Blow");
         mod_button(panel, ModButton::Draw, "Draw");
         // Separator between the breath direction and the techniques.
-        panel.spawn((
-            Node { width: Val::Px(1.0), height: Val::Px(28.0), margin: UiRect::horizontal(Val::Px(4.0)), ..default() },
-            BackgroundColor(Color::srgb(0.30, 0.30, 0.40)),
-        ));
+        panel_separator(panel);
         mod_button(panel, ModButton::Bend, "Bend");
         mod_button(panel, ModButton::Overblow, "Overblow");
         mod_button(panel, ModButton::Overdraw, "Overdraw");
@@ -685,6 +737,82 @@ fn mod_button(panel: &mut ChildSpawnerCommands, kind: ModButton, label: &str) {
                     Pickable::IGNORE,
                 ));
             }
+        });
+}
+
+/// A thin vertical divider between groups of panel buttons.
+fn panel_separator(panel: &mut ChildSpawnerCommands) {
+    panel.spawn((
+        Node {
+            width: Val::Px(1.0),
+            height: Val::Px(28.0),
+            margin: UiRect::horizontal(Val::Px(4.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.30, 0.30, 0.40)),
+    ));
+}
+
+/// Play (synthesise + sound the authored notes, plus any background track) and
+/// Stop (silence playback) transport buttons.
+fn spawn_transport(panel: &mut ChildSpawnerCommands) {
+    transport_button(
+        panel,
+        "\u{25B6} Play",
+        Color::srgb(0.20, 0.40, 0.24),
+        |_: On<Pointer<Click>>,
+         state: Res<EditorState>,
+         mut sources: ResMut<Assets<AudioSource>>,
+         settings: Res<AudioSettings>,
+         playing: Query<Entity, With<EditorAudio>>,
+         mut playhead: ResMut<Playhead>,
+         mut commands: Commands| {
+            start_playback(&state, &mut sources, &settings, &playing, &mut playhead, &mut commands);
+        },
+    );
+    transport_button(
+        panel,
+        "\u{25A0} Stop",
+        Color::srgb(0.36, 0.20, 0.20),
+        |_: On<Pointer<Click>>,
+         playing: Query<Entity, With<EditorAudio>>,
+         mut playhead: ResMut<Playhead>,
+         mut commands: Commands| {
+            for e in &playing {
+                commands.entity(e).despawn();
+            }
+            playhead.playing = false;
+        },
+    );
+}
+
+fn transport_button<M: 'static>(
+    panel: &mut ChildSpawnerCommands,
+    label: &str,
+    bg: Color,
+    on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
+) {
+    panel
+        .spawn((
+            Button,
+            Node {
+                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(bg),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+        ))
+        .observe(on_click)
+        .with_children(|b| {
+            b.spawn((
+                Text::new(label.to_string()),
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
+            ));
         });
 }
 
@@ -1370,9 +1498,256 @@ fn animate_note_shaders(time: Res<Time>, mut mats: ResMut<Assets<NoteTail2dMater
     }
 }
 
-fn cleanup(mut commands: Commands, roots: Query<Entity, With<EditorRoot>>) {
+fn cleanup(
+    mut commands: Commands,
+    roots: Query<Entity, With<EditorRoot>>,
+    audio: Query<Entity, With<EditorAudio>>,
+) {
     for e in &roots {
         commands.entity(e).despawn();
+    }
+    // Audio players live at the world root (not under EditorRoot), so stop them
+    // explicitly when leaving the editor.
+    for e in &audio {
+        commands.entity(e).despawn();
+    }
+}
+
+// ── Playback / synthesis ─────────────────────────────────────────────────────
+
+/// Marks an audio player spawned by the editor's Play button, so it can be
+/// stopped (Stop button or leaving the editor).
+#[derive(Component)]
+struct EditorAudio;
+
+/// The moving playback cursor (a vertical line) drawn over the grid.
+#[derive(Component)]
+struct PlayheadLine;
+
+/// The growing fill of the top progress bar (overall playback fraction).
+#[derive(Component)]
+struct EditorProgressFill;
+
+/// Drive the top progress bar from the playhead's elapsed/total time.
+fn update_progress_bar(playhead: Res<Playhead>, mut fills: Query<&mut Node, With<EditorProgressFill>>) {
+    let p = if playhead.total > 0.0 {
+        (playhead.elapsed / playhead.total).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    for mut node in &mut fills {
+        node.width = Val::Percent(p * 100.0);
+    }
+}
+
+/// Tracks the playhead while the authored notes are sounding. Time is followed
+/// independently of the audio sink, which is plenty accurate for a preview.
+#[derive(Resource, Default)]
+struct Playhead {
+    playing: bool,
+    /// Seconds since playback began.
+    elapsed: f32,
+    /// Total span to sweep (last note's end), in seconds.
+    total: f32,
+    /// Seconds per tick at the playback tempo (0 when idle).
+    secs_per_tick: f32,
+}
+
+/// Advance the playhead clock; stop it once the swept span is done.
+fn advance_playhead(time: Res<Time>, mut playhead: ResMut<Playhead>) {
+    if playhead.playing {
+        playhead.elapsed += time.delta_secs();
+        if playhead.elapsed >= playhead.total {
+            playhead.playing = false;
+        }
+    }
+}
+
+/// Position the playhead line at the current playback tick, hiding it when idle
+/// or scrolled out of view.
+fn update_playhead_view(
+    playhead: Res<Playhead>,
+    state: Res<EditorState>,
+    windows: Query<&Window>,
+    mut line: Query<(&mut Node, &mut Visibility), With<PlayheadLine>>,
+) {
+    let Ok((mut node, mut vis)) = line.single_mut() else { return };
+    if !playhead.playing || playhead.secs_per_tick <= 0.0 {
+        *vis = Visibility::Hidden;
+        return;
+    }
+    let cur_tick = playhead.elapsed / playhead.secs_per_tick;
+    let scroll_tick = (state.scroll_beat * TICKS_PER_BEAT) as f32;
+    let left = (cur_tick - scroll_tick) * TICK_W;
+    let view_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0) - HOLE_COL_W;
+    if (0.0..=view_w).contains(&left) {
+        node.left = Val::Px(left);
+        *vis = Visibility::Inherited;
+    } else {
+        *vis = Visibility::Hidden;
+    }
+}
+
+/// Render sample rate for the synthesised preview.
+const SAMPLE_RATE: u32 = 44_100;
+
+/// Blow / draw note labels of a standard C diatonic harp, by hole (1..=10).
+const C_BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
+const C_DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
+
+/// Semitones to transpose a C-harp pitch by for the given harp key (0 for C, 7
+/// for G, …). Unparseable keys fall back to C. Mirrors the old editor's
+/// `harp_layout`, which transposes the C layout up by the key's offset.
+fn key_offset(key: &str) -> i32 {
+    note_to_midi(&format!("{}4", key.trim())).map_or(0, |m| m - 60)
+}
+
+/// Frequency (Hz) of a note: its hole + breath direction on a harp in the given
+/// key (as a semitone offset from C), shifted by the pitch technique (bend pulls
+/// down, over-blow/draw push up a semitone). Out-of-range holes return `None`.
+fn note_freq(note: &GridNote, key_offset: i32) -> Option<f32> {
+    let idx = (note.hole as usize).checked_sub(1)?;
+    let label = match note.dir {
+        Dir::Blow => *C_BLOW.get(idx)?,
+        Dir::Draw => *C_DRAW.get(idx)?,
+    };
+    let midi = note_to_midi(label)? as f32 + key_offset as f32;
+    let semitones = match note.pitch {
+        Pitch::Normal => 0.0,
+        Pitch::Bend(a) => -a,
+        Pitch::Overblow | Pitch::Overdraw => 1.0,
+    };
+    Some(440.0 * 2f32.powf((midi + semitones - 69.0) / 12.0))
+}
+
+/// A short attack/release envelope (in samples) so notes don't click on/off.
+fn envelope(i: usize, dur: usize) -> f32 {
+    let attack = (SAMPLE_RATE as f32 * 0.005) as usize; // 5 ms
+    let release = (SAMPLE_RATE as f32 * 0.030) as usize; // 30 ms
+    let atk = if attack > 0 && i < attack { i as f32 / attack as f32 } else { 1.0 };
+    let rel = if dur > release && i > dur - release {
+        (dur - i) as f32 / release as f32
+    } else {
+        1.0
+    };
+    atk.min(rel).clamp(0.0, 1.0)
+}
+
+/// Synthesise the notes to mono f32 PCM at [`SAMPLE_RATE`]. Each note is a sine at
+/// its pitch with a click-free envelope; Vibrato adds a small pitch wobble and Wah
+/// an amplitude pulse. The mix is peak-normalised so stacked notes don't clip.
+fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f32> {
+    let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+    let end_tick = notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
+    let total = ((end_tick as f32 * secs_per_tick + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
+    let mut buf = vec![0.0f32; total.max(1)];
+
+    for n in notes {
+        let Some(freq) = note_freq(n, key_offset) else { continue };
+        let start = (n.tick as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
+        let dur = (n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
+        for i in 0..dur {
+            let s = start + i;
+            if s >= buf.len() {
+                break;
+            }
+            let t = i as f32 / SAMPLE_RATE as f32;
+            let f = match n.expr {
+                Expr::Vibrato => freq * (1.0 + 0.012 * (TAU * 5.5 * t).sin()),
+                _ => freq,
+            };
+            let amp = match n.expr {
+                Expr::Wah => 0.55 + 0.45 * (TAU * 4.0 * t).sin().abs(),
+                _ => 1.0,
+            };
+            buf[s] += 0.22 * envelope(i, dur) * amp * (TAU * f * t).sin();
+        }
+    }
+
+    let peak = buf.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
+    if peak > 1.0 {
+        for x in &mut buf {
+            *x /= peak;
+        }
+    }
+    buf
+}
+
+/// Encode mono f32 samples as a 16-bit PCM WAV file in memory (the `wav` bevy
+/// feature lets `AudioSource` decode it).
+fn encode_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
+    let data_len = (samples.len() * 2) as u32;
+    let byte_rate = sample_rate * 2; // mono, 2 bytes/sample
+    let mut v = Vec::with_capacity(44 + data_len as usize);
+    v.extend_from_slice(b"RIFF");
+    v.extend_from_slice(&(36 + data_len).to_le_bytes());
+    v.extend_from_slice(b"WAVE");
+    v.extend_from_slice(b"fmt ");
+    v.extend_from_slice(&16u32.to_le_bytes()); // PCM fmt chunk size
+    v.extend_from_slice(&1u16.to_le_bytes()); // format = PCM
+    v.extend_from_slice(&1u16.to_le_bytes()); // channels = mono
+    v.extend_from_slice(&sample_rate.to_le_bytes());
+    v.extend_from_slice(&byte_rate.to_le_bytes());
+    v.extend_from_slice(&2u16.to_le_bytes()); // block align
+    v.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
+    v.extend_from_slice(b"data");
+    v.extend_from_slice(&data_len.to_le_bytes());
+    for &s in samples {
+        let q = (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
+        v.extend_from_slice(&q.to_le_bytes());
+    }
+    v
+}
+
+/// Stop any current playback, then sound the authored notes and, if the Music
+/// field names a readable audio file, that track too.
+fn start_playback(
+    state: &EditorState,
+    sources: &mut Assets<AudioSource>,
+    settings: &AudioSettings,
+    playing: &Query<Entity, With<EditorAudio>>,
+    playhead: &mut Playhead,
+    commands: &mut Commands,
+) {
+    for e in playing {
+        commands.entity(e).despawn();
+    }
+    *playhead = Playhead::default();
+
+    let bpm = state.tempo.trim().parse::<f32>().unwrap_or(120.0).max(1.0);
+    let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
+    if !state.notes.is_empty() {
+        let wav = encode_wav(&render_pcm(&state.notes, bpm, key_offset(&state.key)), SAMPLE_RATE);
+        let handle = sources.add(AudioSource { bytes: wav.into() });
+        commands.spawn((
+            EditorAudio,
+            AudioPlayer::<AudioSource>(handle),
+            PlaybackSettings::DESPAWN,
+        ));
+        // Run the playhead across the authored span (last note end).
+        let end_tick = state.notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
+        *playhead = Playhead {
+            playing: true,
+            elapsed: 0.0,
+            total: end_tick as f32 * secs_per_tick,
+            secs_per_tick,
+        };
+    }
+
+    // Optional background track: read the file the user named in the Music field.
+    let music = state.music.trim();
+    if !music.is_empty() {
+        match std::fs::read(music) {
+            Ok(bytes) => {
+                let handle = sources.add(AudioSource { bytes: bytes.into() });
+                commands.spawn((
+                    EditorAudio,
+                    AudioPlayer::<AudioSource>(handle),
+                    PlaybackSettings::DESPAWN.with_volume(Volume::Linear(settings.music_volume)),
+                ));
+            }
+            Err(e) => warn!("Song editor: couldn't read background music {music:?}: {e}"),
+        }
     }
 }
 
@@ -1552,6 +1927,41 @@ mod tests {
         assert_eq!(apply_resize(4, 2, Edge::Left, 9, 0, None), (5, 1));
         // …nor goes before beat 0.
         assert_eq!(apply_resize(1, 2, Edge::Left, -9, 0, None), (0, 3));
+    }
+
+    fn note(hole: u8, dir: Dir, pitch: Pitch) -> GridNote {
+        GridNote { id: 0, hole, tick: 0, len: 4, dir, pitch, expr: Expr::None }
+    }
+
+    #[test]
+    fn note_freq_maps_holes_bends_and_key() {
+        // Hole 1 blow on a C harp is C4 ≈ 261.63 Hz.
+        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), 0).unwrap();
+        assert!((c4 - 261.63).abs() < 0.5, "got {c4}");
+        // A whole-step bend lowers the pitch.
+        let bent = note_freq(&note(1, Dir::Blow, Pitch::Bend(1.0)), 0).unwrap();
+        assert!(bent < c4, "bend should drop pitch: {bent} !< {c4}");
+        // A G harp (offset 7) raises the same hole a fifth.
+        let g = note_freq(&note(1, Dir::Blow, Pitch::Normal), key_offset("G")).unwrap();
+        assert!((g / c4 - 2f32.powf(7.0 / 12.0)).abs() < 0.001, "G harp is a fifth up");
+        assert_eq!(key_offset("C"), 0);
+        // Hole 11 doesn't exist.
+        assert!(note_freq(&note(11, Dir::Blow, Pitch::Normal), 0).is_none());
+    }
+
+    #[test]
+    fn render_and_wav_have_expected_size() {
+        // One whole-beat note at 120 BPM = 0.5 s of audio, plus a 0.25 s tail.
+        let notes = vec![note(4, Dir::Draw, Pitch::Normal)];
+        let pcm = render_pcm(&notes, 120.0, 0);
+        let expected = ((0.5 + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
+        assert_eq!(pcm.len(), expected);
+        assert!(pcm.iter().any(|&s| s.abs() > 0.01), "note should be audible");
+        // WAV = 44-byte header + 2 bytes/sample, and starts with RIFF/WAVE.
+        let wav = encode_wav(&pcm, SAMPLE_RATE);
+        assert_eq!(wav.len(), 44 + pcm.len() * 2);
+        assert_eq!(&wav[0..4], b"RIFF");
+        assert_eq!(&wav[8..12], b"WAVE");
     }
 
     #[test]

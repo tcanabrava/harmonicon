@@ -5,7 +5,9 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-bevy = { version = "0.19.0", features = ["dev", "dynamic_linking"] }
+# `wav` lets bevy_audio decode the in-memory WAV the song editor synthesises for
+# its Play button (and user-supplied .wav background tracks).
+bevy = { version = "0.19.0", features = ["dev", "dynamic_linking", "wav"] }
 cpal = "0.15"
 rustfft = "6.4"
 crossbeam-channel = "0.5"
