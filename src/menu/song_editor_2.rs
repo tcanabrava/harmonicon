@@ -36,6 +36,7 @@ use bevy::input::ButtonState;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::prelude::MaterialNode;
 
 use crate::gameplay::note_tail_2d::{NoteTail2dMaterial, tail_params};
@@ -53,6 +54,13 @@ const BEATS_PER_BAR: usize = 4;
 const NOTE_PAD: f32 = 4.0; // vertical inset of a note tile within its lane
 const HANDLE_W: f32 = 8.0; // width of the left/right drag-to-resize handles
 
+/// Sub-beat resolution: a beat is divided into this many ticks. Notes are
+/// positioned and sized in *ticks*, so the smallest note is one tick. With 4,
+/// that's a quarter beat (half beat = 2 ticks, whole beat = 4 ticks).
+const TICKS_PER_BEAT: usize = 4;
+/// Pixel width of one tick (BEAT_W / TICKS_PER_BEAT).
+const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
+
 fn grid_height() -> f32 {
     HEADER_H + ROW_H * ROWS as f32
 }
@@ -65,6 +73,8 @@ const LANE_A: Color = Color::srgba(0.12, 0.12, 0.17, 1.0);
 const LANE_B: Color = Color::srgba(0.10, 0.10, 0.14, 1.0);
 const GRID_LINE: Color = Color::srgb(0.20, 0.20, 0.27);
 const BAR_LINE: Color = Color::srgb(0.40, 0.40, 0.52);
+const HALF_LINE: Color = Color::srgb(0.17, 0.17, 0.23); // the "&" (half-beat) divider
+const QUARTER_LINE: Color = Color::srgb(0.13, 0.13, 0.18); // quarter-beat dividers
 const ACCENT: Color = Color::srgb(0.95, 0.80, 0.35);
 const LABEL: Color = Color::srgb(0.75, 0.75, 0.82);
 const PANEL_BG: Color = Color::srgba(0.10, 0.10, 0.15, 1.0);
@@ -114,14 +124,14 @@ impl Dir {
     }
 }
 
-/// One placed note: a hole (1..=10) starting at an integer beat and lasting
-/// `len` beats, plus its techniques. `id` is a stable handle so the note keeps
-/// its identity while its `beat`/`len` change under an edge-drag.
+/// One placed note: a hole (1..=10) starting at `tick` and lasting `len` ticks
+/// (see [`TICKS_PER_BEAT`]), plus its techniques. `id` is a stable handle so the
+/// note keeps its identity while its `tick`/`len` change under a drag.
 #[derive(Clone, Copy, PartialEq, Debug)]
 struct GridNote {
     id: u32,
     hole: u8,
-    beat: usize,
+    tick: usize,
     len: usize,
     dir: Dir,
     pitch: Pitch,
@@ -167,12 +177,12 @@ enum DragKind {
 struct DragState {
     id: u32,
     kind: DragKind,
-    start_beat: usize,
+    start_tick: usize,
     start_len: usize,
     start_hole: u8,
     /// For a Move: the live snapped destination and whether it's free to drop on.
     target_hole: u8,
-    target_beat: usize,
+    target_tick: usize,
     valid: bool,
 }
 
@@ -181,44 +191,44 @@ impl DragState {
         Self {
             id,
             kind,
-            start_beat: note.beat,
+            start_tick: note.tick,
             start_len: note.len,
             start_hole: note.hole,
             target_hole: note.hole,
-            target_beat: note.beat,
+            target_tick: note.tick,
             valid: true,
         }
     }
 }
 
-/// Snapped destination `(hole, beat)` for a move drag, from the start position and
-/// the pixel drag distance. The hole is clamped to 1..=ROWS, the beat to >= 0.
-fn move_target(start_hole: u8, start_beat: usize, dist_x: f32, dist_y: f32) -> (u8, usize) {
-    let steps_x = (dist_x / BEAT_W).round() as i32;
+/// Snapped destination `(hole, tick)` for a move drag, from the start position and
+/// the pixel drag distance. The hole is clamped to 1..=ROWS, the tick to >= 0.
+fn move_target(start_hole: u8, start_tick: usize, dist_x: f32, dist_y: f32) -> (u8, usize) {
+    let steps_x = (dist_x / TICK_W).round() as i32;
     let steps_y = (dist_y / ROW_H).round() as i32;
     let hole = (start_hole as i32 + steps_y).clamp(1, ROWS as i32) as u8;
-    let beat = (start_beat as i32 + steps_x).max(0) as usize;
-    (hole, beat)
+    let tick = (start_tick as i32 + steps_x).max(0) as usize;
+    (hole, tick)
 }
 
-/// Can a note of length `len` sit at (`hole`, `beat`) without overlapping another
+/// Can a note of length `len` sit at (`hole`, `tick`) without overlapping another
 /// note on the same hole? `id` (the note being moved) is excluded from the check.
-fn can_place(notes: &[GridNote], id: u32, hole: u8, beat: usize, len: usize) -> bool {
+fn can_place(notes: &[GridNote], id: u32, hole: u8, tick: usize, len: usize) -> bool {
     !notes
         .iter()
-        .any(|n| n.id != id && n.hole == hole && n.beat < beat + len && beat < n.beat + n.len)
+        .any(|n| n.id != id && n.hole == hole && n.tick < tick + len && tick < n.tick + n.len)
 }
 
-/// New `(beat, len)` after dragging an edge by `steps` whole beats (positive =
-/// dragged rightward). The right edge changes length; the left edge moves the
-/// start and changes length inversely.
+/// New `(tick, len)` after dragging an edge by `steps` ticks (positive = dragged
+/// rightward). The right edge changes length; the left edge moves the start and
+/// changes length inversely.
 ///
-/// A note never shrinks below one beat, and it cannot overlap its neighbours on
-/// the same hole: `left_bound` is the earliest beat the start may reach (the
-/// previous note's end, or 0) and `right_bound` is the latest beat the end may
+/// A note never shrinks below one tick, and it cannot overlap its neighbours on
+/// the same hole: `left_bound` is the earliest tick the start may reach (the
+/// previous note's end, or 0) and `right_bound` is the latest tick the end may
 /// reach (the next note's start, if any).
 fn apply_resize(
-    beat: usize,
+    tick: usize,
     len: usize,
     edge: Edge,
     steps: i32,
@@ -227,26 +237,26 @@ fn apply_resize(
 ) -> (usize, usize) {
     match edge {
         Edge::Right => {
-            let mut end = (beat + len) as i32 + steps;
-            end = end.max((beat + 1) as i32); // keep at least one beat
+            let mut end = (tick + len) as i32 + steps;
+            end = end.max((tick + 1) as i32); // keep at least one tick
             if let Some(rb) = right_bound {
                 end = end.min(rb as i32); // don't cross the next note on this hole
             }
-            (beat, end as usize - beat)
+            (tick, end as usize - tick)
         }
         Edge::Left => {
-            let end = beat + len; // the right edge is fixed while dragging the left
-            let mut start = beat as i32 + steps;
-            start = start.min((end - 1) as i32); // keep at least one beat
+            let end = tick + len; // the right edge is fixed while dragging the left
+            let mut start = tick as i32 + steps;
+            start = start.min((end - 1) as i32); // keep at least one tick
             start = start.max(left_bound as i32); // don't cross the previous note (>= 0)
             (start as usize, end - start as usize)
         }
     }
 }
 
-/// Do two notes sound at the same time (their beat ranges overlap)?
+/// Do two notes sound at the same time (their tick ranges overlap)?
 fn overlaps(a: &GridNote, b: &GridNote) -> bool {
-    a.beat < b.beat + b.len && b.beat < a.beat + a.len
+    a.tick < b.tick + b.len && b.tick < a.tick + a.len
 }
 
 /// Make every note overlapping `id` in time — directly or through a chain of
@@ -370,21 +380,21 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    /// The note that starts exactly at this cell, if any. (Test helper.)
+    /// The note that starts exactly at this tick, if any. (Test helper.)
     #[cfg(test)]
-    fn note_at(&self, hole: u8, beat: usize) -> Option<&GridNote> {
-        self.notes.iter().find(|n| n.hole == hole && n.beat == beat)
+    fn note_at(&self, hole: u8, tick: usize) -> Option<&GridNote> {
+        self.notes.iter().find(|n| n.hole == hole && n.tick == tick)
     }
 
     fn note_by_id(&self, id: u32) -> Option<&GridNote> {
         self.notes.iter().find(|n| n.id == id)
     }
 
-    /// The breath direction already sounding at `beat`, if any note spans it.
-    fn dir_at(&self, beat: usize) -> Option<Dir> {
+    /// The breath direction already sounding at `tick`, if any note spans it.
+    fn dir_at(&self, tick: usize) -> Option<Dir> {
         self.notes
             .iter()
-            .find(|n| n.beat <= beat && beat < n.beat + n.len)
+            .find(|n| n.tick <= tick && tick < n.tick + n.len)
             .map(|n| n.dir)
     }
 
@@ -788,7 +798,30 @@ fn rebuild_grid(
                 .id(),
         );
 
-        // Beat header: "N &" (the beat-in-bar number and its eighth-note "and").
+        // Sub-beat dividers within the beat: the half-beat (the "&") is brighter
+        // than the quarter dividers.
+        for s in 1..TICKS_PER_BEAT {
+            let is_half = s * 2 == TICKS_PER_BEAT;
+            items.push(
+                commands
+                    .spawn((
+                        GridItem,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(x + s as f32 * TICK_W),
+                            top: Val::Px(HEADER_H),
+                            width: Val::Px(1.0),
+                            height: Val::Px(grid_height() - HEADER_H),
+                            ..default()
+                        },
+                        BackgroundColor(if is_half { HALF_LINE } else { QUARTER_LINE }),
+                        Pickable::IGNORE,
+                    ))
+                    .id(),
+            );
+        }
+
+        // Header: the beat-in-bar number, plus an "&" marking the half-beat.
         let in_bar = beat % BEATS_PER_BAR + 1;
         items.push(
             commands
@@ -800,46 +833,75 @@ fn rebuild_grid(
                         top: Val::Px(6.0),
                         ..default()
                     },
-                    Text::new(format!("{in_bar} &")),
+                    Text::new(format!("{in_bar}")),
                     TextFont { font_size: FontSize::Px(12.0), ..default() },
                     TextColor(if is_bar { ACCENT } else { LABEL }),
                     Pickable::IGNORE,
                 ))
                 .id(),
         );
+        items.push(
+            commands
+                .spawn((
+                    GridItem,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x + BEAT_W * 0.5 + 2.0),
+                        top: Val::Px(6.0),
+                        ..default()
+                    },
+                    Text::new("&"),
+                    TextFont { font_size: FontSize::Px(11.0), ..default() },
+                    TextColor(Color::srgb(0.45, 0.45, 0.55)),
+                    Pickable::IGNORE,
+                ))
+                .id(),
+        );
 
-        // Ten clickable cells in this column.
+        // Ten clickable cells (one per hole) spanning this beat. The click maps to
+        // the quarter-beat tick under the cursor via `RelativeCursorPosition`.
         for hole in 1..=ROWS {
             let y = HEADER_H + (hole as f32 - 1.0) * ROW_H;
             let lane = if hole % 2 == 0 { LANE_A } else { LANE_B };
             let mut cell = commands.spawn((
                 GridItem,
                 Button,
+                RelativeCursorPosition::default(),
                 Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(x),
                     top: Val::Px(y),
                     width: Val::Px(BEAT_W),
                     height: Val::Px(ROW_H),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
                     ..default()
                 },
                 BackgroundColor(lane),
             ));
-            cell.observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                select_or_add(&mut state, hole, beat);
-            });
+            cell.observe(
+                move |ev: On<Pointer<Click>>,
+                      rel: Query<&RelativeCursorPosition>,
+                      mut state: ResMut<EditorState>| {
+                    let frac = rel
+                        .get(ev.entity)
+                        .ok()
+                        .and_then(|r| r.normalized)
+                        .map_or(0.0, |n| n.x)
+                        .clamp(0.0, 0.999);
+                    let sub = (frac * TICKS_PER_BEAT as f32).floor() as usize;
+                    select_or_add(&mut state, hole, beat * TICKS_PER_BEAT + sub);
+                },
+            );
             items.push(cell.id());
         }
     }
 
-    // Notes are a separate overlay above the cells (ZIndex 1) so a multi-beat
-    // note can both span several columns and intercept clicks across its whole
-    // width. Only notes intersecting the visible window are spawned.
-    let last_beat = state.scroll_beat + cols;
+    // Notes are a separate overlay above the cells (ZIndex 1) so a note can span
+    // several columns and intercept clicks across its whole width. Only notes
+    // intersecting the visible window (in ticks) are spawned.
+    let first_tick = state.scroll_beat * TICKS_PER_BEAT;
+    let last_tick = (state.scroll_beat + cols) * TICKS_PER_BEAT;
     for note in &state.notes {
-        if note.beat < last_beat && note.beat + note.len > state.scroll_beat {
+        if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.selected == Some(note.id);
             items.push(spawn_note(&mut commands, *note, selected, state.scroll_beat, &mut tail_mats));
         }
@@ -851,18 +913,19 @@ fn rebuild_grid(
 /// Pixel rect (left, top, width, height) of a note within the grid viewport,
 /// given the current horizontal scroll.
 fn note_rect(note: &GridNote, scroll_beat: usize) -> (f32, f32, f32, f32) {
-    let left = (note.beat as f32 - scroll_beat as f32) * BEAT_W + 1.0;
+    let scroll_tick = scroll_beat * TICKS_PER_BEAT;
+    let left = (note.tick as f32 - scroll_tick as f32) * TICK_W + 1.0;
     let top = HEADER_H + (note.hole as f32 - 1.0) * ROW_H + NOTE_PAD;
-    let width = note.len as f32 * BEAT_W - 2.0;
+    let width = note.len as f32 * TICK_W - 2.0;
     let height = ROW_H - 2.0 * NOTE_PAD;
     (left, top, width, height)
 }
 
 /// Spawn a note as an overlay entity above the grid cells. The root is the
-/// clickable/selectable body (spanning `len` beats); two thin children at its
-/// left and right edges are the drag-to-resize handles. Plain pitches are
-/// flat-coloured; Wah/Vibrato render through the gameplay note shader so the
-/// tile visibly pulses (wah) or wobbles (vibrato).
+/// clickable/selectable body (spanning `len` beats); dragging it moves the note,
+/// while two thin children at its left and right edges are the drag-to-resize
+/// handles. Plain pitches are flat-coloured; Wah/Vibrato render through the
+/// gameplay note shader so the tile visibly pulses (wah) or wobbles (vibrato).
 fn spawn_note(
     commands: &mut Commands,
     note: GridNote,
@@ -917,11 +980,11 @@ fn spawn_note(
             }
             // Snap to a target cell, but only mark it droppable when that hole is
             // free there — the note itself doesn't move until release.
-            let (hole, beat) = move_target(drag.start_hole, drag.start_beat, ev.distance.x, ev.distance.y);
-            let valid = can_place(&state.notes, id, hole, beat, drag.start_len);
+            let (hole, tick) = move_target(drag.start_hole, drag.start_tick, ev.distance.x, ev.distance.y);
+            let valid = can_place(&state.notes, id, hole, tick, drag.start_len);
             if let Some(d) = state.dragging.as_mut() {
                 d.target_hole = hole;
-                d.target_beat = beat;
+                d.target_tick = tick;
                 d.valid = valid;
             }
         })
@@ -932,7 +995,7 @@ fn spawn_note(
             if drag.kind == DragKind::Move && drag.valid {
                 if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                     n.hole = drag.target_hole;
-                    n.beat = drag.target_beat;
+                    n.tick = drag.target_tick;
                 }
                 enforce_direction(&mut state, id);
             }
@@ -1011,18 +1074,18 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
                 if n.id == id || n.hole != hole {
                     continue;
                 }
-                if n.beat < drag.start_beat {
-                    left_bound = left_bound.max(n.beat + n.len);
+                if n.tick < drag.start_tick {
+                    left_bound = left_bound.max(n.tick + n.len);
                 } else {
-                    right_bound = Some(right_bound.map_or(n.beat, |r| r.min(n.beat)));
+                    right_bound = Some(right_bound.map_or(n.tick, |r| r.min(n.tick)));
                 }
             }
 
-            let steps = (ev.distance.x / BEAT_W).round() as i32;
-            let (beat, len) =
-                apply_resize(drag.start_beat, drag.start_len, edge, steps, left_bound, right_bound);
+            let steps = (ev.distance.x / TICK_W).round() as i32;
+            let (tick, len) =
+                apply_resize(drag.start_tick, drag.start_len, edge, steps, left_bound, right_bound);
             if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
-                n.beat = beat;
+                n.tick = tick;
                 n.len = len;
             }
         })
@@ -1065,11 +1128,12 @@ fn update_move_ghost(
     let Ok((mut node, mut vis, mut bg, mut border)) = ghost.single_mut() else { return };
     match state.dragging {
         Some(drag) if drag.kind == DragKind::Move => {
-            let left = (drag.target_beat as f32 - state.scroll_beat as f32) * BEAT_W + 1.0;
+            let scroll_tick = state.scroll_beat * TICKS_PER_BEAT;
+            let left = (drag.target_tick as f32 - scroll_tick as f32) * TICK_W + 1.0;
             let top = HEADER_H + (drag.target_hole as f32 - 1.0) * ROW_H + NOTE_PAD;
             node.left = Val::Px(left);
             node.top = Val::Px(top);
-            node.width = Val::Px(drag.start_len as f32 * BEAT_W - 2.0);
+            node.width = Val::Px(drag.start_len as f32 * TICK_W - 2.0);
             *vis = Visibility::Inherited;
             let color = if drag.valid { GHOST_OK } else { GHOST_BAD };
             bg.0 = color.with_alpha(0.30);
@@ -1081,27 +1145,38 @@ fn update_move_ghost(
 
 // ── Interaction ──────────────────────────────────────────────────────────────
 
-fn select_or_add(state: &mut EditorState, hole: u8, beat: usize) {
-    // Select any note on this hole that already covers the clicked beat — a hole
+fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
+    // Select any note on this hole that already covers the clicked tick — a hole
     // sounds one note at a time, so we never stack a second note onto it.
     if let Some(existing) = state
         .notes
         .iter()
-        .find(|n| n.hole == hole && n.beat <= beat && beat < n.beat + n.len)
+        .find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.selected = Some(existing.id);
         return;
     }
+    // New notes default to one beat, shortened so they can't overlap the next
+    // note already on this hole (at least one tick — a quarter beat).
+    let next_start = state
+        .notes
+        .iter()
+        .filter(|n| n.hole == hole && n.tick > tick)
+        .map(|n| n.tick)
+        .min();
+    let len = next_start
+        .map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT))
+        .max(1);
     // A new note adopts whatever breath direction is already sounding at this
-    // beat (all notes at one instant share it), defaulting to blow when alone.
-    let dir = state.dir_at(beat).unwrap_or(Dir::Blow);
+    // tick (all notes at one instant share it), defaulting to blow when alone.
+    let dir = state.dir_at(tick).unwrap_or(Dir::Blow);
     let id = state.next_id;
     state.next_id += 1;
     state.notes.push(GridNote {
         id,
         hole,
-        beat,
-        len: 1,
+        tick,
+        len,
         dir,
         pitch: Pitch::Normal,
         expr: Expr::None,
@@ -1312,7 +1387,8 @@ mod tests {
         assert_eq!(s.notes.len(), 1);
         let added = s.notes[0];
         assert_eq!(s.selected, Some(added.id));
-        assert_eq!((added.hole, added.beat, added.len), (4, 2, 1)); // new notes are one beat
+        // New notes start at the clicked tick and default to a full beat.
+        assert_eq!((added.hole, added.tick, added.len), (4, 2, TICKS_PER_BEAT));
         // Clicking the same cell selects the existing note, doesn't add another.
         select_or_add(&mut s, 4, 2);
         assert_eq!(s.notes.len(), 1);
@@ -1435,11 +1511,11 @@ mod tests {
     fn enforce_unifies_overlap_chain_but_not_independent_notes() {
         let mut s = EditorState::default();
         s.notes = vec![
-            GridNote { id: 0, hole: 1, beat: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
             // Overlaps id 0 over beat 2.
-            GridNote { id: 1, hole: 2, beat: 2, len: 3, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote { id: 1, hole: 2, tick: 2, len: 3, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
             // Far away, touches nothing.
-            GridNote { id: 2, hole: 3, beat: 10, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote { id: 2, hole: 3, tick: 10, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
         ];
         s.next_id = 3;
         enforce_direction(&mut s, 0); // impose id 0's blow
@@ -1482,9 +1558,11 @@ mod tests {
     fn move_target_snaps_and_clamps() {
         // No movement → same cell.
         assert_eq!(move_target(5, 4, 0.0, 0.0), (5, 4));
-        // One column right, two rows down.
-        assert_eq!(move_target(5, 4, BEAT_W, 2.0 * ROW_H), (7, 5));
-        // Rows clamp to 1..=ROWS, beats never go below 0.
+        // One tick right, two rows down.
+        assert_eq!(move_target(5, 4, TICK_W, 2.0 * ROW_H), (7, 5));
+        // A whole beat is TICKS_PER_BEAT ticks.
+        assert_eq!(move_target(5, 4, BEAT_W, 0.0), (5, 4 + TICKS_PER_BEAT));
+        // Rows clamp to 1..=ROWS, ticks never go below 0.
         assert_eq!(move_target(1, 0, -5.0 * BEAT_W, -5.0 * ROW_H), (1, 0));
         assert_eq!(move_target(10, 2, 0.0, 5.0 * ROW_H), (10, 2));
     }
@@ -1492,8 +1570,8 @@ mod tests {
     #[test]
     fn move_is_blocked_where_a_note_already_sits() {
         let notes = vec![
-            GridNote { id: 0, hole: 3, beat: 0, len: 2, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
-            GridNote { id: 1, hole: 3, beat: 5, len: 1, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote { id: 0, hole: 3, tick: 0, len: 2, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote { id: 1, hole: 3, tick: 5, len: 1, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
         ];
         // Moving note 1 onto beat 1 of hole 3 overlaps note 0 → not placeable.
         assert!(!can_place(&notes, 1, 3, 1, 1));
