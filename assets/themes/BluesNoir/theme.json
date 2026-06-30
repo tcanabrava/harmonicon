@@ -87,5 +87,22 @@
     "Credits": {
       "background_image": "images/credits_background.png"
     }
+  },
+  "colors": {
+    "song_editor": {
+      "background": "#0F0F17",
+      "hole_box": "#282838",
+      "lane_a": "#1F1F2B",
+      "lane_b": "#1A1A24",
+      "grid_line": "#333345",
+      "bar_line": "#666685",
+      "accent": "#F2CC59",
+      "label": "#BFC0D1",
+      "panel_bg": "#1A1A26",
+      "btn_bg": "#29293D",
+      "btn_active": "#476B4C",
+      "field_bg": "#1A1A24",
+      "field_bg_focus": "#29293D"
+    }
   }
 }

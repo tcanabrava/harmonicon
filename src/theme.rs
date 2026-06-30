@@ -17,6 +17,7 @@ struct ThemeJson {
     default_background: BackgroundThemeJson,
     #[serde(default)]
     menus: HashMap<String, MenuThemeJson>,
+    colors: ThemeColorsJson,
 }
 
 #[derive(Deserialize, Clone, Debug, Default)]
@@ -78,6 +79,48 @@ struct CoordsJson {
     y: f32,
     width: f32,
     height: f32,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+struct ThemeColorsJson {
+    song_editor: SongEditor,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+struct SongEditor {
+    editor_bg: Color,
+    hole_box: Color,
+    lane_a: Color,
+    lane_b: Color,
+    grid_line: Color,
+    bar_line: Color,
+    accent: Color,
+    label: Color,
+    panel_bg: Color,
+    btn_bg: Color,
+    btn_active: Color,
+    field_bg: Color,
+    field_bg_focus: Color,
+}
+
+impl SongEditor {
+    pub fn default() -> Self {
+        Self {
+            editor_bg: Color::srgb(0.06, 0.06, 0.09),
+            hole_box: Color::srgb(0.16, 0.16, 0.22),
+            lane_a: Color::srgba(0.12, 0.12, 0.17, 1.0),
+            lane_b: Color::srgba(0.10, 0.10, 0.14, 1.0),
+            grid_line: Color::srgb(0.20, 0.20, 0.27),
+            bar_line: Color::srgb(0.40, 0.40, 0.52),
+            accent: Color::srgb(0.95, 0.80, 0.35),
+            label: Color::srgb(0.75, 0.75, 0.82),
+            panel_bg: Color::srgba(0.10, 0.10, 0.15, 1.0),
+            btn_bg: Color::srgb(0.16, 0.16, 0.24),
+            btn_active: Color::srgb(0.28, 0.42, 0.30),
+            field_bg: Color::srgba(0.10, 0.10, 0.14, 1.0),
+            field_bg_focus: Color::srgba(0.16, 0.16, 0.24, 1.0),
+        }
+    }
 }
 
 // ── Runtime resource ──────────────────────────────────────────────────────────
