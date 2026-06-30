@@ -174,6 +174,39 @@ fn apply_resize(beat: usize, len: usize, edge: Edge, steps: i32) -> (usize, usiz
     }
 }
 
+/// Do two notes sound at the same time (their beat ranges overlap)?
+fn overlaps(a: &GridNote, b: &GridNote) -> bool {
+    a.beat < b.beat + b.len && b.beat < a.beat + a.len
+}
+
+/// Make every note overlapping `id` in time — directly or through a chain of
+/// overlaps — share `id`'s breath direction. A player can't blow and draw at the
+/// same instant, so notes that sound together must agree; the actively-edited
+/// note's direction wins.
+fn enforce_direction(state: &mut EditorState, id: u32) {
+    let Some(dir) = state.note_by_id(id).map(|n| n.dir) else { return };
+    // Flood-fill the time-overlap connected component starting from `id`.
+    let mut group = vec![id];
+    let mut i = 0;
+    while i < group.len() {
+        let Some(cur) = state.note_by_id(group[i]).copied() else {
+            i += 1;
+            continue;
+        };
+        for n in &state.notes {
+            if !group.contains(&n.id) && overlaps(&cur, n) {
+                group.push(n.id);
+            }
+        }
+        i += 1;
+    }
+    for n in &mut state.notes {
+        if group.contains(&n.id) {
+            n.dir = dir;
+        }
+    }
+}
+
 /// The most a hole can be bent in this editor, in semitones (0.0 = not bendable).
 ///
 /// Simplified Richter rule: holes 1-6 draw-bend, 7-10 blow-bend, capped at the
@@ -275,6 +308,14 @@ impl EditorState {
 
     fn note_by_id(&self, id: u32) -> Option<&GridNote> {
         self.notes.iter().find(|n| n.id == id)
+    }
+
+    /// The breath direction already sounding at `beat`, if any note spans it.
+    fn dir_at(&self, beat: usize) -> Option<Dir> {
+        self.notes
+            .iter()
+            .find(|n| n.beat <= beat && beat < n.beat + n.len)
+            .map(|n| n.dir)
     }
 
     fn selected_note(&self) -> Option<&GridNote> {
@@ -835,6 +876,9 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
         })
         .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
             state.dragging = None;
+            // Resizing may have pulled this note over notes of the opposite
+            // breath direction; unify them (the dragged note wins).
+            enforce_direction(&mut state, id);
         });
 }
 
@@ -857,20 +901,23 @@ fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, &mut Node)>
 fn select_or_add(state: &mut EditorState, hole: u8, beat: usize) {
     if let Some(existing) = state.note_at(hole, beat) {
         state.selected = Some(existing.id);
-    } else {
-        let id = state.next_id;
-        state.next_id += 1;
-        state.notes.push(GridNote {
-            id,
-            hole,
-            beat,
-            len: 1,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        });
-        state.selected = Some(id);
+        return;
     }
+    // A new note adopts whatever breath direction is already sounding at this
+    // beat (all notes at one instant share it), defaulting to blow when alone.
+    let dir = state.dir_at(beat).unwrap_or(Dir::Blow);
+    let id = state.next_id;
+    state.next_id += 1;
+    state.notes.push(GridNote {
+        id,
+        hole,
+        beat,
+        len: 1,
+        dir,
+        pitch: Pitch::Normal,
+        expr: Expr::None,
+    });
+    state.selected = Some(id);
 }
 
 fn delete_selected(state: &mut EditorState) {
@@ -884,10 +931,22 @@ fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         delete_selected(state);
         return;
     }
+    let Some(id) = state.selected else { return };
+
+    // Breath direction is shared by everything sounding at the same time, so
+    // setting it propagates across the overlapping group.
+    if matches!(kind, ModButton::Blow | ModButton::Draw) {
+        let dir = if kind == ModButton::Blow { Dir::Blow } else { Dir::Draw };
+        if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
+            n.dir = dir;
+        }
+        enforce_direction(state, id);
+        return;
+    }
+
     let Some(note) = state.selected_note_mut() else { return };
     match kind {
-        ModButton::Blow => note.dir = Dir::Blow,
-        ModButton::Draw => note.dir = Dir::Draw,
+        ModButton::Blow | ModButton::Draw => unreachable!("handled above"),
         ModButton::Bend => {
             let max = max_bend(note.hole);
             if max <= 0.0 {
@@ -1146,6 +1205,55 @@ mod tests {
         apply_modifier(&mut s, ModButton::Delete);
         assert!(s.notes.is_empty());
         assert_eq!(s.selected, None);
+    }
+
+    #[test]
+    fn new_note_adopts_direction_sounding_at_that_beat() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 2, 0);
+        apply_modifier(&mut s, ModButton::Draw); // first note becomes draw
+        // A second note at the same beat can't blow while the first draws.
+        select_or_add(&mut s, 5, 0);
+        assert_eq!(s.note_at(5, 0).unwrap().dir, Dir::Draw);
+    }
+
+    #[test]
+    fn setting_direction_propagates_to_simultaneous_notes() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 2, 0); // blow
+        select_or_add(&mut s, 5, 0); // adopts blow
+        // Switch one to draw → the other (same instant) must follow.
+        s.selected = Some(s.note_at(2, 0).unwrap().id);
+        apply_modifier(&mut s, ModButton::Draw);
+        assert_eq!(s.note_at(2, 0).unwrap().dir, Dir::Draw);
+        assert_eq!(s.note_at(5, 0).unwrap().dir, Dir::Draw);
+    }
+
+    #[test]
+    fn enforce_unifies_overlap_chain_but_not_independent_notes() {
+        let mut s = EditorState::default();
+        s.notes = vec![
+            GridNote { id: 0, hole: 1, beat: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
+            // Overlaps id 0 over beat 2.
+            GridNote { id: 1, hole: 2, beat: 2, len: 3, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+            // Far away, touches nothing.
+            GridNote { id: 2, hole: 3, beat: 10, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+        ];
+        s.next_id = 3;
+        enforce_direction(&mut s, 0); // impose id 0's blow
+        assert_eq!(s.note_by_id(1).unwrap().dir, Dir::Blow); // overlapping flips
+        assert_eq!(s.note_by_id(2).unwrap().dir, Dir::Draw); // independent untouched
+    }
+
+    #[test]
+    fn separate_times_keep_independent_directions() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 2, 0); // beat 0
+        select_or_add(&mut s, 2, 4); // beat 4 — no overlap
+        s.selected = Some(s.note_at(2, 4).unwrap().id);
+        apply_modifier(&mut s, ModButton::Draw);
+        assert_eq!(s.note_at(2, 0).unwrap().dir, Dir::Blow); // unaffected
+        assert_eq!(s.note_at(2, 4).unwrap().dir, Dir::Draw);
     }
 
     #[test]
