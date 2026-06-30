@@ -131,6 +131,73 @@
       "description": "Named menu screens.  Keys are menu identifiers (Main, Play, Options, …).",
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/menu_def" }
+    },
+
+    "colors": {
+      "description": "Theme colors.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "song_editor": {
+          "description": "Colors for the song editor.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "editor_bg": {
+              "description": "Background color for the song editor.",
+              "type": "string"
+            },
+            "hole_box": {
+              "description": "Background color for the hole box in the song editor.",
+              "type": "string"
+            },
+            "lane_a": {
+              "description": "",
+              "type": "string"
+            },
+            "lane_b": {
+              "description": "",
+              "type": "string"
+            },
+            "grid_line": {
+              "description": "",
+              "type": "string"
+            },
+            "bar_line": {
+              "description": "",
+              "type": "string"
+            },
+            "accent": {
+              "description": "",
+              "type": "string"
+            },
+            "label": {
+              "description": "",
+              "type": "string"
+            },
+            "panel_bg": {
+              "description": "",
+              "type": "string"
+            },
+            "btn_bg": {
+              "description": "",
+              "type": "string"
+            },
+            "btn_active": {
+              "description": "",
+              "type": "string"
+            },
+            "field_bg": {
+              "description": "",
+              "type": "string"
+            },
+            "field_bg_focus": {
+              "description": "",
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   }
 }

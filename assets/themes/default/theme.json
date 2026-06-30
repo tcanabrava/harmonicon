@@ -90,7 +90,7 @@
   },
   "colors": {
     "song_editor": {
-      "background": "#0F0F17",
+      "editor_bg": "#0F0F17",
       "hole_box": "#282838",
       "lane_a": "#1F1F2B",
       "lane_b": "#1A1A24",

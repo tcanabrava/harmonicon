@@ -17,6 +17,8 @@ struct ThemeJson {
     default_background: BackgroundThemeJson,
     #[serde(default)]
     menus: HashMap<String, MenuThemeJson>,
+
+    #[serde(default)]
     colors: ThemeColorsJson,
 }
 
@@ -81,30 +83,30 @@ struct CoordsJson {
     height: f32,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Default)]
 struct ThemeColorsJson {
-    song_editor: SongEditor,
+    pub song_editor: SongEditor,
 }
 
 #[derive(Deserialize, Clone, Debug)]
 struct SongEditor {
-    editor_bg: Color,
-    hole_box: Color,
-    lane_a: Color,
-    lane_b: Color,
-    grid_line: Color,
-    bar_line: Color,
-    accent: Color,
-    label: Color,
-    panel_bg: Color,
-    btn_bg: Color,
-    btn_active: Color,
-    field_bg: Color,
-    field_bg_focus: Color,
+    pub editor_bg: Color,
+    pub hole_box: Color,
+    pub lane_a: Color,
+    pub lane_b: Color,
+    pub grid_line: Color,
+    pub bar_line: Color,
+    pub accent: Color,
+    pub label: Color,
+    pub panel_bg: Color,
+    pub btn_bg: Color,
+    pub btn_active: Color,
+    pub field_bg: Color,
+    pub field_bg_focus: Color,
 }
 
-impl SongEditor {
-    pub fn default() -> Self {
+impl Default for SongEditor {
+    fn default() -> Self {
         Self {
             editor_bg: Color::srgb(0.06, 0.06, 0.09),
             hole_box: Color::srgb(0.16, 0.16, 0.22),
@@ -154,6 +156,7 @@ pub struct LoadedTheme {
     /// Per-menu, per-button pixel coordinates: `menu_id → button_id → coords`.
     /// Button ids match the `MenuButton` variant names (e.g. "Play", "BackToMain").
     pub button_coords: HashMap<String, HashMap<String, ButtonCoords>>,
+    pub colors: Option<ThemeColorsJson>,
 }
 
 impl LoadedTheme {
