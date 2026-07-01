@@ -44,13 +44,14 @@ use bevy::ui_render::prelude::MaterialNode;
 use std::f32::consts::TAU;
 
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
-use crate::dialogs::file_dialog::{DialogId, DialogMode, FileChosen, OpenFileDialog};
+use crate::dialogs::file_dialog::{DialogId, DialogMode, FileChosen, FileDialog, OpenFileDialog};
 use crate::gameplay::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use crate::settings::AudioSettings;
 
 use super::AppState;
 
 const SAVE_PURPOSE: DialogId = DialogId("song_editor_2_save");
+const MUSIC_PURPOSE: DialogId = DialogId("song_editor_2_music");
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
 
@@ -351,6 +352,11 @@ const FIELDS: [(Field, &str); 5] = [
     (Field::Author, "Author"),
 ];
 
+/// All valid diatonic harp keys in chromatic order. Cycling through these is
+/// the only way to set the key — free-text is not accepted.
+const HARP_KEYS: [&str; 12] =
+    ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 #[derive(Resource)]
@@ -538,9 +544,23 @@ impl Plugin for SongEditor2Plugin {
                     update_meta_fields,
                     animate_note_shaders,
                     handle_save_chosen,
+                    handle_music_chosen,
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             );
+    }
+}
+
+/// Set the background music path when the file dialog returns an ogg pick.
+fn handle_music_chosen(
+    mut chosen: MessageReader<FileChosen>,
+    mut state: ResMut<EditorState>,
+) {
+    for ev in chosen.read() {
+        if ev.purpose != MUSIC_PURPOSE {
+            continue;
+        }
+        state.music = ev.path.to_string_lossy().into_owned();
     }
 }
 
@@ -927,7 +947,8 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands) {
                     TextFont { font_size: FontSize::Px(14.0), ..default() },
                     TextColor(LABEL),
                 ));
-                line.spawn((
+
+                let mut btn = line.spawn((
                     Button,
                     MetaFieldBox(field),
                     Node {
@@ -940,11 +961,23 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands) {
                     },
                     BackgroundColor(FIELD_BG),
                     BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-                ))
-                .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                    state.focus = Some(field);
-                })
-                .with_children(|b| {
+                ));
+
+                if field == Field::Key {
+                    btn.observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                        let idx = HARP_KEYS
+                            .iter()
+                            .position(|&k| k == state.key.as_str())
+                            .unwrap_or(0);
+                        state.key = HARP_KEYS[(idx + 1) % HARP_KEYS.len()].into();
+                    });
+                } else {
+                    btn.observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                        state.focus = Some(field);
+                    });
+                }
+
+                btn.with_children(|b| {
                     b.spawn((
                         MetaFieldText(field),
                         Text::new(String::new()),
@@ -953,6 +986,39 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands) {
                         Pickable::IGNORE,
                     ));
                 });
+                drop(btn);
+
+                if field == Field::Music {
+                    line.spawn((
+                        Button,
+                        Node {
+                            height: Val::Px(26.0),
+                            align_items: AlignItems::Center,
+                            padding: UiRect::horizontal(Val::Px(10.0)),
+                            border: UiRect::all(Val::Px(1.0)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.18, 0.24, 0.36)),
+                        BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+                    ))
+                    .observe(|_: On<Pointer<Click>>, mut open: MessageWriter<OpenFileDialog>| {
+                        open.write(OpenFileDialog {
+                            purpose: MUSIC_PURPOSE,
+                            title: "Select background music".to_string(),
+                            extensions: vec!["ogg".into()],
+                            start_dir: dirs::home_dir(),
+                            mode: DialogMode::Open,
+                        });
+                    })
+                    .with_children(|b| {
+                        b.spawn((
+                            Text::new("\u{1F4C2} Browse"),
+                            TextFont { font_size: FontSize::Px(13.0), ..default() },
+                            TextColor(Color::WHITE),
+                            Pickable::IGNORE,
+                        ));
+                    });
+                }
             });
         }
     });
@@ -1458,8 +1524,13 @@ fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     }
 }
 
-fn pan_keys(keyboard: Res<ButtonInput<KeyCode>>, state: Res<EditorState>, mut scroll: ResMut<Scroll>) {
-    if state.focus.is_some() {
+fn pan_keys(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    state: Res<EditorState>,
+    file_dialog: Res<FileDialog>,
+    mut scroll: ResMut<Scroll>,
+) {
+    if state.focus.is_some() || file_dialog.open {
         return;
     }
     if keyboard.just_pressed(KeyCode::ArrowRight) {
@@ -1470,7 +1541,15 @@ fn pan_keys(keyboard: Res<ButtonInput<KeyCode>>, state: Res<EditorState>, mut sc
     }
 }
 
-fn pan_wheel(mut wheel: MessageReader<MouseWheel>, mut scroll: ResMut<Scroll>) {
+fn pan_wheel(
+    mut wheel: MessageReader<MouseWheel>,
+    file_dialog: Res<FileDialog>,
+    mut scroll: ResMut<Scroll>,
+) {
+    if file_dialog.open {
+        wheel.clear();
+        return;
+    }
     let mut delta = 0.0;
     for ev in wheel.read() {
         // Either axis pans horizontally; a vertical wheel is the common case.
@@ -1596,14 +1675,22 @@ fn update_meta_fields(
     mut boxes: Query<(&MetaFieldBox, &mut BackgroundColor)>,
 ) {
     for (tag, mut text) in &mut texts {
-        let mut s = state.field_text(tag.0).to_string();
-        if state.focus == Some(tag.0) {
-            s.push('_');
-        }
-        **text = s;
+        **text = if tag.0 == Field::Key {
+            format!("\u{2039}  {}  \u{203A}", state.key) // ‹ KEY ›
+        } else {
+            let mut s = state.field_text(tag.0).to_string();
+            if state.focus == Some(tag.0) {
+                s.push('_');
+            }
+            s
+        };
     }
     for (tag, mut bg) in &mut boxes {
-        bg.0 = if state.focus == Some(tag.0) { FIELD_BG_FOCUS } else { FIELD_BG };
+        bg.0 = if tag.0 != Field::Key && state.focus == Some(tag.0) {
+            FIELD_BG_FOCUS
+        } else {
+            FIELD_BG
+        };
     }
 }
 
