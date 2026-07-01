@@ -51,6 +51,7 @@ use crate::settings::AudioSettings;
 use super::AppState;
 
 const SAVE_PURPOSE: DialogId = DialogId("song_editor_2_save");
+const LOAD_PURPOSE: DialogId = DialogId("song_editor_2_load");
 const MUSIC_PURPOSE: DialogId = DialogId("song_editor_2_music");
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
@@ -516,7 +517,7 @@ pub struct SongEditor2Plugin;
 
 impl Plugin for SongEditor2Plugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::SongEditor2), (reset_state, setup).chain())
+        app.add_systems(OnEnter(AppState::SongEditor2), (init_state, setup, force_grid_rebuild).chain())
             .add_systems(OnExit(AppState::SongEditor2), cleanup)
             .init_resource::<Scroll>()
             .add_systems(
@@ -544,10 +545,128 @@ impl Plugin for SongEditor2Plugin {
                     update_meta_fields,
                     animate_note_shaders,
                     handle_save_chosen,
+                    handle_load_chosen,
                     handle_music_chosen,
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             );
+    }
+}
+
+/// Decode pitch and expression modifiers from a harpchart event's `modifiers` array.
+fn parse_pitch_expr(modifiers: &[serde_json::Value]) -> (Pitch, Expr) {
+    let mut pitch = Pitch::Normal;
+    let mut expr = Expr::None;
+    for m in modifiers {
+        match m["type"].as_str().unwrap_or("") {
+            "bend" => {
+                let s = m["semitones"].as_f64().unwrap_or(0.0) as f32;
+                pitch = Pitch::Bend(-s); // saved as negative semitones, stored as positive
+            }
+            "overblow" => pitch = Pitch::Overblow,
+            "overdraw" => pitch = Pitch::Overdraw,
+            "vibrato"  => expr = Expr::Vibrato,
+            "wah-wah"  => expr = Expr::Wah,
+            _ => {}
+        }
+    }
+    (pitch, expr)
+}
+
+/// Parse a harpchart JSON value into `EditorState`, overwriting all authored content.
+fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scroll: &mut Scroll) {
+    if let Some(song) = v.get("song") {
+        if let Some(t) = song["title"].as_str()  { state.name   = t.to_string(); }
+        if let Some(a) = song["artist"].as_str()  { state.author = a.to_string(); }
+        if let Some(b) = song["tempo_bpm"].as_f64() {
+            state.tempo = format!("{}", b.round() as u32);
+        }
+        if let Some(k) = song["key"].as_str() {
+            if HARP_KEYS.contains(&k) {
+                state.key = k.to_string();
+            }
+        }
+    }
+    if let Some(meta) = v.get("metadata") {
+        if let Some(audio) = meta["audio_file"].as_str() {
+            if !audio.is_empty() {
+                state.music = audio.to_string();
+            }
+        }
+    }
+
+    let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
+    let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+
+    let mut notes: Vec<GridNote> = Vec::new();
+    let mut next_id = 0u32;
+    let empty = vec![];
+
+    if let Some(track) = v["track"].as_array() {
+        for phrase in track {
+            let start_tick = if let Some(t) = phrase["tick"].as_u64() {
+                t as usize
+            } else if let Some(t) = phrase["time"].as_f64() {
+                (t as f32 / secs_per_tick).round() as usize
+            } else {
+                continue;
+            };
+
+            let duration_secs = phrase["duration"].as_f64().unwrap_or(
+                secs_per_tick as f64 * TICKS_PER_BEAT as f64,
+            ) as f32;
+            let len = ((duration_secs / secs_per_tick).round() as usize).max(1);
+
+            let events = phrase["events"].as_array().unwrap_or(&empty);
+            for event in events {
+                let hole = event["hole"].as_u64().unwrap_or(1) as u8;
+                if !(1..=10).contains(&hole) {
+                    continue;
+                }
+                let dir = if event["action"].as_str() == Some("draw") {
+                    Dir::Draw
+                } else {
+                    Dir::Blow
+                };
+                let mods_empty = vec![];
+                let mods = event["modifiers"].as_array().unwrap_or(&mods_empty);
+                let (pitch, expr) = parse_pitch_expr(mods);
+
+                notes.push(GridNote { id: next_id, hole, tick: start_tick, len, dir, pitch, expr });
+                next_id += 1;
+            }
+        }
+    }
+
+    state.notes    = notes;
+    state.next_id  = next_id;
+    state.selected = None;
+    state.dragging = None;
+    state.focus    = None;
+    state.scroll_beat = 0;
+    scroll.px = 0.0;
+}
+
+/// Load a harpchart when the file dialog returns a pick.
+fn handle_load_chosen(
+    mut chosen: MessageReader<FileChosen>,
+    mut state: ResMut<EditorState>,
+    mut scroll: ResMut<Scroll>,
+) {
+    for ev in chosen.read() {
+        if ev.purpose != LOAD_PURPOSE {
+            continue;
+        }
+        let text = match std::fs::read_to_string(&ev.path) {
+            Ok(t) => t,
+            Err(e) => { println!("Load failed (read): {e}"); continue; }
+        };
+        let v: serde_json::Value = match serde_json::from_str(&text) {
+            Ok(v) => v,
+            Err(e) => { println!("Load failed (parse): {e}"); continue; }
+        };
+        load_harpchart(&v, &mut state, &mut scroll);
+        println!("Loaded: {}", ev.path.display());
     }
 }
 
@@ -587,8 +706,18 @@ fn handle_save_chosen(
     }
 }
 
-fn reset_state(mut commands: Commands) {
-    commands.insert_resource(EditorState::default());
+/// Force `rebuild_grid` to run on the first `Update` tick after (re-)entering
+/// the editor, even when `EditorState` has not been mutated since last visit.
+fn force_grid_rebuild(mut state: ResMut<EditorState>) {
+    state.set_changed();
+}
+
+/// Initialise editor resources on first entry; on re-entry only reset the
+/// transient playback/scroll state so the authored notes are preserved.
+fn init_state(mut commands: Commands, existing: Option<Res<EditorState>>) {
+    if existing.is_none() {
+        commands.insert_resource(EditorState::default());
+    }
     commands.insert_resource(Playhead::default());
     commands.insert_resource(Scroll::default());
 }
@@ -765,6 +894,16 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands) {
         BackgroundColor(PANEL_BG),
     ))
     .with_children(|panel| {
+        // Back: return to the main menu (editor state is preserved).
+        transport_button(
+            panel,
+            "\u{2190} Back",
+            Color::srgb(0.22, 0.22, 0.28),
+            |_: On<Pointer<Click>>, mut next: ResMut<NextState<AppState>>| {
+                next.set(AppState::Menu);
+            },
+        );
+        panel_separator(panel);
         // Transport: play the authored song / stop playback.
         spawn_transport(panel);
         panel_separator(panel);
@@ -888,6 +1027,20 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
                 extensions: vec!["harpchart".into()],
                 start_dir: Some(std::path::PathBuf::from("assets/songs")),
                 mode: DialogMode::Save { default_name },
+            });
+        },
+    );
+    transport_button(
+        panel,
+        "\u{1F4C2} Load",
+        Color::srgb(0.24, 0.30, 0.20),
+        |_: On<Pointer<Click>>, mut open: MessageWriter<OpenFileDialog>| {
+            open.write(OpenFileDialog {
+                purpose: LOAD_PURPOSE,
+                title: "Load chart".to_string(),
+                extensions: vec!["harpchart".into()],
+                start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                mode: DialogMode::Open,
             });
         },
     );
@@ -1881,7 +2034,8 @@ fn serialize_harpchart(state: &EditorState) -> String {
         "metadata": {
             "format_version": "1.0.0",
             "author": artist,
-            "description": "Created with Harmonicon Song Editor 2"
+            "description": "Created with Harmonicon Song Editor 2",
+            "audio_file": state.music.trim()
         },
         "song": {
             "title": title,
