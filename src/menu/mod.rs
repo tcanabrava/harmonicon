@@ -17,6 +17,7 @@ use super::dialogs::button;
 
 mod calibration;
 mod credits;
+mod editor_note_material;
 mod options;
 mod song_editor_2;
 

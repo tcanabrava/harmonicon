@@ -26,8 +26,9 @@
 //!
 //! A note carries one *pitch* technique (Normal, Bend 0.5/1.0/1.5, Overblow,
 //! Overdraw) and one optional *expression* (Wah or Vibrato) that stacks on top.
-//! Pitch states are flat-coloured; Wah/Vibrato reuse the gameplay note shader
-//! ([`NoteTail2dMaterial`]) so the note visibly wobbles/pulses.
+//! Pitch states are flat-coloured; Wah/Vibrato use an editor-specific shader
+//! ([`EditorNoteMaterial`]) showing a horizontal sine wave (vibrato) or
+//! alternating thick/thin band (wah) along the note's duration axis.
 //!
 //! The grid only ever spawns the cells currently on screen — scrolling rebuilds
 //! the visible window, so off-screen notes cost nothing to draw.
@@ -45,7 +46,7 @@ use std::f32::consts::TAU;
 
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::dialogs::file_dialog::{DialogId, DialogMode, FileChosen, FileDialog, OpenFileDialog};
-use crate::gameplay::note_tail_2d::{NoteTail2dMaterial, tail_params};
+use super::editor_note_material::{EditorNoteMaterial, EditorNoteMaterialPlugin};
 use crate::settings::AudioSettings;
 
 use super::AppState;
@@ -157,15 +158,7 @@ impl GridNote {
         }
     }
 
-    /// Pitch shift in semitones for the shader: bends pull down, over-blow/draw
-    /// push up. Drives the tail's lean direction and depth.
-    fn shift(&self) -> f32 {
-        match self.pitch {
-            Pitch::Normal => 0.0,
-            Pitch::Bend(a) => -a,
-            Pitch::Overblow | Pitch::Overdraw => 1.0,
-        }
-    }
+
 }
 
 /// Which edge of a note is being dragged to resize it.
@@ -228,6 +221,25 @@ fn can_place(notes: &[GridNote], id: u32, hole: u8, tick: usize, len: usize) -> 
     !notes
         .iter()
         .any(|n| n.id != id && n.hole == hole && n.tick < tick + len && tick < n.tick + n.len)
+}
+
+/// Returns true if the pitch technique is playable on this hole.
+fn pitch_compatible(pitch: Pitch, hole: u8) -> bool {
+    match pitch {
+        Pitch::Normal => true,
+        Pitch::Bend(depth) => depth <= max_bend(hole) + f32::EPSILON,
+        Pitch::Overblow => overblow_ok(hole),
+        Pitch::Overdraw => overdraw_ok(hole),
+    }
+}
+
+fn pitch_deny_reason(pitch: Pitch, _hole: u8) -> &'static str {
+    match pitch {
+        Pitch::Bend(_) => "This hole does not support this bend depth",
+        Pitch::Overblow => "Overblow is only available on holes 1–6",
+        Pitch::Overdraw => "Overdraw is only available on holes 7–10",
+        Pitch::Normal => "",
+    }
 }
 
 /// New `(tick, len)` after dragging an edge by `steps` ticks (positive = dragged
@@ -380,6 +392,8 @@ struct EditorState {
     author: String,
     /// Which metadata field is being typed into (suppresses grid keys).
     focus: Option<Field>,
+    /// Reason the current move drag is blocked (empty when valid or no drag).
+    drag_msg: String,
 }
 
 impl Default for EditorState {
@@ -396,6 +410,7 @@ impl Default for EditorState {
             name: String::new(),
             author: String::new(),
             focus: None,
+            drag_msg: String::new(),
         }
     }
 }
@@ -511,13 +526,18 @@ struct MetaFieldBox(Field);
 #[derive(Component)]
 struct MetaFieldText(Field);
 
+/// Status bar text shown below the meta form; displays drag-block reasons.
+#[derive(Component)]
+struct StatusMsg;
+
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 pub struct SongEditor2Plugin;
 
 impl Plugin for SongEditor2Plugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::SongEditor2), (init_state, setup, force_grid_rebuild).chain())
+        app.add_plugins(EditorNoteMaterialPlugin)
+            .add_systems(OnEnter(AppState::SongEditor2), (init_state, setup, force_grid_rebuild).chain())
             .add_systems(OnExit(AppState::SongEditor2), cleanup)
             .init_resource::<Scroll>()
             .add_systems(
@@ -543,7 +563,7 @@ impl Plugin for SongEditor2Plugin {
                     update_move_ghost,
                     update_mod_panel,
                     update_meta_fields,
-                    animate_note_shaders,
+                    update_status_bar,
                     handle_save_chosen,
                     handle_load_chosen,
                     handle_music_chosen,
@@ -830,6 +850,19 @@ fn setup(mut commands: Commands) {
 
             spawn_mod_panel(root);
             spawn_meta_form(root);
+
+            // Status bar: shows drag-block reasons (pitch incompatibility, overlap).
+            root.spawn((
+                StatusMsg,
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextColor(Color::srgb(1.0, 0.40, 0.15)),
+                Node {
+                    width: Val::Percent(100.0),
+                    padding: UiRect::axes(Val::Px(10.0), Val::Px(4.0)),
+                    ..default()
+                },
+            ));
         });
 }
 
@@ -1193,7 +1226,7 @@ fn rebuild_grid(
     content: Query<Entity, With<GridContent>>,
     old: Query<Entity, With<GridItem>>,
     windows: Query<&Window>,
-    mut tail_mats: ResMut<Assets<NoteTail2dMaterial>>,
+    mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
 ) {
     // While an edge is being dragged the note entity must survive the gesture,
     // so the whole grid is left in place; `live_resize` updates it instead.
@@ -1339,7 +1372,7 @@ fn rebuild_grid(
     for note in &state.notes {
         if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.selected == Some(note.id);
-            items.push(spawn_note(&mut commands, *note, selected, &mut tail_mats));
+            items.push(spawn_note(&mut commands, *note, selected, &mut note_mats));
         }
     }
 
@@ -1360,12 +1393,13 @@ fn note_rect(note: &GridNote) -> (f32, f32, f32, f32) {
 /// clickable/selectable body (spanning `len` beats); dragging it moves the note,
 /// while two thin children at its left and right edges are the drag-to-resize
 /// handles. Plain pitches are flat-coloured; Wah/Vibrato render through the
-/// gameplay note shader so the tile visibly pulses (wah) or wobbles (vibrato).
+/// editor note shader so the tile shows a horizontal wave (vibrato) or
+/// alternating thick/thin band (wah) along the note's duration axis.
 fn spawn_note(
     commands: &mut Commands,
     note: GridNote,
     selected: bool,
-    tail_mats: &mut Assets<NoteTail2dMaterial>,
+    note_mats: &mut Assets<EditorNoteMaterial>,
 ) -> Entity {
     let (left, top, width, height) = note_rect(&note);
     let border = if selected { 2.0 } else { 0.0 };
@@ -1412,10 +1446,18 @@ fn spawn_note(
             if drag.id != id || drag.kind != DragKind::Move {
                 return;
             }
-            // Snap to a target cell, but only mark it droppable when that hole is
-            // free there — the note itself doesn't move until release.
             let (hole, tick) = move_target(drag.start_hole, drag.start_tick, ev.distance.x, ev.distance.y);
-            let valid = can_place(&state.notes, id, hole, tick, drag.start_len);
+            let pitch = state.notes.iter().find(|n| n.id == id).map(|n| n.pitch).unwrap_or(Pitch::Normal);
+            let place_ok = can_place(&state.notes, id, hole, tick, drag.start_len);
+            let pitch_ok = pitch_compatible(pitch, hole);
+            let valid = place_ok && pitch_ok;
+            state.drag_msg = if !pitch_ok {
+                pitch_deny_reason(pitch, hole).into()
+            } else if !place_ok {
+                "Another note is already here".into()
+            } else {
+                String::new()
+            };
             if let Some(d) = state.dragging.as_mut() {
                 d.target_hole = hole;
                 d.target_tick = tick;
@@ -1424,6 +1466,7 @@ fn spawn_note(
         })
         .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
             let Some(drag) = state.dragging.take() else { return };
+            state.drag_msg.clear();
             // Commit the move only if it landed on a free spot; otherwise the note
             // stays put. Resize drags are finalised by the handle, not here.
             if drag.kind == DragKind::Move && drag.valid {
@@ -1436,21 +1479,16 @@ fn spawn_note(
         })
         .id();
 
-    // Background: flat colour, or the animated note shader for Wah/Vibrato.
+    // Background: flat colour, or the editor expression shader for Wah/Vibrato.
     match note.expr {
         Expr::None => {
             commands.entity(root).insert(BackgroundColor(pitch_color(note.pitch)));
         }
         Expr::Wah | Expr::Vibrato => {
-            let (vibrato, wah) = match note.expr {
-                Expr::Vibrato => (Some(0.8), None),
-                _ => (None, Some(0.8)),
-            };
-            let (params, wah_v) = tail_params(40.0, vibrato, Some(note.shift()), wah);
-            let mat = tail_mats.add(NoteTail2dMaterial {
+            let mode = if note.expr == Expr::Vibrato { 0.0 } else { 1.0 };
+            let mat = note_mats.add(EditorNoteMaterial {
                 color: pitch_color(note.pitch).to_linear(),
-                params,
-                wah: wah_v,
+                params: Vec4::new(mode, 0.0, 0.0, 0.0),
             });
             commands.entity(root).insert(MaterialNode(mat));
         }
@@ -1847,12 +1885,10 @@ fn update_meta_fields(
     }
 }
 
-/// Advance the animation clock of every note shader so Wah/Vibrato tiles move.
-fn animate_note_shaders(time: Res<Time>, mut mats: ResMut<Assets<NoteTail2dMaterial>>) {
-    let t = time.elapsed_secs();
-    for (_, mat) in mats.iter_mut() {
-        mat.params.z = t;
-    }
+
+fn update_status_bar(state: Res<EditorState>, mut texts: Query<&mut Text, With<StatusMsg>>) {
+    let Ok(mut text) = texts.single_mut() else { return };
+    **text = state.drag_msg.clone();
 }
 
 fn cleanup(
