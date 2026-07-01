@@ -18,7 +18,6 @@ use super::dialogs::button;
 mod calibration;
 mod credits;
 mod options;
-mod song_editor;
 mod song_editor_2;
 
 mod theme_picker;
@@ -65,9 +64,6 @@ pub enum AppState {
     /// Credits screen with scrolling text and 3D harmonica background.
     Credits,
     /// Song authoring tool, launched from the main menu.
-    SongEditor,
-    /// Standalone bending practice: harmonica bend diagram + metronome, with a
-    /// directly pickable key and adjustable tempo (no song).
     SongEditor2,
     /// Standalone bending practice: harmonica bend diagram + metronome, with a
     /// directly pickable key and adjustable tempo (no song).
@@ -118,7 +114,6 @@ impl Plugin for MenuPlugin {
             .add_plugins(options::OptionsPlugin)
             .add_plugins(calibration::CalibrationPlugin)
             .add_plugins(credits::CreditsPlugin)
-            .add_plugins(song_editor::SongEditorPlugin)
             .add_plugins(song_editor_2::SongEditor2Plugin)
             .add_plugins(theme_picker::ThemePickerPlugin)
             .add_systems(OnEnter(AppState::Menu), route_menu_entry)
@@ -396,8 +391,6 @@ fn setup_main_menu(
     let root = spawn_menu_root(&mut commands, &loc.msg("app-title"), None, &theme, "Main");
     spawn_button(&mut commands, root, &loc.msg("menu-play"), Some("Play"), &theme, &btn_mats, "Main",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play));
-    spawn_button(&mut commands, root, &loc.msg("menu-song-editor"), Some("SongEditor"), &theme, &btn_mats, "Main",
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::SongEditor));
     spawn_button(&mut commands, root, &loc.msg("menu-song-editor-2"), Some("SongEditor2"), &theme, &btn_mats, "Main",
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::SongEditor2));
     spawn_button(&mut commands, root, &loc.msg("menu-options"), Some("Options"), &theme, &btn_mats, "Main",

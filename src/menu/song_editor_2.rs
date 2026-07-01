@@ -43,11 +43,14 @@ use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::prelude::MaterialNode;
 use std::f32::consts::TAU;
 
-use crate::audio_system::midi::note_to_midi;
+use crate::audio_system::midi::{midi_to_note, note_to_midi};
+use crate::dialogs::file_dialog::{DialogId, DialogMode, FileChosen, OpenFileDialog};
 use crate::gameplay::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use crate::settings::AudioSettings;
 
 use super::AppState;
+
+const SAVE_PURPOSE: DialogId = DialogId("song_editor_2_save");
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
 
@@ -534,9 +537,33 @@ impl Plugin for SongEditor2Plugin {
                     update_mod_panel,
                     update_meta_fields,
                     animate_note_shaders,
+                    handle_save_chosen,
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             );
+    }
+}
+
+/// Write the harpchart when the file dialog confirms a save path.
+fn handle_save_chosen(
+    mut chosen: MessageReader<FileChosen>,
+    state: Res<EditorState>,
+) {
+    for ev in chosen.read() {
+        if ev.purpose != SAVE_PURPOSE {
+            continue;
+        }
+        let json = serialize_harpchart(&state);
+        if let Some(parent) = ev.path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                println!("Save failed (mkdir): {e}");
+                continue;
+            }
+        }
+        match std::fs::write(&ev.path, json.as_bytes()) {
+            Ok(()) => println!("Saved: {}", ev.path.display()),
+            Err(e) => println!("Save failed (write): {e}"),
+        }
     }
 }
 
@@ -822,6 +849,26 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
                 commands.entity(e).despawn();
             }
             playhead.playing = false;
+        },
+    );
+    transport_button(
+        panel,
+        "\u{1F4BE} Save",
+        Color::srgb(0.18, 0.28, 0.45),
+        |_: On<Pointer<Click>>,
+         state: Res<EditorState>,
+         mut open: MessageWriter<OpenFileDialog>| {
+            let default_name = format!(
+                "{}.harpchart",
+                safe_path_segment(if state.name.is_empty() { "chart" } else { &state.name })
+            );
+            open.write(OpenFileDialog {
+                purpose: SAVE_PURPOSE,
+                title: "Save chart".to_string(),
+                extensions: vec!["harpchart".into()],
+                start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                mode: DialogMode::Save { default_name },
+            });
         },
     );
 }
@@ -1650,6 +1697,175 @@ fn update_playhead_view(
     *vis = Visibility::Inherited;
 }
 
+// ── Harpchart export ─────────────────────────────────────────────────────────
+
+/// Serialise `state` to a harpchart JSON string (schema v1.0.0).
+///
+/// Notes at the same tick are collapsed into a single chord phrase
+/// (`play_mode: "chord"`); all others are `"single"`. The `timing.resolution`
+/// is set to `TICKS_PER_BEAT` so the integer `tick` values in each phrase
+/// entry map directly to the editor's tick coordinates.
+fn serialize_harpchart(state: &EditorState) -> String {
+    use serde_json::{Value, json};
+    use std::collections::BTreeMap;
+
+    let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
+    let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+    let k_off = key_offset(&state.key);
+
+    // Group notes by start tick so simultaneous notes become chord phrases.
+    let mut by_tick: BTreeMap<usize, Vec<&GridNote>> = BTreeMap::new();
+    for n in &state.notes {
+        by_tick.entry(n.tick).or_default().push(n);
+    }
+
+    let track: Vec<Value> = by_tick
+        .iter()
+        .enumerate()
+        .map(|(idx, (&tick, notes))| {
+            let max_len = notes.iter().map(|n| n.len).max().unwrap_or(1);
+            let duration_secs = max_len as f64 * secs_per_tick as f64;
+            let play_mode = if notes.len() == 1 { "single" } else { "chord" };
+
+            let events: Vec<Value> = notes
+                .iter()
+                .map(|n| {
+                    let action = match n.dir {
+                        Dir::Blow => "blow",
+                        Dir::Draw => "draw",
+                    };
+                    // Actual sounded pitch at the chosen key.
+                    let note_name = {
+                        let idx = (n.hole as usize).saturating_sub(1);
+                        let base = match n.dir {
+                            Dir::Blow => C_BLOW.get(idx).copied().unwrap_or("C4"),
+                            Dir::Draw => C_DRAW.get(idx).copied().unwrap_or("D4"),
+                        };
+                        let midi = note_to_midi(base).unwrap_or(60) + k_off;
+                        midi_to_note(midi)
+                    };
+
+                    let mut modifiers: Vec<Value> = Vec::new();
+                    match n.pitch {
+                        Pitch::Bend(a) => {
+                            modifiers.push(json!({ "type": "bend", "semitones": -(a as f64) }));
+                        }
+                        Pitch::Overblow => modifiers.push(json!({ "type": "overblow" })),
+                        Pitch::Overdraw => modifiers.push(json!({ "type": "overdraw" })),
+                        Pitch::Normal => {}
+                    }
+                    match n.expr {
+                        Expr::Vibrato => modifiers.push(
+                            json!({ "type": "vibrato", "oscillation_hz": 5.5, "intensity": 0.5 }),
+                        ),
+                        Expr::Wah => modifiers.push(
+                            json!({ "type": "wah-wah", "oscillation_hz": 4.0, "intensity": 0.5 }),
+                        ),
+                        Expr::None => {}
+                    }
+
+                    let mut event = json!({
+                        "hole": n.hole,
+                        "action": action,
+                        "note": note_name,
+                    });
+                    if !modifiers.is_empty() {
+                        event["modifiers"] = Value::Array(modifiers);
+                    }
+                    event
+                })
+                .collect();
+
+            json!({
+                "id": format!("phrase_{:02}", idx + 1),
+                "tick": tick,
+                "duration": (duration_secs * 1000.0).round() / 1000.0,
+                "play_mode": play_mode,
+                "events": events,
+            })
+        })
+        .collect();
+
+    let title = if state.name.is_empty() { "Untitled" } else { &state.name };
+    let artist = if state.author.is_empty() { "Unknown Artist" } else { &state.author };
+    let last_phrase = track.len().saturating_sub(1);
+
+    let chart = json!({
+        "metadata": {
+            "format_version": "1.0.0",
+            "author": artist,
+            "description": "Created with Harmonicon Song Editor 2"
+        },
+        "song": {
+            "title": title,
+            "artist": artist,
+            "tempo_bpm": bpm,
+            "key": state.key,
+            "time_signature": "4/4",
+            "difficulty": "intermediate"
+        },
+        "timing": {
+            "resolution": TICKS_PER_BEAT,
+            "tempo_map": [{ "tick": 0, "bpm": bpm }]
+        },
+        "harmonica": {
+            "type": "diatonic",
+            "holes": 10,
+            "position": "2nd",
+            "bending_profile": "richter_standard",
+            "layout": {
+                "blow": C_BLOW,
+                "draw": C_DRAW
+            }
+        },
+        "track": track,
+        "loop": {
+            "type": "full",
+            "repeat": false,
+            "start_index": 0,
+            "end_index": last_phrase
+        },
+        "scoring": {
+            "perfect_window_ms": 60,
+            "good_window_ms": 120,
+            "miss_window_ms": 220,
+            "combo": {
+                "enabled": true,
+                "base_multiplier": 1.0,
+                "step_multiplier": 0.1,
+                "max_multiplier": 4.0,
+                "decay_ms": 2000
+            },
+            "style_bonus": {
+                "bend": 50,
+                "vibrato": 25,
+                "wah-wah": 40
+            }
+        },
+        "fx_mapping": {
+            "bend": "pitch_bend",
+            "vibrato": "pitch_lfo",
+            "wah-wah": "filter_lfo"
+        }
+    });
+
+    serde_json::to_string_pretty(&chart).unwrap_or_default()
+}
+
+/// Derive a filesystem-safe path component from a user-supplied string:
+/// collapses whitespace to underscores and removes characters outside
+/// `[A-Za-z0-9_\-]`.
+fn safe_path_segment(s: &str) -> String {
+    s.trim()
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '_' })
+        .collect::<String>()
+        .split('_')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
 /// Render sample rate for the synthesised preview.
 const SAMPLE_RATE: u32 = 44_100;
 
@@ -2104,5 +2320,37 @@ mod tests {
         assert_eq!(apply_resize(0, 1, Edge::Right, 10, 0, Some(3)), (0, 3));
         // Left edge can't move before the previous note's end (left_bound = 2).
         assert_eq!(apply_resize(4, 2, Edge::Left, -10, 2, None), (2, 4));
+    }
+
+    #[test]
+    fn serialize_harpchart_is_valid_json_with_required_fields() {
+        let mut s = EditorState::default();
+        s.name = "Test Song".into();
+        s.author = "Test Artist".into();
+        s.tempo = "120".into();
+        s.key = "G".into();
+        // Single note + chord (two simultaneous notes).
+        select_or_add(&mut s, 2, 0);
+        select_or_add(&mut s, 4, 4);
+        select_or_add(&mut s, 5, 4); // simultaneous with hole 4 → chord phrase
+        apply_modifier(&mut s, ModButton::Vibrato);
+
+        let json_str = serialize_harpchart(&s);
+        let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+
+        assert_eq!(v["song"]["title"], "Test Song");
+        assert_eq!(v["song"]["artist"], "Test Artist");
+        assert_eq!(v["timing"]["resolution"], TICKS_PER_BEAT as i64);
+
+        let track = v["track"].as_array().expect("track array");
+        assert_eq!(track.len(), 2, "one single + one chord phrase");
+
+        let chord = track.iter().find(|p| p["tick"] == 4).expect("chord phrase");
+        assert_eq!(chord["play_mode"], "chord");
+        assert_eq!(chord["events"].as_array().unwrap().len(), 2);
+
+        // Key G transposes hole 2 blow (E4 + 7 semitones = B4).
+        let single = &track[0];
+        assert_eq!(single["events"][0]["note"], "B4");
     }
 }

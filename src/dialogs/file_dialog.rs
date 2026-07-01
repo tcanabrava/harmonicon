@@ -3,18 +3,20 @@
 //! Reusable in-app dialogs. Currently a navigable file picker, decoupled from
 //! its callers via messages so any screen can request one.
 //!
-//! Open one by writing [`OpenFileDialog`] (with a [`DialogId`] you choose and an
-//! optional extension filter); read the result by reading [`FileChosen`]
-//! messages whose `purpose` matches your id. The dialog handles folder
-//! navigation (into subfolders and up via "..") and closes on pick, Cancel, or
-//! Esc.
+//! Open one by writing [`OpenFileDialog`] with a [`DialogId`] you choose, an
+//! optional extension filter, and a [`DialogMode`]; read the result by reading
+//! [`FileChosen`] messages whose `purpose` matches your id. The dialog handles
+//! folder navigation (into subfolders and up via "..") and closes on pick,
+//! Cancel, or Esc.
 //!
-//! The UI is authored with the `bsn!` macro, and each clickable row carries its
-//! behaviour as an `on(...)` / `observe(...)` callback rather than a polling
-//! system.
+//! In [`DialogMode::Save`] a filename text field appears at the bottom.
+//! Keyboard input goes to that field; Enter confirms, Esc cancels.
+//! Clicking a file entry fills the filename field instead of picking immediately.
 
 use std::path::PathBuf;
 
+use bevy::input::ButtonState;
+use bevy::input::keyboard::KeyboardInput;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
@@ -25,6 +27,19 @@ use crate::dialogs::button;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct DialogId(pub &'static str);
 
+/// Whether the dialog is picking an existing file or choosing a save location.
+#[derive(Clone, Debug, Default)]
+pub enum DialogMode {
+    /// Browse and select an existing file (original behaviour).
+    #[default]
+    Open,
+    /// Browse to a directory and type/confirm a filename to write.
+    Save {
+        /// Pre-filled filename shown in the text field when the dialog opens.
+        default_name: String,
+    },
+}
+
 /// Request to open the file dialog.
 #[derive(Message)]
 pub struct OpenFileDialog {
@@ -34,9 +49,11 @@ pub struct OpenFileDialog {
     pub extensions: Vec<String>,
     /// Where to start browsing; defaults to the current directory.
     pub start_dir: Option<PathBuf>,
+    /// Open an existing file or choose a save path. Defaults to [`DialogMode::Open`].
+    pub mode: DialogMode,
 }
 
-/// Emitted when the user picks a file.
+/// Emitted when the user picks a file (Open) or confirms a save path (Save).
 #[derive(Message)]
 pub struct FileChosen {
     pub purpose: DialogId,
@@ -56,6 +73,9 @@ pub struct FileDialog {
     extensions: Vec<String>,
     purpose: Option<DialogId>,
     title: String,
+    pub mode: DialogMode,
+    /// Current contents of the filename text field (Save mode only).
+    save_filename: String,
 }
 
 #[derive(Component, Default, Clone)]
@@ -64,6 +84,9 @@ struct FileDialogRoot;
 struct FileDialogList;
 #[derive(Component, Default, Clone)]
 struct DialogPathText;
+/// Marks the `Text` entity that mirrors `FileDialog::save_filename`.
+#[derive(Component, Default, Clone)]
+struct SaveFilenameText;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, States)]
 enum FileDialogState {
@@ -108,7 +131,7 @@ fn file_name(p: &std::path::Path) -> String {
 }
 
 /// Open the dialog when an [`OpenFileDialog`] arrives: set state and spawn the
-/// `bsn!` modal shell. The entry list is filled by `refresh`.
+/// modal shell. The entry list is filled by `refresh`.
 fn handle_open(
     mut requests: MessageReader<OpenFileDialog>,
     mut dialog: ResMut<FileDialog>,
@@ -125,13 +148,23 @@ fn handle_open(
         .or_else(|| std::env::current_dir().ok())
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("/"));
+
     dialog.open = true;
     dialog.dir = std::fs::canonicalize(&start).unwrap_or(start);
     dialog.extensions = req.extensions.clone();
     dialog.purpose = Some(req.purpose);
     dialog.title = req.title.clone();
+    dialog.mode = req.mode.clone();
+    dialog.save_filename = match &req.mode {
+        DialogMode::Save { default_name } => default_name.clone(),
+        DialogMode::Open => String::new(),
+    };
 
     let title = dialog.title.clone();
+    let is_save = matches!(dialog.mode, DialogMode::Save { .. });
+    let save_row_display = if is_save { Display::Flex } else { Display::None };
+    let initial_filename = dialog.save_filename.clone();
+
     commands.spawn_scene(bsn! {
         Node {
             position_type: {PositionType::Absolute},
@@ -170,8 +203,61 @@ fn handle_open(
                 }
                 BackgroundColor({PANEL_BG})
                 FileDialogList
-                // Wheel/trackpad scrolling for the (potentially long) entry list.
                 ScrollArea
+            ),
+            (
+                Node {
+                    display: {save_row_display},
+                    flex_direction: {FlexDirection::Row},
+                    align_items: {AlignItems::Center},
+                    column_gap: {Val::Px(8.0)},
+                }
+                Children [
+                    (
+                        Text({"File name:".to_string()})
+                        TextFont { font_size: {FontSize::Px(13.0)} }
+                        TextColor({Color::srgb(0.75, 0.75, 0.85)})
+                    ),
+                    (
+                        Node {
+                            width: {Val::Px(340.0)},
+                            height: {Val::Px(28.0)},
+                            align_items: {AlignItems::Center},
+                            padding: {UiRect::horizontal(Val::Px(8.0))},
+                        }
+                        BackgroundColor({Color::srgba(0.10, 0.10, 0.16, 1.0)})
+                        Children [
+                            (
+                                Text({initial_filename})
+                                TextFont { font_size: {FontSize::Px(13.0)} }
+                                TextColor({Color::WHITE})
+                                SaveFilenameText
+                            )
+                        ]
+                    ),
+                    (
+                        Button
+                        Node {
+                            padding: {UiRect::axes(Val::Px(14.0), Val::Px(5.0))},
+                        }
+                        BackgroundColor({Color::srgb(0.18, 0.28, 0.45)})
+                        on(|_: On<Pointer<Click>>,
+                           mut dialog: ResMut<FileDialog>,
+                           mut chosen: MessageWriter<FileChosen>,
+                           roots: Query<Entity, With<FileDialogRoot>>,
+                           next: ResMut<NextState<FileDialogState>>,
+                           mut commands: Commands| {
+                            confirm_save(&mut dialog, &mut chosen, &roots, next, &mut commands);
+                        })
+                        Children [
+                            (
+                                Text({"Save".to_string()})
+                                TextFont { font_size: {FontSize::Px(13.0)} }
+                                TextColor({Color::WHITE})
+                            )
+                        ]
+                    ),
+                ]
             ),
             (
                 Button
@@ -240,8 +326,7 @@ fn refresh(
     }
 }
 
-/// A folder row: its "navigate into this folder" click callback rides along
-/// inline as `on(...)`.
+/// A folder row: navigates into the folder on click.
 fn spawn_dir_entry(parent: &mut ChildSpawnerCommands, label: String, path: PathBuf) {
     parent.spawn_empty().apply_scene(button::default(
         &label,
@@ -254,8 +339,9 @@ fn spawn_dir_entry(parent: &mut ChildSpawnerCommands, label: String, path: PathB
     ));
 }
 
-/// A file row: its "pick this file and close" click callback rides along inline
-/// as `on(...)`.
+/// A file row.
+/// - **Open mode**: picks the file and closes the dialog.
+/// - **Save mode**: fills the filename field with the clicked entry's name.
 fn spawn_file_entry(parent: &mut ChildSpawnerCommands, label: String, path: PathBuf) {
     parent.spawn_empty().apply_scene(button::default(
         &label,
@@ -265,32 +351,116 @@ fn spawn_file_entry(parent: &mut ChildSpawnerCommands, label: String, path: Path
               roots: Query<Entity, With<FileDialogRoot>>,
               next: ResMut<NextState<FileDialogState>>,
               mut commands: Commands| {
-            if let Some(purpose) = dialog.purpose {
-                chosen.write(FileChosen { purpose, path: path.clone() });
+            match &dialog.mode {
+                DialogMode::Open => {
+                    if let Some(purpose) = dialog.purpose {
+                        chosen.write(FileChosen { purpose, path: path.clone() });
+                    }
+                    close(&mut dialog, &roots, next, &mut commands);
+                }
+                DialogMode::Save { .. } => {
+                    if let Some(name) = path.file_name() {
+                        dialog.save_filename = name.to_string_lossy().into_owned();
+                    }
+                }
             }
-            close(&mut dialog, &roots, next, &mut commands);
         },
     ));
 }
 
-/// Esc cancels; Backspace goes up a folder. Esc is consumed so callers behind
-/// the modal don't also act on it.
+/// Confirm a save: emit [`FileChosen`] with `dir/filename` and close.
+/// Does nothing if the filename field is empty.
+fn confirm_save(
+    dialog: &mut FileDialog,
+    chosen: &mut MessageWriter<FileChosen>,
+    roots: &Query<Entity, With<FileDialogRoot>>,
+    next: ResMut<NextState<FileDialogState>>,
+    commands: &mut Commands,
+) {
+    if dialog.save_filename.is_empty() {
+        return;
+    }
+    if let Some(purpose) = dialog.purpose {
+        let path = dialog.dir.join(&dialog.save_filename);
+        chosen.write(FileChosen { purpose, path });
+    }
+    close(dialog, roots, next, commands);
+}
+
+/// Mirror `FileDialog::save_filename` into the on-screen text entity whenever
+/// it changes (Save mode only; the entity is hidden in Open mode).
+fn sync_save_filename(
+    dialog: Res<FileDialog>,
+    mut texts: Query<&mut Text, With<SaveFilenameText>>,
+) {
+    if !dialog.is_changed() {
+        return;
+    }
+    for mut text in &mut texts {
+        **text = dialog.save_filename.clone();
+    }
+}
+
+/// Keyboard handling while the dialog is open.
+///
+/// **Open mode**: Esc closes; Backspace navigates up a folder.
+/// **Save mode**: printable keys type into the filename field; Backspace removes
+/// the last character; Enter confirms; Esc cancels.
 fn dialog_keys(
     mut keyboard: ResMut<ButtonInput<KeyCode>>,
+    mut key_events: MessageReader<KeyboardInput>,
     mut dialog: ResMut<FileDialog>,
     roots: Query<Entity, With<FileDialogRoot>>,
     next_state: ResMut<NextState<FileDialogState>>,
     mut refresh_req: MessageWriter<RefreshFileList>,
+    mut chosen: MessageWriter<FileChosen>,
     mut commands: Commands,
 ) {
-    if keyboard.just_pressed(KeyCode::Escape) {
-        keyboard.clear_just_pressed(KeyCode::Escape);
-        close(&mut dialog, &roots, next_state, &mut commands);
-    } else if keyboard.just_pressed(KeyCode::Backspace)
-        && let Some(parent) = dialog.dir.parent() {
-            dialog.dir = parent.to_path_buf();
-            refresh_req.write(RefreshFileList);
+    match &dialog.mode {
+        DialogMode::Save { .. } => {
+            // Collect the action first so `next_state` isn't moved inside a loop.
+            #[derive(PartialEq)]
+            enum Act { Confirm, Cancel, None }
+            let mut act = Act::None;
+
+            for ev in key_events.read() {
+                if ev.state != ButtonState::Pressed {
+                    continue;
+                }
+                match &ev.logical_key {
+                    bevy::input::keyboard::Key::Character(s) => {
+                        for c in s.chars() {
+                            if !c.is_control() {
+                                dialog.save_filename.push(c);
+                            }
+                        }
+                    }
+                    bevy::input::keyboard::Key::Space => dialog.save_filename.push(' '),
+                    bevy::input::keyboard::Key::Backspace => { dialog.save_filename.pop(); }
+                    bevy::input::keyboard::Key::Enter => { act = Act::Confirm; break; }
+                    bevy::input::keyboard::Key::Escape => { act = Act::Cancel; break; }
+                    _ => {}
+                }
+            }
+
+            match act {
+                Act::Confirm => confirm_save(&mut dialog, &mut chosen, &roots, next_state, &mut commands),
+                Act::Cancel  => close(&mut dialog, &roots, next_state, &mut commands),
+                Act::None    => {}
+            }
         }
+        DialogMode::Open => {
+            if keyboard.just_pressed(KeyCode::Escape) {
+                keyboard.clear_just_pressed(KeyCode::Escape);
+                close(&mut dialog, &roots, next_state, &mut commands);
+            } else if keyboard.just_pressed(KeyCode::Backspace) {
+                if let Some(parent) = dialog.dir.parent() {
+                    dialog.dir = parent.to_path_buf();
+                    refresh_req.write(RefreshFileList);
+                }
+            }
+        }
+    }
 }
 
 fn close(
@@ -319,7 +489,8 @@ impl Plugin for FileDialogsPlugin {
             .add_systems(Update, handle_open.run_if(in_state(FileDialogState::Closed)))
             .add_systems(
                 Update,
-                (refresh, dialog_keys).run_if(in_state(FileDialogState::Open)),
+                (refresh, sync_save_filename, dialog_keys)
+                    .run_if(in_state(FileDialogState::Open)),
             );
     }
 }
@@ -330,10 +501,8 @@ mod tests {
 
     #[test]
     fn list_dir_splits_and_filters() {
-        // The repo's assets/songs has subfolders and (deeper) ogg files.
         let (dirs, files) = list_dir(std::path::Path::new("assets/songs"), &["ogg".into()]);
         assert!(!dirs.is_empty(), "expected artist subfolders");
-        // No ogg directly in assets/songs (they're under <song>/song/).
         assert!(files.iter().all(|f| f.extension().and_then(|e| e.to_str()) == Some("ogg")));
     }
 
