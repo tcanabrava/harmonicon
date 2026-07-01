@@ -127,18 +127,21 @@ pub(super) fn note_freq(note: &GridNote, key_offset: i32) -> Option<f32> {
 }
 
 /// Full harmonic content — sounds bright/open, like uncupped hands.
-fn harmonica_wave(freq: f32, t: f32) -> f32 {
+/// `phase_mod` is an additional phase offset applied to all harmonics; use it
+/// for vibrato so the modulation is expressed as bounded phase deviation rather
+/// than a drifting frequency × time product.
+fn harmonica_wave(freq: f32, t: f32, phase_mod: f32) -> f32 {
     let mut s = 0.0f32;
-    for (k, amp) in [(1.0, P1), (2.0, P2), (3.0, P3), (4.0, P4), (5.0, P5), (6.0, P6)] {
-        s += amp * (TAU * freq * k * t).sin();
+    for (k, amp) in [(1.0f32, P1), (2.0, P2), (3.0, P3), (4.0, P4), (5.0, P5), (6.0, P6)] {
+        s += amp * (TAU * freq * k * t + k * phase_mod).sin();
     }
     s / PARTIALS_SUM
 }
 
 /// Muffled version — fundamental only, as if hands fully cup the harmonica.
 /// Used as the dark extreme of the hand-wah crossfade.
-fn harmonica_wave_muffled(freq: f32, t: f32) -> f32 {
-    (TAU * freq * t).sin()
+fn harmonica_wave_muffled(freq: f32, t: f32, phase_mod: f32) -> f32 {
+    (TAU * freq * t + phase_mod).sin()
 }
 
 fn envelope(i: usize, dur: usize) -> f32 {
@@ -177,12 +180,24 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
             let t   = i as f32 / SAMPLE_RATE as f32;
             let env = envelope(i, dur);
 
-            // ── Vibrato: pitch (frequency) fluctuation ───────────────────────
-            // Modulates the instantaneous frequency with a sine LFO, producing
-            // the characteristic pitch wobble of diaphragm/tongue vibrato.
-            let f = match n.expr {
-                Expr::Vibrato => freq * (1.0 + VIBRATO_DEPTH * (TAU * VIBRATO_RATE * t).sin()),
-                _ => freq,
+            // ── Vibrato: phase-correct pitch fluctuation ─────────────────────
+            // Naively writing sin(TAU * f_mod * t) where f_mod varies with t
+            // causes the modulation term (depth * sin(rate*t) * t) to grow
+            // without bound, making the pitch appear to rise over time.
+            //
+            // The correct approach is to integrate the instantaneous frequency:
+            //   f(t) = freq * (1 + depth * sin(TAU * rate * t))
+            //   φ(t) = TAU * freq * t  +  freq*depth/rate * (1 - cos(TAU*rate*t))
+            //
+            // The second term is the bounded phase deviation Δφ(t); it
+            // oscillates symmetrically between 0 and 2*freq*depth/rate, so the
+            // pitch wobbles evenly above and below the base frequency.
+            let phase_mod = match n.expr {
+                Expr::Vibrato => {
+                    freq * VIBRATO_DEPTH / VIBRATO_RATE
+                        * (1.0 - (TAU * VIBRATO_RATE * t).cos())
+                }
+                _ => 0.0,
             };
 
             // ── Hand Wah: amplitude + tone-color modulation ──────────────────
@@ -193,13 +208,13 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
             // full bright harmonic stack as the hands open.
             let (tone, amp_mod) = if n.expr == Expr::Wah {
                 let wah_open = ((TAU * WAH_RATE * t).sin() + 1.0) * 0.5;
-                let bright   = harmonica_wave(f, t);
-                let muffled  = harmonica_wave_muffled(f, t);
+                let bright   = harmonica_wave(freq, t, 0.0);
+                let muffled  = harmonica_wave_muffled(freq, t, 0.0);
                 let blended  = muffled + wah_open * (bright - muffled);
                 let amp      = WAH_AMP_CLOSED + (1.0 - WAH_AMP_CLOSED) * wah_open;
                 (blended, amp)
             } else {
-                (harmonica_wave(f, t), 1.0)
+                (harmonica_wave(freq, t, phase_mod), 1.0)
             };
 
             // ── Breath noise ─────────────────────────────────────────────────
