@@ -17,9 +17,9 @@ use super::dialogs::button;
 
 mod calibration;
 mod credits;
-mod editor_note_material;
 mod options;
-mod song_editor_2;
+mod song_editor;
+
 
 mod theme_picker;
 
@@ -115,7 +115,7 @@ impl Plugin for MenuPlugin {
             .add_plugins(options::OptionsPlugin)
             .add_plugins(calibration::CalibrationPlugin)
             .add_plugins(credits::CreditsPlugin)
-            .add_plugins(song_editor_2::SongEditor2Plugin)
+            .add_plugins(song_editor::SongEditor2Plugin)
             .add_plugins(theme_picker::ThemePickerPlugin)
             .add_systems(OnEnter(AppState::Menu), route_menu_entry)
             // Each page manages its own lifetime.
