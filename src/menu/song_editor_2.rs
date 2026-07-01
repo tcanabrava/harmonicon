@@ -1682,10 +1682,32 @@ fn note_freq(note: &GridNote, key_offset: i32) -> Option<f32> {
     Some(440.0 * 2f32.powf((midi + semitones - 69.0) / 12.0))
 }
 
-/// A short attack/release envelope (in samples) so notes don't click on/off.
+/// Harmonica reed waveform: additive synthesis with the first six harmonics at
+/// amplitudes approximating a measured diatonic harmonica spectrum. Both even and
+/// odd harmonics are present (unlike a clarinet), with a roll-off toward high
+/// partials. Output is normalised to [-1, 1] by dividing by the sum of amplitudes.
+fn harmonica_wave(freq: f32, t: f32) -> f32 {
+    const PARTIALS: [(f32, f32); 6] = [
+        (1.0, 1.00),
+        (2.0, 0.50),
+        (3.0, 0.35),
+        (4.0, 0.18),
+        (5.0, 0.10),
+        (6.0, 0.05),
+    ];
+    const SUM: f32 = 1.00 + 0.50 + 0.35 + 0.18 + 0.10 + 0.05; // 2.18
+    let mut s = 0.0f32;
+    for (k, amp) in PARTIALS {
+        s += amp * (TAU * freq * k * t).sin();
+    }
+    s / SUM
+}
+
+/// AHDSR envelope shaped for a harmonica reed: slightly slower attack than a
+/// pure click-free ramp, a brief hold at peak, and a natural release tail.
 fn envelope(i: usize, dur: usize) -> f32 {
-    let attack = (SAMPLE_RATE as f32 * 0.005) as usize; // 5 ms
-    let release = (SAMPLE_RATE as f32 * 0.030) as usize; // 30 ms
+    let attack  = (SAMPLE_RATE as f32 * 0.018) as usize; // 18 ms reed pressure build-up
+    let release = (SAMPLE_RATE as f32 * 0.045) as usize; // 45 ms natural decay
     let atk = if attack > 0 && i < attack { i as f32 / attack as f32 } else { 1.0 };
     let rel = if dur > release && i > dur - release {
         (dur - i) as f32 / release as f32
@@ -1695,9 +1717,10 @@ fn envelope(i: usize, dur: usize) -> f32 {
     atk.min(rel).clamp(0.0, 1.0)
 }
 
-/// Synthesise the notes to mono f32 PCM at [`SAMPLE_RATE`]. Each note is a sine at
-/// its pitch with a click-free envelope; Vibrato adds a small pitch wobble and Wah
-/// an amplitude pulse. The mix is peak-normalised so stacked notes don't clip.
+/// Synthesise the notes to mono f32 PCM at [`SAMPLE_RATE`]. Each note uses a
+/// six-harmonic reed model with a breath-noise layer (audible on the attack) that
+/// gives the characteristic "chiff" of a real harmonica. Vibrato modulates pitch;
+/// Wah modulates amplitude. The mix is peak-normalised so stacked notes don't clip.
 fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f32> {
     let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
     let end_tick = notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
@@ -1708,21 +1731,44 @@ fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f32> {
         let Some(freq) = note_freq(n, key_offset) else { continue };
         let start = (n.tick as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
         let dur = (n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
+        // Per-note LCG seeded by hole so simultaneous notes have uncorrelated noise.
+        let mut rng: u32 = 0x9e3779b9u32
+            .wrapping_add((n.hole as u32).wrapping_mul(2654435761))
+            .wrapping_add((n.tick as u32).wrapping_mul(1013904223));
         for i in 0..dur {
             let s = start + i;
             if s >= buf.len() {
                 break;
             }
             let t = i as f32 / SAMPLE_RATE as f32;
+            let env = envelope(i, dur);
+
             let f = match n.expr {
                 Expr::Vibrato => freq * (1.0 + 0.012 * (TAU * 5.5 * t).sin()),
                 _ => freq,
             };
-            let amp = match n.expr {
+            let amp_mod = match n.expr {
                 Expr::Wah => 0.55 + 0.45 * (TAU * 4.0 * t).sin().abs(),
                 _ => 1.0,
             };
-            buf[s] += 0.22 * envelope(i, dur) * amp * (TAU * f * t).sin();
+
+            // Reed tone: six harmonics
+            let tone = harmonica_wave(f, t);
+
+            // Breath noise: band-limited hiss strongest at attack, fades to ~5%
+            rng = rng.wrapping_mul(1664525).wrapping_add(1013904223);
+            let noise_sample = (rng as i32) as f32 / i32::MAX as f32;
+            // Noise decays exponentially after the attack window so only the
+            // initial "chiff" is audible, not a sustained hiss.
+            let attack_samples = (SAMPLE_RATE as f32 * 0.018) as usize;
+            let noise_env = if i < attack_samples {
+                1.0
+            } else {
+                (-3.0 * (i - attack_samples) as f32 / SAMPLE_RATE as f32).exp()
+            };
+            let breath = noise_sample * 0.07 * noise_env;
+
+            buf[s] += 0.25 * env * amp_mod * (tone + breath);
         }
     }
 
