@@ -38,6 +38,7 @@ back = ← Back
 
 # Song Editor 2 — transport & mod-panel buttons
 editor-play = ▶ Play
+editor-pause = ⏸ Pause
 editor-stop = ■ Stop
 editor-practice = 🎤 Practice
 editor-save = 💾 Save

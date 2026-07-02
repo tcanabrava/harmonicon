@@ -160,6 +160,10 @@ impl Plugin for GameplayPlugin {
         // click/hover behaviour as inline on(...) observers (see results::setup).
         .add_systems(OnEnter(AppState::Results), results::setup)
         .add_systems(OnExit(AppState::Results), results::cleanup)
+        .add_systems(
+            Update,
+            results::handle_escape.run_if(in_state(AppState::Results)),
+        )
         // 2D update chain
         .add_systems(
             Update,

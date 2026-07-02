@@ -131,6 +131,7 @@ pub(super) fn start_practice(
 
     *playhead = Playhead {
         playing:      true,
+        paused:       false,
         elapsed:      0.0,
         total:        end_tick as f32 * secs_per_tick,
         secs_per_tick,
@@ -166,6 +167,7 @@ pub(super) fn stop_practice(
         commands.entity(e).despawn();
     }
     playhead.playing = false;
+    playhead.paused = false;
     practice.reset();
 }
 

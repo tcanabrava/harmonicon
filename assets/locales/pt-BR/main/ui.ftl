@@ -36,6 +36,7 @@ back = ← Voltar
 
 # Editor de Músicas 2 — botões de transporte e painel de modificadores
 editor-play = ▶ Tocar
+editor-pause = ⏸ Pausar
 editor-stop = ■ Parar
 editor-practice = 🎤 Praticar
 editor-save = 💾 Salvar

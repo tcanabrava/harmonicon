@@ -100,6 +100,11 @@ pub(super) struct EditorProgressFill;
 #[derive(Resource, Default)]
 pub(super) struct Playhead {
     pub(super) playing: bool,
+    /// True while playback/practice is frozen mid-song by the Pause button.
+    /// Left orthogonal to `playing` (which stays `true` throughout a pause) so
+    /// the playhead line's existing `!playing` visibility check keeps showing
+    /// it, just not advancing — see `update_playhead_view`.
+    pub(super) paused: bool,
     pub(super) elapsed: f32,
     pub(super) total: f32,
     pub(super) secs_per_tick: f32,
@@ -299,6 +304,7 @@ pub(super) fn start_playback(
         let end_tick = state.notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
         *playhead = Playhead {
             playing: true,
+            paused: false,
             elapsed: 0.0,
             total: end_tick as f32 * secs_per_tick,
             secs_per_tick,
@@ -324,10 +330,29 @@ pub(super) fn start_playback(
 // ── Systems ──────────────────────────────────────────────────────────────────
 
 pub(super) fn advance_playhead(time: Res<Time>, mut playhead: ResMut<Playhead>) {
-    if playhead.playing {
+    if playhead.playing && !playhead.paused {
         playhead.elapsed += time.delta_secs();
         if playhead.elapsed >= playhead.total {
             playhead.playing = false;
+        }
+    }
+}
+
+/// Toggles pause on the currently running playback/practice: pauses/resumes
+/// every editor audio sink and freezes/unfreezes the playhead timer. The
+/// playhead line stays visible while paused — only `paused` changes, not
+/// `playing` (see the doc comment on [`Playhead::paused`]). A no-op if
+/// nothing is currently playing.
+pub(super) fn toggle_pause(playhead: &mut Playhead, sinks: &Query<&AudioSink, With<EditorAudio>>) {
+    if !playhead.playing {
+        return;
+    }
+    playhead.paused = !playhead.paused;
+    for sink in sinks {
+        if playhead.paused {
+            sink.pause();
+        } else {
+            sink.play();
         }
     }
 }

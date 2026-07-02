@@ -7,12 +7,11 @@ use bevy::prelude::*;
 
 use crate::dialogs::file_dialog::FileDialog;
 use crate::theme::LoadedTheme;
-use super::{BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
+use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use super::state::{
     DragKind, Dir, EditorState, Expr, GridNote, Pitch, Scroll,
     enforce_direction, max_bend, note_rect, overblow_ok, overdraw_ok,
 };
-use super::AppState;
 use super::playback::Playhead;
 use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
 
@@ -49,36 +48,6 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         expr: Expr::None,
     });
     state.selected = Some(id);
-}
-
-pub(super) fn keyboard_input_system(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut state: ResMut<EditorState>,
-    mut next: ResMut<NextState<AppState>>,
-) {
-    if keyboard_input.just_pressed(KeyCode::Delete) {
-        delete_selected(&mut state);
-        return;
-    }
-    if keyboard_input.just_pressed(KeyCode::Backspace) {
-        if let Some(id) = state.selected {
-            state.notes.retain(|n| n.id != id);
-            state.selected = None;
-            state.focus = None;
-            state.dragging = None;
-            return;
-        }
-    }
-    if keyboard_input.just_pressed(KeyCode::Escape) {
-        if let Some(id) = state.selected {
-            state.selected = None;
-            state.focus = None;
-            state.dragging = None;
-            return;
-        }
-
-        next.set(AppState::Menu);
-    }
 }
 
 pub(super) fn delete_selected(state: &mut EditorState) {
@@ -138,13 +107,26 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
 
 // ── Keyboard / scroll systems ─────────────────────────────────────────────────
 
-pub(super) fn grid_keys(keyboard: Res<ButtonInput<KeyCode>>, mut state: ResMut<EditorState>) {
+/// Escape first deselects the current note (if any); pressed again with
+/// nothing selected, it leaves the editor for the menu — same "back" rule
+/// every other screen follows. Suppressed while a save/load dialog is open,
+/// since that dialog handles its own Escape (closes itself).
+pub(super) fn grid_keys(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<EditorState>,
+    file_dialog: Res<FileDialog>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
     if state.focus.is_some() { return; }
     if keyboard.just_pressed(KeyCode::Delete) || keyboard.just_pressed(KeyCode::Backspace) {
         delete_selected(&mut state);
     }
-    if keyboard.just_pressed(KeyCode::Escape) {
-        state.selected = None;
+    if keyboard.just_pressed(KeyCode::Escape) && !file_dialog.open {
+        if state.selected.is_some() {
+            state.selected = None;
+        } else {
+            next_state.set(AppState::Menu);
+        }
     }
 }
 

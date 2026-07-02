@@ -16,7 +16,7 @@ use super::{
     SAVE_PURPOSE, LOAD_PURPOSE, MUSIC_PURPOSE,
 };
 use super::state::{EditorState, Scroll, Field, FIELDS, HARP_KEYS};
-use super::playback::{Playhead, EditorAudio, EditorProgressFill, PlayheadLine, start_playback};
+use super::playback::{Playhead, EditorAudio, EditorProgressFill, PlayheadLine, start_playback, toggle_pause};
 use super::harpchart::safe_path_segment;
 use super::interaction::apply_modifier;
 use super::practice::{start_practice, stop_practice, PracticeState};
@@ -361,6 +361,16 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands, loc: &Localization) {
          mut commands: Commands| {
             practice.reset(); // exit practice mode before starting preview playback
             start_playback(&state, &mut sources, &settings, &playing, &mut playhead, &mut commands);
+        },
+    );
+    transport_button(
+        panel,
+        loc.msg("editor-pause"),
+        Color::srgb(0.36, 0.32, 0.16),
+        |_: On<Pointer<Click>>,
+         mut playhead: ResMut<Playhead>,
+         sinks: Query<&AudioSink, With<EditorAudio>>| {
+            toggle_pause(&mut playhead, &sinks);
         },
     );
     transport_button(
