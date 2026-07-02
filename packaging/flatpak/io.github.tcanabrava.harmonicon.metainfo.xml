@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.tcanabrava.Harmonicon</id>
+  <id>io.github.tcanabrava.harmonicon</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
 
@@ -23,7 +23,7 @@
     </ul>
   </description>
 
-  <launchable type="desktop-id">io.github.tcanabrava.Harmonicon.desktop</launchable>
+  <launchable type="desktop-id">io.github.tcanabrava.harmonicon.desktop</launchable>
 
   <categories>
     <category>Game</category>
@@ -32,9 +32,12 @@
 
   <content_rating type="oars-1.1" />
 
-  <developer_name>Tomaz Canabrava</developer_name>
-  <url type="homepage">https://github.com/tcanabrava/orin</url>
-  <url type="bugtracker">https://github.com/tcanabrava/orin/issues</url>
+  <developer>
+    <name>Tomaz Canabrava</name>
+  </developer>
+
+  <url type="homepage">https://github.com/tcanabrava/harmonicon</url>
+  <url type="bugtracker">https://github.com/tcanabrava/harmonicon/issues</url>
 
   <requires>
     <display_length compare="ge">768</display_length>

@@ -76,7 +76,7 @@ Then in the manifest:
 
 ## Notes / caveats
 
-- **App ID vs. repo name.** The GitHub repo is `tcanabrava/orin`, but the app is
+- **App ID vs. repo name.** The GitHub repo is `tcanabrava/harmonicon`, but the app is
   `Harmonicon`, so the ID here is `io.github.tcanabrava.Harmonicon`. Flathub
   requires the `io.github.<user>.<Repo>` ID to match the hosting repo, so a
   Flathub submission would need the ID to track the actual repo name (or the repo
