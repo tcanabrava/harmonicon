@@ -290,7 +290,7 @@ pub(super) fn spawn_note(
             let mode = if note.expr == Expr::Vibrato { 0.0 } else { 1.0 };
             let mat = note_mats.add(EditorNoteMaterial {
                 color: pitch_color(note.pitch).to_linear(),
-                params: Vec4::new(mode, 0.0, 0.0, 0.0),
+                params: Vec4::new(mode, width, 0.0, 0.0),
             });
             commands.entity(root).insert(MaterialNode(mat));
         }

@@ -4,10 +4,12 @@ use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
+use bevy::ui_render::prelude::MaterialNode;
 
 use crate::dialogs::file_dialog::FileDialog;
 use crate::theme::LoadedTheme;
 use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
+use super::material::EditorNoteMaterial;
 use super::state::{
     DragKind, Dir, EditorState, Expr, GridNote, Pitch, Scroll,
     enforce_direction, max_bend, note_rect, overblow_ok, overdraw_ok,
@@ -217,15 +219,26 @@ pub(super) fn auto_scroll(
 
 // ── Resize live-update ────────────────────────────────────────────────────────
 
-pub(super) fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, &mut Node)>) {
+/// Live width/position during a resize drag. Also nudges the vibrato/wah
+/// material's width uniform so the wave pattern's rhythm updates as-you-drag
+/// instead of only snapping correct once `rebuild_grid` runs after release.
+pub(super) fn live_resize(
+    state: Res<EditorState>,
+    mut notes: Query<(&NoteView, &mut Node, Option<&MaterialNode<EditorNoteMaterial>>)>,
+    mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
+) {
     let Some(drag) = state.dragging else { return };
     if !matches!(drag.kind, DragKind::Resize(_)) { return; }
     let Some(note) = state.note_by_id(drag.id) else { return };
     let (left, _top, width, _height) = note_rect(note);
-    for (view, mut node) in &mut notes {
+    for (view, mut node, mat) in &mut notes {
         if view.0 == drag.id {
             node.left = Val::Px(left);
             node.width = Val::Px(width);
+            if let Some(handle) = mat
+                && let Some(mut m) = note_mats.get_mut(&handle.0) {
+                    m.params.y = width;
+                }
         }
     }
 }

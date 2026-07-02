@@ -8,6 +8,10 @@
 // uv.y = 0 is the top, 1 is the bottom (across the note's height).
 //
 // params.x = mode:  0 = vibrato (sine wave ribbon),  1 = wah (thick/thin band)
+// params.y = the note's rendered width in pixels. `cycles` is derived from
+// this and a fixed per-mode wavelength (px per wave cycle) rather than being
+// a constant — so resizing a note repeats or truncates the pattern at a
+// steady rhythm instead of stretching/squeezing a fixed number of waves.
 
 #import bevy_ui::ui_vertex_output::UiVertexOutput
 
@@ -15,17 +19,20 @@
 @group(1) @binding(1) var<uniform> params: vec4<f32>;
 
 const TAU: f32 = 6.2831853;
+const VIBRATO_WAVELENGTH_PX: f32 = 18.0;
+const WAH_WAVELENGTH_PX: f32 = 16.0;
 
 @fragment
 fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
-    let uv  = in.uv;
-    let mode = params.x;
+    let uv       = in.uv;
+    let mode     = params.x;
+    let width_px = max(params.y, 1.0);
 
     if (mode < 0.5) {
         // Vibrato: a sine-wave ribbon running horizontally (~~~~~).
         // The wave rises and dips in Y as the eye travels left to right in X.
-        let amp    = 0.28;
-        let cycles = 3.0 + uv.x * 0.5;   // slight stretch toward the right
+        let amp    = 0.25;
+        let cycles = (width_px * 2) / VIBRATO_WAVELENGTH_PX;
         let center = 0.5 + amp * sin(uv.x * cycles * TAU);
 
         let dist      = abs(uv.y - center);
@@ -40,7 +47,7 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     // Wah: alternating thick/thin band running horizontally (OoOoOo).
     // The vertical extent at each X position oscillates between wide (O) and
     // narrow (o), producing a string of lens-shaped bulges and pinch points.
-    let cycles = 3.5;
+    let cycles = (width_px) / (WAH_WAVELENGTH_PX * 3.0);
     let bulge  = abs(sin(uv.x * cycles * TAU));  // 1 at O, 0 at o
     let half_h = 0.10 + 0.35 * bulge;
 

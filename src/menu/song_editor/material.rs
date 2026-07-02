@@ -12,7 +12,11 @@ use bevy::ui_render::prelude::{UiMaterial, UiMaterialPlugin};
 pub(super) struct EditorNoteMaterial {
     #[uniform(0)]
     pub(super) color: LinearRgba,
-    /// x = mode (0 = vibrato, 1 = wah), y/z/w unused.
+    /// x = mode (0 = vibrato, 1 = wah). y = the note's rendered width in
+    /// pixels, so the shader can derive a constant wavelength (px per wave
+    /// cycle) instead of stretching a fixed cycle count across the note —
+    /// resizing the note then repeats/truncates the pattern rather than
+    /// squeezing or stretching it. z/w unused.
     #[uniform(1)]
     pub(super) params: Vec4,
 }
