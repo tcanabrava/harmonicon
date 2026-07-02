@@ -83,6 +83,7 @@ impl Plugin for SongEditor2Plugin {
                         interaction::pan_keys,
                         interaction::pan_wheel,
                         interaction::apply_scroll,
+                        ui::rebuild_grid_on_resize,
                         grid::rebuild_grid
                             .run_if(resource_exists_and_changed::<state::EditorState>),
                     )

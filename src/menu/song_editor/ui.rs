@@ -4,6 +4,7 @@ use bevy::audio::AudioSource;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy::window::WindowResized;
 
 use bevy_fluent::prelude::Localization;
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
@@ -77,6 +78,19 @@ pub(super) fn init_state(mut commands: Commands, existing: Option<Res<EditorStat
 
 pub(super) fn force_grid_rebuild(mut state: ResMut<EditorState>) {
     state.set_changed();
+}
+
+/// `rebuild_grid` only runs when `EditorState` changes, but the number of
+/// visible columns depends on the window width too — without this, resizing
+/// the window would leave the grid showing its old column count until some
+/// unrelated edit happens to touch `EditorState` and trigger a rebuild.
+pub(super) fn rebuild_grid_on_resize(
+    mut resized: MessageReader<WindowResized>,
+    mut state: ResMut<EditorState>,
+) {
+    if resized.read().next().is_some() {
+        state.set_changed();
+    }
 }
 
 pub(super) fn cleanup(
