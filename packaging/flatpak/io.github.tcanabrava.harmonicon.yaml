@@ -26,6 +26,10 @@ finish-args:
   - --device=dri
   # Audio output and microphone input (pitch detection records from the mic).
   - --socket=pulseaudio
+  # Joystick/gamepad input (bevy_gilrs) — planned screen navigation. Without
+  # this, gilrs can't reach /dev/input to enumerate controllers and logs an
+  # error at startup (harmless today, but blocks the feature once it's built).
+  - --device=input
   # User-added songs and themes: dropped into ~/Harmonicon, read as an extra
   # asset root alongside the bundled ones (see the "external" AssetSource in
   # main.rs). Scoped to this one subfolder, not the whole home directory.
