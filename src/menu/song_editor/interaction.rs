@@ -12,6 +12,7 @@ use super::state::{
     DragKind, Dir, EditorState, Expr, GridNote, Pitch, Scroll,
     enforce_direction, max_bend, note_rect, overblow_ok, overdraw_ok,
 };
+use super::AppState;
 use super::playback::Playhead;
 use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
 
@@ -48,6 +49,36 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         expr: Expr::None,
     });
     state.selected = Some(id);
+}
+
+pub(super) fn keyboard_input_system(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<EditorState>,
+    mut next: ResMut<NextState<AppState>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Delete) {
+        delete_selected(&mut state);
+        return;
+    }
+    if keyboard_input.just_pressed(KeyCode::Backspace) {
+        if let Some(id) = state.selected {
+            state.notes.retain(|n| n.id != id);
+            state.selected = None;
+            state.focus = None;
+            state.dragging = None;
+            return;
+        }
+    }
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        if let Some(id) = state.selected {
+            state.selected = None;
+            state.focus = None;
+            state.dragging = None;
+            return;
+        }
+
+        next.set(AppState::Menu);
+    }
 }
 
 pub(super) fn delete_selected(state: &mut EditorState) {

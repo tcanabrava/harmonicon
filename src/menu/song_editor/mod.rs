@@ -95,12 +95,14 @@ impl Plugin for SongEditor2Plugin {
                     interaction::type_into_field,
                     interaction::live_resize,
                     interaction::update_move_ghost,
+                    interaction::keyboard_input_system,
                     panel::update_mod_panel,
                     panel::update_meta_fields,
                     panel::update_status_bar,
                     harpchart::handle_save_chosen,
                     harpchart::handle_load_chosen,
                     harpchart::handle_music_chosen,
+
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             );
