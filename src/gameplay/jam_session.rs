@@ -9,6 +9,7 @@ use crate::{
     song::SongManifest,
     song::chart::Action,
     song::harmonica::{Harmonica, harp_banner, semitone, twelve_bar},
+    theme::LoadedTheme,
 };
 
 use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
@@ -31,6 +32,7 @@ pub fn setup(
     mut music_started: ResMut<MusicStarted>,
     spectrogram_style: Res<SpectrogramStyle>,
     osc_material: Res<OscMaterial>,
+    theme: Res<LoadedTheme>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Jam Session");
@@ -116,7 +118,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|grid| {
-                    spawn_12_bar_grid(grid, &chords, key, &GridConfig::for_2d());
+                    spawn_12_bar_grid(grid, &chords, key, &GridConfig::for_2d(), theme.twelve_bar_colors());
                     spawn_hole_map(grid, &holes_info);
                 });
                 left.spawn(Node {

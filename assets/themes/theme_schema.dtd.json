@@ -212,6 +212,25 @@
               "type": "string"
             }
           }
+        },
+        "twelve_bar": {
+          "description": "Chord-function colors (I/IV/V) for a 12-bar blues progression, shared by the Jam Session bar grid and the song editor's grid background.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tonic": {
+              "description": "I (tonic) — the \"home\" chord most bars sit on.",
+              "type": "string"
+            },
+            "subdominant": {
+              "description": "IV (subdominant).",
+              "type": "string"
+            },
+            "dominant": {
+              "description": "V (dominant).",
+              "type": "string"
+            }
+          }
         }
       }
     }

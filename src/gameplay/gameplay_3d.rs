@@ -11,6 +11,7 @@ use crate::{
     song::SongManifest,
     song::chart::{Action, HarpChart},
     song::harmonica::twelve_bar,
+    theme::{LoadedTheme, TwelveBarColors},
 };
 
 use super::countdown_overlay::spawn_countdown;
@@ -346,6 +347,7 @@ pub fn setup(
     mut tail_materials: ResMut<Assets<NoteTail3dMaterial>>,
     note_theme: Res<SelectedNoteTheme3d>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
+    theme: Res<LoadedTheme>,
 ) {
     let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing (3D) state");
@@ -437,6 +439,7 @@ pub fn setup(
         chart.song.tempo_bpm,
         beats_per_bar,
         shape_materials,
+        theme.twelve_bar_colors(),
     );
     spawn_song_progress(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
@@ -501,6 +504,7 @@ fn spawn_hud_overlay(
     bpm: f32,
     beats_per_bar: usize,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
+    twelve_bar_colors: TwelveBarColors,
 ) {
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     let info = format!(
@@ -578,7 +582,7 @@ fn spawn_hud_overlay(
                 ..default()
             })
             .with_children(|grid| {
-                spawn_12_bar_grid(grid, chords, key, &GridConfig::for_3d());
+                spawn_12_bar_grid(grid, chords, key, &GridConfig::for_3d(), twelve_bar_colors);
             });
 
             // Blow/draw legend

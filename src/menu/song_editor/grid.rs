@@ -12,6 +12,7 @@ use super::{
     TICK_W, TICKS_PER_BEAT, HANDLE_W,
 };
 use super::material::EditorNoteMaterial;
+use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
 use crate::localization::LocalizationExt;
 use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
@@ -24,6 +25,24 @@ use super::interaction::select_or_add;
 
 pub(super) fn visible_beats(win_w: f32) -> usize {
     (((win_w - super::HOLE_COL_W) / BEAT_W).ceil() as usize) + 1
+}
+
+/// How strongly a bar's 12-bar-blues chord-function tint (see [`bar_bg`])
+/// shows through the lane's own alternating-row color. Low enough to keep
+/// the checkerboard readable and not compete with note blocks.
+const BAR_TINT_MIX: f32 = 0.35;
+
+/// Blends `tint` into `base` by `t` (0 = pure `base`, 1 = pure `tint`),
+/// keeping `base`'s own alpha so lane cells stay fully opaque.
+pub(super) fn mix_srgba(base: Color, tint: Color, t: f32) -> Color {
+    let b = base.to_srgba();
+    let c = tint.to_srgba();
+    Color::srgba(
+        b.red + (c.red - b.red) * t,
+        b.green + (c.green - b.green) * t,
+        b.blue + (c.blue - b.blue) * t,
+        b.alpha,
+    )
 }
 
 pub(super) fn rebuild_grid(
@@ -39,6 +58,7 @@ pub(super) fn rebuild_grid(
         return;
     }
     let colors = theme.song_editor_colors();
+    let bar_colors = theme.twelve_bar_colors();
     for e in &old {
         commands.entity(e).despawn();
     }
@@ -51,6 +71,11 @@ pub(super) fn rebuild_grid(
         let beat = state.scroll_beat + col;
         let x = beat as f32 * BEAT_W;
         let is_bar = beat % BEATS_PER_BAR == 0;
+        // Tiles the standard 12-bar-blues form indefinitely as the user
+        // scrolls, so the grid reads as harmonic function (I/IV/V) even for
+        // charts longer than 12 bars.
+        let bar_index = (beat / BEATS_PER_BAR) % 12;
+        let bar_tint = bar_bg(bar_index, &state.key, bar_colors);
 
         items.push(
             commands
@@ -130,6 +155,7 @@ pub(super) fn rebuild_grid(
         for hole in 1..=ROWS {
             let y = HEADER_H + (hole as f32 - 1.0) * ROW_H;
             let lane = if hole % 2 == 0 { colors.lane_a } else { colors.lane_b };
+            let lane = mix_srgba(lane, bar_tint, BAR_TINT_MIX);
             let mut cell = commands.spawn((
                 GridItem,
                 Button,

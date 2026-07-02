@@ -120,6 +120,7 @@ mod tests {
     use super::ui::ModButton;
     use super::playback::{encode_wav, key_offset, note_freq, render_pcm, SAMPLE_RATE};
     use super::harpchart::serialize_harpchart;
+    use super::grid::mix_srgba;
     use super::{BEAT_W, ROW_H, TICK_W, TICKS_PER_BEAT};
 
     #[test]
@@ -360,5 +361,22 @@ mod tests {
 
         let single = &track[0];
         assert_eq!(single["events"][0]["note"], "B4");
+    }
+
+    #[test]
+    fn mix_srgba_interpolates_and_keeps_base_alpha() {
+        let base = bevy::prelude::Color::srgba(0.0, 0.0, 0.0, 0.5);
+        let tint = bevy::prelude::Color::srgba(1.0, 1.0, 1.0, 1.0);
+
+        let none = mix_srgba(base, tint, 0.0).to_srgba();
+        assert_eq!((none.red, none.green, none.blue), (0.0, 0.0, 0.0));
+        assert_eq!(none.alpha, 0.5, "base's own alpha is preserved, not blended");
+
+        let full = mix_srgba(base, tint, 1.0).to_srgba();
+        assert_eq!((full.red, full.green, full.blue), (1.0, 1.0, 1.0));
+        assert_eq!(full.alpha, 0.5);
+
+        let half = mix_srgba(base, tint, 0.5).to_srgba();
+        assert!((half.red - 0.5).abs() < 1e-6);
     }
 }

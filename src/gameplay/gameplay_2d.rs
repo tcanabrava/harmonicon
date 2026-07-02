@@ -34,6 +34,7 @@ pub fn setup(
     mut valid_notes: ResMut<ValidHarpNotes>,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
     note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
+    theme: Res<crate::theme::LoadedTheme>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
@@ -268,6 +269,7 @@ pub fn setup(
                             &chords,
                             key,
                             &GridConfig::for_2d(),
+                            theme.twelve_bar_colors(),
                         );
                     });
 

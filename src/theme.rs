@@ -83,12 +83,42 @@ struct CoordsJson {
     height: f32,
 }
 
-/// Per-theme color overrides for optional subsystems. Currently just the song
-/// editor; add further fields here as other screens grow theme support.
+/// Per-theme color overrides for optional subsystems. Add further fields here
+/// as other screens grow theme support.
 #[derive(Deserialize, Clone, Debug, Default)]
 pub struct ThemeColorsJson {
     #[serde(default)]
     pub song_editor: SongEditorColors,
+    #[serde(default)]
+    pub twelve_bar: TwelveBarColors,
+}
+
+/// Chord-function colors for a 12-bar blues progression (I / IV / V), read
+/// from a theme's `theme.json` under `"colors": { "twelve_bar": { ... } }`.
+/// Shared by the Jam Session bar grid (`gameplay::twelve_bar_blues_overlay`)
+/// and the song editor's grid background, so both reflect the same theme.
+#[derive(Deserialize, Clone, Copy, Debug)]
+#[serde(default)]
+pub struct TwelveBarColors {
+    /// I (tonic) — the "home" chord most bars sit on.
+    #[serde(deserialize_with = "hex_color")]
+    pub tonic: Color,
+    /// IV (subdominant).
+    #[serde(deserialize_with = "hex_color")]
+    pub subdominant: Color,
+    /// V (dominant).
+    #[serde(deserialize_with = "hex_color")]
+    pub dominant: Color,
+}
+
+impl Default for TwelveBarColors {
+    fn default() -> Self {
+        Self {
+            tonic: Color::srgba(0.10, 0.16, 0.26, 0.85),
+            subdominant: Color::srgba(0.10, 0.20, 0.14, 0.85),
+            dominant: Color::srgba(0.20, 0.10, 0.14, 0.85),
+        }
+    }
 }
 
 /// Parses a `"#RRGGBB"` / `"#RRGGBBAA"` string into a [`Color`]. `Color`'s own
@@ -225,6 +255,13 @@ impl LoadedTheme {
     /// if the theme's `theme.json` has no `"colors"` block at all.
     pub fn song_editor_colors(&self) -> SongEditorColors {
         self.colors.as_ref().map_or_else(SongEditorColors::default, |c| c.song_editor)
+    }
+
+    /// 12-bar-blues chord-function colors for the active theme, or
+    /// [`TwelveBarColors::default`] if the theme's `theme.json` has no
+    /// `"colors"` block at all.
+    pub fn twelve_bar_colors(&self) -> TwelveBarColors {
+        self.colors.as_ref().map_or_else(TwelveBarColors::default, |c| c.twelve_bar)
     }
 }
 

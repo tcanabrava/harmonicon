@@ -107,6 +107,11 @@
       "field_bg_focus": "#29293D",
       "ghost_ok": "#FAD933",
       "ghost_bad": "#E64033"
+    },
+    "twelve_bar": {
+      "tonic": "#1A2942D9",
+      "subdominant": "#1A3324D9",
+      "dominant": "#331A24D9"
     }
   }
 }

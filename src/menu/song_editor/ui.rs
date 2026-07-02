@@ -356,9 +356,15 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands, loc: &Localization) {
          mut sources: ResMut<Assets<AudioSource>>,
          settings: Res<AudioSettings>,
          playing: Query<Entity, With<EditorAudio>>,
+         sinks: Query<&AudioSink, With<EditorAudio>>,
          mut practice: ResMut<PracticeState>,
          mut playhead: ResMut<Playhead>,
          mut commands: Commands| {
+            // Paused, not stopped: resume in place rather than restarting.
+            if playhead.playing && playhead.paused {
+                toggle_pause(&mut playhead, &sinks);
+                return;
+            }
             practice.reset(); // exit practice mode before starting preview playback
             start_playback(&state, &mut sources, &settings, &playing, &mut playhead, &mut commands);
         },
@@ -397,7 +403,13 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands, loc: &Localization) {
          mut practice: ResMut<PracticeState>,
          mut playhead: ResMut<Playhead>,
          mut commands: Commands,
-         loc: Res<Localization>| {
+         loc: Res<Localization>,
+         sinks: Query<&AudioSink, With<EditorAudio>>| {
+            // Paused, not stopped: resume in place rather than stopping.
+            if practice.active && playhead.paused {
+                toggle_pause(&mut playhead, &sinks);
+                return;
+            }
             if practice.active {
                 stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
             } else {

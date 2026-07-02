@@ -8,6 +8,7 @@ use crate::{
         SongManifest,
         harmonica::{semitone, twelve_bar},
     },
+    theme::{LoadedTheme, TwelveBarColors},
 };
 
 use super::{GameplayClock, Paused, ScoringConfig, current_bar_index, secs_per_bar};
@@ -45,16 +46,20 @@ impl GridConfig {
     }
 }
 
-pub fn bar_bg(bar: usize, key: &str) -> Color {
+/// Background for `bar` (0-indexed) under `key`, colored by chord function
+/// (I / IV / V) using `colors` — pulled from the active theme via
+/// [`LoadedTheme::twelve_bar_colors`] so this stays consistent everywhere the
+/// 12-bar-blues progression is drawn (Jam Session grid, song editor grid).
+pub fn bar_bg(bar: usize, key: &str, colors: TwelveBarColors) -> Color {
     let iv = semitone(key, 5);
     let v = semitone(key, 7);
     let chords = twelve_bar(key);
     if chords[bar] == v {
-        Color::srgba(0.20, 0.10, 0.14, 0.85)
+        colors.dominant
     } else if chords[bar] == iv {
-        Color::srgba(0.10, 0.20, 0.14, 0.85)
+        colors.subdominant
     } else {
-        Color::srgba(0.10, 0.16, 0.26, 0.85)
+        colors.tonic
     }
 }
 
@@ -63,6 +68,7 @@ pub fn spawn_12_bar_grid(
     chords: &[String],
     key: &str,
     cfg: &GridConfig,
+    colors: TwelveBarColors,
 ) {
     for row in 0..3usize {
         parent
@@ -84,7 +90,7 @@ pub fn spawn_12_bar_grid(
                             border: UiRect::all(Val::Px(1.0)),
                             ..default()
                         },
-                        BackgroundColor(bar_bg(idx, key)),
+                        BackgroundColor(bar_bg(idx, key, colors)),
                         BorderColor::all(Color::srgb(0.25, 0.25, 0.38)),
                         BarCell(idx),
                     ))
@@ -116,6 +122,7 @@ pub fn update_bar(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     config: Res<ScoringConfig>,
+    theme: Res<LoadedTheme>,
     mut cells: Query<(&BarCell, &mut BackgroundColor)>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -125,12 +132,13 @@ pub fn update_bar(
     let spb = secs_per_bar(bpm, config.beats_per_bar);
     let current = current_bar_index(clock.0, spb);
     let key = manifest.chart.song.key.as_str();
+    let colors = theme.twelve_bar_colors();
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current {
             BackgroundColor(Color::srgba(0.75, 0.55, 0.08, 0.95))
         } else {
-            BackgroundColor(bar_bg(cell.0, key))
+            BackgroundColor(bar_bg(cell.0, key, colors))
         };
     }
 }
@@ -151,16 +159,17 @@ mod tests {
 
     #[test]
     fn bar_bg_colours_the_one_four_five_chords_distinctly() {
+        let colors = TwelveBarColors::default();
         // C 12-bar: bars are [I,I,I,I,IV,IV,I,I,V,IV,I,V] (0-indexed).
-        let i = bar_bg(0, "C"); // tonic
-        let iv = bar_bg(4, "C"); // subdominant
-        let v = bar_bg(8, "C"); // dominant
+        let i = bar_bg(0, "C", colors); // tonic
+        let iv = bar_bg(4, "C", colors); // subdominant
+        let v = bar_bg(8, "C", colors); // dominant
         assert_ne!(i, iv);
         assert_ne!(i, v);
         assert_ne!(iv, v);
         // The last bar is also the V chord, so it shares the dominant colour.
-        assert_eq!(bar_bg(11, "C"), v);
+        assert_eq!(bar_bg(11, "C", colors), v);
         // The IV bars share the subdominant colour.
-        assert_eq!(bar_bg(9, "C"), iv);
+        assert_eq!(bar_bg(9, "C", colors), iv);
     }
 }
