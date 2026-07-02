@@ -2,16 +2,18 @@
 
 use bevy::prelude::*;
 
-use super::{BTN_ACTIVE, BTN_BG, FIELD_BG, FIELD_BG_FOCUS};
+use crate::theme::LoadedTheme;
 use super::practice::PracticeState;
 use super::state::{Dir, EditorState, Expr, Field, Pitch};
 use super::ui::{BendDot, MetaFieldBox, MetaFieldText, ModButton, StatusMsg};
 
 pub(super) fn update_mod_panel(
     state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
     mut buttons: Query<(&ModButton, &mut BackgroundColor)>,
     mut dot: Query<&mut Visibility, With<BendDot>>,
 ) {
+    let colors = theme.song_editor_colors();
     let selected = state.selected_note().copied();
     for (kind, mut bg) in &mut buttons {
         let active = selected.is_some_and(|n| match kind {
@@ -24,7 +26,7 @@ pub(super) fn update_mod_panel(
             ModButton::Vibrato  => n.expr == Expr::Vibrato,
             ModButton::Delete   => false,
         });
-        bg.0 = if active { BTN_ACTIVE } else { BTN_BG };
+        bg.0 = if active { colors.btn_active } else { colors.btn_bg };
     }
     let bent = selected.is_some_and(|n| matches!(n.pitch, Pitch::Bend(_)));
     for mut vis in &mut dot {
@@ -34,9 +36,11 @@ pub(super) fn update_mod_panel(
 
 pub(super) fn update_meta_fields(
     state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
     mut texts: Query<(&MetaFieldText, &mut Text)>,
     mut boxes: Query<(&MetaFieldBox, &mut BackgroundColor)>,
 ) {
+    let colors = theme.song_editor_colors();
     for (tag, mut text) in &mut texts {
         **text = if tag.0 == Field::Key {
             format!("\u{2039}  {}  \u{203A}", state.key)
@@ -48,9 +52,9 @@ pub(super) fn update_meta_fields(
     }
     for (tag, mut bg) in &mut boxes {
         bg.0 = if tag.0 != Field::Key && state.focus == Some(tag.0) {
-            FIELD_BG_FOCUS
+            colors.field_bg_focus
         } else {
-            FIELD_BG
+            colors.field_bg
         };
     }
 }

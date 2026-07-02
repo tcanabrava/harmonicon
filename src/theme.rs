@@ -83,29 +83,74 @@ struct CoordsJson {
     height: f32,
 }
 
+/// Per-theme color overrides for optional subsystems. Currently just the song
+/// editor; add further fields here as other screens grow theme support.
 #[derive(Deserialize, Clone, Debug, Default)]
-struct ThemeColorsJson {
-    pub song_editor: SongEditor,
+pub struct ThemeColorsJson {
+    #[serde(default)]
+    pub song_editor: SongEditorColors,
 }
 
-#[derive(Deserialize, Clone, Debug)]
-struct SongEditor {
+/// Parses a `"#RRGGBB"` / `"#RRGGBBAA"` string into a [`Color`]. `Color`'s own
+/// derived `Deserialize` only accepts its verbose tagged-enum form (e.g.
+/// `{"Srgba":{"red":0.06,"green":0.06,"blue":0.09,"alpha":1.0}}`), which is
+/// unusable for hand-authored theme JSON — this is what lets theme.json write
+/// plain hex strings instead, matching `theme_schema.dtd.json`.
+fn hex_color<'de, D>(deserializer: D) -> Result<Color, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    bevy::color::Srgba::hex(&s)
+        .map(Color::from)
+        .map_err(serde::de::Error::custom)
+}
+
+/// Colors for the song editor grid/panel, read from a theme's `theme.json`
+/// under `"colors": { "song_editor": { ... } }`. The struct-level
+/// `#[serde(default)]` means a theme can override just a few fields (e.g.
+/// only `"accent"`) and every other field falls back to
+/// [`SongEditorColors::default`] — the editor's original hardcoded palette.
+#[derive(Deserialize, Clone, Copy, Debug)]
+#[serde(default)]
+pub struct SongEditorColors {
+    #[serde(deserialize_with = "hex_color")]
     pub editor_bg: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub hole_box: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub lane_a: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub lane_b: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub grid_line: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub bar_line: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub half_line: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub quarter_line: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub accent: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub label: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub panel_bg: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub btn_bg: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub btn_active: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub field_bg: Color,
+    #[serde(deserialize_with = "hex_color")]
     pub field_bg_focus: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub ghost_ok: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub ghost_bad: Color,
 }
 
-impl Default for SongEditor {
+impl Default for SongEditorColors {
     fn default() -> Self {
         Self {
             editor_bg: Color::srgb(0.06, 0.06, 0.09),
@@ -114,6 +159,8 @@ impl Default for SongEditor {
             lane_b: Color::srgba(0.10, 0.10, 0.14, 1.0),
             grid_line: Color::srgb(0.20, 0.20, 0.27),
             bar_line: Color::srgb(0.40, 0.40, 0.52),
+            half_line: Color::srgb(0.17, 0.17, 0.23),
+            quarter_line: Color::srgb(0.13, 0.13, 0.18),
             accent: Color::srgb(0.95, 0.80, 0.35),
             label: Color::srgb(0.75, 0.75, 0.82),
             panel_bg: Color::srgba(0.10, 0.10, 0.15, 1.0),
@@ -121,6 +168,8 @@ impl Default for SongEditor {
             btn_active: Color::srgb(0.28, 0.42, 0.30),
             field_bg: Color::srgba(0.10, 0.10, 0.14, 1.0),
             field_bg_focus: Color::srgba(0.16, 0.16, 0.24, 1.0),
+            ghost_ok: Color::srgb(0.98, 0.85, 0.20),
+            ghost_bad: Color::srgb(0.90, 0.25, 0.20),
         }
     }
 }
@@ -171,6 +220,23 @@ impl LoadedTheme {
     pub fn button_coords(&self, menu_id: &str, button_id: &str) -> Option<&ButtonCoords> {
         self.button_coords.get(menu_id)?.get(button_id)
     }
+
+    /// Song editor colors for the active theme, or [`SongEditorColors::default`]
+    /// if the theme's `theme.json` has no `"colors"` block at all.
+    pub fn song_editor_colors(&self) -> SongEditorColors {
+        self.colors.as_ref().map_or_else(SongEditorColors::default, |c| c.song_editor)
+    }
+}
+
+/// Resolves the `AssetSource` prefix for `theme_name`: empty when it exists
+/// under the bundled `assets/themes/`, or `"external://"` when it only
+/// exists under the `~/Harmonicon/themes/` drop folder. Bundled wins when a
+/// name exists in both places, matching `load_theme`'s resolution — so a
+/// theme's own preview image (loaded separately by the theme picker) comes
+/// from the same place as the rest of its assets.
+pub fn theme_source_prefix(theme_name: &str) -> &'static str {
+    let bundled = std::path::Path::new("assets/themes").join(theme_name);
+    if bundled.is_dir() { "" } else { "external://" }
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
@@ -201,12 +267,29 @@ fn load_theme(
     // Clear previous theme data so no stale entries from the old theme survive.
     *theme = LoadedTheme::default();
 
-    let json_path = format!("assets/themes/{}/theme.json", selected.0);
+    // `source_prefix` tags the asset-loading `prefix` below so images/sounds
+    // load from the same place the theme.json itself came from.
+    let source_prefix = theme_source_prefix(&selected.0);
+    let json_path: std::path::PathBuf = if source_prefix.is_empty() {
+        format!("assets/themes/{}/theme.json", selected.0).into()
+    } else {
+        match dirs::home_dir() {
+            Some(h) => h.join("Harmonicon/themes").join(&selected.0).join("theme.json"),
+            None => {
+                warn!("Could not find theme.json for '{}' in assets/themes/", selected.0);
+                return;
+            }
+        }
+    };
+    if !json_path.exists() {
+        warn!("Could not find theme.json for '{}' in assets/themes/ or ~/Harmonicon/themes/", selected.0);
+        return;
+    }
 
     let text = match std::fs::read_to_string(&json_path) {
         Ok(t) => t,
         Err(e) => {
-            warn!("Could not read {json_path}: {e}");
+            warn!("Could not read {}: {e}", json_path.display());
             return;
         }
     };
@@ -214,12 +297,14 @@ fn load_theme(
     let data: ThemeJson = match serde_json::from_str(&text) {
         Ok(d) => d,
         Err(e) => {
-            error!("Failed to parse {json_path}: {e}");
+            error!("Failed to parse {}: {e}", json_path.display());
             return;
         }
     };
 
-    let prefix = format!("themes/{}/", selected.0);
+    theme.colors = Some(data.colors.clone());
+
+    let prefix = format!("{source_prefix}themes/{}/", selected.0);
 
     if !data.default_background.image.is_empty() {
         theme.default_background = Some(
@@ -267,7 +352,7 @@ fn load_theme(
 
     theme.has_shaders = data.default_menu_button.button_shaders.is_some();
 
-    info!("Loaded theme '{}' from {json_path}", data.name);
+    info!("Loaded theme '{}' from {}", data.name, json_path.display());
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -275,6 +360,40 @@ fn load_theme(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Song editor colors ──────────────────────────────────────────────────
+
+    #[test]
+    fn song_editor_colors_parse_from_hex_strings() {
+        let json = r##"{
+            "editor_bg": "#0F0F17",
+            "accent": "#F2CC59FF"
+        }"##;
+        let colors: SongEditorColors = serde_json::from_str(json).unwrap();
+        assert_eq!(colors.editor_bg, Color::srgb_u8(0x0F, 0x0F, 0x17));
+        assert_eq!(colors.accent, Color::srgb_u8(0xF2, 0xCC, 0x59));
+        // Fields not present in the JSON fall back to the hardcoded defaults.
+        assert_eq!(colors.hole_box, SongEditorColors::default().hole_box);
+    }
+
+    #[test]
+    fn shipped_theme_jsons_with_colors_block_parse_end_to_end() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/themes");
+        for name in ["default", "BluesNoir"] {
+            let path = root.join(name).join("theme.json");
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{path:?}: {e}"));
+            let data: ThemeJson = serde_json::from_str(&text)
+                .unwrap_or_else(|e| panic!("{path:?} failed to parse: {e}"));
+            // Both shipped themes ship an explicit song_editor colors block;
+            // confirm it actually deserialized rather than silently defaulting.
+            assert_ne!(
+                data.colors.song_editor.editor_bg,
+                Color::NONE,
+                "{path:?}: editor_bg should be a real color",
+            );
+        }
+    }
 
     // ── JSON parsing ──────────────────────────────────────────────────────
 

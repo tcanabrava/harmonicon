@@ -46,7 +46,7 @@ pub fn setup(
     // the head's `bsn!` scene loads it. The image frees when the note entities
     // despawn on leaving the song.
     let head_image: AssetPath<'static> = match &manifest.assets_2d {
-        Some(path) => path.clone().into(),
+        Some(path) => path.clone(),
         None => format!("notes/2d/{}.png", note_theme.0).into(),
     };
 

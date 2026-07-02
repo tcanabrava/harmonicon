@@ -9,10 +9,10 @@ use bevy_fluent::prelude::Localization;
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::localization::{LocalizationExt, LocalizedStr};
 use crate::settings::AudioSettings;
+use crate::theme::{LoadedTheme, SongEditorColors};
 use super::{
     AppState, grid_height,
     HOLE_COL_W, HEADER_H, ROW_H, BEAT_W, ROWS, NOTE_PAD,
-    EDITOR_BG, HOLE_BOX, LABEL, PANEL_BG, BTN_BG, FIELD_BG, GHOST_OK,
     SAVE_PURPOSE, LOAD_PURPOSE, MUSIC_PURPOSE,
 };
 use super::state::{EditorState, Scroll, Field, FIELDS, HARP_KEYS};
@@ -94,7 +94,8 @@ pub(super) fn cleanup(
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
-pub(super) fn setup(mut commands: Commands, loc: Res<Localization>) {
+pub(super) fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<LoadedTheme>) {
+    let colors = theme.song_editor_colors();
     commands
         .spawn((
             EditorRoot,
@@ -104,7 +105,7 @@ pub(super) fn setup(mut commands: Commands, loc: Res<Localization>) {
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
-            BackgroundColor(EDITOR_BG),
+            BackgroundColor(colors.editor_bg),
         ))
         .with_children(|root| {
             root.spawn((
@@ -131,7 +132,7 @@ pub(super) fn setup(mut commands: Commands, loc: Res<Localization>) {
                 ..default()
             })
             .with_children(|row| {
-                spawn_hole_column(row);
+                spawn_hole_column(row, colors);
                 row.spawn((
                     GridArea,
                     Node {
@@ -163,8 +164,8 @@ pub(super) fn setup(mut commands: Commands, loc: Res<Localization>) {
                                 border: UiRect::all(Val::Px(2.0)),
                                 ..default()
                             },
-                            BackgroundColor(GHOST_OK.with_alpha(0.30)),
-                            BorderColor::all(GHOST_OK),
+                            BackgroundColor(colors.ghost_ok.with_alpha(0.30)),
+                            BorderColor::all(colors.ghost_ok),
                             Visibility::Hidden,
                             Pickable::IGNORE,
                         ));
@@ -186,8 +187,8 @@ pub(super) fn setup(mut commands: Commands, loc: Res<Localization>) {
                 });
             });
 
-            spawn_mod_panel(root, &loc);
-            spawn_meta_form(root, &loc);
+            spawn_mod_panel(root, &loc, colors);
+            spawn_meta_form(root, &loc, colors);
 
             root.spawn((
                 StatusMsg,
@@ -203,7 +204,7 @@ pub(super) fn setup(mut commands: Commands, loc: Res<Localization>) {
         });
 }
 
-fn spawn_hole_column(row: &mut ChildSpawnerCommands) {
+fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors) {
     row.spawn(Node {
         width: Val::Px(HOLE_COL_W),
         height: Val::Px(grid_height()),
@@ -231,7 +232,7 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands) {
                 r.spawn((
                     Text::new(format!("{hole:02}")),
                     TextFont { font_size: FontSize::Px(13.0), ..default() },
-                    TextColor(LABEL),
+                    TextColor(colors.label),
                 ));
                 r.spawn((
                     Node {
@@ -240,7 +241,7 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands) {
                         border: UiRect::all(Val::Px(1.5)),
                         ..default()
                     },
-                    BackgroundColor(HOLE_BOX),
+                    BackgroundColor(colors.hole_box),
                     BorderColor::all(Color::srgb(0.45, 0.45, 0.55)),
                 ));
             });
@@ -248,7 +249,7 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands) {
     });
 }
 
-fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization) {
+fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     root.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -259,7 +260,7 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization) {
             padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
             ..default()
         },
-        BackgroundColor(PANEL_BG),
+        BackgroundColor(colors.panel_bg),
     ))
     .with_children(|panel| {
         transport_button(
@@ -273,20 +274,25 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization) {
         panel_separator(panel);
         spawn_transport(panel, loc);
         panel_separator(panel);
-        mod_button(panel, ModButton::Blow,     loc.msg("mod-blow"));
-        mod_button(panel, ModButton::Draw,     loc.msg("mod-draw"));
+        mod_button(panel, ModButton::Blow,     loc.msg("mod-blow"),     colors);
+        mod_button(panel, ModButton::Draw,     loc.msg("mod-draw"),     colors);
         panel_separator(panel);
-        mod_button(panel, ModButton::Bend,     loc.msg("mod-bend"));
-        mod_button(panel, ModButton::Overblow, loc.msg("mod-overblow"));
-        mod_button(panel, ModButton::Overdraw, loc.msg("mod-overdraw"));
-        mod_button(panel, ModButton::Wah,      loc.msg("mod-wah"));
-        mod_button(panel, ModButton::Vibrato,  loc.msg("mod-vibrato"));
+        mod_button(panel, ModButton::Bend,     loc.msg("mod-bend"),     colors);
+        mod_button(panel, ModButton::Overblow, loc.msg("mod-overblow"), colors);
+        mod_button(panel, ModButton::Overdraw, loc.msg("mod-overdraw"), colors);
+        mod_button(panel, ModButton::Wah,      loc.msg("mod-wah"),      colors);
+        mod_button(panel, ModButton::Vibrato,  loc.msg("mod-vibrato"),  colors);
         panel.spawn(Node { flex_grow: 1.0, ..default() });
-        mod_button(panel, ModButton::Delete,   loc.msg("mod-delete"));
+        mod_button(panel, ModButton::Delete,   loc.msg("mod-delete"),   colors);
     });
 }
 
-pub(super) fn mod_button(panel: &mut ChildSpawnerCommands, kind: ModButton, label: LocalizedStr) {
+pub(super) fn mod_button(
+    panel: &mut ChildSpawnerCommands,
+    kind: ModButton,
+    label: LocalizedStr,
+    colors: SongEditorColors,
+) {
     panel
         .spawn((
             Button,
@@ -298,7 +304,7 @@ pub(super) fn mod_button(panel: &mut ChildSpawnerCommands, kind: ModButton, labe
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(BTN_BG),
+            BackgroundColor(colors.btn_bg),
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
         ))
         .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
@@ -461,7 +467,7 @@ pub(super) fn transport_button<M: 'static>(
         });
 }
 
-fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization) {
+fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     root.spawn(Node {
         width: Val::Percent(100.0),
         flex_direction: FlexDirection::Column,
@@ -483,7 +489,7 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization) {
                     Node { width: Val::Px(150.0), ..default() },
                     Text::new(format!("{}:", loc.msg(label))),
                     TextFont { font_size: FontSize::Px(14.0), ..default() },
-                    TextColor(LABEL),
+                    TextColor(colors.label),
                 ));
 
                 let mut btn = line.spawn((
@@ -497,7 +503,7 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization) {
                         border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
-                    BackgroundColor(FIELD_BG),
+                    BackgroundColor(colors.field_bg),
                     BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
                 ));
 

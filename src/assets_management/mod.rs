@@ -183,27 +183,39 @@ fn override_default_font(mut fonts: ResMut<Assets<Font>>) {
     }
 }
 
-fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
-    let root = std::path::Path::new("assets/themes");
+/// Collects the names of subfolders under `root` that contain a `theme.json`.
+fn scan_theme_names(root: &std::path::Path) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(root) else {
-        warn!("No themes directory at assets/themes/; defaulting to \"default\"");
-        available.0.push("default".into());
-        return;
+        return Vec::new();
     };
-    for entry in entries.flatten() {
-        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            continue;
-        }
-        if !entry.path().join("theme.json").exists() {
-            continue;
-        }
-        available.0.push(entry.file_name().to_string_lossy().into_owned());
+    entries
+        .flatten()
+        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .filter(|e| e.path().join("theme.json").exists())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect()
+}
+
+// Discovers UI themes from the bundled `assets/themes/` directory, plus the
+// external `~/Harmonicon/themes/` drop folder if present (see `load_theme` in
+// `theme.rs`, which does the matching bundled-first resolution when loading).
+fn scan_ui_themes(mut available: ResMut<AvailableThemes>) {
+    let mut names = scan_theme_names(std::path::Path::new("assets/themes"));
+    if names.is_empty() {
+        warn!("No themes directory at assets/themes/; defaulting to \"default\"");
     }
-    available.0.sort_unstable();
-    if available.0.is_empty() {
-        available.0.push("default".into());
+
+    if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/themes")) {
+        names.extend(scan_theme_names(&external_root));
     }
-    info!("Found {} UI theme(s): {:?}", available.0.len(), available.0);
+
+    names.sort_unstable();
+    names.dedup();
+    if names.is_empty() {
+        names.push("default".into());
+    }
+    info!("Found {} UI theme(s): {:?}", names.len(), names);
+    available.0 = names;
 }
 
 fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
@@ -231,7 +243,15 @@ fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
     );
 }
 
-pub fn scan_artist_song(artist_dir: &DirEntry, available: &mut ResMut<AvailableSongs>) {
+/// `source_prefix` is prepended to the built `SongEntry::asset_path` so it
+/// loads from the right [`AssetSource`](bevy::asset::io::AssetSource): empty
+/// for the bundled `assets/` root, or `"external://"` for the `~/Harmonicon`
+/// drop folder registered under that source name in `main.rs`.
+pub fn scan_artist_song(
+    artist_dir: &DirEntry,
+    available: &mut ResMut<AvailableSongs>,
+    source_prefix: &str,
+) {
     let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
         return;
     };
@@ -255,18 +275,19 @@ pub fn scan_artist_song(artist_dir: &DirEntry, available: &mut ResMut<AvailableS
             .entry(artist.clone())
             .or_default()
             .push(SongEntry {
-                asset_path: format!("songs/{artist}/{name}/song/chart.harpchart"),
+                asset_path: format!("{source_prefix}songs/{artist}/{name}/song/chart.harpchart"),
                 artist: artist.clone(),
                 name,
             });
     }
 }
 
-// Scans the entire songs directory for harmonica models and songs, per artist.
-pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
-    let songs_root = std::path::Path::new("assets/songs");
+/// Walks `songs_root` (bundled `assets/songs` or the external
+/// `~/Harmonicon/songs` drop folder) and scans each artist subfolder into
+/// `available`, tagging entries with `source_prefix` so they load from the
+/// matching [`AssetSource`](bevy::asset::io::AssetSource).
+fn scan_songs_root(songs_root: &std::path::Path, source_prefix: &str, available: &mut ResMut<AvailableSongs>) {
     let Ok(artists) = std::fs::read_dir(songs_root) else {
-        warn!("No songs directory found at assets/songs/");
         return;
     };
 
@@ -274,7 +295,24 @@ pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
         if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             continue;
         }
-        scan_artist_song(&artist_dir, &mut available);
+        scan_artist_song(&artist_dir, available, source_prefix);
+    }
+}
+
+// Scans the bundled songs directory, plus the external `~/Harmonicon/songs`
+// drop folder if present, for harmonica models and songs, per artist. The
+// external folder is optional — most players won't have one — so its absence
+// is not a warning, unlike the bundled directory always shipped with the game.
+pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
+    let bundled_root = std::path::Path::new("assets/songs");
+    if bundled_root.is_dir() {
+        scan_songs_root(bundled_root, "", &mut available);
+    } else {
+        warn!("No songs directory found at assets/songs/");
+    }
+
+    if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/songs")) {
+        scan_songs_root(&external_root, "external://", &mut available);
     }
 
     let total: usize = available.0.values().map(|v| v.len()).sum();

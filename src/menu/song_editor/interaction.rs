@@ -6,7 +6,8 @@ use bevy::input::ButtonState;
 use bevy::prelude::*;
 
 use crate::dialogs::file_dialog::FileDialog;
-use super::{BEAT_W, GHOST_OK, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
+use crate::theme::LoadedTheme;
+use super::{BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use super::state::{
     DragKind, Dir, EditorState, Expr, GridNote, Pitch, Scroll,
     enforce_direction, max_bend, note_rect, overblow_ok, overdraw_ok,
@@ -218,18 +219,20 @@ pub(super) fn live_resize(state: Res<EditorState>, mut notes: Query<(&NoteView, 
 
 pub(super) fn update_move_ghost(
     state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
     mut ghost: Query<(&mut Node, &mut Visibility, &mut BackgroundColor, &mut BorderColor), With<MoveGhost>>,
 ) {
     let Ok((mut node, mut vis, mut bg, mut border)) = ghost.single_mut() else { return };
     match state.dragging {
         Some(drag) if drag.kind == DragKind::Move => {
+            let colors = theme.song_editor_colors();
             let left = drag.target_tick as f32 * TICK_W + 1.0;
             let top = HEADER_H + (drag.target_hole as f32 - 1.0) * ROW_H + NOTE_PAD;
             node.left = Val::Px(left);
             node.top = Val::Px(top);
             node.width = Val::Px(drag.start_len as f32 * TICK_W - 2.0);
             *vis = Visibility::Inherited;
-            let color = if drag.valid { GHOST_OK } else { super::GHOST_BAD };
+            let color = if drag.valid { colors.ghost_ok } else { colors.ghost_bad };
             bg.0 = color.with_alpha(0.30);
             *border = BorderColor::all(color);
         }

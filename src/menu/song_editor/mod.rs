@@ -53,24 +53,12 @@ fn grid_height() -> f32 {
 }
 
 // ── Colours ───────────────────────────────────────────────────────────────────
-
-const EDITOR_BG:      Color = Color::srgb(0.06, 0.06, 0.09);
-const HOLE_BOX:       Color = Color::srgb(0.16, 0.16, 0.22);
-const LANE_A:         Color = Color::srgba(0.12, 0.12, 0.17, 1.0);
-const LANE_B:         Color = Color::srgba(0.10, 0.10, 0.14, 1.0);
-const GRID_LINE:      Color = Color::srgb(0.20, 0.20, 0.27);
-const BAR_LINE:       Color = Color::srgb(0.40, 0.40, 0.52);
-const HALF_LINE:      Color = Color::srgb(0.17, 0.17, 0.23);
-const QUARTER_LINE:   Color = Color::srgb(0.13, 0.13, 0.18);
-const ACCENT:         Color = Color::srgb(0.95, 0.80, 0.35);
-const LABEL:          Color = Color::srgb(0.75, 0.75, 0.82);
-const PANEL_BG:       Color = Color::srgba(0.10, 0.10, 0.15, 1.0);
-const BTN_BG:         Color = Color::srgb(0.16, 0.16, 0.24);
-const BTN_ACTIVE:     Color = Color::srgb(0.28, 0.42, 0.30);
-const FIELD_BG:       Color = Color::srgba(0.10, 0.10, 0.14, 1.0);
-const FIELD_BG_FOCUS: Color = Color::srgba(0.16, 0.16, 0.24, 1.0);
-const GHOST_OK:       Color = Color::srgb(0.98, 0.85, 0.20);
-const GHOST_BAD:      Color = Color::srgb(0.90, 0.25, 0.20);
+//
+// The editor's palette lives in the active theme (`crate::theme::LoadedTheme`,
+// `theme.song_editor_colors()`) rather than as consts here, so a theme's
+// `theme.json` can override it under `"colors": { "song_editor": { ... } }`.
+// See `crate::theme::SongEditorColors` for the fields and their defaults —
+// the same values this module used to hardcode.
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
 

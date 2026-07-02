@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use bevy::asset::io::{AssetSource, AssetSourceBuilder};
 use bevy::image::ImageSamplerDescriptor;
 use bevy::prelude::*;
 use core::time::Duration;
@@ -25,6 +26,22 @@ use harmonicon::dialogs::ui_scale::{TargetScale, apply_scaling, change_scaling};
 
 fn main() {
     let mut app = App::new();
+
+    // Extra, optional asset root: songs the user drops into ~/Harmonicon are
+    // discovered alongside (not instead of) the bundled `assets/` tree, via
+    // this "external" source (e.g. `external://songs/Artist/Song/...`). Must
+    // be registered before `DefaultPlugins` — `AssetPlugin` builds registered
+    // sources when it's added, not after.
+    if let Some(home) = dirs::home_dir() {
+        let external_root = home.join("Harmonicon");
+        app.register_asset_source(
+            "external",
+            AssetSourceBuilder::new(AssetSource::get_default_reader(
+                external_root.to_string_lossy().into_owned(),
+            )),
+        );
+    }
+
     app.add_plugins(
         DefaultPlugins
             .set(WindowPlugin {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::{
-    asset::{AssetLoader, LoadContext, io::Reader},
+    asset::{AssetLoader, AssetPath, LoadContext, io::Reader},
     audio::AudioSource,
     image::Image,
     prelude::*,
@@ -73,25 +73,38 @@ impl AssetLoader for SongChartLoader {
             .unwrap_or(std::path::Path::new(""))
             .to_path_buf();
 
-        let background = load_context.load::<Image>(song_folder.join("background.png"));
-        let music = load_context.load::<AudioSource>(song_folder.join("song/music.ogg"));
-        let elements = load_context.load::<Image>(song_folder.join("elements.png"));
+        // The source this manifest itself was loaded from (bundled `assets/`,
+        // or the external `~/Harmonicon` drop folder registered as
+        // `external://`). Sibling loads below must reuse it explicitly: a bare
+        // `PathBuf`/`&str` always resolves against the *default* source, so
+        // without this, a song loaded from `external://...` would have its
+        // manifest parsed correctly but its music/images silently looked up in
+        // the bundled folder instead.
+        let source = load_context.path().source().clone_owned();
+        let sibling = |rel: std::path::PathBuf| AssetPath::from(rel).with_source(source.clone());
+
+        let background = load_context.load::<Image>(sibling(song_folder.join("background.png")));
+        let music = load_context.load::<AudioSource>(sibling(song_folder.join("song/music.ogg")));
+        let elements = load_context.load::<Image>(sibling(song_folder.join("elements.png")));
 
         // Note the song's own 2D image path if it ships one. We deliberately do
         // NOT `load()` it here: that would make it a manifest dependency, kept
         // resident for the whole song regardless of mode. gameplay_2d::setup
         // loads it on demand when entering a 2D game (and it frees on exit).
-        let png_rel = song_folder.join("2d/note_2d.png");
-        let assets_2d: Option<std::path::PathBuf> =
+        let png_rel = sibling(song_folder.join("2d/note_2d.png"));
+        let assets_2d: Option<AssetPath<'static>> =
             match load_context.read_asset_bytes(png_rel.clone()).await {
                 Ok(_) => Some(png_rel),
                 Err(_) => None,
             };
 
-        // Try to read the note layout from the song's own folder; if it has none,
-        // fall back to the default circular.json layout.
+        // Try to read the note layout from the song's own folder; if it has
+        // none, fall back to the default circular.json layout. The fallback
+        // path is a bare string with no `source`, so it always resolves
+        // against the bundled `assets/` source — shared defaults live there
+        // regardless of where the song itself came from.
         let note_2d_json = match load_context
-            .read_asset_bytes(song_folder.join("2d/note_2d.json"))
+            .read_asset_bytes(sibling(song_folder.join("2d/note_2d.json")))
             .await
         {
             Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
@@ -105,17 +118,17 @@ impl AssetLoader for SongChartLoader {
         // reasoning as 2D above). gameplay_3d::setup loads it with the
         // `#Mesh0/Primitive0` label when entering a 3D game; otherwise it falls
         // back to the selected theme's default mesh.
-        let glb_rel = song_folder.join("3d/note_3d.glb");
-        let assets_3d: Option<std::path::PathBuf> =
+        let glb_rel = sibling(song_folder.join("3d/note_3d.glb"));
+        let assets_3d: Option<AssetPath<'static>> =
             match load_context.read_asset_bytes(glb_rel.clone()).await {
                 Ok(_) => Some(glb_rel),
                 Err(_) => None,
             };
 
         // 3D note layout: the song's own json if present, else the default
-        // circular.json layout. Mirrors the 2D path above.
+        // circular.json layout (bundled source, same reasoning as 2D above).
         let note_3d_json = match load_context
-            .read_asset_bytes(song_folder.join("3d/note_3d.json"))
+            .read_asset_bytes(sibling(song_folder.join("3d/note_3d.json")))
             .await
         {
             Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),

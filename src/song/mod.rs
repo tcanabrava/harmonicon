@@ -12,7 +12,7 @@ pub use chart::HarpChart;
 pub use harmonica::Harmonica;
 pub use loader::SongChartLoader;
 
-use bevy::{audio::AudioSource, image::Image, prelude::*};
+use bevy::{asset::AssetPath, audio::AudioSource, image::Image, prelude::*};
 
 #[derive(Asset, TypePath, Debug)]
 pub struct SongManifest {
@@ -21,16 +21,18 @@ pub struct SongManifest {
     pub background: Handle<Image>,
     pub music: Handle<AudioSource>,
     pub elements: Handle<Image>,
-    /// Asset path of the song's own 2D note image, if it ships one. Stored as a
-    /// path (not a `Handle`) so the image is *not* a manifest dependency: it is
-    /// loaded lazily by `gameplay_2d::setup` only when entering a 2D game, and
-    /// freed when those note entities despawn on leaving. `None` → use the theme
-    /// default.
-    pub assets_2d: Option<PathBuf>,
+    /// Asset path of the song's own 2D note image, if it ships one. Stored as
+    /// a full [`AssetPath`] (not a `Handle`, and not a bare `PathBuf`) so the
+    /// image is *not* a manifest dependency — it is loaded lazily by
+    /// `gameplay_2d::setup` only when entering a 2D game, and freed when those
+    /// note entities despawn on leaving — while still carrying the source the
+    /// song itself was loaded from (bundled `assets/` vs. the external
+    /// `~/Harmonicon` drop folder). `None` → use the theme default.
+    pub assets_2d: Option<AssetPath<'static>>,
     pub assets_2d_config: NoteThemeConfig,
     /// Asset path of the song's own 3D note GLB, if it ships one. Lazily loaded
     /// by `gameplay_3d::setup` (with the `#Mesh0/Primitive0` label) the same way.
-    pub assets_3d: Option<PathBuf>,
+    pub assets_3d: Option<AssetPath<'static>>,
     pub assets_3d_config: NoteCube3dConfig,
 }
 

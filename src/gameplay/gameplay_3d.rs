@@ -399,7 +399,7 @@ pub fn setup(
     // theme's default. The handle lives only on the note entities, so it frees
     // when they despawn on leaving the song.
     let head_mesh: Handle<Mesh> = match &manifest.assets_3d {
-        Some(path) => asset_server.load(format!("{}#Mesh0/Primitive0", path.to_string_lossy())),
+        Some(path) => asset_server.load(path.clone().with_label("Mesh0/Primitive0")),
         None => asset_server.load(format!("notes/3d/{}.glb#Mesh0/Primitive0", note_theme.0)),
     };
     let note_cfg = manifest.assets_3d_config.clone();

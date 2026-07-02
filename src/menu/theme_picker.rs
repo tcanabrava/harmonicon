@@ -18,7 +18,7 @@ use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::assets_management::{AvailableThemes, SelectedTheme};
-use crate::theme::LoadedTheme;
+use crate::theme::{LoadedTheme, theme_source_prefix};
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
 
@@ -135,8 +135,11 @@ fn setup(
         .id();
     commands.entity(content).add_child(right);
 
-    let preview_handle: Handle<Image> =
-        asset_server.load(format!("themes/{}/preview.png", selected.0));
+    let preview_handle: Handle<Image> = asset_server.load(format!(
+        "{}themes/{}/preview.png",
+        theme_source_prefix(&selected.0),
+        selected.0
+    ));
     let preview = commands
         .spawn((
             Node {
@@ -245,8 +248,11 @@ fn update_preview(
     if !selected.is_changed() {
         return;
     }
-    let handle: Handle<Image> =
-        asset_server.load(format!("themes/{}/preview.png", selected.0));
+    let handle: Handle<Image> = asset_server.load(format!(
+        "{}themes/{}/preview.png",
+        theme_source_prefix(&selected.0),
+        selected.0
+    ));
     for mut img in &mut previews {
         img.image = handle.clone();
     }

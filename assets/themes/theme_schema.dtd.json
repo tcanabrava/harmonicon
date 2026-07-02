@@ -167,6 +167,14 @@
               "description": "",
               "type": "string"
             },
+            "half_line": {
+              "description": "",
+              "type": "string"
+            },
+            "quarter_line": {
+              "description": "",
+              "type": "string"
+            },
             "accent": {
               "description": "",
               "type": "string"
@@ -192,6 +200,14 @@
               "type": "string"
             },
             "field_bg_focus": {
+              "description": "",
+              "type": "string"
+            },
+            "ghost_ok": {
+              "description": "",
+              "type": "string"
+            },
+            "ghost_bad": {
               "description": "",
               "type": "string"
             }

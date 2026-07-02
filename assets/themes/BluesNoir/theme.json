@@ -96,13 +96,17 @@
       "lane_b": "#1A1A24",
       "grid_line": "#333345",
       "bar_line": "#666685",
+      "half_line": "#2B2B3B",
+      "quarter_line": "#21212E",
       "accent": "#F2CC59",
       "label": "#BFC0D1",
       "panel_bg": "#1A1A26",
       "btn_bg": "#29293D",
       "btn_active": "#476B4C",
       "field_bg": "#1A1A24",
-      "field_bg_focus": "#29293D"
+      "field_bg_focus": "#29293D",
+      "ghost_ok": "#FAD933",
+      "ghost_bad": "#E64033"
     }
   }
 }

@@ -7,12 +7,13 @@ use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::prelude::MaterialNode;
 
 use super::{
-    grid_height, ACCENT, BAR_LINE, BEAT_W, BEATS_PER_BAR, GRID_LINE,
-    HALF_LINE, HEADER_H, LABEL, LANE_A, LANE_B, QUARTER_LINE, ROW_H, ROWS,
+    grid_height, BEAT_W, BEATS_PER_BAR,
+    HEADER_H, ROW_H, ROWS,
     TICK_W, TICKS_PER_BEAT, HANDLE_W,
 };
 use super::material::EditorNoteMaterial;
 use crate::localization::LocalizationExt;
+use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
 use super::state::{
     can_place, enforce_direction, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
@@ -32,10 +33,12 @@ pub(super) fn rebuild_grid(
     old: Query<Entity, With<GridItem>>,
     windows: Query<&Window>,
     mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
+    theme: Res<LoadedTheme>,
 ) {
     if state.dragging.is_some() {
         return;
     }
+    let colors = theme.song_editor_colors();
     for e in &old {
         commands.entity(e).despawn();
     }
@@ -61,7 +64,7 @@ pub(super) fn rebuild_grid(
                         height: Val::Px(grid_height()),
                         ..default()
                     },
-                    BackgroundColor(if is_bar { BAR_LINE } else { GRID_LINE }),
+                    BackgroundColor(if is_bar { colors.bar_line } else { colors.grid_line }),
                     Pickable::IGNORE,
                 ))
                 .id(),
@@ -81,7 +84,7 @@ pub(super) fn rebuild_grid(
                             height: Val::Px(grid_height() - HEADER_H),
                             ..default()
                         },
-                        BackgroundColor(if is_half { HALF_LINE } else { QUARTER_LINE }),
+                        BackgroundColor(if is_half { colors.half_line } else { colors.quarter_line }),
                         Pickable::IGNORE,
                     ))
                     .id(),
@@ -101,7 +104,7 @@ pub(super) fn rebuild_grid(
                     },
                     Text::new(format!("{in_bar}")),
                     TextFont { font_size: FontSize::Px(12.0), ..default() },
-                    TextColor(if is_bar { ACCENT } else { LABEL }),
+                    TextColor(if is_bar { colors.accent } else { colors.label }),
                     Pickable::IGNORE,
                 ))
                 .id(),
@@ -126,7 +129,7 @@ pub(super) fn rebuild_grid(
 
         for hole in 1..=ROWS {
             let y = HEADER_H + (hole as f32 - 1.0) * ROW_H;
-            let lane = if hole % 2 == 0 { LANE_A } else { LANE_B };
+            let lane = if hole % 2 == 0 { colors.lane_a } else { colors.lane_b };
             let mut cell = commands.spawn((
                 GridItem,
                 Button,
@@ -164,7 +167,7 @@ pub(super) fn rebuild_grid(
     for note in &state.notes {
         if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.selected == Some(note.id);
-            items.push(spawn_note(&mut commands, *note, selected, &mut note_mats));
+            items.push(spawn_note(&mut commands, *note, selected, &mut note_mats, colors));
         }
     }
 
@@ -176,10 +179,11 @@ pub(super) fn spawn_note(
     note: GridNote,
     selected: bool,
     note_mats: &mut Assets<EditorNoteMaterial>,
+    colors: SongEditorColors,
 ) -> Entity {
     let (left, top, width, height) = note_rect(&note);
     let border = if selected { 2.0 } else { 0.0 };
-    let border_color = if selected { ACCENT } else { Color::NONE };
+    let border_color = if selected { colors.accent } else { Color::NONE };
     let id = note.id;
 
     let root = commands
