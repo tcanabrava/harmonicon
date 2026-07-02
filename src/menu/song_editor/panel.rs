@@ -64,8 +64,8 @@ pub(super) fn update_status_bar(
     // Drag messages take priority (they're ephemeral and action-specific).
     // Practice messages fill the bar while no drag is in progress.
     **text = if !state.drag_msg.is_empty() {
-        state.drag_msg.clone()
+        state.drag_msg.to_string()
     } else {
-        practice.msg.clone()
+        practice.msg.to_string()
     };
 }

@@ -117,12 +117,13 @@ pub(super) enum Field {
     Author,
 }
 
+/// Each entry pairs a [`Field`] with the localization key used for its label.
 pub(super) const FIELDS: [(Field, &str); 5] = [
-    (Field::Tempo, "Music Tempo"),
-    (Field::Key, "Harp Key"),
-    (Field::Music, "Background Music"),
-    (Field::Name, "Name"),
-    (Field::Author, "Author"),
+    (Field::Tempo, "editor-field-tempo"),
+    (Field::Key,   "editor-field-key"),
+    (Field::Music, "editor-field-music"),
+    (Field::Name,  "editor-field-name"),
+    (Field::Author,"editor-field-author"),
 ];
 
 /// All valid diatonic harp keys in chromatic order.
@@ -144,7 +145,7 @@ pub(super) struct EditorState {
     pub(super) name: String,
     pub(super) author: String,
     pub(super) focus: Option<Field>,
-    pub(super) drag_msg: String,
+    pub(super) drag_msg: crate::localization::LocalizedStr,
 }
 
 impl Default for EditorState {
@@ -161,7 +162,7 @@ impl Default for EditorState {
             name: String::new(),
             author: String::new(),
             focus: None,
-            drag_msg: String::new(),
+            drag_msg: crate::localization::LocalizedStr::default(),
         }
     }
 }
@@ -237,11 +238,13 @@ pub(super) fn pitch_compatible(pitch: Pitch, hole: u8) -> bool {
     }
 }
 
-pub(super) fn pitch_deny_reason(pitch: Pitch, _hole: u8) -> &'static str {
+/// Returns the localization key for the reason a pitch is not allowed on a hole,
+/// or `""` when the pitch is valid (callers should skip `loc.msg("")`).
+pub(super) fn pitch_deny_key(pitch: Pitch, _hole: u8) -> &'static str {
     match pitch {
-        Pitch::Bend(_) => "This hole does not support this bend depth",
-        Pitch::Overblow => "Overblow is only available on holes 1–6",
-        Pitch::Overdraw => "Overdraw is only available on holes 7–10",
+        Pitch::Bend(_) => "drag-denied-bend",
+        Pitch::Overblow => "drag-denied-overblow",
+        Pitch::Overdraw => "drag-denied-overdraw",
         Pitch::Normal => "",
     }
 }

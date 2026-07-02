@@ -5,7 +5,9 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
+use bevy_fluent::prelude::Localization;
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
+use crate::localization::{LocalizationExt, LocalizedStr};
 use crate::settings::AudioSettings;
 use super::{
     AppState, grid_height,
@@ -92,7 +94,7 @@ pub(super) fn cleanup(
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
-pub(super) fn setup(mut commands: Commands) {
+pub(super) fn setup(mut commands: Commands, loc: Res<Localization>) {
     commands
         .spawn((
             EditorRoot,
@@ -184,8 +186,8 @@ pub(super) fn setup(mut commands: Commands) {
                 });
             });
 
-            spawn_mod_panel(root);
-            spawn_meta_form(root);
+            spawn_mod_panel(root, &loc);
+            spawn_meta_form(root, &loc);
 
             root.spawn((
                 StatusMsg,
@@ -246,7 +248,7 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands) {
     });
 }
 
-fn spawn_mod_panel(root: &mut ChildSpawnerCommands) {
+fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization) {
     root.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -262,29 +264,29 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands) {
     .with_children(|panel| {
         transport_button(
             panel,
-            "\u{2190} Back",
+            loc.msg("back"),
             Color::srgb(0.22, 0.22, 0.28),
             |_: On<Pointer<Click>>, mut next: ResMut<NextState<AppState>>| {
                 next.set(AppState::Menu);
             },
         );
         panel_separator(panel);
-        spawn_transport(panel);
+        spawn_transport(panel, loc);
         panel_separator(panel);
-        mod_button(panel, ModButton::Blow, "Blow");
-        mod_button(panel, ModButton::Draw, "Draw");
+        mod_button(panel, ModButton::Blow,     loc.msg("mod-blow"));
+        mod_button(panel, ModButton::Draw,     loc.msg("mod-draw"));
         panel_separator(panel);
-        mod_button(panel, ModButton::Bend, "Bend");
-        mod_button(panel, ModButton::Overblow, "Overblow");
-        mod_button(panel, ModButton::Overdraw, "Overdraw");
-        mod_button(panel, ModButton::Wah, "Wah");
-        mod_button(panel, ModButton::Vibrato, "Vibrato");
+        mod_button(panel, ModButton::Bend,     loc.msg("mod-bend"));
+        mod_button(panel, ModButton::Overblow, loc.msg("mod-overblow"));
+        mod_button(panel, ModButton::Overdraw, loc.msg("mod-overdraw"));
+        mod_button(panel, ModButton::Wah,      loc.msg("mod-wah"));
+        mod_button(panel, ModButton::Vibrato,  loc.msg("mod-vibrato"));
         panel.spawn(Node { flex_grow: 1.0, ..default() });
-        mod_button(panel, ModButton::Delete, "Delete");
+        mod_button(panel, ModButton::Delete,   loc.msg("mod-delete"));
     });
 }
 
-pub(super) fn mod_button(panel: &mut ChildSpawnerCommands, kind: ModButton, label: &str) {
+pub(super) fn mod_button(panel: &mut ChildSpawnerCommands, kind: ModButton, label: LocalizedStr) {
     panel
         .spawn((
             Button,
@@ -304,7 +306,7 @@ pub(super) fn mod_button(panel: &mut ChildSpawnerCommands, kind: ModButton, labe
         })
         .with_children(|b| {
             b.spawn((
-                Text::new(label.to_string()),
+                Text::new(String::from(label)),
                 TextFont { font_size: FontSize::Px(14.0), ..default() },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
@@ -338,10 +340,10 @@ fn panel_separator(panel: &mut ChildSpawnerCommands) {
     ));
 }
 
-fn spawn_transport(panel: &mut ChildSpawnerCommands) {
+fn spawn_transport(panel: &mut ChildSpawnerCommands, loc: &Localization) {
     transport_button(
         panel,
-        "\u{25B6} Play",
+        loc.msg("editor-play"),
         Color::srgb(0.20, 0.40, 0.24),
         |_: On<Pointer<Click>>,
          state: Res<EditorState>,
@@ -357,7 +359,7 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
     );
     transport_button(
         panel,
-        "\u{25A0} Stop",
+        loc.msg("editor-stop"),
         Color::srgb(0.36, 0.20, 0.20),
         |_: On<Pointer<Click>>,
          playing: Query<Entity, With<EditorAudio>>,
@@ -369,7 +371,7 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
     );
     transport_button(
         panel,
-        "\u{1F3A4} Practice",
+        loc.msg("editor-practice"),
         Color::srgb(0.25, 0.18, 0.42),
         |_: On<Pointer<Click>>,
          state: Res<EditorState>,
@@ -378,23 +380,25 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
          playing: Query<Entity, With<EditorAudio>>,
          mut practice: ResMut<PracticeState>,
          mut playhead: ResMut<Playhead>,
-         mut commands: Commands| {
+         mut commands: Commands,
+         loc: Res<Localization>| {
             if practice.active {
                 stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
             } else {
                 start_practice(
                     &state, &mut sources, &settings,
-                    &playing, &mut practice, &mut playhead, &mut commands,
+                    &playing, &mut practice, &mut playhead, &mut commands, &loc,
                 );
             }
         },
     );
     transport_button(
         panel,
-        "\u{1F4BE} Save",
+        loc.msg("editor-save"),
         Color::srgb(0.18, 0.28, 0.45),
         |_: On<Pointer<Click>>,
          state: Res<EditorState>,
+         loc: Res<Localization>,
          mut open: MessageWriter<OpenFileDialog>| {
             let default_name = format!(
                 "{}.harpchart",
@@ -402,7 +406,7 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
             );
             open.write(OpenFileDialog {
                 purpose: SAVE_PURPOSE,
-                title: "Save chart".to_string(),
+                title: String::from(loc.msg("dialog-save-chart")),
                 extensions: vec!["harpchart".into()],
                 start_dir: Some(std::path::PathBuf::from("assets/songs")),
                 mode: DialogMode::Save { default_name },
@@ -411,12 +415,14 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
     );
     transport_button(
         panel,
-        "\u{1F4C2} Load",
+        loc.msg("editor-load"),
         Color::srgb(0.24, 0.30, 0.20),
-        |_: On<Pointer<Click>>, mut open: MessageWriter<OpenFileDialog>| {
+        |_: On<Pointer<Click>>,
+         loc: Res<Localization>,
+         mut open: MessageWriter<OpenFileDialog>| {
             open.write(OpenFileDialog {
                 purpose: LOAD_PURPOSE,
-                title: "Load chart".to_string(),
+                title: String::from(loc.msg("dialog-load-chart")),
                 extensions: vec!["harpchart".into()],
                 start_dir: Some(std::path::PathBuf::from("assets/songs")),
                 mode: DialogMode::Open,
@@ -427,7 +433,7 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
 
 pub(super) fn transport_button<M: 'static>(
     panel: &mut ChildSpawnerCommands,
-    label: &str,
+    label: LocalizedStr,
     bg: Color,
     on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
 ) {
@@ -447,7 +453,7 @@ pub(super) fn transport_button<M: 'static>(
         .observe(on_click)
         .with_children(|b| {
             b.spawn((
-                Text::new(label.to_string()),
+                Text::new(String::from(label)),
                 TextFont { font_size: FontSize::Px(14.0), ..default() },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
@@ -455,7 +461,7 @@ pub(super) fn transport_button<M: 'static>(
         });
 }
 
-fn spawn_meta_form(root: &mut ChildSpawnerCommands) {
+fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization) {
     root.spawn(Node {
         width: Val::Percent(100.0),
         flex_direction: FlexDirection::Column,
@@ -475,7 +481,7 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands) {
             .with_children(|line| {
                 line.spawn((
                     Node { width: Val::Px(150.0), ..default() },
-                    Text::new(format!("{label}:")),
+                    Text::new(format!("{}:", loc.msg(label))),
                     TextFont { font_size: FontSize::Px(14.0), ..default() },
                     TextColor(LABEL),
                 ));
@@ -533,10 +539,12 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands) {
                         BackgroundColor(Color::srgb(0.18, 0.24, 0.36)),
                         BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
                     ))
-                    .observe(|_: On<Pointer<Click>>, mut open: MessageWriter<OpenFileDialog>| {
+                    .observe(|_: On<Pointer<Click>>,
+                               loc: Res<Localization>,
+                               mut open: MessageWriter<OpenFileDialog>| {
                         open.write(OpenFileDialog {
                             purpose: MUSIC_PURPOSE,
-                            title: "Select background music".to_string(),
+                            title: String::from(loc.msg("dialog-select-music")),
                             extensions: vec!["ogg".into()],
                             start_dir: dirs::home_dir(),
                             mode: DialogMode::Open,
@@ -544,7 +552,7 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands) {
                     })
                     .with_children(|b| {
                         b.spawn((
-                            Text::new("\u{1F4C2} Browse"),
+                            Text::new(String::from(loc.msg("editor-browse"))),
                             TextFont { font_size: FontSize::Px(13.0), ..default() },
                             TextColor(Color::WHITE),
                             Pickable::IGNORE,

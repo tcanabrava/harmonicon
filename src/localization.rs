@@ -152,19 +152,76 @@ fn build_localization(
     commands.insert_resource(builder.build(&folder.0));
 }
 
+// ── Localized-string newtype ──────────────────────────────────────────────────
+
+/// A string that was produced by the localization system.
+///
+/// Cannot be constructed from a raw `&str` or `String`; only from
+/// [`LocalizationExt::msg`] or [`LocalizationExt::msg_args`]. This makes it a
+/// compile-time error to pass a raw string literal where a user-visible label is
+/// expected, as long as your own UI helpers accept `LocalizedStr` rather than
+/// `&str`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LocalizedStr(String);
+
+impl LocalizedStr {
+    fn new(s: String) -> Self { Self(s) }
+}
+
+impl std::ops::Deref for LocalizedStr {
+    type Target = str;
+    fn deref(&self) -> &str { &self.0 }
+}
+
+impl std::fmt::Display for LocalizedStr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<LocalizedStr> for String {
+    fn from(s: LocalizedStr) -> Self { s.0 }
+}
+
+// ── Ergonomic lookup trait ────────────────────────────────────────────────────
+
 /// Ergonomic string lookup on [`Localization`].
 pub trait LocalizationExt {
     /// The localized string for `key`, or the key itself when it is missing — so
     /// a forgotten or not-yet-loaded translation is visible rather than blank.
-    fn msg(&self, key: &str) -> String;
+    fn msg(&self, key: &str) -> LocalizedStr;
+
+    /// Like [`msg`] but substitutes `%name%` placeholders in the FTL template
+    /// with the supplied values before returning the result.
+    ///
+    /// FTL example:
+    /// ```text
+    /// practice-done = Done — %hits%/%total% notes · %score% pts
+    /// ```
+    /// Call site:
+    /// ```ignore
+    /// loc.msg_args("practice-done", &[("hits", hits.to_string()), ...])
+    /// ```
+    fn msg_args(&self, key: &str, args: &[(&str, String)]) -> LocalizedStr;
 }
 
 impl LocalizationExt for Localization {
-    fn msg(&self, key: &str) -> String {
-        self.content(key).unwrap_or_else(|| {
+    fn msg(&self, key: &str) -> LocalizedStr {
+        LocalizedStr::new(self.content(key).unwrap_or_else(|| {
             warn!("Missing translation for {key:?}");
             key.to_string()
-        })
+        }))
+    }
+
+    fn msg_args(&self, key: &str, args: &[(&str, String)]) -> LocalizedStr {
+        let mut s = self.content(key).unwrap_or_else(|| {
+            warn!("Missing translation for {key:?}");
+            key.to_string()
+        });
+        for (name, value) in args {
+            s = s.replace(&format!("%{name}%"), value.as_str());
+        }
+        LocalizedStr::new(s)
     }
 }
 

@@ -12,8 +12,10 @@ use super::{
     TICK_W, TICKS_PER_BEAT, HANDLE_W,
 };
 use super::material::EditorNoteMaterial;
+use crate::localization::LocalizationExt;
+use bevy_fluent::prelude::Localization;
 use super::state::{
-    can_place, enforce_direction, note_rect, pitch_color, pitch_compatible, pitch_deny_reason,
+    can_place, enforce_direction, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
     move_target, DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch,
 };
 use super::ui::{GridContent, GridItem, NoteView};
@@ -210,7 +212,7 @@ pub(super) fn spawn_note(
                 state.dragging = Some(DragState::new(id, DragKind::Move, &n));
             }
         })
-        .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>| {
+        .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>, loc: Res<Localization>| {
             let Some(drag) = state.dragging else { return };
             if drag.id != id || drag.kind != DragKind::Move { return; }
             let (hole, tick) = move_target(drag.start_hole, drag.start_tick, ev.distance.x, ev.distance.y);
@@ -219,11 +221,11 @@ pub(super) fn spawn_note(
             let pitch_ok = pitch_compatible(pitch, hole);
             let valid = place_ok && pitch_ok;
             state.drag_msg = if !pitch_ok {
-                pitch_deny_reason(pitch, hole).into()
+                loc.msg(pitch_deny_key(pitch, hole))
             } else if !place_ok {
-                "Another note is already here".into()
+                loc.msg("drag-denied-overlap")
             } else {
-                String::new()
+                crate::localization::LocalizedStr::default()
             };
             if let Some(d) = state.dragging.as_mut() {
                 d.target_hole = hole;
@@ -233,7 +235,7 @@ pub(super) fn spawn_note(
         })
         .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
             let Some(drag) = state.dragging.take() else { return };
-            state.drag_msg.clear();
+            state.drag_msg = crate::localization::LocalizedStr::default();
             if drag.kind == DragKind::Move && drag.valid {
                 if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                     n.hole = drag.target_hole;

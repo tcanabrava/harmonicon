@@ -2,10 +2,12 @@
 
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
+use bevy_fluent::prelude::Localization;
 
 use crate::audio_system::midi::midi_to_note;
 use crate::audio_system::pitch_detect::PitchEvent;
 use crate::gameplay::{classify_note, compute_points, sustain_points, HitQuality, NoteOutcome};
+use crate::localization::{LocalizationExt, LocalizedStr};
 use crate::settings::AudioSettings;
 
 use super::playback::{key_offset, note_freq, EditorAudio, Playhead};
@@ -56,7 +58,7 @@ pub(super) struct PracticeState {
     pub misses: u32,
     pub total:  u32,
     /// Status line shown in the editor's status bar while practice is running.
-    pub msg:    String,
+    pub msg:    LocalizedStr,
 }
 
 impl PracticeState {
@@ -112,6 +114,7 @@ pub(super) fn start_practice(
     practice: &mut PracticeState,
     playhead: &mut Playhead,
     commands: &mut Commands,
+    loc:      &Localization,
 ) {
     for e in playing {
         commands.entity(e).despawn();
@@ -148,7 +151,7 @@ pub(super) fn start_practice(
             Err(e) => warn!("Practice: can't read background music {music:?}: {e}"),
         }
     } else {
-        practice.msg = "No background music set — play along with the chart!".into();
+        practice.msg = loc.msg("practice-no-music");
     }
 }
 
@@ -172,6 +175,7 @@ pub(super) fn practice_tick(
     time:             Res<Time>,
     playhead:         Res<Playhead>,
     settings:         Res<AudioSettings>,
+    loc:              Res<Localization>,
     mut pitch_events: MessageReader<PitchEvent>,
     mut practice:     ResMut<PracticeState>,
 ) {
@@ -192,7 +196,11 @@ pub(super) fn practice_tick(
         }
         practice.misses += extra_misses;
         let (hits, total, score) = (practice.hits, practice.total, practice.score);
-        practice.msg = format!("Done — {hits}/{total} notes  ·  {score} pts");
+        practice.msg = loc.msg_args("practice-done", &[
+            ("hits",  hits.to_string()),
+            ("total", total.to_string()),
+            ("score", score.to_string()),
+        ]);
         practice.active = false;
         return;
     }
@@ -226,7 +234,7 @@ pub(super) fn practice_tick(
     let mut hits_delta:    u32 = 0;
     let mut misses_delta:  u32 = 0;
     let mut score_delta:   u32 = 0;
-    let mut new_msg: Option<String> = None;
+    let mut new_msg: Option<LocalizedStr> = None;
 
     for (i, note) in practice.notes.iter_mut().enumerate() {
         if note.missed { continue; }
@@ -255,15 +263,20 @@ pub(super) fn practice_tick(
             NoteOutcome::Missed => {
                 note.missed = true;
                 misses_delta += 1;
-                new_msg.get_or_insert_with(|| format!("✗ Missed {}", note.expected_name));
+                let name = note.expected_name.clone();
+                new_msg.get_or_insert_with(|| loc.msg_args("practice-missed", &[("note", name)]));
             }
             NoteOutcome::Waiting => {
                 let got = detected.first().copied().map(freq_to_name).unwrap_or_default();
+                let expected = note.expected_name.clone();
                 new_msg.get_or_insert_with(|| {
                     if got.is_empty() {
-                        format!("▶ Play {}…", note.expected_name)
+                        loc.msg_args("practice-prompt", &[("note", expected)])
                     } else {
-                        format!("▶ {} → need {}", got, note.expected_name)
+                        loc.msg_args("practice-wrong-note", &[
+                            ("got",      got),
+                            ("expected", expected),
+                        ])
                     }
                 });
             }
@@ -273,9 +286,16 @@ pub(super) fn practice_tick(
                 new_consumed.push(i);
                 let pts = compute_points(quality, 1.0);
                 score_delta += pts;
+                let name = note.expected_name.clone();
                 new_msg = Some(match quality {
-                    HitQuality::Perfect => format!("✓ PERFECT  {}  +{pts}", note.expected_name),
-                    HitQuality::Good    => format!("✓ GOOD  {}  +{pts}", note.expected_name),
+                    HitQuality::Perfect => loc.msg_args("practice-hit-perfect", &[
+                        ("note", name),
+                        ("pts",  pts.to_string()),
+                    ]),
+                    HitQuality::Good => loc.msg_args("practice-hit-good", &[
+                        ("note", name),
+                        ("pts",  pts.to_string()),
+                    ]),
                 });
             }
             NoteOutcome::TooEarly | NoteOutcome::Gap => {}
