@@ -3,6 +3,7 @@
 use bevy::prelude::*;
 
 use super::{BTN_ACTIVE, BTN_BG, FIELD_BG, FIELD_BG_FOCUS};
+use super::practice::PracticeState;
 use super::state::{Dir, EditorState, Expr, Field, Pitch};
 use super::ui::{BendDot, MetaFieldBox, MetaFieldText, ModButton, StatusMsg};
 
@@ -55,9 +56,16 @@ pub(super) fn update_meta_fields(
 }
 
 pub(super) fn update_status_bar(
-    state: Res<EditorState>,
+    state:    Res<EditorState>,
+    practice: Res<PracticeState>,
     mut texts: Query<&mut Text, With<StatusMsg>>,
 ) {
     let Ok(mut text) = texts.single_mut() else { return };
-    **text = state.drag_msg.clone();
+    // Drag messages take priority (they're ephemeral and action-specific).
+    // Practice messages fill the bar while no drag is in progress.
+    **text = if !state.drag_msg.is_empty() {
+        state.drag_msg.clone()
+    } else {
+        practice.msg.clone()
+    };
 }

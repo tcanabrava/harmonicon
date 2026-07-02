@@ -23,6 +23,7 @@ mod interaction;
 mod material;
 mod panel;
 mod playback;
+mod practice;
 mod state;
 mod ui;
 
@@ -84,6 +85,7 @@ impl Plugin for SongEditor2Plugin {
             )
             .add_systems(OnExit(AppState::SongEditor2), ui::cleanup)
             .init_resource::<state::Scroll>()
+            .init_resource::<practice::PracticeState>()
             .add_systems(
                 Update,
                 (
@@ -99,6 +101,8 @@ impl Plugin for SongEditor2Plugin {
                         .chain(),
                     playback::update_playhead_view.after(playback::advance_playhead),
                     playback::update_progress_bar.after(playback::advance_playhead),
+                    // Practice tick runs after the playhead advances so `elapsed` is current.
+                    practice::practice_tick.after(playback::advance_playhead),
                     interaction::grid_keys,
                     interaction::type_into_field,
                     interaction::live_resize,

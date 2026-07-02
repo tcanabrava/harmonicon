@@ -20,8 +20,10 @@ pub mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
 use scoring::{
-    NoteOutcome, classify_note, combo_label, compute_multiplier, compute_points,
-    should_decay_combo, sustain_points,
+    combo_label, compute_multiplier, should_decay_combo,
+};
+pub use scoring::{
+    NoteOutcome, classify_note, compute_points, sustain_points,
 };
 use std::collections::HashMap;
 use std::collections::HashSet;

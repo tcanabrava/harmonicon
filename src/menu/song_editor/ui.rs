@@ -17,6 +17,7 @@ use super::state::{EditorState, Scroll, Field, FIELDS, HARP_KEYS};
 use super::playback::{Playhead, EditorAudio, EditorProgressFill, PlayheadLine, start_playback};
 use super::harpchart::safe_path_segment;
 use super::interaction::apply_modifier;
+use super::practice::{start_practice, stop_practice, PracticeState};
 
 // ── Components ────────────────────────────────────────────────────────────────
 
@@ -347,8 +348,10 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
          mut sources: ResMut<Assets<AudioSource>>,
          settings: Res<AudioSettings>,
          playing: Query<Entity, With<EditorAudio>>,
+         mut practice: ResMut<PracticeState>,
          mut playhead: ResMut<Playhead>,
          mut commands: Commands| {
+            practice.reset(); // exit practice mode before starting preview playback
             start_playback(&state, &mut sources, &settings, &playing, &mut playhead, &mut commands);
         },
     );
@@ -358,12 +361,32 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands) {
         Color::srgb(0.36, 0.20, 0.20),
         |_: On<Pointer<Click>>,
          playing: Query<Entity, With<EditorAudio>>,
+         mut practice: ResMut<PracticeState>,
          mut playhead: ResMut<Playhead>,
          mut commands: Commands| {
-            for e in &playing {
-                commands.entity(e).despawn();
+            stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+        },
+    );
+    transport_button(
+        panel,
+        "\u{1F3A4} Practice",
+        Color::srgb(0.25, 0.18, 0.42),
+        |_: On<Pointer<Click>>,
+         state: Res<EditorState>,
+         mut sources: ResMut<Assets<AudioSource>>,
+         settings: Res<AudioSettings>,
+         playing: Query<Entity, With<EditorAudio>>,
+         mut practice: ResMut<PracticeState>,
+         mut playhead: ResMut<Playhead>,
+         mut commands: Commands| {
+            if practice.active {
+                stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+            } else {
+                start_practice(
+                    &state, &mut sources, &settings,
+                    &playing, &mut practice, &mut playhead, &mut commands,
+                );
             }
-            playhead.playing = false;
         },
     );
     transport_button(
