@@ -340,6 +340,34 @@ pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
     }
 }
 
+/// Wah (hand cupping) and vibrato (breath/diaphragm) are both whole-player
+/// techniques: whichever one you're doing, it colours every hole sounding at
+/// that instant, not just one. So `id`'s `expr` — Wah, Vibrato, or None — is
+/// propagated to every note that overlaps it in time, transitively, the same
+/// way `enforce_direction` propagates a shared Blow/Draw.
+pub(super) fn enforce_expr(state: &mut EditorState, id: u32) {
+    let Some(expr) = state.note_by_id(id).map(|n| n.expr) else { return };
+    let mut group = vec![id];
+    let mut i = 0;
+    while i < group.len() {
+        let Some(cur) = state.note_by_id(group[i]).copied() else {
+            i += 1;
+            continue;
+        };
+        for n in &state.notes {
+            if !group.contains(&n.id) && overlaps(&cur, n) {
+                group.push(n.id);
+            }
+        }
+        i += 1;
+    }
+    for n in &mut state.notes {
+        if group.contains(&n.id) {
+            n.expr = expr;
+        }
+    }
+}
+
 /// Absolute pixel rect (left, top, width, height) of a note inside GridContent.
 pub(super) fn note_rect(note: &GridNote) -> (f32, f32, f32, f32) {
     let left = note.tick as f32 * TICK_W + 1.0;

@@ -17,8 +17,8 @@ use crate::localization::LocalizationExt;
 use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
 use super::state::{
-    can_place, enforce_direction, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
-    move_target, DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch,
+    can_place, enforce_direction, enforce_expr, note_rect, pitch_color, pitch_compatible,
+    pitch_deny_key, move_target, DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch,
 };
 use super::ui::{GridContent, GridItem, NoteView};
 use super::interaction::select_or_add;
@@ -278,6 +278,7 @@ pub(super) fn spawn_note(
                     n.tick = drag.target_tick;
                 }
                 enforce_direction(&mut state, id);
+                enforce_expr(&mut state, id);
             }
         })
         .id();
@@ -357,6 +358,7 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
             if matches!(state.dragging, Some(d) if d.id == id && matches!(d.kind, DragKind::Resize(_))) {
                 state.dragging = None;
                 enforce_direction(&mut state, id);
+                enforce_expr(&mut state, id);
             }
         });
 }

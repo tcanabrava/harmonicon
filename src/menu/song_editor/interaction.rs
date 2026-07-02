@@ -12,7 +12,7 @@ use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT}
 use super::material::EditorNoteMaterial;
 use super::state::{
     DragKind, Dir, EditorState, Expr, GridNote, Pitch, Scroll,
-    enforce_direction, max_bend, note_rect, overblow_ok, overdraw_ok,
+    enforce_direction, enforce_expr, max_bend, note_rect, overblow_ok, overdraw_ok,
 };
 use super::playback::Playhead;
 use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
@@ -104,6 +104,9 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
             note.expr = if note.expr == Expr::Vibrato { Expr::None } else { Expr::Vibrato };
         }
         ModButton::Delete => unreachable!(),
+    }
+    if matches!(kind, ModButton::Wah | ModButton::Vibrato) {
+        enforce_expr(state, id);
     }
 }
 

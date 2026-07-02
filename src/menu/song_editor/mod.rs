@@ -113,8 +113,8 @@ impl Plugin for SongEditor2Plugin {
 #[cfg(test)]
 mod tests {
     use super::state::{
-        apply_resize, can_place, enforce_direction, move_target, Dir, EditorState, Edge, Expr,
-        GridNote, Pitch,
+        apply_resize, can_place, enforce_direction, enforce_expr, move_target, Dir, EditorState,
+        Edge, Expr, GridNote, Pitch,
     };
     use super::interaction::{apply_modifier, select_or_add};
     use super::ui::ModButton;
@@ -250,6 +250,36 @@ mod tests {
         enforce_direction(&mut s, 0);
         assert_eq!(s.note_by_id(1).unwrap().dir, Dir::Blow);
         assert_eq!(s.note_by_id(2).unwrap().dir, Dir::Draw);
+    }
+
+    // Wah (hand cupping) and vibrato (breath vibrato) are whole-player
+    // techniques: every hole sounding at the same instant must share the
+    // same one, mirroring how Blow/Draw is already unified above.
+    #[test]
+    fn enforce_expr_unifies_overlap_chain_but_not_independent_notes() {
+        let mut s = EditorState::default();
+        s.notes = vec![
+            GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::Vibrato },
+            GridNote { id: 1, hole: 2, tick: 2, len: 3, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote { id: 2, hole: 3, tick: 10, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+        ];
+        s.next_id = 3;
+        enforce_expr(&mut s, 0);
+        assert_eq!(s.note_by_id(1).unwrap().expr, Expr::Vibrato, "overlapping note shares the vibrato");
+        assert_eq!(s.note_by_id(2).unwrap().expr, Expr::None, "independent note is untouched");
+    }
+
+    #[test]
+    fn clicking_wah_propagates_to_overlapping_notes_via_apply_modifier() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 2, 0);
+        select_or_add(&mut s, 5, 2); // overlaps the first note (tick 0..4 vs 2..6)
+        select_or_add(&mut s, 7, 10); // independent
+        s.selected = Some(s.note_at(2, 0).unwrap().id);
+        apply_modifier(&mut s, ModButton::Wah);
+        assert_eq!(s.note_at(2, 0).unwrap().expr, Expr::Wah);
+        assert_eq!(s.note_at(5, 2).unwrap().expr, Expr::Wah, "overlapping note picks up the wah too");
+        assert_eq!(s.note_at(7, 10).unwrap().expr, Expr::None, "independent note keeps its own expression");
     }
 
     #[test]
