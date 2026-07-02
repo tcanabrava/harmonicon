@@ -7,7 +7,7 @@ license = "MIT"
 [dependencies]
 # `wav` lets bevy_audio decode the in-memory WAV the song editor synthesises for
 # its Play button (and user-supplied .wav background tracks).
-bevy = { version = "0.19.0", features = ["dev", "dynamic_linking", "wav"] }
+bevy = { version = "0.19.0", features = ["wav"] }
 cpal = "0.15"
 rustfft = "6.4"
 crossbeam-channel = "0.5"
@@ -33,6 +33,13 @@ unic-langid = "0.9"
 # Detect the OS UI language so the game starts in the player's locale.
 sys-locale = "0.3"
 regex = "1.12.4"
+
+[features]
+# Fast local iteration: dynamic-links Bevy and enables its dev tools + asset
+# file watcher. Never ship this — dynamic_linking needs libbevy_dylib*.so
+# alongside the binary, which packaged builds (e.g. the flatpak) don't bundle.
+# Local dev: `cargo run --features dev`.
+dev = ["bevy/dev", "bevy/dynamic_linking"]
 
 [[bin]]
 name = "hole-editor"

@@ -50,7 +50,14 @@ modules:
         # bundled font, song schema JSON), so cargo needs them present even
         # though the full assets tree is copied again at runtime by the
         # harmonicon-metadata module below.
-        skip: [ "packaging", ".git" ]
+        #
+        # `target`, `target-flatpak`, `build-dir` and `.flatpak-builder` ARE
+        # skipped: they're build-output/cache directories that mutate on every
+        # build. Left unskipped, each successful build changes this source
+        # dir's content hash, which invalidates flatpak-builder's own module
+        # cache for the next run — every invocation would recompile from
+        # scratch even with no source changes.
+        skip: [ "packaging", ".git", "target", "target-flatpak", "build-dir", ".flatpak-builder" ]
 
   # Module 2: Handles metadata and assets. Fast and rebuilds instantly!
   - name: harmonicon-metadata
@@ -68,3 +75,4 @@ modules:
     sources:
       - type: dir
         path: ../..
+        skip: [ "target", "target-flatpak", "build-dir", ".flatpak-builder" ]
