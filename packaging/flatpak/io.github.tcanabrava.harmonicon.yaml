@@ -28,36 +28,38 @@ finish-args:
   - --socket=pulseaudio
 
 modules:
-  - name: harmonicon
+  # Module 1: Compiles the Rust binary. Cached once done!
+  - name: harmonicon-binary
     buildsystem: simple
     build-options:
       append-path: /usr/lib/sdk/rust-stable/bin
       env:
         CARGO_HOME: /run/build/harmonicon/cargo
-      # Drop this for an offline (vendored) build.
       build-args:
         - --share=network
     build-commands:
-      # The repo's .cargo/config.toml pins the `wild` linker + clang, neither of
-      # which ship in the SDK; remove it so cargo uses the toolchain defaults.
       - rm -f .cargo/config.toml
       - cargo build --release --bin harmonicon
-      # Real binary + a launcher that points Bevy and the CWD-relative reads at
-      # the bundled asset root.
       - install -Dm755 target/release/harmonicon /app/bin/harmonicon.bin
+    sources:
+      - type: dir
+        path: ../..
+        only-arches: []
+        skip: [ "packaging", "assets", ".git" ]
+
+  # Module 2: Handles metadata and assets. Fast and rebuilds instantly!
+  - name: harmonicon-metadata
+    buildsystem: simple
+    build-commands:
       - install -Dm755 packaging/flatpak/harmonicon.sh /app/bin/harmonicon
-      # Game data.
+      # Game data
       - mkdir -p /app/share/harmonicon
       - cp -r assets /app/share/harmonicon/
       - find /app/share/harmonicon/assets -name '*~' -delete
-      # Desktop integration.
+      # Desktop integration (Fixed icon path)
       - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.desktop -t /app/share/applications
       - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.metainfo.xml -t /app/share/metainfo
-      - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.png /app/share/icons/hicolor/1024x1024/apps/io.github.tcanabrava.harmonicon.png
+      - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.png /app/share/icons/hicolor/scalable/apps/io.github.tcanabrava.harmonicon.png
     sources:
-      - type: git
-        url: https://github.com/tcanabrava/harmonicon.git
-        branch: main
-      # Build from the local working tree instead (replace the git source above):
-      # - type: dir
-      #   path: ../..
+      - type: dir
+        path: ../..
