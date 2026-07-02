@@ -77,45 +77,6 @@ pub(super) fn rebuild_grid(
         let bar_index = (beat / BEATS_PER_BAR) % 12;
         let bar_tint = bar_bg(bar_index, &state.key, bar_colors);
 
-        items.push(
-            commands
-                .spawn((
-                    GridItem,
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(x),
-                        top: Val::Px(0.0),
-                        width: Val::Px(if is_bar { 2.0 } else { 1.0 }),
-                        height: Val::Px(grid_height()),
-                        ..default()
-                    },
-                    BackgroundColor(if is_bar { colors.bar_line } else { colors.grid_line }),
-                    Pickable::IGNORE,
-                ))
-                .id(),
-        );
-
-        for s in 1..TICKS_PER_BEAT {
-            let is_half = s * 2 == TICKS_PER_BEAT;
-            items.push(
-                commands
-                    .spawn((
-                        GridItem,
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: Val::Px(x + s as f32 * TICK_W),
-                            top: Val::Px(HEADER_H),
-                            width: Val::Px(1.0),
-                            height: Val::Px(grid_height() - HEADER_H),
-                            ..default()
-                        },
-                        BackgroundColor(if is_half { colors.half_line } else { colors.quarter_line }),
-                        Pickable::IGNORE,
-                    ))
-                    .id(),
-            );
-        }
-
         let in_bar = beat % BEATS_PER_BAR + 1;
         items.push(
             commands
@@ -185,6 +146,51 @@ pub(super) fn rebuild_grid(
                 },
             );
             items.push(cell.id());
+        }
+
+        // Divider lines are spawned after the lane cells (not before) so they
+        // render on top of them — otherwise the opaque lane backgrounds would
+        // cover the lines everywhere except the header strip above the lanes,
+        // making them look like they stop at the header instead of running
+        // down through every hole's row. `Pickable::IGNORE` keeps them from
+        // blocking clicks on the lane buttons underneath.
+        items.push(
+            commands
+                .spawn((
+                    GridItem,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x),
+                        top: Val::Px(0.0),
+                        width: Val::Px(if is_bar { 2.0 } else { 1.0 }),
+                        height: Val::Px(grid_height()),
+                        ..default()
+                    },
+                    BackgroundColor(if is_bar { colors.bar_line } else { colors.grid_line }),
+                    Pickable::IGNORE,
+                ))
+                .id(),
+        );
+
+        for s in 1..TICKS_PER_BEAT {
+            let is_half = s * 2 == TICKS_PER_BEAT;
+            items.push(
+                commands
+                    .spawn((
+                        GridItem,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(x + s as f32 * TICK_W),
+                            top: Val::Px(HEADER_H),
+                            width: Val::Px(1.0),
+                            height: Val::Px(grid_height() - HEADER_H),
+                            ..default()
+                        },
+                        BackgroundColor(if is_half { colors.half_line } else { colors.quarter_line }),
+                        Pickable::IGNORE,
+                    ))
+                    .id(),
+            );
         }
     }
 
