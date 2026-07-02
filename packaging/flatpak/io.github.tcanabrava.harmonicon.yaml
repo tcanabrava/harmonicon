@@ -71,7 +71,10 @@ modules:
       # Desktop integration (Fixed icon path)
       - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.desktop -t /app/share/applications
       - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.metainfo.xml -t /app/share/metainfo
-      - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.png /app/share/icons/hicolor/scalable/apps/io.github.tcanabrava.harmonicon.png
+      # 512x512 raster icon: `scalable` is for SVG only and flatpak's icon
+      # validator caps raster icons at 512x512, so this goes in the matching
+      # fixed-size hicolor directory instead.
+      - install -Dm644 packaging/flatpak/io.github.tcanabrava.harmonicon.png /app/share/icons/hicolor/512x512/apps/io.github.tcanabrava.harmonicon.png
     sources:
       - type: dir
         path: ../..
