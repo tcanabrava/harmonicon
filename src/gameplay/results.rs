@@ -280,6 +280,19 @@ fn on_continue(
     next_state.set(AppState::Menu);
 }
 
+/// Escape does the same as Continue: return to the song list.
+pub(super) fn handle_escape(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut return_to_song_list: ResMut<ReturnToSongList>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    if !keyboard.just_pressed(KeyCode::Escape) {
+        return;
+    }
+    return_to_song_list.0 = true;
+    next_state.set(AppState::Menu);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

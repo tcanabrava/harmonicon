@@ -132,8 +132,33 @@ impl Plugin for MenuPlugin {
             .add_systems(
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
+            )
+            .add_systems(
+                Update,
+                handle_menu_escape.run_if(in_state(AppState::Menu)),
             );
     }
+}
+
+/// Escape navigates back one level in the menu hierarchy, mirroring each
+/// page's own "Back" button target. `Main` has no parent, so it's a no-op
+/// there.
+fn handle_menu_escape(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    page: Res<State<MenuPage>>,
+    mut next_page: ResMut<NextState<MenuPage>>,
+) {
+    if !keyboard.just_pressed(KeyCode::Escape) {
+        return;
+    }
+    let target = match page.get() {
+        MenuPage::Main => return,
+        MenuPage::Play | MenuPage::Options => MenuPage::Main,
+        MenuPage::ArtistList | MenuPage::ModeSelect => MenuPage::Play,
+        MenuPage::SongList => MenuPage::ArtistList,
+        MenuPage::Theme => MenuPage::Options,
+    };
+    next_page.set(target);
 }
 // ── UI helpers ────────────────────────────────────────────────────────────────
 

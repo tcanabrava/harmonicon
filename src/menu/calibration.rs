@@ -146,6 +146,7 @@ impl Plugin for CalibrationPlugin {
                     update_status,
                     update_result_block,
                     sync_phase_visibility,
+                    handle_escape,
                 )
                     .run_if(in_state(AppState::Calibration)),
             );
@@ -427,6 +428,19 @@ fn cancel_calibration(
     mut next_state: ResMut<NextState<AppState>>,
     mut return_to_options: ResMut<ReturnToOptions>,
 ) {
+    return_to_options.0 = true;
+    next_state.set(AppState::Menu);
+}
+
+/// Escape does the same as Cancel: leave without changing the latency setting.
+fn handle_escape(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut return_to_options: ResMut<ReturnToOptions>,
+) {
+    if !keyboard.just_pressed(KeyCode::Escape) {
+        return;
+    }
     return_to_options.0 = true;
     next_state.set(AppState::Menu);
 }
