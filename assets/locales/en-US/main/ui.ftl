@@ -35,3 +35,46 @@ options-language = Language
 
 # Shared
 back = ← Back
+
+# Song Editor 2 — transport & mod-panel buttons
+editor-play = ▶ Play
+editor-stop = ■ Stop
+editor-practice = 🎤 Practice
+editor-save = 💾 Save
+editor-load = 📂 Load
+editor-browse = 📂 Browse
+mod-blow = Blow
+mod-draw = Draw
+mod-bend = Bend
+mod-overblow = Overblow
+mod-overdraw = Overdraw
+mod-wah = Wah
+mod-vibrato = Vibrato
+mod-delete = Delete
+
+# Song Editor 2 — meta-form field labels
+editor-field-tempo = Music Tempo
+editor-field-key = Harp Key
+editor-field-music = Background Music
+editor-field-name = Name
+editor-field-author = Author
+
+# Song Editor 2 — file-dialog titles
+dialog-save-chart = Save chart
+dialog-load-chart = Load chart
+dialog-select-music = Select background music
+
+# Song Editor 2 — drag validation messages
+drag-denied-bend = This hole does not support this bend depth
+drag-denied-overblow = Overblow is only available on holes 1–6
+drag-denied-overdraw = Overdraw is only available on holes 7–10
+drag-denied-overlap = Another note is already here
+
+# Song Editor 2 — practice mode feedback
+practice-no-music = No background music set — play along with the chart!
+practice-prompt = ▶ Play %note%…
+practice-wrong-note = ▶ %got% → need %expected%
+practice-hit-perfect = ✓ PERFECT  %note%  +%pts% pts
+practice-hit-good = ✓ GOOD  %note%  +%pts% pts
+practice-missed = ✗ Missed %note%
+practice-done = Done — %hits%/%total% notes  ·  %score% pts
