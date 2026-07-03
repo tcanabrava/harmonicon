@@ -21,10 +21,13 @@ const NOTES: [&str; 12] = [
 
 const CELL_DEFAULT: Color = Color::srgba(0.12, 0.12, 0.16, 0.92);
 const CELL_LIT: Color = Color::srgb(0.95, 0.85, 0.30);
+/// Every row — including bends and over-blow/draw — is colored by which
+/// breath direction actually produces it, not by technique. Overblow reads
+/// as blue (you *blow* it, even though its pitch sits above the draw note)
+/// and overdraw reads as orange (you *draw* it) — the two are easy to mix up
+/// by name alone, so color is the disambiguator.
 const BLOW_COLOR: Color = Color::srgb(0.45, 0.70, 1.0);
 const DRAW_COLOR: Color = Color::srgb(1.0, 0.65, 0.30);
-const BEND_COLOR: Color = Color::srgb(0.78, 0.58, 0.96);
-const OVER_COLOR: Color = Color::srgb(0.45, 0.85, 0.80);
 const LABEL_COLOR: Color = Color::srgb(0.55, 0.55, 0.65);
 
 /// One note cell in the diagram; lit when its `note` (e.g. `"C#4"`) is sounding.
@@ -79,23 +82,40 @@ pub struct HoleNotes {
     pub bends: Vec<String>,
 }
 
-/// Which row a cell belongs to (and thus which note to pull from a `HoleNotes`).
+/// Which row a cell belongs to. `DrawBend`/`Overblow` are only ever valid for
+/// holes 1–6 and `BlowBend`/`Overdraw` only for holes 7–10 — [`note_for`]
+/// enforces that, since a hole's single `bends`/`over` fields don't carry
+/// which family they belong to on their own.
 #[derive(Clone, Copy)]
 enum Row {
-    Over,
+    Overblow,
+    DrawBend(usize),
     Blow,
     Draw,
-    Bend(usize),
+    BlowBend(usize),
+    Overdraw,
 }
 
-/// The diagram's rows, top to bottom, with their left-hand label.
-const ROWS: [(&str, Row); 6] = [
-    ("OB/OD", Row::Over),
-    ("blow \u{2191}", Row::Blow),
-    ("draw \u{2193}", Row::Draw),
-    ("\u{00BD}", Row::Bend(0)),
-    ("1", Row::Bend(1)),
-    ("1\u{00BD}", Row::Bend(2)),
+/// The diagram's rows, top to bottom, with their left-hand label and color.
+///
+/// Grouped by actual breath direction, not music theory or hole family:
+/// blow sits above draw, and every row that's played by *blowing* (blow
+/// bends, holes 7–10, plus overblow, holes 1/4/5/6) sits above the blow row;
+/// every row played by *drawing* (draw bends, holes 1–6, plus overdraw,
+/// holes 7–10) sits below the draw row. So the top half of the diagram is
+/// always "blow" and the bottom half is always "draw" — position alone
+/// tells a player which way to breathe, with color reinforcing it.
+const ROWS: [(&str, Row, Color); 10] = [
+    ("overblow \u{2191}", Row::Overblow, BLOW_COLOR),
+    ("1\u{00BD} \u{2191}", Row::BlowBend(2), BLOW_COLOR),
+    ("1 \u{2191}", Row::BlowBend(1), BLOW_COLOR),
+    ("\u{00BD} \u{2191}", Row::BlowBend(0), BLOW_COLOR),
+    ("blow \u{2191}", Row::Blow, BLOW_COLOR),
+    ("draw \u{2193}", Row::Draw, DRAW_COLOR),
+    ("\u{00BD} \u{2193}", Row::DrawBend(0), DRAW_COLOR),
+    ("1 \u{2193}", Row::DrawBend(1), DRAW_COLOR),
+    ("1\u{00BD} \u{2193}", Row::DrawBend(2), DRAW_COLOR),
+    ("overdraw \u{2193}", Row::Overdraw, DRAW_COLOR),
 ];
 
 pub fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
@@ -131,21 +151,17 @@ pub fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
     }
 }
 
-fn note_for(h: &HoleNotes, row: Row) -> Option<&str> {
+/// The note `row` shows for `hole`, or `None` if that row doesn't apply to
+/// this hole at all (wrong wing, or the technique isn't available here).
+fn note_for(h: &HoleNotes, hole: u8, row: Row) -> Option<&str> {
     match row {
-        Row::Over => h.over.as_deref(),
+        Row::Overblow if hole <= 6 => h.over.as_deref(),
+        Row::Overdraw if hole >= 7 => h.over.as_deref(),
         Row::Blow => h.blow.as_deref(),
         Row::Draw => h.draw.as_deref(),
-        Row::Bend(i) => h.bends.get(i).map(String::as_str),
-    }
-}
-
-fn row_color(row: Row) -> Color {
-    match row {
-        Row::Over => OVER_COLOR,
-        Row::Blow => BLOW_COLOR,
-        Row::Draw => DRAW_COLOR,
-        Row::Bend(_) => BEND_COLOR,
+        Row::DrawBend(i) if hole <= 6 => h.bends.get(i).map(String::as_str),
+        Row::BlowBend(i) if hole >= 7 => h.bends.get(i).map(String::as_str),
+        _ => None,
     }
 }
 
@@ -194,7 +210,7 @@ pub fn spawn_harmonica_overlay(
                     });
 
                     // One row per technique.
-                    for (label, kind) in ROWS {
+                    for (label, kind, color) in ROWS {
                         grid.spawn(Node {
                             flex_direction: FlexDirection::Row,
                             column_gap: Val::Px(2.0),
@@ -202,9 +218,9 @@ pub fn spawn_harmonica_overlay(
                         })
                         .with_children(|row| {
                             spawn_label(row, label);
-                            for h in &holes {
-                                match note_for(h, kind) {
-                                    Some(note) => spawn_note_cell(row, note, row_color(kind)),
+                            for (hole, h) in (1..=10u8).zip(&holes) {
+                                match note_for(h, hole, kind) {
+                                    Some(note) => spawn_note_cell(row, note, color),
                                     None => spawn_empty(row),
                                 }
                             }
@@ -252,10 +268,11 @@ fn spawn_text_cell(row: &mut ChildSpawnerCommands, text: &str, color: Color) {
     });
 }
 
-/// The left-hand row label (narrower than a hole cell).
+/// The left-hand row label (narrower than a hole cell). Wide enough for the
+/// longest label ("overblow ↑"/"overdraw ↓") at this font size.
 fn spawn_label(row: &mut ChildSpawnerCommands, text: &str) {
     row.spawn(Node {
-        width: Val::Px(40.0),
+        width: Val::Px(58.0),
         height: Val::Px(22.0),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::FlexEnd,
@@ -353,5 +370,100 @@ mod tests {
     #[test]
     fn hole_1_overblow_is_a_semitone_above_draw() {
         assert_eq!(hole_notes(&c_harp(), 1).over.as_deref(), Some("D#4"));
+    }
+
+    // ── ROWS layout ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn rows_has_two_wings_of_five_around_no_gap() {
+        assert_eq!(ROWS.len(), 10);
+    }
+
+    #[test]
+    fn top_half_is_always_blow_and_bottom_half_is_always_draw() {
+        // The whole point of this layout: position alone tells a player
+        // which way to breathe. Overblow is executed by *blowing* even
+        // though its pitch sits above the draw note (and overdraw is the
+        // mirror case) — that name-vs-action mismatch is exactly the
+        // confusion this is meant to resolve, so it must still land on the
+        // blow side here despite the name starting with "over".
+        let expected_by_label: &[(&str, Color)] = &[
+            ("overblow \u{2191}", BLOW_COLOR),
+            ("1\u{00BD} \u{2191}", BLOW_COLOR),
+            ("1 \u{2191}", BLOW_COLOR),
+            ("\u{00BD} \u{2191}", BLOW_COLOR),
+            ("blow \u{2191}", BLOW_COLOR),
+            ("draw \u{2193}", DRAW_COLOR),
+            ("\u{00BD} \u{2193}", DRAW_COLOR),
+            ("1 \u{2193}", DRAW_COLOR),
+            ("1\u{00BD} \u{2193}", DRAW_COLOR),
+            ("overdraw \u{2193}", DRAW_COLOR),
+        ];
+        for (i, (label, _row, color)) in ROWS.iter().enumerate() {
+            assert_eq!(*label, expected_by_label[i].0, "row {i} label");
+            assert_eq!(*color, expected_by_label[i].1, "row {i} ({label}) color");
+        }
+        // The split is exactly down the middle: rows 0-4 blow, 5-9 draw.
+        assert!(ROWS[..5].iter().all(|(_, _, c)| *c == BLOW_COLOR));
+        assert!(ROWS[5..].iter().all(|(_, _, c)| *c == DRAW_COLOR));
+    }
+
+    #[test]
+    fn bend_depth_increases_moving_away_from_the_blow_draw_center() {
+        fn bend_index(row: Row) -> Option<usize> {
+            match row {
+                Row::DrawBend(i) | Row::BlowBend(i) => Some(i),
+                _ => None,
+            }
+        }
+        // Above blow: overblow, then 1½ → 1 → ½ heading down into `blow`.
+        assert_eq!(bend_index(ROWS[1].1), Some(2));
+        assert_eq!(bend_index(ROWS[2].1), Some(1));
+        assert_eq!(bend_index(ROWS[3].1), Some(0));
+        // Below draw: `draw`, then ½ → 1 → 1½ heading down into overdraw.
+        assert_eq!(bend_index(ROWS[6].1), Some(0));
+        assert_eq!(bend_index(ROWS[7].1), Some(1));
+        assert_eq!(bend_index(ROWS[8].1), Some(2));
+    }
+
+    #[test]
+    fn each_hole_lights_up_only_one_wing() {
+        // Regression: DrawBend/Overblow and BlowBend/Overdraw read from the
+        // same underlying `bends`/`over` fields, so without a wing check in
+        // `note_for` a hole's draw bends would also leak into (and be
+        // mislabeled within) the blow-bend rows, and vice versa.
+        let harp = c_harp();
+        for hole in 1..=10u8 {
+            let h = hole_notes(&harp, hole);
+            for (_, row, _) in ROWS {
+                let draw_side = matches!(row, Row::Overblow | Row::DrawBend(_));
+                let blow_side = matches!(row, Row::Overdraw | Row::BlowBend(_));
+                if (draw_side && hole >= 7) || (blow_side && hole <= 6) {
+                    assert!(
+                        note_for(&h, hole, row).is_none(),
+                        "hole {hole} shouldn't show anything in the wrong wing's row"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn note_for_only_answers_for_the_hole_it_actually_applies_to() {
+        let harp = c_harp();
+        // Hole 1 (draw-bend family): shows its draw bend and overblow...
+        let h1 = hole_notes(&harp, 1);
+        assert_eq!(note_for(&h1, 1, Row::DrawBend(0)), Some("C#4"));
+        assert_eq!(note_for(&h1, 1, Row::Overblow), Some("D#4"));
+        // ...but never as a blow bend or overdraw.
+        assert_eq!(note_for(&h1, 1, Row::BlowBend(0)), None);
+        assert_eq!(note_for(&h1, 1, Row::Overdraw), None);
+
+        // Hole 10 (blow-bend family): the mirror image.
+        let h10 = hole_notes(&harp, 10);
+        assert_eq!(note_for(&h10, 10, Row::BlowBend(0)), Some("B6"));
+        assert_eq!(note_for(&h10, 10, Row::Overdraw), Some("C#7"));
+        assert_eq!(note_for(&h10, 10, Row::DrawBend(0)), None);
+        assert_eq!(note_for(&h10, 10, Row::Overblow), None);
     }
 }
