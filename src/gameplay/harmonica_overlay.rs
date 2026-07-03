@@ -126,7 +126,7 @@ pub fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
     // (holes 7–10) a semitone above the blow reed.
     let over = match hole {
         1 | 4 | 5 | 6 => draw.as_deref().and_then(|d| transpose(d, 1)),
-        7 | 8 | 9 | 10 => blow.as_deref().and_then(|b| transpose(b, 1)),
+        7..=10 => blow.as_deref().and_then(|b| transpose(b, 1)),
         _ => None,
     };
 

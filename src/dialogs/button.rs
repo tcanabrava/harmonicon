@@ -7,6 +7,12 @@ pub fn color_default() -> Color {
     Color::srgb(0.14, 0.14, 0.22)
 }
 
+/// Background for a "this option is currently selected" choice button —
+/// shared by any button-group picker (pitch algorithm, harmonica model, ...).
+pub const CHOICE_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
+/// Hover background for an unselected choice button in the same group.
+pub const CHOICE_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
+
 fn mouse_over(ev: On<Pointer<Over>>, mut colors: Query<&mut BackgroundColor>) {
     if let Ok(mut bg) = colors.get_mut(ev.entity) {
         *bg = BackgroundColor(Color::srgb(0.20, 0.20, 0.32));

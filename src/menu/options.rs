@@ -18,14 +18,11 @@ use bevy::ui_widgets::{
 };
 
 const TRACK_BG: Color = Color::srgb(0.14, 0.14, 0.22);
-const CHOICE_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
-const CHOICE_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
 
 use crate::assets_management::{
     AvailableHarmonicas,
     SelectedHarmonicaModel
 };
-use crate::audio_system::pitch_detect::PitchAlgorithm;
 use crate::settings::AudioSettings;
 
 use crate::theme::LoadedTheme;
@@ -36,6 +33,7 @@ use super::{
     spawn_button, spawn_menu_root,
 };
 
+use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
 
@@ -59,8 +57,6 @@ impl Plugin for OptionsPlugin {
                     update_sliders,
                     update_latency_slider,
                     harmonica_button_visuals,
-                    algo_button_visuals,
-                    update_algo_explanation,
                     propagate_preview_layers,
                 )
                     .run_if(in_state(MenuPage::Options)),
@@ -89,14 +85,6 @@ struct SliderValueLabel(VolumeSlider);
 /// A harmonica-model choice button; carries the model name.
 #[derive(Component, Default, Clone)]
 struct HarmonicaButton(String);
-
-/// A pitch-algorithm choice button; carries the algorithm it selects.
-#[derive(Component, Default, Clone)]
-struct AlgoButton(PitchAlgorithm);
-
-/// The explanation text describing the currently selected pitch algorithm.
-#[derive(Component)]
-struct AlgoExplanation;
 
 /// Marks a preview scene root (a `WorldAssetRoot`); the propagation system forces
 /// this `RenderLayers` onto all its descendants, since glTF scene children don't
@@ -191,8 +179,8 @@ fn setup_options_menu(
         &selected_harmonica.0,
     );
 
-    spawn_algo_row(&mut commands, root, settings.pitch_algorithm);
-    spawn_algo_explanation(&mut commands, root, settings.pitch_algorithm);
+    spawn_algo_row(&mut commands, root, Some("Pitch detect"), settings.pitch_algorithm);
+    spawn_algo_explanation(&mut commands, root, 560.0, settings.pitch_algorithm);
 
     spawn_button(&mut commands, root, "Theme", Some("Theme"), &theme, &btn_mats, "Options",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme));
@@ -248,7 +236,7 @@ fn spawn_harmonica_row(
 /// this model" click callback (capturing the name), and hover — all inline
 /// `on(...)`.
 fn harmonica_button_scene(image: Handle<Image>, name: String, is_selected: bool) -> impl Scene {
-    let color = if is_selected { CHOICE_SELECTED } else { button::color_default() };
+    let color = if is_selected { button::CHOICE_SELECTED } else { button::color_default() };
     let label = name.clone();
     let pick = name.clone();
     bsn! {
@@ -396,7 +384,7 @@ fn harm_over(
 ) {
     if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
         && btn.0 != selected.0 {
-            *bg = BackgroundColor(CHOICE_HOVER);
+            *bg = BackgroundColor(button::CHOICE_HOVER);
         }
 }
 
@@ -421,163 +409,10 @@ fn harmonica_button_visuals(
     }
     for (button, mut bg) in &mut buttons {
         bg.0 = if button.0 == selected.0 {
-            CHOICE_SELECTED
+            button::CHOICE_SELECTED
         } else {
             button::color_default()
         };
-    }
-}
-
-// ── Pitch-detection algorithm selector ────────────────────────────────────────
-
-/// A labelled row of algorithm choice buttons (FFT / YIN / …), each carrying its
-/// own dedicated "select this algorithm" click callback plus hover. The row
-/// label keeps the custom font (imperative); `bsn!` can't set it in 0.19.
-fn spawn_algo_row(
-    commands: &mut Commands,
-    parent: Entity,
-
-    selected: PitchAlgorithm,
-) {
-    let row = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(8.0),
-            ..default()
-        })
-        .id();
-
-    commands.entity(row).with_children(|r| {
-        r.spawn((
-            Node {
-                width: Val::Px(110.0),
-                ..default()
-            },
-            Text::new("Pitch detect"),
-            TextFont {
-                font_size: FontSize::Px(20.0),
-                                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
-        for &algo in PitchAlgorithm::all() {
-            r.spawn_empty()
-                .apply_scene(algo_button_scene(algo, algo == selected));
-        }
-    });
-
-    commands.entity(parent).add_child(row);
-}
-
-/// One algorithm choice button: its label + a dedicated "select this algorithm"
-/// click callback (capturing the algorithm) plus hover — all inline `on(...)`.
-fn algo_button_scene(algo: PitchAlgorithm, is_selected: bool) -> impl Scene {
-    let color = if is_selected {
-        CHOICE_SELECTED
-    } else {
-        button::color_default()
-    };
-    bsn! {
-        Button
-        Node {
-            padding: {UiRect::axes(Val::Px(14.0), Val::Px(8.0))},
-        }
-        BackgroundColor({color})
-        AlgoButton({algo})
-        on(move |_: On<Pointer<Click>>, mut settings: ResMut<AudioSettings>| {
-            settings.pitch_algorithm = algo;
-        })
-        on(algo_over)
-        on(algo_out)
-        Children [
-            (
-                Text({algo.label().to_string()})
-                TextFont { font_size: {FontSize::Px(16.0)} }
-                TextColor({Color::WHITE})
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-            )
-        ]
-    }
-}
-
-fn algo_over(
-    ev: On<Pointer<Over>>,
-    settings: Res<AudioSettings>,
-    mut buttons: Query<(&AlgoButton, &mut BackgroundColor)>,
-) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != settings.pitch_algorithm
-    {
-        *bg = BackgroundColor(CHOICE_HOVER);
-    }
-}
-
-fn algo_out(
-    ev: On<Pointer<Out>>,
-    settings: Res<AudioSettings>,
-    mut buttons: Query<(&AlgoButton, &mut BackgroundColor)>,
-) {
-    if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != settings.pitch_algorithm
-    {
-        *bg = BackgroundColor(button::color_default());
-    }
-}
-
-/// Recolour the algorithm buttons when the selection changes (green = chosen).
-fn algo_button_visuals(
-    settings: Res<AudioSettings>,
-    mut buttons: Query<(&AlgoButton, &mut BackgroundColor)>,
-) {
-    if !settings.is_changed() {
-        return;
-    }
-    for (button, mut bg) in &mut buttons {
-        bg.0 = if button.0 == settings.pitch_algorithm {
-            CHOICE_SELECTED
-        } else {
-            button::color_default()
-        };
-    }
-}
-
-/// A read-only box explaining the currently selected pitch algorithm.
-fn spawn_algo_explanation(commands: &mut Commands, parent: Entity, selected: PitchAlgorithm) {
-    let panel = commands
-        .spawn((
-            Node {
-                width: Val::Px(560.0),
-                padding: UiRect::all(Val::Px(10.0)),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
-        ))
-        .id();
-    commands.entity(panel).with_children(|p| {
-        p.spawn((
-            Text::new(selected.description()),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.75, 0.78, 0.88)),
-            AlgoExplanation,
-        ));
-    });
-    commands.entity(parent).add_child(panel);
-}
-
-/// Keep the explanation box in step with the chosen algorithm.
-fn update_algo_explanation(
-    settings: Res<AudioSettings>,
-    mut texts: Query<&mut Text, With<AlgoExplanation>>,
-) {
-    if !settings.is_changed() {
-        return;
-    }
-    for mut text in &mut texts {
-        *text = Text::new(settings.pitch_algorithm.description());
     }
 }
 

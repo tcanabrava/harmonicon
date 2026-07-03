@@ -27,8 +27,13 @@ pub struct GridConfig {
 impl GridConfig {
     pub fn for_2d() -> Self {
         Self {
-            cell_width: Val::Vw(6.5),
-            cell_height: Val::Vh(5.0),
+            // Fixed px (not Vw/Vh) so `UiScale` affects these cells the same
+            // way it affects everything else — viewport units resolve
+            // straight from the physical window size and don't multiply by
+            // the scale factor at all, so the grid used to stay a fixed size
+            // on screen while its own text scaled independently.
+            cell_width: Val::Px(120.0),
+            cell_height: Val::Px(54.0),
             chord_font_size: 17.0,
             bar_num_font_size: 9.0,
             col_gap: 3.0,

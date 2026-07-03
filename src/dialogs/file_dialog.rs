@@ -453,12 +453,11 @@ fn dialog_keys(
             if keyboard.just_pressed(KeyCode::Escape) {
                 keyboard.clear_just_pressed(KeyCode::Escape);
                 close(&mut dialog, &roots, next_state, &mut commands);
-            } else if keyboard.just_pressed(KeyCode::Backspace) {
-                if let Some(parent) = dialog.dir.parent() {
+            } else if keyboard.just_pressed(KeyCode::Backspace)
+                && let Some(parent) = dialog.dir.parent() {
                     dialog.dir = parent.to_path_buf();
                     refresh_req.write(RefreshFileList);
                 }
-            }
         }
     }
 }

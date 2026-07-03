@@ -75,6 +75,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<bending_trainer::TrainerKey>()
         .init_resource::<bending_trainer::TrainerTarget>()
         .init_resource::<bending_trainer::DrillState>()
+        .init_resource::<jam_session::JamLoop>()
         // Setup: shared pause menu + mode-specific scenes
         .add_systems(
             OnEnter(AppState::Playing),
@@ -159,6 +160,15 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             harmonica_overlay::update_harmonica_overlay.run_if(
+                in_state(AppState::Playing)
+                    .and_then(|p: Res<Paused>| !p.0)
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+            ),
+        )
+        // Jam Session: music loop toggle + its readout.
+        .add_systems(
+            Update,
+            (jam_session::apply_jam_loop_toggle, jam_session::update_jam_loop_label).run_if(
                 in_state(AppState::Playing)
                     .and_then(|p: Res<Paused>| !p.0)
                     .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
@@ -828,11 +838,10 @@ fn score_notes(
                 // Track pitch/loudness through the hold so a declared vibrato
                 // or wah can be verified (rather than trusted) once it ends.
                 if note.modifiers.iter().any(is_sustained_technique) {
-                    if let Some(hz) = active_frequency_for(&active.0, &note.expected_pitch) {
-                        if let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch) {
+                    if let Some(hz) = active_frequency_for(&active.0, &note.expected_pitch)
+                        && let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch) {
                             note.pitch_samples.push(1200.0 * (hz / expected_hz).log2());
                         }
-                    }
                     note.amp_samples.push(rms(&frame.samples));
                 }
             } else {
@@ -840,9 +849,7 @@ fn score_notes(
 
                 let sustained: Vec<Modifier> = note
                     .modifiers
-                    .iter()
-                    .cloned()
-                    .filter(is_sustained_technique)
+                    .iter().filter(|&x| is_sustained_technique(x)).cloned()
                     .collect();
                 if !sustained.is_empty() {
                     let (verified, unverified): (Vec<Modifier>, Vec<Modifier>) =
@@ -892,9 +899,7 @@ fn score_notes(
                 // rather than falling through to the "normal" bucket.
                 let immediate: Vec<Modifier> = note
                     .modifiers
-                    .iter()
-                    .cloned()
-                    .filter(|m| !is_sustained_technique(m))
+                    .iter().filter(|&m| !is_sustained_technique(m)).cloned()
                     .collect();
                 if note.modifiers.is_empty() || !immediate.is_empty() {
                     stats.record_technique(&immediate, true);

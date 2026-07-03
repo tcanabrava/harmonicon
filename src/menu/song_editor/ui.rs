@@ -715,7 +715,6 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                         Pickable::IGNORE,
                     ));
                 });
-                drop(btn);
 
                 if field == Field::Music {
                     line.spawn((

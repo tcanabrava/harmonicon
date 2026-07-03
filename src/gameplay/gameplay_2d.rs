@@ -615,7 +615,11 @@ fn spawn_harmonica_strip(
             row.spawn((
                 Node {
                     width: Val::Percent(LANE_PCT),
-                    height: Val::Vh(9.0),
+                    // Fixed px, not Vh — Vh resolves from the physical
+                    // viewport and doesn't respond to `UiScale`, unlike this
+                    // cell's own text, so the cell would stay a fixed size on
+                    // screen while its labels scaled independently.
+                    height: Val::Px(96.0),
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::SpaceAround,

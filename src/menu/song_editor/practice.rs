@@ -320,7 +320,7 @@ pub(super) fn practice_tick(
 pub(super) fn freq_matches(detected: f32, expected: f32) -> bool {
     if expected <= 0.0 { return false; }
     let ratio = detected / expected;
-    ratio >= 1.0 / PITCH_TOLERANCE && ratio <= PITCH_TOLERANCE
+    (1.0 / PITCH_TOLERANCE..=PITCH_TOLERANCE).contains(&ratio)
 }
 
 /// Nearest MIDI note name for a raw frequency (used in "you played X" messages).

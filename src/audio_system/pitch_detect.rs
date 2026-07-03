@@ -385,7 +385,7 @@ fn first_dip_below(cmnd: &[f32], tau_min: usize, tau_max: usize, threshold: f32)
     let mut tau = tau_min;
     while tau <= tau_max {
         if cmnd[tau] < threshold {
-            while tau + 1 <= tau_max && cmnd[tau + 1] < cmnd[tau] {
+            while tau < tau_max && cmnd[tau + 1] < cmnd[tau] {
                 tau += 1;
             }
             return Some(tau);

@@ -71,6 +71,7 @@ fn main() {
         GameplayPlugin,
         SpectrogramPlugin,
         SettingsPlugin,
+        harmonicon::dialogs::algo_picker::AlgoPickerPlugin,
         harmonicon::dialogs::file_dialog::FileDialogsPlugin,
         harmonicon::dialogs::font_fallback::FontFallbackPlugin,
     ));

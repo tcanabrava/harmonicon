@@ -2,10 +2,14 @@
 
 use std::collections::{HashMap, HashSet};
 
+use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use crate::{
+    dialogs::button,
     menu::SelectedSong,
+    settings::AudioSettings,
     song::SongManifest,
     song::chart::Action,
     song::harmonica::{Harmonica, blues_scale_classes, harp_banner, semitone, twelve_bar},
@@ -18,7 +22,10 @@ use super::countdown_overlay::spawn_countdown;
 use super::harmonica_overlay::spawn_harmonica_overlay;
 use super::metronome_overlay::spawn_metronome;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::{ActivePitches, COUNTDOWN, GameplayClock, GameplayRoot, MusicStarted, current_bar_index, secs_per_bar};
+use super::{
+    ActivePitches, COUNTDOWN, GameplayClock, GameplayRoot, MusicPlayer, MusicStarted,
+    current_bar_index, secs_per_bar,
+};
 
 /// Free-play screen: left half shows the 12-bar chart and the metronome stacked
 /// vertically; the right half is reserved for a future jam feature. The shared
@@ -115,6 +122,26 @@ pub fn setup(
                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                 ));
                 left.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(8.0),
+                    ..default()
+                })
+                .with_children(|row| {
+                    row.spawn_empty().apply_scene(button::small(
+                        "\u{21BB} Loop",
+                        |_: On<Pointer<Click>>, mut jam_loop: ResMut<JamLoop>| {
+                            jam_loop.0 = !jam_loop.0;
+                        },
+                    ));
+                    row.spawn((
+                        Text::new("Loop: off"),
+                        TextFont { font_size: FontSize::Px(13.0), ..default() },
+                        TextColor(Color::srgb(0.70, 0.70, 0.80)),
+                        JamLoopLabel,
+                    ));
+                });
+                left.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(4.0),
                     ..default()
@@ -160,6 +187,69 @@ pub fn setup(
     // Jam already shows the harp hint on the persistent left panel, so the
     // countdown doesn't repeat it.
     spawn_countdown(&mut commands, None);
+}
+
+// ── Music loop toggle ────────────────────────────────────────────────────────
+
+/// Whether Jam Session should restart its background music from the top when
+/// it reaches the end, instead of just letting it stop. Off by default; a
+/// user preference that (intentionally) persists across songs within a jam.
+#[derive(Resource, Default)]
+pub struct JamLoop(pub bool);
+
+/// The "Loop: on/off" readout, kept in step with [`JamLoop`].
+#[derive(Component)]
+pub struct JamLoopLabel;
+
+/// Keeps the "Loop: ..." readout in step with the toggle.
+pub fn update_jam_loop_label(jam_loop: Res<JamLoop>, mut labels: Query<&mut Text, With<JamLoopLabel>>) {
+    if !jam_loop.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(if jam_loop.0 { "Loop: on" } else { "Loop: off" });
+    }
+}
+
+/// Playback settings for (re)starting the jam's music at `at_secs`: looping
+/// or not per `loop_enabled`, resuming from the given position rather than
+/// jumping back to the top. Split out from the system so the decision itself
+/// (loop vs. once, and where it resumes) is unit-testable without spinning up
+/// an `App`.
+fn jam_playback_settings(loop_enabled: bool, at_secs: f64) -> PlaybackSettings {
+    let base = if loop_enabled { PlaybackSettings::LOOP } else { PlaybackSettings::ONCE };
+    base.with_start_position(std::time::Duration::from_secs_f64(at_secs.max(0.0)))
+}
+
+/// Restarts the background music when the Loop toggle changes mid-jam, so
+/// flipping it takes effect immediately instead of only applying the next
+/// time a song starts. Picks up from the current position (rather than
+/// jumping back to the top) so toggling it doesn't itself restart the jam.
+pub fn apply_jam_loop_toggle(
+    jam_loop: Res<JamLoop>,
+    music_started: Res<MusicStarted>,
+    clock: Res<GameplayClock>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    audio: Res<AudioSettings>,
+    existing: Query<Entity, With<MusicPlayer>>,
+    mut commands: Commands,
+) {
+    if !jam_loop.is_changed() || !music_started.0 {
+        return;
+    }
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    for e in &existing {
+        commands.entity(e).despawn();
+    }
+    commands.spawn((
+        AudioPlayer::<AudioSource>(manifest.music.clone()),
+        jam_playback_settings(jam_loop.0, clock.0).with_volume(Volume::Linear(audio.music_volume)),
+        MusicPlayer,
+        GameplayRoot,
+    ));
 }
 
 // ── Live harmonica hole map ─────────────────────────────────────────────────────
@@ -379,6 +469,35 @@ pub fn update_hole_map(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::audio::PlaybackMode;
+
+    // ── jam_playback_settings ────────────────────────────────────────────────
+
+    #[test]
+    fn loop_enabled_selects_loop_mode() {
+        let settings = jam_playback_settings(true, 0.0);
+        assert!(matches!(settings.mode, PlaybackMode::Loop));
+    }
+
+    #[test]
+    fn loop_disabled_selects_once_mode() {
+        let settings = jam_playback_settings(false, 0.0);
+        assert!(matches!(settings.mode, PlaybackMode::Once));
+    }
+
+    #[test]
+    fn resumes_from_the_given_position_not_the_top() {
+        let settings = jam_playback_settings(true, 42.5);
+        assert_eq!(settings.start_position, Some(std::time::Duration::from_secs_f64(42.5)));
+    }
+
+    #[test]
+    fn a_negative_clock_clamps_to_the_start() {
+        // The clock is negative during the pre-roll countdown; toggling loop
+        // then shouldn't ask for a negative start position.
+        let settings = jam_playback_settings(true, -1.5);
+        assert_eq!(settings.start_position, Some(std::time::Duration::ZERO));
+    }
 
     /// Standard Richter C diatonic, matching `harmonica.rs`'s test layout.
     fn c_harp() -> Harmonica {

@@ -15,8 +15,10 @@ use bevy::prelude::*;
 
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::audio_system::wav::encode_wav;
+use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
 use crate::dialogs::button;
 use crate::menu::AppState;
+use crate::settings::AudioSettings;
 use crate::song::chart::{BendingProfile, DiatonicLayout};
 use crate::song::harmonica::Harmonica;
 
@@ -349,6 +351,7 @@ pub fn setup(
     mut tempo: ResMut<MetronomeTempo>,
     key: Res<TrainerKey>,
     target: Res<TrainerTarget>,
+    audio: Res<AudioSettings>,
 ) {
     clock.0 = 0.0;
     tempo.beats_per_bar = 4;
@@ -519,14 +522,21 @@ pub fn setup(
                         spawn_harmonica_overlay(host, &richter_harp(&key.0));
                     });
 
-                // How-to hint + Drill explanation, stacked beside the diagram.
-                row.spawn(Node {
+                // Algorithm picker, how-to hint, and Drill explanation, stacked
+                // beside the diagram. Same picker as Options (it drives the
+                // same global setting) — surfaced here too so a player can
+                // compare algorithms while actually bending notes.
+                let mut side_col = row.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     width: Val::Px(280.0),
                     row_gap: Val::Px(8.0),
                     ..default()
-                })
-                .with_children(|col| {
+                });
+                let side_col_id = side_col.id();
+                side_col.with_children(|col| {
+                    spawn_algo_row(col.commands_mut(), side_col_id, Some("Detect"), audio.pitch_algorithm);
+                    spawn_algo_explanation(col.commands_mut(), side_col_id, 260.0, audio.pitch_algorithm);
+
                     col.spawn((
                         Node { padding: UiRect::all(Val::Px(8.0)), ..default() },
                         BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),

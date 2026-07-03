@@ -175,18 +175,14 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         if let Some(b) = song["tempo_bpm"].as_f64() {
             state.tempo = format!("{}", b.round() as u32);
         }
-        if let Some(k) = song["key"].as_str() {
-            if HARP_KEYS.contains(&k) { state.key = k.to_string(); }
-        }
+        if let Some(k) = song["key"].as_str()
+            && HARP_KEYS.contains(&k) { state.key = k.to_string(); }
     }
-    if let Some(p) = v["harmonica"]["position"].as_str() {
-        if POSITIONS.contains(&p) { state.position = p.to_string(); }
-    }
-    if let Some(meta) = v.get("metadata") {
-        if let Some(audio) = meta["audio_file"].as_str() {
-            if !audio.is_empty() { state.music = audio.to_string(); }
-        }
-    }
+    if let Some(p) = v["harmonica"]["position"].as_str()
+        && POSITIONS.contains(&p) { state.position = p.to_string(); }
+    if let Some(meta) = v.get("metadata")
+        && let Some(audio) = meta["audio_file"].as_str()
+            && !audio.is_empty() { state.music = audio.to_string(); }
 
     let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
     let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
@@ -276,12 +272,11 @@ pub(super) fn handle_save_chosen(
     for ev in chosen.read() {
         if ev.purpose != SAVE_PURPOSE { continue; }
         let json = serialize_harpchart(&state);
-        if let Some(parent) = ev.path.parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
+        if let Some(parent) = ev.path.parent()
+            && let Err(e) = std::fs::create_dir_all(parent) {
                 println!("Save failed (mkdir): {e}");
                 continue;
             }
-        }
         match std::fs::write(&ev.path, json.as_bytes()) {
             Ok(()) => println!("Saved: {}", ev.path.display()),
             Err(e) => println!("Save failed (write): {e}"),

@@ -6,11 +6,12 @@ use bevy::{
 };
 
 use crate::{
-    menu::{AppState, SelectedSong},
+    menu::{AppState, GameplayMode, SelectedSong},
     settings::AudioSettings,
     song::SongManifest,
 };
 
+use super::jam_session::JamLoop;
 use super::{GameplayClock, GameplayRoot, MusicPlayer, MusicStarted, Paused};
 
 #[derive(Component, Default, Clone)]
@@ -80,6 +81,8 @@ pub fn update_countdown(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     audio: Res<AudioSettings>,
+    mode: Res<GameplayMode>,
+    jam_loop: Res<JamLoop>,
     mut commands: Commands,
 ) {
     if clock.0 >= 0.0 {
@@ -89,9 +92,16 @@ pub fn update_countdown(
         if !music_started.0 {
             music_started.0 = true;
             if let Some(manifest) = manifests.get(&selected.0) {
+                // Only Jam Session offers looping — scored modes end the song
+                // and move on to the results screen.
+                let settings = if *mode == GameplayMode::JamSession && jam_loop.0 {
+                    PlaybackSettings::LOOP
+                } else {
+                    PlaybackSettings::ONCE
+                };
                 commands.spawn((
                     AudioPlayer::<AudioSource>(manifest.music.clone()),
-                    PlaybackSettings::ONCE.with_volume(Volume::Linear(audio.music_volume)),
+                    settings.with_volume(Volume::Linear(audio.music_volume)),
                     MusicPlayer,
                     GameplayRoot,
                 ));

@@ -101,7 +101,7 @@ pub(super) fn rebuild_grid(
     for col in 0..=cols {
         let beat = state.scroll_beat + col;
         let x = beat as f32 * BEAT_W;
-        let is_bar = beat % BEATS_PER_BAR == 0;
+        let is_bar = beat.is_multiple_of(BEATS_PER_BAR);
         // Tiles the standard 12-bar-blues form indefinitely as the user
         // scrolls, so the grid reads as harmonic function (I/IV/V) even for
         // charts longer than 12 bars.
