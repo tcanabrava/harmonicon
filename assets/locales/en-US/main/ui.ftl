@@ -59,6 +59,7 @@ mod-delete = Delete
 # Song Editor 2 — meta-form field labels
 editor-field-tempo = Music Tempo
 editor-field-key = Harp Key
+editor-field-position = Position
 editor-field-music = Background Music
 editor-field-name = Name
 editor-field-author = Author

@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::dialogs::file_dialog::FileChosen;
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
-use super::state::{Dir, EditorState, Expr, GridNote, Pitch, Scroll, HARP_KEYS};
+use super::state::{Dir, EditorState, Expr, GridNote, Pitch, Scroll, HARP_KEYS, POSITIONS};
 use super::playback::{C_BLOW, C_DRAW, key_offset};
 
 // ── Serialisation ────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
         "harmonica": {
             "type": "diatonic",
             "holes": 10,
-            "position": "2nd",
+            "position": state.position,
             "bending_profile": "richter_standard",
             "layout": { "blow": C_BLOW, "draw": C_DRAW }
         },
@@ -178,6 +178,9 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         if let Some(k) = song["key"].as_str() {
             if HARP_KEYS.contains(&k) { state.key = k.to_string(); }
         }
+    }
+    if let Some(p) = v["harmonica"]["position"].as_str() {
+        if POSITIONS.contains(&p) { state.position = p.to_string(); }
     }
     if let Some(meta) = v.get("metadata") {
         if let Some(audio) = meta["audio_file"].as_str() {

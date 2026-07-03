@@ -16,7 +16,7 @@ use super::{
     HOLE_COL_W, HEADER_H, ROW_H, BEAT_W, ROWS, NOTE_PAD,
     SAVE_PURPOSE, LOAD_PURPOSE, MUSIC_PURPOSE,
 };
-use super::state::{EditorState, Mode, Scroll, Field, FIELDS, HARP_KEYS};
+use super::state::{EditorState, Mode, Scroll, Field, FIELDS, HARP_KEYS, POSITIONS};
 use super::playback::{Playhead, EditorAudio, EditorProgressFill, PlayheadLine, start_playback, toggle_pause};
 use super::harpchart::safe_path_segment;
 use super::interaction::apply_modifier;
@@ -691,6 +691,14 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                             .position(|&k| k == state.key.as_str())
                             .unwrap_or(0);
                         state.key = HARP_KEYS[(idx + 1) % HARP_KEYS.len()].into();
+                    });
+                } else if field == Field::Position {
+                    btn.observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                        let idx = POSITIONS
+                            .iter()
+                            .position(|&p| p == state.position.as_str())
+                            .unwrap_or(0);
+                        state.position = POSITIONS[(idx + 1) % POSITIONS.len()].into();
                     });
                 } else {
                     btn.observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {

@@ -122,7 +122,8 @@ mod tests {
     use super::interaction::{apply_modifier, select_or_add};
     use super::ui::ModButton;
     use super::playback::{encode_wav, key_offset, note_freq, render_pcm, SAMPLE_RATE};
-    use super::harpchart::serialize_harpchart;
+    use super::harpchart::{load_harpchart, serialize_harpchart};
+    use super::state::Scroll;
     use super::grid::{mix_srgba, note_in_scale};
     use crate::song::harmonica::blues_scale_classes;
     use super::{BEAT_W, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -395,6 +396,32 @@ mod tests {
 
         let single = &track[0];
         assert_eq!(single["events"][0]["note"], "B4");
+    }
+
+    #[test]
+    fn saved_position_round_trips_through_load() {
+        let mut s = EditorState::default();
+        s.position = "3rd".into();
+
+        let json_str = serialize_harpchart(&s);
+        let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+        assert_eq!(v["harmonica"]["position"], "3rd");
+
+        let mut loaded = EditorState::default();
+        let mut scroll = Scroll::default();
+        load_harpchart(&v, &mut loaded, &mut scroll);
+        assert_eq!(loaded.position, "3rd");
+    }
+
+    #[test]
+    fn loading_an_unknown_position_keeps_the_default() {
+        let v: serde_json::Value = serde_json::json!({
+            "harmonica": { "position": "9th" }
+        });
+        let mut loaded = EditorState::default();
+        let mut scroll = Scroll::default();
+        load_harpchart(&v, &mut loaded, &mut scroll);
+        assert_eq!(loaded.position, "2nd");
     }
 
     #[test]

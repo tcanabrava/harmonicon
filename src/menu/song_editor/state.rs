@@ -124,15 +124,17 @@ impl DragState {
 pub(super) enum Field {
     Tempo,
     Key,
+    Position,
     Music,
     Name,
     Author,
 }
 
 /// Each entry pairs a [`Field`] with the localization key used for its label.
-pub(super) const FIELDS: [(Field, &str); 5] = [
+pub(super) const FIELDS: [(Field, &str); 6] = [
     (Field::Tempo, "editor-field-tempo"),
     (Field::Key,   "editor-field-key"),
+    (Field::Position, "editor-field-position"),
     (Field::Music, "editor-field-music"),
     (Field::Name,  "editor-field-name"),
     (Field::Author,"editor-field-author"),
@@ -141,6 +143,11 @@ pub(super) const FIELDS: [(Field, &str); 5] = [
 /// All valid diatonic harp keys in chromatic order.
 pub(super) const HARP_KEYS: [&str; 12] =
     ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+
+/// Playing positions in the order harmonica players commonly reach for them:
+/// 1st (straight), 2nd (cross harp, the blues staple), 3rd through 5th, and
+/// 12th, which jazz players use for its major-scale-friendly hole layout.
+pub(super) const POSITIONS: [&str; 6] = ["1st", "2nd", "3rd", "4th", "5th", "12th"];
 
 // ── Resources ────────────────────────────────────────────────────────────────
 
@@ -153,6 +160,7 @@ pub(super) struct EditorState {
     pub(super) dragging: Option<DragState>,
     pub(super) tempo: String,
     pub(super) key: String,
+    pub(super) position: String,
     pub(super) music: String,
     pub(super) name: String,
     pub(super) author: String,
@@ -173,6 +181,7 @@ impl Default for EditorState {
             dragging: None,
             tempo: "120".into(),
             key: "C".into(),
+            position: "2nd".into(),
             music: String::new(),
             name: String::new(),
             author: String::new(),
@@ -214,6 +223,7 @@ impl EditorState {
         match field {
             Field::Tempo => &self.tempo,
             Field::Key => &self.key,
+            Field::Position => &self.position,
             Field::Music => &self.music,
             Field::Name => &self.name,
             Field::Author => &self.author,
@@ -224,6 +234,7 @@ impl EditorState {
         match field {
             Field::Tempo => &mut self.tempo,
             Field::Key => &mut self.key,
+            Field::Position => &mut self.position,
             Field::Music => &mut self.music,
             Field::Name => &mut self.name,
             Field::Author => &mut self.author,

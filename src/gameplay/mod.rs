@@ -944,6 +944,63 @@ fn cleanup_gameplay(mut commands: Commands, roots: Query<Entity, With<GameplayRo
 mod tests {
     use super::*;
 
+    // ── TechniqueStats / SongStats::record_technique ───────────────────────
+
+    #[test]
+    fn technique_stats_accuracy_is_none_when_never_exercised() {
+        assert_eq!(TechniqueStats::default().accuracy(), None);
+    }
+
+    #[test]
+    fn technique_stats_accuracy_divides_hits_by_total() {
+        let s = TechniqueStats { hits: 3, misses: 1 };
+        assert_eq!(s.total(), 4);
+        assert!((s.accuracy().unwrap() - 0.75).abs() < 1e-6);
+    }
+
+    #[test]
+    fn record_technique_with_no_modifiers_goes_to_normal() {
+        let mut stats = SongStats::default();
+        stats.record_technique(&[], true);
+        stats.record_technique(&[], false);
+        assert_eq!(stats.normal.hits, 1);
+        assert_eq!(stats.normal.misses, 1);
+        assert_eq!(stats.bend.total(), 0);
+    }
+
+    #[test]
+    fn record_technique_routes_each_modifier_to_its_own_bucket() {
+        let mut stats = SongStats::default();
+        stats.record_technique(&[Modifier::Bend { semitones: -1.0, intensity: None }], true);
+        stats.record_technique(&[Modifier::Overblow], false);
+        stats.record_technique(&[Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }], true);
+        stats.record_technique(&[Modifier::WahWah { oscillation_hz: 3.0, intensity: None }], true);
+        stats.record_technique(&[Modifier::Overdraw], true);
+
+        assert_eq!(stats.bend.hits, 1);
+        assert_eq!(stats.overblow.misses, 1);
+        assert_eq!(stats.vibrato.hits, 1);
+        assert_eq!(stats.wah.hits, 1);
+        assert_eq!(stats.overdraw.hits, 1);
+        assert_eq!(stats.normal.total(), 0, "no plain notes were recorded");
+    }
+
+    #[test]
+    fn record_technique_with_two_modifiers_credits_both() {
+        // A note that's both bent and vibrato'd counts as a data point for
+        // both techniques' accuracy — hitting/missing it is informative for both.
+        let mut stats = SongStats::default();
+        stats.record_technique(
+            &[
+                Modifier::Bend { semitones: -1.0, intensity: None },
+                Modifier::Vibrato { oscillation_hz: 5.0, intensity: None },
+            ],
+            true,
+        );
+        assert_eq!(stats.bend.hits, 1);
+        assert_eq!(stats.vibrato.hits, 1);
+    }
+
     #[test]
     fn parse_beats_4_4() {
         assert_eq!(parse_beats(Some("4/4")), 4.0);

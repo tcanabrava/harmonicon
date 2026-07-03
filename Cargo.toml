@@ -33,6 +33,7 @@ unic-langid = "0.9"
 # Detect the OS UI language so the game starts in the player's locale.
 sys-locale = "0.3"
 regex = "1.12.4"
+rand = "0.10"
 
 [features]
 # Fast local iteration: dynamic-links Bevy and enables its dev tools + asset

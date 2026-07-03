@@ -57,6 +57,7 @@ mod-delete = Apagar
 # Editor de Músicas 2 — rótulos dos campos de metadados
 editor-field-tempo = Andamento da Música
 editor-field-key = Tom do Gaita
+editor-field-position = Posição
 editor-field-music = Música de Fundo
 editor-field-name = Nome
 editor-field-author = Autor
