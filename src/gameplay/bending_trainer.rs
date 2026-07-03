@@ -398,7 +398,7 @@ pub fn setup(
                         target.technique = target.technique.next();
                     },
                 ));
-                row.spawn_empty().apply_scene(button::default(
+                row.spawn_empty().apply_scene(button::small(
                     "\u{1F50A} Listen",
                     |_: On<Pointer<Click>>,
                      key: Res<TrainerKey>,
@@ -432,7 +432,7 @@ pub fn setup(
                 ..default()
             })
             .with_children(|row| {
-                row.spawn_empty().apply_scene(button::default(
+                row.spawn_empty().apply_scene(button::small(
                     "\u{1F3B2} Drill",
                     |_: On<Pointer<Click>>,
                      key: Res<TrainerKey>,
