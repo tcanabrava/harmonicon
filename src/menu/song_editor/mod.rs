@@ -116,17 +116,17 @@ impl Plugin for SongEditor2Plugin {
 #[cfg(test)]
 mod tests {
     use super::state::{
-        apply_resize, can_place, enforce_direction, enforce_expr, move_target, Dir, EditorState,
-        Edge, Expr, GridNote, Pitch,
+        apply_resize, can_place, enforce_direction, enforce_expr, move_target, note_rect, Dir,
+        EditorState, Edge, Expr, GridNote, Pitch,
     };
     use super::interaction::{apply_modifier, select_or_add};
     use super::ui::ModButton;
-    use super::playback::{encode_wav, key_offset, note_freq, render_pcm, SAMPLE_RATE};
-    use super::harpchart::{load_harpchart, serialize_harpchart};
+    use super::playback::{encode_wav, envelope, key_offset, note_freq, render_pcm, SAMPLE_RATE};
+    use super::harpchart::{load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart};
     use super::state::Scroll;
-    use super::grid::{mix_srgba, note_in_scale};
+    use super::grid::{mix_srgba, note_in_scale, visible_beats};
     use crate::song::harmonica::blues_scale_classes;
-    use super::{BEAT_W, ROW_H, TICK_W, TICKS_PER_BEAT};
+    use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 
     #[test]
     fn click_adds_then_selects_without_duplicating() {
@@ -453,5 +453,153 @@ mod tests {
         // how a blues player accesses that blue note. Should read as in-scale.
         let bent = GridNote { id: 0, hole: 3, tick: 0, len: 1, dir: Dir::Draw, pitch: Pitch::Bend(1.5), expr: Expr::None };
         assert!(note_in_scale(&bent, 0, &scale), "bending down 1.5 steps reaches Bb, the b7 — in scale");
+    }
+
+    // ── safe_path_segment ────────────────────────────────────────────────────────
+
+    #[test]
+    fn safe_path_segment_keeps_alphanumerics_and_hyphens() {
+        assert_eq!(safe_path_segment("Windy-City Swing2"), "Windy-City_Swing2");
+    }
+
+    #[test]
+    fn safe_path_segment_strips_traversal_and_separators() {
+        // Every path separator/traversal character becomes an underscore, and
+        // runs of them collapse rather than leaving "..", "/", or "\" intact.
+        assert_eq!(safe_path_segment("../../etc/passwd"), "etc_passwd");
+        assert_eq!(safe_path_segment("a/b\\c"), "a_b_c");
+    }
+
+    #[test]
+    fn safe_path_segment_trims_and_collapses_whitespace_punctuation() {
+        assert_eq!(safe_path_segment("  My Song!!  "), "My_Song");
+    }
+
+    #[test]
+    fn safe_path_segment_of_all_punctuation_is_empty() {
+        assert_eq!(safe_path_segment("###"), "");
+        assert_eq!(safe_path_segment(""), "");
+    }
+
+    // ── parse_pitch_expr ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_pitch_expr_reads_bend_semitones_as_negative() {
+        let mods = vec![serde_json::json!({ "type": "bend", "semitones": -1.5 })];
+        let (pitch, expr) = parse_pitch_expr(&mods);
+        assert_eq!(pitch, Pitch::Bend(1.5));
+        assert_eq!(expr, Expr::None);
+    }
+
+    #[test]
+    fn parse_pitch_expr_reads_overblow_overdraw_vibrato_wah() {
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "overblow" })]).0,
+            Pitch::Overblow
+        );
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "overdraw" })]).0,
+            Pitch::Overdraw
+        );
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "vibrato" })]).1,
+            Expr::Vibrato
+        );
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah" })]).1,
+            Expr::Wah
+        );
+    }
+
+    #[test]
+    fn parse_pitch_expr_defaults_for_empty_or_unknown_modifiers() {
+        assert_eq!(parse_pitch_expr(&[]), (Pitch::Normal, Expr::None));
+        let unknown = vec![serde_json::json!({ "type": "flutter" })];
+        assert_eq!(parse_pitch_expr(&unknown), (Pitch::Normal, Expr::None));
+    }
+
+    // ── note_rect ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
+        let note = GridNote { id: 0, hole: 1, tick: 0, len: 1, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None };
+        let (left, top, width, height) = note_rect(&note);
+        assert_eq!(left, 1.0);
+        assert_eq!(top, HEADER_H + NOTE_PAD);
+        assert_eq!(width, TICK_W - 2.0);
+        assert_eq!(height, ROW_H - 2.0 * NOTE_PAD);
+    }
+
+    #[test]
+    fn note_rect_advances_one_row_per_hole_and_scales_width_with_len() {
+        let a = GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None };
+        let b = GridNote { id: 1, hole: 2, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None };
+        let (_, top_a, width_a, _) = note_rect(&a);
+        let (_, top_b, width_b, _) = note_rect(&b);
+        assert_eq!(top_b - top_a, ROW_H, "hole 2 sits exactly one row below hole 1");
+        assert_eq!(width_a, width_b);
+        assert_eq!(width_a, 3.0 * TICK_W - 2.0);
+    }
+
+    // ── visible_beats ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn visible_beats_covers_the_window_with_one_extra_partial_beat() {
+        // Window exactly wide enough for 5 beats past the hole column still
+        // gets a +1 so a partially-scrolled beat at the edge still renders.
+        let win_w = HOLE_COL_W + 5.0 * BEAT_W;
+        assert_eq!(visible_beats(win_w), 6);
+    }
+
+    #[test]
+    fn visible_beats_rounds_up_a_partial_beat() {
+        let win_w = HOLE_COL_W + 5.5 * BEAT_W;
+        assert_eq!(visible_beats(win_w), 7);
+    }
+
+    #[test]
+    fn visible_beats_never_goes_negative_for_a_narrow_window() {
+        // Window narrower than the hole column alone: ceil() of a negative
+        // fraction still produces a small, non-panicking usize.
+        assert_eq!(visible_beats(HOLE_COL_W), 1);
+    }
+
+    // ── envelope ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn envelope_starts_at_zero_and_stays_in_unit_range() {
+        let dur = SAMPLE_RATE as usize; // 1 second, comfortably longer than attack+release
+        for i in [0, 100, dur / 2, dur - 100, dur - 1] {
+            let e = envelope(i, dur);
+            assert!((0.0..=1.0).contains(&e), "envelope({i}, {dur}) = {e} out of range");
+        }
+        assert_eq!(envelope(0, dur), 0.0);
+    }
+
+    #[test]
+    fn envelope_reaches_full_sustain_between_attack_and_release() {
+        let dur = SAMPLE_RATE as usize;
+        assert_eq!(envelope(dur / 2, dur), 1.0);
+    }
+
+    #[test]
+    fn envelope_ramps_down_toward_the_note_end() {
+        let dur = SAMPLE_RATE as usize;
+        let near_end = envelope(dur - 10, dur);
+        let mid = envelope(dur / 2, dur);
+        assert!(near_end < mid, "release should pull the tail down from full sustain");
+    }
+
+    #[test]
+    fn envelope_of_a_very_short_note_never_panics_or_exceeds_unity() {
+        // Duration shorter than the release window entirely: `dur > release`
+        // is false, so only the attack ramp applies — this must not panic
+        // on the `dur - i` subtraction inside the (skipped) release branch.
+        for dur in [0usize, 1, 10, 100] {
+            for i in 0..dur {
+                let e = envelope(i, dur);
+                assert!((0.0..=1.0).contains(&e));
+            }
+        }
     }
 }

@@ -317,16 +317,127 @@ pub(super) fn practice_tick(
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 /// True when `detected` is within ±50 cents of `expected`.
-fn freq_matches(detected: f32, expected: f32) -> bool {
+pub(super) fn freq_matches(detected: f32, expected: f32) -> bool {
     if expected <= 0.0 { return false; }
     let ratio = detected / expected;
     ratio >= 1.0 / PITCH_TOLERANCE && ratio <= PITCH_TOLERANCE
 }
 
 /// Nearest MIDI note name for a raw frequency (used in "you played X" messages).
-fn freq_to_name(freq: f32) -> String {
+pub(super) fn freq_to_name(freq: f32) -> String {
     if freq <= 0.0 { return String::new(); }
     let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
     if !(0..=127).contains(&midi) { return String::new(); }
     midi_to_note(midi)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::menu::song_editor::interaction::select_or_add;
+    use crate::menu::song_editor::state::{Dir, Expr, GridNote, Pitch};
+
+    fn state_with_notes(key: &str, placements: &[(u8, usize)]) -> EditorState {
+        let mut state = EditorState::default();
+        state.key = key.into();
+        for &(hole, tick) in placements {
+            select_or_add(&mut state, hole, tick);
+        }
+        state
+    }
+
+    // ── freq_matches ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn freq_matches_exact_pitch() {
+        assert!(freq_matches(440.0, 440.0));
+    }
+
+    #[test]
+    fn freq_matches_within_fifty_cents_either_direction() {
+        // 2^(0.5/12) ≈ the ±50-cent boundary ratio.
+        assert!(freq_matches(440.0 * 1.029, 440.0));
+        assert!(freq_matches(440.0 / 1.029, 440.0));
+    }
+
+    #[test]
+    fn freq_matches_rejects_beyond_fifty_cents() {
+        assert!(!freq_matches(440.0 * 1.06, 440.0));
+        assert!(!freq_matches(440.0 / 1.06, 440.0));
+    }
+
+    #[test]
+    fn freq_matches_rejects_nonpositive_expected() {
+        assert!(!freq_matches(440.0, 0.0));
+        assert!(!freq_matches(440.0, -10.0));
+    }
+
+    // ── freq_to_name ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn freq_to_name_identifies_concert_pitch() {
+        assert_eq!(freq_to_name(440.0), "A4");
+    }
+
+    #[test]
+    fn freq_to_name_is_empty_for_silence_or_invalid_input() {
+        assert_eq!(freq_to_name(0.0), "");
+        assert_eq!(freq_to_name(-5.0), "");
+    }
+
+    // ── build_schedule ───────────────────────────────────────────────────────
+
+    #[test]
+    fn build_schedule_sorts_notes_by_start_time() {
+        let state = state_with_notes("C", &[(3, 8), (2, 0), (5, 4)]);
+        let schedule = build_schedule(&state);
+        let starts: Vec<f64> = schedule.iter().map(|n| n.start_secs).collect();
+        let mut sorted = starts.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(starts, sorted);
+    }
+
+    #[test]
+    fn build_schedule_matches_note_freq_and_applies_key_transposition() {
+        let state = state_with_notes("D", &[(2, 0)]);
+        let schedule = build_schedule(&state);
+        assert_eq!(schedule.len(), 1);
+        let k_off = key_offset(&state.key);
+        let expected_freq = note_freq(&state.notes[0], k_off).unwrap();
+        assert_eq!(schedule[0].expected_freq, expected_freq);
+        // A C-harp draw-2 in D (up a whole step) should not equal the C-key freq.
+        let c_state = state_with_notes("C", &[(2, 0)]);
+        let c_freq = note_freq(&c_state.notes[0], key_offset(&c_state.key)).unwrap();
+        assert_ne!(expected_freq, c_freq);
+    }
+
+    #[test]
+    fn build_schedule_derives_timing_from_tempo_and_tick_length() {
+        let mut state = state_with_notes("C", &[(2, 0)]);
+        state.tempo = "120".into();
+        let schedule = build_schedule(&state);
+        let secs_per_tick = 60.0 / 120.0 / TICKS_PER_BEAT as f64;
+        assert_eq!(schedule[0].start_secs, 0.0);
+        assert_eq!(
+            schedule[0].end_secs,
+            state.notes[0].len as f64 * secs_per_tick
+        );
+    }
+
+    #[test]
+    fn build_schedule_skips_notes_with_no_resolvable_frequency() {
+        // Hole 0 is out of the harp's 1..=10 range, so note_freq returns None
+        // and the note must be dropped rather than panicking or defaulting.
+        let mut state = EditorState::default();
+        state.notes.push(GridNote {
+            id: 0,
+            hole: 0,
+            tick: 0,
+            len: 4,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        });
+        assert!(build_schedule(&state).is_empty());
+    }
 }

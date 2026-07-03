@@ -467,3 +467,225 @@ fn validate(chart: &Value) {
         std::process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use midly::num::{u15, u24, u28, u4, u7};
+    use midly::{Format, Header, Timing};
+
+    fn meta(delta: u32, kind: MetaMessage<'static>) -> midly::TrackEvent<'static> {
+        midly::TrackEvent { delta: u28::from(delta), kind: TrackEventKind::Meta(kind) }
+    }
+
+    fn note_on(delta: u32, key: u8, vel: u8) -> midly::TrackEvent<'static> {
+        midly::TrackEvent {
+            delta: u28::from(delta),
+            kind: TrackEventKind::Midi {
+                channel: u4::from(0),
+                message: MidiMessage::NoteOn { key: u7::from(key), vel: u7::from(vel) },
+            },
+        }
+    }
+
+    fn note_off(delta: u32, key: u8) -> midly::TrackEvent<'static> {
+        midly::TrackEvent {
+            delta: u28::from(delta),
+            kind: TrackEventKind::Midi {
+                channel: u4::from(0),
+                message: MidiMessage::NoteOff { key: u7::from(key), vel: u7::from(0) },
+            },
+        }
+    }
+
+    fn smf(tracks: Vec<Vec<midly::TrackEvent<'static>>>) -> Smf<'static> {
+        Smf {
+            header: Header { format: Format::SingleTrack, timing: Timing::Metrical(u15::from(480)) },
+            tracks,
+        }
+    }
+
+    // ── track_name_of / note_on_count / find_track ──────────────────────────────
+
+    #[test]
+    fn track_name_of_reads_the_first_track_name_event() {
+        let track = vec![meta(0, MetaMessage::TrackName(b"Bass")), note_on(0, 60, 100)];
+        assert_eq!(track_name_of(&track).as_deref(), Some("Bass"));
+    }
+
+    #[test]
+    fn track_name_of_is_none_without_a_name_event() {
+        let track = vec![note_on(0, 60, 100)];
+        assert_eq!(track_name_of(&track), None);
+    }
+
+    #[test]
+    fn note_on_count_ignores_zero_velocity_note_ons() {
+        // A NoteOn with velocity 0 is a NoteOff in disguise (MIDI convention);
+        // it must not inflate the note count.
+        let track = vec![
+            note_on(0, 60, 100),
+            note_on(10, 62, 0),
+            note_off(10, 60),
+            note_on(0, 64, 80),
+        ];
+        assert_eq!(note_on_count(&track), 2);
+    }
+
+    #[test]
+    fn find_track_matches_by_name_case_sensitively() {
+        let file = smf(vec![
+            vec![meta(0, MetaMessage::TrackName(b"Drums"))],
+            vec![meta(0, MetaMessage::TrackName(b"Bass"))],
+        ]);
+        assert_eq!(find_track(&file, "Bass"), Some(1));
+        assert_eq!(find_track(&file, "bass"), None);
+        assert_eq!(find_track(&file, "Lead"), None);
+    }
+
+    // ── processed_path ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn processed_path_appends_suffix_before_the_extension() {
+        let out = processed_path(Path::new("/songs/Riff.mid"));
+        assert_eq!(out, Path::new("/songs/Riff_processed.midi"));
+    }
+
+    #[test]
+    fn processed_path_falls_back_to_song_for_an_unnamed_file() {
+        let out = processed_path(Path::new("/"));
+        assert_eq!(out, Path::new("/song_processed.midi"));
+    }
+
+    // ── collect_tempo_map / tick_to_seconds ─────────────────────────────────────
+
+    #[test]
+    fn collect_tempo_map_defaults_to_120bpm_at_tick_zero_when_unset() {
+        let file = smf(vec![vec![note_on(0, 60, 100)]]);
+        assert_eq!(collect_tempo_map(&file), vec![(0, DEFAULT_TEMPO_US)]);
+    }
+
+    #[test]
+    fn collect_tempo_map_collects_and_sorts_changes_across_tracks() {
+        let file = smf(vec![
+            vec![meta(100, MetaMessage::Tempo(u24::from(300_000)))],
+            vec![meta(0, MetaMessage::Tempo(u24::from(500_000)))],
+        ]);
+        assert_eq!(collect_tempo_map(&file), vec![(0, 500_000), (100, 300_000)]);
+    }
+
+    #[test]
+    fn tick_to_seconds_integrates_across_a_tempo_change() {
+        let tpq = 480;
+        // 500,000 us/qtr (120 BPM) for the first 480 ticks (1 beat = 0.5s),
+        // then a change to 250,000 us/qtr (240 BPM) for the next 480 ticks (0.25s).
+        let tempo = vec![(0u64, 500_000u32), (480, 250_000)];
+        assert!((tick_to_seconds(0, tpq, &tempo) - 0.0).abs() < 1e-9);
+        assert!((tick_to_seconds(480, tpq, &tempo) - 0.5).abs() < 1e-9);
+        assert!((tick_to_seconds(960, tpq, &tempo) - 0.75).abs() < 1e-9);
+    }
+
+    #[test]
+    fn tick_to_seconds_uses_default_tempo_with_an_empty_map() {
+        // 480 ticks at the default 120 BPM (500,000 us/qtr) is half a second.
+        assert!((tick_to_seconds(480, 480, &[]) - 0.5).abs() < 1e-9);
+    }
+
+    // ── first_time_signature ─────────────────────────────────────────────────────
+
+    #[test]
+    fn first_time_signature_decodes_denominator_as_a_power_of_two() {
+        // (3, 3, ...) encodes 3/8 — denominator is 2^3.
+        let file = smf(vec![vec![meta(0, MetaMessage::TimeSignature(3, 3, 24, 8))]]);
+        assert_eq!(first_time_signature(&file), (3, 8));
+    }
+
+    #[test]
+    fn first_time_signature_defaults_to_four_four_when_absent() {
+        let file = smf(vec![vec![note_on(0, 60, 100)]]);
+        assert_eq!(first_time_signature(&file), (4, 4));
+    }
+
+    // ── extract_notes ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn extract_notes_pairs_note_on_with_note_off() {
+        let track = vec![note_on(0, 60, 100), note_off(240, 60)];
+        let notes = extract_notes(&track);
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].start_tick, 0);
+        assert_eq!(notes[0].dur_ticks, 240);
+        assert_eq!(notes[0].key, 60);
+    }
+
+    #[test]
+    fn extract_notes_treats_zero_velocity_note_on_as_note_off() {
+        let track = vec![note_on(0, 60, 100), note_on(120, 60, 0)];
+        let notes = extract_notes(&track);
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].dur_ticks, 120);
+    }
+
+    #[test]
+    fn extract_notes_orders_overlapping_notes_by_start_then_key() {
+        let track = vec![
+            note_on(0, 64, 100),
+            note_on(0, 60, 100),
+            note_off(100, 64),
+            note_off(0, 60),
+        ];
+        let notes = extract_notes(&track);
+        let keys: Vec<u8> = notes.iter().map(|n| n.key).collect();
+        assert_eq!(keys, vec![60, 64]);
+    }
+
+    #[test]
+    fn extract_notes_ignores_an_unmatched_note_off() {
+        let track = vec![note_off(0, 60)];
+        assert!(extract_notes(&track).is_empty());
+    }
+
+    // ── build_pitch_maps / map_pitch ─────────────────────────────────────────────
+
+    #[test]
+    fn map_pitch_maps_a_directly_playable_blow_note() {
+        let (blow, draw) = build_pitch_maps();
+        // C4 is hole 1 blow on a C richter harp.
+        let midi = note_to_midi("C4").unwrap() as u8;
+        let mapped = map_pitch(midi, &blow, &draw);
+        assert_eq!(mapped.hole, 1);
+        assert_eq!(mapped.action, "blow");
+        assert_eq!(mapped.bend, None);
+    }
+
+    #[test]
+    fn map_pitch_reaches_a_low_hole_draw_bend() {
+        let (blow, draw) = build_pitch_maps();
+        // Hole 2 draw is G4; bending down one semitone reaches F#4, which
+        // isn't directly playable, so it should resolve to a -1 semitone bend.
+        let target = note_to_midi("G4").unwrap() as u8 - 1;
+        let mapped = map_pitch(target, &blow, &draw);
+        assert_eq!(mapped.action, "draw");
+        assert!((1..=6).contains(&mapped.hole));
+        assert_eq!(mapped.bend, Some(-1));
+    }
+
+    #[test]
+    fn map_pitch_falls_back_to_the_nearest_playable_note() {
+        let (blow, draw) = build_pitch_maps();
+        // Absurdly low pitch: nothing is directly playable or bend-reachable,
+        // so it must snap to *some* natural note rather than panicking.
+        let mapped = map_pitch(0, &blow, &draw);
+        assert!(mapped.bend.is_none());
+        assert!(mapped.hole >= 1 && mapped.hole <= 10);
+    }
+
+    // ── round3 ────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn round3_rounds_to_three_decimal_places() {
+        assert_eq!(round3(1.234_449), 1.234);
+        assert_eq!(round3(1.234_5), 1.235);
+        assert_eq!(round3(0.0), 0.0);
+    }
+}

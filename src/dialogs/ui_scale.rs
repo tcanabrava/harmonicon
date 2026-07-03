@@ -63,3 +63,29 @@ pub fn change_scaling(input: Res<ButtonInput<KeyCode>>, mut ui_scale: ResMut<Tar
         info!("Scaling down! Scale: {}", ui_scale.target_scale);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ease_in_expo_starts_at_zero_and_ends_at_one() {
+        assert_eq!(ease_in_expo(0.0), 0.0);
+        assert!((ease_in_expo(1.0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn ease_in_expo_is_monotonically_increasing() {
+        let samples: Vec<f32> = (0..=10).map(|i| ease_in_expo(i as f32 / 10.0)).collect();
+        for w in samples.windows(2) {
+            assert!(w[1] >= w[0], "expected non-decreasing, got {:?}", samples);
+        }
+    }
+
+    #[test]
+    fn ease_in_expo_stays_near_zero_for_most_of_the_range() {
+        // The defining shape of an ease-*in* curve: slow start, sharp finish.
+        assert!(ease_in_expo(0.5) < 0.2, "midpoint should still be near the floor");
+        assert!(ease_in_expo(0.9) < ease_in_expo(1.0));
+    }
+}

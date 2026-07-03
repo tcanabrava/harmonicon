@@ -149,7 +149,7 @@ fn harmonica_wave_muffled(freq: f32, t: f32, phase_mod: f32) -> f32 {
     (TAU * freq * t + phase_mod).sin()
 }
 
-fn envelope(i: usize, dur: usize) -> f32 {
+pub(super) fn envelope(i: usize, dur: usize) -> f32 {
     let attack  = (SAMPLE_RATE as f32 * ATTACK_SECS)  as usize;
     let release = (SAMPLE_RATE as f32 * RELEASE_SECS) as usize;
     let atk = if attack > 0 && i < attack { i as f32 / attack as f32 } else { 1.0 };

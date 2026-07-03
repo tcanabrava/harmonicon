@@ -67,3 +67,46 @@ fn band_color(band: usize, level: f32) -> Color {
         (0.95 - 0.45 * hue) * bright,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn band_color_channels_stay_within_unit_range() {
+        for band in [0, NUM_BANDS / 2, NUM_BANDS - 1] {
+            for level in [0.0, 0.5, 1.0] {
+                let c = band_color(band, level).to_srgba();
+                for channel in [c.red, c.green, c.blue] {
+                    assert!((0.0..=1.0).contains(&channel), "channel {channel} out of range");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn band_color_red_rises_and_blue_falls_across_the_spectrum() {
+        // Low band index (bass) should read bluer; high index (treble) redder.
+        let low = band_color(0, 1.0).to_srgba();
+        let high = band_color(NUM_BANDS - 1, 1.0).to_srgba();
+        assert!(high.red > low.red, "high bands should lean redder");
+        assert!(high.blue < low.blue, "high bands should lean less blue");
+    }
+
+    #[test]
+    fn band_color_brightens_with_level() {
+        let dim = band_color(5, 0.0).to_srgba();
+        let bright = band_color(5, 1.0).to_srgba();
+        assert!(bright.red > dim.red);
+        assert!(bright.green > dim.green);
+        assert!(bright.blue > dim.blue);
+    }
+
+    #[test]
+    fn band_color_has_a_visible_floor_at_zero_level() {
+        // Even at level 0.0, bars keep a 35% brightness floor rather than
+        // going fully black — verified via the sum of channels staying > 0.
+        let c = band_color(0, 0.0).to_srgba();
+        assert!(c.red + c.green + c.blue > 0.0);
+    }
+}
