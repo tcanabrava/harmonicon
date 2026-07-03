@@ -243,40 +243,10 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
     buf
 }
 
-pub(super) fn encode_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
-    // WAV/RIFF layout per the PCM subset of the WAVE spec:
-    //   RIFF chunk (12 bytes) + fmt subchunk (24 bytes) + data subchunk header (8 bytes)
-    //   = 44 bytes of header, followed by raw 16-bit LE PCM samples.
-    let channels: u16 = 1;            // mono
-    let bits_per_sample: u16 = 16;    // 16-bit PCM
-    let bytes_per_sample = (bits_per_sample / 8) as u32;
-    let data_len  = (samples.len() as u32) * bytes_per_sample;
-    let byte_rate = sample_rate * channels as u32 * bytes_per_sample;
-    let block_align = (channels as u32 * bytes_per_sample) as u16;
-
-    let mut v = Vec::with_capacity(44 + data_len as usize);
-    // RIFF chunk descriptor
-    v.extend_from_slice(b"RIFF");
-    v.extend_from_slice(&(36 + data_len).to_le_bytes()); // total file size minus 8
-    v.extend_from_slice(b"WAVE");
-    // fmt subchunk (16 bytes for PCM)
-    v.extend_from_slice(b"fmt ");
-    v.extend_from_slice(&16u32.to_le_bytes());            // subchunk size for PCM
-    v.extend_from_slice(&1u16.to_le_bytes());             // AudioFormat = PCM (no compression)
-    v.extend_from_slice(&channels.to_le_bytes());
-    v.extend_from_slice(&sample_rate.to_le_bytes());
-    v.extend_from_slice(&byte_rate.to_le_bytes());
-    v.extend_from_slice(&block_align.to_le_bytes());
-    v.extend_from_slice(&bits_per_sample.to_le_bytes());
-    // data subchunk
-    v.extend_from_slice(b"data");
-    v.extend_from_slice(&data_len.to_le_bytes());
-    for &s in samples {
-        let q = (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
-        v.extend_from_slice(&q.to_le_bytes());
-    }
-    v
-}
+/// Re-exported so existing call sites/tests in this module don't need to
+/// change; the real implementation is shared with the Bending Trainer's
+/// reference-tone playback.
+pub(super) use crate::audio_system::wav::encode_wav;
 
 pub(super) fn start_playback(
     state: &super::state::EditorState,

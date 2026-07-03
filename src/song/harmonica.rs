@@ -73,6 +73,13 @@ pub fn semitone(root: &str, n: i32) -> String {
     NOTES[((i as i32 + n).rem_euclid(12)) as usize].to_string()
 }
 
+/// The six note classes of the blues scale rooted on `key` (1, b3, 4, b5, 5, b7).
+/// Shared by Jam Session's live hole-map feedback and the song editor's
+/// scale-aware note coloring, so both reflect the same blues-scale definition.
+pub fn blues_scale_classes(key: &str) -> HashSet<String> {
+    [0, 3, 5, 6, 7, 10].iter().map(|&n| semitone(key, n)).collect()
+}
+
 // Returns the blow label for the given hole, or a dash if not available.
 
 impl Harmonica {
@@ -233,6 +240,18 @@ mod tests {
         assert_eq!(semitone("B", 1), "C");
         assert_eq!(semitone("C", 12), "C");
         assert_eq!(semitone("A", 14), "B");
+    }
+
+    #[test]
+    fn blues_scale_is_the_six_classes() {
+        // C blues: C, Eb(=D#), F, Gb(=F#), G, Bb(=A#).
+        let s = blues_scale_classes("C");
+        for c in ["C", "D#", "F", "F#", "G", "A#"] {
+            assert!(s.contains(c), "missing {c}");
+        }
+        assert_eq!(s.len(), 6);
+        assert!(!s.contains("D"), "major 2nd is not in the blues scale");
+        assert!(!s.contains("E"), "major 3rd is not in the blues scale");
     }
 
     #[test]

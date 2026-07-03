@@ -72,6 +72,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<LoopConfig>()
         .init_resource::<FxMapping>()
         .init_resource::<bending_trainer::TrainerKey>()
+        .init_resource::<bending_trainer::TrainerTarget>()
         // Setup: shared pause menu + mode-specific scenes
         .add_systems(
             OnEnter(AppState::Playing),
@@ -95,6 +96,8 @@ impl Plugin for GameplayPlugin {
                 harmonica_overlay::update_harmonica_overlay,
                 bending_trainer::rebuild_overlay,
                 bending_trainer::update_key_label,
+                bending_trainer::update_target_label,
+                bending_trainer::update_tuner_readout,
                 bending_trainer::handle_escape,
             )
                 .run_if(in_state(AppState::BendingTrainer)),
@@ -256,6 +259,32 @@ pub struct Score {
     pub last_hit_time: f64, // clock time of the last successful hit, for decay
 }
 
+/// Hit/miss tally for one technique category, so the results screen can show
+/// "your bends land, your overblows don't" instead of one blended accuracy
+/// number — the diagnostic a self-taught player actually needs.
+#[derive(Default, Clone, Copy)]
+pub struct TechniqueStats {
+    pub hits: u32,
+    pub misses: u32,
+}
+
+impl TechniqueStats {
+    pub fn total(&self) -> u32 {
+        self.hits + self.misses
+    }
+
+    /// Hit rate in `[0.0, 1.0]`, or `None` if the technique never came up in
+    /// this song (nothing to report, not "0% accurate").
+    pub fn accuracy(&self) -> Option<f32> {
+        let total = self.total();
+        if total == 0 {
+            None
+        } else {
+            Some(self.hits as f32 / total as f32)
+        }
+    }
+}
+
 /// Per-song hit tally shown on the results screen. Reset at the start of each
 /// song. `good` are on-time/early Good hits; `delayed` are late Good hits.
 #[derive(Resource, Default)]
@@ -270,6 +299,44 @@ pub struct SongStats {
     /// current `input_latency_ms` applied; increasing that setting by the mean
     /// (in ms) should centre the distribution.
     pub offset_sum: f64,
+    /// Notes with no technique modifier at all — the baseline every other
+    /// category is implicitly compared against.
+    pub normal: TechniqueStats,
+    pub bend: TechniqueStats,
+    pub overblow: TechniqueStats,
+    pub overdraw: TechniqueStats,
+    pub vibrato: TechniqueStats,
+    pub wah: TechniqueStats,
+}
+
+impl SongStats {
+    /// Tallies a note's hit/miss outcome against every technique modifier it
+    /// carries (a note can have up to two, e.g. Bend + Vibrato — it counts
+    /// toward both), or `normal` if it has none.
+    fn record_technique(&mut self, modifiers: &[Modifier], hit: bool) {
+        if modifiers.is_empty() {
+            bump(&mut self.normal, hit);
+            return;
+        }
+        for m in modifiers {
+            let bucket = match m {
+                Modifier::Bend { .. } => &mut self.bend,
+                Modifier::Overblow => &mut self.overblow,
+                Modifier::Overdraw => &mut self.overdraw,
+                Modifier::Vibrato { .. } => &mut self.vibrato,
+                Modifier::WahWah { .. } => &mut self.wah,
+            };
+            bump(bucket, hit);
+        }
+    }
+}
+
+fn bump(stats: &mut TechniqueStats, hit: bool) {
+    if hit {
+        stats.hits += 1;
+    } else {
+        stats.misses += 1;
+    }
 }
 
 /// Gameplay-clock time at which the song's content ends (so the results screen
@@ -730,6 +797,7 @@ fn score_notes(
             NoteOutcome::Missed => {
                 note.missed = true;
                 stats.miss += 1;
+                stats.record_technique(&note.modifiers, false);
                 if config.combo_enabled {
                     score.combo = 0;
                 }
@@ -737,6 +805,7 @@ fn score_notes(
             NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
             NoteOutcome::Hit(quality) => {
                 note.hit = true;
+                stats.record_technique(&note.modifiers, true);
                 // Claim the attack so a held breath can't also clear the next
                 // same-pitch note; the player must re-articulate for that one.
                 gate.consume(&note.expected_pitch);

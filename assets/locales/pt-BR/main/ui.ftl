@@ -35,6 +35,9 @@ options-language = Idioma
 back = ← Voltar
 
 # Editor de Músicas 2 — botões de transporte e painel de modificadores
+editor-mode-edit = ✎ Editar
+editor-mode-perform = 🎵 Apresentar
+editor-lock = 🔒 Bloquear
 editor-play = ▶ Tocar
 editor-pause = ⏸ Pausar
 editor-stop = ■ Parar

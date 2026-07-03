@@ -8,7 +8,7 @@ use crate::{
     menu::SelectedSong,
     song::SongManifest,
     song::chart::Action,
-    song::harmonica::{Harmonica, harp_banner, semitone, twelve_bar},
+    song::harmonica::{Harmonica, blues_scale_classes, harp_banner, semitone, twelve_bar},
     theme::LoadedTheme,
 };
 
@@ -18,7 +18,7 @@ use super::countdown_overlay::spawn_countdown;
 use super::harmonica_overlay::spawn_harmonica_overlay;
 use super::metronome_overlay::spawn_metronome;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::{ActivePitches, COUNTDOWN, GameplayRoot, MusicStarted};
+use super::{ActivePitches, COUNTDOWN, GameplayClock, GameplayRoot, MusicStarted, current_bar_index, secs_per_bar};
 
 /// Free-play screen: left half shows the 12-bar chart and the metronome stacked
 /// vertically; the right half is reserved for a future jam feature. The shared
@@ -55,8 +55,10 @@ pub fn setup(
     };
 
     // Per-hole note labels + the lookup the live feedback system uses to light
-    // the hole(s) the player is currently sounding, coloured by blues-scale fit.
-    let (holes_info, guide) = build_hole_guide(&chart.harmonica, key);
+    // the hole(s) the player is currently sounding, coloured by blues-scale fit
+    // and — bar by bar — by whether the note is a tone of the chord currently
+    // sounding (I, IV, or V), not just "somewhere in the blues scale".
+    let (holes_info, guide) = build_hole_guide(&chart.harmonica, key, bpm, beats_per_bar);
 
     // Which physical harp to grab: a Richter harp's key is its hole-1 blow note.
     let harp_hint = harp_banner(&chart.harmonica, key);
@@ -163,12 +165,17 @@ pub fn setup(
 // ── Live harmonica hole map ─────────────────────────────────────────────────────
 
 /// Lookup driving the live hole feedback, rebuilt for each jam: which holes can
-/// sound a given `note+octave`, and which note classes are in the song's blues
-/// scale (so a sounding note can be coloured "in scale" vs "outside").
+/// sound a given `note+octave`; which note classes are in the song's blues
+/// scale generally; and, per bar of the 12-bar cycle, which note classes are
+/// tones of *that bar's* chord (I, IV, or V) — chord-tone awareness is a
+/// distinct, more advanced skill than just staying in the scale.
 #[derive(Resource)]
 pub struct JamHoleGuide {
     note_to_holes: HashMap<String, Vec<u8>>,
     scale_classes: HashSet<String>,
+    chord_tones_by_bar: [HashSet<String>; 12],
+    bpm: f32,
+    beats_per_bar: usize,
 }
 
 /// One hole cell in the map; its background is tinted each frame by play state.
@@ -188,6 +195,9 @@ struct HoleInfo {
 }
 
 const HOLE_DEFAULT: Color = Color::srgba(0.12, 0.12, 0.16, 0.9);
+/// A chord tone of the bar currently sounding — the strongest, most targeted
+/// choice right now (not just "in the scale somewhere").
+const PLAY_CHORD_TONE: Color = Color::srgb(0.95, 0.85, 0.25);
 const PLAY_IN_SCALE: Color = Color::srgb(0.20, 0.80, 0.35);
 const PLAY_OUT_SCALE: Color = Color::srgb(0.90, 0.55, 0.15);
 const LABEL_IN_SCALE: Color = Color::srgb(0.45, 0.85, 0.50);
@@ -198,16 +208,28 @@ fn note_class(note: &str) -> &str {
     note.trim_end_matches(|c: char| c.is_ascii_digit())
 }
 
-/// The six note classes of the blues scale rooted on `key` (1, b3, 4, b5, 5, b7).
-fn blues_scale_classes(key: &str) -> HashSet<String> {
-    [0, 3, 5, 6, 7, 10].iter().map(|&n| semitone(key, n)).collect()
+/// The four note classes of the dominant-7th chord rooted on `chord_root`
+/// (root, major 3rd, perfect 5th, minor 7th) — every chord in a standard
+/// 12-bar blues (I7, IV7, V7) is dominant 7th.
+fn chord_tone_classes(chord_root: &str) -> HashSet<String> {
+    [0, 4, 7, 10].iter().map(|&n| semitone(chord_root, n)).collect()
 }
 
 /// Build the per-hole render data and the live-feedback lookup from the harp
-/// layout and the song key.
-fn build_hole_guide(harp: &Harmonica, key: &str) -> (Vec<HoleInfo>, JamHoleGuide) {
+/// layout, the song key, and its tempo (needed to track which bar — and thus
+/// which chord — is currently sounding).
+fn build_hole_guide(
+    harp: &Harmonica,
+    key: &str,
+    bpm: f32,
+    beats_per_bar: usize,
+) -> (Vec<HoleInfo>, JamHoleGuide) {
     let dash = "\u{2014}";
     let scale_classes = blues_scale_classes(key);
+    let chord_tones_by_bar: [HashSet<String>; 12] = {
+        let chords = twelve_bar(key);
+        std::array::from_fn(|i| chord_tone_classes(&chords[i]))
+    };
     let mut note_to_holes: HashMap<String, Vec<u8>> = HashMap::new();
     let mut holes = Vec::new();
 
@@ -232,7 +254,10 @@ fn build_hole_guide(harp: &Harmonica, key: &str) -> (Vec<HoleInfo>, JamHoleGuide
         });
     }
 
-    (holes, JamHoleGuide { note_to_holes, scale_classes })
+    (
+        holes,
+        JamHoleGuide { note_to_holes, scale_classes, chord_tones_by_bar, bpm, beats_per_bar },
+    )
 }
 
 /// Spawn the bottom-strip hole map: a row of cells (blow note, hole number, draw
@@ -249,7 +274,7 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
         })
         .with_children(|col| {
             col.spawn((
-                Text::new("Your harmonica  \u{00B7}  green = blues-scale note  \u{00B7}  top blow / bottom draw"),
+                Text::new("Your harmonica  \u{00B7}  gold = chord tone right now  \u{00B7}  green = blues-scale note  \u{00B7}  top blow / bottom draw"),
                 TextFont { font_size: FontSize::Px(12.0), ..default() },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
             ));
@@ -295,34 +320,57 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
         });
 }
 
-/// Tint each hole cell from the live mic pitches: bright green if the sounding
-/// note is in the blues scale, amber if outside, default when silent. Reuses the
-/// same `ActivePitches` the scored modes detect.
+/// How "targeted" a sounding note is, worst to best.
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+enum NoteFit {
+    OutOfScale,
+    InScale,
+    ChordTone,
+}
+
+/// Tint each hole cell from the live mic pitches, three tiers: gold if the
+/// sounding note is a tone of the chord currently sounding (the most targeted
+/// choice — chord-tone awareness, not just scale membership), green if it's
+/// elsewhere in the blues scale, amber if outside the scale, default when
+/// silent. Reuses the same `ActivePitches` the scored modes detect.
 pub fn update_hole_map(
     active: Res<ActivePitches>,
     guide: Option<Res<JamHoleGuide>>,
+    clock: Res<GameplayClock>,
     mut cells: Query<(&JamHoleCell, &mut BackgroundColor)>,
 ) {
     let Some(guide) = guide else {
         return;
     };
+    let spb = secs_per_bar(guide.bpm as f64, guide.beats_per_bar as f64);
+    let bar = current_bar_index(clock.0, spb);
+    let chord_tones = &guide.chord_tones_by_bar[bar];
 
-    // Map each currently-lit hole to whether the note sounding it is in scale.
-    let mut lit: HashMap<u8, bool> = HashMap::new();
+    // Map each currently-lit hole to the best fit among all notes sounding it.
+    let mut lit: HashMap<u8, NoteFit> = HashMap::new();
     for p in &active.0 {
         let note = format!("{}{}", p.note, p.octave);
         if let Some(holes) = guide.note_to_holes.get(&note) {
-            let in_scale = guide.scale_classes.contains(&p.note);
+            let fit = if chord_tones.contains(&p.note) {
+                NoteFit::ChordTone
+            } else if guide.scale_classes.contains(&p.note) {
+                NoteFit::InScale
+            } else {
+                NoteFit::OutOfScale
+            };
             for &h in holes {
-                lit.entry(h).and_modify(|v| *v |= in_scale).or_insert(in_scale);
+                lit.entry(h)
+                    .and_modify(|v| if fit > *v { *v = fit })
+                    .or_insert(fit);
             }
         }
     }
 
     for (cell, mut bg) in &mut cells {
         bg.0 = match lit.get(&cell.hole) {
-            Some(true) => PLAY_IN_SCALE,
-            Some(false) => PLAY_OUT_SCALE,
+            Some(NoteFit::ChordTone) => PLAY_CHORD_TONE,
+            Some(NoteFit::InScale) => PLAY_IN_SCALE,
+            Some(NoteFit::OutOfScale) => PLAY_OUT_SCALE,
             None => HOLE_DEFAULT,
         };
     }
@@ -350,21 +398,9 @@ mod tests {
     }
 
     #[test]
-    fn blues_scale_is_the_six_classes() {
-        // C blues: C, Eb(=D#), F, Gb(=F#), G, Bb(=A#).
-        let s = blues_scale_classes("C");
-        for c in ["C", "D#", "F", "F#", "G", "A#"] {
-            assert!(s.contains(c), "missing {c}");
-        }
-        assert_eq!(s.len(), 6);
-        assert!(!s.contains("D"), "major 2nd is not in the blues scale");
-        assert!(!s.contains("E"), "major 3rd is not in the blues scale");
-    }
-
-    #[test]
     fn guide_maps_a_shared_note_to_every_hole_that_sounds_it() {
         // On a C harp, G4 is both draw-2 and blow-3 — both holes should light.
-        let (_, guide) = build_hole_guide(&c_harp(), "C");
+        let (_, guide) = build_hole_guide(&c_harp(), "C", 120.0, 4);
         let mut holes = guide.note_to_holes.get("G4").cloned().unwrap_or_default();
         holes.sort_unstable();
         assert_eq!(holes, vec![2, 3]);
@@ -372,7 +408,7 @@ mod tests {
 
     #[test]
     fn guide_marks_scale_membership_per_direction() {
-        let (holes, _) = build_hole_guide(&c_harp(), "C");
+        let (holes, _) = build_hole_guide(&c_harp(), "C", 120.0, 4);
         let hole1 = holes.iter().find(|h| h.hole == 1).unwrap();
         assert!(hole1.blow_in_scale, "blow C4 is the root → in scale");
         assert!(!hole1.draw_in_scale, "draw D4 (major 2nd) → outside");
@@ -382,8 +418,39 @@ mod tests {
 
     #[test]
     fn guide_covers_all_ten_holes() {
-        let (holes, _) = build_hole_guide(&c_harp(), "C");
+        let (holes, _) = build_hole_guide(&c_harp(), "C", 120.0, 4);
         assert_eq!(holes.len(), 10);
+    }
+
+    #[test]
+    fn chord_tone_classes_are_the_dominant_seventh() {
+        // C7: C, E, G, Bb(=A#).
+        let s = chord_tone_classes("C");
+        assert_eq!(s.len(), 4);
+        for c in ["C", "E", "G", "A#"] {
+            assert!(s.contains(c), "missing {c}");
+        }
+        assert!(!s.contains("D"), "major 2nd is not a chord tone");
+    }
+
+    #[test]
+    fn guide_indexes_chord_tones_per_bar_of_the_twelve_bar_cycle() {
+        // C 12-bar: bars are [I,I,I,I,IV,IV,I,I,V,IV,I,V] (0-indexed) — see
+        // `twelve_bar`. Bar 4 is IV (F7); bar 8 is V (G7).
+        let (_, guide) = build_hole_guide(&c_harp(), "C", 120.0, 4);
+        assert!(guide.chord_tones_by_bar[0].contains("C"), "bar 0 is I (C7)");
+        assert!(guide.chord_tones_by_bar[4].contains("F"), "bar 4 is IV (F7)");
+        assert!(guide.chord_tones_by_bar[8].contains("G"), "bar 8 is V (G7)");
+        assert!(
+            !guide.chord_tones_by_bar[0].contains("F"),
+            "F is not a tone of the I chord"
+        );
+    }
+
+    #[test]
+    fn note_fit_orders_chord_tone_above_scale_above_out_of_scale() {
+        assert!(NoteFit::ChordTone > NoteFit::InScale);
+        assert!(NoteFit::InScale > NoteFit::OutOfScale);
     }
 
     #[test]

@@ -12,14 +12,18 @@ use super::{
     TICK_W, TICKS_PER_BEAT, HANDLE_W,
 };
 use super::material::EditorNoteMaterial;
+use crate::audio_system::midi::midi_to_note;
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
 use crate::localization::LocalizationExt;
+use crate::song::harmonica::blues_scale_classes;
 use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
+use std::collections::HashSet;
 use super::state::{
     can_place, enforce_direction, enforce_expr, note_rect, pitch_color, pitch_compatible,
     pitch_deny_key, move_target, DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch,
 };
+use super::playback::{key_offset, note_freq};
 use super::ui::{GridContent, GridItem, NoteView};
 use super::interaction::select_or_add;
 
@@ -45,6 +49,25 @@ pub(super) fn mix_srgba(base: Color, tint: Color, t: f32) -> Color {
     )
 }
 
+/// How strongly the "outside the blues scale" warning tint shows through a
+/// note's own technique color. Subtle — this flags the exception (an outside
+/// note), not the common case, so in-scale notes are left untouched.
+const OUT_OF_SCALE_MIX: f32 = 0.45;
+const OUT_OF_SCALE_TINT: Color = Color::srgb(0.95, 0.25, 0.20);
+
+/// Whether `note`'s target pitch — its bent/overblown/overdrawn pitch, not
+/// just its natural one, since e.g. bending draw-3 down a step-and-a-half on a
+/// C harp is exactly how a blues player reaches the ♭7 — falls in `scale`.
+/// `None` (holes/directions the harp can't produce) counts as in-scale, so a
+/// note that can't be resolved to a pitch isn't flagged as "wrong" too.
+pub(super) fn note_in_scale(note: &GridNote, key_offset: i32, scale: &HashSet<String>) -> bool {
+    let Some(freq) = note_freq(note, key_offset) else { return true };
+    let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
+    let name = midi_to_note(midi);
+    let class = name.trim_end_matches(|c: char| c.is_ascii_digit());
+    scale.contains(class)
+}
+
 pub(super) fn rebuild_grid(
     mut commands: Commands,
     state: Res<EditorState>,
@@ -59,6 +82,14 @@ pub(super) fn rebuild_grid(
     }
     let colors = theme.song_editor_colors();
     let bar_colors = theme.twelve_bar_colors();
+    let scale = blues_scale_classes(&state.key);
+    let k_off = key_offset(&state.key);
+    // Locked (user Lock toggle, or Perform mode): grid cells, notes, and
+    // resize handles are all spawned non-interactive via `Pickable::IGNORE`,
+    // so no click/drag observer below ever fires — a single gate at spawn
+    // time rather than a check duplicated inside every observer.
+    let locked = state.locked();
+    let pickable = |locked: bool| if locked { Pickable::IGNORE } else { Pickable::default() };
     for e in &old {
         commands.entity(e).despawn();
     }
@@ -130,6 +161,7 @@ pub(super) fn rebuild_grid(
                     ..default()
                 },
                 BackgroundColor(lane),
+                pickable(locked),
             ));
             cell.observe(
                 move |ev: On<Pointer<Click>>,
@@ -199,7 +231,8 @@ pub(super) fn rebuild_grid(
     for note in &state.notes {
         if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.selected == Some(note.id);
-            items.push(spawn_note(&mut commands, *note, selected, &mut note_mats, colors));
+            let in_scale = note_in_scale(note, k_off, &scale);
+            items.push(spawn_note(&mut commands, *note, selected, &mut note_mats, colors, locked, in_scale));
         }
     }
 
@@ -212,11 +245,24 @@ pub(super) fn spawn_note(
     selected: bool,
     note_mats: &mut Assets<EditorNoteMaterial>,
     colors: SongEditorColors,
+    locked: bool,
+    in_scale: bool,
 ) -> Entity {
     let (left, top, width, height) = note_rect(&note);
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { colors.accent } else { Color::NONE };
     let id = note.id;
+    let pick = if locked { Pickable::IGNORE } else { Pickable::default() };
+    // Flag the exception (a note outside the song's blues scale), not the
+    // common case: an in-scale note keeps its plain technique color; an
+    // outside note gets a warm red warning blended in. Bend/overblow/overdraw
+    // are accounted for by `note_in_scale` using the note's *target* pitch —
+    // e.g. bending draw-3 down a step-and-a-half is how a blues player reaches
+    // the ♭7, so that bent note reads as in-scale even though its natural
+    // (unbent) pitch wouldn't.
+    let note_color = |base: Color| {
+        if in_scale { base } else { mix_srgba(base, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX) }
+    };
 
     let root = commands
         .spawn((
@@ -237,6 +283,7 @@ pub(super) fn spawn_note(
                 ..default()
             },
             BorderColor::all(border_color),
+            pick,
         ))
         .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
             state.selected = Some(id);
@@ -285,12 +332,12 @@ pub(super) fn spawn_note(
 
     match note.expr {
         Expr::None => {
-            commands.entity(root).insert(BackgroundColor(pitch_color(note.pitch)));
+            commands.entity(root).insert(BackgroundColor(note_color(pitch_color(note.pitch))));
         }
         Expr::Wah | Expr::Vibrato => {
             let mode = if note.expr == Expr::Vibrato { 0.0 } else { 1.0 };
             let mat = note_mats.add(EditorNoteMaterial {
-                color: pitch_color(note.pitch).to_linear(),
+                color: note_color(pitch_color(note.pitch)).to_linear(),
                 params: Vec4::new(mode, width, 0.0, 0.0),
             });
             commands.entity(root).insert(MaterialNode(mat));
@@ -304,14 +351,14 @@ pub(super) fn spawn_note(
             TextColor(Color::WHITE),
             Pickable::IGNORE,
         ));
-        spawn_resize_handle(r, id, Edge::Left);
-        spawn_resize_handle(r, id, Edge::Right);
+        spawn_resize_handle(r, id, Edge::Left, locked);
+        spawn_resize_handle(r, id, Edge::Right, locked);
     });
 
     root
 }
 
-fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
+fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge, locked: bool) {
     use super::state::apply_resize;
     let mut node = Node {
         position_type: PositionType::Absolute,
@@ -324,8 +371,9 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge) {
         Edge::Left  => node.left  = Val::Px(0.0),
         Edge::Right => node.right = Val::Px(0.0),
     }
+    let pick = if locked { Pickable::IGNORE } else { Pickable::default() };
     parent
-        .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.25))))
+        .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.25)), pick))
         .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
             if let Some(n) = state.note_by_id(id).copied() {
                 state.selected = Some(id);

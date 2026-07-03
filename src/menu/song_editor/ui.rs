@@ -16,7 +16,7 @@ use super::{
     HOLE_COL_W, HEADER_H, ROW_H, BEAT_W, ROWS, NOTE_PAD,
     SAVE_PURPOSE, LOAD_PURPOSE, MUSIC_PURPOSE,
 };
-use super::state::{EditorState, Scroll, Field, FIELDS, HARP_KEYS};
+use super::state::{EditorState, Mode, Scroll, Field, FIELDS, HARP_KEYS};
 use super::playback::{Playhead, EditorAudio, EditorProgressFill, PlayheadLine, start_playback, toggle_pause};
 use super::harpchart::safe_path_segment;
 use super::interaction::apply_modifier;
@@ -53,6 +53,28 @@ pub(super) enum ModButton {
     Vibrato,
     Delete,
 }
+
+/// The always-visible Edit/Perform mode switch and Lock toggle. Unlike
+/// [`ModButton`], these don't go through `apply_modifier` — they change
+/// `EditorState::mode`/`user_locked` directly, and switching to Edit also
+/// needs to stop any running playback/practice, which needs more than just
+/// `&mut EditorState` gives `apply_modifier`.
+#[derive(Component, Clone, Copy, PartialEq)]
+pub(super) enum ModeButton {
+    Edit,
+    Perform,
+    Lock,
+}
+
+/// Wraps the note-editing button cluster (Blow, Draw, Bend, ...), shown only
+/// in [`Mode::Edit`]. See `update_mode_visibility`.
+#[derive(Component)]
+pub(super) struct EditModeGroup;
+
+/// Wraps the playback/practice button cluster (Play, Pause, Stop, Practice),
+/// shown only in [`Mode::Perform`]. See `update_mode_visibility`.
+#[derive(Component)]
+pub(super) struct PerformModeGroup;
 
 #[derive(Component)]
 pub(super) struct BendDot;
@@ -108,8 +130,14 @@ pub(super) fn cleanup(
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
-pub(super) fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<LoadedTheme>) {
+pub(super) fn setup(
+    mut commands: Commands,
+    loc: Res<Localization>,
+    theme: Res<LoadedTheme>,
+    state: Res<EditorState>,
+) {
     let colors = theme.song_editor_colors();
+    let mode = state.mode;
     commands
         .spawn((
             EditorRoot,
@@ -201,7 +229,7 @@ pub(super) fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<L
                 });
             });
 
-            spawn_mod_panel(root, &loc, colors);
+            spawn_mod_panel(root, &loc, colors, mode);
             spawn_meta_form(root, &loc, colors);
 
             root.spawn((
@@ -263,7 +291,7 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors) {
     });
 }
 
-fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors, mode: Mode) {
     root.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -286,19 +314,126 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
             },
         );
         panel_separator(panel);
-        spawn_transport(panel, loc);
+
+        // Edit/Perform/Lock: always visible, regardless of which mode-group
+        // below is currently shown.
+        mode_button(
+            panel,
+            ModeButton::Edit,
+            loc.msg("editor-mode-edit"),
+            colors,
+            |_: On<Pointer<Click>>,
+             mut state: ResMut<EditorState>,
+             playing: Query<Entity, With<EditorAudio>>,
+             mut practice: ResMut<PracticeState>,
+             mut playhead: ResMut<Playhead>,
+             mut commands: Commands| {
+                state.mode = Mode::Edit;
+                // Leaving Perform mode hides Play/Pause/Stop/Practice, so
+                // nothing would be left to stop anything that's running.
+                stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+            },
+        );
+        mode_button(
+            panel,
+            ModeButton::Perform,
+            loc.msg("editor-mode-perform"),
+            colors,
+            |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.mode = Mode::Perform;
+            },
+        );
+        mode_button(
+            panel,
+            ModeButton::Lock,
+            loc.msg("editor-lock"),
+            colors,
+            |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.user_locked = !state.user_locked;
+            },
+        );
         panel_separator(panel);
-        mod_button(panel, ModButton::Blow,     loc.msg("mod-blow"),     colors);
-        mod_button(panel, ModButton::Draw,     loc.msg("mod-draw"),     colors);
+
+        spawn_file_buttons(panel, loc);
         panel_separator(panel);
-        mod_button(panel, ModButton::Bend,     loc.msg("mod-bend"),     colors);
-        mod_button(panel, ModButton::Overblow, loc.msg("mod-overblow"), colors);
-        mod_button(panel, ModButton::Overdraw, loc.msg("mod-overdraw"), colors);
-        mod_button(panel, ModButton::Wah,      loc.msg("mod-wah"),      colors);
-        mod_button(panel, ModButton::Vibrato,  loc.msg("mod-vibrato"),  colors);
-        panel.spawn(Node { flex_grow: 1.0, ..default() });
-        mod_button(panel, ModButton::Delete,   loc.msg("mod-delete"),   colors);
+
+        panel
+            .spawn((
+                EditModeGroup,
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(8.0),
+                    flex_grow: 1.0,
+                    // `Display::None`, not `Visibility::Hidden` — Visibility
+                    // only skips rendering, it still reserves this group's
+                    // full layout width, which pushed the other group off to
+                    // the right instead of freeing its place.
+                    display: if mode == Mode::Edit { Display::Flex } else { Display::None },
+                    ..default()
+                },
+            ))
+            .with_children(|g| {
+                mod_button(g, ModButton::Blow,     loc.msg("mod-blow"),     colors);
+                mod_button(g, ModButton::Draw,     loc.msg("mod-draw"),     colors);
+                panel_separator(g);
+                mod_button(g, ModButton::Bend,     loc.msg("mod-bend"),     colors);
+                mod_button(g, ModButton::Overblow, loc.msg("mod-overblow"), colors);
+                mod_button(g, ModButton::Overdraw, loc.msg("mod-overdraw"), colors);
+                mod_button(g, ModButton::Wah,      loc.msg("mod-wah"),      colors);
+                mod_button(g, ModButton::Vibrato,  loc.msg("mod-vibrato"),  colors);
+                g.spawn(Node { flex_grow: 1.0, ..default() });
+                mod_button(g, ModButton::Delete,   loc.msg("mod-delete"),   colors);
+            });
+
+        panel
+            .spawn((
+                PerformModeGroup,
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(8.0),
+                    flex_grow: 1.0,
+                    display: if mode == Mode::Perform { Display::Flex } else { Display::None },
+                    ..default()
+                },
+            ))
+            .with_children(|g| {
+                spawn_playback_buttons(g, loc);
+            });
     });
+}
+
+pub(super) fn mode_button<M: 'static>(
+    panel: &mut ChildSpawnerCommands,
+    kind: ModeButton,
+    label: LocalizedStr,
+    colors: SongEditorColors,
+    on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
+) {
+    panel
+        .spawn((
+            Button,
+            kind,
+            Node {
+                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(colors.btn_bg),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+        ))
+        .observe(on_click)
+        .with_children(|b| {
+            b.spawn((
+                Text::new(String::from(label)),
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
+            ));
+        });
 }
 
 pub(super) fn mod_button(
@@ -360,7 +495,50 @@ fn panel_separator(panel: &mut ChildSpawnerCommands) {
     ));
 }
 
-fn spawn_transport(panel: &mut ChildSpawnerCommands, loc: &Localization) {
+/// Chart file I/O — always visible, in both Edit and Perform mode.
+fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
+    transport_button(
+        panel,
+        loc.msg("editor-save"),
+        Color::srgb(0.18, 0.28, 0.45),
+        |_: On<Pointer<Click>>,
+         state: Res<EditorState>,
+         loc: Res<Localization>,
+         mut open: MessageWriter<OpenFileDialog>| {
+            let default_name = format!(
+                "{}.harpchart",
+                safe_path_segment(if state.name.is_empty() { "chart" } else { &state.name })
+            );
+            open.write(OpenFileDialog {
+                purpose: SAVE_PURPOSE,
+                title: String::from(loc.msg("dialog-save-chart")),
+                extensions: vec!["harpchart".into()],
+                start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                mode: DialogMode::Save { default_name },
+            });
+        },
+    );
+    transport_button(
+        panel,
+        loc.msg("editor-load"),
+        Color::srgb(0.24, 0.30, 0.20),
+        |_: On<Pointer<Click>>,
+         loc: Res<Localization>,
+         mut open: MessageWriter<OpenFileDialog>| {
+            open.write(OpenFileDialog {
+                purpose: LOAD_PURPOSE,
+                title: String::from(loc.msg("dialog-load-chart")),
+                extensions: vec!["harpchart".into()],
+                start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                mode: DialogMode::Open,
+            });
+        },
+    );
+}
+
+/// Play/Pause/Stop/Practice — only shown in [`Mode::Perform`] (wrapped in
+/// [`PerformModeGroup`] by the caller).
+fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
     transport_button(
         panel,
         loc.msg("editor-play"),
@@ -432,43 +610,6 @@ fn spawn_transport(panel: &mut ChildSpawnerCommands, loc: &Localization) {
                     &playing, &mut practice, &mut playhead, &mut commands, &loc,
                 );
             }
-        },
-    );
-    transport_button(
-        panel,
-        loc.msg("editor-save"),
-        Color::srgb(0.18, 0.28, 0.45),
-        |_: On<Pointer<Click>>,
-         state: Res<EditorState>,
-         loc: Res<Localization>,
-         mut open: MessageWriter<OpenFileDialog>| {
-            let default_name = format!(
-                "{}.harpchart",
-                safe_path_segment(if state.name.is_empty() { "chart" } else { &state.name })
-            );
-            open.write(OpenFileDialog {
-                purpose: SAVE_PURPOSE,
-                title: String::from(loc.msg("dialog-save-chart")),
-                extensions: vec!["harpchart".into()],
-                start_dir: Some(std::path::PathBuf::from("assets/songs")),
-                mode: DialogMode::Save { default_name },
-            });
-        },
-    );
-    transport_button(
-        panel,
-        loc.msg("editor-load"),
-        Color::srgb(0.24, 0.30, 0.20),
-        |_: On<Pointer<Click>>,
-         loc: Res<Localization>,
-         mut open: MessageWriter<OpenFileDialog>| {
-            open.write(OpenFileDialog {
-                purpose: LOAD_PURPOSE,
-                title: String::from(loc.msg("dialog-load-chart")),
-                extensions: vec!["harpchart".into()],
-                start_dir: Some(std::path::PathBuf::from("assets/songs")),
-                mode: DialogMode::Open,
-            });
         },
     );
 }

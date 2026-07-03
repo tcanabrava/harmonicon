@@ -37,6 +37,9 @@ options-language = Language
 back = ← Back
 
 # Song Editor 2 — transport & mod-panel buttons
+editor-mode-edit = ✎ Edit
+editor-mode-perform = 🎵 Perform
+editor-lock = 🔒 Lock
 editor-play = ▶ Play
 editor-pause = ⏸ Pause
 editor-stop = ■ Stop

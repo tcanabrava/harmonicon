@@ -36,7 +36,7 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
         let center = 0.5 + amp * sin(uv.x * cycles * TAU);
 
         let dist      = abs(uv.y - center);
-        let ribbon_r  = 0.07;
+        let ribbon_r  = 0.40;
         let aa        = fwidth(dist) * 1.5;
         let core      = 1.0 - smoothstep(ribbon_r - aa, ribbon_r + aa, dist);
         let glow      = exp(-dist * 13.0) * 0.35;

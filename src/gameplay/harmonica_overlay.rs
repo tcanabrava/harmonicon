@@ -67,14 +67,16 @@ fn valid_note(s: String) -> Option<String> {
 
 // ── Per-hole note set ─────────────────────────────────────────────────────────
 
-/// Every note one hole can produce, by technique.
-struct HoleNotes {
-    over: Option<String>,
-    blow: Option<String>,
-    draw: Option<String>,
+/// Every note one hole can produce, by technique. `pub` so other trainers
+/// (e.g. the Bending Trainer's target picker) can reuse the same bend/overblow
+/// math instead of re-deriving it.
+pub struct HoleNotes {
+    pub over: Option<String>,
+    pub blow: Option<String>,
+    pub draw: Option<String>,
     /// Bends, smallest first (½ step, whole, 1½). Draw bends on holes 1–6,
     /// blow bends on holes 7–10.
-    bends: Vec<String>,
+    pub bends: Vec<String>,
 }
 
 /// Which row a cell belongs to (and thus which note to pull from a `HoleNotes`).
@@ -96,7 +98,7 @@ const ROWS: [(&str, Row); 6] = [
     ("1\u{00BD}", Row::Bend(2)),
 ];
 
-fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
+pub fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
     let blow = valid_note(harp.wind_direction_label(hole, &Action::Blow));
     let draw = valid_note(harp.wind_direction_label(hole, &Action::Draw));
 

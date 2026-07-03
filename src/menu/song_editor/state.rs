@@ -33,6 +33,18 @@ pub(super) enum Dir {
     Draw,
 }
 
+/// Song editor work mode. `Edit` shows note-editing controls (Blow, Draw,
+/// Bend, ...) and allows adding/moving/resizing notes. `Perform` hides those
+/// and shows playback/practice controls instead, and always behaves as
+/// locked regardless of the user's own [`EditorState::user_locked`] toggle —
+/// see [`EditorState::locked`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub(super) enum Mode {
+    #[default]
+    Edit,
+    Perform,
+}
+
 impl Dir {
     pub(super) fn arrow(self) -> &'static str {
         match self {
@@ -146,6 +158,9 @@ pub(super) struct EditorState {
     pub(super) author: String,
     pub(super) focus: Option<Field>,
     pub(super) drag_msg: crate::localization::LocalizedStr,
+    pub(super) mode: Mode,
+    /// User's own Lock toggle, independent of `mode`. See [`EditorState::locked`].
+    pub(super) user_locked: bool,
 }
 
 impl Default for EditorState {
@@ -163,6 +178,8 @@ impl Default for EditorState {
             author: String::new(),
             focus: None,
             drag_msg: crate::localization::LocalizedStr::default(),
+            mode: Mode::default(),
+            user_locked: false,
         }
     }
 }
@@ -211,6 +228,13 @@ impl EditorState {
             Field::Name => &mut self.name,
             Field::Author => &mut self.author,
         }
+    }
+
+    /// True when notes cannot be added, moved, or resized: either the user
+    /// turned Lock on themselves, or `mode` is `Perform` (which is always
+    /// locked, regardless of the user's own toggle).
+    pub(super) fn locked(&self) -> bool {
+        self.user_locked || self.mode == Mode::Perform
     }
 }
 

@@ -4,8 +4,11 @@ use bevy::prelude::*;
 
 use crate::theme::LoadedTheme;
 use super::practice::PracticeState;
-use super::state::{Dir, EditorState, Expr, Field, Pitch};
-use super::ui::{BendDot, MetaFieldBox, MetaFieldText, ModButton, StatusMsg};
+use super::state::{Dir, EditorState, Expr, Field, Mode, Pitch};
+use super::ui::{
+    BendDot, EditModeGroup, MetaFieldBox, MetaFieldText, ModButton, ModeButton, PerformModeGroup,
+    StatusMsg,
+};
 
 pub(super) fn update_mod_panel(
     state: Res<EditorState>,
@@ -56,6 +59,43 @@ pub(super) fn update_meta_fields(
         } else {
             colors.field_bg
         };
+    }
+}
+
+/// Highlights whichever of Edit/Perform is the current mode, and Lock when
+/// `state.locked()` — which includes the forced-lock that Perform mode always
+/// applies, not just the user's own toggle.
+pub(super) fn update_mode_buttons(
+    state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
+    mut buttons: Query<(&ModeButton, &mut BackgroundColor)>,
+) {
+    let colors = theme.song_editor_colors();
+    for (kind, mut bg) in &mut buttons {
+        let active = match kind {
+            ModeButton::Edit => state.mode == Mode::Edit,
+            ModeButton::Perform => state.mode == Mode::Perform,
+            ModeButton::Lock => state.locked(),
+        };
+        bg.0 = if active { colors.btn_active } else { colors.btn_bg };
+    }
+}
+
+/// Shows the note-editing button cluster in [`Mode::Edit`] and the
+/// playback/practice cluster in [`Mode::Perform`] — never both. Toggles
+/// `Node::display`, not `Visibility`: `Visibility::Hidden` only skips
+/// rendering and still reserves the hidden group's full layout width, which
+/// would push the visible group off to the side instead of freeing its place.
+pub(super) fn update_mode_visibility(
+    state: Res<EditorState>,
+    mut edit_group: Query<&mut Node, (With<EditModeGroup>, Without<PerformModeGroup>)>,
+    mut perform_group: Query<&mut Node, (With<PerformModeGroup>, Without<EditModeGroup>)>,
+) {
+    for mut node in &mut edit_group {
+        node.display = if state.mode == Mode::Edit { Display::Flex } else { Display::None };
+    }
+    for mut node in &mut perform_group {
+        node.display = if state.mode == Mode::Perform { Display::Flex } else { Display::None };
     }
 }
 

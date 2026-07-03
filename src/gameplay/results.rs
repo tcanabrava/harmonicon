@@ -9,7 +9,7 @@ use crate::menu::{AppState, ReturnToSongList};
 use crate::dialogs::button;
 use crate::settings::AudioSettings;
 
-use super::{Score, SongStats};
+use super::{Score, SongStats, TechniqueStats};
 
 #[derive(Component)]
 pub(super) struct ResultsRoot;
@@ -123,6 +123,35 @@ pub(super) fn setup(
             ];
             for (label, value, color) in rows {
                 spawn_stat_row(root, label, value, color);
+            }
+
+            // Per-technique accuracy — only techniques the song actually used,
+            // so a simple song without bends doesn't show a clutter of "n/a"
+            // rows. This is the diagnostic a self-taught player needs: not
+            // just "you scored 82%" but "your bends are solid, your overblows
+            // need work".
+            let technique_rows: Vec<(&str, TechniqueStats)> = [
+                ("Normal notes", stats.normal),
+                ("Bends", stats.bend),
+                ("Vibrato", stats.vibrato),
+                ("Wah", stats.wah),
+                ("Overblow", stats.overblow),
+                ("Overdraw", stats.overdraw),
+            ]
+            .into_iter()
+            .filter(|(_, s)| s.total() > 0)
+            .collect();
+
+            if !technique_rows.is_empty() {
+                root.spawn((
+                    Text::new("By technique"),
+                    TextFont { font_size: FontSize::Px(14.0), ..default() },
+                    TextColor(Color::srgb(0.55, 0.58, 0.65)),
+                    Node { margin: UiRect::top(Val::Px(6.0)), ..default() },
+                ));
+                for (label, s) in technique_rows {
+                    spawn_technique_row(root, label, s);
+                }
             }
 
             // Timing offset row + calibration hint.
@@ -257,6 +286,21 @@ fn spawn_stat_row(
         });
 }
 
+/// One "Bends  18/20  90%" row, color-coded by accuracy: green ≥ 80%,
+/// amber ≥ 50%, red below.
+fn spawn_technique_row(parent: &mut ChildSpawnerCommands, label: &str, s: TechniqueStats) {
+    let Some(acc) = s.accuracy() else { return };
+    let color = if acc >= 0.80 {
+        Color::srgb(0.45, 1.00, 0.45)
+    } else if acc >= 0.50 {
+        Color::srgb(0.95, 0.75, 0.30)
+    } else {
+        Color::srgb(0.95, 0.40, 0.35)
+    };
+    let value = format!("{}/{}  \u{00B7}  {:.0}%", s.hits, s.total(), acc * 100.0);
+    spawn_text_row(parent, label, &value, color);
+}
+
 pub(super) fn cleanup(mut commands: Commands, roots: Query<Entity, With<ResultsRoot>>) {
     for e in &roots {
         commands.entity(e).despawn();
@@ -304,6 +348,7 @@ mod tests {
             delayed,
             miss,
             offset_sum: 0.0,
+            ..Default::default()
         }
     }
 
@@ -320,6 +365,7 @@ mod tests {
             delayed,
             miss,
             offset_sum,
+            ..Default::default()
         }
     }
 

@@ -97,6 +97,8 @@ impl Plugin for SongEditor2Plugin {
                     interaction::live_resize,
                     interaction::update_move_ghost,
                     panel::update_mod_panel,
+                    panel::update_mode_buttons,
+                    panel::update_mode_visibility,
                     panel::update_meta_fields,
                     panel::update_status_bar,
                     harpchart::handle_save_chosen,
@@ -121,7 +123,8 @@ mod tests {
     use super::ui::ModButton;
     use super::playback::{encode_wav, key_offset, note_freq, render_pcm, SAMPLE_RATE};
     use super::harpchart::serialize_harpchart;
-    use super::grid::mix_srgba;
+    use super::grid::{mix_srgba, note_in_scale};
+    use crate::song::harmonica::blues_scale_classes;
     use super::{BEAT_W, ROW_H, TICK_W, TICKS_PER_BEAT};
 
     #[test]
@@ -409,5 +412,19 @@ mod tests {
 
         let half = mix_srgba(base, tint, 0.5).to_srgba();
         assert!((half.red - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn note_in_scale_uses_the_bent_target_pitch_not_the_natural_one() {
+        let scale = blues_scale_classes("C");
+
+        // Draw-3 unbent is B4 (the major 7th) — outside the C blues scale.
+        let natural = GridNote { id: 0, hole: 3, tick: 0, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None };
+        assert!(!note_in_scale(&natural, 0, &scale), "unbent B (major 7th) is outside the blues scale");
+
+        // Bending draw-3 down a step-and-a-half reaches Bb (the ♭7) — exactly
+        // how a blues player accesses that blue note. Should read as in-scale.
+        let bent = GridNote { id: 0, hole: 3, tick: 0, len: 1, dir: Dir::Draw, pitch: Pitch::Bend(1.5), expr: Expr::None };
+        assert!(note_in_scale(&bent, 0, &scale), "bending down 1.5 steps reaches Bb, the b7 — in scale");
     }
 }

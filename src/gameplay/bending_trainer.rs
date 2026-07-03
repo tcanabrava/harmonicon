@@ -9,18 +9,20 @@
 //! chosen key (transposed Richter layout) and the diagram is rebuilt whenever
 //! the key changes.
 
+use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
+use crate::audio_system::wav::encode_wav;
 use crate::dialogs::button;
 use crate::menu::AppState;
 use crate::song::chart::{BendingProfile, DiatonicLayout};
 use crate::song::harmonica::Harmonica;
 
-use super::harmonica_overlay::spawn_harmonica_overlay;
+use super::harmonica_overlay::{hole_notes, spawn_harmonica_overlay, HoleNotes};
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
-use super::{GameplayClock, GameplayRoot};
+use super::{ActivePitches, GameplayClock, GameplayRoot};
 
 const KEYS: [&str; 12] = [
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
@@ -49,6 +51,118 @@ pub struct OverlayHost;
 /// The "Key: X" readout.
 #[derive(Component)]
 pub struct KeyLabel;
+
+// ── Ear-training target ─────────────────────────────────────────────────────────
+
+/// Which of the six technique rows in the diagram is the current target.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Technique {
+    Blow,
+    Draw,
+    Bend1,
+    Bend2,
+    Bend3,
+    Over,
+}
+
+impl Technique {
+    fn label(self) -> &'static str {
+        match self {
+            Technique::Blow => "Blow",
+            Technique::Draw => "Draw",
+            Technique::Bend1 => "\u{00BD}-step bend",
+            Technique::Bend2 => "1-step bend",
+            Technique::Bend3 => "1\u{00BD}-step bend",
+            Technique::Over => "Overblow/draw",
+        }
+    }
+
+    fn next(self) -> Self {
+        match self {
+            Technique::Blow => Technique::Draw,
+            Technique::Draw => Technique::Bend1,
+            Technique::Bend1 => Technique::Bend2,
+            Technique::Bend2 => Technique::Bend3,
+            Technique::Bend3 => Technique::Over,
+            Technique::Over => Technique::Blow,
+        }
+    }
+
+    fn prev(self) -> Self {
+        // Same cycle, walked backward — six variants, so five `next` steps.
+        (0..5).fold(self, |t, _| t.next())
+    }
+
+    fn note(self, holes: &HoleNotes) -> Option<&str> {
+        match self {
+            Technique::Blow => holes.blow.as_deref(),
+            Technique::Draw => holes.draw.as_deref(),
+            Technique::Bend1 => holes.bends.first().map(String::as_str),
+            Technique::Bend2 => holes.bends.get(1).map(String::as_str),
+            Technique::Bend3 => holes.bends.get(2).map(String::as_str),
+            Technique::Over => holes.over.as_deref(),
+        }
+    }
+}
+
+/// The hole + technique the "Listen" button and the live tuner readout target.
+/// Not every hole has every technique (e.g. hole 5 has no bend) — [`Technique::note`]
+/// returns `None` for a hole/technique pair the harp can't produce.
+#[derive(Resource, Clone, Copy)]
+pub struct TrainerTarget {
+    pub hole: u8,
+    pub technique: Technique,
+}
+
+impl Default for TrainerTarget {
+    fn default() -> Self {
+        // Hole 2's half-step draw bend: the classic first bend most players learn.
+        Self { hole: 2, technique: Technique::Bend1 }
+    }
+}
+
+/// The "Target: Hole N Draw" readout.
+#[derive(Component)]
+pub struct TargetLabel;
+
+/// The live cents-off tuner readout.
+#[derive(Component)]
+pub struct TunerReadout;
+
+/// Note name for the current target on `harp`, or `None` if that hole doesn't
+/// have that technique (e.g. hole 5 has no bend, most holes have no overblow).
+fn target_note(harp: &Harmonica, target: TrainerTarget) -> Option<String> {
+    let holes = hole_notes(harp, target.hole);
+    target.technique.note(&holes).map(str::to_string)
+}
+
+/// Frequency in Hz for a note label like `"C#4"`.
+fn note_freq_hz(note: &str) -> Option<f32> {
+    let midi = note_to_midi(note)?;
+    Some(440.0 * 2f32.powf((midi - 69) as f32 / 12.0))
+}
+
+/// A short, clean reference tone (fundamental + two soft harmonics) — plain
+/// enough to make the *pitch* the whole focus, unlike the full harmonica
+/// synth used elsewhere, which is deliberately breathy/textured.
+fn synth_reference_tone(freq: f32) -> Vec<u8> {
+    const SAMPLE_RATE: u32 = 44_100;
+    const DUR_SECS: f32 = 1.1;
+    let n = (SAMPLE_RATE as f32 * DUR_SECS) as usize;
+    let mut buf = vec![0.0f32; n];
+    for (i, sample) in buf.iter_mut().enumerate() {
+        let t = i as f32 / SAMPLE_RATE as f32;
+        let attack = (t / 0.02).min(1.0);
+        let release = ((DUR_SECS - t) / 0.15).clamp(0.0, 1.0);
+        let env = attack.min(release);
+        let tau = std::f32::consts::TAU;
+        let s = (tau * freq * t).sin()
+            + 0.30 * (tau * freq * 2.0 * t).sin()
+            + 0.12 * (tau * freq * 3.0 * t).sin();
+        *sample = env * 0.28 * s;
+    }
+    encode_wav(&buf, SAMPLE_RATE)
+}
 
 // ── Key helpers ───────────────────────────────────────────────────────────────
 
@@ -96,6 +210,7 @@ pub fn setup(
     mut clock: ResMut<GameplayClock>,
     mut tempo: ResMut<MetronomeTempo>,
     key: Res<TrainerKey>,
+    target: Res<TrainerTarget>,
 ) {
     clock.0 = 0.0;
     tempo.beats_per_bar = 4;
@@ -155,6 +270,65 @@ pub fn setup(
                     },
                 ));
             });
+
+            // ── Ear-training target: hole + technique, Listen, tuner ────────
+            root.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(10.0),
+                ..default()
+            })
+            .with_children(|row| {
+                row.spawn_empty().apply_scene(button::small(
+                    "\u{25C2}",
+                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
+                        target.hole = if target.hole <= 1 { 10 } else { target.hole - 1 };
+                    },
+                ));
+                row.spawn((
+                    Node { width: Val::Px(220.0), justify_content: JustifyContent::Center, ..default() },
+                    Text::new(target_label_text(target.hole, target.technique)),
+                    TextFont { font_size: FontSize::Px(16.0), ..default() },
+                    TextColor(Color::srgb(0.80, 0.90, 0.95)),
+                    TargetLabel,
+                ));
+                row.spawn_empty().apply_scene(button::small(
+                    "\u{25B8}",
+                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
+                        target.hole = if target.hole >= 10 { 1 } else { target.hole + 1 };
+                    },
+                ));
+                row.spawn_empty().apply_scene(button::small(
+                    "technique \u{21BB}",
+                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
+                        target.technique = target.technique.next();
+                    },
+                ));
+                row.spawn_empty().apply_scene(button::default(
+                    "\u{1F50A} Listen",
+                    |_: On<Pointer<Click>>,
+                     key: Res<TrainerKey>,
+                     target: Res<TrainerTarget>,
+                     mut sources: ResMut<Assets<AudioSource>>,
+                     mut commands: Commands| {
+                        let harp = richter_harp(&key.0);
+                        let Some(note) = target_note(&harp, *target) else { return };
+                        let Some(freq) = note_freq_hz(&note) else { return };
+                        let wav = synth_reference_tone(freq);
+                        let handle = sources.add(AudioSource { bytes: wav.into() });
+                        commands.spawn((
+                            AudioPlayer::<AudioSource>(handle),
+                            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.6)),
+                        ));
+                    },
+                ));
+            });
+            root.spawn((
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextColor(Color::srgb(0.55, 0.85, 0.60)),
+                TunerReadout,
+            ));
 
             // ── The bend diagram (rebuilt on key change) ────────────────────
             root.spawn((Node::default(), OverlayHost))
@@ -247,6 +421,71 @@ pub fn handle_escape(keyboard: Res<ButtonInput<KeyCode>>, mut next_state: ResMut
     }
 }
 
+/// "Target: Hole 2 · ½-step bend" — or a note that the current harp can't
+/// actually produce there, so the reader knows why Listen did nothing.
+fn target_label_text(hole: u8, technique: Technique) -> String {
+    format!("Target: Hole {hole}  \u{00B7}  {}", technique.label())
+}
+
+/// Keep the "Target: ..." readout in step with the chosen hole/technique.
+pub fn update_target_label(
+    target: Res<TrainerTarget>,
+    mut labels: Query<&mut Text, With<TargetLabel>>,
+) {
+    if !target.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(target_label_text(target.hole, target.technique));
+    }
+}
+
+/// Within this many cents of the target, the readout calls it "in tune"
+/// rather than reporting a flat/sharp direction — no bend is perfectly
+/// stable, and a human ear can't reliably split hairs finer than this anyway.
+const IN_TUNE_CENTS: f32 = 6.0;
+
+/// Live cents-off tuner: compares the closest currently-sounding pitch (from
+/// the mic) against the selected target note, and reports how far off — and
+/// in which direction — the player currently is.
+pub fn update_tuner_readout(
+    key: Res<TrainerKey>,
+    target: Res<TrainerTarget>,
+    active: Res<ActivePitches>,
+    mut labels: Query<(&mut Text, &mut TextColor), With<TunerReadout>>,
+) {
+    let Ok((mut text, mut color)) = labels.single_mut() else { return };
+    let harp = richter_harp(&key.0);
+    let Some(target_note) = target_note(&harp, *target) else {
+        *text = Text::new("This hole has no note for that technique.");
+        color.0 = Color::srgb(0.60, 0.60, 0.65);
+        return;
+    };
+    let Some(target_freq) = note_freq_hz(&target_note) else { return };
+
+    let Some(heard) = active.0.iter().min_by(|a, b| {
+        (a.frequency.log2() - target_freq.log2())
+            .abs()
+            .total_cmp(&(b.frequency.log2() - target_freq.log2()).abs())
+    }) else {
+        *text = Text::new(format!("Play it \u{2014} target {target_note}"));
+        color.0 = Color::srgb(0.60, 0.60, 0.65);
+        return;
+    };
+
+    let cents = 1200.0 * (heard.frequency / target_freq).log2();
+    if cents.abs() <= IN_TUNE_CENTS {
+        *text = Text::new(format!("\u{2713} In tune  ({target_note})"));
+        color.0 = Color::srgb(0.45, 0.85, 0.50);
+    } else if cents > 0.0 {
+        *text = Text::new(format!("\u{2191} {cents:+.0} cents sharp  (target {target_note})"));
+        color.0 = Color::srgb(0.90, 0.70, 0.30);
+    } else {
+        *text = Text::new(format!("\u{2193} {cents:+.0} cents flat  (target {target_note})"));
+        color.0 = Color::srgb(0.90, 0.70, 0.30);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,5 +531,43 @@ mod tests {
             panic!("expected diatonic");
         };
         assert_eq!(l.blow.unwrap()[0], "G3");
+    }
+
+    #[test]
+    fn technique_cycles_both_ways_through_all_six() {
+        let start = Technique::Blow;
+        let mut t = start;
+        for _ in 0..6 {
+            t = t.next();
+        }
+        assert_eq!(t, start, "six steps forward returns to the start");
+        assert_eq!(start.next().prev(), start);
+        assert_eq!(Technique::Blow.prev(), Technique::Over);
+    }
+
+    #[test]
+    fn target_note_reads_the_right_technique_off_the_harp() {
+        let harp = richter_harp("C");
+        // Hole 1: blow C4, draw D4, single ½-step bend C#4, overblow D#4.
+        assert_eq!(
+            target_note(&harp, TrainerTarget { hole: 1, technique: Technique::Blow }).as_deref(),
+            Some("C4")
+        );
+        assert_eq!(
+            target_note(&harp, TrainerTarget { hole: 1, technique: Technique::Bend1 }).as_deref(),
+            Some("C#4")
+        );
+        // Hole 5 has no bend (blow E5, draw F5 are a semitone apart).
+        assert_eq!(
+            target_note(&harp, TrainerTarget { hole: 5, technique: Technique::Bend1 }),
+            None
+        );
+    }
+
+    #[test]
+    fn note_freq_hz_matches_concert_pitch() {
+        assert!((note_freq_hz("A4").unwrap() - 440.0).abs() < 0.01);
+        // One semitone below A4.
+        assert!((note_freq_hz("G#4").unwrap() - 415.30).abs() < 0.1);
     }
 }
