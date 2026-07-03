@@ -75,6 +75,7 @@ fn main() {
         SpectrogramPlugin,
         SettingsPlugin,
         harmonicon::dialogs::file_dialog::FileDialogsPlugin,
+        harmonicon::dialogs::font_fallback::FontFallbackPlugin,
     ));
 
     app.add_message::<PitchEvent>()
