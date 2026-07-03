@@ -574,7 +574,7 @@ fn build_nmf_dict(sample_rate: u32, n_bins: usize) -> NmfDict {
     let mut freqs = Vec::new();
     let mut columns: Vec<Vec<f32>> = Vec::new();
     for midi in midi_lo..=midi_hi {
-        let f = 440.0 * 2f32.powf((midi - 69) as f32 / 12.0);
+        let f = crate::audio_system::midi::midi_to_freq_hz(midi as f32);
         let mut col = vec![0.0f32; n_bins];
         for h in 1..=NMF_HARMONICS {
             let fh = f * h as f32;

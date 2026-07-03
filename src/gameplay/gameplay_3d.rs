@@ -305,6 +305,8 @@ pub fn create_note_visuals(
                         held: 0.0,
                         sustain_scored: false,
                         modifiers,
+                        pitch_samples: Vec::new(),
+                        amp_samples: Vec::new(),
                     },
                     GameplayRoot,
                 ))

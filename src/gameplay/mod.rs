@@ -20,7 +20,8 @@ pub mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
 use scoring::{
-    combo_label, compute_multiplier, should_decay_combo,
+    combo_label, compute_multiplier, detect_relative_wobble, detect_wobble, should_decay_combo,
+    VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC,
 };
 pub use scoring::{
     NoteOutcome, classify_note, compute_points, sustain_points,
@@ -31,8 +32,8 @@ use std::collections::HashSet;
 use bevy::audio::Volume;
 
 use crate::{
-    audio_system::midi::{midi_to_note, note_to_midi},
-    audio_system::pitch_detect::{PitchEvent, PitchInfo},
+    audio_system::midi::{midi_to_note, note_to_freq_hz, note_to_midi},
+    audio_system::pitch_detect::{AudioFrame, PitchEvent, PitchInfo},
     menu::{AppState, GameplayMode, SelectedSong},
     settings::AudioSettings,
     song::{SongManifest, chart::Modifier},
@@ -73,6 +74,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<FxMapping>()
         .init_resource::<bending_trainer::TrainerKey>()
         .init_resource::<bending_trainer::TrainerTarget>()
+        .init_resource::<bending_trainer::DrillState>()
         // Setup: shared pause menu + mode-specific scenes
         .add_systems(
             OnEnter(AppState::Playing),
@@ -98,6 +100,8 @@ impl Plugin for GameplayPlugin {
                 bending_trainer::update_key_label,
                 bending_trainer::update_target_label,
                 bending_trainer::update_tuner_readout,
+                bending_trainer::drill_update,
+                bending_trainer::update_drill_label,
                 bending_trainer::handle_escape,
             )
                 .run_if(in_state(AppState::BendingTrainer)),
@@ -405,6 +409,12 @@ pub struct ScheduledNote {
     /// Technique modifiers from the chart (bend, vibrato, etc.).
     /// Used to trigger fx sounds when the note is hit.
     pub modifiers: Vec<Modifier>,
+    /// Cents-from-expected-pitch, sampled once per frame while held — used to
+    /// verify a declared `vibrato` was actually played, not just declared.
+    pub pitch_samples: Vec<f32>,
+    /// Input loudness (RMS), sampled once per frame while held — used to
+    /// verify a declared `wah-wah` was actually played, not just declared.
+    pub amp_samples: Vec<f32>,
 }
 
 #[derive(Component)]
@@ -559,6 +569,44 @@ pub fn style_bonus_points(modifiers: &[Modifier], table: &HashMap<String, f32>) 
         .iter()
         .map(|m| table.get(modifier_fx_key(m)).copied().unwrap_or(0.0))
         .sum()
+}
+
+/// Vibrato and wah are hand/throat articulations sustained *through* the
+/// note, not a pitch shift validated by the onset alone (unlike a bend, whose
+/// `expected_pitch` already encodes the bent target). Their style bonus is
+/// deferred to the end of the sustain window and only paid out if
+/// [`technique_confirmed`] finds the player actually wobbled the pitch/level.
+fn is_sustained_technique(modifier: &Modifier) -> bool {
+    matches!(modifier, Modifier::Vibrato { .. } | Modifier::WahWah { .. })
+}
+
+/// Did the player actually perform this sustained technique, judged from the
+/// pitch/loudness samples collected while the note was held? Non-sustained
+/// modifiers (bend, overblow, overdraw) are validated at onset instead —
+/// this always returns `true` for them since it shouldn't be asked.
+fn technique_confirmed(modifier: &Modifier, pitch_samples: &[f32], amp_samples: &[f32]) -> bool {
+    match modifier {
+        Modifier::Vibrato { .. } => detect_wobble(pitch_samples, VIBRATO_MIN_SWING_CENTS),
+        Modifier::WahWah { .. } => detect_relative_wobble(amp_samples, WAH_MIN_SWING_FRAC),
+        _ => true,
+    }
+}
+
+/// The currently-detected frequency (Hz) matching `pitch_name` (e.g. `"D4"`),
+/// or `None` if that exact note isn't among the detected pitches this frame.
+fn active_frequency_for(active: &[PitchInfo], pitch_name: &str) -> Option<f32> {
+    active
+        .iter()
+        .find(|p| format!("{}{}", p.note, p.octave) == pitch_name)
+        .map(|p| p.frequency)
+}
+
+/// RMS loudness of a block of audio samples.
+fn rms(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    (samples.iter().map(|&s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
 }
 
 // ── Shared systems ────────────────────────────────────────────────────────────
@@ -723,6 +771,7 @@ fn score_notes(
     clock: Res<GameplayClock>,
     time: Res<Time>,
     active: Res<ActivePitches>,
+    frame: Res<AudioFrame>,
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
@@ -775,8 +824,39 @@ fn score_notes(
                 if harp_pitches.contains(&note.expected_pitch) {
                     note.held += dt;
                 }
+                // Track pitch/loudness through the hold so a declared vibrato
+                // or wah can be verified (rather than trusted) once it ends.
+                if note.modifiers.iter().any(is_sustained_technique) {
+                    if let Some(hz) = active_frequency_for(&active.0, &note.expected_pitch) {
+                        if let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch) {
+                            note.pitch_samples.push(1200.0 * (hz / expected_hz).log2());
+                        }
+                    }
+                    note.amp_samples.push(rms(&frame.samples));
+                }
             } else {
                 score.points += sustain_points(note.held, note.duration);
+
+                let sustained: Vec<Modifier> = note
+                    .modifiers
+                    .iter()
+                    .cloned()
+                    .filter(is_sustained_technique)
+                    .collect();
+                if !sustained.is_empty() {
+                    let (verified, unverified): (Vec<Modifier>, Vec<Modifier>) =
+                        sustained.into_iter().partition(|m| {
+                            technique_confirmed(m, &note.pitch_samples, &note.amp_samples)
+                        });
+                    if !verified.is_empty() {
+                        score.points +=
+                            style_bonus_points(&verified, &config.style_bonus).round() as u32;
+                        stats.record_technique(&verified, true);
+                    }
+                    if !unverified.is_empty() {
+                        stats.record_technique(&unverified, false);
+                    }
+                }
                 note.sustain_scored = true;
             }
             continue;
@@ -805,7 +885,19 @@ fn score_notes(
             NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
             NoteOutcome::Hit(quality) => {
                 note.hit = true;
-                stats.record_technique(&note.modifiers, true);
+                // Vibrato/wah are judged from the sustain, not the onset — see
+                // the sustain branch above. A note with only those modifiers
+                // has nothing to credit yet, so it's left out of `stats` here
+                // rather than falling through to the "normal" bucket.
+                let immediate: Vec<Modifier> = note
+                    .modifiers
+                    .iter()
+                    .cloned()
+                    .filter(|m| !is_sustained_technique(m))
+                    .collect();
+                if note.modifiers.is_empty() || !immediate.is_empty() {
+                    stats.record_technique(&immediate, true);
+                }
                 // Claim the attack so a held breath can't also clear the next
                 // same-pitch note; the player must re-articulate for that one.
                 gate.consume(&note.expected_pitch);
@@ -830,11 +922,12 @@ fn score_notes(
                     1.0
                 };
                 score.points += compute_points(quality, multiplier);
-                // Reward executing the note's techniques. Bends are genuinely
-                // validated (the note's expected pitch is the bent one); the
-                // bonus is the payoff for nailing them.
+                // Reward executing the note's onset techniques. Bends are
+                // genuinely validated (the note's expected pitch is the bent
+                // one); the bonus is the payoff for nailing them. Vibrato/wah
+                // bonuses are awarded later, once the sustain confirms them.
                 score.points +=
-                    style_bonus_points(&note.modifiers, &config.style_bonus).round() as u32;
+                    style_bonus_points(&immediate, &config.style_bonus).round() as u32;
                 feedback.quality = Some(quality);
                 feedback.timer = 0.75;
 
@@ -1283,6 +1376,61 @@ mod tests {
     #[test]
     fn style_bonus_is_zero_without_modifiers() {
         assert_eq!(style_bonus_points(&[], &bonus_table()), 0.0);
+    }
+
+    // ── sustained-technique validation (vibrato / wah) ──────────────────────────
+
+    #[test]
+    fn vibrato_and_wah_are_sustained_bend_and_overblow_are_not() {
+        let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
+        let wah = Modifier::WahWah { oscillation_hz: 3.0, intensity: None };
+        let bend = Modifier::Bend { semitones: -1.0, intensity: None };
+        assert!(is_sustained_technique(&vibrato));
+        assert!(is_sustained_technique(&wah));
+        assert!(!is_sustained_technique(&bend));
+        assert!(!is_sustained_technique(&Modifier::Overblow));
+        assert!(!is_sustained_technique(&Modifier::Overdraw));
+    }
+
+    #[test]
+    fn technique_confirmed_requires_real_wobble_for_vibrato() {
+        let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
+        let steady: Vec<f32> = vec![0.0; 20];
+        let wobbling: Vec<f32> = (0..40).map(|i| 25.0 * (i as f32 * 0.6).sin()).collect();
+        assert!(!technique_confirmed(&vibrato, &steady, &[]));
+        assert!(technique_confirmed(&vibrato, &wobbling, &[]));
+    }
+
+    #[test]
+    fn technique_confirmed_requires_real_wobble_for_wah() {
+        let wah = Modifier::WahWah { oscillation_hz: 3.0, intensity: None };
+        let steady_volume: Vec<f32> = vec![0.2; 20];
+        let pumping_volume: Vec<f32> =
+            (0..40).map(|i| 0.2 + 0.06 * (i as f32 * 0.6).sin()).collect();
+        assert!(!technique_confirmed(&wah, &[], &steady_volume));
+        assert!(technique_confirmed(&wah, &[], &pumping_volume));
+    }
+
+    #[test]
+    fn technique_confirmed_is_always_true_for_onset_validated_modifiers() {
+        // Bend/overblow/overdraw are judged at onset, not from the sustain
+        // buffers — this should never gate them on empty/steady samples.
+        assert!(technique_confirmed(
+            &Modifier::Bend { semitones: -1.0, intensity: None },
+            &[],
+            &[]
+        ));
+        assert!(technique_confirmed(&Modifier::Overblow, &[], &[]));
+    }
+
+    #[test]
+    fn active_frequency_for_matches_by_note_and_octave() {
+        let active = vec![
+            PitchInfo { note: "D".into(), octave: 4, frequency: 293.66 },
+            PitchInfo { note: "G".into(), octave: 4, frequency: 392.00 },
+        ];
+        assert_eq!(active_frequency_for(&active, "D4"), Some(293.66));
+        assert_eq!(active_frequency_for(&active, "A4"), None);
     }
 
     // ── cleanup_gameplay ──────────────────────────────────────────────────────────

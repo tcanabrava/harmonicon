@@ -55,7 +55,7 @@ pub struct KeyLabel;
 // ── Ear-training target ─────────────────────────────────────────────────────────
 
 /// Which of the six technique rows in the diagram is the current target.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Technique {
     Blow,
     Draw,
@@ -64,6 +64,16 @@ pub enum Technique {
     Bend3,
     Over,
 }
+
+/// Every technique row, in diagram order — used to enumerate drill targets.
+const ALL_TECHNIQUES: [Technique; 6] = [
+    Technique::Blow,
+    Technique::Draw,
+    Technique::Bend1,
+    Technique::Bend2,
+    Technique::Bend3,
+    Technique::Over,
+];
 
 impl Technique {
     fn label(self) -> &'static str {
@@ -129,6 +139,91 @@ pub struct TargetLabel;
 #[derive(Component)]
 pub struct TunerReadout;
 
+/// The drill's "on/off" readout, plus a running streak/weak-spot summary.
+#[derive(Component)]
+pub struct DrillLabel;
+
+// ── Adaptive drill mode ─────────────────────────────────────────────────────────
+
+/// Per hole/technique hit-rate, used to weight which targets the drill
+/// serves up next — misses come back around more often than notes the
+/// player already nails.
+#[derive(Default, Clone, Copy)]
+pub struct DrillStat {
+    pub attempts: u32,
+    pub hits: u32,
+}
+
+impl DrillStat {
+    /// Selection weight: never-seen and weak targets are drawn more often;
+    /// a target the player consistently hits fades toward the 1.0 floor.
+    fn weight(&self) -> f32 {
+        if self.attempts == 0 {
+            return 2.5;
+        }
+        let miss_rate = 1.0 - self.hits as f32 / self.attempts as f32;
+        1.0 + 3.0 * miss_rate
+    }
+}
+
+/// Auto-advancing ear-training drill: picks a random hole/technique, waits
+/// for the player to sustain it in tune, then moves on. Tracks a running
+/// hit rate per target so weak spots come up more often than mastered ones.
+#[derive(Resource, Default)]
+pub struct DrillState {
+    pub enabled: bool,
+    pub stats: std::collections::HashMap<(u8, Technique), DrillStat>,
+    /// How long the current target has been held in tune, in seconds.
+    pub hold_secs: f32,
+    /// How long the current target has been active at all, in seconds —
+    /// resets the drill to a fresh target if the player gets stuck.
+    pub elapsed_secs: f32,
+    pub streak: u32,
+}
+
+/// Seconds the player must hold a target in tune before the drill advances.
+const DRILL_HOLD_TO_ADVANCE: f32 = 0.5;
+/// Seconds before a stuck target is scored as a miss and swapped out.
+const DRILL_TIMEOUT_SECS: f32 = 12.0;
+
+/// Every (hole, technique) pair the current harp can actually produce.
+fn valid_targets(harp: &Harmonica) -> Vec<TrainerTarget> {
+    (1..=10)
+        .flat_map(|hole| ALL_TECHNIQUES.iter().map(move |&technique| TrainerTarget { hole, technique }))
+        .filter(|t| target_note(harp, *t).is_some())
+        .collect()
+}
+
+/// Weighted-random pick of the next drill target, biased toward targets the
+/// player has missed more often, and avoiding an immediate repeat of `avoid`
+/// when another option exists.
+fn pick_next_target(
+    harp: &Harmonica,
+    stats: &std::collections::HashMap<(u8, Technique), DrillStat>,
+    avoid: Option<TrainerTarget>,
+) -> Option<TrainerTarget> {
+    let mut pool = valid_targets(harp);
+    if pool.len() > 1 {
+        pool.retain(|&t| Some((t.hole, t.technique)) != avoid.map(|a| (a.hole, a.technique)));
+    }
+    if pool.is_empty() {
+        return None;
+    }
+    let weights: Vec<f32> = pool
+        .iter()
+        .map(|t| stats.get(&(t.hole, t.technique)).copied().unwrap_or_default().weight())
+        .collect();
+    let total: f32 = weights.iter().sum();
+    let mut roll = rand::random_range(0.0..total);
+    for (target, w) in pool.iter().zip(weights.iter()) {
+        if roll < *w {
+            return Some(*target);
+        }
+        roll -= w;
+    }
+    pool.last().copied()
+}
+
 /// Note name for the current target on `harp`, or `None` if that hole doesn't
 /// have that technique (e.g. hole 5 has no bend, most holes have no overblow).
 fn target_note(harp: &Harmonica, target: TrainerTarget) -> Option<String> {
@@ -138,8 +233,7 @@ fn target_note(harp: &Harmonica, target: TrainerTarget) -> Option<String> {
 
 /// Frequency in Hz for a note label like `"C#4"`.
 fn note_freq_hz(note: &str) -> Option<f32> {
-    let midi = note_to_midi(note)?;
-    Some(440.0 * 2f32.powf((midi - 69) as f32 / 12.0))
+    crate::audio_system::midi::note_to_freq_hz(note)
 }
 
 /// A short, clean reference tone (fundamental + two soft harmonics) — plain
@@ -330,6 +424,39 @@ pub fn setup(
                 TunerReadout,
             ));
 
+            // ── Adaptive drill: auto-picks targets, weighted by miss rate ───
+            root.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(10.0),
+                ..default()
+            })
+            .with_children(|row| {
+                row.spawn_empty().apply_scene(button::default(
+                    "\u{1F3B2} Drill",
+                    |_: On<Pointer<Click>>,
+                     key: Res<TrainerKey>,
+                     mut target: ResMut<TrainerTarget>,
+                     mut drill: ResMut<DrillState>| {
+                        drill.enabled = !drill.enabled;
+                        drill.hold_secs = 0.0;
+                        drill.elapsed_secs = 0.0;
+                        if drill.enabled {
+                            let harp = richter_harp(&key.0);
+                            if let Some(next) = pick_next_target(&harp, &drill.stats, Some(*target)) {
+                                *target = next;
+                            }
+                        }
+                    },
+                ));
+                row.spawn((
+                    Text::new("Drill: off"),
+                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextColor(Color::srgb(0.70, 0.70, 0.80)),
+                    DrillLabel,
+                ));
+            });
+
             // ── The bend diagram (rebuilt on key change) ────────────────────
             root.spawn((Node::default(), OverlayHost))
                 .with_children(|host| {
@@ -486,6 +613,70 @@ pub fn update_tuner_readout(
     }
 }
 
+/// Drives the adaptive drill while it's on: holds the current target until
+/// the player sustains it in tune, credits a hit, and picks the next target,
+/// weighted toward whatever's been missed most. A target the player can't
+/// land within [`DRILL_TIMEOUT_SECS`] is scored a miss so the drill keeps
+/// moving instead of stalling on one hole.
+pub fn drill_update(
+    key: Res<TrainerKey>,
+    mut target: ResMut<TrainerTarget>,
+    active: Res<ActivePitches>,
+    mut drill: ResMut<DrillState>,
+    time: Res<Time>,
+) {
+    if !drill.enabled {
+        return;
+    }
+    let harp = richter_harp(&key.0);
+    let Some(target_note) = target_note(&harp, *target) else { return };
+    let Some(target_freq) = note_freq_hz(&target_note) else { return };
+
+    let dt = time.delta_secs();
+    drill.elapsed_secs += dt;
+
+    let in_tune = active
+        .0
+        .iter()
+        .any(|p| (1200.0 * (p.frequency / target_freq).log2()).abs() <= IN_TUNE_CENTS);
+    drill.hold_secs = if in_tune { drill.hold_secs + dt } else { 0.0 };
+
+    let hit = drill.hold_secs >= DRILL_HOLD_TO_ADVANCE;
+    let timed_out = drill.elapsed_secs >= DRILL_TIMEOUT_SECS;
+    if !hit && !timed_out {
+        return;
+    }
+
+    let stat = drill.stats.entry((target.hole, target.technique)).or_default();
+    stat.attempts += 1;
+    if hit {
+        stat.hits += 1;
+        drill.streak += 1;
+    } else {
+        drill.streak = 0;
+    }
+
+    if let Some(next) = pick_next_target(&harp, &drill.stats, Some(*target)) {
+        *target = next;
+    }
+    drill.hold_secs = 0.0;
+    drill.elapsed_secs = 0.0;
+}
+
+/// Keeps the "Drill: ..." readout in step with on/off state and streak.
+pub fn update_drill_label(drill: Res<DrillState>, mut labels: Query<&mut Text, With<DrillLabel>>) {
+    if !drill.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(if drill.enabled {
+            format!("Drill: on \u{00B7} streak {}", drill.streak)
+        } else {
+            "Drill: off".to_string()
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -569,5 +760,36 @@ mod tests {
         assert!((note_freq_hz("A4").unwrap() - 440.0).abs() < 0.01);
         // One semitone below A4.
         assert!((note_freq_hz("G#4").unwrap() - 415.30).abs() < 0.1);
+    }
+
+    #[test]
+    fn drill_stat_weight_favors_never_seen_and_weak_targets() {
+        let never = DrillStat::default();
+        let mostly_missed = DrillStat { attempts: 10, hits: 1 };
+        let mostly_hit = DrillStat { attempts: 10, hits: 9 };
+        let perfect = DrillStat { attempts: 10, hits: 10 };
+        assert!(mostly_missed.weight() > never.weight());
+        assert!(never.weight() > mostly_hit.weight());
+        assert!(mostly_hit.weight() > perfect.weight());
+    }
+
+    #[test]
+    fn valid_targets_excludes_bends_the_harp_cant_produce() {
+        let harp = richter_harp("C");
+        let targets = valid_targets(&harp);
+        assert!(targets.iter().any(|t| t.hole == 1 && t.technique == Technique::Blow));
+        // Hole 5 has no bend on a Richter-tuned harp.
+        assert!(!targets.iter().any(|t| t.hole == 5 && t.technique == Technique::Bend1));
+    }
+
+    #[test]
+    fn pick_next_target_avoids_immediate_repeat_when_alternatives_exist() {
+        let harp = richter_harp("C");
+        let stats = std::collections::HashMap::new();
+        let avoid = TrainerTarget { hole: 1, technique: Technique::Blow };
+        for _ in 0..20 {
+            let picked = pick_next_target(&harp, &stats, Some(avoid)).expect("a target exists");
+            assert_ne!((picked.hole, picked.technique), (avoid.hole, avoid.technique));
+        }
     }
 }

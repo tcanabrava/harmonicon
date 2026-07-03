@@ -128,7 +128,7 @@ pub(super) fn note_freq(note: &GridNote, key_offset: i32) -> Option<f32> {
         Pitch::Bend(a) => -a,
         Pitch::Overblow | Pitch::Overdraw => 1.0,
     };
-    Some(440.0 * 2f32.powf((midi + semitones - 69.0) / 12.0))
+    Some(crate::audio_system::midi::midi_to_freq_hz(midi + semitones))
 }
 
 /// Full harmonic content — sounds bright/open, like uncupped hands.

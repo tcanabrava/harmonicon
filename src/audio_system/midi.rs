@@ -42,6 +42,18 @@ pub fn midi_to_note(midi: i32) -> String {
     format!("{}{}", NAMES[semitone as usize], octave)
 }
 
+/// Concert-pitch frequency (Hz) for a MIDI note number. Fractional input is
+/// allowed so callers can price in bends/cents (e.g. a half-step-flat draw
+/// note is `midi - 0.5`) without rounding to the nearest semitone first.
+pub fn midi_to_freq_hz(midi: f32) -> f32 {
+    440.0 * 2f32.powf((midi - 69.0) / 12.0)
+}
+
+/// Concert-pitch frequency (Hz) for a note name like `"C#4"`.
+pub fn note_to_freq_hz(note: &str) -> Option<f32> {
+    Some(midi_to_freq_hz(note_to_midi(note)? as f32))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

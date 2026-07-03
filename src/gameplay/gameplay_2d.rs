@@ -498,6 +498,8 @@ fn spawn_highway(
                     held: 0.0,
                     sustain_scored: false,
                     modifiers: modifiers.clone(),
+                    pitch_samples: Vec::new(),
+                    amp_samples: Vec::new(),
                 },
             ))
             .with_children(|note| {

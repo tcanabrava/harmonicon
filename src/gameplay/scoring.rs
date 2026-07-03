@@ -83,6 +83,62 @@ pub fn sustain_points(held: f64, duration: f64) -> u32 {
     (held.clamp(0.0, duration) * SUSTAIN_POINTS_PER_SEC).round() as u32
 }
 
+// ── Sustained-technique validation (vibrato, wah) ───────────────────────────────
+
+/// Minimum pitch swing (cents, peak-to-trough) a held note must show to count
+/// as genuine vibrato rather than natural breath-pitch noise.
+pub const VIBRATO_MIN_SWING_CENTS: f32 = 15.0;
+/// Minimum relative loudness swing a held note must show to count as a hand-wah
+/// sweep rather than steady breath pressure. Expressed as a fraction of the
+/// note's mean input level, since raw mic gain varies per player/setup.
+pub const WAH_MIN_SWING_FRAC: f32 = 0.12;
+
+/// Did `samples` genuinely oscillate — swinging at least `min_swing` with at
+/// least one full up/down cycle — rather than holding steady, drifting
+/// monotonically, or doing a single one-way bend? Small deltas below 15% of
+/// `min_swing` are treated as frame-to-frame jitter and ignored so they don't
+/// get counted as spurious direction changes.
+pub fn detect_wobble(samples: &[f32], min_swing: f32) -> bool {
+    if samples.len() < 6 {
+        return false;
+    }
+    let max = samples.iter().cloned().fold(f32::MIN, f32::max);
+    let min = samples.iter().cloned().fold(f32::MAX, f32::min);
+    if max - min < min_swing {
+        return false;
+    }
+    let noise_floor = min_swing * 0.15;
+    let mut direction = 0i32;
+    let mut flips = 0;
+    for w in samples.windows(2) {
+        let d = w[1] - w[0];
+        if d.abs() < noise_floor {
+            continue;
+        }
+        let sign = if d > 0.0 { 1 } else { -1 };
+        if direction != 0 && sign != direction {
+            flips += 1;
+        }
+        direction = sign;
+    }
+    flips >= 2
+}
+
+/// Like [`detect_wobble`], but for a signal whose absolute scale is meaningless
+/// (input gain varies per mic/player) — normalises to the sample mean first, so
+/// `min_frac` is a *relative* swing (e.g. `0.12` = 12% above/below the mean).
+pub fn detect_relative_wobble(samples: &[f32], min_frac: f32) -> bool {
+    if samples.is_empty() {
+        return false;
+    }
+    let mean = samples.iter().sum::<f32>() / samples.len() as f32;
+    if mean <= 0.0001 {
+        return false;
+    }
+    let normalized: Vec<f32> = samples.iter().map(|s| s / mean).collect();
+    detect_wobble(&normalized, min_frac)
+}
+
 /// True when the combo should reset due to inactivity.
 pub fn should_decay_combo(
     combo: u32,
@@ -326,5 +382,59 @@ mod tests {
         // mult = (1 + 40/10).min(4) = 4
         let s = combo_label(40);
         assert!(s.contains("\u{00D7}4"), "label: {s}");
+    }
+
+    // ── detect_wobble / detect_relative_wobble ──────────────────────────────────
+
+    #[test]
+    fn steady_pitch_is_not_wobble() {
+        let steady = vec![2.0; 20];
+        assert!(!detect_wobble(&steady, VIBRATO_MIN_SWING_CENTS));
+    }
+
+    #[test]
+    fn single_bend_is_not_wobble() {
+        // One smooth ramp down and back up is a single direction change,
+        // not a repeating oscillation.
+        let mut samples = vec![0.0; 10];
+        samples.extend((0..10).map(|i| -i as f32 * 4.0));
+        assert!(!detect_wobble(&samples, VIBRATO_MIN_SWING_CENTS));
+    }
+
+    #[test]
+    fn real_vibrato_is_wobble() {
+        // A few full cycles of a sine-like swing, well above the swing floor.
+        let samples: Vec<f32> = (0..40)
+            .map(|i| 25.0 * (i as f32 * 0.6).sin())
+            .collect();
+        assert!(detect_wobble(&samples, VIBRATO_MIN_SWING_CENTS));
+    }
+
+    #[test]
+    fn tiny_swing_is_not_wobble_even_with_direction_changes() {
+        // Oscillates, but well under the swing threshold — natural jitter.
+        let samples: Vec<f32> = (0..40).map(|i| 2.0 * (i as f32 * 0.6).sin()).collect();
+        assert!(!detect_wobble(&samples, VIBRATO_MIN_SWING_CENTS));
+    }
+
+    #[test]
+    fn too_few_samples_is_not_wobble() {
+        assert!(!detect_wobble(&[0.0, 20.0, 0.0], VIBRATO_MIN_SWING_CENTS));
+    }
+
+    #[test]
+    fn relative_wobble_scales_with_input_level() {
+        // Same 20% swing shape at two very different gain levels — both should
+        // register, since the check is relative to each signal's own mean.
+        let quiet: Vec<f32> = (0..40).map(|i| 0.02 + 0.004 * (i as f32 * 0.6).sin()).collect();
+        let loud: Vec<f32> = (0..40).map(|i| 0.5 + 0.10 * (i as f32 * 0.6).sin()).collect();
+        assert!(detect_relative_wobble(&quiet, WAH_MIN_SWING_FRAC));
+        assert!(detect_relative_wobble(&loud, WAH_MIN_SWING_FRAC));
+    }
+
+    #[test]
+    fn steady_loudness_is_not_relative_wobble() {
+        let steady = vec![0.2; 20];
+        assert!(!detect_relative_wobble(&steady, WAH_MIN_SWING_FRAC));
     }
 }
