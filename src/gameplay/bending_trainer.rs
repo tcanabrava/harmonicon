@@ -10,7 +10,7 @@
 //! the key changes.
 
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
-use bevy::picking::events::{Click, Pointer};
+use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
@@ -135,6 +135,10 @@ impl Default for TrainerTarget {
 #[derive(Component)]
 pub struct TargetLabel;
 
+/// The "how to physically play this" hint box, kept in step with the target.
+#[derive(Component)]
+pub struct HintLabel;
+
 /// The live cents-off tuner readout.
 #[derive(Component)]
 pub struct TunerReadout;
@@ -142,6 +146,46 @@ pub struct TunerReadout;
 /// The drill's "on/off" readout, plus a running streak/weak-spot summary.
 #[derive(Component)]
 pub struct DrillLabel;
+
+/// The Drill button's hover explanation; empty while not hovering it.
+#[derive(Component)]
+pub struct DrillExplanation;
+
+/// What Drill mode actually does, shown only while hovering the button —
+/// it's not obvious from the label alone that it's adaptive/weighted.
+const DRILL_EXPLANATION: &str = "Auto-picks a random hole + technique, weighted toward whatever you've been missing most. Hold the note in tune to advance \u{2014} it keeps circling back to your weak spots until they're solid.";
+
+/// Practical "how do I actually play this" text for a technique on a given
+/// hole. Bends and overs go a different physical direction depending on
+/// which side of the harp the hole is on, so both are needed to be accurate:
+/// holes 1\u{2013}6 bend (and overblow) by drawing, holes 7\u{2013}10 by blowing.
+fn technique_hint(technique: Technique, hole: u8) -> String {
+    match technique {
+        Technique::Blow => "Blow steadily into the hole \u{2014} no special embouchure needed.".to_string(),
+        Technique::Draw => "Draw (inhale) steadily through the hole \u{2014} no special embouchure needed.".to_string(),
+        Technique::Bend1 | Technique::Bend2 | Technique::Bend3 => {
+            let depth = match technique {
+                Technique::Bend1 => "a little",
+                Technique::Bend2 => "further",
+                _ => "as far as it will go",
+            };
+            if hole <= 6 {
+                format!(
+                    "Draw, then lower the back of your tongue and drop your jaw slightly \u{2014} shape your mouth from \"ee\" toward \"oh\" \u{2014} to pull the pitch down {depth} while still drawing."
+                )
+            } else {
+                format!(
+                    "Blow, then raise the back of your tongue slightly \u{2014} shape your mouth toward \"ee\" \u{2014} to push the pitch down {depth} while still blowing."
+                )
+            }
+        }
+        Technique::Over => match hole {
+            1 | 4 | 5 | 6 => "Blow with a tight, controlled embouchure (tongue-blocked, airway narrowed) so the draw reed sounds instead of the blow reed \u{2014} an overblow. Start soft; it takes practice.".to_string(),
+            7..=10 => "Draw with a tight, controlled embouchure so the blow reed sounds instead of the draw reed \u{2014} an overdraw. Start soft; it takes practice.".to_string(),
+            _ => format!("Hole {hole} doesn't support overblow/overdraw \u{2014} try hole 1, 4, 5, 6, or 7\u{2013}10."),
+        },
+    }
+}
 
 // ── Adaptive drill mode ─────────────────────────────────────────────────────────
 
@@ -417,6 +461,7 @@ pub fn setup(
                     },
                 ));
             });
+
             root.spawn((
                 Text::new(""),
                 TextFont { font_size: FontSize::Px(13.0), ..default() },
@@ -424,7 +469,7 @@ pub fn setup(
                 TunerReadout,
             ));
 
-            // ── Adaptive drill: auto-picks targets, weighted by miss rate ───
+            // ── Adaptive drill toggle ────────────────────────────────────────
             root.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
@@ -432,23 +477,26 @@ pub fn setup(
                 ..default()
             })
             .with_children(|row| {
-                row.spawn_empty().apply_scene(button::small(
-                    "\u{1F3B2} Drill",
-                    |_: On<Pointer<Click>>,
-                     key: Res<TrainerKey>,
-                     mut target: ResMut<TrainerTarget>,
-                     mut drill: ResMut<DrillState>| {
-                        drill.enabled = !drill.enabled;
-                        drill.hold_secs = 0.0;
-                        drill.elapsed_secs = 0.0;
-                        if drill.enabled {
-                            let harp = richter_harp(&key.0);
-                            if let Some(next) = pick_next_target(&harp, &drill.stats, Some(*target)) {
-                                *target = next;
+                row.spawn_empty()
+                    .apply_scene(button::small(
+                        "\u{1F3B2} Drill",
+                        |_: On<Pointer<Click>>,
+                         key: Res<TrainerKey>,
+                         mut target: ResMut<TrainerTarget>,
+                         mut drill: ResMut<DrillState>| {
+                            drill.enabled = !drill.enabled;
+                            drill.hold_secs = 0.0;
+                            drill.elapsed_secs = 0.0;
+                            if drill.enabled {
+                                let harp = richter_harp(&key.0);
+                                if let Some(next) = pick_next_target(&harp, &drill.stats, Some(*target)) {
+                                    *target = next;
+                                }
                             }
-                        }
-                    },
-                ));
+                        },
+                    ))
+                    .observe(show_drill_explanation)
+                    .observe(hide_drill_explanation);
                 row.spawn((
                     Text::new("Drill: off"),
                     TextFont { font_size: FontSize::Px(13.0), ..default() },
@@ -457,11 +505,48 @@ pub fn setup(
                 ));
             });
 
-            // ── The bend diagram (rebuilt on key change) ────────────────────
-            root.spawn((Node::default(), OverlayHost))
-                .with_children(|host| {
-                    spawn_harmonica_overlay(host, &richter_harp(&key.0));
+            // ── Diagram + side texts: kept side by side to save vertical space ──
+            root.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::FlexStart,
+                column_gap: Val::Px(14.0),
+                ..default()
+            })
+            .with_children(|row| {
+                // The bend diagram (rebuilt on key change).
+                row.spawn((Node::default(), OverlayHost))
+                    .with_children(|host| {
+                        spawn_harmonica_overlay(host, &richter_harp(&key.0));
+                    });
+
+                // How-to hint + Drill explanation, stacked beside the diagram.
+                row.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    width: Val::Px(280.0),
+                    row_gap: Val::Px(8.0),
+                    ..default()
+                })
+                .with_children(|col| {
+                    col.spawn((
+                        Node { padding: UiRect::all(Val::Px(8.0)), ..default() },
+                        BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
+                    ))
+                    .with_children(|p| {
+                        p.spawn((
+                            Text::new(technique_hint(target.technique, target.hole)),
+                            TextFont { font_size: FontSize::Px(13.0), ..default() },
+                            TextColor(Color::srgb(0.75, 0.75, 0.85)),
+                            HintLabel,
+                        ));
+                    });
+                    col.spawn((
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(12.0), ..default() },
+                        TextColor(Color::srgb(0.60, 0.60, 0.70)),
+                        DrillExplanation,
+                    ));
                 });
+            });
 
             // ── Tempo control: −  ♩ = NN (in the metronome)  + ──────────────
             root.spawn(Node {
@@ -564,6 +649,30 @@ pub fn update_target_label(
     }
     for mut text in &mut labels {
         *text = Text::new(target_label_text(target.hole, target.technique));
+    }
+}
+
+/// Keep the how-to-play hint in step with the chosen hole/technique.
+pub fn update_hint_label(target: Res<TrainerTarget>, mut labels: Query<&mut Text, With<HintLabel>>) {
+    if !target.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(technique_hint(target.technique, target.hole));
+    }
+}
+
+/// Show what Drill mode does while the button is hovered.
+fn show_drill_explanation(_: On<Pointer<Over>>, mut labels: Query<&mut Text, With<DrillExplanation>>) {
+    for mut text in &mut labels {
+        *text = Text::new(DRILL_EXPLANATION);
+    }
+}
+
+/// Hide the Drill explanation once the pointer leaves the button.
+fn hide_drill_explanation(_: On<Pointer<Out>>, mut labels: Query<&mut Text, With<DrillExplanation>>) {
+    for mut text in &mut labels {
+        *text = Text::new("");
     }
 }
 
@@ -760,6 +869,56 @@ mod tests {
         assert!((note_freq_hz("A4").unwrap() - 440.0).abs() < 0.01);
         // One semitone below A4.
         assert!((note_freq_hz("G#4").unwrap() - 415.30).abs() < 0.1);
+    }
+
+    // ── technique_hint ────────────────────────────────────────────────────────
+
+    #[test]
+    fn blow_and_draw_hints_dont_depend_on_hole() {
+        assert!(technique_hint(Technique::Blow, 1).contains("Blow"));
+        assert!(technique_hint(Technique::Blow, 9).contains("Blow"));
+        assert!(technique_hint(Technique::Draw, 1).contains("Draw"));
+        assert!(technique_hint(Technique::Draw, 9).contains("Draw"));
+    }
+
+    #[test]
+    fn bend_hint_direction_matches_the_hole_side() {
+        // Holes 1-6 bend by drawing; holes 7-10 bend by blowing.
+        let low_hole = technique_hint(Technique::Bend1, 3);
+        assert!(low_hole.starts_with("Draw"), "hole 3 bends by drawing: {low_hole:?}");
+        let high_hole = technique_hint(Technique::Bend1, 8);
+        assert!(high_hole.starts_with("Blow"), "hole 8 bends by blowing: {high_hole:?}");
+    }
+
+    #[test]
+    fn bend_hint_wording_deepens_with_technique() {
+        let half = technique_hint(Technique::Bend1, 3);
+        let whole = technique_hint(Technique::Bend2, 3);
+        let step_and_half = technique_hint(Technique::Bend3, 3);
+        assert!(half.contains("a little"));
+        assert!(whole.contains("further"));
+        assert!(step_and_half.contains("as far as it will go"));
+    }
+
+    #[test]
+    fn over_hint_names_overblow_or_overdraw_by_hole() {
+        // Overblow holes.
+        for hole in [1, 4, 5, 6] {
+            let hint = technique_hint(Technique::Over, hole);
+            assert!(hint.contains("overblow"), "hole {hole}: {hint:?}");
+            assert!(hint.starts_with("Blow"));
+        }
+        // Overdraw holes.
+        for hole in 7..=10 {
+            let hint = technique_hint(Technique::Over, hole);
+            assert!(hint.contains("overdraw"), "hole {hole}: {hint:?}");
+            assert!(hint.starts_with("Draw"));
+        }
+        // Holes 2 and 3 support neither.
+        for hole in [2, 3] {
+            let hint = technique_hint(Technique::Over, hole);
+            assert!(hint.contains("doesn't support"), "hole {hole}: {hint:?}");
+        }
     }
 
     #[test]

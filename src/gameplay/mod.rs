@@ -99,6 +99,7 @@ impl Plugin for GameplayPlugin {
                 bending_trainer::rebuild_overlay,
                 bending_trainer::update_key_label,
                 bending_trainer::update_target_label,
+                bending_trainer::update_hint_label,
                 bending_trainer::update_tuner_readout,
                 bending_trainer::drill_update,
                 bending_trainer::update_drill_label,

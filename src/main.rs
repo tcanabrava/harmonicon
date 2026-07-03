@@ -3,9 +3,6 @@
 use bevy::asset::io::{AssetSource, AssetSourceBuilder};
 use bevy::image::ImageSamplerDescriptor;
 use bevy::prelude::*;
-use core::time::Duration;
-
-const SCALE_TIME: u64 = 400;
 
 /// Reverse-DNS app id. On Wayland the icon comes from a matching desktop file
 /// (`<APP_ID>.desktop`); this sets the window's app_id so the compositor can find
@@ -22,7 +19,7 @@ use harmonicon::settings::SettingsPlugin;
 use harmonicon::song::SongPlugin;
 use harmonicon::spectrogram::SpectrogramPlugin;
 use harmonicon::theme::ThemePlugin;
-use harmonicon::dialogs::ui_scale::{TargetScale, apply_scaling, change_scaling};
+use harmonicon::dialogs::ui_scale::change_scaling;
 
 fn main() {
     let mut app = App::new();
@@ -80,11 +77,6 @@ fn main() {
 
     app.add_message::<PitchEvent>()
         .init_resource::<AudioFrame>()
-        .insert_resource(TargetScale {
-            start_scale: 1.0,
-            target_scale: 1.0,
-            target_time: Timer::new(Duration::from_millis(SCALE_TIME), TimerMode::Once),
-        })
         .add_systems(Startup, (spawn_camera, setup_audio))
         // Hold on the Startup state until the locale folder has loaded, so the
         // menu's first frame shows translated labels rather than raw Fluent keys.
@@ -99,10 +91,7 @@ fn main() {
             Update,
             print_pitches.run_if(in_state(AppState::Playing)),
         )
-        .add_systems(
-                   Update,
-                   (change_scaling, apply_scaling.after(change_scaling)),
-        )
+        .add_systems(Update, change_scaling)
         .run();
 }
 
