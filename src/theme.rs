@@ -24,7 +24,11 @@ struct ThemeJson {
 
 #[derive(Deserialize, Clone, Debug, Default)]
 struct ButtonThemeJson {
+    // Documented in the theme schema (`button_def.background_image`) but not
+    // yet wired up to rendering — parsed for schema completeness, like
+    // `ButtonShadersJson`'s fields below.
     #[serde(default)]
+    #[allow(dead_code)]
     background_image: Option<ImageRefJson>,
     #[serde(default)]
     icon: Option<ImageRefJson>,

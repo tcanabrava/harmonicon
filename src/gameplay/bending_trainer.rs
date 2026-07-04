@@ -440,7 +440,13 @@ pub fn setup(
                     },
                 ));
                 row.spawn_empty().apply_scene(button::small(
-                    "technique \u{21BB}",
+                    "\u{25C2}",
+                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
+                        target.technique = target.technique.prev();
+                    },
+                ));
+                row.spawn_empty().apply_scene(button::small(
+                    "technique \u{25B8}",
                     |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
                         target.technique = target.technique.next();
                     },

@@ -104,14 +104,6 @@ pub struct LastClickedTick(pub Option<i64>);
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
-/// Global beat index for a clock position, or `None` before the song starts.
-pub fn beat_index(clock: f64, bpm: f64) -> Option<i64> {
-    if clock < 0.0 || bpm <= 0.0 {
-        return None;
-    }
-    Some((clock / (60.0 / bpm)).floor() as i64)
-}
-
 /// True when a beat is the first beat of its bar.
 pub fn is_downbeat(beat: i64, beats_per_bar: f64) -> bool {
     let beats = (beats_per_bar.max(1.0)) as i64;
@@ -474,27 +466,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn no_beat_before_the_song_starts() {
-        assert_eq!(beat_index(-0.5, 120.0), None);
-        assert_eq!(beat_index(-3.0, 60.0), None);
+    fn no_tick_before_the_song_starts() {
+        assert_eq!(tick_index(-0.5, 120.0, MetronomeFeel::Straight), None);
+        assert_eq!(tick_index(-3.0, 60.0, MetronomeFeel::Straight), None);
     }
 
     #[test]
-    fn beat_zero_at_clock_zero() {
-        assert_eq!(beat_index(0.0, 120.0), Some(0));
+    fn tick_zero_at_clock_zero() {
+        assert_eq!(tick_index(0.0, 120.0, MetronomeFeel::Straight), Some(0));
     }
 
     #[test]
-    fn beat_advances_every_half_second_at_120bpm() {
-        assert_eq!(beat_index(0.49, 120.0), Some(0));
-        assert_eq!(beat_index(0.5, 120.0), Some(1));
-        assert_eq!(beat_index(1.99, 120.0), Some(3));
+    fn straight_feel_ticks_advance_every_beat_at_120bpm() {
+        // In Straight feel a tick is a whole beat, so at 120bpm (0.5s/beat):
+        assert_eq!(tick_index(0.49, 120.0, MetronomeFeel::Straight), Some(0));
+        assert_eq!(tick_index(0.5, 120.0, MetronomeFeel::Straight), Some(1));
+        assert_eq!(tick_index(1.99, 120.0, MetronomeFeel::Straight), Some(3));
     }
 
     #[test]
-    fn invalid_bpm_gives_no_beat() {
-        assert_eq!(beat_index(1.0, 0.0), None);
-        assert_eq!(beat_index(1.0, -60.0), None);
+    fn invalid_bpm_gives_no_tick() {
+        assert_eq!(tick_index(1.0, 0.0, MetronomeFeel::Straight), None);
+        assert_eq!(tick_index(1.0, -60.0, MetronomeFeel::Straight), None);
+    }
+
+    #[test]
+    fn shuffle_feel_ticks_three_times_per_beat() {
+        // At 120bpm a beat is 0.5s, so a shuffle tick (triplet-eighth) is
+        // 1/6s — three ticks land within the same beat.
+        assert_eq!(tick_index(0.0, 120.0, MetronomeFeel::Shuffle), Some(0));
+        assert_eq!(tick_index(0.49, 120.0, MetronomeFeel::Shuffle), Some(2));
+        assert_eq!(tick_index(0.5, 120.0, MetronomeFeel::Shuffle), Some(3));
     }
 
     #[test]
