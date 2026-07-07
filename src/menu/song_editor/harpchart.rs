@@ -57,11 +57,11 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
                         Pitch::Normal => {}
                     }
                     match n.expr {
-                        Expr::Vibrato => modifiers.push(
-                            json!({ "type": "vibrato", "oscillation_hz": 5.5, "intensity": 0.5 }),
+                        Expr::Vibrato(hz) => modifiers.push(
+                            json!({ "type": "vibrato", "oscillation_hz": hz, "intensity": 0.5 }),
                         ),
-                        Expr::Wah => modifiers.push(
-                            json!({ "type": "wah-wah", "oscillation_hz": 4.0, "intensity": 0.5 }),
+                        Expr::Wah(hz) => modifiers.push(
+                            json!({ "type": "wah-wah", "oscillation_hz": hz, "intensity": 0.5 }),
                         ),
                         Expr::None => {}
                     }
@@ -160,8 +160,18 @@ pub(super) fn parse_pitch_expr(modifiers: &[serde_json::Value]) -> (Pitch, Expr)
             }
             "overblow" => pitch = Pitch::Overblow,
             "overdraw" => pitch = Pitch::Overdraw,
-            "vibrato"  => expr  = Expr::Vibrato,
-            "wah-wah"  => expr  = Expr::Wah,
+            // Default to the old fixed rates for charts saved before
+            // `oscillation_hz` was per-note; clamp away non-positive/absurd
+            // values so a hand-edited chart can't divide-by-zero the preview
+            // synth's phase integration.
+            "vibrato"  => {
+                let hz = m["oscillation_hz"].as_f64().unwrap_or(5.5) as f32;
+                expr = Expr::Vibrato(hz.max(0.5));
+            }
+            "wah-wah"  => {
+                let hz = m["oscillation_hz"].as_f64().unwrap_or(4.0) as f32;
+                expr = Expr::Wah(hz.max(0.5));
+            }
             _ => {}
         }
     }

@@ -20,8 +20,8 @@ pub mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
 use scoring::{
-    combo_label, compute_multiplier, detect_relative_wobble, detect_wobble, should_decay_combo,
-    VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC,
+    combo_label, compute_multiplier, measured_oscillation_hz, measured_relative_oscillation_hz,
+    oscillation_matches_rate, should_decay_combo, VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC,
 };
 pub use scoring::{
     NoteOutcome, classify_note, compute_points, sustain_points,
@@ -422,12 +422,16 @@ pub struct ScheduledNote {
     /// Technique modifiers from the chart (bend, vibrato, etc.).
     /// Used to trigger fx sounds when the note is hit.
     pub modifiers: Vec<Modifier>,
-    /// Cents-from-expected-pitch, sampled once per frame while held — used to
-    /// verify a declared `vibrato` was actually played, not just declared.
-    pub pitch_samples: Vec<f32>,
-    /// Input loudness (RMS), sampled once per frame while held — used to
-    /// verify a declared `wah-wah` was actually played, not just declared.
-    pub amp_samples: Vec<f32>,
+    /// `(clock time, cents-from-expected-pitch)`, sampled once per frame
+    /// while held — used to verify a declared `vibrato` was actually played
+    /// at roughly its declared `oscillation_hz`, not just declared. Storing
+    /// the timestamp (rather than trusting sample order) keeps the measured
+    /// rate frame-rate independent.
+    pub pitch_samples: Vec<(f64, f32)>,
+    /// `(clock time, input loudness RMS)`, sampled once per frame while
+    /// held — used to verify a declared `wah-wah` was actually played at
+    /// roughly its declared `oscillation_hz`, not just declared.
+    pub amp_samples: Vec<(f64, f32)>,
 }
 
 #[derive(Component)]
@@ -593,14 +597,35 @@ fn is_sustained_technique(modifier: &Modifier) -> bool {
     matches!(modifier, Modifier::Vibrato { .. } | Modifier::WahWah { .. })
 }
 
+/// How far a measured vibrato/wah rate may drift from the chart's declared
+/// `oscillation_hz` and still count — generous, since hand technique speed
+/// varies naturally between players and even between notes.
+const OSCILLATION_RATE_TOLERANCE_FRAC: f32 = 0.4;
+
 /// Did the player actually perform this sustained technique, judged from the
-/// pitch/loudness samples collected while the note was held? Non-sustained
-/// modifiers (bend, overblow, overdraw) are validated at onset instead —
-/// this always returns `true` for them since it shouldn't be asked.
-fn technique_confirmed(modifier: &Modifier, pitch_samples: &[f32], amp_samples: &[f32]) -> bool {
+/// pitch/loudness samples collected while the note was held — both that it
+/// swung enough to be a real wobble, and that it swung at roughly the
+/// chart's declared `oscillation_hz` rather than some unrelated rate.
+/// Non-sustained modifiers (bend, overblow, overdraw) are validated at onset
+/// instead — this always returns `true` for them since it shouldn't be asked.
+fn technique_confirmed(
+    modifier: &Modifier,
+    pitch_samples: &[(f64, f32)],
+    amp_samples: &[(f64, f32)],
+) -> bool {
     match modifier {
-        Modifier::Vibrato { .. } => detect_wobble(pitch_samples, VIBRATO_MIN_SWING_CENTS),
-        Modifier::WahWah { .. } => detect_relative_wobble(amp_samples, WAH_MIN_SWING_FRAC),
+        Modifier::Vibrato { oscillation_hz, .. } => {
+            measured_oscillation_hz(pitch_samples, VIBRATO_MIN_SWING_CENTS)
+                .is_some_and(|hz| {
+                    oscillation_matches_rate(hz, *oscillation_hz, OSCILLATION_RATE_TOLERANCE_FRAC)
+                })
+        }
+        Modifier::WahWah { oscillation_hz, .. } => {
+            measured_relative_oscillation_hz(amp_samples, WAH_MIN_SWING_FRAC)
+                .is_some_and(|hz| {
+                    oscillation_matches_rate(hz, *oscillation_hz, OSCILLATION_RATE_TOLERANCE_FRAC)
+                })
+        }
         _ => true,
     }
 }
@@ -895,9 +920,9 @@ fn score_notes(
                 if note.modifiers.iter().any(is_sustained_technique) {
                     if let Some(hz) = active_frequency_for(&active.0, &note.expected_pitch)
                         && let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch) {
-                            note.pitch_samples.push(1200.0 * (hz / expected_hz).log2());
+                            note.pitch_samples.push((clock.0, 1200.0 * (hz / expected_hz).log2()));
                         }
-                    note.amp_samples.push(rms(&frame.samples));
+                    note.amp_samples.push((clock.0, rms(&frame.samples)));
                 }
             } else {
                 score.points += sustain_points(note.held, note.duration);
@@ -1505,11 +1530,22 @@ mod tests {
         assert!(!is_sustained_technique(&Modifier::Overdraw));
     }
 
+    // Timestamped sine samples around `offset`, `n` samples spaced `dt` seconds apart.
+    fn timestamped_sine(freq_hz: f32, offset: f32, amplitude: f32, n: usize, dt: f64) -> Vec<(f64, f32)> {
+        (0..n)
+            .map(|i| {
+                let t = i as f64 * dt;
+                let v = offset + amplitude * (2.0 * std::f32::consts::PI * freq_hz * t as f32).sin();
+                (t, v)
+            })
+            .collect()
+    }
+
     #[test]
     fn technique_confirmed_requires_real_wobble_for_vibrato() {
         let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
-        let steady: Vec<f32> = vec![0.0; 20];
-        let wobbling: Vec<f32> = (0..40).map(|i| 25.0 * (i as f32 * 0.6).sin()).collect();
+        let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64 / 60.0, 0.0)).collect();
+        let wobbling = timestamped_sine(5.0, 0.0, 25.0, 40, 1.0 / 60.0);
         assert!(!technique_confirmed(&vibrato, &steady, &[]));
         assert!(technique_confirmed(&vibrato, &wobbling, &[]));
     }
@@ -1517,11 +1553,27 @@ mod tests {
     #[test]
     fn technique_confirmed_requires_real_wobble_for_wah() {
         let wah = Modifier::WahWah { oscillation_hz: 3.0, intensity: None };
-        let steady_volume: Vec<f32> = vec![0.2; 20];
-        let pumping_volume: Vec<f32> =
-            (0..40).map(|i| 0.2 + 0.06 * (i as f32 * 0.6).sin()).collect();
+        let steady_volume: Vec<(f64, f32)> = (0..20).map(|i| (i as f64 / 60.0, 0.2)).collect();
+        let pumping_volume = timestamped_sine(3.0, 0.2, 0.06, 40, 1.0 / 60.0);
         assert!(!technique_confirmed(&wah, &[], &steady_volume));
         assert!(technique_confirmed(&wah, &[], &pumping_volume));
+    }
+
+    #[test]
+    fn technique_confirmed_rejects_vibrato_at_the_wrong_rate() {
+        // The chart declares a 5 Hz vibrato, but the player wobbled at ~1.5 Hz
+        // — real oscillation, just not the declared rate. A flip-count-only
+        // check (the old behavior) couldn't tell these apart.
+        let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
+        let slow_wobble = timestamped_sine(1.5, 0.0, 25.0, 40, 1.0 / 60.0);
+        assert!(!technique_confirmed(&vibrato, &slow_wobble, &[]));
+    }
+
+    #[test]
+    fn technique_confirmed_rejects_wah_at_the_wrong_rate() {
+        let wah = Modifier::WahWah { oscillation_hz: 3.0, intensity: None };
+        let fast_pumping = timestamped_sine(9.0, 0.2, 0.06, 40, 1.0 / 60.0);
+        assert!(!technique_confirmed(&wah, &[], &fast_pumping));
     }
 
     #[test]

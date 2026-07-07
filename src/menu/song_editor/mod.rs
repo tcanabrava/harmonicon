@@ -173,10 +173,34 @@ mod tests {
         apply_modifier(&mut s, ModButton::Bend);
         apply_modifier(&mut s, ModButton::Vibrato);
         assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
-        assert_eq!(s.notes[0].expr, Expr::Vibrato);
+        assert_eq!(s.notes[0].expr, Expr::Vibrato(3.0), "first click lands on the min rate");
         apply_modifier(&mut s, ModButton::Wah);
-        assert_eq!(s.notes[0].expr, Expr::Wah);
+        assert_eq!(s.notes[0].expr, Expr::Wah(2.0), "first click lands on the min rate");
         assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    }
+
+    #[test]
+    fn vibrato_cycles_through_rates_and_caps_at_none() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 1, 0);
+        for expected in [3.0, 4.0, 5.0, 6.0, 7.0] {
+            apply_modifier(&mut s, ModButton::Vibrato);
+            assert_eq!(s.notes[0].expr, Expr::Vibrato(expected));
+        }
+        apply_modifier(&mut s, ModButton::Vibrato);
+        assert_eq!(s.notes[0].expr, Expr::None, "cycling past the max rate deselects");
+    }
+
+    #[test]
+    fn wah_cycles_through_rates_and_caps_at_none() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 1, 0);
+        for expected in [2.0, 3.0, 4.0, 5.0] {
+            apply_modifier(&mut s, ModButton::Wah);
+            assert_eq!(s.notes[0].expr, Expr::Wah(expected));
+        }
+        apply_modifier(&mut s, ModButton::Wah);
+        assert_eq!(s.notes[0].expr, Expr::None, "cycling past the max rate deselects");
     }
 
     #[test]
@@ -264,13 +288,13 @@ mod tests {
     fn enforce_expr_unifies_overlap_chain_but_not_independent_notes() {
         let mut s = EditorState::default();
         s.notes = vec![
-            GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::Vibrato },
+            GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::Vibrato(5.0) },
             GridNote { id: 1, hole: 2, tick: 2, len: 3, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
             GridNote { id: 2, hole: 3, tick: 10, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
         ];
         s.next_id = 3;
         enforce_expr(&mut s, 0);
-        assert_eq!(s.note_by_id(1).unwrap().expr, Expr::Vibrato, "overlapping note shares the vibrato");
+        assert_eq!(s.note_by_id(1).unwrap().expr, Expr::Vibrato(5.0), "overlapping note shares the vibrato (rate included)");
         assert_eq!(s.note_by_id(2).unwrap().expr, Expr::None, "independent note is untouched");
     }
 
@@ -282,8 +306,8 @@ mod tests {
         select_or_add(&mut s, 7, 10); // independent
         s.selected = Some(s.note_at(2, 0).unwrap().id);
         apply_modifier(&mut s, ModButton::Wah);
-        assert_eq!(s.note_at(2, 0).unwrap().expr, Expr::Wah);
-        assert_eq!(s.note_at(5, 2).unwrap().expr, Expr::Wah, "overlapping note picks up the wah too");
+        assert_eq!(s.note_at(2, 0).unwrap().expr, Expr::Wah(2.0));
+        assert_eq!(s.note_at(5, 2).unwrap().expr, Expr::Wah(2.0), "overlapping note picks up the wah too");
         assert_eq!(s.note_at(7, 10).unwrap().expr, Expr::None, "independent note keeps its own expression");
     }
 
@@ -399,6 +423,42 @@ mod tests {
     }
 
     #[test]
+    fn serialize_harpchart_writes_the_notes_own_oscillation_hz() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 2, 0);
+        apply_modifier(&mut s, ModButton::Vibrato); // -> 3.0
+        apply_modifier(&mut s, ModButton::Vibrato); // -> 4.0
+        apply_modifier(&mut s, ModButton::Vibrato); // -> 5.0
+
+        let json_str = serialize_harpchart(&s);
+        let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+        let modifiers = v["track"][0]["events"][0]["modifiers"]
+            .as_array()
+            .expect("modifiers array");
+        let vibrato = modifiers
+            .iter()
+            .find(|m| m["type"] == "vibrato")
+            .expect("vibrato modifier");
+        assert_eq!(vibrato["oscillation_hz"], 5.0);
+    }
+
+    #[test]
+    fn oscillation_hz_round_trips_through_save_and_load() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 3, 0);
+        apply_modifier(&mut s, ModButton::Wah); // -> 2.0
+        apply_modifier(&mut s, ModButton::Wah); // -> 3.0
+
+        let json_str = serialize_harpchart(&s);
+        let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+
+        let mut loaded = EditorState::default();
+        let mut scroll = Scroll::default();
+        load_harpchart(&v, &mut loaded, &mut scroll);
+        assert_eq!(loaded.notes[0].expr, Expr::Wah(3.0));
+    }
+
+    #[test]
     fn saved_position_round_trips_through_load() {
         let mut s = EditorState::default();
         s.position = "3rd".into();
@@ -501,13 +561,35 @@ mod tests {
             parse_pitch_expr(&[serde_json::json!({ "type": "overdraw" })]).0,
             Pitch::Overdraw
         );
+        // No `oscillation_hz` in the JSON (e.g. a chart saved before it was
+        // per-note) falls back to the old fixed rates.
         assert_eq!(
             parse_pitch_expr(&[serde_json::json!({ "type": "vibrato" })]).1,
-            Expr::Vibrato
+            Expr::Vibrato(5.5)
         );
         assert_eq!(
             parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah" })]).1,
-            Expr::Wah
+            Expr::Wah(4.0)
+        );
+    }
+
+    #[test]
+    fn parse_pitch_expr_reads_custom_oscillation_hz() {
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "vibrato", "oscillation_hz": 6.0 })]).1,
+            Expr::Vibrato(6.0)
+        );
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah", "oscillation_hz": 2.5 })]).1,
+            Expr::Wah(2.5)
+        );
+    }
+
+    #[test]
+    fn parse_pitch_expr_clamps_a_nonpositive_oscillation_hz() {
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "vibrato", "oscillation_hz": 0.0 })]).1,
+            Expr::Vibrato(0.5)
         );
     }
 

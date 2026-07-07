@@ -41,14 +41,14 @@ const BREATH_NOISE_DECAY: f32 = -3.0;
 const NOTE_LEVEL: f32 = 0.25;
 
 // Vibrato — pitch (frequency) modulation mimicking tongue/diaphragm flutter.
-/// LFO rate in Hz. 7 Hz sits at the fast end of realistic harmonica vibrato.
-const VIBRATO_RATE: f32 = 7.0;
+// The LFO rate itself comes from the note's `Expr::Vibrato(hz)` (set per-note
+// in the editor); only the depth is a fixed synthesis parameter here.
 /// Frequency deviation as a fraction of the base pitch (±1.5 %).
 const VIBRATO_DEPTH: f32 = 0.015;
 
-// Hand-wah — player cups/uncovers hands around the harmonica body.
-/// LFO rate in Hz. Hand movement is naturally slower than diaphragm vibrato.
-const WAH_RATE: f32 = 3.0;
+// Hand-wah — player cups/uncovers hands around the harmonica body. The LFO
+// rate comes from the note's `Expr::Wah(hz)`; only the closed-hand amplitude
+// floor is fixed here.
 /// Minimum amplitude fraction when hands are fully cupped (closed position).
 const WAH_AMP_CLOSED: f32 = 0.35;
 
@@ -198,9 +198,9 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
             // oscillates symmetrically between 0 and 2*freq*depth/rate, so the
             // pitch wobbles evenly above and below the base frequency.
             let phase_mod = match n.expr {
-                Expr::Vibrato => {
-                    freq * VIBRATO_DEPTH / VIBRATO_RATE
-                        * (1.0 - (TAU * VIBRATO_RATE * t).cos())
+                Expr::Vibrato(rate) => {
+                    freq * VIBRATO_DEPTH / rate
+                        * (1.0 - (TAU * rate * t).cos())
                 }
                 _ => 0.0,
             };
@@ -211,8 +211,8 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
             // Amplitude dips toward WAH_AMP_CLOSED when cupped.
             // Tone color is crossfaded from muffled (fundamental only) to the
             // full bright harmonic stack as the hands open.
-            let (tone, amp_mod) = if n.expr == Expr::Wah {
-                let wah_open = ((TAU * WAH_RATE * t).sin() + 1.0) * 0.5;
+            let (tone, amp_mod) = if let Expr::Wah(rate) = n.expr {
+                let wah_open = ((TAU * rate * t).sin() + 1.0) * 0.5;
                 let bright   = harmonica_wave(freq, t, 0.0);
                 let muffled  = harmonica_wave_muffled(freq, t, 0.0);
                 let blended  = muffled + wah_open * (bright - muffled);

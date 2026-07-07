@@ -34,6 +34,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 | Scoring / sustain / techniques / pitch logic | `gameplay::scoring::tests`, `gameplay::tests::*`, `audio_system::*` |
 | Clock re-anchors to the audio sink, clamped so it can't jump | `gameplay::tests::advance_clock_*` |
 | Detector range derives from the harmonica layout (low-keyed harps not cut off) | `song::harmonica::tests::frequency_range_*`, `audio_system::pitch_detect::tests::pitch_range_from_freqs_*` |
+| Vibrato/wah bonus requires the measured rate to match the chart's `oscillation_hz` | `gameplay::scoring::tests::measured_oscillation_hz_*`, `…::oscillation_matches_rate_*`, `gameplay::tests::technique_confirmed_rejects_*_at_the_wrong_rate` |
 
 ## Manual checks
 

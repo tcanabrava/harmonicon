@@ -79,6 +79,16 @@ pub(super) struct PerformModeGroup;
 #[derive(Component)]
 pub(super) struct BendDot;
 
+/// Marks a mod button's label text so [`super::panel::update_mod_panel`] can
+/// append the selected note's configured rate (e.g. "Vibrato 5Hz"). `base` is
+/// the localized label cached at spawn time, since the per-frame update only
+/// has the note's numeric state, not the `Localization` resource.
+#[derive(Component)]
+pub(super) struct ModButtonLabel {
+    pub(super) kind: ModButton,
+    pub(super) base: String,
+}
+
 #[derive(Component)]
 pub(super) struct MetaFieldBox(pub(super) Field);
 
@@ -460,12 +470,16 @@ pub(super) fn mod_button(
             apply_modifier(&mut state, kind);
         })
         .with_children(|b| {
-            b.spawn((
-                Text::new(String::from(label)),
+            let base = String::from(label);
+            let mut text = b.spawn((
+                Text::new(base.clone()),
                 TextFont { font_size: FontSize::Px(14.0), ..default() },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
             ));
+            if matches!(kind, ModButton::Wah | ModButton::Vibrato) {
+                text.insert(ModButtonLabel { kind, base });
+            }
             if kind == ModButton::Bend {
                 b.spawn((
                     BendDot,

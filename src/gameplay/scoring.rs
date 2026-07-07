@@ -93,50 +93,85 @@ pub const VIBRATO_MIN_SWING_CENTS: f32 = 15.0;
 /// note's mean input level, since raw mic gain varies per player/setup.
 pub const WAH_MIN_SWING_FRAC: f32 = 0.12;
 
-/// Did `samples` genuinely oscillate — swinging at least `min_swing` with at
-/// least one full up/down cycle — rather than holding steady, drifting
-/// monotonically, or doing a single one-way bend? Small deltas below 15% of
-/// `min_swing` are treated as frame-to-frame jitter and ignored so they don't
-/// get counted as spurious direction changes.
-pub fn detect_wobble(samples: &[f32], min_swing: f32) -> bool {
-    if samples.len() < 6 {
-        return false;
+/// Timestamps of `min_swing`-qualifying direction reversals in `values`
+/// (paired 1:1 with `times`), or `None` if there aren't enough samples or the
+/// swing never reaches `min_swing` peak-to-trough. Shared by the rate-matching
+/// checks below. Deltas below 15% of `min_swing` are treated as
+/// frame-to-frame jitter and ignored so they don't get counted as spurious
+/// direction changes.
+fn wobble_flip_times(values: &[f32], times: &[f64], min_swing: f32) -> Option<Vec<f64>> {
+    if values.len() < 6 {
+        return None;
     }
-    let max = samples.iter().cloned().fold(f32::MIN, f32::max);
-    let min = samples.iter().cloned().fold(f32::MAX, f32::min);
+    let max = values.iter().cloned().fold(f32::MIN, f32::max);
+    let min = values.iter().cloned().fold(f32::MAX, f32::min);
     if max - min < min_swing {
-        return false;
+        return None;
     }
     let noise_floor = min_swing * 0.15;
     let mut direction = 0i32;
-    let mut flips = 0;
-    for w in samples.windows(2) {
-        let d = w[1] - w[0];
+    let mut flip_times = Vec::new();
+    for i in 1..values.len() {
+        let d = values[i] - values[i - 1];
         if d.abs() < noise_floor {
             continue;
         }
         let sign = if d > 0.0 { 1 } else { -1 };
         if direction != 0 && sign != direction {
-            flips += 1;
+            flip_times.push(times[i]);
         }
         direction = sign;
     }
-    flips >= 2
+    Some(flip_times)
 }
 
-/// Like [`detect_wobble`], but for a signal whose absolute scale is meaningless
-/// (input gain varies per mic/player) — normalises to the sample mean first, so
-/// `min_frac` is a *relative* swing (e.g. `0.12` = 12% above/below the mean).
-pub fn detect_relative_wobble(samples: &[f32], min_frac: f32) -> bool {
+/// Estimated oscillation rate (Hz) from the real elapsed time between
+/// direction reversals in timestamped `samples` — frame-rate independent,
+/// unlike counting flips over a fixed number of samples. `None` if `samples`
+/// never wobbles enough to qualify as oscillation at all (fewer than two
+/// reversals, or peak-to-trough swing under `min_swing`).
+pub fn measured_oscillation_hz(samples: &[(f64, f32)], min_swing: f32) -> Option<f32> {
+    let times: Vec<f64> = samples.iter().map(|&(t, _)| t).collect();
+    let values: Vec<f32> = samples.iter().map(|&(_, v)| v).collect();
+    let flips = wobble_flip_times(&values, &times, min_swing)?;
+    if flips.len() < 2 {
+        return None;
+    }
+    // Consecutive reversals are half a cycle apart; average them then double
+    // the period to get a full-cycle rate.
+    let half_periods: Vec<f64> = flips.windows(2).map(|w| w[1] - w[0]).collect();
+    let mean_half_period = half_periods.iter().sum::<f64>() / half_periods.len() as f64;
+    if mean_half_period <= 0.0 {
+        return None;
+    }
+    Some((1.0 / (2.0 * mean_half_period)) as f32)
+}
+
+/// Like [`measured_oscillation_hz`], but for a signal whose absolute scale is
+/// meaningless (input gain varies per mic/player) — normalises to the sample
+/// mean first, so `min_frac` is a *relative* swing.
+pub fn measured_relative_oscillation_hz(samples: &[(f64, f32)], min_frac: f32) -> Option<f32> {
     if samples.is_empty() {
-        return false;
+        return None;
     }
-    let mean = samples.iter().sum::<f32>() / samples.len() as f32;
+    let mean = samples.iter().map(|&(_, v)| v).sum::<f32>() / samples.len() as f32;
     if mean <= 0.0001 {
+        return None;
+    }
+    let normalized: Vec<(f64, f32)> = samples.iter().map(|&(t, v)| (t, v / mean)).collect();
+    measured_oscillation_hz(&normalized, min_frac)
+}
+
+/// True when `measured_hz` is within `tolerance_frac` of `target_hz` (e.g.
+/// `0.4` = ±40%) — generous, since hand vibrato/wah speed varies naturally
+/// between players and even between notes.
+pub fn oscillation_matches_rate(measured_hz: f32, target_hz: f32, tolerance_frac: f32) -> bool {
+    if target_hz <= 0.0 {
         return false;
     }
-    let normalized: Vec<f32> = samples.iter().map(|s| s / mean).collect();
-    detect_wobble(&normalized, min_frac)
+    let lower = target_hz * (1.0 - tolerance_frac);
+    let upper = target_hz * (1.0 + tolerance_frac);
+    (lower..=upper).contains(&measured_hz)
 }
 
 /// True when the combo should reset due to inactivity.
@@ -410,57 +445,126 @@ mod tests {
         assert_eq!(format_multiplier(1.25), "1.25");
     }
 
-    // ── detect_wobble / detect_relative_wobble ──────────────────────────────────
+    // ── measured_oscillation_hz / measured_relative_oscillation_hz ──────────────
+
+    // Timestamped sine samples at `freq_hz`, `n` samples spaced `dt` seconds apart.
+    fn timestamped_sine(freq_hz: f32, amplitude: f32, n: usize, dt: f64) -> Vec<(f64, f32)> {
+        (0..n)
+            .map(|i| {
+                let t = i as f64 * dt;
+                let v = amplitude * (2.0 * std::f32::consts::PI * freq_hz * t as f32).sin();
+                (t, v)
+            })
+            .collect()
+    }
 
     #[test]
     fn steady_pitch_is_not_wobble() {
-        let steady = vec![2.0; 20];
-        assert!(!detect_wobble(&steady, VIBRATO_MIN_SWING_CENTS));
+        let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64, 2.0)).collect();
+        assert_eq!(measured_oscillation_hz(&steady, VIBRATO_MIN_SWING_CENTS), None);
     }
 
     #[test]
     fn single_bend_is_not_wobble() {
         // One smooth ramp down and back up is a single direction change,
         // not a repeating oscillation.
-        let mut samples = vec![0.0; 10];
-        samples.extend((0..10).map(|i| -i as f32 * 4.0));
-        assert!(!detect_wobble(&samples, VIBRATO_MIN_SWING_CENTS));
-    }
-
-    #[test]
-    fn real_vibrato_is_wobble() {
-        // A few full cycles of a sine-like swing, well above the swing floor.
-        let samples: Vec<f32> = (0..40)
-            .map(|i| 25.0 * (i as f32 * 0.6).sin())
-            .collect();
-        assert!(detect_wobble(&samples, VIBRATO_MIN_SWING_CENTS));
+        let mut values = vec![0.0; 10];
+        values.extend((0..10).map(|i| -i as f32 * 4.0));
+        let samples: Vec<(f64, f32)> = values.into_iter().enumerate().map(|(i, v)| (i as f64, v)).collect();
+        assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
     }
 
     #[test]
     fn tiny_swing_is_not_wobble_even_with_direction_changes() {
         // Oscillates, but well under the swing threshold — natural jitter.
-        let samples: Vec<f32> = (0..40).map(|i| 2.0 * (i as f32 * 0.6).sin()).collect();
-        assert!(!detect_wobble(&samples, VIBRATO_MIN_SWING_CENTS));
+        let samples = timestamped_sine(5.0, 2.0, 40, 1.0 / 60.0);
+        assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
     }
 
     #[test]
     fn too_few_samples_is_not_wobble() {
-        assert!(!detect_wobble(&[0.0, 20.0, 0.0], VIBRATO_MIN_SWING_CENTS));
+        let samples = [(0.0, 0.0), (1.0, 20.0), (2.0, 0.0)];
+        assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
     }
 
     #[test]
     fn relative_wobble_scales_with_input_level() {
-        // Same 20% swing shape at two very different gain levels — both should
-        // register, since the check is relative to each signal's own mean.
-        let quiet: Vec<f32> = (0..40).map(|i| 0.02 + 0.004 * (i as f32 * 0.6).sin()).collect();
-        let loud: Vec<f32> = (0..40).map(|i| 0.5 + 0.10 * (i as f32 * 0.6).sin()).collect();
-        assert!(detect_relative_wobble(&quiet, WAH_MIN_SWING_FRAC));
-        assert!(detect_relative_wobble(&loud, WAH_MIN_SWING_FRAC));
+        // Same swing shape at two very different gain levels — both should
+        // register at the same rate, since the check is relative to each
+        // signal's own mean.
+        let quiet = timestamped_sine(5.0, 0.004, 40, 1.0 / 60.0)
+            .into_iter()
+            .map(|(t, v)| (t, v + 0.02))
+            .collect::<Vec<_>>();
+        let loud = timestamped_sine(5.0, 0.10, 40, 1.0 / 60.0)
+            .into_iter()
+            .map(|(t, v)| (t, v + 0.5))
+            .collect::<Vec<_>>();
+        assert!(measured_relative_oscillation_hz(&quiet, WAH_MIN_SWING_FRAC).is_some());
+        assert!(measured_relative_oscillation_hz(&loud, WAH_MIN_SWING_FRAC).is_some());
     }
 
     #[test]
     fn steady_loudness_is_not_relative_wobble() {
-        let steady = vec![0.2; 20];
-        assert!(!detect_relative_wobble(&steady, WAH_MIN_SWING_FRAC));
+        let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64, 0.2)).collect();
+        assert_eq!(measured_relative_oscillation_hz(&steady, WAH_MIN_SWING_FRAC), None);
+    }
+
+    #[test]
+    fn measured_oscillation_hz_matches_a_clean_5hz_vibrato() {
+        // 40 samples at a 60 Hz frame rate span ~0.65s — over 3 full cycles at 5 Hz.
+        let samples = timestamped_sine(5.0, 25.0, 40, 1.0 / 60.0);
+        let hz = measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS)
+            .expect("should measure a rate");
+        assert!((hz - 5.0).abs() < 0.5, "expected ~5 Hz, got {hz}");
+    }
+
+    #[test]
+    fn measured_oscillation_hz_is_frame_rate_independent() {
+        // Same 5 Hz vibrato sampled twice as densely — a raw flip *count*
+        // would roughly double, but the timestamp-based rate should read
+        // the same either way.
+        let sparse = timestamped_sine(5.0, 25.0, 40, 1.0 / 60.0);
+        let dense = timestamped_sine(5.0, 25.0, 80, 1.0 / 120.0);
+        let hz_sparse = measured_oscillation_hz(&sparse, VIBRATO_MIN_SWING_CENTS).unwrap();
+        let hz_dense = measured_oscillation_hz(&dense, VIBRATO_MIN_SWING_CENTS).unwrap();
+        assert!((hz_sparse - hz_dense).abs() < 0.3, "{hz_sparse} vs {hz_dense}");
+    }
+
+    #[test]
+    fn measured_oscillation_hz_is_none_below_the_swing_threshold() {
+        let flat = timestamped_sine(5.0, 1.0, 40, 1.0 / 60.0); // swing well under 15 cents
+        assert_eq!(measured_oscillation_hz(&flat, VIBRATO_MIN_SWING_CENTS), None);
+    }
+
+    #[test]
+    fn measured_relative_oscillation_hz_normalizes_scale() {
+        let quiet = timestamped_sine(3.0, 0.004, 40, 1.0 / 60.0)
+            .into_iter()
+            .map(|(t, v)| (t, v + 0.02))
+            .collect::<Vec<_>>();
+        let hz = measured_relative_oscillation_hz(&quiet, WAH_MIN_SWING_FRAC)
+            .expect("should measure a rate");
+        assert!((hz - 3.0).abs() < 0.5, "expected ~3 Hz, got {hz}");
+    }
+
+    #[test]
+    fn oscillation_matches_rate_within_tolerance() {
+        assert!(oscillation_matches_rate(5.0, 5.0, 0.4));
+        assert!(oscillation_matches_rate(6.9, 5.0, 0.4)); // +38%, inside ±40%
+        assert!(oscillation_matches_rate(3.1, 5.0, 0.4)); // -38%, inside ±40%
+    }
+
+    #[test]
+    fn oscillation_matches_rate_rejects_outside_tolerance() {
+        // A slow ~1.5 Hz wobble should not satisfy a declared 5 Hz vibrato.
+        assert!(!oscillation_matches_rate(1.5, 5.0, 0.4));
+        assert!(!oscillation_matches_rate(10.0, 5.0, 0.4));
+    }
+
+    #[test]
+    fn oscillation_matches_rate_rejects_nonpositive_target() {
+        assert!(!oscillation_matches_rate(5.0, 0.0, 0.4));
+        assert!(!oscillation_matches_rate(5.0, -1.0, 0.4));
     }
 }

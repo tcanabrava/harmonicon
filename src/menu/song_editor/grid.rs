@@ -334,8 +334,8 @@ pub(super) fn spawn_note(
         Expr::None => {
             commands.entity(root).insert(BackgroundColor(note_color(pitch_color(note.pitch))));
         }
-        Expr::Wah | Expr::Vibrato => {
-            let mode = if note.expr == Expr::Vibrato { 0.0 } else { 1.0 };
+        Expr::Wah(_) | Expr::Vibrato(_) => {
+            let mode = if matches!(note.expr, Expr::Vibrato(_)) { 0.0 } else { 1.0 };
             let mat = note_mats.add(EditorNoteMaterial {
                 color: note_color(pitch_color(note.pitch)).to_linear(),
                 params: Vec4::new(mode, width, 0.0, 0.0),

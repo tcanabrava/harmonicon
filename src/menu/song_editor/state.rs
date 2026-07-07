@@ -17,12 +17,14 @@ pub(super) enum Pitch {
 }
 
 /// An expression technique layered on top of the pitch. At most one at a time;
-/// either may combine with any [`Pitch`].
+/// either may combine with any [`Pitch`]. Both carry their oscillation rate in
+/// Hz, cycled through by repeatedly clicking the mod button — same pattern as
+/// `Bend`'s depth.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) enum Expr {
     None,
-    Wah,
-    Vibrato,
+    Wah(f32),
+    Vibrato(f32),
 }
 
 /// Breath direction: blow (exhale) or draw (inhale). Every note is one or the
@@ -283,6 +285,19 @@ pub(super) fn pitch_deny_key(pitch: Pitch, _hole: u8) -> &'static str {
         Pitch::Normal => "",
     }
 }
+
+/// Vibrato rate range (Hz) the editor cycles through when repeatedly clicking
+/// the Vibrato button — spans realistic diaphragm/breath vibrato speed.
+pub(super) const VIBRATO_HZ_MIN: f32 = 3.0;
+pub(super) const VIBRATO_HZ_MAX: f32 = 7.0;
+pub(super) const VIBRATO_HZ_STEP: f32 = 1.0;
+
+/// Hand-wah rate range (Hz) the editor cycles through when repeatedly
+/// clicking the Wah button — hand movement is naturally slower than
+/// diaphragm vibrato.
+pub(super) const WAH_HZ_MIN: f32 = 2.0;
+pub(super) const WAH_HZ_MAX: f32 = 5.0;
+pub(super) const WAH_HZ_STEP: f32 = 1.0;
 
 pub(super) fn max_bend(hole: u8) -> f32 {
     match hole {

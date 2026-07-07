@@ -6,8 +6,8 @@ use crate::theme::LoadedTheme;
 use super::practice::PracticeState;
 use super::state::{Dir, EditorState, Expr, Field, Mode, Pitch};
 use super::ui::{
-    BendDot, EditModeGroup, MetaFieldBox, MetaFieldText, ModButton, ModeButton, PerformModeGroup,
-    StatusMsg,
+    BendDot, EditModeGroup, MetaFieldBox, MetaFieldText, ModButton, ModButtonLabel, ModeButton,
+    PerformModeGroup, StatusMsg,
 };
 
 pub(super) fn update_mod_panel(
@@ -15,6 +15,7 @@ pub(super) fn update_mod_panel(
     theme: Res<LoadedTheme>,
     mut buttons: Query<(&ModButton, &mut BackgroundColor)>,
     mut dot: Query<&mut Visibility, With<BendDot>>,
+    mut labels: Query<(&ModButtonLabel, &mut Text)>,
 ) {
     let colors = theme.song_editor_colors();
     let selected = state.selected_note().copied();
@@ -25,8 +26,8 @@ pub(super) fn update_mod_panel(
             ModButton::Bend     => matches!(n.pitch, Pitch::Bend(_)),
             ModButton::Overblow => n.pitch == Pitch::Overblow,
             ModButton::Overdraw => n.pitch == Pitch::Overdraw,
-            ModButton::Wah      => n.expr == Expr::Wah,
-            ModButton::Vibrato  => n.expr == Expr::Vibrato,
+            ModButton::Wah      => matches!(n.expr, Expr::Wah(_)),
+            ModButton::Vibrato  => matches!(n.expr, Expr::Vibrato(_)),
             ModButton::Delete   => false,
         });
         bg.0 = if active { colors.btn_active } else { colors.btn_bg };
@@ -34,6 +35,19 @@ pub(super) fn update_mod_panel(
     let bent = selected.is_some_and(|n| matches!(n.pitch, Pitch::Bend(_)));
     for mut vis in &mut dot {
         *vis = if bent { Visibility::Inherited } else { Visibility::Hidden };
+    }
+    // Show the selected note's configured rate next to Wah/Vibrato (e.g.
+    // "Vibrato 5Hz") so cycling the rate with repeated clicks is legible.
+    for (label, mut text) in &mut labels {
+        let hz = selected.and_then(|n| match (label.kind, n.expr) {
+            (ModButton::Vibrato, Expr::Vibrato(hz)) => Some(hz),
+            (ModButton::Wah, Expr::Wah(hz)) => Some(hz),
+            _ => None,
+        });
+        **text = match hz {
+            Some(hz) => format!("{} {hz:.0}Hz", label.base),
+            None => label.base.clone(),
+        };
     }
 }
 
