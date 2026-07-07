@@ -867,7 +867,7 @@ fn score_notes(
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
     fx_mapping: Res<FxMapping>,
-    mut notes: Query<&mut ScheduledNote>,
+    mut notes: Query<(Entity, &mut ScheduledNote)>,
     mut score: ResMut<Score>,
     mut stats: ResMut<SongStats>,
     mut feedback: ResMut<HitFeedback>,
@@ -898,7 +898,14 @@ fn score_notes(
     // fresh. Pitches still held remain consumed and can't score again.
     gate.release_absent(&harp_pitches);
 
-    for mut note in &mut notes {
+    // Notes not yet hit or missed are classified in a second pass below,
+    // ordered by |offset| (closest to the judged instant first). Query
+    // iteration order is otherwise arbitrary, and when two same-pitch notes
+    // overlap the hit window, whichever one happened to be classified first
+    // would consume the attack — not necessarily the one actually due.
+    let mut pending: Vec<(Entity, f64)> = Vec::new();
+
+    for (entity, mut note) in &mut notes {
         if note.missed {
             continue;
         }
@@ -950,7 +957,13 @@ fn score_notes(
             continue;
         }
 
-        let offset = judged - note.time;
+        pending.push((entity, judged - note.time));
+    }
+
+    pending.sort_by(|a, b| a.1.abs().partial_cmp(&b.1.abs()).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (entity, offset) in pending {
+        let Ok((_, mut note)) = notes.get_mut(entity) else { continue };
         // A note counts as "playing" only on a fresh attack: the pitch must be
         // sounding and not already consumed by an earlier note in this sustain.
         let playing = gate.is_fresh(&note.expected_pitch, &harp_pitches);
@@ -1625,6 +1638,68 @@ mod tests {
         assert!(
             world.entities().contains(keep),
             "unrelated entities must survive"
+        );
+    }
+
+    // ── score_notes (same-pitch overlap ordering) ───────────────────────────
+
+    fn overlap_test_note(time: f64) -> ScheduledNote {
+        ScheduledNote {
+            time,
+            duration: 1.0,
+            hole: 1,
+            is_blow: true,
+            expected_pitch: "C4".to_string(),
+            hit: false,
+            missed: false,
+            held: 0.0,
+            sustain_scored: false,
+            modifiers: Vec::new(),
+            pitch_samples: Vec::new(),
+            amp_samples: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn score_notes_credits_the_closest_offset_when_two_same_pitch_notes_overlap() {
+        // Two C4 notes both sit inside the hit window at clock=0.5 while C4 is
+        // sounding: one 0.01s away (should score), one 0.10s away (should
+        // stay `Waiting` — the pitch is fresh only once). Before the |offset|
+        // sort this depended on arbitrary Query iteration order; spawning the
+        // farther note first reproduces the exact bug (whichever the query
+        // visited first used to win, regardless of which was actually due).
+        let mut world = World::new();
+        world.insert_resource(GameplayClock(0.5));
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(ActivePitches(vec![PitchInfo {
+            note: "C".to_string(),
+            octave: 4,
+            frequency: note_to_freq_hz("C4").unwrap(),
+        }]));
+        world.insert_resource(AudioFrame::default());
+        world.insert_resource(ValidHarpNotes(HashSet::from(["C4".to_string()])));
+        world.insert_resource(ScoringConfig::default());
+        world.insert_resource(AudioSettings::default());
+        world.insert_resource(FxMapping::default());
+        world.insert_resource(Score::default());
+        world.insert_resource(SongStats::default());
+        world.insert_resource(HitFeedback::default());
+        world.insert_resource(PitchGate::default());
+
+        let far = world.spawn(overlap_test_note(0.40)).id(); // offset -0.10
+        let close = world.spawn(overlap_test_note(0.49)).id(); // offset -0.01
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+
+        assert!(
+            world.get::<ScheduledNote>(close).unwrap().hit,
+            "the note actually due should be credited"
+        );
+        assert!(
+            !world.get::<ScheduledNote>(far).unwrap().hit,
+            "the farther note must not steal the attack meant for the closer one"
         );
     }
 }
