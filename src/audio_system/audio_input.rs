@@ -62,7 +62,14 @@ fn resolve_device_name(available: &[String], wanted: &str) -> Option<String> {
 /// can trigger it directly (the latter via `Commands::queue`).
 pub fn start_capture(world: &mut World) {
     let wanted = world.resource::<AudioSettings>().input_device.clone();
-    let device_name = resolve_device_name(&input_device_names(), &wanted);
+    // Skip enumeration entirely for the common case (no preference set) — on
+    // Linux, listing input devices makes cpal probe every ALSA/JACK backend,
+    // which is noisy and pointless when we're just taking the default anyway.
+    let device_name = if wanted.is_empty() {
+        None
+    } else {
+        resolve_device_name(&input_device_names(), &wanted)
+    };
 
     match create_audio_capture(device_name.as_deref()) {
         Ok((stream, capture)) => {
@@ -203,5 +210,32 @@ fn push_chunks(buf: &mut Vec<f32>, data: &[f32], channels: usize, tx: &Sender<Ve
     while buf.len() >= CHUNK_SIZE {
         let _ = tx.try_send(buf[..CHUNK_SIZE].to_vec());
         buf.drain(..CHUNK_SIZE / 2);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── resolve_device_name ──────────────────────────────────────────────────
+
+    #[test]
+    fn empty_preference_means_use_the_default() {
+        assert_eq!(resolve_device_name(&["Mic A".to_string()], ""), None);
+    }
+
+    #[test]
+    fn finds_a_currently_available_match() {
+        let available = vec!["Mic A".to_string(), "Mic B".to_string()];
+        assert_eq!(
+            resolve_device_name(&available, "Mic B"),
+            Some("Mic B".to_string())
+        );
+    }
+
+    #[test]
+    fn falls_back_to_default_when_the_saved_device_is_unplugged() {
+        let available = vec!["Mic A".to_string()];
+        assert_eq!(resolve_device_name(&available, "USB Mic (unplugged)"), None);
     }
 }

@@ -72,6 +72,7 @@ fn main() {
         SpectrogramPlugin,
         SettingsPlugin,
         harmonicon::dialogs::algo_picker::AlgoPickerPlugin,
+        harmonicon::dialogs::combobox::ComboboxPlugin,
         harmonicon::dialogs::file_dialog::FileDialogsPlugin,
         harmonicon::dialogs::font_fallback::FontFallbackPlugin,
     ));
@@ -79,7 +80,16 @@ fn main() {
     app.add_message::<PitchEvent>()
         .init_resource::<AudioFrame>()
         .init_resource::<PitchRange>()
-        .add_systems(Startup, (spawn_camera, setup_audio))
+        .add_systems(
+            Startup,
+            (
+                spawn_camera,
+                // Must run after settings are loaded from disk, or the mic
+                // would always start on the default device, ignoring a saved
+                // `input_device` preference.
+                audio_input::start_capture.after(harmonicon::settings::apply_loaded_settings),
+            ),
+        )
         // Hold on the Startup state until the locale folder has loaded, so the
         // menu's first frame shows translated labels rather than raw Fluent keys.
         .add_systems(
@@ -100,19 +110,6 @@ fn spawn_camera(mut commands: Commands) {
 
 fn enter_menu_when_localized(mut next: ResMut<NextState<AppState>>) {
     next.set(AppState::Menu);
-}
-
-fn setup_audio(world: &mut World) {
-    match audio_input::create_audio_capture() {
-        Ok((stream, capture)) => {
-            info!("Audio capture started at {} Hz", capture.sample_rate);
-            world.insert_non_send(stream);
-            world.insert_resource(capture);
-        }
-        Err(e) => {
-            error!("Failed to start audio capture: {e}");
-        }
-    }
 }
 
 fn process_audio(

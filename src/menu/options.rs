@@ -20,6 +20,7 @@ use bevy::ui_widgets::{
 const TRACK_BG: Color = Color::srgb(0.14, 0.14, 0.22);
 
 use crate::assets_management::{AvailableHarmonicas, SelectedHarmonicaModel};
+use crate::audio_system::audio_input::{self, MicStatus};
 use crate::settings::AudioSettings;
 
 use crate::theme::LoadedTheme;
@@ -29,6 +30,7 @@ use super::{AppState, MenuPage, MenuRoot, cleanup_menu, spawn_button, spawn_menu
 use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
+use crate::dialogs::combobox;
 
 /// Owns the Options page: builds it on entry, tears it down on exit, and runs
 /// the slider/preview interaction systems while it's open.
@@ -51,6 +53,8 @@ impl Plugin for OptionsPlugin {
                     update_latency_slider,
                     harmonica_button_visuals,
                     propagate_preview_layers,
+                    update_mic_banner,
+                    sync_mic_combobox,
                 )
                     .run_if(in_state(MenuPage::Options)),
             );
@@ -78,6 +82,15 @@ struct SliderValueLabel(VolumeSlider);
 /// A harmonica-model choice button; carries the model name.
 #[derive(Component, Default, Clone)]
 struct HarmonicaButton(String);
+
+/// The "no microphone" warning banner, shown only while [`MicStatus::Failed`].
+/// See TODO.md: "No microphone = silent failure."
+#[derive(Component)]
+struct MicBanner;
+
+/// The failure-reason text inside [`MicBanner`].
+#[derive(Component)]
+struct MicBannerText;
 
 /// Marks a preview scene root (a `WorldAssetRoot`); the propagation system forces
 /// this `RenderLayers` onto all its descendants, since glTF scene children don't
@@ -111,6 +124,7 @@ fn setup_options_menu(
     mut commands: Commands,
 
     settings: Res<AudioSettings>,
+    mic_status: Res<MicStatus>,
     harmonicas: Res<AvailableHarmonicas>,
     selected_harmonica: Res<SelectedHarmonicaModel>,
     asset_server: Res<AssetServer>,
@@ -119,6 +133,7 @@ fn setup_options_menu(
     btn_mats: Res<ButtonMaterials>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"), &theme, "Options");
+    spawn_mic_banner(&mut commands, root, &mic_status);
     spawn_volume_slider(
         &mut commands,
         root,
@@ -136,6 +151,12 @@ fn setup_options_menu(
         set_metronome_volume,
     );
     spawn_latency_slider(&mut commands, root, settings.input_latency_ms);
+    spawn_mic_combobox(
+        &mut commands,
+        root,
+        &audio_input::input_device_names(),
+        connected_device_name(&mic_status),
+    );
 
     // Harmonica previews: the model's glTF scene rendered to a texture (its own
     // materials, no tint). Layers are assigned after the 3D-note layers so the
@@ -438,6 +459,162 @@ fn harmonica_button_visuals(
             button::color_default()
         };
     }
+}
+
+// ── Microphone picker / status banner ───────────────────────────────────────
+
+/// The name of the device actually connected right now, or `None` while
+/// [`MicStatus::Failed`]. Used (rather than the raw `AudioSettings::input_device`
+/// preference) so the picker highlights reality — if a saved device went
+/// missing and capture fell back to the default, that's what lights up.
+fn connected_device_name(status: &MicStatus) -> Option<&str> {
+    match status {
+        MicStatus::Connected { device_name } => Some(device_name.as_str()),
+        MicStatus::Failed { .. } => None,
+    }
+}
+
+/// A dismiss-free warning banner, visible only while the microphone failed to
+/// open, with a Retry button that re-runs `audio_input::start_capture`.
+fn spawn_mic_banner(commands: &mut Commands, parent: Entity, status: &MicStatus) {
+    let visible = matches!(status, MicStatus::Failed { .. });
+    let text = mic_banner_text(status);
+
+    let banner = commands
+        .spawn((
+            Node {
+                width: Val::Px(560.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(14.0),
+                padding: UiRect::all(Val::Px(10.0)),
+                display: if visible {
+                    Display::Flex
+                } else {
+                    Display::None
+                },
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.45, 0.12, 0.12, 0.85)),
+            MicBanner,
+        ))
+        .id();
+
+    commands.entity(banner).with_children(|b| {
+        b.spawn((
+            Text::new(text),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.95, 0.85, 0.85)),
+            MicBannerText,
+        ));
+        b.spawn_empty().apply_scene(mic_retry_button_scene());
+    });
+
+    commands.entity(parent).add_child(banner);
+}
+
+fn mic_banner_text(status: &MicStatus) -> String {
+    match status {
+        MicStatus::Failed { reason } => format!("No microphone: {reason}"),
+        MicStatus::Connected { .. } => String::new(),
+    }
+}
+
+fn mic_retry_button_scene() -> impl Scene {
+    bsn! {
+        Button
+        Node { padding: {UiRect::axes(Val::Px(12.0), Val::Px(6.0))} }
+        BackgroundColor({button::color_default()})
+        on(|_: On<Pointer<Click>>, mut commands: Commands| {
+            commands.queue(audio_input::start_capture);
+        })
+        Children [
+            (
+                Text({"Retry".to_string()})
+                TextFont { font_size: {FontSize::Px(14.0)} }
+                TextColor({Color::WHITE})
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
+}
+
+/// Show/hide the banner and refresh its reason text when `MicStatus` changes
+/// (e.g. after a Retry click or a device-picker selection).
+fn update_mic_banner(
+    status: Res<MicStatus>,
+    mut banners: Query<&mut Node, With<MicBanner>>,
+    mut texts: Query<&mut Text, With<MicBannerText>>,
+) {
+    if !status.is_changed() {
+        return;
+    }
+    let visible = matches!(*status, MicStatus::Failed { .. });
+    for mut node in &mut banners {
+        node.display = if visible {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+    let text = mic_banner_text(&status);
+    for mut t in &mut texts {
+        **t = text.clone();
+    }
+}
+
+/// Marks the Options page's microphone combobox root, so [`sync_mic_combobox`]
+/// can find it to push `MicStatus` changes into its display — e.g. after
+/// Retry reconnects to a different actual device than was last picked, or a
+/// saved device disappears and capture silently falls back to the default.
+#[derive(Component)]
+struct MicCombobox;
+
+/// Wires the shared [`combobox`] widget to the microphone device list:
+/// picking an option persists it to `AudioSettings` and reconnects capture
+/// immediately.
+fn spawn_mic_combobox(
+    commands: &mut Commands,
+    parent: Entity,
+    devices: &[String],
+    connected: Option<&str>,
+) {
+    let root = combobox::spawn_combobox(
+        commands,
+        parent,
+        "Microphone",
+        devices,
+        connected.unwrap_or("None"),
+        on_mic_selected,
+    );
+    commands.entity(root).insert(MicCombobox);
+}
+
+fn on_mic_selected(
+    ev: On<combobox::ComboboxSelect>,
+    mut settings: ResMut<AudioSettings>,
+    mut commands: Commands,
+) {
+    settings.input_device = ev.value.clone();
+    commands.queue(audio_input::start_capture);
+}
+
+fn sync_mic_combobox(
+    status: Res<MicStatus>,
+    combo: Query<Entity, With<MicCombobox>>,
+    mut values: Query<&mut combobox::ComboboxValue>,
+) {
+    if !status.is_changed() {
+        return;
+    }
+    let Ok(root) = combo.single() else { return };
+    let Ok(mut value) = values.get_mut(root) else {
+        return;
+    };
+    value.0 = connected_device_name(&status).unwrap_or("None").to_string();
 }
 
 // ── Dedicated slider callbacks ────────────────────────────────────────────────

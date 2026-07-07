@@ -34,6 +34,10 @@ pub struct AudioSettings {
     pub input_latency_ms: i32,
     /// Which algorithm the audio pipeline uses to detect played pitches.
     pub pitch_algorithm: PitchAlgorithm,
+    /// Preferred microphone input device name; empty means "use the system
+    /// default". Read by `audio_system::audio_input::start_capture`, which
+    /// falls back to the default if this device isn't currently plugged in.
+    pub input_device: String,
 }
 
 impl Default for AudioSettings {
@@ -43,6 +47,7 @@ impl Default for AudioSettings {
             metronome_volume: 0.7,
             input_latency_ms: 0,
             pitch_algorithm: PitchAlgorithm::default(),
+            input_device: String::new(),
         }
     }
 }
@@ -60,6 +65,7 @@ struct Settings {
     harmonica_model: String,
     ui_theme: String,
     pitch_algorithm: PitchAlgorithm,
+    input_device: String,
 }
 
 impl Default for Settings {
@@ -73,6 +79,7 @@ impl Default for Settings {
             harmonica_model: "default".into(),
             ui_theme: "default".into(),
             pitch_algorithm: PitchAlgorithm::default(),
+            input_device: String::new(),
         }
     }
 }
@@ -141,8 +148,10 @@ impl Plugin for SettingsPlugin {
     }
 }
 
-/// Loads the saved settings into the live resources at startup.
-fn apply_loaded_settings(
+/// Loads the saved settings into the live resources at startup. `pub` so
+/// other Startup systems that need the loaded values (e.g. audio capture
+/// reading `AudioSettings::input_device`) can order themselves `.after` it.
+pub fn apply_loaded_settings(
     mut audio: ResMut<AudioSettings>,
     mut theme_2d: ResMut<SelectedNoteTheme2d>,
     mut theme_3d: ResMut<SelectedNoteTheme3d>,
@@ -154,6 +163,7 @@ fn apply_loaded_settings(
     audio.metronome_volume = settings.metronome_volume;
     audio.input_latency_ms = settings.input_latency_ms;
     audio.pitch_algorithm = settings.pitch_algorithm;
+    audio.input_device = settings.input_device;
     theme_2d.0 = settings.note_theme_2d;
     theme_3d.0 = settings.note_theme_3d;
     model.0 = settings.harmonica_model;
@@ -183,6 +193,7 @@ fn persist_settings(
         metronome_volume: audio.metronome_volume,
         input_latency_ms: audio.input_latency_ms,
         pitch_algorithm: audio.pitch_algorithm,
+        input_device: audio.input_device.clone(),
         note_theme_2d: theme_2d.0.clone(),
         note_theme_3d: theme_3d.0.clone(),
         harmonica_model: model.0.clone(),

@@ -132,7 +132,16 @@ impl Plugin for MenuPlugin {
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
             )
-            .add_systems(Update, handle_menu_escape.run_if(in_state(AppState::Menu)));
+            // If a combobox dropdown was open, its own Escape handler closes
+            // it and consumes the keypress — this handler never sees it, so
+            // one Escape press doesn't both close a dropdown and navigate
+            // back a page.
+            .add_systems(
+                Update,
+                handle_menu_escape
+                    .after(super::dialogs::combobox::close_open_comboboxes_on_escape)
+                    .run_if(in_state(AppState::Menu)),
+            );
     }
 }
 
