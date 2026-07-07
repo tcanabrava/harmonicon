@@ -42,35 +42,35 @@ pub fn spawn_countdown(commands: &mut Commands, harp_hint: Option<&str>) {
         })
         .id();
     commands.entity(overlay).with_children(|ov| {
+        ov.spawn((
+            Text::new("GET READY"),
+            TextFont {
+                font_size: FontSize::Px(22.0),
+                ..default()
+            },
+            TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
+        ));
+        // Which physical harp to grab (2D/3D pass this; jam shows it elsewhere).
+        if let Some(hint) = harp_hint {
             ov.spawn((
-                Text::new("GET READY"),
+                Text::new(hint.to_string()),
                 TextFont {
-                    font_size: FontSize::Px(22.0),
-                                        ..default()
+                    font_size: FontSize::Px(16.0),
+                    ..default()
                 },
-                TextColor(Color::srgba(0.85, 0.85, 1.0, 0.80)),
+                TextColor(Color::srgb(0.95, 0.80, 0.35)),
             ));
-            // Which physical harp to grab (2D/3D pass this; jam shows it elsewhere).
-            if let Some(hint) = harp_hint {
-                ov.spawn((
-                    Text::new(hint.to_string()),
-                    TextFont {
-                        font_size: FontSize::Px(16.0),
-                                                ..default()
-                    },
-                    TextColor(Color::srgb(0.95, 0.80, 0.35)),
-                ));
-            }
-            ov.spawn((
-                Text::new("3"),
-                TextFont {
-                    font_size: FontSize::Px(120.0),
-                                        ..default()
-                },
-                TextColor(Color::WHITE),
-                CountdownText,
-            ));
-        });
+        }
+        ov.spawn((
+            Text::new("3"),
+            TextFont {
+                font_size: FontSize::Px(120.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            CountdownText,
+        ));
+    });
 }
 
 pub fn update_countdown(

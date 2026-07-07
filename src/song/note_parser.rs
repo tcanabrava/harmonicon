@@ -1,16 +1,15 @@
-
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum State {
-    Start,          // Beginning of the string or right after a space
-    Minus,          // Saw a '-' sign, expecting a digit
-    Number,         // Parsing a number (1-9 or 10)
-    Rest,           // Saw 'r'
-    OpenParenthesis, // Saw '('
-    Comma,          // Saw ','
+    Start,            // Beginning of the string or right after a space
+    Minus,            // Saw a '-' sign, expecting a digit
+    Number,           // Parsing a number (1-9 or 10)
+    Rest,             // Saw 'r'
+    OpenParenthesis,  // Saw '('
+    Comma,            // Saw ','
     CloseParenthesis, // Saw ')'
-    Duration,       // Saw 'w', 'h', 'q', 'e', or 's'
-    Space,          // Saw a valid space, expecting a new note
-    Failed,         // Invalid sequence encountered
+    Duration,         // Saw 'w', 'h', 'q', 'e', or 's'
+    Space,            // Saw a valid space, expecting a new note
+    Failed,           // Invalid sequence encountered
 }
 
 pub struct MatchResult {
@@ -23,7 +22,10 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
         // Regex uses ^...$, and while the internal groups are optional,
         // it requires at least one note base to start. Empty string fails.
         println!("Empty notes to analyze");
-        return MatchResult { matched: false, is_valid: false };
+        return MatchResult {
+            matched: false,
+            is_valid: false,
+        };
     }
     let input = str::from_utf8(bytes).unwrap().to_string();
     println!("Analyzing {}", input);
@@ -39,7 +41,7 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
                 b'-' => {
                     has_minus = true;
                     State::Minus
-                },
+                }
                 b'r' => State::Rest,
                 // Holes are 1-10, so a token never starts with 0.
                 b'1'..=b'9' => {
@@ -49,7 +51,7 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
                 b'(' => {
                     in_parentheses = true;
                     State::OpenParenthesis
-                },
+                }
                 _ => State::Failed,
             },
             State::Minus => match b {
@@ -61,7 +63,7 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
                 b'(' => {
                     in_parentheses = true;
                     State::OpenParenthesis
-                },
+                }
                 _ => State::Failed,
             },
             State::Number => match b {
@@ -124,7 +126,7 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
                 b'-' => {
                     has_minus = true;
                     State::Minus
-                },
+                }
                 b'r' => State::Rest,
                 b'1'..=b'9' => {
                     current_num = (b - b'0') as u32;
@@ -137,7 +139,10 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
 
         if state == State::Failed {
             println!("Failed to parse note at byte {:?}", b);
-            return MatchResult { matched: false, is_valid: false };
+            return MatchResult {
+                matched: false,
+                is_valid: false,
+            };
         }
     }
 
@@ -154,7 +159,10 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
         },
     };
 
-    println!("Analyzed notes: matched={} is_valid={}", res.matched, res.is_valid);
+    println!(
+        "Analyzed notes: matched={} is_valid={}",
+        res.matched, res.is_valid
+    );
     res
 }
 
@@ -168,11 +176,13 @@ mod tests {
             let res = analyze_notes($input.as_bytes());
             assert_eq!(
                 res.matched, $matched,
-                "Expected matched={} for {:?}", $matched, $input
+                "Expected matched={} for {:?}",
+                $matched, $input
             );
             assert_eq!(
                 res.is_valid, $is_valid,
-                "Expected is_valid={} for {:?}", $is_valid, $input
+                "Expected is_valid={} for {:?}",
+                $is_valid, $input
             );
         };
     }

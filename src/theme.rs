@@ -258,14 +258,18 @@ impl LoadedTheme {
     /// Song editor colors for the active theme, or [`SongEditorColors::default`]
     /// if the theme's `theme.json` has no `"colors"` block at all.
     pub fn song_editor_colors(&self) -> SongEditorColors {
-        self.colors.as_ref().map_or_else(SongEditorColors::default, |c| c.song_editor)
+        self.colors
+            .as_ref()
+            .map_or_else(SongEditorColors::default, |c| c.song_editor)
     }
 
     /// 12-bar-blues chord-function colors for the active theme, or
     /// [`TwelveBarColors::default`] if the theme's `theme.json` has no
     /// `"colors"` block at all.
     pub fn twelve_bar_colors(&self) -> TwelveBarColors {
-        self.colors.as_ref().map_or_else(TwelveBarColors::default, |c| c.twelve_bar)
+        self.colors
+            .as_ref()
+            .map_or_else(TwelveBarColors::default, |c| c.twelve_bar)
     }
 }
 
@@ -315,15 +319,24 @@ fn load_theme(
         format!("assets/themes/{}/theme.json", selected.0).into()
     } else {
         match dirs::home_dir() {
-            Some(h) => h.join("Harmonicon/themes").join(&selected.0).join("theme.json"),
+            Some(h) => h
+                .join("Harmonicon/themes")
+                .join(&selected.0)
+                .join("theme.json"),
             None => {
-                warn!("Could not find theme.json for '{}' in assets/themes/", selected.0);
+                warn!(
+                    "Could not find theme.json for '{}' in assets/themes/",
+                    selected.0
+                );
                 return;
             }
         }
     };
     if !json_path.exists() {
-        warn!("Could not find theme.json for '{}' in assets/themes/ or ~/Harmonicon/themes/", selected.0);
+        warn!(
+            "Could not find theme.json for '{}' in assets/themes/ or ~/Harmonicon/themes/",
+            selected.0
+        );
         return;
     }
 
@@ -348,17 +361,15 @@ fn load_theme(
     let prefix = format!("{source_prefix}themes/{}/", selected.0);
 
     if !data.default_background.image.is_empty() {
-        theme.default_background = Some(
-            asset_server.load(format!("{prefix}{}", data.default_background.image)),
-        );
+        theme.default_background =
+            Some(asset_server.load(format!("{prefix}{}", data.default_background.image)));
     }
 
     for (menu_id, menu) in &data.menus {
         if let Some(bg) = &menu.background_image {
-            theme.menu_backgrounds.insert(
-                menu_id.clone(),
-                asset_server.load(format!("{prefix}{bg}")),
-            );
+            theme
+                .menu_backgrounds
+                .insert(menu_id.clone(), asset_server.load(format!("{prefix}{bg}")));
         }
         if !menu.buttons.is_empty() {
             let coords: HashMap<String, ButtonCoords> = menu
@@ -385,10 +396,8 @@ fn load_theme(
     }
 
     if let Some(sounds) = &data.default_menu_button.button_sounds {
-        theme.btn_sound_hover =
-            Some(asset_server.load(format!("{prefix}{}", sounds.hover)));
-        theme.btn_sound_click =
-            Some(asset_server.load(format!("{prefix}{}", sounds.click)));
+        theme.btn_sound_hover = Some(asset_server.load(format!("{prefix}{}", sounds.hover)));
+        theme.btn_sound_click = Some(asset_server.load(format!("{prefix}{}", sounds.click)));
     }
 
     theme.has_shaders = data.default_menu_button.button_shaders.is_some();
@@ -422,8 +431,7 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/themes");
         for name in ["default", "BluesNoir"] {
             let path = root.join(name).join("theme.json");
-            let text = std::fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("{path:?}: {e}"));
+            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
             let data: ThemeJson = serde_json::from_str(&text)
                 .unwrap_or_else(|e| panic!("{path:?} failed to parse: {e}"));
             // Both shipped themes ship an explicit song_editor colors block;
@@ -496,7 +504,10 @@ mod tests {
         }"#;
         let d: ThemeJson = serde_json::from_str(json).unwrap();
         assert!(d.menus["Credits"].buttons.is_empty());
-        assert_eq!(d.menus["Credits"].background_image.as_deref(), Some("bg.png"));
+        assert_eq!(
+            d.menus["Credits"].background_image.as_deref(),
+            Some("bg.png")
+        );
     }
 
     // ── LoadedTheme::button_coords ────────────────────────────────────────
@@ -504,8 +515,24 @@ mod tests {
     fn theme_with_main_buttons() -> LoadedTheme {
         let mut theme = LoadedTheme::default();
         let mut btns = HashMap::new();
-        btns.insert("Play".into(), ButtonCoords { x: 510.0, y: 260.0, width: 260.0, height: 50.0 });
-        btns.insert("Quit".into(), ButtonCoords { x: 510.0, y: 458.0, width: 260.0, height: 50.0 });
+        btns.insert(
+            "Play".into(),
+            ButtonCoords {
+                x: 510.0,
+                y: 260.0,
+                width: 260.0,
+                height: 50.0,
+            },
+        );
+        btns.insert(
+            "Quit".into(),
+            ButtonCoords {
+                x: 510.0,
+                y: 458.0,
+                width: 260.0,
+                height: 50.0,
+            },
+        );
         theme.button_coords.insert("Main".into(), btns);
         theme
     }
@@ -552,7 +579,9 @@ mod tests {
     #[test]
     fn background_for_returns_some_for_menu_with_explicit_entry() {
         let mut theme = LoadedTheme::default();
-        theme.menu_backgrounds.insert("Main".into(), Handle::default());
+        theme
+            .menu_backgrounds
+            .insert("Main".into(), Handle::default());
         assert!(theme.background_for("Main").is_some());
     }
 
@@ -596,20 +625,36 @@ mod tests {
 
         // First update: SelectedTheme was just inserted → is_changed fires.
         app.update();
-        assert_eq!(app.world().resource::<ReloadCount>().0, 1, "should fire on insert");
+        assert_eq!(
+            app.world().resource::<ReloadCount>().0,
+            1,
+            "should fire on insert"
+        );
 
         // No change → silent.
         app.update();
-        assert_eq!(app.world().resource::<ReloadCount>().0, 1, "should not fire without change");
+        assert_eq!(
+            app.world().resource::<ReloadCount>().0,
+            1,
+            "should not fire without change"
+        );
 
         // Change the theme → fires again.
         app.world_mut().resource_mut::<SelectedTheme>().0 = "dark".into();
         app.update();
-        assert_eq!(app.world().resource::<ReloadCount>().0, 2, "should fire when theme changes");
+        assert_eq!(
+            app.world().resource::<ReloadCount>().0,
+            2,
+            "should fire when theme changes"
+        );
 
         // No further change → silent.
         app.update();
-        assert_eq!(app.world().resource::<ReloadCount>().0, 2, "should not fire without change");
+        assert_eq!(
+            app.world().resource::<ReloadCount>().0,
+            2,
+            "should not fire without change"
+        );
     }
 
     #[test]

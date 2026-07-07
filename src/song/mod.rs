@@ -50,7 +50,12 @@ pub struct NoteHeadRect {
 
 impl Default for NoteHeadRect {
     fn default() -> Self {
-        Self { x: 0.0, y: 0.0, width: 100.0, height: 100.0 }
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        }
     }
 }
 

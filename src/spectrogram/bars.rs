@@ -78,7 +78,10 @@ mod tests {
             for level in [0.0, 0.5, 1.0] {
                 let c = band_color(band, level).to_srgba();
                 for channel in [c.red, c.green, c.blue] {
-                    assert!((0.0..=1.0).contains(&channel), "channel {channel} out of range");
+                    assert!(
+                        (0.0..=1.0).contains(&channel),
+                        "channel {channel} out of range"
+                    );
                 }
             }
         }

@@ -13,7 +13,7 @@ use bevy::{
 };
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use crate::assets_management::{SelectedHarmonicaModel};
+use crate::assets_management::SelectedHarmonicaModel;
 use crate::dialogs::button;
 
 use super::AppState;
@@ -115,7 +115,10 @@ fn spawn_3d_scene(
     // Camera: renders layer CREDITS_LAYER only, sits in front of everything.
     commands.spawn((
         Camera3d::default(),
-        Camera { order: 0, ..default() },
+        Camera {
+            order: 0,
+            ..default()
+        },
         Transform::from_xyz(-1.5, 1.8, 5.0).looking_at(Vec3::new(0.0, 0.2, 0.0), Vec3::Y),
         layers.clone(),
         CreditsRoot,
@@ -149,8 +152,12 @@ fn spawn_3d_scene(
     let scene_path = format!("harmonicas/3d/{model}/harmonica.glb#Scene0");
     commands.spawn((
         WorldAssetRoot(asset_server.load(scene_path)),
-        Transform::from_scale(Vec3::splat(0.14))
-            .with_rotation(Quat::from_euler(EulerRot::YXZ, -0.4, 0.2, 0.0)),
+        Transform::from_scale(Vec3::splat(0.14)).with_rotation(Quat::from_euler(
+            EulerRot::YXZ,
+            -0.4,
+            0.2,
+            0.0,
+        )),
         // Visibility is auto-inserted by WorldAssetRoot's `#[require(Visibility)]`.
         layers.clone(),
         CreditsSceneLayer(layers.clone()),
@@ -193,7 +200,9 @@ fn spawn_ui(commands: &mut Commands) {
                 row_gap: Val::Px(0.0),
                 ..default()
             },
-            CreditsScroll { offset: SCROLL_START },
+            CreditsScroll {
+                offset: SCROLL_START,
+            },
         ))
         .id();
 
@@ -208,10 +217,12 @@ fn spawn_ui(commands: &mut Commands) {
     // "Back to Menu" button — fixed at the bottom-right of the overlay. Its
     // click/hover behaviour rides along as inline on(...) observers. (Default
     // font: bsn! can't set TextFont.font in 0.19.)
-    commands.spawn_scene(button::default("Back to Menu",
+    commands.spawn_scene(button::default(
+        "Back to Menu",
         |_: On<Pointer<Click>>, mut next_state: ResMut<NextState<AppState>>| {
             next_state.set(AppState::Menu);
-        }));
+        },
+    ));
 }
 
 // ── Credit line definitions ───────────────────────────────────────────────────
@@ -302,37 +313,58 @@ fn parse_credits(markdown: &str) -> Vec<CreditLine> {
     out
 }
 
-fn spawn_credit_line(parent: &mut ChildSpawnerCommands,  item: CreditLine) {
+fn spawn_credit_line(parent: &mut ChildSpawnerCommands, item: CreditLine) {
     match item {
         CreditLine::BigTitle(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(38.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(38.0),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
-                Node { margin: UiRect::bottom(Val::Px(6.0)), ..default() },
+                Node {
+                    margin: UiRect::bottom(Val::Px(6.0)),
+                    ..default()
+                },
             ));
         }
         CreditLine::Subtitle(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(18.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(18.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.62, 0.65, 0.80)),
             ));
         }
         CreditLine::Heading(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.85, 0.72, 0.35)),
-                Node { margin: UiRect::bottom(Val::Px(8.0)), ..default() },
+                Node {
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                },
             ));
         }
         CreditLine::Body(text) => {
             parent.spawn((
                 Text::new(text),
-                TextFont { font_size: FontSize::Px(17.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(17.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.78, 0.80, 0.88)),
-                Node { margin: UiRect::bottom(Val::Px(4.0)), ..default() },
+                Node {
+                    margin: UiRect::bottom(Val::Px(4.0)),
+                    ..default()
+                },
             ));
         }
         CreditLine::Divider => {
@@ -373,10 +405,7 @@ fn rotate_harmonica(time: Res<Time>, mut q: Query<&mut Transform, With<CreditsHa
     }
 }
 
-fn scroll_credits(
-    time: Res<Time>,
-    mut scrollers: Query<(&mut Node, &mut CreditsScroll)>,
-) {
+fn scroll_credits(time: Res<Time>, mut scrollers: Query<(&mut Node, &mut CreditsScroll)>) {
     let dt = time.delta_secs();
     for (mut node, mut scroll) in &mut scrollers {
         scroll.offset -= SCROLL_SPEED * dt;
@@ -408,10 +437,7 @@ fn propagate_scene_layers(
 }
 
 /// Esc leaves the credits screen (the Back button does it via its own on()).
-fn handle_input(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut next_state: ResMut<NextState<AppState>>,
-) {
+fn handle_input(keyboard: Res<ButtonInput<KeyCode>>, mut next_state: ResMut<NextState<AppState>>) {
     if keyboard.just_pressed(KeyCode::Escape) {
         next_state.set(AppState::Menu);
     }

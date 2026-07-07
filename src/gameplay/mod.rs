@@ -19,12 +19,11 @@ mod song_progress_overlay;
 pub mod twelve_bar_blues_overlay;
 
 use bevy::prelude::*;
+pub use scoring::{NoteOutcome, classify_note, compute_points, sustain_points};
 use scoring::{
-    combo_label, compute_multiplier, measured_oscillation_hz, measured_relative_oscillation_hz,
-    oscillation_matches_rate, should_decay_combo, VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC,
-};
-pub use scoring::{
-    NoteOutcome, classify_note, compute_points, sustain_points,
+    VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC, combo_label, compute_multiplier,
+    measured_oscillation_hz, measured_relative_oscillation_hz, oscillation_matches_rate,
+    should_decay_combo,
 };
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -170,11 +169,15 @@ impl Plugin for GameplayPlugin {
         // Jam Session: music loop toggle + its readout.
         .add_systems(
             Update,
-            (jam_session::apply_jam_loop_toggle, jam_session::update_jam_loop_label).run_if(
-                in_state(AppState::Playing)
-                    .and_then(|p: Res<Paused>| !p.0)
-                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
-            ),
+            (
+                jam_session::apply_jam_loop_toggle,
+                jam_session::update_jam_loop_label,
+            )
+                .run_if(
+                    in_state(AppState::Playing)
+                        .and_then(|p: Res<Paused>| !p.0)
+                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+                ),
         )
         // Results screen lifecycle. The Retry/Continue buttons carry their own
         // click/hover behaviour as inline on(...) observers (see results::setup).
@@ -615,16 +618,14 @@ fn technique_confirmed(
 ) -> bool {
     match modifier {
         Modifier::Vibrato { oscillation_hz, .. } => {
-            measured_oscillation_hz(pitch_samples, VIBRATO_MIN_SWING_CENTS)
-                .is_some_and(|hz| {
-                    oscillation_matches_rate(hz, *oscillation_hz, OSCILLATION_RATE_TOLERANCE_FRAC)
-                })
+            measured_oscillation_hz(pitch_samples, VIBRATO_MIN_SWING_CENTS).is_some_and(|hz| {
+                oscillation_matches_rate(hz, *oscillation_hz, OSCILLATION_RATE_TOLERANCE_FRAC)
+            })
         }
         Modifier::WahWah { oscillation_hz, .. } => {
-            measured_relative_oscillation_hz(amp_samples, WAH_MIN_SWING_FRAC)
-                .is_some_and(|hz| {
-                    oscillation_matches_rate(hz, *oscillation_hz, OSCILLATION_RATE_TOLERANCE_FRAC)
-                })
+            measured_relative_oscillation_hz(amp_samples, WAH_MIN_SWING_FRAC).is_some_and(|hz| {
+                oscillation_matches_rate(hz, *oscillation_hz, OSCILLATION_RATE_TOLERANCE_FRAC)
+            })
         }
         _ => true,
     }
@@ -926,9 +927,11 @@ fn score_notes(
                 // or wah can be verified (rather than trusted) once it ends.
                 if note.modifiers.iter().any(is_sustained_technique) {
                     if let Some(hz) = active_frequency_for(&active.0, &note.expected_pitch)
-                        && let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch) {
-                            note.pitch_samples.push((clock.0, 1200.0 * (hz / expected_hz).log2()));
-                        }
+                        && let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch)
+                    {
+                        note.pitch_samples
+                            .push((clock.0, 1200.0 * (hz / expected_hz).log2()));
+                    }
                     note.amp_samples.push((clock.0, rms(&frame.samples)));
                 }
             } else {
@@ -936,7 +939,9 @@ fn score_notes(
 
                 let sustained: Vec<Modifier> = note
                     .modifiers
-                    .iter().filter(|&x| is_sustained_technique(x)).cloned()
+                    .iter()
+                    .filter(|&x| is_sustained_technique(x))
+                    .cloned()
                     .collect();
                 if !sustained.is_empty() {
                     let (verified, unverified): (Vec<Modifier>, Vec<Modifier>) =
@@ -960,10 +965,16 @@ fn score_notes(
         pending.push((entity, judged - note.time));
     }
 
-    pending.sort_by(|a, b| a.1.abs().partial_cmp(&b.1.abs()).unwrap_or(std::cmp::Ordering::Equal));
+    pending.sort_by(|a, b| {
+        a.1.abs()
+            .partial_cmp(&b.1.abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     for (entity, offset) in pending {
-        let Ok((_, mut note)) = notes.get_mut(entity) else { continue };
+        let Ok((_, mut note)) = notes.get_mut(entity) else {
+            continue;
+        };
         // A note counts as "playing" only on a fresh attack: the pitch must be
         // sounding and not already consumed by an earlier note in this sustain.
         let playing = gate.is_fresh(&note.expected_pitch, &harp_pitches);
@@ -992,7 +1003,9 @@ fn score_notes(
                 // rather than falling through to the "normal" bucket.
                 let immediate: Vec<Modifier> = note
                     .modifiers
-                    .iter().filter(|&m| !is_sustained_technique(m)).cloned()
+                    .iter()
+                    .filter(|&m| !is_sustained_technique(m))
+                    .cloned()
                     .collect();
                 if note.modifiers.is_empty() || !immediate.is_empty() {
                     stats.record_technique(&immediate, true);
@@ -1025,8 +1038,7 @@ fn score_notes(
                 // genuinely validated (the note's expected pitch is the bent
                 // one); the bonus is the payoff for nailing them. Vibrato/wah
                 // bonuses are awarded later, once the sustain confirms them.
-                score.points +=
-                    style_bonus_points(&immediate, &config.style_bonus).round() as u32;
+                score.points += style_bonus_points(&immediate, &config.style_bonus).round() as u32;
                 feedback.quality = Some(quality);
                 feedback.timer = 0.75;
 
@@ -1184,10 +1196,28 @@ mod tests {
     #[test]
     fn record_technique_routes_each_modifier_to_its_own_bucket() {
         let mut stats = SongStats::default();
-        stats.record_technique(&[Modifier::Bend { semitones: -1.0, intensity: None }], true);
+        stats.record_technique(
+            &[Modifier::Bend {
+                semitones: -1.0,
+                intensity: None,
+            }],
+            true,
+        );
         stats.record_technique(&[Modifier::Overblow], false);
-        stats.record_technique(&[Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }], true);
-        stats.record_technique(&[Modifier::WahWah { oscillation_hz: 3.0, intensity: None }], true);
+        stats.record_technique(
+            &[Modifier::Vibrato {
+                oscillation_hz: 5.0,
+                intensity: None,
+            }],
+            true,
+        );
+        stats.record_technique(
+            &[Modifier::WahWah {
+                oscillation_hz: 3.0,
+                intensity: None,
+            }],
+            true,
+        );
         stats.record_technique(&[Modifier::Overdraw], true);
 
         assert_eq!(stats.bend.hits, 1);
@@ -1205,8 +1235,14 @@ mod tests {
         let mut stats = SongStats::default();
         stats.record_technique(
             &[
-                Modifier::Bend { semitones: -1.0, intensity: None },
-                Modifier::Vibrato { oscillation_hz: 5.0, intensity: None },
+                Modifier::Bend {
+                    semitones: -1.0,
+                    intensity: None,
+                },
+                Modifier::Vibrato {
+                    oscillation_hz: 5.0,
+                    intensity: None,
+                },
             ],
             true,
         );
@@ -1533,9 +1569,18 @@ mod tests {
 
     #[test]
     fn vibrato_and_wah_are_sustained_bend_and_overblow_are_not() {
-        let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
-        let wah = Modifier::WahWah { oscillation_hz: 3.0, intensity: None };
-        let bend = Modifier::Bend { semitones: -1.0, intensity: None };
+        let vibrato = Modifier::Vibrato {
+            oscillation_hz: 5.0,
+            intensity: None,
+        };
+        let wah = Modifier::WahWah {
+            oscillation_hz: 3.0,
+            intensity: None,
+        };
+        let bend = Modifier::Bend {
+            semitones: -1.0,
+            intensity: None,
+        };
         assert!(is_sustained_technique(&vibrato));
         assert!(is_sustained_technique(&wah));
         assert!(!is_sustained_technique(&bend));
@@ -1544,11 +1589,18 @@ mod tests {
     }
 
     // Timestamped sine samples around `offset`, `n` samples spaced `dt` seconds apart.
-    fn timestamped_sine(freq_hz: f32, offset: f32, amplitude: f32, n: usize, dt: f64) -> Vec<(f64, f32)> {
+    fn timestamped_sine(
+        freq_hz: f32,
+        offset: f32,
+        amplitude: f32,
+        n: usize,
+        dt: f64,
+    ) -> Vec<(f64, f32)> {
         (0..n)
             .map(|i| {
                 let t = i as f64 * dt;
-                let v = offset + amplitude * (2.0 * std::f32::consts::PI * freq_hz * t as f32).sin();
+                let v =
+                    offset + amplitude * (2.0 * std::f32::consts::PI * freq_hz * t as f32).sin();
                 (t, v)
             })
             .collect()
@@ -1556,7 +1608,10 @@ mod tests {
 
     #[test]
     fn technique_confirmed_requires_real_wobble_for_vibrato() {
-        let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
+        let vibrato = Modifier::Vibrato {
+            oscillation_hz: 5.0,
+            intensity: None,
+        };
         let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64 / 60.0, 0.0)).collect();
         let wobbling = timestamped_sine(5.0, 0.0, 25.0, 40, 1.0 / 60.0);
         assert!(!technique_confirmed(&vibrato, &steady, &[]));
@@ -1565,7 +1620,10 @@ mod tests {
 
     #[test]
     fn technique_confirmed_requires_real_wobble_for_wah() {
-        let wah = Modifier::WahWah { oscillation_hz: 3.0, intensity: None };
+        let wah = Modifier::WahWah {
+            oscillation_hz: 3.0,
+            intensity: None,
+        };
         let steady_volume: Vec<(f64, f32)> = (0..20).map(|i| (i as f64 / 60.0, 0.2)).collect();
         let pumping_volume = timestamped_sine(3.0, 0.2, 0.06, 40, 1.0 / 60.0);
         assert!(!technique_confirmed(&wah, &[], &steady_volume));
@@ -1577,14 +1635,20 @@ mod tests {
         // The chart declares a 5 Hz vibrato, but the player wobbled at ~1.5 Hz
         // — real oscillation, just not the declared rate. A flip-count-only
         // check (the old behavior) couldn't tell these apart.
-        let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
+        let vibrato = Modifier::Vibrato {
+            oscillation_hz: 5.0,
+            intensity: None,
+        };
         let slow_wobble = timestamped_sine(1.5, 0.0, 25.0, 40, 1.0 / 60.0);
         assert!(!technique_confirmed(&vibrato, &slow_wobble, &[]));
     }
 
     #[test]
     fn technique_confirmed_rejects_wah_at_the_wrong_rate() {
-        let wah = Modifier::WahWah { oscillation_hz: 3.0, intensity: None };
+        let wah = Modifier::WahWah {
+            oscillation_hz: 3.0,
+            intensity: None,
+        };
         let fast_pumping = timestamped_sine(9.0, 0.2, 0.06, 40, 1.0 / 60.0);
         assert!(!technique_confirmed(&wah, &[], &fast_pumping));
     }
@@ -1594,7 +1658,10 @@ mod tests {
         // Bend/overblow/overdraw are judged at onset, not from the sustain
         // buffers — this should never gate them on empty/steady samples.
         assert!(technique_confirmed(
-            &Modifier::Bend { semitones: -1.0, intensity: None },
+            &Modifier::Bend {
+                semitones: -1.0,
+                intensity: None
+            },
             &[],
             &[]
         ));
@@ -1604,8 +1671,16 @@ mod tests {
     #[test]
     fn active_frequency_for_matches_by_note_and_octave() {
         let active = vec![
-            PitchInfo { note: "D".into(), octave: 4, frequency: 293.66 },
-            PitchInfo { note: "G".into(), octave: 4, frequency: 392.00 },
+            PitchInfo {
+                note: "D".into(),
+                octave: 4,
+                frequency: 293.66,
+            },
+            PitchInfo {
+                note: "G".into(),
+                octave: 4,
+                frequency: 392.00,
+            },
         ];
         assert_eq!(active_frequency_for(&active, "D4"), Some(293.66));
         assert_eq!(active_frequency_for(&active, "A4"), None);

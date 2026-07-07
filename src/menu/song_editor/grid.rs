@@ -6,12 +6,17 @@ use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::prelude::MaterialNode;
 
-use super::{
-    grid_height, BEAT_W, BEATS_PER_BAR,
-    HEADER_H, ROW_H, ROWS,
-    TICK_W, TICKS_PER_BEAT, HANDLE_W,
-};
+use super::interaction::select_or_add;
 use super::material::EditorNoteMaterial;
+use super::playback::{key_offset, note_freq};
+use super::state::{
+    DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch, can_place, enforce_direction,
+    enforce_expr, move_target, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
+};
+use super::ui::{GridContent, GridItem, NoteView};
+use super::{
+    BEAT_W, BEATS_PER_BAR, HANDLE_W, HEADER_H, ROW_H, ROWS, TICK_W, TICKS_PER_BEAT, grid_height,
+};
 use crate::audio_system::midi::midi_to_note;
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
 use crate::localization::LocalizationExt;
@@ -19,13 +24,6 @@ use crate::song::harmonica::blues_scale_classes;
 use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
 use std::collections::HashSet;
-use super::state::{
-    can_place, enforce_direction, enforce_expr, note_rect, pitch_color, pitch_compatible,
-    pitch_deny_key, move_target, DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch,
-};
-use super::playback::{key_offset, note_freq};
-use super::ui::{GridContent, GridItem, NoteView};
-use super::interaction::select_or_add;
 
 pub(super) fn visible_beats(win_w: f32) -> usize {
     (((win_w - super::HOLE_COL_W) / BEAT_W).ceil() as usize) + 1
@@ -61,7 +59,9 @@ const OUT_OF_SCALE_TINT: Color = Color::srgb(0.95, 0.25, 0.20);
 /// `None` (holes/directions the harp can't produce) counts as in-scale, so a
 /// note that can't be resolved to a pitch isn't flagged as "wrong" too.
 pub(super) fn note_in_scale(note: &GridNote, key_offset: i32, scale: &HashSet<String>) -> bool {
-    let Some(freq) = note_freq(note, key_offset) else { return true };
+    let Some(freq) = note_freq(note, key_offset) else {
+        return true;
+    };
     let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
     let name = midi_to_note(midi);
     let class = name.trim_end_matches(|c: char| c.is_ascii_digit());
@@ -89,11 +89,19 @@ pub(super) fn rebuild_grid(
     // so no click/drag observer below ever fires — a single gate at spawn
     // time rather than a check duplicated inside every observer.
     let locked = state.locked();
-    let pickable = |locked: bool| if locked { Pickable::IGNORE } else { Pickable::default() };
+    let pickable = |locked: bool| {
+        if locked {
+            Pickable::IGNORE
+        } else {
+            Pickable::default()
+        }
+    };
     for e in &old {
         commands.entity(e).despawn();
     }
-    let Ok(content) = content.single() else { return };
+    let Ok(content) = content.single() else {
+        return;
+    };
     let win_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0);
     let cols = visible_beats(win_w);
     let mut items: Vec<Entity> = Vec::new();
@@ -120,7 +128,10 @@ pub(super) fn rebuild_grid(
                         ..default()
                     },
                     Text::new(format!("{in_bar}")),
-                    TextFont { font_size: FontSize::Px(12.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(12.0),
+                        ..default()
+                    },
                     TextColor(if is_bar { colors.accent } else { colors.label }),
                     Pickable::IGNORE,
                 ))
@@ -137,7 +148,10 @@ pub(super) fn rebuild_grid(
                         ..default()
                     },
                     Text::new("&"),
-                    TextFont { font_size: FontSize::Px(11.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(11.0),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.45, 0.45, 0.55)),
                     Pickable::IGNORE,
                 ))
@@ -146,7 +160,11 @@ pub(super) fn rebuild_grid(
 
         for hole in 1..=ROWS {
             let y = HEADER_H + (hole as f32 - 1.0) * ROW_H;
-            let lane = if hole % 2 == 0 { colors.lane_a } else { colors.lane_b };
+            let lane = if hole % 2 == 0 {
+                colors.lane_a
+            } else {
+                colors.lane_b
+            };
             let lane = mix_srgba(lane, bar_tint, BAR_TINT_MIX);
             let mut cell = commands.spawn((
                 GridItem,
@@ -198,7 +216,11 @@ pub(super) fn rebuild_grid(
                         height: Val::Px(grid_height()),
                         ..default()
                     },
-                    BackgroundColor(if is_bar { colors.bar_line } else { colors.grid_line }),
+                    BackgroundColor(if is_bar {
+                        colors.bar_line
+                    } else {
+                        colors.grid_line
+                    }),
                     Pickable::IGNORE,
                 ))
                 .id(),
@@ -218,7 +240,11 @@ pub(super) fn rebuild_grid(
                             height: Val::Px(grid_height() - HEADER_H),
                             ..default()
                         },
-                        BackgroundColor(if is_half { colors.half_line } else { colors.quarter_line }),
+                        BackgroundColor(if is_half {
+                            colors.half_line
+                        } else {
+                            colors.quarter_line
+                        }),
                         Pickable::IGNORE,
                     ))
                     .id(),
@@ -232,7 +258,15 @@ pub(super) fn rebuild_grid(
         if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.selected == Some(note.id);
             let in_scale = note_in_scale(note, k_off, &scale);
-            items.push(spawn_note(&mut commands, *note, selected, &mut note_mats, colors, locked, in_scale));
+            items.push(spawn_note(
+                &mut commands,
+                *note,
+                selected,
+                &mut note_mats,
+                colors,
+                locked,
+                in_scale,
+            ));
         }
     }
 
@@ -252,7 +286,11 @@ pub(super) fn spawn_note(
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { colors.accent } else { Color::NONE };
     let id = note.id;
-    let pick = if locked { Pickable::IGNORE } else { Pickable::default() };
+    let pick = if locked {
+        Pickable::IGNORE
+    } else {
+        Pickable::default()
+    };
     // Flag the exception (a note outside the song's blues scale), not the
     // common case: an in-scale note keeps its plain technique color; an
     // outside note gets a warm red warning blended in. Bend/overblow/overdraw
@@ -261,7 +299,11 @@ pub(super) fn spawn_note(
     // the ♭7, so that bent note reads as in-scale even though its natural
     // (unbent) pitch wouldn't.
     let note_color = |base: Color| {
-        if in_scale { base } else { mix_srgba(base, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX) }
+        if in_scale {
+            base
+        } else {
+            mix_srgba(base, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX)
+        }
     };
 
     let root = commands
@@ -285,57 +327,87 @@ pub(super) fn spawn_note(
             BorderColor::all(border_color),
             pick,
         ))
-        .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-            state.selected = Some(id);
-        })
-        .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
-            if state.dragging.is_some() { return; }
-            if let Some(n) = state.note_by_id(id).copied() {
+        .observe(
+            move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
                 state.selected = Some(id);
-                state.dragging = Some(DragState::new(id, DragKind::Move, &n));
-            }
-        })
-        .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>, loc: Res<Localization>| {
-            let Some(drag) = state.dragging else { return };
-            if drag.id != id || drag.kind != DragKind::Move { return; }
-            let (hole, tick) = move_target(drag.start_hole, drag.start_tick, ev.distance.x, ev.distance.y);
-            let pitch = state.notes.iter().find(|n| n.id == id).map(|n| n.pitch).unwrap_or(Pitch::Normal);
-            let place_ok = can_place(&state.notes, id, hole, tick, drag.start_len);
-            let pitch_ok = pitch_compatible(pitch, hole);
-            let valid = place_ok && pitch_ok;
-            state.drag_msg = if !pitch_ok {
-                loc.msg(pitch_deny_key(pitch, hole))
-            } else if !place_ok {
-                loc.msg("drag-denied-overlap")
-            } else {
-                crate::localization::LocalizedStr::default()
-            };
-            if let Some(d) = state.dragging.as_mut() {
-                d.target_hole = hole;
-                d.target_tick = tick;
-                d.valid = valid;
-            }
-        })
-        .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
-            let Some(drag) = state.dragging.take() else { return };
-            state.drag_msg = crate::localization::LocalizedStr::default();
-            if drag.kind == DragKind::Move && drag.valid {
-                if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
-                    n.hole = drag.target_hole;
-                    n.tick = drag.target_tick;
+            },
+        )
+        .observe(
+            move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
+                if state.dragging.is_some() {
+                    return;
                 }
-                enforce_direction(&mut state, id);
-                enforce_expr(&mut state, id);
-            }
-        })
+                if let Some(n) = state.note_by_id(id).copied() {
+                    state.selected = Some(id);
+                    state.dragging = Some(DragState::new(id, DragKind::Move, &n));
+                }
+            },
+        )
+        .observe(
+            move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>, loc: Res<Localization>| {
+                let Some(drag) = state.dragging else { return };
+                if drag.id != id || drag.kind != DragKind::Move {
+                    return;
+                }
+                let (hole, tick) = move_target(
+                    drag.start_hole,
+                    drag.start_tick,
+                    ev.distance.x,
+                    ev.distance.y,
+                );
+                let pitch = state
+                    .notes
+                    .iter()
+                    .find(|n| n.id == id)
+                    .map(|n| n.pitch)
+                    .unwrap_or(Pitch::Normal);
+                let place_ok = can_place(&state.notes, id, hole, tick, drag.start_len);
+                let pitch_ok = pitch_compatible(pitch, hole);
+                let valid = place_ok && pitch_ok;
+                state.drag_msg = if !pitch_ok {
+                    loc.msg(pitch_deny_key(pitch, hole))
+                } else if !place_ok {
+                    loc.msg("drag-denied-overlap")
+                } else {
+                    crate::localization::LocalizedStr::default()
+                };
+                if let Some(d) = state.dragging.as_mut() {
+                    d.target_hole = hole;
+                    d.target_tick = tick;
+                    d.valid = valid;
+                }
+            },
+        )
+        .observe(
+            move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
+                let Some(drag) = state.dragging.take() else {
+                    return;
+                };
+                state.drag_msg = crate::localization::LocalizedStr::default();
+                if drag.kind == DragKind::Move && drag.valid {
+                    if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
+                        n.hole = drag.target_hole;
+                        n.tick = drag.target_tick;
+                    }
+                    enforce_direction(&mut state, id);
+                    enforce_expr(&mut state, id);
+                }
+            },
+        )
         .id();
 
     match note.expr {
         Expr::None => {
-            commands.entity(root).insert(BackgroundColor(note_color(pitch_color(note.pitch))));
+            commands
+                .entity(root)
+                .insert(BackgroundColor(note_color(pitch_color(note.pitch))));
         }
         Expr::Wah(_) | Expr::Vibrato(_) => {
-            let mode = if matches!(note.expr, Expr::Vibrato(_)) { 0.0 } else { 1.0 };
+            let mode = if matches!(note.expr, Expr::Vibrato(_)) {
+                0.0
+            } else {
+                1.0
+            };
             let mat = note_mats.add(EditorNoteMaterial {
                 color: note_color(pitch_color(note.pitch)).to_linear(),
                 params: Vec4::new(mode, width, 0.0, 0.0),
@@ -347,7 +419,10 @@ pub(super) fn spawn_note(
     commands.entity(root).with_children(|r| {
         r.spawn((
             Text::new(note.dir.arrow()),
-            TextFont { font_size: FontSize::Px(15.0), ..default() },
+            TextFont {
+                font_size: FontSize::Px(15.0),
+                ..default()
+            },
             TextColor(Color::WHITE),
             Pickable::IGNORE,
         ));
@@ -368,10 +443,14 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge, l
         ..default()
     };
     match edge {
-        Edge::Left  => node.left  = Val::Px(0.0),
+        Edge::Left => node.left = Val::Px(0.0),
         Edge::Right => node.right = Val::Px(0.0),
     }
-    let pick = if locked { Pickable::IGNORE } else { Pickable::default() };
+    let pick = if locked {
+        Pickable::IGNORE
+    } else {
+        Pickable::default()
+    };
     parent
         .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.25)), pick))
         .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {

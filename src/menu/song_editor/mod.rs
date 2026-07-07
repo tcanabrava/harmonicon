@@ -31,22 +31,22 @@ mod ui;
 
 use crate::dialogs::file_dialog::DialogId;
 
-const SAVE_PURPOSE:  DialogId = DialogId("song_editor_2_save");
-const LOAD_PURPOSE:  DialogId = DialogId("song_editor_2_load");
+const SAVE_PURPOSE: DialogId = DialogId("song_editor_2_save");
+const LOAD_PURPOSE: DialogId = DialogId("song_editor_2_load");
 const MUSIC_PURPOSE: DialogId = DialogId("song_editor_2_music");
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
 
-const HOLE_COL_W:    f32    = 78.0;
-const HEADER_H:      f32    = 30.0;
-const ROW_H:         f32    = 34.0;
-const BEAT_W:        f32    = 60.0;
-const ROWS:          u8     = 10;
-const BEATS_PER_BAR: usize  = 4;
-const NOTE_PAD:      f32    = 4.0;
-const HANDLE_W:      f32    = 8.0;
+const HOLE_COL_W: f32 = 78.0;
+const HEADER_H: f32 = 30.0;
+const ROW_H: f32 = 34.0;
+const BEAT_W: f32 = 60.0;
+const ROWS: u8 = 10;
+const BEATS_PER_BAR: usize = 4;
+const NOTE_PAD: f32 = 4.0;
+const HANDLE_W: f32 = 8.0;
 const TICKS_PER_BEAT: usize = 4;
-const TICK_W:        f32    = BEAT_W / TICKS_PER_BEAT as f32;
+const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
 
 fn grid_height() -> f32 {
     HEADER_H + ROW_H * ROWS as f32
@@ -104,7 +104,6 @@ impl Plugin for SongEditor2Plugin {
                     harpchart::handle_save_chosen,
                     harpchart::handle_load_chosen,
                     harpchart::handle_music_chosen,
-
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             );
@@ -115,18 +114,20 @@ impl Plugin for SongEditor2Plugin {
 
 #[cfg(test)]
 mod tests {
-    use super::state::{
-        apply_resize, can_place, enforce_direction, enforce_expr, move_target, note_rect, Dir,
-        EditorState, Edge, Expr, GridNote, Pitch,
+    use super::grid::{mix_srgba, note_in_scale, visible_beats};
+    use super::harpchart::{
+        load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart,
     };
     use super::interaction::{apply_modifier, select_or_add};
-    use super::ui::ModButton;
-    use super::playback::{encode_wav, envelope, key_offset, note_freq, render_pcm, SAMPLE_RATE};
-    use super::harpchart::{load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart};
+    use super::playback::{SAMPLE_RATE, encode_wav, envelope, key_offset, note_freq, render_pcm};
     use super::state::Scroll;
-    use super::grid::{mix_srgba, note_in_scale, visible_beats};
-    use crate::song::harmonica::blues_scale_classes;
+    use super::state::{
+        Dir, Edge, EditorState, Expr, GridNote, Pitch, apply_resize, can_place, enforce_direction,
+        enforce_expr, move_target, note_rect,
+    };
+    use super::ui::ModButton;
     use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
+    use crate::song::harmonica::blues_scale_classes;
 
     #[test]
     fn click_adds_then_selects_without_duplicating() {
@@ -161,9 +162,15 @@ mod tests {
         select_or_add(&mut s, 7, 0);
         s.selected = Some(hole5);
         apply_modifier(&mut s, ModButton::Bend);
-        assert_eq!(s.notes.iter().find(|n| n.hole == 5).unwrap().pitch, Pitch::Bend(0.5));
+        assert_eq!(
+            s.notes.iter().find(|n| n.hole == 5).unwrap().pitch,
+            Pitch::Bend(0.5)
+        );
         apply_modifier(&mut s, ModButton::Bend);
-        assert_eq!(s.notes.iter().find(|n| n.hole == 5).unwrap().pitch, Pitch::Normal);
+        assert_eq!(
+            s.notes.iter().find(|n| n.hole == 5).unwrap().pitch,
+            Pitch::Normal
+        );
     }
 
     #[test]
@@ -173,9 +180,17 @@ mod tests {
         apply_modifier(&mut s, ModButton::Bend);
         apply_modifier(&mut s, ModButton::Vibrato);
         assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
-        assert_eq!(s.notes[0].expr, Expr::Vibrato(3.0), "first click lands on the min rate");
+        assert_eq!(
+            s.notes[0].expr,
+            Expr::Vibrato(3.0),
+            "first click lands on the min rate"
+        );
         apply_modifier(&mut s, ModButton::Wah);
-        assert_eq!(s.notes[0].expr, Expr::Wah(2.0), "first click lands on the min rate");
+        assert_eq!(
+            s.notes[0].expr,
+            Expr::Wah(2.0),
+            "first click lands on the min rate"
+        );
         assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
     }
 
@@ -188,7 +203,11 @@ mod tests {
             assert_eq!(s.notes[0].expr, Expr::Vibrato(expected));
         }
         apply_modifier(&mut s, ModButton::Vibrato);
-        assert_eq!(s.notes[0].expr, Expr::None, "cycling past the max rate deselects");
+        assert_eq!(
+            s.notes[0].expr,
+            Expr::None,
+            "cycling past the max rate deselects"
+        );
     }
 
     #[test]
@@ -200,7 +219,11 @@ mod tests {
             assert_eq!(s.notes[0].expr, Expr::Wah(expected));
         }
         apply_modifier(&mut s, ModButton::Wah);
-        assert_eq!(s.notes[0].expr, Expr::None, "cycling past the max rate deselects");
+        assert_eq!(
+            s.notes[0].expr,
+            Expr::None,
+            "cycling past the max rate deselects"
+        );
     }
 
     #[test]
@@ -211,7 +234,10 @@ mod tests {
         assert_eq!(s.notes[0].pitch, Pitch::Normal);
         select_or_add(&mut s, 3, 0);
         apply_modifier(&mut s, ModButton::Overblow);
-        assert_eq!(s.notes.iter().find(|n| n.hole == 3).unwrap().pitch, Pitch::Overblow);
+        assert_eq!(
+            s.notes.iter().find(|n| n.hole == 3).unwrap().pitch,
+            Pitch::Overblow
+        );
     }
 
     #[test]
@@ -271,9 +297,33 @@ mod tests {
     fn enforce_unifies_overlap_chain_but_not_independent_notes() {
         let mut s = EditorState::default();
         s.notes = vec![
-            GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
-            GridNote { id: 1, hole: 2, tick: 2, len: 3, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
-            GridNote { id: 2, hole: 3, tick: 10, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote {
+                id: 0,
+                hole: 1,
+                tick: 0,
+                len: 3,
+                dir: Dir::Blow,
+                pitch: Pitch::Normal,
+                expr: Expr::None,
+            },
+            GridNote {
+                id: 1,
+                hole: 2,
+                tick: 2,
+                len: 3,
+                dir: Dir::Draw,
+                pitch: Pitch::Normal,
+                expr: Expr::None,
+            },
+            GridNote {
+                id: 2,
+                hole: 3,
+                tick: 10,
+                len: 1,
+                dir: Dir::Draw,
+                pitch: Pitch::Normal,
+                expr: Expr::None,
+            },
         ];
         s.next_id = 3;
         enforce_direction(&mut s, 0);
@@ -288,14 +338,46 @@ mod tests {
     fn enforce_expr_unifies_overlap_chain_but_not_independent_notes() {
         let mut s = EditorState::default();
         s.notes = vec![
-            GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::Vibrato(5.0) },
-            GridNote { id: 1, hole: 2, tick: 2, len: 3, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
-            GridNote { id: 2, hole: 3, tick: 10, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote {
+                id: 0,
+                hole: 1,
+                tick: 0,
+                len: 3,
+                dir: Dir::Blow,
+                pitch: Pitch::Normal,
+                expr: Expr::Vibrato(5.0),
+            },
+            GridNote {
+                id: 1,
+                hole: 2,
+                tick: 2,
+                len: 3,
+                dir: Dir::Draw,
+                pitch: Pitch::Normal,
+                expr: Expr::None,
+            },
+            GridNote {
+                id: 2,
+                hole: 3,
+                tick: 10,
+                len: 1,
+                dir: Dir::Draw,
+                pitch: Pitch::Normal,
+                expr: Expr::None,
+            },
         ];
         s.next_id = 3;
         enforce_expr(&mut s, 0);
-        assert_eq!(s.note_by_id(1).unwrap().expr, Expr::Vibrato(5.0), "overlapping note shares the vibrato (rate included)");
-        assert_eq!(s.note_by_id(2).unwrap().expr, Expr::None, "independent note is untouched");
+        assert_eq!(
+            s.note_by_id(1).unwrap().expr,
+            Expr::Vibrato(5.0),
+            "overlapping note shares the vibrato (rate included)"
+        );
+        assert_eq!(
+            s.note_by_id(2).unwrap().expr,
+            Expr::None,
+            "independent note is untouched"
+        );
     }
 
     #[test]
@@ -307,8 +389,16 @@ mod tests {
         s.selected = Some(s.note_at(2, 0).unwrap().id);
         apply_modifier(&mut s, ModButton::Wah);
         assert_eq!(s.note_at(2, 0).unwrap().expr, Expr::Wah(2.0));
-        assert_eq!(s.note_at(5, 2).unwrap().expr, Expr::Wah(2.0), "overlapping note picks up the wah too");
-        assert_eq!(s.note_at(7, 10).unwrap().expr, Expr::None, "independent note keeps its own expression");
+        assert_eq!(
+            s.note_at(5, 2).unwrap().expr,
+            Expr::Wah(2.0),
+            "overlapping note picks up the wah too"
+        );
+        assert_eq!(
+            s.note_at(7, 10).unwrap().expr,
+            Expr::None,
+            "independent note keeps its own expression"
+        );
     }
 
     #[test]
@@ -338,7 +428,15 @@ mod tests {
     }
 
     fn note(hole: u8, dir: Dir, pitch: Pitch) -> GridNote {
-        GridNote { id: 0, hole, tick: 0, len: 4, dir, pitch, expr: Expr::None }
+        GridNote {
+            id: 0,
+            hole,
+            tick: 0,
+            len: 4,
+            dir,
+            pitch,
+            expr: Expr::None,
+        }
     }
 
     #[test]
@@ -348,7 +446,10 @@ mod tests {
         let bent = note_freq(&note(1, Dir::Blow, Pitch::Bend(1.0)), 0).unwrap();
         assert!(bent < c4, "bend should drop pitch: {bent} !< {c4}");
         let g = note_freq(&note(1, Dir::Blow, Pitch::Normal), key_offset("G")).unwrap();
-        assert!((g / c4 - 2f32.powf(7.0 / 12.0)).abs() < 0.001, "G harp is a fifth up");
+        assert!(
+            (g / c4 - 2f32.powf(7.0 / 12.0)).abs() < 0.001,
+            "G harp is a fifth up"
+        );
         assert_eq!(key_offset("C"), 0);
         assert!(note_freq(&note(11, Dir::Blow, Pitch::Normal), 0).is_none());
     }
@@ -359,7 +460,10 @@ mod tests {
         let pcm = render_pcm(&notes, 120.0, 0);
         let expected = ((0.5 + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
         assert_eq!(pcm.len(), expected);
-        assert!(pcm.iter().any(|&s| s.abs() > 0.01), "note should be audible");
+        assert!(
+            pcm.iter().any(|&s| s.abs() > 0.01),
+            "note should be audible"
+        );
         let wav = encode_wav(&pcm, SAMPLE_RATE);
         assert_eq!(wav.len(), 44 + pcm.len() * 2);
         assert_eq!(&wav[0..4], b"RIFF");
@@ -378,8 +482,24 @@ mod tests {
     #[test]
     fn move_is_blocked_where_a_note_already_sits() {
         let notes = vec![
-            GridNote { id: 0, hole: 3, tick: 0, len: 2, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
-            GridNote { id: 1, hole: 3, tick: 5, len: 1, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None },
+            GridNote {
+                id: 0,
+                hole: 3,
+                tick: 0,
+                len: 2,
+                dir: Dir::Blow,
+                pitch: Pitch::Normal,
+                expr: Expr::None,
+            },
+            GridNote {
+                id: 1,
+                hole: 3,
+                tick: 5,
+                len: 1,
+                dir: Dir::Blow,
+                pitch: Pitch::Normal,
+                expr: Expr::None,
+            },
         ];
         assert!(!can_place(&notes, 1, 3, 1, 1));
         assert!(can_place(&notes, 1, 3, 2, 1));
@@ -491,7 +611,10 @@ mod tests {
 
         let none = mix_srgba(base, tint, 0.0).to_srgba();
         assert_eq!((none.red, none.green, none.blue), (0.0, 0.0, 0.0));
-        assert_eq!(none.alpha, 0.5, "base's own alpha is preserved, not blended");
+        assert_eq!(
+            none.alpha, 0.5,
+            "base's own alpha is preserved, not blended"
+        );
 
         let full = mix_srgba(base, tint, 1.0).to_srgba();
         assert_eq!((full.red, full.green, full.blue), (1.0, 1.0, 1.0));
@@ -506,13 +629,35 @@ mod tests {
         let scale = blues_scale_classes("C");
 
         // Draw-3 unbent is B4 (the major 7th) — outside the C blues scale.
-        let natural = GridNote { id: 0, hole: 3, tick: 0, len: 1, dir: Dir::Draw, pitch: Pitch::Normal, expr: Expr::None };
-        assert!(!note_in_scale(&natural, 0, &scale), "unbent B (major 7th) is outside the blues scale");
+        let natural = GridNote {
+            id: 0,
+            hole: 3,
+            tick: 0,
+            len: 1,
+            dir: Dir::Draw,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        };
+        assert!(
+            !note_in_scale(&natural, 0, &scale),
+            "unbent B (major 7th) is outside the blues scale"
+        );
 
         // Bending draw-3 down a step-and-a-half reaches Bb (the ♭7) — exactly
         // how a blues player accesses that blue note. Should read as in-scale.
-        let bent = GridNote { id: 0, hole: 3, tick: 0, len: 1, dir: Dir::Draw, pitch: Pitch::Bend(1.5), expr: Expr::None };
-        assert!(note_in_scale(&bent, 0, &scale), "bending down 1.5 steps reaches Bb, the b7 — in scale");
+        let bent = GridNote {
+            id: 0,
+            hole: 3,
+            tick: 0,
+            len: 1,
+            dir: Dir::Draw,
+            pitch: Pitch::Bend(1.5),
+            expr: Expr::None,
+        };
+        assert!(
+            note_in_scale(&bent, 0, &scale),
+            "bending down 1.5 steps reaches Bb, the b7 — in scale"
+        );
     }
 
     // ── safe_path_segment ────────────────────────────────────────────────────────
@@ -604,7 +749,15 @@ mod tests {
 
     #[test]
     fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
-        let note = GridNote { id: 0, hole: 1, tick: 0, len: 1, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None };
+        let note = GridNote {
+            id: 0,
+            hole: 1,
+            tick: 0,
+            len: 1,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        };
         let (left, top, width, height) = note_rect(&note);
         assert_eq!(left, 1.0);
         assert_eq!(top, HEADER_H + NOTE_PAD);
@@ -614,11 +767,31 @@ mod tests {
 
     #[test]
     fn note_rect_advances_one_row_per_hole_and_scales_width_with_len() {
-        let a = GridNote { id: 0, hole: 1, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None };
-        let b = GridNote { id: 1, hole: 2, tick: 0, len: 3, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None };
+        let a = GridNote {
+            id: 0,
+            hole: 1,
+            tick: 0,
+            len: 3,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        };
+        let b = GridNote {
+            id: 1,
+            hole: 2,
+            tick: 0,
+            len: 3,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        };
         let (_, top_a, width_a, _) = note_rect(&a);
         let (_, top_b, width_b, _) = note_rect(&b);
-        assert_eq!(top_b - top_a, ROW_H, "hole 2 sits exactly one row below hole 1");
+        assert_eq!(
+            top_b - top_a,
+            ROW_H,
+            "hole 2 sits exactly one row below hole 1"
+        );
         assert_eq!(width_a, width_b);
         assert_eq!(width_a, 3.0 * TICK_W - 2.0);
     }
@@ -653,7 +826,10 @@ mod tests {
         let dur = SAMPLE_RATE as usize; // 1 second, comfortably longer than attack+release
         for i in [0, 100, dur / 2, dur - 100, dur - 1] {
             let e = envelope(i, dur);
-            assert!((0.0..=1.0).contains(&e), "envelope({i}, {dur}) = {e} out of range");
+            assert!(
+                (0.0..=1.0).contains(&e),
+                "envelope({i}, {dur}) = {e} out of range"
+            );
         }
         assert_eq!(envelope(0, dur), 0.0);
     }
@@ -669,7 +845,10 @@ mod tests {
         let dur = SAMPLE_RATE as usize;
         let near_end = envelope(dur - 10, dur);
         let mid = envelope(dur / 2, dur);
-        assert!(near_end < mid, "release should pull the tail down from full sustain");
+        assert!(
+            near_end < mid,
+            "release should pull the tail down from full sustain"
+        );
     }
 
     #[test]

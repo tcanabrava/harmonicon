@@ -165,12 +165,16 @@ fn build_localization(
 pub struct LocalizedStr(String);
 
 impl LocalizedStr {
-    fn new(s: String) -> Self { Self(s) }
+    fn new(s: String) -> Self {
+        Self(s)
+    }
 }
 
 impl std::ops::Deref for LocalizedStr {
     type Target = str;
-    fn deref(&self) -> &str { &self.0 }
+    fn deref(&self) -> &str {
+        &self.0
+    }
 }
 
 impl std::fmt::Display for LocalizedStr {
@@ -180,7 +184,9 @@ impl std::fmt::Display for LocalizedStr {
 }
 
 impl From<LocalizedStr> for String {
-    fn from(s: LocalizedStr) -> Self { s.0 }
+    fn from(s: LocalizedStr) -> Self {
+        s.0
+    }
 }
 
 // ── Ergonomic lookup trait ────────────────────────────────────────────────────

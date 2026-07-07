@@ -19,7 +19,10 @@ pub struct PitchRange {
 impl Default for PitchRange {
     fn default() -> Self {
         // Roughly C4 (262 Hz) to the top of a 10-hole diatonic.
-        Self { min_freq: 200.0, max_freq: 2500.0 }
+        Self {
+            min_freq: 200.0,
+            max_freq: 2500.0,
+        }
     }
 }
 
@@ -46,9 +49,7 @@ impl PitchRange {
 /// FFT magnitude spectrum is always computed (the spectrogram needs it); this
 /// only selects how fundamentals are extracted. Selectable on the Options page
 /// and persisted in settings.
-#[derive(
-    Resource, Clone, Copy, PartialEq, Eq, Hash, Debug, Default, Serialize, Deserialize,
-)]
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Hash, Debug, Default, Serialize, Deserialize)]
 pub enum PitchAlgorithm {
     /// FFT peak-picking with harmonic suppression. Reports multiple pitches.
     #[default]
@@ -391,7 +392,11 @@ fn yin_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f32
 /// Build YIN's cumulative-mean-normalized difference function d'(τ) over
 /// `range`'s τ span. Returns `(d', tau_min, tau_max)`, or `None` if the
 /// block is too short. Shared by YIN and pYIN.
-fn yin_cmnd(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<(Vec<f32>, usize, usize)> {
+fn yin_cmnd(
+    samples: &[f32],
+    sample_rate: u32,
+    range: PitchRange,
+) -> Option<(Vec<f32>, usize, usize)> {
     let sr = sample_rate as f32;
     let tau_min = ((sr / range.max_freq).floor() as usize).max(2);
     let tau_max = (sr / range.min_freq).ceil() as usize;
@@ -442,7 +447,9 @@ fn first_dip_below(cmnd: &[f32], tau_min: usize, tau_max: usize, threshold: f32)
 fn cmnd_to_freq(cmnd: &[f32], tau: usize, sample_rate: u32, range: PitchRange) -> Option<f32> {
     let refined = parabolic_vertex(cmnd, tau);
     let f0 = sample_rate as f32 / refined;
-    (range.min_freq..=range.max_freq).contains(&f0).then_some(f0)
+    (range.min_freq..=range.max_freq)
+        .contains(&f0)
+        .then_some(f0)
 }
 
 // ── pYIN (probabilistic YIN) ──────────────────────────────────────────────────
@@ -470,8 +477,11 @@ fn pyin_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f3
         }
     }
 
-    let best = (tau_min..=tau_max)
-        .max_by(|&a, &b| prob[a].partial_cmp(&prob[b]).unwrap_or(std::cmp::Ordering::Equal))?;
+    let best = (tau_min..=tau_max).max_by(|&a, &b| {
+        prob[a]
+            .partial_cmp(&prob[b])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    })?;
     if prob[best] <= 0.0 {
         return None;
     }
@@ -566,7 +576,9 @@ fn mpm_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f32
 
     let refined = parabolic_vertex(&nsdf, chosen);
     let f0 = sr / refined;
-    (range.min_freq..=range.max_freq).contains(&f0).then_some(f0)
+    (range.min_freq..=range.max_freq)
+        .contains(&f0)
+        .then_some(f0)
 }
 
 // ── Template NMF (polyphonic) ─────────────────────────────────────────────────
@@ -799,7 +811,10 @@ mod tests {
     #[test]
     fn yin_rejects_silence_and_noise() {
         // Flat silence: no period.
-        assert_eq!(yin_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()), None);
+        assert_eq!(
+            yin_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()),
+            None
+        );
     }
 
     #[test]
@@ -809,13 +824,17 @@ mod tests {
         let samples: Vec<f32> = (0..n)
             .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
             .collect();
-        let f0 = pyin_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
+        let f0 =
+            pyin_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
         assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
     }
 
     #[test]
     fn pyin_rejects_silence() {
-        assert_eq!(pyin_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()), None);
+        assert_eq!(
+            pyin_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()),
+            None
+        );
     }
 
     #[test]
@@ -831,7 +850,10 @@ mod tests {
 
     #[test]
     fn mpm_rejects_silence() {
-        assert_eq!(mpm_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()), None);
+        assert_eq!(
+            mpm_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()),
+            None
+        );
     }
 
     // Render the FFT magnitude spectrum of a sum of sine tones, the way
@@ -896,8 +918,14 @@ mod tests {
             .collect();
         let mut state = FftState::default();
         for algo in PitchAlgorithm::all() {
-            let pitches = analyze(&samples, sample_rate, &mut state, *algo, PitchRange::default())
-                .pitches;
+            let pitches = analyze(
+                &samples,
+                sample_rate,
+                &mut state,
+                *algo,
+                PitchRange::default(),
+            )
+            .pitches;
             assert!(
                 pitches.iter().any(|p| p.note == "E" && p.octave == 4),
                 "{:?} should detect E4, got {:?}",
@@ -932,7 +960,10 @@ mod tests {
 
     #[test]
     fn pitch_range_from_freqs_falls_back_to_default_when_empty() {
-        assert_eq!(PitchRange::from_freqs(std::iter::empty(), 1.0), PitchRange::default());
+        assert_eq!(
+            PitchRange::from_freqs(std::iter::empty(), 1.0),
+            PitchRange::default()
+        );
     }
 
     #[test]
@@ -940,8 +971,16 @@ mod tests {
         // G3 (~196 Hz) to G6 (~1568 Hz), the range of a low-G 10-hole diatonic.
         let range = PitchRange::from_freqs([196.0, 1568.0], 1.0);
         // A semitone below G3 / above G6.
-        assert!(range.min_freq < 196.0, "min {} should be below 196", range.min_freq);
-        assert!(range.max_freq > 1568.0, "max {} should be above 1568", range.max_freq);
+        assert!(
+            range.min_freq < 196.0,
+            "min {} should be below 196",
+            range.min_freq
+        );
+        assert!(
+            range.max_freq > 1568.0,
+            "max {} should be above 1568",
+            range.max_freq
+        );
         // And within ~1 semitone (ratio 2^(1/12) ≈ 1.0595) of the source notes.
         assert!((range.min_freq - 196.0 / 2f32.powf(1.0 / 12.0)).abs() < 0.01);
         assert!((range.max_freq - 1568.0 * 2f32.powf(1.0 / 12.0)).abs() < 0.01);
@@ -953,7 +992,10 @@ mod tests {
         // detector floor of 200 Hz — the bug this range replaces MIN_FREQ for.
         let range = PitchRange::from_freqs([196.0, 1568.0], 1.0);
         assert!(range.min_freq < 196.0);
-        assert!(196.0 < PitchRange::default().min_freq, "sanity: below the old fixed floor");
+        assert!(
+            196.0 < PitchRange::default().min_freq,
+            "sanity: below the old fixed floor"
+        );
     }
 
     #[test]

@@ -23,7 +23,9 @@
 //!   Shift          larger step
 //!   S              save to assets/notes/2d/<theme>.json
 
-use bevy::{asset::AssetPath, input::ButtonInput, prelude::*, ui_render::prelude::UiMaterialPlugin};
+use bevy::{
+    asset::AssetPath, input::ButtonInput, prelude::*, ui_render::prelude::UiMaterialPlugin,
+};
 use harmonicon::gameplay::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use harmonicon::gameplay::note_visual_2d::{NoteChildConfig, spawn_note_children};
 use harmonicon::gameplay::{HIT_H_PCT, LOOKAHEAD};
@@ -43,7 +45,12 @@ struct HeadRect {
 
 impl Default for HeadRect {
     fn default() -> Self {
-        Self { x: 0.0, y: 0.0, width: 100.0, height: 100.0 }
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 100.0,
+        }
     }
 }
 
@@ -58,7 +65,12 @@ struct NoteConfig {
 
 impl Default for NoteConfig {
     fn default() -> Self {
-        Self { tail_x: 0.5, tail_y: 0.5, tail_width: 0.45, head: HeadRect::default() }
+        Self {
+            tail_x: 0.5,
+            tail_y: 0.5,
+            tail_width: 0.45,
+            head: HeadRect::default(),
+        }
     }
 }
 
@@ -83,7 +95,7 @@ impl NoteConfig {
                 let s = if shift { 5.0 } else { 1.0 };
                 let h = &mut self.head;
                 if resize {
-                    h.width  = (h.width  + dx * s).clamp(1.0, 200.0);
+                    h.width = (h.width + dx * s).clamp(1.0, 200.0);
                     h.height = (h.height + dy * s).clamp(1.0, 200.0);
                 } else {
                     h.x = (h.x + dx * s).clamp(-50.0, 100.0);
@@ -199,7 +211,9 @@ fn tail_len_px(duration: f32) -> f32 {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
-    let theme = std::env::args().nth(1).unwrap_or_else(|| "circular".to_string());
+    let theme = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "circular".to_string());
 
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.07, 0.07, 0.09)))
@@ -214,7 +228,10 @@ fn main() {
         .add_plugins(UiMaterialPlugin::<NoteTail2dMaterial>::default())
         .insert_resource(EditorState::from_theme(&theme))
         .add_systems(Startup, setup)
-        .add_systems(Update, (handle_input, sync_preview, apply_selection_tint, tick_tail))
+        .add_systems(
+            Update,
+            (handle_input, sync_preview, apply_selection_tint, tick_tail),
+        )
         .run();
 }
 
@@ -316,8 +333,12 @@ fn setup(
                                         head_width: cfg.head.width,
                                         head_height: cfg.head.height,
                                     },
-                                    |cmd| { cmd.insert(PreviewTail); },
-                                    |cmd| { cmd.insert(PreviewHead); },
+                                    |cmd| {
+                                        cmd.insert(PreviewTail);
+                                    },
+                                    |cmd| {
+                                        cmd.insert(PreviewHead);
+                                    },
                                 );
                             });
                     });
@@ -325,7 +346,10 @@ fn setup(
                     // Duration label (fixed height → anchors the head line).
                     cell.spawn((
                         Text::new(label),
-                        TextFont { font_size: FontSize::Px(13.0), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(13.0),
+                            ..default()
+                        },
                         TextColor(Color::srgb(0.55, 0.55, 0.65)),
                     ));
                 });
@@ -335,7 +359,10 @@ fn setup(
     // Status bar.
     commands.spawn((
         Text::new(""),
-        TextFont { font_size: FontSize::Px(14.0), ..default() },
+        TextFont {
+            font_size: FontSize::Px(14.0),
+            ..default()
+        },
         TextColor(Color::WHITE),
         Node {
             position_type: PositionType::Absolute,
@@ -398,10 +425,18 @@ fn handle_input(
     let dt = time.delta_secs();
     let mut dx = 0.0_f32;
     let mut dy = 0.0_f32;
-    if arrow_fires(KeyCode::ArrowLeft,  &keys, dt, &mut rep.left)  { dx = -1.0; }
-    if arrow_fires(KeyCode::ArrowRight, &keys, dt, &mut rep.right) { dx =  1.0; }
-    if arrow_fires(KeyCode::ArrowUp,    &keys, dt, &mut rep.up)    { dy = -1.0; }
-    if arrow_fires(KeyCode::ArrowDown,  &keys, dt, &mut rep.down)  { dy =  1.0; }
+    if arrow_fires(KeyCode::ArrowLeft, &keys, dt, &mut rep.left) {
+        dx = -1.0;
+    }
+    if arrow_fires(KeyCode::ArrowRight, &keys, dt, &mut rep.right) {
+        dx = 1.0;
+    }
+    if arrow_fires(KeyCode::ArrowUp, &keys, dt, &mut rep.up) {
+        dy = -1.0;
+    }
+    if arrow_fires(KeyCode::ArrowDown, &keys, dt, &mut rep.down) {
+        dy = 1.0;
+    }
 
     if dx != 0.0 || dy != 0.0 {
         let (selected, resize) = (state.selected, state.resize);
@@ -419,7 +454,11 @@ fn handle_input(
         let dirty = if state.dirty { "  [unsaved — S]" } else { "" };
         let line = match state.selected {
             Selected::Tail => {
-                let act = if state.resize { "RESIZE WIDTH" } else { "MOVE        " };
+                let act = if state.resize {
+                    "RESIZE WIDTH"
+                } else {
+                    "MOVE        "
+                };
                 format!(
                     "[TAIL {act}]  tail_x:{:.2}  tail_y:{:.2}  tail_width:{:.2}",
                     c.tail_x, c.tail_y, c.tail_width,
@@ -451,14 +490,14 @@ fn sync_preview(
     // Tail length (height) is per-note duration, set at spawn — only update the
     // attach point and width here.
     for mut node in &mut tails {
-        node.left   = Val::Percent((c.tail_x - c.tail_width * 0.5) * 100.0);
+        node.left = Val::Percent((c.tail_x - c.tail_width * 0.5) * 100.0);
         node.bottom = Val::Percent((1.0 - c.tail_y) * 100.0);
-        node.width  = Val::Percent(c.tail_width * 100.0);
+        node.width = Val::Percent(c.tail_width * 100.0);
     }
     for mut node in &mut heads {
-        node.left   = Val::Percent(c.head.x);
-        node.top    = Val::Percent(c.head.y);
-        node.width  = Val::Percent(c.head.width);
+        node.left = Val::Percent(c.head.x);
+        node.top = Val::Percent(c.head.y);
+        node.width = Val::Percent(c.head.width);
         node.height = Val::Percent(c.head.height);
     }
 }
@@ -473,11 +512,19 @@ fn apply_selection_tint(
     if !state.is_changed() {
         return;
     }
-    let head_color = if state.selected == Selected::Head { BLUE } else { HEAD_IDLE };
+    let head_color = if state.selected == Selected::Head {
+        BLUE
+    } else {
+        HEAD_IDLE
+    };
     for mut img in &mut heads {
         img.color = head_color;
     }
-    let tail_color = if state.selected == Selected::Tail { BLUE } else { TAIL_IDLE };
+    let tail_color = if state.selected == Selected::Tail {
+        BLUE
+    } else {
+        TAIL_IDLE
+    };
     for (_, mat) in mats.iter_mut() {
         mat.color = LinearRgba::from(tail_color);
     }
@@ -505,7 +552,10 @@ mod tests {
         // Twice the duration → twice the on-screen tail length.
         let short = tail_len_px(0.4);
         let long = tail_len_px(0.8);
-        assert!((long - 2.0 * short).abs() < 1e-3, "short={short} long={long}");
+        assert!(
+            (long - 2.0 * short).abs() < 1e-3,
+            "short={short} long={long}"
+        );
     }
 
     #[test]
@@ -629,7 +679,11 @@ mod tests {
     fn selecting_tail_leaves_head_untouched_and_vice_versa() {
         let mut c = NoteConfig::default();
         c.nudge(Selected::Tail, false, false, 1.0, 1.0);
-        assert_eq!(c.head, HeadRect::default(), "tail edits must not touch head");
+        assert_eq!(
+            c.head,
+            HeadRect::default(),
+            "tail edits must not touch head"
+        );
 
         let mut c = NoteConfig::default();
         c.nudge(Selected::Head, false, false, 1.0, 1.0);
@@ -694,14 +748,28 @@ mod tests {
         assert!(fires > 1, "a long press must auto-repeat, got {fires}");
         // Allow a small slop for frame quantisation.
         let diff = (fires as i32 - (1 + expected_repeats) as i32).abs();
-        assert!(diff <= 2, "fires={fires}, expected≈{}", 1 + expected_repeats);
+        assert!(
+            diff <= 2,
+            "fires={fires}, expected≈{}",
+            1 + expected_repeats
+        );
     }
 
     // ── serde / config schema ─────────────────────────────────────────────────
 
     #[test]
     fn config_round_trips_through_json() {
-        let c = NoteConfig { tail_x: 0.3, tail_y: 0.7, tail_width: 0.2, head: HeadRect { x: 5.0, y: -10.0, width: 80.0, height: 120.0 } };
+        let c = NoteConfig {
+            tail_x: 0.3,
+            tail_y: 0.7,
+            tail_width: 0.2,
+            head: HeadRect {
+                x: 5.0,
+                y: -10.0,
+                width: 80.0,
+                height: 120.0,
+            },
+        };
         let json = serde_json::to_string(&c).unwrap();
         let back: NoteConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(back.tail_x, c.tail_x);
@@ -714,7 +782,8 @@ mod tests {
     fn missing_head_falls_back_to_default_fill() {
         // Older files without a `head` block parse, defaulting to fill.
         let c: NoteConfig =
-            serde_json::from_str(r#"{ "tail_x": 0.5, "tail_y": 0.5, "tail_width": 0.45 }"#).unwrap();
+            serde_json::from_str(r#"{ "tail_x": 0.5, "tail_y": 0.5, "tail_width": 0.45 }"#)
+                .unwrap();
         assert_eq!(c.head, HeadRect::default());
         assert_eq!(c.head.width, 100.0);
     }
@@ -724,11 +793,14 @@ mod tests {
         // Guards against the JSON drifting out of sync with the editor struct.
         for theme in ["circular", "square"] {
             let path = format!("assets/notes/2d/{theme}.json");
-            let text = std::fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("read {path}: {e}"));
-            let cfg: NoteConfig = serde_json::from_str(&text)
-                .unwrap_or_else(|e| panic!("parse {path}: {e}"));
-            assert!(cfg.tail_width > 0.0, "{theme}: tail_width should be positive");
+            let text =
+                std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {path}: {e}"));
+            let cfg: NoteConfig =
+                serde_json::from_str(&text).unwrap_or_else(|e| panic!("parse {path}: {e}"));
+            assert!(
+                cfg.tail_width > 0.0,
+                "{theme}: tail_width should be positive"
+            );
         }
     }
 }

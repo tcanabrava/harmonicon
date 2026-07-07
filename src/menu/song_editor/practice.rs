@@ -6,13 +6,13 @@ use bevy_fluent::prelude::Localization;
 
 use crate::audio_system::midi::midi_to_note;
 use crate::audio_system::pitch_detect::PitchEvent;
-use crate::gameplay::{classify_note, compute_points, sustain_points, HitQuality, NoteOutcome};
+use crate::gameplay::{HitQuality, NoteOutcome, classify_note, compute_points, sustain_points};
 use crate::localization::{LocalizationExt, LocalizedStr};
 use crate::settings::AudioSettings;
 
-use super::playback::{key_offset, note_freq, EditorAudio, Playhead};
-use super::state::EditorState;
 use super::TICKS_PER_BEAT;
+use super::playback::{EditorAudio, Playhead, key_offset, note_freq};
+use super::state::EditorState;
 
 // ── Timing windows ────────────────────────────────────────────────────────────
 
@@ -31,34 +31,34 @@ const PITCH_TOLERANCE: f32 = 1.029_302_2;
 
 /// One note from the editor grid, compiled into a practice-scoring record.
 struct PracticeNote {
-    start_secs:    f64,
-    end_secs:      f64,
+    start_secs: f64,
+    end_secs: f64,
     /// Expected pitch frequency in Hz (key-transposed, bend-adjusted).
     expected_freq: f32,
     /// Human-readable name of the expected pitch, e.g. "G4".
     expected_name: String,
-    hit:           bool,
-    missed:        bool,
+    hit: bool,
+    missed: bool,
     /// Seconds the player held the correct pitch after scoring the onset.
-    held:          f64,
+    held: f64,
     /// True once the sustain bonus for this note has been paid out.
-    sustain_done:  bool,
+    sustain_done: bool,
 }
 
 #[derive(Resource, Default)]
 pub(super) struct PracticeState {
     pub active: bool,
-    notes:      Vec<PracticeNote>,
+    notes: Vec<PracticeNote>,
     /// Indices of notes consumed by the current sustained breath.
     /// A note is dropped from this set once its frequency stops sounding,
     /// re-arming it for the next articulation (same logic as gameplay's PitchGate).
-    consumed:   std::collections::HashSet<usize>,
-    pub score:  u32,
-    pub hits:   u32,
+    consumed: std::collections::HashSet<usize>,
+    pub score: u32,
+    pub hits: u32,
     pub misses: u32,
-    pub total:  u32,
+    pub total: u32,
     /// Status line shown in the editor's status bar while practice is running.
-    pub msg:    LocalizedStr,
+    pub msg: LocalizedStr,
 }
 
 impl PracticeState {
@@ -82,14 +82,14 @@ fn build_schedule(state: &EditorState) -> Vec<PracticeNote> {
             let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
             let name = midi_to_note(midi);
             Some(PracticeNote {
-                start_secs:    n.tick as f64 * secs_per_tick as f64,
-                end_secs:      (n.tick + n.len) as f64 * secs_per_tick as f64,
+                start_secs: n.tick as f64 * secs_per_tick as f64,
+                end_secs: (n.tick + n.len) as f64 * secs_per_tick as f64,
                 expected_freq: freq,
                 expected_name: name,
-                hit:           false,
-                missed:        false,
-                held:          0.0,
-                sustain_done:  false,
+                hit: false,
+                missed: false,
+                held: 0.0,
+                sustain_done: false,
             })
         })
         .collect();
@@ -107,14 +107,14 @@ fn build_schedule(state: &EditorState) -> Vec<PracticeNote> {
 /// Start practice mode: plays background music only (no synthesized notes),
 /// then scores the player's microphone input against the editor's note grid.
 pub(super) fn start_practice(
-    state:    &EditorState,
-    sources:  &mut Assets<AudioSource>,
+    state: &EditorState,
+    sources: &mut Assets<AudioSource>,
     settings: &AudioSettings,
-    playing:  &Query<Entity, With<EditorAudio>>,
+    playing: &Query<Entity, With<EditorAudio>>,
     practice: &mut PracticeState,
     playhead: &mut Playhead,
     commands: &mut Commands,
-    loc:      &Localization,
+    loc: &Localization,
 ) {
     for e in playing {
         commands.entity(e).despawn();
@@ -127,13 +127,18 @@ pub(super) fn start_practice(
 
     let bpm: f32 = state.tempo.parse::<f32>().unwrap_or(120.0).max(1.0);
     let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
-    let end_tick = state.notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
+    let end_tick = state
+        .notes
+        .iter()
+        .map(|n| n.tick + n.len)
+        .max()
+        .unwrap_or(0);
 
     *playhead = Playhead {
-        playing:      true,
-        paused:       false,
-        elapsed:      0.0,
-        total:        end_tick as f32 * secs_per_tick,
+        playing: true,
+        paused: false,
+        elapsed: 0.0,
+        total: end_tick as f32 * secs_per_tick,
         secs_per_tick,
     };
 
@@ -141,12 +146,13 @@ pub(super) fn start_practice(
     if !music.is_empty() {
         match std::fs::read(music) {
             Ok(bytes) => {
-                let handle = sources.add(AudioSource { bytes: bytes.into() });
+                let handle = sources.add(AudioSource {
+                    bytes: bytes.into(),
+                });
                 commands.spawn((
                     EditorAudio,
                     AudioPlayer::<AudioSource>(handle),
-                    PlaybackSettings::DESPAWN
-                        .with_volume(Volume::Linear(settings.music_volume)),
+                    PlaybackSettings::DESPAWN.with_volume(Volume::Linear(settings.music_volume)),
                 ));
             }
             Err(e) => warn!("Practice: can't read background music {music:?}: {e}"),
@@ -158,7 +164,7 @@ pub(super) fn start_practice(
 
 /// Stop practice and reset all state. Safe to call when practice is not active.
 pub(super) fn stop_practice(
-    playing:  &Query<Entity, With<EditorAudio>>,
+    playing: &Query<Entity, With<EditorAudio>>,
     practice: &mut PracticeState,
     playhead: &mut Playhead,
     commands: &mut Commands,
@@ -174,12 +180,12 @@ pub(super) fn stop_practice(
 // ── System ────────────────────────────────────────────────────────────────────
 
 pub(super) fn practice_tick(
-    time:             Res<Time>,
-    playhead:         Res<Playhead>,
-    settings:         Res<AudioSettings>,
-    loc:              Res<Localization>,
+    time: Res<Time>,
+    playhead: Res<Playhead>,
+    settings: Res<AudioSettings>,
+    loc: Res<Localization>,
     mut pitch_events: MessageReader<PitchEvent>,
-    mut practice:     ResMut<PracticeState>,
+    mut practice: ResMut<PracticeState>,
 ) {
     if !practice.active {
         // Drain unread pitch events so they don't pile up while idle.
@@ -198,11 +204,14 @@ pub(super) fn practice_tick(
         }
         practice.misses += extra_misses;
         let (hits, total, score) = (practice.hits, practice.total, practice.score);
-        practice.msg = loc.msg_args("practice-done", &[
-            ("hits",  hits.to_string()),
-            ("total", total.to_string()),
-            ("score", score.to_string()),
-        ]);
+        practice.msg = loc.msg_args(
+            "practice-done",
+            &[
+                ("hits", hits.to_string()),
+                ("total", total.to_string()),
+                ("score", score.to_string()),
+            ],
+        );
         practice.active = false;
         return;
     }
@@ -232,20 +241,27 @@ pub(super) fn practice_tick(
     });
 
     // Score all notes, collecting mutations for application after the loop.
-    let mut new_consumed:  Vec<usize> = Vec::new();
-    let mut hits_delta:    u32 = 0;
-    let mut misses_delta:  u32 = 0;
-    let mut score_delta:   u32 = 0;
+    let mut new_consumed: Vec<usize> = Vec::new();
+    let mut hits_delta: u32 = 0;
+    let mut misses_delta: u32 = 0;
+    let mut score_delta: u32 = 0;
     let mut new_msg: Option<LocalizedStr> = None;
 
     for (i, note) in practice.notes.iter_mut().enumerate() {
-        if note.missed { continue; }
+        if note.missed {
+            continue;
+        }
 
         // Sustain phase: onset was already scored — reward holding the pitch.
         if note.hit {
-            if note.sustain_done { continue; }
+            if note.sustain_done {
+                continue;
+            }
             if judged < note.end_secs {
-                if detected.iter().any(|&f| freq_matches(f, note.expected_freq)) {
+                if detected
+                    .iter()
+                    .any(|&f| freq_matches(f, note.expected_freq))
+                {
                     note.held += dt;
                 }
             } else {
@@ -259,9 +275,17 @@ pub(super) fn practice_tick(
         // A note scores only on a fresh attack: the pitch must be sounding AND
         // not already consumed by an earlier note in this continuous breath.
         let playing_expected = !consumed.contains(&i)
-            && detected.iter().any(|&f| freq_matches(f, note.expected_freq));
+            && detected
+                .iter()
+                .any(|&f| freq_matches(f, note.expected_freq));
 
-        match classify_note(offset, playing_expected, PERFECT_WINDOW, GOOD_WINDOW, MISS_WINDOW) {
+        match classify_note(
+            offset,
+            playing_expected,
+            PERFECT_WINDOW,
+            GOOD_WINDOW,
+            MISS_WINDOW,
+        ) {
             NoteOutcome::Missed => {
                 note.missed = true;
                 misses_delta += 1;
@@ -269,16 +293,20 @@ pub(super) fn practice_tick(
                 new_msg.get_or_insert_with(|| loc.msg_args("practice-missed", &[("note", name)]));
             }
             NoteOutcome::Waiting => {
-                let got = detected.first().copied().map(freq_to_name).unwrap_or_default();
+                let got = detected
+                    .first()
+                    .copied()
+                    .map(freq_to_name)
+                    .unwrap_or_default();
                 let expected = note.expected_name.clone();
                 new_msg.get_or_insert_with(|| {
                     if got.is_empty() {
                         loc.msg_args("practice-prompt", &[("note", expected)])
                     } else {
-                        loc.msg_args("practice-wrong-note", &[
-                            ("got",      got),
-                            ("expected", expected),
-                        ])
+                        loc.msg_args(
+                            "practice-wrong-note",
+                            &[("got", got), ("expected", expected)],
+                        )
                     }
                 });
             }
@@ -290,14 +318,14 @@ pub(super) fn practice_tick(
                 score_delta += pts;
                 let name = note.expected_name.clone();
                 new_msg = Some(match quality {
-                    HitQuality::Perfect => loc.msg_args("practice-hit-perfect", &[
-                        ("note", name),
-                        ("pts",  pts.to_string()),
-                    ]),
-                    HitQuality::Good => loc.msg_args("practice-hit-good", &[
-                        ("note", name),
-                        ("pts",  pts.to_string()),
-                    ]),
+                    HitQuality::Perfect => loc.msg_args(
+                        "practice-hit-perfect",
+                        &[("note", name), ("pts", pts.to_string())],
+                    ),
+                    HitQuality::Good => loc.msg_args(
+                        "practice-hit-good",
+                        &[("note", name), ("pts", pts.to_string())],
+                    ),
                 });
             }
             NoteOutcome::TooEarly | NoteOutcome::Gap => {}
@@ -306,9 +334,9 @@ pub(super) fn practice_tick(
 
     consumed.extend(new_consumed);
     practice.consumed = consumed;
-    practice.hits   += hits_delta;
+    practice.hits += hits_delta;
     practice.misses += misses_delta;
-    practice.score  += score_delta;
+    practice.score += score_delta;
     if let Some(msg) = new_msg {
         practice.msg = msg;
     }
@@ -318,16 +346,22 @@ pub(super) fn practice_tick(
 
 /// True when `detected` is within ±50 cents of `expected`.
 pub(super) fn freq_matches(detected: f32, expected: f32) -> bool {
-    if expected <= 0.0 { return false; }
+    if expected <= 0.0 {
+        return false;
+    }
     let ratio = detected / expected;
     (1.0 / PITCH_TOLERANCE..=PITCH_TOLERANCE).contains(&ratio)
 }
 
 /// Nearest MIDI note name for a raw frequency (used in "you played X" messages).
 pub(super) fn freq_to_name(freq: f32) -> String {
-    if freq <= 0.0 { return String::new(); }
+    if freq <= 0.0 {
+        return String::new();
+    }
     let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
-    if !(0..=127).contains(&midi) { return String::new(); }
+    if !(0..=127).contains(&midi) {
+        return String::new();
+    }
     midi_to_note(midi)
 }
 

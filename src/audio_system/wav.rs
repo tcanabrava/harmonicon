@@ -10,10 +10,10 @@ pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     // WAV/RIFF layout per the PCM subset of the WAVE spec:
     //   RIFF chunk (12 bytes) + fmt subchunk (24 bytes) + data subchunk header (8 bytes)
     //   = 44 bytes of header, followed by raw 16-bit LE PCM samples.
-    let channels: u16 = 1;            // mono
-    let bits_per_sample: u16 = 16;    // 16-bit PCM
+    let channels: u16 = 1; // mono
+    let bits_per_sample: u16 = 16; // 16-bit PCM
     let bytes_per_sample = (bits_per_sample / 8) as u32;
-    let data_len  = (samples.len() as u32) * bytes_per_sample;
+    let data_len = (samples.len() as u32) * bytes_per_sample;
     let byte_rate = sample_rate * channels as u32 * bytes_per_sample;
     let block_align = (channels as u32 * bytes_per_sample) as u16;
 
@@ -24,8 +24,8 @@ pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     v.extend_from_slice(b"WAVE");
     // fmt subchunk (16 bytes for PCM)
     v.extend_from_slice(b"fmt ");
-    v.extend_from_slice(&16u32.to_le_bytes());            // subchunk size for PCM
-    v.extend_from_slice(&1u16.to_le_bytes());             // AudioFormat = PCM (no compression)
+    v.extend_from_slice(&16u32.to_le_bytes()); // subchunk size for PCM
+    v.extend_from_slice(&1u16.to_le_bytes()); // AudioFormat = PCM (no compression)
     v.extend_from_slice(&channels.to_le_bytes());
     v.extend_from_slice(&sample_rate.to_le_bytes());
     v.extend_from_slice(&byte_rate.to_le_bytes());

@@ -134,7 +134,11 @@ fn theme_json_validates_against_schema() {
     let validator = theme_schema_validator();
     let root = Path::new("assets/themes");
     let themes = subdirs(root);
-    assert!(!themes.is_empty(), "no themes found under {}", root.display());
+    assert!(
+        !themes.is_empty(),
+        "no themes found under {}",
+        root.display()
+    );
 
     let mut report = String::new();
     for theme_dir in themes {
@@ -151,10 +155,7 @@ fn theme_json_validates_against_schema() {
         let instance: serde_json::Value = match serde_json::from_str(&text) {
             Ok(v) => v,
             Err(e) => {
-                report.push_str(&format!(
-                    "  {}: JSON parse error: {e}\n",
-                    label(&theme_dir)
-                ));
+                report.push_str(&format!("  {}: JSON parse error: {e}\n", label(&theme_dir)));
                 continue;
             }
         };
@@ -172,7 +173,10 @@ fn theme_json_validates_against_schema() {
         }
     }
 
-    assert!(report.is_empty(), "Theme JSON validation failures:\n{report}");
+    assert!(
+        report.is_empty(),
+        "Theme JSON validation failures:\n{report}"
+    );
 }
 
 /// Collects every file path referenced inside a parsed `theme.json` value.
@@ -235,7 +239,11 @@ fn collect_theme_file_refs(theme: &serde_json::Value) -> Vec<String> {
 fn theme_assets_are_complete() {
     let root = Path::new("assets/themes");
     let themes = subdirs(root);
-    assert!(!themes.is_empty(), "no themes found under {}", root.display());
+    assert!(
+        !themes.is_empty(),
+        "no themes found under {}",
+        root.display()
+    );
 
     let mut report = String::new();
     for theme_dir in themes {

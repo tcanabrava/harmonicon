@@ -127,7 +127,9 @@ fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<
 }
 
 fn file_name(p: &std::path::Path) -> String {
-    p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+    p.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 /// Open the dialog when an [`OpenFileDialog`] arrives: set state and spawn the
@@ -162,7 +164,11 @@ fn handle_open(
 
     let title = dialog.title.clone();
     let is_save = matches!(dialog.mode, DialogMode::Save { .. });
-    let save_row_display = if is_save { Display::Flex } else { Display::None };
+    let save_row_display = if is_save {
+        Display::Flex
+    } else {
+        Display::None
+    };
     let initial_filename = dialog.save_filename.clone();
 
     commands.spawn_scene(bsn! {
@@ -354,7 +360,10 @@ fn spawn_file_entry(parent: &mut ChildSpawnerCommands, label: String, path: Path
             match &dialog.mode {
                 DialogMode::Open => {
                     if let Some(purpose) = dialog.purpose {
-                        chosen.write(FileChosen { purpose, path: path.clone() });
+                        chosen.write(FileChosen {
+                            purpose,
+                            path: path.clone(),
+                        });
                     }
                     close(&mut dialog, &roots, next, &mut commands);
                 }
@@ -420,7 +429,11 @@ fn dialog_keys(
         DialogMode::Save { .. } => {
             // Collect the action first so `next_state` isn't moved inside a loop.
             #[derive(PartialEq)]
-            enum Act { Confirm, Cancel, None }
+            enum Act {
+                Confirm,
+                Cancel,
+                None,
+            }
             let mut act = Act::None;
 
             for ev in key_events.read() {
@@ -436,17 +449,27 @@ fn dialog_keys(
                         }
                     }
                     bevy::input::keyboard::Key::Space => dialog.save_filename.push(' '),
-                    bevy::input::keyboard::Key::Backspace => { dialog.save_filename.pop(); }
-                    bevy::input::keyboard::Key::Enter => { act = Act::Confirm; break; }
-                    bevy::input::keyboard::Key::Escape => { act = Act::Cancel; break; }
+                    bevy::input::keyboard::Key::Backspace => {
+                        dialog.save_filename.pop();
+                    }
+                    bevy::input::keyboard::Key::Enter => {
+                        act = Act::Confirm;
+                        break;
+                    }
+                    bevy::input::keyboard::Key::Escape => {
+                        act = Act::Cancel;
+                        break;
+                    }
                     _ => {}
                 }
             }
 
             match act {
-                Act::Confirm => confirm_save(&mut dialog, &mut chosen, &roots, next_state, &mut commands),
-                Act::Cancel  => close(&mut dialog, &roots, next_state, &mut commands),
-                Act::None    => {}
+                Act::Confirm => {
+                    confirm_save(&mut dialog, &mut chosen, &roots, next_state, &mut commands)
+                }
+                Act::Cancel => close(&mut dialog, &roots, next_state, &mut commands),
+                Act::None => {}
             }
         }
         DialogMode::Open => {
@@ -454,10 +477,11 @@ fn dialog_keys(
                 keyboard.clear_just_pressed(KeyCode::Escape);
                 close(&mut dialog, &roots, next_state, &mut commands);
             } else if keyboard.just_pressed(KeyCode::Backspace)
-                && let Some(parent) = dialog.dir.parent() {
-                    dialog.dir = parent.to_path_buf();
-                    refresh_req.write(RefreshFileList);
-                }
+                && let Some(parent) = dialog.dir.parent()
+            {
+                dialog.dir = parent.to_path_buf();
+                refresh_req.write(RefreshFileList);
+            }
         }
     }
 }
@@ -485,11 +509,13 @@ impl Plugin for FileDialogsPlugin {
             .add_message::<RefreshFileList>()
             .init_resource::<FileDialog>()
             .init_state::<FileDialogState>()
-            .add_systems(Update, handle_open.run_if(in_state(FileDialogState::Closed)))
             .add_systems(
                 Update,
-                (refresh, sync_save_filename, dialog_keys)
-                    .run_if(in_state(FileDialogState::Open)),
+                handle_open.run_if(in_state(FileDialogState::Closed)),
+            )
+            .add_systems(
+                Update,
+                (refresh, sync_save_filename, dialog_keys).run_if(in_state(FileDialogState::Open)),
             );
     }
 }
@@ -502,7 +528,11 @@ mod tests {
     fn list_dir_splits_and_filters() {
         let (dirs, files) = list_dir(std::path::Path::new("assets/songs"), &["ogg".into()]);
         assert!(!dirs.is_empty(), "expected artist subfolders");
-        assert!(files.iter().all(|f| f.extension().and_then(|e| e.to_str()) == Some("ogg")));
+        assert!(
+            files
+                .iter()
+                .all(|f| f.extension().and_then(|e| e.to_str()) == Some("ogg"))
+        );
     }
 
     #[test]

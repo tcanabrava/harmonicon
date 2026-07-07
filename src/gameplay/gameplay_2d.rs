@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-use bevy::asset::AssetPath;
-use bevy::prelude::*;
-use bevy::ui::ComputedNode;
 use crate::{
     menu::SelectedSong,
+    song::NoteThemeConfig,
     song::SongManifest,
     song::chart::{Action, Modifier, PlayMode},
     song::harmonica::twelve_bar,
-    song::NoteThemeConfig,
 };
+use bevy::asset::AssetPath;
+use bevy::prelude::*;
+use bevy::ui::ComputedNode;
 
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
@@ -167,13 +167,7 @@ pub fn setup(
                     NoteHighway,
                 ))
                 .with_children(|hw| {
-                    spawn_highway(
-                        hw,
-                        chart,
-                        &note_materials,
-                        &head_image,
-                        &tail_cfg,
-                    );
+                    spawn_highway(hw, chart, &note_materials, &head_image, &tail_cfg);
                 });
 
                 // Harmonica holes
@@ -211,7 +205,7 @@ pub fn setup(
                             Text::new(title),
                             TextFont {
                                 font_size: FontSize::Px(18.0),
-                                                                ..default()
+                                ..default()
                             },
                             TextColor(Color::WHITE),
                         ));
@@ -219,7 +213,7 @@ pub fn setup(
                             Text::new(info),
                             TextFont {
                                 font_size: FontSize::Px(12.0),
-                                                                ..default()
+                                ..default()
                             },
                             TextColor(Color::srgb(0.60, 0.65, 0.75)),
                         ));
@@ -227,7 +221,7 @@ pub fn setup(
                             Text::new(harp_info),
                             TextFont {
                                 font_size: FontSize::Px(11.0),
-                                                                ..default()
+                                ..default()
                             },
                             TextColor(Color::srgb(0.45, 0.72, 0.55)),
                         ));
@@ -236,7 +230,7 @@ pub fn setup(
                                 Text::new(desc.to_string()),
                                 TextFont {
                                     font_size: FontSize::Px(10.0),
-                                                                        ..default()
+                                    ..default()
                                 },
                                 TextColor(Color::srgb(0.50, 0.50, 0.55)),
                             ));
@@ -246,7 +240,7 @@ pub fn setup(
                                 Text::new(format!("Chart: {author}")),
                                 TextFont {
                                     font_size: FontSize::Px(9.0),
-                                                                        ..default()
+                                    ..default()
                                 },
                                 TextColor(Color::srgb(0.40, 0.40, 0.45)),
                             ));
@@ -299,7 +293,7 @@ pub fn setup(
                             Text::new("0"),
                             TextFont {
                                 font_size: FontSize::Px(28.0),
-                                                                ..default()
+                                ..default()
                             },
                             TextColor(Color::WHITE),
                             ScoreText,
@@ -308,7 +302,7 @@ pub fn setup(
                             Text::new(""),
                             TextFont {
                                 font_size: FontSize::Px(14.0),
-                                                                ..default()
+                                ..default()
                             },
                             TextColor(Color::srgb(0.90, 0.72, 0.20)),
                             ComboText,
@@ -317,7 +311,7 @@ pub fn setup(
                             Text::new(""),
                             TextFont {
                                 font_size: FontSize::Px(20.0),
-                                                                ..default()
+                                ..default()
                             },
                             TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
                             FeedbackText,
@@ -350,7 +344,6 @@ pub(super) struct NoteHead;
 pub(super) struct NoteTail {
     duration_frac: f32,
 }
-
 
 /// The highway distance (in %) a note scrolls from entering at the top to its
 /// head reaching the hit line — i.e. the span covered in `LOOKAHEAD` seconds.
@@ -522,14 +515,16 @@ fn spawn_highway(
                         head_width: tail_cfg.head.width,
                         head_height: tail_cfg.head.height,
                     },
-                    |cmd| { cmd.insert(NoteTail { duration_frac }); },
+                    |cmd| {
+                        cmd.insert(NoteTail { duration_frac });
+                    },
                     |cmd| {
                         cmd.insert(NoteHead).with_children(|head| {
                             head.spawn((
                                 Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
                                 TextFont {
                                     font_size: FontSize::Px(13.0),
-                                                                        ..default()
+                                    ..default()
                                 },
                                 TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
                             ));
@@ -599,10 +594,7 @@ fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
     }
 }
 
-fn spawn_harmonica_strip(
-    col: &mut ChildSpawnerCommands,
-    chart: &crate::song::chart::HarpChart,
-) {
+fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::chart::HarpChart) {
     col.spawn(Node {
         flex_direction: FlexDirection::Row,
         width: Val::Percent(100.0),
@@ -635,7 +627,7 @@ fn spawn_harmonica_strip(
                     Text::new(b),
                     TextFont {
                         font_size: FontSize::Px(11.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
@@ -643,7 +635,7 @@ fn spawn_harmonica_strip(
                     Text::new(format!("{hole}")),
                     TextFont {
                         font_size: FontSize::Px(16.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::WHITE),
                 ));
@@ -651,7 +643,7 @@ fn spawn_harmonica_strip(
                     Text::new(d),
                     TextFont {
                         font_size: FontSize::Px(11.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
@@ -670,7 +662,7 @@ fn spawn_harmonica_strip(
             Text::new("\u{25A0} BLOW"),
             TextFont {
                 font_size: FontSize::Px(11.0),
-                                ..default()
+                ..default()
             },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
@@ -678,7 +670,7 @@ fn spawn_harmonica_strip(
             Text::new("\u{25A0} DRAW"),
             TextFont {
                 font_size: FontSize::Px(11.0),
-                                ..default()
+                ..default()
             },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),
         ));

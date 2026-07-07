@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
 
+use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
-use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::ui_render::prelude::MaterialNode;
 
+use super::material::EditorNoteMaterial;
+use super::playback::Playhead;
+use super::state::{
+    Dir, DragKind, EditorState, Expr, GridNote, Pitch, Scroll, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN,
+    VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction, enforce_expr,
+    max_bend, note_rect, overblow_ok, overdraw_ok,
+};
+use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
+use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::dialogs::file_dialog::FileDialog;
 use crate::theme::LoadedTheme;
-use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
-use super::material::EditorNoteMaterial;
-use super::state::{
-    DragKind, Dir, EditorState, Expr, GridNote, Pitch, Scroll,
-    enforce_direction, enforce_expr, max_bend, note_rect, overblow_ok, overdraw_ok,
-    VIBRATO_HZ_MAX, VIBRATO_HZ_MIN, VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP,
-};
-use super::playback::Playhead;
-use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
 
 // ── Note interaction ─────────────────────────────────────────────────────────
 
@@ -67,7 +67,11 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     let Some(id) = state.selected else { return };
 
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
-        let dir = if kind == ModButton::Blow { Dir::Blow } else { Dir::Draw };
+        let dir = if kind == ModButton::Blow {
+            Dir::Blow
+        } else {
+            Dir::Draw
+        };
         if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
             n.dir = dir;
         }
@@ -75,12 +79,16 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         return;
     }
 
-    let Some(note) = state.selected_note_mut() else { return };
+    let Some(note) = state.selected_note_mut() else {
+        return;
+    };
     match kind {
         ModButton::Blow | ModButton::Draw => unreachable!(),
         ModButton::Bend => {
             let max = max_bend(note.hole);
-            if max <= 0.0 { return; }
+            if max <= 0.0 {
+                return;
+            }
             let next = note.bend() + 0.5;
             note.pitch = if next > max + f32::EPSILON {
                 Pitch::Normal
@@ -90,12 +98,20 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         }
         ModButton::Overblow => {
             if overblow_ok(note.hole) {
-                note.pitch = if note.pitch == Pitch::Overblow { Pitch::Normal } else { Pitch::Overblow };
+                note.pitch = if note.pitch == Pitch::Overblow {
+                    Pitch::Normal
+                } else {
+                    Pitch::Overblow
+                };
             }
         }
         ModButton::Overdraw => {
             if overdraw_ok(note.hole) {
-                note.pitch = if note.pitch == Pitch::Overdraw { Pitch::Normal } else { Pitch::Overdraw };
+                note.pitch = if note.pitch == Pitch::Overdraw {
+                    Pitch::Normal
+                } else {
+                    Pitch::Overdraw
+                };
             }
         }
         ModButton::Wah => {
@@ -139,7 +155,9 @@ pub(super) fn grid_keys(
     file_dialog: Res<FileDialog>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    if state.focus.is_some() { return; }
+    if state.focus.is_some() {
+        return;
+    }
     if keyboard.just_pressed(KeyCode::Delete) || keyboard.just_pressed(KeyCode::Backspace) {
         delete_selected(&mut state);
     }
@@ -161,7 +179,9 @@ pub(super) fn type_into_field(
         return;
     };
     for ev in keys.read() {
-        if ev.state != ButtonState::Pressed { continue; }
+        if ev.state != ButtonState::Pressed {
+            continue;
+        }
         match &ev.logical_key {
             bevy::input::keyboard::Key::Character(s) => {
                 for c in s.chars() {
@@ -188,8 +208,12 @@ pub(super) fn pan_keys(
     file_dialog: Res<FileDialog>,
     mut scroll: ResMut<Scroll>,
 ) {
-    if state.focus.is_some() || file_dialog.open { return; }
-    if keyboard.just_pressed(KeyCode::ArrowRight) { scroll.px += BEAT_W; }
+    if state.focus.is_some() || file_dialog.open {
+        return;
+    }
+    if keyboard.just_pressed(KeyCode::ArrowRight) {
+        scroll.px += BEAT_W;
+    }
     if keyboard.just_pressed(KeyCode::ArrowLeft) {
         scroll.px = (scroll.px - BEAT_W).max(0.0);
     }
@@ -200,7 +224,10 @@ pub(super) fn pan_wheel(
     file_dialog: Res<FileDialog>,
     mut scroll: ResMut<Scroll>,
 ) {
-    if file_dialog.open { wheel.clear(); return; }
+    if file_dialog.open {
+        wheel.clear();
+        return;
+    }
     let mut delta = 0.0;
     for ev in wheel.read() {
         delta += if ev.y != 0.0 { ev.y } else { ev.x };
@@ -229,12 +256,16 @@ pub(super) fn auto_scroll(
     windows: Query<&Window>,
     mut scroll: ResMut<Scroll>,
 ) {
-    if !playhead.playing || playhead.secs_per_tick <= 0.0 { return; }
+    if !playhead.playing || playhead.secs_per_tick <= 0.0 {
+        return;
+    }
     const FOLLOW_LEAD: f32 = 0.7;
     let view_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0) - super::HOLE_COL_W;
     let head_px = playhead.elapsed / playhead.secs_per_tick * TICK_W;
     let target = head_px - FOLLOW_LEAD * view_w;
-    if target > scroll.px { scroll.px = target; }
+    if target > scroll.px {
+        scroll.px = target;
+    }
 }
 
 // ── Resize live-update ────────────────────────────────────────────────────────
@@ -244,21 +275,30 @@ pub(super) fn auto_scroll(
 /// instead of only snapping correct once `rebuild_grid` runs after release.
 pub(super) fn live_resize(
     state: Res<EditorState>,
-    mut notes: Query<(&NoteView, &mut Node, Option<&MaterialNode<EditorNoteMaterial>>)>,
+    mut notes: Query<(
+        &NoteView,
+        &mut Node,
+        Option<&MaterialNode<EditorNoteMaterial>>,
+    )>,
     mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
 ) {
     let Some(drag) = state.dragging else { return };
-    if !matches!(drag.kind, DragKind::Resize(_)) { return; }
-    let Some(note) = state.note_by_id(drag.id) else { return };
+    if !matches!(drag.kind, DragKind::Resize(_)) {
+        return;
+    }
+    let Some(note) = state.note_by_id(drag.id) else {
+        return;
+    };
     let (left, _top, width, _height) = note_rect(note);
     for (view, mut node, mat) in &mut notes {
         if view.0 == drag.id {
             node.left = Val::Px(left);
             node.width = Val::Px(width);
             if let Some(handle) = mat
-                && let Some(mut m) = note_mats.get_mut(&handle.0) {
-                    m.params.y = width;
-                }
+                && let Some(mut m) = note_mats.get_mut(&handle.0)
+            {
+                m.params.y = width;
+            }
         }
     }
 }
@@ -266,9 +306,19 @@ pub(super) fn live_resize(
 pub(super) fn update_move_ghost(
     state: Res<EditorState>,
     theme: Res<LoadedTheme>,
-    mut ghost: Query<(&mut Node, &mut Visibility, &mut BackgroundColor, &mut BorderColor), With<MoveGhost>>,
+    mut ghost: Query<
+        (
+            &mut Node,
+            &mut Visibility,
+            &mut BackgroundColor,
+            &mut BorderColor,
+        ),
+        With<MoveGhost>,
+    >,
 ) {
-    let Ok((mut node, mut vis, mut bg, mut border)) = ghost.single_mut() else { return };
+    let Ok((mut node, mut vis, mut bg, mut border)) = ghost.single_mut() else {
+        return;
+    };
     match state.dragging {
         Some(drag) if drag.kind == DragKind::Move => {
             let colors = theme.song_editor_colors();
@@ -278,7 +328,11 @@ pub(super) fn update_move_ghost(
             node.top = Val::Px(top);
             node.width = Val::Px(drag.start_len as f32 * TICK_W - 2.0);
             *vis = Visibility::Inherited;
-            let color = if drag.valid { colors.ghost_ok } else { colors.ghost_bad };
+            let color = if drag.valid {
+                colors.ghost_ok
+            } else {
+                colors.ghost_bad
+            };
             bg.0 = color.with_alpha(0.30);
             *border = BorderColor::all(color);
         }

@@ -142,11 +142,7 @@ pub fn click_for_tick(tick: i64, beats_per_bar: f64, feel: MetronomeFeel) -> Opt
 
 // ── UI ────────────────────────────────────────────────────────────────────────
 
-pub fn spawn_metronome(
-    parent: &mut ChildSpawnerCommands,
-    beats_per_bar: usize,
-    bpm: f32,
-) {
+pub fn spawn_metronome(parent: &mut ChildSpawnerCommands, beats_per_bar: usize, bpm: f32) {
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -159,7 +155,7 @@ pub fn spawn_metronome(
                 Text::new(format!("\u{2669} = {}", bpm as u32)),
                 TextFont {
                     font_size: FontSize::Px(13.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.65, 0.70)),
                 // Refreshed live from MetronomeTempo (the trainer's BPM control).
@@ -375,7 +371,12 @@ fn set_tempo_from_song(
         return;
     };
     tempo.bpm = manifest.chart.song.tempo_bpm;
-    let ts = manifest.chart.song.time_signature.as_deref().unwrap_or("4/4");
+    let ts = manifest
+        .chart
+        .song
+        .time_signature
+        .as_deref()
+        .unwrap_or("4/4");
     tempo.beats_per_bar = ts
         .split('/')
         .next()

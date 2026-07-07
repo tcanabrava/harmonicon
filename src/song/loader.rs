@@ -67,9 +67,9 @@ impl AssetLoader for SongChartLoader {
         let song_folder = load_context
             .path()
             .path()
-            .parent()   // songs/{artist}/{name}/song/
+            .parent() // songs/{artist}/{name}/song/
             .unwrap_or(std::path::Path::new(""))
-            .parent()// songs/{artist}/{name}/
+            .parent() // songs/{artist}/{name}/
             .unwrap_or(std::path::Path::new(""))
             .to_path_buf();
 
@@ -109,7 +109,9 @@ impl AssetLoader for SongChartLoader {
         {
             Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
             Err(_) => {
-                let res = load_context.read_asset_bytes("notes/2d/circular.json").await;
+                let res = load_context
+                    .read_asset_bytes("notes/2d/circular.json")
+                    .await;
                 String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
             }
         };
@@ -133,7 +135,9 @@ impl AssetLoader for SongChartLoader {
         {
             Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
             Err(_) => {
-                let res = load_context.read_asset_bytes("notes/3d/circular.json").await;
+                let res = load_context
+                    .read_asset_bytes("notes/3d/circular.json")
+                    .await;
                 String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
             }
         };

@@ -8,7 +8,7 @@ use bevy::prelude::*;
 
 use bevy_fluent::Localization;
 
-use crate::assets_management::{AvailableSongs};
+use crate::assets_management::AvailableSongs;
 use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
 use crate::theme::LoadedTheme;
@@ -19,7 +19,6 @@ mod calibration;
 mod credits;
 mod options;
 mod song_editor;
-
 
 mod theme_picker;
 
@@ -133,10 +132,7 @@ impl Plugin for MenuPlugin {
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
             )
-            .add_systems(
-                Update,
-                handle_menu_escape.run_if(in_state(AppState::Menu)),
-            );
+            .add_systems(Update, handle_menu_escape.run_if(in_state(AppState::Menu)));
     }
 }
 
@@ -245,7 +241,6 @@ pub(super) fn spawn_menu_root(
     root
 }
 
-
 /// Spawn a single button as a child of `parent`.
 ///
 /// When the theme JSON defines coords for this button in `menu_id`, the button
@@ -303,9 +298,7 @@ pub(super) fn spawn_button<M: 'static>(
     // icon, z-ordered smoke layer); plain buttons are authored with bsn!. Either
     // way the click rides along as the caller's dedicated `on_click`.
     if theme.has_shaders {
-        let e = commands
-            .spawn((Button, node, ThemedButton))
-            .id();
+        let e = commands.spawn((Button, node, ThemedButton)).id();
 
         // Smoke shader layer — absolute, behind content. Keep its entity so the
         // pointer observers can swap its material.
@@ -348,7 +341,7 @@ pub(super) fn spawn_button<M: 'static>(
                 Text::new(label.to_string()),
                 TextFont {
                     font_size: FontSize::Px(20.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
@@ -415,16 +408,62 @@ fn setup_main_menu(
     loc: Res<Localization>,
 ) {
     let root = spawn_menu_root(&mut commands, &loc.msg("app-title"), None, &theme, "Main");
-    spawn_button(&mut commands, root, &loc.msg("menu-play"), Some("Play"), &theme, &btn_mats, "Main",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play));
-    spawn_button(&mut commands, root, &loc.msg("menu-song-editor-2"), Some("SongEditor2"), &theme, &btn_mats, "Main",
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::SongEditor2));
-    spawn_button(&mut commands, root, &loc.msg("menu-options"), Some("Options"), &theme, &btn_mats, "Main",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Options));
-    spawn_button(&mut commands, root, &loc.msg("menu-credits"), Some("Credits"), &theme, &btn_mats, "Main",
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::Credits));
-    spawn_button(&mut commands, root, &loc.msg("menu-quit"), Some("Quit"), &theme, &btn_mats, "Main",
-        |_: On<Pointer<Click>>, mut exit: MessageWriter<AppExit>| { exit.write(AppExit::Success); });
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-play"),
+        Some("Play"),
+        &theme,
+        &btn_mats,
+        "Main",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-song-editor-2"),
+        Some("SongEditor2"),
+        &theme,
+        &btn_mats,
+        "Main",
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
+            state.set(AppState::SongEditor2)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-options"),
+        Some("Options"),
+        &theme,
+        &btn_mats,
+        "Main",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Options),
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-credits"),
+        Some("Credits"),
+        &theme,
+        &btn_mats,
+        "Main",
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
+            state.set(AppState::Credits)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-quit"),
+        Some("Quit"),
+        &theme,
+        &btn_mats,
+        "Main",
+        |_: On<Pointer<Click>>, mut exit: MessageWriter<AppExit>| {
+            exit.write(AppExit::Success);
+        },
+    );
 }
 
 fn setup_play_menu(
@@ -436,17 +475,55 @@ fn setup_play_menu(
 ) {
     let root = spawn_menu_root(&mut commands, &loc.msg("menu-play"), None, &theme, "Play");
     // The render mode is chosen up front, before picking a song.
-    spawn_button(&mut commands, root, &loc.msg("play-song"), Some("PlaySong"), &theme, &btn_mats, "Play",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::ModeSelect));
-    spawn_button(&mut commands, root, &loc.msg("jam-session"), Some("JamSession"), &theme, &btn_mats, "Play",
-        |_: On<Pointer<Click>>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("play-song"),
+        Some("PlaySong"),
+        &theme,
+        &btn_mats,
+        "Play",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::ModeSelect)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("jam-session"),
+        Some("JamSession"),
+        &theme,
+        &btn_mats,
+        "Play",
+        |_: On<Pointer<Click>>,
+         mut mode: ResMut<GameplayMode>,
+         mut page: ResMut<NextState<MenuPage>>| {
             *mode = GameplayMode::JamSession;
             page.set(MenuPage::ArtistList);
-        });
-    spawn_button(&mut commands, root, &loc.msg("bending-trainer"), Some("BendingTrainer"), &theme, &btn_mats, "Play",
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::BendingTrainer));
-    spawn_button(&mut commands, root, &loc.msg("back"), Some("BackToMain"), &theme, &btn_mats, "Play",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main));
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("bending-trainer"),
+        Some("BendingTrainer"),
+        &theme,
+        &btn_mats,
+        "Play",
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
+            state.set(AppState::BendingTrainer)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("back"),
+        Some("BackToMain"),
+        &theme,
+        &btn_mats,
+        "Play",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
+    );
 }
 
 fn setup_artist_list(
@@ -457,7 +534,13 @@ fn setup_artist_list(
     btn_mats: Res<ButtonMaterials>,
     loc: Res<Localization>,
 ) {
-    let root = spawn_menu_root(&mut commands, &loc.msg("select-artist"), None, &theme, "ArtistList");
+    let root = spawn_menu_root(
+        &mut commands,
+        &loc.msg("select-artist"),
+        None,
+        &theme,
+        "ArtistList",
+    );
 
     if songs.0.is_empty() {
         let msg = commands
@@ -465,7 +548,7 @@ fn setup_artist_list(
                 Text::new(loc.msg("no-songs-found")),
                 TextFont {
                     font_size: FontSize::Px(16.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::srgb(0.8, 0.4, 0.4)),
             ))
@@ -478,15 +561,33 @@ fn setup_artist_list(
             let n = songs.0[artist].len();
             let label = format!("{artist}  ({n} song{})", if n == 1 { "" } else { "s" });
             let artist = artist.clone();
-            spawn_button(&mut commands, root, &label, None, &theme, &btn_mats, "ArtistList",
-                move |_: On<Pointer<Click>>, mut selected: ResMut<SelectedArtist>, mut page: ResMut<NextState<MenuPage>>| {
+            spawn_button(
+                &mut commands,
+                root,
+                &label,
+                None,
+                &theme,
+                &btn_mats,
+                "ArtistList",
+                move |_: On<Pointer<Click>>,
+                      mut selected: ResMut<SelectedArtist>,
+                      mut page: ResMut<NextState<MenuPage>>| {
                     selected.0 = artist.clone();
                     page.set(MenuPage::SongList);
-                });
+                },
+            );
         }
     }
-    spawn_button(&mut commands, root, &loc.msg("back"), Some("BackToPlay"), &theme, &btn_mats, "ArtistList",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play));
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("back"),
+        Some("BackToPlay"),
+        &theme,
+        &btn_mats,
+        "ArtistList",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
+    );
 }
 
 fn setup_song_list(
@@ -498,7 +599,13 @@ fn setup_song_list(
     loc: Res<Localization>,
 ) {
     let subtitle = format!("by {}", selected_artist.0);
-    let root = spawn_menu_root(&mut commands, &loc.msg("select-song"), Some(&subtitle), &theme, "SongList");
+    let root = spawn_menu_root(
+        &mut commands,
+        &loc.msg("select-song"),
+        Some(&subtitle),
+        &theme,
+        "SongList",
+    );
 
     if let Some(artist_songs) = songs.0.get(&selected_artist.0) {
         let mut sorted = artist_songs.clone();
@@ -506,7 +613,14 @@ fn setup_song_list(
         for song in &sorted {
             let path = song.asset_path.clone();
             // The mode is already chosen — picking a song starts the game.
-            spawn_button(&mut commands, root, &song.name, None, &theme, &btn_mats, "SongList",
+            spawn_button(
+                &mut commands,
+                root,
+                &song.name,
+                None,
+                &theme,
+                &btn_mats,
+                "SongList",
                 move |_: On<Pointer<Click>>,
                       asset_server: Res<AssetServer>,
                       mut state: ResMut<NextState<AppState>>,
@@ -515,11 +629,22 @@ fn setup_song_list(
                         asset_server.load::<SongManifest>(path.clone()),
                     ));
                     state.set(AppState::SongLoading);
-                });
+                },
+            );
         }
     }
-    spawn_button(&mut commands, root, &loc.msg("back"), Some("BackToArtistList"), &theme, &btn_mats, "SongList",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::ArtistList));
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("back"),
+        Some("BackToArtistList"),
+        &theme,
+        &btn_mats,
+        "SongList",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::ArtistList)
+        },
+    );
 }
 
 fn setup_mode_select(
@@ -529,19 +654,53 @@ fn setup_mode_select(
     btn_mats: Res<ButtonMaterials>,
     loc: Res<Localization>,
 ) {
-    let root = spawn_menu_root(&mut commands, &loc.msg("select-mode"), None, &theme, "ModeSelect");
-    spawn_button(&mut commands, root, &loc.msg("play-2d"), Some("PlayMode2D"), &theme, &btn_mats, "ModeSelect",
-        |_: On<Pointer<Click>>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
+    let root = spawn_menu_root(
+        &mut commands,
+        &loc.msg("select-mode"),
+        None,
+        &theme,
+        "ModeSelect",
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("play-2d"),
+        Some("PlayMode2D"),
+        &theme,
+        &btn_mats,
+        "ModeSelect",
+        |_: On<Pointer<Click>>,
+         mut mode: ResMut<GameplayMode>,
+         mut page: ResMut<NextState<MenuPage>>| {
             *mode = GameplayMode::Play2D;
             page.set(MenuPage::ArtistList);
-        });
-    spawn_button(&mut commands, root, &loc.msg("play-3d"), Some("PlayMode3D"), &theme, &btn_mats, "ModeSelect",
-        |_: On<Pointer<Click>>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("play-3d"),
+        Some("PlayMode3D"),
+        &theme,
+        &btn_mats,
+        "ModeSelect",
+        |_: On<Pointer<Click>>,
+         mut mode: ResMut<GameplayMode>,
+         mut page: ResMut<NextState<MenuPage>>| {
             *mode = GameplayMode::Play3D;
             page.set(MenuPage::ArtistList);
-        });
-    spawn_button(&mut commands, root, &loc.msg("back"), Some("BackToPlay"), &theme, &btn_mats, "ModeSelect",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play));
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("back"),
+        Some("BackToPlay"),
+        &theme,
+        &btn_mats,
+        "ModeSelect",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
+    );
 }
 
 // ── Loading + cleanup ─────────────────────────────────────────────────────────

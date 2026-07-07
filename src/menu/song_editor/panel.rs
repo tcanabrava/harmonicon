@@ -2,13 +2,13 @@
 
 use bevy::prelude::*;
 
-use crate::theme::LoadedTheme;
 use super::practice::PracticeState;
 use super::state::{Dir, EditorState, Expr, Field, Mode, Pitch};
 use super::ui::{
     BendDot, EditModeGroup, MetaFieldBox, MetaFieldText, ModButton, ModButtonLabel, ModeButton,
     PerformModeGroup, StatusMsg,
 };
+use crate::theme::LoadedTheme;
 
 pub(super) fn update_mod_panel(
     state: Res<EditorState>,
@@ -21,20 +21,28 @@ pub(super) fn update_mod_panel(
     let selected = state.selected_note().copied();
     for (kind, mut bg) in &mut buttons {
         let active = selected.is_some_and(|n| match kind {
-            ModButton::Blow     => n.dir == Dir::Blow,
-            ModButton::Draw     => n.dir == Dir::Draw,
-            ModButton::Bend     => matches!(n.pitch, Pitch::Bend(_)),
+            ModButton::Blow => n.dir == Dir::Blow,
+            ModButton::Draw => n.dir == Dir::Draw,
+            ModButton::Bend => matches!(n.pitch, Pitch::Bend(_)),
             ModButton::Overblow => n.pitch == Pitch::Overblow,
             ModButton::Overdraw => n.pitch == Pitch::Overdraw,
-            ModButton::Wah      => matches!(n.expr, Expr::Wah(_)),
-            ModButton::Vibrato  => matches!(n.expr, Expr::Vibrato(_)),
-            ModButton::Delete   => false,
+            ModButton::Wah => matches!(n.expr, Expr::Wah(_)),
+            ModButton::Vibrato => matches!(n.expr, Expr::Vibrato(_)),
+            ModButton::Delete => false,
         });
-        bg.0 = if active { colors.btn_active } else { colors.btn_bg };
+        bg.0 = if active {
+            colors.btn_active
+        } else {
+            colors.btn_bg
+        };
     }
     let bent = selected.is_some_and(|n| matches!(n.pitch, Pitch::Bend(_)));
     for mut vis in &mut dot {
-        *vis = if bent { Visibility::Inherited } else { Visibility::Hidden };
+        *vis = if bent {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
     // Show the selected note's configured rate next to Wah/Vibrato (e.g.
     // "Vibrato 5Hz") so cycling the rate with repeated clicks is legible.
@@ -63,7 +71,9 @@ pub(super) fn update_meta_fields(
             format!("\u{2039}  {}  \u{203A}", state.key)
         } else {
             let mut s = state.field_text(tag.0).to_string();
-            if state.focus == Some(tag.0) { s.push('_'); }
+            if state.focus == Some(tag.0) {
+                s.push('_');
+            }
             s
         };
     }
@@ -91,7 +101,11 @@ pub(super) fn update_mode_buttons(
             ModeButton::Perform => state.mode == Mode::Perform,
             ModeButton::Lock => state.locked(),
         };
-        bg.0 = if active { colors.btn_active } else { colors.btn_bg };
+        bg.0 = if active {
+            colors.btn_active
+        } else {
+            colors.btn_bg
+        };
     }
 }
 
@@ -106,19 +120,29 @@ pub(super) fn update_mode_visibility(
     mut perform_group: Query<&mut Node, (With<PerformModeGroup>, Without<EditModeGroup>)>,
 ) {
     for mut node in &mut edit_group {
-        node.display = if state.mode == Mode::Edit { Display::Flex } else { Display::None };
+        node.display = if state.mode == Mode::Edit {
+            Display::Flex
+        } else {
+            Display::None
+        };
     }
     for mut node in &mut perform_group {
-        node.display = if state.mode == Mode::Perform { Display::Flex } else { Display::None };
+        node.display = if state.mode == Mode::Perform {
+            Display::Flex
+        } else {
+            Display::None
+        };
     }
 }
 
 pub(super) fn update_status_bar(
-    state:    Res<EditorState>,
+    state: Res<EditorState>,
     practice: Res<PracticeState>,
     mut texts: Query<&mut Text, With<StatusMsg>>,
 ) {
-    let Ok(mut text) = texts.single_mut() else { return };
+    let Ok(mut text) = texts.single_mut() else {
+        return;
+    };
     // Drag messages take priority (they're ephemeral and action-specific).
     // Practice messages fill the bar while no drag is in progress.
     **text = if !state.drag_msg.is_empty() {

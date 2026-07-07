@@ -26,7 +26,12 @@ pub struct AlgoExplanation;
 /// onto further lines if the row is narrower than all five buttons need (the
 /// Bending Trainer's side column, unlike the Options page, doesn't have the
 /// width to spare). `label`, if given, is a leading caption for the row.
-pub fn spawn_algo_row(commands: &mut Commands, parent: Entity, label: Option<&str>, selected: PitchAlgorithm) {
+pub fn spawn_algo_row(
+    commands: &mut Commands,
+    parent: Entity,
+    label: Option<&str>,
+    selected: PitchAlgorithm,
+) {
     let row = commands
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -41,14 +46,21 @@ pub fn spawn_algo_row(commands: &mut Commands, parent: Entity, label: Option<&st
     commands.entity(row).with_children(|r| {
         if let Some(label) = label {
             r.spawn((
-                Node { width: Val::Px(110.0), ..default() },
+                Node {
+                    width: Val::Px(110.0),
+                    ..default()
+                },
                 Text::new(label.to_string()),
-                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
         }
         for &algo in PitchAlgorithm::all() {
-            r.spawn_empty().apply_scene(algo_button_scene(algo, algo == selected));
+            r.spawn_empty()
+                .apply_scene(algo_button_scene(algo, algo == selected));
         }
     });
 
@@ -58,7 +70,11 @@ pub fn spawn_algo_row(commands: &mut Commands, parent: Entity, label: Option<&st
 /// One algorithm choice button: its label + a dedicated "select this algorithm"
 /// click callback (capturing the algorithm) plus hover — all inline `on(...)`.
 fn algo_button_scene(algo: PitchAlgorithm, is_selected: bool) -> impl Scene {
-    let color = if is_selected { CHOICE_SELECTED } else { button::color_default() };
+    let color = if is_selected {
+        CHOICE_SELECTED
+    } else {
+        button::color_default()
+    };
     bsn! {
         Button
         Node {
@@ -116,24 +132,40 @@ pub fn algo_button_visuals(
         return;
     }
     for (button, mut bg) in &mut buttons {
-        bg.0 = if button.0 == settings.pitch_algorithm { CHOICE_SELECTED } else { button::color_default() };
+        bg.0 = if button.0 == settings.pitch_algorithm {
+            CHOICE_SELECTED
+        } else {
+            button::color_default()
+        };
     }
 }
 
 /// A read-only box explaining the currently selected pitch algorithm, `width`
 /// pixels wide (the Options page and the Bending Trainer's side column want
 /// different widths).
-pub fn spawn_algo_explanation(commands: &mut Commands, parent: Entity, width: f32, selected: PitchAlgorithm) {
+pub fn spawn_algo_explanation(
+    commands: &mut Commands,
+    parent: Entity,
+    width: f32,
+    selected: PitchAlgorithm,
+) {
     let panel = commands
         .spawn((
-            Node { width: Val::Px(width), padding: UiRect::all(Val::Px(10.0)), ..default() },
+            Node {
+                width: Val::Px(width),
+                padding: UiRect::all(Val::Px(10.0)),
+                ..default()
+            },
             BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
         ))
         .id();
     commands.entity(panel).with_children(|p| {
         p.spawn((
             Text::new(selected.description()),
-            TextFont { font_size: FontSize::Px(14.0), ..default() },
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
             TextColor(Color::srgb(0.75, 0.78, 0.88)),
             AlgoExplanation,
         ));
@@ -142,7 +174,10 @@ pub fn spawn_algo_explanation(commands: &mut Commands, parent: Entity, width: f3
 }
 
 /// Keep every explanation box in step with the chosen algorithm.
-pub fn update_algo_explanation(settings: Res<AudioSettings>, mut texts: Query<&mut Text, With<AlgoExplanation>>) {
+pub fn update_algo_explanation(
+    settings: Res<AudioSettings>,
+    mut texts: Query<&mut Text, With<AlgoExplanation>>,
+) {
     if !settings.is_changed() {
         return;
     }

@@ -202,7 +202,10 @@ pub fn combo_label(combo: u32, multiplier: f32) -> String {
         return String::new();
     }
     if multiplier > 1.0 {
-        format!("\u{00D7}{combo} [\u{00D7}{} pts]", format_multiplier(multiplier))
+        format!(
+            "\u{00D7}{combo} [\u{00D7}{} pts]",
+            format_multiplier(multiplier)
+        )
     } else {
         format!("\u{00D7}{combo}")
     }
@@ -461,7 +464,10 @@ mod tests {
     #[test]
     fn steady_pitch_is_not_wobble() {
         let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64, 2.0)).collect();
-        assert_eq!(measured_oscillation_hz(&steady, VIBRATO_MIN_SWING_CENTS), None);
+        assert_eq!(
+            measured_oscillation_hz(&steady, VIBRATO_MIN_SWING_CENTS),
+            None
+        );
     }
 
     #[test]
@@ -470,21 +476,34 @@ mod tests {
         // not a repeating oscillation.
         let mut values = vec![0.0; 10];
         values.extend((0..10).map(|i| -i as f32 * 4.0));
-        let samples: Vec<(f64, f32)> = values.into_iter().enumerate().map(|(i, v)| (i as f64, v)).collect();
-        assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
+        let samples: Vec<(f64, f32)> = values
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| (i as f64, v))
+            .collect();
+        assert_eq!(
+            measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS),
+            None
+        );
     }
 
     #[test]
     fn tiny_swing_is_not_wobble_even_with_direction_changes() {
         // Oscillates, but well under the swing threshold — natural jitter.
         let samples = timestamped_sine(5.0, 2.0, 40, 1.0 / 60.0);
-        assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
+        assert_eq!(
+            measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS),
+            None
+        );
     }
 
     #[test]
     fn too_few_samples_is_not_wobble() {
         let samples = [(0.0, 0.0), (1.0, 20.0), (2.0, 0.0)];
-        assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
+        assert_eq!(
+            measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS),
+            None
+        );
     }
 
     #[test]
@@ -507,7 +526,10 @@ mod tests {
     #[test]
     fn steady_loudness_is_not_relative_wobble() {
         let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64, 0.2)).collect();
-        assert_eq!(measured_relative_oscillation_hz(&steady, WAH_MIN_SWING_FRAC), None);
+        assert_eq!(
+            measured_relative_oscillation_hz(&steady, WAH_MIN_SWING_FRAC),
+            None
+        );
     }
 
     #[test]
@@ -528,13 +550,19 @@ mod tests {
         let dense = timestamped_sine(5.0, 25.0, 80, 1.0 / 120.0);
         let hz_sparse = measured_oscillation_hz(&sparse, VIBRATO_MIN_SWING_CENTS).unwrap();
         let hz_dense = measured_oscillation_hz(&dense, VIBRATO_MIN_SWING_CENTS).unwrap();
-        assert!((hz_sparse - hz_dense).abs() < 0.3, "{hz_sparse} vs {hz_dense}");
+        assert!(
+            (hz_sparse - hz_dense).abs() < 0.3,
+            "{hz_sparse} vs {hz_dense}"
+        );
     }
 
     #[test]
     fn measured_oscillation_hz_is_none_below_the_swing_threshold() {
         let flat = timestamped_sine(5.0, 1.0, 40, 1.0 / 60.0); // swing well under 15 cents
-        assert_eq!(measured_oscillation_hz(&flat, VIBRATO_MIN_SWING_CENTS), None);
+        assert_eq!(
+            measured_oscillation_hz(&flat, VIBRATO_MIN_SWING_CENTS),
+            None
+        );
     }
 
     #[test]

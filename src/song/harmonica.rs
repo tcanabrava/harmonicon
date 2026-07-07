@@ -58,7 +58,9 @@ pub fn harp_banner(harp: &Harmonica, song_key: &str) -> String {
     }
     match harp.position() {
         Some(pos) => {
-            format!("Use a {harp_key} harmonica  \u{00B7}  {pos} position  \u{00B7}  key of {song_key}")
+            format!(
+                "Use a {harp_key} harmonica  \u{00B7}  {pos} position  \u{00B7}  key of {song_key}"
+            )
         }
         None => format!("Use a {harp_key} harmonica  \u{00B7}  key of {song_key}"),
     }
@@ -77,7 +79,10 @@ pub fn semitone(root: &str, n: i32) -> String {
 /// Shared by Jam Session's live hole-map feedback and the song editor's
 /// scale-aware note coloring, so both reflect the same blues-scale definition.
 pub fn blues_scale_classes(key: &str) -> HashSet<String> {
-    [0, 3, 5, 6, 7, 10].iter().map(|&n| semitone(key, n)).collect()
+    [0, 3, 5, 6, 7, 10]
+        .iter()
+        .map(|&n| semitone(key, n))
+        .collect()
 }
 
 // Returns the blow label for the given hole, or a dash if not available.

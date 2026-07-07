@@ -5,8 +5,8 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use crate::menu::{AppState, ReturnToSongList};
 use crate::dialogs::button;
+use crate::menu::{AppState, ReturnToSongList};
 use crate::settings::AudioSettings;
 
 use super::{Score, SongStats, TechniqueStats};
@@ -90,7 +90,7 @@ pub(super) fn setup(
                 Text::new("SONG COMPLETE"),
                 TextFont {
                     font_size: FontSize::Px(28.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::srgb(0.80, 0.82, 0.90)),
             ));
@@ -99,7 +99,7 @@ pub(super) fn setup(
                 Text::new(g),
                 TextFont {
                     font_size: FontSize::Px(120.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(grade_color(g)),
                 Node {
@@ -145,9 +145,15 @@ pub(super) fn setup(
             if !technique_rows.is_empty() {
                 root.spawn((
                     Text::new("By technique"),
-                    TextFont { font_size: FontSize::Px(14.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(14.0),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.55, 0.58, 0.65)),
-                    Node { margin: UiRect::top(Val::Px(6.0)), ..default() },
+                    Node {
+                        margin: UiRect::top(Val::Px(6.0)),
+                        ..default()
+                    },
                 ));
                 for (label, s) in technique_rows {
                     spawn_technique_row(root, label, s);
@@ -181,7 +187,7 @@ pub(super) fn setup(
                         Text::new(hint),
                         TextFont {
                             font_size: FontSize::Px(15.0),
-                                                        ..default()
+                            ..default()
                         },
                         TextColor(Color::srgb(0.60, 0.65, 0.75)),
                     ));
@@ -193,7 +199,7 @@ pub(super) fn setup(
                 Text::new(format!("Score: {}", score.points)),
                 TextFont {
                     font_size: FontSize::Px(20.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::WHITE),
                 Node {
@@ -218,13 +224,7 @@ pub(super) fn setup(
         });
 }
 
-fn spawn_text_row(
-    parent: &mut ChildSpawnerCommands,
-
-    label: &str,
-    value: &str,
-    color: Color,
-) {
+fn spawn_text_row(parent: &mut ChildSpawnerCommands, label: &str, value: &str, color: Color) {
     parent
         .spawn(Node {
             width: Val::Px(320.0),
@@ -237,7 +237,7 @@ fn spawn_text_row(
                 Text::new(label.to_string()),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.68, 0.75)),
             ));
@@ -245,20 +245,14 @@ fn spawn_text_row(
                 Text::new(value.to_string()),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(color),
             ));
         });
 }
 
-fn spawn_stat_row(
-    parent: &mut ChildSpawnerCommands,
-
-    label: &str,
-    value: u32,
-    color: Color,
-) {
+fn spawn_stat_row(parent: &mut ChildSpawnerCommands, label: &str, value: u32, color: Color) {
     parent
         .spawn(Node {
             width: Val::Px(320.0),
@@ -271,7 +265,7 @@ fn spawn_stat_row(
                 Text::new(label.to_string()),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.68, 0.75)),
             ));
@@ -279,7 +273,7 @@ fn spawn_stat_row(
                 Text::new(format!("{value}")),
                 TextFont {
                     font_size: FontSize::Px(18.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(color),
             ));

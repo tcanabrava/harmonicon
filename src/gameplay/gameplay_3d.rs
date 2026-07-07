@@ -547,7 +547,7 @@ fn spawn_hud_overlay(
                     Text::new(text.to_string()),
                     TextFont {
                         font_size: FontSize::Px(size),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(color),
                 ));
@@ -557,7 +557,7 @@ fn spawn_hud_overlay(
                     Text::new(desc.to_string()),
                     TextFont {
                         font_size: FontSize::Px(10.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::srgb(0.50, 0.50, 0.55)),
                 ));
@@ -567,7 +567,7 @@ fn spawn_hud_overlay(
                     Text::new(format!("Chart: {author}")),
                     TextFont {
                         font_size: FontSize::Px(9.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::srgb(0.40, 0.40, 0.45)),
                 ));
@@ -599,7 +599,7 @@ fn spawn_hud_overlay(
                     Text::new("\u{25A0} BLOW"),
                     TextFont {
                         font_size: FontSize::Px(10.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
@@ -607,7 +607,7 @@ fn spawn_hud_overlay(
                     Text::new("\u{25A0} DRAW"),
                     TextFont {
                         font_size: FontSize::Px(10.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
                 ));
@@ -660,7 +660,7 @@ fn spawn_hud_overlay(
                 Text::new("0"),
                 TextFont {
                     font_size: FontSize::Px(30.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::WHITE),
                 ScoreText,
@@ -669,7 +669,7 @@ fn spawn_hud_overlay(
                 Text::new(""),
                 TextFont {
                     font_size: FontSize::Px(15.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::srgb(0.90, 0.72, 0.20)),
                 ComboText,
@@ -678,7 +678,7 @@ fn spawn_hud_overlay(
                 Text::new(""),
                 TextFont {
                     font_size: FontSize::Px(22.0),
-                                        ..default()
+                    ..default()
                 },
                 TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
                 FeedbackText,

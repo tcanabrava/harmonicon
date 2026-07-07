@@ -23,7 +23,7 @@ use crate::settings::AudioSettings;
 use crate::song::chart::{BendingProfile, DiatonicLayout};
 use crate::song::harmonica::Harmonica;
 
-use super::harmonica_overlay::{hole_notes, spawn_harmonica_overlay, HoleNotes};
+use super::harmonica_overlay::{HoleNotes, hole_notes, spawn_harmonica_overlay};
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
 use super::{ActivePitches, GameplayClock, GameplayRoot, PITCH_RANGE_MARGIN_SEMITONES};
 
@@ -130,7 +130,10 @@ pub struct TrainerTarget {
 impl Default for TrainerTarget {
     fn default() -> Self {
         // Hole 2's half-step draw bend: the classic first bend most players learn.
-        Self { hole: 2, technique: Technique::Bend1 }
+        Self {
+            hole: 2,
+            technique: Technique::Bend1,
+        }
     }
 }
 
@@ -236,7 +239,11 @@ const DRILL_TIMEOUT_SECS: f32 = 12.0;
 /// Every (hole, technique) pair the current harp can actually produce.
 fn valid_targets(harp: &Harmonica) -> Vec<TrainerTarget> {
     (1..=10)
-        .flat_map(|hole| ALL_TECHNIQUES.iter().map(move |&technique| TrainerTarget { hole, technique }))
+        .flat_map(|hole| {
+            ALL_TECHNIQUES
+                .iter()
+                .map(move |&technique| TrainerTarget { hole, technique })
+        })
         .filter(|t| target_note(harp, *t).is_some())
         .collect()
 }
@@ -258,7 +265,13 @@ fn pick_next_target(
     }
     let weights: Vec<f32> = pool
         .iter()
-        .map(|t| stats.get(&(t.hole, t.technique)).copied().unwrap_or_default().weight())
+        .map(|t| {
+            stats
+                .get(&(t.hole, t.technique))
+                .copied()
+                .unwrap_or_default()
+                .weight()
+        })
         .collect();
     let total: f32 = weights.iter().sum();
     let mut roll = rand::random_range(0.0..total);
@@ -664,7 +677,10 @@ pub fn update_key_label(key: Res<TrainerKey>, mut labels: Query<&mut Text, With<
 }
 
 /// Esc returns to the menu.
-pub fn handle_escape(keyboard: Res<ButtonInput<KeyCode>>, mut next_state: ResMut<NextState<AppState>>) {
+pub fn handle_escape(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
     if keyboard.just_pressed(KeyCode::Escape) {
         next_state.set(AppState::Menu);
     }
@@ -690,7 +706,10 @@ pub fn update_target_label(
 }
 
 /// Keep the how-to-play hint in step with the chosen hole/technique.
-pub fn update_hint_label(target: Res<TrainerTarget>, mut labels: Query<&mut Text, With<HintLabel>>) {
+pub fn update_hint_label(
+    target: Res<TrainerTarget>,
+    mut labels: Query<&mut Text, With<HintLabel>>,
+) {
     if !target.is_changed() {
         return;
     }
@@ -700,14 +719,20 @@ pub fn update_hint_label(target: Res<TrainerTarget>, mut labels: Query<&mut Text
 }
 
 /// Show what Drill mode does while the button is hovered.
-fn show_drill_explanation(_: On<Pointer<Over>>, mut labels: Query<&mut Text, With<DrillExplanation>>) {
+fn show_drill_explanation(
+    _: On<Pointer<Over>>,
+    mut labels: Query<&mut Text, With<DrillExplanation>>,
+) {
     for mut text in &mut labels {
         *text = Text::new(DRILL_EXPLANATION);
     }
 }
 
 /// Hide the Drill explanation once the pointer leaves the button.
-fn hide_drill_explanation(_: On<Pointer<Out>>, mut labels: Query<&mut Text, With<DrillExplanation>>) {
+fn hide_drill_explanation(
+    _: On<Pointer<Out>>,
+    mut labels: Query<&mut Text, With<DrillExplanation>>,
+) {
     for mut text in &mut labels {
         *text = Text::new("");
     }
@@ -727,14 +752,18 @@ pub fn update_tuner_readout(
     active: Res<ActivePitches>,
     mut labels: Query<(&mut Text, &mut TextColor), With<TunerReadout>>,
 ) {
-    let Ok((mut text, mut color)) = labels.single_mut() else { return };
+    let Ok((mut text, mut color)) = labels.single_mut() else {
+        return;
+    };
     let harp = richter_harp(&key.0);
     let Some(target_note) = target_note(&harp, *target) else {
         *text = Text::new("This hole has no note for that technique.");
         color.0 = Color::srgb(0.60, 0.60, 0.65);
         return;
     };
-    let Some(target_freq) = note_freq_hz(&target_note) else { return };
+    let Some(target_freq) = note_freq_hz(&target_note) else {
+        return;
+    };
 
     let Some(heard) = active.0.iter().min_by(|a, b| {
         (a.frequency.log2() - target_freq.log2())
@@ -751,10 +780,14 @@ pub fn update_tuner_readout(
         *text = Text::new(format!("\u{2713} In tune  ({target_note})"));
         color.0 = Color::srgb(0.45, 0.85, 0.50);
     } else if cents > 0.0 {
-        *text = Text::new(format!("\u{2191} {cents:+.0} cents sharp  (target {target_note})"));
+        *text = Text::new(format!(
+            "\u{2191} {cents:+.0} cents sharp  (target {target_note})"
+        ));
         color.0 = Color::srgb(0.90, 0.70, 0.30);
     } else {
-        *text = Text::new(format!("\u{2193} {cents:+.0} cents flat  (target {target_note})"));
+        *text = Text::new(format!(
+            "\u{2193} {cents:+.0} cents flat  (target {target_note})"
+        ));
         color.0 = Color::srgb(0.90, 0.70, 0.30);
     }
 }
@@ -775,8 +808,12 @@ pub fn drill_update(
         return;
     }
     let harp = richter_harp(&key.0);
-    let Some(target_note) = target_note(&harp, *target) else { return };
-    let Some(target_freq) = note_freq_hz(&target_note) else { return };
+    let Some(target_note) = target_note(&harp, *target) else {
+        return;
+    };
+    let Some(target_freq) = note_freq_hz(&target_note) else {
+        return;
+    };
 
     let dt = time.delta_secs();
     drill.elapsed_secs += dt;
@@ -793,7 +830,10 @@ pub fn drill_update(
         return;
     }
 
-    let stat = drill.stats.entry((target.hole, target.technique)).or_default();
+    let stat = drill
+        .stats
+        .entry((target.hole, target.technique))
+        .or_default();
     stat.attempts += 1;
     if hit {
         stat.hits += 1;
@@ -846,7 +886,10 @@ mod tests {
 
     #[test]
     fn c_harp_keeps_the_reference_layout() {
-        let Harmonica::Diatonic { layout: Some(l), .. } = richter_harp("C") else {
+        let Harmonica::Diatonic {
+            layout: Some(l), ..
+        } = richter_harp("C")
+        else {
             panic!("expected diatonic");
         };
         assert_eq!(l.blow.unwrap()[0], "C4");
@@ -855,7 +898,10 @@ mod tests {
 
     #[test]
     fn d_harp_hole_1_blow_is_d4() {
-        let Harmonica::Diatonic { layout: Some(l), .. } = richter_harp("D") else {
+        let Harmonica::Diatonic {
+            layout: Some(l), ..
+        } = richter_harp("D")
+        else {
             panic!("expected diatonic");
         };
         assert_eq!(l.blow.unwrap()[0], "D4");
@@ -864,7 +910,10 @@ mod tests {
     #[test]
     fn g_harp_hole_1_blow_is_g3() {
         // The G harp is a low harp — hole-1 blow sits below C4.
-        let Harmonica::Diatonic { layout: Some(l), .. } = richter_harp("G") else {
+        let Harmonica::Diatonic {
+            layout: Some(l), ..
+        } = richter_harp("G")
+        else {
             panic!("expected diatonic");
         };
         assert_eq!(l.blow.unwrap()[0], "G3");
@@ -887,16 +936,36 @@ mod tests {
         let harp = richter_harp("C");
         // Hole 1: blow C4, draw D4, single ½-step bend C#4, overblow D#4.
         assert_eq!(
-            target_note(&harp, TrainerTarget { hole: 1, technique: Technique::Blow }).as_deref(),
+            target_note(
+                &harp,
+                TrainerTarget {
+                    hole: 1,
+                    technique: Technique::Blow
+                }
+            )
+            .as_deref(),
             Some("C4")
         );
         assert_eq!(
-            target_note(&harp, TrainerTarget { hole: 1, technique: Technique::Bend1 }).as_deref(),
+            target_note(
+                &harp,
+                TrainerTarget {
+                    hole: 1,
+                    technique: Technique::Bend1
+                }
+            )
+            .as_deref(),
             Some("C#4")
         );
         // Hole 5 has no bend (blow E5, draw F5 are a semitone apart).
         assert_eq!(
-            target_note(&harp, TrainerTarget { hole: 5, technique: Technique::Bend1 }),
+            target_note(
+                &harp,
+                TrainerTarget {
+                    hole: 5,
+                    technique: Technique::Bend1
+                }
+            ),
             None
         );
     }
@@ -922,9 +991,15 @@ mod tests {
     fn bend_hint_direction_matches_the_hole_side() {
         // Holes 1-6 bend by drawing; holes 7-10 bend by blowing.
         let low_hole = technique_hint(Technique::Bend1, 3);
-        assert!(low_hole.starts_with("Draw"), "hole 3 bends by drawing: {low_hole:?}");
+        assert!(
+            low_hole.starts_with("Draw"),
+            "hole 3 bends by drawing: {low_hole:?}"
+        );
         let high_hole = technique_hint(Technique::Bend1, 8);
-        assert!(high_hole.starts_with("Blow"), "hole 8 bends by blowing: {high_hole:?}");
+        assert!(
+            high_hole.starts_with("Blow"),
+            "hole 8 bends by blowing: {high_hole:?}"
+        );
     }
 
     #[test]
@@ -961,9 +1036,18 @@ mod tests {
     #[test]
     fn drill_stat_weight_favors_never_seen_and_weak_targets() {
         let never = DrillStat::default();
-        let mostly_missed = DrillStat { attempts: 10, hits: 1 };
-        let mostly_hit = DrillStat { attempts: 10, hits: 9 };
-        let perfect = DrillStat { attempts: 10, hits: 10 };
+        let mostly_missed = DrillStat {
+            attempts: 10,
+            hits: 1,
+        };
+        let mostly_hit = DrillStat {
+            attempts: 10,
+            hits: 9,
+        };
+        let perfect = DrillStat {
+            attempts: 10,
+            hits: 10,
+        };
         assert!(mostly_missed.weight() > never.weight());
         assert!(never.weight() > mostly_hit.weight());
         assert!(mostly_hit.weight() > perfect.weight());
@@ -973,19 +1057,33 @@ mod tests {
     fn valid_targets_excludes_bends_the_harp_cant_produce() {
         let harp = richter_harp("C");
         let targets = valid_targets(&harp);
-        assert!(targets.iter().any(|t| t.hole == 1 && t.technique == Technique::Blow));
+        assert!(
+            targets
+                .iter()
+                .any(|t| t.hole == 1 && t.technique == Technique::Blow)
+        );
         // Hole 5 has no bend on a Richter-tuned harp.
-        assert!(!targets.iter().any(|t| t.hole == 5 && t.technique == Technique::Bend1));
+        assert!(
+            !targets
+                .iter()
+                .any(|t| t.hole == 5 && t.technique == Technique::Bend1)
+        );
     }
 
     #[test]
     fn pick_next_target_avoids_immediate_repeat_when_alternatives_exist() {
         let harp = richter_harp("C");
         let stats = std::collections::HashMap::new();
-        let avoid = TrainerTarget { hole: 1, technique: Technique::Blow };
+        let avoid = TrainerTarget {
+            hole: 1,
+            technique: Technique::Blow,
+        };
         for _ in 0..20 {
             let picked = pick_next_target(&harp, &stats, Some(avoid)).expect("a target exists");
-            assert_ne!((picked.hole, picked.technique), (avoid.hole, avoid.technique));
+            assert_ne!(
+                (picked.hole, picked.technique),
+                (avoid.hole, avoid.technique)
+            );
         }
     }
 }

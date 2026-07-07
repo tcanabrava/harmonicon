@@ -77,7 +77,9 @@ fn is_raw_text_new(line: &str) -> bool {
     }
 
     const NEEDLE: &str = "Text::new(\"";
-    let Some(pos) = line.find(NEEDLE) else { return false };
+    let Some(pos) = line.find(NEEDLE) else {
+        return false;
+    };
     let after_quote = &line[pos + NEEDLE.len()..];
 
     // Collect content up to the closing `"`, respecting `\"` escapes.
@@ -86,7 +88,9 @@ fn is_raw_text_new(line: &str) -> bool {
     loop {
         match chars.next() {
             None | Some('"') => break,
-            Some('\\') => { chars.next(); } // skip escaped character
+            Some('\\') => {
+                chars.next();
+            } // skip escaped character
             Some(c) => content.push(c),
         }
     }
@@ -102,7 +106,9 @@ mod tests {
     #[test]
     fn flags_natural_language() {
         assert!(is_raw_text_new(r#"Text::new("▶ Play")"#));
-        assert!(is_raw_text_new(r#"Text::new("Another note is already here")"#));
+        assert!(is_raw_text_new(
+            r#"Text::new("Another note is already here")"#
+        ));
         assert!(is_raw_text_new(r#"Text::new("✓ PERFECT G4 +10 pts")"#));
     }
 
@@ -119,7 +125,9 @@ mod tests {
         assert!(!is_raw_text_new(r#"Text::new(some_var)"#));
         assert!(!is_raw_text_new(r#"Text::new(format!("{}", n))"#));
         assert!(!is_raw_text_new(r#"Text::new(String::from(label))"#));
-        assert!(!is_raw_text_new(r#"Text::new(String::from(loc.msg("key")))"#));
+        assert!(!is_raw_text_new(
+            r#"Text::new(String::from(loc.msg("key")))"#
+        ));
     }
 
     #[test]

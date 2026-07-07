@@ -12,6 +12,7 @@ const APP_ID: &str = "io.github.tcanabrava.Harmonicon";
 use harmonicon::assets_management::AssetsManagementPlugin;
 use harmonicon::audio_system::pitch_detect::{AudioFrame, PitchRange};
 use harmonicon::audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
+use harmonicon::dialogs::ui_scale::change_scaling;
 use harmonicon::gameplay::GameplayPlugin;
 use harmonicon::localization::LocalizationPlugin;
 use harmonicon::menu::{AppState, MenuPlugin};
@@ -19,7 +20,6 @@ use harmonicon::settings::SettingsPlugin;
 use harmonicon::song::SongPlugin;
 use harmonicon::spectrogram::SpectrogramPlugin;
 use harmonicon::theme::ThemePlugin;
-use harmonicon::dialogs::ui_scale::change_scaling;
 
 fn main() {
     let mut app = App::new();
@@ -89,10 +89,7 @@ fn main() {
                 .run_if(harmonicon::localization::localization_ready),
         )
         .add_systems(Update, process_audio)
-        .add_systems(
-            Update,
-            print_pitches.run_if(in_state(AppState::Playing)),
-        )
+        .add_systems(Update, print_pitches.run_if(in_state(AppState::Playing)))
         .add_systems(Update, change_scaling)
         .run();
 }

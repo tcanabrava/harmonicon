@@ -8,10 +8,10 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::RenderTarget;
 use bevy::camera::visibility::RenderLayers;
-use bevy::prelude::*;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Out, Over, Pointer};
+use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use bevy::ui_widgets::{
     Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange, slider_self_update,
@@ -19,19 +19,12 @@ use bevy::ui_widgets::{
 
 const TRACK_BG: Color = Color::srgb(0.14, 0.14, 0.22);
 
-use crate::assets_management::{
-    AvailableHarmonicas,
-    SelectedHarmonicaModel
-};
+use crate::assets_management::{AvailableHarmonicas, SelectedHarmonicaModel};
 use crate::settings::AudioSettings;
 
 use crate::theme::LoadedTheme;
 
-use super::{
-    AppState, MenuPage, MenuRoot,
-    cleanup_menu,
-    spawn_button, spawn_menu_root,
-};
+use super::{AppState, MenuPage, MenuRoot, cleanup_menu, spawn_button, spawn_menu_root};
 
 use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
 use crate::dialogs::button;
@@ -129,7 +122,6 @@ fn setup_options_menu(
     spawn_volume_slider(
         &mut commands,
         root,
-
         "Music",
         VolumeSlider::Music,
         settings.music_volume,
@@ -138,18 +130,12 @@ fn setup_options_menu(
     spawn_volume_slider(
         &mut commands,
         root,
-
         "Metronome",
         VolumeSlider::Metronome,
         settings.metronome_volume,
         set_metronome_volume,
     );
-    spawn_latency_slider(
-        &mut commands,
-        root,
-
-        settings.input_latency_ms,
-    );
+    spawn_latency_slider(&mut commands, root, settings.input_latency_ms);
 
     // Harmonica previews: the model's glTF scene rendered to a texture (its own
     // materials, no tint). Layers are assigned after the 3D-note layers so the
@@ -174,20 +160,50 @@ fn setup_options_menu(
     spawn_harmonica_row(
         &mut commands,
         root,
-
         &previews_harmonica,
         &selected_harmonica.0,
     );
 
-    spawn_algo_row(&mut commands, root, Some("Pitch detect"), settings.pitch_algorithm);
+    spawn_algo_row(
+        &mut commands,
+        root,
+        Some("Pitch detect"),
+        settings.pitch_algorithm,
+    );
     spawn_algo_explanation(&mut commands, root, 560.0, settings.pitch_algorithm);
 
-    spawn_button(&mut commands, root, "Theme", Some("Theme"), &theme, &btn_mats, "Options",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme));
-    spawn_button(&mut commands, root, "Calibrate input lag", Some("Calibrate"), &theme, &btn_mats, "Options",
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| state.set(AppState::Calibration));
-    spawn_button(&mut commands, root, "\u{2190} Back", Some("BackToMain"), &theme, &btn_mats, "Options",
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main));
+    spawn_button(
+        &mut commands,
+        root,
+        "Theme",
+        Some("Theme"),
+        &theme,
+        &btn_mats,
+        "Options",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme),
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        "Calibrate input lag",
+        Some("Calibrate"),
+        &theme,
+        &btn_mats,
+        "Options",
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
+            state.set(AppState::Calibration)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        "\u{2190} Back",
+        Some("BackToMain"),
+        &theme,
+        &btn_mats,
+        "Options",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
+    );
 }
 
 /// A labelled row of harmonica-model choice buttons, each showing a rendered
@@ -218,14 +234,17 @@ fn spawn_harmonica_row(
             Text::new("Harmonica"),
             TextFont {
                 font_size: FontSize::Px(20.0),
-                                ..default()
+                ..default()
             },
             TextColor(Color::WHITE),
         ));
         for (image, name) in previews {
             let is_selected = name == selected;
-            r.spawn_empty()
-                .apply_scene(harmonica_button_scene(image.clone(), name.clone(), is_selected));
+            r.spawn_empty().apply_scene(harmonica_button_scene(
+                image.clone(),
+                name.clone(),
+                is_selected,
+            ));
         }
     });
 
@@ -236,7 +255,11 @@ fn spawn_harmonica_row(
 /// this model" click callback (capturing the name), and hover — all inline
 /// `on(...)`.
 fn harmonica_button_scene(image: Handle<Image>, name: String, is_selected: bool) -> impl Scene {
-    let color = if is_selected { button::CHOICE_SELECTED } else { button::color_default() };
+    let color = if is_selected {
+        button::CHOICE_SELECTED
+    } else {
+        button::color_default()
+    };
     let label = name.clone();
     let pick = name.clone();
     bsn! {
@@ -271,7 +294,6 @@ fn harmonica_button_scene(image: Handle<Image>, name: String, is_selected: bool)
 }
 
 // ── 3D model previews (render-to-texture) ──────────────────────────────────────
-
 
 /// Renders a harmonica model's glTF scene to an off-screen texture for the
 /// Options UI. Like the note preview, but the model is a multi-mesh scene with
@@ -383,9 +405,10 @@ fn harm_over(
     mut buttons: Query<(&HarmonicaButton, &mut BackgroundColor)>,
 ) {
     if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != selected.0 {
-            *bg = BackgroundColor(button::CHOICE_HOVER);
-        }
+        && btn.0 != selected.0
+    {
+        *bg = BackgroundColor(button::CHOICE_HOVER);
+    }
 }
 
 fn harm_out(
@@ -394,9 +417,10 @@ fn harm_out(
     mut buttons: Query<(&HarmonicaButton, &mut BackgroundColor)>,
 ) {
     if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != selected.0 {
-            *bg = BackgroundColor(button::color_default());
-        }
+        && btn.0 != selected.0
+    {
+        *bg = BackgroundColor(button::color_default());
+    }
 }
 
 /// Recolour the harmonica buttons when the selection changes (green = chosen).
@@ -464,7 +488,7 @@ fn spawn_volume_slider<M: 'static>(
             Text::new(label.to_string()),
             TextFont {
                 font_size: FontSize::Px(20.0),
-                                ..default()
+                ..default()
             },
             TextColor(Color::WHITE),
         ));
@@ -487,7 +511,7 @@ fn spawn_volume_slider<M: 'static>(
             Text::new(format!("{:.0}%", value * 100.0)),
             TextFont {
                 font_size: FontSize::Px(18.0),
-                                ..default()
+                ..default()
             },
             TextColor(Color::srgb(0.6, 0.6, 0.7)),
             SliderValueLabel(kind),
@@ -528,7 +552,7 @@ const LATENCY_MAX_MS: i32 = 200;
 
 /// One labelled slider row for the mic input-latency offset.
 /// The track maps 0–200 ms linearly; the label shows "Xms".
-fn spawn_latency_slider(commands: &mut Commands, parent: Entity,  value_ms: i32) {
+fn spawn_latency_slider(commands: &mut Commands, parent: Entity, value_ms: i32) {
     let frac = (value_ms as f32 / LATENCY_MAX_MS as f32).clamp(0.0, 1.0);
 
     let row = commands
@@ -550,7 +574,7 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity,  value_ms: i32)
             Text::new("Input lag"),
             TextFont {
                 font_size: FontSize::Px(20.0),
-                                ..default()
+                ..default()
             },
             TextColor(Color::WHITE),
         ));
@@ -558,7 +582,10 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity,  value_ms: i32)
 
     let track = commands
         .spawn_scene(latency_slider_scene(value_ms as f32, frac))
-        .insert((SliderRange::new(0.0, LATENCY_MAX_MS as f32), SliderStep(1.0)))
+        .insert((
+            SliderRange::new(0.0, LATENCY_MAX_MS as f32),
+            SliderStep(1.0),
+        ))
         .id();
     commands.entity(row).add_child(track);
 
@@ -571,7 +598,7 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity,  value_ms: i32)
             Text::new(format!("{}ms", value_ms)),
             TextFont {
                 font_size: FontSize::Px(18.0),
-                                ..default()
+                ..default()
             },
             TextColor(Color::srgb(0.6, 0.6, 0.7)),
             LatencySliderLabel,

@@ -471,11 +471,14 @@ fn validate(chart: &Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use midly::num::{u15, u24, u28, u4, u7};
+    use midly::num::{u4, u7, u15, u24, u28};
     use midly::{Format, Header, Timing};
 
     fn meta(delta: u32, kind: MetaMessage<'static>) -> midly::TrackEvent<'static> {
-        midly::TrackEvent { delta: u28::from(delta), kind: TrackEventKind::Meta(kind) }
+        midly::TrackEvent {
+            delta: u28::from(delta),
+            kind: TrackEventKind::Meta(kind),
+        }
     }
 
     fn note_on(delta: u32, key: u8, vel: u8) -> midly::TrackEvent<'static> {
@@ -483,7 +486,10 @@ mod tests {
             delta: u28::from(delta),
             kind: TrackEventKind::Midi {
                 channel: u4::from(0),
-                message: MidiMessage::NoteOn { key: u7::from(key), vel: u7::from(vel) },
+                message: MidiMessage::NoteOn {
+                    key: u7::from(key),
+                    vel: u7::from(vel),
+                },
             },
         }
     }
@@ -493,14 +499,20 @@ mod tests {
             delta: u28::from(delta),
             kind: TrackEventKind::Midi {
                 channel: u4::from(0),
-                message: MidiMessage::NoteOff { key: u7::from(key), vel: u7::from(0) },
+                message: MidiMessage::NoteOff {
+                    key: u7::from(key),
+                    vel: u7::from(0),
+                },
             },
         }
     }
 
     fn smf(tracks: Vec<Vec<midly::TrackEvent<'static>>>) -> Smf<'static> {
         Smf {
-            header: Header { format: Format::SingleTrack, timing: Timing::Metrical(u15::from(480)) },
+            header: Header {
+                format: Format::SingleTrack,
+                timing: Timing::Metrical(u15::from(480)),
+            },
             tracks,
         }
     }
@@ -509,7 +521,10 @@ mod tests {
 
     #[test]
     fn track_name_of_reads_the_first_track_name_event() {
-        let track = vec![meta(0, MetaMessage::TrackName(b"Bass")), note_on(0, 60, 100)];
+        let track = vec![
+            meta(0, MetaMessage::TrackName(b"Bass")),
+            note_on(0, 60, 100),
+        ];
         assert_eq!(track_name_of(&track).as_deref(), Some("Bass"));
     }
 

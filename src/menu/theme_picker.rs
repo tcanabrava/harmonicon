@@ -18,13 +18,11 @@ use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::assets_management::{AvailableThemes, SelectedTheme};
-use crate::theme::{LoadedTheme, theme_source_prefix};
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
+use crate::theme::{LoadedTheme, theme_source_prefix};
 
-use super::{
-    MenuPage, MenuRoot,  cleanup_menu, spawn_button,
-};
+use super::{MenuPage, MenuRoot, cleanup_menu, spawn_button};
 
 const THEME_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
 const THEME_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
@@ -85,7 +83,10 @@ fn setup(
     let title = commands
         .spawn((
             Text::new("Theme"),
-            TextFont { font_size: FontSize::Px(48.0), ..default() },
+            TextFont {
+                font_size: FontSize::Px(48.0),
+                ..default()
+            },
             TextColor(Color::WHITE),
         ))
         .id();
@@ -147,7 +148,10 @@ fn setup(
                 height: Val::Px(288.0),
                 ..default()
             },
-            ImageNode { image: preview_handle, ..default() },
+            ImageNode {
+                image: preview_handle,
+                ..default()
+            },
             ThemePreviewImage,
         ))
         .id();
@@ -171,7 +175,11 @@ fn setup(
 /// One theme-list button: its label, its dedicated "select this theme" click
 /// callback (capturing the name), and hover highlight — all inline `on(...)`.
 fn theme_button_scene(name: String, is_selected: bool) -> impl Scene {
-    let color = if is_selected { THEME_SELECTED } else { button::color_default() };
+    let color = if is_selected {
+        THEME_SELECTED
+    } else {
+        button::color_default()
+    };
     let label = name.clone();
     let pick = name.clone();
     bsn! {
@@ -206,9 +214,10 @@ fn theme_over(
     mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
 ) {
     if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != selected.0 {
-            *bg = BackgroundColor(THEME_HOVER);
-        }
+        && btn.0 != selected.0
+    {
+        *bg = BackgroundColor(THEME_HOVER);
+    }
 }
 
 fn theme_out(
@@ -217,9 +226,10 @@ fn theme_out(
     mut buttons: Query<(&ThemeButton, &mut BackgroundColor)>,
 ) {
     if let Ok((btn, mut bg)) = buttons.get_mut(ev.entity)
-        && btn.0 != selected.0 {
-            *bg = BackgroundColor(button::color_default());
-        }
+        && btn.0 != selected.0
+    {
+        *bg = BackgroundColor(button::color_default());
+    }
 }
 
 /// Recolour the list whenever the selection changes (green for the chosen one).

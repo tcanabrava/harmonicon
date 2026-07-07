@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::{HEADER_H, NOTE_PAD, ROW_H, TICK_W, ROWS};
+use super::{HEADER_H, NOTE_PAD, ROW_H, ROWS, TICK_W};
 
 // ── Note model types ─────────────────────────────────────────────────────────
 
@@ -135,16 +135,17 @@ pub(super) enum Field {
 /// Each entry pairs a [`Field`] with the localization key used for its label.
 pub(super) const FIELDS: [(Field, &str); 6] = [
     (Field::Tempo, "editor-field-tempo"),
-    (Field::Key,   "editor-field-key"),
+    (Field::Key, "editor-field-key"),
     (Field::Position, "editor-field-position"),
     (Field::Music, "editor-field-music"),
-    (Field::Name,  "editor-field-name"),
-    (Field::Author,"editor-field-author"),
+    (Field::Name, "editor-field-name"),
+    (Field::Author, "editor-field-author"),
 ];
 
 /// All valid diatonic harp keys in chromatic order.
-pub(super) const HARP_KEYS: [&str; 12] =
-    ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+pub(super) const HARP_KEYS: [&str; 12] = [
+    "C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B",
+];
 
 /// Playing positions in the order harmonica players commonly reach for them:
 /// 1st (straight), 2nd (cross harp, the blues staple), 3rd through 5th, and
@@ -328,7 +329,12 @@ pub(super) fn pitch_color(pitch: Pitch) -> Color {
     }
 }
 
-pub(super) fn move_target(start_hole: u8, start_tick: usize, dist_x: f32, dist_y: f32) -> (u8, usize) {
+pub(super) fn move_target(
+    start_hole: u8,
+    start_tick: usize,
+    dist_x: f32,
+    dist_y: f32,
+) -> (u8, usize) {
     let steps_x = (dist_x / TICK_W).round() as i32;
     let steps_y = (dist_y / ROW_H).round() as i32;
     let hole = (start_hole as i32 + steps_y).clamp(1, ROWS as i32) as u8;
@@ -368,7 +374,9 @@ pub(super) fn overlaps(a: &GridNote, b: &GridNote) -> bool {
 }
 
 pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
-    let Some(dir) = state.note_by_id(id).map(|n| n.dir) else { return };
+    let Some(dir) = state.note_by_id(id).map(|n| n.dir) else {
+        return;
+    };
     let mut group = vec![id];
     let mut i = 0;
     while i < group.len() {
@@ -396,7 +404,9 @@ pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
 /// propagated to every note that overlaps it in time, transitively, the same
 /// way `enforce_direction` propagates a shared Blow/Draw.
 pub(super) fn enforce_expr(state: &mut EditorState, id: u32) {
-    let Some(expr) = state.note_by_id(id).map(|n| n.expr) else { return };
+    let Some(expr) = state.note_by_id(id).map(|n| n.expr) else {
+        return;
+    };
     let mut group = vec![id];
     let mut i = 0;
     while i < group.len() {

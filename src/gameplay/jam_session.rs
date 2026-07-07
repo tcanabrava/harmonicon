@@ -109,7 +109,7 @@ pub fn setup(
                     Text::new(title),
                     TextFont {
                         font_size: FontSize::Px(20.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::WHITE),
                 ));
@@ -117,7 +117,7 @@ pub fn setup(
                     Text::new(harp_hint),
                     TextFont {
                         font_size: FontSize::Px(15.0),
-                                                ..default()
+                        ..default()
                     },
                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                 ));
@@ -136,7 +136,10 @@ pub fn setup(
                     ));
                     row.spawn((
                         Text::new("Loop: off"),
-                        TextFont { font_size: FontSize::Px(13.0), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(13.0),
+                            ..default()
+                        },
                         TextColor(Color::srgb(0.70, 0.70, 0.80)),
                         JamLoopLabel,
                     ));
@@ -147,7 +150,13 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|grid| {
-                    spawn_12_bar_grid(grid, &chords, key, &GridConfig::for_2d(), theme.twelve_bar_colors());
+                    spawn_12_bar_grid(
+                        grid,
+                        &chords,
+                        key,
+                        &GridConfig::for_2d(),
+                        theme.twelve_bar_colors(),
+                    );
                     spawn_hole_map(grid, &holes_info);
                 });
                 left.spawn(Node {
@@ -202,7 +211,10 @@ pub struct JamLoop(pub bool);
 pub struct JamLoopLabel;
 
 /// Keeps the "Loop: ..." readout in step with the toggle.
-pub fn update_jam_loop_label(jam_loop: Res<JamLoop>, mut labels: Query<&mut Text, With<JamLoopLabel>>) {
+pub fn update_jam_loop_label(
+    jam_loop: Res<JamLoop>,
+    mut labels: Query<&mut Text, With<JamLoopLabel>>,
+) {
     if !jam_loop.is_changed() {
         return;
     }
@@ -217,7 +229,11 @@ pub fn update_jam_loop_label(jam_loop: Res<JamLoop>, mut labels: Query<&mut Text
 /// (loop vs. once, and where it resumes) is unit-testable without spinning up
 /// an `App`.
 fn jam_playback_settings(loop_enabled: bool, at_secs: f64) -> PlaybackSettings {
-    let base = if loop_enabled { PlaybackSettings::LOOP } else { PlaybackSettings::ONCE };
+    let base = if loop_enabled {
+        PlaybackSettings::LOOP
+    } else {
+        PlaybackSettings::ONCE
+    };
     base.with_start_position(std::time::Duration::from_secs_f64(at_secs.max(0.0)))
 }
 
@@ -302,7 +318,10 @@ fn note_class(note: &str) -> &str {
 /// (root, major 3rd, perfect 5th, minor 7th) — every chord in a standard
 /// 12-bar blues (I7, IV7, V7) is dominant 7th.
 fn chord_tone_classes(chord_root: &str) -> HashSet<String> {
-    [0, 4, 7, 10].iter().map(|&n| semitone(chord_root, n)).collect()
+    [0, 4, 7, 10]
+        .iter()
+        .map(|&n| semitone(chord_root, n))
+        .collect()
 }
 
 /// Build the per-hole render data and the live-feedback lookup from the harp
@@ -346,7 +365,13 @@ fn build_hole_guide(
 
     (
         holes,
-        JamHoleGuide { note_to_holes, scale_classes, chord_tones_by_bar, bpm, beats_per_bar },
+        JamHoleGuide {
+            note_to_holes,
+            scale_classes,
+            chord_tones_by_bar,
+            bpm,
+            beats_per_bar,
+        },
     )
 }
 
@@ -450,7 +475,11 @@ pub fn update_hole_map(
             };
             for &h in holes {
                 lit.entry(h)
-                    .and_modify(|v| if fit > *v { *v = fit })
+                    .and_modify(|v| {
+                        if fit > *v {
+                            *v = fit
+                        }
+                    })
                     .or_insert(fit);
             }
         }
@@ -488,7 +517,10 @@ mod tests {
     #[test]
     fn resumes_from_the_given_position_not_the_top() {
         let settings = jam_playback_settings(true, 42.5);
-        assert_eq!(settings.start_position, Some(std::time::Duration::from_secs_f64(42.5)));
+        assert_eq!(
+            settings.start_position,
+            Some(std::time::Duration::from_secs_f64(42.5))
+        );
     }
 
     #[test]
@@ -558,7 +590,10 @@ mod tests {
         // `twelve_bar`. Bar 4 is IV (F7); bar 8 is V (G7).
         let (_, guide) = build_hole_guide(&c_harp(), "C", 120.0, 4);
         assert!(guide.chord_tones_by_bar[0].contains("C"), "bar 0 is I (C7)");
-        assert!(guide.chord_tones_by_bar[4].contains("F"), "bar 4 is IV (F7)");
+        assert!(
+            guide.chord_tones_by_bar[4].contains("F"),
+            "bar 4 is IV (F7)"
+        );
         assert!(guide.chord_tones_by_bar[8].contains("G"), "bar 8 is V (G7)");
         assert!(
             !guide.chord_tones_by_bar[0].contains("F"),
@@ -575,7 +610,10 @@ mod tests {
     #[test]
     fn banner_derives_harp_key_from_hole_1_blow() {
         // c_harp() has no position field → the "no position" wording.
-        assert_eq!(harp_banner(&c_harp(), "G"), "Use a C harmonica  \u{00B7}  key of G");
+        assert_eq!(
+            harp_banner(&c_harp(), "G"),
+            "Use a C harmonica  \u{00B7}  key of G"
+        );
     }
 
     #[test]

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-use bevy::prelude::Resource;
+use bevy::log::{error, info};
+use bevy::prelude::{Resource, World};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{SampleFormat, StreamConfig};
 use crossbeam_channel::{Receiver, Sender, bounded};
+
+use crate::settings::AudioSettings;
 
 pub const CHUNK_SIZE: usize = 4096;
 
@@ -15,13 +18,88 @@ pub struct AudioStream(pub cpal::Stream);
 pub struct AudioCapture {
     pub receiver: Receiver<Vec<f32>>,
     pub sample_rate: u32,
+    /// The actually-connected device's name — may differ from the requested
+    /// one if it wasn't found and capture fell back to the system default.
+    pub device_name: String,
 }
 
-pub fn create_audio_capture() -> Result<(AudioStream, AudioCapture), Box<dyn std::error::Error>> {
+/// Whether the microphone capture stream is currently up. Set by
+/// [`start_capture`] (startup and manual retry) so menu UI can show a visible
+/// warning instead of the game silently running "deaf" — see TODO.md.
+#[derive(Resource, Clone, PartialEq, Debug)]
+pub enum MicStatus {
+    Connected { device_name: String },
+    Failed { reason: String },
+}
+
+/// Names of every input device the current host reports, in host-listed
+/// order. Empty (rather than an error) if enumeration itself fails — callers
+/// treat "no devices" and "enumeration failed" the same way.
+pub fn input_device_names() -> Vec<String> {
     let host = cpal::default_host();
-    let device = host
-        .default_input_device()
+    match host.input_devices() {
+        Ok(devices) => devices.filter_map(|d| d.name().ok()).collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Which device name to actually look for, given the user's configured
+/// preference (`""` means "use the system default"). Returns `None` when
+/// `wanted` is empty or doesn't match anything currently plugged in, so the
+/// caller falls back to the default device instead of erroring — a saved
+/// preference for a since-unplugged device shouldn't brick capture.
+fn resolve_device_name(available: &[String], wanted: &str) -> Option<String> {
+    if wanted.is_empty() {
+        return None;
+    }
+    available.iter().find(|n| n.as_str() == wanted).cloned()
+}
+
+/// (Re)starts the microphone capture stream using `AudioSettings::input_device`
+/// (falling back to the system default if that device is empty/unavailable),
+/// and records the outcome in [`MicStatus`]. Only needs `&mut World`, so both
+/// the startup system and the Options page's "Retry" button / device picker
+/// can trigger it directly (the latter via `Commands::queue`).
+pub fn start_capture(world: &mut World) {
+    let wanted = world.resource::<AudioSettings>().input_device.clone();
+    let device_name = resolve_device_name(&input_device_names(), &wanted);
+
+    match create_audio_capture(device_name.as_deref()) {
+        Ok((stream, capture)) => {
+            info!(
+                "Audio capture started at {} Hz on \"{}\"",
+                capture.sample_rate, capture.device_name
+            );
+            world.insert_resource(MicStatus::Connected {
+                device_name: capture.device_name.clone(),
+            });
+            world.insert_non_send(stream);
+            world.insert_resource(capture);
+        }
+        Err(e) => {
+            error!("Failed to start audio capture: {e}");
+            world.insert_resource(MicStatus::Failed {
+                reason: e.to_string(),
+            });
+        }
+    }
+}
+
+/// Opens capture on `device_name` (falling back to the system default if
+/// `None` or not found among the current input devices).
+pub fn create_audio_capture(
+    device_name: Option<&str>,
+) -> Result<(AudioStream, AudioCapture), Box<dyn std::error::Error>> {
+    let host = cpal::default_host();
+    let device = device_name
+        .and_then(|name| {
+            host.input_devices()
+                .ok()?
+                .find(|d| d.name().map(|n| n == name).unwrap_or(false))
+        })
+        .or_else(|| host.default_input_device())
         .ok_or("no input device available")?;
+    let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
 
     let config = device.default_input_config()?;
     let sample_rate = config.sample_rate().0;
@@ -29,10 +107,7 @@ pub fn create_audio_capture() -> Result<(AudioStream, AudioCapture), Box<dyn std
     let sample_format = config.sample_format();
     let stream_config: StreamConfig = config.into();
 
-    println!(
-        "Input device : {}",
-        device.name().unwrap_or_else(|_| "unknown".into())
-    );
+    println!("Input device : {device_name}");
     println!(
         "Sample rate  : {} Hz  |  channels: {}  |  format: {:?}",
         sample_rate, channels, sample_format
@@ -54,6 +129,7 @@ pub fn create_audio_capture() -> Result<(AudioStream, AudioCapture), Box<dyn std
         AudioCapture {
             receiver: rx,
             sample_rate,
+            device_name,
         },
     ))
 }

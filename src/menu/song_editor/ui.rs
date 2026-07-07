@@ -6,21 +6,22 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::window::WindowResized;
 
-use bevy_fluent::prelude::Localization;
+use super::harpchart::safe_path_segment;
+use super::interaction::apply_modifier;
+use super::playback::{
+    EditorAudio, EditorProgressFill, Playhead, PlayheadLine, start_playback, toggle_pause,
+};
+use super::practice::{PracticeState, start_practice, stop_practice};
+use super::state::{EditorState, FIELDS, Field, HARP_KEYS, Mode, POSITIONS, Scroll};
+use super::{
+    AppState, BEAT_W, HEADER_H, HOLE_COL_W, LOAD_PURPOSE, MUSIC_PURPOSE, NOTE_PAD, ROW_H, ROWS,
+    SAVE_PURPOSE, grid_height,
+};
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::localization::{LocalizationExt, LocalizedStr};
 use crate::settings::AudioSettings;
 use crate::theme::{LoadedTheme, SongEditorColors};
-use super::{
-    AppState, grid_height,
-    HOLE_COL_W, HEADER_H, ROW_H, BEAT_W, ROWS, NOTE_PAD,
-    SAVE_PURPOSE, LOAD_PURPOSE, MUSIC_PURPOSE,
-};
-use super::state::{EditorState, Mode, Scroll, Field, FIELDS, HARP_KEYS, POSITIONS};
-use super::playback::{Playhead, EditorAudio, EditorProgressFill, PlayheadLine, start_playback, toggle_pause};
-use super::harpchart::safe_path_segment;
-use super::interaction::apply_modifier;
-use super::practice::{start_practice, stop_practice, PracticeState};
+use bevy_fluent::prelude::Localization;
 
 // ── Components ────────────────────────────────────────────────────────────────
 
@@ -172,7 +173,11 @@ pub(super) fn setup(
             .with_children(|bar| {
                 bar.spawn((
                     EditorProgressFill,
-                    Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+                    Node {
+                        width: Val::Percent(0.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
                     BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
                 ));
             });
@@ -245,7 +250,10 @@ pub(super) fn setup(
             root.spawn((
                 StatusMsg,
                 Text::new(""),
-                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(12.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(1.0, 0.40, 0.15)),
                 Node {
                     width: Val::Percent(100.0),
@@ -283,7 +291,10 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors) {
             .with_children(|r| {
                 r.spawn((
                     Text::new(format!("{hole:02}")),
-                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(13.0),
+                        ..default()
+                    },
                     TextColor(colors.label),
                 ));
                 r.spawn((
@@ -301,7 +312,12 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors) {
     });
 }
 
-fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors, mode: Mode) {
+fn spawn_mod_panel(
+    root: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+    mode: Mode,
+) {
     root.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -379,21 +395,28 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                     // only skips rendering, it still reserves this group's
                     // full layout width, which pushed the other group off to
                     // the right instead of freeing its place.
-                    display: if mode == Mode::Edit { Display::Flex } else { Display::None },
+                    display: if mode == Mode::Edit {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
                     ..default()
                 },
             ))
             .with_children(|g| {
-                mod_button(g, ModButton::Blow,     loc.msg("mod-blow"),     colors);
-                mod_button(g, ModButton::Draw,     loc.msg("mod-draw"),     colors);
+                mod_button(g, ModButton::Blow, loc.msg("mod-blow"), colors);
+                mod_button(g, ModButton::Draw, loc.msg("mod-draw"), colors);
                 panel_separator(g);
-                mod_button(g, ModButton::Bend,     loc.msg("mod-bend"),     colors);
+                mod_button(g, ModButton::Bend, loc.msg("mod-bend"), colors);
                 mod_button(g, ModButton::Overblow, loc.msg("mod-overblow"), colors);
                 mod_button(g, ModButton::Overdraw, loc.msg("mod-overdraw"), colors);
-                mod_button(g, ModButton::Wah,      loc.msg("mod-wah"),      colors);
-                mod_button(g, ModButton::Vibrato,  loc.msg("mod-vibrato"),  colors);
-                g.spawn(Node { flex_grow: 1.0, ..default() });
-                mod_button(g, ModButton::Delete,   loc.msg("mod-delete"),   colors);
+                mod_button(g, ModButton::Wah, loc.msg("mod-wah"), colors);
+                mod_button(g, ModButton::Vibrato, loc.msg("mod-vibrato"), colors);
+                g.spawn(Node {
+                    flex_grow: 1.0,
+                    ..default()
+                });
+                mod_button(g, ModButton::Delete, loc.msg("mod-delete"), colors);
             });
 
         panel
@@ -404,7 +427,11 @@ fn spawn_mod_panel(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                     align_items: AlignItems::Center,
                     column_gap: Val::Px(8.0),
                     flex_grow: 1.0,
-                    display: if mode == Mode::Perform { Display::Flex } else { Display::None },
+                    display: if mode == Mode::Perform {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
                     ..default()
                 },
             ))
@@ -439,7 +466,10 @@ pub(super) fn mode_button<M: 'static>(
         .with_children(|b| {
             b.spawn((
                 Text::new(String::from(label)),
-                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
             ));
@@ -466,14 +496,19 @@ pub(super) fn mod_button(
             BackgroundColor(colors.btn_bg),
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
         ))
-        .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-            apply_modifier(&mut state, kind);
-        })
+        .observe(
+            move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                apply_modifier(&mut state, kind);
+            },
+        )
         .with_children(|b| {
             let base = String::from(label);
             let mut text = b.spawn((
                 Text::new(base.clone()),
-                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
             ));
@@ -521,7 +556,11 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
          mut open: MessageWriter<OpenFileDialog>| {
             let default_name = format!(
                 "{}.harpchart",
-                safe_path_segment(if state.name.is_empty() { "chart" } else { &state.name })
+                safe_path_segment(if state.name.is_empty() {
+                    "chart"
+                } else {
+                    &state.name
+                })
             );
             open.write(OpenFileDialog {
                 purpose: SAVE_PURPOSE,
@@ -536,9 +575,7 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
         panel,
         loc.msg("editor-load"),
         Color::srgb(0.24, 0.30, 0.20),
-        |_: On<Pointer<Click>>,
-         loc: Res<Localization>,
-         mut open: MessageWriter<OpenFileDialog>| {
+        |_: On<Pointer<Click>>, loc: Res<Localization>, mut open: MessageWriter<OpenFileDialog>| {
             open.write(OpenFileDialog {
                 purpose: LOAD_PURPOSE,
                 title: String::from(loc.msg("dialog-load-chart")),
@@ -572,7 +609,14 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
                 return;
             }
             practice.reset(); // exit practice mode before starting preview playback
-            start_playback(&state, &mut sources, &settings, &playing, &mut playhead, &mut commands);
+            start_playback(
+                &state,
+                &mut sources,
+                &settings,
+                &playing,
+                &mut playhead,
+                &mut commands,
+            );
         },
     );
     transport_button(
@@ -620,8 +664,14 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
                 stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
             } else {
                 start_practice(
-                    &state, &mut sources, &settings,
-                    &playing, &mut practice, &mut playhead, &mut commands, &loc,
+                    &state,
+                    &mut sources,
+                    &settings,
+                    &playing,
+                    &mut practice,
+                    &mut playhead,
+                    &mut commands,
+                    &loc,
                 );
             }
         },
@@ -651,7 +701,10 @@ pub(super) fn transport_button<M: 'static>(
         .with_children(|b| {
             b.spawn((
                 Text::new(String::from(label)),
-                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
             ));
@@ -677,9 +730,15 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
             })
             .with_children(|line| {
                 line.spawn((
-                    Node { width: Val::Px(150.0), ..default() },
+                    Node {
+                        width: Val::Px(150.0),
+                        ..default()
+                    },
                     Text::new(format!("{}:", loc.msg(label))),
-                    TextFont { font_size: FontSize::Px(14.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(14.0),
+                        ..default()
+                    },
                     TextColor(colors.label),
                 ));
 
@@ -715,16 +774,21 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                         state.position = POSITIONS[(idx + 1) % POSITIONS.len()].into();
                     });
                 } else {
-                    btn.observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                        state.focus = Some(field);
-                    });
+                    btn.observe(
+                        move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                            state.focus = Some(field);
+                        },
+                    );
                 }
 
                 btn.with_children(|b| {
                     b.spawn((
                         MetaFieldText(field),
                         Text::new(String::new()),
-                        TextFont { font_size: FontSize::Px(14.0), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(14.0),
+                            ..default()
+                        },
                         TextColor(Color::WHITE),
                         Pickable::IGNORE,
                     ));
@@ -743,21 +807,26 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                         BackgroundColor(Color::srgb(0.18, 0.24, 0.36)),
                         BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
                     ))
-                    .observe(|_: On<Pointer<Click>>,
-                               loc: Res<Localization>,
-                               mut open: MessageWriter<OpenFileDialog>| {
-                        open.write(OpenFileDialog {
-                            purpose: MUSIC_PURPOSE,
-                            title: String::from(loc.msg("dialog-select-music")),
-                            extensions: vec!["ogg".into()],
-                            start_dir: dirs::home_dir(),
-                            mode: DialogMode::Open,
-                        });
-                    })
+                    .observe(
+                        |_: On<Pointer<Click>>,
+                         loc: Res<Localization>,
+                         mut open: MessageWriter<OpenFileDialog>| {
+                            open.write(OpenFileDialog {
+                                purpose: MUSIC_PURPOSE,
+                                title: String::from(loc.msg("dialog-select-music")),
+                                extensions: vec!["ogg".into()],
+                                start_dir: dirs::home_dir(),
+                                mode: DialogMode::Open,
+                            });
+                        },
+                    )
                     .with_children(|b| {
                         b.spawn((
                             Text::new(String::from(loc.msg("editor-browse"))),
-                            TextFont { font_size: FontSize::Px(13.0), ..default() },
+                            TextFont {
+                                font_size: FontSize::Px(13.0),
+                                ..default()
+                            },
                             TextColor(Color::WHITE),
                             Pickable::IGNORE,
                         ));

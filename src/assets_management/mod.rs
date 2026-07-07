@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::prelude::*;
-use std::{
-    collections::HashMap,
-    fs::DirEntry,
-};
+use std::{collections::HashMap, fs::DirEntry};
 
 pub struct AssetsManagementPlugin;
 
@@ -286,7 +283,11 @@ pub fn scan_artist_song(
 /// `~/Harmonicon/songs` drop folder) and scans each artist subfolder into
 /// `available`, tagging entries with `source_prefix` so they load from the
 /// matching [`AssetSource`](bevy::asset::io::AssetSource).
-fn scan_songs_root(songs_root: &std::path::Path, source_prefix: &str, available: &mut ResMut<AvailableSongs>) {
+fn scan_songs_root(
+    songs_root: &std::path::Path,
+    source_prefix: &str,
+    available: &mut ResMut<AvailableSongs>,
+) {
     let Ok(artists) = std::fs::read_dir(songs_root) else {
         return;
     };

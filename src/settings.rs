@@ -15,7 +15,9 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::assets_management::{SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d, SelectedTheme};
+use crate::assets_management::{
+    SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d, SelectedTheme,
+};
 use crate::audio_system::pitch_detect::PitchAlgorithm;
 
 /// Player-tunable audio levels (0.0–1.0, linear), read by the audio spawners

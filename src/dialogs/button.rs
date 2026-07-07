@@ -1,7 +1,7 @@
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
-use bevy::ecs::system::IntoObserverSystem;
 
 pub fn color_default() -> Color {
     Color::srgb(0.14, 0.14, 0.22)
@@ -27,7 +27,10 @@ fn mouse_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
 
 /// A compact button (no 220px min-width, smaller padding/font) for HUD-style
 /// controls. Same colours/hover as [`default`].
-pub fn small<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static) -> impl Scene {
+pub fn small<M: 'static>(
+    label: &str,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
+) -> impl Scene {
     bsn! {
         Button
         BackgroundColor({color_default()})
@@ -50,7 +53,10 @@ pub fn small<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointer<
     }
 }
 
-pub fn default<M: 'static>(label: &str, on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static) -> impl Scene {
+pub fn default<M: 'static>(
+    label: &str,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
+) -> impl Scene {
     bsn! {
         Button
         BackgroundColor({color_default()})

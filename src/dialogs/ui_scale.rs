@@ -38,7 +38,9 @@ mod tests {
     }
 
     fn press(app: &mut App, key: KeyCode) {
-        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(key);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
         app.update();
     }
 
@@ -78,9 +80,14 @@ mod tests {
         // app's input systems call once per frame — a bare test App doesn't
         // run those, so without this the key would read as freshly-pressed
         // forever and the second `update()` would double-apply the scaling.
-        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().clear();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .clear();
         app.update();
         let after_two_frames = app.world().resource::<UiScale>().0;
-        assert_eq!(after_one_frame, after_two_frames, "no further drift once the key press is handled");
+        assert_eq!(
+            after_one_frame, after_two_frames,
+            "no further drift once the key press is handled"
+        );
     }
 }

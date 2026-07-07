@@ -7,9 +7,9 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use crate::menu::{AppState, ReturnToSongList};
-use crate::dialogs::button;
 use super::{GameplayRoot, MusicPlayer, Paused};
+use crate::dialogs::button;
+use crate::menu::{AppState, ReturnToSongList};
 
 /// Root of the pause overlay; toggled between hidden/visible.
 #[derive(Component, Default, Clone)]

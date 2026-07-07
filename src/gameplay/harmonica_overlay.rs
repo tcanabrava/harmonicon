@@ -168,10 +168,7 @@ fn note_for(h: &HoleNotes, hole: u8, row: Row) -> Option<&str> {
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 /// Spawn the harmonica diagram as a child of `parent`, built for `harp`.
-pub fn spawn_harmonica_overlay(
-    parent: &mut ChildSpawnerCommands,
-    harp: &Harmonica,
-) {
+pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) {
     let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
 
     parent
@@ -185,7 +182,10 @@ pub fn spawn_harmonica_overlay(
         .with_children(|panel| {
             panel.spawn((
                 Text::new("Harmonica  \u{00B7}  lights up as you play"),
-                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(12.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
             ));
 
@@ -247,11 +247,16 @@ fn cell<'a>(row: &'a mut ChildSpawnerCommands, bg: Color) -> EntityCommands<'a> 
 /// A note cell: shows the note class, lights up live (carries `HarpOverlayCell`).
 fn spawn_note_cell(row: &mut ChildSpawnerCommands, note: &str, color: Color) {
     cell(row, CELL_DEFAULT)
-        .insert(HarpOverlayCell { note: note.to_string() })
+        .insert(HarpOverlayCell {
+            note: note.to_string(),
+        })
         .with_children(|c| {
             c.spawn((
                 Text::new(note_class(note).to_string()),
-                TextFont { font_size: FontSize::Px(11.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(11.0),
+                    ..default()
+                },
                 TextColor(color),
             ));
         });
@@ -262,7 +267,10 @@ fn spawn_text_cell(row: &mut ChildSpawnerCommands, text: &str, color: Color) {
     cell(row, Color::NONE).with_children(|c| {
         c.spawn((
             Text::new(text.to_string()),
-            TextFont { font_size: FontSize::Px(12.0), ..default() },
+            TextFont {
+                font_size: FontSize::Px(12.0),
+                ..default()
+            },
             TextColor(color),
         ));
     });
@@ -282,7 +290,10 @@ fn spawn_label(row: &mut ChildSpawnerCommands, text: &str) {
     .with_children(|c| {
         c.spawn((
             Text::new(text.to_string()),
-            TextFont { font_size: FontSize::Px(10.0), ..default() },
+            TextFont {
+                font_size: FontSize::Px(10.0),
+                ..default()
+            },
             TextColor(LABEL_COLOR),
         ));
     });
@@ -357,7 +368,11 @@ mod tests {
         // blow C7, draw A6 → blow bends B6, A#6.
         let h = hole_notes(&c_harp(), 10);
         assert_eq!(h.bends, vec!["B6", "A#6"]);
-        assert_eq!(h.over.as_deref(), Some("C#7"), "overdraw a semitone above blow");
+        assert_eq!(
+            h.over.as_deref(),
+            Some("C#7"),
+            "overdraw a semitone above blow"
+        );
     }
 
     #[test]

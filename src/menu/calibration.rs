@@ -27,11 +27,7 @@ use bevy::{
     prelude::*,
 };
 
-use crate::{
-    audio_system::pitch_detect::PitchEvent,
-    settings::AudioSettings,
-    dialogs::button
-};
+use crate::{audio_system::pitch_detect::PitchEvent, dialogs::button, settings::AudioSettings};
 
 use super::{AppState, ReturnToOptions};
 
@@ -44,9 +40,9 @@ const BEATS_NEEDED: usize = 8;
 const HIT_WINDOW: f64 = 0.45; // ±450 ms around each beat
 
 // Timing bar: what range to display (±200 ms) and game window sizes.
-const BAR_RANGE_MS: f64 = 200.0;   // ±200 ms displayed
-const PERFECT_MS:  f64 = 60.0;     // matches ScoringConfig default
-const GOOD_MS:     f64 = 130.0;    // matches ScoringConfig default
+const BAR_RANGE_MS: f64 = 200.0; // ±200 ms displayed
+const PERFECT_MS: f64 = 60.0; // matches ScoringConfig default
+const GOOD_MS: f64 = 130.0; // matches ScoringConfig default
 const BAR_WIDTH_PX: f32 = 360.0;
 
 // How long a hit-marker stays visible before fading away.
@@ -73,22 +69,28 @@ struct CalState {
 }
 
 impl CalState {
-    fn reset(&mut self) { *self = CalState::default(); }
+    fn reset(&mut self) {
+        *self = CalState::default();
+    }
 
     fn mean_offset_ms(&self) -> Option<f64> {
-        if self.offsets.is_empty() { return None; }
+        if self.offsets.is_empty() {
+            return None;
+        }
         Some(self.offsets.iter().sum::<f64>() / self.offsets.len() as f64 * 1000.0)
     }
 }
 
 #[derive(Resource)]
-struct CalSounds { downbeat: Handle<AudioSource>, beat: Handle<AudioSource> }
+struct CalSounds {
+    downbeat: Handle<AudioSource>,
+    beat: Handle<AudioSource>,
+}
 
 // ── Components ────────────────────────────────────────────────────────────────
 
 #[derive(Component)]
 struct CalRoot;
-
 
 #[derive(Component)]
 struct BeatDot(usize);
@@ -102,7 +104,10 @@ struct TimingBarContainer;
 
 /// A per-hit tick mark inside the timing bar.
 #[derive(Component)]
-struct TimingMarker { offset_secs: f64, age: f32 }
+struct TimingMarker {
+    offset_secs: f64,
+    age: f32,
+}
 
 /// Text showing the per-hit offset list ("±Xms  ±Yms …").
 #[derive(Component)]
@@ -119,8 +124,10 @@ struct CalMeanText;
 struct CalSuggestedText;
 
 // Phase-gated visibility markers.
-#[derive(Component)] struct ShowWaiting;
-#[derive(Component)] struct ShowDone;
+#[derive(Component)]
+struct ShowWaiting;
+#[derive(Component)]
+struct ShowDone;
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
@@ -158,25 +165,33 @@ impl Plugin for CalibrationPlugin {
 fn load_sounds(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(CalSounds {
         downbeat: asset_server.load("sounds/metronome_high.ogg"),
-        beat:     asset_server.load("sounds/metronome_low.ogg"),
+        beat: asset_server.load("sounds/metronome_low.ogg"),
     });
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-fn reset_state(mut cal: ResMut<CalState>) { cal.reset(); }
+fn reset_state(mut cal: ResMut<CalState>) {
+    cal.reset();
+}
 
 fn cleanup(mut commands: Commands, roots: Query<Entity, With<CalRoot>>) {
-    for e in &roots { commands.entity(e).despawn(); }
+    for e in &roots {
+        commands.entity(e).despawn();
+    }
 }
 
 // ── Core systems ──────────────────────────────────────────────────────────────
 
 fn tick(time: Res<Time>, mut cal: ResMut<CalState>) {
-    if cal.phase != CalPhase::Recording { return; }
+    if cal.phase != CalPhase::Recording {
+        return;
+    }
     cal.clock += time.delta_secs_f64();
     let beat = (cal.clock / BEAT_DUR).floor() as u32;
-    if beat > cal.beat_count { cal.beat_count = beat; }
+    if beat > cal.beat_count {
+        cal.beat_count = beat;
+    }
 }
 
 fn play_clicks(
@@ -186,11 +201,20 @@ fn play_clicks(
     mut commands: Commands,
     mut last_click: Local<Option<i64>>,
 ) {
-    if cal.phase != CalPhase::Recording { *last_click = None; return; }
+    if cal.phase != CalPhase::Recording {
+        *last_click = None;
+        return;
+    }
     let beat = (cal.clock / BEAT_DUR).floor() as i64;
-    if *last_click == Some(beat) { return; }
+    if *last_click == Some(beat) {
+        return;
+    }
     *last_click = Some(beat);
-    let sample = if beat % 4 == 0 { sounds.downbeat.clone() } else { sounds.beat.clone() };
+    let sample = if beat % 4 == 0 {
+        sounds.downbeat.clone()
+    } else {
+        sounds.beat.clone()
+    };
     commands.spawn((
         AudioPlayer::<AudioSource>(sample),
         PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.metronome_volume)),
@@ -198,21 +222,31 @@ fn play_clicks(
 }
 
 fn collect_hits(mut pitches: MessageReader<PitchEvent>, mut cal: ResMut<CalState>) {
-    if cal.phase != CalPhase::Recording { return; }
+    if cal.phase != CalPhase::Recording {
+        return;
+    }
 
     let mut has_pitch = false;
     for ev in pitches.read() {
-        if !ev.0.is_empty() { has_pitch = true; }
+        if !ev.0.is_empty() {
+            has_pitch = true;
+        }
     }
     let is_attack = has_pitch && !cal.prev_has_pitch;
     cal.prev_has_pitch = has_pitch;
 
-    if !is_attack || cal.beat_count <= WARMUP_BEATS { return; }
+    if !is_attack || cal.beat_count <= WARMUP_BEATS {
+        return;
+    }
 
     let nearest_beat = (cal.clock / BEAT_DUR).round() as i64;
     let offset = cal.clock - nearest_beat as f64 * BEAT_DUR;
-    if offset.abs() > HIT_WINDOW { return; }
-    if cal.last_recorded_beat == Some(nearest_beat) { return; }
+    if offset.abs() > HIT_WINDOW {
+        return;
+    }
+    if cal.last_recorded_beat == Some(nearest_beat) {
+        return;
+    }
 
     cal.offsets.push(offset);
     cal.last_recorded_beat = Some(nearest_beat);
@@ -272,9 +306,13 @@ fn sync_hit_markers(
     bar: Query<Entity, With<TimingBarContainer>>,
     markers: Query<(), With<TimingMarker>>,
 ) {
-    if !cal.is_changed() { return; }
+    if !cal.is_changed() {
+        return;
+    }
     let existing = markers.iter().count();
-    if cal.offsets.len() <= existing { return; }
+    if cal.offsets.len() <= existing {
+        return;
+    }
 
     let Ok(bar_entity) = bar.single() else { return };
 
@@ -300,7 +338,10 @@ fn sync_hit_markers(
                     ..default()
                 },
                 BackgroundColor(color),
-                TimingMarker { offset_secs, age: 0.0 },
+                TimingMarker {
+                    offset_secs,
+                    age: 0.0,
+                },
             ));
         });
     }
@@ -333,43 +374,59 @@ fn fade_hit_markers(
 }
 
 /// Updates the hit-offsets summary text ("±Xms  ±Yms  …").
-fn update_offset_summary(
-    cal: Res<CalState>,
-    mut texts: Query<&mut Text, With<HitOffsetsSummary>>,
-) {
-    if !cal.is_changed() { return; }
-    let line: String = cal.offsets.iter()
+fn update_offset_summary(cal: Res<CalState>, mut texts: Query<&mut Text, With<HitOffsetsSummary>>) {
+    if !cal.is_changed() {
+        return;
+    }
+    let line: String = cal
+        .offsets
+        .iter()
         .map(|&o| {
             let ms = (o * 1000.0).round() as i32;
-            if ms >= 0 { format!("+{ms}ms") } else { format!("{ms}ms") }
+            if ms >= 0 {
+                format!("+{ms}ms")
+            } else {
+                format!("{ms}ms")
+            }
         })
         .collect::<Vec<_>>()
         .join("  ");
-    for mut t in &mut texts { t.0 = line.clone(); }
+    for mut t in &mut texts {
+        t.0 = line.clone();
+    }
 }
 
 fn update_status(cal: Res<CalState>, mut texts: Query<&mut Text, With<CalStatusText>>) {
-    if !cal.is_changed() { return; }
+    if !cal.is_changed() {
+        return;
+    }
     let msg: String = match cal.phase {
-        CalPhase::Waiting   => "Play any note on each beat — the game measures how late \
-                               your mic detects sound.".into(),
-        CalPhase::Recording => if cal.beat_count <= WARMUP_BEATS {
-            "Get ready…".into()
-        } else {
-            format!("{} / {} hits recorded", cal.offsets.len(), BEATS_NEEDED)
-        },
+        CalPhase::Waiting => "Play any note on each beat — the game measures how late \
+                               your mic detects sound."
+            .into(),
+        CalPhase::Recording => {
+            if cal.beat_count <= WARMUP_BEATS {
+                "Get ready…".into()
+            } else {
+                format!("{} / {} hits recorded", cal.offsets.len(), BEATS_NEEDED)
+            }
+        }
         CalPhase::Done => "Calibration complete!".into(),
     };
-    for mut t in &mut texts { t.0 = msg.clone(); }
+    for mut t in &mut texts {
+        t.0 = msg.clone();
+    }
 }
 
 fn update_result_block(
     cal: Res<CalState>,
     audio: Res<AudioSettings>,
-    mut mean_texts:      Query<(&mut Text, &mut TextColor), With<CalMeanText>>,
+    mut mean_texts: Query<(&mut Text, &mut TextColor), With<CalMeanText>>,
     mut suggested_texts: Query<&mut Text, (With<CalSuggestedText>, Without<CalMeanText>)>,
 ) {
-    if !cal.is_changed() || cal.phase != CalPhase::Done { return; }
+    if !cal.is_changed() || cal.phase != CalPhase::Done {
+        return;
+    }
     if let Some(ms) = cal.mean_offset_ms() {
         let sign = if ms >= 0.0 { "+" } else { "" };
         for (mut t, mut color) in &mut mean_texts {
@@ -382,7 +439,10 @@ fn update_result_block(
         }
         let suggested = (audio.input_latency_ms + ms.round() as i32).max(0);
         for mut t in &mut suggested_texts {
-            t.0 = format!("Current: {}ms   →   Suggested: {}ms", audio.input_latency_ms, suggested);
+            t.0 = format!(
+                "Current: {}ms   →   Suggested: {}ms",
+                audio.input_latency_ms, suggested
+            );
         }
     }
 }
@@ -390,13 +450,27 @@ fn update_result_block(
 fn sync_phase_visibility(
     cal: Res<CalState>,
     mut waiting: Query<&mut Visibility, (With<ShowWaiting>, Without<ShowDone>)>,
-    mut done:    Query<&mut Visibility, (With<ShowDone>,    Without<ShowWaiting>)>,
+    mut done: Query<&mut Visibility, (With<ShowDone>, Without<ShowWaiting>)>,
 ) {
-    if !cal.is_changed() { return; }
+    if !cal.is_changed() {
+        return;
+    }
     let show_w = cal.phase == CalPhase::Waiting;
     let show_d = cal.phase == CalPhase::Done;
-    for mut v in &mut waiting { *v = if show_w { Visibility::Inherited } else { Visibility::Hidden }; }
-    for mut v in &mut done    { *v = if show_d { Visibility::Inherited } else { Visibility::Hidden }; }
+    for mut v in &mut waiting {
+        *v = if show_w {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
+    for mut v in &mut done {
+        *v = if show_d {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
 }
 
 // ── Dedicated button callbacks ────────────────────────────────────────────────
@@ -448,75 +522,108 @@ fn handle_escape(
 // ── UI construction ───────────────────────────────────────────────────────────
 
 fn setup_ui(mut commands: Commands) {
-    let root = commands.spawn((
-        Node {
-            width:            Val::Percent(100.0),
-            height:           Val::Percent(100.0),
-            flex_direction:   FlexDirection::Column,
-            align_items:      AlignItems::Center,
-            justify_content:  JustifyContent::Center,
-            row_gap:          Val::Px(20.0),
-            ..default()
-        },
-        BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
-        CalRoot,
-    )).id();
+    let root = commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(20.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
+            CalRoot,
+        ))
+        .id();
 
     commands.entity(root).with_children(|p| {
         // ── Title ─────────────────────────────────────────────────────────────
         p.spawn((
             Text::new("Latency Calibration"),
-            TextFont { font_size: FontSize::Px(38.0), ..default() },
+            TextFont {
+                font_size: FontSize::Px(38.0),
+                ..default()
+            },
             TextColor(Color::WHITE),
         ));
 
         // ── Status text ───────────────────────────────────────────────────────
         p.spawn((
-            Text::new("Play any note on each beat — the game measures how late \
-                       your mic detects sound."),
-            TextFont { font_size: FontSize::Px(16.0), ..default() },
+            Text::new(
+                "Play any note on each beat — the game measures how late \
+                       your mic detects sound.",
+            ),
+            TextFont {
+                font_size: FontSize::Px(16.0),
+                ..default()
+            },
             TextColor(Color::srgb(0.62, 0.65, 0.80)),
-            TextLayout { justify: Justify::Center, ..default() },
-            Node { max_width: Val::Px(480.0), ..default() },
+            TextLayout {
+                justify: Justify::Center,
+                ..default()
+            },
+            Node {
+                max_width: Val::Px(480.0),
+                ..default()
+            },
             CalStatusText,
         ));
 
         // ── Beat dots ─────────────────────────────────────────────────────────
-        p.spawn(Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(18.0), ..default() })
-         .with_children(|row| {
-             for i in 0..4 {
-                 row.spawn((
-                     Node { width: Val::Px(44.0), height: Val::Px(44.0), ..default() },
-                     BackgroundColor(Color::srgb(0.12, 0.12, 0.20)),
-                     BeatDot(i),
-                 ));
-             }
-         });
+        p.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(18.0),
+            ..default()
+        })
+        .with_children(|row| {
+            for i in 0..4 {
+                row.spawn((
+                    Node {
+                        width: Val::Px(44.0),
+                        height: Val::Px(44.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.12, 0.12, 0.20)),
+                    BeatDot(i),
+                ));
+            }
+        });
 
         // ── Mic-level bar ─────────────────────────────────────────────────────
         p.spawn(Node {
-            flex_direction:  FlexDirection::Row,
-            align_items:     AlignItems::Center,
-            column_gap:      Val::Px(12.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(12.0),
             ..default()
-        }).with_children(|row| {
+        })
+        .with_children(|row| {
             row.spawn((
                 Text::new("Mic"),
-                TextFont { font_size: FontSize::Px(15.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.55, 0.58, 0.68)),
             ));
             // Track
             row.spawn((
                 Node {
-                    width:  Val::Px(220.0),
+                    width: Val::Px(220.0),
                     height: Val::Px(12.0),
                     ..default()
                 },
                 BackgroundColor(Color::srgb(0.10, 0.12, 0.10)),
-            )).with_children(|track| {
+            ))
+            .with_children(|track| {
                 // Fill — width is animated by update_mic_bar
                 track.spawn((
-                    Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+                    Node {
+                        width: Val::Percent(0.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
                     BackgroundColor(Color::srgb(0.10, 0.18, 0.14)),
                     MicBarFill,
                 ));
@@ -524,60 +631,92 @@ fn setup_ui(mut commands: Commands) {
         });
 
         // ── Timing window bar ─────────────────────────────────────────────────
-        p.spawn(Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: Val::Px(4.0), ..default() })
-         .with_children(|col| {
-             // The bar itself: coloured zones + hit markers as absolute children.
-             col.spawn((
-                 Node {
-                     width:         Val::Px(BAR_WIDTH_PX),
-                     height:        Val::Px(28.0),
-                     flex_direction: FlexDirection::Row,
-                     overflow:      Overflow::clip(),
-                     ..default()
-                 },
-                 BackgroundColor(Color::srgb(0.08, 0.08, 0.12)),
-                 TimingBarContainer,
-             )).with_children(|bar| {
-                 spawn_timing_zones(bar);
-             });
+        p.spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(4.0),
+            ..default()
+        })
+        .with_children(|col| {
+            // The bar itself: coloured zones + hit markers as absolute children.
+            col.spawn((
+                Node {
+                    width: Val::Px(BAR_WIDTH_PX),
+                    height: Val::Px(28.0),
+                    flex_direction: FlexDirection::Row,
+                    overflow: Overflow::clip(),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.08, 0.08, 0.12)),
+                TimingBarContainer,
+            ))
+            .with_children(|bar| {
+                spawn_timing_zones(bar);
+            });
 
-             // Axis labels: -200ms  |  0  |  +200ms
-             col.spawn(Node { width: Val::Px(BAR_WIDTH_PX), flex_direction: FlexDirection::Row, justify_content: JustifyContent::SpaceBetween, ..default() })
-                .with_children(|labels| {
-                    for txt in ["-200ms", "0", "+200ms"] {
-                        labels.spawn((
-                            Text::new(txt),
-                            TextFont { font_size: FontSize::Px(11.0), ..default() },
-                            TextColor(Color::srgb(0.40, 0.42, 0.52)),
-                        ));
-                    }
-                });
+            // Axis labels: -200ms  |  0  |  +200ms
+            col.spawn(Node {
+                width: Val::Px(BAR_WIDTH_PX),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            })
+            .with_children(|labels| {
+                for txt in ["-200ms", "0", "+200ms"] {
+                    labels.spawn((
+                        Text::new(txt),
+                        TextFont {
+                            font_size: FontSize::Px(11.0),
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.40, 0.42, 0.52)),
+                    ));
+                }
+            });
 
-             // Per-hit offset summary text
-             col.spawn((
-                 Text::new(""),
-                 TextFont { font_size: FontSize::Px(14.0), ..default() },
-                 TextColor(Color::srgb(0.70, 0.72, 0.85)),
-                 Node { margin: UiRect::top(Val::Px(2.0)), ..default() },
-                 HitOffsetsSummary,
-             ));
-         });
+            // Per-hit offset summary text
+            col.spawn((
+                Text::new(""),
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.70, 0.72, 0.85)),
+                Node {
+                    margin: UiRect::top(Val::Px(2.0)),
+                    ..default()
+                },
+                HitOffsetsSummary,
+            ));
+        });
 
         // ── Result block (Done only) ───────────────────────────────────────────
         p.spawn((
-            Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: Val::Px(6.0), ..default() },
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(6.0),
+                ..default()
+            },
             Visibility::Hidden,
             ShowDone,
-        )).with_children(|block| {
+        ))
+        .with_children(|block| {
             block.spawn((
                 Text::new("Mean offset: —"),
-                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.95, 0.62, 0.30)),
                 CalMeanText,
             ));
             block.spawn((
                 Text::new("Current: —   →   Suggested: —"),
-                TextFont { font_size: FontSize::Px(16.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(16.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.62, 0.65, 0.80)),
                 CalSuggestedText,
             ));
@@ -594,27 +733,36 @@ fn setup_ui(mut commands: Commands) {
 
         // Waiting-only row
         p.spawn((
-            Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(14.0), ..default() },
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(14.0),
+                ..default()
+            },
             ShowWaiting,
-        )).with_children(|row| {
+        ))
+        .with_children(|row| {
             spawn_cal_button(row, "Start", begin_recording);
         });
 
         // Done-only row
         p.spawn((
-            Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(14.0), ..default() },
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(14.0),
+                ..default()
+            },
             Visibility::Hidden,
             ShowDone,
-        )).with_children(|row| {
+        ))
+        .with_children(|row| {
             spawn_cal_button(row, "Apply", apply_calibration);
             spawn_cal_button(row, "Try Again", begin_recording);
         });
 
         // Cancel — always visible regardless of phase
-        p.spawn(Node::default())
-         .with_children(|row| {
-             spawn_cal_button(row, "\u{2190} Cancel", cancel_calibration);
-         });
+        p.spawn(Node::default()).with_children(|row| {
+            spawn_cal_button(row, "\u{2190} Cancel", cancel_calibration);
+        });
     });
 }
 
@@ -622,30 +770,51 @@ fn setup_ui(mut commands: Commands) {
 /// child nodes.  Zones are (left_pct, width_pct, color).
 fn spawn_timing_zones(bar: &mut ChildSpawnerCommands) {
     // Map ms to 0..1: frac = (ms / BAR_RANGE_MS) * 0.5 + 0.5
-    let ms_to_pct = |ms: f64| -> f32 { ((ms / BAR_RANGE_MS) * 0.5 + 0.5).clamp(0.0, 1.0) as f32 * 100.0 };
+    let ms_to_pct =
+        |ms: f64| -> f32 { ((ms / BAR_RANGE_MS) * 0.5 + 0.5).clamp(0.0, 1.0) as f32 * 100.0 };
 
-    let left_outer  = ms_to_pct(-BAR_RANGE_MS); //   0%
-    let left_good   = ms_to_pct(-GOOD_MS);       //  17.5%
-    let left_perf   = ms_to_pct(-PERFECT_MS);    //  35%
-    let right_perf  = ms_to_pct( PERFECT_MS);    //  65%
-    let right_good  = ms_to_pct( GOOD_MS);       //  82.5%
-    let right_outer = ms_to_pct( BAR_RANGE_MS);  // 100%
+    let left_outer = ms_to_pct(-BAR_RANGE_MS); //   0%
+    let left_good = ms_to_pct(-GOOD_MS); //  17.5%
+    let left_perf = ms_to_pct(-PERFECT_MS); //  35%
+    let right_perf = ms_to_pct(PERFECT_MS); //  65%
+    let right_good = ms_to_pct(GOOD_MS); //  82.5%
+    let right_outer = ms_to_pct(BAR_RANGE_MS); // 100%
 
     let zones: &[(f32, f32, Color)] = &[
-        (left_outer, left_good  - left_outer,  Color::srgb(0.30, 0.10, 0.10)), // dark red left
-        (left_good,  left_perf  - left_good,   Color::srgb(0.50, 0.32, 0.08)), // orange left
-        (left_perf,  right_perf - left_perf,   Color::srgb(0.10, 0.38, 0.14)), // green centre
-        (right_perf, right_good - right_perf,  Color::srgb(0.50, 0.32, 0.08)), // orange right
-        (right_good, right_outer- right_good,  Color::srgb(0.30, 0.10, 0.10)), // dark red right
+        (
+            left_outer,
+            left_good - left_outer,
+            Color::srgb(0.30, 0.10, 0.10),
+        ), // dark red left
+        (
+            left_good,
+            left_perf - left_good,
+            Color::srgb(0.50, 0.32, 0.08),
+        ), // orange left
+        (
+            left_perf,
+            right_perf - left_perf,
+            Color::srgb(0.10, 0.38, 0.14),
+        ), // green centre
+        (
+            right_perf,
+            right_good - right_perf,
+            Color::srgb(0.50, 0.32, 0.08),
+        ), // orange right
+        (
+            right_good,
+            right_outer - right_good,
+            Color::srgb(0.30, 0.10, 0.10),
+        ), // dark red right
     ];
 
     for &(left, width, color) in zones {
         bar.spawn((
             Node {
                 position_type: PositionType::Absolute,
-                left:   Val::Percent(left),
-                top:    Val::Percent(0.0),
-                width:  Val::Percent(width),
+                left: Val::Percent(left),
+                top: Val::Percent(0.0),
+                width: Val::Percent(width),
                 height: Val::Percent(100.0),
                 ..default()
             },
@@ -657,9 +826,9 @@ fn spawn_timing_zones(bar: &mut ChildSpawnerCommands) {
     bar.spawn((
         Node {
             position_type: PositionType::Absolute,
-            left:   Val::Percent(50.0),
-            top:    Val::Percent(0.0),
-            width:  Val::Px(1.0),
+            left: Val::Percent(50.0),
+            top: Val::Percent(0.0),
+            width: Val::Px(1.0),
             height: Val::Percent(100.0),
             ..default()
         },
@@ -686,7 +855,10 @@ mod tests {
     use super::*;
 
     fn state_with_offsets(offsets: &[f64]) -> CalState {
-        CalState { offsets: offsets.to_vec(), ..default() }
+        CalState {
+            offsets: offsets.to_vec(),
+            ..default()
+        }
     }
 
     #[test]
@@ -708,7 +880,9 @@ mod tests {
 
     #[test]
     fn mixed_offsets_average_correctly() {
-        let ms = state_with_offsets(&[0.040, 0.060]).mean_offset_ms().unwrap();
+        let ms = state_with_offsets(&[0.040, 0.060])
+            .mean_offset_ms()
+            .unwrap();
         assert!((ms - 50.0).abs() < 0.1, "expected 50ms, got {ms}");
     }
 

@@ -4,10 +4,10 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 
+use super::state::{Dir, Expr, GridNote, Pitch};
+use super::{TICK_W, TICKS_PER_BEAT};
 use crate::audio_system::midi::note_to_midi;
 use crate::settings::AudioSettings;
-use super::{TICKS_PER_BEAT, TICK_W};
-use super::state::{Dir, Expr, GridNote, Pitch};
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -15,11 +15,9 @@ use super::state::{Dir, Expr, GridNote, Pitch};
 pub(super) const SAMPLE_RATE: u32 = 44_100;
 
 /// Standard Richter-tuned C-harp blow notes, holes 1–10.
-pub(super) const C_BLOW: [&str; 10] =
-    ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
+pub(super) const C_BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
 /// Standard Richter-tuned C-harp draw notes, holes 1–10.
-pub(super) const C_DRAW: [&str; 10] =
-    ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
+pub(super) const C_DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
 
 // ── Synthesis parameters ─────────────────────────────────────────────────────
 
@@ -137,7 +135,14 @@ pub(super) fn note_freq(note: &GridNote, key_offset: i32) -> Option<f32> {
 /// than a drifting frequency × time product.
 fn harmonica_wave(freq: f32, t: f32, phase_mod: f32) -> f32 {
     let mut s = 0.0f32;
-    for (k, amp) in [(1.0f32, P1), (2.0, P2), (3.0, P3), (4.0, P4), (5.0, P5), (6.0, P6)] {
+    for (k, amp) in [
+        (1.0f32, P1),
+        (2.0, P2),
+        (3.0, P3),
+        (4.0, P4),
+        (5.0, P5),
+        (6.0, P6),
+    ] {
         s += amp * (TAU * freq * k * t + k * phase_mod).sin();
     }
     s / PARTIALS_SUM
@@ -150,9 +155,13 @@ fn harmonica_wave_muffled(freq: f32, t: f32, phase_mod: f32) -> f32 {
 }
 
 pub(super) fn envelope(i: usize, dur: usize) -> f32 {
-    let attack  = (SAMPLE_RATE as f32 * ATTACK_SECS)  as usize;
+    let attack = (SAMPLE_RATE as f32 * ATTACK_SECS) as usize;
     let release = (SAMPLE_RATE as f32 * RELEASE_SECS) as usize;
-    let atk = if attack > 0 && i < attack { i as f32 / attack as f32 } else { 1.0 };
+    let atk = if attack > 0 && i < attack {
+        i as f32 / attack as f32
+    } else {
+        1.0
+    };
     let rel = if dur > release && i > dur - release {
         (dur - i) as f32 / release as f32
     } else {
@@ -164,15 +173,18 @@ pub(super) fn envelope(i: usize, dur: usize) -> f32 {
 pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f32> {
     let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
     let end_tick = notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
-    let total = ((end_tick as f32 * secs_per_tick + TAIL_SECS) * SAMPLE_RATE as f32).ceil() as usize;
+    let total =
+        ((end_tick as f32 * secs_per_tick + TAIL_SECS) * SAMPLE_RATE as f32).ceil() as usize;
     let mut buf = vec![0.0f32; total.max(1)];
 
     let attack_samples = (SAMPLE_RATE as f32 * ATTACK_SECS) as usize;
 
     for n in notes {
-        let Some(freq) = note_freq(n, key_offset) else { continue };
+        let Some(freq) = note_freq(n, key_offset) else {
+            continue;
+        };
         let start = (n.tick as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
-        let dur   = (n.len  as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
+        let dur = (n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
 
         // Unique per-note LCG seed so each note has an independent breath-noise stream.
         let mut rng: u32 = LCG_SEED
@@ -181,8 +193,10 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
 
         for i in 0..dur {
             let s = start + i;
-            if s >= buf.len() { break; }
-            let t   = i as f32 / SAMPLE_RATE as f32;
+            if s >= buf.len() {
+                break;
+            }
+            let t = i as f32 / SAMPLE_RATE as f32;
             let env = envelope(i, dur);
 
             // ── Vibrato: phase-correct pitch fluctuation ─────────────────────
@@ -198,10 +212,7 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
             // oscillates symmetrically between 0 and 2*freq*depth/rate, so the
             // pitch wobbles evenly above and below the base frequency.
             let phase_mod = match n.expr {
-                Expr::Vibrato(rate) => {
-                    freq * VIBRATO_DEPTH / rate
-                        * (1.0 - (TAU * rate * t).cos())
-                }
+                Expr::Vibrato(rate) => freq * VIBRATO_DEPTH / rate * (1.0 - (TAU * rate * t).cos()),
                 _ => 0.0,
             };
 
@@ -213,10 +224,10 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
             // full bright harmonic stack as the hands open.
             let (tone, amp_mod) = if let Expr::Wah(rate) = n.expr {
                 let wah_open = ((TAU * rate * t).sin() + 1.0) * 0.5;
-                let bright   = harmonica_wave(freq, t, 0.0);
-                let muffled  = harmonica_wave_muffled(freq, t, 0.0);
-                let blended  = muffled + wah_open * (bright - muffled);
-                let amp      = WAH_AMP_CLOSED + (1.0 - WAH_AMP_CLOSED) * wah_open;
+                let bright = harmonica_wave(freq, t, 0.0);
+                let muffled = harmonica_wave_muffled(freq, t, 0.0);
+                let blended = muffled + wah_open * (bright - muffled);
+                let amp = WAH_AMP_CLOSED + (1.0 - WAH_AMP_CLOSED) * wah_open;
                 (blended, amp)
             } else {
                 (harmonica_wave(freq, t, phase_mod), 1.0)
@@ -238,7 +249,9 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
 
     let peak = buf.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
     if peak > 1.0 {
-        for x in &mut buf { *x /= peak; }
+        for x in &mut buf {
+            *x /= peak;
+        }
     }
     buf
 }
@@ -264,14 +277,22 @@ pub(super) fn start_playback(
     let bpm = state.tempo.trim().parse::<f32>().unwrap_or(120.0).max(1.0);
     let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
     if !state.notes.is_empty() {
-        let wav = encode_wav(&render_pcm(&state.notes, bpm, key_offset(&state.key)), SAMPLE_RATE);
+        let wav = encode_wav(
+            &render_pcm(&state.notes, bpm, key_offset(&state.key)),
+            SAMPLE_RATE,
+        );
         let handle = sources.add(AudioSource { bytes: wav.into() });
         commands.spawn((
             EditorAudio,
             AudioPlayer::<AudioSource>(handle),
             PlaybackSettings::DESPAWN,
         ));
-        let end_tick = state.notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
+        let end_tick = state
+            .notes
+            .iter()
+            .map(|n| n.tick + n.len)
+            .max()
+            .unwrap_or(0);
         *playhead = Playhead {
             playing: true,
             paused: false,
@@ -285,7 +306,9 @@ pub(super) fn start_playback(
     if !music.is_empty() {
         match std::fs::read(music) {
             Ok(bytes) => {
-                let handle = sources.add(AudioSource { bytes: bytes.into() });
+                let handle = sources.add(AudioSource {
+                    bytes: bytes.into(),
+                });
                 commands.spawn((
                     EditorAudio,
                     AudioPlayer::<AudioSource>(handle),
@@ -331,7 +354,9 @@ pub(super) fn update_playhead_view(
     playhead: Res<Playhead>,
     mut line: Query<(&mut Node, &mut Visibility), With<PlayheadLine>>,
 ) {
-    let Ok((mut node, mut vis)) = line.single_mut() else { return };
+    let Ok((mut node, mut vis)) = line.single_mut() else {
+        return;
+    };
     if !playhead.playing || playhead.secs_per_tick <= 0.0 {
         *vis = Visibility::Hidden;
         return;

@@ -5,9 +5,9 @@
 //! Both `gameplay_2d` (in-game notes) and the `note_editor` binary use
 //! [`spawn_note_children`] so any layout change here is reflected everywhere.
 
-use bevy::{asset::AssetPath, ecs::system::EntityCommands, prelude::*};
-use bevy::ui_render::prelude::MaterialNode;
 use super::note_tail_2d::NoteTail2dMaterial;
+use bevy::ui_render::prelude::MaterialNode;
+use bevy::{asset::AssetPath, ecs::system::EntityCommands, prelude::*};
 
 /// Everything needed to spawn the tail + head children of a 2-D note node.
 pub struct NoteChildConfig {
