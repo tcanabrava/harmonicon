@@ -12,9 +12,9 @@ use super::playback::{
     EditorAudio, EditorProgressFill, Playhead, PlayheadLine, start_playback, toggle_pause,
 };
 use super::practice::{PracticeState, start_practice, stop_practice};
-use super::state::{EditorState, FIELDS, Field, HARP_KEYS, Mode, POSITIONS, Scroll};
+use super::state::{EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, Mode, POSITIONS, Scroll};
 use super::{
-    AppState, BEAT_W, HEADER_H, HOLE_COL_W, LOAD_PURPOSE, MUSIC_PURPOSE, NOTE_PAD, ROW_H, ROWS,
+    AppState, BEAT_W, HEADER_H, HOLE_COL_W, LOAD_PURPOSE, MUSIC_PURPOSE, NOTE_PAD, ROW_H,
     SAVE_PURPOSE, grid_height,
 };
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
@@ -37,6 +37,22 @@ pub(super) struct GridContent;
 #[derive(Component)]
 pub(super) struct GridItem;
 
+/// The row wrapping the hole column and the grid area, sized to
+/// [`grid_height`] — resized when the harmonica's hole count changes.
+#[derive(Component)]
+pub(super) struct GridRowContainer;
+
+/// The fixed-width hole column's container (number + box per hole). Its
+/// per-hole rows are (re)spawned by `grid::rebuild_grid` alongside the grid
+/// lanes, since both depend on the current harmonica's hole count.
+#[derive(Component)]
+pub(super) struct HoleColumnContent;
+
+/// The label showing the current [`super::state::HarmonicaKind`] ("Diatonic"
+/// / "Chromatic") next to its toggle button.
+#[derive(Component)]
+pub(super) struct HarmonicaKindText;
+
 #[derive(Component)]
 pub(super) struct NoteView(pub(super) u32);
 
@@ -50,6 +66,9 @@ pub(super) enum ModButton {
     Bend,
     Overblow,
     Overdraw,
+    /// Chromatic-only: the slide button, a half-step raise. Hidden for
+    /// diatonic charts, shown in place of Bend/Overblow/Overdraw.
+    Slide,
     Wah,
     Vibrato,
     Delete,
@@ -139,6 +158,60 @@ pub(super) fn cleanup(
     }
 }
 
+/// Resizes the fixed chrome around the note grid — the row wrapping the hole
+/// column and the grid area, the grid area itself, its scrollable content,
+/// and the playhead line — to fit the harmonica's current hole count. Runs
+/// alongside [`sync_hole_column`] and `grid::rebuild_grid`, gated the same
+/// way, since hole count only changes when the harmonica kind is switched.
+pub(super) fn sync_chrome_height(
+    state: Res<EditorState>,
+    mut rows: Query<
+        &mut Node,
+        Or<(
+            With<GridRowContainer>,
+            With<GridArea>,
+            With<GridContent>,
+            With<PlayheadLine>,
+        )>,
+    >,
+) {
+    let h = grid_height(state.hole_count());
+    for mut node in &mut rows {
+        node.height = Val::Px(h);
+    }
+}
+
+/// Respawns the hole column's per-hole rows for the current harmonica's hole
+/// count. The rows carry no interaction state (unlike the note grid), so a
+/// full despawn/respawn on every `EditorState` change is simple and cheap.
+pub(super) fn sync_hole_column(
+    mut commands: Commands,
+    state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
+    col: Query<(Entity, Option<&Children>), With<HoleColumnContent>>,
+) {
+    let Ok((entity, children)) = col.single() else {
+        return;
+    };
+    if let Some(children) = children {
+        for &c in children {
+            commands.entity(c).despawn();
+        }
+    }
+    let hole_count = state.hole_count();
+    let colors = theme.song_editor_colors();
+    commands.entity(entity).insert(Node {
+        width: Val::Px(HOLE_COL_W),
+        height: Val::Px(grid_height(hole_count)),
+        flex_direction: FlexDirection::Column,
+        flex_shrink: 0.0,
+        ..default()
+    });
+    commands.entity(entity).with_children(|col| {
+        spawn_hole_column_rows(col, colors, hole_count);
+    });
+}
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 pub(super) fn setup(
@@ -149,6 +222,7 @@ pub(super) fn setup(
 ) {
     let colors = theme.song_editor_colors();
     let mode = state.mode;
+    let hole_count = state.hole_count();
     commands
         .spawn((
             EditorRoot,
@@ -182,19 +256,22 @@ pub(super) fn setup(
                 ));
             });
 
-            root.spawn(Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(grid_height()),
-                flex_direction: FlexDirection::Row,
-                ..default()
-            })
+            root.spawn((
+                GridRowContainer,
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(grid_height(hole_count)),
+                    flex_direction: FlexDirection::Row,
+                    ..default()
+                },
+            ))
             .with_children(|row| {
-                spawn_hole_column(row, colors);
+                spawn_hole_column(row, colors, hole_count);
                 row.spawn((
                     GridArea,
                     Node {
                         flex_grow: 1.0,
-                        height: Val::Px(grid_height()),
+                        height: Val::Px(grid_height(hole_count)),
                         overflow: Overflow::clip(),
                         ..default()
                     },
@@ -206,7 +283,7 @@ pub(super) fn setup(
                             position_type: PositionType::Absolute,
                             left: Val::Px(0.0),
                             top: Val::Px(0.0),
-                            height: Val::Px(grid_height()),
+                            height: Val::Px(grid_height(hole_count)),
                             ..default()
                         },
                     ))
@@ -233,7 +310,7 @@ pub(super) fn setup(
                                 position_type: PositionType::Absolute,
                                 top: Val::Px(0.0),
                                 width: Val::Px(2.0),
-                                height: Val::Px(grid_height()),
+                                height: Val::Px(grid_height(hole_count)),
                                 ..default()
                             },
                             BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
@@ -264,52 +341,61 @@ pub(super) fn setup(
         });
 }
 
-fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors) {
-    row.spawn(Node {
-        width: Val::Px(HOLE_COL_W),
-        height: Val::Px(grid_height()),
-        flex_direction: FlexDirection::Column,
-        flex_shrink: 0.0,
-        ..default()
-    })
+fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
+    row.spawn((
+        HoleColumnContent,
+        Node {
+            width: Val::Px(HOLE_COL_W),
+            height: Val::Px(grid_height(hole_count)),
+            flex_direction: FlexDirection::Column,
+            flex_shrink: 0.0,
+            ..default()
+        },
+    ))
     .with_children(|col| {
+        spawn_hole_column_rows(col, colors, hole_count);
+    });
+}
+
+/// Respawns the hole column's contents (called from [`setup`] initially, and
+/// from [`sync_hole_column`] whenever the harmonica's hole count changes).
+fn spawn_hole_column_rows(col: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        height: Val::Px(HEADER_H),
+        ..default()
+    });
+    for hole in 1..=hole_count {
         col.spawn(Node {
             width: Val::Percent(100.0),
-            height: Val::Px(HEADER_H),
+            height: Val::Px(ROW_H),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            column_gap: Val::Px(6.0),
             ..default()
+        })
+        .with_children(|r| {
+            r.spawn((
+                Text::new(format!("{hole:02}")),
+                TextFont {
+                    font_size: FontSize::Px(13.0),
+                    ..default()
+                },
+                TextColor(colors.label),
+            ));
+            r.spawn((
+                Node {
+                    width: Val::Px(20.0),
+                    height: Val::Px(20.0),
+                    border: UiRect::all(Val::Px(1.5)),
+                    ..default()
+                },
+                BackgroundColor(colors.hole_box),
+                BorderColor::all(Color::srgb(0.45, 0.45, 0.55)),
+            ));
         });
-        for hole in 1..=ROWS {
-            col.spawn(Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(ROW_H),
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                column_gap: Val::Px(6.0),
-                ..default()
-            })
-            .with_children(|r| {
-                r.spawn((
-                    Text::new(format!("{hole:02}")),
-                    TextFont {
-                        font_size: FontSize::Px(13.0),
-                        ..default()
-                    },
-                    TextColor(colors.label),
-                ));
-                r.spawn((
-                    Node {
-                        width: Val::Px(20.0),
-                        height: Val::Px(20.0),
-                        border: UiRect::all(Val::Px(1.5)),
-                        ..default()
-                    },
-                    BackgroundColor(colors.hole_box),
-                    BorderColor::all(Color::srgb(0.45, 0.45, 0.55)),
-                ));
-            });
-        }
-    });
+    }
 }
 
 fn spawn_mod_panel(
@@ -410,6 +496,7 @@ fn spawn_mod_panel(
                 mod_button(g, ModButton::Bend, loc.msg("mod-bend"), colors);
                 mod_button(g, ModButton::Overblow, loc.msg("mod-overblow"), colors);
                 mod_button(g, ModButton::Overdraw, loc.msg("mod-overdraw"), colors);
+                mod_button(g, ModButton::Slide, loc.msg("mod-slide"), colors);
                 mod_button(g, ModButton::Wah, loc.msg("mod-wah"), colors);
                 mod_button(g, ModButton::Vibrato, loc.msg("mod-vibrato"), colors);
                 g.spawn(Node {
@@ -720,6 +807,62 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
         ..default()
     })
     .with_children(|form| {
+        form.spawn(Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(10.0),
+            ..default()
+        })
+        .with_children(|line| {
+            line.spawn((
+                Node {
+                    width: Val::Px(150.0),
+                    ..default()
+                },
+                Text::new(format!("{}:", loc.msg("editor-field-harmonica"))),
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
+                TextColor(colors.label),
+            ));
+            line.spawn((
+                Button,
+                Node {
+                    width: Val::Px(240.0),
+                    height: Val::Px(26.0),
+                    align_items: AlignItems::Center,
+                    padding: UiRect::horizontal(Val::Px(8.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(colors.field_bg),
+                BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            ))
+            .observe(
+                |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                    let next = match state.harmonica_kind {
+                        HarmonicaKind::Diatonic => HarmonicaKind::Chromatic,
+                        HarmonicaKind::Chromatic => HarmonicaKind::Diatonic,
+                    };
+                    state.set_harmonica_kind(next);
+                },
+            )
+            .with_children(|b| {
+                b.spawn((
+                    HarmonicaKindText,
+                    Text::new(String::new()),
+                    TextFont {
+                        font_size: FontSize::Px(14.0),
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                    Pickable::IGNORE,
+                ));
+            });
+        });
+
         for (field, label) in FIELDS {
             form.spawn(Node {
                 width: Val::Percent(100.0),

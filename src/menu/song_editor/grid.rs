@@ -10,12 +10,13 @@ use super::interaction::select_or_add;
 use super::material::EditorNoteMaterial;
 use super::playback::{key_offset, note_freq};
 use super::state::{
-    DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch, can_place, enforce_direction,
-    enforce_expr, move_target, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
+    DragKind, DragState, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, can_place,
+    enforce_direction, enforce_expr, move_target, note_rect, pitch_color, pitch_compatible,
+    pitch_deny_key,
 };
 use super::ui::{GridContent, GridItem, NoteView};
 use super::{
-    BEAT_W, BEATS_PER_BAR, HANDLE_W, HEADER_H, ROW_H, ROWS, TICK_W, TICKS_PER_BEAT, grid_height,
+    BEAT_W, BEATS_PER_BAR, HANDLE_W, HEADER_H, ROW_H, TICK_W, TICKS_PER_BEAT, grid_height,
 };
 use crate::audio_system::midi::midi_to_note;
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
@@ -58,8 +59,13 @@ const OUT_OF_SCALE_TINT: Color = Color::srgb(0.95, 0.25, 0.20);
 /// C harp is exactly how a blues player reaches the ♭7 — falls in `scale`.
 /// `None` (holes/directions the harp can't produce) counts as in-scale, so a
 /// note that can't be resolved to a pitch isn't flagged as "wrong" too.
-pub(super) fn note_in_scale(note: &GridNote, key_offset: i32, scale: &HashSet<String>) -> bool {
-    let Some(freq) = note_freq(note, key_offset) else {
+pub(super) fn note_in_scale(
+    note: &GridNote,
+    key_offset: i32,
+    scale: &HashSet<String>,
+    kind: HarmonicaKind,
+) -> bool {
+    let Some(freq) = note_freq(note, key_offset, kind) else {
         return true;
     };
     let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
@@ -84,6 +90,8 @@ pub(super) fn rebuild_grid(
     let bar_colors = theme.twelve_bar_colors();
     let scale = blues_scale_classes(&state.key);
     let k_off = key_offset(&state.key);
+    let hole_count = state.hole_count();
+    let kind = state.harmonica_kind;
     // Locked (user Lock toggle, or Perform mode): grid cells, notes, and
     // resize handles are all spawned non-interactive via `Pickable::IGNORE`,
     // so no click/drag observer below ever fires — a single gate at spawn
@@ -158,7 +166,7 @@ pub(super) fn rebuild_grid(
                 .id(),
         );
 
-        for hole in 1..=ROWS {
+        for hole in 1..=hole_count {
             let y = HEADER_H + (hole as f32 - 1.0) * ROW_H;
             let lane = if hole % 2 == 0 {
                 colors.lane_a
@@ -213,7 +221,7 @@ pub(super) fn rebuild_grid(
                         left: Val::Px(x),
                         top: Val::Px(0.0),
                         width: Val::Px(if is_bar { 2.0 } else { 1.0 }),
-                        height: Val::Px(grid_height()),
+                        height: Val::Px(grid_height(hole_count)),
                         ..default()
                     },
                     BackgroundColor(if is_bar {
@@ -237,7 +245,7 @@ pub(super) fn rebuild_grid(
                             left: Val::Px(x + s as f32 * TICK_W),
                             top: Val::Px(HEADER_H),
                             width: Val::Px(1.0),
-                            height: Val::Px(grid_height() - HEADER_H),
+                            height: Val::Px(grid_height(hole_count) - HEADER_H),
                             ..default()
                         },
                         BackgroundColor(if is_half {
@@ -257,7 +265,7 @@ pub(super) fn rebuild_grid(
     for note in &state.notes {
         if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.selected == Some(note.id);
-            let in_scale = note_in_scale(note, k_off, &scale);
+            let in_scale = note_in_scale(note, k_off, &scale, kind);
             items.push(spawn_note(
                 &mut commands,
                 *note,
@@ -354,6 +362,7 @@ pub(super) fn spawn_note(
                     drag.start_tick,
                     ev.distance.x,
                     ev.distance.y,
+                    state.hole_count(),
                 );
                 let pitch = state
                     .notes

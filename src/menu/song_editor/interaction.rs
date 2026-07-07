@@ -114,6 +114,13 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 };
             }
         }
+        ModButton::Slide => {
+            note.pitch = if note.pitch == Pitch::Slide {
+                Pitch::Normal
+            } else {
+                Pitch::Slide
+            };
+        }
         ModButton::Wah => {
             let next = match note.expr {
                 Expr::Wah(hz) => hz + WAH_HZ_STEP,

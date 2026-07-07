@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-//! A "Let's Bend"-style harmonica diagram: holes 1–10 as columns, with a row
-//! for each way a hole can sound — overblow/overdraw, blow, draw, and the
-//! draw/blow bends — each cell labelled with its note and lit up live from the
-//! mic (via [`ActivePitches`]). Built from the selected harp's blow/draw layout,
-//! so it follows the song's key.
+//! A "Let's Bend"-style harmonica diagram: holes as columns, with a row for
+//! each way a hole can sound, each cell labelled with its note and lit up
+//! live from the mic (via [`ActivePitches`]). Built from the selected harp's
+//! blow/draw layout, so it follows the song's key. Diatonic harps get the
+//! full bend/overblow/overdraw diagram (holes 1–10, [`ROWS`]); chromatic
+//! harps get a simpler blow/draw + slide diagram sized to the harp's actual
+//! hole count, since bends and overblow/overdraw don't exist on that harp.
 
 use std::collections::HashSet;
 
@@ -168,7 +170,14 @@ fn note_for(h: &HoleNotes, hole: u8, row: Row) -> Option<&str> {
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 /// Spawn the harmonica diagram as a child of `parent`, built for `harp`.
+/// Diatonic harps get the full bend/overblow/overdraw diagram; chromatic
+/// harps (no bends, no overblow/overdraw — just a slide button) get a
+/// simpler diagram, see [`spawn_chromatic_overlay`].
 pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) {
+    if matches!(harp, Harmonica::Chromatic { .. }) {
+        spawn_chromatic_overlay(parent, harp);
+        return;
+    }
     let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
 
     parent
@@ -221,6 +230,104 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
                             for (hole, h) in (1..=10u8).zip(&holes) {
                                 match note_for(h, hole, kind) {
                                     Some(note) => spawn_note_cell(row, note, color),
+                                    None => spawn_empty(row),
+                                }
+                            }
+                        });
+                    }
+                });
+        });
+}
+
+/// Which row of the chromatic diagram a cell belongs to.
+#[derive(Clone, Copy)]
+enum ChromaticRow {
+    BlowSlide,
+    Blow,
+    Draw,
+    DrawSlide,
+}
+
+/// The chromatic diagram's rows, top to bottom: slide sits further from the
+/// blow/draw center on each wing, mirroring the diatonic diagram's convention
+/// that the altered pitch sits away from center and color marks breath
+/// direction, not technique.
+const CHROMATIC_ROWS: [(&str, ChromaticRow, Color); 4] = [
+    ("slide \u{2191}", ChromaticRow::BlowSlide, BLOW_COLOR),
+    ("blow \u{2191}", ChromaticRow::Blow, BLOW_COLOR),
+    ("draw \u{2193}", ChromaticRow::Draw, DRAW_COLOR),
+    ("slide \u{2193}", ChromaticRow::DrawSlide, DRAW_COLOR),
+];
+
+/// The note `row` shows for `hole`, or `None` if the harp has no layout data
+/// for that cell (`wind_direction_label`/`slide_label` return `"—"`).
+fn chromatic_note_for(harp: &Harmonica, hole: u8, row: ChromaticRow) -> Option<String> {
+    let label = match row {
+        ChromaticRow::Blow => harp.wind_direction_label(hole, &Action::Blow),
+        ChromaticRow::Draw => harp.wind_direction_label(hole, &Action::Draw),
+        ChromaticRow::BlowSlide => harp.slide_label(hole, &Action::Blow),
+        ChromaticRow::DrawSlide => harp.slide_label(hole, &Action::Draw),
+    };
+    valid_note(label)
+}
+
+/// Spawn the simpler chromatic diagram: blow/draw plus the slide-raised
+/// pitch on each side, sized to `harp`'s actual hole count (12 or 16 — the
+/// bend/overblow/overdraw diagram in [`spawn_harmonica_overlay`] only applies
+/// to the fixed 10-hole diatonic layout).
+fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) {
+    let hole_count = harp.hole_count();
+
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(4.0),
+            padding: UiRect::all(Val::Px(10.0)),
+            ..default()
+        })
+        .with_children(|panel| {
+            panel.spawn((
+                Text::new("Harmonica  \u{00B7}  lights up as you play"),
+                TextFont {
+                    font_size: FontSize::Px(12.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.70, 0.70, 0.80)),
+            ));
+
+            panel
+                .spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(2.0),
+                    ..default()
+                })
+                .with_children(|grid| {
+                    // Header: blank corner + hole numbers.
+                    grid.spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        column_gap: Val::Px(2.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        spawn_label(row, "");
+                        for hole in 1..=hole_count {
+                            spawn_text_cell(row, &hole.to_string(), Color::WHITE);
+                        }
+                    });
+
+                    // One row per technique.
+                    for (label, kind, color) in CHROMATIC_ROWS {
+                        grid.spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(2.0),
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            spawn_label(row, label);
+                            for hole in 1..=hole_count {
+                                match chromatic_note_for(harp, hole, kind) {
+                                    Some(note) => spawn_note_cell(row, &note, color),
                                     None => spawn_empty(row),
                                 }
                             }
@@ -480,5 +587,54 @@ mod tests {
         assert_eq!(note_for(&h10, 10, Row::Overdraw), Some("C#7"));
         assert_eq!(note_for(&h10, 10, Row::DrawBend(0)), None);
         assert_eq!(note_for(&h10, 10, Row::Overblow), None);
+    }
+
+    // ── Chromatic diagram ────────────────────────────────────────────────────
+
+    fn c_chromatic_harp() -> Harmonica {
+        serde_json::from_str(
+            r#"{"type":"chromatic","holes":12,
+                "layout":{"blow":["C4","D4","E4","F4","G4","A4","B4","C5","D5","E5","F5","G5"],
+                          "draw":["D4","E4","F#4","G4","A4","B4","C#5","D5","E5","F#5","G5","A5"],
+                          "blow_slide":["C#4","D#4","F4","F#4","G#4","A#4","C5","C#5","D#5","F5","F#5","G#5"],
+                          "draw_slide":["D#4","F4","G4","G#4","A#4","C5","D5","D#5","F5","G5","G#5","A#5"]}}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn chromatic_note_for_reads_blow_and_draw() {
+        let harp = c_chromatic_harp();
+        assert_eq!(
+            chromatic_note_for(&harp, 1, ChromaticRow::Blow).as_deref(),
+            Some("C4")
+        );
+        assert_eq!(
+            chromatic_note_for(&harp, 1, ChromaticRow::Draw).as_deref(),
+            Some("D4")
+        );
+    }
+
+    #[test]
+    fn chromatic_note_for_reads_the_slide_tables() {
+        let harp = c_chromatic_harp();
+        assert_eq!(
+            chromatic_note_for(&harp, 1, ChromaticRow::BlowSlide).as_deref(),
+            Some("C#4")
+        );
+        assert_eq!(
+            chromatic_note_for(&harp, 1, ChromaticRow::DrawSlide).as_deref(),
+            Some("D#4")
+        );
+    }
+
+    #[test]
+    fn chromatic_note_for_is_none_for_a_diatonic_harp() {
+        // A diatonic harp has no slide tables at all.
+        let harp = c_harp();
+        assert_eq!(
+            chromatic_note_for(&harp, 1, ChromaticRow::BlowSlide),
+            None
+        );
     }
 }

@@ -131,6 +131,12 @@ pub enum Modifier {
     Overblow,
     #[serde(rename = "overdraw")]
     Overdraw,
+    /// Chromatic harmonica's slide button, pressed to raise a hole's natural
+    /// pitch by a half-step — the chromatic equivalent of a diatonic bend.
+    /// Like `Overblow`/`Overdraw`, the resulting pitch is validated at onset
+    /// via the note's own `note` field, not derived from this modifier.
+    #[serde(rename = "slide")]
+    Slide,
     #[serde(rename = "vibrato")]
     Vibrato {
         oscillation_hz: f32,

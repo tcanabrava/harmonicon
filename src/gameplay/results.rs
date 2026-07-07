@@ -137,6 +137,7 @@ pub(super) fn setup(
                 ("Wah", stats.wah),
                 ("Overblow", stats.overblow),
                 ("Overdraw", stats.overdraw),
+                ("Slide", stats.slide),
             ]
             .into_iter()
             .filter(|(_, s)| s.total() > 0)

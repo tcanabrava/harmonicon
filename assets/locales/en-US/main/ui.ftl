@@ -52,6 +52,7 @@ mod-draw = Draw
 mod-bend = Bend
 mod-overblow = Overblow
 mod-overdraw = Overdraw
+mod-slide = Slide
 mod-wah = Wah
 mod-vibrato = Vibrato
 mod-delete = Delete
@@ -60,9 +61,12 @@ mod-delete = Delete
 editor-field-tempo = Music Tempo
 editor-field-key = Harp Key
 editor-field-position = Position
+editor-field-harmonica = Harmonica
 editor-field-music = Background Music
 editor-field-name = Name
 editor-field-author = Author
+editor-harmonica-diatonic = ‹ Diatonic (10 holes) ›
+editor-harmonica-chromatic = ‹ Chromatic (12 holes) ›
 
 # Song Editor 2 — file-dialog titles
 dialog-save-chart = Save chart

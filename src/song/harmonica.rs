@@ -88,32 +88,73 @@ pub fn blues_scale_classes(key: &str) -> HashSet<String> {
 // Returns the blow label for the given hole, or a dash if not available.
 
 impl Harmonica {
-    // Returns the draw label for the given hole, or a dash if not available.
+    /// How many holes this harmonica has — the loaded chart's authority for
+    /// lane counts, hole-strip ranges, etc. (a 10-hole diatonic vs. e.g. a
+    /// 12-hole chromatic), instead of the old hardcoded `HOLE_COUNT = 10`.
+    pub fn hole_count(&self) -> u8 {
+        match self {
+            Harmonica::Diatonic { holes, .. } | Harmonica::Chromatic { holes, .. } => *holes,
+        }
+    }
+
+    // Returns the blow/draw label for the given hole, or a dash if not available.
     pub fn wind_direction_label(&self, hole: u8, action: &Action) -> String {
         let default_return = "\u{2014}".into();
         let Some(idx) = hole.checked_sub(1) else {
             return default_return;
         };
 
-        let Harmonica::Diatonic {
-            layout: Some(l), ..
-        } = self
-        else {
-            return default_return;
+        let notes = match self {
+            Harmonica::Diatonic {
+                layout: Some(l), ..
+            } => match action {
+                Action::Blow => &l.blow,
+                Action::Draw => &l.draw,
+            },
+            Harmonica::Chromatic {
+                layout: Some(l), ..
+            } => match action {
+                Action::Blow => &l.blow,
+                Action::Draw => &l.draw,
+            },
+            _ => return default_return,
         };
 
-        let direction = match action {
-            Action::Blow => &l.blow,
-            Action::Draw => &l.draw,
-        };
-
-        let Some(notes) = &direction else {
+        let Some(notes) = notes else {
             return default_return;
         };
         let Some(n) = notes.get(idx as usize) else {
             return default_return;
         };
 
+        n.clone()
+    }
+
+    /// The slide-pressed pitch for the given hole/direction on a chromatic
+    /// harmonica (a half-step above the natural note) — the chromatic
+    /// equivalent of a diatonic bend. `"—"` for a diatonic harmonica (which
+    /// has no slide button) or an out-of-range hole.
+    pub fn slide_label(&self, hole: u8, action: &Action) -> String {
+        let default_return = "\u{2014}".into();
+        let Some(idx) = hole.checked_sub(1) else {
+            return default_return;
+        };
+        let Harmonica::Chromatic {
+            layout: Some(l), ..
+        } = self
+        else {
+            return default_return;
+        };
+        let notes = match action {
+            Action::Blow => &l.blow_slide,
+            Action::Draw => &l.draw_slide,
+        };
+        let Some(notes) = notes else {
+            return default_return;
+        };
+        let Some(n) = notes.get(idx as usize) else {
+            return default_return;
+        };
         n.clone()
     }
 
@@ -328,6 +369,58 @@ mod tests {
         assert_eq!(
             chart.harmonica.wind_direction_label(0, &Action::Draw),
             "\u{2014}"
+        );
+    }
+
+    #[test]
+    fn hole_count_reads_holes_from_either_variant() {
+        assert_eq!(test_chart().harmonica.hole_count(), 10);
+        assert_eq!(test_chromatic_chart().harmonica.hole_count(), 12);
+    }
+
+    fn test_chromatic_chart() -> HarpChart {
+        serde_json::from_str(r#"{
+            "song": { "title": "T", "artist": "A", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
+            "timing": { "resolution": 480, "tempo_map": [{"tick": 0, "bpm": 120.0}] },
+            "harmonica": {
+                "type": "chromatic",
+                "holes": 12,
+                "layout": {
+                    "blow":       ["C4","D4","E4","F4","G4","A4","B4","C5","D5","E5","F5","G5"],
+                    "draw":       ["D4","E4","F#4","G4","A4","B4","C#5","D5","E5","F#5","G5","A5"],
+                    "blow_slide": ["C#4","D#4","F4","F#4","G#4","A#4","B4","C#5","D#5","F5","F#5","G#5"],
+                    "draw_slide": ["D#4","F4","G4","G#4","A#4","C5","D5","D#5","F5","G5","G#5","A#5"]
+                }
+            },
+            "track": [],
+            "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
+        }"#).unwrap()
+    }
+
+    // Before this fix, `wind_direction_label` only matched `Harmonica::Diatonic`
+    // and silently returned "—" for every chromatic hole regardless of layout.
+    #[test]
+    fn wind_direction_label_works_for_chromatic_too() {
+        let chart = test_chromatic_chart();
+        assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Blow), "C4");
+        assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Draw), "D4");
+        assert_eq!(
+            chart.harmonica.wind_direction_label(12, &Action::Blow),
+            "G5"
+        );
+    }
+
+    #[test]
+    fn slide_label_reads_the_slide_tables_for_chromatic_only() {
+        let chromatic = test_chromatic_chart();
+        assert_eq!(chromatic.harmonica.slide_label(1, &Action::Blow), "C#4");
+        assert_eq!(chromatic.harmonica.slide_label(1, &Action::Draw), "D#4");
+
+        let diatonic = test_chart();
+        assert_eq!(
+            diatonic.harmonica.slide_label(1, &Action::Blow),
+            "\u{2014}",
+            "diatonic harmonicas have no slide button"
         );
     }
 

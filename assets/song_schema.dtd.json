@@ -354,6 +354,7 @@
                           "bend",
                           "overblow",
                           "overdraw",
+                          "slide",
                           "vibrato",
                           "wah-wah"
                         ]
@@ -397,6 +398,14 @@
                         "properties": {
                           "type": {
                             "const": "overdraw"
+                          }
+                        }
+                      },
+
+                      {
+                        "properties": {
+                          "type": {
+                            "const": "slide"
                           }
                         }
                       },

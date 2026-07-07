@@ -2,18 +2,33 @@
 
 use bevy::prelude::*;
 
-use super::{HEADER_H, NOTE_PAD, ROW_H, ROWS, TICK_W};
+use super::{HEADER_H, NOTE_PAD, ROW_H, TICK_W};
 
 // ── Note model types ─────────────────────────────────────────────────────────
 
 /// The pitch technique of a note. Mutually exclusive — a note is exactly one of
-/// these. `Bend` carries its depth in semitones (0.5, 1.0 or 1.5).
+/// these. `Bend` carries its depth in semitones (0.5, 1.0 or 1.5). `Bend`,
+/// `Overblow` and `Overdraw` only apply to [`HarmonicaKind::Diatonic`]; `Slide`
+/// (the chromatic slide button, a half-step raise) only to
+/// [`HarmonicaKind::Chromatic`] — which is in play is gated by which mod
+/// buttons the UI shows for the current [`EditorState::harmonica_kind`].
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) enum Pitch {
     Normal,
     Bend(f32),
     Overblow,
     Overdraw,
+    Slide,
+}
+
+/// Which harmonica the chart is authored for. Diatonic gets the full
+/// bend/overblow/overdraw technique set on 10 holes; chromatic gets a slide
+/// button on 12 holes instead — see [`EditorState::hole_count`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub(super) enum HarmonicaKind {
+    #[default]
+    Diatonic,
+    Chromatic,
 }
 
 /// An expression technique layered on top of the pitch. At most one at a time;
@@ -172,6 +187,7 @@ pub(super) struct EditorState {
     pub(super) mode: Mode,
     /// User's own Lock toggle, independent of `mode`. See [`EditorState::locked`].
     pub(super) user_locked: bool,
+    pub(super) harmonica_kind: HarmonicaKind,
 }
 
 impl Default for EditorState {
@@ -192,6 +208,7 @@ impl Default for EditorState {
             drag_msg: crate::localization::LocalizedStr::default(),
             mode: Mode::default(),
             user_locked: false,
+            harmonica_kind: HarmonicaKind::default(),
         }
     }
 }
@@ -250,6 +267,41 @@ impl EditorState {
     pub(super) fn locked(&self) -> bool {
         self.user_locked || self.mode == Mode::Perform
     }
+
+    /// The number of playable holes for the current [`HarmonicaKind`] — 10 for
+    /// diatonic, 12 for chromatic (the most common chromatic harp; the chart
+    /// format also allows 16, but the editor doesn't offer that layout).
+    pub(super) fn hole_count(&self) -> u8 {
+        match self.harmonica_kind {
+            HarmonicaKind::Diatonic => 10,
+            HarmonicaKind::Chromatic => 12,
+        }
+    }
+
+    /// Switches [`EditorState::harmonica_kind`] and repairs any note that
+    /// wouldn't be valid on the new harp: notes on holes beyond the new
+    /// harp's range are dropped, and pitch techniques exclusive to the old
+    /// kind (bend/overblow/overdraw for diatonic, slide for chromatic) fall
+    /// back to `Pitch::Normal` rather than being silently misinterpreted.
+    pub(super) fn set_harmonica_kind(&mut self, kind: HarmonicaKind) {
+        self.harmonica_kind = kind;
+        let hole_count = self.hole_count();
+        self.notes.retain(|n| n.hole <= hole_count);
+        for n in &mut self.notes {
+            n.pitch = match (kind, n.pitch) {
+                (HarmonicaKind::Diatonic, Pitch::Slide) => Pitch::Normal,
+                (HarmonicaKind::Chromatic, Pitch::Bend(_) | Pitch::Overblow | Pitch::Overdraw) => {
+                    Pitch::Normal
+                }
+                (_, p) => p,
+            };
+        }
+        if let Some(id) = self.selected
+            && !self.notes.iter().any(|n| n.id == id)
+        {
+            self.selected = None;
+        }
+    }
 }
 
 /// Continuous horizontal scroll in pixels. Kept separate from [`EditorState`]
@@ -273,6 +325,9 @@ pub(super) fn pitch_compatible(pitch: Pitch, hole: u8) -> bool {
         Pitch::Bend(depth) => depth <= max_bend(hole) + f32::EPSILON,
         Pitch::Overblow => overblow_ok(hole),
         Pitch::Overdraw => overdraw_ok(hole),
+        // The slide button works on every chromatic hole, so dragging a
+        // slide note never needs to be denied on that basis.
+        Pitch::Slide => true,
     }
 }
 
@@ -283,7 +338,7 @@ pub(super) fn pitch_deny_key(pitch: Pitch, _hole: u8) -> &'static str {
         Pitch::Bend(_) => "drag-denied-bend",
         Pitch::Overblow => "drag-denied-overblow",
         Pitch::Overdraw => "drag-denied-overdraw",
-        Pitch::Normal => "",
+        Pitch::Normal | Pitch::Slide => "",
     }
 }
 
@@ -326,6 +381,7 @@ pub(super) fn pitch_color(pitch: Pitch) -> Color {
         }
         Pitch::Overblow => Color::srgb(0.72, 0.42, 0.95),
         Pitch::Overdraw => Color::srgb(0.28, 0.85, 0.78),
+        Pitch::Slide => Color::srgb(0.90, 0.80, 0.25),
     }
 }
 
@@ -334,10 +390,11 @@ pub(super) fn move_target(
     start_tick: usize,
     dist_x: f32,
     dist_y: f32,
+    hole_count: u8,
 ) -> (u8, usize) {
     let steps_x = (dist_x / TICK_W).round() as i32;
     let steps_y = (dist_y / ROW_H).round() as i32;
-    let hole = (start_hole as i32 + steps_y).clamp(1, ROWS as i32) as u8;
+    let hole = (start_hole as i32 + steps_y).clamp(1, hole_count as i32) as u8;
     let tick = (start_tick as i32 + steps_x).max(0) as usize;
     (hole, tick)
 }

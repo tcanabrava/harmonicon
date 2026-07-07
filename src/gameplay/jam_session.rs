@@ -342,7 +342,7 @@ fn build_hole_guide(
     let mut note_to_holes: HashMap<String, Vec<u8>> = HashMap::new();
     let mut holes = Vec::new();
 
-    for hole in 1..=10u8 {
+    for hole in 1..=harp.hole_count() {
         let blow = harp.wind_direction_label(hole, &Action::Blow);
         let draw = harp.wind_direction_label(hole, &Action::Draw);
         if blow == dash && draw == dash {
@@ -571,6 +571,24 @@ mod tests {
     fn guide_covers_all_ten_holes() {
         let (holes, _) = build_hole_guide(&c_harp(), "C", 120.0, 4);
         assert_eq!(holes.len(), 10);
+    }
+
+    /// 12-hole chromatic, matching the fixture in `harmonica.rs`'s tests.
+    fn c_chromatic_harp() -> Harmonica {
+        serde_json::from_str(
+            r#"{"type":"chromatic","holes":12,
+                "layout":{"blow":["C4","D4","E4","F4","G4","A4","B4","C5","D5","E5","F5","G5"],
+                          "draw":["D4","E4","F#4","G4","A4","B4","C#5","D5","E5","F#5","G5","A5"],
+                          "blow_slide":["C#4","D#4","F4","F#4","G#4","A#4","C5","C#5","D#5","F5","F#5","G#5"],
+                          "draw_slide":["D#4","F4","G4","G#4","A#4","C5","D5","D#5","F5","G5","G#5","A#5"]}}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn guide_covers_all_twelve_holes_for_a_chromatic_harp() {
+        let (holes, _) = build_hole_guide(&c_chromatic_harp(), "C", 120.0, 4);
+        assert_eq!(holes.len(), 12);
     }
 
     #[test]

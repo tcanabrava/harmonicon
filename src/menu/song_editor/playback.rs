@@ -4,7 +4,7 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 
-use super::state::{Dir, Expr, GridNote, Pitch};
+use super::state::{Dir, Expr, GridNote, HarmonicaKind, Pitch};
 use super::{TICK_W, TICKS_PER_BEAT};
 use crate::audio_system::midi::note_to_midi;
 use crate::settings::AudioSettings;
@@ -18,6 +18,28 @@ pub(super) const SAMPLE_RATE: u32 = 44_100;
 pub(super) const C_BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
 /// Standard Richter-tuned C-harp draw notes, holes 1–10.
 pub(super) const C_DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
+
+/// Standard 12-hole C chromatic blow notes: a straight C-major scale (unlike
+/// the diatonic layout above, blow and draw are each already a full scale —
+/// the slide button fills in the remaining chromatic steps, see
+/// `C_BLOW_SLIDE`/`C_DRAW_SLIDE`).
+pub(super) const C_BLOW_CHROMATIC: [&str; 12] = [
+    "C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5", "D5", "E5", "F5", "G5",
+];
+/// Standard 12-hole C chromatic draw notes (the scale a whole step up).
+pub(super) const C_DRAW_CHROMATIC: [&str; 12] = [
+    "D4", "E4", "F#4", "G4", "A4", "B4", "C#5", "D5", "E5", "F#5", "G5", "A5",
+];
+/// Blow notes with the slide button pressed: each a half-step above the
+/// unslid blow note.
+pub(super) const C_BLOW_SLIDE_CHROMATIC: [&str; 12] = [
+    "C#4", "D#4", "F4", "F#4", "G#4", "A#4", "C5", "C#5", "D#5", "F5", "F#5", "G#5",
+];
+/// Draw notes with the slide button pressed: each a half-step above the
+/// unslid draw note.
+pub(super) const C_DRAW_SLIDE_CHROMATIC: [&str; 12] = [
+    "D#4", "F4", "G4", "G#4", "A#4", "C5", "D5", "D#5", "F5", "G5", "G#5", "A#5",
+];
 
 // ── Synthesis parameters ─────────────────────────────────────────────────────
 
@@ -114,15 +136,21 @@ pub(super) fn key_offset(key: &str) -> i32 {
     note_to_midi(&format!("{}4", key.trim())).map_or(0, |m| m - 60)
 }
 
-pub(super) fn note_freq(note: &GridNote, key_offset: i32) -> Option<f32> {
+pub(super) fn note_freq(note: &GridNote, key_offset: i32, kind: HarmonicaKind) -> Option<f32> {
     let idx = (note.hole as usize).checked_sub(1)?;
-    let label = match note.dir {
-        Dir::Blow => *C_BLOW.get(idx)?,
-        Dir::Draw => *C_DRAW.get(idx)?,
+    let label = match (kind, note.dir, note.pitch) {
+        (HarmonicaKind::Chromatic, Dir::Blow, Pitch::Slide) => *C_BLOW_SLIDE_CHROMATIC.get(idx)?,
+        (HarmonicaKind::Chromatic, Dir::Draw, Pitch::Slide) => *C_DRAW_SLIDE_CHROMATIC.get(idx)?,
+        (HarmonicaKind::Chromatic, Dir::Blow, _) => *C_BLOW_CHROMATIC.get(idx)?,
+        (HarmonicaKind::Chromatic, Dir::Draw, _) => *C_DRAW_CHROMATIC.get(idx)?,
+        (HarmonicaKind::Diatonic, Dir::Blow, _) => *C_BLOW.get(idx)?,
+        (HarmonicaKind::Diatonic, Dir::Draw, _) => *C_DRAW.get(idx)?,
     };
     let midi = note_to_midi(label)? as f32 + key_offset as f32;
     let semitones = match note.pitch {
-        Pitch::Normal => 0.0,
+        // Slide is already resolved via the slide table above, not a
+        // semitone offset applied on top of the unslid note.
+        Pitch::Normal | Pitch::Slide => 0.0,
         Pitch::Bend(a) => -a,
         Pitch::Overblow | Pitch::Overdraw => 1.0,
     };
@@ -170,7 +198,12 @@ pub(super) fn envelope(i: usize, dur: usize) -> f32 {
     atk.min(rel).clamp(0.0, 1.0)
 }
 
-pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f32> {
+pub(super) fn render_pcm(
+    notes: &[GridNote],
+    bpm: f32,
+    key_offset: i32,
+    kind: HarmonicaKind,
+) -> Vec<f32> {
     let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
     let end_tick = notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
     let total =
@@ -180,7 +213,7 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, key_offset: i32) -> Vec<f
     let attack_samples = (SAMPLE_RATE as f32 * ATTACK_SECS) as usize;
 
     for n in notes {
-        let Some(freq) = note_freq(n, key_offset) else {
+        let Some(freq) = note_freq(n, key_offset, kind) else {
             continue;
         };
         let start = (n.tick as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
@@ -278,7 +311,12 @@ pub(super) fn start_playback(
     let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
     if !state.notes.is_empty() {
         let wav = encode_wav(
-            &render_pcm(&state.notes, bpm, key_offset(&state.key)),
+            &render_pcm(
+                &state.notes,
+                bpm,
+                key_offset(&state.key),
+                state.harmonica_kind,
+            ),
             SAMPLE_RATE,
         );
         let handle = sources.add(AudioSource { bytes: wav.into() });

@@ -21,8 +21,8 @@ use super::song_progress_overlay::spawn_song_progress;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HIT_H_PCT,
-    HOLE_COUNT, HoleCell, HoleState, LANE_PCT, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote,
-    ScoreText, ValidHarpNotes,
+    HoleCell, HoleState, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote, ScoreText,
+    ValidHarpNotes,
 };
 
 pub fn setup(
@@ -361,6 +361,9 @@ pub(super) fn note_anim_mode(modifiers: Option<&[Modifier]>) -> f32 {
         Some(Modifier::WahWah { .. }) => 3.0,
         Some(Modifier::Overblow) => 4.0,
         Some(Modifier::Overdraw) => 5.0,
+        // No dedicated shader animation yet — falls through to the shader's
+        // default/last branch (currently "overdraw"'s), which is harmless.
+        Some(Modifier::Slide) => 6.0,
         None => 0.0,
     }
 }
@@ -384,15 +387,20 @@ fn spawn_highway(
 ) {
     use crate::song::chart::Action;
 
-    for h in 0..HOLE_COUNT {
-        let left_pct = h as f32 * LANE_PCT;
+    // Lane count/width come from the loaded harmonica, not a fixed 10 —
+    // a chromatic chart's 12+ holes need proportionally narrower lanes.
+    let hole_count = chart.harmonica.hole_count() as usize;
+    let lane_pct = 100.0 / hole_count as f32;
+
+    for h in 0..hole_count {
+        let left_pct = h as f32 * lane_pct;
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
         hw.spawn((
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Percent(left_pct),
                 top: Val::Percent(0.0),
-                width: Val::Percent(LANE_PCT),
+                width: Val::Percent(lane_pct),
                 height: Val::Percent(100.0),
                 ..default()
             },
@@ -448,7 +456,7 @@ fn spawn_highway(
             let is_blow = matches!(event.action, Action::Blow);
             let (r, g, b) = note_rgb(is_blow);
             let note_color = Color::srgba(r, g, b, 1.0);
-            let left_pct = (event.hole as f32 - 1.0) * LANE_PCT;
+            let left_pct = (event.hole as f32 - 1.0) * lane_pct;
             let modifiers = event.modifiers.clone().unwrap_or_default();
             let natural_pitch = event.note.clone().unwrap_or_else(|| {
                 chart
@@ -472,7 +480,7 @@ fn spawn_highway(
                     position_type: PositionType::Absolute,
                     left: Val::Percent(left_pct),
                     bottom: Val::Percent(150.0), // placeholder; set in update_notes
-                    width: Val::Percent(LANE_PCT),
+                    width: Val::Percent(lane_pct),
                     aspect_ratio: Some(1.0),
                     ..default()
                 },
@@ -569,8 +577,9 @@ pub(super) fn note_techniques(
             Modifier::Vibrato { intensity, .. } => vib = Some(intensity.unwrap_or(0.5)),
             Modifier::WahWah { intensity, .. } => wah = Some(intensity.unwrap_or(0.5)),
             Modifier::Bend { semitones, .. } => shift = Some(*semitones),
-            // Overblow/overdraw raise pitch ~1 semitone — represent as an up-bend.
-            Modifier::Overblow | Modifier::Overdraw => shift = Some(1.0),
+            // Overblow/overdraw/slide all raise pitch ~1 semitone — represent
+            // as an up-bend.
+            Modifier::Overblow | Modifier::Overdraw | Modifier::Slide => shift = Some(1.0),
         }
     }
     (vib, shift, wah)
@@ -595,18 +604,20 @@ fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
 }
 
 fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::chart::HarpChart) {
+    let hole_count = chart.harmonica.hole_count();
+    let lane_pct = 100.0 / hole_count as f32;
     col.spawn(Node {
         flex_direction: FlexDirection::Row,
         width: Val::Percent(100.0),
         ..default()
     })
     .with_children(|row| {
-        for hole in 1u8..=10 {
+        for hole in 1u8..=hole_count {
             let b = chart.harmonica.wind_direction_label(hole, &Action::Blow);
             let d = chart.harmonica.wind_direction_label(hole, &Action::Draw);
             row.spawn((
                 Node {
-                    width: Val::Percent(LANE_PCT),
+                    width: Val::Percent(lane_pct),
                     // Fixed px, not Vh — Vh resolves from the physical
                     // viewport and doesn't respond to `UiScale`, unlike this
                     // cell's own text, so the cell would stay a fixed size on

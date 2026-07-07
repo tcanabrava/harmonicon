@@ -3,12 +3,14 @@
 use bevy::prelude::*;
 
 use super::practice::PracticeState;
-use super::state::{Dir, EditorState, Expr, Field, Mode, Pitch};
+use super::state::{Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
 use super::ui::{
-    BendDot, EditModeGroup, MetaFieldBox, MetaFieldText, ModButton, ModButtonLabel, ModeButton,
-    PerformModeGroup, StatusMsg,
+    BendDot, EditModeGroup, HarmonicaKindText, MetaFieldBox, MetaFieldText, ModButton,
+    ModButtonLabel, ModeButton, PerformModeGroup, StatusMsg,
 };
+use crate::localization::LocalizationExt;
 use crate::theme::LoadedTheme;
+use bevy_fluent::prelude::Localization;
 
 pub(super) fn update_mod_panel(
     state: Res<EditorState>,
@@ -26,6 +28,7 @@ pub(super) fn update_mod_panel(
             ModButton::Bend => matches!(n.pitch, Pitch::Bend(_)),
             ModButton::Overblow => n.pitch == Pitch::Overblow,
             ModButton::Overdraw => n.pitch == Pitch::Overdraw,
+            ModButton::Slide => n.pitch == Pitch::Slide,
             ModButton::Wah => matches!(n.expr, Expr::Wah(_)),
             ModButton::Vibrato => matches!(n.expr, Expr::Vibrato(_)),
             ModButton::Delete => false,
@@ -132,6 +135,43 @@ pub(super) fn update_mode_visibility(
         } else {
             Display::None
         };
+    }
+}
+
+/// Shows Bend/Overblow/Overdraw for a diatonic chart and Slide for a
+/// chromatic one — never both, since the two harmonicas don't share
+/// techniques. Mirrors [`update_mode_visibility`]'s `Node::display` approach.
+pub(super) fn update_technique_button_visibility(
+    state: Res<EditorState>,
+    mut buttons: Query<(&ModButton, &mut Node)>,
+) {
+    let diatonic_only = matches!(
+        state.harmonica_kind,
+        HarmonicaKind::Diatonic
+    );
+    for (kind, mut node) in &mut buttons {
+        let visible = match kind {
+            ModButton::Bend | ModButton::Overblow | ModButton::Overdraw => diatonic_only,
+            ModButton::Slide => !diatonic_only,
+            _ => continue,
+        };
+        node.display = if visible { Display::Flex } else { Display::None };
+    }
+}
+
+/// Keeps the harmonica-kind toggle's label in sync with `state.harmonica_kind`.
+pub(super) fn update_harmonica_kind_text(
+    state: Res<EditorState>,
+    loc: Res<Localization>,
+    mut texts: Query<&mut Text, With<HarmonicaKindText>>,
+) {
+    let key = match state.harmonica_kind {
+        HarmonicaKind::Diatonic => "editor-harmonica-diatonic",
+        HarmonicaKind::Chromatic => "editor-harmonica-chromatic",
+    };
+    let label = String::from(loc.msg(key));
+    for mut text in &mut texts {
+        **text = label.clone();
     }
 }
 

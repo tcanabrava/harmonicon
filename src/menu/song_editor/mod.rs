@@ -41,15 +41,14 @@ const HOLE_COL_W: f32 = 78.0;
 const HEADER_H: f32 = 30.0;
 const ROW_H: f32 = 34.0;
 const BEAT_W: f32 = 60.0;
-const ROWS: u8 = 10;
 const BEATS_PER_BAR: usize = 4;
 const NOTE_PAD: f32 = 4.0;
 const HANDLE_W: f32 = 8.0;
 const TICKS_PER_BEAT: usize = 4;
 const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
 
-fn grid_height() -> f32 {
-    HEADER_H + ROW_H * ROWS as f32
+fn grid_height(hole_count: u8) -> f32 {
+    HEADER_H + ROW_H * hole_count as f32
 }
 
 // ── Colours ───────────────────────────────────────────────────────────────────
@@ -84,6 +83,10 @@ impl Plugin for SongEditor2Plugin {
                         interaction::pan_wheel,
                         interaction::apply_scroll,
                         ui::rebuild_grid_on_resize,
+                        ui::sync_chrome_height
+                            .run_if(resource_exists_and_changed::<state::EditorState>),
+                        ui::sync_hole_column
+                            .run_if(resource_exists_and_changed::<state::EditorState>),
                         grid::rebuild_grid
                             .run_if(resource_exists_and_changed::<state::EditorState>),
                     )
@@ -99,7 +102,9 @@ impl Plugin for SongEditor2Plugin {
                     panel::update_mod_panel,
                     panel::update_mode_buttons,
                     panel::update_mode_visibility,
+                    panel::update_technique_button_visibility,
                     panel::update_meta_fields,
+                    panel::update_harmonica_kind_text,
                     panel::update_status_bar,
                     harpchart::handle_save_chosen,
                     harpchart::handle_load_chosen,
@@ -122,8 +127,8 @@ mod tests {
     use super::playback::{SAMPLE_RATE, encode_wav, envelope, key_offset, note_freq, render_pcm};
     use super::state::Scroll;
     use super::state::{
-        Dir, Edge, EditorState, Expr, GridNote, Pitch, apply_resize, can_place, enforce_direction,
-        enforce_expr, move_target, note_rect,
+        Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, apply_resize, can_place,
+        enforce_direction, enforce_expr, move_target, note_rect,
     };
     use super::ui::ModButton;
     use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -238,6 +243,69 @@ mod tests {
             s.notes.iter().find(|n| n.hole == 3).unwrap().pitch,
             Pitch::Overblow
         );
+    }
+
+    #[test]
+    fn slide_cycles_on_and_off_on_any_hole() {
+        let mut s = EditorState::default();
+        s.harmonica_kind = HarmonicaKind::Chromatic;
+        select_or_add(&mut s, 11, 0); // valid on a 12-hole chromatic harp
+        apply_modifier(&mut s, ModButton::Slide);
+        assert_eq!(s.notes[0].pitch, Pitch::Slide);
+        apply_modifier(&mut s, ModButton::Slide);
+        assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    }
+
+    // ── HarmonicaKind switching ──────────────────────────────────────────────
+
+    #[test]
+    fn hole_count_matches_the_harmonica_kind() {
+        let mut s = EditorState::default();
+        assert_eq!(s.hole_count(), 10);
+        s.set_harmonica_kind(HarmonicaKind::Chromatic);
+        assert_eq!(s.hole_count(), 12);
+    }
+
+    #[test]
+    fn switching_to_diatonic_drops_notes_beyond_hole_ten_and_clears_slide() {
+        let mut s = EditorState::default();
+        s.harmonica_kind = HarmonicaKind::Chromatic;
+        select_or_add(&mut s, 11, 0);
+        apply_modifier(&mut s, ModButton::Slide);
+        select_or_add(&mut s, 3, 4);
+        apply_modifier(&mut s, ModButton::Slide);
+
+        s.set_harmonica_kind(HarmonicaKind::Diatonic);
+
+        assert_eq!(s.notes.len(), 1, "the hole-11 note doesn't fit anymore");
+        assert_eq!(
+            s.notes[0].pitch,
+            Pitch::Normal,
+            "slide isn't a valid diatonic technique"
+        );
+    }
+
+    #[test]
+    fn switching_to_chromatic_clears_diatonic_only_techniques() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 3, 0);
+        apply_modifier(&mut s, ModButton::Overblow);
+
+        s.set_harmonica_kind(HarmonicaKind::Chromatic);
+
+        assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    }
+
+    #[test]
+    fn switching_kind_deselects_a_note_that_got_dropped() {
+        let mut s = EditorState::default();
+        s.harmonica_kind = HarmonicaKind::Chromatic;
+        select_or_add(&mut s, 11, 0);
+        assert!(s.selected.is_some());
+
+        s.set_harmonica_kind(HarmonicaKind::Diatonic);
+
+        assert_eq!(s.selected, None);
     }
 
     #[test]
@@ -441,23 +509,50 @@ mod tests {
 
     #[test]
     fn note_freq_maps_holes_bends_and_key() {
-        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), 0).unwrap();
+        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Diatonic).unwrap();
         assert!((c4 - 261.63).abs() < 0.5, "got {c4}");
-        let bent = note_freq(&note(1, Dir::Blow, Pitch::Bend(1.0)), 0).unwrap();
+        let bent = note_freq(
+            &note(1, Dir::Blow, Pitch::Bend(1.0)),
+            0,
+            HarmonicaKind::Diatonic,
+        )
+        .unwrap();
         assert!(bent < c4, "bend should drop pitch: {bent} !< {c4}");
-        let g = note_freq(&note(1, Dir::Blow, Pitch::Normal), key_offset("G")).unwrap();
+        let g = note_freq(
+            &note(1, Dir::Blow, Pitch::Normal),
+            key_offset("G"),
+            HarmonicaKind::Diatonic,
+        )
+        .unwrap();
         assert!(
             (g / c4 - 2f32.powf(7.0 / 12.0)).abs() < 0.001,
             "G harp is a fifth up"
         );
         assert_eq!(key_offset("C"), 0);
-        assert!(note_freq(&note(11, Dir::Blow, Pitch::Normal), 0).is_none());
+        assert!(
+            note_freq(&note(11, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Diatonic).is_none()
+        );
+    }
+
+    #[test]
+    fn note_freq_reads_the_chromatic_layout_and_slide_table() {
+        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Chromatic)
+            .unwrap();
+        assert!((c4 - 261.63).abs() < 0.5, "hole 1 blow is C4, got {c4}");
+        let slid = note_freq(&note(1, Dir::Blow, Pitch::Slide), 0, HarmonicaKind::Chromatic)
+            .unwrap();
+        assert!(slid > c4, "slide should raise pitch: {slid} !> {c4}");
+        // Chromatic goes up to hole 12; hole 11 is out of range for diatonic
+        // but valid here.
+        assert!(
+            note_freq(&note(11, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Chromatic).is_some()
+        );
     }
 
     #[test]
     fn render_and_wav_have_expected_size() {
         let notes = vec![note(4, Dir::Draw, Pitch::Normal)];
-        let pcm = render_pcm(&notes, 120.0, 0);
+        let pcm = render_pcm(&notes, 120.0, 0, HarmonicaKind::Diatonic);
         let expected = ((0.5 + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
         assert_eq!(pcm.len(), expected);
         assert!(
@@ -472,11 +567,19 @@ mod tests {
 
     #[test]
     fn move_target_snaps_and_clamps() {
-        assert_eq!(move_target(5, 4, 0.0, 0.0), (5, 4));
-        assert_eq!(move_target(5, 4, TICK_W, 2.0 * ROW_H), (7, 5));
-        assert_eq!(move_target(5, 4, BEAT_W, 0.0), (5, 4 + TICKS_PER_BEAT));
-        assert_eq!(move_target(1, 0, -5.0 * BEAT_W, -5.0 * ROW_H), (1, 0));
-        assert_eq!(move_target(10, 2, 0.0, 5.0 * ROW_H), (10, 2));
+        assert_eq!(move_target(5, 4, 0.0, 0.0, 10), (5, 4));
+        assert_eq!(move_target(5, 4, TICK_W, 2.0 * ROW_H, 10), (7, 5));
+        assert_eq!(move_target(5, 4, BEAT_W, 0.0, 10), (5, 4 + TICKS_PER_BEAT));
+        assert_eq!(move_target(1, 0, -5.0 * BEAT_W, -5.0 * ROW_H, 10), (1, 0));
+        assert_eq!(move_target(10, 2, 0.0, 5.0 * ROW_H, 10), (10, 2));
+    }
+
+    #[test]
+    fn move_target_clamps_to_a_chromatic_hole_count() {
+        // A chromatic chart's 12 holes should let a note move past hole 10,
+        // where a diatonic chart would clamp.
+        assert_eq!(move_target(10, 0, 0.0, 2.0 * ROW_H, 12), (12, 0));
+        assert_eq!(move_target(10, 0, 0.0, 5.0 * ROW_H, 12), (12, 0));
     }
 
     #[test]
@@ -579,6 +682,48 @@ mod tests {
     }
 
     #[test]
+    fn chromatic_chart_round_trips_kind_hole_count_and_slide() {
+        let mut s = EditorState::default();
+        s.harmonica_kind = HarmonicaKind::Chromatic;
+        select_or_add(&mut s, 11, 0); // only valid on a chromatic (12-hole) harp
+        apply_modifier(&mut s, ModButton::Slide);
+
+        let json_str = serialize_harpchart(&s);
+        let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+        assert_eq!(v["harmonica"]["type"], "chromatic");
+        assert_eq!(v["harmonica"]["holes"], 12);
+        assert_eq!(
+            v["track"][0]["events"][0]["modifiers"][0]["type"],
+            "slide"
+        );
+
+        let mut loaded = EditorState::default();
+        let mut scroll = Scroll::default();
+        load_harpchart(&v, &mut loaded, &mut scroll);
+        assert_eq!(loaded.harmonica_kind, HarmonicaKind::Chromatic);
+        assert_eq!(loaded.notes[0].hole, 11);
+        assert_eq!(loaded.notes[0].pitch, Pitch::Slide);
+    }
+
+    #[test]
+    fn loading_a_diatonic_chart_drops_holes_beyond_ten() {
+        // A hand-edited or malformed chart claiming diatonic with an
+        // out-of-range hole shouldn't produce an invalid GridNote.
+        let v: serde_json::Value = serde_json::json!({
+            "harmonica": { "type": "diatonic" },
+            "track": [{
+                "tick": 0,
+                "duration": 0.5,
+                "events": [{ "hole": 11, "action": "blow" }]
+            }]
+        });
+        let mut loaded = EditorState::default();
+        let mut scroll = Scroll::default();
+        load_harpchart(&v, &mut loaded, &mut scroll);
+        assert!(loaded.notes.is_empty());
+    }
+
+    #[test]
     fn saved_position_round_trips_through_load() {
         let mut s = EditorState::default();
         s.position = "3rd".into();
@@ -639,7 +784,7 @@ mod tests {
             expr: Expr::None,
         };
         assert!(
-            !note_in_scale(&natural, 0, &scale),
+            !note_in_scale(&natural, 0, &scale, HarmonicaKind::Diatonic),
             "unbent B (major 7th) is outside the blues scale"
         );
 
@@ -655,7 +800,7 @@ mod tests {
             expr: Expr::None,
         };
         assert!(
-            note_in_scale(&bent, 0, &scale),
+            note_in_scale(&bent, 0, &scale, HarmonicaKind::Diatonic),
             "bending down 1.5 steps reaches Bb, the b7 — in scale"
         );
     }
@@ -715,6 +860,10 @@ mod tests {
         assert_eq!(
             parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah" })]).1,
             Expr::Wah(4.0)
+        );
+        assert_eq!(
+            parse_pitch_expr(&[serde_json::json!({ "type": "slide" })]).0,
+            Pitch::Slide
         );
     }
 

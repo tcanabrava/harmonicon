@@ -50,6 +50,7 @@ mod-draw = Puxar
 mod-bend = Dobrar
 mod-overblow = Oversopro
 mod-overdraw = Overpuxar
+mod-slide = Slide
 mod-wah = Wah
 mod-vibrato = Vibrato
 mod-delete = Apagar
@@ -58,9 +59,12 @@ mod-delete = Apagar
 editor-field-tempo = Andamento da Música
 editor-field-key = Tom do Gaita
 editor-field-position = Posição
+editor-field-harmonica = Gaita
 editor-field-music = Música de Fundo
 editor-field-name = Nome
 editor-field-author = Autor
+editor-harmonica-diatonic = ‹ Diatônica (10 buracos) ›
+editor-harmonica-chromatic = ‹ Cromática (12 buracos) ›
 
 # Editor de Músicas 2 — títulos dos diálogos de arquivo
 dialog-save-chart = Salvar partitura

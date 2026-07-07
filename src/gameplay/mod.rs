@@ -324,6 +324,9 @@ pub struct SongStats {
     pub bend: TechniqueStats,
     pub overblow: TechniqueStats,
     pub overdraw: TechniqueStats,
+    /// Chromatic harmonica's slide button — the chromatic equivalent of a
+    /// diatonic bend.
+    pub slide: TechniqueStats,
     pub vibrato: TechniqueStats,
     pub wah: TechniqueStats,
 }
@@ -342,6 +345,7 @@ impl SongStats {
                 Modifier::Bend { .. } => &mut self.bend,
                 Modifier::Overblow => &mut self.overblow,
                 Modifier::Overdraw => &mut self.overdraw,
+                Modifier::Slide => &mut self.slide,
                 Modifier::Vibrato { .. } => &mut self.vibrato,
                 Modifier::WahWah { .. } => &mut self.wah,
             };
@@ -1031,6 +1035,7 @@ fn modifier_fx_key(modifier: &Modifier) -> &'static str {
         Modifier::WahWah { .. } => "wah-wah",
         Modifier::Overblow => "overblow",
         Modifier::Overdraw => "overdraw",
+        Modifier::Slide => "slide",
     }
 }
 
@@ -1189,12 +1194,14 @@ mod tests {
             true,
         );
         stats.record_technique(&[Modifier::Overdraw], true);
+        stats.record_technique(&[Modifier::Slide], true);
 
         assert_eq!(stats.bend.hits, 1);
         assert_eq!(stats.overblow.misses, 1);
         assert_eq!(stats.vibrato.hits, 1);
         assert_eq!(stats.wah.hits, 1);
         assert_eq!(stats.overdraw.hits, 1);
+        assert_eq!(stats.slide.hits, 1);
         assert_eq!(stats.normal.total(), 0, "no plain notes were recorded");
     }
 
@@ -1400,6 +1407,7 @@ mod tests {
         );
         assert_eq!(modifier_fx_key(&Overblow), "overblow");
         assert_eq!(modifier_fx_key(&Overdraw), "overdraw");
+        assert_eq!(modifier_fx_key(&Slide), "slide");
     }
 
     // ── PitchGate (re-attack detection) ──────────────────────────────────────────
@@ -1554,6 +1562,7 @@ mod tests {
         assert!(is_sustained_technique(&vibrato));
         assert!(is_sustained_technique(&wah));
         assert!(!is_sustained_technique(&bend));
+        assert!(!is_sustained_technique(&Modifier::Slide));
         assert!(!is_sustained_technique(&Modifier::Overblow));
         assert!(!is_sustained_technique(&Modifier::Overdraw));
     }
@@ -1625,8 +1634,8 @@ mod tests {
 
     #[test]
     fn technique_confirmed_is_always_true_for_onset_validated_modifiers() {
-        // Bend/overblow/overdraw are judged at onset, not from the sustain
-        // buffers — this should never gate them on empty/steady samples.
+        // Bend/overblow/overdraw/slide are judged at onset, not from the
+        // sustain buffers — this should never gate them on empty/steady samples.
         assert!(technique_confirmed(
             &Modifier::Bend {
                 semitones: -1.0,
@@ -1636,6 +1645,7 @@ mod tests {
             &[]
         ));
         assert!(technique_confirmed(&Modifier::Overblow, &[], &[]));
+        assert!(technique_confirmed(&Modifier::Slide, &[], &[]));
     }
 
     #[test]

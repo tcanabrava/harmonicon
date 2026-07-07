@@ -24,8 +24,8 @@ use super::phrase_overlay::spawn_phrase_banner;
 use super::song_progress_overlay::spawn_song_progress;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
-    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HOLE_COUNT,
-    HoleCell, HoleState, LOOKAHEAD, MusicStarted, ScheduledNote, ScoreText, ValidHarpNotes,
+    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HoleCell,
+    HoleState, LOOKAHEAD, MusicStarted, ScheduledNote, ScoreText, ValidHarpNotes,
 };
 
 // ── 3D layout constants ───────────────────────────────────────────────────────
@@ -71,8 +71,11 @@ pub(super) struct HoleMesh3D(Handle<StandardMaterial>);
 #[require(Transform, Visibility)]
 pub(super) struct HarmonicaGroove;
 
-fn lane_x(hole: u8) -> f32 {
-    (hole as f32 - 1.0) * LANE_WIDTH - (HOLE_COUNT as f32 * LANE_WIDTH) / 2.0 + LANE_WIDTH * 0.5
+/// `hole_count` comes from the loaded chart's harmonica (10 for diatonic,
+/// more for chromatic) — not a fixed constant, so lanes/notes land in the
+/// right place regardless of harmonica type.
+fn lane_x(hole: u8, hole_count: u8) -> f32 {
+    (hole as f32 - 1.0) * LANE_WIDTH - (hole_count as f32 * LANE_WIDTH) / 2.0 + LANE_WIDTH * 0.5
 }
 
 fn note_depth(duration: f64) -> f32 {
@@ -82,15 +85,20 @@ fn note_depth(duration: f64) -> f32 {
 // ── Harmonica model config ────────────────────────────────────────────────────
 
 /// The fallback layout when a model has no `holes.json`: holes evenly spaced
-/// across the lanes at the harmonica's resting position.
-fn default_model_layout() -> HarmonicaModelConfig {
+/// across the lanes at the harmonica's resting position, sized to the
+/// chart's actual hole count. (No bundled 3D model currently ships a
+/// chromatic `holes.json`, so a chromatic chart's *note lanes* line up
+/// correctly even though the harmonica prop itself still renders as
+/// whichever diatonic model is selected — that needs a matching 3D asset,
+/// not just code.)
+fn default_model_layout(hole_count: u8) -> HarmonicaModelConfig {
     HarmonicaModelConfig {
         model_translation: [0.0, LANE_Y + 0.45, HARP_Z],
         model_rotation_y_deg: 0.0,
         model_scale: 1.0,
-        holes: (1u8..=HOLE_COUNT as u8)
+        holes: (1u8..=hole_count)
             .map(|hole| HoleConfig {
-                x: lane_x(hole),
+                x: lane_x(hole, hole_count),
                 y: LANE_Y + 0.9 + 0.10,
                 z: HARP_Z,
                 w: LANE_WIDTH - LANE_GAP - 0.08,
@@ -101,14 +109,14 @@ fn default_model_layout() -> HarmonicaModelConfig {
     }
 }
 
-fn load_model_config(model_name: &str) -> HarmonicaModelConfig {
+fn load_model_config(model_name: &str, hole_count: u8) -> HarmonicaModelConfig {
     let path = format!("assets/harmonicas/3d/{model_name}/holes.json");
     std::fs::read_to_string(&path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_else(|| {
             warn!("No holes.json for model '{model_name}', using default layout");
-            default_model_layout()
+            default_model_layout(hole_count)
         })
 }
 
@@ -235,6 +243,7 @@ pub fn create_note_visuals(
     holes: &[HoleConfig],
     chart: &HarpChart,
 ) {
+    let hole_count = chart.harmonica.hole_count();
     for item in &chart.track {
         let t = super::resolve_item_time(item, &chart.timing);
         let tail_len = note_depth(item.duration);
@@ -248,7 +257,9 @@ pub fn create_note_visuals(
             let modifiers = event.modifiers.clone().unwrap_or_default();
 
             let hole_cfg = holes.get(event.hole.saturating_sub(1) as usize);
-            let note_x = hole_cfg.map(|h| h.x).unwrap_or_else(|| lane_x(event.hole));
+            let note_x = hole_cfg
+                .map(|h| h.x)
+                .unwrap_or_else(|| lane_x(event.hole, hole_count));
             let note_w = hole_cfg.map(|h| h.w).unwrap_or(LANE_WIDTH - LANE_GAP);
 
             // Head: the elongated cube (1.4 units long in Z), tinted blow/draw.
@@ -367,7 +378,7 @@ pub fn setup(
     let chart = &manifest.chart;
     let key = chart.song.key.as_str();
     let chords = twelve_bar(key);
-    let model_cfg = load_model_config(&selected_model.0);
+    let model_cfg = load_model_config(&selected_model.0, chart.harmonica.hole_count());
 
     setup_camera_3d(&mut commands);
     setup_lighting(&mut commands);
@@ -938,15 +949,21 @@ mod tests {
     #[test]
     fn lanes_are_centered_and_ordered() {
         // The ten lanes straddle x = 0 symmetrically.
-        assert!((lane_x(1) + lane_x(HOLE_COUNT as u8)).abs() < 1e-6);
+        assert!((lane_x(1, 10) + lane_x(10, 10)).abs() < 1e-6);
         // ...and march left-to-right with hole number.
-        assert!(lane_x(2) > lane_x(1));
-        assert!(lane_x(HOLE_COUNT as u8) > lane_x(1));
+        assert!(lane_x(2, 10) > lane_x(1, 10));
+        assert!(lane_x(10, 10) > lane_x(1, 10));
+    }
+
+    #[test]
+    fn lanes_recenter_for_a_different_hole_count() {
+        // A 12-hole chromatic layout must still straddle x = 0 symmetrically.
+        assert!((lane_x(1, 12) + lane_x(12, 12)).abs() < 1e-6);
     }
 
     #[test]
     fn lane_spacing_is_one_lane_width() {
-        assert!((lane_x(2) - lane_x(1) - LANE_WIDTH).abs() < 1e-6);
+        assert!((lane_x(2, 10) - lane_x(1, 10) - LANE_WIDTH).abs() < 1e-6);
     }
 
     #[test]

@@ -2,13 +2,41 @@
 
 use bevy::prelude::*;
 
-use super::playback::{C_BLOW, C_DRAW, key_offset};
-use super::state::{Dir, EditorState, Expr, GridNote, HARP_KEYS, POSITIONS, Pitch, Scroll};
+use super::playback::{
+    C_BLOW, C_BLOW_CHROMATIC, C_BLOW_SLIDE_CHROMATIC, C_DRAW, C_DRAW_CHROMATIC,
+    C_DRAW_SLIDE_CHROMATIC, key_offset,
+};
+use super::state::{
+    Dir, EditorState, Expr, GridNote, HARP_KEYS, HarmonicaKind, POSITIONS, Pitch, Scroll,
+};
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::dialogs::file_dialog::FileChosen;
 
 // ── Serialisation ────────────────────────────────────────────────────────────
+
+/// Resolves `n`'s note name, choosing the diatonic or chromatic reference
+/// layout (and the slide table when `n.pitch` is `Pitch::Slide`) to match
+/// `kind` — mirrors `playback::note_freq`'s table selection, but returns the
+/// note name for the chart's `events[].note` field rather than a frequency.
+fn note_name_for(n: &GridNote, key_offset: i32, kind: HarmonicaKind) -> String {
+    let idx = (n.hole as usize).saturating_sub(1);
+    let base = match (kind, n.dir, n.pitch) {
+        (HarmonicaKind::Chromatic, Dir::Blow, Pitch::Slide) => {
+            C_BLOW_SLIDE_CHROMATIC.get(idx).copied()
+        }
+        (HarmonicaKind::Chromatic, Dir::Draw, Pitch::Slide) => {
+            C_DRAW_SLIDE_CHROMATIC.get(idx).copied()
+        }
+        (HarmonicaKind::Chromatic, Dir::Blow, _) => C_BLOW_CHROMATIC.get(idx).copied(),
+        (HarmonicaKind::Chromatic, Dir::Draw, _) => C_DRAW_CHROMATIC.get(idx).copied(),
+        (HarmonicaKind::Diatonic, Dir::Blow, _) => C_BLOW.get(idx).copied(),
+        (HarmonicaKind::Diatonic, Dir::Draw, _) => C_DRAW.get(idx).copied(),
+    }
+    .unwrap_or("C4");
+    let midi = note_to_midi(base).unwrap_or(60) + key_offset;
+    midi_to_note(midi)
+}
 
 pub(super) fn serialize_harpchart(state: &EditorState) -> String {
     use serde_json::{Value, json};
@@ -38,15 +66,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
                         Dir::Blow => "blow",
                         Dir::Draw => "draw",
                     };
-                    let note_name = {
-                        let idx = (n.hole as usize).saturating_sub(1);
-                        let base = match n.dir {
-                            Dir::Blow => C_BLOW.get(idx).copied().unwrap_or("C4"),
-                            Dir::Draw => C_DRAW.get(idx).copied().unwrap_or("D4"),
-                        };
-                        let midi = note_to_midi(base).unwrap_or(60) + k_off;
-                        midi_to_note(midi)
-                    };
+                    let note_name = note_name_for(n, k_off, state.harmonica_kind);
                     let mut modifiers: Vec<Value> = Vec::new();
                     match n.pitch {
                         Pitch::Bend(a) => {
@@ -54,6 +74,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
                         }
                         Pitch::Overblow => modifiers.push(json!({ "type": "overblow" })),
                         Pitch::Overdraw => modifiers.push(json!({ "type": "overdraw" })),
+                        Pitch::Slide => modifiers.push(json!({ "type": "slide" })),
                         Pitch::Normal => {}
                     }
                     match n.expr {
@@ -99,6 +120,27 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
     };
     let last_phrase = track.len().saturating_sub(1);
 
+    let harmonica = match state.harmonica_kind {
+        HarmonicaKind::Diatonic => json!({
+            "type": "diatonic",
+            "holes": 10,
+            "position": state.position,
+            "bending_profile": "richter_standard",
+            "layout": { "blow": C_BLOW, "draw": C_DRAW }
+        }),
+        HarmonicaKind::Chromatic => json!({
+            "type": "chromatic",
+            "holes": 12,
+            "position": state.position,
+            "layout": {
+                "blow": C_BLOW_CHROMATIC,
+                "draw": C_DRAW_CHROMATIC,
+                "blow_slide": C_BLOW_SLIDE_CHROMATIC,
+                "draw_slide": C_DRAW_SLIDE_CHROMATIC
+            }
+        }),
+    };
+
     let chart = json!({
         "metadata": {
             "format_version": "1.0.0",
@@ -118,13 +160,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
             "resolution": TICKS_PER_BEAT,
             "tempo_map": [{ "tick": 0, "bpm": bpm }]
         },
-        "harmonica": {
-            "type": "diatonic",
-            "holes": 10,
-            "position": state.position,
-            "bending_profile": "richter_standard",
-            "layout": { "blow": C_BLOW, "draw": C_DRAW }
-        },
+        "harmonica": harmonica,
         "track": track,
         "loop": {
             "type": "full",
@@ -163,6 +199,7 @@ pub(super) fn parse_pitch_expr(modifiers: &[serde_json::Value]) -> (Pitch, Expr)
             }
             "overblow" => pitch = Pitch::Overblow,
             "overdraw" => pitch = Pitch::Overdraw,
+            "slide" => pitch = Pitch::Slide,
             // Default to the old fixed rates for charts saved before
             // `oscillation_hz` was per-note; clamp away non-positive/absurd
             // values so a hand-edited chart can't divide-by-zero the preview
@@ -203,6 +240,15 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     {
         state.position = p.to_string();
     }
+    // The editor only models a 10-hole diatonic or 12-hole chromatic harp
+    // (`HarmonicaKind::hole_count`); a chart declaring a 16-hole chromatic
+    // harp still loads as 12-hole chromatic, so any of its holes 13–16 are
+    // dropped below rather than rejecting the whole chart.
+    state.harmonica_kind = if v["harmonica"]["type"].as_str() == Some("chromatic") {
+        HarmonicaKind::Chromatic
+    } else {
+        HarmonicaKind::Diatonic
+    };
     if let Some(meta) = v.get("metadata")
         && let Some(audio) = meta["audio_file"].as_str()
         && !audio.is_empty()
@@ -216,6 +262,7 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     let mut notes: Vec<GridNote> = Vec::new();
     let mut next_id = 0u32;
     let empty = vec![];
+    let hole_count = state.hole_count();
 
     if let Some(track) = v["track"].as_array() {
         for phrase in track {
@@ -236,7 +283,7 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
             let events = phrase["events"].as_array().unwrap_or(&empty);
             for event in events {
                 let hole = event["hole"].as_u64().unwrap_or(1) as u8;
-                if !(1..=10).contains(&hole) {
+                if !(1..=hole_count).contains(&hole) {
                     continue;
                 }
                 let dir = if event["action"].as_str() == Some("draw") {

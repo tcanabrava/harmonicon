@@ -78,7 +78,7 @@ fn build_schedule(state: &EditorState) -> Vec<PracticeNote> {
         .notes
         .iter()
         .filter_map(|n| {
-            let freq = note_freq(n, k_off)?;
+            let freq = note_freq(n, k_off, state.harmonica_kind)?;
             let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
             let name = midi_to_note(midi);
             Some(PracticeNote {
@@ -437,11 +437,16 @@ mod tests {
         let schedule = build_schedule(&state);
         assert_eq!(schedule.len(), 1);
         let k_off = key_offset(&state.key);
-        let expected_freq = note_freq(&state.notes[0], k_off).unwrap();
+        let expected_freq = note_freq(&state.notes[0], k_off, state.harmonica_kind).unwrap();
         assert_eq!(schedule[0].expected_freq, expected_freq);
         // A C-harp draw-2 in D (up a whole step) should not equal the C-key freq.
         let c_state = state_with_notes("C", &[(2, 0)]);
-        let c_freq = note_freq(&c_state.notes[0], key_offset(&c_state.key)).unwrap();
+        let c_freq = note_freq(
+            &c_state.notes[0],
+            key_offset(&c_state.key),
+            c_state.harmonica_kind,
+        )
+        .unwrap();
         assert_ne!(expected_freq, c_freq);
     }
 
