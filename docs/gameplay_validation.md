@@ -33,6 +33,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 | Scene teardown despawns only `GameplayRoot` | `gameplay::tests::cleanup_despawns_only_gameplay_entities` |
 | Scoring / sustain / techniques / pitch logic | `gameplay::scoring::tests`, `gameplay::tests::*`, `audio_system::*` |
 | Clock re-anchors to the audio sink, clamped so it can't jump | `gameplay::tests::advance_clock_*` |
+| Detector range derives from the harmonica layout (low-keyed harps not cut off) | `song::harmonica::tests::frequency_range_*`, `audio_system::pitch_detect::tests::pitch_range_from_freqs_*` |
 
 ## Manual checks
 
@@ -41,6 +42,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 - [ ] The HUD score/combo reads `0` and updates as you hit notes. *(manual)*
 - [ ] No errors/panics in the console while the gameplay chain runs. *(manual)*
 - [ ] **Long-song sync**: play a 3+ minute song end to end; the hit line still matches the beat at the end, with no accumulating drift. *(manual: audio + timing; correction math is unit-tested but real decoder/frame-hitch drift isn't)*
+- [ ] **Low-keyed harp detection**: load (or author) a chart with a Low-F/Low-D harmonica and confirm hole-1 blow/draw register — the detector range now derives from the chart's layout instead of a fixed 200 Hz floor. *(manual: needs a real low-keyed harp and mic)*
 
 ### Play 2D
 - [ ] The note **highway shows falling notes** in the ten lanes, with the comet head + animated tail. *(manual: rendering)*
