@@ -178,18 +178,16 @@ pub(super) fn setup(
                 let adjustment = ms.round() as i32;
                 let new_latency = (audio.input_latency_ms + adjustment).max(0);
                 if adjustment.abs() >= 5 {
-                    let hint = if adjustment > 0 {
-                        format!("→ Increase Input lag to {}ms in Options", new_latency)
+                    let label = if adjustment > 0 {
+                        format!("Increase Input lag to {new_latency}ms")
                     } else {
-                        format!("→ Decrease Input lag to {}ms in Options", new_latency)
+                        format!("Decrease Input lag to {new_latency}ms")
                     };
-                    root.spawn((
-                        Text::new(hint),
-                        TextFont {
-                            font_size: FontSize::Px(15.0),
-                            ..default()
+                    root.spawn_empty().apply_scene(button::small(
+                        &label,
+                        move |_: On<Pointer<Click>>, mut audio: ResMut<AudioSettings>| {
+                            audio.input_latency_ms = new_latency;
                         },
-                        TextColor(Color::srgb(0.60, 0.65, 0.75)),
                     ));
                 }
             }

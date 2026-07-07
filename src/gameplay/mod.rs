@@ -727,19 +727,9 @@ fn setup_scoring_config(
         let si = ls.start_index;
         let ei = ls.end_index;
         if si < track.len() && ei < track.len() && si <= ei {
-            let resolve = |i: usize| -> f64 {
-                track[i].time.unwrap_or_else(|| {
-                    let tick = track[i].tick.unwrap_or(0);
-                    crate::song::chart::tick_to_seconds(
-                        tick,
-                        chart.timing.resolution,
-                        &chart.timing.tempo_map,
-                    )
-                })
-            };
             loop_cfg.active = true;
-            loop_cfg.start_time = resolve(si);
-            loop_cfg.end_time = resolve(ei) + track[ei].duration;
+            loop_cfg.start_time = resolve_item_time(&track[si], &chart.timing);
+            loop_cfg.end_time = resolve_item_time(&track[ei], &chart.timing) + track[ei].duration;
             info!(
                 "Loop section ({:?}): {:.2}s – {:.2}s",
                 ls.section_type, loop_cfg.start_time, loop_cfg.end_time,
