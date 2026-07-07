@@ -21,7 +21,18 @@
 
 use std::path::Path;
 
+#[cfg(target_os = "windows")]
 fn main() {
+    build();
+    generate_wix_assets().unwrap();
+}
+
+#[cfg(not(target_os = "windows"))]
+fn main() {
+    build();
+}
+
+fn build() {
     println!("cargo:rerun-if-changed=src/menu/song_editor");
 
     let dir = Path::new("src/menu/song_editor");
@@ -97,6 +108,133 @@ fn is_raw_text_new(line: &str) -> bool {
 
     content.chars().any(|c| c.is_ascii_alphabetic())
         && content.chars().any(|c| c.is_ascii_whitespace())
+}
+
+use std::io::Write;
+fn generate_wix_assets() -> std::io::Result<()> {
+    let assets_dir = Path::new("assets");
+
+    if !assets_dir.exists() {
+        return Ok(());
+    }
+
+    std::fs::create_dir_all("wix")?;
+
+    let file = std::fs::File::create("wix/assets.wxi")?;
+    let mut out = std::io::BufWriter::new(file);
+
+    writeln!(
+        out,
+        r#"<Include> 
+    <DirectoryRef Id="APPLICATIONFOLDER">
+      <Directory Id="AssetsFolder" Name="assets">"#
+    )?;
+
+    let mut component_refs = Vec::new();
+
+    visit_assets(
+        assets_dir,
+        assets_dir,
+        &mut out,
+        &mut component_refs,
+    )?;
+
+    writeln!(
+        out,
+        r#"
+      </Directory>
+    </DirectoryRef>
+
+    <ComponentGroup Id="AssetsGroup">"#
+    )?;
+
+    for id in component_refs {
+        writeln!(out, r#"      <ComponentRef Id="{id}"/>"#)?;
+    }
+
+    writeln!(
+        out,
+        r#"
+    </ComponentGroup> 
+</Include>"#
+    )?;
+
+    Ok(())
+} 
+
+fn visit_assets(
+    root: &Path,
+    current: &Path,
+    out: &mut dyn std::io::Write,
+    component_refs: &mut Vec<String>,
+) -> std::io::Result<()> {
+    let mut entries: Vec<_> = std::fs::read_dir(current)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect();
+
+    entries.sort();
+
+    for path in entries {
+        if path.is_dir() {
+            let rel = path.strip_prefix(root).unwrap_or(&path);
+            let name = path.file_name().unwrap().to_string_lossy();
+
+            let dir_id = sanitize_wix_id(&rel.to_string_lossy());
+            let dir_id = format!("A14e9533a2bd754b0bd9{}", dir_id);
+            let dir_id = format!("Dir_{}", &dir_id[..12]);
+
+            writeln!(
+                out,
+                r#"<Directory Id="{dir_id}" Name="{name}">"#
+            )?;
+
+            visit_assets(root, &path, out, component_refs)?;
+
+            writeln!(out, "</Directory>")?;
+        } else {
+            let rel = path.strip_prefix(root).unwrap_or(&path);
+            let id = sanitize_wix_id(&rel.to_string_lossy());
+
+            let component_id = format!("Comp_{id}");
+            let file_id = format!("File_{id}");
+
+            component_refs.push(component_id.clone());
+
+            let source = path.to_string_lossy().replace('/', "\\");
+
+            writeln!(
+                out,
+                r#"
+<Component Id="{component_id}" Guid="*">
+    <File Id="{file_id}" Source="{source}" KeyPath="yes"/>
+</Component>"#
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn sanitize_wix_id(input: &str) -> String {
+    let mut s = String::new();
+
+    for c in input.chars() {
+        if c.is_ascii_alphanumeric() {
+            s.push(c);
+        } else {
+            s.push('_');
+        }
+    }
+
+    if s.is_empty() {
+        return "_asset".to_string();
+    }
+
+    if !s.chars().next().unwrap().is_ascii_alphabetic() {
+        s.insert(0, '_');
+    }
+
+    s
 }
 
 #[cfg(test)]
