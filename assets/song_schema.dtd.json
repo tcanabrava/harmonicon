@@ -580,14 +580,6 @@
           }
         }
       }
-    },
-
-    "fx_mapping": {
-      "type": "object",
-
-      "additionalProperties": {
-        "type": "string"
-      }
     }
   }
 }

@@ -14,7 +14,6 @@ pub struct HarpChart {
     #[serde(rename = "loop")]
     pub loop_section: Option<LoopSection>,
     pub scoring: Scoring,
-    pub fx_mapping: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

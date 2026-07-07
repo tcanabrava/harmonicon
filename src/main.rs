@@ -99,7 +99,7 @@ fn main() {
                 .run_if(harmonicon::localization::localization_ready),
         )
         .add_systems(Update, process_audio)
-        .add_systems(Update, print_pitches.run_if(in_state(AppState::Playing)))
+        .add_systems(Update, log_pitches.run_if(in_state(AppState::Playing)))
         .add_systems(Update, change_scaling)
         .run();
 }
@@ -135,11 +135,19 @@ fn process_audio(
         // waveform (time) without re-analysing.
         frame.magnitudes = analysis.magnitudes;
         frame.freq_res = analysis.freq_res;
-        frame.samples = samples;
+        // Recycle the buffer we're about to overwrite back to the capture
+        // callback's pool instead of letting it deallocate here — see
+        // `audio_input::AudioCapture::free_sender`.
+        let previous = std::mem::replace(&mut frame.samples, samples);
+        let _ = capture.free_sender.try_send(previous);
     }
 }
 
-fn print_pitches(mut reader: MessageReader<PitchEvent>, mut last: Local<Vec<String>>) {
+/// Logs the detected pitches whenever they change during Playing, at
+/// `debug` level rather than stdout — a diagnostic aid, not something every
+/// player's console should be spammed with (enable with `RUST_LOG=debug` or
+/// similar to see it).
+fn log_pitches(mut reader: MessageReader<PitchEvent>, mut last: Local<Vec<String>>) {
     for event in reader.read() {
         let current: Vec<String> = event
             .0
@@ -152,9 +160,9 @@ fn print_pitches(mut reader: MessageReader<PitchEvent>, mut last: Local<Vec<Stri
         }
 
         if current.is_empty() {
-            println!("---");
+            debug!("pitches: (silence)");
         } else {
-            println!("Pitches: {}", current.join("  |  "));
+            debug!("pitches: {}", current.join("  |  "));
         }
         *last = current;
     }

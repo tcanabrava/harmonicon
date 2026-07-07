@@ -144,11 +144,6 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
                 "decay_ms": 2000
             },
             "style_bonus": { "bend": 50, "vibrato": 25, "wah-wah": 40 }
-        },
-        "fx_mapping": {
-            "bend": "pitch_bend",
-            "vibrato": "pitch_lfo",
-            "wah-wah": "filter_lfo"
         }
     });
 

@@ -121,30 +121,50 @@ fn save_settings(settings: &Settings) {
     }
 }
 
+/// How long to wait after the last settings change before actually writing
+/// to disk. Without this, dragging a volume slider (which changes
+/// `AudioSettings` every frame) would rewrite `settings.json` every frame
+/// too; debouncing coalesces a burst of changes into one write.
+const SAVE_DEBOUNCE_SECS: f32 = 0.5;
+
+/// Seconds left before a pending settings change is written to disk.
+/// `None` means nothing has changed since the last save.
+#[derive(Resource, Default)]
+struct PendingSave(Option<f32>);
+
 pub struct SettingsPlugin;
 
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AudioSettings>()
+            .init_resource::<PendingSave>()
             .add_systems(Startup, apply_loaded_settings)
             // Save whenever either settings resource changes. The Startup load
-            // also marks them changed, so the file is created on first run.
+            // also marks them changed, so the file is created on first run
+            // (after one debounce interval).
             .add_systems(
                 Update,
-                persist_settings.run_if(
-                    |audio: Res<AudioSettings>,
-                     theme_2d: Res<SelectedNoteTheme2d>,
-                     theme_3d: Res<SelectedNoteTheme3d>,
-                     model: Res<SelectedHarmonicaModel>,
-                     ui_theme: Res<SelectedTheme>| {
-                        audio.is_changed()
-                            || theme_2d.is_changed()
-                            || theme_3d.is_changed()
-                            || model.is_changed()
-                            || ui_theme.is_changed()
-                    },
-                ),
-            );
+                (
+                    mark_settings_dirty.run_if(
+                        |audio: Res<AudioSettings>,
+                         theme_2d: Res<SelectedNoteTheme2d>,
+                         theme_3d: Res<SelectedNoteTheme3d>,
+                         model: Res<SelectedHarmonicaModel>,
+                         ui_theme: Res<SelectedTheme>| {
+                            audio.is_changed()
+                                || theme_2d.is_changed()
+                                || theme_3d.is_changed()
+                                || model.is_changed()
+                                || ui_theme.is_changed()
+                        },
+                    ),
+                    tick_pending_save,
+                )
+                    .chain(),
+            )
+            // Don't lose a change made just before quitting to the debounce
+            // window — flush it immediately once exit is requested.
+            .add_systems(Last, flush_pending_save_on_exit);
     }
 }
 
@@ -181,12 +201,12 @@ pub fn apply_loaded_settings(
 }
 
 /// Writes the current resource values back to disk.
-fn persist_settings(
-    audio: Res<AudioSettings>,
-    theme_2d: Res<SelectedNoteTheme2d>,
-    theme_3d: Res<SelectedNoteTheme3d>,
-    model: Res<SelectedHarmonicaModel>,
-    ui_theme: Res<SelectedTheme>,
+fn save_current(
+    audio: &AudioSettings,
+    theme_2d: &SelectedNoteTheme2d,
+    theme_3d: &SelectedNoteTheme3d,
+    model: &SelectedHarmonicaModel,
+    ui_theme: &SelectedTheme,
 ) {
     save_settings(&Settings {
         music_volume: audio.music_volume,
@@ -199,4 +219,90 @@ fn persist_settings(
         harmonica_model: model.0.clone(),
         ui_theme: ui_theme.0.clone(),
     });
+}
+
+/// (Re)starts the debounce countdown — called only when something actually
+/// changed this frame, so a burst of changes (e.g. dragging a slider)
+/// coalesces into one save `SAVE_DEBOUNCE_SECS` after the last of them.
+fn mark_settings_dirty(mut pending: ResMut<PendingSave>) {
+    pending.0 = Some(SAVE_DEBOUNCE_SECS);
+}
+
+/// Advances a pending-save countdown by `dt` seconds. Returns whether the
+/// save should fire now, and the countdown's new state.
+fn tick_debounce(remaining: Option<f32>, dt: f32) -> (bool, Option<f32>) {
+    let Some(remaining) = remaining else {
+        return (false, None);
+    };
+    let remaining = remaining - dt;
+    if remaining > 0.0 {
+        (false, Some(remaining))
+    } else {
+        (true, None)
+    }
+}
+
+/// Ticks the debounce countdown; once it elapses, writes the current
+/// resource values to disk exactly once.
+fn tick_pending_save(
+    time: Res<Time>,
+    mut pending: ResMut<PendingSave>,
+    audio: Res<AudioSettings>,
+    theme_2d: Res<SelectedNoteTheme2d>,
+    theme_3d: Res<SelectedNoteTheme3d>,
+    model: Res<SelectedHarmonicaModel>,
+    ui_theme: Res<SelectedTheme>,
+) {
+    let (should_save, remaining) = tick_debounce(pending.0, time.delta_secs());
+    pending.0 = remaining;
+    if should_save {
+        save_current(&audio, &theme_2d, &theme_3d, &model, &ui_theme);
+    }
+}
+
+/// Flushes a pending save immediately when the app is exiting, so a change
+/// made just before quitting isn't lost to the debounce window.
+fn flush_pending_save_on_exit(
+    mut exit: MessageReader<AppExit>,
+    mut pending: ResMut<PendingSave>,
+    audio: Res<AudioSettings>,
+    theme_2d: Res<SelectedNoteTheme2d>,
+    theme_3d: Res<SelectedNoteTheme3d>,
+    model: Res<SelectedHarmonicaModel>,
+    ui_theme: Res<SelectedTheme>,
+) {
+    if exit.read().next().is_none() || pending.0.is_none() {
+        return;
+    }
+    pending.0 = None;
+    save_current(&audio, &theme_2d, &theme_3d, &model, &ui_theme);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── tick_debounce ────────────────────────────────────────────────────────
+
+    #[test]
+    fn no_pending_save_stays_idle() {
+        assert_eq!(tick_debounce(None, 0.1), (false, None));
+    }
+
+    #[test]
+    fn counts_down_without_firing_before_it_elapses() {
+        let (fired, remaining) = tick_debounce(Some(0.5), 0.1);
+        assert!(!fired);
+        assert!((remaining.unwrap() - 0.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn fires_once_the_countdown_elapses() {
+        assert_eq!(tick_debounce(Some(0.05), 0.1), (true, None));
+    }
+
+    #[test]
+    fn fires_exactly_at_zero() {
+        assert_eq!(tick_debounce(Some(0.1), 0.1), (true, None));
+    }
 }

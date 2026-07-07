@@ -423,7 +423,6 @@ fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path) 
             "combo": { "enabled": true, "base_multiplier": 1.0, "step_multiplier": 0.1, "max_multiplier": 4.0, "decay_ms": 2000 },
             "style_bonus": { "bend": 50, "vibrato": 25, "wah-wah": 40 },
         },
-        "fx_mapping": { "bend": "pitch_bend", "vibrato": "pitch_lfo", "wah-wah": "filter_lfo" },
     });
 
     validate(&chart);

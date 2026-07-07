@@ -156,8 +156,7 @@ Each song lives under `assets/songs/<artist>/<song>/` and is loaded as a single
 A chart's `track` is a list of timed items, each with a duration and one or more
 note events (hole + `blow`/`draw` + the expected pitch), optionally carrying
 technique modifiers (`bend`, `overblow`, `overdraw`, `vibrato`, `wah-wah`,
-`hold`). Charts can also define a `loop` section, scoring windows, and an
-`fx_mapping` from modifiers to DSP effects.
+`hold`). Charts can also define a `loop` section and scoring windows.
 
 ### Authoring tools
 

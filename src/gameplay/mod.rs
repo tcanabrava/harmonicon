@@ -71,7 +71,6 @@ impl Plugin for GameplayPlugin {
         .init_resource::<ActiveTargets>()
         .init_resource::<Paused>()
         .init_resource::<LoopConfig>()
-        .init_resource::<FxMapping>()
         .init_resource::<bending_trainer::TrainerKey>()
         .init_resource::<bending_trainer::TrainerTarget>()
         .init_resource::<bending_trainer::DrillState>()
@@ -509,12 +508,6 @@ pub struct LoopConfig {
     pub end_time: f64,
 }
 
-/// Maps modifier type names (e.g. `"bend"`, `"vibrato"`) to the DSP effect
-/// processor name the chart author intends to activate (e.g. `"pitch_bend"`).
-/// Populated from `chart.fx_mapping` at song start; consumed by the audio/DSP layer.
-#[derive(Resource, Default)]
-pub struct FxMapping(pub HashMap<String, String>);
-
 // ── Shared constants ──────────────────────────────────────────────────────────
 
 pub const HOLE_COUNT: usize = 10;
@@ -675,7 +668,6 @@ fn setup_scoring_config(
     manifests: Res<Assets<SongManifest>>,
     mut config: ResMut<ScoringConfig>,
     mut loop_cfg: ResMut<LoopConfig>,
-    mut fx_mapping: ResMut<FxMapping>,
     mut song_end: ResMut<SongEnd>,
     mut pitch_range: ResMut<PitchRange>,
 ) {
@@ -727,19 +719,9 @@ fn setup_scoring_config(
         let si = ls.start_index;
         let ei = ls.end_index;
         if si < track.len() && ei < track.len() && si <= ei {
-            let resolve = |i: usize| -> f64 {
-                track[i].time.unwrap_or_else(|| {
-                    let tick = track[i].tick.unwrap_or(0);
-                    crate::song::chart::tick_to_seconds(
-                        tick,
-                        chart.timing.resolution,
-                        &chart.timing.tempo_map,
-                    )
-                })
-            };
             loop_cfg.active = true;
-            loop_cfg.start_time = resolve(si);
-            loop_cfg.end_time = resolve(ei) + track[ei].duration;
+            loop_cfg.start_time = resolve_item_time(&track[si], &chart.timing);
+            loop_cfg.end_time = resolve_item_time(&track[ei], &chart.timing) + track[ei].duration;
             info!(
                 "Loop section ({:?}): {:.2}s – {:.2}s",
                 ls.section_type, loop_cfg.start_time, loop_cfg.end_time,
@@ -754,9 +736,6 @@ fn setup_scoring_config(
     } else {
         last_note_end(&chart.track, &chart.timing) + SONG_END_TAIL
     };
-
-    // Resolve fx_mapping: modifier name → DSP effect processor name.
-    fx_mapping.0 = chart.fx_mapping.clone().unwrap_or_default();
 
     info!(
         "Scoring config: perfect={:.0}ms good={:.0}ms miss={:.0}ms combo={} beats/bar={}",
@@ -867,7 +846,6 @@ fn score_notes(
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
-    fx_mapping: Res<FxMapping>,
     mut notes: Query<(Entity, &mut ScheduledNote)>,
     mut score: ResMut<Score>,
     mut stats: ResMut<SongStats>,
@@ -1041,14 +1019,6 @@ fn score_notes(
                 score.points += style_bonus_points(&immediate, &config.style_bonus).round() as u32;
                 feedback.quality = Some(quality);
                 feedback.timer = 0.75;
-
-                // Resolve which DSP effects should activate for each modifier.
-                for modifier in &note.modifiers {
-                    let key = modifier_fx_key(modifier);
-                    if let Some(effect) = fx_mapping.0.get(key) {
-                        debug!("fx: modifier={key} → effect={effect}");
-                    }
-                }
             }
         }
     }
@@ -1755,7 +1725,6 @@ mod tests {
         world.insert_resource(ValidHarpNotes(HashSet::from(["C4".to_string()])));
         world.insert_resource(ScoringConfig::default());
         world.insert_resource(AudioSettings::default());
-        world.insert_resource(FxMapping::default());
         world.insert_resource(Score::default());
         world.insert_resource(SongStats::default());
         world.insert_resource(HitFeedback::default());
