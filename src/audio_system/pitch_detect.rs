@@ -5,9 +5,42 @@ use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-// Harmonica range: roughly C4 (262 Hz) to the top of a 10-hole diatonic.
-const MIN_FREQ: f32 = 200.0;
-const MAX_FREQ: f32 = 2500.0;
+/// Frequency bounds (Hz) the pitch detectors search within. Defaults to
+/// roughly a standard-key 10-hole diatonic's range; gameplay narrows/widens
+/// this from the loaded chart's harmonica layout (or the bend trainer's
+/// current key) in [`PitchRange::from_freqs`], so a Low-F/Low-D harp's
+/// hole-1 notes aren't cut off by a floor tuned for standard keys.
+#[derive(Resource, Clone, Copy, PartialEq, Debug)]
+pub struct PitchRange {
+    pub min_freq: f32,
+    pub max_freq: f32,
+}
+
+impl Default for PitchRange {
+    fn default() -> Self {
+        // Roughly C4 (262 Hz) to the top of a 10-hole diatonic.
+        Self { min_freq: 200.0, max_freq: 2500.0 }
+    }
+}
+
+impl PitchRange {
+    /// Bounds spanning `freqs`, widened by `margin_semitones` on each side so
+    /// a bend or attack landing just past a charted note still detects.
+    /// Falls back to [`PitchRange::default`] when `freqs` is empty.
+    pub fn from_freqs(freqs: impl IntoIterator<Item = f32>, margin_semitones: f32) -> Self {
+        let (lo, hi) = freqs
+            .into_iter()
+            .fold((f32::MAX, f32::MIN), |(lo, hi), f| (lo.min(f), hi.max(f)));
+        if lo > hi {
+            return Self::default();
+        }
+        let ratio = 2f32.powf(margin_semitones / 12.0);
+        Self {
+            min_freq: lo / ratio,
+            max_freq: hi * ratio,
+        }
+    }
+}
 
 /// Which pitch-detection algorithm the audio pipeline uses for *pitches*. The
 /// FFT magnitude spectrum is always computed (the spectrogram needs it); this
@@ -149,20 +182,29 @@ impl Default for FftState {
     }
 }
 
-/// Detect pitches in a block of audio with the default (FFT) algorithm. Thin
-/// wrapper over [`analyze`] for callers that only want the pitches.
+/// Detect pitches in a block of audio with the default (FFT) algorithm and the
+/// default [`PitchRange`]. Thin wrapper over [`analyze`] for callers that only
+/// want the pitches.
 pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -> Vec<PitchInfo> {
-    analyze(samples, sample_rate, state, PitchAlgorithm::Fft).pitches
+    analyze(
+        samples,
+        sample_rate,
+        state,
+        PitchAlgorithm::Fft,
+        PitchRange::default(),
+    )
+    .pitches
 }
 
 /// Window + FFT a block once (for the magnitude spectrum), then extract pitches
-/// with the selected `algorithm`. Returns empty magnitudes/pitches for
-/// too-short or silent input.
+/// with the selected `algorithm`, searched within `range`. Returns empty
+/// magnitudes/pitches for too-short or silent input.
 pub fn analyze(
     samples: &[f32],
     sample_rate: u32,
     state: &mut FftState,
     algorithm: PitchAlgorithm,
+    range: PitchRange,
 ) -> Analysis {
     let n = samples.len();
     let freq_res = if n > 0 {
@@ -209,18 +251,18 @@ pub fn analyze(
     // Pitches come from the selected algorithm; the magnitudes above are always
     // produced so frequency-domain views (the spectrogram) keep working.
     let pitches = match algorithm {
-        PitchAlgorithm::Fft => pitches_from_magnitudes(&magnitudes, freq_res),
-        PitchAlgorithm::Yin => mono_pitch(yin_pitch(samples, sample_rate)),
-        PitchAlgorithm::Pyin => mono_pitch(pyin_pitch(samples, sample_rate)),
-        PitchAlgorithm::Mcleod => mono_pitch(mpm_pitch(samples, sample_rate)),
+        PitchAlgorithm::Fft => pitches_from_magnitudes(&magnitudes, freq_res, range),
+        PitchAlgorithm::Yin => mono_pitch(yin_pitch(samples, sample_rate, range)),
+        PitchAlgorithm::Pyin => mono_pitch(pyin_pitch(samples, sample_rate, range)),
+        PitchAlgorithm::Mcleod => mono_pitch(mpm_pitch(samples, sample_rate, range)),
         PitchAlgorithm::Nmf => {
             let n_bins = magnitudes.len();
             let stale = match &state.nmf_dict {
-                Some(d) => d.n_bins != n_bins || d.sample_rate != sample_rate,
+                Some(d) => d.n_bins != n_bins || d.sample_rate != sample_rate || d.range != range,
                 None => true,
             };
             if stale {
-                state.nmf_dict = Some(build_nmf_dict(sample_rate, n_bins));
+                state.nmf_dict = Some(build_nmf_dict(sample_rate, n_bins, range));
             }
             nmf_pitches(&magnitudes, state.nmf_dict.as_ref().unwrap())
         }
@@ -248,7 +290,7 @@ fn mono_pitch(freq: Option<f32>) -> Vec<PitchInfo> {
 }
 
 /// Peak-picks fundamentals from a precomputed magnitude spectrum.
-fn pitches_from_magnitudes(magnitudes: &[f32], freq_res: f32) -> Vec<PitchInfo> {
+fn pitches_from_magnitudes(magnitudes: &[f32], freq_res: f32, range: PitchRange) -> Vec<PitchInfo> {
     let n_bins = magnitudes.len();
     let max_mag = magnitudes.iter().cloned().fold(0.0f32, f32::max);
     if max_mag < 1e-9 || freq_res <= 0.0 {
@@ -256,8 +298,8 @@ fn pitches_from_magnitudes(magnitudes: &[f32], freq_res: f32) -> Vec<PitchInfo> 
     }
 
     let threshold = max_mag * PEAK_THRESHOLD_RATIO;
-    let min_bin = (MIN_FREQ / freq_res) as usize;
-    let max_bin = ((MAX_FREQ / freq_res) as usize).min(n_bins.saturating_sub(2));
+    let min_bin = (range.min_freq / freq_res) as usize;
+    let max_bin = ((range.max_freq / freq_res) as usize).min(n_bins.saturating_sub(2));
 
     // Collect local maxima — use parabolic interpolation for sub-bin accuracy.
     let mut raw_peaks: Vec<(f32, f32)> = Vec::new();
@@ -338,21 +380,21 @@ fn suppress_harmonics(peaks: &[(f32, f32)]) -> Vec<(f32, f32)> {
 const YIN_THRESHOLD: f32 = 0.15;
 
 /// Estimate the fundamental frequency of `samples` with YIN, or `None` if the
-/// block is too short or has no clear pitch in the harmonica range.
-fn yin_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
-    let (cmnd, tau_min, tau_max) = yin_cmnd(samples, sample_rate)?;
+/// block is too short or has no clear pitch within `range`.
+fn yin_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f32> {
+    let (cmnd, tau_min, tau_max) = yin_cmnd(samples, sample_rate, range)?;
     // First τ whose d' dips below the absolute threshold (no dip → unvoiced).
     let tau = first_dip_below(&cmnd, tau_min, tau_max, YIN_THRESHOLD)?;
-    cmnd_to_freq(&cmnd, tau, sample_rate)
+    cmnd_to_freq(&cmnd, tau, sample_rate, range)
 }
 
-/// Build YIN's cumulative-mean-normalized difference function d'(τ) over the
-/// harmonica's τ range. Returns `(d', tau_min, tau_max)`, or `None` if the
+/// Build YIN's cumulative-mean-normalized difference function d'(τ) over
+/// `range`'s τ span. Returns `(d', tau_min, tau_max)`, or `None` if the
 /// block is too short. Shared by YIN and pYIN.
-fn yin_cmnd(samples: &[f32], sample_rate: u32) -> Option<(Vec<f32>, usize, usize)> {
+fn yin_cmnd(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<(Vec<f32>, usize, usize)> {
     let sr = sample_rate as f32;
-    let tau_min = ((sr / MAX_FREQ).floor() as usize).max(2);
-    let tau_max = (sr / MIN_FREQ).ceil() as usize;
+    let tau_min = ((sr / range.max_freq).floor() as usize).max(2);
+    let tau_max = (sr / range.min_freq).ceil() as usize;
     let n = samples.len();
     if tau_max < tau_min || n < tau_max + 2 {
         return None;
@@ -395,12 +437,12 @@ fn first_dip_below(cmnd: &[f32], tau_min: usize, tau_max: usize, threshold: f32)
     None
 }
 
-/// Parabolic-refine the chosen lag and convert to a frequency, gated to the
-/// harmonica range.
-fn cmnd_to_freq(cmnd: &[f32], tau: usize, sample_rate: u32) -> Option<f32> {
+/// Parabolic-refine the chosen lag and convert to a frequency, gated to
+/// `range`.
+fn cmnd_to_freq(cmnd: &[f32], tau: usize, sample_rate: u32, range: PitchRange) -> Option<f32> {
     let refined = parabolic_vertex(cmnd, tau);
     let f0 = sample_rate as f32 / refined;
-    (MIN_FREQ..=MAX_FREQ).contains(&f0).then_some(f0)
+    (range.min_freq..=range.max_freq).contains(&f0).then_some(f0)
 }
 
 // ── pYIN (probabilistic YIN) ──────────────────────────────────────────────────
@@ -416,8 +458,8 @@ const PYIN_THRESHOLDS: usize = 100;
 
 /// Estimate f0 with the per-frame pYIN threshold sweep, or `None` if no
 /// candidate accumulates any probability.
-fn pyin_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
-    let (cmnd, tau_min, tau_max) = yin_cmnd(samples, sample_rate)?;
+fn pyin_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f32> {
+    let (cmnd, tau_min, tau_max) = yin_cmnd(samples, sample_rate, range)?;
 
     // Accumulate prior probability onto whichever τ each threshold selects.
     let mut prob = vec![0.0f32; tau_max + 1];
@@ -433,7 +475,7 @@ fn pyin_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
     if prob[best] <= 0.0 {
         return None;
     }
-    cmnd_to_freq(&cmnd, best, sample_rate)
+    cmnd_to_freq(&cmnd, best, sample_rate, range)
 }
 
 /// Unnormalized Beta(2, 18) density — pYIN's default prior over the YIN
@@ -469,11 +511,11 @@ fn parabolic_vertex(c: &[f32], tau: usize) -> f32 {
 const MPM_CLARITY: f32 = 0.9;
 
 /// Estimate f0 with MPM, or `None` if the block is too short or no key maximum
-/// lands a clear pitch in the harmonica range.
-fn mpm_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
+/// lands a clear pitch within `range`.
+fn mpm_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f32> {
     let sr = sample_rate as f32;
-    let tau_min = ((sr / MAX_FREQ).floor() as usize).max(2);
-    let tau_max = (sr / MIN_FREQ).ceil() as usize;
+    let tau_min = ((sr / range.max_freq).floor() as usize).max(2);
+    let tau_max = (sr / range.min_freq).ceil() as usize;
     let n = samples.len();
     if tau_max < tau_min || n < tau_max + 2 {
         return None;
@@ -524,7 +566,7 @@ fn mpm_pitch(samples: &[f32], sample_rate: u32) -> Option<f32> {
 
     let refined = parabolic_vertex(&nsdf, chosen);
     let f0 = sr / refined;
-    (MIN_FREQ..=MAX_FREQ).contains(&f0).then_some(f0)
+    (range.min_freq..=range.max_freq).contains(&f0).then_some(f0)
 }
 
 // ── Template NMF (polyphonic) ─────────────────────────────────────────────────
@@ -553,6 +595,7 @@ const NMF_MAX_NOTES: usize = 6;
 struct NmfDict {
     sample_rate: u32,
     n_bins: usize,
+    range: PitchRange,
     n_notes: usize,
     /// Fundamental frequency of each note (dictionary column).
     freqs: Vec<f32>,
@@ -562,14 +605,15 @@ struct NmfDict {
     dtd: Vec<Vec<f32>>,
 }
 
-/// Build the harmonic-template dictionary for a given spectrum size / rate.
-fn build_nmf_dict(sample_rate: u32, n_bins: usize) -> NmfDict {
+/// Build the harmonic-template dictionary for a given spectrum size / rate /
+/// pitch range.
+fn build_nmf_dict(sample_rate: u32, n_bins: usize, range: PitchRange) -> NmfDict {
     let nyquist = sample_rate as f32 / 2.0;
     // magnitudes span DC..Nyquist over n_bins, so each bin is this wide.
     let freq_res = nyquist / n_bins.max(1) as f32;
 
-    let midi_lo = (12.0 * (MIN_FREQ / 440.0).log2() + 69.0).ceil() as i32;
-    let midi_hi = (12.0 * (MAX_FREQ / 440.0).log2() + 69.0).floor() as i32;
+    let midi_lo = (12.0 * (range.min_freq / 440.0).log2() + 69.0).ceil() as i32;
+    let midi_hi = (12.0 * (range.max_freq / 440.0).log2() + 69.0).floor() as i32;
 
     let mut freqs = Vec::new();
     let mut columns: Vec<Vec<f32>> = Vec::new();
@@ -615,6 +659,7 @@ fn build_nmf_dict(sample_rate: u32, n_bins: usize) -> NmfDict {
     NmfDict {
         sample_rate,
         n_bins,
+        range,
         n_notes,
         freqs,
         columns,
@@ -746,7 +791,7 @@ mod tests {
         let samples: Vec<f32> = (0..n)
             .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
             .collect();
-        let f0 = yin_pitch(&samples, sample_rate).expect("expected a pitch");
+        let f0 = yin_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
         assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
         assert_eq!(freq_to_note(f0), Some(("A".to_string(), 4)));
     }
@@ -754,7 +799,7 @@ mod tests {
     #[test]
     fn yin_rejects_silence_and_noise() {
         // Flat silence: no period.
-        assert_eq!(yin_pitch(&vec![0.0f32; 4096], 44100), None);
+        assert_eq!(yin_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()), None);
     }
 
     #[test]
@@ -764,13 +809,13 @@ mod tests {
         let samples: Vec<f32> = (0..n)
             .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
             .collect();
-        let f0 = pyin_pitch(&samples, sample_rate).expect("expected a pitch");
+        let f0 = pyin_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
         assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
     }
 
     #[test]
     fn pyin_rejects_silence() {
-        assert_eq!(pyin_pitch(&vec![0.0f32; 4096], 44100), None);
+        assert_eq!(pyin_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()), None);
     }
 
     #[test]
@@ -780,13 +825,13 @@ mod tests {
         let samples: Vec<f32> = (0..n)
             .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
             .collect();
-        let f0 = mpm_pitch(&samples, sample_rate).expect("expected a pitch");
+        let f0 = mpm_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
         assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
     }
 
     #[test]
     fn mpm_rejects_silence() {
-        assert_eq!(mpm_pitch(&vec![0.0f32; 4096], 44100), None);
+        assert_eq!(mpm_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default()), None);
     }
 
     // Render the FFT magnitude spectrum of a sum of sine tones, the way
@@ -801,7 +846,14 @@ mod tests {
             })
             .collect();
         let mut state = FftState::default();
-        analyze(&samples, sample_rate, &mut state, PitchAlgorithm::Fft).magnitudes
+        analyze(
+            &samples,
+            sample_rate,
+            &mut state,
+            PitchAlgorithm::Fft,
+            PitchRange::default(),
+        )
+        .magnitudes
     }
 
     #[test]
@@ -810,7 +862,7 @@ mod tests {
         let n = 4096;
         // A4 (440) + C#5 (554.37): a major third.
         let mags = magnitudes_of(&[440.0, 554.37], sample_rate, n);
-        let dict = build_nmf_dict(sample_rate, mags.len());
+        let dict = build_nmf_dict(sample_rate, mags.len(), PitchRange::default());
         let pitches = nmf_pitches(&mags, &dict);
         assert!(
             pitches.iter().any(|p| p.note == "A" && p.octave == 4),
@@ -826,7 +878,7 @@ mod tests {
     fn nmf_single_tone_is_one_note() {
         let sample_rate = 44100u32;
         let mags = magnitudes_of(&[440.0], sample_rate, 4096);
-        let dict = build_nmf_dict(sample_rate, mags.len());
+        let dict = build_nmf_dict(sample_rate, mags.len(), PitchRange::default());
         let pitches = nmf_pitches(&mags, &dict);
         assert!(
             pitches.iter().any(|p| p.note == "A" && p.octave == 4),
@@ -844,7 +896,8 @@ mod tests {
             .collect();
         let mut state = FftState::default();
         for algo in PitchAlgorithm::all() {
-            let pitches = analyze(&samples, sample_rate, &mut state, *algo).pitches;
+            let pitches = analyze(&samples, sample_rate, &mut state, *algo, PitchRange::default())
+                .pitches;
             assert!(
                 pitches.iter().any(|p| p.note == "E" && p.octave == 4),
                 "{:?} should detect E4, got {:?}",
@@ -862,10 +915,45 @@ mod tests {
             .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
             .collect();
         let mut state = FftState::default();
-        let pitches = analyze(&samples, sample_rate, &mut state, PitchAlgorithm::Yin).pitches;
+        let pitches = analyze(
+            &samples,
+            sample_rate,
+            &mut state,
+            PitchAlgorithm::Yin,
+            PitchRange::default(),
+        )
+        .pitches;
         assert_eq!(pitches.len(), 1, "YIN is monophonic: one pitch");
         assert_eq!(pitches[0].note, "A");
         assert_eq!(pitches[0].octave, 4);
+    }
+
+    // ── PitchRange::from_freqs ───────────────────────────────────────────────
+
+    #[test]
+    fn pitch_range_from_freqs_falls_back_to_default_when_empty() {
+        assert_eq!(PitchRange::from_freqs(std::iter::empty(), 1.0), PitchRange::default());
+    }
+
+    #[test]
+    fn pitch_range_from_freqs_spans_min_and_max_with_margin() {
+        // G3 (~196 Hz) to G6 (~1568 Hz), the range of a low-G 10-hole diatonic.
+        let range = PitchRange::from_freqs([196.0, 1568.0], 1.0);
+        // A semitone below G3 / above G6.
+        assert!(range.min_freq < 196.0, "min {} should be below 196", range.min_freq);
+        assert!(range.max_freq > 1568.0, "max {} should be above 1568", range.max_freq);
+        // And within ~1 semitone (ratio 2^(1/12) ≈ 1.0595) of the source notes.
+        assert!((range.min_freq - 196.0 / 2f32.powf(1.0 / 12.0)).abs() < 0.01);
+        assert!((range.max_freq - 1568.0 * 2f32.powf(1.0 / 12.0)).abs() < 0.01);
+    }
+
+    #[test]
+    fn pitch_range_from_freqs_lets_a_low_g_harp_hole_1_blow_through() {
+        // Hole-1 blow on a key-of-G diatonic is G3 ≈ 196 Hz, below the default
+        // detector floor of 200 Hz — the bug this range replaces MIN_FREQ for.
+        let range = PitchRange::from_freqs([196.0, 1568.0], 1.0);
+        assert!(range.min_freq < 196.0);
+        assert!(196.0 < PitchRange::default().min_freq, "sanity: below the old fixed floor");
     }
 
     #[test]

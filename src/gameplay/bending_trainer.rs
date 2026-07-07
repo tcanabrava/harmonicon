@@ -14,6 +14,7 @@ use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
+use crate::audio_system::pitch_detect::PitchRange;
 use crate::audio_system::wav::encode_wav;
 use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
 use crate::dialogs::button;
@@ -24,7 +25,7 @@ use crate::song::harmonica::Harmonica;
 
 use super::harmonica_overlay::{hole_notes, spawn_harmonica_overlay, HoleNotes};
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
-use super::{ActivePitches, GameplayClock, GameplayRoot};
+use super::{ActivePitches, GameplayClock, GameplayRoot, PITCH_RANGE_MARGIN_SEMITONES};
 
 const KEYS: [&str; 12] = [
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
@@ -343,6 +344,16 @@ fn richter_harp(key: &str) -> Harmonica {
     }
 }
 
+/// The pitch detector's search range for `key`'s transposed Richter harp,
+/// widened by a semitone margin — the trainer's own key-derived range, kept
+/// separate from a loaded chart's (see `setup_scoring_config` in `mod.rs`).
+fn pitch_range_for_key(key: &str) -> PitchRange {
+    richter_harp(key)
+        .frequency_range()
+        .map(|(lo, hi)| PitchRange::from_freqs([lo, hi], PITCH_RANGE_MARGIN_SEMITONES))
+        .unwrap_or_default()
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 pub fn setup(
@@ -352,8 +363,10 @@ pub fn setup(
     key: Res<TrainerKey>,
     target: Res<TrainerTarget>,
     audio: Res<AudioSettings>,
+    mut pitch_range: ResMut<PitchRange>,
 ) {
     clock.0 = 0.0;
+    *pitch_range = pitch_range_for_key(&key.0);
     tempo.beats_per_bar = 4;
     // Keep whatever BPM was last set; default to a comfortable practice tempo.
     if tempo.bpm < MIN_BPM || tempo.bpm > MAX_BPM {
@@ -630,6 +643,14 @@ pub fn rebuild_overlay(
             .entity(host)
             .with_children(|h| spawn_harmonica_overlay(h, &harp));
     }
+}
+
+/// Re-derive the pitch detector's range when the key changes.
+pub fn update_pitch_range(key: Res<TrainerKey>, mut pitch_range: ResMut<PitchRange>) {
+    if !key.is_changed() {
+        return;
+    }
+    *pitch_range = pitch_range_for_key(&key.0);
 }
 
 /// Keep the "Key: X" readout in step with the chosen key.

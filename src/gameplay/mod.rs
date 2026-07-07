@@ -33,7 +33,7 @@ use bevy::audio::Volume;
 
 use crate::{
     audio_system::midi::{midi_to_note, note_to_freq_hz, note_to_midi},
-    audio_system::pitch_detect::{AudioFrame, PitchEvent, PitchInfo},
+    audio_system::pitch_detect::{AudioFrame, PitchEvent, PitchInfo, PitchRange},
     menu::{AppState, GameplayMode, SelectedSong},
     settings::AudioSettings,
     song::{SongManifest, chart::Modifier},
@@ -59,6 +59,7 @@ impl Plugin for GameplayPlugin {
             song_progress_overlay::SongProgressPlugin,
         ))
         .init_resource::<GameplayClock>()
+        .init_resource::<PitchRange>()
         .init_resource::<ActivePitches>()
         .init_resource::<PitchGate>()
         .init_resource::<MusicStarted>()
@@ -98,6 +99,7 @@ impl Plugin for GameplayPlugin {
                 collect_pitches,
                 harmonica_overlay::update_harmonica_overlay,
                 bending_trainer::rebuild_overlay,
+                bending_trainer::update_pitch_range,
                 bending_trainer::update_key_label,
                 bending_trainer::update_target_label,
                 bending_trainer::update_hint_label,
@@ -636,6 +638,12 @@ fn reset_score(
     gate.consumed.clear();
 }
 
+/// Semitone margin added on each side of the harmonica's natural range when
+/// sizing the pitch detector — covers bends/overblows landing just past a
+/// charted note plus a little slop before a clean attack. Also used by the
+/// bend trainer, which derives its own range from the current key.
+pub(crate) const PITCH_RANGE_MARGIN_SEMITONES: f32 = 1.0;
+
 fn setup_scoring_config(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
@@ -643,12 +651,22 @@ fn setup_scoring_config(
     mut loop_cfg: ResMut<LoopConfig>,
     mut fx_mapping: ResMut<FxMapping>,
     mut song_end: ResMut<SongEnd>,
+    mut pitch_range: ResMut<PitchRange>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
     let chart = &manifest.chart;
     let s = &chart.scoring;
+
+    // Size the detector to this harmonica instead of a fixed constant, so a
+    // Low-F/Low-D harp's low notes aren't cut off by a floor tuned for
+    // standard keys (see TODO.md).
+    *pitch_range = chart
+        .harmonica
+        .frequency_range()
+        .map(|(lo, hi)| PitchRange::from_freqs([lo, hi], PITCH_RANGE_MARGIN_SEMITONES))
+        .unwrap_or_default();
 
     config.perfect_window = s.perfect_window_ms as f64 / 1000.0;
     config.good_window = s.good_window_ms as f64 / 1000.0;
@@ -998,6 +1016,7 @@ fn modifier_fx_key(modifier: &Modifier) -> &'static str {
 
 fn update_score_display(
     score: Res<Score>,
+    config: Res<ScoringConfig>,
     mut feedback: ResMut<HitFeedback>,
     time: Res<Time>,
     mut q_score: Query<&mut Text, (With<ScoreText>, Without<ComboText>, Without<FeedbackText>)>,
@@ -1011,8 +1030,20 @@ fn update_score_display(
         t.0 = format!("{}", score.points);
     }
 
+    // Same multiplier `score_notes` actually applies to points, so the HUD
+    // can never show a number the score disagrees with.
+    let multiplier = if config.combo_enabled {
+        compute_multiplier(
+            score.combo,
+            config.base_multiplier,
+            config.step_multiplier,
+            config.max_multiplier,
+        )
+    } else {
+        1.0
+    };
     for mut t in &mut q_combo {
-        t.0 = combo_label(score.combo);
+        t.0 = combo_label(score.combo, multiplier);
     }
 
     feedback.timer = (feedback.timer - time.delta_secs()).max(0.0);
@@ -1070,10 +1101,18 @@ fn apply_music_volume(
     }
 }
 
-fn cleanup_gameplay(mut commands: Commands, roots: Query<Entity, With<GameplayRoot>>) {
+fn cleanup_gameplay(
+    mut commands: Commands,
+    roots: Query<Entity, With<GameplayRoot>>,
+    mut pitch_range: ResMut<PitchRange>,
+) {
     for e in &roots {
         commands.entity(e).despawn();
     }
+    // Leaving Playing/BendingTrainer drops the chart- or key-derived range;
+    // menus and the spectrogram fall back to the default until another chart
+    // (or the trainer) sets it again.
+    *pitch_range = PitchRange::default();
 }
 
 #[cfg(test)]
@@ -1514,6 +1553,7 @@ mod tests {
         // Leaving Playing must tear down the scene (every `GameplayRoot`) while
         // leaving unrelated entities (e.g. the persistent camera) untouched.
         let mut world = World::new();
+        world.init_resource::<PitchRange>();
         let scene_a = world.spawn(GameplayRoot).id();
         let scene_b = world.spawn((GameplayRoot, Transform::default())).id();
         let keep = world.spawn_empty().id();

@@ -10,7 +10,7 @@ use bevy::prelude::*;
 const APP_ID: &str = "io.github.tcanabrava.Harmonicon";
 
 use harmonicon::assets_management::AssetsManagementPlugin;
-use harmonicon::audio_system::pitch_detect::AudioFrame;
+use harmonicon::audio_system::pitch_detect::{AudioFrame, PitchRange};
 use harmonicon::audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
 use harmonicon::gameplay::GameplayPlugin;
 use harmonicon::localization::LocalizationPlugin;
@@ -78,6 +78,7 @@ fn main() {
 
     app.add_message::<PitchEvent>()
         .init_resource::<AudioFrame>()
+        .init_resource::<PitchRange>()
         .add_systems(Startup, (spawn_camera, setup_audio))
         // Hold on the Startup state until the locale folder has loaded, so the
         // menu's first frame shows translated labels rather than raw Fluent keys.
@@ -120,6 +121,7 @@ fn setup_audio(world: &mut World) {
 fn process_audio(
     capture: Option<Res<audio_input::AudioCapture>>,
     settings: Res<harmonicon::settings::AudioSettings>,
+    range: Res<PitchRange>,
     mut writer: MessageWriter<PitchEvent>,
     mut frame: ResMut<AudioFrame>,
     mut fft: Local<pitch_detect::FftState>,
@@ -132,6 +134,7 @@ fn process_audio(
             capture.sample_rate,
             &mut fft,
             settings.pitch_algorithm,
+            *range,
         );
         writer.write(PitchEvent(analysis.pitches));
         // Publish the frame so visualizers reuse this FFT (freq) or the raw

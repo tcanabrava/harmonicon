@@ -6,7 +6,7 @@ use crate::song::chart::{Action, BendingProfile};
 
 use crate::song::chart::{ChromaticLayout, DiatonicLayout};
 
-use crate::audio_system::midi::{midi_to_note, note_to_midi};
+use crate::audio_system::midi::{midi_to_note, note_to_freq_hz, note_to_midi};
 
 use std::collections::HashSet;
 
@@ -195,6 +195,27 @@ impl Harmonica {
         }
         set
     }
+
+    /// Frequency bounds (Hz) spanning every note in [`build_valid_notes`], or
+    /// `None` if the harmonica has no layout to derive them from. Used to
+    /// size the pitch detector's search range to the actual instrument
+    /// instead of a fixed constant — a Low-F/Low-D diatonic's hole-1 notes
+    /// sit well below a standard-key harp's range.
+    ///
+    /// [`build_valid_notes`]: Self::build_valid_notes
+    pub fn frequency_range(&self) -> Option<(f32, f32)> {
+        let freqs: Vec<f32> = self
+            .build_valid_notes()
+            .iter()
+            .filter_map(|n| note_to_freq_hz(n))
+            .collect();
+        if freqs.is_empty() {
+            return None;
+        }
+        let lo = freqs.iter().cloned().fold(f32::MAX, f32::min);
+        let hi = freqs.iter().cloned().fold(f32::MIN, f32::max);
+        Some((lo, hi))
+    }
 }
 
 #[cfg(test)]
@@ -334,5 +355,42 @@ mod tests {
         let notes = chart.harmonica.build_valid_notes();
         assert!(!notes.contains("D#0"));
         assert!(!notes.contains("C8"));
+    }
+
+    #[test]
+    fn frequency_range_spans_lowest_to_highest_valid_note() {
+        let chart = test_chart();
+        let (lo, hi) = chart.harmonica.frequency_range().expect("has a layout");
+        // Lowest note is hole-1 blow (C4 ≈ 261.6 Hz), highest is hole-10 blow (C7 ≈ 2093 Hz).
+        assert!((lo - 261.63).abs() < 1.0, "expected ~C4, got {lo}");
+        assert!((hi - 2093.0).abs() < 1.0, "expected ~C7, got {hi}");
+    }
+
+    #[test]
+    fn frequency_range_of_a_low_g_harp_dips_below_the_old_fixed_floor() {
+        // Hole 1 blow on a key-of-G diatonic is G3 ≈ 196 Hz — below the old
+        // fixed 200 Hz detector floor this range replaces.
+        let harp = Harmonica::Diatonic {
+            holes: 10,
+            bending_profile: BendingProfile::RichterStandard,
+            position: None,
+            layout: Some(DiatonicLayout {
+                blow: Some(vec!["G3".into(), "B3".into()]),
+                draw: Some(vec!["A3".into(), "D4".into()]),
+            }),
+        };
+        let (lo, _hi) = harp.frequency_range().expect("has a layout");
+        assert!(lo < 200.0, "expected below 200 Hz, got {lo}");
+    }
+
+    #[test]
+    fn frequency_range_is_none_without_a_layout() {
+        let harp = Harmonica::Diatonic {
+            holes: 10,
+            bending_profile: BendingProfile::RichterStandard,
+            position: None,
+            layout: None,
+        };
+        assert_eq!(harp.frequency_range(), None);
     }
 }

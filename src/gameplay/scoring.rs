@@ -156,16 +156,28 @@ pub fn should_decay_combo(
 }
 
 /// HUD label for the current combo. Empty string when combo is ≤ 1.
-pub fn combo_label(combo: u32) -> String {
+///
+/// `multiplier` must be the same value actually applied to points (i.e. from
+/// [`compute_multiplier`] with the chart's configured base/step/max, or `1.0`
+/// when combo scoring is disabled) — a separately hardcoded formula here
+/// would disagree with the score whenever a chart sets a non-default
+/// `step_multiplier`/`max_multiplier`.
+pub fn combo_label(combo: u32, multiplier: f32) -> String {
     if combo <= 1 {
         return String::new();
     }
-    let mult = (1 + combo / 10).min(4);
-    if mult > 1 {
-        format!("\u{00D7}{} [\u{00D7}{} pts]", combo, mult)
+    if multiplier > 1.0 {
+        format!("\u{00D7}{combo} [\u{00D7}{} pts]", format_multiplier(multiplier))
     } else {
-        format!("\u{00D7}{}", combo)
+        format!("\u{00D7}{combo}")
     }
+}
+
+/// Render a multiplier without a noisy fractional tail: `2.0` -> `"2"`,
+/// `1.25` -> `"1.25"`.
+fn format_multiplier(mult: f32) -> String {
+    let s = format!("{mult:.2}");
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
 #[cfg(test)]
@@ -359,29 +371,43 @@ mod tests {
 
     #[test]
     fn empty_for_zero_and_one() {
-        assert_eq!(combo_label(0), "");
-        assert_eq!(combo_label(1), "");
+        assert_eq!(combo_label(0, 1.0), "");
+        assert_eq!(combo_label(1, 1.0), "");
     }
 
     #[test]
-    fn simple_label_below_ten() {
-        // mult = (1 + 5/10).min(4) = 1 — no multiplier shown
-        assert_eq!(combo_label(5), "\u{00D7}5");
+    fn simple_label_when_multiplier_is_at_baseline() {
+        assert_eq!(combo_label(5, 1.0), "\u{00D7}5");
     }
 
     #[test]
-    fn shows_multiplier_at_ten() {
-        // mult = (1 + 10/10).min(4) = 2
-        let s = combo_label(10);
+    fn shows_multiplier_when_above_baseline() {
+        let s = combo_label(10, 2.0);
         assert!(s.contains("\u{00D7}10"), "label: {s}");
         assert!(s.contains("\u{00D7}2"), "label: {s}");
     }
 
     #[test]
+    fn shows_fractional_multiplier_from_a_custom_step() {
+        // A chart with step_multiplier: 0.25 should show the real value, not
+        // the old hardcoded (1 + combo/10).min(4) formula's "2".
+        let s = combo_label(10, 1.25);
+        assert!(s.contains("\u{00D7}1.25"), "label: {s}");
+    }
+
+    #[test]
     fn multiplier_capped_at_four_in_label() {
-        // mult = (1 + 40/10).min(4) = 4
-        let s = combo_label(40);
+        let s = combo_label(40, 4.0);
         assert!(s.contains("\u{00D7}4"), "label: {s}");
+    }
+
+    // ── format_multiplier ────────────────────────────────────────────────────
+
+    #[test]
+    fn format_multiplier_drops_trailing_zeros() {
+        assert_eq!(format_multiplier(2.0), "2");
+        assert_eq!(format_multiplier(2.5), "2.5");
+        assert_eq!(format_multiplier(1.25), "1.25");
     }
 
     // ── detect_wobble / detect_relative_wobble ──────────────────────────────────
