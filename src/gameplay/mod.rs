@@ -724,8 +724,45 @@ fn setup_scoring_config(
     );
 }
 
-fn tick_clock(mut clock: ResMut<GameplayClock>, time: Res<Time>) {
-    clock.0 += time.delta_secs_f64();
+/// Max per-frame pull toward the audio sink's playback position. Keeping this
+/// small (rather than snapping straight to `audio_pos`) means a coarse or
+/// jittery sink read never makes notes visibly jump; larger drift closes
+/// gradually over a few frames instead.
+const CLOCK_CORRECTION_STEP: f64 = 0.003;
+
+/// Advance the clock by `dt`, re-anchoring toward `audio_pos` (the music
+/// sink's playback position) when it's known. `audio_pos` is `None` during
+/// the countdown, in Jam Session, and before the sink reports a position —
+/// callers fall back to plain frame-delta accumulation in those cases.
+fn advance_clock(current: f64, dt: f64, audio_pos: Option<f64>) -> f64 {
+    let projected = current + dt;
+    match audio_pos {
+        Some(audio_pos) => {
+            projected + (audio_pos - projected).clamp(-CLOCK_CORRECTION_STEP, CLOCK_CORRECTION_STEP)
+        }
+        None => projected,
+    }
+}
+
+/// Ticks the single [`GameplayClock`] all gameplay systems read. Once the
+/// countdown finishes and the song's music starts, the clock is kept
+/// anchored to the `AudioSink` playback position instead of free-running on
+/// `Time::delta` — otherwise decoder start-up delay and frame hitches drift
+/// the notes out of sync with the audio over a long song. Jam Session has no
+/// long track to drift against and stays frame-timer driven (metronome-led).
+fn tick_clock(
+    mut clock: ResMut<GameplayClock>,
+    time: Res<Time>,
+    mode: Res<GameplayMode>,
+    music_started: Res<MusicStarted>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    let dt = time.delta_secs_f64();
+    let audio_pos = (clock.0 >= 0.0 && music_started.0 && *mode != GameplayMode::JamSession)
+        .then(|| sinks.single().ok())
+        .flatten()
+        .map(|sink| sink.position().as_secs_f64());
+    clock.0 = advance_clock(clock.0, dt, audio_pos);
 }
 
 fn handle_loop_boundary(
@@ -1128,6 +1165,37 @@ mod tests {
     #[test]
     fn secs_per_bar_60bpm_4beats() {
         assert!((secs_per_bar(60.0, 4.0) - 4.0).abs() < 1e-9);
+    }
+
+    // ── advance_clock (audio-synced gameplay clock) ─────────────────────────
+
+    #[test]
+    fn advance_clock_with_no_audio_pos_is_plain_frame_delta() {
+        assert!((advance_clock(1.0, 0.016, None) - 1.016).abs() < 1e-9);
+    }
+
+    #[test]
+    fn advance_clock_snaps_fully_when_drift_is_within_the_correction_step() {
+        // Projected clock is 1.016; audio says 1.017 — 1ms of drift, well
+        // under the correction cap, so it's corrected in a single frame.
+        let result = advance_clock(1.0, 0.016, Some(1.017));
+        assert!((result - 1.017).abs() < 1e-9);
+    }
+
+    #[test]
+    fn advance_clock_clamps_large_positive_drift() {
+        // Audio is way ahead of the projected clock (e.g. after a stall) —
+        // the correction must not jump straight there in one frame.
+        let projected = 1.0 + 0.016;
+        let result = advance_clock(1.0, 0.016, Some(projected + 0.5));
+        assert!((result - (projected + CLOCK_CORRECTION_STEP)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn advance_clock_clamps_large_negative_drift() {
+        let projected = 1.0 + 0.016;
+        let result = advance_clock(1.0, 0.016, Some(projected - 0.5));
+        assert!((result - (projected - CLOCK_CORRECTION_STEP)).abs() < 1e-9);
     }
 
     #[test]

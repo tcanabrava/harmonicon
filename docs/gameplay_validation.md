@@ -32,6 +32,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 | **Play 3D restores the 2D camera on exit** | `gameplay::gameplay_3d::tests::leaving_3d_restores_the_2d_camera` |
 | Scene teardown despawns only `GameplayRoot` | `gameplay::tests::cleanup_despawns_only_gameplay_entities` |
 | Scoring / sustain / techniques / pitch logic | `gameplay::scoring::tests`, `gameplay::tests::*`, `audio_system::*` |
+| Clock re-anchors to the audio sink, clamped so it can't jump | `gameplay::tests::advance_clock_*` |
 
 ## Manual checks
 
@@ -39,6 +40,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 - [ ] **Audio starts.** After the 3-2-1 countdown, the backing track plays. *(manual: audio output)*
 - [ ] The HUD score/combo reads `0` and updates as you hit notes. *(manual)*
 - [ ] No errors/panics in the console while the gameplay chain runs. *(manual)*
+- [ ] **Long-song sync**: play a 3+ minute song end to end; the hit line still matches the beat at the end, with no accumulating drift. *(manual: audio + timing; correction math is unit-tested but real decoder/frame-hitch drift isn't)*
 
 ### Play 2D
 - [ ] The note **highway shows falling notes** in the ten lanes, with the comet head + animated tail. *(manual: rendering)*
