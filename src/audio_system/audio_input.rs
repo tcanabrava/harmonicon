@@ -248,14 +248,19 @@ fn push_chunks(
     if channels == 1 {
         mono.extend_from_slice(data);
     } else {
-        mono.extend(data.chunks(channels).map(|frame| frame.iter().sum::<f32>() / channels as f32));
+        mono.extend(
+            data.chunks(channels)
+                .map(|frame| frame.iter().sum::<f32>() / channels as f32),
+        );
     }
     buf.extend_from_slice(mono);
     while buf.len() >= CHUNK_SIZE {
         // Reuse a buffer the consumer already handed back if one's
         // available; only allocate as a last resort (pool momentarily
         // empty), so steady-state operation never touches the allocator.
-        let mut chunk = free_rx.try_recv().unwrap_or_else(|_| Vec::with_capacity(CHUNK_SIZE));
+        let mut chunk = free_rx
+            .try_recv()
+            .unwrap_or_else(|_| Vec::with_capacity(CHUNK_SIZE));
         chunk.clear();
         chunk.extend_from_slice(&buf[..CHUNK_SIZE]);
         let _ = tx.try_send(chunk);
@@ -320,7 +325,10 @@ mod tests {
         push_chunks(&mut buf, &mut mono, &data, 2, &tx, &free_rx);
 
         assert_eq!(buf, vec![2.0, 3.0]);
-        assert!(rx.try_recv().is_err(), "not enough samples yet for a full chunk");
+        assert!(
+            rx.try_recv().is_err(),
+            "not enough samples yet for a full chunk"
+        );
     }
 
     #[test]
