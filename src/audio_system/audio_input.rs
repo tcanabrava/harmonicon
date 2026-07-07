@@ -10,6 +10,14 @@ use crate::settings::AudioSettings;
 
 pub const CHUNK_SIZE: usize = 4096;
 
+/// How many chunk buffers circulate between the real-time audio callback and
+/// the consumer (`process_audio`). Comfortably more than one in flight at a
+/// time — the consumer drains far faster than chunks arrive (one FFT per
+/// ~46ms chunk) — so recycling normally never runs dry; if it ever does
+/// (startup, or the consumer briefly falling behind), `push_chunks` falls
+/// back to allocating a fresh buffer rather than dropping audio.
+const POOL_SIZE: usize = 8;
+
 // NonSend resource — keeps the cpal stream alive for the duration of the app.
 #[allow(dead_code)]
 pub struct AudioStream(pub cpal::Stream);
@@ -17,6 +25,13 @@ pub struct AudioStream(pub cpal::Stream);
 #[derive(Resource)]
 pub struct AudioCapture {
     pub receiver: Receiver<Vec<f32>>,
+    /// Hand a chunk buffer back here once you're done with it (e.g. when
+    /// overwriting `AudioFrame::samples` with a newer chunk) so the
+    /// real-time callback can reuse it instead of allocating — see
+    /// `push_chunks`. Calling into the allocator from that callback risks
+    /// blocking on a lock held by a lower-priority thread, causing an
+    /// audible dropout ("xrun") on weaker machines.
+    pub free_sender: Sender<Vec<f32>>,
     pub sample_rate: u32,
     /// The actually-connected device's name — may differ from the requested
     /// one if it wasn't found and capture fell back to the system default.
@@ -122,10 +137,17 @@ pub fn create_audio_capture(
 
     let (tx, rx) = bounded::<Vec<f32>>(64);
 
+    // Pre-warm the recycling pool so even the first few chunks don't need to
+    // allocate — see `AudioCapture::free_sender` / `push_chunks`.
+    let (free_tx, free_rx) = bounded::<Vec<f32>>(POOL_SIZE);
+    for _ in 0..POOL_SIZE {
+        let _ = free_tx.try_send(Vec::with_capacity(CHUNK_SIZE));
+    }
+
     let stream = match sample_format {
-        SampleFormat::F32 => build_stream_f32(&device, &stream_config, channels, tx)?,
-        SampleFormat::I16 => build_stream_i16(&device, &stream_config, channels, tx)?,
-        SampleFormat::I32 => build_stream_i32(&device, &stream_config, channels, tx)?,
+        SampleFormat::F32 => build_stream_f32(&device, &stream_config, channels, tx, free_rx)?,
+        SampleFormat::I16 => build_stream_i16(&device, &stream_config, channels, tx, free_rx)?,
+        SampleFormat::I32 => build_stream_i32(&device, &stream_config, channels, tx, free_rx)?,
         fmt => return Err(format!("unsupported sample format: {fmt:?}").into()),
     };
 
@@ -135,6 +157,7 @@ pub fn create_audio_capture(
         AudioStream(stream),
         AudioCapture {
             receiver: rx,
+            free_sender: free_tx,
             sample_rate,
             device_name,
         },
@@ -150,11 +173,13 @@ fn build_stream_f32(
     config: &StreamConfig,
     channels: usize,
     tx: Sender<Vec<f32>>,
+    free_rx: Receiver<Vec<f32>>,
 ) -> Result<cpal::Stream, cpal::BuildStreamError> {
-    let mut buf: Vec<f32> = Vec::new();
+    let mut buf: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
+    let mut mono: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
     device.build_input_stream(
         config,
-        move |data: &[f32], _| push_chunks(&mut buf, data, channels, &tx),
+        move |data: &[f32], _| push_chunks(&mut buf, &mut mono, data, channels, &tx, &free_rx),
         |e| eprintln!("audio stream error: {e}"),
         None,
     )
@@ -165,13 +190,17 @@ fn build_stream_i16(
     config: &StreamConfig,
     channels: usize,
     tx: Sender<Vec<f32>>,
+    free_rx: Receiver<Vec<f32>>,
 ) -> Result<cpal::Stream, cpal::BuildStreamError> {
-    let mut buf: Vec<f32> = Vec::new();
+    let mut buf: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
+    let mut mono: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
+    let mut converted: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
     device.build_input_stream(
         config,
         move |data: &[i16], _| {
-            let f: Vec<f32> = data.iter().map(|&s| s as f32 / 32_768.0).collect();
-            push_chunks(&mut buf, &f, channels, &tx);
+            converted.clear();
+            converted.extend(data.iter().map(|&s| s as f32 / 32_768.0));
+            push_chunks(&mut buf, &mut mono, &converted, channels, &tx, &free_rx);
         },
         |e| eprintln!("audio stream error: {e}"),
         None,
@@ -183,32 +212,53 @@ fn build_stream_i32(
     config: &StreamConfig,
     channels: usize,
     tx: Sender<Vec<f32>>,
+    free_rx: Receiver<Vec<f32>>,
 ) -> Result<cpal::Stream, cpal::BuildStreamError> {
-    let mut buf: Vec<f32> = Vec::new();
+    let mut buf: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
+    let mut mono: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
+    let mut converted: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
     device.build_input_stream(
         config,
         move |data: &[i32], _| {
-            let f: Vec<f32> = data.iter().map(|&s| s as f32 / 2_147_483_648.0).collect();
-            push_chunks(&mut buf, &f, channels, &tx);
+            converted.clear();
+            converted.extend(data.iter().map(|&s| s as f32 / 2_147_483_648.0));
+            push_chunks(&mut buf, &mut mono, &converted, channels, &tx, &free_rx);
         },
         |e| eprintln!("audio stream error: {e}"),
         None,
     )
 }
 
-// Downmix multichannel interleaved frames to mono, accumulate in `buf`, and
-// emit CHUNK_SIZE blocks with 50 % overlap for better time resolution.
-fn push_chunks(buf: &mut Vec<f32>, data: &[f32], channels: usize, tx: &Sender<Vec<f32>>) {
-    let mono: Vec<f32> = if channels == 1 {
-        data.to_vec()
+/// Downmixes multichannel interleaved frames to mono into the reusable
+/// `mono` scratch buffer, accumulates into `buf`, and emits CHUNK_SIZE
+/// blocks with 50% overlap. Every buffer here (`buf`, `mono`, and the chunk
+/// handed to `tx`, drawn from `free_rx`) is reused across calls rather than
+/// freshly allocated, since this runs on the real-time audio callback
+/// thread — calling into the allocator there risks blocking on a lock held
+/// by a lower-priority thread and causing an audible dropout.
+fn push_chunks(
+    buf: &mut Vec<f32>,
+    mono: &mut Vec<f32>,
+    data: &[f32],
+    channels: usize,
+    tx: &Sender<Vec<f32>>,
+    free_rx: &Receiver<Vec<f32>>,
+) {
+    mono.clear();
+    if channels == 1 {
+        mono.extend_from_slice(data);
     } else {
-        data.chunks(channels)
-            .map(|frame| frame.iter().sum::<f32>() / channels as f32)
-            .collect()
-    };
-    buf.extend(mono);
+        mono.extend(data.chunks(channels).map(|frame| frame.iter().sum::<f32>() / channels as f32));
+    }
+    buf.extend_from_slice(mono);
     while buf.len() >= CHUNK_SIZE {
-        let _ = tx.try_send(buf[..CHUNK_SIZE].to_vec());
+        // Reuse a buffer the consumer already handed back if one's
+        // available; only allocate as a last resort (pool momentarily
+        // empty), so steady-state operation never touches the allocator.
+        let mut chunk = free_rx.try_recv().unwrap_or_else(|_| Vec::with_capacity(CHUNK_SIZE));
+        chunk.clear();
+        chunk.extend_from_slice(&buf[..CHUNK_SIZE]);
+        let _ = tx.try_send(chunk);
         buf.drain(..CHUNK_SIZE / 2);
     }
 }
@@ -237,5 +287,62 @@ mod tests {
     fn falls_back_to_default_when_the_saved_device_is_unplugged() {
         let available = vec!["Mic A".to_string()];
         assert_eq!(resolve_device_name(&available, "USB Mic (unplugged)"), None);
+    }
+
+    // ── push_chunks ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn emits_a_full_chunk_and_keeps_the_overlap_tail() {
+        let (tx, rx) = bounded::<Vec<f32>>(4);
+        let (_free_tx, free_rx) = bounded::<Vec<f32>>(4); // empty pool: falls back to alloc
+        let mut buf = Vec::new();
+        let mut mono = Vec::new();
+        let data: Vec<f32> = (0..CHUNK_SIZE).map(|i| i as f32).collect();
+
+        push_chunks(&mut buf, &mut mono, &data, 1, &tx, &free_rx);
+
+        let chunk = rx.try_recv().expect("one chunk should have been emitted");
+        assert_eq!(chunk, data);
+        // 50% overlap: the back half stays buffered for the next call.
+        assert_eq!(buf, &data[CHUNK_SIZE / 2..]);
+        assert!(rx.try_recv().is_err(), "only one chunk should have emitted");
+    }
+
+    #[test]
+    fn downmixes_multichannel_frames_by_averaging() {
+        let (tx, rx) = bounded::<Vec<f32>>(4);
+        let (_free_tx, free_rx) = bounded::<Vec<f32>>(4);
+        let mut buf = Vec::new();
+        let mut mono = Vec::new();
+        // Two channels interleaved: (1,3) -> 2.0, (2,4) -> 3.0.
+        let data = vec![1.0, 3.0, 2.0, 4.0];
+
+        push_chunks(&mut buf, &mut mono, &data, 2, &tx, &free_rx);
+
+        assert_eq!(buf, vec![2.0, 3.0]);
+        assert!(rx.try_recv().is_err(), "not enough samples yet for a full chunk");
+    }
+
+    #[test]
+    fn reuses_a_recycled_buffer_instead_of_allocating() {
+        let (tx, rx) = bounded::<Vec<f32>>(4);
+        let (free_tx, free_rx) = bounded::<Vec<f32>>(4);
+
+        let recycled: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
+        let recycled_ptr = recycled.as_ptr();
+        free_tx.try_send(recycled).unwrap();
+
+        let mut buf = Vec::new();
+        let mut mono = Vec::new();
+        let data = vec![0.0f32; CHUNK_SIZE];
+
+        push_chunks(&mut buf, &mut mono, &data, 1, &tx, &free_rx);
+
+        let chunk = rx.try_recv().expect("chunk emitted");
+        assert_eq!(
+            chunk.as_ptr(),
+            recycled_ptr,
+            "should reuse the pooled allocation instead of a fresh one"
+        );
     }
 }

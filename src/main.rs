@@ -135,7 +135,11 @@ fn process_audio(
         // waveform (time) without re-analysing.
         frame.magnitudes = analysis.magnitudes;
         frame.freq_res = analysis.freq_res;
-        frame.samples = samples;
+        // Recycle the buffer we're about to overwrite back to the capture
+        // callback's pool instead of letting it deallocate here — see
+        // `audio_input::AudioCapture::free_sender`.
+        let previous = std::mem::replace(&mut frame.samples, samples);
+        let _ = capture.free_sender.try_send(previous);
     }
 }
 
