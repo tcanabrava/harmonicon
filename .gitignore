@@ -6,3 +6,10 @@ scripts/.venv/
 .cargo
 .zed
 
+# Local flatpak-builder output (the source manifest lives in packaging/flatpak/)
+/flatpak-harmonicon/
+/target-flatpak/
+/.flatpak-builder/
+/packaging/flatpak/.flatpak-builder/
+/harmonicon.flatpak
+
