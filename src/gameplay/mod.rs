@@ -628,12 +628,22 @@ fn technique_confirmed(
     }
 }
 
+/// Whether `note`+`octave` (e.g. `("G", 4)`) is the pitch named by `formatted`
+/// (e.g. `"G4"`) — equivalent to `format!("{note}{octave}") == formatted` but
+/// without allocating, since this runs per active pitch every frame.
+fn note_octave_eq(note: &str, octave: i32, formatted: &str) -> bool {
+    formatted
+        .strip_prefix(note)
+        .and_then(|rest| rest.parse::<i32>().ok())
+        .is_some_and(|o| o == octave)
+}
+
 /// The currently-detected frequency (Hz) matching `pitch_name` (e.g. `"D4"`),
 /// or `None` if that exact note isn't among the detected pitches this frame.
 fn active_frequency_for(active: &[PitchInfo], pitch_name: &str) -> Option<f32> {
     active
         .iter()
-        .find(|p| format!("{}{}", p.note, p.octave) == pitch_name)
+        .find(|p| note_octave_eq(&p.note, p.octave, pitch_name))
         .map(|p| p.frequency)
 }
 
@@ -870,11 +880,15 @@ fn score_notes(
         score.combo = 0;
     }
 
+    // One `format!` per active pitch, not two — the set only ever needs the
+    // formatted name once, whether it's kept (valid) or dropped (not on the harp).
     let harp_pitches: HashSet<String> = active
         .0
         .iter()
-        .filter(|p| valid_notes.0.contains(&format!("{}{}", p.note, p.octave)))
-        .map(|p| format!("{}{}", p.note, p.octave))
+        .filter_map(|p| {
+            let name = format!("{}{}", p.note, p.octave);
+            valid_notes.0.contains(&name).then_some(name)
+        })
         .collect();
 
     // Re-arm any pitch the player has stopped sounding, so its next attack is
@@ -944,7 +958,16 @@ fn score_notes(
             continue;
         }
 
-        pending.push((entity, judged - note.time));
+        // Anything further out than `good_window` classifies as `TooEarly`
+        // regardless of `playing` (see `classify_note`) — a guaranteed no-op
+        // match arm below. Skipping the push means a long chart's untouched
+        // future notes don't get sorted and classified every single frame;
+        // only notes actually near the judged instant pay that cost.
+        let offset = judged - note.time;
+        if offset < -config.good_window {
+            continue;
+        }
+        pending.push((entity, offset));
     }
 
     pending.sort_by(|a, b| {
@@ -1666,6 +1689,22 @@ mod tests {
         assert_eq!(active_frequency_for(&active, "A4"), None);
     }
 
+    #[test]
+    fn note_octave_eq_matches_format_without_allocating() {
+        assert!(note_octave_eq("G", 4, "G4"));
+        assert!(note_octave_eq("C#", 5, "C#5"));
+        assert!(!note_octave_eq("G", 4, "G5"), "different octave");
+        assert!(!note_octave_eq("G", 4, "A4"), "different note");
+        assert!(
+            !note_octave_eq("G", 4, "G4x"),
+            "trailing garbage after the octave must not match"
+        );
+        assert!(
+            !note_octave_eq("G", 4, "G"),
+            "missing octave must not match"
+        );
+    }
+
     // ── cleanup_gameplay ──────────────────────────────────────────────────────────
 
     #[test]
@@ -1755,5 +1794,154 @@ mod tests {
             !world.get::<ScheduledNote>(far).unwrap().hit,
             "the farther note must not steal the attack meant for the closer one"
         );
+    }
+
+    #[test]
+    fn score_notes_leaves_a_far_future_note_untouched() {
+        // A note well beyond `good_window` classifies as `TooEarly` — a no-op
+        // — so it's skipped before the sort/classify pass entirely (the
+        // optimization for long charts). Confirm that skip doesn't change its
+        // observable state: still neither hit nor missed.
+        let mut world = World::new();
+        world.insert_resource(GameplayClock(0.0));
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(ActivePitches(vec![]));
+        world.insert_resource(AudioFrame::default());
+        world.insert_resource(ValidHarpNotes(HashSet::from(["C4".to_string()])));
+        world.insert_resource(ScoringConfig::default());
+        world.insert_resource(AudioSettings::default());
+        world.insert_resource(Score::default());
+        world.insert_resource(SongStats::default());
+        world.insert_resource(HitFeedback::default());
+        world.insert_resource(PitchGate::default());
+
+        let far_future = world.spawn(overlap_test_note(120.0)).id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+
+        let note = world.get::<ScheduledNote>(far_future).unwrap();
+        assert!(!note.hit);
+        assert!(!note.missed);
+    }
+
+    /// A tiny synthetic 3-note "song" driven frame by frame through
+    /// `score_notes`, exercising the full detected-pitch → classify →
+    /// score/combo/stats path together rather than each piece in isolation.
+    /// This is the headless stand-in for
+    /// `docs/gameplay_validation.md`'s "HUD score/combo updates as you hit
+    /// notes" manual check.
+    #[test]
+    fn end_to_end_synthetic_song_drives_score_combo_and_stats() {
+        let mut world = World::new();
+        world.insert_resource(GameplayClock(0.0));
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(ActivePitches(vec![]));
+        world.insert_resource(AudioFrame::default());
+        world.insert_resource(ValidHarpNotes(HashSet::from([
+            "C4".to_string(),
+            "D4".to_string(),
+            "E4".to_string(),
+        ])));
+        world.insert_resource(ScoringConfig::default());
+        world.insert_resource(AudioSettings::default());
+        world.insert_resource(Score::default());
+        world.insert_resource(SongStats::default());
+        world.insert_resource(HitFeedback::default());
+        world.insert_resource(PitchGate::default());
+
+        fn note(time: f64, pitch: &str) -> ScheduledNote {
+            ScheduledNote {
+                time,
+                duration: 0.2,
+                hole: 1,
+                is_blow: true,
+                expected_pitch: pitch.to_string(),
+                hit: false,
+                missed: false,
+                held: 0.0,
+                sustain_scored: false,
+                modifiers: Vec::new(),
+                pitch_samples: Vec::new(),
+                amp_samples: Vec::new(),
+            }
+        }
+        fn pitch(note: &str, octave: i32) -> PitchInfo {
+            PitchInfo {
+                note: note.to_string(),
+                octave,
+                frequency: note_to_freq_hz(&format!("{note}{octave}")).unwrap(),
+            }
+        }
+
+        // C4 at t=0.0 is played right on time (Perfect); D4 at t=0.5 is played
+        // 90ms late (inside `good_window` 130ms but past `perfect_window`
+        // 60ms, so "Good"/delayed); E4 at t=1.0 is never played (Missed).
+        let perfect_note = world.spawn(note(0.0, "C4")).id();
+        let good_note = world.spawn(note(0.5, "D4")).id();
+        let missed_note = world.spawn(note(1.0, "E4")).id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+
+        // (clock time, active pitches this frame) — irregular steps are fine
+        // since `score_notes` classifies purely from clock time, not frame
+        // count; only the sustain-hold measurement cares about elapsed `dt`,
+        // which `Time::advance_by` sets exactly per step below.
+        let steps: &[(f64, &[(&str, i32)])] = &[
+            (0.0, &[("C", 4)]),
+            (0.05, &[("C", 4)]),
+            (0.1, &[("C", 4)]),
+            (0.15, &[("C", 4)]),
+            (0.2, &[("C", 4)]),
+            (0.21, &[]),
+            (0.5, &[]),
+            (0.59, &[("D", 4)]),
+            (0.6, &[]),
+            (1.0, &[]),
+            (1.14, &[]),
+            (1.3, &[]),
+        ];
+        let mut prev_t = 0.0f64;
+        for &(t, pitches) in steps {
+            world.resource_mut::<GameplayClock>().0 = t;
+            world.resource_mut::<ActivePitches>().0 =
+                pitches.iter().map(|&(n, o)| pitch(n, o)).collect();
+            world
+                .resource_mut::<Time>()
+                .advance_by(std::time::Duration::from_secs_f64(t - prev_t));
+            schedule.run(&mut world);
+            prev_t = t;
+        }
+
+        assert!(
+            world.get::<ScheduledNote>(perfect_note).unwrap().hit,
+            "on-time note should be hit"
+        );
+        assert!(
+            world.get::<ScheduledNote>(good_note).unwrap().hit,
+            "late-but-in-window note should still be hit"
+        );
+        assert!(
+            world.get::<ScheduledNote>(missed_note).unwrap().missed,
+            "never-played note should be missed"
+        );
+
+        let stats = world.resource::<SongStats>();
+        assert_eq!(stats.perfect, 1);
+        assert_eq!(
+            stats.delayed, 1,
+            "the D4 hit landed after its onset, inside the good window"
+        );
+        assert_eq!(stats.miss, 1);
+
+        let score = world.resource::<Score>();
+        assert!(score.points > 0, "hits and sustain should award points");
+        assert_eq!(
+            score.max_combo, 2,
+            "combo should have peaked at 2 (both hits) before the miss reset it"
+        );
+        assert_eq!(score.combo, 0, "the miss should have reset the live combo");
     }
 }
