@@ -15,7 +15,7 @@
 
 use bevy::prelude::*;
 
-use super::AppState;
+use crate::menu::AppState;
 
 mod grid;
 mod harpchart;

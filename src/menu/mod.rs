@@ -12,13 +12,13 @@ use crate::assets_management::AvailableSongs;
 use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
 use crate::theme::LoadedTheme;
+use crate::song_editor;
 
 use super::dialogs::button;
 
 mod calibration;
 mod credits;
 mod options;
-mod song_editor;
 
 mod theme_picker;
 
@@ -432,7 +432,7 @@ fn setup_main_menu(
         root,
         &loc.msg("menu-song-editor-2"),
         Some("SongEditor2"),
-        &theme,
+        &&theme,
         &btn_mats,
         "Main",
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {

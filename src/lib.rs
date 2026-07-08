@@ -23,3 +23,4 @@ pub mod settings;
 pub mod song;
 pub mod spectrogram;
 pub mod theme;
+pub mod song_editor;
