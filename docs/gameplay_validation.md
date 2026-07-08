@@ -36,12 +36,17 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 | Detector range derives from the harmonica layout (low-keyed harps not cut off) | `song::harmonica::tests::frequency_range_*`, `audio_system::pitch_detect::tests::pitch_range_from_freqs_*` |
 | Vibrato/wah bonus requires the measured rate to match the chart's `oscillation_hz` | `gameplay::scoring::tests::measured_oscillation_hz_*`, `…::oscillation_matches_rate_*`, `gameplay::tests::technique_confirmed_rejects_*_at_the_wrong_rate` |
 | Overlapping same-pitch notes credit the one actually due, not query order | `gameplay::tests::score_notes_credits_the_closest_offset_when_two_same_pitch_notes_overlap` |
+| End-to-end: a synthetic pitch stream drives a mini chart through hit/good/miss and the score/combo/stats update accordingly | `gameplay::tests::end_to_end_synthetic_song_drives_score_combo_and_stats` |
 
 ## Manual checks
 
 ### All modes — entering `Playing`
 - [ ] **Audio starts.** After the 3-2-1 countdown, the backing track plays. *(manual: audio output)*
-- [ ] The HUD score/combo reads `0` and updates as you hit notes. *(manual)*
+- [ ] The HUD score/combo reads `0` and updates as you hit notes. *(the
+  underlying score/combo/stats math is now covered end to end by
+  `gameplay::tests::end_to_end_synthetic_song_drives_score_combo_and_stats`;
+  this check is now just about the HUD actually *displaying* those numbers —
+  manual: rendering)*
 - [ ] No errors/panics in the console while the gameplay chain runs. *(manual)*
 - [ ] **Long-song sync**: play a 3+ minute song end to end; the hit line still matches the beat at the end, with no accumulating drift. *(manual: audio + timing; correction math is unit-tested but real decoder/frame-hitch drift isn't)*
 - [ ] **Low-keyed harp detection**: load (or author) a chart with a Low-F/Low-D harmonica and confirm hole-1 blow/draw register — the detector range now derives from the chart's layout instead of a fixed 200 Hz floor. *(manual: needs a real low-keyed harp and mic)*
