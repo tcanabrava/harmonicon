@@ -368,8 +368,8 @@ pub(super) fn freq_to_name(freq: f32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::menu::song_editor::interaction::select_or_add;
-    use crate::menu::song_editor::state::{Dir, Expr, GridNote, Pitch};
+    use crate::song_editor::interaction::select_or_add;
+    use crate::song_editor::state::{Dir, Expr, GridNote, Pitch};
 
     fn state_with_notes(key: &str, placements: &[(u8, usize)]) -> EditorState {
         let mut state = EditorState::default();
