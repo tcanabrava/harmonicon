@@ -37,6 +37,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 | Vibrato/wah bonus requires the measured rate to match the chart's `oscillation_hz` | `gameplay::scoring::tests::measured_oscillation_hz_*`, `…::oscillation_matches_rate_*`, `gameplay::tests::technique_confirmed_rejects_*_at_the_wrong_rate` |
 | Overlapping same-pitch notes credit the one actually due, not query order | `gameplay::tests::score_notes_credits_the_closest_offset_when_two_same_pitch_notes_overlap` |
 | End-to-end: a synthetic pitch stream drives a mini chart through hit/good/miss and the score/combo/stats update accordingly | `gameplay::tests::end_to_end_synthetic_song_drives_score_combo_and_stats` |
+| Loop boundary rewinds the clock and resets only the notes inside the loop range | `gameplay::tests::loop_boundary_rewinds_the_clock_and_resets_notes_in_range`, `…::loop_boundary_is_a_no_op_before_end_time_or_when_inactive` |
 
 ## Manual checks
 
@@ -50,6 +51,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 - [ ] No errors/panics in the console while the gameplay chain runs. *(manual)*
 - [ ] **Long-song sync**: play a 3+ minute song end to end; the hit line still matches the beat at the end, with no accumulating drift. *(manual: audio + timing; correction math is unit-tested but real decoder/frame-hitch drift isn't)*
 - [ ] **Low-keyed harp detection**: load (or author) a chart with a Low-F/Low-D harmonica and confirm hole-1 blow/draw register — the detector range now derives from the chart's layout instead of a fixed 200 Hz floor. *(manual: needs a real low-keyed harp and mic)*
+- [ ] **Looping doesn't speed up the music.** With `chart.loop.repeat = true` (or any future A–B loop UI), let the loop wrap a few times: the backing track should audibly stay in sync with the notes/metronome, not creep faster each pass. *(manual: needs a live `AudioSink`; the clock-rewind and note-reset logic is unit-tested — see the table above — but `AudioSink::try_seek` itself needs real audio output)*
 
 ### Play 2D
 - [ ] The note **highway shows falling notes** in the ten lanes, with the comet head + animated tail. *(manual: rendering)*

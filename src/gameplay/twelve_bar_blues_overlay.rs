@@ -135,7 +135,7 @@ pub fn update_bar(
     };
     let bpm = manifest.chart.song.tempo_bpm as f64;
     let spb = secs_per_bar(bpm, config.beats_per_bar);
-    let current = current_bar_index(clock.0, spb);
+    let current = current_bar_index(clock.get(), spb);
     let key = manifest.chart.song.key.as_str();
     let colors = theme.twelve_bar_colors();
 

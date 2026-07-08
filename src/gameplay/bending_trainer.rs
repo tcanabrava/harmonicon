@@ -378,7 +378,7 @@ pub fn setup(
     audio: Res<AudioSettings>,
     mut pitch_range: ResMut<PitchRange>,
 ) {
-    clock.0 = 0.0;
+    clock.set_free(0.0);
     *pitch_range = pitch_range_for_key(&key.0);
     tempo.beats_per_bar = 4;
     // Keep whatever BPM was last set; default to a comfortable practice tempo.
@@ -633,7 +633,7 @@ pub fn setup(
 
 /// Advance the trainer's own clock (no song to drive it).
 pub fn tick_clock(mut clock: ResMut<GameplayClock>, time: Res<Time>) {
-    clock.0 += time.delta_secs_f64();
+    clock.advance(time.delta_secs_f64(), None);
 }
 
 /// Rebuild the bend diagram when the key changes.

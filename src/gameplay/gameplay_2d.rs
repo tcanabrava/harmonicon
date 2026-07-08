@@ -53,7 +53,7 @@ pub fn setup(
 
     let tail_cfg = manifest.assets_2d_config.clone();
 
-    clock.0 = -COUNTDOWN;
+    clock.set_free(-COUNTDOWN);
     music_started.0 = false;
     valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
 
@@ -696,7 +696,7 @@ pub fn update_notes(
     mut commands: Commands,
     mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
 ) {
-    let elapsed = clock.0;
+    let elapsed = clock.get();
     for (entity, note, mut node) in &mut notes {
         let bottom = note_head_bottom_pct(note.time, elapsed, LOOKAHEAD);
 

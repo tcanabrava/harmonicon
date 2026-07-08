@@ -366,7 +366,7 @@ pub fn setup(
         error!("SongManifest not ready when entering Playing (3D) state");
         return;
     };
-    clock.0 = -COUNTDOWN;
+    clock.set_free(-COUNTDOWN);
     music_started.0 = false;
     valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
 
@@ -724,7 +724,7 @@ pub fn groove_harmonica(
     };
     // Hold still during the countdown (clock is negative); only dance once the
     // music has started.
-    if clock.0 < 0.0 {
+    if clock.get() < 0.0 {
         for mut tf in &mut groove {
             tf.translation = Vec3::ZERO;
             tf.rotation = Quat::IDENTITY;
@@ -734,7 +734,7 @@ pub fn groove_harmonica(
 
     let bpm = manifest.chart.song.tempo_bpm.max(1.0);
     // Beats elapsed (fractional).
-    let beat = (clock.0 / (60.0 / bpm as f64)) as f32;
+    let beat = (clock.get() / (60.0 / bpm as f64)) as f32;
     let bi = beat.floor();
     let frac = beat.fract();
 
@@ -777,7 +777,7 @@ pub fn update_notes_3d(
     mut commands: Commands,
     mut notes: Query<(Entity, &NoteVisual3D, &mut Transform)>,
 ) {
-    let elapsed = clock.0;
+    let elapsed = clock.get();
     for (entity, note, mut tf) in &mut notes {
         let remaining = (note.time - elapsed) as f32;
         // The head's front face lands on the hit line at the note's time.
@@ -843,7 +843,7 @@ pub fn animate_note_tails_3d(
     clock: Res<super::GameplayClock>,
     mut materials: ResMut<Assets<NoteTail3dMaterial>>,
 ) {
-    let t = clock.0 as f32;
+    let t = clock.get() as f32;
     for (_, material) in materials.iter_mut() {
         material.params.z = t;
     }

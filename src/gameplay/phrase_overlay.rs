@@ -82,7 +82,7 @@ pub fn update_phrase(
                 item.groove.as_deref(),
             )
         }),
-        clock.0,
+        clock.get(),
     );
     let label = format_phrase_label(phrase, groove);
 

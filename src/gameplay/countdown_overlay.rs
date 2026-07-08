@@ -85,7 +85,7 @@ pub fn update_countdown(
     jam_loop: Res<JamLoop>,
     mut commands: Commands,
 ) {
-    if clock.0 >= 0.0 {
+    if clock.get() >= 0.0 {
         for mut vis in &mut overlay {
             *vis = Visibility::Hidden;
         }
@@ -114,7 +114,7 @@ pub fn update_countdown(
         *vis = Visibility::Visible;
     }
 
-    let remaining = -clock.0;
+    let remaining = -clock.get();
     let n = remaining.ceil() as u32;
     let frac = remaining.fract() as f32;
     let font_size = 80.0 + (1.0 - frac) * 80.0;

@@ -91,7 +91,7 @@ pub fn animate_note_tails(
     clock: Res<super::GameplayClock>,
     mut materials: ResMut<Assets<NoteTail2dMaterial>>,
 ) {
-    let t = clock.0 as f32;
+    let t = clock.get() as f32;
     for (_, material) in materials.iter_mut() {
         material.params.z = t;
     }

@@ -45,7 +45,7 @@ pub fn setup(
         error!("SongManifest not ready when entering Jam Session");
         return;
     };
-    clock.0 = -COUNTDOWN;
+    clock.set_free(-COUNTDOWN);
     music_started.0 = false;
 
     let chart = &manifest.chart;
@@ -262,7 +262,7 @@ pub fn apply_jam_loop_toggle(
     }
     commands.spawn((
         AudioPlayer::<AudioSource>(manifest.music.clone()),
-        jam_playback_settings(jam_loop.0, clock.0).with_volume(Volume::Linear(audio.music_volume)),
+        jam_playback_settings(jam_loop.0, clock.get()).with_volume(Volume::Linear(audio.music_volume)),
         MusicPlayer,
         GameplayRoot,
     ));
@@ -458,7 +458,7 @@ pub fn update_hole_map(
         return;
     };
     let spb = secs_per_bar(guide.bpm as f64, guide.beats_per_bar as f64);
-    let bar = current_bar_index(clock.0, spb);
+    let bar = current_bar_index(clock.get(), spb);
     let chord_tones = &guide.chord_tones_by_bar[bar];
 
     // Map each currently-lit hole to the best fit among all notes sounding it.

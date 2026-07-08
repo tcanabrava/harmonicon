@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 mod bending_trainer;
+mod clock;
 mod countdown_overlay;
 mod gameplay_2d;
 mod gameplay_3d;
@@ -226,8 +227,7 @@ impl Plugin for GameplayPlugin {
 
 // ── Shared resources ──────────────────────────────────────────────────────────
 
-#[derive(Resource, Default)]
-pub struct GameplayClock(pub f64);
+pub use clock::GameplayClock;
 
 #[derive(Resource, Default)]
 pub struct ActivePitches(pub Vec<PitchInfo>);
@@ -761,26 +761,6 @@ fn setup_scoring_config(
     );
 }
 
-/// Max per-frame pull toward the audio sink's playback position. Keeping this
-/// small (rather than snapping straight to `audio_pos`) means a coarse or
-/// jittery sink read never makes notes visibly jump; larger drift closes
-/// gradually over a few frames instead.
-const CLOCK_CORRECTION_STEP: f64 = 0.003;
-
-/// Advance the clock by `dt`, re-anchoring toward `audio_pos` (the music
-/// sink's playback position) when it's known. `audio_pos` is `None` during
-/// the countdown, in Jam Session, and before the sink reports a position —
-/// callers fall back to plain frame-delta accumulation in those cases.
-fn advance_clock(current: f64, dt: f64, audio_pos: Option<f64>) -> f64 {
-    let projected = current + dt;
-    match audio_pos {
-        Some(audio_pos) => {
-            projected + (audio_pos - projected).clamp(-CLOCK_CORRECTION_STEP, CLOCK_CORRECTION_STEP)
-        }
-        None => projected,
-    }
-}
-
 /// Ticks the single [`GameplayClock`] all gameplay systems read. Once the
 /// countdown finishes and the song's music starts, the clock is kept
 /// anchored to the `AudioSink` playback position instead of free-running on
@@ -795,22 +775,26 @@ fn tick_clock(
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
     let dt = time.delta_secs_f64();
-    let audio_pos = (clock.0 >= 0.0 && music_started.0 && *mode != GameplayMode::JamSession)
+    let audio_pos = (clock.get() >= 0.0 && music_started.0 && *mode != GameplayMode::JamSession)
         .then(|| sinks.single().ok())
         .flatten()
         .map(|sink| sink.position().as_secs_f64());
-    clock.0 = advance_clock(clock.0, dt, audio_pos);
+    clock.advance(dt, audio_pos);
 }
 
 fn handle_loop_boundary(
     loop_cfg: Res<LoopConfig>,
     mut clock: ResMut<GameplayClock>,
     mut notes: Query<&mut ScheduledNote>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    if !loop_cfg.active || clock.0 < loop_cfg.end_time {
+    if !loop_cfg.active || clock.get() < loop_cfg.end_time {
         return;
     }
-    clock.0 = loop_cfg.start_time;
+    // `rewind_to` also seeks the sink, so `tick_clock`'s anchoring doesn't
+    // see it far ahead of the just-rewound clock next frame and drag the
+    // clock forward again — see the doc comment on `GameplayClock`.
+    clock.rewind_to(loop_cfg.start_time, sinks.single().ok());
     for mut note in &mut notes {
         if note.time >= loop_cfg.start_time && note.time <= loop_cfg.end_time {
             note.hit = false;
@@ -835,13 +819,13 @@ fn update_active_targets(
     mut targets: ResMut<ActiveTargets>,
 ) {
     targets.0.clear();
-    if clock.0 < 0.0 {
+    if clock.get() < 0.0 {
         return;
     }
     // Shift the judgment point back by the microphone pipeline latency so the
     // highlighted hole tracks what the player is *actually* hearing, not what
     // the raw clock says.
-    let judged = clock.0 - audio.input_latency_ms as f64 / 1000.0;
+    let judged = clock.get() - audio.input_latency_ms as f64 / 1000.0;
     for note in &notes {
         if note.hit || note.missed {
             continue;
@@ -866,16 +850,16 @@ fn score_notes(
     mut feedback: ResMut<HitFeedback>,
     mut gate: ResMut<PitchGate>,
 ) {
-    if clock.0 < 0.0 {
+    if clock.get() < 0.0 {
         return;
     }
     let dt = time.delta_secs_f64();
     // Compensate for microphone pipeline latency: a pitch detected at clock T
     // was actually played at T - latency. Shift the judgment window accordingly.
-    let judged = clock.0 - audio.input_latency_ms as f64 / 1000.0;
+    let judged = clock.get() - audio.input_latency_ms as f64 / 1000.0;
 
     if config.combo_enabled
-        && should_decay_combo(score.combo, clock.0, score.last_hit_time, config.decay_secs)
+        && should_decay_combo(score.combo, clock.get(), score.last_hit_time, config.decay_secs)
     {
         score.combo = 0;
     }
@@ -913,7 +897,7 @@ fn score_notes(
             if note.sustain_scored {
                 continue;
             }
-            if clock.0 < note.time + note.duration {
+            if clock.get() < note.time + note.duration {
                 // The held pitch stays "consumed" by the gate, so checking the
                 // raw detected set keeps crediting this same note's sustain.
                 if harp_pitches.contains(&note.expected_pitch) {
@@ -926,9 +910,9 @@ fn score_notes(
                         && let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch)
                     {
                         note.pitch_samples
-                            .push((clock.0, 1200.0 * (hz / expected_hz).log2()));
+                            .push((clock.get(), 1200.0 * (hz / expected_hz).log2()));
                     }
-                    note.amp_samples.push((clock.0, rms(&frame.samples)));
+                    note.amp_samples.push((clock.get(), rms(&frame.samples)));
                 }
             } else {
                 score.points += sustain_points(note.held, note.duration);
@@ -1025,7 +1009,7 @@ fn score_notes(
                     HitQuality::Good => stats.good += 1,
                 }
                 stats.offset_sum += offset;
-                score.last_hit_time = clock.0;
+                score.last_hit_time = clock.get();
                 score.combo += 1;
                 score.max_combo = score.max_combo.max(score.combo);
                 let multiplier = if config.combo_enabled {
@@ -1132,7 +1116,7 @@ fn detect_song_end(
     if *mode == GameplayMode::JamSession || !music_started.0 {
         return;
     }
-    if clock.0 >= song_end.0 {
+    if clock.get() >= song_end.0 {
         next_state.set(AppState::Results);
     }
 }
@@ -1280,35 +1264,91 @@ mod tests {
         assert!((secs_per_bar(60.0, 4.0) - 4.0).abs() < 1e-9);
     }
 
-    // ── advance_clock (audio-synced gameplay clock) ─────────────────────────
+    // `advance_clock`'s own tests live in `clock.rs` alongside the type.
 
-    #[test]
-    fn advance_clock_with_no_audio_pos_is_plain_frame_delta() {
-        assert!((advance_clock(1.0, 0.016, None) - 1.016).abs() < 1e-9);
+    // ── handle_loop_boundary ─────────────────────────────────────────────────
+
+    /// No `AudioSink`/`MusicPlayer` entity is spawned in these tests — the
+    /// seek-on-wrap fix (see the doc comment on `handle_loop_boundary`)
+    /// degrades gracefully to a no-op when no sink exists (as it does for a
+    /// real chart before the music sink spawns, or if audio init failed), so
+    /// the clock/note-reset behaviour is testable headlessly without a real
+    /// audio backend; the actual seek call needs a live sink and is a manual
+    /// check (see `docs/gameplay_validation.md`).
+    fn loop_test_note(time: f64) -> ScheduledNote {
+        ScheduledNote {
+            time,
+            duration: 0.5,
+            hole: 1,
+            is_blow: true,
+            expected_pitch: "C4".to_string(),
+            hit: true,
+            missed: true,
+            held: 1.0,
+            sustain_scored: true,
+            modifiers: Vec::new(),
+            pitch_samples: Vec::new(),
+            amp_samples: Vec::new(),
+        }
     }
 
     #[test]
-    fn advance_clock_snaps_fully_when_drift_is_within_the_correction_step() {
-        // Projected clock is 1.016; audio says 1.017 — 1ms of drift, well
-        // under the correction cap, so it's corrected in a single frame.
-        let result = advance_clock(1.0, 0.016, Some(1.017));
-        assert!((result - 1.017).abs() < 1e-9);
+    fn loop_boundary_rewinds_the_clock_and_resets_notes_in_range() {
+        let mut world = World::new();
+        world.insert_resource(LoopConfig {
+            active: true,
+            start_time: 2.0,
+            end_time: 10.0,
+        });
+        world.insert_resource(GameplayClock::new(10.0));
+
+        let in_range = world.spawn(loop_test_note(5.0)).id();
+        let before_range = world.spawn(loop_test_note(1.0)).id();
+        let after_range = world.spawn(loop_test_note(11.0)).id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(handle_loop_boundary);
+        schedule.run(&mut world);
+
+        assert_eq!(world.resource::<GameplayClock>().get(), 2.0);
+
+        let reset = world.get::<ScheduledNote>(in_range).unwrap();
+        assert!(!reset.hit && !reset.missed && !reset.sustain_scored && reset.held == 0.0);
+
+        for id in [before_range, after_range] {
+            let untouched = world.get::<ScheduledNote>(id).unwrap();
+            assert!(
+                untouched.hit && untouched.missed && untouched.sustain_scored,
+                "notes outside [start_time, end_time] must not be reset"
+            );
+        }
     }
 
     #[test]
-    fn advance_clock_clamps_large_positive_drift() {
-        // Audio is way ahead of the projected clock (e.g. after a stall) —
-        // the correction must not jump straight there in one frame.
-        let projected = 1.0 + 0.016;
-        let result = advance_clock(1.0, 0.016, Some(projected + 0.5));
-        assert!((result - (projected + CLOCK_CORRECTION_STEP)).abs() < 1e-9);
-    }
+    fn loop_boundary_is_a_no_op_before_end_time_or_when_inactive() {
+        let mut world = World::new();
+        world.insert_resource(LoopConfig {
+            active: true,
+            start_time: 2.0,
+            end_time: 10.0,
+        });
+        world.insert_resource(GameplayClock::new(9.999));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(handle_loop_boundary);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<GameplayClock>().get(), 9.999);
 
-    #[test]
-    fn advance_clock_clamps_large_negative_drift() {
-        let projected = 1.0 + 0.016;
-        let result = advance_clock(1.0, 0.016, Some(projected - 0.5));
-        assert!((result - (projected - CLOCK_CORRECTION_STEP)).abs() < 1e-9);
+        let mut world = World::new();
+        world.insert_resource(LoopConfig {
+            active: false,
+            start_time: 2.0,
+            end_time: 10.0,
+        });
+        world.insert_resource(GameplayClock::new(10.0));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(handle_loop_boundary);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<GameplayClock>().get(), 10.0);
     }
 
     #[test]
@@ -1763,7 +1803,7 @@ mod tests {
         // farther note first reproduces the exact bug (whichever the query
         // visited first used to win, regardless of which was actually due).
         let mut world = World::new();
-        world.insert_resource(GameplayClock(0.5));
+        world.insert_resource(GameplayClock::new(0.5));
         world.insert_resource(Time::<()>::default());
         world.insert_resource(ActivePitches(vec![PitchInfo {
             note: "C".to_string(),
@@ -1803,7 +1843,7 @@ mod tests {
         // optimization for long charts). Confirm that skip doesn't change its
         // observable state: still neither hit nor missed.
         let mut world = World::new();
-        world.insert_resource(GameplayClock(0.0));
+        world.insert_resource(GameplayClock::new(0.0));
         world.insert_resource(Time::<()>::default());
         world.insert_resource(ActivePitches(vec![]));
         world.insert_resource(AudioFrame::default());
@@ -1835,7 +1875,7 @@ mod tests {
     #[test]
     fn end_to_end_synthetic_song_drives_score_combo_and_stats() {
         let mut world = World::new();
-        world.insert_resource(GameplayClock(0.0));
+        world.insert_resource(GameplayClock::new(0.0));
         world.insert_resource(Time::<()>::default());
         world.insert_resource(ActivePitches(vec![]));
         world.insert_resource(AudioFrame::default());
@@ -1905,7 +1945,7 @@ mod tests {
         ];
         let mut prev_t = 0.0f64;
         for &(t, pitches) in steps {
-            world.resource_mut::<GameplayClock>().0 = t;
+            world.resource_mut::<GameplayClock>().set_free(t);
             world.resource_mut::<ActivePitches>().0 =
                 pitches.iter().map(|&(n, o)| pitch(n, o)).collect();
             world

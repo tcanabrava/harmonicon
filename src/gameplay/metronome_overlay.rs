@@ -244,14 +244,14 @@ pub fn update_metronome(
     tempo: Res<MetronomeTempo>,
     mut beats: Query<(&MetronomeBeat, &mut BackgroundColor)>,
 ) {
-    if clock.0 < 0.0 {
+    if clock.get() < 0.0 {
         return;
     }
 
     let bpm = tempo.bpm as f64;
     let beat_dur = 60.0 / bpm;
     let beats_per_bar = tempo.beats_per_bar;
-    let beat_pos = clock.0 / beat_dur;
+    let beat_pos = clock.get() / beat_dur;
     let current = beat_pos.floor() as usize % beats_per_bar;
     let phase = beat_pos.fract() as f32;
 
@@ -299,7 +299,7 @@ fn click_metronome(
     mut last: ResMut<LastClickedTick>,
     mut commands: Commands,
 ) {
-    let Some(current) = tick_index(clock.0, tempo.bpm as f64, *feel) else {
+    let Some(current) = tick_index(clock.get(), tempo.bpm as f64, *feel) else {
         return;
     };
     if last.0 == Some(current) {

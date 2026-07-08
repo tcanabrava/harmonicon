@@ -49,7 +49,7 @@ fn update_progress(
     mut fills: Query<&mut Node, With<ProgressFill>>,
 ) {
     let progress = if song_end.0.is_finite() && song_end.0 > 0.0 {
-        (clock.0 / song_end.0).clamp(0.0, 1.0) as f32
+        (clock.get() / song_end.0).clamp(0.0, 1.0) as f32
     } else {
         0.0
     };
