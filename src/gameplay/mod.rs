@@ -64,6 +64,9 @@ impl Plugin for GameplayPlugin {
         .init_resource::<PitchGate>()
         .init_resource::<MusicStarted>()
         .init_resource::<ValidHarpNotes>()
+        .init_resource::<SongNotes>()
+        .init_resource::<gameplay_2d::NoteRenderAssets>()
+        .init_resource::<gameplay_3d::NoteRenderAssets3D>()
         .init_resource::<Score>()
         .init_resource::<SongStats>()
         .init_resource::<SongEnd>()
@@ -191,6 +194,7 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             (
+                gameplay_2d::spawn_visible_notes,
                 gameplay_2d::update_notes,
                 gameplay_2d::size_note_tails,
                 gameplay_2d::update_note_visuals,
@@ -208,6 +212,7 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             (
+                gameplay_3d::spawn_visible_notes_3d,
                 gameplay_3d::update_notes_3d,
                 gameplay_3d::update_note_visuals_3d,
                 gameplay_3d::animate_note_tails_3d,
@@ -406,16 +411,23 @@ pub struct GameplayRoot;
 
 #[derive(Component)]
 pub struct NoteVisual {
-    pub time: f64,
-    /// The note's duration as a fraction of `LOOKAHEAD`. The tail spans the
-    /// highway distance scrolled over that duration, so its tip meets the hit
-    /// line at the note's end — and the note is recycled only once that whole
-    /// tail has scrolled off the bottom.
-    pub duration_frac: f32,
+    /// Index into [`SongNotes::notes`] — this entity is purely a rendering
+    /// of that note's score state, spawned only while it's within
+    /// `LOOKAHEAD` of the playhead (see `gameplay_2d::spawn_visible_notes`)
+    /// and despawned once scrolled past, independent of the note's actual
+    /// score state (which lives on regardless of whether anything currently
+    /// renders it).
+    pub note_id: usize,
 }
 
-/// Attached to every note entity (both modes). Drives scoring logic.
-#[derive(Component)]
+/// One chart note's score state. Plain data, not an ECS component — lives in
+/// [`SongNotes`], independent of whatever render entity (if any) currently
+/// represents it on screen. That split is what lets `gameplay_2d`/
+/// `gameplay_3d` spawn note *visuals* only for a `LOOKAHEAD` window around
+/// the playhead instead of the whole song up front, and lets
+/// `handle_loop_boundary` reset a note's state without needing it to have a
+/// live entity at all.
+#[derive(Clone)]
 pub struct ScheduledNote {
     pub time: f64,
     /// Note length in seconds; long notes reward sustaining the pitch.
@@ -445,6 +457,26 @@ pub struct ScheduledNote {
     /// held — used to verify a declared `wah-wah` was actually played at
     /// roughly its declared `oscillation_hz`, not just declared.
     pub amp_samples: Vec<(f64, f32)>,
+}
+
+/// Every note in the loaded chart, sorted by `time` ascending (matches chart
+/// authoring order; nothing re-sorts `chart.track` elsewhere either). The
+/// scoring systems (`score_notes`, `handle_loop_boundary`,
+/// `update_active_targets`) read and mutate this directly instead of
+/// querying ECS components, so a note's score state exists independent of
+/// whether it currently has a render entity.
+#[derive(Resource, Default)]
+pub struct SongNotes {
+    pub notes: Vec<ScheduledNote>,
+    /// Index of the first not-fully-resolved note (not `missed`, and not
+    /// both `hit` and `sustain_scored`). Advanced forward by `score_notes`
+    /// as a prefix of notes finishes for good; rewound by
+    /// `handle_loop_boundary` on a loop wrap, since notes before the loop's
+    /// start are no longer "permanently done" once it can replay them.
+    /// Purely a per-frame scan-avoidance optimization — correctness never
+    /// depends on its exact value, only that it's `<=` the true first
+    /// unresolved index.
+    pub cursor: usize,
 }
 
 #[derive(Component)]
@@ -785,7 +817,7 @@ fn tick_clock(
 fn handle_loop_boundary(
     loop_cfg: Res<LoopConfig>,
     mut clock: ResMut<GameplayClock>,
-    mut notes: Query<&mut ScheduledNote>,
+    mut song_notes: ResMut<SongNotes>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
     if !loop_cfg.active || clock.get() < loop_cfg.end_time {
@@ -795,14 +827,23 @@ fn handle_loop_boundary(
     // see it far ahead of the just-rewound clock next frame and drag the
     // clock forward again — see the doc comment on `GameplayClock`.
     clock.rewind_to(loop_cfg.start_time, sinks.single().ok());
-    for mut note in &mut notes {
-        if note.time >= loop_cfg.start_time && note.time <= loop_cfg.end_time {
-            note.hit = false;
-            note.missed = false;
-            note.held = 0.0;
-            note.sustain_scored = false;
-        }
+
+    // `notes` is sorted by `time`, so the loop's range is one contiguous
+    // slice — binary search it instead of scanning the whole song.
+    let start_time = loop_cfg.start_time;
+    let end_time = loop_cfg.end_time;
+    let start_idx = song_notes.notes.partition_point(|n| n.time < start_time);
+    let end_idx = song_notes.notes.partition_point(|n| n.time <= end_time);
+    for note in &mut song_notes.notes[start_idx..end_idx] {
+        note.hit = false;
+        note.missed = false;
+        note.held = 0.0;
+        note.sustain_scored = false;
     }
+    // These notes are playable again, so `score_notes`'s cursor (which only
+    // ever advances past *permanently* resolved notes) can't stay ahead of
+    // them — `min` in case the loop wraps before ever reaching this section.
+    song_notes.cursor = song_notes.cursor.min(start_idx);
 }
 
 fn collect_pitches(mut reader: MessageReader<PitchEvent>, mut active: ResMut<ActivePitches>) {
@@ -815,7 +856,7 @@ fn update_active_targets(
     clock: Res<GameplayClock>,
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
-    notes: Query<&ScheduledNote>,
+    song_notes: Res<SongNotes>,
     mut targets: ResMut<ActiveTargets>,
 ) {
     targets.0.clear();
@@ -826,7 +867,14 @@ fn update_active_targets(
     // highlighted hole tracks what the player is *actually* hearing, not what
     // the raw clock says.
     let judged = clock.get() - audio.input_latency_ms as f64 / 1000.0;
-    for note in &notes {
+    // Starting from `score_notes`'s cursor (possibly a frame stale — that's
+    // fine, it only ever lags a monotonically-advancing lower bound) means
+    // this never re-scans notes long done. `notes` is sorted by `time`, so
+    // once a not-yet-due note is too far out, everything after it is too.
+    for note in &song_notes.notes[song_notes.cursor..] {
+        if note.time > judged + config.good_window {
+            break;
+        }
         if note.hit || note.missed {
             continue;
         }
@@ -844,7 +892,7 @@ fn score_notes(
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
-    mut notes: Query<(Entity, &mut ScheduledNote)>,
+    mut song_notes: ResMut<SongNotes>,
     mut score: ResMut<Score>,
     mut stats: ResMut<SongStats>,
     mut feedback: ResMut<HitFeedback>,
@@ -875,14 +923,31 @@ fn score_notes(
     // fresh. Pitches still held remain consumed and can't score again.
     gate.release_absent(&harp_pitches);
 
-    // Notes not yet hit or missed are classified in a second pass below,
-    // ordered by |offset| (closest to the judged instant first). Query
-    // iteration order is otherwise arbitrary, and when two same-pitch notes
-    // overlap the hit window, whichever one happened to be classified first
-    // would consume the attack — not necessarily the one actually due.
-    let mut pending: Vec<(Entity, f64)> = Vec::new();
+    // A prefix of `notes` (sorted by `time`) that's permanently resolved
+    // (missed, or hit and fully sustained) never needs visiting again —
+    // advance past it so a long chart's already-finished notes don't cost a
+    // scan every frame. A later note occasionally resolving before an
+    // earlier still-pending one (e.g. a chord) is fine: the cursor just
+    // stays put until that earlier one finishes too.
+    while song_notes.cursor < song_notes.notes.len() {
+        let n = &song_notes.notes[song_notes.cursor];
+        if n.missed || (n.hit && n.sustain_scored) {
+            song_notes.cursor += 1;
+        } else {
+            break;
+        }
+    }
 
-    for (entity, mut note) in &mut notes {
+    // Not-yet-hit-or-missed notes are classified in a second pass below,
+    // ordered by |offset| (closest to the judged instant first) rather than
+    // array order, so when two same-pitch notes overlap the hit window,
+    // whichever is actually due consumes the attack — not just whichever
+    // happened to be classified first.
+    let mut pending: Vec<usize> = Vec::new();
+    let len = song_notes.notes.len();
+
+    for i in song_notes.cursor..len {
+        let note = &mut song_notes.notes[i];
         if note.missed {
             continue;
         }
@@ -941,26 +1006,28 @@ fn score_notes(
 
         // Anything further out than `good_window` classifies as `TooEarly`
         // regardless of `playing` (see `classify_note`) — a guaranteed no-op
-        // match arm below. Skipping the push means a long chart's untouched
-        // future notes don't get sorted and classified every single frame;
-        // only notes actually near the judged instant pay that cost.
+        // match arm below. `notes` is sorted by `time`, so once one note is
+        // this far out, every note after it is too — stop scanning outright
+        // instead of just skipping the push, so a long chart's untouched
+        // future notes cost nothing per frame, not even a visit.
         let offset = judged - note.time;
         if offset < -config.good_window {
-            continue;
+            break;
         }
-        pending.push((entity, offset));
+        pending.push(i);
     }
 
-    pending.sort_by(|a, b| {
-        a.1.abs()
-            .partial_cmp(&b.1.abs())
+    pending.sort_by(|&a, &b| {
+        let offset_a = (judged - song_notes.notes[a].time).abs();
+        let offset_b = (judged - song_notes.notes[b].time).abs();
+        offset_a
+            .partial_cmp(&offset_b)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    for (entity, offset) in pending {
-        let Ok((_, mut note)) = notes.get_mut(entity) else {
-            continue;
-        };
+    for i in pending {
+        let note = &mut song_notes.notes[i];
+        let offset = judged - note.time;
         // A note counts as "playing" only on a fresh attack: the pitch must be
         // sounding and not already consumed by an earlier note in this sustain.
         // A note with no valid `expected_pitch` (the harp can't produce it) can
@@ -1305,10 +1372,15 @@ mod tests {
             end_time: 10.0,
         });
         world.insert_resource(GameplayClock::new(10.0));
-
-        let in_range = world.spawn(loop_test_note(5.0)).id();
-        let before_range = world.spawn(loop_test_note(1.0)).id();
-        let after_range = world.spawn(loop_test_note(11.0)).id();
+        // Sorted by time, as `SongNotes` requires: before-range, in-range, after-range.
+        world.insert_resource(SongNotes {
+            notes: vec![
+                loop_test_note(1.0),
+                loop_test_note(5.0),
+                loop_test_note(11.0),
+            ],
+            cursor: 3, // as if all three had already resolved and rolled off.
+        });
 
         let mut schedule = Schedule::default();
         schedule.add_systems(handle_loop_boundary);
@@ -1316,11 +1388,13 @@ mod tests {
 
         assert_eq!(world.resource::<GameplayClock>().get(), 2.0);
 
-        let reset = world.get::<ScheduledNote>(in_range).unwrap();
+        let song_notes = world.resource::<SongNotes>();
+        let reset = &song_notes.notes[1];
         assert!(!reset.hit && !reset.missed && !reset.sustain_scored && reset.held == 0.0);
+        assert_eq!(song_notes.cursor, 1, "cursor rewinds to the in-range note");
 
-        for id in [before_range, after_range] {
-            let untouched = world.get::<ScheduledNote>(id).unwrap();
+        for i in [0, 2] {
+            let untouched = &song_notes.notes[i];
             assert!(
                 untouched.hit && untouched.missed && untouched.sustain_scored,
                 "notes outside [start_time, end_time] must not be reset"
@@ -1337,6 +1411,7 @@ mod tests {
             end_time: 10.0,
         });
         world.insert_resource(GameplayClock::new(9.999));
+        world.insert_resource(SongNotes::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(handle_loop_boundary);
         schedule.run(&mut world);
@@ -1348,6 +1423,7 @@ mod tests {
             start_time: 2.0,
             end_time: 10.0,
         });
+        world.insert_resource(SongNotes::default());
         world.insert_resource(GameplayClock::new(10.0));
         let mut schedule = Schedule::default();
         schedule.add_systems(handle_loop_boundary);
@@ -1793,9 +1869,12 @@ mod tests {
         // Two C4 notes both sit inside the hit window at clock=0.5 while C4 is
         // sounding: one 0.01s away (should score), one 0.10s away (should
         // stay `Waiting` — the pitch is fresh only once). Before the |offset|
-        // sort this depended on arbitrary Query iteration order; spawning the
-        // farther note first reproduces the exact bug (whichever the query
-        // visited first used to win, regardless of which was actually due).
+        // sort this depended on arbitrary Query iteration order; now that
+        // notes live in a plain `time`-sorted `Vec`, array order alone would
+        // also (coincidentally) put the closer note second — this still
+        // checks that classification actually goes by |offset|, not array
+        // position, since nothing else would catch a regression back to
+        // "whichever comes first in the Vec wins".
         let mut world = World::new();
         world.insert_resource(GameplayClock::new(0.5));
         world.insert_resource(Time::<()>::default());
@@ -1813,20 +1892,24 @@ mod tests {
         world.insert_resource(SongStats::default());
         world.insert_resource(HitFeedback::default());
         world.insert_resource(PitchGate::default());
-
-        let far = world.spawn(overlap_test_note(0.40)).id(); // offset -0.10
-        let close = world.spawn(overlap_test_note(0.49)).id(); // offset -0.01
+        world.insert_resource(SongNotes {
+            // Sorted by time: index 0 is farther from `judged` (offset
+            // -0.10), index 1 is closer (offset -0.01).
+            notes: vec![overlap_test_note(0.40), overlap_test_note(0.49)],
+            cursor: 0,
+        });
 
         let mut schedule = Schedule::default();
         schedule.add_systems(score_notes);
         schedule.run(&mut world);
 
+        let song_notes = world.resource::<SongNotes>();
         assert!(
-            world.get::<ScheduledNote>(close).unwrap().hit,
+            song_notes.notes[1].hit,
             "the note actually due should be credited"
         );
         assert!(
-            !world.get::<ScheduledNote>(far).unwrap().hit,
+            !song_notes.notes[0].hit,
             "the farther note must not steal the attack meant for the closer one"
         );
     }
@@ -1849,16 +1932,18 @@ mod tests {
         world.insert_resource(SongStats::default());
         world.insert_resource(HitFeedback::default());
         world.insert_resource(PitchGate::default());
-
-        let far_future = world.spawn(overlap_test_note(120.0)).id();
+        world.insert_resource(SongNotes {
+            notes: vec![overlap_test_note(120.0)],
+            cursor: 0,
+        });
 
         let mut schedule = Schedule::default();
         schedule.add_systems(score_notes);
         schedule.run(&mut world);
 
-        let note = world.get::<ScheduledNote>(far_future).unwrap();
-        assert!(!note.hit);
-        assert!(!note.missed);
+        let song_notes = world.resource::<SongNotes>();
+        assert!(!song_notes.notes[0].hit);
+        assert!(!song_notes.notes[0].missed);
     }
 
     /// A tiny synthetic 3-note "song" driven frame by frame through
@@ -1911,9 +1996,12 @@ mod tests {
         // C4 at t=0.0 is played right on time (Perfect); D4 at t=0.5 is played
         // 90ms late (inside `good_window` 130ms but past `perfect_window`
         // 60ms, so "Good"/delayed); E4 at t=1.0 is never played (Missed).
-        let perfect_note = world.spawn(note(0.0, 60)).id();
-        let good_note = world.spawn(note(0.5, 62)).id();
-        let missed_note = world.spawn(note(1.0, 64)).id();
+        // Already sorted by time, as `SongNotes` requires.
+        world.insert_resource(SongNotes {
+            notes: vec![note(0.0, 60), note(0.5, 62), note(1.0, 64)],
+            cursor: 0,
+        });
+        let (perfect_idx, good_idx, missed_idx) = (0, 1, 2);
 
         let mut schedule = Schedule::default();
         schedule.add_systems(score_notes);
@@ -1948,16 +2036,17 @@ mod tests {
             prev_t = t;
         }
 
+        let song_notes = world.resource::<SongNotes>();
         assert!(
-            world.get::<ScheduledNote>(perfect_note).unwrap().hit,
+            song_notes.notes[perfect_idx].hit,
             "on-time note should be hit"
         );
         assert!(
-            world.get::<ScheduledNote>(good_note).unwrap().hit,
+            song_notes.notes[good_idx].hit,
             "late-but-in-window note should still be hit"
         );
         assert!(
-            world.get::<ScheduledNote>(missed_note).unwrap().missed,
+            song_notes.notes[missed_idx].missed,
             "never-played note should be missed"
         );
 

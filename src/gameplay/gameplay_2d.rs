@@ -23,9 +23,22 @@ use super::song_progress_overlay::spawn_song_progress;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HIT_H_PCT,
-    HoleCell, HoleState, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote, ScoreText,
+    HoleCell, HoleState, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote, ScoreText, SongNotes,
     ValidHarpNotes,
 };
+
+/// Chart-level (not per-note) rendering config `spawn_visible_notes` needs
+/// once a note's `LOOKAHEAD` window arrives — set once at song load
+/// alongside `SongNotes`, since neither changes for the rest of the song.
+#[derive(Resource, Default)]
+pub(super) struct NoteRenderAssets {
+    head_image: Option<AssetPath<'static>>,
+    tail_cfg: Option<NoteThemeConfig>,
+    /// Chord/split play-mode badge text, parallel to `SongNotes::notes`
+    /// (same index = same note) — the one piece of the old per-note spawn
+    /// data that doesn't already live on `ScheduledNote` itself.
+    play_mode_tags: Vec<Option<&'static str>>,
+}
 
 pub fn setup(
     mut commands: Commands,
@@ -34,6 +47,8 @@ pub fn setup(
     mut clock: ResMut<super::GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
     mut valid_notes: ResMut<ValidHarpNotes>,
+    mut song_notes: ResMut<SongNotes>,
+    mut render_assets: ResMut<NoteRenderAssets>,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
     note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
     theme: Res<crate::theme::LoadedTheme>,
@@ -61,37 +76,56 @@ pub fn setup(
 
     let chart = &manifest.chart;
 
-    // Pre-build one comet-tail shader material per note (in the same flat order
-    // `spawn_highway` walks the track), so the highway closures only need a shared
-    // slice — no nested mutable borrow of the asset store. The technique modifier
-    // shapes the tail *and* picks its animation (`wah.z`); each note gets a
-    // distinct phase so same-technique tails don't pulse in lockstep. `params.z`
-    // is the animation clock, driven live by `animate_note_tails`.
-    let note_materials: Vec<Handle<NoteTail2dMaterial>> = chart
-        .track
-        .iter()
-        .flat_map(|item| {
-            let h_pct = note_height_pct(item.duration);
-            item.events.iter().map(move |event| {
-                let (vib, bend, wah) = note_techniques(event.modifiers.as_deref());
-                let mode = note_anim_mode(event.modifiers.as_deref());
-                let (r, g, b) = note_rgb(matches!(event.action, Action::Blow));
-                (h_pct, vib, bend, wah, mode, Color::srgba(r, g, b, 0.95))
-            })
-        })
-        .enumerate()
-        .map(|(i, (h_pct, vib, bend, wah, mode, color))| {
-            let (mut params, mut wah_v) = tail_params(h_pct, vib, bend, wah);
-            params.z = 0.0; // animation time, refreshed every frame
-            wah_v.z = mode; // which technique animation to run
-            wah_v.w = i as f32 * 0.7; // per-note phase offset
-            shape_materials.add(NoteTail2dMaterial {
-                color: color.to_linear(),
-                params,
-                wah: wah_v,
-            })
-        })
-        .collect();
+    // Build every note's score state up front (cheap — plain data, no
+    // entities/materials yet) plus the one piece of render data that isn't
+    // already on `ScheduledNote` (the chord/split badge). Actual note
+    // *visuals* are spawned later, lazily, by `spawn_visible_notes` as each
+    // one enters the `LOOKAHEAD` window — a long/dense chart no longer pays
+    // for every note's UI subtree (and comet-tail material) at song load.
+    let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
+    for item in &chart.track {
+        let t = super::resolve_item_time(item, &chart.timing);
+        let tag = play_mode_label(item.play_mode.as_ref());
+        for event in &item.events {
+            let is_blow = matches!(event.action, Action::Blow);
+            let modifiers = event.modifiers.clone().unwrap_or_default();
+            let natural_pitch = event.note.clone().unwrap_or_else(|| {
+                chart
+                    .harmonica
+                    .wind_direction_label(event.hole, &event.action)
+            });
+            let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
+            combined.push((
+                ScheduledNote {
+                    time: t,
+                    duration: item.duration,
+                    hole: event.hole,
+                    is_blow,
+                    expected_pitch,
+                    hit: false,
+                    missed: false,
+                    held: 0.0,
+                    sustain_scored: false,
+                    modifiers,
+                    pitch_samples: Vec::new(),
+                    amp_samples: Vec::new(),
+                },
+                tag,
+            ));
+        }
+    }
+    // `score_notes`/`spawn_visible_notes` both rely on this being sorted —
+    // charts are assumed authored in time order, but this makes that an
+    // actual guarantee instead of an assumption.
+    combined.sort_by(|a, b| a.0.time.partial_cmp(&b.0.time).unwrap_or(std::cmp::Ordering::Equal));
+    let (notes, play_mode_tags): (Vec<ScheduledNote>, Vec<Option<&'static str>>) =
+        combined.into_iter().unzip();
+    *song_notes = SongNotes { notes, cursor: 0 };
+    *render_assets = NoteRenderAssets {
+        head_image: Some(head_image.clone()),
+        tail_cfg: Some(tail_cfg.clone()),
+        play_mode_tags,
+    };
 
     // Animated tail previews for the techniques legend (built up front so the UI
     // closures only borrow a ready slice, not the material store).
@@ -169,7 +203,7 @@ pub fn setup(
                     NoteHighway,
                 ))
                 .with_children(|hw| {
-                    spawn_highway(hw, chart, &note_materials, &head_image, &tail_cfg);
+                    spawn_highway(hw, chart);
                 });
 
                 // Harmonica holes
@@ -379,16 +413,9 @@ pub fn note_head_bottom_pct(note_time: f64, elapsed: f64, lookahead: f64) -> f32
     (100.0 - hit_center_pct * progress) as f32
 }
 
-fn spawn_highway(
-    hw: &mut ChildSpawnerCommands,
-
-    chart: &crate::song::chart::HarpChart,
-    note_materials: &[Handle<NoteTail2dMaterial>],
-    head_image: &AssetPath<'static>,
-    tail_cfg: &NoteThemeConfig,
-) {
-    use crate::song::chart::Action;
-
+/// Spawns the static highway furniture (lane stripes, dividers, hit zone) —
+/// no notes. Notes are spawned later, lazily, by `spawn_visible_notes`.
+fn spawn_highway(hw: &mut ChildSpawnerCommands, chart: &crate::song::chart::HarpChart) {
     // Lane count/width come from the loaded harmonica, not a fixed 10 —
     // a chromatic chart's 12+ holes need proportionally narrower lanes.
     let hole_count = chart.harmonica.hole_count() as usize;
@@ -446,121 +473,175 @@ fn spawn_highway(
         },
         BackgroundColor(Color::srgba(1.0, 1.0, 0.70, 0.55)),
     ));
+}
 
-    let mut note_idx = 0usize;
-    for item in &chart.track {
-        let t = super::resolve_item_time(item, &chart.timing);
-        let play_mode = item.play_mode.as_ref();
-        for event in &item.events {
-            let idx = note_idx;
-            note_idx += 1;
+/// Spawns note visuals for any note that has newly entered the `LOOKAHEAD`
+/// window and doesn't have one yet — the windowed counterpart of the old
+/// spawn-the-whole-track-up-front `spawn_highway`. Runs every frame; cost is
+/// bounded by how many notes are near the playhead, not the song length.
+/// Self-healing across a loop wrap (no cursor to keep in sync): it just
+/// compares "notes whose window could plausibly be open" against "notes
+/// that currently have a visual", so notes reappear correctly once the
+/// (rewound) clock nears them again.
+pub fn spawn_visible_notes(
+    mut commands: Commands,
+    clock: Res<super::GameplayClock>,
+    song_notes: Res<SongNotes>,
+    render_assets: Res<NoteRenderAssets>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    highway: Query<Entity, With<NoteHighway>>,
+    existing: Query<&NoteVisual>,
+    mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
+) {
+    let (Some(manifest), Ok(highway_entity), Some(head_image), Some(tail_cfg)) = (
+        manifests.get(&selected.0),
+        highway.single(),
+        &render_assets.head_image,
+        &render_assets.tail_cfg,
+    ) else {
+        return;
+    };
 
-            let is_blow = matches!(event.action, Action::Blow);
-            let (r, g, b) = note_rgb(is_blow);
-            let note_color = Color::srgba(r, g, b, 1.0);
-            let left_pct = (event.hole as f32 - 1.0) * lane_pct;
-            let modifiers = event.modifiers.clone().unwrap_or_default();
-            let natural_pitch = event.note.clone().unwrap_or_else(|| {
-                chart
-                    .harmonica
-                    .wind_direction_label(event.hole, &event.action)
-            });
-            // The pitch the player must actually produce — a bend targets the bent
-            // pitch, so the technique is scored, not just shown.
-            let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
-            // The note entity IS the comet head: a lane-width square (kept round
-            // by the disc image + aspect_ratio), positioned each frame by its
-            // bottom edge so it reaches the hit line on time. The tail hangs off
-            // the head's attach point (from the theme JSON) and trails upward; it
-            // is drawn first so the head image layers over its base and hides the
-            // join.
-            let material = note_materials[idx].clone();
-            let duration_frac = (item.duration / LOOKAHEAD) as f32;
+    let hole_count = manifest.chart.harmonica.hole_count() as usize;
+    let lane_pct = 100.0 / hole_count as f32;
+    let elapsed = clock.get();
 
-            hw.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Percent(left_pct),
-                    bottom: Val::Percent(150.0), // placeholder; set in update_notes
-                    width: Val::Percent(lane_pct),
-                    aspect_ratio: Some(1.0),
-                    ..default()
-                },
-                NoteVisual {
-                    time: t,
-                    duration_frac,
-                },
-                ScheduledNote {
-                    time: t,
-                    duration: item.duration,
-                    hole: event.hole,
-                    is_blow,
-                    expected_pitch,
-                    hit: false,
-                    missed: false,
-                    held: 0.0,
-                    sustain_scored: false,
-                    modifiers: modifiers.clone(),
-                    pitch_samples: Vec::new(),
-                    amp_samples: Vec::new(),
-                },
-            ))
-            .with_children(|note| {
-                // Tail + head layout shared with the note_editor binary via
-                // note_visual_2d::spawn_note_children. Game-specific markers and
-                // the direction arrow are added in the callbacks.
-                spawn_note_children(
-                    note,
-                    &NoteChildConfig {
-                        tail_x: tail_cfg.tail_x,
-                        tail_y: tail_cfg.tail_y,
-                        tail_width: tail_cfg.tail_width,
-                        // Placeholder height; resized each frame by size_note_tails.
-                        tail_height: Val::Percent(100.0),
-                        tail_material: material,
-                        head_image: head_image.clone(),
-                        head_color: note_color,
-                        head_left: tail_cfg.head.x,
-                        head_top: tail_cfg.head.y,
-                        head_width: tail_cfg.head.width,
-                        head_height: tail_cfg.head.height,
-                    },
-                    |cmd| {
-                        cmd.insert(NoteTail { duration_frac });
-                    },
-                    |cmd| {
-                        cmd.insert(NoteHead).with_children(|head| {
-                            head.spawn((
-                                Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
-                                TextFont {
-                                    font_size: FontSize::Px(13.0),
-                                    ..default()
-                                },
-                                TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
-                            ));
-                        });
-                    },
-                );
+    let already_spawned: HashSet<usize> = existing.iter().map(|v| v.note_id).collect();
+    // `notes` is sorted by `time`, so this is the first index whose window
+    // could possibly be open — no need to consider anything before it.
+    let start = song_notes
+        .notes
+        .partition_point(|n| n.time + LOOKAHEAD < elapsed);
 
-                // Chord / split play-mode badge, pinned to the bottom edge.
-                if let Some(tag) = play_mode_label(play_mode) {
-                    note.spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            bottom: Val::Px(1.0),
-                            ..default()
-                        },
-                        Text::new(tag),
-                        TextFont {
-                            font_size: FontSize::Px(8.0),
-                            ..default()
-                        },
-                        TextColor(Color::srgba(0.95, 0.95, 1.0, 0.75)),
-                    ));
-                }
-            });
+    let mut to_spawn: Vec<usize> = Vec::new();
+    for (i, note) in song_notes.notes.iter().enumerate().skip(start) {
+        if note.time - LOOKAHEAD > elapsed {
+            break; // sorted — nothing further out needs spawning yet either.
+        }
+        if !already_spawned.contains(&i) {
+            to_spawn.push(i);
         }
     }
+    if to_spawn.is_empty() {
+        return;
+    }
+
+    commands.entity(highway_entity).with_children(|hw| {
+        for i in to_spawn {
+            spawn_note_visual(
+                hw,
+                i,
+                &song_notes.notes[i],
+                lane_pct,
+                head_image,
+                tail_cfg,
+                render_assets.play_mode_tags.get(i).copied().flatten(),
+                &mut shape_materials,
+            );
+        }
+    });
+}
+
+/// Spawns one note's visual: the comet head (a lane-width square, kept round
+/// by the disc image + aspect_ratio) plus its trailing tail. Positioned each
+/// frame by `update_notes`; the material's shape/animation is driven by the
+/// note's own technique modifiers, matching `size_note_tails`'s time-accurate
+/// length.
+fn spawn_note_visual(
+    hw: &mut ChildSpawnerCommands,
+    note_id: usize,
+    note: &ScheduledNote,
+    lane_pct: f32,
+    head_image: &AssetPath<'static>,
+    tail_cfg: &NoteThemeConfig,
+    play_mode_tag: Option<&'static str>,
+    shape_materials: &mut Assets<NoteTail2dMaterial>,
+) {
+    let is_blow = note.is_blow;
+    let (r, g, b) = note_rgb(is_blow);
+    let note_color = Color::srgba(r, g, b, 1.0);
+    let left_pct = (note.hole as f32 - 1.0) * lane_pct;
+    let duration_frac = (note.duration / LOOKAHEAD) as f32;
+
+    let h_pct = note_height_pct(note.duration);
+    let (vib, bend, wah) = note_techniques(Some(&note.modifiers));
+    let mode = note_anim_mode(Some(&note.modifiers));
+    let (mut params, mut wah_v) = tail_params(h_pct, vib, bend, wah);
+    params.z = 0.0; // animation time, refreshed every frame
+    wah_v.z = mode; // which technique animation to run
+    wah_v.w = note_id as f32 * 0.7; // per-note phase offset
+    let material = shape_materials.add(NoteTail2dMaterial {
+        color: Color::srgba(r, g, b, 0.95).to_linear(),
+        params,
+        wah: wah_v,
+    });
+
+    hw.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Percent(left_pct),
+            bottom: Val::Percent(150.0), // placeholder; set in update_notes
+            width: Val::Percent(lane_pct),
+            aspect_ratio: Some(1.0),
+            ..default()
+        },
+        NoteVisual { note_id },
+    ))
+    .with_children(|note_e| {
+        // Tail + head layout shared with the note_editor binary via
+        // note_visual_2d::spawn_note_children. Game-specific markers and
+        // the direction arrow are added in the callbacks.
+        spawn_note_children(
+            note_e,
+            &NoteChildConfig {
+                tail_x: tail_cfg.tail_x,
+                tail_y: tail_cfg.tail_y,
+                tail_width: tail_cfg.tail_width,
+                // Placeholder height; resized each frame by size_note_tails.
+                tail_height: Val::Percent(100.0),
+                tail_material: material,
+                head_image: head_image.clone(),
+                head_color: note_color,
+                head_left: tail_cfg.head.x,
+                head_top: tail_cfg.head.y,
+                head_width: tail_cfg.head.width,
+                head_height: tail_cfg.head.height,
+            },
+            |cmd| {
+                cmd.insert(NoteTail { duration_frac });
+            },
+            |cmd| {
+                cmd.insert(NoteHead).with_children(|head| {
+                    head.spawn((
+                        Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
+                        TextFont {
+                            font_size: FontSize::Px(13.0),
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
+                    ));
+                });
+            },
+        );
+
+        // Chord / split play-mode badge, pinned to the bottom edge.
+        if let Some(tag) = play_mode_tag {
+            note_e.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    bottom: Val::Px(1.0),
+                    ..default()
+                },
+                Text::new(tag),
+                TextFont {
+                    font_size: FontSize::Px(8.0),
+                    ..default()
+                },
+                TextColor(Color::srgba(0.95, 0.95, 1.0, 0.75)),
+            ));
+        }
+    });
 }
 
 /// Extracts the shape-driving techniques from a note's modifiers:
@@ -694,19 +775,26 @@ fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::ch
 
 pub fn update_notes(
     clock: Res<super::GameplayClock>,
-    loop_cfg: Res<super::LoopConfig>,
+    song_notes: Res<SongNotes>,
     mut commands: Commands,
     mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
 ) {
     let elapsed = clock.get();
-    for (entity, note, mut node) in &mut notes {
+    for (entity, visual, mut node) in &mut notes {
+        let Some(note) = song_notes.notes.get(visual.note_id) else {
+            continue;
+        };
         let bottom = note_head_bottom_pct(note.time, elapsed, LOOKAHEAD);
+        let duration_frac = (note.duration / LOOKAHEAD) as f32;
 
-        // Recycle only once the whole comet has fallen past the bottom. The tail
-        // tip sits `SCROLL_SPAN * duration_frac` % above the head, so a long note
-        // lingers exactly as long as its tail needs. Not while looping.
-        let tail_pct = SCROLL_SPAN * note.duration_frac;
-        if !loop_cfg.active && bottom < -(tail_pct + 15.0) {
+        // Recycle once the whole comet has fallen past the bottom. The tail
+        // tip sits `SCROLL_SPAN * duration_frac` % above the head, so a long
+        // note lingers exactly as long as its tail needs. Score state lives
+        // independently in `SongNotes` now, so this despawns unconditionally
+        // even while looping — `spawn_visible_notes` respawns it once the
+        // (rewound) clock nears it again, with no state to lose.
+        let tail_pct = SCROLL_SPAN * duration_frac;
+        if bottom < -(tail_pct + 15.0) {
             commands.entity(entity).despawn();
             continue;
         }
@@ -736,20 +824,28 @@ pub fn size_note_tails(
     }
 }
 
-/// Tints a note's head image and tail material when it is hit or missed. Mirrors
-/// the 3D path: a hit flashes gold, a miss dims to red so a whiff never looks
-/// like a clean hit. Reacts only to `ScheduledNote` changes (set by scoring), so
-/// it runs the frame a note's outcome lands, not every frame.
+/// Tints a note's head image and tail material when it is hit or missed.
+/// Mirrors the 3D path: a hit flashes gold, a miss dims to red so a whiff
+/// never looks like a clean hit. `ScheduledNote` isn't an ECS component
+/// anymore (score state lives in `SongNotes`, independent of any render
+/// entity), so this can no longer react only to `Changed<ScheduledNote>` —
+/// it re-syncs every currently-spawned note's tint each frame instead. That's
+/// cheap now: only a `LOOKAHEAD` window's worth of notes are ever spawned,
+/// not the whole song.
 pub fn update_note_visuals(
-    notes: Query<(&ScheduledNote, &Children), Changed<ScheduledNote>>,
+    song_notes: Res<SongNotes>,
+    notes: Query<(&NoteVisual, &Children)>,
     mut heads: Query<&mut ImageNode, With<NoteHead>>,
     tails: Query<&MaterialNode<NoteTail2dMaterial>, With<NoteTail>>,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
 ) {
-    for (scheduled, children) in &notes {
-        let tint = if scheduled.hit {
+    for (visual, children) in &notes {
+        let Some(note) = song_notes.notes.get(visual.note_id) else {
+            continue;
+        };
+        let tint = if note.hit {
             Color::srgba(1.0, 0.85, 0.25, 1.0)
-        } else if scheduled.missed {
+        } else if note.missed {
             Color::srgba(0.5, 0.13, 0.13, 1.0)
         } else {
             continue;
