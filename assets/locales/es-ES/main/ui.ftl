@@ -6,8 +6,7 @@ app-title = Harmonicon
 
 # Menú principal
 menu-play = Jugar
-menu-song-editor = Editor de Canciones
-menu-song-editor-2 = Editor de Canciones 2
+menu-song-editor-2 = Editor de Canciones
 menu-options = Opciones
 menu-credits = Créditos
 menu-quit = Salir
