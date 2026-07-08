@@ -277,7 +277,9 @@ pub fn apply_jam_loop_toggle(
 /// distinct, more advanced skill than just staying in the scale.
 #[derive(Resource)]
 pub struct JamHoleGuide {
-    note_to_holes: HashMap<String, Vec<u8>>,
+    /// MIDI note number → the holes that can sound it (may be more than one
+    /// — e.g. draw-2 and blow-3 are both G4 on a C harp).
+    note_to_holes: HashMap<u8, Vec<u8>>,
     scale_classes: HashSet<String>,
     chord_tones_by_bar: [HashSet<String>; 12],
     bpm: f32,
@@ -339,7 +341,7 @@ fn build_hole_guide(
         let chords = twelve_bar(key);
         std::array::from_fn(|i| chord_tone_classes(&chords[i]))
     };
-    let mut note_to_holes: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut note_to_holes: HashMap<u8, Vec<u8>> = HashMap::new();
     let mut holes = Vec::new();
 
     for hole in 1..=harp.hole_count() {
@@ -348,11 +350,11 @@ fn build_hole_guide(
         if blow == dash && draw == dash {
             continue;
         }
-        if blow != dash {
-            note_to_holes.entry(blow.clone()).or_default().push(hole);
+        if let Some(m) = harp.wind_direction_midi(hole, &Action::Blow) {
+            note_to_holes.entry(m).or_default().push(hole);
         }
-        if draw != dash {
-            note_to_holes.entry(draw.clone()).or_default().push(hole);
+        if let Some(m) = harp.wind_direction_midi(hole, &Action::Draw) {
+            note_to_holes.entry(m).or_default().push(hole);
         }
         holes.push(HoleInfo {
             hole,
@@ -464,8 +466,7 @@ pub fn update_hole_map(
     // Map each currently-lit hole to the best fit among all notes sounding it.
     let mut lit: HashMap<u8, NoteFit> = HashMap::new();
     for p in &active.0 {
-        let note = format!("{}{}", p.note, p.octave);
-        if let Some(holes) = guide.note_to_holes.get(&note) {
+        if let Some(holes) = guide.note_to_holes.get(&p.midi) {
             let fit = if chord_tones.contains(&p.note) {
                 NoteFit::ChordTone
             } else if guide.scale_classes.contains(&p.note) {
@@ -552,7 +553,7 @@ mod tests {
     fn guide_maps_a_shared_note_to_every_hole_that_sounds_it() {
         // On a C harp, G4 is both draw-2 and blow-3 — both holes should light.
         let (_, guide) = build_hole_guide(&c_harp(), "C", 120.0, 4);
-        let mut holes = guide.note_to_holes.get("G4").cloned().unwrap_or_default();
+        let mut holes = guide.note_to_holes.get(&67u8).cloned().unwrap_or_default(); // G4
         holes.sort_unstable();
         assert_eq!(holes, vec![2, 3]);
     }

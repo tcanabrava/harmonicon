@@ -32,10 +32,13 @@ const BLOW_COLOR: Color = Color::srgb(0.45, 0.70, 1.0);
 const DRAW_COLOR: Color = Color::srgb(1.0, 0.65, 0.30);
 const LABEL_COLOR: Color = Color::srgb(0.55, 0.55, 0.65);
 
-/// One note cell in the diagram; lit when its `note` (e.g. `"C#4"`) is sounding.
+/// One note cell in the diagram; lit when its pitch is sounding. `None` for a
+/// cell whose label failed to parse to a MIDI number (shouldn't happen in
+/// practice — `spawn_note_cell` is only ever given already-resolved note
+/// labels — but a cell that can never light is a safer failure than a panic).
 #[derive(Component)]
 pub struct HarpOverlayCell {
-    note: String,
+    midi: Option<u8>,
 }
 
 // ── Note math ───────────────────────────────────────────────────────────────
@@ -355,7 +358,7 @@ fn cell<'a>(row: &'a mut ChildSpawnerCommands, bg: Color) -> EntityCommands<'a> 
 fn spawn_note_cell(row: &mut ChildSpawnerCommands, note: &str, color: Color) {
     cell(row, CELL_DEFAULT)
         .insert(HarpOverlayCell {
-            note: note.to_string(),
+            midi: note_to_midi(note).and_then(|m| u8::try_from(m).ok()),
         })
         .with_children(|c| {
             c.spawn((
@@ -419,14 +422,10 @@ pub fn update_harmonica_overlay(
     active: Res<ActivePitches>,
     mut cells: Query<(&HarpOverlayCell, &mut BackgroundColor)>,
 ) {
-    let played: HashSet<String> = active
-        .0
-        .iter()
-        .map(|p| format!("{}{}", p.note, p.octave))
-        .collect();
+    let played: HashSet<u8> = active.0.iter().map(|p| p.midi).collect();
 
     for (cell, mut bg) in &mut cells {
-        bg.0 = if played.contains(&cell.note) {
+        bg.0 = if cell.midi.is_some_and(|m| played.contains(&m)) {
             CELL_LIT
         } else {
             CELL_DEFAULT

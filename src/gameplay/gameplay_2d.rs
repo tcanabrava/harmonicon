@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+use std::collections::HashSet;
+
 use crate::{
     menu::SelectedSong,
     song::NoteThemeConfig,
@@ -783,27 +785,19 @@ pub fn update_holes(
     let attack = 1.0 - (-dt * 25.0_f32).exp();
     let decay = 1.0 - (-dt * 4.0_f32).exp();
 
-    let harp_pitches: Vec<&crate::audio_system::pitch_detect::PitchInfo> = active
+    let harp_pitches: HashSet<u8> = active
         .0
         .iter()
-        .filter(|p| valid_notes.0.contains(&format!("{}{}", p.note, p.octave)))
+        .map(|p| p.midi)
+        .filter(|m| valid_notes.0.contains(m))
         .collect();
 
     for (cell, mut bg, mut state) in &mut cells {
-        let blow = chart.harmonica.wind_direction_label(cell.0, &Action::Blow);
-        let draw = chart.harmonica.wind_direction_label(cell.0, &Action::Draw);
+        let blow = chart.harmonica.wind_direction_midi(cell.0, &Action::Blow);
+        let draw = chart.harmonica.wind_direction_midi(cell.0, &Action::Draw);
 
-        let mut blow_hit = false;
-        let mut draw_hit = false;
-        for p in &harp_pitches {
-            let name = format!("{}{}", p.note, p.octave);
-            if name == blow {
-                blow_hit = true;
-            }
-            if name == draw {
-                draw_hit = true;
-            }
-        }
+        let blow_hit = blow.is_some_and(|m| harp_pitches.contains(&m));
+        let draw_hit = draw.is_some_and(|m| harp_pitches.contains(&m));
 
         let hint = targets
             .0

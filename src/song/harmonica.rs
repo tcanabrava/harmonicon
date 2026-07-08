@@ -6,7 +6,7 @@ use crate::song::chart::{Action, BendingProfile};
 
 use crate::song::chart::{ChromaticLayout, DiatonicLayout};
 
-use crate::audio_system::midi::{midi_to_note, note_to_freq_hz, note_to_midi};
+use crate::audio_system::midi::{midi_to_freq_hz, note_to_midi};
 
 use std::collections::HashSet;
 
@@ -130,6 +130,19 @@ impl Harmonica {
         n.clone()
     }
 
+    /// The MIDI note number for `hole`'s `action` (blow/draw), or `None` for
+    /// a hole/direction the harp can't produce. Identity/comparison uses
+    /// (e.g. matching a detected pitch to a hole for hole-lighting) should
+    /// use this instead of comparing [`wind_direction_label`]'s display
+    /// string, which is spelling-sensitive (`"A#4"` vs `"Bb4"`) in a way a
+    /// MIDI number isn't.
+    ///
+    /// [`wind_direction_label`]: Self::wind_direction_label
+    pub fn wind_direction_midi(&self, hole: u8, action: &Action) -> Option<u8> {
+        let m = note_to_midi(&self.wind_direction_label(hole, action))?;
+        u8::try_from(m).ok()
+    }
+
     /// The slide-pressed pitch for the given hole/direction on a chromatic
     /// harmonica (a half-step above the natural note) — the chromatic
     /// equivalent of a diatonic bend. `"—"` for a diatonic harmonica (which
@@ -198,9 +211,18 @@ impl Harmonica {
         }
     }
 
-    // Build the complete set of notes this harmonica can physically produce,
-    // including all bendable pitches between blow and draw notes.
-    pub fn build_valid_notes(&self) -> HashSet<String> {
+    // Build the complete set of MIDI note numbers this harmonica can
+    // physically produce, including all bendable pitches between blow and
+    // draw notes. Keying on the MIDI number (rather than a formatted name
+    // like `"G4"`) is what lets scoring compare detected pitches by integer
+    // equality — no allocation, no risk of an enharmonic spelling mismatch.
+    pub fn build_valid_notes(&self) -> HashSet<u8> {
+        // Doesn't capture `set`, so it can be called freely alongside direct
+        // `set.insert` calls below without fighting the borrow checker.
+        fn to_midi_u8(name: &str) -> Option<u8> {
+            u8::try_from(note_to_midi(name)?).ok()
+        }
+
         let mut set = HashSet::new();
         match &self {
             Harmonica::Diatonic {
@@ -209,8 +231,8 @@ impl Harmonica {
                 let blow = l.blow.as_deref().unwrap_or(&[]);
                 let draw = l.draw.as_deref().unwrap_or(&[]);
                 for (i, (b, d)) in blow.iter().zip(draw.iter()).enumerate() {
-                    set.insert(b.clone());
-                    set.insert(d.clone());
+                    set.extend(to_midi_u8(b));
+                    set.extend(to_midi_u8(d));
                     // Holes 1-6: draw bends downward toward the blow note.
                     // Holes 7-10: blow bends downward toward the draw note.
                     let (bend_from, bend_to) = if i < 6 { (d, b) } else { (b, d) };
@@ -220,7 +242,7 @@ impl Harmonica {
                         let lo = from_m.min(to_m);
                         let hi = from_m.max(to_m);
                         for m in (lo + 1)..hi {
-                            set.insert(midi_to_note(m));
+                            set.extend(u8::try_from(m).ok());
                         }
                     }
                 }
@@ -233,7 +255,7 @@ impl Harmonica {
                     .flatten()
                 {
                     for n in notes {
-                        set.insert(n.clone());
+                        set.extend(to_midi_u8(n));
                     }
                 }
             }
@@ -253,7 +275,7 @@ impl Harmonica {
         let freqs: Vec<f32> = self
             .build_valid_notes()
             .iter()
-            .filter_map(|n| note_to_freq_hz(n))
+            .map(|&m| midi_to_freq_hz(m as f32))
             .collect();
         if freqs.is_empty() {
             return None;
@@ -428,11 +450,13 @@ mod tests {
     fn build_valid_notes_contains_blow_and_draw() {
         let chart = test_chart();
         let notes = chart.harmonica.build_valid_notes();
-        for n in &["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"] {
-            assert!(notes.contains(*n), "missing blow note {n}");
+        // C4, E4, G4, C5, E5, G5, C6, E6, G6, C7
+        for n in &[60u8, 64, 67, 72, 76, 79, 84, 88, 91, 96] {
+            assert!(notes.contains(n), "missing blow note {n}");
         }
-        for n in &["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"] {
-            assert!(notes.contains(*n), "missing draw note {n}");
+        // D4, G4, B4, D5, F5, A5, B5, D6, F6, A6
+        for n in &[62u8, 67, 71, 74, 77, 81, 83, 86, 89, 93] {
+            assert!(notes.contains(n), "missing draw note {n}");
         }
     }
 
@@ -441,18 +465,18 @@ mod tests {
         let chart = test_chart();
         let notes = chart.harmonica.build_valid_notes();
         // Hole 1: draw=D4(62) bends down to blow=C4(60) → C#4(61) reachable
-        assert!(notes.contains("C#4"), "missing bend note C#4");
+        assert!(notes.contains(&61u8), "missing bend note C#4");
         // Hole 2: draw=G4(67) bends down to blow=E4(64) → F4(65), F#4(66) reachable
-        assert!(notes.contains("F4"), "missing bend note F4");
-        assert!(notes.contains("F#4"), "missing bend note F#4");
+        assert!(notes.contains(&65u8), "missing bend note F4");
+        assert!(notes.contains(&66u8), "missing bend note F#4");
     }
 
     #[test]
     fn build_valid_notes_excludes_unrelated_notes() {
         let chart = test_chart();
         let notes = chart.harmonica.build_valid_notes();
-        assert!(!notes.contains("D#0"));
-        assert!(!notes.contains("C8"));
+        assert!(!notes.contains(&3u8)); // D#0
+        assert!(!notes.contains(&108u8)); // C8
     }
 
     #[test]

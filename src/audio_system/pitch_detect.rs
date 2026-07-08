@@ -134,6 +134,12 @@ const NOTE_NAMES: [&str; 12] = [
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PitchInfo {
+    /// MIDI note number (0-127), rounded to the nearest semitone — the
+    /// canonical identity used for scoring comparisons (see
+    /// `gameplay::PitchGate`/`ValidHarpNotes`). `note`/`octave` are kept
+    /// alongside it purely for display; they're the same pitch, just spelled
+    /// out (and always sharp-spelled, never flat — see `midi_to_note`).
+    pub midi: u8,
     pub note: String,
     pub octave: i32,
     pub frequency: f32,
@@ -280,7 +286,8 @@ pub fn analyze(
 /// rest of the pipeline expects.
 fn mono_pitch(freq: Option<f32>) -> Vec<PitchInfo> {
     freq.and_then(|f| {
-        freq_to_note(f).map(|(note, octave)| PitchInfo {
+        freq_to_note(f).map(|(midi, note, octave)| PitchInfo {
+            midi,
             note,
             octave,
             frequency: f,
@@ -320,7 +327,8 @@ fn pitches_from_magnitudes(magnitudes: &[f32], freq_res: f32, range: PitchRange)
     suppress_harmonics(&raw_peaks)
         .into_iter()
         .filter_map(|(freq, _)| {
-            freq_to_note(freq).map(|(note, octave)| PitchInfo {
+            freq_to_note(freq).map(|(midi, note, octave)| PitchInfo {
+                midi,
                 note,
                 octave,
                 frequency: freq,
@@ -723,7 +731,8 @@ fn nmf_pitches(magnitudes: &[f32], dict: &NmfDict) -> Vec<PitchInfo> {
     active
         .into_iter()
         .filter_map(|(f, _)| {
-            freq_to_note(f).map(|(note, octave)| PitchInfo {
+            freq_to_note(f).map(|(midi, note, octave)| PitchInfo {
+                midi,
                 note,
                 octave,
                 frequency: f,
@@ -732,18 +741,22 @@ fn nmf_pitches(magnitudes: &[f32], dict: &NmfDict) -> Vec<PitchInfo> {
         .collect()
 }
 
-fn freq_to_note(freq: f32) -> Option<(String, i32)> {
+/// Rounds `freq` to the nearest MIDI semitone, returning `(midi, note_name,
+/// octave)` — `None` outside the valid MIDI range (0-127), which also
+/// catches non-positive/nonsensical input rather than producing a bogus
+/// octave number.
+fn freq_to_note(freq: f32) -> Option<(u8, String, i32)> {
     if freq <= 0.0 {
         return None;
     }
     let midi = 12.0 * (freq / 440.0).log2() + 69.0;
     let midi_rounded = midi.round() as i32;
-    if midi_rounded < 0 {
+    if !(0..=127).contains(&midi_rounded) {
         return None;
     }
     let octave = midi_rounded / 12 - 1;
     let note_idx = (midi_rounded % 12) as usize;
-    Some((NOTE_NAMES[note_idx].to_string(), octave))
+    Some((midi_rounded as u8, NOTE_NAMES[note_idx].to_string(), octave))
 }
 
 #[cfg(test)]
@@ -805,7 +818,7 @@ mod tests {
             .collect();
         let f0 = yin_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
         assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
-        assert_eq!(freq_to_note(f0), Some(("A".to_string(), 4)));
+        assert_eq!(freq_to_note(f0), Some((69, "A".to_string(), 4)));
     }
 
     #[test]
@@ -1000,18 +1013,25 @@ mod tests {
 
     #[test]
     fn freq_to_note_a440() {
-        assert_eq!(freq_to_note(440.0), Some(("A".to_string(), 4)));
+        assert_eq!(freq_to_note(440.0), Some((69, "A".to_string(), 4)));
     }
 
     #[test]
     fn freq_to_note_middle_c() {
         // C4 ≈ 261.63 Hz
-        assert_eq!(freq_to_note(261.63), Some(("C".to_string(), 4)));
+        assert_eq!(freq_to_note(261.63), Some((60, "C".to_string(), 4)));
     }
 
     #[test]
     fn freq_to_note_zero_or_negative_returns_none() {
         assert_eq!(freq_to_note(0.0), None);
         assert_eq!(freq_to_note(-1.0), None);
+    }
+
+    #[test]
+    fn freq_to_note_rejects_absurdly_high_frequencies() {
+        // Comfortably beyond MIDI 127 (~12.5kHz) — a bogus detection, not a
+        // real harmonica note; must not silently produce a garbage octave.
+        assert_eq!(freq_to_note(50_000.0), None);
     }
 }

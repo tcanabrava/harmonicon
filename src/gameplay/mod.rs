@@ -32,7 +32,7 @@ use std::collections::HashSet;
 use bevy::audio::Volume;
 
 use crate::{
-    audio_system::midi::{midi_to_note, note_to_freq_hz, note_to_midi},
+    audio_system::midi::{midi_to_freq_hz, note_to_midi},
     audio_system::pitch_detect::{AudioFrame, PitchEvent, PitchInfo, PitchRange},
     menu::{AppState, GameplayMode, SelectedSong},
     settings::AudioSettings,
@@ -238,37 +238,42 @@ pub struct ActivePitches(pub Vec<PitchInfo>);
 /// (say) G4 would clear every G4 note that later scrolls into its hit window.
 #[derive(Resource, Default)]
 pub struct PitchGate {
-    /// Valid harp pitches consumed by a hit since their last onset. Each is
-    /// dropped once the pitch is no longer detected, re-arming it for the next
-    /// articulation.
-    consumed: HashSet<String>,
+    /// Valid harp pitches (MIDI note numbers) consumed by a hit since their
+    /// last onset. Each is dropped once the pitch is no longer detected,
+    /// re-arming it for the next articulation.
+    consumed: HashSet<u8>,
 }
 
 impl PitchGate {
     /// Drop consumption for any pitch that is no longer sounding, so its next
     /// articulation counts as a fresh attack.
-    fn release_absent(&mut self, playing: &HashSet<String>) {
+    fn release_absent(&mut self, playing: &HashSet<u8>) {
         self.consumed.retain(|p| playing.contains(p));
     }
 
     /// True if `pitch` is sounding and has not already scored a note during its
     /// current, continuous sustain.
-    fn is_fresh(&self, pitch: &str, playing: &HashSet<String>) -> bool {
-        playing.contains(pitch) && !self.consumed.contains(pitch)
+    fn is_fresh(&self, pitch: u8, playing: &HashSet<u8>) -> bool {
+        playing.contains(&pitch) && !self.consumed.contains(&pitch)
     }
 
     /// Mark `pitch` as having scored; it won't score another note until it is
     /// released (see [`release_absent`](Self::release_absent)) and replayed.
-    fn consume(&mut self, pitch: &str) {
-        self.consumed.insert(pitch.to_string());
+    fn consume(&mut self, pitch: u8) {
+        self.consumed.insert(pitch);
     }
 }
 
 #[derive(Resource, Default)]
 pub struct MusicStarted(pub bool);
 
+/// The set of MIDI note numbers this harp can actually produce (across every
+/// hole/action/bend), from `Harmonica::build_valid_notes`. Keying on the MIDI
+/// number (rather than a formatted name like `"G4"`) means comparisons are
+/// integer equality — no per-frame string allocation, and no risk of an
+/// enharmonic spelling mismatch (`"A#4"` vs `"Bb4"`) silently failing to match.
 #[derive(Resource, Default)]
-pub struct ValidHarpNotes(pub HashSet<String>);
+pub struct ValidHarpNotes(pub HashSet<u8>);
 
 #[derive(Resource, Default)]
 pub struct Score {
@@ -417,8 +422,10 @@ pub struct ScheduledNote {
     pub duration: f64,
     pub hole: u8,
     pub is_blow: bool,
-    /// The pitch string (e.g. "C4") this note expects, pre-computed at spawn.
-    pub expected_pitch: String,
+    /// The MIDI note number this note expects, pre-computed at spawn
+    /// (`None` for a hole/action/bend combination the harp can't actually
+    /// produce — see [`target_pitch`] — which can never be hit).
+    pub expected_pitch: Option<u8>,
     pub hit: bool,
     pub missed: bool,
     /// Seconds the expected pitch has been held since the onset was hit.
@@ -564,19 +571,24 @@ pub fn last_note_end(
         .fold(0.0_f64, f64::max)
 }
 
-/// The pitch the player must actually produce for a note. A `bend` shifts the
-/// note's natural pitch by its semitones (negative = down), so the bend is
-/// *validated* by scoring — playing the unbent note no longer counts. Notes
-/// without a bend (or an unknown pitch name) keep their natural pitch.
-pub fn target_pitch(natural: &str, modifiers: &[Modifier]) -> String {
-    let bend = modifiers.iter().find_map(|m| match m {
-        Modifier::Bend { semitones, .. } => Some(semitones.round() as i32),
-        _ => None,
-    });
-    match (bend, note_to_midi(natural)) {
-        (Some(s), Some(midi)) if s != 0 => midi_to_note(midi + s),
-        _ => natural.to_string(),
-    }
+/// The MIDI note the player must actually produce for a note. A `bend`
+/// shifts the note's natural pitch by its semitones (negative = down, and
+/// rounded to the nearest whole semitone — the actual bent pitch is
+/// continuous, but the matched target is discrete), so the bend is
+/// *validated* by scoring — playing the unbent note no longer counts.
+/// `None` if `natural` isn't a parseable note name (e.g. the "—" placeholder
+/// for a hole/direction the harp can't produce) or the shifted result falls
+/// outside the valid MIDI range.
+pub fn target_pitch(natural: &str, modifiers: &[Modifier]) -> Option<u8> {
+    let bend: i32 = modifiers
+        .iter()
+        .find_map(|m| match m {
+            Modifier::Bend { semitones, .. } => Some(semitones.round() as i32),
+            _ => None,
+        })
+        .unwrap_or(0);
+    let midi = note_to_midi(natural)? + bend;
+    (0..=127).contains(&midi).then_some(midi as u8)
 }
 
 /// Style-bonus points awarded for a hit note's techniques, summed over its
@@ -628,23 +640,11 @@ fn technique_confirmed(
     }
 }
 
-/// Whether `note`+`octave` (e.g. `("G", 4)`) is the pitch named by `formatted`
-/// (e.g. `"G4"`) — equivalent to `format!("{note}{octave}") == formatted` but
-/// without allocating, since this runs per active pitch every frame.
-fn note_octave_eq(note: &str, octave: i32, formatted: &str) -> bool {
-    formatted
-        .strip_prefix(note)
-        .and_then(|rest| rest.parse::<i32>().ok())
-        .is_some_and(|o| o == octave)
-}
-
-/// The currently-detected frequency (Hz) matching `pitch_name` (e.g. `"D4"`),
-/// or `None` if that exact note isn't among the detected pitches this frame.
-fn active_frequency_for(active: &[PitchInfo], pitch_name: &str) -> Option<f32> {
-    active
-        .iter()
-        .find(|p| note_octave_eq(&p.note, p.octave, pitch_name))
-        .map(|p| p.frequency)
+/// The currently-detected frequency (Hz) matching `midi` (a MIDI note
+/// number), or `None` if that exact pitch isn't among the detected pitches
+/// this frame.
+fn active_frequency_for(active: &[PitchInfo], midi: u8) -> Option<f32> {
+    active.iter().find(|p| p.midi == midi).map(|p| p.frequency)
 }
 
 /// RMS loudness of a block of audio samples.
@@ -864,15 +864,11 @@ fn score_notes(
         score.combo = 0;
     }
 
-    // One `format!` per active pitch, not two — the set only ever needs the
-    // formatted name once, whether it's kept (valid) or dropped (not on the harp).
-    let harp_pitches: HashSet<String> = active
+    let harp_pitches: HashSet<u8> = active
         .0
         .iter()
-        .filter_map(|p| {
-            let name = format!("{}{}", p.note, p.octave);
-            valid_notes.0.contains(&name).then_some(name)
-        })
+        .map(|p| p.midi)
+        .filter(|m| valid_notes.0.contains(m))
         .collect();
 
     // Re-arm any pitch the player has stopped sounding, so its next attack is
@@ -900,15 +896,16 @@ fn score_notes(
             if clock.get() < note.time + note.duration {
                 // The held pitch stays "consumed" by the gate, so checking the
                 // raw detected set keeps crediting this same note's sustain.
-                if harp_pitches.contains(&note.expected_pitch) {
+                if note.expected_pitch.is_some_and(|m| harp_pitches.contains(&m)) {
                     note.held += dt;
                 }
                 // Track pitch/loudness through the hold so a declared vibrato
                 // or wah can be verified (rather than trusted) once it ends.
                 if note.modifiers.iter().any(is_sustained_technique) {
-                    if let Some(hz) = active_frequency_for(&active.0, &note.expected_pitch)
-                        && let Some(expected_hz) = note_to_freq_hz(&note.expected_pitch)
+                    if let Some(midi) = note.expected_pitch
+                        && let Some(hz) = active_frequency_for(&active.0, midi)
                     {
+                        let expected_hz = midi_to_freq_hz(midi as f32);
                         note.pitch_samples
                             .push((clock.get(), 1200.0 * (hz / expected_hz).log2()));
                     }
@@ -966,7 +963,11 @@ fn score_notes(
         };
         // A note counts as "playing" only on a fresh attack: the pitch must be
         // sounding and not already consumed by an earlier note in this sustain.
-        let playing = gate.is_fresh(&note.expected_pitch, &harp_pitches);
+        // A note with no valid `expected_pitch` (the harp can't produce it) can
+        // never be "playing".
+        let playing = note
+            .expected_pitch
+            .is_some_and(|m| gate.is_fresh(m, &harp_pitches));
 
         match classify_note(
             offset,
@@ -1001,7 +1002,10 @@ fn score_notes(
                 }
                 // Claim the attack so a held breath can't also clear the next
                 // same-pitch note; the player must re-articulate for that one.
-                gate.consume(&note.expected_pitch);
+                // `playing` was only true above if `expected_pitch` is `Some`.
+                if let Some(m) = note.expected_pitch {
+                    gate.consume(m);
+                }
                 match quality {
                     HitQuality::Perfect => stats.perfect += 1,
                     // A late Good hit counts as "delayed"; early/on-time as "good".
@@ -1281,7 +1285,7 @@ mod tests {
             duration: 0.5,
             hole: 1,
             is_blow: true,
-            expected_pitch: "C4".to_string(),
+            expected_pitch: Some(60), // C4
             hit: true,
             missed: true,
             held: 1.0,
@@ -1475,58 +1479,59 @@ mod tests {
 
     // ── PitchGate (re-attack detection) ──────────────────────────────────────────
 
-    fn playing(pitches: &[&str]) -> HashSet<String> {
-        pitches.iter().map(|p| p.to_string()).collect()
+    /// G4 = 67, B4 = 71.
+    fn playing(pitches: &[u8]) -> HashSet<u8> {
+        pitches.iter().copied().collect()
     }
 
     #[test]
     fn a_sounding_unconsumed_pitch_is_fresh() {
         let gate = PitchGate::default();
-        assert!(gate.is_fresh("G4", &playing(&["G4"])));
+        assert!(gate.is_fresh(67, &playing(&[67])));
     }
 
     #[test]
     fn a_silent_pitch_is_never_fresh() {
         let gate = PitchGate::default();
-        assert!(!gate.is_fresh("G4", &playing(&[])));
+        assert!(!gate.is_fresh(67, &playing(&[])));
     }
 
     #[test]
     fn a_held_pitch_cannot_score_twice() {
         // The core fix: one sustained breath clears one note, not the next.
         let mut gate = PitchGate::default();
-        let held = playing(&["G4"]);
+        let held = playing(&[67]);
 
         // First note: fresh attack scores, then we consume the pitch.
-        assert!(gate.is_fresh("G4", &held));
-        gate.consume("G4");
+        assert!(gate.is_fresh(67, &held));
+        gate.consume(67);
 
         // The breath is still held — a second G4 note must NOT count.
         gate.release_absent(&held);
-        assert!(!gate.is_fresh("G4", &held));
+        assert!(!gate.is_fresh(67, &held));
     }
 
     #[test]
     fn re_articulating_a_pitch_re_arms_it() {
         let mut gate = PitchGate::default();
-        gate.consume("G4");
+        gate.consume(67);
 
         // Player stops playing: G4 drops out of the detected set and re-arms.
         gate.release_absent(&playing(&[]));
 
         // Next attack on G4 is fresh again.
-        assert!(gate.is_fresh("G4", &playing(&["G4"])));
+        assert!(gate.is_fresh(67, &playing(&[67])));
     }
 
     #[test]
     fn consuming_one_pitch_leaves_others_fresh() {
         let mut gate = PitchGate::default();
-        let chord = playing(&["G4", "B4"]);
-        gate.consume("G4");
+        let chord = playing(&[67, 71]);
+        gate.consume(67);
         gate.release_absent(&chord);
 
-        assert!(!gate.is_fresh("G4", &chord));
-        assert!(gate.is_fresh("B4", &chord));
+        assert!(!gate.is_fresh(67, &chord));
+        assert!(gate.is_fresh(71, &chord));
     }
 
     // ── target_pitch (bend validation) ───────────────────────────────────────────
@@ -1537,8 +1542,9 @@ mod tests {
             semitones: -1.0,
             intensity: None,
         }];
-        // A 1-semitone draw bend on B4 must be played as A#4, not the natural B4.
-        assert_eq!(target_pitch("B4", &bend), "A#4");
+        // A 1-semitone draw bend on B4 (71) must be played as A#4 (70), not
+        // the natural B4.
+        assert_eq!(target_pitch("B4", &bend), Some(70));
     }
 
     #[test]
@@ -1547,7 +1553,7 @@ mod tests {
             semitones: -2.0,
             intensity: None,
         }];
-        assert_eq!(target_pitch("B4", &bend), "A4");
+        assert_eq!(target_pitch("B4", &bend), Some(69)); // A4
     }
 
     #[test]
@@ -1556,17 +1562,20 @@ mod tests {
             oscillation_hz: 5.0,
             intensity: None,
         }];
-        assert_eq!(target_pitch("D5", &vib), "D5");
-        assert_eq!(target_pitch("D5", &[]), "D5");
+        assert_eq!(target_pitch("D5", &vib), Some(74));
+        assert_eq!(target_pitch("D5", &[]), Some(74));
     }
 
     #[test]
-    fn unknown_pitch_name_is_left_alone() {
+    fn unknown_pitch_name_has_no_target() {
+        // The "—" placeholder for a hole/direction the harp can't produce
+        // isn't a parseable note name, so there's no valid target at all —
+        // this note can never be hit.
         let bend = vec![Modifier::Bend {
             semitones: -1.0,
             intensity: None,
         }];
-        assert_eq!(target_pitch("\u{2014}", &bend), "\u{2014}");
+        assert_eq!(target_pitch("\u{2014}", &bend), None);
     }
 
     // ── style_bonus_points ───────────────────────────────────────────────────────
@@ -1711,38 +1720,23 @@ mod tests {
         assert!(technique_confirmed(&Modifier::Slide, &[], &[]));
     }
 
-    #[test]
-    fn active_frequency_for_matches_by_note_and_octave() {
-        let active = vec![
-            PitchInfo {
-                note: "D".into(),
-                octave: 4,
-                frequency: 293.66,
-            },
-            PitchInfo {
-                note: "G".into(),
-                octave: 4,
-                frequency: 392.00,
-            },
-        ];
-        assert_eq!(active_frequency_for(&active, "D4"), Some(293.66));
-        assert_eq!(active_frequency_for(&active, "A4"), None);
+    fn pitch_info(midi: u8, note: &str, octave: i32, frequency: f32) -> PitchInfo {
+        PitchInfo {
+            midi,
+            note: note.into(),
+            octave,
+            frequency,
+        }
     }
 
     #[test]
-    fn note_octave_eq_matches_format_without_allocating() {
-        assert!(note_octave_eq("G", 4, "G4"));
-        assert!(note_octave_eq("C#", 5, "C#5"));
-        assert!(!note_octave_eq("G", 4, "G5"), "different octave");
-        assert!(!note_octave_eq("G", 4, "A4"), "different note");
-        assert!(
-            !note_octave_eq("G", 4, "G4x"),
-            "trailing garbage after the octave must not match"
-        );
-        assert!(
-            !note_octave_eq("G", 4, "G"),
-            "missing octave must not match"
-        );
+    fn active_frequency_for_matches_by_midi_number() {
+        let active = vec![
+            pitch_info(62, "D", 4, 293.66),
+            pitch_info(67, "G", 4, 392.00),
+        ];
+        assert_eq!(active_frequency_for(&active, 62), Some(293.66));
+        assert_eq!(active_frequency_for(&active, 69), None);
     }
 
     // ── cleanup_gameplay ──────────────────────────────────────────────────────────
@@ -1783,7 +1777,7 @@ mod tests {
             duration: 1.0,
             hole: 1,
             is_blow: true,
-            expected_pitch: "C4".to_string(),
+            expected_pitch: Some(60), // C4
             hit: false,
             missed: false,
             held: 0.0,
@@ -1806,12 +1800,13 @@ mod tests {
         world.insert_resource(GameplayClock::new(0.5));
         world.insert_resource(Time::<()>::default());
         world.insert_resource(ActivePitches(vec![PitchInfo {
+            midi: 60,
             note: "C".to_string(),
             octave: 4,
-            frequency: note_to_freq_hz("C4").unwrap(),
+            frequency: midi_to_freq_hz(60.0),
         }]));
         world.insert_resource(AudioFrame::default());
-        world.insert_resource(ValidHarpNotes(HashSet::from(["C4".to_string()])));
+        world.insert_resource(ValidHarpNotes(HashSet::from([60u8])));
         world.insert_resource(ScoringConfig::default());
         world.insert_resource(AudioSettings::default());
         world.insert_resource(Score::default());
@@ -1847,7 +1842,7 @@ mod tests {
         world.insert_resource(Time::<()>::default());
         world.insert_resource(ActivePitches(vec![]));
         world.insert_resource(AudioFrame::default());
-        world.insert_resource(ValidHarpNotes(HashSet::from(["C4".to_string()])));
+        world.insert_resource(ValidHarpNotes(HashSet::from([60u8])));
         world.insert_resource(ScoringConfig::default());
         world.insert_resource(AudioSettings::default());
         world.insert_resource(Score::default());
@@ -1879,11 +1874,7 @@ mod tests {
         world.insert_resource(Time::<()>::default());
         world.insert_resource(ActivePitches(vec![]));
         world.insert_resource(AudioFrame::default());
-        world.insert_resource(ValidHarpNotes(HashSet::from([
-            "C4".to_string(),
-            "D4".to_string(),
-            "E4".to_string(),
-        ])));
+        world.insert_resource(ValidHarpNotes(HashSet::from([60u8, 62, 64]))); // C4, D4, E4
         world.insert_resource(ScoringConfig::default());
         world.insert_resource(AudioSettings::default());
         world.insert_resource(Score::default());
@@ -1891,13 +1882,13 @@ mod tests {
         world.insert_resource(HitFeedback::default());
         world.insert_resource(PitchGate::default());
 
-        fn note(time: f64, pitch: &str) -> ScheduledNote {
+        fn note(time: f64, pitch: u8) -> ScheduledNote {
             ScheduledNote {
                 time,
                 duration: 0.2,
                 hole: 1,
                 is_blow: true,
-                expected_pitch: pitch.to_string(),
+                expected_pitch: Some(pitch),
                 hit: false,
                 missed: false,
                 held: 0.0,
@@ -1908,19 +1899,21 @@ mod tests {
             }
         }
         fn pitch(note: &str, octave: i32) -> PitchInfo {
+            let midi = note_to_midi(&format!("{note}{octave}")).unwrap() as u8;
             PitchInfo {
+                midi,
                 note: note.to_string(),
                 octave,
-                frequency: note_to_freq_hz(&format!("{note}{octave}")).unwrap(),
+                frequency: midi_to_freq_hz(midi as f32),
             }
         }
 
         // C4 at t=0.0 is played right on time (Perfect); D4 at t=0.5 is played
         // 90ms late (inside `good_window` 130ms but past `perfect_window`
         // 60ms, so "Good"/delayed); E4 at t=1.0 is never played (Missed).
-        let perfect_note = world.spawn(note(0.0, "C4")).id();
-        let good_note = world.spawn(note(0.5, "D4")).id();
-        let missed_note = world.spawn(note(1.0, "E4")).id();
+        let perfect_note = world.spawn(note(0.0, 60)).id();
+        let good_note = world.spawn(note(0.5, 62)).id();
+        let missed_note = world.spawn(note(1.0, 64)).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(score_notes);
