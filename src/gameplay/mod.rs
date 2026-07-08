@@ -479,6 +479,34 @@ pub struct SongNotes {
     pub cursor: usize,
 }
 
+/// Indices of notes that should have a spawned visual at `elapsed` but don't
+/// yet (per `already_spawned`) — the windowing logic shared by
+/// `gameplay_2d::spawn_visible_notes` and `gameplay_3d::spawn_visible_notes_3d`.
+/// `notes` must be sorted by `time` ascending (as `SongNotes::notes` always
+/// is). A note's window is open from `LOOKAHEAD` seconds before its `time`
+/// until `elapsed` passes it (recycling/despawning is each mode's own
+/// concern, based on how far the note has visually scrolled — this only
+/// decides when a *new* visual should appear).
+pub(super) fn notes_needing_spawn(
+    notes: &[ScheduledNote],
+    already_spawned: &HashSet<usize>,
+    elapsed: f64,
+) -> Vec<usize> {
+    // Sorted by time, so this is the first index whose window could
+    // possibly be open — no need to consider anything before it.
+    let start = notes.partition_point(|n| n.time + LOOKAHEAD < elapsed);
+    let mut result = Vec::new();
+    for (i, note) in notes.iter().enumerate().skip(start) {
+        if note.time - LOOKAHEAD > elapsed {
+            break; // sorted — nothing further out needs spawning yet either.
+        }
+        if !already_spawned.contains(&i) {
+            result.push(i);
+        }
+    }
+    result
+}
+
 #[derive(Component)]
 #[require(HoleState)]
 pub struct HoleCell(pub u8);
@@ -553,9 +581,7 @@ pub struct LoopConfig {
 
 // ── Shared constants ──────────────────────────────────────────────────────────
 
-pub const HOLE_COUNT: usize = 10;
 pub const COUNTDOWN: f64 = 3.0;
-pub const LANE_PCT: f32 = 100.0 / HOLE_COUNT as f32;
 pub const HIT_H_PCT: f32 = 7.0;
 pub const LOOKAHEAD: f64 = 3.0;
 
@@ -1944,6 +1970,65 @@ mod tests {
         let song_notes = world.resource::<SongNotes>();
         assert!(!song_notes.notes[0].hit);
         assert!(!song_notes.notes[0].missed);
+    }
+
+    // ── notes_needing_spawn (windowed rendering) ─────────────────────────────
+    //
+    // `gameplay_2d`/`gameplay_3d` can't be smoke-tested headlessly (they need
+    // a real render/asset harness), so this pure windowing logic — the part
+    // that actually decides which notes get a visual and when — is the one
+    // piece of the windowed-spawn refactor that's directly testable. LOOKAHEAD
+    // is 3.0s throughout.
+
+    #[test]
+    fn notes_needing_spawn_is_empty_well_before_or_after_a_note() {
+        let notes = [overlap_test_note(10.0)];
+        let none = HashSet::new();
+        assert_eq!(notes_needing_spawn(&notes, &none, 0.0), Vec::<usize>::new());
+        assert_eq!(
+            notes_needing_spawn(&notes, &none, 20.0),
+            Vec::<usize>::new()
+        );
+    }
+
+    #[test]
+    fn notes_needing_spawn_includes_a_note_right_at_the_lookahead_edge() {
+        let notes = [overlap_test_note(10.0)];
+        let none = HashSet::new();
+        // Window opens at note.time - LOOKAHEAD = 7.0.
+        assert_eq!(notes_needing_spawn(&notes, &none, 7.0), vec![0]);
+        assert_eq!(notes_needing_spawn(&notes, &none, 6.999), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn notes_needing_spawn_skips_indices_already_spawned() {
+        let notes = [overlap_test_note(10.0), overlap_test_note(10.5)];
+        let one_spawned = HashSet::from([0]);
+        assert_eq!(notes_needing_spawn(&notes, &one_spawned, 8.0), vec![1]);
+    }
+
+    #[test]
+    fn notes_needing_spawn_returns_every_note_whose_window_is_open() {
+        let notes = [
+            overlap_test_note(10.0),
+            overlap_test_note(10.2),
+            overlap_test_note(20.0), // window not open yet at elapsed=9.0
+        ];
+        let none = HashSet::new();
+        assert_eq!(notes_needing_spawn(&notes, &none, 9.0), vec![0, 1]);
+    }
+
+    #[test]
+    fn notes_needing_spawn_stops_scanning_once_a_note_is_too_far_out() {
+        // A note far beyond the window sits after several already-open ones —
+        // confirms the scan doesn't spuriously include (or choke on) it.
+        let notes = [
+            overlap_test_note(10.0),
+            overlap_test_note(10.1),
+            overlap_test_note(1000.0),
+        ];
+        let none = HashSet::new();
+        assert_eq!(notes_needing_spawn(&notes, &none, 9.0), vec![0, 1]);
     }
 
     /// A tiny synthetic 3-note "song" driven frame by frame through

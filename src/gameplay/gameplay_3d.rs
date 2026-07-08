@@ -336,17 +336,7 @@ pub fn spawn_visible_notes_3d(
     }
     let elapsed = clock.get();
     let already_spawned: HashSet<usize> = existing.iter().map(|v| v.note_id).collect();
-    let start = song_notes
-        .notes
-        .partition_point(|n| n.time + LOOKAHEAD < elapsed);
-
-    for (i, note) in song_notes.notes.iter().enumerate().skip(start) {
-        if note.time - LOOKAHEAD > elapsed {
-            break; // sorted — nothing further out needs spawning yet either.
-        }
-        if already_spawned.contains(&i) {
-            continue;
-        }
+    for i in super::notes_needing_spawn(&song_notes.notes, &already_spawned, elapsed) {
         spawn_note_visual_3d(
             &mut commands,
             &mut meshes,
@@ -354,7 +344,7 @@ pub fn spawn_visible_notes_3d(
             &mut tail_materials,
             &render_assets,
             i,
-            note,
+            &song_notes.notes[i],
         );
     }
 }

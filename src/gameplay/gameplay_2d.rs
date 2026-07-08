@@ -508,21 +508,7 @@ pub fn spawn_visible_notes(
     let elapsed = clock.get();
 
     let already_spawned: HashSet<usize> = existing.iter().map(|v| v.note_id).collect();
-    // `notes` is sorted by `time`, so this is the first index whose window
-    // could possibly be open — no need to consider anything before it.
-    let start = song_notes
-        .notes
-        .partition_point(|n| n.time + LOOKAHEAD < elapsed);
-
-    let mut to_spawn: Vec<usize> = Vec::new();
-    for (i, note) in song_notes.notes.iter().enumerate().skip(start) {
-        if note.time - LOOKAHEAD > elapsed {
-            break; // sorted — nothing further out needs spawning yet either.
-        }
-        if !already_spawned.contains(&i) {
-            to_spawn.push(i);
-        }
-    }
+    let to_spawn = super::notes_needing_spawn(&song_notes.notes, &already_spawned, elapsed);
     if to_spawn.is_empty() {
         return;
     }

@@ -38,6 +38,7 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 | Overlapping same-pitch notes credit the one actually due, not query order | `gameplay::tests::score_notes_credits_the_closest_offset_when_two_same_pitch_notes_overlap` |
 | End-to-end: a synthetic pitch stream drives a mini chart through hit/good/miss and the score/combo/stats update accordingly | `gameplay::tests::end_to_end_synthetic_song_drives_score_combo_and_stats` |
 | Loop boundary rewinds the clock and resets only the notes inside the loop range | `gameplay::tests::loop_boundary_rewinds_the_clock_and_resets_notes_in_range`, `…::loop_boundary_is_a_no_op_before_end_time_or_when_inactive` |
+| Windowed note-visual spawning: a note's window opens/closes at the right time, already-spawned notes aren't respawned, far-out notes are excluded | `gameplay::tests::notes_needing_spawn_*` |
 
 ## Manual checks
 
@@ -52,16 +53,19 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 - [ ] **Long-song sync**: play a 3+ minute song end to end; the hit line still matches the beat at the end, with no accumulating drift. *(manual: audio + timing; correction math is unit-tested but real decoder/frame-hitch drift isn't)*
 - [ ] **Low-keyed harp detection**: load (or author) a chart with a Low-F/Low-D harmonica and confirm hole-1 blow/draw register — the detector range now derives from the chart's layout instead of a fixed 200 Hz floor. *(manual: needs a real low-keyed harp and mic)*
 - [ ] **Looping doesn't speed up the music.** With `chart.loop.repeat = true` (or any future A–B loop UI), let the loop wrap a few times: the backing track should audibly stay in sync with the notes/metronome, not creep faster each pass. *(manual: needs a live `AudioSink`; the clock-rewind and note-reset logic is unit-tested — see the table above — but `AudioSink::try_seek` itself needs real audio output)*
+- [ ] **Looped notes replay correctly on screen.** On a loop wrap, notes inside the loop range should reappear and be hittable again exactly as on the first pass (not stuck showing a stale hit/miss tint, not missing, not duplicated). *(manual: rendering; the note-reset data is unit-tested, but note visuals are now spawned/despawned dynamically rather than kept alive across the whole song, so this is the one loop behavior that can only be confirmed by watching it happen)*
 
 ### Play 2D
 - [ ] The note **highway shows falling notes** in the ten lanes, with the comet head + animated tail. *(manual: rendering)*
 - [ ] The **HUD** (song info, 12-bar grid, metronome, technique legend, score) is visible on the right. *(manual)*
 - [ ] Notes recolour gold on hit / red on miss; long notes reward holding the pitch. *(manual; sustain logic is unit-tested)*
+- [ ] **Notes appear and disappear cleanly** — no pop-in right at the top of the highway, no note lingering after it's scrolled off, no duplicate/ghost note. *(manual: rendering; note visuals are now spawned in a `LOOKAHEAD` window rather than all up front — the windowing math is unit-tested (`notes_needing_spawn_*`), but only a live run shows whether it's visually seamless)*
 
 ### Play 3D
 - [ ] The 3D scene initializes: lane floor, hit zone, the harmonica model, and comet notes travelling down the lane. *(manual: rendering + GLB asset)*
 - [ ] **Leaving 3D restores the 2D menu camera** (menu renders normally afterward — order/clear reset). *(automated; verify visually too)*
 - [ ] Exiting despawns the 3D scene (no leftover meshes/cameras on the next song). *(teardown automated; verify visually)*
+- [ ] **Notes appear and disappear cleanly**, same windowed-spawning check as 2D above. *(manual: rendering)*
 
 ### Jam Session
 - [ ] Starts and runs **without falling notes** — the 12-bar chart + metronome drive it; no chart-note highway is required. *(manual)*
