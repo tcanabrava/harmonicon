@@ -11,7 +11,6 @@ use crate::{
     song::SongManifest,
 };
 
-use super::jam_session::JamLoop;
 use super::{GameplayClock, GameplayRoot, MusicPlayer, MusicStarted, Paused};
 
 #[derive(Component, Default, Clone)]
@@ -82,7 +81,6 @@ pub fn update_countdown(
     manifests: Res<Assets<SongManifest>>,
     audio: Res<AudioSettings>,
     mode: Res<GameplayMode>,
-    jam_loop: Res<JamLoop>,
     mut commands: Commands,
 ) {
     if clock.get() >= 0.0 {
@@ -92,10 +90,13 @@ pub fn update_countdown(
         if !music_started.0 {
             music_started.0 = true;
             if let Some(manifest) = manifests.get(&selected.0) {
-                // Only Jam Session offers looping — scored modes end the song
-                // and move on to the results screen.
-                let settings = if *mode == GameplayMode::JamSession && jam_loop.0 {
-                    PlaybackSettings::LOOP
+                // Jam Session's own `restart_finished_jam_music` re-spawns
+                // this entity once it despawns itself, if Loop is on at that
+                // moment — so it always starts as a plain one-shot that
+                // self-cleans; scored modes need the same self-cleaning
+                // one-shot to move on to the results screen.
+                let settings = if *mode == GameplayMode::JamSession {
+                    PlaybackSettings::DESPAWN
                 } else {
                     PlaybackSettings::ONCE
                 };

@@ -173,7 +173,7 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             (
-                jam_session::apply_jam_loop_toggle,
+                jam_session::restart_finished_jam_music,
                 jam_session::update_jam_loop_label,
             )
                 .run_if(

@@ -223,46 +223,55 @@ pub fn update_jam_loop_label(
     }
 }
 
-/// Playback settings for (re)starting the jam's music at `at_secs`: looping
-/// or not per `loop_enabled`, resuming from the given position rather than
-/// jumping back to the top. Split out from the system so the decision itself
-/// (loop vs. once, and where it resumes) is unit-testable without spinning up
-/// an `App`.
-fn jam_playback_settings(loop_enabled: bool, at_secs: f64) -> PlaybackSettings {
-    let base = if loop_enabled {
-        PlaybackSettings::LOOP
-    } else {
-        PlaybackSettings::ONCE
-    };
-    base.with_start_position(std::time::Duration::from_secs_f64(at_secs.max(0.0)))
+/// Whether the jam's music should be (re)spawned right now: the jam has
+/// started, Loop is on, and no `MusicPlayer` entity is currently alive (i.e.
+/// the previous playthrough already finished and despawned itself — see
+/// `restart_finished_jam_music`). Split out as a pure predicate so the
+/// decision is unit-testable without spinning up an `App`.
+fn should_restart_jam_music(loop_on: bool, music_started: bool, music_player_alive: bool) -> bool {
+    music_started && loop_on && !music_player_alive
 }
 
-/// Restarts the background music when the Loop toggle changes mid-jam, so
-/// flipping it takes effect immediately instead of only applying the next
-/// time a song starts. Picks up from the current position (rather than
-/// jumping back to the top) so toggling it doesn't itself restart the jam.
-pub fn apply_jam_loop_toggle(
+/// Restarts the jam's background music once the current playthrough has
+/// *finished on its own* — the `MusicPlayer` entity despawns itself via
+/// `PlaybackSettings::DESPAWN` (`countdown_overlay::update_countdown` spawns
+/// it that way for Jam Session) — and Loop is on at that moment. Toggling
+/// Loop itself does nothing here beyond flipping the resource
+/// (`update_jam_loop_label` is the only other reader); this system never
+/// touches a live sink, only ever spawning a *new* entity after the old one
+/// is already gone.
+///
+/// Three earlier designs instead reacted to the toggle directly, despawning
+/// the live `MusicPlayer` entity and immediately respawning it mid-track:
+/// resuming from the gameplay clock, resuming from the old sink's own
+/// `AudioSink::position()`, and finally an explicit restart from
+/// `Duration::ZERO` via `.with_start_position()`. All three went silent, for
+/// two distinct reasons (both documented in TODO.md): resuming from an
+/// unbounded position exhausts the raw decoder before `bevy_audio` wraps it
+/// in `repeat_infinite` (the first two), and even `Some(Duration::ZERO)`
+/// takes a different, silently-broken `bevy_audio` code path than leaving
+/// `start_position` as `None` (the third). All of that only mattered because
+/// those designs mutated a sink that was still playing. Never doing that
+/// removes the failure mode entirely instead of finding yet another way
+/// around it.
+pub fn restart_finished_jam_music(
     jam_loop: Res<JamLoop>,
     music_started: Res<MusicStarted>,
-    clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     audio: Res<AudioSettings>,
-    existing: Query<Entity, With<MusicPlayer>>,
+    existing: Query<(), With<MusicPlayer>>,
     mut commands: Commands,
 ) {
-    if !jam_loop.is_changed() || !music_started.0 {
+    if !should_restart_jam_music(jam_loop.0, music_started.0, !existing.is_empty()) {
         return;
     }
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
-    for e in &existing {
-        commands.entity(e).despawn();
-    }
     commands.spawn((
         AudioPlayer::<AudioSource>(manifest.music.clone()),
-        jam_playback_settings(jam_loop.0, clock.get()).with_volume(Volume::Linear(audio.music_volume)),
+        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.music_volume)),
         MusicPlayer,
         GameplayRoot,
     ));
@@ -499,37 +508,27 @@ pub fn update_hole_map(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::audio::PlaybackMode;
 
-    // ── jam_playback_settings ────────────────────────────────────────────────
+    // ── should_restart_jam_music ─────────────────────────────────────────────
 
     #[test]
-    fn loop_enabled_selects_loop_mode() {
-        let settings = jam_playback_settings(true, 0.0);
-        assert!(matches!(settings.mode, PlaybackMode::Loop));
+    fn restarts_once_finished_when_loop_is_on() {
+        assert!(should_restart_jam_music(true, true, false));
     }
 
     #[test]
-    fn loop_disabled_selects_once_mode() {
-        let settings = jam_playback_settings(false, 0.0);
-        assert!(matches!(settings.mode, PlaybackMode::Once));
+    fn does_not_restart_while_still_playing() {
+        assert!(!should_restart_jam_music(true, true, true));
     }
 
     #[test]
-    fn resumes_from_the_given_position_not_the_top() {
-        let settings = jam_playback_settings(true, 42.5);
-        assert_eq!(
-            settings.start_position,
-            Some(std::time::Duration::from_secs_f64(42.5))
-        );
+    fn does_not_restart_when_loop_is_off() {
+        assert!(!should_restart_jam_music(false, true, false));
     }
 
     #[test]
-    fn a_negative_clock_clamps_to_the_start() {
-        // The clock is negative during the pre-roll countdown; toggling loop
-        // then shouldn't ask for a negative start position.
-        let settings = jam_playback_settings(true, -1.5);
-        assert_eq!(settings.start_position, Some(std::time::Duration::ZERO));
+    fn does_not_restart_before_the_jam_has_started() {
+        assert!(!should_restart_jam_music(true, false, false));
     }
 
     /// Standard Richter C diatonic, matching `harmonica.rs`'s test layout.
