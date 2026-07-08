@@ -15,6 +15,43 @@ use crate::menu::{AppState, ReturnToSongList};
 #[derive(Component, Default, Clone)]
 pub(super) struct PauseMenuRoot;
 
+/// Practice aid: when on, gameplay freezes the instant a playable note
+/// reaches the hit line without having been hit, instead of letting it run
+/// out and become a miss — resuming the moment it's hit (see
+/// `super::note_due_and_unresolved` and `super::tick_clock`). Off by
+/// default; a standing player preference (like `JamLoop`), so it isn't reset
+/// between restarts/songs.
+#[derive(Resource, Default)]
+pub struct WaitForNoteMode(pub bool);
+
+/// The "Wait for Note: on/off" readout, kept in step with [`WaitForNoteMode`].
+#[derive(Component, Default, Clone)]
+pub(super) struct WaitForNoteLabel;
+
+fn on_toggle_wait_mode(_: On<Pointer<Click>>, mut wait_mode: ResMut<WaitForNoteMode>) {
+    wait_mode.0 = !wait_mode.0;
+}
+
+/// Keeps the "Wait for Note: ..." readout in step with the toggle. Not
+/// gated on `Paused` — the button only lives on the (otherwise hidden)
+/// pause overlay, so it can only be clicked while already paused, same as
+/// `apply_music_volume` intentionally keeps running through a pause.
+pub(super) fn update_wait_mode_label(
+    wait_mode: Res<WaitForNoteMode>,
+    mut labels: Query<&mut Text, With<WaitForNoteLabel>>,
+) {
+    if !wait_mode.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(if wait_mode.0 {
+            "Wait for Note: on"
+        } else {
+            "Wait for Note: off"
+        });
+    }
+}
+
 /// Spawns the (initially hidden) pause overlay. Tagged `GameplayRoot` so it is
 /// torn down with the rest of the scene. The whole tree — including each
 /// button's click/hover behaviour — is authored declaratively with `bsn!`.
@@ -44,6 +81,22 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                 button::default("Resume", on_resume),
                 button::default("Restart", on_restart),
                 button::default("Quit Song", on_quit),
+                (
+                    Node {
+                        flex_direction: {FlexDirection::Row},
+                        align_items: {AlignItems::Center},
+                        column_gap: {Val::Px(8.0)},
+                    }
+                    Children [
+                        button::small("\u{23F8} Wait for Note", on_toggle_wait_mode),
+                        (
+                            Text({"Wait for Note: off"})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                            WaitForNoteLabel
+                        ),
+                    ]
+                ),
             ]
         })
         // bsn! can't express the `Visibility::Hidden` enum variant; set it here.
