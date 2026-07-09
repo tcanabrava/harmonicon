@@ -7,13 +7,9 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use super::{
-    GameplayClock, GameplayRoot, LoopConfig, MusicPlayer, Paused, ScoringConfig, loop_range_valid,
-    secs_per_bar, snap_to_bar_start,
-};
+use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused};
 use crate::dialogs::button;
-use crate::menu::{AppState, ReturnToSongList, SelectedSong};
-use crate::song::SongManifest;
+use crate::menu::{AppState, ReturnToSongList};
 
 /// Root of the pause overlay; toggled between hidden/visible.
 #[derive(Component, Default, Clone)]
@@ -60,54 +56,19 @@ pub(super) fn update_wait_mode_label(
 #[derive(Component, Default, Clone)]
 pub(super) struct LoopRangeLabel;
 
-/// Bar-snaps the current clock position (`snap_to_bar_start`) into
-/// `LoopConfig::start_time`/`end_time` and recomputes `active` from
-/// `loop_range_valid` — the same recompute after either point, so setting A
-/// and B in either order (or moving one past the other) lands on a
-/// consistent, valid-or-inactive state instead of a stale half-set range.
-fn on_set_loop_a(
-    _: On<Pointer<Click>>,
-    clock: Res<GameplayClock>,
-    config: Res<ScoringConfig>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    mut loop_cfg: ResMut<LoopConfig>,
-) {
-    let Some(manifest) = manifests.get(&selected.0) else {
-        return;
-    };
-    let spb = secs_per_bar(manifest.chart.song.tempo_bpm as f64, config.beats_per_bar);
-    loop_cfg.start_time = snap_to_bar_start(clock.get(), spb);
-    loop_cfg.active = loop_range_valid(loop_cfg.start_time, loop_cfg.end_time);
-}
-
-fn on_set_loop_b(
-    _: On<Pointer<Click>>,
-    clock: Res<GameplayClock>,
-    config: Res<ScoringConfig>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    mut loop_cfg: ResMut<LoopConfig>,
-) {
-    let Some(manifest) = manifests.get(&selected.0) else {
-        return;
-    };
-    let spb = secs_per_bar(manifest.chart.song.tempo_bpm as f64, config.beats_per_bar);
-    loop_cfg.end_time = snap_to_bar_start(clock.get(), spb);
-    loop_cfg.active = loop_range_valid(loop_cfg.start_time, loop_cfg.end_time);
-}
-
+/// The loop range itself is set by click-and-drag directly on the
+/// song-progress bar while paused (`song_progress_overlay`'s
+/// `ProgressBarMode::Edit` — see its module doc comment); this button only
+/// ever clears it.
 fn on_clear_loop(_: On<Pointer<Click>>, mut loop_cfg: ResMut<LoopConfig>) {
     *loop_cfg = LoopConfig::default();
 }
 
-/// Pure so the three possible readouts (off / one point pending / a valid
-/// range) are unit-testable without spinning up an `App`.
+/// Pure so both possible readouts (off / a valid range) are unit-testable
+/// without spinning up an `App`.
 fn loop_label_text(cfg: &LoopConfig) -> String {
     if cfg.active {
         format!("Loop: {:.0}s\u{2013}{:.0}s", cfg.start_time, cfg.end_time)
-    } else if cfg.start_time > 0.0 || cfg.end_time > 0.0 {
-        "Loop: pending (set the other point)".to_string()
     } else {
         "Loop: off".to_string()
     }
@@ -179,8 +140,6 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                         column_gap: {Val::Px(8.0)},
                     }
                     Children [
-                        button::small("Set A", on_set_loop_a),
-                        button::small("Set B", on_set_loop_b),
                         button::small("Clear Loop", on_clear_loop),
                         (
                             Text({"Loop: off"})
@@ -189,6 +148,11 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                             LoopRangeLabel
                         ),
                     ]
+                ),
+                (
+                    Text({"Drag on the progress bar above to set a loop range"})
+                    TextFont { font_size: {FontSize::Px(13.0)} }
+                    TextColor({Color::srgb(0.55, 0.55, 0.62)})
                 ),
             ]
         })
@@ -361,13 +325,17 @@ mod tests {
     }
 
     #[test]
-    fn loop_label_shows_pending_once_only_one_point_is_set() {
+    fn loop_label_is_off_for_an_inactive_nonzero_range() {
+        // e.g. a degenerate (zero-width) drag on the progress bar: it left
+        // start/end nonzero but `apply_requested_loop_range` never activated
+        // it, so the readout should still just say "off", not something
+        // stale from a pre-drag config.
         let cfg = LoopConfig {
             active: false,
             start_time: 8.0,
-            end_time: 0.0,
+            end_time: 8.0,
         };
-        assert_eq!(loop_label_text(&cfg), "Loop: pending (set the other point)");
+        assert_eq!(loop_label_text(&cfg), "Loop: off");
     }
 
     #[test]

@@ -817,14 +817,35 @@ pub fn size_note_tails(
     }
 }
 
-/// Tints a note's head image and tail material when it is hit or missed.
-/// Mirrors the 3D path: a hit flashes gold, a miss dims to red so a whiff
-/// never looks like a clean hit. `ScheduledNote` isn't an ECS component
-/// anymore (score state lives in `SongNotes`, independent of any render
-/// entity), so this can no longer react only to `Changed<ScheduledNote>` —
-/// it re-syncs every currently-spawned note's tint each frame instead. That's
-/// cheap now: only a `LOOKAHEAD` window's worth of notes are ever spawned,
-/// not the whole song.
+/// Head/tail tint for a note visual: gold while hit, dim red while missed,
+/// otherwise its base blow/draw colour (head at full alpha, tail slightly
+/// under — matching the alphas `spawn_note_visual` gives a freshly-spawned
+/// note). Pulled out of `update_note_visuals` so the "what colour should this
+/// note be" decision is unit-testable without spinning up rendering — this is
+/// exactly the case that used to be missing: a loop wrap that clears
+/// `hit`/`missed` on a note whose visual is still on screen (it despawns only
+/// once it scrolls well past the bottom) used to leave it tinted from before,
+/// since the old code just skipped the "neither" case instead of resetting it.
+fn note_tint(hit: bool, missed: bool, is_blow: bool) -> (Color, Color) {
+    if hit {
+        let tint = Color::srgba(1.0, 0.85, 0.25, 1.0);
+        (tint, tint)
+    } else if missed {
+        let tint = Color::srgba(0.5, 0.13, 0.13, 1.0);
+        (tint, tint)
+    } else {
+        let (r, g, b) = note_rgb(is_blow);
+        (Color::srgba(r, g, b, 1.0), Color::srgba(r, g, b, 0.95))
+    }
+}
+
+/// Tints a note's head image and tail material when it is hit or missed, and
+/// restores its base blow/draw colour otherwise (see [`note_tint`]).
+/// `ScheduledNote` isn't an ECS component anymore (score state lives in
+/// `SongNotes`, independent of any render entity), so this can no longer
+/// react only to `Changed<ScheduledNote>` — it re-syncs every
+/// currently-spawned note's tint each frame instead. That's cheap now: only
+/// a `LOOKAHEAD` window's worth of notes are ever spawned, not the whole song.
 pub fn update_note_visuals(
     song_notes: Res<SongNotes>,
     notes: Query<(&NoteVisual, &Children)>,
@@ -836,21 +857,15 @@ pub fn update_note_visuals(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let tint = if note.hit {
-            Color::srgba(1.0, 0.85, 0.25, 1.0)
-        } else if note.missed {
-            Color::srgba(0.5, 0.13, 0.13, 1.0)
-        } else {
-            continue;
-        };
+        let (head_tint, tail_tint) = note_tint(note.hit, note.missed, note.is_blow);
         for child in children {
             if let Ok(mut head) = heads.get_mut(*child) {
-                head.color = tint;
+                head.color = head_tint;
             }
             if let Ok(tail) = tails.get(*child)
                 && let Some(mut material) = shape_materials.get_mut(&tail.0)
             {
-                material.color = tint.to_linear();
+                material.color = tail_tint.to_linear();
             }
         }
     }
@@ -976,6 +991,46 @@ mod tests {
         // Well after its time, the head has dropped below the hit line.
         let got = note_head_bottom_pct(0.0, 3.0, LOOKAHEAD);
         assert!(got < 0.0, "got {got}");
+    }
+
+    // ── note_tint ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn note_tint_is_gold_when_hit() {
+        let (head, tail) = note_tint(true, false, true);
+        assert_eq!(head, Color::srgba(1.0, 0.85, 0.25, 1.0));
+        assert_eq!(tail, head);
+    }
+
+    #[test]
+    fn note_tint_is_dark_red_when_missed() {
+        let (head, tail) = note_tint(false, true, true);
+        assert_eq!(head, Color::srgba(0.5, 0.13, 0.13, 1.0));
+        assert_eq!(tail, head);
+    }
+
+    #[test]
+    fn note_tint_hit_wins_over_missed() {
+        // Shouldn't happen in practice (score_notes never sets both), but
+        // the tint decision itself should still be unambiguous.
+        let (head, _) = note_tint(true, true, true);
+        assert_eq!(head, Color::srgba(1.0, 0.85, 0.25, 1.0));
+    }
+
+    #[test]
+    fn note_tint_restores_the_base_blow_draw_colour_once_neither() {
+        // The bug this guards against: a loop wrap clears hit/missed on a
+        // note whose visual is still on screen, and it must go back to its
+        // normal blow/draw colour instead of keeping a stale tint forever.
+        let (blow_head, blow_tail) = note_tint(false, false, true);
+        let (r, g, b) = note_rgb(true);
+        assert_eq!(blow_head, Color::srgba(r, g, b, 1.0));
+        assert_eq!(blow_tail, Color::srgba(r, g, b, 0.95));
+
+        let (draw_head, draw_tail) = note_tint(false, false, false);
+        let (r, g, b) = note_rgb(false);
+        assert_eq!(draw_head, Color::srgba(r, g, b, 1.0));
+        assert_eq!(draw_tail, Color::srgba(r, g, b, 0.95));
     }
 
     // ── play_mode_label ───────────────────────────────────────────────────────

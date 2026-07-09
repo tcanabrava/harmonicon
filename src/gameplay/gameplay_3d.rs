@@ -349,6 +349,20 @@ pub fn spawn_visible_notes_3d(
     }
 }
 
+/// A note's base (un-hit, un-missed) blow/draw appearance: `(r, g, b,
+/// emissive_r, emissive_g, emissive_b)`. Shared by `spawn_note_visual_3d`
+/// (initial spawn) and `update_note_visuals_3d` (restoring it once a hit/miss
+/// tint is cleared — e.g. a loop wrap resetting `ScheduledNote::hit`/`missed`
+/// on a note whose visual entity is still alive), so the two can never drift
+/// out of sync with each other.
+fn note_base_appearance(is_blow: bool) -> (f32, f32, f32, f32, f32, f32) {
+    if is_blow {
+        (0.25, 0.55, 0.95, 0.1, 0.3, 1.2)
+    } else {
+        (0.95, 0.38, 0.15, 1.2, 0.2, 0.05)
+    }
+}
+
 /// Spawns one note as a 3D comet: an elongated cube head (from the theme's
 /// glTF) tinted by blow/draw colour, trailing a flat ribbon that runs the
 /// technique's animation via [`NoteTail3dMaterial`] — the 3D twin of the 2D
@@ -365,12 +379,7 @@ fn spawn_note_visual_3d(
 ) {
     let head_mesh = assets.head_mesh.as_ref().expect("checked by caller");
     let cfg = assets.cfg.as_ref().expect("checked by caller");
-    let is_blow = note.is_blow;
-    let (r, g, b, emit_r, emit_g, emit_b) = if is_blow {
-        (0.25f32, 0.55, 0.95, 0.1, 0.3, 1.2)
-    } else {
-        (0.95f32, 0.38, 0.15, 1.2, 0.2, 0.05)
-    };
+    let (r, g, b, emit_r, emit_g, emit_b) = note_base_appearance(note.is_blow);
 
     let hole_cfg = assets.holes.get(note.hole.saturating_sub(1) as usize);
     let note_x = hole_cfg
@@ -888,12 +897,45 @@ pub fn update_notes_3d(
     }
 }
 
+/// Head/emissive/tail appearance for a 3D note visual: gold while hit, dim
+/// red while missed, otherwise its base blow/draw appearance
+/// ([`note_base_appearance`]). Pulled out of `update_note_visuals_3d` so the
+/// "what should this note look like" decision is unit-testable without
+/// spinning up rendering — mirrors [`gameplay_2d::note_tint`]'s reasoning:
+/// this is exactly the case that used to be missing (a loop wrap clearing
+/// `hit`/`missed` on a note whose visual is still on screen left it tinted
+/// from before, since the old code just skipped the "neither" case instead
+/// of resetting it).
+fn note_tint_3d(hit: bool, missed: bool, is_blow: bool) -> (Color, LinearRgba, LinearRgba) {
+    if hit {
+        (
+            Color::srgb(1.0, 0.9, 0.3),
+            LinearRgba::new(2.5, 2.0, 0.3, 1.0),
+            Color::srgba(1.0, 0.85, 0.25, 0.95).to_linear(),
+        )
+    } else if missed {
+        (
+            Color::srgb(0.4, 0.12, 0.12),
+            LinearRgba::new(0.2, 0.05, 0.05, 1.0),
+            Color::srgba(0.5, 0.13, 0.13, 0.6).to_linear(),
+        )
+    } else {
+        let (r, g, b, emit_r, emit_g, emit_b) = note_base_appearance(is_blow);
+        (
+            Color::srgb(r, g, b),
+            LinearRgba::new(emit_r, emit_g, emit_b, 1.0),
+            Color::srgba(r, g, b, 0.9).to_linear(),
+        )
+    }
+}
+
 /// Tints a 3D note's cube head and tail ribbon when it is hit or missed —
-/// gold on a hit, dim red on a miss — mirroring the 2D path. `ScheduledNote`
-/// isn't an ECS component (score state lives in `SongNotes`), so this
-/// re-syncs every currently-spawned note's tint each frame instead of
-/// reacting to `Changed<ScheduledNote>` — cheap now that only a `LOOKAHEAD`
-/// window's worth of notes are ever spawned.
+/// gold on a hit, dim red on a miss — mirroring the 2D path, and restores
+/// the base blow/draw appearance otherwise (see [`note_tint_3d`]).
+/// `ScheduledNote` isn't an ECS component (score state lives in
+/// `SongNotes`), so this re-syncs every currently-spawned note's tint each
+/// frame instead of reacting to `Changed<ScheduledNote>` — cheap now that
+/// only a `LOOKAHEAD` window's worth of notes are ever spawned.
 pub fn update_note_visuals_3d(
     song_notes: Res<super::SongNotes>,
     notes: Query<(&NoteVisual3D, &Children)>,
@@ -906,24 +948,7 @@ pub fn update_note_visuals_3d(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let tint = if note.hit {
-            Some((
-                Color::srgb(1.0, 0.9, 0.3),
-                LinearRgba::new(2.5, 2.0, 0.3, 1.0),
-                Color::srgba(1.0, 0.85, 0.25, 0.95).to_linear(),
-            ))
-        } else if note.missed {
-            Some((
-                Color::srgb(0.4, 0.12, 0.12),
-                LinearRgba::new(0.2, 0.05, 0.05, 1.0),
-                Color::srgba(0.5, 0.13, 0.13, 0.6).to_linear(),
-            ))
-        } else {
-            None
-        };
-        let Some((base, emissive, tail_color)) = tint else {
-            continue;
-        };
+        let (base, emissive, tail_color) = note_tint_3d(note.hit, note.missed, note.is_blow);
         for child in children {
             if let Ok(h) = heads.get(*child)
                 && let Some(mut m) = std_materials.get_mut(&h.0)
@@ -1071,6 +1096,32 @@ mod tests {
     fn note_depth_is_clamped() {
         assert_eq!(note_depth(0.0), 0.4); // tiny notes keep a visible minimum
         assert_eq!(note_depth(100.0), 12.0); // long notes are capped
+    }
+
+    // ── note_tint_3d ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn note_tint_3d_is_gold_when_hit() {
+        let (base, _, _) = note_tint_3d(true, false, true);
+        assert_eq!(base, Color::srgb(1.0, 0.9, 0.3));
+    }
+
+    #[test]
+    fn note_tint_3d_is_dark_red_when_missed() {
+        let (base, _, _) = note_tint_3d(false, true, true);
+        assert_eq!(base, Color::srgb(0.4, 0.12, 0.12));
+    }
+
+    #[test]
+    fn note_tint_3d_restores_the_base_blow_draw_appearance_once_neither() {
+        // The bug this guards against: a loop wrap clears hit/missed on a
+        // note whose visual is still on screen, and it must go back to its
+        // normal blow/draw appearance instead of keeping a stale tint forever.
+        let (base, emissive, tail_color) = note_tint_3d(false, false, true);
+        let (r, g, b, emit_r, emit_g, emit_b) = note_base_appearance(true);
+        assert_eq!(base, Color::srgb(r, g, b));
+        assert_eq!(emissive, LinearRgba::new(emit_r, emit_g, emit_b, 1.0));
+        assert_eq!(tail_color, Color::srgba(r, g, b, 0.9).to_linear());
     }
 
     #[test]

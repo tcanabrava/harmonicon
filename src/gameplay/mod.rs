@@ -646,22 +646,11 @@ pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
     (clock.max(0.0) / secs_per_bar) as usize % 12
 }
 
-/// Rounds `time` down to the start of its current bar. Used to snap the A/B
-/// loop points set from the pause menu to bar boundaries, since notes and
-/// the metronome align to bars, not arbitrary seconds a mouse click landed
-/// on.
-pub fn snap_to_bar_start(time: f64, secs_per_bar: f64) -> f64 {
-    if secs_per_bar <= 0.0 {
-        return time.max(0.0);
-    }
-    (time.max(0.0) / secs_per_bar).floor() * secs_per_bar
-}
-
 /// A loop range only makes sense once `end_time` is strictly after
 /// `start_time` — the single rule `LoopConfig::active` is recomputed from
-/// whenever either point is set from the pause menu (in either order, or
-/// moving a point that invalidates an already-active range), so the result
-/// is consistent regardless of click order.
+/// whenever a new range is requested (see `song_progress_overlay::
+/// RequestLoopRange`), so a degenerate zero-width drag on the progress bar
+/// cleanly ends up inactive instead of a stale or nonsensical range.
 pub fn loop_range_valid(start_time: f64, end_time: f64) -> bool {
     end_time > start_time
 }
@@ -1664,23 +1653,7 @@ mod tests {
         ));
     }
 
-    // ── snap_to_bar_start / loop_range_valid (A/B loop points) ──────────────
-
-    #[test]
-    fn snap_to_bar_start_rounds_down_to_the_current_bar() {
-        assert_eq!(snap_to_bar_start(5.0, 2.0), 4.0);
-        assert_eq!(snap_to_bar_start(4.0, 2.0), 4.0); // already on a boundary
-    }
-
-    #[test]
-    fn snap_to_bar_start_clamps_negative_time_to_zero() {
-        assert_eq!(snap_to_bar_start(-3.0, 2.0), 0.0);
-    }
-
-    #[test]
-    fn snap_to_bar_start_falls_back_for_nonpositive_bar_length() {
-        assert_eq!(snap_to_bar_start(5.0, 0.0), 5.0);
-    }
+    // ── loop_range_valid (progress-bar drag loop range) ──────────────────────
 
     #[test]
     fn loop_range_valid_requires_end_strictly_after_start() {
