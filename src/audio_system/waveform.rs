@@ -47,13 +47,9 @@ pub fn bucket_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
 
 /// Decodes an in-memory audio file (the song's `music.ogg`) into a
 /// `buckets`-wide peak-amplitude waveform, plus the file's real duration in
-/// seconds. The duration matters as much as the waveform itself: it's the
-/// timescale the waveform bars are laid out on, and callers must position
-/// anything drawn over them (a playhead, a loop-range marker) using this same
-/// duration — not some other notion of "song length" — or the marker drifts
-/// out of sync with the waveform it's supposed to be pointing at. Returns an
-/// all-zero, zero-duration waveform on a decode failure rather than erroring
-/// — the progress bar still works, just without a waveform drawn.
+/// seconds — the timescale the waveform is laid out on; anything positioned
+/// over it should use this same duration. Returns an all-zero, zero-duration
+/// waveform on a decode failure rather than erroring.
 pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
     let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes.to_vec())) else {
         return (vec![0.0; buckets], 0.0);

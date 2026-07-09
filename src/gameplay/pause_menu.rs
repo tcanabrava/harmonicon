@@ -326,10 +326,8 @@ mod tests {
 
     #[test]
     fn loop_label_is_off_for_an_inactive_nonzero_range() {
-        // e.g. a degenerate (zero-width) drag on the progress bar: it left
-        // start/end nonzero but `apply_requested_loop_range` never activated
-        // it, so the readout should still just say "off", not something
-        // stale from a pre-drag config.
+        // A zero-width range (e.g. a degenerate drag) leaves start/end
+        // nonzero but inactive — the readout should still read "off".
         let cfg = LoopConfig {
             active: false,
             start_time: 8.0,

@@ -8,10 +8,9 @@
 //! enforces) the invariant that matters here — **whoever jumps the clock to
 //! a new value must also keep the music sink in sync, or suspend anchoring**,
 //! otherwise [`tick_clock`](super::tick_clock)'s anchoring sees a stale sink
-//! position and drags the clock right back toward it. That bug already
-//! happened once with `handle_loop_boundary` (see `TODO.md`); this module
-//! exists so the next rewind (A–B looping, practice speed changes) can't
-//! reintroduce it by accident.
+//! position and drags the clock right back toward it. This module exists so
+//! any rewind (A–B looping, practice speed changes) can't violate that
+//! invariant by accident.
 
 use bevy::prelude::*;
 

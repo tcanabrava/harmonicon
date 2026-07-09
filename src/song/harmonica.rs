@@ -90,7 +90,7 @@ pub fn blues_scale_classes(key: &str) -> HashSet<String> {
 impl Harmonica {
     /// How many holes this harmonica has — the loaded chart's authority for
     /// lane counts, hole-strip ranges, etc. (a 10-hole diatonic vs. e.g. a
-    /// 12-hole chromatic), instead of the old hardcoded `HOLE_COUNT = 10`.
+    /// 12-hole chromatic), rather than a fixed constant.
     pub fn hole_count(&self) -> u8 {
         match self {
             Harmonica::Diatonic { holes, .. } | Harmonica::Chromatic { holes, .. } => *holes,
@@ -419,8 +419,6 @@ mod tests {
         }"#).unwrap()
     }
 
-    // Before this fix, `wind_direction_label` only matched `Harmonica::Diatonic`
-    // and silently returned "—" for every chromatic hole regardless of layout.
     #[test]
     fn wind_direction_label_works_for_chromatic_too() {
         let chart = test_chromatic_chart();
@@ -490,8 +488,8 @@ mod tests {
 
     #[test]
     fn frequency_range_of_a_low_g_harp_dips_below_the_old_fixed_floor() {
-        // Hole 1 blow on a key-of-G diatonic is G3 ≈ 196 Hz — below the old
-        // fixed 200 Hz detector floor this range replaces.
+        // Hole 1 blow on a key-of-G diatonic is G3 ≈ 196 Hz — below the
+        // default 200 Hz detector floor.
         let harp = Harmonica::Diatonic {
             holes: 10,
             bending_profile: BendingProfile::RichterStandard,

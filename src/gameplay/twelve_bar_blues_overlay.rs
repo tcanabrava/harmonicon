@@ -29,9 +29,9 @@ impl GridConfig {
         Self {
             // Fixed px (not Vw/Vh) so `UiScale` affects these cells the same
             // way it affects everything else — viewport units resolve
-            // straight from the physical window size and don't multiply by
-            // the scale factor at all, so the grid used to stay a fixed size
-            // on screen while its own text scaled independently.
+            // straight from the physical window size and ignore the scale
+            // factor, which would leave the grid a fixed size on screen
+            // while its own text scaled independently.
             cell_width: Val::Px(120.0),
             cell_height: Val::Px(54.0),
             chord_font_size: 17.0,

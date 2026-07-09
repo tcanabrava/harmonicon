@@ -50,10 +50,9 @@ pub struct GameplayCamera3D;
 #[require(Transform, Visibility)]
 pub(super) struct NoteVisual3D {
     /// Index into `SongNotes::notes` — see the doc comment on the 2D
-    /// `NoteVisual`, which this mirrors. `head_depth`/`tail_len` (used to be
-    /// cached here) are cheap to recompute on demand from
-    /// `NoteRenderAssets3D` + the note's own `hole`/`duration`, so there's
-    /// nothing else this needs to carry.
+    /// `NoteVisual`, which this mirrors. `head_depth`/`tail_len` are cheap to
+    /// recompute on demand from `NoteRenderAssets3D` + the note's own
+    /// `hole`/`duration`, so there's nothing else this needs to carry.
     note_id: usize,
 }
 
@@ -316,11 +315,10 @@ fn build_song_notes_3d(
     )
 }
 
-/// Spawns 3D note visuals for any note newly within the `LOOKAHEAD` window —
-/// the windowed counterpart of the old spawn-everything-up-front
-/// `create_note_visuals`. Self-healing across a loop wrap, same as the 2D
-/// version: no persistent spawn cursor, just "is this note's window open,
-/// and does it already have a visual" recomputed each frame.
+/// Spawns 3D note visuals for any note newly within the `LOOKAHEAD` window.
+/// Self-healing across a loop wrap, same as the 2D version: no persistent
+/// spawn cursor, just "is this note's window open, and does it already have
+/// a visual" recomputed each frame.
 pub fn spawn_visible_notes_3d(
     mut commands: Commands,
     clock: Res<super::GameplayClock>,
@@ -350,11 +348,8 @@ pub fn spawn_visible_notes_3d(
 }
 
 /// A note's base (un-hit, un-missed) blow/draw appearance: `(r, g, b,
-/// emissive_r, emissive_g, emissive_b)`. Shared by `spawn_note_visual_3d`
-/// (initial spawn) and `update_note_visuals_3d` (restoring it once a hit/miss
-/// tint is cleared — e.g. a loop wrap resetting `ScheduledNote::hit`/`missed`
-/// on a note whose visual entity is still alive), so the two can never drift
-/// out of sync with each other.
+/// emissive_r, emissive_g, emissive_b)`. Shared by `spawn_note_visual_3d` and
+/// `update_note_visuals_3d` so the two can't drift out of sync.
 fn note_base_appearance(is_blow: bool) -> (f32, f32, f32, f32, f32, f32) {
     if is_blow {
         (0.25, 0.55, 0.95, 0.1, 0.3, 1.2)
@@ -900,12 +895,8 @@ pub fn update_notes_3d(
 /// Head/emissive/tail appearance for a 3D note visual: gold while hit, dim
 /// red while missed, otherwise its base blow/draw appearance
 /// ([`note_base_appearance`]). Pulled out of `update_note_visuals_3d` so the
-/// "what should this note look like" decision is unit-testable without
-/// spinning up rendering — mirrors [`gameplay_2d::note_tint`]'s reasoning:
-/// this is exactly the case that used to be missing (a loop wrap clearing
-/// `hit`/`missed` on a note whose visual is still on screen left it tinted
-/// from before, since the old code just skipped the "neither" case instead
-/// of resetting it).
+/// tint decision is unit-testable without spinning up rendering — mirrors
+/// [`gameplay_2d::note_tint`].
 fn note_tint_3d(hit: bool, missed: bool, is_blow: bool) -> (Color, LinearRgba, LinearRgba) {
     if hit {
         (
@@ -934,8 +925,8 @@ fn note_tint_3d(hit: bool, missed: bool, is_blow: bool) -> (Color, LinearRgba, L
 /// the base blow/draw appearance otherwise (see [`note_tint_3d`]).
 /// `ScheduledNote` isn't an ECS component (score state lives in
 /// `SongNotes`), so this re-syncs every currently-spawned note's tint each
-/// frame instead of reacting to `Changed<ScheduledNote>` — cheap now that
-/// only a `LOOKAHEAD` window's worth of notes are ever spawned.
+/// frame rather than reacting to `Changed<ScheduledNote>` — cheap since only
+/// a `LOOKAHEAD` window's worth of notes are ever spawned.
 pub fn update_note_visuals_3d(
     song_notes: Res<super::SongNotes>,
     notes: Query<(&NoteVisual3D, &Children)>,
@@ -1114,9 +1105,6 @@ mod tests {
 
     #[test]
     fn note_tint_3d_restores_the_base_blow_draw_appearance_once_neither() {
-        // The bug this guards against: a loop wrap clears hit/missed on a
-        // note whose visual is still on screen, and it must go back to its
-        // normal blow/draw appearance instead of keeping a stale tint forever.
         let (base, emissive, tail_color) = note_tint_3d(false, false, true);
         let (r, g, b, emit_r, emit_g, emit_b) = note_base_appearance(true);
         assert_eq!(base, Color::srgb(r, g, b));

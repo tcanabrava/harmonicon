@@ -56,8 +56,7 @@ fn grid_height(hole_count: u8) -> f32 {
 // The editor's palette lives in the active theme (`crate::theme::LoadedTheme`,
 // `theme.song_editor_colors()`) rather than as consts here, so a theme's
 // `theme.json` can override it under `"colors": { "song_editor": { ... } }`.
-// See `crate::theme::SongEditorColors` for the fields and their defaults —
-// the same values this module used to hardcode.
+// See `crate::theme::SongEditorColors` for the fields and their defaults.
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
@@ -852,7 +851,7 @@ mod tests {
             Pitch::Overdraw
         );
         // No `oscillation_hz` in the JSON (e.g. a chart saved before it was
-        // per-note) falls back to the old fixed rates.
+        // per-note) falls back to the default rate.
         assert_eq!(
             parse_pitch_expr(&[serde_json::json!({ "type": "vibrato" })]).1,
             Expr::Vibrato(5.5)

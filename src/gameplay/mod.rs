@@ -931,22 +931,14 @@ fn tick_clock(
 
 /// Whether `tick_clock` should anchor the clock to the music sink's reported
 /// position this frame, rather than free-running on frame delta: past the
-/// countdown, once music has actually started, and never in Jam Session
-/// (no long track to drift against there — see `tick_clock`'s doc comment).
+/// countdown, once music has actually started, and never in Jam Session (no
+/// long track to drift against there — see `tick_clock`'s doc comment).
 ///
-/// Also `false` once the sink's queue is empty. A `Player`/`AudioSink`'s
-/// `position()` is updated by a per-source polling hook; once that source
-/// finishes playing and the queue has nothing else queued, nothing updates
-/// it anymore and it *freezes* at the value it last had — it does not keep
-/// advancing with real time. Anchoring to a frozen position looks fine at
-/// first, but once real elapsed time drifts more than `SNAP_THRESHOLD_SECS`
-/// past it, `advance_clock` starts snapping the clock straight back to that
-/// frozen value every time the gap reopens — a repeating half-second
-/// "rewind" right before the results screen, for any song whose audio ends
-/// before `SongEnd` (`last_note_end + SONG_END_TAIL`) does. Bundled example
-/// songs happen to ship audio padded well past their last chart note, so
-/// this never fires for them, but a tightly-trimmed audio file (chart notes
-/// ending right where the file does) hits it every time.
+/// Also `false` once the sink's queue is empty. A finished sink's
+/// `position()` freezes at its last value instead of continuing to advance,
+/// so anchoring to it would make `advance_clock` repeatedly snap the clock
+/// back to that frozen point once real time drifts past
+/// `SNAP_THRESHOLD_SECS` — better to free-run past that point instead.
 fn should_anchor_to_sink(
     clock: f64,
     music_started: bool,
@@ -957,16 +949,10 @@ fn should_anchor_to_sink(
 }
 
 /// Index range (into `notes`, sorted by `time`) that a loop wrap must reset
-/// `hit`/`missed`/`held`/`sustain_scored` for — not just notes strictly
-/// inside `start_time..end_time`, but out to `end_time + LOOKAHEAD` too.
-/// Once the clock rewinds to `start_time`, `notes_needing_spawn`'s window can
-/// preview a note up to `LOOKAHEAD` seconds ahead of wherever the clock is —
-/// and since the loop always rewinds the instant the clock reaches
-/// `end_time`, the furthest that preview ever reaches is `end_time +
-/// LOOKAHEAD`. A note in that gap left un-reset would render with whatever
-/// hit/missed tint an earlier, no-longer-relevant pass left it in, the
-/// moment it's first previewed — well before the loop can actually reach and
-/// re-judge it.
+/// `hit`/`missed`/`held`/`sustain_scored` for: `start_time..end_time`,
+/// extended by `LOOKAHEAD` past `end_time` since `notes_needing_spawn` can
+/// preview a note that far ahead of the clock before the loop ever actually
+/// reaches it.
 pub(super) fn loop_reset_range(
     notes: &[ScheduledNote],
     start_time: f64,
@@ -1672,9 +1658,7 @@ mod tests {
     fn does_not_anchor_once_the_sink_is_empty() {
         // A finished sink's reported position freezes rather than continuing
         // to advance — anchoring to it would repeatedly snap the clock back
-        // once real time drifts past it. See the doc comment on
-        // `should_anchor_to_sink` for the full story (this is the "song
-        // enters a loop right before the results screen" bug).
+        // once real time drifts past it.
         assert!(!should_anchor_to_sink(
             1.0,
             true,
@@ -1999,7 +1983,7 @@ mod tests {
     fn technique_confirmed_rejects_vibrato_at_the_wrong_rate() {
         // The chart declares a 5 Hz vibrato, but the player wobbled at ~1.5 Hz
         // — real oscillation, just not the declared rate. A flip-count-only
-        // check (the old behavior) couldn't tell these apart.
+        // check couldn't tell these apart.
         let vibrato = Modifier::Vibrato {
             oscillation_hz: 5.0,
             intensity: None,
@@ -2106,13 +2090,10 @@ mod tests {
     fn score_notes_credits_the_closest_offset_when_two_same_pitch_notes_overlap() {
         // Two C4 notes both sit inside the hit window at clock=0.5 while C4 is
         // sounding: one 0.01s away (should score), one 0.10s away (should
-        // stay `Waiting` — the pitch is fresh only once). Before the |offset|
-        // sort this depended on arbitrary Query iteration order; now that
-        // notes live in a plain `time`-sorted `Vec`, array order alone would
-        // also (coincidentally) put the closer note second — this still
+        // stay `Waiting` — the pitch is fresh only once). Array order alone
+        // would coincidentally put the closer note second too, so this
         // checks that classification actually goes by |offset|, not array
-        // position, since nothing else would catch a regression back to
-        // "whichever comes first in the Vec wins".
+        // position.
         let mut world = World::new();
         world.insert_resource(GameplayClock::new(0.5));
         world.insert_resource(Time::<()>::default());
@@ -2258,12 +2239,6 @@ mod tests {
 
     #[test]
     fn loop_reset_range_extends_past_end_time_by_lookahead() {
-        // A note just past `end_time` can still get spawned as a LOOKAHEAD
-        // preview before the loop ever actually reaches it (the loop always
-        // rewinds the instant the clock hits `end_time`) — it must be reset
-        // too, or it renders with a stale hit/miss tint the moment it's
-        // first previewed. This is the fix for notes showing the wrong
-        // color right after a loop wrap.
         let notes = [
             overlap_test_note(10.0),                    // == end_time
             overlap_test_note(10.0 + LOOKAHEAD),        // exactly at the reach

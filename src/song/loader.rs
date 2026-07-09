@@ -89,9 +89,8 @@ impl AssetLoader for SongChartLoader {
         let elements = load_context.load::<Image>(sibling(song_folder.join("elements.png")));
 
         // Pre-analyze the waveform here (asset load time, off the main
-        // thread) rather than at gameplay setup, so the progress bar has it
-        // ready the instant the song starts — no synchronous decode competing
-        // with note-track setup.
+        // thread) so the progress bar has it ready the instant the song
+        // starts.
         let (waveform, music_duration_secs) = match load_context.read_asset_bytes(music_path).await
         {
             Ok(bytes) => crate::audio_system::waveform::analyze_ogg_waveform(

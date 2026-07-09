@@ -427,8 +427,8 @@ mod tests {
 
     #[test]
     fn shows_fractional_multiplier_from_a_custom_step() {
-        // A chart with step_multiplier: 0.25 should show the real value, not
-        // the old hardcoded (1 + combo/10).min(4) formula's "2".
+        // A chart with step_multiplier: 0.25 should show the real,
+        // fractional multiplier value.
         let s = combo_label(10, 1.25);
         assert!(s.contains("\u{00D7}1.25"), "label: {s}");
     }

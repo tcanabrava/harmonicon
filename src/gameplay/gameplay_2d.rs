@@ -35,8 +35,8 @@ pub(super) struct NoteRenderAssets {
     head_image: Option<AssetPath<'static>>,
     tail_cfg: Option<NoteThemeConfig>,
     /// Chord/split play-mode badge text, parallel to `SongNotes::notes`
-    /// (same index = same note) — the one piece of the old per-note spawn
-    /// data that doesn't already live on `ScheduledNote` itself.
+    /// (same index = same note) — the one piece of per-note render data that
+    /// doesn't already live on `ScheduledNote` itself.
     play_mode_tags: Vec<Option<&'static str>>,
 }
 
@@ -483,13 +483,12 @@ fn spawn_highway(hw: &mut ChildSpawnerCommands, chart: &crate::song::chart::Harp
 }
 
 /// Spawns note visuals for any note that has newly entered the `LOOKAHEAD`
-/// window and doesn't have one yet — the windowed counterpart of the old
-/// spawn-the-whole-track-up-front `spawn_highway`. Runs every frame; cost is
-/// bounded by how many notes are near the playhead, not the song length.
-/// Self-healing across a loop wrap (no cursor to keep in sync): it just
-/// compares "notes whose window could plausibly be open" against "notes
-/// that currently have a visual", so notes reappear correctly once the
-/// (rewound) clock nears them again.
+/// window and doesn't have one yet. Runs every frame; cost is bounded by how
+/// many notes are near the playhead, not the song length. Self-healing
+/// across a loop wrap (no cursor to keep in sync): it just compares "notes
+/// whose window could plausibly be open" against "notes that currently have
+/// a visual", so notes reappear correctly once the (rewound) clock nears
+/// them again.
 pub fn spawn_visible_notes(
     mut commands: Commands,
     clock: Res<super::GameplayClock>,
@@ -819,13 +818,9 @@ pub fn size_note_tails(
 
 /// Head/tail tint for a note visual: gold while hit, dim red while missed,
 /// otherwise its base blow/draw colour (head at full alpha, tail slightly
-/// under — matching the alphas `spawn_note_visual` gives a freshly-spawned
-/// note). Pulled out of `update_note_visuals` so the "what colour should this
-/// note be" decision is unit-testable without spinning up rendering — this is
-/// exactly the case that used to be missing: a loop wrap that clears
-/// `hit`/`missed` on a note whose visual is still on screen (it despawns only
-/// once it scrolls well past the bottom) used to leave it tinted from before,
-/// since the old code just skipped the "neither" case instead of resetting it.
+/// under, matching the alphas `spawn_note_visual` gives a freshly-spawned
+/// note). Pulled out of `update_note_visuals` so the tint decision is
+/// unit-testable without spinning up rendering.
 fn note_tint(hit: bool, missed: bool, is_blow: bool) -> (Color, Color) {
     if hit {
         let tint = Color::srgba(1.0, 0.85, 0.25, 1.0);
@@ -841,11 +836,10 @@ fn note_tint(hit: bool, missed: bool, is_blow: bool) -> (Color, Color) {
 
 /// Tints a note's head image and tail material when it is hit or missed, and
 /// restores its base blow/draw colour otherwise (see [`note_tint`]).
-/// `ScheduledNote` isn't an ECS component anymore (score state lives in
-/// `SongNotes`, independent of any render entity), so this can no longer
-/// react only to `Changed<ScheduledNote>` — it re-syncs every
-/// currently-spawned note's tint each frame instead. That's cheap now: only
-/// a `LOOKAHEAD` window's worth of notes are ever spawned, not the whole song.
+/// `ScheduledNote` isn't an ECS component (score state lives in
+/// `SongNotes`), so this re-syncs every currently-spawned note's tint each
+/// frame rather than reacting to `Changed<ScheduledNote>` — cheap since only
+/// a `LOOKAHEAD` window's worth of notes are ever spawned.
 pub fn update_note_visuals(
     song_notes: Res<SongNotes>,
     notes: Query<(&NoteVisual, &Children)>,
@@ -1019,9 +1013,6 @@ mod tests {
 
     #[test]
     fn note_tint_restores_the_base_blow_draw_colour_once_neither() {
-        // The bug this guards against: a loop wrap clears hit/missed on a
-        // note whose visual is still on screen, and it must go back to its
-        // normal blow/draw colour instead of keeping a stale tint forever.
         let (blow_head, blow_tail) = note_tint(false, false, true);
         let (r, g, b) = note_rgb(true);
         assert_eq!(blow_head, Color::srgba(r, g, b, 1.0));

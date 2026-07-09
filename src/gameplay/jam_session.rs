@@ -239,21 +239,9 @@ fn should_restart_jam_music(loop_on: bool, music_started: bool, music_player_ali
 /// Loop itself does nothing here beyond flipping the resource
 /// (`update_jam_loop_label` is the only other reader); this system never
 /// touches a live sink, only ever spawning a *new* entity after the old one
-/// is already gone.
-///
-/// Three earlier designs instead reacted to the toggle directly, despawning
-/// the live `MusicPlayer` entity and immediately respawning it mid-track:
-/// resuming from the gameplay clock, resuming from the old sink's own
-/// `AudioSink::position()`, and finally an explicit restart from
-/// `Duration::ZERO` via `.with_start_position()`. All three went silent, for
-/// two distinct reasons (both documented in TODO.md): resuming from an
-/// unbounded position exhausts the raw decoder before `bevy_audio` wraps it
-/// in `repeat_infinite` (the first two), and even `Some(Duration::ZERO)`
-/// takes a different, silently-broken `bevy_audio` code path than leaving
-/// `start_position` as `None` (the third). All of that only mattered because
-/// those designs mutated a sink that was still playing. Never doing that
-/// removes the failure mode entirely instead of finding yet another way
-/// around it.
+/// is already gone — seeking or restarting a still-playing sink is
+/// unreliable in `bevy_audio` (see `TODO.md`), so this sidesteps that
+/// entirely rather than working around it.
 pub fn restart_finished_jam_music(
     jam_loop: Res<JamLoop>,
     music_started: Res<MusicStarted>,

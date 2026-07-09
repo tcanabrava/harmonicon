@@ -357,8 +357,8 @@ pub(super) fn spawn_button<M: 'static>(
             ));
         });
 
-        // Themed hover/press visuals via observers (replaces the old
-        // Changed<Interaction> system in button_material).
+        // Themed hover/press visuals via observers, not a
+        // `Changed<Interaction>` system.
         commands.entity(e).observe(
             move |_: On<Pointer<Over>>,
                   mats: Res<ButtonMaterials>,

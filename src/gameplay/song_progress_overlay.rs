@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 
 //! A song-progress bar pinned to the top of the screen, shared by the 2D and
-//! 3D gameplay views. Rather than a flat growing fill, it shows the song's
-//! whole waveform — pre-analyzed at asset-load time, see
-//! `audio_system::waveform` and `SongManifest::waveform` — so a player
-//! picking a loop range can see where in the song they're aiming. A thin red
-//! playhead line (styled like the Song Editor's `PlayheadLine`) sweeps across
-//! it to mark the current position. A thin strip below the waveform marks
-//! every chart note's onset as a tiny white rectangle, on the same timescale.
+//! 3D gameplay views. It shows the song's whole waveform — pre-analyzed at
+//! asset-load time, see `audio_system::waveform` and
+//! `SongManifest::waveform` — so a player picking a loop range can see where
+//! in the song they're aiming. A thin red playhead line (styled like the
+//! Song Editor's `PlayheadLine`) sweeps across it to mark the current
+//! position. A thin strip below the waveform marks every chart note's onset
+//! as a tiny white rectangle, on the same timescale.
 //!
 //! The bar has two [`ProgressBarMode`]s. While playing it's pure
 //! visualization. While paused it becomes editable: click-and-drag anywhere
 //! on it to sweep out a new A–B loop range, shown live as a yellow
-//! semi-transparent rectangle; releasing the mouse fires [`RequestLoopRange`]
-//! rather than writing `LoopConfig` directly, so the drag interaction and the
-//! actual loop-adoption policy stay decoupled.
+//! semi-transparent rectangle. Releasing the mouse fires [`RequestLoopRange`]
+//! rather than writing `LoopConfig` directly, keeping the drag interaction
+//! and the loop-adoption policy decoupled.
 
 use bevy::picking::events::{Drag, DragEnd, DragStart, Pointer};
 use bevy::picking::pointer::PointerButton;
@@ -45,8 +45,7 @@ const NOTE_MARKER_WIDTH: f32 = 2.0;
 const BAR_Z_INDEX: i32 = 250;
 
 /// The moving playhead; a thin vertical line, styled like the Song Editor's
-/// `PlayheadLine`. Its horizontal position (not width, unlike the old flat
-/// fill) is driven each frame.
+/// `PlayheadLine`. Its horizontal position is driven each frame.
 #[derive(Component, Default, Clone)]
 pub struct ProgressPlayhead;
 

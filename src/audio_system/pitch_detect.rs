@@ -1001,13 +1001,14 @@ mod tests {
 
     #[test]
     fn pitch_range_from_freqs_lets_a_low_g_harp_hole_1_blow_through() {
-        // Hole-1 blow on a key-of-G diatonic is G3 ≈ 196 Hz, below the default
-        // detector floor of 200 Hz — the bug this range replaces MIN_FREQ for.
+        // Hole-1 blow on a key-of-G diatonic is G3 ≈ 196 Hz, below the
+        // default detector floor of 200 Hz — this harp needs its own
+        // derived range, not the fixed default.
         let range = PitchRange::from_freqs([196.0, 1568.0], 1.0);
         assert!(range.min_freq < 196.0);
         assert!(
             196.0 < PitchRange::default().min_freq,
-            "sanity: below the old fixed floor"
+            "sanity: below the default fixed floor"
         );
     }
 
