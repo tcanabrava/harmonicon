@@ -19,7 +19,7 @@ use bevy::ui_widgets::{
 
 const TRACK_BG: Color = Color::srgb(0.14, 0.14, 0.22);
 
-use crate::assets_management::{AvailableHarmonicas, SelectedHarmonicaModel};
+use crate::assets_management::{AvailableHarmonicas, SelectedHarmonicaModel, ShowNoteNumbers};
 use crate::audio_system::audio_input::{self, MicStatus};
 use crate::settings::AudioSettings;
 
@@ -55,6 +55,7 @@ impl Plugin for OptionsPlugin {
                     propagate_preview_layers,
                     update_mic_banner,
                     sync_mic_combobox,
+                    update_note_numbers_label,
                 )
                     .run_if(in_state(MenuPage::Options)),
             );
@@ -110,6 +111,10 @@ struct LatencySliderFill;
 #[derive(Component)]
 struct LatencySliderLabel;
 
+/// The "Note labels: ..." readout beside the note-numbers toggle.
+#[derive(Component)]
+struct NoteNumbersLabel;
+
 /// Current level for a given slider kind.
 fn audio_level(settings: &AudioSettings, kind: VolumeSlider) -> f32 {
     match kind {
@@ -131,6 +136,7 @@ fn setup_options_menu(
     mut images: ResMut<Assets<Image>>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
+    show_numbers: Res<ShowNoteNumbers>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"), &theme, "Options");
     spawn_mic_banner(&mut commands, root, &mic_status);
@@ -193,6 +199,8 @@ fn setup_options_menu(
     );
     spawn_algo_explanation(&mut commands, root, 560.0, settings.pitch_algorithm);
 
+    spawn_note_numbers_toggle(&mut commands, root, show_numbers.0);
+
     spawn_button(
         &mut commands,
         root,
@@ -225,6 +233,62 @@ fn setup_options_menu(
         "Options",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
     );
+}
+
+/// Flips whether falling notes show their hole number instead of the
+/// blow/draw arrow (`gameplay_2d`/`gameplay_3d`'s note spawners read this).
+fn toggle_note_numbers(_: On<Pointer<Click>>, mut show: ResMut<ShowNoteNumbers>) {
+    show.0 = !show.0;
+}
+
+/// Pure so both readouts are unit-testable without spinning up an `App`.
+fn note_numbers_label_text(show: bool) -> &'static str {
+    if show {
+        "Note labels: numbers"
+    } else {
+        "Note labels: arrows"
+    }
+}
+
+/// A row with a pill button that flips [`ShowNoteNumbers`] plus a label
+/// reflecting the current choice — same shape as the pause menu's
+/// `WaitForNoteMode` toggle.
+fn spawn_note_numbers_toggle(commands: &mut Commands, parent: Entity, show_numbers: bool) {
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(8.0),
+            ..default()
+        })
+        .id();
+    commands.entity(row).with_children(|r| {
+        r.spawn_empty()
+            .apply_scene(button::small("Note labels", toggle_note_numbers));
+        r.spawn((
+            Text::new(note_numbers_label_text(show_numbers)),
+            TextFont {
+                font_size: FontSize::Px(16.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            NoteNumbersLabel,
+        ));
+    });
+    commands.entity(parent).add_child(row);
+}
+
+/// Keeps the toggle's label in step with [`ShowNoteNumbers`].
+fn update_note_numbers_label(
+    show: Res<ShowNoteNumbers>,
+    mut labels: Query<&mut Text, With<NoteNumbersLabel>>,
+) {
+    if !show.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(note_numbers_label_text(show.0));
+    }
 }
 
 /// A labelled row of harmonica-model choice buttons, each showing a rendered
@@ -834,5 +898,16 @@ fn update_sliders(
     }
     for (mut text, label) in &mut labels {
         text.0 = format!("{:.0}%", audio_level(&settings, label.0) * 100.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn note_numbers_label_reflects_the_current_choice() {
+        assert_eq!(note_numbers_label_text(false), "Note labels: arrows");
+        assert_eq!(note_numbers_label_text(true), "Note labels: numbers");
     }
 }

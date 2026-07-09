@@ -230,6 +230,7 @@ impl Plugin for GameplayPlugin {
             (
                 gameplay_3d::spawn_visible_notes_3d,
                 gameplay_3d::update_notes_3d,
+                gameplay_3d::update_note_hole_labels_3d,
                 gameplay_3d::update_note_visuals_3d,
                 gameplay_3d::animate_note_tails_3d,
                 gameplay_3d::update_holes_3d,

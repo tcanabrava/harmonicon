@@ -501,6 +501,7 @@ pub fn spawn_visible_notes(
     highway: Query<Entity, With<NoteHighway>>,
     existing: Query<&NoteVisual>,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
+    show_numbers: Res<crate::assets_management::ShowNoteNumbers>,
 ) {
     let (Some(manifest), Ok(highway_entity), Some(head_image), Some(tail_cfg)) = (
         manifests.get(&selected.0),
@@ -532,6 +533,7 @@ pub fn spawn_visible_notes(
                 tail_cfg,
                 render_assets.play_mode_tags.get(i).copied().flatten(),
                 &mut shape_materials,
+                show_numbers.0,
             );
         }
     });
@@ -551,8 +553,10 @@ fn spawn_note_visual(
     tail_cfg: &NoteThemeConfig,
     play_mode_tag: Option<&'static str>,
     shape_materials: &mut Assets<NoteTail2dMaterial>,
+    show_numbers: bool,
 ) {
     let is_blow = note.is_blow;
+    let hole = note.hole;
     let (r, g, b) = note_rgb(is_blow);
     let note_color = Color::srgba(r, g, b, 1.0);
     let left_pct = (note.hole as f32 - 1.0) * lane_pct;
@@ -607,8 +611,19 @@ fn spawn_note_visual(
             },
             |cmd| {
                 cmd.insert(NoteHead).with_children(|head| {
+                    let label = if show_numbers {
+                        // `+`/`-` for blow/draw, no bend/overblow/slide
+                        // suffix — that level of detail lives in the tab
+                        // ribbon (`phrase_overlay`); the note-head label is
+                        // just "which hole, which direction".
+                        super::phrase_overlay::tab_label(hole, is_blow, &[])
+                    } else if is_blow {
+                        "\u{2191}".to_string()
+                    } else {
+                        "\u{2193}".to_string()
+                    };
                     head.spawn((
-                        Text::new(if is_blow { "\u{2191}" } else { "\u{2193}" }),
+                        Text::new(label),
                         TextFont {
                             font_size: FontSize::Px(13.0),
                             ..default()

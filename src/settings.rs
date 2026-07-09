@@ -17,6 +17,7 @@ use std::path::PathBuf;
 
 use crate::assets_management::{
     SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d, SelectedTheme,
+    ShowNoteNumbers,
 };
 use crate::audio_system::pitch_detect::PitchAlgorithm;
 
@@ -66,6 +67,7 @@ struct Settings {
     ui_theme: String,
     pitch_algorithm: PitchAlgorithm,
     input_device: String,
+    show_note_numbers: bool,
 }
 
 impl Default for Settings {
@@ -80,6 +82,7 @@ impl Default for Settings {
             ui_theme: "default".into(),
             pitch_algorithm: PitchAlgorithm::default(),
             input_device: String::new(),
+            show_note_numbers: false,
         }
     }
 }
@@ -150,12 +153,14 @@ impl Plugin for SettingsPlugin {
                          theme_2d: Res<SelectedNoteTheme2d>,
                          theme_3d: Res<SelectedNoteTheme3d>,
                          model: Res<SelectedHarmonicaModel>,
-                         ui_theme: Res<SelectedTheme>| {
+                         ui_theme: Res<SelectedTheme>,
+                         note_numbers: Res<ShowNoteNumbers>| {
                             audio.is_changed()
                                 || theme_2d.is_changed()
                                 || theme_3d.is_changed()
                                 || model.is_changed()
                                 || ui_theme.is_changed()
+                                || note_numbers.is_changed()
                         },
                     ),
                     tick_pending_save,
@@ -177,6 +182,7 @@ pub fn apply_loaded_settings(
     mut theme_3d: ResMut<SelectedNoteTheme3d>,
     mut model: ResMut<SelectedHarmonicaModel>,
     mut ui_theme: ResMut<SelectedTheme>,
+    mut note_numbers: ResMut<ShowNoteNumbers>,
 ) {
     let settings = load_settings();
     audio.music_volume = settings.music_volume;
@@ -188,8 +194,9 @@ pub fn apply_loaded_settings(
     theme_3d.0 = settings.note_theme_3d;
     model.0 = settings.harmonica_model;
     ui_theme.0 = settings.ui_theme;
+    note_numbers.0 = settings.show_note_numbers;
     info!(
-        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={}",
+        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={} note_numbers={}",
         audio.music_volume,
         audio.metronome_volume,
         audio.input_latency_ms,
@@ -197,6 +204,7 @@ pub fn apply_loaded_settings(
         theme_3d.0,
         model.0,
         ui_theme.0,
+        note_numbers.0,
     );
 }
 
@@ -207,6 +215,7 @@ fn save_current(
     theme_3d: &SelectedNoteTheme3d,
     model: &SelectedHarmonicaModel,
     ui_theme: &SelectedTheme,
+    note_numbers: &ShowNoteNumbers,
 ) {
     save_settings(&Settings {
         music_volume: audio.music_volume,
@@ -218,6 +227,7 @@ fn save_current(
         note_theme_3d: theme_3d.0.clone(),
         harmonica_model: model.0.clone(),
         ui_theme: ui_theme.0.clone(),
+        show_note_numbers: note_numbers.0,
     });
 }
 
@@ -252,11 +262,19 @@ fn tick_pending_save(
     theme_3d: Res<SelectedNoteTheme3d>,
     model: Res<SelectedHarmonicaModel>,
     ui_theme: Res<SelectedTheme>,
+    note_numbers: Res<ShowNoteNumbers>,
 ) {
     let (should_save, remaining) = tick_debounce(pending.0, time.delta_secs());
     pending.0 = remaining;
     if should_save {
-        save_current(&audio, &theme_2d, &theme_3d, &model, &ui_theme);
+        save_current(
+            &audio,
+            &theme_2d,
+            &theme_3d,
+            &model,
+            &ui_theme,
+            &note_numbers,
+        );
     }
 }
 
@@ -270,12 +288,20 @@ fn flush_pending_save_on_exit(
     theme_3d: Res<SelectedNoteTheme3d>,
     model: Res<SelectedHarmonicaModel>,
     ui_theme: Res<SelectedTheme>,
+    note_numbers: Res<ShowNoteNumbers>,
 ) {
     if exit.read().next().is_none() || pending.0.is_none() {
         return;
     }
     pending.0 = None;
-    save_current(&audio, &theme_2d, &theme_3d, &model, &ui_theme);
+    save_current(
+        &audio,
+        &theme_2d,
+        &theme_3d,
+        &model,
+        &ui_theme,
+        &note_numbers,
+    );
 }
 
 #[cfg(test)]

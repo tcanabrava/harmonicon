@@ -112,6 +112,11 @@ impl Default for SelectedNoteTheme3d {
     }
 }
 
+/// Whether falling notes show their harmonica hole number instead of the
+/// blow/draw arrow. Off (arrows) by default.
+#[derive(Resource, Default)]
+pub struct ShowNoteNumbers(pub bool);
+
 impl Plugin for AssetsManagementPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AvailableSongs>()
@@ -121,6 +126,7 @@ impl Plugin for AssetsManagementPlugin {
             .init_resource::<AvailableNoteThemes3d>()
             .init_resource::<SelectedNoteTheme2d>()
             .init_resource::<SelectedNoteTheme3d>()
+            .init_resource::<ShowNoteNumbers>()
             .init_resource::<AvailableThemes>()
             .init_resource::<SelectedTheme>()
             .add_systems(

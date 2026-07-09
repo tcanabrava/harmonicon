@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use crate::{
     assets_management::{
         HarmonicaModelConfig, HoleConfig, SelectedHarmonicaModel, SelectedNoteTheme3d,
+        ShowNoteNumbers,
     },
     menu::SelectedSong,
     song::NoteCube3dConfig,
@@ -54,6 +55,20 @@ pub(super) struct NoteVisual3D {
     /// recompute on demand from `NoteRenderAssets3D` + the note's own
     /// `hole`/`duration`, so there's nothing else this needs to carry.
     note_id: usize,
+}
+
+/// A hole-number label tracking a 3D note (`ShowNoteNumbers` on). 3D notes
+/// are opaque meshes with nowhere to put a number *on* them the way the 2D
+/// head can, so this is a separate UI `Text` entity, positioned every frame
+/// by projecting `target`'s world position through the gameplay camera
+/// (`update_note_hole_labels_3d`) rather than living in the note's own
+/// entity hierarchy — UI layout doesn't propagate through 3D `Transform`
+/// parents. Despawns itself once `target` no longer exists (the note scrolled
+/// past and was recycled), so nothing needs to reach back into this entity
+/// from `update_notes_3d`.
+#[derive(Component)]
+pub(super) struct NoteHoleLabel3D {
+    target: Entity,
 }
 
 /// Chart-level (not per-note) 3D rendering config `spawn_visible_notes_3d`
@@ -328,6 +343,7 @@ pub fn spawn_visible_notes_3d(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut tail_materials: ResMut<Assets<NoteTail3dMaterial>>,
     existing: Query<&NoteVisual3D>,
+    show_numbers: Res<ShowNoteNumbers>,
 ) {
     if render_assets.head_mesh.is_none() {
         return;
@@ -343,6 +359,7 @@ pub fn spawn_visible_notes_3d(
             &render_assets,
             i,
             &song_notes.notes[i],
+            show_numbers.0,
         );
     }
 }
@@ -371,6 +388,7 @@ fn spawn_note_visual_3d(
     assets: &NoteRenderAssets3D,
     note_id: usize,
     note: &ScheduledNote,
+    show_numbers: bool,
 ) {
     let head_mesh = assets.head_mesh.as_ref().expect("checked by caller");
     let cfg = assets.cfg.as_ref().expect("checked by caller");
@@ -408,7 +426,7 @@ fn spawn_note_visual_3d(
         Vec2::new(tail_w * 0.5, tail_len * 0.5),
     )));
 
-    commands
+    let note_entity = commands
         .spawn((
             Transform::from_xyz(note_x, LANE_Y + NOTE_H * 0.5, FAR_Z),
             NoteVisual3D { note_id },
@@ -433,7 +451,113 @@ fn spawn_note_visual_3d(
                 ),
                 NoteTail3d,
             ));
-        });
+        })
+        .id();
+
+    // Hole-number label: a separate UI entity (see `NoteHoleLabel3D`'s doc
+    // comment for why), positioned every frame by `update_note_hole_labels_3d`
+    // — hidden until then, since it starts at the origin.
+    if show_numbers {
+        commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    padding: UiRect::axes(Val::Px(4.0), Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+                Visibility::Hidden,
+                NoteHoleLabel3D {
+                    target: note_entity,
+                },
+                GameplayRoot,
+            ))
+            .with_children(|l| {
+                l.spawn((
+                    // `+`/`-` for blow/draw — see the matching comment in
+                    // `gameplay_2d::spawn_note_visual`.
+                    Text::new(super::phrase_overlay::tab_label(
+                        note.hole,
+                        note.is_blow,
+                        &[],
+                    )),
+                    TextFont {
+                        font_size: FontSize::Px(16.0),
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+            });
+    }
+}
+
+/// Offset (logical px) from a note's projected screen position to where its
+/// hole-number label's top-left corner should land — up and to the left, so
+/// the label sits just outside the note instead of covering it.
+const NOTE_LABEL_OFFSET: Vec2 = Vec2::new(-24.0, -20.0);
+
+/// Converts a `Camera::world_to_viewport` result into the `Val::Px` a UI
+/// `Node`'s `left`/`top` needs, offset to the label's anchor point.
+/// `world_to_viewport` already resolves through `logical_viewport_rect()`,
+/// so its result is in the same logical-window-pixel space `Val::Px` is —
+/// *except* that bevy_ui additionally multiplies every `Val::Px` by
+/// [`UiScale`] before converting to physical pixels
+/// (`propagate_ui_target_cameras` in `bevy_ui`), a multiplier the camera
+/// projection knows nothing about. Dividing by `ui_scale` here cancels that
+/// back out, so the label lands under the note regardless of the player's
+/// UI zoom level (`dialogs::ui_scale`, arrow keys).
+fn note_label_position(viewport_px: Vec2, ui_scale: f32) -> Vec2 {
+    viewport_px / ui_scale + NOTE_LABEL_OFFSET
+}
+
+/// Positions each [`NoteHoleLabel3D`] over its target note's current screen
+/// position, or hides it once the note is behind the camera, or despawns it
+/// once the note itself is gone (scrolled past and recycled).
+///
+/// Reads the note's local `Transform`, not `GlobalTransform`: `update_notes_3d`
+/// (earlier in the same `Update` chain) writes `Transform.translation.z` every
+/// frame, but `GlobalTransform` propagation only runs afterward, in
+/// `PostUpdate` — reading it here would always be one frame stale, which
+/// reads as the label trailing behind its note. Note root entities have no
+/// transform parent, so the local `Transform` already *is* world space; no
+/// propagation to wait on.
+pub fn update_note_hole_labels_3d(
+    mut commands: Commands,
+    camera: Query<(&Camera, &GlobalTransform), With<GameplayCamera3D>>,
+    ui_scale: Res<UiScale>,
+    notes: Query<&Transform, With<NoteVisual3D>>,
+    mut labels: Query<(Entity, &NoteHoleLabel3D, &mut Node, &mut Visibility)>,
+) {
+    let Ok((camera, camera_transform)) = camera.single() else {
+        return;
+    };
+
+    for (entity, label, mut node, mut visibility) in &mut labels {
+        let Ok(note_transform) = notes.get(label.target) else {
+            commands.entity(entity).despawn();
+            continue;
+        };
+        match camera.world_to_viewport(camera_transform, note_transform.translation) {
+            Ok(viewport_px) => {
+                let pos = note_label_position(viewport_px, ui_scale.0);
+                node.left = Val::Px(pos.x);
+                node.top = Val::Px(pos.y);
+                // Guarded so change detection (and the visibility-propagation
+                // it triggers) doesn't fire every frame for every label while
+                // nothing about their visibility actually changed.
+                if *visibility != Visibility::Visible {
+                    *visibility = Visibility::Visible;
+                }
+            }
+            Err(_) => {
+                if *visibility != Visibility::Hidden {
+                    *visibility = Visibility::Hidden;
+                }
+            }
+        }
+    }
 }
 
 pub fn setup(
@@ -1077,6 +1201,31 @@ mod tests {
     #[test]
     fn lane_spacing_is_one_lane_width() {
         assert!((lane_x(2, 10) - lane_x(1, 10) - LANE_WIDTH).abs() < 1e-6);
+    }
+
+    // ── note_label_position ───────────────────────────────────────────────────
+
+    #[test]
+    fn note_label_position_cancels_out_ui_scale() {
+        // At 2x UI zoom, bevy_ui will double whatever Val::Px we emit when it
+        // converts to physical pixels — so we must emit half the viewport
+        // coordinate up front for the two to cancel out to the right place.
+        let pos = note_label_position(Vec2::new(200.0, 100.0), 2.0);
+        assert_eq!(pos, Vec2::new(100.0, 50.0) + NOTE_LABEL_OFFSET);
+    }
+
+    #[test]
+    fn note_label_position_is_unchanged_at_default_ui_scale() {
+        let pos = note_label_position(Vec2::new(300.0, 150.0), 1.0);
+        assert_eq!(pos, Vec2::new(300.0, 150.0) + NOTE_LABEL_OFFSET);
+    }
+
+    #[test]
+    fn note_label_position_offsets_up_and_left() {
+        let pos = note_label_position(Vec2::ZERO, 1.0);
+        assert_eq!(pos, NOTE_LABEL_OFFSET);
+        assert!(pos.x < 0.0, "should sit left of the note");
+        assert!(pos.y < 0.0, "should sit above the note");
     }
 
     #[test]
