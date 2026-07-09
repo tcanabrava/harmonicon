@@ -1,11 +1,27 @@
 // SPDX-License-Identifier: MIT
 
+use bevy::picking::Pickable;
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::ui_render::prelude::MaterialNode;
 
 use super::gameplay_2d::{note_anim_mode, note_techniques};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use crate::song::chart::Modifier;
+
+/// Whether the techniques legend body is collapsed, toggled by clicking its
+/// header. Not reset on song load — like [`super::metronome_overlay::
+/// MetronomeMuted`], a player's preference should outlive one song.
+#[derive(Resource, Default)]
+pub struct TechniqueLegendCollapsed(pub bool);
+
+/// The column of technique rows, hidden/shown by [`TechniqueLegendCollapsed`].
+#[derive(Component)]
+struct TechniqueLegendBody;
+
+/// The header's text, carrying the collapse/expand arrow.
+#[derive(Component, Default, Clone)]
+struct TechniqueLegendToggleLabel;
 
 /// The six techniques shown in the legend, paired with the label to display. The
 /// example modifiers carry representative intensities so each preview animates
@@ -73,9 +89,15 @@ pub fn build_legend_materials(
         .collect()
 }
 
+/// Arrow shown on the collapse/expand toggle, matched to `collapsed`.
+fn toggle_arrow(collapsed: bool) -> &'static str {
+    if collapsed { "\u{25B6}" } else { "\u{25BC}" }
+}
+
 /// Spawns the techniques legend: a small *animated tail* preview beside each
-/// technique's name, so players learn to read a note by its motion. Used by both
-/// the 2D and 3D HUDs. `entries` come from [`build_legend_materials`].
+/// technique's name, so players learn to read a note by its motion, stacked
+/// one per row under a clickable header that collapses/expands the list. Used
+/// by both the 2D and 3D HUDs. `entries` come from [`build_legend_materials`].
 pub fn spawn_modifier_legend(
     parent: &mut ChildSpawnerCommands,
     entries: &[(Handle<NoteTail2dMaterial>, &'static str)],
@@ -87,27 +109,36 @@ pub fn spawn_modifier_legend(
             ..default()
         })
         .with_children(|col| {
+            col.spawn_empty().apply_scene(bsn! {
+                Button
+                Node { padding: {UiRect::ZERO} }
+                BackgroundColor({Color::NONE})
+                on(toggle_technique_legend)
+                Children [
+                    (
+                        Text({format!("{} TECHNIQUES", toggle_arrow(false))})
+                        TextFont { font_size: {FontSize::Px(15.0)} }
+                        TextColor({Color::srgb(0.55, 0.55, 0.62)})
+                        TechniqueLegendToggleLabel
+                        Pickable { should_block_lower: {false}, is_hoverable: {false} }
+                    )
+                ]
+            });
+
+            // One technique per row (icon left, name right), stacked vertically
+            // instead of wrapping, so the legend's width never varies with how
+            // many entries fit per line.
             col.spawn((
-                Text::new("TECHNIQUES"),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(6.0),
                     ..default()
                 },
-                TextColor(Color::srgb(0.55, 0.55, 0.62)),
-            ));
-
-            // Wrapping row so the six previews pack into a small footprint.
-            col.spawn(Node {
-                flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                column_gap: Val::Px(12.0),
-                row_gap: Val::Px(6.0),
-                max_width: Val::Px(260.0),
-                ..default()
-            })
-            .with_children(|wrap| {
+                TechniqueLegendBody,
+            ))
+            .with_children(|list| {
                 for (handle, name) in entries {
-                    wrap.spawn(Node {
+                    list.spawn(Node {
                         flex_direction: FlexDirection::Row,
                         align_items: AlignItems::Center,
                         column_gap: Val::Px(5.0),
@@ -135,6 +166,42 @@ pub fn spawn_modifier_legend(
                 }
             });
         });
+}
+
+fn toggle_technique_legend(
+    _: On<Pointer<Click>>,
+    mut collapsed: ResMut<TechniqueLegendCollapsed>,
+) {
+    collapsed.0 = !collapsed.0;
+}
+
+/// Mirrors [`TechniqueLegendCollapsed`] onto the body's visibility and the
+/// header's arrow, written every frame (like `update_mute_label`) so a
+/// freshly spawned legend — a new one is spawned per song — isn't stale.
+fn update_technique_legend_visibility(
+    collapsed: Res<TechniqueLegendCollapsed>,
+    mut bodies: Query<&mut Node, With<TechniqueLegendBody>>,
+    mut labels: Query<&mut Text, With<TechniqueLegendToggleLabel>>,
+) {
+    for mut node in &mut bodies {
+        node.display = if collapsed.0 {
+            Display::None
+        } else {
+            Display::Flex
+        };
+    }
+    for mut text in &mut labels {
+        *text = Text::new(format!("{} TECHNIQUES", toggle_arrow(collapsed.0)));
+    }
+}
+
+pub struct ModifierLegendPlugin;
+
+impl Plugin for ModifierLegendPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<TechniqueLegendCollapsed>()
+            .add_systems(Update, update_technique_legend_visibility);
+    }
 }
 
 #[cfg(test)]

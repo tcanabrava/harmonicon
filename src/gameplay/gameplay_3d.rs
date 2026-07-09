@@ -758,6 +758,9 @@ fn spawn_hud_overlay(
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(4.0),
                 padding: UiRect::all(Val::Px(8.0)),
+                // Fixed so the panel doesn't grow or shrink with the current
+                // song's title/description length — long text wraps instead.
+                max_width: Val::Px(420.0),
                 ..default()
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
@@ -804,17 +807,6 @@ fn spawn_hud_overlay(
             spawn_phrase_banner(p);
             // Tab-notation ribbon for the current phrase (phrase_overlay::update_tab_ribbon)
             spawn_tab_ribbon(p);
-
-            // 12-bar blues grid
-            p.spawn(Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(4.0),
-                margin: UiRect::top(Val::Px(4.0)),
-                ..default()
-            })
-            .with_children(|grid| {
-                spawn_12_bar_grid(grid, chords, key, &GridConfig::for_3d(), twelve_bar_colors);
-            });
 
             // Blow/draw legend
             p.spawn(Node {
@@ -867,51 +859,78 @@ fn spawn_hud_overlay(
             });
         });
 
-    // Score panel
+    // 12-bar blues grid + score, grouped top-right — clear of the note
+    // highway, which sits center-screen, instead of stacked under the song
+    // info: the grid's fixed width used to force the info panel above to
+    // match it, growing/shrinking the whole panel with whatever else was in
+    // it (in particular the song title/description).
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
                 top: Val::Px(8.0),
                 right: Val::Px(8.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::FlexEnd,
-                row_gap: Val::Px(2.0),
-                padding: UiRect::all(Val::Px(8.0)),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::FlexStart,
+                column_gap: Val::Px(16.0),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
             GlobalZIndex(20),
             GameplayRoot,
         ))
-        .with_children(|p| {
-            p.spawn((
-                Text::new("0"),
-                TextFont {
-                    font_size: FontSize::Px(30.0),
+        .with_children(|row| {
+            row.spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(4.0),
+                    padding: UiRect::all(Val::Px(8.0)),
                     ..default()
                 },
-                TextColor(Color::WHITE),
-                ScoreText,
-            ));
-            p.spawn((
-                Text::new(""),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+            ))
+            .with_children(|grid| {
+                spawn_12_bar_grid(grid, chords, key, &GridConfig::for_3d(), twelve_bar_colors);
+            });
+
+            row.spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexEnd,
+                    row_gap: Val::Px(2.0),
+                    padding: UiRect::all(Val::Px(8.0)),
                     ..default()
                 },
-                TextColor(Color::srgb(0.90, 0.72, 0.20)),
-                ComboText,
-            ));
-            p.spawn((
-                Text::new(""),
-                TextFont {
-                    font_size: FontSize::Px(22.0),
-                    ..default()
-                },
-                TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
-                FeedbackText,
-            ));
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+            ))
+            .with_children(|p| {
+                p.spawn((
+                    Text::new("0"),
+                    TextFont {
+                        font_size: FontSize::Px(30.0),
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                    ScoreText,
+                ));
+                p.spawn((
+                    Text::new(""),
+                    TextFont {
+                        font_size: FontSize::Px(15.0),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.90, 0.72, 0.20)),
+                    ComboText,
+                ));
+                p.spawn((
+                    Text::new(""),
+                    TextFont {
+                        font_size: FontSize::Px(22.0),
+                        ..default()
+                    },
+                    TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                    FeedbackText,
+                ));
+            });
         });
 }
 

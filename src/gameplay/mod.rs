@@ -54,6 +54,7 @@ impl Plugin for GameplayPlugin {
             countdown_overlay::CountdownPlugin,
             twelve_bar_blues_overlay::TwelveBarBluesPlugin,
             metronome_overlay::MetronomePlugin,
+            modifier_legend::ModifierLegendPlugin,
             phrase_overlay::PhrasePlugin,
             note_tail_2d::NoteTail2dPlugin,
             note_tail_3d::NoteTail3dPlugin,
