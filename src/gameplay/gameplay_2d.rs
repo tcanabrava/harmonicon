@@ -18,7 +18,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_visual_2d::{NoteChildConfig, spawn_note_children};
-use super::phrase_overlay::spawn_phrase_banner;
+use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
 use super::song_progress_overlay::spawn_song_progress;
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
@@ -285,6 +285,8 @@ pub fn setup(
 
                 // Live phrase / groove banner (driven by phrase_overlay::update_phrase)
                 spawn_phrase_banner(right);
+                // Tab-notation ribbon for the current phrase (phrase_overlay::update_tab_ribbon)
+                spawn_tab_ribbon(right);
 
                 // 12-bar blues grid
                 right

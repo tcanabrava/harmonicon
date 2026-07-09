@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use crate::{
     menu::{AppState, SelectedSong},
     song::SongManifest,
+    song::chart::{Action, Modifier, NoteEvent},
 };
 
 use super::{GameplayClock, Paused, resolve_item_time};
@@ -22,6 +23,25 @@ pub fn spawn_phrase_banner(parent: &mut ChildSpawnerCommands) {
         },
         TextColor(Color::srgb(0.80, 0.70, 0.95)),
         PhraseText,
+    ));
+}
+
+/// Live tab-notation ribbon for the phrase currently active — see
+/// [`tab_label`]/[`phrase_tab_sequence`]. Spawned as a sibling right below
+/// [`PhraseText`] so the two "what's happening right now" readouts sit
+/// together.
+#[derive(Component)]
+pub struct TabRibbonText;
+
+pub fn spawn_tab_ribbon(parent: &mut ChildSpawnerCommands) {
+    parent.spawn((
+        Text::new(""),
+        TextFont {
+            font_size: FontSize::Px(15.0),
+            ..default()
+        },
+        TextColor(Color::srgb(0.90, 0.90, 0.75)),
+        TabRibbonText,
     ));
 }
 
@@ -63,6 +83,95 @@ pub fn format_phrase_label(phrase: Option<&str>, groove: Option<&str>) -> String
     }
 }
 
+/// Renders one note as conventional harmonica tab: `+N` for a blow, `-N` for
+/// a draw, an apostrophe per semitone of bend depth (e.g. `-4''` for a
+/// whole-step draw bend), an `o` suffix for an overblow/overdraw, or a `*`
+/// suffix for a chromatic slide.
+pub fn tab_label(hole: u8, is_blow: bool, modifiers: &[Modifier]) -> String {
+    let mut s = format!("{}{hole}", if is_blow { "+" } else { "-" });
+    for m in modifiers {
+        match m {
+            Modifier::Bend { semitones, .. } => {
+                let depth = (semitones.abs().round() as usize).max(1);
+                s.push_str(&"'".repeat(depth));
+            }
+            Modifier::Overblow | Modifier::Overdraw => s.push('o'),
+            Modifier::Slide => s.push('*'),
+            Modifier::Vibrato { .. } | Modifier::WahWah { .. } => {}
+        }
+    }
+    s
+}
+
+/// The tab-notation sequence (space-separated [`tab_label`]s) for every note
+/// event in the phrase currently active at `clock` — the same
+/// phrase-boundary rule as [`active_phrase_groove`] (persists from the most
+/// recent item that declared a phrase), but collecting *every* event from
+/// the phrase's start up to the next phrase's start (or the end of the
+/// track), not just the ones the clock has already reached — the point is
+/// letting a player read the whole phrase ahead, like sheet music.
+pub fn phrase_tab_sequence(items: &[(f64, Option<&str>, &[NoteEvent])], clock: f64) -> String {
+    if clock < 0.0 {
+        return String::new();
+    }
+    let start_idx = items
+        .iter()
+        .enumerate()
+        .rfind(|(_, (t, p, _))| *t <= clock && p.is_some())
+        .map(|(i, _)| i);
+    let Some(start_idx) = start_idx else {
+        return String::new();
+    };
+    let end_idx = items[start_idx + 1..]
+        .iter()
+        .position(|(_, p, _)| p.is_some())
+        .map(|offset| start_idx + 1 + offset)
+        .unwrap_or(items.len());
+
+    items[start_idx..end_idx]
+        .iter()
+        .flat_map(|(_, _, events)| events.iter())
+        .map(|e| {
+            tab_label(
+                e.hole,
+                matches!(e.action, Action::Blow),
+                e.modifiers.as_deref().unwrap_or(&[]),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+pub fn update_tab_ribbon(
+    clock: Res<GameplayClock>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut ribbon: Query<&mut Text, With<TabRibbonText>>,
+) {
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let chart = &manifest.chart;
+    let items: Vec<(f64, Option<&str>, &[NoteEvent])> = chart
+        .track
+        .iter()
+        .map(|item| {
+            (
+                resolve_item_time(item, &chart.timing),
+                item.phrase.as_deref(),
+                item.events.as_slice(),
+            )
+        })
+        .collect();
+    let label = phrase_tab_sequence(&items, clock.get());
+
+    for mut text in &mut ribbon {
+        if text.0 != label {
+            text.0 = label.clone();
+        }
+    }
+}
+
 pub fn update_phrase(
     clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
@@ -99,7 +208,8 @@ impl Plugin for PhrasePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            update_phrase.run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+            (update_phrase, update_tab_ribbon)
+                .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         );
     }
 }
@@ -180,5 +290,118 @@ mod tests {
     #[test]
     fn label_empty_when_nothing_active() {
         assert_eq!(format_phrase_label(None, None), "");
+    }
+
+    // ── tab_label ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn tab_label_plain_blow_and_draw() {
+        assert_eq!(tab_label(4, true, &[]), "+4");
+        assert_eq!(tab_label(4, false, &[]), "-4");
+    }
+
+    #[test]
+    fn tab_label_bend_depth_is_one_apostrophe_per_semitone() {
+        let bend = |semitones| {
+            vec![Modifier::Bend {
+                semitones,
+                intensity: None,
+            }]
+        };
+        assert_eq!(tab_label(4, false, &bend(-1.0)), "-4'");
+        assert_eq!(tab_label(4, false, &bend(-2.0)), "-4''");
+        // Rounds to the nearest semitone rather than truncating.
+        assert_eq!(tab_label(3, false, &bend(-1.5)), "-3''");
+    }
+
+    #[test]
+    fn tab_label_overblow_and_overdraw_get_an_o_suffix() {
+        assert_eq!(tab_label(5, true, &[Modifier::Overblow]), "+5o");
+        assert_eq!(tab_label(7, false, &[Modifier::Overdraw]), "-7o");
+    }
+
+    #[test]
+    fn tab_label_slide_gets_an_asterisk_suffix() {
+        assert_eq!(tab_label(4, true, &[Modifier::Slide]), "+4*");
+    }
+
+    #[test]
+    fn tab_label_ignores_vibrato_and_wah() {
+        assert_eq!(
+            tab_label(
+                2,
+                false,
+                &[Modifier::Vibrato {
+                    oscillation_hz: 5.0,
+                    intensity: None
+                }]
+            ),
+            "-2"
+        );
+    }
+
+    // ── phrase_tab_sequence ────────────────────────────────────────────────────
+
+    fn note_event(hole: u8, action: Action) -> NoteEvent {
+        NoteEvent {
+            hole,
+            action,
+            note: None,
+            modifiers: None,
+        }
+    }
+
+    #[test]
+    fn phrase_tab_sequence_negative_clock_is_empty() {
+        let e = [note_event(4, Action::Draw)];
+        let items = [(0.0, Some("intro"), &e[..])];
+        assert_eq!(phrase_tab_sequence(&items, -0.5), "");
+    }
+
+    #[test]
+    fn phrase_tab_sequence_empty_before_any_phrase_starts() {
+        let e = [note_event(4, Action::Draw)];
+        let items = [(1.0, Some("intro"), &e[..])];
+        assert_eq!(phrase_tab_sequence(&items, 0.5), "");
+    }
+
+    #[test]
+    fn phrase_tab_sequence_includes_later_items_still_in_the_same_phrase() {
+        // The whole phrase reads ahead, not just what's already played —
+        // items after the phrase declaration but before the next one are
+        // included even if the clock hasn't reached them yet.
+        let e1 = [note_event(4, Action::Draw)];
+        let e2 = [note_event(5, Action::Blow)];
+        let e3 = [note_event(4, Action::Draw)];
+        let items = [
+            (0.0, Some("intro"), &e1[..]),
+            (1.0, None, &e2[..]),
+            (2.0, None, &e3[..]),
+        ];
+        assert_eq!(phrase_tab_sequence(&items, 0.5), "-4 +5 -4");
+    }
+
+    #[test]
+    fn phrase_tab_sequence_stops_at_the_next_phrase() {
+        let e1 = [note_event(4, Action::Draw)];
+        let e2 = [note_event(5, Action::Blow)];
+        let items = [
+            (0.0, Some("intro"), &e1[..]),
+            (2.0, Some("turnaround"), &e2[..]),
+        ];
+        assert_eq!(phrase_tab_sequence(&items, 0.5), "-4");
+        assert_eq!(phrase_tab_sequence(&items, 2.5), "+5");
+    }
+
+    #[test]
+    fn phrase_tab_sequence_formats_each_event_as_tab() {
+        let e = [note_event(4, Action::Draw)];
+        let mut with_bend = e.clone();
+        with_bend[0].modifiers = Some(vec![Modifier::Bend {
+            semitones: -1.0,
+            intensity: None,
+        }]);
+        let items = [(0.0, Some("call"), &with_bend[..])];
+        assert_eq!(phrase_tab_sequence(&items, 0.0), "-4'");
     }
 }
