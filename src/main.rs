@@ -75,6 +75,7 @@ fn main() {
         harmonicon::dialogs::combobox::ComboboxPlugin,
         harmonicon::dialogs::file_dialog::FileDialogsPlugin,
         harmonicon::dialogs::font_fallback::FontFallbackPlugin,
+        harmonicon::dialogs::tooltip::TooltipPlugin,
     ));
 
     app.add_message::<PitchEvent>()

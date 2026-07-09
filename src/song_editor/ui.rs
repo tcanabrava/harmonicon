@@ -18,6 +18,7 @@ use super::{
     SAVE_PURPOSE, grid_height,
 };
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
+use crate::dialogs::tooltip::Tooltip;
 use crate::localization::{LocalizationExt, LocalizedStr};
 use crate::settings::AudioSettings;
 use crate::theme::{LoadedTheme, SongEditorColors};
@@ -359,7 +360,11 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors, h
 
 /// Respawns the hole column's contents (called from [`setup`] initially, and
 /// from [`sync_hole_column`] whenever the harmonica's hole count changes).
-fn spawn_hole_column_rows(col: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
+fn spawn_hole_column_rows(
+    col: &mut ChildSpawnerCommands,
+    colors: SongEditorColors,
+    hole_count: u8,
+) {
     col.spawn(Node {
         width: Val::Percent(100.0),
         height: Val::Px(HEADER_H),
@@ -420,6 +425,7 @@ fn spawn_mod_panel(
         transport_button(
             panel,
             loc.msg("back"),
+            loc.msg("editor-back-tooltip"),
             Color::srgb(0.22, 0.22, 0.28),
             |_: On<Pointer<Click>>, mut next: ResMut<NextState<AppState>>| {
                 next.set(AppState::Menu);
@@ -433,6 +439,7 @@ fn spawn_mod_panel(
             panel,
             ModeButton::Edit,
             loc.msg("editor-mode-edit"),
+            loc.msg("editor-mode-edit-tooltip"),
             colors,
             |_: On<Pointer<Click>>,
              mut state: ResMut<EditorState>,
@@ -450,6 +457,7 @@ fn spawn_mod_panel(
             panel,
             ModeButton::Perform,
             loc.msg("editor-mode-perform"),
+            loc.msg("editor-mode-perform-tooltip"),
             colors,
             |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
                 state.mode = Mode::Perform;
@@ -459,6 +467,7 @@ fn spawn_mod_panel(
             panel,
             ModeButton::Lock,
             loc.msg("editor-lock"),
+            loc.msg("editor-lock-tooltip"),
             colors,
             |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
                 state.user_locked = !state.user_locked;
@@ -490,20 +499,74 @@ fn spawn_mod_panel(
                 },
             ))
             .with_children(|g| {
-                mod_button(g, ModButton::Blow, loc.msg("mod-blow"), colors);
-                mod_button(g, ModButton::Draw, loc.msg("mod-draw"), colors);
+                mod_button(
+                    g,
+                    ModButton::Blow,
+                    loc.msg("mod-blow"),
+                    loc.msg("mod-blow-tooltip"),
+                    colors,
+                );
+                mod_button(
+                    g,
+                    ModButton::Draw,
+                    loc.msg("mod-draw"),
+                    loc.msg("mod-draw-tooltip"),
+                    colors,
+                );
                 panel_separator(g);
-                mod_button(g, ModButton::Bend, loc.msg("mod-bend"), colors);
-                mod_button(g, ModButton::Overblow, loc.msg("mod-overblow"), colors);
-                mod_button(g, ModButton::Overdraw, loc.msg("mod-overdraw"), colors);
-                mod_button(g, ModButton::Slide, loc.msg("mod-slide"), colors);
-                mod_button(g, ModButton::Wah, loc.msg("mod-wah"), colors);
-                mod_button(g, ModButton::Vibrato, loc.msg("mod-vibrato"), colors);
+                mod_button(
+                    g,
+                    ModButton::Bend,
+                    loc.msg("mod-bend"),
+                    loc.msg("mod-bend-tooltip"),
+                    colors,
+                );
+                mod_button(
+                    g,
+                    ModButton::Overblow,
+                    loc.msg("mod-overblow"),
+                    loc.msg("mod-overblow-tooltip"),
+                    colors,
+                );
+                mod_button(
+                    g,
+                    ModButton::Overdraw,
+                    loc.msg("mod-overdraw"),
+                    loc.msg("mod-overdraw-tooltip"),
+                    colors,
+                );
+                mod_button(
+                    g,
+                    ModButton::Slide,
+                    loc.msg("mod-slide"),
+                    loc.msg("mod-slide-tooltip"),
+                    colors,
+                );
+                mod_button(
+                    g,
+                    ModButton::Wah,
+                    loc.msg("mod-wah"),
+                    loc.msg("mod-wah-tooltip"),
+                    colors,
+                );
+                mod_button(
+                    g,
+                    ModButton::Vibrato,
+                    loc.msg("mod-vibrato"),
+                    loc.msg("mod-vibrato-tooltip"),
+                    colors,
+                );
                 g.spawn(Node {
                     flex_grow: 1.0,
                     ..default()
                 });
-                mod_button(g, ModButton::Delete, loc.msg("mod-delete"), colors);
+                mod_button(
+                    g,
+                    ModButton::Delete,
+                    loc.msg("mod-delete"),
+                    loc.msg("mod-delete-tooltip"),
+                    colors,
+                );
             });
 
         panel
@@ -532,6 +595,7 @@ pub(super) fn mode_button<M: 'static>(
     panel: &mut ChildSpawnerCommands,
     kind: ModeButton,
     label: LocalizedStr,
+    tooltip: LocalizedStr,
     colors: SongEditorColors,
     on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
 ) {
@@ -548,6 +612,7 @@ pub(super) fn mode_button<M: 'static>(
             },
             BackgroundColor(colors.btn_bg),
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(tooltip)),
         ))
         .observe(on_click)
         .with_children(|b| {
@@ -567,6 +632,7 @@ pub(super) fn mod_button(
     panel: &mut ChildSpawnerCommands,
     kind: ModButton,
     label: LocalizedStr,
+    tooltip: LocalizedStr,
     colors: SongEditorColors,
 ) {
     panel
@@ -582,6 +648,7 @@ pub(super) fn mod_button(
             },
             BackgroundColor(colors.btn_bg),
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(tooltip)),
         ))
         .observe(
             move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
@@ -636,6 +703,7 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
     transport_button(
         panel,
         loc.msg("editor-save"),
+        loc.msg("editor-save-tooltip"),
         Color::srgb(0.18, 0.28, 0.45),
         |_: On<Pointer<Click>>,
          state: Res<EditorState>,
@@ -661,6 +729,7 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
     transport_button(
         panel,
         loc.msg("editor-load"),
+        loc.msg("editor-load-tooltip"),
         Color::srgb(0.24, 0.30, 0.20),
         |_: On<Pointer<Click>>, loc: Res<Localization>, mut open: MessageWriter<OpenFileDialog>| {
             open.write(OpenFileDialog {
@@ -680,6 +749,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
     transport_button(
         panel,
         loc.msg("editor-play"),
+        loc.msg("editor-play-tooltip"),
         Color::srgb(0.20, 0.40, 0.24),
         |_: On<Pointer<Click>>,
          state: Res<EditorState>,
@@ -709,6 +779,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
     transport_button(
         panel,
         loc.msg("editor-pause"),
+        loc.msg("editor-pause-tooltip"),
         Color::srgb(0.36, 0.32, 0.16),
         |_: On<Pointer<Click>>,
          mut playhead: ResMut<Playhead>,
@@ -719,6 +790,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
     transport_button(
         panel,
         loc.msg("editor-stop"),
+        loc.msg("editor-stop-tooltip"),
         Color::srgb(0.36, 0.20, 0.20),
         |_: On<Pointer<Click>>,
          playing: Query<Entity, With<EditorAudio>>,
@@ -731,6 +803,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
     transport_button(
         panel,
         loc.msg("editor-practice"),
+        loc.msg("editor-practice-tooltip"),
         Color::srgb(0.25, 0.18, 0.42),
         |_: On<Pointer<Click>>,
          state: Res<EditorState>,
@@ -768,6 +841,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
 pub(super) fn transport_button<M: 'static>(
     panel: &mut ChildSpawnerCommands,
     label: LocalizedStr,
+    tooltip: LocalizedStr,
     bg: Color,
     on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
 ) {
@@ -783,6 +857,7 @@ pub(super) fn transport_button<M: 'static>(
             },
             BackgroundColor(bg),
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(tooltip)),
         ))
         .observe(on_click)
         .with_children(|b| {
@@ -839,16 +914,15 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                 },
                 BackgroundColor(colors.field_bg),
                 BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+                Tooltip(String::from(loc.msg("editor-harmonica-toggle-tooltip"))),
             ))
-            .observe(
-                |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                    let next = match state.harmonica_kind {
-                        HarmonicaKind::Diatonic => HarmonicaKind::Chromatic,
-                        HarmonicaKind::Chromatic => HarmonicaKind::Diatonic,
-                    };
-                    state.set_harmonica_kind(next);
-                },
-            )
+            .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                let next = match state.harmonica_kind {
+                    HarmonicaKind::Diatonic => HarmonicaKind::Chromatic,
+                    HarmonicaKind::Chromatic => HarmonicaKind::Diatonic,
+                };
+                state.set_harmonica_kind(next);
+            })
             .with_children(|b| {
                 b.spawn((
                     HarmonicaKindText,
@@ -901,21 +975,27 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                 ));
 
                 if field == Field::Key {
-                    btn.observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                        let idx = HARP_KEYS
-                            .iter()
-                            .position(|&k| k == state.key.as_str())
-                            .unwrap_or(0);
-                        state.key = HARP_KEYS[(idx + 1) % HARP_KEYS.len()].into();
-                    });
+                    btn.insert(Tooltip(String::from(loc.msg("editor-field-key-tooltip"))))
+                        .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                            let idx = HARP_KEYS
+                                .iter()
+                                .position(|&k| k == state.key.as_str())
+                                .unwrap_or(0);
+                            state.key = HARP_KEYS[(idx + 1) % HARP_KEYS.len()].into();
+                        });
                 } else if field == Field::Position {
-                    btn.observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                        let idx = POSITIONS
-                            .iter()
-                            .position(|&p| p == state.position.as_str())
-                            .unwrap_or(0);
-                        state.position = POSITIONS[(idx + 1) % POSITIONS.len()].into();
-                    });
+                    btn.insert(Tooltip(String::from(
+                        loc.msg("editor-field-position-tooltip"),
+                    )))
+                    .observe(
+                        |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                            let idx = POSITIONS
+                                .iter()
+                                .position(|&p| p == state.position.as_str())
+                                .unwrap_or(0);
+                            state.position = POSITIONS[(idx + 1) % POSITIONS.len()].into();
+                        },
+                    );
                 } else {
                     btn.observe(
                         move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
@@ -949,6 +1029,7 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                         },
                         BackgroundColor(Color::srgb(0.18, 0.24, 0.36)),
                         BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+                        Tooltip(String::from(loc.msg("editor-browse-tooltip"))),
                     ))
                     .observe(
                         |_: On<Pointer<Click>>,
