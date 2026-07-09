@@ -23,6 +23,12 @@ const GOOD_WINDOW: f64 = 0.130;
 /// After 200 ms past the onset the note is marked Missed.
 const MISS_WINDOW: f64 = 0.200;
 
+/// How long a hit/miss result stays on screen before a "waiting for the next
+/// note" prompt is allowed to replace it. Without this, the tick right after
+/// a hit immediately re-evaluates the next (already-`Waiting`) note and
+/// overwrites the result before it's readable — see `practice_tick`.
+const MSG_HOLD_SECS: f32 = 0.6;
+
 /// 2^(0.5/12) — frequency ratio spanning ±50 cents.
 /// Detected pitches within this band of the expected frequency count as a match.
 const PITCH_TOLERANCE: f32 = 1.029_302_2;
@@ -59,6 +65,9 @@ pub(super) struct PracticeState {
     pub total: u32,
     /// Status line shown in the editor's status bar while practice is running.
     pub msg: LocalizedStr,
+    /// Seconds left before [`MSG_HOLD_SECS`] releases its hold on `msg` —
+    /// see that constant's doc comment.
+    msg_hold: f32,
 }
 
 impl PracticeState {
@@ -246,6 +255,9 @@ pub(super) fn practice_tick(
     let mut misses_delta: u32 = 0;
     let mut score_delta: u32 = 0;
     let mut new_msg: Option<LocalizedStr> = None;
+    // Whether `new_msg` is a hit/miss result (arms `msg_hold`) rather than a
+    // "waiting for the next note" prompt (which must respect an active hold).
+    let mut is_result_msg = false;
 
     for (i, note) in practice.notes.iter_mut().enumerate() {
         if note.missed {
@@ -290,7 +302,10 @@ pub(super) fn practice_tick(
                 note.missed = true;
                 misses_delta += 1;
                 let name = note.expected_name.clone();
-                new_msg.get_or_insert_with(|| loc.msg_args("practice-missed", &[("note", name)]));
+                if new_msg.is_none() {
+                    new_msg = Some(loc.msg_args("practice-missed", &[("note", name)]));
+                    is_result_msg = true;
+                }
             }
             NoteOutcome::Waiting => {
                 let got = detected
@@ -327,6 +342,7 @@ pub(super) fn practice_tick(
                         &[("note", name), ("pts", pts.to_string())],
                     ),
                 });
+                is_result_msg = true;
             }
             NoteOutcome::TooEarly | NoteOutcome::Gap => {}
         }
@@ -337,9 +353,25 @@ pub(super) fn practice_tick(
     practice.hits += hits_delta;
     practice.misses += misses_delta;
     practice.score += score_delta;
-    if let Some(msg) = new_msg {
+    practice.msg_hold = (practice.msg_hold - dt as f32).max(0.0);
+    if let Some(msg) = new_msg
+        && should_update_msg(is_result_msg, practice.msg_hold)
+    {
         practice.msg = msg;
+        if is_result_msg {
+            practice.msg_hold = MSG_HOLD_SECS;
+        }
     }
+}
+
+/// Whether a freshly-computed status message should replace the one
+/// currently on screen: a hit/miss result always wins (and — separately —
+/// arms a fresh hold, see `practice_tick`); a "waiting for the next note"
+/// prompt only wins once the previous result's hold has counted down to
+/// zero. Without this, the tick right after a hit immediately overwrites the
+/// result with the next note's prompt before it's readable.
+fn should_update_msg(is_result_msg: bool, msg_hold: f32) -> bool {
+    is_result_msg || msg_hold <= 0.0
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
@@ -378,6 +410,25 @@ mod tests {
             select_or_add(&mut state, hole, tick);
         }
         state
+    }
+
+    // ── should_update_msg ────────────────────────────────────────────────────
+
+    #[test]
+    fn a_result_message_always_wins() {
+        assert!(should_update_msg(true, 0.6));
+        assert!(should_update_msg(true, 0.0));
+    }
+
+    #[test]
+    fn a_prompt_is_blocked_while_the_hold_is_active() {
+        assert!(!should_update_msg(false, 0.6));
+        assert!(!should_update_msg(false, 0.001));
+    }
+
+    #[test]
+    fn a_prompt_wins_once_the_hold_expires() {
+        assert!(should_update_msg(false, 0.0));
     }
 
     // ── freq_matches ─────────────────────────────────────────────────────────
