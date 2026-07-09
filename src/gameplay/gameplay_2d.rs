@@ -19,7 +19,7 @@ use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_visual_2d::{NoteChildConfig, spawn_note_children};
 use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
-use super::song_progress_overlay::spawn_song_progress;
+use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HIT_H_PCT,
@@ -117,7 +117,11 @@ pub fn setup(
     // `score_notes`/`spawn_visible_notes` both rely on this being sorted —
     // charts are assumed authored in time order, but this makes that an
     // actual guarantee instead of an assumption.
-    combined.sort_by(|a, b| a.0.time.partial_cmp(&b.0.time).unwrap_or(std::cmp::Ordering::Equal));
+    combined.sort_by(|a, b| {
+        a.0.time
+            .partial_cmp(&b.0.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let (notes, play_mode_tags): (Vec<ScheduledNote>, Vec<Option<&'static str>>) =
         combined.into_iter().unzip();
     *song_notes = SongNotes { notes, cursor: 0 };
@@ -166,6 +170,12 @@ pub fn setup(
                 ..default()
             },
             ImageNode::new(manifest.background.clone()),
+            // Background painted first (this node itself), Main Layout second
+            // — everything else here is a child, so it always paints above
+            // the background. The song-progress bar (`BAR_Z_INDEX`) still
+            // paints above this whole layout; panels below reserve
+            // `BAR_HEIGHT` of top space so it doesn't cover their text.
+            GlobalZIndex(1),
             GameplayRoot,
         ))
         .with_children(|root| {
@@ -185,7 +195,10 @@ pub fn setup(
                 width: Val::Percent(60.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(8.0)),
+                padding: UiRect {
+                    top: Val::Px(8.0 + BAR_HEIGHT),
+                    ..UiRect::all(Val::Px(8.0))
+                },
                 row_gap: Val::Px(4.0),
                 ..default()
             })
@@ -224,7 +237,10 @@ pub fn setup(
                 width: Val::Percent(40.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(12.0)),
+                padding: UiRect {
+                    top: Val::Px(12.0 + BAR_HEIGHT),
+                    ..UiRect::all(Val::Px(12.0))
+                },
                 row_gap: Val::Px(12.0),
                 ..default()
             })

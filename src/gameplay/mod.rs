@@ -1078,7 +1078,12 @@ fn score_notes(
     let judged = clock.get() - audio.input_latency_ms as f64 / 1000.0;
 
     if config.combo_enabled
-        && should_decay_combo(score.combo, clock.get(), score.last_hit_time, config.decay_secs)
+        && should_decay_combo(
+            score.combo,
+            clock.get(),
+            score.last_hit_time,
+            config.decay_secs,
+        )
     {
         score.combo = 0;
     }
@@ -1132,7 +1137,10 @@ fn score_notes(
             if clock.get() < note.time + note.duration {
                 // The held pitch stays "consumed" by the gate, so checking the
                 // raw detected set keeps crediting this same note's sustain.
-                if note.expected_pitch.is_some_and(|m| harp_pitches.contains(&m)) {
+                if note
+                    .expected_pitch
+                    .is_some_and(|m| harp_pitches.contains(&m))
+                {
                     note.held += dt;
                 }
                 // Track pitch/loudness through the hold so a declared vibrato
@@ -2214,7 +2222,10 @@ mod tests {
         let none = HashSet::new();
         // Window opens at note.time - LOOKAHEAD = 7.0.
         assert_eq!(notes_needing_spawn(&notes, &none, 7.0), vec![0]);
-        assert_eq!(notes_needing_spawn(&notes, &none, 6.999), Vec::<usize>::new());
+        assert_eq!(
+            notes_needing_spawn(&notes, &none, 6.999),
+            Vec::<usize>::new()
+        );
     }
 
     #[test]

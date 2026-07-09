@@ -631,9 +631,6 @@ mod tests {
     fn chromatic_note_for_is_none_for_a_diatonic_harp() {
         // A diatonic harp has no slide tables at all.
         let harp = c_harp();
-        assert_eq!(
-            chromatic_note_for(&harp, 1, ChromaticRow::BlowSlide),
-            None
-        );
+        assert_eq!(chromatic_note_for(&harp, 1, ChromaticRow::BlowSlide), None);
     }
 }

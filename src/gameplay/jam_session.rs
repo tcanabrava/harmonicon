@@ -21,6 +21,7 @@ use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 use super::countdown_overlay::spawn_countdown;
 use super::harmonica_overlay::spawn_harmonica_overlay;
 use super::metronome_overlay::spawn_metronome;
+use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
     ActivePitches, COUNTDOWN, GameplayClock, GameplayRoot, MusicPlayer, MusicStarted,
@@ -79,6 +80,12 @@ pub fn setup(
                 ..default()
             },
             ImageNode::new(manifest.background.clone()),
+            // Background painted first (this node itself), Main Layout second
+            // — everything else here is a child, so it always paints above
+            // the background. The song-progress bar (`BAR_Z_INDEX`) still
+            // paints above this whole layout; panels below reserve
+            // `BAR_HEIGHT` of top space so it doesn't cover their content.
+            GlobalZIndex(1),
             GameplayRoot,
         ))
         .with_children(|root| {
@@ -101,7 +108,10 @@ pub fn setup(
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
                 row_gap: Val::Px(24.0),
-                padding: UiRect::all(Val::Px(16.0)),
+                padding: UiRect {
+                    top: Val::Px(16.0 + BAR_HEIGHT),
+                    ..UiRect::all(Val::Px(16.0))
+                },
                 ..default()
             })
             .with_children(|left| {
@@ -176,6 +186,7 @@ pub fn setup(
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
+                padding: UiRect::top(Val::Px(BAR_HEIGHT)),
                 ..default()
             })
             .with_children(|right| {
@@ -193,6 +204,22 @@ pub fn setup(
         });
 
     commands.insert_resource(guide);
+
+    // Song-progress bar, pinned across the top like the scored modes — Jam
+    // Session has no `SongNotes` (nothing is scored), so note markers are
+    // taken directly from the chart's track items instead.
+    let note_times: Vec<f64> = chart
+        .track
+        .iter()
+        .map(|item| super::resolve_item_time(item, &chart.timing))
+        .collect();
+    spawn_song_progress(
+        &mut commands,
+        &manifest.waveform,
+        manifest.music_duration_secs,
+        &note_times,
+    );
+
     // Jam already shows the harp hint on the persistent left panel, so the
     // countdown doesn't repeat it.
     spawn_countdown(&mut commands, None);

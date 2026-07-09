@@ -24,7 +24,7 @@ use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_tail_3d::NoteTail3dMaterial;
 use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
-use super::song_progress_overlay::spawn_song_progress;
+use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HoleCell,
@@ -317,7 +317,11 @@ fn build_song_notes_3d(
         }
     }
     // `score_notes`/`spawn_visible_notes_3d` both rely on this being sorted.
-    notes.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap_or(std::cmp::Ordering::Equal));
+    notes.sort_by(|a, b| {
+        a.time
+            .partial_cmp(&b.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let hole_count = chart.harmonica.hole_count();
     (
         super::SongNotes { notes, cursor: 0 },
@@ -753,7 +757,10 @@ fn spawn_hud_overlay(
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Px(8.0),
+                // Below the song-progress bar (`BAR_HEIGHT`, pinned at the very
+                // top across the full width and always painted above the HUD —
+                // see `BAR_Z_INDEX`) so its text is never covered by it.
+                top: Val::Px(8.0 + BAR_HEIGHT),
                 left: Val::Px(8.0),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(4.0),
@@ -764,7 +771,7 @@ fn spawn_hud_overlay(
                 ..default()
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-            GlobalZIndex(10),
+            GlobalZIndex(1),
             GameplayRoot,
         ))
         .with_children(|p| {
@@ -868,14 +875,14 @@ fn spawn_hud_overlay(
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Px(8.0),
+                top: Val::Px(8.0 + BAR_HEIGHT),
                 right: Val::Px(8.0),
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::FlexStart,
                 column_gap: Val::Px(16.0),
                 ..default()
             },
-            GlobalZIndex(20),
+            GlobalZIndex(1),
             GameplayRoot,
         ))
         .with_children(|row| {

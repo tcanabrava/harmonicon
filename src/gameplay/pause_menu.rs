@@ -9,7 +9,7 @@ use bevy::prelude::*;
 
 use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused};
 use crate::dialogs::button;
-use crate::menu::{AppState, ReturnToSongList};
+use crate::menu::{AppState, GameplayMode, ReturnToSongList};
 
 /// Root of the pause overlay; toggled between hidden/visible.
 #[derive(Component, Default, Clone)]
@@ -145,7 +145,16 @@ pub(super) fn update_loop_label(
 /// torn down with the rest of the scene. The whole tree — including each
 /// button's click/hover behaviour — is authored declaratively with `bsn!`.
 /// (Labels use the default font: `bsn!` can't set `TextFont.font` in 0.19.)
-pub(super) fn setup_pause_menu(mut commands: Commands) {
+///
+/// Speed and Wait-for-Note are practice aids for a scored, fixed-length song
+/// — Jam Session has no notes to wait for and no fixed pacing to slow down —
+/// so they're omitted entirely in that mode rather than shown disabled. The
+/// A–B loop controls stay in every mode: dragging a range on the (now
+/// always-present, see `song_progress_overlay`) progress bar while paused is
+/// exactly "select a part of the song to repeat", which is just as useful
+/// for free-play practice as for a scored run.
+pub(super) fn setup_pause_menu(mut commands: Commands, mode: Res<GameplayMode>) {
+    let is_jam = *mode == GameplayMode::JamSession;
     commands
         .spawn_scene(bsn! {
             Node {
@@ -170,7 +179,13 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                 button::default("Resume", on_resume),
                 button::default("Restart", on_restart),
                 button::default("Quit Song", on_quit),
-                (
+            ]
+        })
+        // bsn! can't express the `Visibility::Hidden` enum variant; set it here.
+        .insert(Visibility::Hidden)
+        .with_children(|children| {
+            if !is_jam {
+                children.spawn_empty().apply_scene(bsn! {
                     Node {
                         flex_direction: {FlexDirection::Row},
                         align_items: {AlignItems::Center},
@@ -185,8 +200,8 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                             WaitForNoteLabel
                         ),
                     ]
-                ),
-                (
+                });
+                children.spawn_empty().apply_scene(bsn! {
                     Node {
                         flex_direction: {FlexDirection::Row},
                         align_items: {AlignItems::Center},
@@ -201,32 +216,31 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                             PracticeSpeedLabel
                         ),
                     ]
-                ),
-                (
-                    Node {
-                        flex_direction: {FlexDirection::Row},
-                        align_items: {AlignItems::Center},
-                        column_gap: {Val::Px(8.0)},
-                    }
-                    Children [
-                        button::small("Clear Loop", on_clear_loop),
-                        (
-                            Text({"Loop: off"})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                            LoopRangeLabel
-                        ),
-                    ]
-                ),
-                (
-                    Text({"Drag on the progress bar above to set a loop range"})
-                    TextFont { font_size: {FontSize::Px(15.0)} }
-                    TextColor({Color::srgb(0.55, 0.55, 0.62)})
-                ),
-            ]
-        })
-        // bsn! can't express the `Visibility::Hidden` enum variant; set it here.
-        .insert(Visibility::Hidden);
+                });
+            }
+
+            children.spawn_empty().apply_scene(bsn! {
+                Node {
+                    flex_direction: {FlexDirection::Row},
+                    align_items: {AlignItems::Center},
+                    column_gap: {Val::Px(8.0)},
+                }
+                Children [
+                    button::small("Clear Loop", on_clear_loop),
+                    (
+                        Text({"Loop: off"})
+                        TextFont { font_size: {FontSize::Px(15.0)} }
+                        TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                        LoopRangeLabel
+                    ),
+                ]
+            });
+            children.spawn_empty().apply_scene(bsn! {
+                Text({"Drag on the progress bar above to set a loop range"})
+                TextFont { font_size: {FontSize::Px(15.0)} }
+                TextColor({Color::srgb(0.55, 0.55, 0.62)})
+            });
+        });
 }
 
 // ── Dedicated button callbacks ────────────────────────────────────────────────

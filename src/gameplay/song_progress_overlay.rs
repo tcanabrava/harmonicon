@@ -35,6 +35,13 @@ const WAVEFORM_HEIGHT: f32 = 26.0;
 /// Height (px) of the note-marker strip below the waveform.
 const NOTES_STRIP_HEIGHT: f32 = 10.0;
 
+/// Total height (px) of the bar, pinned across the full width at the very
+/// top of the screen (`top: 0`). `pub` so the gameplay HUDs can reserve this
+/// much space at the top of their own layout instead of placing content
+/// underneath it, where the bar — deliberately painted above them, see
+/// [`BAR_Z_INDEX`] — would cover it.
+pub const BAR_HEIGHT: f32 = WAVEFORM_HEIGHT + NOTES_STRIP_HEIGHT;
+
 /// Width (px) of a single note marker.
 const NOTE_MARKER_WIDTH: f32 = 2.0;
 
@@ -133,7 +140,7 @@ pub fn spawn_song_progress(
                 top: Val::Px(0.0),
                 left: Val::Px(0.0),
                 width: Val::Percent(100.0),
-                height: Val::Px(WAVEFORM_HEIGHT + NOTES_STRIP_HEIGHT),
+                height: Val::Px(BAR_HEIGHT),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },

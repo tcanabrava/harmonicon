@@ -168,10 +168,7 @@ pub fn spawn_modifier_legend(
         });
 }
 
-fn toggle_technique_legend(
-    _: On<Pointer<Click>>,
-    mut collapsed: ResMut<TechniqueLegendCollapsed>,
-) {
+fn toggle_technique_legend(_: On<Pointer<Click>>, mut collapsed: ResMut<TechniqueLegendCollapsed>) {
     collapsed.0 = !collapsed.0;
 }
 
