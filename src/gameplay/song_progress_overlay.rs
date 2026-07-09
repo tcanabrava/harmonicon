@@ -30,11 +30,24 @@ pub struct ProgressPlayhead;
 #[derive(Component, Default, Clone)]
 pub struct LoopRangeMarker;
 
+/// The timescale the currently-drawn waveform bars are laid out on — the
+/// song's real decoded audio duration (`SongManifest::music_duration_secs`),
+/// set once when the bar is spawned. Deliberately *not* [`SongEnd`] (last
+/// chart note + a fixed tail): a tightly-trimmed track ends before that tail
+/// elapses, a padded one keeps going after it, and either way positioning the
+/// playhead/loop marker against the wrong one of the two visibly drifts them
+/// out of sync with the waveform they're drawn on top of.
+#[derive(Resource, Default)]
+pub struct AudioDuration(pub f64);
+
 /// Spawns the full-width progress bar at the very top of the screen: the
 /// song's waveform (from `waveform`, one entry per bar in 0..1, see
 /// `SongManifest::waveform`) with the loop marker and playhead drawn over it.
 /// Tagged `GameplayRoot` so it is torn down with the rest of the scene.
-pub fn spawn_song_progress(commands: &mut Commands, waveform: &[f32]) {
+/// `duration_secs` is the audio's real length (`SongManifest::
+/// music_duration_secs`) — see [`AudioDuration`].
+pub fn spawn_song_progress(commands: &mut Commands, waveform: &[f32], duration_secs: f64) {
+    commands.insert_resource(AudioDuration(duration_secs));
     commands
         .spawn((
             Node {
@@ -93,15 +106,19 @@ pub fn spawn_song_progress(commands: &mut Commands, waveform: &[f32]) {
 }
 
 /// Sweeps the playhead from the left edge at song start to the right edge at
-/// its end. Stays put at the left during the countdown (negative clock) and
-/// for looping songs (no finite end).
+/// the real end of the audio ([`AudioDuration`], not [`SongEnd`] — see its
+/// doc comment). Stays put at the left during the countdown (negative clock)
+/// and for looping songs (no finite `SongEnd`); once the real audio content
+/// is behind it, clamps at the right edge rather than racing ahead of or
+/// lagging the waveform underneath it.
 fn update_progress(
     clock: Res<GameplayClock>,
     song_end: Res<SongEnd>,
+    duration: Res<AudioDuration>,
     mut playheads: Query<&mut Node, With<ProgressPlayhead>>,
 ) {
-    let progress = if song_end.0.is_finite() && song_end.0 > 0.0 {
-        (clock.get() / song_end.0).clamp(0.0, 1.0) as f32
+    let progress = if song_end.0.is_finite() && song_end.0 > 0.0 && duration.0 > 0.0 {
+        (clock.get() / duration.0).clamp(0.0, 1.0) as f32
     } else {
         0.0
     };
@@ -111,20 +128,25 @@ fn update_progress(
 }
 
 /// Left offset and width (both fractions of the bar, 0.0–1.0) for the loop
-/// marker, or `None` if it shouldn't be shown — no finite song length, or the
-/// range isn't currently active. Split out from the system for unit testing
-/// without spinning up rendering.
+/// marker, or `None` if it shouldn't be shown — no finite song length, no
+/// known audio duration to lay it out against, or the range isn't currently
+/// active. Split out from the system for unit testing without spinning up
+/// rendering. `song_end_finite` gates on the same "does this song even have
+/// an end" condition `update_progress` does; `duration_secs` ([`AudioDuration`])
+/// is the timescale actually used for the fraction, so the marker lines up
+/// with the waveform bars it's drawn over.
 pub(super) fn loop_marker_geometry(
     active: bool,
     start_time: f64,
     end_time: f64,
-    song_end: f64,
+    song_end_finite: bool,
+    duration_secs: f64,
 ) -> Option<(f32, f32)> {
-    if !active || !song_end.is_finite() || song_end <= 0.0 {
+    if !active || !song_end_finite || duration_secs <= 0.0 {
         return None;
     }
-    let left = (start_time / song_end).clamp(0.0, 1.0) as f32;
-    let right = (end_time / song_end).clamp(0.0, 1.0) as f32;
+    let left = (start_time / duration_secs).clamp(0.0, 1.0) as f32;
+    let right = (end_time / duration_secs).clamp(0.0, 1.0) as f32;
     Some((left, (right - left).max(0.0)))
 }
 
@@ -135,6 +157,7 @@ pub(super) fn loop_marker_geometry(
 fn update_loop_marker(
     loop_cfg: Res<LoopConfig>,
     song_end: Res<SongEnd>,
+    duration: Res<AudioDuration>,
     mut markers: Query<(&mut Node, &mut Visibility), With<LoopRangeMarker>>,
 ) {
     if !loop_cfg.is_changed() && !song_end.is_changed() {
@@ -144,7 +167,8 @@ fn update_loop_marker(
         loop_cfg.active,
         loop_cfg.start_time,
         loop_cfg.end_time,
-        song_end.0,
+        song_end.0.is_finite() && song_end.0 > 0.0,
+        duration.0,
     );
     for (mut node, mut vis) in &mut markers {
         match geometry {
@@ -162,14 +186,15 @@ pub struct SongProgressPlugin;
 
 impl Plugin for SongProgressPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            update_progress.run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
-        )
-        .add_systems(
-            Update,
-            update_loop_marker.run_if(in_state(AppState::Playing)),
-        );
+        app.init_resource::<AudioDuration>()
+            .add_systems(
+                Update,
+                update_progress.run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+            )
+            .add_systems(
+                Update,
+                update_loop_marker.run_if(in_state(AppState::Playing)),
+            );
     }
 }
 
@@ -179,20 +204,24 @@ mod tests {
 
     #[test]
     fn loop_marker_hidden_when_inactive() {
-        assert_eq!(loop_marker_geometry(false, 8.0, 16.0, 60.0), None);
+        assert_eq!(loop_marker_geometry(false, 8.0, 16.0, true, 60.0), None);
     }
 
     #[test]
     fn loop_marker_hidden_without_a_finite_song_end() {
-        assert_eq!(loop_marker_geometry(true, 8.0, 16.0, f64::INFINITY), None);
-        assert_eq!(loop_marker_geometry(true, 8.0, 16.0, 0.0), None);
+        assert_eq!(loop_marker_geometry(true, 8.0, 16.0, false, 60.0), None);
     }
 
     #[test]
-    fn loop_marker_geometry_is_a_fraction_of_the_song() {
-        // 8s..16s of a 60s song → starts an eighth of the way in, an
-        // eighth wide.
-        let (left, width) = loop_marker_geometry(true, 8.0, 16.0, 64.0).unwrap();
+    fn loop_marker_hidden_without_a_known_audio_duration() {
+        assert_eq!(loop_marker_geometry(true, 8.0, 16.0, true, 0.0), None);
+    }
+
+    #[test]
+    fn loop_marker_geometry_is_a_fraction_of_the_audio_duration() {
+        // 8s..16s of a 64s track → starts an eighth of the way in, an
+        // eighth wide — driven by the real audio duration, not `SongEnd`.
+        let (left, width) = loop_marker_geometry(true, 8.0, 16.0, true, 64.0).unwrap();
         assert!((left - 0.125).abs() < 1e-6);
         assert!((width - 0.125).abs() < 1e-6);
     }

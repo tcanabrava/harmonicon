@@ -932,11 +932,39 @@ fn tick_clock(
         return;
     }
     let dt = time.delta_secs_f64();
-    let audio_pos = (clock.get() >= 0.0 && music_started.0 && *mode != GameplayMode::JamSession)
-        .then(|| sinks.single().ok())
-        .flatten()
+    let audio_pos = sinks
+        .single()
+        .ok()
+        .filter(|sink| should_anchor_to_sink(clock.get(), music_started.0, &mode, sink.empty()))
         .map(|sink| sink.position().as_secs_f64());
     clock.advance(dt, audio_pos);
+}
+
+/// Whether `tick_clock` should anchor the clock to the music sink's reported
+/// position this frame, rather than free-running on frame delta: past the
+/// countdown, once music has actually started, and never in Jam Session
+/// (no long track to drift against there — see `tick_clock`'s doc comment).
+///
+/// Also `false` once the sink's queue is empty. A `Player`/`AudioSink`'s
+/// `position()` is updated by a per-source polling hook; once that source
+/// finishes playing and the queue has nothing else queued, nothing updates
+/// it anymore and it *freezes* at the value it last had — it does not keep
+/// advancing with real time. Anchoring to a frozen position looks fine at
+/// first, but once real elapsed time drifts more than `SNAP_THRESHOLD_SECS`
+/// past it, `advance_clock` starts snapping the clock straight back to that
+/// frozen value every time the gap reopens — a repeating half-second
+/// "rewind" right before the results screen, for any song whose audio ends
+/// before `SongEnd` (`last_note_end + SONG_END_TAIL`) does. Bundled example
+/// songs happen to ship audio padded well past their last chart note, so
+/// this never fires for them, but a tightly-trimmed audio file (chart notes
+/// ending right where the file does) hits it every time.
+fn should_anchor_to_sink(
+    clock: f64,
+    music_started: bool,
+    mode: &GameplayMode,
+    sink_empty: bool,
+) -> bool {
+    clock >= 0.0 && music_started && *mode != GameplayMode::JamSession && !sink_empty
 }
 
 fn handle_loop_boundary(
@@ -1577,6 +1605,63 @@ mod tests {
     fn current_bar_index_clamps_negative_clock() {
         // During countdown the clock is negative — should give bar 0
         assert_eq!(current_bar_index(-1.5, 2.0), 0);
+    }
+
+    // ── should_anchor_to_sink (tick_clock's audio-anchoring gate) ────────────
+
+    #[test]
+    fn anchors_once_playing_with_a_nonempty_sink() {
+        assert!(should_anchor_to_sink(
+            1.0,
+            true,
+            &GameplayMode::Play2D,
+            false
+        ));
+    }
+
+    #[test]
+    fn does_not_anchor_during_the_countdown() {
+        assert!(!should_anchor_to_sink(
+            -1.0,
+            true,
+            &GameplayMode::Play2D,
+            false
+        ));
+    }
+
+    #[test]
+    fn does_not_anchor_before_music_started() {
+        assert!(!should_anchor_to_sink(
+            1.0,
+            false,
+            &GameplayMode::Play2D,
+            false
+        ));
+    }
+
+    #[test]
+    fn does_not_anchor_in_jam_session() {
+        assert!(!should_anchor_to_sink(
+            1.0,
+            true,
+            &GameplayMode::JamSession,
+            false
+        ));
+    }
+
+    #[test]
+    fn does_not_anchor_once_the_sink_is_empty() {
+        // A finished sink's reported position freezes rather than continuing
+        // to advance — anchoring to it would repeatedly snap the clock back
+        // once real time drifts past it. See the doc comment on
+        // `should_anchor_to_sink` for the full story (this is the "song
+        // enters a loop right before the results screen" bug).
+        assert!(!should_anchor_to_sink(
+            1.0,
+            true,
+            &GameplayMode::Play2D,
+            true
+        ));
     }
 
     // ── snap_to_bar_start / loop_range_valid (A/B loop points) ──────────────

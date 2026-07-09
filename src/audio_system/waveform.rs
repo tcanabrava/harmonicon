@@ -46,16 +46,23 @@ pub fn bucket_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
 }
 
 /// Decodes an in-memory audio file (the song's `music.ogg`) into a
-/// `buckets`-wide peak-amplitude waveform. Returns an all-zero waveform on a
-/// decode failure rather than erroring — the progress bar still works, just
-/// without a waveform drawn.
-pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> Vec<f32> {
+/// `buckets`-wide peak-amplitude waveform, plus the file's real duration in
+/// seconds. The duration matters as much as the waveform itself: it's the
+/// timescale the waveform bars are laid out on, and callers must position
+/// anything drawn over them (a playhead, a loop-range marker) using this same
+/// duration — not some other notion of "song length" — or the marker drifts
+/// out of sync with the waveform it's supposed to be pointing at. Returns an
+/// all-zero, zero-duration waveform on a decode failure rather than erroring
+/// — the progress bar still works, just without a waveform drawn.
+pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
     let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes.to_vec())) else {
-        return vec![0.0; buckets];
+        return (vec![0.0; buckets], 0.0);
     };
     let channels = decoder.channels().get() as usize;
+    let sample_rate = decoder.sample_rate().get() as f64;
     let mono = downmix_to_mono(&decoder.collect::<Vec<f32>>(), channels);
-    bucket_peaks(&mono, buckets)
+    let duration_secs = mono.len() as f64 / sample_rate;
+    (bucket_peaks(&mono, buckets), duration_secs)
 }
 
 #[cfg(test)]
@@ -109,8 +116,10 @@ mod tests {
     #[test]
     fn analyze_ogg_waveform_degrades_gracefully_on_bad_bytes() {
         // Not a real ogg file — decoding fails, so we get a flat, sized
-        // waveform back instead of a panic or an error the caller must handle.
-        let waveform = analyze_ogg_waveform(b"not an ogg file", 16);
+        // waveform back (and a zero duration) instead of a panic or an error
+        // the caller must handle.
+        let (waveform, duration) = analyze_ogg_waveform(b"not an ogg file", 16);
         assert_eq!(waveform, vec![0.0; 16]);
+        assert_eq!(duration, 0.0);
     }
 }

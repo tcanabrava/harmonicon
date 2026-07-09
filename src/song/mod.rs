@@ -24,6 +24,14 @@ pub struct SongManifest {
     /// `audio_system::waveform`) so the gameplay progress bar can draw it
     /// immediately instead of decoding audio on the main thread mid-setup.
     pub waveform: Vec<f32>,
+    /// `music`'s real decoded duration in seconds — the timescale `waveform`
+    /// is laid out on. Deliberately *not* the same thing as the gameplay
+    /// `SongEnd` (last chart note + a fixed tail): a tightly-trimmed track
+    /// ends before that tail elapses, a padded one keeps going after it.
+    /// Anything positioned over the waveform (the playhead, the loop-range
+    /// marker) must use this, or it drifts out of sync with the waveform
+    /// it's drawn on top of.
+    pub music_duration_secs: f64,
     pub elements: Handle<Image>,
     /// Asset path of the song's own 2D note image, if it ships one. Stored as
     /// a full [`AssetPath`] (not a `Handle`, and not a bare `PathBuf`) so the

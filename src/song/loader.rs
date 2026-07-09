@@ -92,12 +92,13 @@ impl AssetLoader for SongChartLoader {
         // thread) rather than at gameplay setup, so the progress bar has it
         // ready the instant the song starts — no synchronous decode competing
         // with note-track setup.
-        let waveform = match load_context.read_asset_bytes(music_path).await {
+        let (waveform, music_duration_secs) = match load_context.read_asset_bytes(music_path).await
+        {
             Ok(bytes) => crate::audio_system::waveform::analyze_ogg_waveform(
                 &bytes,
                 crate::audio_system::waveform::WAVEFORM_BUCKETS,
             ),
-            Err(_) => Vec::new(),
+            Err(_) => (Vec::new(), 0.0),
         };
 
         // Note the song's own 2D image path if it ships one. We deliberately do
@@ -161,6 +162,7 @@ impl AssetLoader for SongChartLoader {
             background,
             music,
             waveform,
+            music_duration_secs,
             elements,
             assets_2d,
             assets_2d_config: serde_json::from_str(&note_2d_json).unwrap_or_default(),
