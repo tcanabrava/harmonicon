@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-use super::HitQuality;
+//! Pure scoring math shared by every mode that judges a player's timing and
+//! pitch against a schedule of notes: the main scored gameplay screens
+//! (`crate::gameplay`) and the Song Editor's Practice mode
+//! (`crate::song_editor`). Everything here is deliberately free of ECS
+//! types/resources so both call sites can use it without depending on each
+//! other's UI/HUD code.
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HitQuality {
+    Perfect,
+    Good,
+}
 
 pub const PERFECT_POINTS: u32 = 100;
 pub const GOOD_POINTS: u32 = 50;
@@ -216,6 +227,48 @@ pub fn combo_label(combo: u32, multiplier: f32) -> String {
 fn format_multiplier(mult: f32) -> String {
     let s = format!("{mult:.2}");
     s.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+// ── Attack gate ──────────────────────────────────────────────────────────────
+
+/// Enforces a fresh attack per key. A sustained pitch (or, for Practice mode,
+/// a sustained frequency match against a scheduled note) may satisfy only
+/// **one** note: once it scores, the key is "consumed" and cannot score again
+/// until the condition that made it fresh (the pitch/frequency sounding)
+/// stops holding and starts again. Without this, a single held breath would
+/// clear every note that later scrolls into its hit window at the same pitch.
+///
+/// Generic over `K` so both consumers can key it the way that's natural for
+/// them: `crate::gameplay` keys on the detected MIDI pitch (`u8`) since it
+/// compares against a live, continuously-updated "currently playing" set;
+/// the Song Editor's Practice mode keys on the note's index in its own
+/// schedule (`usize`), since "is it still playing" there means re-checking
+/// that specific note's expected frequency against the detected pitches.
+#[derive(Default)]
+pub struct AttackGate<K> {
+    consumed: std::collections::HashSet<K>,
+}
+
+impl<K: Eq + std::hash::Hash + Copy> AttackGate<K> {
+    /// Drop consumption for any key whose condition no longer holds, so its
+    /// next articulation counts as a fresh attack. `is_playing` decides, for
+    /// each already-consumed key, whether it's still sounding right now.
+    pub fn release_absent(&mut self, mut is_playing: impl FnMut(K) -> bool) {
+        self.consumed.retain(|&k| is_playing(k));
+    }
+
+    /// True if `key` is currently playing (per the caller-supplied `playing`
+    /// flag) and has not already scored during its current, continuous
+    /// sustain.
+    pub fn is_fresh(&self, key: K, playing: bool) -> bool {
+        playing && !self.consumed.contains(&key)
+    }
+
+    /// Mark `key` as having scored; it won't score another note until it is
+    /// released (see [`release_absent`](Self::release_absent)) and replayed.
+    pub fn consume(&mut self, key: K) {
+        self.consumed.insert(key);
+    }
 }
 
 #[cfg(test)]
@@ -594,5 +647,58 @@ mod tests {
     fn oscillation_matches_rate_rejects_nonpositive_target() {
         assert!(!oscillation_matches_rate(5.0, 0.0, 0.4));
         assert!(!oscillation_matches_rate(5.0, -1.0, 0.4));
+    }
+
+    // ── AttackGate ────────────────────────────────────────────────────────────
+
+    fn playing(keys: &[u8]) -> impl Fn(u8) -> bool + '_ {
+        move |k| keys.contains(&k)
+    }
+
+    #[test]
+    fn a_fresh_pitch_is_fresh_when_playing() {
+        let gate = AttackGate::<u8>::default();
+        assert!(gate.is_fresh(67, true));
+    }
+
+    #[test]
+    fn a_pitch_that_is_not_playing_is_never_fresh() {
+        let gate = AttackGate::<u8>::default();
+        assert!(!gate.is_fresh(67, false));
+    }
+
+    #[test]
+    fn a_consumed_pitch_is_not_fresh_while_still_held() {
+        let mut gate = AttackGate::<u8>::default();
+        assert!(gate.is_fresh(67, true));
+        gate.consume(67);
+        gate.release_absent(playing(&[67]));
+        assert!(!gate.is_fresh(67, true));
+    }
+
+    #[test]
+    fn releasing_an_absent_pitch_re_arms_it() {
+        let mut gate = AttackGate::<u8>::default();
+        gate.consume(67);
+        gate.release_absent(playing(&[]));
+        assert!(gate.is_fresh(67, true));
+    }
+
+    #[test]
+    fn consuming_one_pitch_does_not_affect_another() {
+        let mut gate = AttackGate::<u8>::default();
+        gate.consume(67);
+        gate.release_absent(playing(&[67, 71]));
+        assert!(!gate.is_fresh(67, true));
+        assert!(gate.is_fresh(71, true));
+    }
+
+    #[test]
+    fn works_with_a_non_u8_key_type() {
+        // Practice mode keys on the note's schedule index, not a MIDI pitch.
+        let mut gate = AttackGate::<usize>::default();
+        gate.consume(3);
+        assert!(!gate.is_fresh(3, true));
+        assert!(gate.is_fresh(4, true));
     }
 }

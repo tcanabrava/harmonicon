@@ -2,40 +2,49 @@
 
 use bevy::prelude::*;
 
-use super::playback::{
-    C_BLOW, C_BLOW_CHROMATIC, C_BLOW_SLIDE_CHROMATIC, C_DRAW, C_DRAW_CHROMATIC,
-    C_DRAW_SLIDE_CHROMATIC, key_offset,
-};
+use super::playback::build_harp;
 use super::state::{
     Dir, EditorState, Expr, GridNote, HARP_KEYS, HarmonicaKind, POSITIONS, Pitch, Scroll,
 };
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::dialogs::file_dialog::FileChosen;
+use crate::song::chart::Action;
+use crate::song::harmonica::{Harmonica, hole_notes};
 
 // ── Serialisation ────────────────────────────────────────────────────────────
 
-/// Resolves `n`'s note name, choosing the diatonic or chromatic reference
-/// layout (and the slide table when `n.pitch` is `Pitch::Slide`) to match
-/// `kind` — mirrors `playback::note_freq`'s table selection, but returns the
-/// note name for the chart's `events[].note` field rather than a frequency.
-fn note_name_for(n: &GridNote, key_offset: i32, kind: HarmonicaKind) -> String {
-    let idx = (n.hole as usize).saturating_sub(1);
-    let base = match (kind, n.dir, n.pitch) {
-        (HarmonicaKind::Chromatic, Dir::Blow, Pitch::Slide) => {
-            C_BLOW_SLIDE_CHROMATIC.get(idx).copied()
+/// Resolves `n`'s note name for the chart's `events[].note` field — the
+/// actual sounded pitch (bend/overblow/overdraw/slide already applied), not
+/// just the natural blow/draw note. Shares its derivation with the editor's
+/// own preview/practice synthesis (`playback::note_freq`) via
+/// `crate::song::harmonica`, so an exported chart's note always matches what
+/// the editor actually plays for it — in particular, overblow/overdraw are
+/// resolved via [`hole_notes`] rather than a flat "+1 semitone from whichever
+/// direction the note is tagged with", which got the wrong reed for holes
+/// 1/4/5/6 (overblow sits above the *draw* reed, not the blow reed).
+fn note_name_for(n: &GridNote, harp: &Harmonica) -> String {
+    let action = match n.dir {
+        Dir::Blow => Action::Blow,
+        Dir::Draw => Action::Draw,
+    };
+    let label = match n.pitch {
+        Pitch::Normal => harp.wind_direction_label(n.hole, &action),
+        Pitch::Slide => harp.slide_label(n.hole, &action),
+        Pitch::Overblow | Pitch::Overdraw => hole_notes(harp, n.hole)
+            .over
+            .unwrap_or_else(|| "C4".to_string()),
+        Pitch::Bend(a) => {
+            let base = harp.wind_direction_label(n.hole, &action);
+            let midi = note_to_midi(&base).unwrap_or(60);
+            return midi_to_note((midi as f32 - a).round() as i32);
         }
-        (HarmonicaKind::Chromatic, Dir::Draw, Pitch::Slide) => {
-            C_DRAW_SLIDE_CHROMATIC.get(idx).copied()
-        }
-        (HarmonicaKind::Chromatic, Dir::Blow, _) => C_BLOW_CHROMATIC.get(idx).copied(),
-        (HarmonicaKind::Chromatic, Dir::Draw, _) => C_DRAW_CHROMATIC.get(idx).copied(),
-        (HarmonicaKind::Diatonic, Dir::Blow, _) => C_BLOW.get(idx).copied(),
-        (HarmonicaKind::Diatonic, Dir::Draw, _) => C_DRAW.get(idx).copied(),
+    };
+    if label == "\u{2014}" {
+        "C4".to_string()
+    } else {
+        label
     }
-    .unwrap_or("C4");
-    let midi = note_to_midi(base).unwrap_or(60) + key_offset;
-    midi_to_note(midi)
 }
 
 pub(super) fn serialize_harpchart(state: &EditorState) -> String {
@@ -44,7 +53,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
 
     let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
     let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
-    let k_off = key_offset(&state.key);
+    let harp = build_harp(&state.key, state.harmonica_kind);
 
     let mut by_tick: BTreeMap<usize, Vec<&GridNote>> = BTreeMap::new();
     for n in &state.notes {
@@ -66,7 +75,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
                         Dir::Blow => "blow",
                         Dir::Draw => "draw",
                     };
-                    let note_name = note_name_for(n, k_off, state.harmonica_kind);
+                    let note_name = note_name_for(n, &harp);
                     let mut modifiers: Vec<Value> = Vec::new();
                     match n.pitch {
                         Pitch::Bend(a) => {
@@ -120,25 +129,54 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
     };
     let last_phrase = track.len().saturating_sub(1);
 
+    // The harp's own layout, transposed to `state.key` like every note in
+    // `track` above — a 2nd-position G-key song still calls out a C harp
+    // here (the physical instrument to grab), but a straight/1st-position
+    // song's layout now actually matches its key instead of always reading
+    // as a plain, untransposed C harp.
     let harmonica = match state.harmonica_kind {
-        HarmonicaKind::Diatonic => json!({
-            "type": "diatonic",
-            "holes": 10,
-            "position": state.position,
-            "bending_profile": "richter_standard",
-            "layout": { "blow": C_BLOW, "draw": C_DRAW }
-        }),
-        HarmonicaKind::Chromatic => json!({
-            "type": "chromatic",
-            "holes": 12,
-            "position": state.position,
-            "layout": {
-                "blow": C_BLOW_CHROMATIC,
-                "draw": C_DRAW_CHROMATIC,
-                "blow_slide": C_BLOW_SLIDE_CHROMATIC,
-                "draw_slide": C_DRAW_SLIDE_CHROMATIC
-            }
-        }),
+        HarmonicaKind::Diatonic => {
+            let (blow, draw) = match &harp {
+                Harmonica::Diatonic {
+                    layout: Some(l), ..
+                } => (
+                    l.blow.clone().unwrap_or_default(),
+                    l.draw.clone().unwrap_or_default(),
+                ),
+                _ => (Vec::new(), Vec::new()),
+            };
+            json!({
+                "type": "diatonic",
+                "holes": 10,
+                "position": state.position,
+                "bending_profile": "richter_standard",
+                "layout": { "blow": blow, "draw": draw }
+            })
+        }
+        HarmonicaKind::Chromatic => {
+            let (blow, draw, blow_slide, draw_slide) = match &harp {
+                Harmonica::Chromatic {
+                    layout: Some(l), ..
+                } => (
+                    l.blow.clone().unwrap_or_default(),
+                    l.draw.clone().unwrap_or_default(),
+                    l.blow_slide.clone().unwrap_or_default(),
+                    l.draw_slide.clone().unwrap_or_default(),
+                ),
+                _ => (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+            };
+            json!({
+                "type": "chromatic",
+                "holes": 12,
+                "position": state.position,
+                "layout": {
+                    "blow": blow,
+                    "draw": draw,
+                    "blow_slide": blow_slide,
+                    "draw_slide": draw_slide
+                }
+            })
+        }
     };
 
     let chart = json!({

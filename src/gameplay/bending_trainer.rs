@@ -13,25 +13,21 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
-use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::audio_system::pitch_detect::PitchRange;
 use crate::audio_system::wav::encode_wav;
 use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
 use crate::dialogs::button;
 use crate::menu::AppState;
 use crate::settings::AudioSettings;
-use crate::song::chart::{BendingProfile, DiatonicLayout};
-use crate::song::harmonica::Harmonica;
+use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, richter_harp};
 
-use super::harmonica_overlay::{HoleNotes, hole_notes, spawn_harmonica_overlay};
+use super::harmonica_overlay::spawn_harmonica_overlay;
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
 use super::{ActivePitches, GameplayClock, GameplayRoot, PITCH_RANGE_MARGIN_SEMITONES};
 
 const KEYS: [&str; 12] = [
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
 ];
-const C_BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
-const C_DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
 
 const MIN_BPM: f32 = 40.0;
 const MAX_BPM: f32 = 220.0;
@@ -328,33 +324,6 @@ fn next_key(k: &str) -> String {
 fn prev_key(k: &str) -> String {
     let i = KEYS.iter().position(|&x| x == k).unwrap_or(0);
     KEYS[(i + 11) % 12].to_string()
-}
-
-/// Semitone shift from a C harp to `key`, choosing the octave the real harp
-/// sits in: keys up to F# pitch above C, G–B pitch below (the "low" harps).
-fn key_offset(key: &str) -> i32 {
-    let k = KEYS.iter().position(|&x| x == key).unwrap_or(0) as i32;
-    if k <= 6 { k } else { k - 12 }
-}
-
-/// A Richter diatonic harp for `key`, transposed from the C reference layout.
-fn richter_harp(key: &str) -> Harmonica {
-    let off = key_offset(key);
-    let tr = |notes: &[&str]| -> Vec<String> {
-        notes
-            .iter()
-            .filter_map(|n| note_to_midi(n).map(|m| midi_to_note(m + off)))
-            .collect()
-    };
-    Harmonica::Diatonic {
-        holes: 10,
-        bending_profile: BendingProfile::RichterStandard,
-        position: None,
-        layout: Some(DiatonicLayout {
-            blow: Some(tr(&C_BLOW)),
-            draw: Some(tr(&C_DRAW)),
-        }),
-    }
 }
 
 /// The pitch detector's search range for `key`'s transposed Richter harp,
@@ -874,15 +843,8 @@ mod tests {
         assert_eq!(prev_key("C"), "B");
     }
 
-    #[test]
-    fn key_offsets_pick_the_real_harp_octave() {
-        // C harp unchanged; D up two; A and G are the low harps (pitched down).
-        assert_eq!(key_offset("C"), 0);
-        assert_eq!(key_offset("D"), 2);
-        assert_eq!(key_offset("F#"), 6);
-        assert_eq!(key_offset("G"), -5);
-        assert_eq!(key_offset("A"), -3);
-    }
+    // `key_offset` is now `crate::song::harmonica::key_offset` — its
+    // octave-folding behaviour is tested there, not duplicated here.
 
     #[test]
     fn c_harp_keeps_the_reference_layout() {

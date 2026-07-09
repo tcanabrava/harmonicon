@@ -6,9 +6,156 @@ use crate::song::chart::{Action, BendingProfile};
 
 use crate::song::chart::{ChromaticLayout, DiatonicLayout};
 
-use crate::audio_system::midi::{midi_to_freq_hz, note_to_midi};
+use crate::audio_system::midi::{midi_to_freq_hz, midi_to_note, note_to_midi};
 
 use std::collections::HashSet;
+
+// ── Reference layouts ────────────────────────────────────────────────────────
+//
+// Standard-tuned C reference layouts, transposed by [`key_offset`] to build a
+// synthetic [`Harmonica`] for any key — shared by the Bending Trainer (no
+// chart loaded, just a picked key) and the Song Editor's Practice/preview
+// synthesis (its own `GridNote`s, not a chart's authored layout).
+
+/// Standard Richter-tuned C-harp blow notes, holes 1–10.
+pub const C_BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"];
+/// Standard Richter-tuned C-harp draw notes, holes 1–10.
+pub const C_DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
+
+/// Standard 12-hole C chromatic blow notes: a straight C-major scale (unlike
+/// the diatonic layout above, blow and draw are each already a full scale —
+/// the slide button fills in the remaining chromatic steps, see
+/// [`C_BLOW_SLIDE_CHROMATIC`]/[`C_DRAW_SLIDE_CHROMATIC`]).
+pub const C_BLOW_CHROMATIC: [&str; 12] = [
+    "C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5", "D5", "E5", "F5", "G5",
+];
+/// Standard 12-hole C chromatic draw notes (the scale a whole step up).
+pub const C_DRAW_CHROMATIC: [&str; 12] = [
+    "D4", "E4", "F#4", "G4", "A4", "B4", "C#5", "D5", "E5", "F#5", "G5", "A5",
+];
+/// Blow notes with the slide button pressed: each a half-step above the
+/// unslid blow note.
+pub const C_BLOW_SLIDE_CHROMATIC: [&str; 12] = [
+    "C#4", "D#4", "F4", "F#4", "G#4", "A#4", "C5", "C#5", "D#5", "F5", "F#5", "G#5",
+];
+/// Draw notes with the slide button pressed: each a half-step above the
+/// unslid draw note.
+pub const C_DRAW_SLIDE_CHROMATIC: [&str; 12] = [
+    "D#4", "F4", "G4", "G#4", "A#4", "C5", "D5", "D#5", "F5", "G5", "G#5", "A#5",
+];
+
+/// Semitone shift from a C harp to `key`, choosing the octave the real harp
+/// sits in: keys up to F# pitch above C, G–B pitch below (the "low" harps) —
+/// e.g. a G harp's hole-1 blow is G3, not G4. Accepts either sharp or flat
+/// spellings (`"C#"`/`"Db"`), since callers use both.
+pub fn key_offset(key: &str) -> i32 {
+    let semis = note_to_midi(&format!("{}4", key.trim())).map_or(0, |m| m - 60);
+    if semis <= 6 { semis } else { semis - 12 }
+}
+
+/// Transposes each entry of a reference table by `offset` semitones.
+fn transpose_table(notes: &[&str], offset: i32) -> Vec<String> {
+    notes
+        .iter()
+        .filter_map(|n| note_to_midi(n).map(|m| midi_to_note(m + offset)))
+        .collect()
+}
+
+/// A Richter diatonic harp for `key`, transposed from the [`C_BLOW`]/[`C_DRAW`]
+/// reference layout.
+pub fn richter_harp(key: &str) -> Harmonica {
+    let off = key_offset(key);
+    Harmonica::Diatonic {
+        holes: 10,
+        bending_profile: BendingProfile::RichterStandard,
+        position: None,
+        layout: Some(DiatonicLayout {
+            blow: Some(transpose_table(&C_BLOW, off)),
+            draw: Some(transpose_table(&C_DRAW, off)),
+        }),
+    }
+}
+
+/// A 12-hole chromatic harp for `key`, transposed from the reference layout.
+pub fn chromatic_harp(key: &str) -> Harmonica {
+    let off = key_offset(key);
+    Harmonica::Chromatic {
+        holes: 12,
+        position: None,
+        layout: Some(ChromaticLayout {
+            blow: Some(transpose_table(&C_BLOW_CHROMATIC, off)),
+            draw: Some(transpose_table(&C_DRAW_CHROMATIC, off)),
+            blow_slide: Some(transpose_table(&C_BLOW_SLIDE_CHROMATIC, off)),
+            draw_slide: Some(transpose_table(&C_DRAW_SLIDE_CHROMATIC, off)),
+        }),
+    }
+}
+
+// ── Per-hole note set ─────────────────────────────────────────────────────────
+
+/// Every note one hole can produce, by technique. `pub` so any trainer/editor
+/// (the Bending Trainer's target picker, the Song Editor's note-frequency
+/// resolution) can reuse the same bend/overblow math instead of re-deriving
+/// it — see [`hole_notes`].
+pub struct HoleNotes {
+    pub over: Option<String>,
+    pub blow: Option<String>,
+    pub draw: Option<String>,
+    /// Bends, smallest first (½ step, whole, 1½). Draw bends on holes 1–6,
+    /// blow bends on holes 7–10.
+    pub bends: Vec<String>,
+}
+
+/// Transpose a note label by `semis` semitones, e.g. `transpose("B4", 1) → "C5"`.
+fn transpose(s: &str, semis: i32) -> Option<String> {
+    note_to_midi(s).map(|m| midi_to_note(m + semis))
+}
+
+/// Keep a harp label only if it's a real note (drops the `—` "not available".)
+/// `pub(crate)` so callers building their own per-technique note lookups
+/// (the harmonica overlay's chromatic diagram) can filter the same way
+/// [`hole_notes`] does, without re-deriving it.
+pub(crate) fn valid_note(s: String) -> Option<String> {
+    note_to_midi(&s).map(|_| s)
+}
+
+/// Every note `hole` can produce on `harp`, across every technique that
+/// applies to it — the shared derivation behind the harmonica overlay
+/// diagram, the Bending Trainer's target picker, and the Song Editor's note
+/// frequency resolution, so all three agree on e.g. which reed an overblow
+/// actually sounds above.
+pub fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
+    let blow = valid_note(harp.wind_direction_label(hole, &Action::Blow));
+    let draw = valid_note(harp.wind_direction_label(hole, &Action::Draw));
+
+    // Overblow (holes 1,4,5,6) sits a semitone above the draw reed; overdraw
+    // (holes 7–10) a semitone above the blow reed.
+    let over = match hole {
+        1 | 4 | 5 | 6 => draw.as_deref().and_then(|d| transpose(d, 1)),
+        7..=10 => blow.as_deref().and_then(|b| transpose(b, 1)),
+        _ => None,
+    };
+
+    // Bends fill the chromatic steps between blow and draw: drawn down from the
+    // draw reed on holes 1–6, down from the blow reed on holes 7–10.
+    let mut bends = Vec::new();
+    if let (Some(b), Some(d)) = (&blow, &draw)
+        && let (Some(bm), Some(dm)) = (note_to_midi(b), note_to_midi(d))
+    {
+        if hole <= 6 && dm > bm + 1 {
+            bends = (1..dm - bm).map(|k| midi_to_note(dm - k)).collect();
+        } else if hole >= 7 && bm > dm + 1 {
+            bends = (1..bm - dm).map(|k| midi_to_note(bm - k)).collect();
+        }
+    }
+
+    HoleNotes {
+        over,
+        blow,
+        draw,
+        bends,
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -512,5 +659,142 @@ mod tests {
             layout: None,
         };
         assert_eq!(harp.frequency_range(), None);
+    }
+
+    // ── key_offset ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn key_offsets_pick_the_real_harp_octave() {
+        // C harp unchanged; D up two; A and G are the low harps (pitched down).
+        assert_eq!(key_offset("C"), 0);
+        assert_eq!(key_offset("D"), 2);
+        assert_eq!(key_offset("F#"), 6);
+        assert_eq!(key_offset("G"), -5);
+        assert_eq!(key_offset("A"), -3);
+    }
+
+    #[test]
+    fn key_offset_accepts_flat_spellings_too() {
+        // "Db" and "C#" are the same pitch class — callers use both spellings
+        // (the Song Editor's key picker uses flats, the Bending Trainer's
+        // uses sharps).
+        assert_eq!(key_offset("Db"), key_offset("C#"));
+        assert_eq!(key_offset("Ab"), key_offset("G#"));
+        assert_eq!(key_offset("Bb"), key_offset("A#"));
+    }
+
+    // ── richter_harp / chromatic_harp ─────────────────────────────────────────
+
+    #[test]
+    fn c_harp_keeps_the_reference_layout() {
+        let Harmonica::Diatonic {
+            layout: Some(l), ..
+        } = richter_harp("C")
+        else {
+            panic!("expected diatonic");
+        };
+        assert_eq!(l.blow.unwrap()[0], "C4");
+        assert_eq!(l.draw.unwrap()[0], "D4");
+    }
+
+    #[test]
+    fn d_harp_hole_1_blow_is_d4() {
+        let Harmonica::Diatonic {
+            layout: Some(l), ..
+        } = richter_harp("D")
+        else {
+            panic!("expected diatonic");
+        };
+        assert_eq!(l.blow.unwrap()[0], "D4");
+    }
+
+    #[test]
+    fn g_harp_hole_1_blow_is_g3() {
+        // The G harp is a low harp — hole-1 blow sits below C4.
+        let Harmonica::Diatonic {
+            layout: Some(l), ..
+        } = richter_harp("G")
+        else {
+            panic!("expected diatonic");
+        };
+        assert_eq!(l.blow.unwrap()[0], "G3");
+    }
+
+    #[test]
+    fn chromatic_harp_keeps_the_reference_layout_in_c() {
+        let Harmonica::Chromatic {
+            layout: Some(l), ..
+        } = chromatic_harp("C")
+        else {
+            panic!("expected chromatic");
+        };
+        assert_eq!(l.blow.unwrap()[0], "C4");
+        assert_eq!(l.draw.unwrap()[0], "D4");
+        assert_eq!(l.blow_slide.unwrap()[0], "C#4");
+        assert_eq!(l.draw_slide.unwrap()[0], "D#4");
+    }
+
+    #[test]
+    fn chromatic_harp_transposes_every_table() {
+        let Harmonica::Chromatic {
+            layout: Some(l), ..
+        } = chromatic_harp("D")
+        else {
+            panic!("expected chromatic");
+        };
+        assert_eq!(l.blow.unwrap()[0], "D4");
+        assert_eq!(l.draw.unwrap()[0], "E4");
+    }
+
+    // ── hole_notes ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn transpose_crosses_octave() {
+        assert_eq!(transpose("B4", 1).as_deref(), Some("C5"));
+        assert_eq!(transpose("C5", -1).as_deref(), Some("B4"));
+        assert_eq!(transpose("D4", -1).as_deref(), Some("C#4"));
+    }
+
+    #[test]
+    fn hole_1_has_one_draw_bend() {
+        // C harp hole 1: blow C4, draw D4 → single ½-step bend C#4.
+        let h = hole_notes(&richter_harp("C"), 1);
+        assert_eq!(h.blow.as_deref(), Some("C4"));
+        assert_eq!(h.draw.as_deref(), Some("D4"));
+        assert_eq!(h.bends, vec!["C#4"]);
+    }
+
+    #[test]
+    fn hole_3_has_three_draw_bends() {
+        // blow G4, draw B4 → A#4, A4, G#4 (½, whole, 1½).
+        let h = hole_notes(&richter_harp("C"), 3);
+        assert_eq!(h.bends, vec!["A#4", "A4", "G#4"]);
+    }
+
+    #[test]
+    fn hole_10_has_two_blow_bends() {
+        // blow C7, draw A6 → blow bends B6, A#6.
+        let h = hole_notes(&richter_harp("C"), 10);
+        assert_eq!(h.bends, vec!["B6", "A#6"]);
+        assert_eq!(
+            h.over.as_deref(),
+            Some("C#7"),
+            "overdraw a semitone above blow"
+        );
+    }
+
+    #[test]
+    fn hole_5_has_no_draw_bend() {
+        // blow E5, draw F5 — only a semitone apart, nothing between.
+        let h = hole_notes(&richter_harp("C"), 5);
+        assert!(h.bends.is_empty());
+    }
+
+    #[test]
+    fn hole_1_overblow_is_a_semitone_above_draw() {
+        assert_eq!(
+            hole_notes(&richter_harp("C"), 1).over.as_deref(),
+            Some("D#4")
+        );
     }
 }

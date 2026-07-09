@@ -123,7 +123,7 @@ mod tests {
         load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart,
     };
     use super::interaction::{apply_modifier, select_or_add};
-    use super::playback::{SAMPLE_RATE, encode_wav, envelope, key_offset, note_freq, render_pcm};
+    use super::playback::{SAMPLE_RATE, build_harp, encode_wav, envelope, note_freq, render_pcm};
     use super::state::Scroll;
     use super::state::{
         Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, apply_resize, can_place,
@@ -508,50 +508,73 @@ mod tests {
 
     #[test]
     fn note_freq_maps_holes_bends_and_key() {
-        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Diatonic).unwrap();
+        let c_harp = build_harp("C", HarmonicaKind::Diatonic);
+        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), &c_harp).unwrap();
         assert!((c4 - 261.63).abs() < 0.5, "got {c4}");
-        let bent = note_freq(
-            &note(1, Dir::Blow, Pitch::Bend(1.0)),
-            0,
-            HarmonicaKind::Diatonic,
-        )
-        .unwrap();
+        let bent = note_freq(&note(1, Dir::Blow, Pitch::Bend(1.0)), &c_harp).unwrap();
         assert!(bent < c4, "bend should drop pitch: {bent} !< {c4}");
-        let g = note_freq(
-            &note(1, Dir::Blow, Pitch::Normal),
-            key_offset("G"),
-            HarmonicaKind::Diatonic,
-        )
-        .unwrap();
+        // G sits 7 semitones above C, but a real G Richter harp is a "low"
+        // harp — its hole-1 blow is pitched *down* to G3 (a fourth below C4),
+        // not up to G4 (a fifth above), so the octave-folded key offset is
+        // -5, not +7. See `song::harmonica::key_offset`.
+        let g_harp = build_harp("G", HarmonicaKind::Diatonic);
+        let g = note_freq(&note(1, Dir::Blow, Pitch::Normal), &g_harp).unwrap();
         assert!(
-            (g / c4 - 2f32.powf(7.0 / 12.0)).abs() < 0.001,
-            "G harp is a fifth up"
+            (g / c4 - 2f32.powf(-5.0 / 12.0)).abs() < 0.001,
+            "G harp is the low harp — a fourth down, not a fifth up"
         );
-        assert_eq!(key_offset("C"), 0);
+        assert!(note_freq(&note(11, Dir::Blow, Pitch::Normal), &c_harp).is_none());
+    }
+
+    #[test]
+    fn note_freq_resolves_overblow_and_overdraw_from_the_correct_reed() {
+        // Regression: this used to take whichever table `note.dir` picked
+        // (whatever the player happened to set the note's Blow/Draw arrow
+        // to) and add a flat +1 semitone, rather than deriving the reed the
+        // technique actually sounds from — wrong for the very common case of
+        // an Overblow note left at its default `Dir::Blow`. Overblow (holes
+        // 1/4/5/6) always sounds a semitone above the *draw* reed, and
+        // Overdraw (holes 7-10) a semitone above the *blow* reed, regardless
+        // of the note's own `dir` — see `song::harmonica::hole_notes`.
+        let harp = build_harp("C", HarmonicaKind::Diatonic);
+
+        // Hole 1: blow C4, draw D4 → overblow is D#4 (draw reed + 1), not
+        // C#4 (blow reed + 1), even though the note is tagged `Dir::Blow`.
+        let overblow = note_freq(&note(1, Dir::Blow, Pitch::Overblow), &harp).unwrap();
+        let draw_reed = note_freq(&note(1, Dir::Draw, Pitch::Normal), &harp).unwrap();
+        let semitone = 2f32.powf(1.0 / 12.0);
         assert!(
-            note_freq(&note(11, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Diatonic).is_none()
+            (overblow / draw_reed - semitone).abs() < 0.001,
+            "overblow should be a semitone above the draw reed"
+        );
+
+        // Hole 10: blow C7, draw A6 → overdraw is C#7 (blow reed + 1), even
+        // though the note is tagged `Dir::Draw`.
+        let overdraw = note_freq(&note(10, Dir::Draw, Pitch::Overdraw), &harp).unwrap();
+        let blow_reed = note_freq(&note(10, Dir::Blow, Pitch::Normal), &harp).unwrap();
+        assert!(
+            (overdraw / blow_reed - semitone).abs() < 0.001,
+            "overdraw should be a semitone above the blow reed"
         );
     }
 
     #[test]
     fn note_freq_reads_the_chromatic_layout_and_slide_table() {
-        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Chromatic)
-            .unwrap();
+        let harp = build_harp("C", HarmonicaKind::Chromatic);
+        let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), &harp).unwrap();
         assert!((c4 - 261.63).abs() < 0.5, "hole 1 blow is C4, got {c4}");
-        let slid = note_freq(&note(1, Dir::Blow, Pitch::Slide), 0, HarmonicaKind::Chromatic)
-            .unwrap();
+        let slid = note_freq(&note(1, Dir::Blow, Pitch::Slide), &harp).unwrap();
         assert!(slid > c4, "slide should raise pitch: {slid} !> {c4}");
         // Chromatic goes up to hole 12; hole 11 is out of range for diatonic
         // but valid here.
-        assert!(
-            note_freq(&note(11, Dir::Blow, Pitch::Normal), 0, HarmonicaKind::Chromatic).is_some()
-        );
+        assert!(note_freq(&note(11, Dir::Blow, Pitch::Normal), &harp).is_some());
     }
 
     #[test]
     fn render_and_wav_have_expected_size() {
         let notes = vec![note(4, Dir::Draw, Pitch::Normal)];
-        let pcm = render_pcm(&notes, 120.0, 0, HarmonicaKind::Diatonic);
+        let harp = build_harp("C", HarmonicaKind::Diatonic);
+        let pcm = render_pcm(&notes, 120.0, &harp);
         let expected = ((0.5 + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
         assert_eq!(pcm.len(), expected);
         assert!(
@@ -640,8 +663,10 @@ mod tests {
         assert_eq!(chord["play_mode"], "chord");
         assert_eq!(chord["events"].as_array().unwrap().len(), 2);
 
+        // Hole-2 blow is E4 on a C harp; key "G" is a low harp (see
+        // `song::harmonica::key_offset`), transposing it down a fourth to B3.
         let single = &track[0];
-        assert_eq!(single["events"][0]["note"], "B4");
+        assert_eq!(single["events"][0]["note"], "B3");
     }
 
     #[test]
@@ -771,6 +796,7 @@ mod tests {
     #[test]
     fn note_in_scale_uses_the_bent_target_pitch_not_the_natural_one() {
         let scale = blues_scale_classes("C");
+        let harp = build_harp("C", HarmonicaKind::Diatonic);
 
         // Draw-3 unbent is B4 (the major 7th) — outside the C blues scale.
         let natural = GridNote {
@@ -783,7 +809,7 @@ mod tests {
             expr: Expr::None,
         };
         assert!(
-            !note_in_scale(&natural, 0, &scale, HarmonicaKind::Diatonic),
+            !note_in_scale(&natural, &harp, &scale),
             "unbent B (major 7th) is outside the blues scale"
         );
 
@@ -799,7 +825,7 @@ mod tests {
             expr: Expr::None,
         };
         assert!(
-            note_in_scale(&bent, 0, &scale, HarmonicaKind::Diatonic),
+            note_in_scale(&bent, &harp, &scale),
             "bending down 1.5 steps reaches Bb, the b7 — in scale"
         );
     }

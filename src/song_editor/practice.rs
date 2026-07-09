@@ -4,14 +4,16 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 use bevy_fluent::prelude::Localization;
 
-use crate::audio_system::midi::midi_to_note;
+use crate::audio_system::midi::{freq_to_midi, midi_to_note};
 use crate::audio_system::pitch_detect::PitchEvent;
-use crate::gameplay::{HitQuality, NoteOutcome, classify_note, compute_points, sustain_points};
 use crate::localization::{LocalizationExt, LocalizedStr};
+use crate::scoring::{
+    AttackGate, HitQuality, NoteOutcome, classify_note, compute_points, sustain_points,
+};
 use crate::settings::AudioSettings;
 
 use super::TICKS_PER_BEAT;
-use super::playback::{EditorAudio, Playhead, key_offset, note_freq};
+use super::playback::{EditorAudio, Playhead, build_harp, note_freq};
 use super::state::EditorState;
 
 // ── Timing windows ────────────────────────────────────────────────────────────
@@ -55,10 +57,12 @@ struct PracticeNote {
 pub(super) struct PracticeState {
     pub active: bool,
     notes: Vec<PracticeNote>,
-    /// Indices of notes consumed by the current sustained breath.
-    /// A note is dropped from this set once its frequency stops sounding,
-    /// re-arming it for the next articulation (same logic as gameplay's PitchGate).
-    consumed: std::collections::HashSet<usize>,
+    /// Notes (keyed by schedule index) consumed by the current sustained
+    /// breath. An index is released once that note's expected frequency
+    /// stops being detected, re-arming it for the next articulation. Shared
+    /// re-attack logic with `crate::gameplay::PitchGate` — see
+    /// `crate::scoring::AttackGate`.
+    consumed: AttackGate<usize>,
     pub score: u32,
     pub hits: u32,
     pub misses: u32,
@@ -81,15 +85,14 @@ impl PracticeState {
 fn build_schedule(state: &EditorState) -> Vec<PracticeNote> {
     let bpm: f32 = state.tempo.parse::<f32>().unwrap_or(120.0).max(1.0);
     let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
-    let k_off = key_offset(&state.key);
+    let harp = build_harp(&state.key, state.harmonica_kind);
 
     let mut notes: Vec<PracticeNote> = state
         .notes
         .iter()
         .filter_map(|n| {
-            let freq = note_freq(n, k_off, state.harmonica_kind)?;
-            let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
-            let name = midi_to_note(midi);
+            let freq = note_freq(n, &harp)?;
+            let name = freq_to_name(freq);
             Some(PracticeNote {
                 start_secs: n.tick as f64 * secs_per_tick as f64,
                 end_secs: (n.tick + n.len) as f64 * secs_per_tick as f64,
@@ -242,7 +245,7 @@ pub(super) fn practice_tick(
     // Re-arm any entry whose frequency is no longer sounding — the player must
     // re-articulate to score the next occurrence of the same pitch.
     let mut consumed = std::mem::take(&mut practice.consumed);
-    consumed.retain(|&idx| {
+    consumed.release_absent(|idx| {
         practice
             .notes
             .get(idx)
@@ -250,7 +253,6 @@ pub(super) fn practice_tick(
     });
 
     // Score all notes, collecting mutations for application after the loop.
-    let mut new_consumed: Vec<usize> = Vec::new();
     let mut hits_delta: u32 = 0;
     let mut misses_delta: u32 = 0;
     let mut score_delta: u32 = 0;
@@ -286,10 +288,10 @@ pub(super) fn practice_tick(
         let offset = judged - note.start_secs;
         // A note scores only on a fresh attack: the pitch must be sounding AND
         // not already consumed by an earlier note in this continuous breath.
-        let playing_expected = !consumed.contains(&i)
-            && detected
-                .iter()
-                .any(|&f| freq_matches(f, note.expected_freq));
+        let is_playing = detected
+            .iter()
+            .any(|&f| freq_matches(f, note.expected_freq));
+        let playing_expected = consumed.is_fresh(i, is_playing);
 
         match classify_note(
             offset,
@@ -328,7 +330,7 @@ pub(super) fn practice_tick(
             NoteOutcome::Hit(quality) => {
                 note.hit = true;
                 hits_delta += 1;
-                new_consumed.push(i);
+                consumed.consume(i);
                 let pts = compute_points(quality, 1.0);
                 score_delta += pts;
                 let name = note.expected_name.clone();
@@ -348,7 +350,6 @@ pub(super) fn practice_tick(
         }
     }
 
-    consumed.extend(new_consumed);
     practice.consumed = consumed;
     practice.hits += hits_delta;
     practice.misses += misses_delta;
@@ -387,14 +388,7 @@ pub(super) fn freq_matches(detected: f32, expected: f32) -> bool {
 
 /// Nearest MIDI note name for a raw frequency (used in "you played X" messages).
 pub(super) fn freq_to_name(freq: f32) -> String {
-    if freq <= 0.0 {
-        return String::new();
-    }
-    let midi = (69.0_f32 + 12.0 * (freq / 440.0).log2()).round() as i32;
-    if !(0..=127).contains(&midi) {
-        return String::new();
-    }
-    midi_to_note(midi)
+    freq_to_midi(freq).map(midi_to_note).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -487,17 +481,13 @@ mod tests {
         let state = state_with_notes("D", &[(2, 0)]);
         let schedule = build_schedule(&state);
         assert_eq!(schedule.len(), 1);
-        let k_off = key_offset(&state.key);
-        let expected_freq = note_freq(&state.notes[0], k_off, state.harmonica_kind).unwrap();
+        let harp = build_harp(&state.key, state.harmonica_kind);
+        let expected_freq = note_freq(&state.notes[0], &harp).unwrap();
         assert_eq!(schedule[0].expected_freq, expected_freq);
         // A C-harp draw-2 in D (up a whole step) should not equal the C-key freq.
         let c_state = state_with_notes("C", &[(2, 0)]);
-        let c_freq = note_freq(
-            &c_state.notes[0],
-            key_offset(&c_state.key),
-            c_state.harmonica_kind,
-        )
-        .unwrap();
+        let c_harp = build_harp(&c_state.key, c_state.harmonica_kind);
+        let c_freq = note_freq(&c_state.notes[0], &c_harp).unwrap();
         assert_ne!(expected_freq, c_freq);
     }
 

@@ -15,15 +15,14 @@ pub mod note_visual_2d;
 mod pause_menu;
 mod phrase_overlay;
 mod results;
-mod scoring;
 mod song_progress_overlay;
 pub mod twelve_bar_blues_overlay;
 mod wait_freeze_overlay;
 
 use bevy::prelude::*;
-pub use scoring::{NoteOutcome, classify_note, compute_points, sustain_points};
-use scoring::{
-    VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC, combo_label, compute_multiplier,
+pub use crate::scoring::{HitQuality, NoteOutcome, classify_note, compute_points, sustain_points};
+use crate::scoring::{
+    AttackGate, VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC, combo_label, compute_multiplier,
     measured_oscillation_hz, measured_relative_oscillation_hz, oscillation_matches_rate,
     should_decay_combo,
 };
@@ -259,31 +258,21 @@ pub struct ActivePitches(pub Vec<PitchInfo>);
 /// note: once it scores, the pitch is "consumed" and cannot score again until it
 /// stops sounding and is articulated anew. Without this, a single held breath on
 /// (say) G4 would clear every G4 note that later scrolls into its hit window.
+/// Thin `Resource` wrapper around the generic [`AttackGate`] — see
+/// `crate::scoring`, which also backs the Song Editor's Practice mode.
 #[derive(Resource, Default)]
-pub struct PitchGate {
-    /// Valid harp pitches (MIDI note numbers) consumed by a hit since their
-    /// last onset. Each is dropped once the pitch is no longer detected,
-    /// re-arming it for the next articulation.
-    consumed: HashSet<u8>,
+pub struct PitchGate(AttackGate<u8>);
+
+impl std::ops::Deref for PitchGate {
+    type Target = AttackGate<u8>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-impl PitchGate {
-    /// Drop consumption for any pitch that is no longer sounding, so its next
-    /// articulation counts as a fresh attack.
-    fn release_absent(&mut self, playing: &HashSet<u8>) {
-        self.consumed.retain(|p| playing.contains(p));
-    }
-
-    /// True if `pitch` is sounding and has not already scored a note during its
-    /// current, continuous sustain.
-    fn is_fresh(&self, pitch: u8, playing: &HashSet<u8>) -> bool {
-        playing.contains(&pitch) && !self.consumed.contains(&pitch)
-    }
-
-    /// Mark `pitch` as having scored; it won't score another note until it is
-    /// released (see [`release_absent`](Self::release_absent)) and replayed.
-    fn consume(&mut self, pitch: u8) {
-        self.consumed.insert(pitch);
+impl std::ops::DerefMut for PitchGate {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -415,12 +404,6 @@ pub struct HitFeedback {
 /// Updated every frame so hole-display systems can show a target hint.
 #[derive(Resource, Default)]
 pub struct ActiveTargets(pub Vec<(u8, bool)>);
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum HitQuality {
-    Perfect,
-    Good,
-}
 
 // ── Shared components ─────────────────────────────────────────────────────────
 
@@ -780,7 +763,7 @@ fn reset_score(
     *stats = SongStats::default();
     *feedback = HitFeedback::default();
     paused.0 = false;
-    gate.consumed.clear();
+    *gate = PitchGate::default();
 }
 
 /// Semitone margin added on each side of the harmonica's natural range when
@@ -1097,7 +1080,7 @@ fn score_notes(
 
     // Re-arm any pitch the player has stopped sounding, so its next attack is
     // fresh. Pitches still held remain consumed and can't score again.
-    gate.release_absent(&harp_pitches);
+    gate.release_absent(|p| harp_pitches.contains(&p));
 
     // A prefix of `notes` (sorted by `time`) that's permanently resolved
     // (missed, or hit and fully sustained) never needs visiting again —
@@ -1213,7 +1196,7 @@ fn score_notes(
         // never be "playing".
         let playing = note
             .expected_pitch
-            .is_some_and(|m| gate.is_fresh(m, &harp_pitches));
+            .is_some_and(|m| gate.is_fresh(m, harp_pitches.contains(&m)));
 
         match classify_note(
             offset,
@@ -1807,62 +1790,9 @@ mod tests {
         assert_eq!(modifier_fx_key(&Slide), "slide");
     }
 
-    // ── PitchGate (re-attack detection) ──────────────────────────────────────────
-
-    /// G4 = 67, B4 = 71.
-    fn playing(pitches: &[u8]) -> HashSet<u8> {
-        pitches.iter().copied().collect()
-    }
-
-    #[test]
-    fn a_sounding_unconsumed_pitch_is_fresh() {
-        let gate = PitchGate::default();
-        assert!(gate.is_fresh(67, &playing(&[67])));
-    }
-
-    #[test]
-    fn a_silent_pitch_is_never_fresh() {
-        let gate = PitchGate::default();
-        assert!(!gate.is_fresh(67, &playing(&[])));
-    }
-
-    #[test]
-    fn a_held_pitch_cannot_score_twice() {
-        // The core fix: one sustained breath clears one note, not the next.
-        let mut gate = PitchGate::default();
-        let held = playing(&[67]);
-
-        // First note: fresh attack scores, then we consume the pitch.
-        assert!(gate.is_fresh(67, &held));
-        gate.consume(67);
-
-        // The breath is still held — a second G4 note must NOT count.
-        gate.release_absent(&held);
-        assert!(!gate.is_fresh(67, &held));
-    }
-
-    #[test]
-    fn re_articulating_a_pitch_re_arms_it() {
-        let mut gate = PitchGate::default();
-        gate.consume(67);
-
-        // Player stops playing: G4 drops out of the detected set and re-arms.
-        gate.release_absent(&playing(&[]));
-
-        // Next attack on G4 is fresh again.
-        assert!(gate.is_fresh(67, &playing(&[67])));
-    }
-
-    #[test]
-    fn consuming_one_pitch_leaves_others_fresh() {
-        let mut gate = PitchGate::default();
-        let chord = playing(&[67, 71]);
-        gate.consume(67);
-        gate.release_absent(&chord);
-
-        assert!(!gate.is_fresh(67, &chord));
-        assert!(gate.is_fresh(71, &chord));
-    }
+    // `PitchGate` is now a thin `Resource` wrapper around the shared
+    // `AttackGate` (see `crate::scoring`) — its re-attack-detection behaviour
+    // is covered by `AttackGate`'s own tests there, not duplicated here.
 
     // ── target_pitch (bend validation) ───────────────────────────────────────────
 

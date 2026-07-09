@@ -54,6 +54,18 @@ pub fn note_to_freq_hz(note: &str) -> Option<f32> {
     Some(midi_to_freq_hz(note_to_midi(note)? as f32))
 }
 
+/// Nearest MIDI note number for a raw frequency (rounds to the nearest
+/// semitone) — the inverse of [`midi_to_freq_hz`]. `None` outside the valid
+/// MIDI range (0-127), which also catches non-positive/nonsensical input
+/// rather than producing a bogus octave.
+pub fn freq_to_midi(freq: f32) -> Option<i32> {
+    if freq <= 0.0 {
+        return None;
+    }
+    let midi = (69.0 + 12.0 * (freq / 440.0).log2()).round() as i32;
+    (0..=127).contains(&midi).then_some(midi)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,6 +117,37 @@ mod tests {
                 Some(midi),
                 "roundtrip failed for midi={midi}"
             );
+        }
+    }
+
+    // ── freq_to_midi ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn freq_to_midi_identifies_concert_pitch() {
+        assert_eq!(freq_to_midi(440.0), Some(69));
+    }
+
+    #[test]
+    fn freq_to_midi_rounds_to_the_nearest_semitone() {
+        assert_eq!(freq_to_midi(261.63), Some(60)); // middle C
+    }
+
+    #[test]
+    fn freq_to_midi_is_none_for_nonpositive_input() {
+        assert_eq!(freq_to_midi(0.0), None);
+        assert_eq!(freq_to_midi(-1.0), None);
+    }
+
+    #[test]
+    fn freq_to_midi_is_none_outside_the_midi_range() {
+        assert_eq!(freq_to_midi(50_000.0), None);
+    }
+
+    #[test]
+    fn freq_to_midi_round_trips_through_midi_to_freq_hz() {
+        for midi in 21i32..=108 {
+            let freq = midi_to_freq_hz(midi as f32);
+            assert_eq!(freq_to_midi(freq), Some(midi), "round trip failed for {midi}");
         }
     }
 }
