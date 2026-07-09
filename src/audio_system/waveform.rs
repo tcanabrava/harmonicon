@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: MIT
+
+//! Decodes a whole song's audio into a coarse peak-amplitude waveform, for
+//! display on the gameplay progress bar (`gameplay::song_progress_overlay`).
+//! Runs once, at song-asset load time — see `song::loader` — so gameplay
+//! setup just reads the finished `Vec<f32>` off `SongManifest`.
+
+use std::io::Cursor;
+
+use rodio::Source;
+
+/// How many bars the waveform is reduced to — independent of song length or
+/// screen width; the display just divides its width evenly among them.
+pub const WAVEFORM_BUCKETS: usize = 300;
+
+/// Downmixes interleaved multi-channel samples to mono by averaging each
+/// frame. `channels <= 1` returns the input unchanged (already mono).
+fn downmix_to_mono(samples: &[f32], channels: usize) -> Vec<f32> {
+    if channels <= 1 {
+        return samples.to_vec();
+    }
+    samples
+        .chunks(channels)
+        .map(|frame| frame.iter().sum::<f32>() / frame.len() as f32)
+        .collect()
+}
+
+/// Splits mono samples into `buckets` equal-width windows and takes the peak
+/// absolute amplitude (0..1) in each. Empty input yields an all-zero
+/// waveform of the requested length; a zero bucket count yields an empty one.
+pub fn bucket_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
+    if buckets == 0 || samples.is_empty() {
+        return vec![0.0; buckets];
+    }
+    let len = samples.len();
+    (0..buckets)
+        .map(|i| {
+            let start = i * len / buckets;
+            let end = ((i + 1) * len / buckets).max(start + 1).min(len);
+            samples[start..end]
+                .iter()
+                .fold(0.0f32, |peak, &s| peak.max(s.abs()))
+                .clamp(0.0, 1.0)
+        })
+        .collect()
+}
+
+/// Decodes an in-memory audio file (the song's `music.ogg`) into a
+/// `buckets`-wide peak-amplitude waveform. Returns an all-zero waveform on a
+/// decode failure rather than erroring — the progress bar still works, just
+/// without a waveform drawn.
+pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> Vec<f32> {
+    let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes.to_vec())) else {
+        return vec![0.0; buckets];
+    };
+    let channels = decoder.channels().get() as usize;
+    let mono = downmix_to_mono(&decoder.collect::<Vec<f32>>(), channels);
+    bucket_peaks(&mono, buckets)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn downmix_leaves_mono_untouched() {
+        let samples = [0.1, -0.2, 0.3];
+        assert_eq!(downmix_to_mono(&samples, 1), samples);
+    }
+
+    #[test]
+    fn downmix_averages_interleaved_channels() {
+        // Stereo: left=1.0, right=-1.0 should average to 0.0 in every frame.
+        let samples = [1.0, -1.0, 0.5, -0.5];
+        assert_eq!(downmix_to_mono(&samples, 2), vec![0.0, 0.0]);
+    }
+
+    #[test]
+    fn bucket_peaks_empty_input_is_all_zero() {
+        assert_eq!(bucket_peaks(&[], 4), vec![0.0; 4]);
+    }
+
+    #[test]
+    fn bucket_peaks_zero_buckets_is_empty() {
+        assert!(bucket_peaks(&[0.1, 0.2], 0).is_empty());
+    }
+
+    #[test]
+    fn bucket_peaks_finds_the_loudest_sample_per_window() {
+        // Four windows of two samples each; the peak (abs) of each pair.
+        let samples = [0.1, -0.9, 0.2, 0.3, -0.4, 0.05, 0.6, 0.6];
+        let peaks = bucket_peaks(&samples, 4);
+        assert_eq!(peaks.len(), 4);
+        assert!((peaks[0] - 0.9).abs() < 1e-6);
+        assert!((peaks[1] - 0.3).abs() < 1e-6);
+        assert!((peaks[2] - 0.4).abs() < 1e-6);
+        assert!((peaks[3] - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn bucket_peaks_covers_every_sample_even_when_buckets_dont_divide_evenly() {
+        // 7 samples into 3 buckets shouldn't drop the tail samples.
+        let samples = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9];
+        let peaks = bucket_peaks(&samples, 3);
+        assert_eq!(peaks.len(), 3);
+        assert!((peaks[2] - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn analyze_ogg_waveform_degrades_gracefully_on_bad_bytes() {
+        // Not a real ogg file — decoding fails, so we get a flat, sized
+        // waveform back instead of a panic or an error the caller must handle.
+        let waveform = analyze_ogg_waveform(b"not an ogg file", 16);
+        assert_eq!(waveform, vec![0.0; 16]);
+    }
+}

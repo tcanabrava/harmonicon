@@ -7,9 +7,13 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use super::{GameplayRoot, MusicPlayer, Paused};
+use super::{
+    GameplayClock, GameplayRoot, LoopConfig, MusicPlayer, Paused, ScoringConfig, loop_range_valid,
+    secs_per_bar, snap_to_bar_start,
+};
 use crate::dialogs::button;
-use crate::menu::{AppState, ReturnToSongList};
+use crate::menu::{AppState, ReturnToSongList, SelectedSong};
+use crate::song::SongManifest;
 
 /// Root of the pause overlay; toggled between hidden/visible.
 #[derive(Component, Default, Clone)]
@@ -49,6 +53,77 @@ pub(super) fn update_wait_mode_label(
         } else {
             "Wait for Note: off"
         });
+    }
+}
+
+/// The "Loop: ..." readout, kept in step with [`LoopConfig`].
+#[derive(Component, Default, Clone)]
+pub(super) struct LoopRangeLabel;
+
+/// Bar-snaps the current clock position (`snap_to_bar_start`) into
+/// `LoopConfig::start_time`/`end_time` and recomputes `active` from
+/// `loop_range_valid` — the same recompute after either point, so setting A
+/// and B in either order (or moving one past the other) lands on a
+/// consistent, valid-or-inactive state instead of a stale half-set range.
+fn on_set_loop_a(
+    _: On<Pointer<Click>>,
+    clock: Res<GameplayClock>,
+    config: Res<ScoringConfig>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut loop_cfg: ResMut<LoopConfig>,
+) {
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let spb = secs_per_bar(manifest.chart.song.tempo_bpm as f64, config.beats_per_bar);
+    loop_cfg.start_time = snap_to_bar_start(clock.get(), spb);
+    loop_cfg.active = loop_range_valid(loop_cfg.start_time, loop_cfg.end_time);
+}
+
+fn on_set_loop_b(
+    _: On<Pointer<Click>>,
+    clock: Res<GameplayClock>,
+    config: Res<ScoringConfig>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut loop_cfg: ResMut<LoopConfig>,
+) {
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let spb = secs_per_bar(manifest.chart.song.tempo_bpm as f64, config.beats_per_bar);
+    loop_cfg.end_time = snap_to_bar_start(clock.get(), spb);
+    loop_cfg.active = loop_range_valid(loop_cfg.start_time, loop_cfg.end_time);
+}
+
+fn on_clear_loop(_: On<Pointer<Click>>, mut loop_cfg: ResMut<LoopConfig>) {
+    *loop_cfg = LoopConfig::default();
+}
+
+/// Pure so the three possible readouts (off / one point pending / a valid
+/// range) are unit-testable without spinning up an `App`.
+fn loop_label_text(cfg: &LoopConfig) -> String {
+    if cfg.active {
+        format!("Loop: {:.0}s\u{2013}{:.0}s", cfg.start_time, cfg.end_time)
+    } else if cfg.start_time > 0.0 || cfg.end_time > 0.0 {
+        "Loop: pending (set the other point)".to_string()
+    } else {
+        "Loop: off".to_string()
+    }
+}
+
+/// Keeps the "Loop: ..." readout in step with [`LoopConfig`]. Not gated on
+/// `Paused`, same reasoning as `update_wait_mode_label`.
+pub(super) fn update_loop_label(
+    loop_cfg: Res<LoopConfig>,
+    mut labels: Query<&mut Text, With<LoopRangeLabel>>,
+) {
+    if !loop_cfg.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(loop_label_text(&loop_cfg));
     }
 }
 
@@ -94,6 +169,24 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                             TextFont { font_size: {FontSize::Px(15.0)} }
                             TextColor({Color::srgb(0.70, 0.70, 0.80)})
                             WaitForNoteLabel
+                        ),
+                    ]
+                ),
+                (
+                    Node {
+                        flex_direction: {FlexDirection::Row},
+                        align_items: {AlignItems::Center},
+                        column_gap: {Val::Px(8.0)},
+                    }
+                    Children [
+                        button::small("Set A", on_set_loop_a),
+                        button::small("Set B", on_set_loop_b),
+                        button::small("Clear Loop", on_clear_loop),
+                        (
+                            Text({"Loop: off"})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                            LoopRangeLabel
                         ),
                     ]
                 ),
@@ -258,5 +351,32 @@ mod tests {
         assert!(!paused.0);
         assert_eq!(pending_state(&next), Some(AppState::Menu));
         assert!(rtsl.0, "should land on the song list");
+    }
+
+    // ── loop_label_text ───────────────────────────────────────────────────────
+
+    #[test]
+    fn loop_label_is_off_by_default() {
+        assert_eq!(loop_label_text(&LoopConfig::default()), "Loop: off");
+    }
+
+    #[test]
+    fn loop_label_shows_pending_once_only_one_point_is_set() {
+        let cfg = LoopConfig {
+            active: false,
+            start_time: 8.0,
+            end_time: 0.0,
+        };
+        assert_eq!(loop_label_text(&cfg), "Loop: pending (set the other point)");
+    }
+
+    #[test]
+    fn loop_label_shows_the_range_once_active() {
+        let cfg = LoopConfig {
+            active: true,
+            start_time: 8.0,
+            end_time: 16.0,
+        };
+        assert_eq!(loop_label_text(&cfg), "Loop: 8s\u{2013}16s");
     }
 }

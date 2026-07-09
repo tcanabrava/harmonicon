@@ -20,6 +20,10 @@ pub struct SongManifest {
     pub chart: HarpChart,
     pub background: Handle<Image>,
     pub music: Handle<AudioSource>,
+    /// Peak-amplitude waveform of `music`, pre-analyzed at load time (see
+    /// `audio_system::waveform`) so the gameplay progress bar can draw it
+    /// immediately instead of decoding audio on the main thread mid-setup.
+    pub waveform: Vec<f32>,
     pub elements: Handle<Image>,
     /// Asset path of the song's own 2D note image, if it ships one. Stored as
     /// a full [`AssetPath`] (not a `Handle`, and not a bare `PathBuf`) so the

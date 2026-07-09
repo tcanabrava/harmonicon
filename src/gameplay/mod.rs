@@ -139,7 +139,11 @@ impl Plugin for GameplayPlugin {
         // button is visible/clickable).
         .add_systems(
             Update,
-            pause_menu::update_wait_mode_label.run_if(in_state(AppState::Playing)),
+            (
+                pause_menu::update_wait_mode_label,
+                pause_menu::update_loop_label,
+            )
+                .run_if(in_state(AppState::Playing)),
         )
         // Gameplay-logic chains only run when not paused. This set ticks the
         // clock, so every clock reader below must run after it — otherwise the
@@ -640,6 +644,26 @@ pub fn secs_per_bar(bpm: f64, beats: f64) -> f64 {
 /// Which of the 12 bars in a twelve-bar cycle the clock is currently on.
 pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
     (clock.max(0.0) / secs_per_bar) as usize % 12
+}
+
+/// Rounds `time` down to the start of its current bar. Used to snap the A/B
+/// loop points set from the pause menu to bar boundaries, since notes and
+/// the metronome align to bars, not arbitrary seconds a mouse click landed
+/// on.
+pub fn snap_to_bar_start(time: f64, secs_per_bar: f64) -> f64 {
+    if secs_per_bar <= 0.0 {
+        return time.max(0.0);
+    }
+    (time.max(0.0) / secs_per_bar).floor() * secs_per_bar
+}
+
+/// A loop range only makes sense once `end_time` is strictly after
+/// `start_time` — the single rule `LoopConfig::active` is recomputed from
+/// whenever either point is set from the pause menu (in either order, or
+/// moving a point that invalidates an already-active range), so the result
+/// is consistent regardless of click order.
+pub fn loop_range_valid(start_time: f64, end_time: f64) -> bool {
+    end_time > start_time
 }
 
 /// Resolve a track item's start time in seconds, preferring an explicit `time`
@@ -1553,6 +1577,31 @@ mod tests {
     fn current_bar_index_clamps_negative_clock() {
         // During countdown the clock is negative — should give bar 0
         assert_eq!(current_bar_index(-1.5, 2.0), 0);
+    }
+
+    // ── snap_to_bar_start / loop_range_valid (A/B loop points) ──────────────
+
+    #[test]
+    fn snap_to_bar_start_rounds_down_to_the_current_bar() {
+        assert_eq!(snap_to_bar_start(5.0, 2.0), 4.0);
+        assert_eq!(snap_to_bar_start(4.0, 2.0), 4.0); // already on a boundary
+    }
+
+    #[test]
+    fn snap_to_bar_start_clamps_negative_time_to_zero() {
+        assert_eq!(snap_to_bar_start(-3.0, 2.0), 0.0);
+    }
+
+    #[test]
+    fn snap_to_bar_start_falls_back_for_nonpositive_bar_length() {
+        assert_eq!(snap_to_bar_start(5.0, 0.0), 5.0);
+    }
+
+    #[test]
+    fn loop_range_valid_requires_end_strictly_after_start() {
+        assert!(loop_range_valid(4.0, 8.0));
+        assert!(!loop_range_valid(8.0, 8.0));
+        assert!(!loop_range_valid(8.0, 4.0));
     }
 
     // ── resolve_item_time ───────────────────────────────────────────────────────

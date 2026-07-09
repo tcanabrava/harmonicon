@@ -84,8 +84,21 @@ impl AssetLoader for SongChartLoader {
         let sibling = |rel: std::path::PathBuf| AssetPath::from(rel).with_source(source.clone());
 
         let background = load_context.load::<Image>(sibling(song_folder.join("background.png")));
-        let music = load_context.load::<AudioSource>(sibling(song_folder.join("song/music.ogg")));
+        let music_path = sibling(song_folder.join("song/music.ogg"));
+        let music = load_context.load::<AudioSource>(music_path.clone());
         let elements = load_context.load::<Image>(sibling(song_folder.join("elements.png")));
+
+        // Pre-analyze the waveform here (asset load time, off the main
+        // thread) rather than at gameplay setup, so the progress bar has it
+        // ready the instant the song starts — no synchronous decode competing
+        // with note-track setup.
+        let waveform = match load_context.read_asset_bytes(music_path).await {
+            Ok(bytes) => crate::audio_system::waveform::analyze_ogg_waveform(
+                &bytes,
+                crate::audio_system::waveform::WAVEFORM_BUCKETS,
+            ),
+            Err(_) => Vec::new(),
+        };
 
         // Note the song's own 2D image path if it ships one. We deliberately do
         // NOT `load()` it here: that would make it a manifest dependency, kept
@@ -147,6 +160,7 @@ impl AssetLoader for SongChartLoader {
             chart,
             background,
             music,
+            waveform,
             elements,
             assets_2d,
             assets_2d_config: serde_json::from_str(&note_2d_json).unwrap_or_default(),
