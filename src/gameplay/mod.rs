@@ -82,6 +82,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<bending_trainer::DrillState>()
         .init_resource::<jam_session::JamLoop>()
         .init_resource::<pause_menu::WaitForNoteMode>()
+        .init_resource::<pause_menu::PracticeSpeed>()
         // Setup: shared pause menu + mode-specific scenes
         .add_systems(
             OnEnter(AppState::Playing),
@@ -142,6 +143,7 @@ impl Plugin for GameplayPlugin {
             (
                 pause_menu::update_wait_mode_label,
                 pause_menu::update_loop_label,
+                pause_menu::update_practice_speed_label,
             )
                 .run_if(in_state(AppState::Playing)),
         )
@@ -876,23 +878,29 @@ fn setup_scoring_config(
 /// the notes out of sync with the audio over a long song. Jam Session has no
 /// long track to drift against and stays frame-timer driven (metronome-led).
 ///
-/// When `WaitForNoteMode` is on and a playable note is due and still unhit
-/// (`first_due_unresolved_note`), the clock simply isn't advanced this frame
-/// — holding it exactly at the hit line — and the music sink is paused so it
-/// can't drift ahead while frozen. Nothing else needs to know about the
-/// freeze: `score_notes` keeps re-judging the same held instant every frame,
-/// so the moment the player actually plays the note it scores (typically a
-/// Perfect, since the offset never moved) and the very next frame the
-/// condition is false again, resuming the clock and the sink normally. Jam
-/// Session never populates `SongNotes`, so this is a no-op there.
+/// Two things can take the clock off that path, and both work the same way:
+/// the music sink should or shouldn't be audible right now
+/// (`should_play`), computed once and compared against the sink's own
+/// `is_paused()` so `AudioSink::pause`/`play` only ever fires on the actual
+/// edge — calling it ~60 times a second turned out to visibly upset the
+/// audio backend (observed as odd behaviour in the *microphone* input, a
+/// fully separate pipeline, which only makes sense if repeatedly toggling
+/// the output stream was disturbing a shared audio graph/server).
 ///
-/// The sink is only paused/resumed on the actual freeze/unfreeze *edge*
-/// (tracked via `WaitFreezeState`, which also drives the wait-freeze prompt),
-/// not every frame while frozen — calling `AudioSink::pause`/`play` ~60
-/// times a second turned out to visibly upset the audio backend (observed as
-/// odd behaviour in the *microphone* input, a fully separate pipeline, which
-/// only makes sense if repeatedly toggling the output stream was disturbing
-/// a shared audio graph/server).
+/// - `WaitForNoteMode` on and a playable note due and still unhit
+///   (`first_due_unresolved_note`): the clock simply isn't advanced this
+///   frame, holding it exactly at the hit line. `score_notes` keeps
+///   re-judging the same held instant every frame, so the moment the player
+///   plays the note it scores (typically a Perfect, since the offset never
+///   moved) and the very next frame the condition is false again. Jam
+///   Session never populates `SongNotes`, so this is a no-op there.
+/// - `PracticeSpeed` below 100%: real time-stretched audio isn't
+///   implemented, so the sink just pauses instead of playing pitch-shifted,
+///   and the clock free-runs on `Time::delta` scaled by the speed instead of
+///   anchoring (the sink's position wouldn't mean anything at the wrong
+///   speed anyway). Coming back to 100% re-seeks the sink to the clock's
+///   current position (`GameplayClock::rewind_to`) before resuming it, since
+///   it sat still the whole time the clock kept moving.
 fn tick_clock(
     mut clock: ResMut<GameplayClock>,
     time: Res<Time>,
@@ -900,6 +908,7 @@ fn tick_clock(
     music_started: Res<MusicStarted>,
     wait_mode: Res<pause_menu::WaitForNoteMode>,
     mut wait_freeze: ResMut<wait_freeze_overlay::WaitFreezeState>,
+    practice_speed: Res<pause_menu::PracticeSpeed>,
     song_notes: Res<SongNotes>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
@@ -907,19 +916,32 @@ fn tick_clock(
         .0
         .then(|| first_due_unresolved_note(&song_notes.notes, song_notes.cursor, clock.get()))
         .flatten();
+    // Gated so `ResMut`'s change detection (which `wait_freeze_overlay`'s
+    // prompt reacts to) only fires on an actual transition, not every frame.
     if due != wait_freeze.0 {
-        for sink in &sinks {
-            if due.is_some() {
-                sink.pause();
-            } else {
-                sink.play();
-            }
-        }
         wait_freeze.0 = due;
     }
+
+    let full_speed = practice_speed.0 == 1.0;
+    let should_play = due.is_none() && full_speed;
+    if let Ok(sink) = sinks.single() {
+        if should_play && sink.is_paused() {
+            let t = clock.get();
+            clock.rewind_to(t, Some(sink));
+            sink.play();
+        } else if !should_play && !sink.is_paused() {
+            sink.pause();
+        }
+    }
+
     if due.is_some() {
         return;
     }
+    if !full_speed {
+        clock.advance(time.delta_secs_f64() * practice_speed.0 as f64, None);
+        return;
+    }
+
     let dt = time.delta_secs_f64();
     let audio_pos = sinks
         .single()

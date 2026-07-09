@@ -52,6 +52,59 @@ pub(super) fn update_wait_mode_label(
     }
 }
 
+/// Practice aid: scales how fast the gameplay clock advances. The note
+/// highway and metronome read the clock directly, so they slow down for
+/// free; real time-stretched audio is a later upgrade, so `tick_clock` just
+/// pauses the music sink below 100% instead of playing it pitch-shifted.
+/// `1.0` (100%) by default; a standing player preference (like
+/// `WaitForNoteMode`), so it isn't reset between restarts/songs.
+#[derive(Resource, Clone, Copy, PartialEq)]
+pub struct PracticeSpeed(pub f32);
+
+impl Default for PracticeSpeed {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+
+/// Discrete steps a click cycles through, fastest first.
+const SPEED_STEPS: [f32; 6] = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5];
+
+/// The step after `current` in [`SPEED_STEPS`], wrapping back to the first.
+fn next_speed_step(current: f32) -> f32 {
+    let idx = SPEED_STEPS
+        .iter()
+        .position(|&s| (s - current).abs() < 1e-6)
+        .unwrap_or(SPEED_STEPS.len() - 1);
+    SPEED_STEPS[(idx + 1) % SPEED_STEPS.len()]
+}
+
+fn on_cycle_practice_speed(_: On<Pointer<Click>>, mut speed: ResMut<PracticeSpeed>) {
+    speed.0 = next_speed_step(speed.0);
+}
+
+/// The "Speed: ..." readout, kept in step with [`PracticeSpeed`].
+#[derive(Component, Default, Clone)]
+pub(super) struct PracticeSpeedLabel;
+
+fn practice_speed_label_text(speed: f32) -> String {
+    format!("Speed: {:.0}%", speed * 100.0)
+}
+
+/// Keeps the "Speed: ..." readout in step with [`PracticeSpeed`]. Not gated
+/// on `Paused`, same reasoning as `update_wait_mode_label`.
+pub(super) fn update_practice_speed_label(
+    speed: Res<PracticeSpeed>,
+    mut labels: Query<&mut Text, With<PracticeSpeedLabel>>,
+) {
+    if !speed.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(practice_speed_label_text(speed.0));
+    }
+}
+
 /// The "Loop: ..." readout, kept in step with [`LoopConfig`].
 #[derive(Component, Default, Clone)]
 pub(super) struct LoopRangeLabel;
@@ -130,6 +183,22 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                             TextFont { font_size: {FontSize::Px(15.0)} }
                             TextColor({Color::srgb(0.70, 0.70, 0.80)})
                             WaitForNoteLabel
+                        ),
+                    ]
+                ),
+                (
+                    Node {
+                        flex_direction: {FlexDirection::Row},
+                        align_items: {AlignItems::Center},
+                        column_gap: {Val::Px(8.0)},
+                    }
+                    Children [
+                        button::small("\u{1F422} Speed", on_cycle_practice_speed),
+                        (
+                            Text({"Speed: 100%"})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                            PracticeSpeedLabel
                         ),
                     ]
                 ),
@@ -344,5 +413,32 @@ mod tests {
             end_time: 16.0,
         };
         assert_eq!(loop_label_text(&cfg), "Loop: 8s\u{2013}16s");
+    }
+
+    // ── next_speed_step / practice_speed_label_text ───────────────────────────
+
+    #[test]
+    fn next_speed_step_walks_down_from_full_speed() {
+        assert_eq!(next_speed_step(1.0), 0.9);
+        assert_eq!(next_speed_step(0.9), 0.8);
+        assert_eq!(next_speed_step(0.6), 0.5);
+    }
+
+    #[test]
+    fn next_speed_step_wraps_back_to_full_speed() {
+        assert_eq!(next_speed_step(0.5), 1.0);
+    }
+
+    #[test]
+    fn next_speed_step_defaults_to_the_slowest_step_for_an_unknown_value() {
+        // Shouldn't happen — `PracticeSpeed` only ever holds a `SPEED_STEPS`
+        // value — but stay well-defined rather than panicking.
+        assert_eq!(next_speed_step(0.42), 1.0);
+    }
+
+    #[test]
+    fn practice_speed_label_formats_as_a_percentage() {
+        assert_eq!(practice_speed_label_text(1.0), "Speed: 100%");
+        assert_eq!(practice_speed_label_text(0.7), "Speed: 70%");
     }
 }
