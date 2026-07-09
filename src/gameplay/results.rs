@@ -147,7 +147,7 @@ pub(super) fn setup(
                 root.spawn((
                     Text::new("By technique"),
                     TextFont {
-                        font_size: FontSize::Px(14.0),
+                        font_size: FontSize::Px(15.0),
                         ..default()
                     },
                     TextColor(Color::srgb(0.55, 0.58, 0.65)),

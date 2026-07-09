@@ -195,7 +195,7 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
             panel.spawn((
                 Text::new("Harmonica  \u{00B7}  lights up as you play"),
                 TextFont {
-                    font_size: FontSize::Px(12.0),
+                    font_size: FontSize::Px(15.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
@@ -293,7 +293,7 @@ fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) 
             panel.spawn((
                 Text::new("Harmonica  \u{00B7}  lights up as you play"),
                 TextFont {
-                    font_size: FontSize::Px(12.0),
+                    font_size: FontSize::Px(15.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
@@ -340,12 +340,12 @@ fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) 
         });
 }
 
-/// A 34×22 cell shell. Returns its `EntityCommands` so callers add content.
+/// A 44×28 cell shell. Returns its `EntityCommands` so callers add content.
 fn cell<'a>(row: &'a mut ChildSpawnerCommands, bg: Color) -> EntityCommands<'a> {
     row.spawn((
         Node {
-            width: Val::Px(34.0),
-            height: Val::Px(22.0),
+            width: Val::Px(44.0),
+            height: Val::Px(28.0),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
             ..default()
@@ -364,7 +364,7 @@ fn spawn_note_cell(row: &mut ChildSpawnerCommands, note: &str, color: Color) {
             c.spawn((
                 Text::new(note_class(note).to_string()),
                 TextFont {
-                    font_size: FontSize::Px(11.0),
+                    font_size: FontSize::Px(15.0),
                     ..default()
                 },
                 TextColor(color),
@@ -378,7 +378,7 @@ fn spawn_text_cell(row: &mut ChildSpawnerCommands, text: &str, color: Color) {
         c.spawn((
             Text::new(text.to_string()),
             TextFont {
-                font_size: FontSize::Px(12.0),
+                font_size: FontSize::Px(15.0),
                 ..default()
             },
             TextColor(color),
@@ -390,8 +390,8 @@ fn spawn_text_cell(row: &mut ChildSpawnerCommands, text: &str, color: Color) {
 /// longest label ("overblow ↑"/"overdraw ↓") at this font size.
 fn spawn_label(row: &mut ChildSpawnerCommands, text: &str) {
     row.spawn(Node {
-        width: Val::Px(58.0),
-        height: Val::Px(22.0),
+        width: Val::Px(90.0),
+        height: Val::Px(28.0),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::FlexEnd,
         padding: UiRect::right(Val::Px(4.0)),
@@ -401,7 +401,7 @@ fn spawn_label(row: &mut ChildSpawnerCommands, text: &str) {
         c.spawn((
             Text::new(text.to_string()),
             TextFont {
-                font_size: FontSize::Px(10.0),
+                font_size: FontSize::Px(15.0),
                 ..default()
             },
             TextColor(LABEL_COLOR),

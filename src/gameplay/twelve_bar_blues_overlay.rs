@@ -35,7 +35,7 @@ impl GridConfig {
             cell_width: Val::Px(120.0),
             cell_height: Val::Px(54.0),
             chord_font_size: 17.0,
-            bar_num_font_size: 9.0,
+            bar_num_font_size: 15.0,
             col_gap: 3.0,
         }
     }
@@ -45,7 +45,7 @@ impl GridConfig {
             cell_width: Val::Px(76.0),
             cell_height: Val::Px(52.0),
             chord_font_size: 24.0,
-            bar_num_font_size: 11.0,
+            bar_num_font_size: 15.0,
             col_gap: 4.0,
         }
     }

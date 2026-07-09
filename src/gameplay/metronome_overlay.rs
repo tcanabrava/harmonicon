@@ -154,7 +154,7 @@ pub fn spawn_metronome(parent: &mut ChildSpawnerCommands, beats_per_bar: usize, 
             row.spawn((
                 Text::new(format!("\u{2669} = {}", bpm as u32)),
                 TextFont {
-                    font_size: FontSize::Px(13.0),
+                    font_size: FontSize::Px(15.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.65, 0.65, 0.70)),
@@ -180,7 +180,7 @@ pub fn spawn_metronome(parent: &mut ChildSpawnerCommands, beats_per_bar: usize, 
                     Children [
                         (
                             Text({"click: on".to_string()})
-                            TextFont { font_size: {FontSize::Px(11.0)} }
+                            TextFont { font_size: {FontSize::Px(15.0)} }
                             TextColor({Color::srgb(0.65, 0.65, 0.70)})
                             MetronomeMuteLabel
                             Pickable { should_block_lower: {false}, is_hoverable: {false} }
@@ -205,7 +205,7 @@ pub fn spawn_metronome(parent: &mut ChildSpawnerCommands, beats_per_bar: usize, 
                     Children [
                         (
                             Text({"feel: shuffle".to_string()})
-                            TextFont { font_size: {FontSize::Px(11.0)} }
+                            TextFont { font_size: {FontSize::Px(15.0)} }
                             TextColor({Color::srgb(0.65, 0.65, 0.70)})
                             MetronomeFeelLabel
                             Pickable { should_block_lower: {false}, is_hoverable: {false} }

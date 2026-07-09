@@ -666,7 +666,7 @@ fn setup_ui(mut commands: Commands) {
                     labels.spawn((
                         Text::new(txt),
                         TextFont {
-                            font_size: FontSize::Px(11.0),
+                            font_size: FontSize::Px(15.0),
                             ..default()
                         },
                         TextColor(Color::srgb(0.40, 0.42, 0.52)),
@@ -678,7 +678,7 @@ fn setup_ui(mut commands: Commands) {
             col.spawn((
                 Text::new(""),
                 TextFont {
-                    font_size: FontSize::Px(14.0),
+                    font_size: FontSize::Px(15.0),
                     ..default()
                 },
                 TextColor(Color::srgb(0.70, 0.72, 0.85)),

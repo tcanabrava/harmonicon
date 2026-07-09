@@ -220,7 +220,7 @@ pub(super) fn setup_pause_menu(mut commands: Commands) {
                 ),
                 (
                     Text({"Drag on the progress bar above to set a loop range"})
-                    TextFont { font_size: {FontSize::Px(13.0)} }
+                    TextFont { font_size: {FontSize::Px(15.0)} }
                     TextColor({Color::srgb(0.55, 0.55, 0.62)})
                 ),
             ]

@@ -137,7 +137,7 @@ pub fn setup(
                     row.spawn((
                         Text::new("Loop: off"),
                         TextFont {
-                            font_size: FontSize::Px(13.0),
+                            font_size: FontSize::Px(15.0),
                             ..default()
                         },
                         TextColor(Color::srgb(0.70, 0.70, 0.80)),
@@ -389,7 +389,7 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
         .with_children(|col| {
             col.spawn((
                 Text::new("Your harmonica  \u{00B7}  gold = chord tone right now  \u{00B7}  green = blues-scale note  \u{00B7}  top blow / bottom draw"),
-                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
             ));
             col.spawn(Node {
@@ -401,7 +401,7 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
                 for h in holes {
                     row.spawn((
                         Node {
-                            width: Val::Px(40.0),
+                            width: Val::Px(50.0),
                             flex_direction: FlexDirection::Column,
                             align_items: AlignItems::Center,
                             justify_content: JustifyContent::Center,
@@ -415,7 +415,7 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
                     .with_children(|cell| {
                         cell.spawn((
                             Text::new(note_class(&h.blow).to_string()),
-                            TextFont { font_size: FontSize::Px(10.0), ..default() },
+                            TextFont { font_size: FontSize::Px(15.0), ..default() },
                             TextColor(if h.blow_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
                         ));
                         cell.spawn((
@@ -425,7 +425,7 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
                         ));
                         cell.spawn((
                             Text::new(note_class(&h.draw).to_string()),
-                            TextFont { font_size: FontSize::Px(10.0), ..default() },
+                            TextFont { font_size: FontSize::Px(15.0), ..default() },
                             TextColor(if h.draw_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
                         ));
                     });

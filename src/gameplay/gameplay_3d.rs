@@ -767,8 +767,8 @@ fn spawn_hud_overlay(
         .with_children(|p| {
             for (text, size, color) in [
                 (title.as_str(), 18.0f32, Color::WHITE),
-                (info.as_str(), 12.0, Color::srgb(0.65, 0.70, 0.80)),
-                (harp_info.as_str(), 11.0, Color::srgb(0.45, 0.72, 0.55)),
+                (info.as_str(), 15.0, Color::srgb(0.65, 0.70, 0.80)),
+                (harp_info.as_str(), 15.0, Color::srgb(0.45, 0.72, 0.55)),
             ] {
                 p.spawn((
                     Text::new(text.to_string()),
@@ -783,7 +783,7 @@ fn spawn_hud_overlay(
                 p.spawn((
                     Text::new(desc.to_string()),
                     TextFont {
-                        font_size: FontSize::Px(10.0),
+                        font_size: FontSize::Px(15.0),
                         ..default()
                     },
                     TextColor(Color::srgb(0.50, 0.50, 0.55)),
@@ -793,7 +793,7 @@ fn spawn_hud_overlay(
                 p.spawn((
                     Text::new(format!("Chart: {author}")),
                     TextFont {
-                        font_size: FontSize::Px(9.0),
+                        font_size: FontSize::Px(15.0),
                         ..default()
                     },
                     TextColor(Color::srgb(0.40, 0.40, 0.45)),
@@ -827,7 +827,7 @@ fn spawn_hud_overlay(
                 leg.spawn((
                     Text::new("\u{25A0} BLOW"),
                     TextFont {
-                        font_size: FontSize::Px(10.0),
+                        font_size: FontSize::Px(15.0),
                         ..default()
                     },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
@@ -835,7 +835,7 @@ fn spawn_hud_overlay(
                 leg.spawn((
                     Text::new("\u{25A0} DRAW"),
                     TextFont {
-                        font_size: FontSize::Px(10.0),
+                        font_size: FontSize::Px(15.0),
                         ..default()
                     },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),

@@ -163,7 +163,7 @@ pub fn spawn_algo_explanation(
         p.spawn((
             Text::new(selected.description()),
             TextFont {
-                font_size: FontSize::Px(14.0),
+                font_size: FontSize::Px(15.0),
                 ..default()
             },
             TextColor(Color::srgb(0.75, 0.78, 0.88)),

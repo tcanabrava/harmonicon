@@ -194,7 +194,7 @@ fn handle_open(
             ),
             (
                 Text({String::new()})
-                TextFont { font_size: {FontSize::Px(12.0)} }
+                TextFont { font_size: {FontSize::Px(15.0)} }
                 TextColor({Color::srgb(0.6, 0.6, 0.7)})
                 DialogPathText
             ),
@@ -221,7 +221,7 @@ fn handle_open(
                 Children [
                     (
                         Text({"File name:".to_string()})
-                        TextFont { font_size: {FontSize::Px(13.0)} }
+                        TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.75, 0.75, 0.85)})
                     ),
                     (
@@ -235,7 +235,7 @@ fn handle_open(
                         Children [
                             (
                                 Text({initial_filename})
-                                TextFont { font_size: {FontSize::Px(13.0)} }
+                                TextFont { font_size: {FontSize::Px(15.0)} }
                                 TextColor({Color::WHITE})
                                 SaveFilenameText
                             )
@@ -258,7 +258,7 @@ fn handle_open(
                         Children [
                             (
                                 Text({"Save".to_string()})
-                                TextFont { font_size: {FontSize::Px(13.0)} }
+                                TextFont { font_size: {FontSize::Px(15.0)} }
                                 TextColor({Color::WHITE})
                             )
                         ]
@@ -282,7 +282,7 @@ fn handle_open(
                 Children [
                     (
                         Text({"Cancel  (Esc)".to_string()})
-                        TextFont { font_size: {FontSize::Px(13.0)} }
+                        TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.85, 0.7, 0.7)})
                     )
                 ]

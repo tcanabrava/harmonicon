@@ -499,7 +499,7 @@ pub fn setup(
 
             root.spawn((
                 Text::new(""),
-                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.85, 0.60)),
                 TunerReadout,
             ));
@@ -534,7 +534,7 @@ pub fn setup(
                     .observe(hide_drill_explanation);
                 row.spawn((
                     Text::new("Drill: off"),
-                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextFont { font_size: FontSize::Px(15.0), ..default() },
                     TextColor(Color::srgb(0.70, 0.70, 0.80)),
                     DrillLabel,
                 ));
@@ -576,14 +576,14 @@ pub fn setup(
                     .with_children(|p| {
                         p.spawn((
                             Text::new(technique_hint(target.technique, target.hole)),
-                            TextFont { font_size: FontSize::Px(13.0), ..default() },
+                            TextFont { font_size: FontSize::Px(15.0), ..default() },
                             TextColor(Color::srgb(0.75, 0.75, 0.85)),
                             HintLabel,
                         ));
                     });
                     col.spawn((
                         Text::new(""),
-                        TextFont { font_size: FontSize::Px(12.0), ..default() },
+                        TextFont { font_size: FontSize::Px(15.0), ..default() },
                         TextColor(Color::srgb(0.60, 0.60, 0.70)),
                         DrillExplanation,
                     ));
@@ -625,7 +625,7 @@ pub fn setup(
 
             root.spawn((
                 Text::new("Esc to go back  \u{00B7}  M mutes the click  \u{00B7}  feel toggles straight/shuffle"),
-                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
         });

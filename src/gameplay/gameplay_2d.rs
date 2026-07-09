@@ -248,7 +248,7 @@ pub fn setup(
                         col.spawn((
                             Text::new(info),
                             TextFont {
-                                font_size: FontSize::Px(12.0),
+                                font_size: FontSize::Px(15.0),
                                 ..default()
                             },
                             TextColor(Color::srgb(0.60, 0.65, 0.75)),
@@ -256,7 +256,7 @@ pub fn setup(
                         col.spawn((
                             Text::new(harp_info),
                             TextFont {
-                                font_size: FontSize::Px(11.0),
+                                font_size: FontSize::Px(15.0),
                                 ..default()
                             },
                             TextColor(Color::srgb(0.45, 0.72, 0.55)),
@@ -265,7 +265,7 @@ pub fn setup(
                             col.spawn((
                                 Text::new(desc.to_string()),
                                 TextFont {
-                                    font_size: FontSize::Px(10.0),
+                                    font_size: FontSize::Px(15.0),
                                     ..default()
                                 },
                                 TextColor(Color::srgb(0.50, 0.50, 0.55)),
@@ -275,7 +275,7 @@ pub fn setup(
                             col.spawn((
                                 Text::new(format!("Chart: {author}")),
                                 TextFont {
-                                    font_size: FontSize::Px(9.0),
+                                    font_size: FontSize::Px(15.0),
                                     ..default()
                                 },
                                 TextColor(Color::srgb(0.40, 0.40, 0.45)),
@@ -339,7 +339,7 @@ pub fn setup(
                         p.spawn((
                             Text::new(""),
                             TextFont {
-                                font_size: FontSize::Px(14.0),
+                                font_size: FontSize::Px(15.0),
                                 ..default()
                             },
                             TextColor(Color::srgb(0.90, 0.72, 0.20)),
@@ -625,7 +625,7 @@ fn spawn_note_visual(
                     head.spawn((
                         Text::new(label),
                         TextFont {
-                            font_size: FontSize::Px(13.0),
+                            font_size: FontSize::Px(15.0),
                             ..default()
                         },
                         TextColor(Color::srgba(0.05, 0.05, 0.08, 0.95)),
@@ -729,7 +729,7 @@ fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::ch
                 cell.spawn((
                     Text::new(b),
                     TextFont {
-                        font_size: FontSize::Px(11.0),
+                        font_size: FontSize::Px(15.0),
                         ..default()
                     },
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
@@ -745,7 +745,7 @@ fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::ch
                 cell.spawn((
                     Text::new(d),
                     TextFont {
-                        font_size: FontSize::Px(11.0),
+                        font_size: FontSize::Px(15.0),
                         ..default()
                     },
                     TextColor(Color::srgb(1.00, 0.62, 0.35)),
@@ -764,7 +764,7 @@ fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::ch
         leg.spawn((
             Text::new("\u{25A0} BLOW"),
             TextFont {
-                font_size: FontSize::Px(11.0),
+                font_size: FontSize::Px(15.0),
                 ..default()
             },
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
@@ -772,7 +772,7 @@ fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::ch
         leg.spawn((
             Text::new("\u{25A0} DRAW"),
             TextFont {
-                font_size: FontSize::Px(11.0),
+                font_size: FontSize::Px(15.0),
                 ..default()
             },
             TextColor(Color::srgb(1.00, 0.62, 0.35)),

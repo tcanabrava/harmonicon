@@ -568,7 +568,7 @@ fn spawn_mic_banner(commands: &mut Commands, parent: Entity, status: &MicStatus)
         b.spawn((
             Text::new(text),
             TextFont {
-                font_size: FontSize::Px(14.0),
+                font_size: FontSize::Px(15.0),
                 ..default()
             },
             TextColor(Color::srgb(0.95, 0.85, 0.85)),
@@ -598,7 +598,7 @@ fn mic_retry_button_scene() -> impl Scene {
         Children [
             (
                 Text({"Retry".to_string()})
-                TextFont { font_size: {FontSize::Px(14.0)} }
+                TextFont { font_size: {FontSize::Px(15.0)} }
                 TextColor({Color::WHITE})
                 Pickable { should_block_lower: {false}, is_hoverable: {false} }
             )
