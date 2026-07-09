@@ -535,10 +535,12 @@ pub fn setup(
         shape_materials,
         theme.twelve_bar_colors(),
     );
+    let note_times: Vec<f64> = song_notes.notes.iter().map(|n| n.time).collect();
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
         manifest.music_duration_secs,
+        &note_times,
     );
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);

@@ -6,7 +6,8 @@
 //! `audio_system::waveform` and `SongManifest::waveform` — so a player
 //! picking a loop range can see where in the song they're aiming. A thin red
 //! playhead line (styled like the Song Editor's `PlayheadLine`) sweeps across
-//! it to mark the current position.
+//! it to mark the current position. A thin strip below the waveform marks
+//! every chart note's onset as a tiny white rectangle, on the same timescale.
 
 use bevy::prelude::*;
 
@@ -17,6 +18,15 @@ use super::{GameplayClock, GameplayRoot, LoopConfig, Paused, SongEnd};
 /// Every bar keeps at least this much height (as a fraction 0..1) even during
 /// silence, so the waveform reads as a continuous shape rather than gaps.
 const WAVEFORM_FLOOR: f32 = 0.04;
+
+/// Height (px) of the waveform section.
+const WAVEFORM_HEIGHT: f32 = 26.0;
+
+/// Height (px) of the note-marker strip below the waveform.
+const NOTES_STRIP_HEIGHT: f32 = 10.0;
+
+/// Width (px) of a single note marker.
+const NOTE_MARKER_WIDTH: f32 = 2.0;
 
 /// The moving playhead; a thin vertical line, styled like the Song Editor's
 /// `PlayheadLine`. Its horizontal position (not width, unlike the old flat
@@ -42,11 +52,19 @@ pub struct AudioDuration(pub f64);
 
 /// Spawns the full-width progress bar at the very top of the screen: the
 /// song's waveform (from `waveform`, one entry per bar in 0..1, see
-/// `SongManifest::waveform`) with the loop marker and playhead drawn over it.
-/// Tagged `GameplayRoot` so it is torn down with the rest of the scene.
-/// `duration_secs` is the audio's real length (`SongManifest::
-/// music_duration_secs`) — see [`AudioDuration`].
-pub fn spawn_song_progress(commands: &mut Commands, waveform: &[f32], duration_secs: f64) {
+/// `SongManifest::waveform`) on top, a strip of tiny white note markers (from
+/// `note_times`, seconds from song start) below it, with the loop marker and
+/// playhead drawn over both. Tagged `GameplayRoot` so it is torn down with
+/// the rest of the scene. `duration_secs` is the audio's real length
+/// (`SongManifest::music_duration_secs`) — see [`AudioDuration`]; both the
+/// waveform and the note markers are laid out on this same timescale, so they
+/// stay aligned with each other and with the playhead.
+pub fn spawn_song_progress(
+    commands: &mut Commands,
+    waveform: &[f32],
+    duration_secs: f64,
+    note_times: &[f64],
+) {
     commands.insert_resource(AudioDuration(duration_secs));
     commands
         .spawn((
@@ -55,9 +73,8 @@ pub fn spawn_song_progress(commands: &mut Commands, waveform: &[f32], duration_s
                 top: Val::Px(0.0),
                 left: Val::Px(0.0),
                 width: Val::Percent(100.0),
-                height: Val::Px(28.0),
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
+                height: Val::Px(WAVEFORM_HEIGHT + NOTES_STRIP_HEIGHT),
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
             BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
@@ -65,17 +82,52 @@ pub fn spawn_song_progress(commands: &mut Commands, waveform: &[f32], duration_s
             GameplayRoot,
         ))
         .with_children(|bar| {
-            for &amplitude in waveform {
-                bar.spawn((
-                    Node {
-                        flex_grow: 1.0,
-                        flex_basis: Val::Px(0.0),
-                        height: Val::Percent(amplitude.clamp(0.0, 1.0).max(WAVEFORM_FLOOR) * 100.0),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.35, 0.75, 1.0, 0.65)),
-                ));
-            }
+            bar.spawn(Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(WAVEFORM_HEIGHT),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                ..default()
+            })
+            .with_children(|row| {
+                for &amplitude in waveform {
+                    row.spawn((
+                        Node {
+                            flex_grow: 1.0,
+                            flex_basis: Val::Px(0.0),
+                            height: Val::Percent(
+                                amplitude.clamp(0.0, 1.0).max(WAVEFORM_FLOOR) * 100.0,
+                            ),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgba(0.35, 0.75, 1.0, 0.65)),
+                    ));
+                }
+            });
+
+            bar.spawn(Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(NOTES_STRIP_HEIGHT),
+                ..default()
+            })
+            .with_children(|strip| {
+                if duration_secs > 0.0 {
+                    for &time in note_times {
+                        let left = (time / duration_secs).clamp(0.0, 1.0) as f32 * 100.0;
+                        strip.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Percent(left),
+                                top: Val::Px(0.0),
+                                width: Val::Px(NOTE_MARKER_WIDTH),
+                                height: Val::Percent(100.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::WHITE),
+                        ));
+                    }
+                }
+            });
 
             bar.spawn((
                 Node {
