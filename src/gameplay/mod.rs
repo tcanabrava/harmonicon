@@ -18,6 +18,7 @@ mod results;
 mod scoring;
 mod song_progress_overlay;
 pub mod twelve_bar_blues_overlay;
+mod wait_freeze_overlay;
 
 use bevy::prelude::*;
 pub use scoring::{NoteOutcome, classify_note, compute_points, sustain_points};
@@ -57,6 +58,7 @@ impl Plugin for GameplayPlugin {
             note_tail_2d::NoteTail2dPlugin,
             note_tail_3d::NoteTail3dPlugin,
             song_progress_overlay::SongProgressPlugin,
+            wait_freeze_overlay::WaitFreezePlugin,
         ))
         .init_resource::<GameplayClock>()
         .init_resource::<PitchRange>()
@@ -515,25 +517,31 @@ pub(super) fn notes_needing_spawn(
     result
 }
 
-/// True if a not-yet-resolved, *playable* note in `notes[cursor..]` has
-/// already reached `clock_time` — the freeze condition for
-/// `pause_menu::WaitForNoteMode`, checked by `tick_clock`. `notes` sorted by
-/// `time` (as `SongNotes::notes` always is) lets this stop scanning as soon
-/// as it reaches a note that isn't due yet, same as `score_notes`.
+/// Index of the first not-yet-resolved, *playable* note in `notes[cursor..]`
+/// that has already reached `clock_time` — the freeze condition for
+/// `pause_menu::WaitForNoteMode`. `tick_clock` uses the index both to decide
+/// whether to freeze and to label the wait-freeze prompt with which note it's
+/// waiting on. `notes` sorted by `time` (as `SongNotes::notes` always is)
+/// lets this stop scanning as soon as it reaches a note that isn't due yet,
+/// same as `score_notes`.
 ///
 /// Notes with no `expected_pitch` (a hole/action the harp can't produce —
 /// see `target_pitch`) are excluded: they can never be hit, so freezing on
 /// one would wait forever.
-pub(super) fn note_due_and_unresolved(notes: &[ScheduledNote], cursor: usize, clock_time: f64) -> bool {
-    for note in &notes[cursor..] {
+pub(super) fn first_due_unresolved_note(
+    notes: &[ScheduledNote],
+    cursor: usize,
+    clock_time: f64,
+) -> Option<usize> {
+    for (i, note) in notes.iter().enumerate().skip(cursor) {
         if note.time > clock_time {
             break;
         }
         if note.expected_pitch.is_some() && !note.hit && !note.missed {
-            return true;
+            return Some(i);
         }
     }
-    false
+    None
 }
 
 #[derive(Component)]
@@ -856,31 +864,48 @@ fn setup_scoring_config(
 /// long track to drift against and stays frame-timer driven (metronome-led).
 ///
 /// When `WaitForNoteMode` is on and a playable note is due and still unhit
-/// (`note_due_and_unresolved`), the clock simply isn't advanced this frame —
-/// holding it exactly at the hit line — and the music sink is paused so it
+/// (`first_due_unresolved_note`), the clock simply isn't advanced this frame
+/// — holding it exactly at the hit line — and the music sink is paused so it
 /// can't drift ahead while frozen. Nothing else needs to know about the
 /// freeze: `score_notes` keeps re-judging the same held instant every frame,
 /// so the moment the player actually plays the note it scores (typically a
 /// Perfect, since the offset never moved) and the very next frame the
 /// condition is false again, resuming the clock and the sink normally. Jam
 /// Session never populates `SongNotes`, so this is a no-op there.
+///
+/// The sink is only paused/resumed on the actual freeze/unfreeze *edge*
+/// (tracked via `WaitFreezeState`, which also drives the wait-freeze prompt),
+/// not every frame while frozen — calling `AudioSink::pause`/`play` ~60
+/// times a second turned out to visibly upset the audio backend (observed as
+/// odd behaviour in the *microphone* input, a fully separate pipeline, which
+/// only makes sense if repeatedly toggling the output stream was disturbing
+/// a shared audio graph/server).
 fn tick_clock(
     mut clock: ResMut<GameplayClock>,
     time: Res<Time>,
     mode: Res<GameplayMode>,
     music_started: Res<MusicStarted>,
     wait_mode: Res<pause_menu::WaitForNoteMode>,
+    mut wait_freeze: ResMut<wait_freeze_overlay::WaitFreezeState>,
     song_notes: Res<SongNotes>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    if wait_mode.0 && note_due_and_unresolved(&song_notes.notes, song_notes.cursor, clock.get()) {
+    let due = wait_mode
+        .0
+        .then(|| first_due_unresolved_note(&song_notes.notes, song_notes.cursor, clock.get()))
+        .flatten();
+    if due != wait_freeze.0 {
         for sink in &sinks {
-            sink.pause();
+            if due.is_some() {
+                sink.pause();
+            } else {
+                sink.play();
+            }
         }
-        return;
+        wait_freeze.0 = due;
     }
-    for sink in &sinks {
-        sink.play();
+    if due.is_some() {
+        return;
     }
     let dt = time.delta_secs_f64();
     let audio_pos = (clock.get() >= 0.0 && music_started.0 && *mode != GameplayMode::JamSession)
@@ -2081,42 +2106,50 @@ mod tests {
         assert_eq!(notes_needing_spawn(&notes, &none, 9.0), vec![0, 1]);
     }
 
-    // ── note_due_and_unresolved (wait-for-note freeze condition) ────────────
+    // ── first_due_unresolved_note (wait-for-note freeze condition) ──────────
 
     #[test]
-    fn note_due_and_unresolved_is_true_once_the_clock_reaches_it() {
+    fn first_due_unresolved_note_is_none_until_the_clock_reaches_it() {
         let notes = [overlap_test_note(10.0)];
-        assert!(!note_due_and_unresolved(&notes, 0, 9.999));
-        assert!(note_due_and_unresolved(&notes, 0, 10.0));
+        assert_eq!(first_due_unresolved_note(&notes, 0, 9.999), None);
+        assert_eq!(first_due_unresolved_note(&notes, 0, 10.0), Some(0));
     }
 
     #[test]
-    fn note_due_and_unresolved_ignores_already_hit_or_missed_notes() {
+    fn first_due_unresolved_note_ignores_already_hit_or_missed_notes() {
         let mut hit = overlap_test_note(10.0);
         hit.hit = true;
         let mut missed = overlap_test_note(10.0);
         missed.missed = true;
-        assert!(!note_due_and_unresolved(&[hit], 0, 10.0));
-        assert!(!note_due_and_unresolved(&[missed], 0, 10.0));
+        assert_eq!(first_due_unresolved_note(&[hit], 0, 10.0), None);
+        assert_eq!(first_due_unresolved_note(&[missed], 0, 10.0), None);
     }
 
     #[test]
-    fn note_due_and_unresolved_ignores_unplayable_notes() {
+    fn first_due_unresolved_note_ignores_unplayable_notes() {
         // A note the harp can't produce (`expected_pitch: None`) can never be
         // hit — freezing on one would wait forever.
         let mut unplayable = overlap_test_note(10.0);
         unplayable.expected_pitch = None;
-        assert!(!note_due_and_unresolved(&[unplayable], 0, 10.0));
+        assert_eq!(first_due_unresolved_note(&[unplayable], 0, 10.0), None);
     }
 
     #[test]
-    fn note_due_and_unresolved_stops_scanning_once_a_note_is_not_due_yet() {
-        // Sorted by time: an unresolved note far in the future shouldn't make
-        // this true, and the earlier resolved note shouldn't either.
+    fn first_due_unresolved_note_stops_scanning_once_a_note_is_not_due_yet() {
+        // Sorted by time: an unresolved note far in the future shouldn't
+        // match, and the earlier resolved note shouldn't either.
         let mut resolved = overlap_test_note(1.0);
         resolved.hit = true;
         let notes = [resolved, overlap_test_note(1000.0)];
-        assert!(!note_due_and_unresolved(&notes, 0, 5.0));
+        assert_eq!(first_due_unresolved_note(&notes, 0, 5.0), None);
+    }
+
+    #[test]
+    fn first_due_unresolved_note_returns_the_matching_index_after_the_cursor() {
+        let mut resolved = overlap_test_note(1.0);
+        resolved.hit = true;
+        let notes = [resolved, overlap_test_note(2.0)];
+        assert_eq!(first_due_unresolved_note(&notes, 0, 5.0), Some(1));
     }
 
     /// A tiny synthetic 3-note "song" driven frame by frame through

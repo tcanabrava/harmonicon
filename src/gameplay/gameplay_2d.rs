@@ -356,6 +356,7 @@ pub fn setup(
             });
         });
     spawn_song_progress(&mut commands);
+    super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
     spawn_countdown(&mut commands, Some(&harp_hint));
 }
