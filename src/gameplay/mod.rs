@@ -956,6 +956,27 @@ fn should_anchor_to_sink(
     clock >= 0.0 && music_started && *mode != GameplayMode::JamSession && !sink_empty
 }
 
+/// Index range (into `notes`, sorted by `time`) that a loop wrap must reset
+/// `hit`/`missed`/`held`/`sustain_scored` for — not just notes strictly
+/// inside `start_time..end_time`, but out to `end_time + LOOKAHEAD` too.
+/// Once the clock rewinds to `start_time`, `notes_needing_spawn`'s window can
+/// preview a note up to `LOOKAHEAD` seconds ahead of wherever the clock is —
+/// and since the loop always rewinds the instant the clock reaches
+/// `end_time`, the furthest that preview ever reaches is `end_time +
+/// LOOKAHEAD`. A note in that gap left un-reset would render with whatever
+/// hit/missed tint an earlier, no-longer-relevant pass left it in, the
+/// moment it's first previewed — well before the loop can actually reach and
+/// re-judge it.
+pub(super) fn loop_reset_range(
+    notes: &[ScheduledNote],
+    start_time: f64,
+    end_time: f64,
+) -> (usize, usize) {
+    let start_idx = notes.partition_point(|n| n.time < start_time);
+    let end_idx = notes.partition_point(|n| n.time <= end_time + LOOKAHEAD);
+    (start_idx, end_idx)
+}
+
 fn handle_loop_boundary(
     loop_cfg: Res<LoopConfig>,
     mut clock: ResMut<GameplayClock>,
@@ -970,12 +991,10 @@ fn handle_loop_boundary(
     // clock forward again — see the doc comment on `GameplayClock`.
     clock.rewind_to(loop_cfg.start_time, sinks.single().ok());
 
-    // `notes` is sorted by `time`, so the loop's range is one contiguous
+    // `notes` is sorted by `time`, so the reset range is one contiguous
     // slice — binary search it instead of scanning the whole song.
-    let start_time = loop_cfg.start_time;
-    let end_time = loop_cfg.end_time;
-    let start_idx = song_notes.notes.partition_point(|n| n.time < start_time);
-    let end_idx = song_notes.notes.partition_point(|n| n.time <= end_time);
+    let (start_idx, end_idx) =
+        loop_reset_range(&song_notes.notes, loop_cfg.start_time, loop_cfg.end_time);
     for note in &mut song_notes.notes[start_idx..end_idx] {
         note.hit = false;
         note.missed = false;
@@ -1514,14 +1533,17 @@ mod tests {
             end_time: 10.0,
         });
         world.insert_resource(GameplayClock::new(10.0));
-        // Sorted by time, as `SongNotes` requires: before-range, in-range, after-range.
+        // Sorted by time, as `SongNotes` requires: before-range, in-range,
+        // just-past-range-but-within-LOOKAHEAD (still gets a reset — see
+        // `loop_reset_range`), and genuinely far beyond it.
         world.insert_resource(SongNotes {
             notes: vec![
                 loop_test_note(1.0),
                 loop_test_note(5.0),
                 loop_test_note(11.0),
+                loop_test_note(20.0),
             ],
-            cursor: 3, // as if all three had already resolved and rolled off.
+            cursor: 4, // as if all four had already resolved and rolled off.
         });
 
         let mut schedule = Schedule::default();
@@ -1531,17 +1553,25 @@ mod tests {
         assert_eq!(world.resource::<GameplayClock>().get(), 2.0);
 
         let song_notes = world.resource::<SongNotes>();
-        let reset = &song_notes.notes[1];
-        assert!(!reset.hit && !reset.missed && !reset.sustain_scored && reset.held == 0.0);
-        assert_eq!(song_notes.cursor, 1, "cursor rewinds to the in-range note");
-
-        for i in [0, 2] {
-            let untouched = &song_notes.notes[i];
+        for i in [1, 2] {
+            let reset = &song_notes.notes[i];
             assert!(
-                untouched.hit && untouched.missed && untouched.sustain_scored,
-                "notes outside [start_time, end_time] must not be reset"
+                !reset.hit && !reset.missed && !reset.sustain_scored && reset.held == 0.0,
+                "note {i} (in range or a LOOKAHEAD preview past it) should be reset"
             );
         }
+        assert_eq!(song_notes.cursor, 1, "cursor rewinds to the in-range note");
+
+        let untouched = &song_notes.notes[0];
+        assert!(
+            untouched.hit && untouched.missed && untouched.sustain_scored,
+            "a note before start_time must not be reset"
+        );
+        let untouched = &song_notes.notes[3];
+        assert!(
+            untouched.hit && untouched.missed && untouched.sustain_scored,
+            "a note well beyond end_time + LOOKAHEAD must not be reset"
+        );
     }
 
     #[test]
@@ -2211,6 +2241,35 @@ mod tests {
         ];
         let none = HashSet::new();
         assert_eq!(notes_needing_spawn(&notes, &none, 9.0), vec![0, 1]);
+    }
+
+    // ── loop_reset_range (A/B loop wrap note reset) ───────────────────────────
+
+    #[test]
+    fn loop_reset_range_covers_notes_from_start_through_end_time() {
+        let notes = [
+            overlap_test_note(4.0),  // before start_time — excluded
+            overlap_test_note(5.0),  // == start_time — included
+            overlap_test_note(8.0),  // inside the range — included
+            overlap_test_note(10.0), // == end_time — included
+        ];
+        assert_eq!(loop_reset_range(&notes, 5.0, 10.0), (1, 4));
+    }
+
+    #[test]
+    fn loop_reset_range_extends_past_end_time_by_lookahead() {
+        // A note just past `end_time` can still get spawned as a LOOKAHEAD
+        // preview before the loop ever actually reaches it (the loop always
+        // rewinds the instant the clock hits `end_time`) — it must be reset
+        // too, or it renders with a stale hit/miss tint the moment it's
+        // first previewed. This is the fix for notes showing the wrong
+        // color right after a loop wrap.
+        let notes = [
+            overlap_test_note(10.0),                    // == end_time
+            overlap_test_note(10.0 + LOOKAHEAD),        // exactly at the reach
+            overlap_test_note(10.0 + LOOKAHEAD + 0.01), // just past — excluded
+        ];
+        assert_eq!(loop_reset_range(&notes, 5.0, 10.0), (0, 2));
     }
 
     // ── first_due_unresolved_note (wait-for-note freeze condition) ──────────
