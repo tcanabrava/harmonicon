@@ -6,10 +6,28 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use crate::dialogs::button;
-use crate::menu::{AppState, ReturnToSongList};
+use crate::menu::{AppState, ReturnToSongList, SelectedSong};
+use crate::profile::{PlayerProfile, record_play, save_profile};
 use crate::settings::AudioSettings;
+use crate::song::SongManifest;
 
 use super::{Score, SongStats, TechniqueStats};
+
+/// Technique name paired with its `SongStats` field, in display order — the
+/// same keys `gameplay::modifier_fx_key` uses (`"normal"` added for the
+/// baseline/no-modifier bucket), so a song's per-technique bests in
+/// `PlayerProfile` line up with the same vocabulary the rest of scoring uses.
+fn technique_fields(stats: &SongStats) -> [(&'static str, TechniqueStats); 7] {
+    [
+        ("normal", stats.normal),
+        ("bend", stats.bend),
+        ("vibrato", stats.vibrato),
+        ("wah-wah", stats.wah),
+        ("overblow", stats.overblow),
+        ("overdraw", stats.overdraw),
+        ("slide", stats.slide),
+    ]
+}
 
 #[derive(Component)]
 pub(super) struct ResultsRoot;
@@ -64,11 +82,32 @@ pub(super) fn setup(
     score: Res<Score>,
     stats: Res<SongStats>,
     audio: Res<AudioSettings>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut profile: ResMut<PlayerProfile>,
 ) {
     let acc = accuracy(&stats);
     let g = grade(acc);
     let hits = stats.perfect + stats.good + stats.delayed;
     let mean_ms = mean_offset_ms(&stats);
+
+    // Record this play against the song's persisted best — keyed by the
+    // manifest's own path (stable across restarts, unlike the `Handle` in
+    // `SelectedSong`), so repeated plays only ever improve what's shown here,
+    // never regress it because of one worse run. Saved immediately (not
+    // debounced) so quitting right after still keeps the new best.
+    let new_best = manifests.get(&selected.0).map(|manifest| {
+        let technique_accuracy: Vec<(&str, f32)> = technique_fields(&stats)
+            .into_iter()
+            .filter_map(|(name, s)| s.accuracy().map(|a| (name, a)))
+            .collect();
+        let key = manifest.path.display().to_string();
+        let record = profile.songs.entry(key).or_default();
+        let improved = record_play(record, score.points, acc, &technique_accuracy);
+        let best_score = record.best_score;
+        save_profile(&profile);
+        (improved, best_score)
+    });
 
     commands
         .spawn((
@@ -206,6 +245,23 @@ pub(super) fn setup(
                     ..default()
                 },
             ));
+
+            // Persisted best for this song — always shown once known, with a
+            // callout when this run just raised it.
+            if let Some((improved, best_score)) = new_best {
+                if improved {
+                    root.spawn((
+                        Text::new("\u{2605} NEW BEST! \u{2605}"),
+                        TextFont {
+                            font_size: FontSize::Px(18.0),
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.95, 0.85, 0.20)),
+                    ));
+                } else {
+                    spawn_stat_row(root, "Best score", best_score, Color::srgb(0.70, 0.72, 0.80));
+                }
+            }
 
             // Retry / Continue buttons.
             root.spawn(Node {

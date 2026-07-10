@@ -16,6 +16,7 @@ use harmonicon::dialogs::ui_scale::change_scaling;
 use harmonicon::gameplay::GameplayPlugin;
 use harmonicon::localization::LocalizationPlugin;
 use harmonicon::menu::{AppState, MenuPlugin};
+use harmonicon::profile::ProfilePlugin;
 use harmonicon::settings::SettingsPlugin;
 use harmonicon::song::SongPlugin;
 use harmonicon::spectrogram::SpectrogramPlugin;
@@ -71,6 +72,7 @@ fn main() {
         GameplayPlugin,
         SpectrogramPlugin,
         SettingsPlugin,
+        ProfilePlugin,
         harmonicon::dialogs::algo_picker::AlgoPickerPlugin,
         harmonicon::dialogs::combobox::ComboboxPlugin,
         harmonicon::dialogs::file_dialog::FileDialogsPlugin,

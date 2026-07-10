@@ -19,6 +19,7 @@ pub mod dialogs;
 pub mod gameplay;
 pub mod localization;
 pub mod menu;
+pub mod profile;
 pub mod scoring;
 pub mod settings;
 pub mod song;
