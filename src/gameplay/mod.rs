@@ -41,6 +41,9 @@ use crate::{
 
 pub struct GameplayPlugin;
 
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+struct OverlaySet;
+
 /// The shared per-frame gameplay logic (clock tick, scoring, loop handling).
 /// Clock readers — note movement, hole/bar/metronome displays — must be ordered
 /// after this set so they never sample a stale clock and stutter.
@@ -49,6 +52,8 @@ pub struct GameplayLogic;
 
 impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
+        app.configure_sets(Update, OverlaySet);
+
         app.add_plugins((
             countdown_overlay::CountdownPlugin,
             twelve_bar_blues_overlay::TwelveBarBluesPlugin,
@@ -103,12 +108,30 @@ impl Plugin for GameplayPlugin {
         )
         .add_systems(
             Update,
+            harmonica_overlay::update_harmonica_overlay
+                .in_set(OverlaySet)
+                .run_if(in_state(AppState::BendingTrainer)),
+        )
+        .add_systems(
+            Update,
+            harmonica_overlay::update_harmonica_overlay
+                .in_set(OverlaySet)
+                .run_if(
+                    in_state(AppState::Playing)
+                        .and_then(|p: Res<Paused>| !p.0)
+                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+                ),
+        )
+        // Order against the set, not the system function.
+        .add_systems(
+            Update,
+            bending_trainer::update_drill_progress_tint.after(OverlaySet),
+        )
+        .add_systems(
+            Update,
             (
                 bending_trainer::tick_clock,
                 collect_pitches,
-                harmonica_overlay::update_harmonica_overlay,
-                bending_trainer::update_drill_progress_tint
-                    .after(harmonica_overlay::update_harmonica_overlay),
                 bending_trainer::rebuild_overlay,
                 bending_trainer::update_selected_cell_border,
                 bending_trainer::update_pitch_range,
@@ -176,16 +199,6 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             jam_session::update_hole_map.run_if(
-                in_state(AppState::Playing)
-                    .and_then(|p: Res<Paused>| !p.0)
-                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
-            ),
-        )
-        // Live bend-diagram feedback during Jam Session (the Bending Trainer
-        // runs its own copy in its own AppState).
-        .add_systems(
-            Update,
-            harmonica_overlay::update_harmonica_overlay.run_if(
                 in_state(AppState::Playing)
                     .and_then(|p: Res<Paused>| !p.0)
                     .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),

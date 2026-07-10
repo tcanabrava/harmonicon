@@ -40,7 +40,11 @@ rand = "0.10"
 # file watcher. Never ship this — dynamic_linking needs libbevy_dylib*.so
 # alongside the binary, which packaged builds (e.g. the flatpak) don't bundle.
 # Local dev: `cargo run --features dev`.
-dev = ["bevy/dev", "bevy/dynamic_linking"]
+dev = [
+    "bevy/dev",
+    "bevy/dynamic_linking",
+    "bevy/debug"
+]
 
 [[bin]]
 name = "hole-editor"

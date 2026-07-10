@@ -142,12 +142,84 @@ pub fn phrase_tab_sequence(items: &[(f64, Option<&str>, &[NoteEvent])], clock: f
         .join(" ")
 }
 
+/// Times of track items that can move the banner ([`update_phrase`]) or the
+/// tab ribbon ([`update_tab_ribbon`]) off their current label — precomputed
+/// once at song start so [`watch_phrase_boundaries`] can locate the active
+/// boundary with a `partition_point` instead of the two label systems
+/// scanning (`update_phrase`) or fully re-collecting (`update_tab_ribbon`)
+/// the whole chart track every frame.
+#[derive(Resource, Default)]
+struct PhraseBoundaries {
+    /// Items that declare a phrase and/or a groove — the banner changes
+    /// whenever either does.
+    banner: Vec<f64>,
+    /// Items that declare a phrase — the tab ribbon only tracks phrase
+    /// boundaries, not groove ones.
+    ribbon: Vec<f64>,
+}
+
+fn setup_phrase_boundaries(
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut boundaries: ResMut<PhraseBoundaries>,
+) {
+    let Some(manifest) = manifests.get(&selected.0) else {
+        *boundaries = PhraseBoundaries::default();
+        return;
+    };
+    let chart = &manifest.chart;
+    *boundaries = PhraseBoundaries {
+        banner: chart
+            .track
+            .iter()
+            .filter(|item| item.phrase.is_some() || item.groove.is_some())
+            .map(|item| resolve_item_time(item, &chart.timing))
+            .collect(),
+        ribbon: chart
+            .track
+            .iter()
+            .filter(|item| item.phrase.is_some())
+            .map(|item| resolve_item_time(item, &chart.timing))
+            .collect(),
+    };
+}
+
+/// Emitted whenever the clock crosses a phrase/groove boundary, in either
+/// direction — a `handle_loop_boundary` rewind crosses boundaries backward
+/// and must re-emit too, which falls out for free here since the boundary
+/// index is recomputed from the clock each frame (not advanced
+/// incrementally), so a rewind simply produces a smaller index that still
+/// compares unequal to the previous frame's.
+#[derive(Message)]
+struct PhraseChanged;
+
+fn watch_phrase_boundaries(
+    clock: Res<GameplayClock>,
+    boundaries: Res<PhraseBoundaries>,
+    mut last_banner: Local<Option<usize>>,
+    mut last_ribbon: Local<Option<usize>>,
+    mut changed: MessageWriter<PhraseChanged>,
+) {
+    let banner_idx = boundaries.banner.partition_point(|&t| t <= clock.get());
+    let ribbon_idx = boundaries.ribbon.partition_point(|&t| t <= clock.get());
+    let moved = *last_banner != Some(banner_idx) || *last_ribbon != Some(ribbon_idx);
+    *last_banner = Some(banner_idx);
+    *last_ribbon = Some(ribbon_idx);
+    if moved {
+        changed.write(PhraseChanged);
+    }
+}
+
 pub fn update_tab_ribbon(
+    mut changed: MessageReader<PhraseChanged>,
     clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut ribbon: Query<&mut Text, With<TabRibbonText>>,
 ) {
+    if changed.read().count() == 0 {
+        return;
+    }
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
@@ -173,11 +245,15 @@ pub fn update_tab_ribbon(
 }
 
 pub fn update_phrase(
+    mut changed: MessageReader<PhraseChanged>,
     clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut banner: Query<&mut Text, With<PhraseText>>,
 ) {
+    if changed.read().count() == 0 {
+        return;
+    }
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
@@ -206,11 +282,15 @@ pub struct PhrasePlugin;
 
 impl Plugin for PhrasePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (update_phrase, update_tab_ribbon)
-                .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
-        );
+        app.init_resource::<PhraseBoundaries>()
+            .add_message::<PhraseChanged>()
+            .add_systems(OnEnter(AppState::Playing), setup_phrase_boundaries)
+            .add_systems(
+                Update,
+                (watch_phrase_boundaries, update_phrase, update_tab_ribbon)
+                    .chain()
+                    .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+            );
     }
 }
 
