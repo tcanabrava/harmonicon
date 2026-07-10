@@ -13,16 +13,17 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
-use crate::audio_system::pitch_detect::PitchRange;
+use crate::audio_system::pitch_detect::{PitchAlgorithm, PitchRange};
 use crate::audio_system::wav::encode_wav;
-use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
+use crate::dialogs::algo_picker::spawn_algo_explanation;
 use crate::dialogs::button;
+use crate::dialogs::combobox::{self, ComboboxSelect};
 use crate::menu::AppState;
 use crate::profile::{DrillRecord, PlayerProfile};
 use crate::settings::AudioSettings;
 use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, richter_harp};
 
-use super::harmonica_overlay::spawn_harmonica_overlay;
+use super::harmonica_overlay::{DiagramCellTarget, Row, spawn_harmonica_overlay_selectable};
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
 use super::{ActivePitches, GameplayClock, GameplayRoot, PITCH_RANGE_MARGIN_SEMITONES};
 
@@ -87,22 +88,6 @@ impl Technique {
         }
     }
 
-    fn next(self) -> Self {
-        match self {
-            Technique::Blow => Technique::Draw,
-            Technique::Draw => Technique::Bend1,
-            Technique::Bend1 => Technique::Bend2,
-            Technique::Bend2 => Technique::Bend3,
-            Technique::Bend3 => Technique::Over,
-            Technique::Over => Technique::Blow,
-        }
-    }
-
-    fn prev(self) -> Self {
-        // Same cycle, walked backward — six variants, so five `next` steps.
-        (0..5).fold(self, |t, _| t.next())
-    }
-
     fn note(self, holes: &HoleNotes) -> Option<&str> {
         match self {
             Technique::Blow => holes.blow.as_deref(),
@@ -159,6 +144,69 @@ impl Default for TrainerTarget {
         Self {
             hole: 2,
             technique: Technique::Bend1,
+        }
+    }
+}
+
+/// Maps a diagram [`Row`] to the [`Technique`] it represents — the diagram
+/// distinguishes which *wing* a bend/over sits on (`BlowBend`/`DrawBend`,
+/// `Overblow`/`Overdraw`) since that determines which reed it's read off;
+/// `Technique` doesn't need that distinction (`Technique::note` resolves it
+/// from the hole number instead), so several `Row`s collapse to one
+/// `Technique`. `None` only for a `Row::*Bend` index outside 0..=2, which
+/// never actually appears in [`super::harmonica_overlay`]'s `ROWS` table.
+fn row_to_technique(row: Row) -> Option<Technique> {
+    match row {
+        Row::Blow => Some(Technique::Blow),
+        Row::Draw => Some(Technique::Draw),
+        Row::BlowBend(0) | Row::DrawBend(0) => Some(Technique::Bend1),
+        Row::BlowBend(1) | Row::DrawBend(1) => Some(Technique::Bend2),
+        Row::BlowBend(2) | Row::DrawBend(2) => Some(Technique::Bend3),
+        Row::BlowBend(_) | Row::DrawBend(_) => None,
+        Row::Overblow | Row::Overdraw => Some(Technique::Over),
+    }
+}
+
+/// Sets the drill/ear-training target from a click on the harmonica diagram
+/// — the picker itself, replacing the old hole/technique stepper buttons.
+/// Shared across every selectable cell (see `spawn_harmonica_overlay_selectable`);
+/// looks up which cell fired via `DiagramCellTarget` on the clicked entity
+/// rather than a per-cell closure.
+fn on_diagram_cell_clicked(
+    ev: On<Pointer<Click>>,
+    cells: Query<&DiagramCellTarget>,
+    mut target: ResMut<TrainerTarget>,
+) {
+    let Ok(cell) = cells.get(ev.entity) else {
+        return;
+    };
+    let Some(technique) = row_to_technique(cell.row) else {
+        return;
+    };
+    *target = TrainerTarget {
+        hole: cell.hole,
+        technique,
+    };
+}
+
+/// Yellow-borders whichever diagram cell matches the current [`TrainerTarget`]
+/// — the visible counterpart of [`on_diagram_cell_clicked`]. Written every
+/// frame rather than gated on `target.is_changed()`: the diagram itself is
+/// despawned and respawned on every key change (`rebuild_overlay`), and a
+/// change-gated system would miss re-applying the border to those fresh
+/// cells since the *target* didn't change, only the diagram under it.
+pub fn update_selected_cell_border(
+    target: Res<TrainerTarget>,
+    mut cells: Query<(&DiagramCellTarget, &mut BorderColor)>,
+) {
+    const SELECTED: Color = Color::srgb(0.95, 0.85, 0.20);
+    for (cell, mut border) in &mut cells {
+        let selected =
+            cell.hole == target.hole && row_to_technique(cell.row) == Some(target.technique);
+        let color = if selected { SELECTED } else { Color::NONE };
+        let wanted = BorderColor::all(color);
+        if *border != wanted {
+            *border = wanted;
         }
     }
 }
@@ -415,6 +463,18 @@ fn pitch_range_for_key(key: &str) -> PitchRange {
         .unwrap_or_default()
 }
 
+/// The Detect-algorithm combobox's `on_select` — writes straight to the same
+/// global `AudioSettings::pitch_algorithm` the Options page's button row
+/// drives, so picking one here takes effect everywhere immediately, same as
+/// before. Unrecognized values (shouldn't happen — the combobox's own
+/// options list is built from `PitchAlgorithm::all()`) are ignored rather
+/// than falling back to a default, so a stray event can't silently reset it.
+fn on_algo_select(ev: On<ComboboxSelect>, mut settings: ResMut<AudioSettings>) {
+    if let Some(algo) = PitchAlgorithm::from_label(&ev.value) {
+        settings.pitch_algorithm = algo;
+    }
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 pub fn setup(
@@ -439,21 +499,25 @@ pub fn setup(
     // which persists them on the way out.
     drill.stats = stats_from_profile(&profile.drills);
 
-    commands
-        .spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(18.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
-            GameplayRoot,
-        ))
-        .with_children(|root| {
+    let mut root_ec = commands.spawn((
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            row_gap: Val::Px(18.0),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
+        GameplayRoot,
+    ));
+    // Captured so the Detect-algorithm combobox below can be spawned as its
+    // direct child — `combobox::spawn_combobox` requires a full-screen-sized
+    // parent for its click-catching backdrop to size correctly (see its
+    // module doc comment), which rules out nesting it inside `side_col`.
+    let root_id = root_ec.id();
+    root_ec.with_children(|root| {
             root.spawn((
                 Text::new("Bending Trainer"),
                 TextFont { font_size: FontSize::Px(26.0), ..default() },
@@ -491,7 +555,24 @@ pub fn setup(
                 ));
             });
 
-            // ── Ear-training target: hole + technique, Listen, tuner ────────
+            // ── Detect algorithm: combobox (same global AudioSettings::
+            // pitch_algorithm the Options page drives) + its explanation ────
+            combobox::spawn_combobox(
+                root.commands_mut(),
+                root_id,
+                "Detect",
+                &PitchAlgorithm::all()
+                    .iter()
+                    .map(|a| a.label().to_string())
+                    .collect::<Vec<_>>(),
+                audio.pitch_algorithm.label(),
+                on_algo_select,
+            );
+            spawn_algo_explanation(root.commands_mut(), root_id, 420.0, audio.pitch_algorithm);
+
+            // ── Ear-training target: readout (set by clicking the diagram
+            // below, not stepper buttons — see `on_diagram_cell_clicked`) +
+            // Listen ────────────────────────────────────────────────────────
             root.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
@@ -499,36 +580,12 @@ pub fn setup(
                 ..default()
             })
             .with_children(|row| {
-                row.spawn_empty().apply_scene(button::small(
-                    "\u{25C2}",
-                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
-                        target.hole = if target.hole <= 1 { 10 } else { target.hole - 1 };
-                    },
-                ));
                 row.spawn((
                     Node { width: Val::Px(220.0), justify_content: JustifyContent::Center, ..default() },
                     Text::new(target_label_text(target.hole, target.technique)),
                     TextFont { font_size: FontSize::Px(16.0), ..default() },
                     TextColor(Color::srgb(0.80, 0.90, 0.95)),
                     TargetLabel,
-                ));
-                row.spawn_empty().apply_scene(button::small(
-                    "\u{25B8}",
-                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
-                        target.hole = if target.hole >= 10 { 1 } else { target.hole + 1 };
-                    },
-                ));
-                row.spawn_empty().apply_scene(button::small(
-                    "\u{25C2}",
-                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
-                        target.technique = target.technique.prev();
-                    },
-                ));
-                row.spawn_empty().apply_scene(button::small(
-                    "technique \u{25B8}",
-                    |_: On<Pointer<Click>>, mut target: ResMut<TrainerTarget>| {
-                        target.technique = target.technique.next();
-                    },
                 ));
                 row.spawn_empty().apply_scene(button::small(
                     "\u{1F50A} Listen",
@@ -604,24 +661,24 @@ pub fn setup(
                 // The bend diagram (rebuilt on key change).
                 row.spawn((Node::default(), OverlayHost))
                     .with_children(|host| {
-                        spawn_harmonica_overlay(host, &richter_harp(&key.0));
+                        spawn_harmonica_overlay_selectable(
+                            host,
+                            &richter_harp(&key.0),
+                            on_diagram_cell_clicked,
+                        );
                     });
 
-                // Algorithm picker, how-to hint, and Drill explanation, stacked
-                // beside the diagram. Same picker as Options (it drives the
-                // same global setting) — surfaced here too so a player can
-                // compare algorithms while actually bending notes.
-                let mut side_col = row.spawn(Node {
+                // How-to hint + Drill explanation, stacked beside the
+                // diagram (the Detect-algorithm picker moved up top — see
+                // `spawn_combobox`'s call site above — since its combobox
+                // needs a full-screen-sized parent, not this narrow column).
+                row.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     width: Val::Px(280.0),
                     row_gap: Val::Px(8.0),
                     ..default()
-                });
-                let side_col_id = side_col.id();
-                side_col.with_children(|col| {
-                    spawn_algo_row(col.commands_mut(), side_col_id, Some("Detect"), audio.pitch_algorithm);
-                    spawn_algo_explanation(col.commands_mut(), side_col_id, 260.0, audio.pitch_algorithm);
-
+                })
+                .with_children(|col| {
                     col.spawn((
                         Node { padding: UiRect::all(Val::Px(8.0)), ..default() },
                         BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
@@ -705,9 +762,9 @@ pub fn rebuild_overlay(
                 commands.entity(c).despawn();
             }
         }
-        commands
-            .entity(host)
-            .with_children(|h| spawn_harmonica_overlay(h, &harp));
+        commands.entity(host).with_children(|h| {
+            spawn_harmonica_overlay_selectable(h, &harp, on_diagram_cell_clicked);
+        });
     }
 }
 
@@ -937,6 +994,34 @@ mod tests {
         assert_eq!(prev_key("C"), "B");
     }
 
+    // ── row_to_technique (diagram click → drill target) ──────────────────────
+
+    #[test]
+    fn plain_blow_and_draw_rows_map_directly() {
+        assert_eq!(row_to_technique(Row::Blow), Some(Technique::Blow));
+        assert_eq!(row_to_technique(Row::Draw), Some(Technique::Draw));
+    }
+
+    #[test]
+    fn both_bend_wings_collapse_to_the_same_depth() {
+        // The diagram distinguishes which wing a bend is on (to read the
+        // right reed); the drill target doesn't need that, just the depth.
+        for (blow, draw, expected) in [
+            (Row::BlowBend(0), Row::DrawBend(0), Technique::Bend1),
+            (Row::BlowBend(1), Row::DrawBend(1), Technique::Bend2),
+            (Row::BlowBend(2), Row::DrawBend(2), Technique::Bend3),
+        ] {
+            assert_eq!(row_to_technique(blow), Some(expected));
+            assert_eq!(row_to_technique(draw), Some(expected));
+        }
+    }
+
+    #[test]
+    fn overblow_and_overdraw_rows_both_map_to_over() {
+        assert_eq!(row_to_technique(Row::Overblow), Some(Technique::Over));
+        assert_eq!(row_to_technique(Row::Overdraw), Some(Technique::Over));
+    }
+
     // ── Drill persistence (Technique storage key, stats <-> profile) ─────────
 
     #[test]
@@ -1051,18 +1136,6 @@ mod tests {
             panic!("expected diatonic");
         };
         assert_eq!(l.blow.unwrap()[0], "G3");
-    }
-
-    #[test]
-    fn technique_cycles_both_ways_through_all_six() {
-        let start = Technique::Blow;
-        let mut t = start;
-        for _ in 0..6 {
-            t = t.next();
-        }
-        assert_eq!(t, start, "six steps forward returns to the start");
-        assert_eq!(start.next().prev(), start);
-        assert_eq!(Technique::Blow.prev(), Technique::Over);
     }
 
     #[test]

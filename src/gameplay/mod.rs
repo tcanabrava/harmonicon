@@ -108,6 +108,7 @@ impl Plugin for GameplayPlugin {
                 collect_pitches,
                 harmonica_overlay::update_harmonica_overlay,
                 bending_trainer::rebuild_overlay,
+                bending_trainer::update_selected_cell_border,
                 bending_trainer::update_pitch_range,
                 bending_trainer::update_key_label,
                 bending_trainer::update_target_label,

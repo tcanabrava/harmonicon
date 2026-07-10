@@ -10,6 +10,7 @@
 
 use std::collections::HashSet;
 
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use crate::audio_system::midi::note_to_midi;
@@ -46,9 +47,11 @@ fn note_class(s: &str) -> &str {
 /// Which row a cell belongs to. `DrawBend`/`Overblow` are only ever valid for
 /// holes 1–6 and `BlowBend`/`Overdraw` only for holes 7–10 — [`note_for`]
 /// enforces that, since a hole's single `bends`/`over` fields don't carry
-/// which family they belong to on their own.
-#[derive(Clone, Copy)]
-enum Row {
+/// which family they belong to on their own. `pub(super)` (rather than
+/// private) so [`DiagramCellTarget`] can carry it out to a sibling module —
+/// the Bending Trainer's hole/technique picker.
+#[derive(Clone, Copy, PartialEq)]
+pub(super) enum Row {
     Overblow,
     DrawBend(usize),
     Blow,
@@ -155,7 +158,100 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
                             spawn_label(row, label);
                             for (hole, h) in (1..=10u8).zip(&holes) {
                                 match note_for(h, hole, kind) {
-                                    Some(note) => spawn_note_cell(row, note, color),
+                                    Some(note) => {
+                                        spawn_note_cell(row, note, color);
+                                    }
+                                    None => spawn_empty(row),
+                                }
+                            }
+                        });
+                    }
+                });
+        });
+}
+
+/// Tags a selectable diagram's note cell with which (hole, row) it is, so a
+/// single shared `on_click` observer can look this up via the clicked
+/// entity (`ev.entity`) instead of needing a distinct closure per cell.
+#[derive(Component, Clone, Copy)]
+pub struct DiagramCellTarget {
+    pub hole: u8,
+    pub(super) row: Row,
+}
+
+/// Like [`spawn_harmonica_overlay`], but every note cell is clickable —
+/// tagged with [`DiagramCellTarget`] and given `on_click` as a shared
+/// `.observe(...)` — for a UI that lets the player pick a hole/technique
+/// directly off the diagram (the Bending Trainer's target picker) instead of
+/// separate stepper controls. Diatonic only, same as the plain diagram's
+/// bend rows; a chromatic harp falls back to the ordinary, non-selectable
+/// [`spawn_chromatic_overlay`] (dead code for the trainer today, which is
+/// diatonic-only by design, but kept safe rather than assumed).
+pub fn spawn_harmonica_overlay_selectable<M: 'static>(
+    parent: &mut ChildSpawnerCommands,
+    harp: &Harmonica,
+    on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
+) {
+    if matches!(harp, Harmonica::Chromatic { .. }) {
+        spawn_chromatic_overlay(parent, harp);
+        return;
+    }
+    let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
+
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(4.0),
+            padding: UiRect::all(Val::Px(10.0)),
+            ..default()
+        })
+        .with_children(|panel| {
+            panel.spawn((
+                Text::new("Harmonica  \u{00B7}  click a note to select it"),
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.70, 0.70, 0.80)),
+            ));
+
+            panel
+                .spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(2.0),
+                    ..default()
+                })
+                .with_children(|grid| {
+                    // Header: blank corner + hole numbers 1–10.
+                    grid.spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        column_gap: Val::Px(2.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        spawn_label(row, "");
+                        for hole in 1..=10u8 {
+                            spawn_text_cell(row, &hole.to_string(), Color::WHITE);
+                        }
+                    });
+
+                    // One row per technique.
+                    for (label, kind, color) in ROWS {
+                        grid.spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(2.0),
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            spawn_label(row, label);
+                            for (hole, h) in (1..=10u8).zip(&holes) {
+                                match note_for(h, hole, kind) {
+                                    Some(note) => {
+                                        spawn_note_cell(row, note, color)
+                                            .insert(DiagramCellTarget { hole, row: kind })
+                                            .observe(on_click.clone());
+                                    }
                                     None => spawn_empty(row),
                                 }
                             }
@@ -253,7 +349,9 @@ fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) 
                             spawn_label(row, label);
                             for hole in 1..=hole_count {
                                 match chromatic_note_for(harp, hole, kind) {
-                                    Some(note) => spawn_note_cell(row, &note, color),
+                                    Some(note) => {
+                                        spawn_note_cell(row, &note, color);
+                                    }
                                     None => spawn_empty(row),
                                 }
                             }
@@ -264,6 +362,9 @@ fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) 
 }
 
 /// A 44×28 cell shell. Returns its `EntityCommands` so callers add content.
+/// Every cell gets a (transparent by default) border, so a selectable
+/// diagram (see [`spawn_harmonica_overlay_selectable`]) can color one in
+/// without changing the cell's box model on the way in/out of selection.
 fn cell<'a>(row: &'a mut ChildSpawnerCommands, bg: Color) -> EntityCommands<'a> {
     row.spawn((
         Node {
@@ -271,28 +372,37 @@ fn cell<'a>(row: &'a mut ChildSpawnerCommands, bg: Color) -> EntityCommands<'a> 
             height: Val::Px(28.0),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
+            border: UiRect::all(Val::Px(2.0)),
             ..default()
         },
         BackgroundColor(bg),
+        BorderColor::all(Color::NONE),
     ))
 }
 
 /// A note cell: shows the note class, lights up live (carries `HarpOverlayCell`).
-fn spawn_note_cell(row: &mut ChildSpawnerCommands, note: &str, color: Color) {
-    cell(row, CELL_DEFAULT)
-        .insert(HarpOverlayCell {
-            midi: note_to_midi(note).and_then(|m| u8::try_from(m).ok()),
-        })
-        .with_children(|c| {
-            c.spawn((
-                Text::new(note_class(note).to_string()),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
-                TextColor(color),
-            ));
-        });
+/// Returns its `EntityCommands` so a selectable diagram can additionally tag
+/// it with [`DiagramCellTarget`] and an `on_click` observer.
+fn spawn_note_cell<'a>(
+    row: &'a mut ChildSpawnerCommands,
+    note: &str,
+    color: Color,
+) -> EntityCommands<'a> {
+    let mut ec = cell(row, CELL_DEFAULT);
+    ec.insert(HarpOverlayCell {
+        midi: note_to_midi(note).and_then(|m| u8::try_from(m).ok()),
+    });
+    ec.with_children(|c| {
+        c.spawn((
+            Text::new(note_class(note).to_string()),
+            TextFont {
+                font_size: FontSize::Px(15.0),
+                ..default()
+            },
+            TextColor(color),
+        ));
+    });
+    ec
 }
 
 /// A static text cell (header numbers), no highlight.

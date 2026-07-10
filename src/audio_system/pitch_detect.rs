@@ -90,6 +90,14 @@ impl PitchAlgorithm {
         }
     }
 
+    /// Inverse of [`label`](Self::label) — for UI that deals in plain
+    /// strings (e.g. `dialogs::combobox`'s selection event) rather than the
+    /// enum itself. `None` for anything that isn't one of [`Self::all`]'s
+    /// labels.
+    pub fn from_label(label: &str) -> Option<Self> {
+        Self::all().iter().copied().find(|a| a.label() == label)
+    }
+
     /// A short, player-facing explanation shown next to the selector.
     pub fn description(self) -> &'static str {
         match self {
@@ -763,6 +771,20 @@ fn freq_to_note(freq: f32) -> Option<(u8, String, i32)> {
 mod tests {
     use super::*;
     use std::f32::consts::PI;
+
+    // ── PitchAlgorithm::label / from_label ────────────────────────────────────
+
+    #[test]
+    fn every_algorithm_label_round_trips() {
+        for &algo in PitchAlgorithm::all() {
+            assert_eq!(PitchAlgorithm::from_label(algo.label()), Some(algo));
+        }
+    }
+
+    #[test]
+    fn unknown_label_is_none() {
+        assert_eq!(PitchAlgorithm::from_label("nonsense"), None);
+    }
 
     #[test]
     fn silence_returns_empty() {
