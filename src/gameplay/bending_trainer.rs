@@ -18,6 +18,7 @@ use crate::audio_system::wav::encode_wav;
 use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
 use crate::dialogs::button;
 use crate::menu::AppState;
+use crate::profile::{DrillRecord, PlayerProfile};
 use crate::settings::AudioSettings;
 use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, richter_harp};
 
@@ -110,6 +111,35 @@ impl Technique {
             Technique::Bend2 => holes.bends.get(1).map(String::as_str),
             Technique::Bend3 => holes.bends.get(2).map(String::as_str),
             Technique::Over => holes.over.as_deref(),
+        }
+    }
+
+    /// Stable name used as the technique half of a `PlayerProfile::drills`
+    /// key (`"{hole}:{technique}"`) — separate from [`label`](Self::label),
+    /// which is player-facing display text free to change independently of
+    /// what's already saved on disk.
+    fn storage_key(self) -> &'static str {
+        match self {
+            Technique::Blow => "blow",
+            Technique::Draw => "draw",
+            Technique::Bend1 => "bend1",
+            Technique::Bend2 => "bend2",
+            Technique::Bend3 => "bend3",
+            Technique::Over => "over",
+        }
+    }
+
+    /// Inverse of [`storage_key`](Self::storage_key); `None` for anything
+    /// else (e.g. a profile.json hand-edited or from a future version).
+    fn from_storage_key(s: &str) -> Option<Self> {
+        match s {
+            "blow" => Some(Technique::Blow),
+            "draw" => Some(Technique::Draw),
+            "bend1" => Some(Technique::Bend1),
+            "bend2" => Some(Technique::Bend2),
+            "bend3" => Some(Technique::Bend3),
+            "over" => Some(Technique::Over),
+            _ => None,
         }
     }
 }
@@ -225,6 +255,55 @@ pub struct DrillState {
     /// resets the drill to a fresh target if the player gets stuck.
     pub elapsed_secs: f32,
     pub streak: u32,
+}
+
+/// A `"{hole}:{technique}"` key for [`PlayerProfile::drills`] — stats aren't
+/// keyed by [`TrainerKey`], since the physical skill a (hole, technique) pair
+/// drills is the same regardless of which key harp it's practiced on.
+fn drill_key(hole: u8, technique: Technique) -> String {
+    format!("{hole}:{}", technique.storage_key())
+}
+
+/// Snapshot of in-memory drill stats into the flat, string-keyed shape
+/// `PlayerProfile::drills` persists.
+fn stats_to_profile(
+    stats: &std::collections::HashMap<(u8, Technique), DrillStat>,
+) -> std::collections::HashMap<String, DrillRecord> {
+    stats
+        .iter()
+        .map(|(&(hole, technique), stat)| {
+            (
+                drill_key(hole, technique),
+                DrillRecord {
+                    attempts: stat.attempts,
+                    hits: stat.hits,
+                },
+            )
+        })
+        .collect()
+}
+
+/// Inverse of [`stats_to_profile`], for loading. Entries with a key that
+/// doesn't parse (a hand-edited or future-version `profile.json`) are
+/// silently dropped rather than failing the whole load.
+fn stats_from_profile(
+    drills: &std::collections::HashMap<String, DrillRecord>,
+) -> std::collections::HashMap<(u8, Technique), DrillStat> {
+    drills
+        .iter()
+        .filter_map(|(key, record)| {
+            let (hole_str, tech_str) = key.split_once(':')?;
+            let hole: u8 = hole_str.parse().ok()?;
+            let technique = Technique::from_storage_key(tech_str)?;
+            Some((
+                (hole, technique),
+                DrillStat {
+                    attempts: record.attempts,
+                    hits: record.hits,
+                },
+            ))
+        })
+        .collect()
 }
 
 /// Seconds the player must hold a target in tune before the drill advances.
@@ -346,6 +425,8 @@ pub fn setup(
     target: Res<TrainerTarget>,
     audio: Res<AudioSettings>,
     mut pitch_range: ResMut<PitchRange>,
+    mut drill: ResMut<DrillState>,
+    profile: Res<PlayerProfile>,
 ) {
     clock.set_free(0.0);
     *pitch_range = pitch_range_for_key(&key.0);
@@ -354,6 +435,9 @@ pub fn setup(
     if tempo.bpm < MIN_BPM || tempo.bpm > MAX_BPM {
         tempo.bpm = 90.0;
     }
+    // Restore drill hit-rates from the last session — see `save_drill_progress`,
+    // which persists them on the way out.
+    drill.stats = stats_from_profile(&profile.drills);
 
     commands
         .spawn((
@@ -818,6 +902,16 @@ pub fn drill_update(
     drill.elapsed_secs = 0.0;
 }
 
+/// Persists the session's drill hit-rates to `profile.json` on the way out
+/// of the trainer — paired with `setup`'s restore on the way in. Saved once
+/// per visit rather than on every drill-target completion, the same
+/// "meaningful lifecycle boundary" policy `results::setup` uses for song
+/// bests (see `profile.rs`'s module doc comment).
+pub fn save_drill_progress(drill: Res<DrillState>, mut profile: ResMut<PlayerProfile>) {
+    profile.drills = stats_to_profile(&drill.stats);
+    crate::profile::save_profile(&profile);
+}
+
 /// Keeps the "Drill: ..." readout in step with on/off state and streak.
 pub fn update_drill_label(drill: Res<DrillState>, mut labels: Query<&mut Text, With<DrillLabel>>) {
     if !drill.is_changed() {
@@ -841,6 +935,84 @@ mod tests {
         assert_eq!(next_key("C"), "C#");
         assert_eq!(next_key("B"), "C");
         assert_eq!(prev_key("C"), "B");
+    }
+
+    // ── Drill persistence (Technique storage key, stats <-> profile) ─────────
+
+    #[test]
+    fn every_technique_storage_key_round_trips() {
+        for &t in &ALL_TECHNIQUES {
+            assert_eq!(Technique::from_storage_key(t.storage_key()), Some(t));
+        }
+    }
+
+    #[test]
+    fn unknown_storage_key_is_none() {
+        assert_eq!(Technique::from_storage_key("nonsense"), None);
+    }
+
+    #[test]
+    fn drill_key_combines_hole_and_technique() {
+        assert_eq!(drill_key(2, Technique::Bend1), "2:bend1");
+        assert_eq!(drill_key(10, Technique::Over), "10:over");
+    }
+
+    #[test]
+    fn stats_round_trip_through_the_profile_shape() {
+        let mut stats = std::collections::HashMap::new();
+        stats.insert(
+            (2u8, Technique::Bend1),
+            DrillStat {
+                attempts: 5,
+                hits: 3,
+            },
+        );
+        stats.insert(
+            (9u8, Technique::Over),
+            DrillStat {
+                attempts: 1,
+                hits: 0,
+            },
+        );
+
+        let profile = stats_to_profile(&stats);
+        assert_eq!(profile.len(), 2);
+        assert_eq!(profile["2:bend1"], DrillRecord { attempts: 5, hits: 3 });
+
+        let restored = stats_from_profile(&profile);
+        assert_eq!(restored.len(), 2);
+        assert_eq!(restored[&(2, Technique::Bend1)].attempts, 5);
+        assert_eq!(restored[&(2, Technique::Bend1)].hits, 3);
+        assert_eq!(restored[&(9, Technique::Over)].attempts, 1);
+    }
+
+    #[test]
+    fn unparsable_profile_entries_are_dropped_not_fatal() {
+        let mut profile = std::collections::HashMap::new();
+        profile.insert(
+            "not-a-key".to_string(),
+            DrillRecord {
+                attempts: 1,
+                hits: 1,
+            },
+        );
+        profile.insert(
+            "2:not-a-technique".to_string(),
+            DrillRecord {
+                attempts: 1,
+                hits: 1,
+            },
+        );
+        profile.insert(
+            "2:bend1".to_string(),
+            DrillRecord {
+                attempts: 4,
+                hits: 2,
+            },
+        );
+        let stats = stats_from_profile(&profile);
+        assert_eq!(stats.len(), 1, "only the one well-formed entry should survive");
+        assert!(stats.contains_key(&(2, Technique::Bend1)));
     }
 
     // `key_offset` is now `crate::song::harmonica::key_offset` — its

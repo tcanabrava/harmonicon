@@ -97,7 +97,10 @@ impl Plugin for GameplayPlugin {
         )
         // Standalone Bending Trainer (its own AppState, no song).
         .add_systems(OnEnter(AppState::BendingTrainer), bending_trainer::setup)
-        .add_systems(OnExit(AppState::BendingTrainer), cleanup_gameplay)
+        .add_systems(
+            OnExit(AppState::BendingTrainer),
+            (cleanup_gameplay, bending_trainer::save_drill_progress),
+        )
         .add_systems(
             Update,
             (
