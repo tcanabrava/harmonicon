@@ -13,11 +13,11 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
-use crate::audio_system::pitch_detect::{PitchAlgorithm, PitchRange};
+use crate::audio_system::pitch_detect::PitchRange;
 use crate::audio_system::wav::encode_wav;
-use crate::dialogs::algo_picker::spawn_algo_explanation;
+use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_explanation};
 use crate::dialogs::button;
-use crate::dialogs::combobox::{self, ComboboxSelect};
+use crate::dialogs::combobox;
 use crate::menu::AppState;
 use crate::profile::{DrillRecord, PlayerProfile};
 use crate::settings::AudioSettings;
@@ -463,18 +463,6 @@ fn pitch_range_for_key(key: &str) -> PitchRange {
         .unwrap_or_default()
 }
 
-/// The Detect-algorithm combobox's `on_select` — writes straight to the same
-/// global `AudioSettings::pitch_algorithm` the Options page's button row
-/// drives, so picking one here takes effect everywhere immediately, same as
-/// before. Unrecognized values (shouldn't happen — the combobox's own
-/// options list is built from `PitchAlgorithm::all()`) are ignored rather
-/// than falling back to a default, so a stray event can't silently reset it.
-fn on_algo_select(ev: On<ComboboxSelect>, mut settings: ResMut<AudioSettings>) {
-    if let Some(algo) = PitchAlgorithm::from_label(&ev.value) {
-        settings.pitch_algorithm = algo;
-    }
-}
-
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 pub fn setup(
@@ -561,12 +549,9 @@ pub fn setup(
                 root.commands_mut(),
                 root_id,
                 "Detect",
-                &PitchAlgorithm::all()
-                    .iter()
-                    .map(|a| a.label().to_string())
-                    .collect::<Vec<_>>(),
+                &algo_labels(),
                 audio.pitch_algorithm.label(),
-                on_algo_select,
+                on_algo_selected,
             );
             spawn_algo_explanation(root.commands_mut(), root_id, 420.0, audio.pitch_algorithm);
 

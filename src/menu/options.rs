@@ -27,7 +27,7 @@ use crate::theme::LoadedTheme;
 
 use super::{AppState, MenuPage, MenuRoot, cleanup_menu, spawn_button, spawn_menu_root};
 
-use crate::dialogs::algo_picker::{spawn_algo_explanation, spawn_algo_row};
+use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_explanation};
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
 use crate::dialogs::combobox;
@@ -191,11 +191,13 @@ fn setup_options_menu(
         &selected_harmonica.0,
     );
 
-    spawn_algo_row(
+    combobox::spawn_combobox(
         &mut commands,
         root,
-        Some("Pitch detect"),
-        settings.pitch_algorithm,
+        "Pitch detect",
+        &algo_labels(),
+        settings.pitch_algorithm.label(),
+        on_algo_selected,
     );
     spawn_algo_explanation(&mut commands, root, 560.0, settings.pitch_algorithm);
 
