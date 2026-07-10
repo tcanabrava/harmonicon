@@ -107,6 +107,8 @@ impl Plugin for GameplayPlugin {
                 bending_trainer::tick_clock,
                 collect_pitches,
                 harmonica_overlay::update_harmonica_overlay,
+                bending_trainer::update_drill_progress_tint
+                    .after(harmonica_overlay::update_harmonica_overlay),
                 bending_trainer::rebuild_overlay,
                 bending_trainer::update_selected_cell_border,
                 bending_trainer::update_pitch_range,

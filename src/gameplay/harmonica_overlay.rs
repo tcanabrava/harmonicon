@@ -19,7 +19,7 @@ use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, valid_note};
 
 use super::ActivePitches;
 
-const CELL_DEFAULT: Color = Color::srgba(0.12, 0.12, 0.16, 0.92);
+pub(super) const CELL_DEFAULT: Color = Color::srgba(0.12, 0.12, 0.16, 0.92);
 const CELL_LIT: Color = Color::srgb(0.95, 0.85, 0.30);
 /// Every row — including bends and over-blow/draw — is colored by which
 /// breath direction actually produces it, not by technique. Overblow reads
@@ -36,7 +36,7 @@ const LABEL_COLOR: Color = Color::srgb(0.55, 0.55, 0.65);
 /// labels — but a cell that can never light is a safer failure than a panic).
 #[derive(Component)]
 pub struct HarpOverlayCell {
-    midi: Option<u8>,
+    pub(super) midi: Option<u8>,
 }
 
 /// Note label with its octave digit dropped: `"D#5" → "D#"`.

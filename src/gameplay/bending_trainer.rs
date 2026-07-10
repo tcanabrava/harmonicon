@@ -23,7 +23,11 @@ use crate::profile::{DrillRecord, PlayerProfile};
 use crate::settings::AudioSettings;
 use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, richter_harp};
 
-use super::harmonica_overlay::{DiagramCellTarget, Row, spawn_harmonica_overlay_selectable};
+use std::collections::HashSet;
+
+use super::harmonica_overlay::{
+    CELL_DEFAULT, DiagramCellTarget, HarpOverlayCell, Row, spawn_harmonica_overlay_selectable,
+};
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
 use super::{ActivePitches, GameplayClock, GameplayRoot, PITCH_RANGE_MARGIN_SEMITONES};
 
@@ -352,6 +356,59 @@ fn stats_from_profile(
             ))
         })
         .collect()
+}
+
+/// A (hole, technique)'s hit-rate, or `None` if it's never been attempted —
+/// kept distinct from a `0.0` accuracy so [`progress_tint`] can tell "never
+/// tried" (neutral) apart from "tried and always missed" (red).
+fn drill_accuracy(stat: Option<&DrillStat>) -> Option<f32> {
+    let stat = stat?;
+    if stat.attempts == 0 {
+        return None;
+    }
+    Some(stat.hits as f32 / stat.attempts as f32)
+}
+
+/// Idle-cell background color for a (hole, technique)'s drill progress: the
+/// diagram's ordinary idle color for "never attempted", blending from a dim
+/// red (weak) to a dim green (mastered) as hit-rate climbs — so the same
+/// diagram used to pick a drill target also doubles as a progress map, no
+/// separate screen needed.
+fn progress_tint(accuracy: Option<f32>) -> Color {
+    let Some(acc) = accuracy else {
+        return CELL_DEFAULT;
+    };
+    let acc = acc.clamp(0.0, 1.0);
+    let weak = Color::srgb(0.32, 0.12, 0.12).to_srgba();
+    let strong = Color::srgb(0.14, 0.34, 0.16).to_srgba();
+    Color::srgb(
+        weak.red + (strong.red - weak.red) * acc,
+        weak.green + (strong.green - weak.green) * acc,
+        weak.blue + (strong.blue - weak.blue) * acc,
+    )
+}
+
+/// Tints every idle diagram cell by its drill accuracy (see [`progress_tint`]),
+/// layered on top of [`harmonica_overlay::update_harmonica_overlay`]'s live
+/// mic highlight — both write `BackgroundColor`, so this must run `.after`
+/// it (enforced in `GameplayPlugin::build`) and skips any cell currently lit
+/// by a sounding pitch, letting the live highlight win.
+pub fn update_drill_progress_tint(
+    active: Res<ActivePitches>,
+    drill: Res<DrillState>,
+    mut cells: Query<(&HarpOverlayCell, &DiagramCellTarget, &mut BackgroundColor)>,
+) {
+    let played: HashSet<u8> = active.0.iter().map(|p| p.midi).collect();
+    for (cell, target, mut bg) in &mut cells {
+        if cell.midi.is_some_and(|m| played.contains(&m)) {
+            continue;
+        }
+        let Some(technique) = row_to_technique(target.row) else {
+            continue;
+        };
+        let accuracy = drill_accuracy(drill.stats.get(&(target.hole, technique)));
+        *bg = BackgroundColor(progress_tint(accuracy));
+    }
 }
 
 /// Seconds the player must hold a target in tune before the drill advances.
@@ -999,6 +1056,53 @@ mod tests {
             assert_eq!(row_to_technique(blow), Some(expected));
             assert_eq!(row_to_technique(draw), Some(expected));
         }
+    }
+
+    // ── Drill progress grid (drill_accuracy, progress_tint) ──────────────────
+
+    #[test]
+    fn accuracy_is_none_for_a_never_attempted_target() {
+        assert_eq!(drill_accuracy(None), None);
+        assert_eq!(
+            drill_accuracy(Some(&DrillStat {
+                attempts: 0,
+                hits: 0
+            })),
+            None
+        );
+    }
+
+    #[test]
+    fn accuracy_is_hit_rate_for_an_attempted_target() {
+        assert_eq!(
+            drill_accuracy(Some(&DrillStat {
+                attempts: 4,
+                hits: 3
+            })),
+            Some(0.75)
+        );
+        assert_eq!(
+            drill_accuracy(Some(&DrillStat {
+                attempts: 5,
+                hits: 0
+            })),
+            Some(0.0)
+        );
+    }
+
+    #[test]
+    fn untried_tint_matches_the_diagram_idle_color() {
+        assert_eq!(progress_tint(None), CELL_DEFAULT);
+    }
+
+    #[test]
+    fn tint_reddens_toward_zero_and_greens_toward_one() {
+        let weak = progress_tint(Some(0.0)).to_srgba();
+        let strong = progress_tint(Some(1.0)).to_srgba();
+        assert!(weak.red > weak.green, "0% accuracy should read as red");
+        assert!(strong.green > strong.red, "100% accuracy should read as green");
+        // Never attempted stays visually distinct from a 0%-accuracy target.
+        assert_ne!(progress_tint(Some(0.0)), progress_tint(None));
     }
 
     #[test]
