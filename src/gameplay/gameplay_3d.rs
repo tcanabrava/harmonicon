@@ -275,20 +275,14 @@ fn create_hit_zone(commands: &mut Commands, center_x: f32, total_width: f32) {
     });
 }
 
-/// Spawns each note as a 3D comet: an elongated cube head (from the theme's glTF)
-/// tinted by blow/draw colour, trailing a flat ribbon that runs the technique's
-/// animation via [`NoteTail3dMaterial`] — the 3D twin of the 2D head+tail comet.
-/// Builds every note's score state (`SongNotes`) plus the render config
-/// `spawn_visible_notes_3d` needs (`NoteRenderAssets3D`) — no entities yet.
-/// Notes are spawned lazily, in a `LOOKAHEAD` window around the playhead,
-/// mirroring the 2D highway (`gameplay_2d::spawn_visible_notes`).
-fn build_song_notes_3d(
-    chart: &HarpChart,
-    head_mesh: Handle<Mesh>,
-    cfg: NoteCube3dConfig,
-    holes: Vec<HoleConfig>,
-    adaptive: &AdaptiveDifficulty,
-) -> (super::SongNotes, NoteRenderAssets3D) {
+/// Builds every note's score state, filtered/tagged by adaptive
+/// difficulty's current unlock state — the note half of what
+/// `build_song_notes_3d` assembles, factored out so
+/// `resync_notes_on_adaptive_change` can rebuild just the notes later,
+/// mid-song, when the pause menu changes `learned`/`enabled` without a
+/// Restart (the render assets it's paired with there don't need rebuilding —
+/// only which notes exist changes).
+fn build_notes_3d(chart: &HarpChart, adaptive: &AdaptiveDifficulty) -> Vec<ScheduledNote> {
     let items = track_items(&chart.track, &chart.timing);
     let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
     let mut flags = flags.into_iter();
@@ -332,6 +326,24 @@ fn build_song_notes_3d(
             .partial_cmp(&b.time)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+    notes
+}
+
+/// Spawns each note as a 3D comet: an elongated cube head (from the theme's glTF)
+/// tinted by blow/draw colour, trailing a flat ribbon that runs the technique's
+/// animation via [`NoteTail3dMaterial`] — the 3D twin of the 2D head+tail comet.
+/// Builds every note's score state (`SongNotes`) plus the render config
+/// `spawn_visible_notes_3d` needs (`NoteRenderAssets3D`) — no entities yet.
+/// Notes are spawned lazily, in a `LOOKAHEAD` window around the playhead,
+/// mirroring the 2D highway (`gameplay_2d::spawn_visible_notes`).
+fn build_song_notes_3d(
+    chart: &HarpChart,
+    head_mesh: Handle<Mesh>,
+    cfg: NoteCube3dConfig,
+    holes: Vec<HoleConfig>,
+    adaptive: &AdaptiveDifficulty,
+) -> (super::SongNotes, NoteRenderAssets3D) {
+    let notes = build_notes_3d(chart, adaptive);
     let hole_count = chart.harmonica.hole_count();
     (
         super::SongNotes { notes, cursor: 0 },
@@ -342,6 +354,46 @@ fn build_song_notes_3d(
             hole_count,
         },
     )
+}
+
+/// Rebuilds `SongNotes` whenever `AdaptiveDifficulty` changes while a 3D
+/// song is loaded — e.g. the pause menu's manual phrase override — so
+/// unlocking/relocking notes takes effect immediately instead of only on
+/// the next Restart. Score state (hit/missed/held/sustain_scored/pitch/amp
+/// samples) carries over for notes that still exist in the rebuilt list
+/// (matched by `(time, hole, is_blow)` — stable across a rebuild since both
+/// lists derive from the same chart); newly unlocked notes start fresh.
+/// `NoteRenderAssets3D` doesn't need touching — nothing about it depends on
+/// which notes are unlocked.
+///
+/// Every current `NoteVisual3D` is despawned unconditionally rather than
+/// reconciled in place: its `note_id` is a *positional* index into
+/// `SongNotes::notes`, and the rebuild can shift that position for every
+/// note after the edited phrase — a surviving entity would otherwise end up
+/// rendering a different note's data under its old index.
+/// `spawn_visible_notes_3d` re-spawns everything within `LOOKAHEAD` fresh
+/// next frame, using the corrected indices.
+pub(super) fn resync_notes_on_adaptive_change(
+    mut commands: Commands,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut song_notes: ResMut<super::SongNotes>,
+    visuals: Query<Entity, With<NoteVisual3D>>,
+) {
+    if !adaptive.is_changed() {
+        return;
+    }
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let mut new_notes = build_notes_3d(&manifest.chart, &adaptive);
+    super::adaptive_difficulty::carry_over_note_state(&song_notes.notes, &mut new_notes);
+    song_notes.cursor = super::adaptive_difficulty::first_unresolved_index(&new_notes);
+    song_notes.notes = new_notes;
+    for entity in &visuals {
+        commands.entity(entity).despawn();
+    }
 }
 
 /// Spawns 3D note visuals for any note newly within the `LOOKAHEAD` window.

@@ -84,56 +84,7 @@ pub fn setup(
     // *visuals* are spawned later, lazily, by `spawn_visible_notes` as each
     // one enters the `LOOKAHEAD` window — a long/dense chart no longer pays
     // for every note's UI subtree (and comet-tail material) at song load.
-    let items = track_items(&chart.track, &chart.timing);
-    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
-    let mut flags = flags.into_iter();
-    let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
-    for item in &chart.track {
-        let t = super::resolve_item_time(item, &chart.timing);
-        let tag = play_mode_label(item.play_mode.as_ref());
-        for event in &item.events {
-            let (unlocked, section) = flags.next().unwrap_or((true, 0));
-            if !unlocked {
-                continue;
-            }
-            let is_blow = matches!(event.action, Action::Blow);
-            let modifiers = event.modifiers.clone().unwrap_or_default();
-            let natural_pitch = event.note.clone().unwrap_or_else(|| {
-                chart
-                    .harmonica
-                    .wind_direction_label(event.hole, &event.action)
-            });
-            let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
-            combined.push((
-                ScheduledNote {
-                    time: t,
-                    duration: item.duration,
-                    hole: event.hole,
-                    is_blow,
-                    expected_pitch,
-                    hit: false,
-                    missed: false,
-                    held: 0.0,
-                    sustain_scored: false,
-                    modifiers,
-                    pitch_samples: Vec::new(),
-                    amp_samples: Vec::new(),
-                    phrase_section: section,
-                },
-                tag,
-            ));
-        }
-    }
-    // `score_notes`/`spawn_visible_notes` both rely on this being sorted —
-    // charts are assumed authored in time order, but this makes that an
-    // actual guarantee instead of an assumption.
-    combined.sort_by(|a, b| {
-        a.0.time
-            .partial_cmp(&b.0.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    let (notes, play_mode_tags): (Vec<ScheduledNote>, Vec<Option<&'static str>>) =
-        combined.into_iter().unzip();
+    let (notes, play_mode_tags) = build_combined_notes(chart, &adaptive);
     *song_notes = SongNotes { notes, cursor: 0 };
     *render_assets = NoteRenderAssets {
         head_image: Some(head_image.clone()),
@@ -395,6 +346,107 @@ pub fn setup(
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
     spawn_countdown(&mut commands, Some(&harp_hint));
+}
+
+/// Builds every note's score state (see `setup`'s doc comment) plus the
+/// chord/split badge tag parallel to it, filtered/tagged by adaptive
+/// difficulty's current unlock state. Factored out of `setup` so
+/// `resync_notes_on_adaptive_change` can rebuild the same list later, mid-
+/// song, when the pause menu changes `learned`/`enabled` without a Restart.
+fn build_combined_notes(
+    chart: &crate::song::chart::HarpChart,
+    adaptive: &AdaptiveDifficulty,
+) -> (Vec<ScheduledNote>, Vec<Option<&'static str>>) {
+    let items = track_items(&chart.track, &chart.timing);
+    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
+    let mut flags = flags.into_iter();
+    let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
+    for item in &chart.track {
+        let t = super::resolve_item_time(item, &chart.timing);
+        let tag = play_mode_label(item.play_mode.as_ref());
+        for event in &item.events {
+            let (unlocked, section) = flags.next().unwrap_or((true, 0));
+            if !unlocked {
+                continue;
+            }
+            let is_blow = matches!(event.action, Action::Blow);
+            let modifiers = event.modifiers.clone().unwrap_or_default();
+            let natural_pitch = event.note.clone().unwrap_or_else(|| {
+                chart
+                    .harmonica
+                    .wind_direction_label(event.hole, &event.action)
+            });
+            let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
+            combined.push((
+                ScheduledNote {
+                    time: t,
+                    duration: item.duration,
+                    hole: event.hole,
+                    is_blow,
+                    expected_pitch,
+                    hit: false,
+                    missed: false,
+                    held: 0.0,
+                    sustain_scored: false,
+                    modifiers,
+                    pitch_samples: Vec::new(),
+                    amp_samples: Vec::new(),
+                    phrase_section: section,
+                },
+                tag,
+            ));
+        }
+    }
+    // `score_notes`/`spawn_visible_notes` both rely on this being sorted —
+    // charts are assumed authored in time order, but this makes that an
+    // actual guarantee instead of an assumption.
+    combined.sort_by(|a, b| {
+        a.0.time
+            .partial_cmp(&b.0.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    combined.into_iter().unzip()
+}
+
+/// Rebuilds `SongNotes`/`NoteRenderAssets::play_mode_tags` whenever
+/// `AdaptiveDifficulty` changes while a 2D song is loaded — e.g. the pause
+/// menu's manual phrase override — so unlocking/relocking notes takes
+/// effect immediately instead of only on the next Restart. Score state
+/// (hit/missed/held/sustain_scored/pitch/amp samples) carries over for
+/// notes that still exist in the rebuilt list (matched by
+/// `(time, hole, is_blow)` — stable across a rebuild since both lists
+/// derive from the same chart); newly unlocked notes start fresh.
+///
+/// Every current `NoteVisual` is despawned unconditionally rather than
+/// reconciled in place: its `note_id` is a *positional* index into
+/// `SongNotes::notes`, and the rebuild can shift that position for every
+/// note after the edited phrase — a surviving entity would otherwise end up
+/// rendering a different note's data under its old index.
+/// `spawn_visible_notes` re-spawns everything within `LOOKAHEAD` fresh next
+/// frame, using the corrected indices.
+pub(super) fn resync_notes_on_adaptive_change(
+    mut commands: Commands,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut song_notes: ResMut<SongNotes>,
+    mut render_assets: ResMut<NoteRenderAssets>,
+    visuals: Query<Entity, With<NoteVisual>>,
+) {
+    if !adaptive.is_changed() {
+        return;
+    }
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    let (mut new_notes, new_tags) = build_combined_notes(&manifest.chart, &adaptive);
+    super::adaptive_difficulty::carry_over_note_state(&song_notes.notes, &mut new_notes);
+    song_notes.cursor = super::adaptive_difficulty::first_unresolved_index(&new_notes);
+    song_notes.notes = new_notes;
+    render_assets.play_mode_tags = new_tags;
+    for entity in &visuals {
+        commands.entity(entity).despawn();
+    }
 }
 
 fn note_height_pct(duration: f64) -> f32 {

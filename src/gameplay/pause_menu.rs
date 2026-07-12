@@ -269,9 +269,10 @@ fn adjust_learned(current: f32, delta: f32) -> f32 {
 
 /// Shared by the "-25%"/"+25%" buttons: adjusts the selected phrase's
 /// learned fraction in both the live `AdaptiveDifficulty` (so the progress
-/// bar's rectangle re-tints immediately) and the persisted `PlayerProfile`
-/// (so it survives a restart) — the note-unlock effect itself only applies
-/// on the next `OnEnter(Playing)`, same as the pause menu's caption says.
+/// bar's rectangle re-tints immediately, and so `resync_notes_on_adaptive_
+/// change` in `gameplay_2d`/`gameplay_3d` rebuilds the note highway on the
+/// very next frame) and the persisted `PlayerProfile` (so it survives a
+/// restart too).
 fn adjust_selected_phrase_learned(
     delta: f32,
     selected: &SelectedPhraseIndex,
@@ -447,7 +448,7 @@ pub(super) fn setup_pause_menu(mut commands: Commands, mode: Res<GameplayMode>) 
                     ]
                 });
                 children.spawn_empty().apply_scene(bsn! {
-                    Text({"Learned% applies on the next Restart"})
+                    Text({"Notes update live — resume to see them"})
                     TextFont { font_size: {FontSize::Px(13.0)} }
                     TextColor({Color::srgb(0.55, 0.55, 0.62)})
                 });

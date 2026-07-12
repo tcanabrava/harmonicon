@@ -6,6 +6,10 @@ scripts/.venv/
 .cargo
 .zed
 
+# perf profiling output
+/perf.data
+/perf.data.old
+
 # Local flatpak-builder output (the source manifest lives in packaging/flatpak/)
 /flatpak-harmonicon/
 /target-flatpak/

@@ -8,9 +8,12 @@
 //! (`profile::SongRecord::phrase_learned`). Only a prefix of a section's
 //! notes are unlocked (spawned/scored) at a time; clearing a section
 //! cleanly bumps its learned fraction, unlocking more of it on the next
-//! attempt — chart notes are fixed once `SongNotes` is built at song start,
-//! so newly-unlocked notes can only take effect on the next `OnEnter
-//! (Playing)` (a Restart), not mid-song.
+//! attempt. A manual pause-menu override takes effect immediately, mid-song
+//! — `gameplay_2d`/`gameplay_3d`'s `resync_notes_on_adaptive_change` rebuild
+//! `SongNotes` the moment [`AdaptiveDifficulty`] changes, carrying over
+//! already-resolved score state via [`carry_over_note_state`] so a note the
+//! player already hit or missed doesn't reset just because the list was
+//! rebuilt around it.
 
 use bevy::prelude::*;
 
@@ -175,15 +178,63 @@ pub fn track_items<'a>(track: &'a [TrackItem], timing: &Timing) -> Vec<(f64, Opt
         .collect()
 }
 
+/// Copies resolved score state (`hit`, `missed`, `held`, `sustain_scored`,
+/// `pitch_samples`, `amp_samples`) from `old` into matching notes in `new` —
+/// matched by `(time, hole, is_blow)`, which stays stable across an
+/// adaptive-difficulty rebuild since both lists derive from the same chart:
+/// a note present in both *is* the same chart note regardless of which
+/// other notes got unlocked/relocked around it. Used when the pause menu
+/// changes `learned`/`enabled` mid-song (`gameplay_2d`/`gameplay_3d`'s
+/// `resync_notes_on_adaptive_change`) so already-hit/missed notes don't
+/// reset just because the note list was rebuilt. A note with no match in
+/// `old` (freshly unlocked) keeps its default, unresolved state; `used`
+/// guards against double-matching two notes that happen to share an
+/// identical key (e.g. a chord/split voicing the same hole/direction twice
+/// at once — vanishingly rare, but cheap to guard against).
+pub fn carry_over_note_state(old: &[ScheduledNote], new: &mut [ScheduledNote]) {
+    let mut used = vec![false; old.len()];
+    for note in new.iter_mut() {
+        let Some(idx) = old.iter().enumerate().position(|(i, o)| {
+            !used[i]
+                && o.hole == note.hole
+                && o.is_blow == note.is_blow
+                && (o.time - note.time).abs() < 1e-6
+        }) else {
+            continue;
+        };
+        used[idx] = true;
+        let src = &old[idx];
+        note.hit = src.hit;
+        note.missed = src.missed;
+        note.held = src.held;
+        note.sustain_scored = src.sustain_scored;
+        note.pitch_samples = src.pitch_samples.clone();
+        note.amp_samples = src.amp_samples.clone();
+    }
+}
+
+/// Index of the first not-fully-resolved note in a freshly rebuilt list —
+/// the same definition as `SongNotes::cursor`'s doc comment (not `missed`,
+/// and not both `hit` and `sustain_scored`). Used to reset the cursor after
+/// [`carry_over_note_state`], since a rebuild can reorder/insert/remove
+/// notes such that whatever the old cursor pointed at is no longer
+/// meaningful.
+pub fn first_unresolved_index(notes: &[ScheduledNote]) -> usize {
+    notes
+        .iter()
+        .position(|n| !(n.missed || (n.hit && n.sustain_scored)))
+        .unwrap_or(notes.len())
+}
+
 /// Live per-session cache of a song's phrase sections + adaptive-difficulty
 /// state — built once at song start (`setup_adaptive_difficulty`) from the
 /// chart + [`PlayerProfile`], read by the note-unlock filter (`gameplay_2d`/
 /// `gameplay_3d` setup), the progress-bar phrase strip
 /// (`song_progress_overlay`), and the pause menu's manual phrase selector.
 /// Pause-menu edits write through to both `PlayerProfile` (persisted) and
-/// this resource (so the overlay updates instantly) — the note-unlock
-/// effect itself only takes hold on the next `OnEnter(Playing)` (a
-/// Restart), since `SongNotes` is only ever built once per song entry.
+/// this resource — changing it here is also what drives the immediate
+/// mid-song note re-unlock (`resync_notes_on_adaptive_change` in each
+/// gameplay mode) and the progress-bar overlay's live re-tint.
 #[derive(Resource, Default)]
 pub struct AdaptiveDifficulty {
     pub enabled: bool,
@@ -405,5 +456,98 @@ mod tests {
         bump_learned_sections(&notes, 3, &mut learned);
         assert_eq!(learned.len(), 3);
         assert!((learned[2] - PHRASE_LEARN_STEP).abs() < 1e-6);
+    }
+
+    // ── carry_over_note_state / first_unresolved_index ──────────────────────
+
+    fn note_at(time: f64, hole: u8, is_blow: bool) -> ScheduledNote {
+        ScheduledNote {
+            time,
+            duration: 0.5,
+            hole,
+            is_blow,
+            expected_pitch: Some(60),
+            hit: false,
+            missed: false,
+            held: 0.0,
+            sustain_scored: false,
+            modifiers: Vec::new(),
+            pitch_samples: Vec::new(),
+            amp_samples: Vec::new(),
+            phrase_section: 0,
+        }
+    }
+
+    #[test]
+    fn carry_over_preserves_hit_state_for_a_matching_note() {
+        let mut old = note_at(1.0, 2, false);
+        old.hit = true;
+        old.sustain_scored = true;
+        old.held = 0.4;
+        let old_notes = vec![old];
+        let mut new_notes = vec![note_at(1.0, 2, false)];
+        carry_over_note_state(&old_notes, &mut new_notes);
+        assert!(new_notes[0].hit);
+        assert!(new_notes[0].sustain_scored);
+        assert_eq!(new_notes[0].held, 0.4);
+    }
+
+    #[test]
+    fn carry_over_leaves_a_newly_unlocked_note_unresolved() {
+        let old_notes = vec![note_at(1.0, 2, false)]; // no note at t=2.0 yet
+        let mut new_notes = vec![note_at(1.0, 2, false), note_at(2.0, 3, false)];
+        carry_over_note_state(&old_notes, &mut new_notes);
+        assert!(!new_notes[1].hit);
+        assert!(!new_notes[1].missed);
+    }
+
+    #[test]
+    fn carry_over_matches_by_time_hole_and_direction_not_position() {
+        // Inserting a new note earlier shifts every later note's index —
+        // matching must go by identity, not array position.
+        let mut old = note_at(5.0, 3, true);
+        old.missed = true;
+        let old_notes = vec![old];
+        let mut new_notes = vec![note_at(1.0, 1, false), note_at(5.0, 3, true)];
+        carry_over_note_state(&old_notes, &mut new_notes);
+        assert!(!new_notes[0].missed, "the newly-inserted note must not match");
+        assert!(new_notes[1].missed, "the pre-existing note keeps its state");
+    }
+
+    #[test]
+    fn carry_over_does_not_double_match_two_old_notes_to_one_new_note() {
+        let mut hit_note = note_at(1.0, 2, false);
+        hit_note.hit = true;
+        let mut missed_note = note_at(1.0, 2, false); // identical key
+        missed_note.missed = true;
+        let old_notes = vec![hit_note, missed_note];
+        let mut new_notes = vec![note_at(1.0, 2, false)];
+        carry_over_note_state(&old_notes, &mut new_notes);
+        // Whichever it matched first, it must reflect exactly one source,
+        // not a mix (e.g. both hit and missed at once).
+        assert_ne!(new_notes[0].hit, new_notes[0].missed);
+    }
+
+    #[test]
+    fn first_unresolved_index_finds_the_first_note_not_fully_resolved() {
+        let mut n0 = note_at(0.0, 1, false);
+        n0.hit = true;
+        n0.sustain_scored = true;
+        let mut n1 = note_at(1.0, 1, false);
+        n1.missed = true;
+        let n2 = note_at(2.0, 1, false); // untouched
+        assert_eq!(first_unresolved_index(&[n0, n1, n2]), 2);
+    }
+
+    #[test]
+    fn first_unresolved_index_is_the_length_when_everything_is_resolved() {
+        let mut n0 = note_at(0.0, 1, false);
+        n0.missed = true;
+        assert_eq!(first_unresolved_index(&[n0]), 1);
+    }
+
+    #[test]
+    fn first_unresolved_index_is_zero_for_an_empty_list() {
+        assert_eq!(first_unresolved_index(&[]), 0);
     }
 }

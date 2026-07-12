@@ -193,6 +193,22 @@ impl Plugin for GameplayPlugin {
             )
                 .run_if(in_state(AppState::Playing)),
         )
+        // Re-unlocks/re-locks notes the instant the pause menu's phrase
+        // override or on/off toggle changes `AdaptiveDifficulty` — not
+        // gated on `!Paused` like the render chains below, since editing it
+        // is only ever possible *while* paused (see `pause_menu`).
+        .add_systems(
+            Update,
+            gameplay_2d::resync_notes_on_adaptive_change.run_if(
+                in_state(AppState::Playing).and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
+            ),
+        )
+        .add_systems(
+            Update,
+            gameplay_3d::resync_notes_on_adaptive_change.run_if(
+                in_state(AppState::Playing).and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
+            ),
+        )
         // Gameplay-logic chains only run when not paused. This set ticks the
         // clock, so every clock reader below must run after it — otherwise the
         // executor may read a stale clock on some frames, making notes stutter.
