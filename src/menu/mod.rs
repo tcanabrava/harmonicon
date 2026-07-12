@@ -432,7 +432,7 @@ fn setup_main_menu(
         root,
         &loc.msg("menu-song-editor-2"),
         Some("SongEditor2"),
-        &&theme,
+        &theme,
         &btn_mats,
         "Main",
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {

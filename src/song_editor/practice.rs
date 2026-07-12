@@ -398,8 +398,10 @@ mod tests {
     use crate::song_editor::state::{Dir, Expr, GridNote, Pitch};
 
     fn state_with_notes(key: &str, placements: &[(u8, usize)]) -> EditorState {
-        let mut state = EditorState::default();
-        state.key = key.into();
+        let mut state = EditorState {
+            key: key.into(),
+            ..Default::default()
+        };
         for &(hole, tick) in placements {
             select_or_add(&mut state, hole, tick);
         }

@@ -262,8 +262,10 @@ mod tests {
 
     #[test]
     fn slide_cycles_on_and_off_on_any_hole() {
-        let mut s = EditorState::default();
-        s.harmonica_kind = HarmonicaKind::Chromatic;
+        let mut s = EditorState {
+            harmonica_kind: HarmonicaKind::Chromatic,
+            ..Default::default()
+        };
         select_or_add(&mut s, 11, 0); // valid on a 12-hole chromatic harp
         apply_modifier(&mut s, ModButton::Slide);
         assert_eq!(s.notes[0].pitch, Pitch::Slide);
@@ -283,8 +285,10 @@ mod tests {
 
     #[test]
     fn switching_to_diatonic_drops_notes_beyond_hole_ten_and_clears_slide() {
-        let mut s = EditorState::default();
-        s.harmonica_kind = HarmonicaKind::Chromatic;
+        let mut s = EditorState {
+            harmonica_kind: HarmonicaKind::Chromatic,
+            ..Default::default()
+        };
         select_or_add(&mut s, 11, 0);
         apply_modifier(&mut s, ModButton::Slide);
         select_or_add(&mut s, 3, 4);
@@ -313,8 +317,10 @@ mod tests {
 
     #[test]
     fn switching_kind_deselects_a_note_that_got_dropped() {
-        let mut s = EditorState::default();
-        s.harmonica_kind = HarmonicaKind::Chromatic;
+        let mut s = EditorState {
+            harmonica_kind: HarmonicaKind::Chromatic,
+            ..Default::default()
+        };
         select_or_add(&mut s, 11, 0);
         assert!(s.selected.is_some());
 
@@ -378,37 +384,39 @@ mod tests {
 
     #[test]
     fn enforce_unifies_overlap_chain_but_not_independent_notes() {
-        let mut s = EditorState::default();
-        s.notes = vec![
-            GridNote {
-                id: 0,
-                hole: 1,
-                tick: 0,
-                len: 3,
-                dir: Dir::Blow,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-            GridNote {
-                id: 1,
-                hole: 2,
-                tick: 2,
-                len: 3,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-            GridNote {
-                id: 2,
-                hole: 3,
-                tick: 10,
-                len: 1,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-        ];
-        s.next_id = 3;
+        let mut s = EditorState {
+            notes: vec![
+                GridNote {
+                    id: 0,
+                    hole: 1,
+                    tick: 0,
+                    len: 3,
+                    dir: Dir::Blow,
+                    pitch: Pitch::Normal,
+                    expr: Expr::None,
+                },
+                GridNote {
+                    id: 1,
+                    hole: 2,
+                    tick: 2,
+                    len: 3,
+                    dir: Dir::Draw,
+                    pitch: Pitch::Normal,
+                    expr: Expr::None,
+                },
+                GridNote {
+                    id: 2,
+                    hole: 3,
+                    tick: 10,
+                    len: 1,
+                    dir: Dir::Draw,
+                    pitch: Pitch::Normal,
+                    expr: Expr::None,
+                },
+            ],
+            next_id: 3,
+            ..Default::default()
+        };
         enforce_direction(&mut s, 0);
         assert_eq!(s.note_by_id(1).unwrap().dir, Dir::Blow);
         assert_eq!(s.note_by_id(2).unwrap().dir, Dir::Draw);
@@ -419,37 +427,39 @@ mod tests {
     // same one, mirroring how Blow/Draw is already unified above.
     #[test]
     fn enforce_expr_unifies_overlap_chain_but_not_independent_notes() {
-        let mut s = EditorState::default();
-        s.notes = vec![
-            GridNote {
-                id: 0,
-                hole: 1,
-                tick: 0,
-                len: 3,
-                dir: Dir::Blow,
-                pitch: Pitch::Normal,
-                expr: Expr::Vibrato(5.0),
-            },
-            GridNote {
-                id: 1,
-                hole: 2,
-                tick: 2,
-                len: 3,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-            GridNote {
-                id: 2,
-                hole: 3,
-                tick: 10,
-                len: 1,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-        ];
-        s.next_id = 3;
+        let mut s = EditorState {
+            notes: vec![
+                GridNote {
+                    id: 0,
+                    hole: 1,
+                    tick: 0,
+                    len: 3,
+                    dir: Dir::Blow,
+                    pitch: Pitch::Normal,
+                    expr: Expr::Vibrato(5.0),
+                },
+                GridNote {
+                    id: 1,
+                    hole: 2,
+                    tick: 2,
+                    len: 3,
+                    dir: Dir::Draw,
+                    pitch: Pitch::Normal,
+                    expr: Expr::None,
+                },
+                GridNote {
+                    id: 2,
+                    hole: 3,
+                    tick: 10,
+                    len: 1,
+                    dir: Dir::Draw,
+                    pitch: Pitch::Normal,
+                    expr: Expr::None,
+                },
+            ],
+            next_id: 3,
+            ..Default::default()
+        };
         enforce_expr(&mut s, 0);
         assert_eq!(
             s.note_by_id(1).unwrap().expr,
@@ -655,11 +665,13 @@ mod tests {
 
     #[test]
     fn serialize_harpchart_is_valid_json_with_required_fields() {
-        let mut s = EditorState::default();
-        s.name = "Test Song".into();
-        s.author = "Test Artist".into();
-        s.tempo = "120".into();
-        s.key = "G".into();
+        let mut s = EditorState {
+            name: "Test Song".into(),
+            author: "Test Artist".into(),
+            tempo: "120".into(),
+            key: "G".into(),
+            ..Default::default()
+        };
         select_or_add(&mut s, 2, 0);
         select_or_add(&mut s, 4, 4);
         select_or_add(&mut s, 5, 4);
@@ -723,8 +735,10 @@ mod tests {
 
     #[test]
     fn chromatic_chart_round_trips_kind_hole_count_and_slide() {
-        let mut s = EditorState::default();
-        s.harmonica_kind = HarmonicaKind::Chromatic;
+        let mut s = EditorState {
+            harmonica_kind: HarmonicaKind::Chromatic,
+            ..Default::default()
+        };
         select_or_add(&mut s, 11, 0); // only valid on a chromatic (12-hole) harp
         apply_modifier(&mut s, ModButton::Slide);
 
@@ -765,8 +779,10 @@ mod tests {
 
     #[test]
     fn saved_position_round_trips_through_load() {
-        let mut s = EditorState::default();
-        s.position = "3rd".into();
+        let s = EditorState {
+            position: "3rd".into(),
+            ..Default::default()
+        };
 
         let json_str = serialize_harpchart(&s);
         let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");

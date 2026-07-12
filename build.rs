@@ -110,7 +110,10 @@ fn is_raw_text_new(line: &str) -> bool {
         && content.chars().any(|c| c.is_ascii_whitespace())
 }
 
+#[cfg(target_os = "windows")]
 use std::io::Write;
+
+#[cfg(target_os = "windows")]
 fn generate_wix_assets() -> std::io::Result<()> {
     let assets_dir = Path::new("assets");
 
@@ -162,6 +165,7 @@ fn generate_wix_assets() -> std::io::Result<()> {
     Ok(())
 } 
 
+#[cfg(target_os = "windows")]
 fn visit_assets(
     root: &Path,
     current: &Path,
@@ -215,6 +219,7 @@ fn visit_assets(
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
 fn sanitize_wix_id(input: &str) -> String {
     let mut s = String::new();
 

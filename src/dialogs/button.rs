@@ -40,7 +40,7 @@ pub fn small<M: 'static>(
         Node {
             padding: {UiRect::axes(Val::Px(12.0), Val::Px(6.0))},
             justify_content: {JustifyContent::Center},
-            flex_shrink: {0.0},
+            flex_shrink: {0.0_f32},
         }
         Children [
             (
@@ -69,7 +69,7 @@ pub fn default<M: 'static>(
             justify_content: {JustifyContent::Center},
             // Keep natural size inside height-constrained scroll lists (the file
             // dialog) instead of being compressed to fit.
-            flex_shrink: {0.0},
+            flex_shrink: {0.0_f32},
         }
         Children [
             (

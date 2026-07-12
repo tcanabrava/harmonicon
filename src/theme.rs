@@ -570,8 +570,10 @@ mod tests {
 
     #[test]
     fn background_for_falls_back_to_default_for_unconfigured_menu() {
-        let mut theme = LoadedTheme::default();
-        theme.default_background = Some(Handle::default());
+        let theme = LoadedTheme {
+            default_background: Some(Handle::default()),
+            ..Default::default()
+        };
         // "Unknown" has no per-menu entry → falls back to default_background
         assert!(theme.background_for("Unknown").is_some());
     }
