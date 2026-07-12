@@ -23,7 +23,7 @@ use crate::menu::AppState;
 
 /// Best result recorded for one song, keyed by its manifest path (stable
 /// across restarts, unlike a `Handle`/`AssetId`) in [`PlayerProfile::songs`].
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
 pub struct SongRecord {
     pub best_score: u32,
@@ -33,6 +33,30 @@ pub struct SongRecord {
     /// ...), each in `[0.0, 1.0]` — an improving high-water mark across
     /// sessions, not a full log of every play.
     pub technique_best_accuracy: HashMap<String, f32>,
+    /// Adaptive difficulty's "learned" fraction (0.0..=1.0) per musical
+    /// phrase section, indexed by the section's ordinal position in the
+    /// chart track — see `gameplay::adaptive_difficulty`. Empty until the
+    /// song's first play or manual adjustment; a missing/short index reads
+    /// as unlearned (0.0).
+    pub phrase_learned: Vec<f32>,
+    /// Whether adaptive difficulty gates note visibility for this song.
+    /// Defaults to `true` (see the hand-written `Default` impl below —
+    /// `#[serde(default)]` on the struct fills a missing field from it, so
+    /// older `profile.json` files without this field load with it on).
+    pub adaptive_difficulty_enabled: bool,
+}
+
+impl Default for SongRecord {
+    fn default() -> Self {
+        Self {
+            best_score: 0,
+            best_accuracy: 0.0,
+            plays: 0,
+            technique_best_accuracy: HashMap::new(),
+            phrase_learned: Vec::new(),
+            adaptive_difficulty_enabled: true,
+        }
+    }
 }
 
 /// Per-(hole, technique) drill hit-rate from the Bending Trainer's adaptive
@@ -157,6 +181,22 @@ mod tests {
 
     fn record() -> SongRecord {
         SongRecord::default()
+    }
+
+    #[test]
+    fn default_song_record_has_adaptive_difficulty_on_and_nothing_learned() {
+        let r = record();
+        assert!(r.adaptive_difficulty_enabled);
+        assert!(r.phrase_learned.is_empty());
+    }
+
+    #[test]
+    fn missing_adaptive_fields_default_from_json_via_serde_default() {
+        // An older profile.json predating these fields should still load
+        // with adaptive difficulty on, not `bool::default()` (false).
+        let r: SongRecord = serde_json::from_str("{}").unwrap();
+        assert!(r.adaptive_difficulty_enabled);
+        assert!(r.phrase_learned.is_empty());
     }
 
     #[test]

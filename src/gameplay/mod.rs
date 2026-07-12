@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+mod adaptive_difficulty;
 mod bending_trainer;
 mod clock;
 mod countdown_overlay;
@@ -72,6 +73,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<MusicStarted>()
         .init_resource::<ValidHarpNotes>()
         .init_resource::<SongNotes>()
+        .init_resource::<adaptive_difficulty::AdaptiveDifficulty>()
         .init_resource::<gameplay_2d::NoteRenderAssets>()
         .init_resource::<gameplay_3d::NoteRenderAssets3D>()
         .init_resource::<Score>()
@@ -91,12 +93,14 @@ impl Plugin for GameplayPlugin {
         .init_resource::<jam_session::JamLoop>()
         .init_resource::<pause_menu::WaitForNoteMode>()
         .init_resource::<pause_menu::PracticeSpeed>()
+        .init_resource::<pause_menu::SelectedPhraseIndex>()
         // Setup: shared pause menu + mode-specific scenes
         .add_systems(
             OnEnter(AppState::Playing),
             (
                 reset_score,
                 setup_scoring_config,
+                adaptive_difficulty::setup_adaptive_difficulty,
                 pause_menu::setup_pause_menu,
                 gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                 gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
@@ -176,6 +180,8 @@ impl Plugin for GameplayPlugin {
                 pause_menu::update_wait_mode_label,
                 pause_menu::update_loop_label,
                 pause_menu::update_practice_speed_label,
+                pause_menu::update_phrase_selector_label,
+                pause_menu::update_adaptive_difficulty_label,
             )
                 .run_if(in_state(AppState::Playing)),
         )
@@ -497,6 +503,13 @@ pub struct ScheduledNote {
     /// held — used to verify a declared `wah-wah` was actually played at
     /// roughly its declared `oscillation_hz`, not just declared.
     pub amp_samples: Vec<(f64, f32)>,
+    /// Index into `adaptive_difficulty::AdaptiveDifficulty::sections` — the
+    /// musical phrase this note belongs to. A note only exists in
+    /// `SongNotes` at all once adaptive difficulty has unlocked it (see
+    /// `adaptive_difficulty::unlocked_flags`), so this is always a real
+    /// section, not an `Option`; charts with no `phrase` tags get a single
+    /// implicit section (index 0) covering the whole track.
+    pub phrase_section: usize,
 }
 
 /// Every note in the loaded chart, sorted by `time` ascending (matches chart
@@ -1649,6 +1662,7 @@ mod tests {
             modifiers: Vec::new(),
             pitch_samples: Vec::new(),
             amp_samples: Vec::new(),
+            phrase_section: 0,
         }
     }
 
@@ -2172,6 +2186,7 @@ mod tests {
             modifiers: Vec::new(),
             pitch_samples: Vec::new(),
             amp_samples: Vec::new(),
+            phrase_section: 0,
         }
     }
 
@@ -2481,6 +2496,7 @@ mod tests {
                 modifiers: Vec::new(),
                 pitch_samples: Vec::new(),
                 amp_samples: Vec::new(),
+                phrase_section: 0,
             }
         }
         fn pitch(note: &str, octave: i32) -> PitchInfo {

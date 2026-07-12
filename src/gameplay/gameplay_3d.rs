@@ -17,6 +17,7 @@ use crate::{
     theme::{LoadedTheme, TwelveBarColors},
 };
 
+use super::adaptive_difficulty::{AdaptiveDifficulty, track_items, unlocked_flags};
 use super::countdown_overlay::spawn_countdown;
 use super::gameplay_2d::{note_anim_mode, note_techniques};
 use super::metronome_overlay::spawn_metronome;
@@ -286,11 +287,19 @@ fn build_song_notes_3d(
     head_mesh: Handle<Mesh>,
     cfg: NoteCube3dConfig,
     holes: Vec<HoleConfig>,
+    adaptive: &AdaptiveDifficulty,
 ) -> (super::SongNotes, NoteRenderAssets3D) {
+    let items = track_items(&chart.track, &chart.timing);
+    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
+    let mut flags = flags.into_iter();
     let mut notes: Vec<ScheduledNote> = Vec::new();
     for item in &chart.track {
         let t = super::resolve_item_time(item, &chart.timing);
         for event in &item.events {
+            let (unlocked, section) = flags.next().unwrap_or((true, 0));
+            if !unlocked {
+                continue;
+            }
             let is_blow = matches!(event.action, Action::Blow);
             let modifiers = event.modifiers.clone().unwrap_or_default();
             let natural_pitch = event.note.clone().unwrap_or_else(|| {
@@ -313,6 +322,7 @@ fn build_song_notes_3d(
                 modifiers,
                 pitch_samples: Vec::new(),
                 amp_samples: Vec::new(),
+                phrase_section: section,
             });
         }
     }
@@ -564,15 +574,24 @@ pub fn update_note_hole_labels_3d(
     }
 }
 
+/// Note-building state bundled into one `SystemParam` so `setup` stays under
+/// Bevy's function-system parameter arity limit — plain individual params
+/// would put it one over once `AdaptiveDifficulty` joined the list.
+#[derive(bevy::ecs::system::SystemParam)]
+pub(super) struct NoteBuildState<'w> {
+    valid_notes: ResMut<'w, ValidHarpNotes>,
+    song_notes: ResMut<'w, super::SongNotes>,
+    render_assets: ResMut<'w, NoteRenderAssets3D>,
+    adaptive: Res<'w, AdaptiveDifficulty>,
+}
+
 pub fn setup(
     mut commands: Commands,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut clock: ResMut<super::GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
-    mut valid_notes: ResMut<ValidHarpNotes>,
-    mut song_notes: ResMut<super::SongNotes>,
-    mut render_assets: ResMut<NoteRenderAssets3D>,
+    mut note_build: NoteBuildState,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
@@ -588,7 +607,7 @@ pub fn setup(
     };
     clock.set_free(-COUNTDOWN);
     music_started.0 = false;
-    valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
+    note_build.valid_notes.0 = manifest.chart.harmonica.build_valid_notes();
 
     for (mut cam, _) in &mut cameras {
         cam.order = 1;
@@ -638,9 +657,15 @@ pub fn setup(
         None => asset_server.load(format!("notes/3d/{}.glb#Mesh0/Primitive0", note_theme.0)),
     };
     let note_cfg = manifest.assets_3d_config.clone();
-    let (notes, assets) = build_song_notes_3d(chart, head_mesh, note_cfg, holes.clone());
-    *song_notes = notes;
-    *render_assets = assets;
+    let (notes, assets) = build_song_notes_3d(
+        chart,
+        head_mesh,
+        note_cfg,
+        holes.clone(),
+        &note_build.adaptive,
+    );
+    *note_build.song_notes = notes;
+    *note_build.render_assets = assets;
     spawn_harmonica_3d(
         &mut commands,
         &mut meshes,
@@ -667,12 +692,14 @@ pub fn setup(
         shape_materials,
         theme.twelve_bar_colors(),
     );
-    let note_times: Vec<f64> = song_notes.notes.iter().map(|n| n.time).collect();
+    let note_times: Vec<f64> = note_build.song_notes.notes.iter().map(|n| n.time).collect();
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
         manifest.music_duration_secs,
         &note_times,
+        &note_build.adaptive.sections,
+        &note_build.adaptive.learned,
     );
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);

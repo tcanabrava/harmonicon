@@ -7,9 +7,12 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
+use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused};
 use crate::dialogs::button;
-use crate::menu::{AppState, GameplayMode, ReturnToSongList};
+use crate::menu::{AppState, GameplayMode, ReturnToSongList, SelectedSong};
+use crate::profile::PlayerProfile;
+use crate::song::SongManifest;
 
 /// Root of the pause overlay; toggled between hidden/visible.
 #[derive(Component, Default, Clone)]
@@ -141,6 +144,197 @@ pub(super) fn update_loop_label(
     }
 }
 
+// ── Adaptive difficulty controls ──────────────────────────────────────────────
+
+/// Which of `AdaptiveDifficulty::sections` the pause menu's phrase selector
+/// is currently showing/editing. Not reset between restarts (like
+/// `WaitForNoteMode`/`PracticeSpeed`) — picking up where you left off is more
+/// useful than always snapping back to the first phrase.
+#[derive(Resource, Default)]
+pub struct SelectedPhraseIndex(pub usize);
+
+/// The "Section: ... — Learned: NN%" readout.
+#[derive(Component, Default, Clone)]
+pub(super) struct PhraseSelectorLabel;
+
+/// The "Adaptive Difficulty: on/off" readout.
+#[derive(Component, Default, Clone)]
+pub(super) struct AdaptiveDifficultyLabel;
+
+/// Looks up the current song's `PlayerProfile` record key the same way
+/// `results.rs` does (the manifest's own path, stable across restarts).
+fn song_key(selected: &SelectedSong, manifests: &Assets<SongManifest>) -> Option<String> {
+    manifests
+        .get(&selected.0)
+        .map(|m| m.path.display().to_string())
+}
+
+/// Next index in `0..count`, wrapping — same wraparound style as
+/// `next_speed_step`. `0` for an empty (no-phrase-tags-yet-loaded) song.
+fn next_phrase_index(current: usize, count: usize) -> usize {
+    if count == 0 {
+        return 0;
+    }
+    (current + 1) % count
+}
+
+/// Previous index in `0..count`, wrapping.
+fn prev_phrase_index(current: usize, count: usize) -> usize {
+    if count == 0 {
+        return 0;
+    }
+    (current + count - 1) % count
+}
+
+fn on_prev_phrase(
+    _: On<Pointer<Click>>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut selected: ResMut<SelectedPhraseIndex>,
+) {
+    selected.0 = prev_phrase_index(selected.0, adaptive.sections.len());
+}
+
+fn on_next_phrase(
+    _: On<Pointer<Click>>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut selected: ResMut<SelectedPhraseIndex>,
+) {
+    selected.0 = next_phrase_index(selected.0, adaptive.sections.len());
+}
+
+/// Pure so the readout is unit-testable without a live `AdaptiveDifficulty`.
+fn phrase_selector_text(name: Option<&str>, learned: f32) -> String {
+    match name {
+        Some(name) => format!("Section: {name} \u{2014} Learned: {:.0}%", learned * 100.0),
+        None => "No phrases in this song".to_string(),
+    }
+}
+
+/// Keeps the phrase-selector readout in step with `SelectedPhraseIndex`/
+/// `AdaptiveDifficulty`. Not gated on `Paused`, same reasoning as
+/// `update_wait_mode_label`.
+pub(super) fn update_phrase_selector_label(
+    selected: Res<SelectedPhraseIndex>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut labels: Query<&mut Text, With<PhraseSelectorLabel>>,
+) {
+    if !selected.is_changed() && !adaptive.is_changed() {
+        return;
+    }
+    let section = adaptive.sections.get(selected.0);
+    let learned = section
+        .map(|_| adaptive.learned.get(selected.0).copied().unwrap_or(0.0))
+        .unwrap_or(0.0);
+    let text = phrase_selector_text(section.map(|s| s.name.as_str()), learned);
+    for mut label in &mut labels {
+        *label = Text::new(text.clone());
+    }
+}
+
+fn adaptive_difficulty_label_text(enabled: bool) -> String {
+    format!("Adaptive Difficulty: {}", if enabled { "on" } else { "off" })
+}
+
+pub(super) fn update_adaptive_difficulty_label(
+    adaptive: Res<AdaptiveDifficulty>,
+    mut labels: Query<&mut Text, With<AdaptiveDifficultyLabel>>,
+) {
+    if !adaptive.is_changed() {
+        return;
+    }
+    for mut label in &mut labels {
+        *label = Text::new(adaptive_difficulty_label_text(adaptive.enabled));
+    }
+}
+
+fn on_toggle_adaptive_difficulty(
+    _: On<Pointer<Click>>,
+    selected_song: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut profile: ResMut<PlayerProfile>,
+    mut adaptive: ResMut<AdaptiveDifficulty>,
+) {
+    adaptive.enabled = !adaptive.enabled;
+    if let Some(key) = song_key(&selected_song, &manifests) {
+        profile.songs.entry(key).or_default().adaptive_difficulty_enabled = adaptive.enabled;
+        crate::profile::save_profile(&profile);
+    }
+}
+
+/// Clamps a learned fraction into `0.0..=1.0` after applying `delta` — split
+/// out for unit testing without the ECS plumbing.
+fn adjust_learned(current: f32, delta: f32) -> f32 {
+    (current + delta).clamp(0.0, 1.0)
+}
+
+/// Shared by the "-25%"/"+25%" buttons: adjusts the selected phrase's
+/// learned fraction in both the live `AdaptiveDifficulty` (so the progress
+/// bar's rectangle re-tints immediately) and the persisted `PlayerProfile`
+/// (so it survives a restart) — the note-unlock effect itself only applies
+/// on the next `OnEnter(Playing)`, same as the pause menu's caption says.
+fn adjust_selected_phrase_learned(
+    delta: f32,
+    selected: &SelectedPhraseIndex,
+    selected_song: &SelectedSong,
+    manifests: &Assets<SongManifest>,
+    profile: &mut PlayerProfile,
+    adaptive: &mut AdaptiveDifficulty,
+) {
+    if selected.0 >= adaptive.sections.len() {
+        return;
+    }
+    if adaptive.learned.len() <= selected.0 {
+        adaptive.learned.resize(selected.0 + 1, 0.0);
+    }
+    let new_value = adjust_learned(adaptive.learned[selected.0], delta);
+    adaptive.learned[selected.0] = new_value;
+    let Some(key) = song_key(selected_song, manifests) else {
+        return;
+    };
+    let record = profile.songs.entry(key).or_default();
+    if record.phrase_learned.len() <= selected.0 {
+        record.phrase_learned.resize(selected.0 + 1, 0.0);
+    }
+    record.phrase_learned[selected.0] = new_value;
+    crate::profile::save_profile(profile);
+}
+
+fn on_decrease_phrase_learned(
+    _: On<Pointer<Click>>,
+    selected: Res<SelectedPhraseIndex>,
+    selected_song: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut profile: ResMut<PlayerProfile>,
+    mut adaptive: ResMut<AdaptiveDifficulty>,
+) {
+    adjust_selected_phrase_learned(
+        -0.25,
+        &selected,
+        &selected_song,
+        &manifests,
+        &mut profile,
+        &mut adaptive,
+    );
+}
+
+fn on_increase_phrase_learned(
+    _: On<Pointer<Click>>,
+    selected: Res<SelectedPhraseIndex>,
+    selected_song: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    mut profile: ResMut<PlayerProfile>,
+    mut adaptive: ResMut<AdaptiveDifficulty>,
+) {
+    adjust_selected_phrase_learned(
+        0.25,
+        &selected,
+        &selected_song,
+        &manifests,
+        &mut profile,
+        &mut adaptive,
+    );
+}
+
 /// Spawns the (initially hidden) pause overlay. Tagged `GameplayRoot` so it is
 /// torn down with the rest of the scene. The whole tree — including each
 /// button's click/hover behaviour — is authored declaratively with `bsn!`.
@@ -216,6 +410,46 @@ pub(super) fn setup_pause_menu(mut commands: Commands, mode: Res<GameplayMode>) 
                             PracticeSpeedLabel
                         ),
                     ]
+                });
+                children.spawn_empty().apply_scene(bsn! {
+                    Node {
+                        flex_direction: {FlexDirection::Row},
+                        align_items: {AlignItems::Center},
+                        column_gap: {Val::Px(8.0)},
+                    }
+                    Children [
+                        button::small("Adaptive Difficulty", on_toggle_adaptive_difficulty),
+                        (
+                            Text({"Adaptive Difficulty: on"})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                            AdaptiveDifficultyLabel
+                        ),
+                    ]
+                });
+                children.spawn_empty().apply_scene(bsn! {
+                    Node {
+                        flex_direction: {FlexDirection::Row},
+                        align_items: {AlignItems::Center},
+                        column_gap: {Val::Px(8.0)},
+                    }
+                    Children [
+                        button::small("\u{25C0}", on_prev_phrase),
+                        (
+                            Text({"No phrases in this song"})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                            PhraseSelectorLabel
+                        ),
+                        button::small("\u{25B6}", on_next_phrase),
+                        button::small("-25%", on_decrease_phrase_learned),
+                        button::small("+25%", on_increase_phrase_learned),
+                    ]
+                });
+                children.spawn_empty().apply_scene(bsn! {
+                    Text({"Learned% applies on the next Restart"})
+                    TextFont { font_size: {FontSize::Px(13.0)} }
+                    TextColor({Color::srgb(0.55, 0.55, 0.62)})
                 });
             }
 
@@ -454,5 +688,51 @@ mod tests {
     fn practice_speed_label_formats_as_a_percentage() {
         assert_eq!(practice_speed_label_text(1.0), "Speed: 100%");
         assert_eq!(practice_speed_label_text(0.7), "Speed: 70%");
+    }
+
+    // ── phrase selector / adaptive difficulty controls ────────────────────────
+
+    #[test]
+    fn next_phrase_index_wraps_around() {
+        assert_eq!(next_phrase_index(0, 3), 1);
+        assert_eq!(next_phrase_index(2, 3), 0);
+    }
+
+    #[test]
+    fn prev_phrase_index_wraps_around() {
+        assert_eq!(prev_phrase_index(0, 3), 2);
+        assert_eq!(prev_phrase_index(1, 3), 0);
+    }
+
+    #[test]
+    fn phrase_index_stepping_is_a_no_op_with_no_sections() {
+        assert_eq!(next_phrase_index(0, 0), 0);
+        assert_eq!(prev_phrase_index(0, 0), 0);
+    }
+
+    #[test]
+    fn phrase_selector_text_shows_name_and_learned_percent() {
+        assert_eq!(
+            phrase_selector_text(Some("intro"), 0.25),
+            "Section: intro \u{2014} Learned: 25%"
+        );
+    }
+
+    #[test]
+    fn phrase_selector_text_handles_no_sections() {
+        assert_eq!(phrase_selector_text(None, 0.0), "No phrases in this song");
+    }
+
+    #[test]
+    fn adaptive_difficulty_label_reflects_state() {
+        assert_eq!(adaptive_difficulty_label_text(true), "Adaptive Difficulty: on");
+        assert_eq!(adaptive_difficulty_label_text(false), "Adaptive Difficulty: off");
+    }
+
+    #[test]
+    fn adjust_learned_clamps_to_zero_and_one() {
+        assert_eq!(adjust_learned(0.0, -0.25), 0.0);
+        assert_eq!(adjust_learned(1.0, 0.25), 1.0);
+        assert!((adjust_learned(0.5, 0.25) - 0.75).abs() < 1e-6);
     }
 }

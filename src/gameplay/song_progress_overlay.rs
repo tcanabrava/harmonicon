@@ -23,6 +23,7 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::menu::AppState;
 
+use super::adaptive_difficulty::{AdaptiveDifficulty, PhraseSection};
 use super::{GameplayClock, GameplayRoot, LoopConfig, Paused, SongEnd, loop_range_valid};
 
 /// Every bar keeps at least this much height (as a fraction 0..1) even during
@@ -35,12 +36,17 @@ const WAVEFORM_HEIGHT: f32 = 26.0;
 /// Height (px) of the note-marker strip below the waveform.
 const NOTES_STRIP_HEIGHT: f32 = 10.0;
 
+/// Height (px) of the per-phrase adaptive-difficulty strip below the note
+/// markers — one rectangle per `adaptive_difficulty::PhraseSection`, filled
+/// dim-gray to green by how much of that phrase has been learned.
+const PHRASE_STRIP_HEIGHT: f32 = 6.0;
+
 /// Total height (px) of the bar, pinned across the full width at the very
 /// top of the screen (`top: 0`). `pub` so the gameplay HUDs can reserve this
 /// much space at the top of their own layout instead of placing content
 /// underneath it, where the bar — deliberately painted above them, see
 /// [`BAR_Z_INDEX`] — would cover it.
-pub const BAR_HEIGHT: f32 = WAVEFORM_HEIGHT + NOTES_STRIP_HEIGHT;
+pub const BAR_HEIGHT: f32 = WAVEFORM_HEIGHT + NOTES_STRIP_HEIGHT + PHRASE_STRIP_HEIGHT;
 
 /// Width (px) of a single note marker.
 const NOTE_MARKER_WIDTH: f32 = 2.0;
@@ -63,6 +69,15 @@ pub struct ProgressPlayhead;
 /// independent of them.
 #[derive(Component, Default, Clone)]
 pub struct LoopRangeMarker;
+
+/// One rectangle in the per-phrase adaptive-difficulty strip, spanning its
+/// `PhraseSection`'s time range. `usize` is the section's ordinal index
+/// (into `AdaptiveDifficulty::sections`/`learned`), used by
+/// [`update_phrase_section_colors`] to re-tint it without respawning
+/// whenever a phrase's learned fraction changes (e.g. a manual pause-menu
+/// edit).
+#[derive(Component, Clone, Copy)]
+struct PhraseSectionRect(usize);
 
 /// The single entity that accepts click-and-drag input for setting a loop
 /// range — the bar's own root. Every visual child (waveform bars, note
@@ -131,6 +146,8 @@ pub fn spawn_song_progress(
     waveform: &[f32],
     duration_secs: f64,
     note_times: &[f64],
+    sections: &[PhraseSection],
+    learned: &[f32],
 ) {
     commands.insert_resource(AudioDuration(duration_secs));
     commands
@@ -205,6 +222,42 @@ pub fn spawn_song_progress(
                             },
                             BackgroundColor(Color::WHITE),
                             Pickable::IGNORE,
+                        ));
+                    }
+                }
+            });
+
+            bar.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Px(PHRASE_STRIP_HEIGHT),
+                    position_type: PositionType::Relative,
+                    ..default()
+                },
+                Pickable::IGNORE,
+            ))
+            .with_children(|strip| {
+                if duration_secs > 0.0 {
+                    for (i, section) in sections.iter().enumerate() {
+                        let Some((left, width)) =
+                            phrase_rect_geometry(section.start_time, section.end_time, duration_secs)
+                        else {
+                            continue;
+                        };
+                        let learned_frac = learned.get(i).copied().unwrap_or(0.0);
+                        strip.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Percent(left * 100.0),
+                                top: Val::Px(0.0),
+                                width: Val::Percent(width * 100.0),
+                                height: Val::Percent(100.0),
+                                margin: UiRect::horizontal(Val::Px(0.5)),
+                                ..default()
+                            },
+                            BackgroundColor(phrase_fill_color(learned_frac)),
+                            Pickable::IGNORE,
+                            PhraseSectionRect(i),
                         ));
                     }
                 }
@@ -303,6 +356,32 @@ pub(super) fn drag_marker_geometry(
     let b = (current_time / duration_secs).clamp(0.0, 1.0) as f32;
     let left = a.min(b);
     Some((left, (a.max(b) - left).max(0.0)))
+}
+
+/// Left offset and width (fractions 0..1) for a phrase section's rectangle,
+/// laid out on the same `duration_secs` timescale as the waveform/note
+/// markers — same shape as [`loop_marker_geometry`], but unconditional on an
+/// "active"/`SongEnd` flag since every section is always shown. `None` only
+/// when there's no known audio duration to lay it out against.
+fn phrase_rect_geometry(start_time: f64, end_time: f64, duration_secs: f64) -> Option<(f32, f32)> {
+    if duration_secs <= 0.0 {
+        return None;
+    }
+    let left = (start_time / duration_secs).clamp(0.0, 1.0) as f32;
+    let right = (end_time / duration_secs).clamp(0.0, 1.0) as f32;
+    Some((left, (right - left).max(0.0)))
+}
+
+/// Fill color for a phrase-section rectangle: dim gray (unlearned) to green
+/// (fully learned), linearly interpolated by `learned` (clamped to 0..=1).
+fn phrase_fill_color(learned: f32) -> Color {
+    let t = learned.clamp(0.0, 1.0);
+    Color::srgba(
+        0.35 + (0.20 - 0.35) * t,
+        0.35 + (0.85 - 0.35) * t,
+        0.40 + (0.35 - 0.40) * t,
+        0.85,
+    )
 }
 
 /// Converts a `RelativeCursorPosition::normalized` reading (-0.5..0.5 within
@@ -445,6 +524,24 @@ fn update_loop_marker(
     }
 }
 
+/// Re-tints each phrase-section rectangle when `AdaptiveDifficulty` changes
+/// (a manual pause-menu edit, or a fresh song's initial load) without
+/// respawning — the rectangles themselves are only ever (re)created in
+/// [`spawn_song_progress`], since their count/geometry only changes when the
+/// song itself does.
+fn update_phrase_section_colors(
+    adaptive: Res<AdaptiveDifficulty>,
+    mut rects: Query<(&PhraseSectionRect, &mut BackgroundColor)>,
+) {
+    if !adaptive.is_changed() {
+        return;
+    }
+    for (rect, mut color) in &mut rects {
+        let learned = adaptive.learned.get(rect.0).copied().unwrap_or(0.0);
+        *color = BackgroundColor(phrase_fill_color(learned));
+    }
+}
+
 pub struct SongProgressPlugin;
 
 impl Plugin for SongProgressPlugin {
@@ -466,6 +563,10 @@ impl Plugin for SongProgressPlugin {
                 )
                     .chain()
                     .run_if(in_state(AppState::Playing)),
+            )
+            .add_systems(
+                Update,
+                update_phrase_section_colors.run_if(in_state(AppState::Playing)),
             );
     }
 }
@@ -473,6 +574,44 @@ impl Plugin for SongProgressPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── phrase_rect_geometry / phrase_fill_color ──────────────────────────────
+
+    #[test]
+    fn phrase_rect_hidden_without_a_known_audio_duration() {
+        assert_eq!(phrase_rect_geometry(0.0, 8.0, 0.0), None);
+    }
+
+    #[test]
+    fn phrase_rect_geometry_is_a_fraction_of_the_audio_duration() {
+        let (left, width) = phrase_rect_geometry(8.0, 16.0, 64.0).unwrap();
+        assert!((left - 0.125).abs() < 1e-6);
+        assert!((width - 0.125).abs() < 1e-6);
+    }
+
+    #[test]
+    fn phrase_fill_color_is_dim_gray_when_unlearned() {
+        let Color::Srgba(c) = phrase_fill_color(0.0) else {
+            panic!("expected Srgba");
+        };
+        assert!((c.red - 0.35).abs() < 1e-6);
+        assert!((c.green - 0.35).abs() < 1e-6);
+    }
+
+    #[test]
+    fn phrase_fill_color_is_green_when_fully_learned() {
+        let Color::Srgba(c) = phrase_fill_color(1.0) else {
+            panic!("expected Srgba");
+        };
+        assert!((c.red - 0.20).abs() < 1e-6);
+        assert!((c.green - 0.85).abs() < 1e-6);
+    }
+
+    #[test]
+    fn phrase_fill_color_clamps_out_of_range_input() {
+        assert_eq!(phrase_fill_color(-1.0), phrase_fill_color(0.0));
+        assert_eq!(phrase_fill_color(2.0), phrase_fill_color(1.0));
+    }
 
     // ── loop_marker_geometry (committed LoopConfig) ───────────────────────────
 

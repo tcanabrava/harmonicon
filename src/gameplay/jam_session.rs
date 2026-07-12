@@ -212,11 +212,15 @@ pub fn setup(
         .iter()
         .map(|item| super::resolve_item_time(item, &chart.timing))
         .collect();
+    // No phrase sections either — adaptive difficulty is a scored-mode
+    // concept, so Jam Session's bar just shows no phrase strip rectangles.
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
         manifest.music_duration_secs,
         &note_times,
+        &[],
+        &[],
     );
 
     // Jam already shows the harp hint on the persistent left panel, so the

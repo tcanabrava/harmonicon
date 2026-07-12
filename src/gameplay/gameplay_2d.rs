@@ -18,6 +18,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_visual_2d::{NoteChildConfig, spawn_note_children};
+use super::adaptive_difficulty::{AdaptiveDifficulty, track_items, unlocked_flags};
 use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
 use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
@@ -52,6 +53,7 @@ pub fn setup(
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
     note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
     theme: Res<crate::theme::LoadedTheme>,
+    adaptive: Res<AdaptiveDifficulty>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
@@ -82,11 +84,18 @@ pub fn setup(
     // *visuals* are spawned later, lazily, by `spawn_visible_notes` as each
     // one enters the `LOOKAHEAD` window — a long/dense chart no longer pays
     // for every note's UI subtree (and comet-tail material) at song load.
+    let items = track_items(&chart.track, &chart.timing);
+    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
+    let mut flags = flags.into_iter();
     let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
     for item in &chart.track {
         let t = super::resolve_item_time(item, &chart.timing);
         let tag = play_mode_label(item.play_mode.as_ref());
         for event in &item.events {
+            let (unlocked, section) = flags.next().unwrap_or((true, 0));
+            if !unlocked {
+                continue;
+            }
             let is_blow = matches!(event.action, Action::Blow);
             let modifiers = event.modifiers.clone().unwrap_or_default();
             let natural_pitch = event.note.clone().unwrap_or_else(|| {
@@ -109,6 +118,7 @@ pub fn setup(
                     modifiers,
                     pitch_samples: Vec::new(),
                     amp_samples: Vec::new(),
+                    phrase_section: section,
                 },
                 tag,
             ));
@@ -379,6 +389,8 @@ pub fn setup(
         &manifest.waveform,
         manifest.music_duration_secs,
         &note_times,
+        &adaptive.sections,
+        &adaptive.learned,
     );
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
