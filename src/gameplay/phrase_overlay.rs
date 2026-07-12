@@ -210,7 +210,7 @@ fn watch_phrase_boundaries(
     }
 }
 
-pub fn update_tab_ribbon(
+fn update_tab_ribbon(
     mut changed: MessageReader<PhraseChanged>,
     clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
@@ -244,7 +244,7 @@ pub fn update_tab_ribbon(
     }
 }
 
-pub fn update_phrase(
+fn update_phrase(
     mut changed: MessageReader<PhraseChanged>,
     clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
@@ -483,5 +483,55 @@ mod tests {
         }]);
         let items = [(0.0, Some("call"), &with_bend[..])];
         assert_eq!(phrase_tab_sequence(&items, 0.0), "-4'");
+    }
+
+    // ── watch_phrase_boundaries ─────────────────────────────────────────────
+
+    #[derive(Resource, Default)]
+    struct PhraseChangeLog(u32);
+
+    fn log_phrase_changes(mut changed: MessageReader<PhraseChanged>, mut log: ResMut<PhraseChangeLog>) {
+        log.0 += changed.read().count() as u32;
+    }
+
+    #[test]
+    fn watch_phrase_boundaries_emits_only_on_a_boundary_crossing() {
+        let mut world = World::new();
+        world.insert_resource(PhraseBoundaries {
+            banner: vec![0.0, 4.0],
+            ribbon: vec![0.0, 2.0],
+        });
+        world.insert_resource(GameplayClock::new(-1.0));
+        world.init_resource::<Messages<PhraseChanged>>();
+        world.init_resource::<PhraseChangeLog>();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems((watch_phrase_boundaries, log_phrase_changes).chain());
+
+        // First run always emits: `Local` state starts empty.
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<PhraseChangeLog>().0, 1);
+
+        // Crosses both the banner's and the ribbon's first boundary (t=0.0).
+        world.resource_mut::<GameplayClock>().set_free(0.5);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<PhraseChangeLog>().0, 2);
+
+        // No boundary crossed since the last run — no new emission.
+        world.resource_mut::<GameplayClock>().set_free(1.0);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<PhraseChangeLog>().0, 2);
+
+        // Crosses only the ribbon's boundary at t=2.0; still emits.
+        world.resource_mut::<GameplayClock>().set_free(2.5);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<PhraseChangeLog>().0, 3);
+
+        // A loop rewind moves the clock backward across the ribbon boundary
+        // it just crossed — must re-emit, not stay silent because the
+        // index is merely lower than before.
+        world.resource_mut::<GameplayClock>().set_free(0.5);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<PhraseChangeLog>().0, 4);
     }
 }
