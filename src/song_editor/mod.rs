@@ -107,13 +107,16 @@ impl Plugin for SongEditor2Plugin {
                         resource_exists_and_changed::<state::EditorState>
                             .or_else(resource_changed::<LoadedTheme>),
                     ),
-                    panel::update_mode_visibility,
-                    panel::update_technique_button_visibility,
+                    panel::update_mode_visibility
+                        .run_if(resource_exists_and_changed::<state::EditorState>),
+                    panel::update_technique_button_visibility
+                        .run_if(resource_exists_and_changed::<state::EditorState>),
                     panel::update_meta_fields.run_if(
                         resource_exists_and_changed::<state::EditorState>
                             .or_else(resource_changed::<LoadedTheme>),
                     ),
-                    panel::update_harmonica_kind_text,
+                    panel::update_harmonica_kind_text
+                        .run_if(resource_exists_and_changed::<state::EditorState>),
                     panel::update_status_bar.run_if(
                         resource_exists_and_changed::<state::EditorState>
                             .or_else(resource_changed::<practice::PracticeState>),
