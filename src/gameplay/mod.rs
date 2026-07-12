@@ -84,6 +84,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<LoopConfig>()
         .init_resource::<CurrentBar>()
         .add_message::<BarChanged>()
+        .add_message::<NoteScored>()
         .init_resource::<bending_trainer::TrainerKey>()
         .init_resource::<bending_trainer::TrainerTarget>()
         .init_resource::<bending_trainer::DrillState>()
@@ -428,6 +429,20 @@ pub struct HitFeedback {
 /// Updated every frame so hole-display systems can show a target hint.
 #[derive(Resource, Default)]
 pub struct ActiveTargets(pub Vec<(u8, bool)>);
+
+/// Emitted by [`score_notes`] whenever `Score` moves (a fresh hit, a note's
+/// sustain bonus landing, a miss resetting the combo, or the combo decaying
+/// from inactivity) — `update_score_display` reads this instead of
+/// re-`format!`ing the score/combo `Text` every frame regardless of whether
+/// either number actually changed. `quality` is only `Some` for a fresh hit,
+/// which is what tells `update_score_display` to set the "PERFECT!"/"GOOD"
+/// feedback label *once* rather than every frame of its fade — the alpha fade
+/// itself stays a per-frame animation, driven by `HitFeedback` directly, not
+/// this message.
+#[derive(Message)]
+pub struct NoteScored {
+    pub quality: Option<HitQuality>,
+}
 
 // ── Shared components ─────────────────────────────────────────────────────────
 
@@ -1121,6 +1136,7 @@ fn score_notes(
     mut stats: ResMut<SongStats>,
     mut feedback: ResMut<HitFeedback>,
     mut gate: ResMut<PitchGate>,
+    mut scored: MessageWriter<NoteScored>,
 ) {
     if clock.get() < 0.0 {
         return;
@@ -1139,6 +1155,7 @@ fn score_notes(
         )
     {
         score.combo = 0;
+        scored.write(NoteScored { quality: None });
     }
 
     let harp_pitches: HashSet<u8> = active
@@ -1232,6 +1249,7 @@ fn score_notes(
                     }
                 }
                 note.sustain_scored = true;
+                scored.write(NoteScored { quality: None });
             }
             continue;
         }
@@ -1282,6 +1300,7 @@ fn score_notes(
                 if config.combo_enabled {
                     score.combo = 0;
                 }
+                scored.write(NoteScored { quality: None });
             }
             NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
             NoteOutcome::Hit(quality) => {
@@ -1333,6 +1352,9 @@ fn score_notes(
                 score.points += style_bonus_points(&immediate, &config.style_bonus).round() as u32;
                 feedback.quality = Some(quality);
                 feedback.timer = 0.75;
+                scored.write(NoteScored {
+                    quality: Some(quality),
+                });
             }
         }
     }
@@ -1349,7 +1371,22 @@ fn modifier_fx_key(modifier: &Modifier) -> &'static str {
     }
 }
 
+/// Label and tint for a judged hit quality, shared by the label-once and the
+/// per-frame color-fade halves of `update_score_display`.
+fn feedback_style(quality: HitQuality) -> (&'static str, f32, f32, f32) {
+    match quality {
+        HitQuality::Perfect => ("PERFECT!", 1.00, 0.85, 0.10),
+        HitQuality::Good => ("GOOD", 0.40, 1.00, 0.35),
+    }
+}
+
+/// The score/combo digits only get re-`format!`ed when [`NoteScored`] says
+/// `Score` actually moved. The feedback label ("PERFECT!"/"GOOD") is set
+/// once, on the frame a fresh hit's message carries a `quality` — not every
+/// frame of its fade, which stays a per-frame animation (color/alpha only)
+/// driven straight off `HitFeedback`, same as before.
 fn update_score_display(
+    mut scored: MessageReader<NoteScored>,
     score: Res<Score>,
     config: Res<ScoringConfig>,
     mut feedback: ResMut<HitFeedback>,
@@ -1361,29 +1398,53 @@ fn update_score_display(
         (With<FeedbackText>, Without<ScoreText>, Without<ComboText>),
     >,
 ) {
-    for mut t in &mut q_score {
-        t.0 = format!("{}", score.points);
+    let mut score_moved = false;
+    let mut fresh_hit = None;
+    for ev in scored.read() {
+        score_moved = true;
+        if ev.quality.is_some() {
+            fresh_hit = ev.quality;
+        }
     }
 
-    // Same multiplier `score_notes` actually applies to points, so the HUD
-    // can never show a number the score disagrees with.
-    let multiplier = if config.combo_enabled {
-        compute_multiplier(
-            score.combo,
-            config.base_multiplier,
-            config.step_multiplier,
-            config.max_multiplier,
-        )
-    } else {
-        1.0
-    };
-    for mut t in &mut q_combo {
-        t.0 = combo_label(score.combo, multiplier);
+    if score_moved {
+        let points = format!("{}", score.points);
+        for mut t in &mut q_score {
+            if t.0 != points {
+                t.0 = points.clone();
+            }
+        }
+
+        // Same multiplier `score_notes` actually applies to points, so the HUD
+        // can never show a number the score disagrees with.
+        let multiplier = if config.combo_enabled {
+            compute_multiplier(
+                score.combo,
+                config.base_multiplier,
+                config.step_multiplier,
+                config.max_multiplier,
+            )
+        } else {
+            1.0
+        };
+        let combo = combo_label(score.combo, multiplier);
+        for mut t in &mut q_combo {
+            if t.0 != combo {
+                t.0 = combo.clone();
+            }
+        }
+    }
+
+    if let Some(q) = fresh_hit {
+        let (label, ..) = feedback_style(q);
+        for (mut t, _) in &mut q_feedback {
+            t.0 = label.to_string();
+        }
     }
 
     feedback.timer = (feedback.timer - time.delta_secs()).max(0.0);
 
-    for (mut t, mut color) in &mut q_feedback {
+    for (_, mut color) in &mut q_feedback {
         match feedback.quality {
             None => {
                 *color = TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0));
@@ -1392,11 +1453,7 @@ fn update_score_display(
                 let alpha = (feedback.timer / 0.75).clamp(0.0, 1.0);
                 // Scale up then fade: pulse from 1.4× down to 1× size isn't
                 // easily done here, so we just fade alpha.
-                let (label, r, g, b) = match q {
-                    HitQuality::Perfect => ("PERFECT!", 1.00f32, 0.85, 0.10),
-                    HitQuality::Good => ("GOOD", 0.40, 1.00, 0.35),
-                };
-                t.0 = label.to_string();
+                let (_, r, g, b) = feedback_style(q);
                 *color = TextColor(Color::srgba(r, g, b, alpha));
                 if feedback.timer == 0.0 {
                     feedback.quality = None;
@@ -2143,6 +2200,7 @@ mod tests {
         world.insert_resource(SongStats::default());
         world.insert_resource(HitFeedback::default());
         world.insert_resource(PitchGate::default());
+        world.init_resource::<Messages<NoteScored>>();
         world.insert_resource(SongNotes {
             // Sorted by time: index 0 is farther from `judged` (offset
             // -0.10), index 1 is closer (offset -0.01).
@@ -2183,6 +2241,7 @@ mod tests {
         world.insert_resource(SongStats::default());
         world.insert_resource(HitFeedback::default());
         world.insert_resource(PitchGate::default());
+        world.init_resource::<Messages<NoteScored>>();
         world.insert_resource(SongNotes {
             notes: vec![overlap_test_note(120.0)],
             cursor: 0,
@@ -2195,6 +2254,64 @@ mod tests {
         let song_notes = world.resource::<SongNotes>();
         assert!(!song_notes.notes[0].hit);
         assert!(!song_notes.notes[0].missed);
+    }
+
+    // ── update_score_display (message-gated HUD writes) ─────────────────────
+
+    #[test]
+    fn update_score_display_only_writes_text_when_score_moved() {
+        let mut world = World::new();
+        world.insert_resource(Score {
+            points: 100,
+            combo: 3,
+            max_combo: 3,
+            last_hit_time: 0.0,
+        });
+        world.insert_resource(ScoringConfig::default());
+        world.insert_resource(HitFeedback::default());
+        world.insert_resource(Time::<()>::default());
+        world.init_resource::<Messages<NoteScored>>();
+
+        let score_entity = world.spawn((Text::new(""), ScoreText)).id();
+        let combo_entity = world.spawn((Text::new(""), ComboText)).id();
+        let feedback_entity = world
+            .spawn((
+                Text::new(""),
+                TextColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                FeedbackText,
+            ))
+            .id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_score_display);
+
+        // No `NoteScored` this frame: the digits (still their spawn-time
+        // default) must stay untouched.
+        schedule.run(&mut world);
+        assert_eq!(world.get::<Text>(score_entity).unwrap().0, "");
+        assert_eq!(world.get::<Text>(combo_entity).unwrap().0, "");
+
+        // `score_notes` would have set `HitFeedback` itself before emitting a
+        // message with a quality — mirror that here rather than depending on
+        // `update_score_display` to do it.
+        world.insert_resource(HitFeedback {
+            quality: Some(HitQuality::Perfect),
+            timer: 0.75,
+        });
+        world.write_message(NoteScored {
+            quality: Some(HitQuality::Perfect),
+        });
+        schedule.run(&mut world);
+
+        assert_eq!(world.get::<Text>(score_entity).unwrap().0, "100");
+        let expected_multiplier = compute_multiplier(3, 1.0, 0.1, 4.0);
+        assert_eq!(
+            world.get::<Text>(combo_entity).unwrap().0,
+            combo_label(3, expected_multiplier)
+        );
+        assert_eq!(world.get::<Text>(feedback_entity).unwrap().0, "PERFECT!");
+        let color = world.get::<TextColor>(feedback_entity).unwrap();
+        assert!(color.0.alpha() > 0.0, "the feedback flash should be visible right after a fresh hit");
     }
 
     // ── notes_needing_spawn (windowed rendering) ─────────────────────────────
@@ -2348,6 +2465,7 @@ mod tests {
         world.insert_resource(SongStats::default());
         world.insert_resource(HitFeedback::default());
         world.insert_resource(PitchGate::default());
+        world.init_resource::<Messages<NoteScored>>();
 
         fn note(time: f64, pitch: u8) -> ScheduledNote {
             ScheduledNote {
