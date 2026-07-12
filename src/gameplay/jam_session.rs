@@ -24,7 +24,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
-    ActivePitches, COUNTDOWN, CurrentBar, GameplayRoot, MusicPlayer, MusicStarted,
+    ActivePitches, COUNTDOWN, CurrentBar, GameplayClock, GameplayRoot, MusicPlayer, MusicStarted,
 };
 
 /// Free-play screen: left half shows the 12-bar chart and the metronome stacked
@@ -268,6 +268,13 @@ fn should_restart_jam_music(loop_on: bool, music_started: bool, music_player_ali
 /// is already gone — seeking or restarting a still-playing sink is
 /// unreliable in `bevy_audio` (see `TODO.md`), so this sidesteps that
 /// entirely rather than working around it.
+///
+/// Also resets `GameplayClock` back to 0 — Jam Session's clock free-runs on
+/// frame deltas rather than anchoring to the sink (see `should_anchor_to_
+/// sink`), so nothing else would ever bring it back down once it ran past
+/// the song's length; left alone, the song-progress playhead would stay
+/// pinned at the right edge forever even though the music genuinely
+/// restarted.
 pub fn restart_finished_jam_music(
     jam_loop: Res<JamLoop>,
     music_started: Res<MusicStarted>,
@@ -275,6 +282,7 @@ pub fn restart_finished_jam_music(
     manifests: Res<Assets<SongManifest>>,
     audio: Res<AudioSettings>,
     existing: Query<(), With<MusicPlayer>>,
+    mut clock: ResMut<GameplayClock>,
     mut commands: Commands,
 ) {
     if !should_restart_jam_music(jam_loop.0, music_started.0, !existing.is_empty()) {
@@ -283,6 +291,7 @@ pub fn restart_finished_jam_music(
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
+    clock.set_free(0.0);
     commands.spawn((
         AudioPlayer::<AudioSource>(manifest.music.clone()),
         PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.music_volume)),
