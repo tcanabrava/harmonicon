@@ -24,8 +24,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
-    ActivePitches, COUNTDOWN, GameplayClock, GameplayRoot, MusicPlayer, MusicStarted,
-    current_bar_index, secs_per_bar,
+    ActivePitches, COUNTDOWN, CurrentBar, GameplayRoot, MusicPlayer, MusicStarted,
 };
 
 /// Free-play screen: left half shows the 12-bar chart and the metronome stacked
@@ -66,7 +65,7 @@ pub fn setup(
     // the hole(s) the player is currently sounding, coloured by blues-scale fit
     // and — bar by bar — by whether the note is a tone of the chord currently
     // sounding (I, IV, or V), not just "somewhere in the blues scale".
-    let (holes_info, guide) = build_hole_guide(&chart.harmonica, key, bpm, beats_per_bar);
+    let (holes_info, guide) = build_hole_guide(&chart.harmonica, key);
 
     // Which physical harp to grab: a Richter harp's key is its hole-1 blow note.
     let harp_hint = harp_banner(&chart.harmonica, key);
@@ -306,8 +305,6 @@ pub struct JamHoleGuide {
     note_to_holes: HashMap<u8, Vec<u8>>,
     scale_classes: HashSet<String>,
     chord_tones_by_bar: [HashSet<String>; 12],
-    bpm: f32,
-    beats_per_bar: usize,
 }
 
 /// One hole cell in the map; its background is tinted each frame by play state.
@@ -353,12 +350,7 @@ fn chord_tone_classes(chord_root: &str) -> HashSet<String> {
 /// Build the per-hole render data and the live-feedback lookup from the harp
 /// layout, the song key, and its tempo (needed to track which bar — and thus
 /// which chord — is currently sounding).
-fn build_hole_guide(
-    harp: &Harmonica,
-    key: &str,
-    bpm: f32,
-    beats_per_bar: usize,
-) -> (Vec<HoleInfo>, JamHoleGuide) {
+fn build_hole_guide(harp: &Harmonica, key: &str) -> (Vec<HoleInfo>, JamHoleGuide) {
     let dash = "\u{2014}";
     let scale_classes = blues_scale_classes(key);
     let chord_tones_by_bar: [HashSet<String>; 12] = {
@@ -395,8 +387,6 @@ fn build_hole_guide(
             note_to_holes,
             scale_classes,
             chord_tones_by_bar,
-            bpm,
-            beats_per_bar,
         },
     )
 }
@@ -477,15 +467,13 @@ enum NoteFit {
 pub fn update_hole_map(
     active: Res<ActivePitches>,
     guide: Option<Res<JamHoleGuide>>,
-    clock: Res<GameplayClock>,
+    current: Res<CurrentBar>,
     mut cells: Query<(&JamHoleCell, &mut BackgroundColor)>,
 ) {
     let Some(guide) = guide else {
         return;
     };
-    let spb = secs_per_bar(guide.bpm as f64, guide.beats_per_bar as f64);
-    let bar = current_bar_index(clock.get(), spb);
-    let chord_tones = &guide.chord_tones_by_bar[bar];
+    let chord_tones = &guide.chord_tones_by_bar[current.0];
 
     // Map each currently-lit hole to the best fit among all notes sounding it.
     let mut lit: HashMap<u8, NoteFit> = HashMap::new();
@@ -566,7 +554,7 @@ mod tests {
     #[test]
     fn guide_maps_a_shared_note_to_every_hole_that_sounds_it() {
         // On a C harp, G4 is both draw-2 and blow-3 — both holes should light.
-        let (_, guide) = build_hole_guide(&c_harp(), "C", 120.0, 4);
+        let (_, guide) = build_hole_guide(&c_harp(), "C");
         let mut holes = guide.note_to_holes.get(&67u8).cloned().unwrap_or_default(); // G4
         holes.sort_unstable();
         assert_eq!(holes, vec![2, 3]);
@@ -574,7 +562,7 @@ mod tests {
 
     #[test]
     fn guide_marks_scale_membership_per_direction() {
-        let (holes, _) = build_hole_guide(&c_harp(), "C", 120.0, 4);
+        let (holes, _) = build_hole_guide(&c_harp(), "C");
         let hole1 = holes.iter().find(|h| h.hole == 1).unwrap();
         assert!(hole1.blow_in_scale, "blow C4 is the root → in scale");
         assert!(!hole1.draw_in_scale, "draw D4 (major 2nd) → outside");
@@ -584,7 +572,7 @@ mod tests {
 
     #[test]
     fn guide_covers_all_ten_holes() {
-        let (holes, _) = build_hole_guide(&c_harp(), "C", 120.0, 4);
+        let (holes, _) = build_hole_guide(&c_harp(), "C");
         assert_eq!(holes.len(), 10);
     }
 
@@ -602,7 +590,7 @@ mod tests {
 
     #[test]
     fn guide_covers_all_twelve_holes_for_a_chromatic_harp() {
-        let (holes, _) = build_hole_guide(&c_chromatic_harp(), "C", 120.0, 4);
+        let (holes, _) = build_hole_guide(&c_chromatic_harp(), "C");
         assert_eq!(holes.len(), 12);
     }
 
@@ -621,7 +609,7 @@ mod tests {
     fn guide_indexes_chord_tones_per_bar_of_the_twelve_bar_cycle() {
         // C 12-bar: bars are [I,I,I,I,IV,IV,I,I,V,IV,I,V] (0-indexed) — see
         // `twelve_bar`. Bar 4 is IV (F7); bar 8 is V (G7).
-        let (_, guide) = build_hole_guide(&c_harp(), "C", 120.0, 4);
+        let (_, guide) = build_hole_guide(&c_harp(), "C");
         assert!(guide.chord_tones_by_bar[0].contains("C"), "bar 0 is I (C7)");
         assert!(
             guide.chord_tones_by_bar[4].contains("F"),

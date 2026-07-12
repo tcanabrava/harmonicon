@@ -11,7 +11,7 @@ use crate::{
     theme::{LoadedTheme, TwelveBarColors},
 };
 
-use super::{GameplayClock, Paused, ScoringConfig, current_bar_index, secs_per_bar};
+use super::{BarChanged, CurrentBar, GameplayLogic, Paused};
 
 #[derive(Component)]
 pub struct BarCell(pub usize);
@@ -122,25 +122,28 @@ pub fn spawn_12_bar_grid(
     }
 }
 
+/// Recolors the grid only when `track_current_bar` reports a bar change —
+/// otherwise this rewrote `BackgroundColor` on all 12 cells every frame
+/// forever for a bar that only advances every few seconds.
 pub fn update_bar(
-    clock: Res<GameplayClock>,
+    mut changed: MessageReader<BarChanged>,
+    current: Res<CurrentBar>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
-    config: Res<ScoringConfig>,
     theme: Res<LoadedTheme>,
     mut cells: Query<(&BarCell, &mut BackgroundColor)>,
 ) {
+    if changed.read().count() == 0 {
+        return;
+    }
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
-    let bpm = manifest.chart.song.tempo_bpm as f64;
-    let spb = secs_per_bar(bpm, config.beats_per_bar);
-    let current = current_bar_index(clock.get(), spb);
     let key = manifest.chart.song.key.as_str();
     let colors = theme.twelve_bar_colors();
 
     for (cell, mut bg) in &mut cells {
-        *bg = if cell.0 == current {
+        *bg = if cell.0 == current.0 {
             BackgroundColor(Color::srgba(0.75, 0.55, 0.08, 0.95))
         } else {
             BackgroundColor(bar_bg(cell.0, key, colors))
@@ -154,7 +157,9 @@ impl Plugin for TwelveBarBluesPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            update_bar.run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
+            update_bar
+                .after(GameplayLogic)
+                .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         );
     }
 }
