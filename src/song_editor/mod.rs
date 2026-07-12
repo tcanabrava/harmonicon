@@ -16,6 +16,7 @@
 use bevy::prelude::*;
 
 use crate::menu::AppState;
+use crate::theme::LoadedTheme;
 
 mod grid;
 mod harpchart;
@@ -98,13 +99,25 @@ impl Plugin for SongEditor2Plugin {
                     interaction::type_into_field,
                     interaction::live_resize,
                     interaction::update_move_ghost,
-                    panel::update_mod_panel,
-                    panel::update_mode_buttons,
+                    panel::update_mod_panel.run_if(
+                        resource_exists_and_changed::<state::EditorState>
+                            .or_else(resource_changed::<LoadedTheme>),
+                    ),
+                    panel::update_mode_buttons.run_if(
+                        resource_exists_and_changed::<state::EditorState>
+                            .or_else(resource_changed::<LoadedTheme>),
+                    ),
                     panel::update_mode_visibility,
                     panel::update_technique_button_visibility,
-                    panel::update_meta_fields,
+                    panel::update_meta_fields.run_if(
+                        resource_exists_and_changed::<state::EditorState>
+                            .or_else(resource_changed::<LoadedTheme>),
+                    ),
                     panel::update_harmonica_kind_text,
-                    panel::update_status_bar,
+                    panel::update_status_bar.run_if(
+                        resource_exists_and_changed::<state::EditorState>
+                            .or_else(resource_changed::<practice::PracticeState>),
+                    ),
                     harpchart::handle_save_chosen,
                     harpchart::handle_load_chosen,
                     harpchart::handle_music_chosen,
