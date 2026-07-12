@@ -105,7 +105,15 @@ impl Plugin for GameplayPlugin {
                 gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                 gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 jam_session::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
-            ),
+            )
+                // `gameplay_2d`/`gameplay_3d`'s `setup` read `AdaptiveDifficulty`
+                // (`Res`) while `setup_adaptive_difficulty` writes it (`ResMut`) —
+                // a real conflict, unlike the resources the earlier systems in
+                // this tuple touch, so it needs an explicit order rather than
+                // relying on tuple position. `.chain()` is the simplest way to
+                // guarantee it (a `run_if`-skipped system still satisfies the
+                // ordering edge for the next one in the chain).
+                .chain(),
         )
         // Standalone Bending Trainer (its own AppState, no song).
         .add_systems(OnEnter(AppState::BendingTrainer), bending_trainer::setup)

@@ -38,8 +38,14 @@ const NOTES_STRIP_HEIGHT: f32 = 10.0;
 
 /// Height (px) of the per-phrase adaptive-difficulty strip below the note
 /// markers — one rectangle per `adaptive_difficulty::PhraseSection`, filled
-/// dim-gray to green by how much of that phrase has been learned.
-const PHRASE_STRIP_HEIGHT: f32 = 6.0;
+/// (semi-transparently, so it reads as a fill rather than a solid block)
+/// dim-gray to green by how much of that phrase has been learned, with a
+/// fully opaque border so adjacent sections stay visually distinct even
+/// when their fill colors are close.
+const PHRASE_STRIP_HEIGHT: f32 = 18.0;
+
+/// Border thickness (px) on each phrase-section rectangle.
+const PHRASE_RECT_BORDER: f32 = 1.5;
 
 /// Total height (px) of the bar, pinned across the full width at the very
 /// top of the screen (`top: 0`). `pub` so the gameplay HUDs can reserve this
@@ -252,10 +258,11 @@ pub fn spawn_song_progress(
                                 top: Val::Px(0.0),
                                 width: Val::Percent(width * 100.0),
                                 height: Val::Percent(100.0),
-                                margin: UiRect::horizontal(Val::Px(0.5)),
+                                border: UiRect::all(Val::Px(PHRASE_RECT_BORDER)),
                                 ..default()
                             },
                             BackgroundColor(phrase_fill_color(learned_frac)),
+                            BorderColor::all(PHRASE_RECT_BORDER_COLOR),
                             Pickable::IGNORE,
                             PhraseSectionRect(i),
                         ));
@@ -372,17 +379,25 @@ fn phrase_rect_geometry(start_time: f64, end_time: f64, duration_secs: f64) -> O
     Some((left, (right - left).max(0.0)))
 }
 
-/// Fill color for a phrase-section rectangle: dim gray (unlearned) to green
-/// (fully learned), linearly interpolated by `learned` (clamped to 0..=1).
+/// Semi-transparent fill for a phrase-section rectangle: dim gray
+/// (unlearned) to green (fully learned), linearly interpolated by `learned`
+/// (clamped to 0..=1). Low alpha so it reads as a tint over the bar rather
+/// than a solid block — [`PHRASE_RECT_BORDER_COLOR`] is fully opaque so
+/// sections stay visually distinct regardless of how close two fills land.
 fn phrase_fill_color(learned: f32) -> Color {
     let t = learned.clamp(0.0, 1.0);
     Color::srgba(
         0.35 + (0.20 - 0.35) * t,
         0.35 + (0.85 - 0.35) * t,
         0.40 + (0.35 - 0.40) * t,
-        0.85,
+        0.45,
     )
 }
+
+/// Fully opaque border color for every phrase-section rectangle — constant
+/// regardless of learned%, so the boundary between sections is always
+/// crisp even when two neighbors' fills are nearly the same color.
+const PHRASE_RECT_BORDER_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 1.0);
 
 /// Converts a `RelativeCursorPosition::normalized` reading (-0.5..0.5 within
 /// the node's bounds, per its own doc comment; not clamped when the pointer
