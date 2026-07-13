@@ -71,14 +71,20 @@ primitive it needs already exists from Unit 1.
 
 Two primitives, both reused by multiple lessons above — build these once:
 
-### 1. "Clean single note" scoring (small)
+### 1. "Clean single note" scoring (small) — done
 
-A note-hit check that also confirms no *other* pitch is concurrently active
-above some amplitude threshold in `ActivePitches`. Lives next to the
-existing pitch-match logic in `src/scoring.rs`; needs a pure function
-(`is_clean_attack(active: &[PitchInfo], expected_midi: u8) -> bool` or
-similar) with direct unit tests before any ECS wiring, per the existing
-testing convention.
+`is_clean_attack(harp_pitches: &HashSet<u8>, expected: u8) -> bool` in
+`src/scoring.rs`: true only when `expected` is the sole harp-producible
+pitch currently sounding (the caller passes the same `harp_pitches` set
+`score_notes` already computes — `ActivePitches` intersected with
+`ValidHarpNotes`). Tallied as a new `SongStats::clean_attack: TechniqueStats`
+bucket on every onset hit (`score_notes`'s `NoteOutcome::Hit` arm), which
+gets it a "Clean attack" row on *every* song's results screen for free and,
+more importantly, lets it ride the existing `PassCriteria::Technique`
+machinery unchanged — no new criterion variant needed, just a new bucket
+name (`"clean-attack"`, added to `lesson_schema.dtd.json`'s technique enum).
+The single-note lesson's `pass_criteria` now reads `{"type": "technique",
+"technique": "clean-attack", "threshold": 0.6}` instead of overall accuracy.
 
 ### 2. Chord-target notes (bigger; shared by "multiple notes," octave-split
 tongue-blocking drills, and any future jazz chord-tone lesson)
@@ -134,7 +140,8 @@ this repo's established pure-logic-first pattern.
    carry a `LessonContext` resource through the normal gameplay pipeline
    (results judge pass criteria against it; adaptive difficulty is forced
    off for lesson runs; quitting/finishing returns to the lesson list).
-2. "Clean single note" primitive → wire into the single-note lesson.
+2. **Done.** "Clean single note" primitive → wired into the single-note
+   lesson (see "New engine work required" above).
 3. Chord-target primitive → "multiple notes" lesson, then the octave-split/
    tongue-blocking-proxy lesson reusing the same primitive.
 4. Blues-scale-adherence stats accumulator → improvisation lesson (depends

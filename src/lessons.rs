@@ -282,6 +282,25 @@ mod tests {
     }
 
     #[test]
+    fn parses_a_clean_attack_technique_criterion() {
+        // The single-note lesson's actual pass criterion — "clean-attack" is
+        // a `SongStats` bucket like "bend"/"wah-wah", not a chart modifier,
+        // but it goes through the same `Technique` criterion machinery.
+        let m = parse_lesson(
+            br#"{"id":"single-note","unit":"blowing","title_key":"t","body_key":"b",
+                 "pass_criteria":{"type":"technique","technique":"clean-attack","threshold":0.6}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            m.pass_criteria,
+            Some(PassCriteria::Technique {
+                technique: "clean-attack".into(),
+                threshold: 0.6
+            })
+        );
+    }
+
+    #[test]
     fn rejects_a_manifest_missing_required_fields() {
         let err = parse_lesson(br#"{"id":"x","unit":"blowing"}"#).unwrap_err();
         assert!(err.contains("title_key"), "unexpected error: {err}");

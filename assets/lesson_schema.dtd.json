@@ -62,7 +62,7 @@
             "type": { "const": "technique" },
             "technique": {
               "type": "string",
-              "enum": ["normal", "bend", "vibrato", "wah-wah", "overblow", "overdraw", "slide"],
+              "enum": ["normal", "bend", "vibrato", "wah-wah", "overblow", "overdraw", "slide", "clean-attack"],
               "description": "Technique bucket name — the same vocabulary SongStats/profile use."
             },
             "threshold": {

@@ -24,8 +24,8 @@ use bevy::prelude::*;
 pub use crate::scoring::{HitQuality, NoteOutcome, classify_note, compute_points, sustain_points};
 use crate::scoring::{
     AttackGate, VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC, combo_label, compute_multiplier,
-    measured_oscillation_hz, measured_relative_oscillation_hz, oscillation_matches_rate,
-    should_decay_combo,
+    is_clean_attack, measured_oscillation_hz, measured_relative_oscillation_hz,
+    oscillation_matches_rate, should_decay_combo,
 };
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -401,6 +401,12 @@ pub struct SongStats {
     pub slide: TechniqueStats,
     pub vibrato: TechniqueStats,
     pub wah: TechniqueStats,
+    /// Onset hits where [`is_clean_attack`] confirmed no *other*
+    /// harp-producible pitch sounded alongside the expected one — separate
+    /// from the technique buckets above (which are keyed by chart modifier,
+    /// not attack cleanliness) and tallied for every hit regardless of its
+    /// modifiers, or lack of them.
+    pub clean_attack: TechniqueStats,
 }
 
 impl SongStats {
@@ -1360,6 +1366,7 @@ fn score_notes(
                 // `playing` was only true above if `expected_pitch` is `Some`.
                 if let Some(m) = note.expected_pitch {
                     gate.consume(m);
+                    bump(&mut stats.clean_attack, is_clean_attack(&harp_pitches, m));
                 }
                 match quality {
                     HitQuality::Perfect => stats.perfect += 1,
@@ -2293,6 +2300,69 @@ mod tests {
         let song_notes = world.resource::<SongNotes>();
         assert!(!song_notes.notes[0].hit);
         assert!(!song_notes.notes[0].missed);
+    }
+
+    // ── score_notes (clean-attack tallying) ──────────────────────────────────
+
+    /// Builds a world set up to score one `overlap_test_note` at clock=0.5
+    /// against whatever `ActivePitches` the caller supplies, for the
+    /// clean-attack tests below.
+    fn clean_attack_test_world(active: Vec<PitchInfo>) -> World {
+        let mut world = World::new();
+        world.insert_resource(GameplayClock::new(0.5));
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(ActivePitches(active));
+        world.insert_resource(AudioFrame::default());
+        world.insert_resource(ValidHarpNotes(HashSet::from([60u8, 64u8])));
+        world.insert_resource(ScoringConfig::default());
+        world.insert_resource(AudioSettings::default());
+        world.insert_resource(Score::default());
+        world.insert_resource(SongStats::default());
+        world.insert_resource(HitFeedback::default());
+        world.insert_resource(PitchGate::default());
+        world.init_resource::<Messages<NoteScored>>();
+        world.insert_resource(SongNotes {
+            notes: vec![overlap_test_note(0.49)],
+            cursor: 0,
+        });
+        world
+    }
+
+    #[test]
+    fn score_notes_counts_a_solo_pitch_as_a_clean_attack() {
+        let mut world =
+            clean_attack_test_world(vec![pitch_info(60, "C", 4, midi_to_freq_hz(60.0))]);
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+
+        assert!(world.resource::<SongNotes>().notes[0].hit, "should still hit");
+        let stats = world.resource::<SongStats>();
+        assert_eq!(stats.clean_attack.hits, 1);
+        assert_eq!(stats.clean_attack.misses, 0);
+    }
+
+    #[test]
+    fn score_notes_counts_a_breathy_leak_as_a_hit_but_not_a_clean_attack() {
+        // A second, unintended harp-producible pitch (64 = E4) sounds
+        // alongside the expected one (60 = C4): the note still scores — the
+        // expected pitch is present and on time — but it must not count
+        // toward `clean_attack`.
+        let mut world = clean_attack_test_world(vec![
+            pitch_info(60, "C", 4, midi_to_freq_hz(60.0)),
+            pitch_info(64, "E", 4, midi_to_freq_hz(64.0)),
+        ]);
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+
+        assert!(
+            world.resource::<SongNotes>().notes[0].hit,
+            "the expected pitch was present and on time, so it should still hit"
+        );
+        let stats = world.resource::<SongStats>();
+        assert_eq!(stats.clean_attack.hits, 0);
+        assert_eq!(stats.clean_attack.misses, 1);
     }
 
     // ── update_score_display (message-gated HUD writes) ─────────────────────

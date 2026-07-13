@@ -7,6 +7,8 @@
 //! types/resources so both call sites can use it without depending on each
 //! other's UI/HUD code.
 
+use std::collections::HashSet;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum HitQuality {
     Perfect,
@@ -67,6 +69,20 @@ pub fn classify_note(
     } else {
         NoteOutcome::Hit(HitQuality::Good)
     }
+}
+
+// ── Clean attack ─────────────────────────────────────────────────────────────
+
+/// True when `expected` is the *only* harp-producible pitch sounding right
+/// now — a note landed on time and on pitch still fails this if a breathy
+/// multi-hole leak also sounded a second, unintended pitch alongside it.
+/// `harp_pitches` must already be filtered to pitches the harp can actually
+/// produce (e.g. `gameplay::score_notes`'s own `harp_pitches`, itself
+/// `ActivePitches` intersected with `ValidHarpNotes`) — unfiltered ambient
+/// noise picked up by the mic isn't something the player could have avoided
+/// and shouldn't count against them.
+pub fn is_clean_attack(harp_pitches: &HashSet<u8>, expected: u8) -> bool {
+    harp_pitches.len() == 1 && harp_pitches.contains(&expected)
 }
 
 /// Score multiplier for the current combo level.
@@ -398,6 +414,33 @@ mod tests {
             classify_note(offset - 0.0, true, 0.060, 0.130, 0.130),
             classify_note(offset, true, 0.060, 0.130, 0.130),
         );
+    }
+
+    // ── is_clean_attack ───────────────────────────────────────────────────────
+
+    #[test]
+    fn clean_when_only_the_expected_pitch_sounds() {
+        let harp_pitches = HashSet::from([60u8]);
+        assert!(is_clean_attack(&harp_pitches, 60));
+    }
+
+    #[test]
+    fn dirty_when_another_harp_pitch_sounds_alongside_it() {
+        // A breathy attack that leaks into an adjacent hole — the expected
+        // pitch is present, but so is a second one.
+        let harp_pitches = HashSet::from([60u8, 64u8]);
+        assert!(!is_clean_attack(&harp_pitches, 60));
+    }
+
+    #[test]
+    fn dirty_when_the_expected_pitch_is_not_even_the_one_present() {
+        let harp_pitches = HashSet::from([64u8]);
+        assert!(!is_clean_attack(&harp_pitches, 60));
+    }
+
+    #[test]
+    fn dirty_when_nothing_is_sounding() {
+        assert!(!is_clean_attack(&HashSet::new(), 60));
     }
 
     // ── compute_multiplier ────────────────────────────────────────────────────
