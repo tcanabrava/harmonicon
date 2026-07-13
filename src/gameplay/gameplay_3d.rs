@@ -335,6 +335,7 @@ fn build_notes_3d(chart: &HarpChart, adaptive: &AdaptiveDifficulty) -> Vec<Sched
                 amp_samples: Vec::new(),
                 phrase_section: section,
                 chord_pitches: chord_pitches.clone(),
+                force_wait: item.call,
             });
         }
     }

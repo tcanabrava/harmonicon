@@ -328,6 +328,8 @@ pub(super) fn spawn_button<M: 'static>(
     // icon, z-ordered smoke layer); plain buttons are authored with bsn!. Either
     // way the click rides along as the caller's dedicated `on_click`.
     if theme.has_shaders {
+        println!("Creating a shader button with label: {label}");
+
         let e = commands.spawn((Button, node, ThemedButton)).id();
 
         // Smoke shader layer — absolute, behind content. Keep its entity so the
@@ -418,6 +420,7 @@ pub(super) fn spawn_button<M: 'static>(
         commands.entity(e).observe(on_click);
         commands.entity(parent).add_child(e);
     } else {
+        println!("Creating a default button with label: {label}");
         // Plain button: authored declaratively; click + hover ride along as
         // inline on(...)
         let e = commands

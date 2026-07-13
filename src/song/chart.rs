@@ -93,6 +93,17 @@ pub struct TrackItem {
     pub phrase: Option<String>,
     pub groove: Option<String>,
     pub play_mode: Option<PlayMode>,
+    /// Marks this item as part of a call-and-response phrase: absent/`false`
+    /// on every ordinary chart. A maximal run of consecutive `call: true`
+    /// items is one phrase — before its first item's time, the game
+    /// synthesizes and plays those items' notes as a one-shot audio demo
+    /// (`gameplay::call_response`), then always waits for the player to echo
+    /// them (their `ScheduledNote`s force a freeze regardless of the
+    /// practice-only `WaitForNoteMode` toggle), scored by the normal
+    /// pipeline like any other note. See `docs/lessons_plan.md`'s
+    /// "Call and response" entry for the design.
+    #[serde(default)]
+    pub call: bool,
     pub events: Vec<NoteEvent>,
 }
 

@@ -166,6 +166,15 @@ lesson-hand-wah-body =
     En este ejercicio, sostén cada nota con firmeza y abre-y-cierra la copa unas dos veces por segundo — el juego escucha ese pulso en tu sonido.
     Mantén la respiración constante; solo se mueven las manos. Si no registra nada, aprieta el sello de la copa — casi todo el efecto vive en el último centímetro del cierre.
 
+# Lección: llamada y respuesta
+lesson-call-response-title = Llamada y Respuesta
+lesson-call-response-body =
+    Esto es llamada y respuesta: el juego toca una frase corta, y luego es tu turno de tocarla de vuelta.
+    Escucha la demo sintetizada — una serie de una, dos, y luego tres notas — y repite exactamente lo que oíste, a tu propio ritmo; el juego se congela y te espera, el tiempo que necesites.
+    Aquí no hay prisa ni reloj corriendo en tu contra: solo importa la nota, no el tiempo.
+    Si tocas la nota equivocada, no pasa nada — el juego solo sigue esperando hasta que aciertes, así que escúchala de nuevo en tu cabeza e inténtalo otra vez.
+    Esta es la misma habilidad de "escuchar y tocar" que usarás improvisando con otros músicos: alguien toca una frase, tú respondes.
+
 # Lección: improvisación
 lesson-improvisation-title = Improvisar sobre el Blues
 lesson-improvisation-body =

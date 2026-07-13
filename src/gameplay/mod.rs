@@ -2,6 +2,7 @@
 
 mod adaptive_difficulty;
 mod bending_trainer;
+mod call_response;
 mod clock;
 mod countdown_overlay;
 mod gameplay_2d;
@@ -93,6 +94,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<jam_session::JamLoop>()
         .init_resource::<jam_session::ImprovGate>()
         .init_resource::<jam_session::ImprovStats>()
+        .init_resource::<call_response::CallCues>()
         .init_resource::<pause_menu::WaitForNoteMode>()
         .init_resource::<pause_menu::PracticeSpeed>()
         .init_resource::<pause_menu::SelectedPhraseIndex>()
@@ -107,6 +109,11 @@ impl Plugin for GameplayPlugin {
                 gameplay_2d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
                 gameplay_3d::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 jam_session::setup.run_if(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+                // Call-and-response cues need `SongNotes`' response notes to
+                // lead into — Jam Session never builds those.
+                call_response::setup_call_cues.run_if(|m: Res<GameplayMode>| {
+                    matches!(*m, GameplayMode::Play2D | GameplayMode::Play3D)
+                }),
             )
                 // `gameplay_2d`/`gameplay_3d`'s `setup` read `AdaptiveDifficulty`
                 // (`Res`) while `setup_adaptive_difficulty` writes it (`ResMut`) —
@@ -247,6 +254,21 @@ impl Plugin for GameplayPlugin {
                         .and_then(|p: Res<Paused>| !p.0)
                         .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
                 ),
+        )
+        // Call-and-response: fires each phrase's synthesized demo audio the
+        // instant the clock reaches its scheduled lead time. Fire-and-forget
+        // (see `call_response`'s doc comment on why it never touches the
+        // clock/sink), so it only needs to run after the clock ticks, not
+        // strictly ordered against scoring.
+        .add_systems(
+            Update,
+            call_response::fire_call_cues.after(GameplayLogic).run_if(
+                in_state(AppState::Playing)
+                    .and_then(|p: Res<Paused>| !p.0)
+                    .and_then(|m: Res<GameplayMode>| {
+                        matches!(*m, GameplayMode::Play2D | GameplayMode::Play3D)
+                    }),
+            ),
         )
         // Jam Session: music loop toggle + its readout.
         .add_systems(
@@ -569,6 +591,14 @@ pub struct ScheduledNote {
     /// calls for, built on the chart format's existing multi-event
     /// `TrackItem` shape rather than a new schema field.
     pub chord_pitches: Vec<u8>,
+    /// From the chart's `TrackItem::call` — this note is the "response" half
+    /// of a call-and-response phrase. `tick_clock`'s wait-freeze condition
+    /// treats it like `WaitForNoteMode` being on, regardless of whether the
+    /// player actually has that practice toggle enabled: freezing here isn't
+    /// optional the way it is for an ordinary note, since the whole drill is
+    /// "echo what you just heard, in your own time." See
+    /// `gameplay::call_response`.
+    pub force_wait: bool,
 }
 
 /// Every note in the loaded chart, sorted by `time` ascending (matches chart
@@ -644,6 +674,22 @@ pub(super) fn first_due_unresolved_note(
         }
     }
     None
+}
+
+/// The wait-freeze index `tick_clock` should hold the clock at this frame,
+/// or `None` to run normally: the first due unresolved playable note
+/// (`first_due_unresolved_note`), but only kept when the player's global
+/// `wait_mode` toggle is on, or the note itself demands it regardless
+/// (`ScheduledNote::force_wait` — the response half of a call-and-response
+/// phrase always freezes, whether or not the player has that practice
+/// toggle on).
+pub(super) fn wait_freeze_index(
+    notes: &[ScheduledNote],
+    cursor: usize,
+    clock_time: f64,
+    wait_mode: bool,
+) -> Option<usize> {
+    first_due_unresolved_note(notes, cursor, clock_time).filter(|&i| wait_mode || notes[i].force_wait)
 }
 
 #[derive(Component)]
@@ -1033,12 +1079,14 @@ fn setup_scoring_config(
 /// fully separate pipeline, which only makes sense if repeatedly toggling
 /// the output stream was disturbing a shared audio graph/server).
 ///
-/// - `WaitForNoteMode` on and a playable note due and still unhit
-///   (`first_due_unresolved_note`): the clock simply isn't advanced this
-///   frame, holding it exactly at the hit line. `score_notes` keeps
-///   re-judging the same held instant every frame, so the moment the player
-///   plays the note it scores (typically a Perfect, since the offset never
-///   moved) and the very next frame the condition is false again. Jam
+/// - `WaitForNoteMode` on (or the due note's own `ScheduledNote::force_wait`
+///   — a call-and-response phrase's response notes always freeze, whether
+///   or not the player has that practice toggle on) and a playable note due
+///   and still unhit (`first_due_unresolved_note`): the clock simply isn't
+///   advanced this frame, holding it exactly at the hit line. `score_notes`
+///   keeps re-judging the same held instant every frame, so the moment the
+///   player plays the note it scores (typically a Perfect, since the offset
+///   never moved) and the very next frame the condition is false again. Jam
 ///   Session never populates `SongNotes`, so this is a no-op there.
 /// - `PracticeSpeed` below 100%: real time-stretched audio isn't
 ///   implemented, so the sink just pauses instead of playing pitch-shifted,
@@ -1058,10 +1106,7 @@ fn tick_clock(
     song_notes: Res<SongNotes>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    let due = wait_mode
-        .0
-        .then(|| first_due_unresolved_note(&song_notes.notes, song_notes.cursor, clock.get()))
-        .flatten();
+    let due = wait_freeze_index(&song_notes.notes, song_notes.cursor, clock.get(), wait_mode.0);
     // Gated so `ResMut`'s change detection (which `wait_freeze_overlay`'s
     // prompt reacts to) only fires on an actual transition, not every frame.
     if due != wait_freeze.0 {
@@ -1739,6 +1784,7 @@ mod tests {
             amp_samples: Vec::new(),
             phrase_section: 0,
             chord_pitches: Vec::new(),
+            force_wait: false,
         }
     }
 
@@ -1921,6 +1967,7 @@ mod tests {
             phrase: None,
             groove: None,
             play_mode: None,
+            call: false,
             events: vec![],
         }
     }
@@ -2264,6 +2311,7 @@ mod tests {
             amp_samples: Vec::new(),
             phrase_section: 0,
             chord_pitches: Vec::new(),
+            force_wait: false,
         }
     }
 
@@ -2689,6 +2737,40 @@ mod tests {
         assert_eq!(first_due_unresolved_note(&notes, 0, 5.0), Some(1));
     }
 
+    // ── wait_freeze_index (WaitForNoteMode + call-response force_wait) ──────
+
+    #[test]
+    fn wait_freeze_index_is_none_when_wait_mode_is_off_and_not_forced() {
+        let notes = [overlap_test_note(1.0)];
+        assert_eq!(wait_freeze_index(&notes, 0, 5.0, false), None);
+    }
+
+    #[test]
+    fn wait_freeze_index_freezes_when_wait_mode_is_on() {
+        let notes = [overlap_test_note(1.0)];
+        assert_eq!(wait_freeze_index(&notes, 0, 5.0, true), Some(0));
+    }
+
+    #[test]
+    fn wait_freeze_index_freezes_on_a_force_wait_note_even_with_wait_mode_off() {
+        let mut note = overlap_test_note(1.0);
+        note.force_wait = true;
+        let notes = [note];
+        assert_eq!(
+            wait_freeze_index(&notes, 0, 5.0, false),
+            Some(0),
+            "a call-and-response note must freeze regardless of the player's practice toggle"
+        );
+    }
+
+    #[test]
+    fn wait_freeze_index_ignores_a_force_wait_note_thats_not_due_yet() {
+        let mut note = overlap_test_note(100.0);
+        note.force_wait = true;
+        let notes = [note];
+        assert_eq!(wait_freeze_index(&notes, 0, 5.0, false), None);
+    }
+
     /// A tiny synthetic 3-note "song" driven frame by frame through
     /// `score_notes`, exercising the full detected-pitch → classify →
     /// score/combo/stats path together rather than each piece in isolation.
@@ -2727,6 +2809,7 @@ mod tests {
                 amp_samples: Vec::new(),
                 phrase_section: 0,
                 chord_pitches: Vec::new(),
+                force_wait: false,
             }
         }
         fn pitch(note: &str, octave: i32) -> PitchInfo {

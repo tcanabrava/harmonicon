@@ -23,7 +23,10 @@ mod harpchart;
 mod interaction;
 mod material;
 mod panel;
-mod playback;
+// `pub(crate)`, not private like its neighbours: `gameplay::call_response`
+// shares this module's synth (`PhraseNote`/`render_pcm`/`encode_wav`) for
+// the call-and-response lesson feature's audio cue.
+pub(crate) mod playback;
 mod practice;
 mod state;
 mod ui;
@@ -45,7 +48,10 @@ const BEAT_W: f32 = 60.0;
 const BEATS_PER_BAR: usize = 4;
 const NOTE_PAD: f32 = 4.0;
 const HANDLE_W: f32 = 8.0;
-const TICKS_PER_BEAT: usize = 4;
+// `pub(crate)`, not private like its neighbours here: `gameplay::
+// call_response` needs the same tick grid to convert chart-time call
+// phrases into the ticks `playback::render_pcm` expects.
+pub(crate) const TICKS_PER_BEAT: usize = 4;
 const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
 
 fn grid_height(hole_count: u8) -> f32 {
@@ -139,7 +145,9 @@ mod tests {
         load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart,
     };
     use super::interaction::{apply_modifier, select_or_add};
-    use super::playback::{SAMPLE_RATE, build_harp, encode_wav, envelope, note_freq, render_pcm};
+    use super::playback::{
+        PhraseNote, SAMPLE_RATE, build_harp, encode_wav, envelope, note_freq, render_pcm,
+    };
     use super::state::Scroll;
     use super::state::{
         Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, apply_resize, can_place,
@@ -600,7 +608,16 @@ mod tests {
     fn render_and_wav_have_expected_size() {
         let notes = vec![note(4, Dir::Draw, Pitch::Normal)];
         let harp = build_harp("C", HarmonicaKind::Diatonic);
-        let pcm = render_pcm(&notes, 120.0, &harp);
+        let phrase: Vec<PhraseNote> = notes
+            .iter()
+            .map(|n| PhraseNote {
+                tick: n.tick,
+                len: n.len,
+                freq: note_freq(n, &harp),
+                expr: n.expr,
+            })
+            .collect();
+        let pcm = render_pcm(&phrase, 120.0);
         let expected = ((0.5 + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
         assert_eq!(pcm.len(), expected);
         assert!(

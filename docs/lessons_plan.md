@@ -52,7 +52,7 @@ effort spent on a check that can't actually check anything.
 |---|---|---|
 | Reading the 12-bar blues grid | **Instructional + visual** | `TwelveBarBluesOverlay` already exists and visually highlights the current bar/chord. The lesson is: show the overlay large and explained, over a simple I-IV-V backing (reuse Jam Session's existing 12-bar cycle), with a light "does the player stay in time" pass criterion from ordinary timing-window scoring — no new mechanism. |
 | Using your feet (internalizing tempo by tapping) | **Instructional only** | Foot taps aren't harmonica pitch and can't be reliably separated from harmonica audio on a single mic channel — out of scope for the scoring pipeline. Ships as instructional copy plus a metronome-only "keep time" chart (the existing `MetronomeFeel`/tempo machinery), where the *implicit* check is just normal timing-window accuracy on notes played against the beat. |
-| Call and response | **Scored** (needs the feature — see `PLAN.md`) | Game synthesizes a short call via the song editor's existing WAV synth path (`song_editor::playback`), then opens a wait window (reusing `pause_menu::WaitForNoteMode`/`first_due_unresolved_note`) for the player to echo it, scored by the normal pipeline. This is the one lesson-driven item that's also a standalone `PLAN.md`/`ROADMAP.md` feature, not lesson-specific plumbing — build it there, lessons just author call phrases. |
+| Call and response | **Scored — done** | `gameplay::call_response` synthesizes each chart's `call: true` phrase groups via the song editor's WAV synth (`song_editor::playback`) and plays them as a one-shot demo; the response is the same notes, force-frozen (`ScheduledNote::force_wait`) via the existing `WaitForNoteMode`/`first_due_unresolved_note` machinery, scored by the normal pipeline. The `call-response` lesson (Unit 2) is the concrete instance — see `PLAN.md`. |
 | Blues improvisation | **Scored via proxy — done** | `jam_session::ImprovStats` accumulates scale/chord-tone adherence over an open Jam Session (see "New engine work required" below); the `improvisation` lesson (Unit 2) pass criterion is `PassCriteria::ScaleAdherence{threshold: 0.8}`. |
 
 ### Unit 3 — How to play harmonica jazz
@@ -143,7 +143,50 @@ for how the whole judging path differs (routes into `GameplayMode::
 JamSession` from the reader's Start button; judged by a dedicated "Finish
 Lesson" pause-menu button instead of the results screen).
 
-### 4. Lesson manifest, loader, and menu page (structural, no new DSP)
+### 4. Call-and-response (bigger; also a standalone Jam feature) — done
+
+Unlike the three primitives above, this genuinely needed a chart schema
+addition: `TrackItem::call: bool` (`#[serde(default)]`, so every existing
+chart parses unchanged — no `format_version` bump needed for *old* charts to
+keep working, though new charts using it should still bump their own
+`metadata.format_version` per the general convention). A maximal run of
+consecutive `call: true` items (`gameplay::call_response::call_phrase_
+groups`, pure and tested) is one phrase; its notes are ordinary
+`ScheduledNote`s (nothing new about how they're scored) except for one flag,
+`force_wait: bool`, set from `TrackItem::call`.
+
+Two things happen around those notes:
+- **The demo.** At song setup (`setup_call_cues`), each phrase's notes are
+  converted to `song_editor::playback::PhraseNote`s (tick-relative to the
+  phrase's own start, frequency resolved via the *same* `target_pitch` every
+  other note uses — so a demo correctly reflects a bent/overblown call note
+  too) and rendered through `render_pcm`/`encode_wav` — literally the same
+  synth behind the song editor's own Play button, widened from `pub(super)`
+  to `pub(crate)` for this (`PhraseNote` replaces `render_pcm`'s old
+  `&[GridNote]` parameter with a source-agnostic tick/freq/expr triple, so
+  the editor and this feature share the DSP without either depending on the
+  other's note representation). Scheduled to *finish* `LEAD_BUFFER_SECS`
+  before the phrase's first note, computed once from the synthesized
+  buffer's own length — no author-facing lead-time field needed, just "leave
+  enough silence before the phrase" (ordinary chart authoring). Firing
+  (`fire_call_cues`) is a plain fire-and-forget `AudioPlayer` spawn, exactly
+  like a hit-feedback sound — deliberately *not* a clock-jumping mechanism,
+  so it can't fight the sink-anchoring invariant (`CLAUDE.md`'s clock notes)
+  at all; this was the open design question `PLAN.md` flagged, resolved by
+  sidestepping it rather than solving it.
+- **The forced wait.** `force_wait` notes freeze the clock the same way
+  `WaitForNoteMode` does, regardless of whether the player has that practice
+  toggle on — `tick_clock`'s freeze condition, previously `wait_mode.0 &&
+  first_due_unresolved_note(..)`, is now the small pure `wait_freeze_index`
+  helper: `first_due_unresolved_note(..).filter(|&i| wait_mode || notes[i].
+  force_wait)`. Because the *whole* pipeline (clock freeze, sink pause) was
+  already anchoring-safe by construction for `WaitForNoteMode`, reusing it
+  for call-and-response inherits that safety for free rather than needing
+  new clock-jump logic — and self-paces correctly no matter how long a
+  player takes on one response, since a later phrase's cue can't fire before
+  the frozen clock reaches it.
+
+### 5. Lesson manifest, loader, and menu page (structural, no new DSP)
 
 - **Asset tree**: `assets/lessons/<unit>/<lesson>/` — reuses the `.harpchart`
   format directly for any lesson with notes to play; an instructional-only
@@ -194,13 +237,22 @@ Lesson" pause-menu button instead of the results screen).
    safe-to-author subset per `TODO.md`'s content-gap item.
 4. **Done.** Scale-adherence accumulator (see "New engine work required"
    above) → `improvisation` (Unit 2, `assets/lessons/02_rhythm/
-   02_improvisation/`), prerequisite `twelve-bar`, pass: ≥80% of notes
-   in-scale or better. The one lesson that opens `GameplayMode::JamSession`
-   instead of a scored chart — see `PassCriteria::ScaleAdherence`.
-5. Call-and-response (tracked as its own `PLAN.md` item since it's also a
-   standalone Jam Session feature, not lesson-only) → the call-and-response
-   lesson.
-6. Content pass: author the actual lesson bodies/charts. Scale drills,
+   03_improvisation/`), prerequisite `call-response` (moved off `twelve-bar`
+   directly once the call-and-response lesson landed between them — see
+   step 5), pass: ≥80% of notes in-scale or better. The one lesson that
+   opens `GameplayMode::JamSession` instead of a scored chart — see
+   `PassCriteria::ScaleAdherence`.
+5. **Done.** Call-and-response (`gameplay::call_response`, see "New engine
+   work required" above) → `call-response` (Unit 2, `assets/lessons/
+   02_rhythm/02_call_response/`), prerequisite `twelve-bar`, pass: ≥70%
+   accuracy on three phrases (one, two, then three notes) — force-frozen
+   response notes make this mostly a pitch-recognition check, timing is
+   never at risk, hence the more generous threshold than a normal chart.
+   `docs/lessons_plan.md`'s standalone-feature note above still applies:
+   the primitive lives in `gameplay`, not lesson-specific plumbing, so any
+   future non-lesson use (Jam Session call-and-response, say) can reuse it
+   directly.
+6. Content pass: author further lesson bodies/charts. Scale drills,
    technique exercises, and the 12-bar chord-tone walkthrough are safe to
    author freely (no copyrighted melody involved); anything built on a real
    tune follows the same rights/judgment carve-out as `TODO.md`'s bundled-

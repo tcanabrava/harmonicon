@@ -300,6 +300,7 @@ mod tests {
             amp_samples: Vec::new(),
             phrase_section: section,
             chord_pitches: Vec::new(),
+            force_wait: false,
         }
     }
 
@@ -485,6 +486,7 @@ mod tests {
             amp_samples: Vec::new(),
             phrase_section: 0,
             chord_pitches: Vec::new(),
+            force_wait: false,
         }
     }
 

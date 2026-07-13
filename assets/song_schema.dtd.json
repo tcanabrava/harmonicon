@@ -296,6 +296,11 @@
             ]
           },
 
+          "call": {
+            "type": "boolean",
+            "description": "Marks this item as part of a call-and-response phrase. Before a maximal run of consecutive call:true items, the game synthesizes and plays their notes as a one-shot audio demo, then always waits for the player to echo them. Absent = false, an ordinary item."
+          },
+
           "events": {
             "type": "array",
             "minItems": 1,

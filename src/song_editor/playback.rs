@@ -4,7 +4,10 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 
-use super::state::{Dir, Expr, GridNote, HarmonicaKind, Pitch};
+use super::state::{Dir, GridNote, HarmonicaKind, Pitch};
+// `pub(crate)` re-export: `gameplay::call_response` needs `Expr` to build a
+// `PhraseNote` for the call-and-response feature's demo audio.
+pub(crate) use super::state::Expr;
 use super::{TICK_W, TICKS_PER_BEAT};
 use crate::audio_system::midi::{midi_to_freq_hz, note_to_midi};
 use crate::settings::AudioSettings;
@@ -12,8 +15,9 @@ use crate::song::harmonica::{Harmonica, chromatic_harp, hole_notes, richter_harp
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-/// CD-quality mono output used for the in-editor synthesis preview.
-pub(super) const SAMPLE_RATE: u32 = 44_100;
+/// CD-quality mono output used for the in-editor synthesis preview, and by
+/// `gameplay::call_response`'s call-phrase demo audio (same synth).
+pub(crate) const SAMPLE_RATE: u32 = 44_100;
 
 // ── Synthesis parameters ─────────────────────────────────────────────────────
 
@@ -185,7 +189,26 @@ pub(super) fn envelope(i: usize, dur: usize) -> f32 {
     atk.min(rel).clamp(0.0, 1.0)
 }
 
-pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, harp: &Harmonica) -> Vec<f32> {
+/// One note to synthesize: a resolved frequency at a `tick`/`len` position on
+/// the synth's tick grid (see [`TICKS_PER_BEAT`]), with an optional
+/// expression LFO. Decouples [`render_pcm`] from `GridNote`/`Harmonica` so it
+/// can render a phrase from *any* source that can resolve a frequency and a
+/// tick position — the editor's own notes (via [`note_freq`]) and, sharing
+/// this same synth, a chart's call-and-response phrase (via
+/// `ScheduledNote::expected_pitch` → `midi_to_freq_hz`, see
+/// `gameplay::call_response`). `freq: None` means a hole/technique
+/// combination that can't be produced (matching `note_freq`'s convention for
+/// a `GridNote`, and `target_pitch`'s for a chart note) — silently skipped,
+/// same as before this was factored out.
+#[derive(Clone, Copy)]
+pub(crate) struct PhraseNote {
+    pub(crate) tick: usize,
+    pub(crate) len: usize,
+    pub(crate) freq: Option<f32>,
+    pub(crate) expr: Expr,
+}
+
+pub(crate) fn render_pcm(notes: &[PhraseNote], bpm: f32) -> Vec<f32> {
     let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
     let end_tick = notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
     let total =
@@ -194,16 +217,19 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, harp: &Harmonica) -> Vec<
 
     let attack_samples = (SAMPLE_RATE as f32 * ATTACK_SECS) as usize;
 
-    for n in notes {
-        let Some(freq) = note_freq(n, harp) else {
+    for (idx, n) in notes.iter().enumerate() {
+        let Some(freq) = n.freq else {
             continue;
         };
         let start = (n.tick as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
         let dur = (n.len as f32 * secs_per_tick * SAMPLE_RATE as f32) as usize;
 
-        // Unique per-note LCG seed so each note has an independent breath-noise stream.
+        // Unique per-note LCG seed so each note has an independent breath-noise
+        // stream — the slice index stands in for `GridNote::hole` (no longer
+        // available here), just as good at telling apart two notes that share
+        // a tick (e.g. a chord).
         let mut rng: u32 = LCG_SEED
-            .wrapping_add((n.hole as u32).wrapping_mul(LCG_HOLE_MIX))
+            .wrapping_add((idx as u32).wrapping_mul(LCG_HOLE_MIX))
             .wrapping_add((n.tick as u32).wrapping_mul(LCG_TICK_MIX));
 
         for i in 0..dur {
@@ -271,10 +297,11 @@ pub(super) fn render_pcm(notes: &[GridNote], bpm: f32, harp: &Harmonica) -> Vec<
     buf
 }
 
-/// Re-exported so existing call sites/tests in this module don't need to
+/// Re-exported so existing call sites/tests in this module (and
+/// `gameplay::call_response`, which shares this whole synth) don't need to
 /// change; the real implementation is shared with the Bending Trainer's
 /// reference-tone playback.
-pub(super) use crate::audio_system::wav::encode_wav;
+pub(crate) use crate::audio_system::wav::encode_wav;
 
 pub(super) fn start_playback(
     state: &super::state::EditorState,
@@ -293,7 +320,17 @@ pub(super) fn start_playback(
     let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
     if !state.notes.is_empty() {
         let harp = build_harp(&state.key, state.harmonica_kind);
-        let wav = encode_wav(&render_pcm(&state.notes, bpm, &harp), SAMPLE_RATE);
+        let phrase: Vec<PhraseNote> = state
+            .notes
+            .iter()
+            .map(|n| PhraseNote {
+                tick: n.tick,
+                len: n.len,
+                freq: note_freq(n, &harp),
+                expr: n.expr,
+            })
+            .collect();
+        let wav = encode_wav(&render_pcm(&phrase, bpm), SAMPLE_RATE);
         let handle = sources.add(AudioSource { bytes: wav.into() });
         commands.spawn((
             EditorAudio,

@@ -239,12 +239,14 @@ fn populate_lesson_rows(
     let passed = profile.passed_lesson_ids();
     for entry in unit_lessons {
         let title = String::from(loc.msg(&entry.manifest.title_key));
+        let label = if !is_unlocked(&entry.manifest, &passed) {
+            format!("\u{1F512} {} \u{2014} {}", title, loc.msg("lesson-locked"))
+        } else if passed.contains(&entry.manifest.id.as_str()) {
+            format!("\u{2713} {}", title)
+        } else {
+            title
+        };
         if is_unlocked(&entry.manifest, &passed) {
-            let label = if passed.contains(&entry.manifest.id.as_str()) {
-                format!("\u{2713} {title}")
-            } else {
-                title
-            };
             let id = entry.manifest.id.clone();
             spawn_button(
                 commands,
@@ -264,10 +266,7 @@ fn populate_lesson_rows(
         } else {
             let row = commands
                 .spawn((
-                    Text::new(format!(
-                        "\u{1F512} {title} \u{2014} {}",
-                        loc.msg("lesson-locked")
-                    )),
+                    Text::new(&label),
                     TextFont {
                         font_size: FontSize::Px(17.0),
                         ..default()

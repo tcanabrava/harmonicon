@@ -410,6 +410,7 @@ fn build_combined_notes(
                     amp_samples: Vec::new(),
                     phrase_section: section,
                     chord_pitches: chord_pitches.clone(),
+                    force_wait: item.call,
                 },
                 tag,
             ));
