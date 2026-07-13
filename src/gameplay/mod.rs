@@ -91,6 +91,8 @@ impl Plugin for GameplayPlugin {
         .init_resource::<bending_trainer::TrainerTarget>()
         .init_resource::<bending_trainer::DrillState>()
         .init_resource::<jam_session::JamLoop>()
+        .init_resource::<jam_session::ImprovGate>()
+        .init_resource::<jam_session::ImprovStats>()
         .init_resource::<pause_menu::WaitForNoteMode>()
         .init_resource::<pause_menu::PracticeSpeed>()
         .init_resource::<pause_menu::SelectedPhraseIndex>()
@@ -229,10 +231,16 @@ impl Plugin for GameplayPlugin {
                 .in_set(GameplayLogic)
                 .run_if(in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0)),
         )
-        // Jam Session: live harmonica hole-map feedback from the mic.
+        // Jam Session: live harmonica hole-map feedback from the mic, plus the
+        // improv lesson's scale-adherence tally (always accumulating during a
+        // jam, not just when a lesson is in flight — same "always-on
+        // diagnostic" convention as `SongStats::clean_attack`).
         .add_systems(
             Update,
-            jam_session::update_hole_map
+            (
+                jam_session::update_hole_map,
+                jam_session::accumulate_improv_stats,
+            )
                 .after(GameplayLogic)
                 .run_if(
                     in_state(AppState::Playing)
@@ -907,12 +915,16 @@ fn reset_score(
     mut feedback: ResMut<HitFeedback>,
     mut paused: ResMut<Paused>,
     mut gate: ResMut<PitchGate>,
+    mut improv_gate: ResMut<jam_session::ImprovGate>,
+    mut improv_stats: ResMut<jam_session::ImprovStats>,
 ) {
     *score = Score::default();
     *stats = SongStats::default();
     *feedback = HitFeedback::default();
     paused.0 = false;
     *gate = PitchGate::default();
+    *improv_gate = jam_session::ImprovGate::default();
+    *improv_stats = jam_session::ImprovStats::default();
 }
 
 /// Semitone margin added on each side of the harmonica's natural range when

@@ -465,11 +465,31 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
 }
 
 /// How "targeted" a sounding note is, worst to best.
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
-enum NoteFit {
+#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+pub(super) enum NoteFit {
     OutOfScale,
     InScale,
     ChordTone,
+}
+
+/// Classifies one played note class (e.g. `"G"`, no octave — see
+/// `PitchInfo::note`) by how well it fits the harmonic context right now:
+/// a tone of the bar's current chord is the most targeted choice, elsewhere
+/// in the blues scale is still "safe," anything else is out. Shared by the
+/// live hole-map tint (`update_hole_map`) and the improv-lesson accumulator
+/// (`accumulate_improv_stats`) so the two can never silently disagree.
+pub(super) fn classify_note_fit(
+    note: &str,
+    chord_tones: &HashSet<String>,
+    scale_classes: &HashSet<String>,
+) -> NoteFit {
+    if chord_tones.contains(note) {
+        NoteFit::ChordTone
+    } else if scale_classes.contains(note) {
+        NoteFit::InScale
+    } else {
+        NoteFit::OutOfScale
+    }
 }
 
 /// Tint each hole cell from the live mic pitches, three tiers: gold if the
@@ -492,13 +512,7 @@ pub fn update_hole_map(
     let mut lit: HashMap<u8, NoteFit> = HashMap::new();
     for p in &active.0 {
         if let Some(holes) = guide.note_to_holes.get(&p.midi) {
-            let fit = if chord_tones.contains(&p.note) {
-                NoteFit::ChordTone
-            } else if guide.scale_classes.contains(&p.note) {
-                NoteFit::InScale
-            } else {
-                NoteFit::OutOfScale
-            };
+            let fit = classify_note_fit(&p.note, chord_tones, &guide.scale_classes);
             for &h in holes {
                 lit.entry(h)
                     .and_modify(|v| {
@@ -518,6 +532,84 @@ pub fn update_hole_map(
             Some(NoteFit::OutOfScale) => PLAY_OUT_SCALE,
             None => HOLE_DEFAULT,
         };
+    }
+}
+
+// ── Improv-lesson scale-adherence accumulator ───────────────────────────────
+
+/// Enforces a fresh attack per pitch for [`accumulate_improv_stats`] — the
+/// same fresh-attack idea `gameplay::PitchGate` uses for scored modes
+/// (`crate::scoring::AttackGate`), so holding one note doesn't tally it
+/// again every frame it stays sounding.
+#[derive(Resource, Default)]
+pub struct ImprovGate(crate::scoring::AttackGate<u8>);
+
+/// Running tally of every fresh note attack played during an open Jam
+/// Session, classified by [`NoteFit`] against the bar it landed on. Reset
+/// at the start of every `Playing` session (`gameplay::reset_score`) — not
+/// jam-only, so it's always in a known state, but only [`accumulate_improv_
+/// stats`] (jam-only) ever writes to it. The improv lesson's pass criterion
+/// (`lessons::PassCriteria::ScaleAdherence`) reads [`adherence`](Self::
+/// adherence) when the player ends the session.
+#[derive(Resource, Default, Clone, Copy)]
+pub struct ImprovStats {
+    pub chord_tone: u32,
+    pub in_scale: u32,
+    pub out_of_scale: u32,
+}
+
+impl ImprovStats {
+    pub fn total(&self) -> u32 {
+        self.chord_tone + self.in_scale + self.out_of_scale
+    }
+
+    /// Fraction of attacks that were at least in-scale (a chord tone is the
+    /// strictly better case within "in scale", so it counts too) — `None`
+    /// with nothing played yet, same "nothing to report" convention as
+    /// `gameplay::TechniqueStats::accuracy`.
+    pub fn adherence(&self) -> Option<f32> {
+        let total = self.total();
+        if total == 0 {
+            None
+        } else {
+            Some((self.chord_tone + self.in_scale) as f32 / total as f32)
+        }
+    }
+}
+
+/// Tallies each fresh note attack into [`ImprovStats`], classified by
+/// [`classify_note_fit`] against the bar it landed on — the live twin of
+/// `update_hole_map`'s per-frame tint, but counting discrete attacks once
+/// each instead of repainting every frame a pitch stays held.
+pub fn accumulate_improv_stats(
+    active: Res<ActivePitches>,
+    guide: Option<Res<JamHoleGuide>>,
+    current: Res<CurrentBar>,
+    mut gate: ResMut<ImprovGate>,
+    mut stats: ResMut<ImprovStats>,
+) {
+    let Some(guide) = guide else {
+        return;
+    };
+    let sounding: HashSet<u8> = active
+        .0
+        .iter()
+        .filter(|p| guide.note_to_holes.contains_key(&p.midi))
+        .map(|p| p.midi)
+        .collect();
+    gate.0.release_absent(|m| sounding.contains(&m));
+
+    let chord_tones = &guide.chord_tones_by_bar[current.0];
+    for p in &active.0 {
+        if !guide.note_to_holes.contains_key(&p.midi) || !gate.0.is_fresh(p.midi, true) {
+            continue;
+        }
+        gate.0.consume(p.midi);
+        match classify_note_fit(&p.note, chord_tones, &guide.scale_classes) {
+            NoteFit::ChordTone => stats.chord_tone += 1,
+            NoteFit::InScale => stats.in_scale += 1,
+            NoteFit::OutOfScale => stats.out_of_scale += 1,
+        }
     }
 }
 
@@ -639,6 +731,134 @@ mod tests {
     fn note_fit_orders_chord_tone_above_scale_above_out_of_scale() {
         assert!(NoteFit::ChordTone > NoteFit::InScale);
         assert!(NoteFit::InScale > NoteFit::OutOfScale);
+    }
+
+    #[test]
+    fn classify_note_fit_prefers_chord_tone_over_plain_scale_membership() {
+        let chord_tones = HashSet::from(["C".to_string()]);
+        let scale = HashSet::from(["C".to_string(), "E".to_string()]);
+        assert_eq!(
+            classify_note_fit("C", &chord_tones, &scale),
+            NoteFit::ChordTone
+        );
+        assert_eq!(classify_note_fit("E", &chord_tones, &scale), NoteFit::InScale);
+        assert_eq!(
+            classify_note_fit("F", &chord_tones, &scale),
+            NoteFit::OutOfScale
+        );
+    }
+
+    // ── ImprovStats ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn improv_stats_adherence_is_none_with_nothing_played() {
+        assert_eq!(ImprovStats::default().adherence(), None);
+    }
+
+    #[test]
+    fn improv_stats_adherence_counts_chord_tone_and_in_scale_as_good() {
+        let stats = ImprovStats {
+            chord_tone: 3,
+            in_scale: 5,
+            out_of_scale: 2,
+        };
+        assert_eq!(stats.total(), 10);
+        assert!((stats.adherence().unwrap() - 0.8).abs() < 1e-6);
+    }
+
+    // ── accumulate_improv_stats ───────────────────────────────────────────────
+
+    fn improv_pitch_info(midi: u8, note: &str) -> crate::audio_system::pitch_detect::PitchInfo {
+        crate::audio_system::pitch_detect::PitchInfo {
+            midi,
+            note: note.to_string(),
+            octave: 4,
+            frequency: crate::audio_system::midi::midi_to_freq_hz(midi as f32),
+        }
+    }
+
+    fn improv_test_world() -> World {
+        let mut world = World::new();
+        let (_, guide) = build_hole_guide(&c_harp(), "C");
+        world.insert_resource(guide);
+        world.insert_resource(CurrentBar(0)); // bar 0 is the I chord (C7)
+        world.insert_resource(ImprovGate::default());
+        world.insert_resource(ImprovStats::default());
+        world
+    }
+
+    #[test]
+    fn accumulate_improv_stats_tallies_a_fresh_chord_tone_attack() {
+        let mut world = improv_test_world();
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(60, "C")])); // C4: blow hole 1
+        let mut schedule = Schedule::default();
+        schedule.add_systems(accumulate_improv_stats);
+        schedule.run(&mut world);
+
+        let stats = world.resource::<ImprovStats>();
+        assert_eq!(stats.chord_tone, 1);
+        assert_eq!(stats.total(), 1);
+    }
+
+    #[test]
+    fn accumulate_improv_stats_only_counts_a_held_note_once() {
+        let mut world = improv_test_world();
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(60, "C")]));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(accumulate_improv_stats);
+        schedule.run(&mut world); // fresh attack
+        schedule.run(&mut world); // still held, same pitch
+
+        assert_eq!(
+            world.resource::<ImprovStats>().total(),
+            1,
+            "a held note shouldn't tally again every frame"
+        );
+    }
+
+    #[test]
+    fn accumulate_improv_stats_rearms_after_the_note_stops_and_restarts() {
+        let mut world = improv_test_world();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(accumulate_improv_stats);
+
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(60, "C")]));
+        schedule.run(&mut world);
+        world.insert_resource(ActivePitches(vec![])); // released
+        schedule.run(&mut world);
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(60, "C")])); // re-attacked
+        schedule.run(&mut world);
+
+        assert_eq!(world.resource::<ImprovStats>().total(), 2);
+    }
+
+    #[test]
+    fn accumulate_improv_stats_ignores_pitches_the_harp_cant_produce() {
+        let mut world = improv_test_world();
+        // MIDI 61 (C#4) isn't anywhere in this harp's blow/draw layout.
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(61, "C#")]));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(accumulate_improv_stats);
+        schedule.run(&mut world);
+
+        assert_eq!(world.resource::<ImprovStats>().total(), 0);
+    }
+
+    #[test]
+    fn accumulate_improv_stats_classifies_by_the_current_bars_chord() {
+        let mut world = improv_test_world();
+        *world.resource_mut::<CurrentBar>() = CurrentBar(4); // bar 4 is IV (F7)
+        // F4 (MIDI 65) isn't produced by this harp at all — use a note this
+        // harp *can* play that's in the scale but not a tone of F7: G4 (the
+        // blues-scale 5th over C, not in F/A/C/D#).
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(67, "G")]));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(accumulate_improv_stats);
+        schedule.run(&mut world);
+
+        let stats = world.resource::<ImprovStats>();
+        assert_eq!(stats.in_scale, 1);
+        assert_eq!(stats.chord_tone, 0);
     }
 
     #[test]

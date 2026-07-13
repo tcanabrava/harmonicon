@@ -82,6 +82,10 @@ fn goal_line(loc: &Localization, entry: &LessonEntry) -> Option<String> {
             )
             .into(),
         ),
+        Some(PassCriteria::ScaleAdherence { threshold }) => Some(
+            loc.msg_args("lesson-goal-scale-adherence", &[("pct", pct(*threshold))])
+                .into(),
+        ),
         None if entry.chart_asset_path.is_some() => {
             Some(loc.msg("lesson-goal-finish").into())
         }
@@ -397,7 +401,13 @@ pub(super) fn setup_lesson_reader(
                         lesson_id: lesson_id.clone(),
                         pass_criteria: criteria.clone(),
                     });
-                    *mode = GameplayMode::Play2D;
+                    // A scale-adherence lesson is an open jam, not a chart
+                    // to play through — see `PassCriteria::ScaleAdherence`.
+                    *mode = if matches!(criteria, Some(PassCriteria::ScaleAdherence { .. })) {
+                        GameplayMode::JamSession
+                    } else {
+                        GameplayMode::Play2D
+                    };
                     state.set(AppState::SongLoading);
                 },
             );

@@ -8,10 +8,12 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use super::adaptive_difficulty::AdaptiveDifficulty;
+use super::jam_session::ImprovStats;
 use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused};
 use crate::dialogs::button;
+use crate::lessons::{LessonContext, lesson_passed};
 use crate::menu::{AppState, GameplayMode, ReturnToSongList, SelectedSong};
-use crate::profile::PlayerProfile;
+use crate::profile::{PlayerProfile, record_lesson, save_profile};
 use crate::song::SongManifest;
 
 /// Root of the pause overlay; toggled between hidden/visible.
@@ -348,8 +350,17 @@ fn on_increase_phrase_learned(
 /// always-present, see `song_progress_overlay`) progress bar while paused is
 /// exactly "select a part of the song to repeat", which is just as useful
 /// for free-play practice as for a scored run.
-pub(super) fn setup_pause_menu(mut commands: Commands, mode: Res<GameplayMode>) {
+pub(super) fn setup_pause_menu(
+    mut commands: Commands,
+    mode: Res<GameplayMode>,
+    lesson: Option<Res<LessonContext>>,
+) {
     let is_jam = *mode == GameplayMode::JamSession;
+    // A scale-adherence lesson (see `PassCriteria::ScaleAdherence`) is the
+    // one lesson type that never reaches the results screen on its own —
+    // Jam Session has no natural end — so it needs its own explicit
+    // "submit for judgment" action here instead.
+    let is_lesson_jam = is_jam && lesson.is_some();
     commands
         .spawn_scene(bsn! {
             Node {
@@ -379,6 +390,11 @@ pub(super) fn setup_pause_menu(mut commands: Commands, mode: Res<GameplayMode>) 
         // bsn! can't express the `Visibility::Hidden` enum variant; set it here.
         .insert(Visibility::Hidden)
         .with_children(|children| {
+            if is_lesson_jam {
+                children
+                    .spawn_empty()
+                    .apply_scene(button::default("Finish Lesson", on_finish_lesson));
+            }
             if !is_jam {
                 children.spawn_empty().apply_scene(bsn! {
                     Node {
@@ -509,6 +525,28 @@ fn on_quit(
     mut next_state: ResMut<NextState<AppState>>,
     mut return_to_song_list: ResMut<ReturnToSongList>,
 ) {
+    apply_quit(&mut paused, &mut next_state, &mut return_to_song_list);
+}
+
+/// Judges a scale-adherence lesson on demand — the only lesson type with no
+/// natural end to judge it at (see `PassCriteria::ScaleAdherence`). Records
+/// the result and returns to the menu the same way "Quit Song" does;
+/// `route_menu_entry` sees the still-present `LessonContext` and routes to
+/// the lesson list from there, same as any other lesson.
+fn on_finish_lesson(
+    _: On<Pointer<Click>>,
+    lesson: Res<LessonContext>,
+    improv_stats: Res<ImprovStats>,
+    mut profile: ResMut<PlayerProfile>,
+    mut paused: ResMut<Paused>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut return_to_song_list: ResMut<ReturnToSongList>,
+) {
+    let adherence = improv_stats.adherence();
+    let passed = lesson_passed(lesson.pass_criteria.as_ref(), 0.0, &[], adherence);
+    let record = profile.lessons.entry(lesson.lesson_id.clone()).or_default();
+    record_lesson(record, passed, adherence.unwrap_or(0.0));
+    save_profile(&profile);
     apply_quit(&mut paused, &mut next_state, &mut return_to_song_list);
 }
 

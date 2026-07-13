@@ -23,8 +23,11 @@ use std::path::Path;
 
 const SCHEMA: &str = include_str!("../assets/lesson_schema.dtd.json");
 
-/// How a chart-backed lesson is judged when its run reaches the results
-/// screen. `None` on [`LessonManifest`] means finishing at all counts.
+/// How a lesson is judged. `Accuracy`/`Technique` are judged when a
+/// chart-backed run reaches the results screen; `None` on [`LessonManifest`]
+/// means finishing at all counts. `ScaleAdherence` is judged differently —
+/// see its own doc comment — because it backs the one lesson type that
+/// never reaches a results screen at all.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum PassCriteria {
@@ -34,6 +37,18 @@ pub enum PassCriteria {
     /// `SongStats`/`PlayerProfile::technique_best_accuracy` use
     /// (`"bend"`, `"wah-wah"`, ...).
     Technique { technique: String, threshold: f32 },
+    /// Minimum fraction of notes played that were at least in-scale
+    /// (`jam_session::ImprovStats::adherence`), 0..1 — the improvisation
+    /// lesson's criterion. Unlike the other two variants, this is judged
+    /// from an *open* Jam Session, which has no chart notes to score and no
+    /// natural end: the lesson reader's Start button routes a lesson with
+    /// this criterion into `GameplayMode::JamSession` instead of `Play2D`
+    /// (see `menu::lessons::setup_lesson_reader`), and a dedicated "Finish
+    /// Lesson" pause-menu button (jam mode + a `LessonContext` in flight —
+    /// see `gameplay::pause_menu`) judges it on demand and returns to the
+    /// menu directly, bypassing the results screen entirely (there's no
+    /// score/grade that would mean anything for an open jam).
+    ScaleAdherence { threshold: f32 },
 }
 
 /// One `lesson.json`, as authored. See `assets/lesson_schema.dtd.json` for
@@ -109,17 +124,25 @@ pub fn is_unlocked(manifest: &LessonManifest, passed_ids: &[&str]) -> bool {
 /// Judges a finished lesson run. `accuracy` is the overall weighted accuracy
 /// (`results::accuracy`); `technique_accuracy` pairs technique bucket names
 /// with their per-run accuracy — the same slice `results` already builds for
-/// `profile::record_play`. A criteria-less lesson passes by finishing; a
-/// `Technique` criterion over a bucket the run never exercised fails (an
-/// empty run can't demonstrate the technique).
+/// `profile::record_play`; `scale_adherence` is `jam_session::ImprovStats::
+/// adherence`'s result, `None` for any chart-backed run (which never
+/// accumulates it) and always `Some` by the time a jam-based lesson's
+/// "Finish Lesson" button calls this (see [`PassCriteria::ScaleAdherence`]).
+/// A criteria-less lesson passes by finishing; a `Technique`/`ScaleAdherence`
+/// criterion the run never exercised fails (an empty run can't demonstrate
+/// anything).
 pub fn lesson_passed(
     criteria: Option<&PassCriteria>,
     accuracy: f32,
     technique_accuracy: &[(&str, f32)],
+    scale_adherence: Option<f32>,
 ) -> bool {
     match criteria {
         None => true,
         Some(PassCriteria::Accuracy { threshold }) => accuracy >= *threshold,
+        Some(PassCriteria::ScaleAdherence { threshold }) => {
+            scale_adherence.is_some_and(|a| a >= *threshold)
+        }
         Some(PassCriteria::Technique {
             technique,
             threshold,
@@ -301,6 +324,21 @@ mod tests {
     }
 
     #[test]
+    fn parses_a_scale_adherence_criterion() {
+        // The improvisation lesson's pass criterion — no "technique" field,
+        // unlike Technique.
+        let m = parse_lesson(
+            br#"{"id":"improv","unit":"rhythm","title_key":"t","body_key":"b",
+                 "pass_criteria":{"type":"scale-adherence","threshold":0.8}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            m.pass_criteria,
+            Some(PassCriteria::ScaleAdherence { threshold: 0.8 })
+        );
+    }
+
+    #[test]
     fn rejects_a_manifest_missing_required_fields() {
         let err = parse_lesson(br#"{"id":"x","unit":"blowing"}"#).unwrap_err();
         assert!(err.contains("title_key"), "unexpected error: {err}");
@@ -358,14 +396,14 @@ mod tests {
 
     #[test]
     fn no_criteria_means_finishing_passes() {
-        assert!(lesson_passed(None, 0.0, &[]));
+        assert!(lesson_passed(None, 0.0, &[], None));
     }
 
     #[test]
     fn accuracy_criterion_compares_against_overall_accuracy() {
         let c = PassCriteria::Accuracy { threshold: 0.6 };
-        assert!(!lesson_passed(Some(&c), 0.59, &[]));
-        assert!(lesson_passed(Some(&c), 0.6, &[]));
+        assert!(!lesson_passed(Some(&c), 0.59, &[], None));
+        assert!(lesson_passed(Some(&c), 0.6, &[], None));
     }
 
     #[test]
@@ -375,9 +413,9 @@ mod tests {
             threshold: 0.5,
         };
         let per_technique = [("normal", 1.0_f32), ("wah-wah", 0.4)];
-        assert!(!lesson_passed(Some(&c), 1.0, &per_technique));
+        assert!(!lesson_passed(Some(&c), 1.0, &per_technique, None));
         let per_technique = [("normal", 0.0_f32), ("wah-wah", 0.5)];
-        assert!(lesson_passed(Some(&c), 0.0, &per_technique));
+        assert!(lesson_passed(Some(&c), 0.0, &per_technique, None));
     }
 
     #[test]
@@ -386,7 +424,20 @@ mod tests {
             technique: "wah-wah".into(),
             threshold: 0.5,
         };
-        assert!(!lesson_passed(Some(&c), 1.0, &[("normal", 1.0)]));
+        assert!(!lesson_passed(Some(&c), 1.0, &[("normal", 1.0)], None));
+    }
+
+    #[test]
+    fn scale_adherence_criterion_compares_against_the_jam_tally() {
+        let c = PassCriteria::ScaleAdherence { threshold: 0.8 };
+        assert!(!lesson_passed(Some(&c), 0.0, &[], Some(0.79)));
+        assert!(lesson_passed(Some(&c), 0.0, &[], Some(0.8)));
+    }
+
+    #[test]
+    fn scale_adherence_criterion_fails_when_nothing_was_played() {
+        let c = PassCriteria::ScaleAdherence { threshold: 0.8 };
+        assert!(!lesson_passed(Some(&c), 0.0, &[], None));
     }
 
     // ── group_by_unit ─────────────────────────────────────────────────────────

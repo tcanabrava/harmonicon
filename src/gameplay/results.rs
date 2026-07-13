@@ -109,7 +109,10 @@ pub(super) fn setup(
     // best/adaptive records below (a lesson chart isn't a song the best-
     // scores screen should list, and its learned-fraction is meaningless).
     let lesson_result = lesson.as_ref().map(|ctx| {
-        let passed = lesson_passed(ctx.pass_criteria.as_ref(), acc, &technique_accuracy);
+        // A chart-backed run through Results never accumulates jam scale
+        // data — only the jam pause menu's "Finish Lesson" button does
+        // (see `PassCriteria::ScaleAdherence`).
+        let passed = lesson_passed(ctx.pass_criteria.as_ref(), acc, &technique_accuracy, None);
         let record = profile.lessons.entry(ctx.lesson_id.clone()).or_default();
         record_lesson(record, passed, acc);
         save_profile(&profile);

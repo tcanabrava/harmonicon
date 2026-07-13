@@ -120,6 +120,7 @@ lesson-mark-done = Marcar como Hecha
 lesson-goal-accuracy = Objetivo: %pct%% de precisión general
 lesson-goal-technique = Objetivo: %pct%% de precisión en las notas de %technique%
 lesson-goal-finish = Objetivo: tocarla hasta el final
+lesson-goal-scale-adherence = Objetivo: %pct%% de las notas dentro de la escala o mejor
 lesson-complete-banner = LECCIÓN SUPERADA
 lesson-failed-banner = Objetivo no alcanzado — relee la lección e inténtalo de nuevo
 
@@ -164,6 +165,16 @@ lesson-hand-wah-body =
     Copa cerrada = sonido oscuro, apagado. Copa abierta = brillante y fuerte. Abrir la copa rítmicamente mientras suena una nota produce el clásico wah-wah.
     En este ejercicio, sostén cada nota con firmeza y abre-y-cierra la copa unas dos veces por segundo — el juego escucha ese pulso en tu sonido.
     Mantén la respiración constante; solo se mueven las manos. Si no registra nada, aprieta el sello de la copa — casi todo el efecto vive en el último centímetro del cierre.
+
+# Lección: improvisación
+lesson-improvisation-title = Improvisar sobre el Blues
+lesson-improvisation-body =
+    Ahora toca juntarlo todo: la forma de 12 compases, la escala de blues y tus propias decisiones, tocadas en vivo sobre una jam de verdad.
+    Esta lección abre una Jam Session normal — la rejilla de 12 compases y el mapa de agujeros de tu armónica cambian de color en vivo mientras tocas: dorado significa que tocaste una nota del acorde que suena ahora mismo, verde significa que estás dentro de la escala de blues, ámbar significa que saliste de ella.
+    Esto es 2ª posición: tu armónica en Do toca en el tono de Sol, el clásico esquema cross-harp del blues — el agujero 2 aspirado es tu nota base.
+    No hay una melodía fija que acertar; toca lo que quieras sobre los acordes y deja que tu oído siga el color del mapa de agujeros.
+    Cuando sientas que estás listo para parar, abre el menú de pausa y pulsa "Finish Lesson" — el juego cuenta cuántas de tus notas cayeron dentro de la escala o sobre un tono del acorde y juzga el ejercicio con eso.
+    Apunta a verde y dorado la mayor parte del tiempo; alguna nota ámbar de vez en cuando es normal, hasta expresiva — solo no te quedes ahí.
 
 # Lección: leer la rejilla de 12 compases
 lesson-twelve-bar-title = Leer la Rejilla del Blues de 12 Compases

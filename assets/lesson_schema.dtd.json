@@ -72,9 +72,22 @@
               "description": "Minimum accuracy (0..1) on that technique's notes to pass."
             }
           }
+        },
+        {
+          "required": ["type", "threshold"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "scale-adherence" },
+            "threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "description": "Minimum fraction (0..1) of notes played during the jam that were at least in-scale. Routes the lesson into Jam Session instead of the normal chart pipeline — see PassCriteria::ScaleAdherence."
+            }
+          }
         }
       ],
-      "description": "How a chart-backed lesson is judged at the results screen. Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
+      "description": "How a chart-backed lesson is judged at the results screen (or, for a `scale-adherence` lesson, by its own \"Finish Lesson\" jam pause-menu button — see PassCriteria::ScaleAdherence). Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
     }
   }
 }
