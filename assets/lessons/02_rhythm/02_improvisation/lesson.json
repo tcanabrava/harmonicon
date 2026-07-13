@@ -1,0 +1,9 @@
+{
+  "id": "improvisation",
+  "unit": "rhythm",
+  "title_key": "lesson-improvisation-title",
+  "body_key": "lesson-improvisation-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["twelve-bar"],
+  "pass_criteria": { "type": "scale-adherence", "threshold": 0.8 }
+}

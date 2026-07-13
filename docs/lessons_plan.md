@@ -53,7 +53,7 @@ effort spent on a check that can't actually check anything.
 | Reading the 12-bar blues grid | **Instructional + visual** | `TwelveBarBluesOverlay` already exists and visually highlights the current bar/chord. The lesson is: show the overlay large and explained, over a simple I-IV-V backing (reuse Jam Session's existing 12-bar cycle), with a light "does the player stay in time" pass criterion from ordinary timing-window scoring — no new mechanism. |
 | Using your feet (internalizing tempo by tapping) | **Instructional only** | Foot taps aren't harmonica pitch and can't be reliably separated from harmonica audio on a single mic channel — out of scope for the scoring pipeline. Ships as instructional copy plus a metronome-only "keep time" chart (the existing `MetronomeFeel`/tempo machinery), where the *implicit* check is just normal timing-window accuracy on notes played against the beat. |
 | Call and response | **Scored** (needs the feature — see `PLAN.md`) | Game synthesizes a short call via the song editor's existing WAV synth path (`song_editor::playback`), then opens a wait window (reusing `pause_menu::WaitForNoteMode`/`first_due_unresolved_note`) for the player to echo it, scored by the normal pipeline. This is the one lesson-driven item that's also a standalone `PLAN.md`/`ROADMAP.md` feature, not lesson-specific plumbing — build it there, lessons just author call phrases. |
-| Blues improvisation | **Scored via proxy** | Can't judge "good" improvisation, but can judge scale/chord-tone adherence: reuse `jam_session::JamHoleGuide`'s existing blues-scale/chord-tone classification (already used for hole-map tinting) to accumulate "% of notes played that were in-scale/on the current bar's chord tones" over an open jam window, with a pass threshold (e.g. ≥80% in-scale). This is a small new stats accumulator parallel to `SongStats`, not new music-theory work — the classification already exists. |
+| Blues improvisation | **Scored via proxy — done** | `jam_session::ImprovStats` accumulates scale/chord-tone adherence over an open Jam Session (see "New engine work required" below); the `improvisation` lesson (Unit 2) pass criterion is `PassCriteria::ScaleAdherence{threshold: 0.8}`. |
 
 ### Unit 3 — How to play harmonica jazz
 
@@ -119,7 +119,31 @@ hit, invisible to plain accuracy.) The two chord lessons below both pass on
 `{"type": "accuracy", "threshold": 0.5}` — plain accuracy, since every note
 in both charts is a chord note anyway.
 
-### 3. Lesson manifest, loader, and menu page (structural, no new DSP)
+### 3. Scale-adherence accumulator (small) — done
+
+`jam_session::classify_note_fit(note, chord_tones, scale_classes) -> NoteFit`
+is `update_hole_map`'s per-frame tinting logic extracted into a standalone,
+directly-tested pure function (shared by both call sites so the live tint
+and the tally can never silently disagree). `jam_session::ImprovStats`
+(`chord_tone`/`in_scale`/`out_of_scale: u32` counters, `.adherence()` — the
+`(chord_tone + in_scale) / total` fraction `PassCriteria::ScaleAdherence`
+reads) is tallied by `accumulate_improv_stats`, the live twin of
+`update_hole_map`: same classification, but gated on a fresh attack
+(`ImprovGate`, a `scoring::AttackGate<u8>` — the same fresh-attack idea
+`gameplay::PitchGate` uses for scored modes) so a held note counts once, not
+every frame it stays sounding. Reset alongside `SongStats`/`PitchGate` in
+`gameplay::reset_score` (unconditional — always in a known state, even
+though only Jam Session ever writes to it, the same "always-on diagnostic"
+convention `SongStats::clean_attack` established).
+
+This is the one lesson type with no chart notes to score and no natural
+end (an open jam loops indefinitely), so it can't be judged the way the
+other two primitives are — see `PassCriteria::ScaleAdherence`'s doc comment
+for how the whole judging path differs (routes into `GameplayMode::
+JamSession` from the reader's Start button; judged by a dedicated "Finish
+Lesson" pause-menu button instead of the results screen).
+
+### 4. Lesson manifest, loader, and menu page (structural, no new DSP)
 
 - **Asset tree**: `assets/lessons/<unit>/<lesson>/` — reuses the `.harpchart`
   format directly for any lesson with notes to play; an instructional-only
@@ -168,8 +192,11 @@ in both charts is a chord note anyway.
    note, so plain accuracy already means "chord accuracy" here). Both are
    original scale/chord-tone drills, not melodic content — the
    safe-to-author subset per `TODO.md`'s content-gap item.
-4. Blues-scale-adherence stats accumulator → improvisation lesson (depends
-   on nothing above; can move earlier if it's higher-value to ship first).
+4. **Done.** Scale-adherence accumulator (see "New engine work required"
+   above) → `improvisation` (Unit 2, `assets/lessons/02_rhythm/
+   02_improvisation/`), prerequisite `twelve-bar`, pass: ≥80% of notes
+   in-scale or better. The one lesson that opens `GameplayMode::JamSession`
+   instead of a scored chart — see `PassCriteria::ScaleAdherence`.
 5. Call-and-response (tracked as its own `PLAN.md` item since it's also a
    standalone Jam Session feature, not lesson-only) → the call-and-response
    lesson.
