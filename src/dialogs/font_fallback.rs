@@ -122,7 +122,25 @@ fn apply_font_fallback(
     let Some(fallback) = fallback else { return };
     for (entity, text, mut font, color, children) in &mut texts {
         let runs = split_runs(&text.0);
-        if runs.len() <= 1 && runs.first().is_none_or(|(_, k)| k.is_none()) {
+        if runs.len() <= 1 {
+            // Nothing to split into spans. Still make sure the font matches
+            // this (possibly fallback-only) run — needed the first time a
+            // label that's *entirely* an icon is spawned — but stop right
+            // there: don't touch `Text` or any already-`GeneratedSpan`
+            // children. Splitting a multi-run label below truncates this
+            // same entity's own `Text` down to its first run (e.g. "🔒 Foo"
+            // -> "🔒"), which is itself a *second* `Changed<Text>` next
+            // frame; without this early return that second pass would see
+            // a single fallback-only run, despawn the span the first pass
+            // just created (matched via `GeneratedSpan`), and — with
+            // nothing left in `runs[1..]` — never recreate it, leaving only
+            // the icon on screen.
+            if let Some((_, kind)) = runs.first() {
+                font.font = match kind {
+                    Some(k) => FontSource::Handle(fallback.handle(*k)),
+                    None => FontSource::default(),
+                };
+            }
             continue;
         }
 
@@ -339,6 +357,36 @@ mod tests {
             FontSource::default(),
             "the text run keeps the default font"
         );
+    }
+
+    #[test]
+    fn the_span_survives_a_second_update_with_no_further_text_changes() {
+        // Regression: splitting an entity's own `Text` down to just its
+        // first run (see `button_label_with_a_leading_icon_gets_split_into_
+        // a_span`) is itself a write to `Text`, so `Changed<Text>` fires
+        // again on the *next* frame even though nothing external changed
+        // it. That second, self-triggered pass must not despawn the span
+        // it just created without recreating it.
+        let mut app = test_app();
+        let id = app
+            .world_mut()
+            .spawn((
+                Text::new("\u{1F512} Locked \u{2014} needs a prerequisite"),
+                TextFont::default(),
+                TextColor::default(),
+            ))
+            .id();
+        app.update();
+        app.update();
+
+        let world = app.world();
+        assert_eq!(world.get::<Text>(id).unwrap().0, "\u{1F512}");
+        let children = world
+            .get::<Children>(id)
+            .expect("span child must still be present after the second update");
+        assert_eq!(children.len(), 1, "must not duplicate or drop the span");
+        let span = world.get::<TextSpan>(children[0]).unwrap();
+        assert_eq!(span.0, " Locked \u{2014} needs a prerequisite");
     }
 
     #[test]
