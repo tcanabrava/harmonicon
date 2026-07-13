@@ -87,19 +87,31 @@ The single-note lesson's `pass_criteria` now reads `{"type": "technique",
 "technique": "clean-attack", "threshold": 0.6}` instead of overall accuracy.
 
 ### 2. Chord-target notes (bigger; shared by "multiple notes," octave-split
-tongue-blocking drills, and any future jazz chord-tone lesson)
+tongue-blocking drills, and any future jazz chord-tone lesson) — done
 
-`ScheduledNote::expected_pitch` is `Option<u8>` — a single pitch. A chord
-target needs a set: `expected_pitches: Vec<u8>` (or a small enum
-distinguishing "single" vs "chord" to avoid touching every existing single-
-note call site). Scoring becomes "what fraction of the set is
-simultaneously present in `ActivePitches`" rather than an exact-one-pitch
-match — this is new scoring logic, not a reuse of `PitchGate`'s consumed-set
-mechanism (that mechanism assumes one pitch resolves one note). Chart schema
-addition: a new note-event shape or a `chord: [u8]` field, optional so
-existing charts are untouched — bump `format_version` per convention. Needs
-its own dense unit-test module before wiring into `score_notes`, matching
-this repo's established pure-logic-first pattern.
+No chart schema change, no `format_version` bump: the chart format already
+lets one `TrackItem` carry multiple simultaneous `events` (`PlayMode::Chord`/
+`Split`, used for the visual badge only until now) — every event just became
+its own independent `ScheduledNote`, scored with no idea the others existed.
+The fix stays entirely on the scoring side: `ScheduledNote` gained
+`chord_pitches: Vec<u8>` (`src/gameplay/mod.rs`), the full target set shared
+identically by every sibling note `gameplay_2d::build_combined_notes`/
+`gameplay_3d::build_notes_3d` produce from one multi-event item (empty for
+an ordinary single-event item — no behavior change there). The new pure
+primitive is `scoring::chord_is_sounding(expected: &[u8], harp_pitches:
+&HashSet<u8>) -> bool` — true only when *every* pitch in the set sounds at
+once, unlike a single note's exact-one-pitch match. `score_notes` ANDs it
+into each chord note's existing per-pitch `AttackGate` freshness check
+(still needed, still reused — a chord's individual pitches must each be
+freshly articulated too, not just simultaneously present), so a chord scores
+only when its sibling events are actually struck together, not one at a
+time. Tallied as a new `SongStats::chord: TechniqueStats` bucket (one entry
+per sibling note, same convention as every other technique bucket) — added
+to `lesson_schema.dtd.json`'s technique enum as `"chord"`, so it rides the
+same `PassCriteria::Technique` machinery `clean-attack` does, no new
+criterion variant. A chord note is deliberately excluded from `clean_attack`
+tallying (see primitive 1) — "only one pitch sounding" is the wrong question
+for a note that's supposed to have company.
 
 ### 3. Lesson manifest, loader, and menu page (structural, no new DSP)
 
@@ -142,8 +154,13 @@ this repo's established pure-logic-first pattern.
    off for lesson runs; quitting/finishing returns to the lesson list).
 2. **Done.** "Clean single note" primitive → wired into the single-note
    lesson (see "New engine work required" above).
-3. Chord-target primitive → "multiple notes" lesson, then the octave-split/
-   tongue-blocking-proxy lesson reusing the same primitive.
+3. **Done.** Chord-target primitive (see "New engine work required" above)
+   → two new bundled lessons under `assets/lessons/01_blowing/`:
+   `03_multiple_notes` (blow/draw triads on holes 1-2-3/2-3-4/4-5-6) and
+   `04_octave_split` (tongue-blocked octave splits on holes 1+4/2+5/3+6),
+   both pass: ≥50% chord-technique accuracy. Both are original
+   scale/chord-tone drills, not melodic content — the safe-to-author subset
+   per `TODO.md`'s content-gap item.
 4. Blues-scale-adherence stats accumulator → improvisation lesson (depends
    on nothing above; can move earlier if it's higher-value to ship first).
 5. Call-and-response (tracked as its own `PLAN.md` item since it's also a

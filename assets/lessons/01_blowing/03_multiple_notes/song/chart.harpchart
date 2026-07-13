@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: 2-3 hole blow/draw chords on a C diatonic (a C major triad, a G major triad, and the same C major triad an octave up). Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Multiple Notes Drill",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 70,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [ { "tick": 0, "bpm": 70 } ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+      "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+    }
+  },
+  "track": [
+    { "id": "chord123_blow_a", "time": 0.0,  "duration": 2.5, "phrase": "Blow chord: holes 1-2-3", "play_mode": "chord",
+      "events": [
+        { "hole": 1, "action": "blow", "note": "C4" },
+        { "hole": 2, "action": "blow", "note": "E4" },
+        { "hole": 3, "action": "blow", "note": "G4" }
+      ] },
+    { "id": "chord123_blow_b", "time": 4.0,  "duration": 2.5, "play_mode": "chord",
+      "events": [
+        { "hole": 1, "action": "blow", "note": "C4" },
+        { "hole": 2, "action": "blow", "note": "E4" },
+        { "hole": 3, "action": "blow", "note": "G4" }
+      ] },
+    { "id": "chord234_draw_a", "time": 8.0,  "duration": 2.5, "phrase": "Draw chord: holes 2-3-4", "play_mode": "chord",
+      "events": [
+        { "hole": 2, "action": "draw", "note": "G4" },
+        { "hole": 3, "action": "draw", "note": "B4" },
+        { "hole": 4, "action": "draw", "note": "D5" }
+      ] },
+    { "id": "chord234_draw_b", "time": 12.0, "duration": 2.5, "play_mode": "chord",
+      "events": [
+        { "hole": 2, "action": "draw", "note": "G4" },
+        { "hole": 3, "action": "draw", "note": "B4" },
+        { "hole": 4, "action": "draw", "note": "D5" }
+      ] },
+    { "id": "chord456_blow_a", "time": 16.0, "duration": 2.5, "phrase": "Blow chord: holes 4-5-6", "play_mode": "chord",
+      "events": [
+        { "hole": 4, "action": "blow", "note": "C5" },
+        { "hole": 5, "action": "blow", "note": "E5" },
+        { "hole": 6, "action": "blow", "note": "G5" }
+      ] },
+    { "id": "chord456_blow_b", "time": 20.0, "duration": 2.5, "play_mode": "chord",
+      "events": [
+        { "hole": 4, "action": "blow", "note": "C5" },
+        { "hole": 5, "action": "blow", "note": "E5" },
+        { "hole": 6, "action": "blow", "note": "G5" }
+      ] }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 600
+  }
+}

@@ -12,7 +12,7 @@ use crate::{
     menu::SelectedSong,
     song::NoteCube3dConfig,
     song::SongManifest,
-    song::chart::{Action, HarpChart},
+    song::chart::{Action, HarpChart, Modifier},
     song::harmonica::twelve_bar,
     theme::{LoadedTheme, TwelveBarColors},
 };
@@ -289,20 +289,37 @@ fn build_notes_3d(chart: &HarpChart, adaptive: &AdaptiveDifficulty) -> Vec<Sched
     let mut notes: Vec<ScheduledNote> = Vec::new();
     for item in &chart.track {
         let t = super::resolve_item_time(item, &chart.timing);
-        for event in &item.events {
+        // Each event's own modifiers/expected pitch, computed once up front
+        // so the chord-target set (below) doesn't need to redo it.
+        let event_data: Vec<(Vec<Modifier>, Option<u8>)> = item
+            .events
+            .iter()
+            .map(|event| {
+                let modifiers = event.modifiers.clone().unwrap_or_default();
+                let natural_pitch = event.note.clone().unwrap_or_else(|| {
+                    chart
+                        .harmonica
+                        .wind_direction_label(event.hole, &event.action)
+                });
+                // A bend targets the bent pitch, so the technique is scored not shown.
+                let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
+                (modifiers, expected_pitch)
+            })
+            .collect();
+        // A real chord/octave-split needs every sibling pitch sounding at
+        // once (see `ScheduledNote::chord_pitches`) — a `TrackItem` with
+        // only one event stays an ordinary single note, untouched by this.
+        let chord_pitches: Vec<u8> = if item.events.len() > 1 {
+            event_data.iter().filter_map(|(_, p)| *p).collect()
+        } else {
+            Vec::new()
+        };
+        for (event, (modifiers, expected_pitch)) in item.events.iter().zip(event_data) {
             let (unlocked, section) = flags.next().unwrap_or((true, 0));
             if !unlocked {
                 continue;
             }
             let is_blow = matches!(event.action, Action::Blow);
-            let modifiers = event.modifiers.clone().unwrap_or_default();
-            let natural_pitch = event.note.clone().unwrap_or_else(|| {
-                chart
-                    .harmonica
-                    .wind_direction_label(event.hole, &event.action)
-            });
-            // A bend targets the bent pitch, so the technique is scored not shown.
-            let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
             notes.push(ScheduledNote {
                 time: t,
                 duration: item.duration,
@@ -317,6 +334,7 @@ fn build_notes_3d(chart: &HarpChart, adaptive: &AdaptiveDifficulty) -> Vec<Sched
                 pitch_samples: Vec::new(),
                 amp_samples: Vec::new(),
                 phrase_section: section,
+                chord_pitches: chord_pitches.clone(),
             });
         }
     }

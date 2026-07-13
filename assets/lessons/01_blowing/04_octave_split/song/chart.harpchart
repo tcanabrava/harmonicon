@@ -1,0 +1,68 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: tongue-blocked octave splits on a C diatonic — holes 1+4, 2+5, and 3+6 blown together, each pair an octave apart in Richter tuning. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Octave Split Drill",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 70,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [ { "tick": 0, "bpm": 70 } ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+      "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+    }
+  },
+  "track": [
+    { "id": "split14_a", "time": 0.0,  "duration": 2.5, "phrase": "Octave split: holes 1+4", "play_mode": "split",
+      "events": [
+        { "hole": 1, "action": "blow", "note": "C4" },
+        { "hole": 4, "action": "blow", "note": "C5" }
+      ] },
+    { "id": "split14_b", "time": 4.0,  "duration": 2.5, "play_mode": "split",
+      "events": [
+        { "hole": 1, "action": "blow", "note": "C4" },
+        { "hole": 4, "action": "blow", "note": "C5" }
+      ] },
+    { "id": "split25_a", "time": 8.0,  "duration": 2.5, "phrase": "Octave split: holes 2+5", "play_mode": "split",
+      "events": [
+        { "hole": 2, "action": "blow", "note": "E4" },
+        { "hole": 5, "action": "blow", "note": "E5" }
+      ] },
+    { "id": "split25_b", "time": 12.0, "duration": 2.5, "play_mode": "split",
+      "events": [
+        { "hole": 2, "action": "blow", "note": "E4" },
+        { "hole": 5, "action": "blow", "note": "E5" }
+      ] },
+    { "id": "split36_a", "time": 16.0, "duration": 2.5, "phrase": "Octave split: holes 3+6", "play_mode": "split",
+      "events": [
+        { "hole": 3, "action": "blow", "note": "G4" },
+        { "hole": 6, "action": "blow", "note": "G5" }
+      ] },
+    { "id": "split36_b", "time": 20.0, "duration": 2.5, "play_mode": "split",
+      "events": [
+        { "hole": 3, "action": "blow", "note": "G4" },
+        { "hole": 6, "action": "blow", "note": "G5" }
+      ] }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 600
+  }
+}

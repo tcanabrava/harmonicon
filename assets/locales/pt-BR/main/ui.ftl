@@ -137,6 +137,25 @@ lesson-single-note-body =
     Neste exercício, notas longas nos furos 4, 5 e 6 deslizam até a linha de acerto. Sopre cada uma com calma — não importa o volume, importa a pureza.
     Se ouvir duas notas ao mesmo tempo, não force: estreite um pouco a abertura e desacelere o sopro.
 
+# Lição: várias notas (acordes)
+lesson-multiple-notes-title = Tocando Várias Notas Juntas
+lesson-multiple-notes-body =
+    Uma nota só não é o único alvo — algumas levadas do blues soam de propósito dois ou três furos juntos, como um acorde.
+    Alargue a embocadura para cobrir os furos que quer e nenhum além deles; o mesmo controle de sopro que deu uma nota limpa agora dá um grupo controlado delas.
+    Acordes de sopro ficam em furos vizinhos: os furos 1-2-3 soprados juntos soam um alegre acorde de Dó maior.
+    Acordes de sugado funcionam do mesmo jeito: os furos 2-3-4 sugados juntos soam um acorde de Sol maior.
+    Neste exercício, as levadas de acorde deslizam até a linha de acerto — o jogo escuta cada nota do acorde soando no mesmo instante, não uma depois da outra.
+    Se só parte do acorde registrar, você provavelmente não está cobrindo todos os furos por igual; alargue a embocadura em vez de soprar mais forte.
+
+# Lição: divisão de oitava (bloqueio de língua)
+lesson-octave-split-title = Divisão de Oitava
+lesson-octave-split-body =
+    O bloqueio de língua deixa tocar dois furos ao mesmo tempo, abafando os furos entre eles — o clássico é a divisão de oitava.
+    Apoie a língua achatada sobre a gaita, cobrindo os dois furos do meio, e deixe o ar passar só pelo furo de cada lado.
+    Nos furos 1 e 4 soprados juntos você ouve Dó4 e Dó5 — a mesma nota, uma oitava acima. Os furos 2 e 5, e os furos 3 e 6, funcionam do mesmo jeito.
+    Neste exercício, os dois furos de cada divisão precisam soar juntos, igual a um acorde — o bloqueio de língua em si não dá pra verificar pelo microfone, mas a oitava que ele produz dá.
+    Se só ouvir uma nota, confira se a língua está cobrindo os furos do meio por inteiro, em vez de ficar torta para um lado.
+
 # Lição: formato das mãos / wah
 lesson-hand-wah-title = O Formato das Mãos e o Wah
 lesson-hand-wah-body =

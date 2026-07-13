@@ -137,6 +137,25 @@ lesson-single-note-body =
     En este ejercicio, notas largas en los agujeros 4, 5 y 6 se deslizan hacia la línea de acierto. Sopla cada una con suavidad — no importa el volumen, importa la pureza.
     Si oyes dos notas a la vez, no aprietes: estrecha un poco la abertura y frena la respiración.
 
+# Lección: varias notas (acordes)
+lesson-multiple-notes-title = Tocar Varias Notas a la Vez
+lesson-multiple-notes-body =
+    Una sola nota no es el único objetivo — algunos riffs de blues suenan a propósito dos o tres agujeros juntos, como un acorde.
+    Ensancha la embocadura para cubrir los agujeros que quieres y ninguno más allá; el mismo control de aire que te dio una nota limpia ahora te da un grupo controlado de ellas.
+    Los acordes de soplido van en agujeros vecinos: los agujeros 1-2-3 soplados juntos suenan un brillante acorde de Do mayor.
+    Los acordes de aspirado funcionan igual: los agujeros 2-3-4 aspirados juntos suenan un acorde de Sol mayor.
+    En este ejercicio, las levadas de acorde se deslizan hacia la línea de acierto — el juego escucha que cada nota del acorde suene en el mismo instante, no una tras otra.
+    Si solo registra parte del acorde, seguramente no estás cubriendo todos los agujeros por igual; ensancha la embocadura en vez de soplar más fuerte.
+
+# Lección: división de octava (bloqueo de lengua)
+lesson-octave-split-title = Divisiones de Octava
+lesson-octave-split-body =
+    El bloqueo de lengua permite tocar dos agujeros a la vez, silenciando los que quedan entre ellos — el clásico es la división de octava.
+    Apoya la lengua plana sobre la armónica, cubriendo los dos agujeros del medio, y deja pasar el aire solo por el agujero de cada lado.
+    En los agujeros 1 y 4 soplados juntos suenan Do4 y Do5 — la misma nota, una octava más arriba. Los agujeros 2 y 5, y los agujeros 3 y 6, funcionan igual.
+    En este ejercicio, los dos agujeros de cada división deben sonar juntos, igual que un acorde — el bloqueo de lengua en sí no se puede verificar por el micrófono, pero la octava que produce sí.
+    Si solo oyes una nota, revisa que la lengua cubra del todo los agujeros del medio, en vez de quedar ladeada hacia un lado.
+
 # Lección: forma de las manos / wah
 lesson-hand-wah-title = La Forma de las Manos y el Wah
 lesson-hand-wah-body =

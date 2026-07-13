@@ -85,6 +85,18 @@ pub fn is_clean_attack(harp_pitches: &HashSet<u8>, expected: u8) -> bool {
     harp_pitches.len() == 1 && harp_pitches.contains(&expected)
 }
 
+// ── Chord target ─────────────────────────────────────────────────────────────
+
+/// True when every pitch in `expected` (a chord or octave-split target — two
+/// or more holes meant to sound at once) is simultaneously present in
+/// `harp_pitches` right now. Unlike a single note's exact-one-pitch match,
+/// playing the same pitches one at a time doesn't satisfy this — they must
+/// all be sounding together. `expected` empty is never "sounding" (an empty
+/// chord target is a caller bug, not a trivially-satisfied one).
+pub fn chord_is_sounding(expected: &[u8], harp_pitches: &HashSet<u8>) -> bool {
+    !expected.is_empty() && expected.iter().all(|m| harp_pitches.contains(m))
+}
+
 /// Score multiplier for the current combo level.
 pub fn compute_multiplier(combo: u32, base_mult: f32, step_mult: f32, max_mult: f32) -> f32 {
     (base_mult + combo as f32 * step_mult).min(max_mult)
@@ -441,6 +453,40 @@ mod tests {
     #[test]
     fn dirty_when_nothing_is_sounding() {
         assert!(!is_clean_attack(&HashSet::new(), 60));
+    }
+
+    // ── chord_is_sounding ─────────────────────────────────────────────────────
+
+    #[test]
+    fn chord_sounds_when_every_pitch_is_present_at_once() {
+        let harp_pitches = HashSet::from([60u8, 64u8]);
+        assert!(chord_is_sounding(&[60, 64], &harp_pitches));
+    }
+
+    #[test]
+    fn chord_extra_pitches_dont_disqualify_it() {
+        // A third, unrelated pitch sounding alongside the target chord
+        // doesn't unmake the chord — unlike `is_clean_attack`, this isn't a
+        // single-note precision check.
+        let harp_pitches = HashSet::from([60u8, 64u8, 67u8]);
+        assert!(chord_is_sounding(&[60, 64], &harp_pitches));
+    }
+
+    #[test]
+    fn chord_is_not_sounding_when_only_part_of_it_plays() {
+        let harp_pitches = HashSet::from([60u8]);
+        assert!(!chord_is_sounding(&[60, 64], &harp_pitches));
+    }
+
+    #[test]
+    fn chord_is_not_sounding_when_nothing_plays() {
+        assert!(!chord_is_sounding(&[60, 64], &HashSet::new()));
+    }
+
+    #[test]
+    fn an_empty_chord_target_never_sounds() {
+        let harp_pitches = HashSet::from([60u8, 64u8]);
+        assert!(!chord_is_sounding(&[], &harp_pitches));
     }
 
     // ── compute_multiplier ────────────────────────────────────────────────────

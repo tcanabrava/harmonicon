@@ -23,9 +23,9 @@ mod wait_freeze_overlay;
 use bevy::prelude::*;
 pub use crate::scoring::{HitQuality, NoteOutcome, classify_note, compute_points, sustain_points};
 use crate::scoring::{
-    AttackGate, VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC, combo_label, compute_multiplier,
-    is_clean_attack, measured_oscillation_hz, measured_relative_oscillation_hz,
-    oscillation_matches_rate, should_decay_combo,
+    AttackGate, VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC, chord_is_sounding, combo_label,
+    compute_multiplier, is_clean_attack, measured_oscillation_hz,
+    measured_relative_oscillation_hz, oscillation_matches_rate, should_decay_combo,
 };
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -405,8 +405,15 @@ pub struct SongStats {
     /// harp-producible pitch sounded alongside the expected one — separate
     /// from the technique buckets above (which are keyed by chart modifier,
     /// not attack cleanliness) and tallied for every hit regardless of its
-    /// modifiers, or lack of them.
+    /// modifiers, or lack of them. Never tallied for a chord/octave-split
+    /// note (see `chord` below) — clean-attack and chord are mutually
+    /// exclusive checks on the same onset.
     pub clean_attack: TechniqueStats,
+    /// Onset hits/misses for chord/octave-split notes (non-empty
+    /// `ScheduledNote::chord_pitches`) — one tally per sibling note of the
+    /// chord, not per musical chord struck, same as every other technique
+    /// bucket here counts per-note.
+    pub chord: TechniqueStats,
 }
 
 impl SongStats {
@@ -540,6 +547,19 @@ pub struct ScheduledNote {
     /// section, not an `Option`; charts with no `phrase` tags get a single
     /// implicit section (index 0) covering the whole track.
     pub phrase_section: usize,
+    /// The full set of expected MIDI pitches for this note's chart
+    /// `TrackItem`, shared identically by every sibling `ScheduledNote` the
+    /// item produced (one per `NoteEvent` — see `gameplay_2d::
+    /// build_combined_notes`/`gameplay_3d::build_notes_3d`). Empty for an
+    /// ordinary single-event item, which is the signal `score_notes` uses to
+    /// skip the simultaneity check entirely — nothing about single-note
+    /// charts changes. Non-empty (a `PlayMode::Chord`/`Split` item — two or
+    /// more `events` at the same `time`) means this note's own onset only
+    /// counts as "playing" while *every* pitch in the set sounds together,
+    /// not just its own — the chord-target primitive `docs/lessons_plan.md`
+    /// calls for, built on the chart format's existing multi-event
+    /// `TrackItem` shape rather than a new schema field.
+    pub chord_pitches: Vec<u8>,
 }
 
 /// Every note in the loaded chart, sorted by `time` ascending (matches chart
@@ -1324,10 +1344,15 @@ fn score_notes(
         // A note counts as "playing" only on a fresh attack: the pitch must be
         // sounding and not already consumed by an earlier note in this sustain.
         // A note with no valid `expected_pitch` (the harp can't produce it) can
-        // never be "playing".
-        let playing = note
-            .expected_pitch
-            .is_some_and(|m| gate.is_fresh(m, harp_pitches.contains(&m)));
+        // never be "playing". A chord/octave-split note (non-empty
+        // `chord_pitches`) additionally requires every sibling pitch of its
+        // `TrackItem` to be sounding at the same instant — its own freshness
+        // alone isn't enough, or a chord could be "hit" one note at a time.
+        let playing = note.expected_pitch.is_some_and(|m| {
+            gate.is_fresh(m, harp_pitches.contains(&m))
+                && (note.chord_pitches.is_empty()
+                    || chord_is_sounding(&note.chord_pitches, &harp_pitches))
+        });
 
         match classify_note(
             offset,
@@ -1340,6 +1365,9 @@ fn score_notes(
                 note.missed = true;
                 stats.miss += 1;
                 stats.record_technique(&note.modifiers, false);
+                if !note.chord_pitches.is_empty() {
+                    bump(&mut stats.chord, false);
+                }
                 if config.combo_enabled {
                     score.combo = 0;
                 }
@@ -1366,7 +1394,14 @@ fn score_notes(
                 // `playing` was only true above if `expected_pitch` is `Some`.
                 if let Some(m) = note.expected_pitch {
                     gate.consume(m);
-                    bump(&mut stats.clean_attack, is_clean_attack(&harp_pitches, m));
+                    if note.chord_pitches.is_empty() {
+                        // `is_clean_attack` means "nothing else sounded" —
+                        // meaningless for a chord note, where other pitches
+                        // sounding is the whole point; tracked separately below.
+                        bump(&mut stats.clean_attack, is_clean_attack(&harp_pitches, m));
+                    } else {
+                        bump(&mut stats.chord, true);
+                    }
                 }
                 match quality {
                     HitQuality::Perfect => stats.perfect += 1,
@@ -1694,6 +1729,7 @@ mod tests {
             pitch_samples: Vec::new(),
             amp_samples: Vec::new(),
             phrase_section: 0,
+            chord_pitches: Vec::new(),
         }
     }
 
@@ -2218,6 +2254,7 @@ mod tests {
             pitch_samples: Vec::new(),
             amp_samples: Vec::new(),
             phrase_section: 0,
+            chord_pitches: Vec::new(),
         }
     }
 
@@ -2363,6 +2400,95 @@ mod tests {
         let stats = world.resource::<SongStats>();
         assert_eq!(stats.clean_attack.hits, 0);
         assert_eq!(stats.clean_attack.misses, 1);
+    }
+
+    // ── score_notes (chord-target simultaneity) ──────────────────────────────
+
+    /// Two `ScheduledNote`s from one chord `TrackItem` (same `time`, sharing
+    /// `chord_pitches: [60, 64]`), one per sibling pitch — the shape
+    /// `gameplay_2d::build_combined_notes`/`gameplay_3d::build_notes_3d`
+    /// actually produce for a multi-event item.
+    fn chord_test_notes() -> Vec<ScheduledNote> {
+        let base = overlap_test_note(0.49);
+        vec![
+            ScheduledNote {
+                hole: 1,
+                expected_pitch: Some(60),
+                chord_pitches: vec![60, 64],
+                ..base.clone()
+            },
+            ScheduledNote {
+                hole: 2,
+                expected_pitch: Some(64),
+                chord_pitches: vec![60, 64],
+                ..base
+            },
+        ]
+    }
+
+    fn chord_test_world(active: Vec<PitchInfo>) -> World {
+        let mut world = World::new();
+        world.insert_resource(GameplayClock::new(0.5));
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(ActivePitches(active));
+        world.insert_resource(AudioFrame::default());
+        world.insert_resource(ValidHarpNotes(HashSet::from([60u8, 64u8])));
+        world.insert_resource(ScoringConfig::default());
+        world.insert_resource(AudioSettings::default());
+        world.insert_resource(Score::default());
+        world.insert_resource(SongStats::default());
+        world.insert_resource(HitFeedback::default());
+        world.insert_resource(PitchGate::default());
+        world.init_resource::<Messages<NoteScored>>();
+        world.insert_resource(SongNotes {
+            notes: chord_test_notes(),
+            cursor: 0,
+        });
+        world
+    }
+
+    #[test]
+    fn score_notes_hits_both_chord_notes_when_both_pitches_sound_together() {
+        let mut world = chord_test_world(vec![
+            pitch_info(60, "C", 4, midi_to_freq_hz(60.0)),
+            pitch_info(64, "E", 4, midi_to_freq_hz(64.0)),
+        ]);
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+
+        let notes = &world.resource::<SongNotes>().notes;
+        assert!(notes[0].hit, "60 should hit — both pitches sounded together");
+        assert!(notes[1].hit, "64 should hit — both pitches sounded together");
+        let stats = world.resource::<SongStats>();
+        assert_eq!(stats.chord.hits, 2);
+        assert_eq!(stats.clean_attack.total(), 0, "chord notes aren't clean-attack notes");
+    }
+
+    #[test]
+    fn score_notes_does_not_hit_a_chord_note_from_only_one_of_its_pitches() {
+        // Only 60 sounds — 64 never joins it. Neither half of the chord
+        // should score just because its own pitch happens to be present.
+        let mut world = chord_test_world(vec![pitch_info(60, "C", 4, midi_to_freq_hz(60.0))]);
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+
+        let notes = &world.resource::<SongNotes>().notes;
+        assert!(!notes[0].hit, "60 alone must not satisfy the chord");
+        assert!(!notes[1].hit);
+    }
+
+    #[test]
+    fn score_notes_misses_a_chord_note_that_never_sounded_together_with_its_partner() {
+        let mut world = chord_test_world(vec![]);
+        world.resource_mut::<GameplayClock>().set_free(10.0); // well past miss_window
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+
+        let stats = world.resource::<SongStats>();
+        assert_eq!(stats.chord.misses, 2);
     }
 
     // ── update_score_display (message-gated HUD writes) ─────────────────────
@@ -2591,6 +2717,7 @@ mod tests {
                 pitch_samples: Vec::new(),
                 amp_samples: Vec::new(),
                 phrase_section: 0,
+                chord_pitches: Vec::new(),
             }
         }
         fn pitch(note: &str, octave: i32) -> PitchInfo {

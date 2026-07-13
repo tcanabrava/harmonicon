@@ -299,6 +299,7 @@ mod tests {
             pitch_samples: Vec::new(),
             amp_samples: Vec::new(),
             phrase_section: section,
+            chord_pitches: Vec::new(),
         }
     }
 
@@ -483,6 +484,7 @@ mod tests {
             pitch_samples: Vec::new(),
             amp_samples: Vec::new(),
             phrase_section: 0,
+            chord_pitches: Vec::new(),
         }
     }
 
