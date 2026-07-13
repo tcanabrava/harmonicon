@@ -252,6 +252,7 @@ pub(super) fn setup_adaptive_difficulty(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     profile: Res<PlayerProfile>,
+    lesson: Option<Res<crate::lessons::LessonContext>>,
     mut adaptive: ResMut<AdaptiveDifficulty>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -263,10 +264,17 @@ pub(super) fn setup_adaptive_difficulty(
     let song_end = last_note_end(&chart.track, &chart.timing);
     let sections = group_phrase_sections(&items, song_end);
 
+    // A lesson chart is a curriculum unit, not a song being learned
+    // phrase-by-phrase: its pass criteria assume every note is present, so
+    // adaptive gating stays off for lesson runs regardless of any profile
+    // record.
+    let enabled_for_lesson = lesson.is_none();
+
     let key = manifest.path.display().to_string();
     let record = profile.songs.get(&key);
     *adaptive = AdaptiveDifficulty {
-        enabled: record.map(|r| r.adaptive_difficulty_enabled).unwrap_or(true),
+        enabled: enabled_for_lesson
+            && record.map(|r| r.adaptive_difficulty_enabled).unwrap_or(true),
         learned: record.map(|r| r.phrase_learned.clone()).unwrap_or_default(),
         sections,
     };

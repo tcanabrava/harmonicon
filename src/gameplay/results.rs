@@ -4,10 +4,13 @@
 
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy_fluent::Localization;
 
 use crate::dialogs::button;
+use crate::lessons::{LessonContext, lesson_passed};
+use crate::localization::LocalizationExt;
 use crate::menu::{AppState, ReturnToSongList, SelectedSong};
-use crate::profile::{PlayerProfile, record_play, save_profile};
+use crate::profile::{PlayerProfile, record_lesson, record_play, save_profile};
 use crate::settings::AudioSettings;
 use crate::song::SongManifest;
 
@@ -88,34 +91,52 @@ pub(super) fn setup(
     mut profile: ResMut<PlayerProfile>,
     song_notes: Res<SongNotes>,
     adaptive: Res<AdaptiveDifficulty>,
+    lesson: Option<Res<LessonContext>>,
+    loc: Res<Localization>,
 ) {
     let acc = accuracy(&stats);
     let g = grade(acc);
     let hits = stats.perfect + stats.good + stats.delayed;
     let mean_ms = mean_offset_ms(&stats);
+    let technique_accuracy: Vec<(&str, f32)> = technique_fields(&stats)
+        .into_iter()
+        .filter_map(|(name, s)| s.accuracy().map(|a| (name, a)))
+        .collect();
+
+    // A lesson run is judged against its pass criteria and recorded under
+    // the lesson's own id — it deliberately does *not* touch the per-song
+    // best/adaptive records below (a lesson chart isn't a song the best-
+    // scores screen should list, and its learned-fraction is meaningless).
+    let lesson_result = lesson.as_ref().map(|ctx| {
+        let passed = lesson_passed(ctx.pass_criteria.as_ref(), acc, &technique_accuracy);
+        let record = profile.lessons.entry(ctx.lesson_id.clone()).or_default();
+        record_lesson(record, passed, acc);
+        save_profile(&profile);
+        passed
+    });
 
     // Record this play against the song's persisted best — keyed by the
     // manifest's own path (stable across restarts, unlike the `Handle` in
     // `SelectedSong`), so repeated plays only ever improve what's shown here,
     // never regress it because of one worse run. Saved immediately (not
     // debounced) so quitting right after still keeps the new best.
-    let new_best = manifests.get(&selected.0).map(|manifest| {
-        let technique_accuracy: Vec<(&str, f32)> = technique_fields(&stats)
-            .into_iter()
-            .filter_map(|(name, s)| s.accuracy().map(|a| (name, a)))
-            .collect();
-        let key = manifest.path.display().to_string();
-        let record = profile.songs.entry(key).or_default();
-        let improved = record_play(record, score.points, acc, &technique_accuracy);
-        bump_learned_sections(
-            &song_notes.notes,
-            adaptive.sections.len(),
-            &mut record.phrase_learned,
-        );
-        let best_score = record.best_score;
-        save_profile(&profile);
-        (improved, best_score)
-    });
+    let new_best = if lesson.is_some() {
+        None
+    } else {
+        manifests.get(&selected.0).map(|manifest| {
+            let key = manifest.path.display().to_string();
+            let record = profile.songs.entry(key).or_default();
+            let improved = record_play(record, score.points, acc, &technique_accuracy);
+            bump_learned_sections(
+                &song_notes.notes,
+                adaptive.sections.len(),
+                &mut record.phrase_learned,
+            );
+            let best_score = record.best_score;
+            save_profile(&profile);
+            (improved, best_score)
+        })
+    };
 
     commands
         .spawn((
@@ -154,6 +175,27 @@ pub(super) fn setup(
                     ..default()
                 },
             ));
+
+            // Lesson verdict, when this run was a lesson.
+            if let Some(passed) = lesson_result {
+                let (key, color) = if passed {
+                    ("lesson-complete-banner", Color::srgb(0.45, 0.95, 0.50))
+                } else {
+                    ("lesson-failed-banner", Color::srgb(0.95, 0.62, 0.30))
+                };
+                root.spawn((
+                    Text::new(String::from(loc.msg(key))),
+                    TextFont {
+                        font_size: FontSize::Px(22.0),
+                        ..default()
+                    },
+                    TextColor(color),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(6.0)),
+                        ..default()
+                    },
+                ));
+            }
 
             // Stat lines.
             let rows = [

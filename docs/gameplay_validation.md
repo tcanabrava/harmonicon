@@ -96,6 +96,14 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 - [ ] **Restart** reloads the same song from the countdown. *(automated for the state change)*
 - [ ] **Quit Song** returns to the **song list** (not the main menu). *(automated)*
 
+### Lessons
+- [ ] **Main menu shows "Lessons" directly below "Play"** (themed coords in `default`/`BluesNoir`; flex-flow otherwise), and it opens a unit-grouped lesson list. On a fresh profile: "Playing a Single Note" and "Reading the 12-Bar Blues Grid" are clickable; "Hand Shape and the Wah" shows dimmed with a 🔒 (its prerequisite is single-note). *(manual: rendering; the unlock logic is unit-tested — `lessons::tests::is_unlocked_*`)*
+- [ ] **Reader page** shows the localized body text (wrapped, not spanning the full window), a gold "Goal: ..." line for chart lessons, and Start Lesson / Back. The 12-bar lesson shows "Mark as Done" instead of Start; clicking it returns to the list with a ✓ on that lesson. Switch locale (pt-BR/es-ES) and confirm the body text follows. *(manual: rendering + localization)*
+- [ ] **Start Lesson launches the drill through normal 2D gameplay**: countdown, falling notes, metronome — with **every note present** (adaptive difficulty must not gate lesson notes, even after a prior partial run). The single-note drill is silent backing + metronome by design. *(manual; the adaptive-off-for-lessons gate is code-reviewed but needs a live run to confirm notes appear)*
+- [ ] **Results screen judges the lesson**: a green "LESSON PASSED" (≥60% accuracy on the single-note drill) or orange goal-not-reached banner appears under the grade; no "Best score"/"NEW BEST" song row for lesson runs. Retry keeps judging as a lesson. Continue (or Esc, or pause→Quit Song) returns to the **lesson list**, not the song list. *(manual: rendering + flow; the pass judgment is unit-tested — `lessons::tests::lesson_passed_*` and `accuracy_criterion_*`/`technique_criterion_*`)*
+- [ ] **Passing single-note unlocks hand-wah** on the next visit to the list (🔒 gone, button clickable), and the passed lesson shows ✓ but stays replayable. The pass survives a game restart (`profile.json`). *(manual; persistence logic unit-tested — `profile::tests::*lesson*`)*
+- [ ] **Hand-wah drill passes on the wah**, not just the pitch: holding clean steady notes without cupping should fail the ≥50% wah-technique goal; opening/closing the cup ~2×/second on the held notes should pass it. *(manual: needs a real mic + hands)*
+
 ## Acceptance criteria → coverage
 
 - Main gameplay chain runs without errors in the observed modes — *manual run + automated state/teardown tests.*

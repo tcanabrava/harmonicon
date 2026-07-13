@@ -18,6 +18,7 @@ use super::dialogs::button;
 
 mod calibration;
 mod credits;
+mod lessons;
 mod options;
 
 mod theme_picker;
@@ -83,6 +84,10 @@ pub(crate) enum MenuPage {
     ModeSelect,
     Options,
     Theme,
+    /// Curriculum list, grouped by unit (see `crate::lessons`).
+    Lessons,
+    /// One lesson's instructional page (+ Start for chart-backed lessons).
+    LessonReader,
 }
 
 // ── Public resources ──────────────────────────────────────────────────────────
@@ -106,6 +111,7 @@ impl Plugin for MenuPlugin {
         app.init_state::<AppState>()
             .add_sub_state::<MenuPage>()
             .init_resource::<SelectedArtist>()
+            .init_resource::<lessons::SelectedLesson>()
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
@@ -128,6 +134,10 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::SongList), cleanup_menu)
             .add_systems(OnEnter(MenuPage::ModeSelect), setup_mode_select)
             .add_systems(OnExit(MenuPage::ModeSelect), cleanup_menu)
+            .add_systems(OnEnter(MenuPage::Lessons), lessons::setup_lessons_menu)
+            .add_systems(OnExit(MenuPage::Lessons), cleanup_menu)
+            .add_systems(OnEnter(MenuPage::LessonReader), lessons::setup_lesson_reader)
+            .add_systems(OnExit(MenuPage::LessonReader), cleanup_menu)
             .add_systems(
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
@@ -158,10 +168,11 @@ fn handle_menu_escape(
     }
     let target = match page.get() {
         MenuPage::Main => return,
-        MenuPage::Play | MenuPage::Options => MenuPage::Main,
+        MenuPage::Play | MenuPage::Options | MenuPage::Lessons => MenuPage::Main,
         MenuPage::ArtistList | MenuPage::ModeSelect => MenuPage::Play,
         MenuPage::SongList => MenuPage::ArtistList,
         MenuPage::Theme => MenuPage::Options,
+        MenuPage::LessonReader => MenuPage::Lessons,
     };
     next_page.set(target);
 }
@@ -426,6 +437,18 @@ fn setup_main_menu(
         &btn_mats,
         "Main",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-lessons"),
+        Some("Lessons"),
+        &theme,
+        &btn_mats,
+        "Main",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::Lessons)
+        },
     );
     spawn_button(
         &mut commands,
@@ -734,12 +757,24 @@ pub(super) fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<Men
 /// On entering the menu, jump straight to the song list if we just quit a song
 /// (so "Quit Song" returns to the list, not the main menu). Otherwise the menu
 /// opens on its default page (Main), unless a return-to flag says otherwise.
+/// A finished/quit *lesson* run returns to the lesson list instead, and its
+/// [`LessonContext`] ends here — the menu is the boundary where a lesson run
+/// stops being in flight (Results→Retry never passes through the menu, so
+/// retries keep their context).
 fn route_menu_entry(
+    lesson: Option<Res<crate::lessons::LessonContext>>,
     mut ret_song: ResMut<ReturnToSongList>,
     mut ret_opts: ResMut<ReturnToOptions>,
     mut next_page: ResMut<NextState<MenuPage>>,
+    mut commands: Commands,
 ) {
-    if ret_song.0 {
+    if lesson.is_some() {
+        commands.remove_resource::<crate::lessons::LessonContext>();
+        // "Quit Song" sets this unconditionally; for a lesson run the lesson
+        // list is the right place to land, so the flag is consumed here.
+        ret_song.0 = false;
+        next_page.set(MenuPage::Lessons);
+    } else if ret_song.0 {
         ret_song.0 = false;
         next_page.set(MenuPage::SongList);
     } else if ret_opts.0 {

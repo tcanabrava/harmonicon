@@ -111,3 +111,48 @@ editor-harmonica-toggle-tooltip = Click to switch between Diatonic and Chromatic
 editor-field-key-tooltip = Click to cycle through harp keys
 editor-field-position-tooltip = Click to cycle through playing positions
 editor-browse-tooltip = Choose a background-music audio file for this chart
+
+# Lessons — menu, reader, results verdict
+menu-lessons = Lessons
+no-lessons-found = No lessons found. Add folders under assets/lessons/<unit>/<lesson>/
+lesson-locked = locked
+lesson-passed = Passed
+lesson-start = Start Lesson
+lesson-mark-done = Mark as Done
+lesson-goal-accuracy = Goal: %pct%% overall accuracy
+lesson-goal-technique = Goal: %pct%% accuracy on %technique% notes
+lesson-goal-finish = Goal: play it through to the end
+lesson-complete-banner = LESSON PASSED
+lesson-failed-banner = Goal not reached — read the lesson again and retry
+
+# Lessons — unit headings (keyed by each lesson.json's "unit" field)
+lesson-unit-blowing = Unit 1 · Blowing the Harmonica
+lesson-unit-rhythm = Unit 2 · Counting the Blues
+
+# Lesson: single note
+lesson-single-note-title = Playing a Single Note
+lesson-single-note-body =
+    The harmonica's biggest beginner hurdle: getting one clean note instead of a chord of neighbours.
+    Pucker your lips as if whistling, or say the syllable "too" — the opening should be barely wider than one hole.
+    Relax: the harmonica goes deep between your lips, resting on the moist inner part, not gripped by the dry edge.
+    Tilt the back of the harmonica slightly upward and let your jaw drop so the air moves slow and warm, from the belly.
+    In this drill, long notes on holes 4, 5 and 6 scroll toward the hit line. Breathe each one gently — volume doesn't matter, purity does.
+    If you hear two notes at once, don't press harder; narrow the opening a touch and slow your breath.
+
+# Lesson: hand shape / wah
+lesson-hand-wah-title = Hand Shape and the Wah
+lesson-hand-wah-body =
+    Your hands are the harmonica's tone control. Cup them around the back of the harp to make a sealed air chamber, then open and close the seal to speak: "wah".
+    Hold the harp between the thumb and index finger of one hand, and seal the other hand around the back like a clamshell.
+    Closed cup = dark, muffled tone. Open cup = bright and loud. Opening the cup rhythmically while a note sounds makes the classic wah-wah.
+    In this drill, hold each note steadily and open-close your cup about twice per second — the game listens for that pulse in your sound.
+    Keep the breath constant; only the hands move. If nothing registers, tighten the cup seal — most of the effect lives in the last centimetre of closure.
+
+# Lesson: reading the 12-bar grid
+lesson-twelve-bar-title = Reading the 12-Bar Blues Grid
+lesson-twelve-bar-body =
+    Nearly every blues song follows the same 12-bar cycle — learn to read it once and you can follow along with any blues jam on the planet.
+    Each cell in the grid is one bar of four beats. The Roman numerals name the chords: I is the home chord, IV the middle voyage, V the turnaround tension.
+    The classic layout: four bars of I, two bars of IV, two bars of I, one bar of V, one of IV, and two final bars of I (the last often swaps to V to launch the next chorus — the "turnaround").
+    Count it out loud: "ONE two three four, TWO two three four..." — twelve bars, then the cycle repeats.
+    You'll see this grid live in Jam Session, where the current bar lights up as the backing plays. Open a Jam Session afterwards and just watch a few cycles go by, counting along, before you play a single note.

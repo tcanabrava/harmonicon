@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: long held notes with a ~2 Hz hand wah on a C diatonic. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Hand Wah Drill",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 60,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [ { "tick": 0, "bpm": 60 } ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "2nd",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+      "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+    }
+  },
+  "track": [
+    { "id": "wah_draw2_a", "time": 0.0,  "duration": 4.0, "phrase": "Draw 2", "play_mode": "single",
+      "events": [{ "hole": 2, "action": "draw", "note": "G4",
+                   "modifiers": [{ "type": "wah-wah", "oscillation_hz": 2.0 }] }] },
+    { "id": "wah_draw2_b", "time": 6.0,  "duration": 4.0, "play_mode": "single",
+      "events": [{ "hole": 2, "action": "draw", "note": "G4",
+                   "modifiers": [{ "type": "wah-wah", "oscillation_hz": 2.0 }] }] },
+    { "id": "wah_blow4_a", "time": 12.0, "duration": 4.0, "phrase": "Blow 4", "play_mode": "single",
+      "events": [{ "hole": 4, "action": "blow", "note": "C5",
+                   "modifiers": [{ "type": "wah-wah", "oscillation_hz": 2.0 }] }] },
+    { "id": "wah_blow4_b", "time": 18.0, "duration": 4.0, "play_mode": "single",
+      "events": [{ "hole": 4, "action": "blow", "note": "C5",
+                   "modifiers": [{ "type": "wah-wah", "oscillation_hz": 2.0 }] }] },
+    { "id": "wah_draw2_c", "time": 24.0, "duration": 4.0, "phrase": "Draw 2 again", "play_mode": "single",
+      "events": [{ "hole": 2, "action": "draw", "note": "G4",
+                   "modifiers": [{ "type": "wah-wah", "oscillation_hz": 2.0 }] }] },
+    { "id": "wah_draw2_d", "time": 30.0, "duration": 4.0, "play_mode": "single",
+      "events": [{ "hole": 2, "action": "draw", "note": "G4",
+                   "modifiers": [{ "type": "wah-wah", "oscillation_hz": 2.0 }] }] }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

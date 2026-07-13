@@ -14,6 +14,7 @@ use harmonicon::audio_system::pitch_detect::{AudioFrame, PitchRange};
 use harmonicon::audio_system::{audio_input, pitch_detect, pitch_detect::PitchEvent};
 use harmonicon::dialogs::ui_scale::change_scaling;
 use harmonicon::gameplay::GameplayPlugin;
+use harmonicon::lessons::LessonsPlugin;
 use harmonicon::localization::LocalizationPlugin;
 use harmonicon::menu::{AppState, MenuPlugin};
 use harmonicon::profile::ProfilePlugin;
@@ -66,6 +67,7 @@ fn main() {
     .add_plugins((
         AssetsManagementPlugin,
         ThemePlugin,
+        LessonsPlugin,
         LocalizationPlugin,
         SongPlugin,
         MenuPlugin,

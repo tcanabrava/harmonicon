@@ -1,0 +1,8 @@
+{
+  "id": "single-note",
+  "unit": "blowing",
+  "title_key": "lesson-single-note-title",
+  "body_key": "lesson-single-note-body",
+  "chart": "song/chart.harpchart",
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

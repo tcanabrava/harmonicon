@@ -413,9 +413,9 @@ fn update_mute_label(
     muted: Res<MetronomeMuted>,
     mut labels: Query<(&mut Text, &mut TextColor), With<MetronomeMuteLabel>>,
 ) {
-    // written every frame, like update_score_display: the mute state outlives
-    // the label (it survives across songs), so a change guard would leave a
-    // freshly spawned label stale.
+    // Written every frame: the mute state outlives the label (it survives
+    // across songs), so a change guard would leave a freshly spawned label
+    // stale.
     for (mut text, mut color) in &mut labels {
         if muted.0 {
             *text = Text::new("click: off");

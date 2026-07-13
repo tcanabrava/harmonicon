@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "harmonicon/lesson",
+  "title": "Harmonicon Lesson Manifest",
+  "description": "One lesson in the curriculum: localized title/body keys, an optional playable chart, prerequisites, and pass criteria.",
+  "type": "object",
+  "required": ["id", "unit", "title_key", "body_key"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier, unique across all lessons. Used as the profile key and in other lessons' prerequisites — never rename one that has shipped."
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unit identifier grouping lessons in the menu. Localized via the Fluent key `lesson-unit-<unit>`."
+    },
+    "title_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Fluent key for the lesson's title."
+    },
+    "body_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Fluent key for the lesson's instructional body text."
+    },
+    "chart": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to a .harpchart, relative to the lesson's own directory. Absent = instructional-only lesson (no playable drill)."
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Lesson ids that must be passed before this one unlocks."
+    },
+    "pass_criteria": {
+      "type": "object",
+      "required": ["type"],
+      "oneOf": [
+        {
+          "required": ["type", "threshold"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "accuracy" },
+            "threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "description": "Minimum overall weighted accuracy (0..1) to pass."
+            }
+          }
+        },
+        {
+          "required": ["type", "technique", "threshold"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "technique" },
+            "technique": {
+              "type": "string",
+              "enum": ["normal", "bend", "vibrato", "wah-wah", "overblow", "overdraw", "slide"],
+              "description": "Technique bucket name — the same vocabulary SongStats/profile use."
+            },
+            "threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "description": "Minimum accuracy (0..1) on that technique's notes to pass."
+            }
+          }
+        }
+      ],
+      "description": "How a chart-backed lesson is judged at the results screen. Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
+    }
+  }
+}

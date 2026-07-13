@@ -109,3 +109,48 @@ editor-harmonica-toggle-tooltip = Haz clic para alternar entre armónica Diatón
 editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación
 editor-browse-tooltip = Elegir un archivo de audio de música de fondo para esta partitura
+
+# Lecciones — menú, lector, veredicto en resultados
+menu-lessons = Lecciones
+no-lessons-found = No se encontraron lecciones. Añade carpetas en assets/lessons/<unidad>/<lección>/
+lesson-locked = bloqueada
+lesson-passed = Superada
+lesson-start = Empezar la Lección
+lesson-mark-done = Marcar como Hecha
+lesson-goal-accuracy = Objetivo: %pct%% de precisión general
+lesson-goal-technique = Objetivo: %pct%% de precisión en las notas de %technique%
+lesson-goal-finish = Objetivo: tocarla hasta el final
+lesson-complete-banner = LECCIÓN SUPERADA
+lesson-failed-banner = Objetivo no alcanzado — relee la lección e inténtalo de nuevo
+
+# Lecciones — títulos de unidad (la clave sale del campo "unit" de cada lesson.json)
+lesson-unit-blowing = Unidad 1 · Soplar la Armónica
+lesson-unit-rhythm = Unidad 2 · Contar el Blues
+
+# Lección: nota única
+lesson-single-note-title = Tocar una Sola Nota
+lesson-single-note-body =
+    El mayor obstáculo del principiante con la armónica: sacar una nota limpia en lugar de un acorde de vecinas.
+    Frunce los labios como para silbar, o di la sílaba "tu" — la abertura debe ser apenas más ancha que un agujero.
+    Relájate: la armónica entra profunda entre los labios, apoyada en la parte interna húmeda, no sujeta por el borde seco.
+    Inclina la parte trasera de la armónica ligeramente hacia arriba y deja caer la mandíbula, para que el aire salga lento y cálido, desde el vientre.
+    En este ejercicio, notas largas en los agujeros 4, 5 y 6 se deslizan hacia la línea de acierto. Sopla cada una con suavidad — no importa el volumen, importa la pureza.
+    Si oyes dos notas a la vez, no aprietes: estrecha un poco la abertura y frena la respiración.
+
+# Lección: forma de las manos / wah
+lesson-hand-wah-title = La Forma de las Manos y el Wah
+lesson-hand-wah-body =
+    Tus manos son el control de timbre de la armónica. Ahuécalas detrás del instrumento formando una cámara de aire sellada, y abre y cierra el sello para que "hable": "ua".
+    Sujeta la armónica entre el pulgar y el índice de una mano, y sella la otra mano detrás, como una almeja.
+    Copa cerrada = sonido oscuro, apagado. Copa abierta = brillante y fuerte. Abrir la copa rítmicamente mientras suena una nota produce el clásico wah-wah.
+    En este ejercicio, sostén cada nota con firmeza y abre-y-cierra la copa unas dos veces por segundo — el juego escucha ese pulso en tu sonido.
+    Mantén la respiración constante; solo se mueven las manos. Si no registra nada, aprieta el sello de la copa — casi todo el efecto vive en el último centímetro del cierre.
+
+# Lección: leer la rejilla de 12 compases
+lesson-twelve-bar-title = Leer la Rejilla del Blues de 12 Compases
+lesson-twelve-bar-body =
+    Casi toda canción de blues sigue el mismo ciclo de 12 compases — aprende a leerlo una vez y podrás seguir cualquier jam de blues del planeta.
+    Cada celda de la rejilla es un compás de cuatro tiempos. Los números romanos nombran los acordes: I es el acorde de casa, IV el viaje intermedio, V la tensión del regreso.
+    El esquema clásico: cuatro compases de I, dos de IV, dos de I, uno de V, uno de IV y dos compases finales de I (el último suele cambiarse a V para lanzar el siguiente chorus — el "turnaround").
+    Cuéntalo en voz alta: "UN dos tres cuatro, DOS dos tres cuatro..." — doce compases, y el ciclo vuelve a empezar.
+    Verás esta rejilla en vivo en la Jam Session, donde el compás actual se ilumina mientras suena la base. Después de esta lección, abre una Jam Session y solo mira pasar unos ciclos, contando, antes de tocar una sola nota.

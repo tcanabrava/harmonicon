@@ -71,6 +71,21 @@ pub struct DrillRecord {
     pub hits: u32,
 }
 
+/// Cross-session result for one lesson, keyed by the lesson manifest's
+/// stable `id` in [`PlayerProfile::lessons`] — a plain string rather than a
+/// type from `crate::lessons`, same dependency reasoning as [`DrillRecord`].
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct LessonRecord {
+    /// Whether the lesson's pass criteria have ever been met. Once true it
+    /// stays true — a later worse run must not re-lock dependent lessons.
+    pub passed: bool,
+    /// High-water mark of overall accuracy across attempts (0 for
+    /// instructional-only lessons marked done from the reader).
+    pub best_accuracy: f32,
+    pub attempts: u32,
+}
+
 /// Cross-session player progress. Loaded once at startup and updated as the
 /// player finishes songs; see the module doc comment for the save policy.
 #[derive(Resource, Serialize, Deserialize, Clone, Debug, Default)]
@@ -79,6 +94,19 @@ pub struct PlayerProfile {
     pub songs: HashMap<String, SongRecord>,
     pub total_play_secs: f64,
     pub drills: HashMap<String, DrillRecord>,
+    pub lessons: HashMap<String, LessonRecord>,
+}
+
+impl PlayerProfile {
+    /// Ids of every lesson whose pass criteria have been met — the shape
+    /// `lessons::is_unlocked` takes for prerequisite gating.
+    pub fn passed_lesson_ids(&self) -> Vec<&str> {
+        self.lessons
+            .iter()
+            .filter(|(_, r)| r.passed)
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
 }
 
 /// Updates `record` with a just-finished play's result, keeping whichever
@@ -103,6 +131,15 @@ pub fn record_play(
         }
     }
     improved
+}
+
+/// Updates `record` with a just-finished lesson attempt. Like
+/// [`record_play`], marks only ever improve: a failed retry can't un-pass a
+/// lesson or lower its best accuracy.
+pub fn record_lesson(record: &mut LessonRecord, passed: bool, accuracy: f32) {
+    record.attempts += 1;
+    record.passed |= passed;
+    record.best_accuracy = record.best_accuracy.max(accuracy);
 }
 
 fn profile_path() -> Option<PathBuf> {
@@ -246,6 +283,50 @@ mod tests {
         record_play(&mut r, 50, 0.05, &[]);
         record_play(&mut r, 900, 0.9, &[]);
         assert_eq!(r.plays, 3);
+    }
+
+    // ── record_lesson ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn a_passed_lesson_stays_passed_after_a_failed_retry() {
+        let mut r = LessonRecord::default();
+        record_lesson(&mut r, true, 0.8);
+        record_lesson(&mut r, false, 0.2);
+        assert!(r.passed, "a worse retry must not un-pass a lesson");
+        assert!((r.best_accuracy - 0.8).abs() < f32::EPSILON);
+        assert_eq!(r.attempts, 2);
+    }
+
+    #[test]
+    fn a_failed_lesson_records_the_attempt_without_passing() {
+        let mut r = LessonRecord::default();
+        record_lesson(&mut r, false, 0.3);
+        assert!(!r.passed);
+        assert_eq!(r.attempts, 1);
+        assert!((r.best_accuracy - 0.3).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn passed_lesson_ids_lists_only_passed_lessons() {
+        let mut p = PlayerProfile::default();
+        p.lessons.insert(
+            "a".into(),
+            LessonRecord {
+                passed: true,
+                ..Default::default()
+            },
+        );
+        p.lessons.insert("b".into(), LessonRecord::default());
+        let mut ids = p.passed_lesson_ids();
+        ids.sort_unstable();
+        assert_eq!(ids, ["a"]);
+    }
+
+    #[test]
+    fn missing_lessons_field_defaults_to_empty_via_serde_default() {
+        // Older profile.json files predate the lessons map.
+        let p: PlayerProfile = serde_json::from_str("{}").unwrap();
+        assert!(p.lessons.is_empty());
     }
 
     #[test]

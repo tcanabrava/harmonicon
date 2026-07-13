@@ -114,6 +114,187 @@ fn harmonica_model_assets_are_complete() {
     );
 }
 
+// ── Lesson tests ──────────────────────────────────────────────────────────────
+
+/// Files a chart-backed lesson's directory must contain besides lesson.json —
+/// the same set a song needs, because the chart loads through the ordinary
+/// `SongManifest` pipeline, whose loader unconditionally depends on all of
+/// them (a missing one leaves `SongLoading` waiting forever).
+const LESSON_CHART_FILES: [&str; 3] = ["background.png", "elements.png", "song/music.ogg"];
+
+fn schema_validator(path: &str) -> jsonschema::Validator {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("Cannot read {path}: {e}"));
+    let value: serde_json::Value =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("Cannot parse {path}: {e}"));
+    jsonschema::validator_for(&value)
+        .unwrap_or_else(|e| panic!("{path} does not compile as a schema: {e}"))
+}
+
+fn validation_errors(validator: &jsonschema::Validator, instance: &serde_json::Value) -> String {
+    validator
+        .iter_errors(instance)
+        .map(|e| format!("    - {e} (at /{path})", path = e.instance_path))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Every bundled lesson must have a schema-valid `lesson.json`; a
+/// chart-backed lesson must ship the full song file set, and its chart must
+/// validate against the song schema. Lesson ids must be unique, and every
+/// prerequisite must name a lesson that exists (a typo'd prerequisite would
+/// lock a lesson forever).
+#[test]
+fn lesson_assets_are_complete_and_valid() {
+    let root = Path::new("assets/lessons");
+    assert!(root.is_dir(), "missing asset directory: {}", root.display());
+
+    let lesson_dirs: Vec<PathBuf> = subdirs(root)
+        .iter()
+        .flat_map(|unit| subdirs(unit))
+        .collect();
+    assert!(
+        !lesson_dirs.is_empty(),
+        "no lessons found under {}",
+        root.display()
+    );
+
+    let lesson_validator = schema_validator("assets/lesson_schema.dtd.json");
+    let chart_validator = schema_validator("assets/song_schema.dtd.json");
+
+    let mut report = String::new();
+    let mut ids: Vec<String> = Vec::new();
+    let mut prerequisites: Vec<(String, String)> = Vec::new(); // (lesson dir, prereq id)
+
+    for dir in &lesson_dirs {
+        let manifest_path = dir.join("lesson.json");
+        if !manifest_path.exists() {
+            report.push_str(&format!("  {}: missing lesson.json\n", label(dir)));
+            continue;
+        }
+        let text = std::fs::read_to_string(&manifest_path)
+            .unwrap_or_else(|e| panic!("Cannot read {}: {e}", manifest_path.display()));
+        let manifest: serde_json::Value = match serde_json::from_str(&text) {
+            Ok(v) => v,
+            Err(e) => {
+                report.push_str(&format!("  {}: JSON parse error: {e}\n", label(dir)));
+                continue;
+            }
+        };
+        let errors = validation_errors(&lesson_validator, &manifest);
+        if !errors.is_empty() {
+            report.push_str(&format!("  {}:\n{errors}\n", label(dir)));
+            continue;
+        }
+
+        if let Some(id) = manifest["id"].as_str() {
+            ids.push(id.to_string());
+        }
+        for p in manifest["prerequisites"].as_array().into_iter().flatten() {
+            if let Some(p) = p.as_str() {
+                prerequisites.push((label(dir), p.to_string()));
+            }
+        }
+
+        // Chart-backed lessons: the referenced chart + full song file set.
+        if let Some(chart_rel) = manifest["chart"].as_str() {
+            let chart_path = dir.join(chart_rel);
+            if !chart_path.exists() {
+                report.push_str(&format!(
+                    "  {}: missing referenced chart {chart_rel}\n",
+                    label(dir)
+                ));
+            } else {
+                let chart_text = std::fs::read_to_string(&chart_path)
+                    .unwrap_or_else(|e| panic!("Cannot read {}: {e}", chart_path.display()));
+                match serde_json::from_str::<serde_json::Value>(&chart_text) {
+                    Ok(chart) => {
+                        let errors = validation_errors(&chart_validator, &chart);
+                        if !errors.is_empty() {
+                            report.push_str(&format!(
+                                "  {} ({chart_rel}):\n{errors}\n",
+                                label(dir)
+                            ));
+                        }
+                    }
+                    Err(e) => report.push_str(&format!(
+                        "  {} ({chart_rel}): JSON parse error: {e}\n",
+                        label(dir)
+                    )),
+                }
+            }
+            let missing = missing_files(dir, &LESSON_CHART_FILES);
+            if !missing.is_empty() {
+                report.push_str(&format!(
+                    "  {}: missing {}\n",
+                    label(dir),
+                    missing.join(", ")
+                ));
+            }
+        }
+    }
+
+    let mut sorted_ids = ids.clone();
+    sorted_ids.sort_unstable();
+    sorted_ids.dedup();
+    if sorted_ids.len() != ids.len() {
+        report.push_str(&format!("  duplicate lesson ids in {ids:?}\n"));
+    }
+    for (dir, prereq) in prerequisites {
+        if !ids.contains(&prereq) {
+            report.push_str(&format!(
+                "  {dir}: prerequisite {prereq:?} names no existing lesson\n"
+            ));
+        }
+    }
+
+    assert!(report.is_empty(), "Lesson asset failures:\n{report}");
+}
+
+/// Every Fluent key a lesson manifest declares (`title_key`, `body_key`,
+/// `lesson-unit-<unit>`) must exist in the en-US locale — the parity test in
+/// `localization.rs` then guarantees every other locale has it too. A missing
+/// key would render as the raw key name in the menu.
+#[test]
+fn lesson_localization_keys_exist() {
+    let ftl = std::fs::read_to_string("assets/locales/en-US/main/ui.ftl")
+        .expect("en-US ui.ftl must exist");
+    let defined: Vec<&str> = ftl
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter_map(|l| l.split_once('=').map(|(k, _)| k.trim()))
+        .filter(|k| !k.is_empty())
+        .collect();
+
+    let root = Path::new("assets/lessons");
+    let mut report = String::new();
+    for dir in subdirs(root).iter().flat_map(|unit| subdirs(unit)) {
+        let Ok(text) = std::fs::read_to_string(dir.join("lesson.json")) else {
+            continue; // absence reported by lesson_assets_are_complete_and_valid
+        };
+        let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&text) else {
+            continue;
+        };
+        let mut needed: Vec<String> = Vec::new();
+        for field in ["title_key", "body_key"] {
+            if let Some(k) = manifest[field].as_str() {
+                needed.push(k.to_string());
+            }
+        }
+        if let Some(unit) = manifest["unit"].as_str() {
+            needed.push(format!("lesson-unit-{unit}"));
+        }
+        for key in needed {
+            if !defined.contains(&key.as_str()) {
+                report.push_str(&format!(
+                    "  {}: key {key:?} not defined in en-US ui.ftl\n",
+                    label(&dir)
+                ));
+            }
+        }
+    }
+    assert!(report.is_empty(), "Missing lesson locale keys:\n{report}");
+}
+
 // ── Theme tests ───────────────────────────────────────────────────────────────
 
 /// Loads the compiled JSON Schema validator for `theme_schema.dtd.json`.

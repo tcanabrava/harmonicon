@@ -109,3 +109,48 @@ editor-harmonica-toggle-tooltip = Clique para alternar entre gaita Diatônica e 
 editor-field-key-tooltip = Clique para alternar entre os tons da gaita
 editor-field-position-tooltip = Clique para alternar entre as posições de execução
 editor-browse-tooltip = Escolher um arquivo de áudio de música de fundo para esta partitura
+
+# Lições — menu, leitor, veredito nos resultados
+menu-lessons = Lições
+no-lessons-found = Nenhuma lição encontrada. Adicione pastas em assets/lessons/<unidade>/<lição>/
+lesson-locked = bloqueada
+lesson-passed = Concluída
+lesson-start = Começar a Lição
+lesson-mark-done = Marcar como Concluída
+lesson-goal-accuracy = Meta: %pct%% de precisão geral
+lesson-goal-technique = Meta: %pct%% de precisão nas notas de %technique%
+lesson-goal-finish = Meta: tocar até o fim
+lesson-complete-banner = LIÇÃO CONCLUÍDA
+lesson-failed-banner = Meta não atingida — releia a lição e tente de novo
+
+# Lições — títulos das unidades (chave vem do campo "unit" de cada lesson.json)
+lesson-unit-blowing = Unidade 1 · Soprando a Gaita
+lesson-unit-rhythm = Unidade 2 · Contando o Blues
+
+# Lição: nota única
+lesson-single-note-title = Tocando uma Nota Só
+lesson-single-note-body =
+    O maior obstáculo do iniciante na gaita: tirar uma nota limpa em vez de um acorde de vizinhas.
+    Faça bico como se fosse assobiar, ou diga a sílaba "tu" — a abertura deve ser pouco maior que um furo.
+    Relaxe: a gaita entra fundo entre os lábios, apoiada na parte interna úmida, não presa pela borda seca.
+    Incline o fundo da gaita levemente para cima e deixe o queixo cair, para o ar sair lento e quente, vindo da barriga.
+    Neste exercício, notas longas nos furos 4, 5 e 6 deslizam até a linha de acerto. Sopre cada uma com calma — não importa o volume, importa a pureza.
+    Se ouvir duas notas ao mesmo tempo, não force: estreite um pouco a abertura e desacelere o sopro.
+
+# Lição: formato das mãos / wah
+lesson-hand-wah-title = O Formato das Mãos e o Wah
+lesson-hand-wah-body =
+    Suas mãos são o controle de timbre da gaita. Feche-as em concha atrás do instrumento formando uma câmara de ar vedada, e abra e feche a vedação para ela "falar": "uá".
+    Segure a gaita entre o polegar e o indicador de uma mão, e vede a outra mão atrás, como uma concha.
+    Concha fechada = som escuro, abafado. Concha aberta = claro e forte. Abrir a concha em ritmo enquanto a nota soa produz o clássico wah-wah.
+    Neste exercício, sustente cada nota com firmeza e abra-e-feche a concha cerca de duas vezes por segundo — o jogo escuta esse pulso no seu som.
+    Mantenha o sopro constante; só as mãos se movem. Se nada registrar, aperte a vedação da concha — quase todo o efeito mora no último centímetro do fechamento.
+
+# Lição: lendo a grade de 12 compassos
+lesson-twelve-bar-title = Lendo a Grade do Blues de 12 Compassos
+lesson-twelve-bar-body =
+    Quase toda música de blues segue o mesmo ciclo de 12 compassos — aprenda a lê-lo uma vez e você acompanha qualquer roda de blues do planeta.
+    Cada célula da grade é um compasso de quatro tempos. Os algarismos romanos nomeiam os acordes: I é o acorde de casa, IV a viagem do meio, V a tensão do retorno.
+    O desenho clássico: quatro compassos de I, dois de IV, dois de I, um de V, um de IV e dois compassos finais de I (o último costuma virar V para lançar o próximo chorus — o "turnaround").
+    Conte em voz alta: "UM dois três quatro, DOIS dois três quatro..." — doze compassos, e o ciclo recomeça.
+    Você verá essa grade ao vivo na Jam Session, onde o compasso atual acende conforme a base toca. Depois desta lição, abra uma Jam Session e apenas observe alguns ciclos passarem, contando junto, antes de tocar qualquer nota.
