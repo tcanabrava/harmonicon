@@ -105,13 +105,19 @@ into each chord note's existing per-pitch `AttackGate` freshness check
 (still needed, still reused — a chord's individual pitches must each be
 freshly articulated too, not just simultaneously present), so a chord scores
 only when its sibling events are actually struck together, not one at a
-time. Tallied as a new `SongStats::chord: TechniqueStats` bucket (one entry
-per sibling note, same convention as every other technique bucket) — added
-to `lesson_schema.dtd.json`'s technique enum as `"chord"`, so it rides the
-same `PassCriteria::Technique` machinery `clean-attack` does, no new
-criterion variant. A chord note is deliberately excluded from `clean_attack`
-tallying (see primitive 1) — "only one pitch sounding" is the wrong question
-for a note that's supposed to have company.
+time. A chord note is also excluded from `clean_attack` tallying (see
+primitive 1) — "only one pitch sounding" is the wrong question for a note
+that's supposed to have company.
+
+No new `SongStats` bucket or `PassCriteria` variant, unlike `clean-attack`:
+once `chord_is_sounding` gates whether a chord note can be `Hit` at all, an
+out-of-sync chord already shows up as an ordinary miss in plain accuracy —
+there's no separate blind spot to track. (`clean-attack` genuinely needed
+its own bucket because `score_notes` only ever checked the *expected*
+pitch's presence; a breathy leak alongside it still scored as an ordinary
+hit, invisible to plain accuracy.) The two chord lessons below both pass on
+`{"type": "accuracy", "threshold": 0.5}` — plain accuracy, since every note
+in both charts is a chord note anyway.
 
 ### 3. Lesson manifest, loader, and menu page (structural, no new DSP)
 
@@ -158,9 +164,10 @@ for a note that's supposed to have company.
    → two new bundled lessons under `assets/lessons/01_blowing/`:
    `03_multiple_notes` (blow/draw triads on holes 1-2-3/2-3-4/4-5-6) and
    `04_octave_split` (tongue-blocked octave splits on holes 1+4/2+5/3+6),
-   both pass: ≥50% chord-technique accuracy. Both are original
-   scale/chord-tone drills, not melodic content — the safe-to-author subset
-   per `TODO.md`'s content-gap item.
+   both pass: ≥50% overall accuracy (every note in both charts is a chord
+   note, so plain accuracy already means "chord accuracy" here). Both are
+   original scale/chord-tone drills, not melodic content — the
+   safe-to-author subset per `TODO.md`'s content-gap item.
 4. Blues-scale-adherence stats accumulator → improvisation lesson (depends
    on nothing above; can move earlier if it's higher-value to ship first).
 5. Call-and-response (tracked as its own `PLAN.md` item since it's also a

@@ -5,5 +5,5 @@
   "body_key": "lesson-octave-split-body",
   "chart": "song/chart.harpchart",
   "prerequisites": ["multiple-notes"],
-  "pass_criteria": { "type": "technique", "technique": "chord", "threshold": 0.5 }
+  "pass_criteria": { "type": "accuracy", "threshold": 0.5 }
 }

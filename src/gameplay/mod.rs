@@ -406,14 +406,15 @@ pub struct SongStats {
     /// from the technique buckets above (which are keyed by chart modifier,
     /// not attack cleanliness) and tallied for every hit regardless of its
     /// modifiers, or lack of them. Never tallied for a chord/octave-split
-    /// note (see `chord` below) — clean-attack and chord are mutually
-    /// exclusive checks on the same onset.
+    /// note (non-empty `ScheduledNote::chord_pitches`) — "only one pitch
+    /// sounding" is the wrong question for a note that's supposed to have
+    /// company. Chords don't get their own bucket the way clean-attack
+    /// does: `score_notes` already refuses to mark a chord note `Hit`
+    /// unless its siblings sound together (see `chord_is_sounding`), so an
+    /// out-of-sync chord already shows up as an ordinary miss in plain
+    /// accuracy — unlike a breathy leak, which plain accuracy can't see at
+    /// all (that blind spot is what `clean_attack` exists to cover).
     pub clean_attack: TechniqueStats,
-    /// Onset hits/misses for chord/octave-split notes (non-empty
-    /// `ScheduledNote::chord_pitches`) — one tally per sibling note of the
-    /// chord, not per musical chord struck, same as every other technique
-    /// bucket here counts per-note.
-    pub chord: TechniqueStats,
 }
 
 impl SongStats {
@@ -1365,9 +1366,6 @@ fn score_notes(
                 note.missed = true;
                 stats.miss += 1;
                 stats.record_technique(&note.modifiers, false);
-                if !note.chord_pitches.is_empty() {
-                    bump(&mut stats.chord, false);
-                }
                 if config.combo_enabled {
                     score.combo = 0;
                 }
@@ -1394,13 +1392,12 @@ fn score_notes(
                 // `playing` was only true above if `expected_pitch` is `Some`.
                 if let Some(m) = note.expected_pitch {
                     gate.consume(m);
+                    // `is_clean_attack` means "nothing else sounded" —
+                    // meaningless for a chord note, where other pitches
+                    // sounding is the whole point (see the doc comment on
+                    // `SongStats::clean_attack`).
                     if note.chord_pitches.is_empty() {
-                        // `is_clean_attack` means "nothing else sounded" —
-                        // meaningless for a chord note, where other pitches
-                        // sounding is the whole point; tracked separately below.
                         bump(&mut stats.clean_attack, is_clean_attack(&harp_pitches, m));
-                    } else {
-                        bump(&mut stats.chord, true);
                     }
                 }
                 match quality {
@@ -2461,7 +2458,6 @@ mod tests {
         assert!(notes[0].hit, "60 should hit — both pitches sounded together");
         assert!(notes[1].hit, "64 should hit — both pitches sounded together");
         let stats = world.resource::<SongStats>();
-        assert_eq!(stats.chord.hits, 2);
         assert_eq!(stats.clean_attack.total(), 0, "chord notes aren't clean-attack notes");
     }
 
@@ -2487,8 +2483,9 @@ mod tests {
         schedule.add_systems(score_notes);
         schedule.run(&mut world);
 
-        let stats = world.resource::<SongStats>();
-        assert_eq!(stats.chord.misses, 2);
+        let notes = &world.resource::<SongNotes>().notes;
+        assert!(notes[0].missed);
+        assert!(notes[1].missed);
     }
 
     // ── update_score_display (message-gated HUD writes) ─────────────────────

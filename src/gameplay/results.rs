@@ -21,7 +21,7 @@ use super::{Score, SongNotes, SongStats, TechniqueStats};
 /// same keys `gameplay::modifier_fx_key` uses (`"normal"` added for the
 /// baseline/no-modifier bucket), so a song's per-technique bests in
 /// `PlayerProfile` line up with the same vocabulary the rest of scoring uses.
-fn technique_fields(stats: &SongStats) -> [(&'static str, TechniqueStats); 9] {
+fn technique_fields(stats: &SongStats) -> [(&'static str, TechniqueStats); 8] {
     [
         ("normal", stats.normal),
         ("bend", stats.bend),
@@ -31,7 +31,6 @@ fn technique_fields(stats: &SongStats) -> [(&'static str, TechniqueStats); 9] {
         ("overdraw", stats.overdraw),
         ("slide", stats.slide),
         ("clean-attack", stats.clean_attack),
-        ("chord", stats.chord),
     ]
 }
 
@@ -230,7 +229,6 @@ pub(super) fn setup(
                 ("Overdraw", stats.overdraw),
                 ("Slide", stats.slide),
                 ("Clean attack", stats.clean_attack),
-                ("Chord", stats.chord),
             ]
             .into_iter()
             .filter(|(_, s)| s.total() > 0)
