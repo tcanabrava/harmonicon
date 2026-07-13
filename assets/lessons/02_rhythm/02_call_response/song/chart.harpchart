@@ -1,0 +1,52 @@
+{
+  "metadata": {
+    "format_version": "1.1.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: three call-and-response phrases (one, two, then three notes) on a C diatonic. Each phrase plays as a synthesized demo, then waits for the player to echo it. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Call and Response Drill",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 80,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [ { "tick": 0, "bpm": 80 } ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+      "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+    }
+  },
+  "track": [
+    { "id": "call_1_note", "time": 3.0, "duration": 1.0, "phrase": "One note", "call": true,
+      "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+
+    { "id": "call_2_note_a", "time": 9.0, "duration": 0.75, "phrase": "Two notes", "call": true,
+      "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "call_2_note_b", "time": 9.75, "duration": 0.75, "call": true,
+      "events": [{ "hole": 5, "action": "blow", "note": "E5" }] },
+
+    { "id": "call_3_note_a", "time": 16.0, "duration": 0.75, "phrase": "Three notes", "call": true,
+      "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "call_3_note_b", "time": 16.75, "duration": 0.75, "call": true,
+      "events": [{ "hole": 5, "action": "blow", "note": "E5" }] },
+    { "id": "call_3_note_c", "time": 17.5, "duration": 0.75, "call": true,
+      "events": [{ "hole": 6, "action": "blow", "note": "G5" }] }
+  ],
+  "scoring": {
+    "perfect_window_ms": 200,
+    "good_window_ms": 400,
+    "miss_window_ms": 700
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "call-response",
+  "unit": "rhythm",
+  "title_key": "lesson-call-response-title",
+  "body_key": "lesson-call-response-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["twelve-bar"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.7 }
+}
