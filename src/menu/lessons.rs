@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-//! The Lessons menu: a unit-grouped curriculum list, and the per-lesson
-//! reader page (instructional body + Start button for chart-backed lessons,
+//! The Lessons menu: a tab bar of curriculum units over a vertical
+//! scrollbox of that unit's lessons, and the per-lesson reader page
+//! (instructional body + Start button for chart-backed lessons,
 //! Mark-as-Done for instructional-only ones). Discovery/unlock/pass logic
 //! lives in `crate::lessons`; this module is only the menu surface.
 
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy::ui_widgets::ScrollArea;
 use bevy_fluent::Localization;
 
+use crate::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 use crate::lessons::{AvailableLessons, LessonContext, LessonEntry, PassCriteria, group_by_unit, is_unlocked};
 use crate::localization::LocalizationExt;
 use crate::profile::{PlayerProfile, record_lesson, save_profile};
@@ -24,6 +27,33 @@ use super::{
 /// before switching to [`MenuPage::LessonReader`].
 #[derive(Resource, Default)]
 pub(super) struct SelectedLesson(pub Option<String>);
+
+/// The unit tab currently shown on the list page — an index into
+/// [`group_by_unit`]'s order. Persists across visits (returning from a
+/// lesson lands back on the same tab); clamped on read so a shrunk lesson
+/// set can't leave it dangling.
+#[derive(Resource, Default)]
+pub(super) struct SelectedUnitIx(pub usize);
+
+/// Fired by the tab bar's `on_select` observer when the user actually
+/// switches units — [`repopulate_lesson_list`] reacts to this instead of
+/// `resource_changed::<SelectedUnitIx>`, which fires spuriously on the
+/// list page's very first frame (the resource's initial value looks
+/// "changed" to a run condition that has never evaluated it before) and
+/// would otherwise re-populate the scrollbox in the same frame
+/// `setup_lessons_menu` already did — despawning rows whose freshly
+/// inserted `Text` `dialogs::font_fallback::apply_font_fallback` may not
+/// have finished processing yet, which panics ("Entity despawned") when
+/// its deferred command applies against the now-recycled entity index.
+#[derive(Message)]
+pub(super) struct LessonUnitChanged;
+
+/// The scrollbox holding the selected unit's lesson rows, so
+/// [`repopulate_lesson_list`] can swap its children when the tab changes.
+/// `pub(super)` only because it appears in that system's signature, which
+/// `menu::MenuPlugin` names when registering it.
+#[derive(Component)]
+pub(super) struct LessonListBox;
 
 /// Looks a lesson up by id. The list page always sets [`SelectedLesson`]
 /// before opening the reader, so a miss only happens if something desyncs —
@@ -65,6 +95,7 @@ pub(super) fn setup_lessons_menu(
     mut commands: Commands,
     lessons: Res<AvailableLessons>,
     profile: Res<PlayerProfile>,
+    selected_unit: Res<SelectedUnitIx>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
     loc: Res<Localization>,
@@ -77,7 +108,8 @@ pub(super) fn setup_lessons_menu(
         "Lessons",
     );
 
-    if lessons.0.is_empty() {
+    let units = group_by_unit(&lessons.0);
+    if units.is_empty() {
         let msg = commands
             .spawn((
                 Text::new(String::from(loc.msg("no-lessons-found"))),
@@ -89,81 +121,175 @@ pub(super) fn setup_lessons_menu(
             ))
             .id();
         commands.entity(root).add_child(msg);
+        spawn_back_to_main(&mut commands, root, &theme, &btn_mats, &loc);
+        return;
     }
 
-    let passed = profile.passed_lesson_ids();
-    for (unit, unit_lessons) in group_by_unit(&lessons.0) {
-        // Unit heading — localized via the manifest-declared unit id.
-        let heading = commands
-            .spawn((
-                Text::new(String::from(loc.msg(&format!("lesson-unit-{unit}")))),
-                TextFont {
-                    font_size: FontSize::Px(22.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.85, 0.72, 0.35)),
-                Node {
-                    margin: UiRect::top(Val::Px(10.0)),
-                    ..default()
-                },
-            ))
-            .id();
-        commands.entity(root).add_child(heading);
+    // Unit tabs — switching one only updates `SelectedUnitIx`;
+    // `repopulate_lesson_list` reacts and swaps the scrollbox contents.
+    let unit_labels: Vec<String> = units
+        .iter()
+        .map(|(unit, _)| String::from(loc.msg(&format!("lesson-unit-{unit}"))))
+        .collect();
+    let ix = selected_unit.0.min(units.len() - 1);
+    spawn_tab_bar(
+        &mut commands,
+        root,
+        &unit_labels,
+        ix,
+        |ev: On<TabSelect>,
+         mut selected: ResMut<SelectedUnitIx>,
+         mut changed: MessageWriter<LessonUnitChanged>| {
+            selected.0 = ev.index;
+            changed.write(LessonUnitChanged);
+        },
+    );
 
-        for entry in unit_lessons {
-            let title = String::from(loc.msg(&entry.manifest.title_key));
-            let lesson_passed = passed.contains(&entry.manifest.id.as_str());
-            if is_unlocked(&entry.manifest, &passed) {
-                // ✓ marks a passed lesson; both states stay clickable — a
-                // passed lesson can always be replayed.
-                let label = if lesson_passed {
-                    format!("\u{2713} {title}")
-                } else {
-                    title
-                };
-                let id = entry.manifest.id.clone();
-                spawn_button(
-                    &mut commands,
-                    root,
-                    &label,
-                    None,
-                    &theme,
-                    &btn_mats,
-                    "Lessons",
-                    move |_: On<Pointer<Click>>,
-                          mut selected: ResMut<SelectedLesson>,
-                          mut page: ResMut<NextState<MenuPage>>| {
-                        selected.0 = Some(id.clone());
-                        page.set(MenuPage::LessonReader);
-                    },
-                );
+    // The selected unit's lessons, in a vertical scrollbox (`ScrollArea`
+    // gives wheel scrolling — same pattern as `dialogs::file_dialog`).
+    let list = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(8.0),
+                width: Val::Px(520.0),
+                max_height: Val::Percent(48.0),
+                overflow: Overflow::scroll_y(),
+                padding: UiRect::all(Val::Px(10.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.08, 0.08, 0.12, 0.85)),
+            LessonListBox,
+            ScrollArea,
+        ))
+        .id();
+    commands.entity(root).add_child(list);
+    populate_lesson_rows(
+        &mut commands,
+        list,
+        units[ix].1.as_slice(),
+        &profile,
+        &theme,
+        &btn_mats,
+        &loc,
+    );
+
+    spawn_back_to_main(&mut commands, root, &theme, &btn_mats, &loc);
+}
+
+/// Swaps the scrollbox's rows for the newly selected unit's. Runs only
+/// while the list page is open and only when a [`LessonUnitChanged`]
+/// message says the tab actually changed (see the registration in
+/// `menu::MenuPlugin`) — not on resource change-detection, which can't
+/// distinguish "the user just switched tabs" from "this run condition has
+/// never observed this resource before" (see the doc comment on
+/// [`LessonUnitChanged`]).
+pub(super) fn repopulate_lesson_list(
+    mut changed: MessageReader<LessonUnitChanged>,
+    lessons: Res<AvailableLessons>,
+    profile: Res<PlayerProfile>,
+    selected_unit: Res<SelectedUnitIx>,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+    loc: Res<Localization>,
+    list: Query<Entity, With<LessonListBox>>,
+    mut commands: Commands,
+) {
+    if changed.is_empty() {
+        return;
+    }
+    changed.clear();
+    let Ok(list) = list.single() else {
+        return;
+    };
+    let units = group_by_unit(&lessons.0);
+    if units.is_empty() {
+        return;
+    }
+    let ix = selected_unit.0.min(units.len() - 1);
+    commands.entity(list).despawn_related::<Children>();
+    populate_lesson_rows(
+        &mut commands,
+        list,
+        units[ix].1.as_slice(),
+        &profile,
+        &theme,
+        &btn_mats,
+        &loc,
+    );
+}
+
+/// One row per lesson of the shown unit: a clickable button opening the
+/// reader (✓-prefixed once passed — a passed lesson stays replayable), or a
+/// dimmed 🔒 row while its prerequisites aren't met.
+fn populate_lesson_rows(
+    commands: &mut Commands,
+    list: Entity,
+    unit_lessons: &[&LessonEntry],
+    profile: &PlayerProfile,
+    theme: &LoadedTheme,
+    btn_mats: &ButtonMaterials,
+    loc: &Localization,
+) {
+    let passed = profile.passed_lesson_ids();
+    for entry in unit_lessons {
+        let title = String::from(loc.msg(&entry.manifest.title_key));
+        if is_unlocked(&entry.manifest, &passed) {
+            let label = if passed.contains(&entry.manifest.id.as_str()) {
+                format!("\u{2713} {title}")
             } else {
-                // Locked: a dimmed, non-clickable row naming what unlocks it.
-                let row = commands
-                    .spawn((
-                        Text::new(format!(
-                            "\u{1F512} {title} \u{2014} {}",
-                            loc.msg("lesson-locked")
-                        )),
-                        TextFont {
-                            font_size: FontSize::Px(17.0),
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.42, 0.44, 0.50)),
-                    ))
-                    .id();
-                commands.entity(root).add_child(row);
-            }
+                title
+            };
+            let id = entry.manifest.id.clone();
+            spawn_button(
+                commands,
+                list,
+                &label,
+                None,
+                theme,
+                btn_mats,
+                "Lessons",
+                move |_: On<Pointer<Click>>,
+                      mut selected: ResMut<SelectedLesson>,
+                      mut page: ResMut<NextState<MenuPage>>| {
+                    selected.0 = Some(id.clone());
+                    page.set(MenuPage::LessonReader);
+                },
+            );
+        } else {
+            let row = commands
+                .spawn((
+                    Text::new(format!(
+                        "\u{1F512} {title} \u{2014} {}",
+                        loc.msg("lesson-locked")
+                    )),
+                    TextFont {
+                        font_size: FontSize::Px(17.0),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.42, 0.44, 0.50)),
+                ))
+                .id();
+            commands.entity(list).add_child(row);
         }
     }
+}
 
+fn spawn_back_to_main(
+    commands: &mut Commands,
+    root: Entity,
+    theme: &LoadedTheme,
+    btn_mats: &ButtonMaterials,
+    loc: &Localization,
+) {
     spawn_button(
-        &mut commands,
+        commands,
         root,
         &loc.msg("back"),
         Some("BackToMain"),
-        &theme,
-        &btn_mats,
+        theme,
+        btn_mats,
         "Lessons",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
     );

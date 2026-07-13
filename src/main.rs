@@ -75,10 +75,13 @@ fn main() {
         SpectrogramPlugin,
         SettingsPlugin,
         ProfilePlugin,
+    ))
+    .add_plugins((
         harmonicon::dialogs::algo_picker::AlgoPickerPlugin,
         harmonicon::dialogs::combobox::ComboboxPlugin,
         harmonicon::dialogs::file_dialog::FileDialogsPlugin,
         harmonicon::dialogs::font_fallback::FontFallbackPlugin,
+        harmonicon::dialogs::tab_bar::TabBarPlugin,
         harmonicon::dialogs::tooltip::TooltipPlugin,
     ));
 

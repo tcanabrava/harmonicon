@@ -112,6 +112,8 @@ impl Plugin for MenuPlugin {
             .add_sub_state::<MenuPage>()
             .init_resource::<SelectedArtist>()
             .init_resource::<lessons::SelectedLesson>()
+            .init_resource::<lessons::SelectedUnitIx>()
+            .add_message::<lessons::LessonUnitChanged>()
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
@@ -141,6 +143,14 @@ impl Plugin for MenuPlugin {
             .add_systems(
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
+            )
+            // Tab switches on the Lessons page write `SelectedUnitIx` and
+            // fire `LessonUnitChanged`; this swaps the scrollbox rows in
+            // response (message-gated, not resource-change-gated — see the
+            // doc comment on `LessonUnitChanged`).
+            .add_systems(
+                Update,
+                lessons::repopulate_lesson_list.run_if(in_state(MenuPage::Lessons)),
             )
             // If a combobox dropdown was open, its own Escape handler closes
             // it and consumes the keypress — this handler never sees it, so
