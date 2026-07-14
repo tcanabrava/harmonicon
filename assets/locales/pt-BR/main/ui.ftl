@@ -14,12 +14,17 @@ menu-quit = Sair
 # Menu de tocar
 play-song = Tocar Música
 jam-session = Jam Session
+jam-generate = Gerar Jam
 bending-trainer = Treino de Bends
 
 # Seleção de modo
 select-mode = Selecionar Modo
 play-2d = Tocar em 2D
 play-3d = Tocar em 3D
+
+# Gerar Jam (base sintetizada, sem precisar de uma música)
+jam-generate-title = Gerar uma Base de Jam
+jam-generate-start = Começar a Jam
 
 # Seleção de música / artista
 select-artist = Selecionar Artista

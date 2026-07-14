@@ -17,6 +17,7 @@ pub mod assets_management;
 pub mod audio_system;
 pub mod dialogs;
 pub mod gameplay;
+pub mod jam_backing;
 pub mod lessons;
 pub mod localization;
 pub mod menu;

@@ -13,6 +13,7 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 
+use crate::audio_system::midi::{next_key, prev_key};
 use crate::audio_system::pitch_detect::PitchRange;
 use crate::audio_system::wav::encode_wav;
 use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_explanation};
@@ -30,10 +31,6 @@ use super::harmonica_overlay::{
 };
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
 use super::{ActivePitches, GameplayClock, GameplayRoot, PITCH_RANGE_MARGIN_SEMITONES};
-
-const KEYS: [&str; 12] = [
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-];
 
 const MIN_BPM: f32 = 40.0;
 const MAX_BPM: f32 = 220.0;
@@ -496,18 +493,6 @@ fn synth_reference_tone(freq: f32) -> Vec<u8> {
         *sample = env * 0.28 * s;
     }
     encode_wav(&buf, SAMPLE_RATE)
-}
-
-// ── Key helpers ───────────────────────────────────────────────────────────────
-
-fn next_key(k: &str) -> String {
-    let i = KEYS.iter().position(|&x| x == k).unwrap_or(0);
-    KEYS[(i + 1) % 12].to_string()
-}
-
-fn prev_key(k: &str) -> String {
-    let i = KEYS.iter().position(|&x| x == k).unwrap_or(0);
-    KEYS[(i + 11) % 12].to_string()
 }
 
 /// The pitch detector's search range for `key`'s transposed Richter harp,
@@ -1029,12 +1014,8 @@ pub fn update_drill_label(drill: Res<DrillState>, mut labels: Query<&mut Text, W
 mod tests {
     use super::*;
 
-    #[test]
-    fn keys_cycle_both_ways() {
-        assert_eq!(next_key("C"), "C#");
-        assert_eq!(next_key("B"), "C");
-        assert_eq!(prev_key("C"), "B");
-    }
+    // `next_key`/`prev_key` themselves are tested once, centrally, in
+    // `audio_system::midi` — see `next_key_cycles_forward_and_wraps` et al.
 
     // ── row_to_technique (diagram click → drill target) ──────────────────────
 

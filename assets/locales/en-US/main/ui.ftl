@@ -16,12 +16,17 @@ menu-quit = Quit
 # Play menu
 play-song = Play Song
 jam-session = Jam Session
+jam-generate = Generate Jam
 bending-trainer = Bending Trainer
 
 # Mode select
 select-mode = Select Mode
 play-2d = Play 2D
 play-3d = Play 3D
+
+# Generate Jam (synthesized backing, no song required)
+jam-generate-title = Generate a Jam Backing
+jam-generate-start = Start Jam
 
 # Song / artist selection
 select-artist = Select Artist

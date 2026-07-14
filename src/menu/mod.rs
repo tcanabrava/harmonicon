@@ -18,6 +18,7 @@ use super::dialogs::button;
 
 mod calibration;
 mod credits;
+mod jam_generate;
 mod lessons;
 mod options;
 
@@ -88,6 +89,10 @@ pub(crate) enum MenuPage {
     Lessons,
     /// One lesson's instructional page (+ Start for chart-backed lessons).
     LessonReader,
+    /// Key/tempo picker for a synthesized Jam Session backing (see
+    /// `crate::jam_backing`) — the no-existing-song alternative to
+    /// `ArtistList`'s real-song Jam Session flow.
+    JamGenerate,
 }
 
 // ── Public resources ──────────────────────────────────────────────────────────
@@ -114,6 +119,7 @@ impl Plugin for MenuPlugin {
             .init_resource::<lessons::SelectedLesson>()
             .init_resource::<lessons::SelectedUnitIx>()
             .add_message::<lessons::LessonUnitChanged>()
+            .init_resource::<jam_generate::JamGenerateConfig>()
             .init_resource::<GameplayMode>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
@@ -140,6 +146,15 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::Lessons), cleanup_menu)
             .add_systems(OnEnter(MenuPage::LessonReader), lessons::setup_lesson_reader)
             .add_systems(OnExit(MenuPage::LessonReader), cleanup_menu)
+            .add_systems(
+                OnEnter(MenuPage::JamGenerate),
+                jam_generate::setup_jam_generate_menu,
+            )
+            .add_systems(OnExit(MenuPage::JamGenerate), cleanup_menu)
+            .add_systems(
+                Update,
+                jam_generate::update_jam_generate_labels.run_if(in_state(MenuPage::JamGenerate)),
+            )
             .add_systems(
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
@@ -179,7 +194,7 @@ fn handle_menu_escape(
     let target = match page.get() {
         MenuPage::Main => return,
         MenuPage::Play | MenuPage::Options | MenuPage::Lessons => MenuPage::Main,
-        MenuPage::ArtistList | MenuPage::ModeSelect => MenuPage::Play,
+        MenuPage::ArtistList | MenuPage::ModeSelect | MenuPage::JamGenerate => MenuPage::Play,
         MenuPage::SongList => MenuPage::ArtistList,
         MenuPage::Theme => MenuPage::Options,
         MenuPage::LessonReader => MenuPage::Lessons,
@@ -550,6 +565,18 @@ fn setup_play_menu(
     spawn_button(
         &mut commands,
         root,
+        &loc.msg("jam-generate"),
+        Some("JamGenerate"),
+        &theme,
+        &btn_mats,
+        "Play",
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::JamGenerate)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
         &loc.msg("bending-trainer"),
         Some("BendingTrainer"),
         &theme,
@@ -776,6 +803,7 @@ pub(super) fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<Men
 /// retries keep their context).
 fn route_menu_entry(
     lesson: Option<Res<crate::lessons::LessonContext>>,
+    generated_jam: Option<Res<crate::jam_backing::GeneratedJamSession>>,
     mut ret_song: ResMut<ReturnToSongList>,
     mut ret_opts: ResMut<ReturnToOptions>,
     mut next_page: ResMut<NextState<MenuPage>>,
@@ -787,6 +815,13 @@ fn route_menu_entry(
         // list is the right place to land, so the flag is consumed here.
         ret_song.0 = false;
         next_page.set(MenuPage::Lessons);
+    } else if generated_jam.is_some() {
+        commands.remove_resource::<crate::jam_backing::GeneratedJamSession>();
+        // Same reasoning as the lesson branch above: a generated jam never
+        // went through the song list, so land back on its own setup page
+        // instead (ready to jam again with one click).
+        ret_song.0 = false;
+        next_page.set(MenuPage::JamGenerate);
     } else if ret_song.0 {
         ret_song.0 = false;
         next_page.set(MenuPage::SongList);

@@ -515,8 +515,22 @@ fn on_restart(
     _: On<Pointer<Click>>,
     mut paused: ResMut<Paused>,
     mut next_state: ResMut<NextState<AppState>>,
+    generated_jam: Option<Res<crate::jam_backing::GeneratedJamSession>>,
 ) {
-    apply_restart(&mut paused, &mut next_state);
+    // A generated jam's `SelectedSong` was built by `Assets::add`, not
+    // `AssetServer::load` — it has no tracked `LoadState`, so routing
+    // through `SongLoading` would hang there forever waiting on
+    // `check_loading`'s `is_loaded_with_dependencies` (see
+    // `GeneratedJamSession`'s doc comment). Skip straight back to `Playing`
+    // instead; `OnEnter(AppState::Playing)`'s own systems (`reset_score`,
+    // `jam_session::setup`, ...) already do the "fresh restart" work that
+    // `SongLoading` exists to wait for on the normal, asset-server path.
+    let target = if generated_jam.is_some() {
+        AppState::Playing
+    } else {
+        AppState::SongLoading
+    };
+    apply_restart(&mut paused, &mut next_state, target);
 }
 
 fn on_quit(
@@ -555,11 +569,13 @@ fn apply_resume(paused: &mut Paused) {
     paused.0 = false;
 }
 
-fn apply_restart(paused: &mut Paused, next_state: &mut NextState<AppState>) {
+fn apply_restart(paused: &mut Paused, next_state: &mut NextState<AppState>, target: AppState) {
     paused.0 = false;
-    // Re-enter via SongLoading so the whole song setup runs fresh (the asset is
-    // already loaded, so it resumes immediately).
-    next_state.set(AppState::SongLoading);
+    // Re-enter via SongLoading so the whole song setup runs fresh (the asset
+    // is already loaded, so it resumes immediately) — or, for a generated
+    // jam with no asset-server-tracked load state to wait on, straight back
+    // to Playing (see `on_restart`).
+    next_state.set(target);
 }
 
 fn apply_quit(
@@ -657,9 +673,18 @@ mod tests {
     fn restart_button_reloads_the_song() {
         let mut paused = Paused(true);
         let mut next = NextState::<AppState>::Unchanged;
-        apply_restart(&mut paused, &mut next);
+        apply_restart(&mut paused, &mut next, AppState::SongLoading);
         assert!(!paused.0);
         assert_eq!(pending_state(&next), Some(AppState::SongLoading));
+    }
+
+    #[test]
+    fn restart_can_target_playing_directly_for_a_generated_jam() {
+        let mut paused = Paused(true);
+        let mut next = NextState::<AppState>::Unchanged;
+        apply_restart(&mut paused, &mut next, AppState::Playing);
+        assert!(!paused.0);
+        assert_eq!(pending_state(&next), Some(AppState::Playing));
     }
 
     #[test]

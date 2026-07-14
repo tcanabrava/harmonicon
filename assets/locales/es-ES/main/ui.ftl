@@ -14,12 +14,17 @@ menu-quit = Salir
 # Menú de juego
 play-song = Tocar Canción
 jam-session = Sesión Jam
+jam-generate = Generar Jam
 bending-trainer = Entrenador de Bends
 
 # Selección de modo
 select-mode = Seleccionar Modo
 play-2d = Jugar en 2D
 play-3d = Jugar en 3D
+
+# Generar Jam (base sintetizada, sin necesidad de una canción)
+jam-generate-title = Generar una Base de Jam
+jam-generate-start = Empezar la Jam
 
 # Selección de canción / artista
 select-artist = Seleccionar Artista

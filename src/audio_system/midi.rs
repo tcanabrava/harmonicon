@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: MIT
 
+/// The 12 chromatic pitch classes, always sharp-spelled — the one source of
+/// truth every note-name lookup/cycle in the crate should share instead of
+/// re-declaring its own copy (`note_to_midi`/`midi_to_note` below,
+/// `song::harmonica::semitone`'s transposition table, `audio_system::
+/// pitch_detect`'s detected-pitch display, and the key pickers in
+/// `gameplay::bending_trainer`/`menu::jam_generate`, all used to keep
+/// independent copies of this exact array).
+pub const NOTE_NAMES: [&str; 12] = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+];
+
 // Convert a note string like "G4", "C#5", "Bb3" to a MIDI number.
 pub fn note_to_midi(note: &str) -> Option<i32> {
-    const NAMES: [&str; 12] = [
-        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-    ];
     // Note names are ASCII; bail before the byte-slicing below so non-ASCII input
     // (e.g. the "—" placeholder for a missing hole) returns None instead of panicking.
     if !note.is_ascii() || note.is_empty() {
@@ -28,18 +36,31 @@ pub fn note_to_midi(note: &str) -> Option<i32> {
         "Cb" => "B",
         p => p,
     };
-    let semitone = NAMES.iter().position(|&n| n == pitch)? as i32;
+    let semitone = NOTE_NAMES.iter().position(|&n| n == pitch)? as i32;
     let octave: i32 = oct_str.parse().ok()?;
     Some((octave + 1) * 12 + semitone)
 }
 
 pub fn midi_to_note(midi: i32) -> String {
-    const NAMES: [&str; 12] = [
-        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-    ];
     let semitone = midi.rem_euclid(12);
     let octave = midi / 12 - 1;
-    format!("{}{}", NAMES[semitone as usize], octave)
+    format!("{}{}", NOTE_NAMES[semitone as usize], octave)
+}
+
+/// The key after `k` in the chromatic cycle (wrapping from B back to C).
+/// Shared by any "cycle through all 12 keys" picker — `gameplay::
+/// bending_trainer`'s and `menu::jam_generate`'s key controls both call
+/// this instead of keeping their own copy. Unrecognised input falls back to
+/// `NOTE_NAMES[0]` ("C"), same permissive fallback `prev_key` uses.
+pub fn next_key(k: &str) -> String {
+    let i = NOTE_NAMES.iter().position(|&x| x == k).unwrap_or(0);
+    NOTE_NAMES[(i + 1) % 12].to_string()
+}
+
+/// The key before `k` in the chromatic cycle (wrapping from C back to B).
+pub fn prev_key(k: &str) -> String {
+    let i = NOTE_NAMES.iter().position(|&x| x == k).unwrap_or(0);
+    NOTE_NAMES[(i + 11) % 12].to_string()
 }
 
 /// Concert-pitch frequency (Hz) for a MIDI note number. Fractional input is
@@ -118,6 +139,33 @@ mod tests {
                 "roundtrip failed for midi={midi}"
             );
         }
+    }
+
+    // ── next_key / prev_key ──────────────────────────────────────────────────
+
+    #[test]
+    fn next_key_cycles_forward_and_wraps() {
+        assert_eq!(next_key("C"), "C#");
+        assert_eq!(next_key("B"), "C");
+    }
+
+    #[test]
+    fn prev_key_cycles_backward_and_wraps() {
+        assert_eq!(prev_key("C#"), "C");
+        assert_eq!(prev_key("C"), "B");
+    }
+
+    #[test]
+    fn every_key_round_trips_through_next_then_prev() {
+        for &k in &NOTE_NAMES {
+            assert_eq!(prev_key(&next_key(k)), k);
+        }
+    }
+
+    #[test]
+    fn unrecognised_key_falls_back_to_c() {
+        assert_eq!(next_key("nonsense"), "C#");
+        assert_eq!(prev_key("nonsense"), "B");
     }
 
     // ── freq_to_midi ──────────────────────────────────────────────────────────

@@ -5,6 +5,8 @@ use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use super::midi::NOTE_NAMES;
+
 /// Frequency bounds (Hz) the pitch detectors search within. Defaults to
 /// roughly a standard-key 10-hole diatonic's range; gameplay narrows/widens
 /// this from the loaded chart's harmonica layout (or the bend trainer's
@@ -135,10 +137,6 @@ const PEAK_THRESHOLD_RATIO: f32 = 0.08;
 
 // Signals below this RMS level are treated as silence.
 const SILENCE_THRESHOLD: f32 = 0.005;
-
-const NOTE_NAMES: [&str; 12] = [
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PitchInfo {

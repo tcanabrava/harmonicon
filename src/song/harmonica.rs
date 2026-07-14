@@ -6,7 +6,7 @@ use crate::song::chart::{Action, BendingProfile};
 
 use crate::song::chart::{ChromaticLayout, DiatonicLayout};
 
-use crate::audio_system::midi::{midi_to_freq_hz, midi_to_note, note_to_midi};
+use crate::audio_system::midi::{NOTE_NAMES, midi_to_freq_hz, midi_to_note, note_to_midi};
 
 use std::collections::HashSet;
 
@@ -215,11 +215,8 @@ pub fn harp_banner(harp: &Harmonica, song_key: &str) -> String {
 
 // Returns the semitone label for the given root and offset.
 pub fn semitone(root: &str, n: i32) -> String {
-    const NOTES: [&str; 12] = [
-        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-    ];
-    let i = NOTES.iter().position(|&x| x == root).unwrap_or(0);
-    NOTES[((i as i32 + n).rem_euclid(12)) as usize].to_string()
+    let i = NOTE_NAMES.iter().position(|&x| x == root).unwrap_or(0);
+    NOTE_NAMES[((i as i32 + n).rem_euclid(12)) as usize].to_string()
 }
 
 /// The six note classes of the blues scale rooted on `key` (1, b3, 4, b5, 5, b7).
