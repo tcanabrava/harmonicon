@@ -24,6 +24,7 @@ mod lessons;
 mod options;
 
 mod theme_picker;
+mod tutorial;
 
 use super::dialogs::button_material::{
     ButtonMaterialPlugin, ButtonMaterials, ButtonShaderLayer, ButtonVisual, ThemedButton,
@@ -179,15 +180,34 @@ impl Plugin for MenuPlugin {
                 Update,
                 lessons::repopulate_lesson_list.run_if(in_state(MenuPage::Lessons)),
             )
+            // The guided tour drives `NextState<MenuPage>` itself on a
+            // timer, independent of whichever specific page is currently
+            // showing — both systems run for all of `AppState::Menu`, not
+            // gated to one page, and the overlay sync must see the tour
+            // resource change after it ticks.
+            .add_systems(
+                Update,
+                (
+                    tutorial::advance_tutorial_tour,
+                    tutorial::sync_tutorial_overlay,
+                )
+                    .chain()
+                    .run_if(in_state(AppState::Menu)),
+            )
             // If a combobox dropdown was open, its own Escape handler closes
             // it and consumes the keypress — this handler never sees it, so
             // one Escape press doesn't both close a dropdown and navigate
-            // back a page.
+            // back a page. Also skipped while the guided tour is driving
+            // page changes itself — Escape shouldn't fight it mid-tour;
+            // Skip Tutorial is the deliberate way out.
             .add_systems(
                 Update,
                 handle_menu_escape
                     .after(super::dialogs::combobox::close_open_comboboxes_on_escape)
-                    .run_if(in_state(AppState::Menu)),
+                    .run_if(
+                        in_state(AppState::Menu)
+                            .and_then(not(resource_exists::<tutorial::TutorialTour>)),
+                    ),
             );
     }
 }
@@ -480,6 +500,14 @@ fn setup_main_menu(
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
             state.set(AppState::Credits)
         },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-tutorial"),
+        &theme,
+        &btn_mats,
+        tutorial::start_tutorial_tour,
     );
     spawn_button(
         &mut commands,

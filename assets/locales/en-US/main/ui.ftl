@@ -11,6 +11,7 @@ menu-play = Play
 menu-song-editor-2 = Song Editor
 menu-options = Options
 menu-credits = Credits
+menu-tutorial = Tutorial
 menu-quit = Quit
 
 # Play menu
@@ -263,3 +264,21 @@ calibration-suggested = Current: %current%ms   →   Suggested: %suggested%ms
 
 # Options
 options-input-lag = Input lag
+
+# Guided tutorial tour (menu::tutorial)
+tutorial-step = Step %n% of %total%
+tutorial-skip = Skip Tutorial
+tutorial-title-main = Main Menu
+tutorial-body-main = Your home base — jump into a song, browse lessons, or open Options from here.
+tutorial-title-play = Play
+tutorial-body-play = Pick a real song, start a free jam, or practice bends — choose how you want to play.
+tutorial-title-mode-select = Select Mode
+tutorial-body-mode-select = Choose 2D (a scrolling note highway) or 3D (a harmonica model you play along with).
+tutorial-title-options = Options
+tutorial-body-options = Volume, note style, harmonica model, and microphone calibration all live here.
+tutorial-title-theme = Theme
+tutorial-body-theme = Pick a visual theme for the menus — swaps backgrounds and button style.
+tutorial-title-lessons = Lessons
+tutorial-body-lessons = A guided curriculum: single notes, chords, bends, and improvising over the blues.
+tutorial-title-jam-generate = Generate Jam
+tutorial-body-jam-generate = Spin up an instant backing track in any key and tempo — no song required.

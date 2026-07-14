@@ -9,6 +9,7 @@ menu-play = Jugar
 menu-song-editor-2 = Editor de Canciones
 menu-options = Opciones
 menu-credits = Créditos
+menu-tutorial = Tutorial
 menu-quit = Salir
 
 # Menú de juego
@@ -261,3 +262,21 @@ calibration-suggested = Actual: %current%ms   →   Sugerido: %suggested%ms
 
 # Opciones
 options-input-lag = Retardo de entrada
+
+# Recorrido guiado del tutorial (menu::tutorial)
+tutorial-step = Paso %n% de %total%
+tutorial-skip = Saltar Tutorial
+tutorial-title-main = Menú Principal
+tutorial-body-main = Tu base — entra a una canción, explora las lecciones o abre Opciones desde aquí.
+tutorial-title-play = Jugar
+tutorial-body-play = Elige una canción real, empieza una jam libre o practica bends — elige cómo quieres jugar.
+tutorial-title-mode-select = Seleccionar Modo
+tutorial-body-mode-select = Elige 2D (un camino de notas que se desliza) o 3D (una armónica que tocas junto a ti).
+tutorial-title-options = Opciones
+tutorial-body-options = El volumen, el estilo de las notas, el modelo de armónica y la calibración del micrófono están aquí.
+tutorial-title-theme = Tema
+tutorial-body-theme = Elige un tema visual para los menús — cambia los fondos y el estilo de los botones.
+tutorial-title-lessons = Lecciones
+tutorial-body-lessons = Un plan guiado: notas únicas, acordes, bends e improvisación sobre el blues.
+tutorial-title-jam-generate = Generar Jam
+tutorial-body-jam-generate = Genera una base instantánea en cualquier tono y tempo — sin necesidad de una canción.
