@@ -107,7 +107,7 @@ pub struct LastClickedTick(pub Option<i64>);
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
 /// True when a beat is the first beat of its bar.
-pub fn is_downbeat(beat: i64, beats_per_bar: f64) -> bool {
+pub const fn is_downbeat(beat: i64, beats_per_bar: f64) -> bool {
     let beats = (beats_per_bar.max(1.0)) as i64;
     beat.rem_euclid(beats) == 0
 }
@@ -115,7 +115,7 @@ pub fn is_downbeat(beat: i64, beats_per_bar: f64) -> bool {
 /// Index of the current click subdivision ("tick"), or `None` before the song
 /// starts. A tick is a whole beat in `Straight` feel, or a triplet-eighth (three
 /// per beat) in `Shuffle` feel.
-pub fn tick_index(clock: f64, bpm: f64, feel: MetronomeFeel) -> Option<i64> {
+pub const fn tick_index(clock: f64, bpm: f64, feel: MetronomeFeel) -> Option<i64> {
     if clock < 0.0 || bpm <= 0.0 {
         return None;
     }
@@ -131,7 +131,7 @@ pub fn tick_index(clock: f64, bpm: f64, feel: MetronomeFeel) -> Option<i64> {
 /// subdivision. In shuffle feel a beat is three triplet-eighths; we click the
 /// beat (sub 0, accented on the downbeat) and the swung "and" (sub 2, softer),
 /// and stay silent on the middle triplet — the classic long-short shuffle.
-pub fn click_for_tick(tick: i64, beats_per_bar: f64, feel: MetronomeFeel) -> Option<(bool, f32)> {
+pub const fn click_for_tick(tick: i64, beats_per_bar: f64, feel: MetronomeFeel) -> Option<(bool, f32)> {
     match feel {
         MetronomeFeel::Straight => Some((is_downbeat(tick, beats_per_bar), 1.0)),
         MetronomeFeel::Shuffle => match tick.rem_euclid(3) {
@@ -365,10 +365,11 @@ fn pill_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
 /// Maps a chart's declared [`Feel`] onto the metronome's own feel type.
 /// `None` (the common case — most charts don't declare one) means "leave
 /// whatever the player currently has selected untouched", not "straight".
-fn feel_from_chart(chart_feel: Option<Feel>) -> Option<MetronomeFeel> {
-    match chart_feel? {
-        Feel::Straight => Some(MetronomeFeel::Straight),
-        Feel::Shuffle => Some(MetronomeFeel::Shuffle),
+const fn feel_from_chart(chart_feel: Option<Feel>) -> Option<MetronomeFeel> {
+    match chart_feel {
+        Some(Feel::Straight) => Some(MetronomeFeel::Straight),
+        Some(Feel::Shuffle) => Some(MetronomeFeel::Shuffle),
+        None => None,
     }
 }
 
