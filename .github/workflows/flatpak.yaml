@@ -1,0 +1,58 @@
+name: Flatpak
+
+# Verifies packaging/flatpak/io.github.tcanabrava.harmonicon.yaml still
+# builds — this was a manual-only `flatpak-builder` run before (see
+# packaging/flatpak/README.md), so packaging regressions (a bad manifest
+# edit, a build-command that no longer matches the crate) went unnoticed
+# until someone tried it by hand. This mirrors that same local build command
+# exactly; it doesn't install or run the app, just confirms the build
+# succeeds. Path-filtered so it only runs when something that could actually
+# affect the build changes, not on every doc-only commit.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/flatpak/**'
+      - 'src/**'
+      - 'assets/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/flatpak.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packaging/flatpak/**'
+      - 'src/**'
+      - 'assets/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/flatpak.yaml'
+  workflow_dispatch:
+
+jobs:
+  flatpak-build:
+    name: flatpak-builder
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install flatpak and flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install runtime, SDK, and Rust extension
+        run: |
+          sudo flatpak install -y --noninteractive flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//25.08
+
+      - name: Build (same command as packaging/flatpak/README.md's local build)
+        run: |
+          flatpak-builder --force-clean build-dir \
+            packaging/flatpak/io.github.tcanabrava.harmonicon.yaml
