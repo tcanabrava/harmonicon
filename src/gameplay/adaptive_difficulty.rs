@@ -67,19 +67,26 @@ pub fn group_phrase_sections(
 /// Fraction of a phrase's notes unlocked at a given `learned` level (clamped
 /// to 0..=1): 10% at `learned = 0`, scaling linearly up to 100% at
 /// `learned = 1` — the "start with a skeleton, fill in as you learn it" curve.
-pub fn visible_fraction(learned: f32) -> f32 {
+pub const fn visible_fraction(learned: f32) -> f32 {
     (0.1 + 0.9 * learned.clamp(0.0, 1.0)).min(1.0)
 }
 
 /// How many of a section's `note_count` notes are unlocked at `learned` —
 /// always at least 1 (never a fully silent phrase) and never more than
 /// `note_count`.
-fn active_note_count(note_count: usize, learned: f32) -> usize {
+const fn active_note_count(note_count: usize, learned: f32) -> usize {
     if note_count == 0 {
         return 0;
     }
     let visible = visible_fraction(learned);
-    ((visible * note_count as f32).ceil() as usize).clamp(1, note_count)
+    let count = (visible * note_count as f32).ceil() as usize;
+    if count < 1 {
+        1
+    } else if count > note_count {
+        note_count
+    } else {
+        count
+    }
 }
 
 /// Per-event `(unlocked, section_index)`, in the same flattened
