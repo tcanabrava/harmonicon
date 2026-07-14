@@ -244,12 +244,19 @@ pub enum ChordQuality {
     Minor7,
 }
 
+/// Semitone intervals above the root for a dominant-7th chord (root, 3rd,
+/// 5th, ♭7th) — see [`chord_intervals`].
+const DOMINANT7_INTERVALS: [i32; 4] = [0, 4, 7, 10];
+/// Semitone intervals above the root for a minor-7th chord (root, ♭3rd,
+/// 5th, ♭7th) — see [`chord_intervals`].
+const MINOR7_INTERVALS: [i32; 4] = [0, 3, 7, 10];
+
 /// Semitone intervals above the root for `quality`'s chord tones (root,
 /// 3rd, 5th, 7th).
-pub fn chord_intervals(quality: ChordQuality) -> [i32; 4] {
+pub const fn chord_intervals(quality: ChordQuality) -> [i32; 4] {
     match quality {
-        ChordQuality::Dominant7 => [0, 4, 7, 10],
-        ChordQuality::Minor7 => [0, 3, 7, 10],
+        ChordQuality::Dominant7 => DOMINANT7_INTERVALS,
+        ChordQuality::Minor7 => MINOR7_INTERVALS,
     }
 }
 
@@ -324,11 +331,15 @@ pub fn semitone(root: &str, n: i32) -> String {
     NOTE_NAMES[((i as i32 + n).rem_euclid(12)) as usize].to_string()
 }
 
+/// Semitone offsets of the six blues-scale degrees (1, ♭3, 4, ♭5, 5, ♭7)
+/// above the root — see [`blues_scale_classes`].
+const BLUES_SCALE_INTERVALS: [i32; 6] = [0, 3, 5, 6, 7, 10];
+
 /// The six note classes of the blues scale rooted on `key` (1, b3, 4, b5, 5, b7).
 /// Shared by Jam Session's live hole-map feedback and the song editor's
 /// scale-aware note coloring, so both reflect the same blues-scale definition.
 pub fn blues_scale_classes(key: &str) -> HashSet<String> {
-    [0, 3, 5, 6, 7, 10]
+    BLUES_SCALE_INTERVALS
         .iter()
         .map(|&n| semitone(key, n))
         .collect()
