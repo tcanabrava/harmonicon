@@ -7,10 +7,16 @@
 //! changes the selection. Extracted from the Options page's microphone
 //! device picker so future pickers don't have to reinvent it.
 //!
-//! `spawn_combobox`'s `parent` must be a full-screen-sized container (e.g.
-//! the page root from `menu::spawn_menu_root`) — the click-catching backdrop
-//! sizes itself to 100% of `parent`, and is despawned whenever `parent` is
-//! (recursive despawn), so the widget needs no lifecycle hooks of its own.
+//! `spawn_combobox`'s `backdrop_parent` must be a full-screen-sized
+//! container (e.g. the page root from `menu::spawn_menu_root`) — the
+//! click-catching backdrop sizes itself to 100% of `backdrop_parent`, and is
+//! despawned whenever `backdrop_parent` is (recursive despawn), so the
+//! widget needs no lifecycle hooks of its own. `trigger_parent` is where the
+//! visible label+toggle actually lives in-flow — usually the same entity as
+//! `backdrop_parent` (a single-column page), but a page with its own nested
+//! columns (see `gameplay::bending_trainer::setup`) can pass a narrower
+//! column here while keeping the backdrop sized to the whole page, so a
+//! click anywhere still dismisses the dropdown.
 //!
 //! Register [`ComboboxPlugin`] once per app. If some other Escape handler
 //! (e.g. "go back a menu page") should only fire when no dropdown was open
@@ -80,16 +86,19 @@ fn toggle_label(current: &str) -> String {
     format!("{current}  \u{25BE}")
 }
 
-/// Spawns a combobox as a child of `parent` (see module docs for the
-/// full-screen-parent requirement): `label` beside a toggle button showing
-/// `current`, opening an overlay list of `options` below it when clicked.
-/// Returns the combobox's root entity, which carries [`ComboboxValue`] and
-/// is where [`ComboboxSelect`] is triggered — pass `on_select` as an
-/// observer system reacting to it, the same way `spawn_volume_slider`
-/// elsewhere takes an `on_change` observer for `ValueChange<f32>`.
+/// Spawns a combobox as a child of `trigger_parent`, with its click-catching
+/// backdrop sized to `backdrop_parent` instead (see the module docs — the
+/// two are almost always the same entity): `label` beside a toggle button
+/// showing `current`, opening an overlay list of `options` below it when
+/// clicked. Returns the combobox's root entity, which carries
+/// [`ComboboxValue`] and is where [`ComboboxSelect`] is triggered — pass
+/// `on_select` as an observer system reacting to it, the same way
+/// `spawn_volume_slider` elsewhere takes an `on_change` observer for
+/// `ValueChange<f32>`.
 pub fn spawn_combobox<M: 'static>(
     commands: &mut Commands,
-    parent: Entity,
+    trigger_parent: Entity,
+    backdrop_parent: Entity,
     label: &str,
     options: &[String],
     current: &str,
@@ -189,10 +198,10 @@ pub fn spawn_combobox<M: 'static>(
     });
     commands.entity(root).add_child(list);
 
-    // Full-screen invisible click-catcher, a *direct* child of `parent`
-    // (not nested under `root`) so its 100% size resolves against the
-    // page's own full-screen box rather than this widget's small one — same
-    // technique as `dialogs::file_dialog`'s overlay.
+    // Full-screen invisible click-catcher, a *direct* child of
+    // `backdrop_parent` (not nested under `root`) so its 100% size resolves
+    // against the page's own full-screen box rather than this widget's
+    // small one — same technique as `dialogs::file_dialog`'s overlay.
     let backdrop = commands
         .spawn((
             Node {
@@ -209,12 +218,12 @@ pub fn spawn_combobox<M: 'static>(
         ))
         .observe(backdrop_click)
         .id();
-    commands.entity(parent).add_child(backdrop);
+    commands.entity(backdrop_parent).add_child(backdrop);
 
     commands
         .entity(root)
         .insert(ComboboxLinks { list, backdrop });
-    commands.entity(parent).add_child(root);
+    commands.entity(trigger_parent).add_child(root);
     root
 }
 

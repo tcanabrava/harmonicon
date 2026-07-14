@@ -197,6 +197,7 @@ fn setup_options_menu(
     combobox::spawn_combobox(
         &mut commands,
         root,
+        root,
         "Pitch detect",
         &algo_labels(),
         settings.pitch_algorithm.label(),
@@ -653,6 +654,7 @@ fn spawn_mic_combobox(
 ) {
     let root = combobox::spawn_combobox(
         commands,
+        parent,
         parent,
         "Microphone",
         devices,

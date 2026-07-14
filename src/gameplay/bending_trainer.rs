@@ -8,6 +8,12 @@
 //! metronome ticks without any song loaded. The harp is synthesised for the
 //! chosen key (transposed Richter layout) and the diagram is rebuilt whenever
 //! the key changes.
+//!
+//! Two columns, the same split `gameplay::jam_session` uses: left has
+//! everything but the harmonica itself (title, key control, detect-algorithm
+//! picker, ear-training target/Listen, tuner readout, drill toggle, tempo
+//! control, hint line); right is entirely the harmonica — the bend diagram
+//! plus its technique hint/drill explanation text.
 
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Out, Over, Pointer};
@@ -536,29 +542,42 @@ pub fn setup(
         Node {
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            row_gap: Val::Px(18.0),
+            flex_direction: FlexDirection::Row,
             ..default()
         },
         BackgroundColor(Color::srgb(0.05, 0.05, 0.08)),
         GameplayRoot,
     ));
-    // Captured so the Detect-algorithm combobox below can be spawned as its
-    // direct child — `combobox::spawn_combobox` requires a full-screen-sized
-    // parent for its click-catching backdrop to size correctly (see its
-    // module doc comment), which rules out nesting it inside `side_col`.
+    // Captured so the Detect-algorithm combobox below can pass it as the
+    // *backdrop*'s parent — `combobox::spawn_combobox` requires a
+    // full-screen-sized backdrop parent for its click-catching backdrop to
+    // size correctly (see its module doc comment), so a click anywhere on
+    // the right column (not just the left) still dismisses an open dropdown.
+    // The combobox's visible trigger, meanwhile, is parented to the left
+    // column itself so it sits in that column's normal vertical flow.
     let root_id = root_ec.id();
     root_ec.with_children(|root| {
-            root.spawn((
+            // ── Left half: everything but the harmonica itself ───────────────
+            let mut left_ec = root.spawn(Node {
+                width: Val::Percent(50.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(18.0),
+                padding: UiRect::all(Val::Px(16.0)),
+                ..default()
+            });
+            let left_id = left_ec.id();
+            left_ec.with_children(|left| {
+            left.spawn((
                 Text::new(String::from(loc.msg("bending-trainer"))),
                 TextFont { font_size: FontSize::Px(26.0), ..default() },
                 TextColor(Color::WHITE),
             ));
 
             // ── Key control: ◂  Key: C  ▸ ───────────────────────────────────
-            root.spawn(Node {
+            left.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(10.0),
@@ -591,19 +610,20 @@ pub fn setup(
             // ── Detect algorithm: combobox (same global AudioSettings::
             // pitch_algorithm the Options page drives) + its explanation ────
             combobox::spawn_combobox(
-                root.commands_mut(),
+                left.commands_mut(),
+                left_id,
                 root_id,
                 "Detect",
                 &algo_labels(),
                 audio.pitch_algorithm.label(),
                 on_algo_selected,
             );
-            spawn_algo_explanation(root.commands_mut(), root_id, 420.0, audio.pitch_algorithm);
+            spawn_algo_explanation(left.commands_mut(), left_id, 420.0, audio.pitch_algorithm);
 
             // ── Ear-training target: readout (set by clicking the diagram
             // below, not stepper buttons — see `on_diagram_cell_clicked`) +
             // Listen ────────────────────────────────────────────────────────
-            root.spawn(Node {
+            left.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(10.0),
@@ -637,7 +657,7 @@ pub fn setup(
                 ));
             });
 
-            root.spawn((
+            left.spawn((
                 Text::new(""),
                 TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.85, 0.60)),
@@ -645,7 +665,7 @@ pub fn setup(
             ));
 
             // ── Adaptive drill toggle ────────────────────────────────────────
-            root.spawn(Node {
+            left.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(10.0),
@@ -680,59 +700,8 @@ pub fn setup(
                 ));
             });
 
-            // ── Diagram + side texts: kept side by side to save vertical space ──
-            root.spawn(Node {
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::FlexStart,
-                column_gap: Val::Px(14.0),
-                ..default()
-            })
-            .with_children(|row| {
-                // The bend diagram (rebuilt on key change).
-                row.spawn((Node::default(), OverlayHost))
-                    .with_children(|host| {
-                        spawn_harmonica_overlay_selectable(
-                            host,
-                            &richter_harp(&key.0),
-                            on_diagram_cell_clicked,
-                            &loc,
-                        );
-                    });
-
-                // How-to hint + Drill explanation, stacked beside the
-                // diagram (the Detect-algorithm picker moved up top — see
-                // `spawn_combobox`'s call site above — since its combobox
-                // needs a full-screen-sized parent, not this narrow column).
-                row.spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    width: Val::Px(280.0),
-                    row_gap: Val::Px(8.0),
-                    ..default()
-                })
-                .with_children(|col| {
-                    col.spawn((
-                        Node { padding: UiRect::all(Val::Px(8.0)), ..default() },
-                        BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
-                    ))
-                    .with_children(|p| {
-                        p.spawn((
-                            Text::new(technique_hint(target.technique, target.hole)),
-                            TextFont { font_size: FontSize::Px(15.0), ..default() },
-                            TextColor(Color::srgb(0.75, 0.75, 0.85)),
-                            HintLabel,
-                        ));
-                    });
-                    col.spawn((
-                        Text::new(""),
-                        TextFont { font_size: FontSize::Px(15.0), ..default() },
-                        TextColor(Color::srgb(0.60, 0.60, 0.70)),
-                        DrillExplanation,
-                    ));
-                });
-            });
-
             // ── Tempo control: −  ♩ = NN (in the metronome)  + ──────────────
-            root.spawn(Node {
+            left.spawn(Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(10.0),
@@ -764,11 +733,65 @@ pub fn setup(
                 ));
             });
 
-            root.spawn((
+            left.spawn((
                 Text::new(String::from(loc.msg("bending-hint"))),
                 TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
+            });
+
+            // ── Right half: the harmonica — bend diagram + its explanatory
+            // text, the same grouping `jam_session::setup` uses for its own
+            // harmonica column.
+            root.spawn(Node {
+                width: Val::Percent(50.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(10.0),
+                padding: UiRect::all(Val::Px(16.0)),
+                ..default()
+            })
+            .with_children(|right| {
+                // The bend diagram (rebuilt on key change).
+                right.spawn((Node::default(), OverlayHost))
+                    .with_children(|host| {
+                        spawn_harmonica_overlay_selectable(
+                            host,
+                            &richter_harp(&key.0),
+                            on_diagram_cell_clicked,
+                            &loc,
+                        );
+                    });
+
+                right.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    width: Val::Px(280.0),
+                    row_gap: Val::Px(8.0),
+                    ..default()
+                })
+                .with_children(|col| {
+                    col.spawn((
+                        Node { padding: UiRect::all(Val::Px(8.0)), ..default() },
+                        BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
+                    ))
+                    .with_children(|p| {
+                        p.spawn((
+                            Text::new(technique_hint(target.technique, target.hole)),
+                            TextFont { font_size: FontSize::Px(15.0), ..default() },
+                            TextColor(Color::srgb(0.75, 0.75, 0.85)),
+                            HintLabel,
+                        ));
+                    });
+                    col.spawn((
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(15.0), ..default() },
+                        TextColor(Color::srgb(0.60, 0.60, 0.70)),
+                        DrillExplanation,
+                    ));
+                });
+            });
         });
 }
 
