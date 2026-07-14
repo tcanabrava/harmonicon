@@ -226,7 +226,11 @@ pub(super) fn repopulate_lesson_list(
 
 /// One row per lesson of the shown unit: a clickable button opening the
 /// reader (✓-prefixed once passed — a passed lesson stays replayable), or a
-/// dimmed 🔒 row while its prerequisites aren't met.
+/// dimmed 🔒 row while its prerequisites aren't met. Under `--features dev`
+/// every lesson is treated as unlocked regardless of prerequisites — a dev
+/// convenience for jumping straight to any lesson while iterating, not a
+/// change to `is_unlocked` itself (which stays a plain prerequisite check,
+/// still fully exercised by its own unit tests).
 fn populate_lesson_rows(
     commands: &mut Commands,
     list: Entity,
@@ -238,15 +242,16 @@ fn populate_lesson_rows(
 ) {
     let passed = profile.passed_lesson_ids();
     for entry in unit_lessons {
+        let unlocked = cfg!(feature = "dev") || is_unlocked(&entry.manifest, &passed);
         let title = String::from(loc.msg(&entry.manifest.title_key));
-        let label = if !is_unlocked(&entry.manifest, &passed) {
+        let label = if !unlocked {
             format!("\u{1F512} {} \u{2014} {}", title, loc.msg("lesson-locked"))
         } else if passed.contains(&entry.manifest.id.as_str()) {
             format!("\u{2713} {}", title)
         } else {
             title
         };
-        if is_unlocked(&entry.manifest, &passed) {
+        if unlocked {
             let id = entry.manifest.id.clone();
             spawn_button(
                 commands,
