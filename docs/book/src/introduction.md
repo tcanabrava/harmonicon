@@ -35,8 +35,9 @@ to practice next.
   behave the way you expect.
 
 If you're brand new, the in-game **[Guided Tour](tutorial.md)** (Main Menu →
-Tutorial) gives you a 20-second, click-free walk through every top-level
-screen — a good first stop before diving into this book.
+Tutorial) gives you a click-free, under-a-minute walk through every
+top-level screen — including a few live seconds of actual gameplay — a
+good first stop before diving into this book.
 
 > **A note on screenshots:** the images throughout this book are
 > placeholders pending real captures from a running build. If you're

@@ -36,7 +36,7 @@ use bevy::audio::Volume;
 use crate::{
     audio_system::midi::{midi_to_freq_hz, note_to_midi},
     audio_system::pitch_detect::{AudioFrame, PitchEvent, PitchInfo, PitchRange},
-    menu::{AppState, GameplayMode, SelectedSong},
+    menu::{AppState, GameplayMode, SelectedSong, tutorial::tour_active},
     settings::AudioSettings,
     song::{SongManifest, chart::Modifier},
 };
@@ -165,7 +165,9 @@ impl Plugin for GameplayPlugin {
                 bending_trainer::update_tuner_readout,
                 bending_trainer::drill_update,
                 bending_trainer::update_drill_label,
-                bending_trainer::handle_escape,
+                // Suspended while the guided tour is showing this screen —
+                // Esc shouldn't leave out from under it (see `menu::tutorial`).
+                bending_trainer::handle_escape.run_if(not(tour_active)),
             )
                 .run_if(in_state(AppState::BendingTrainer)),
         )
@@ -178,9 +180,12 @@ impl Plugin for GameplayPlugin {
         // Pause input always runs during Playing (even when paused). The pause
         // buttons carry their own click/hover behaviour as inline `on(...)`
         // observers (see `setup_pause_menu`), so no button systems here.
+        // Suspended while the guided tour is showing a live-gameplay step —
+        // Esc shouldn't pause out from under it (see `menu::tutorial`).
         .add_systems(
             Update,
-            pause_menu::handle_pause_input.run_if(in_state(AppState::Playing)),
+            pause_menu::handle_pause_input
+                .run_if(in_state(AppState::Playing).and_then(not(tour_active))),
         )
         // Apply live volume changes to the playing song (even while paused).
         .add_systems(

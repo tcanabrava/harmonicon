@@ -13,9 +13,10 @@ section:
 - **Options** — audio, note style, harmonica model, and microphone
   settings. See [Options](options.md).
 - **Credits** — the people and tools behind Harmonicon.
-- **Tutorial** — a short, automatic tour of every screen listed above,
-  narrated with brief on-screen captions. See [Guided Tour](tutorial.md).
-  A good first stop if you're new.
+- **Tutorial** — a short, automatic tour of every screen listed above —
+  including a few live seconds of actual gameplay, Jam Session, the
+  Bending Trainer, and the Song Editor, not just menu captions. See
+  [Guided Tour](tutorial.md). A good first stop if you're new.
 - **Song Editor** — author or edit `.harpchart` files. See
   [Song Editor](song-editor.md).
 - **Quit** — exits the game.

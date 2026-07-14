@@ -16,6 +16,7 @@
 use bevy::prelude::*;
 
 use crate::menu::AppState;
+use crate::menu::tutorial::tour_active;
 use crate::theme::LoadedTheme;
 
 mod grid;
@@ -101,7 +102,10 @@ impl Plugin for SongEditor2Plugin {
                     playback::update_progress_bar.after(playback::advance_playhead),
                     // Practice tick runs after the playhead advances so `elapsed` is current.
                     practice::practice_tick.after(playback::advance_playhead),
-                    interaction::grid_keys,
+                    // Suspended while the guided tour is showing this
+                    // screen — Esc/Delete shouldn't act on it out from
+                    // under the tour (see `menu::tutorial`).
+                    interaction::grid_keys.run_if(not(tour_active)),
                     interaction::type_into_field,
                     interaction::live_resize,
                     interaction::update_move_ghost,

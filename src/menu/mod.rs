@@ -24,7 +24,7 @@ mod lessons;
 mod options;
 
 mod theme_picker;
-mod tutorial;
+pub(crate) mod tutorial;
 
 use super::dialogs::button_material::{
     ButtonMaterialPlugin, ButtonMaterials, ButtonShaderLayer, ButtonVisual, ThemedButton,
@@ -180,19 +180,21 @@ impl Plugin for MenuPlugin {
                 Update,
                 lessons::repopulate_lesson_list.run_if(in_state(MenuPage::Lessons)),
             )
-            // The guided tour drives `NextState<MenuPage>` itself on a
-            // timer, independent of whichever specific page is currently
-            // showing — both systems run for all of `AppState::Menu`, not
-            // gated to one page, and the overlay sync must see the tour
-            // resource change after it ticks.
+            // The guided tour drives `NextState<AppState>`/`NextState<
+            // MenuPage>` itself on a timer, and some steps leave
+            // `AppState::Menu` entirely (a live gameplay/Bending Trainer/
+            // Song Editor look) — so unlike every other system here, these
+            // two run unconditionally (each checks `Option<Res<
+            // TutorialTour>>` itself) rather than being gated to one page
+            // or even to `AppState::Menu`. The overlay sync must see the
+            // tour resource change after it ticks, hence `.chain()`.
             .add_systems(
                 Update,
                 (
                     tutorial::advance_tutorial_tour,
                     tutorial::sync_tutorial_overlay,
                 )
-                    .chain()
-                    .run_if(in_state(AppState::Menu)),
+                    .chain(),
             )
             // If a combobox dropdown was open, its own Escape handler closes
             // it and consumes the keypress — this handler never sees it, so
@@ -204,10 +206,7 @@ impl Plugin for MenuPlugin {
                 Update,
                 handle_menu_escape
                     .after(super::dialogs::combobox::close_open_comboboxes_on_escape)
-                    .run_if(
-                        in_state(AppState::Menu)
-                            .and_then(not(resource_exists::<tutorial::TutorialTour>)),
-                    ),
+                    .run_if(in_state(AppState::Menu).and_then(not(tutorial::tour_active))),
             );
     }
 }
@@ -789,6 +788,7 @@ pub(super) fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<Men
 /// stops being in flight (Results→Retry never passes through the menu, so
 /// retries keep their context).
 fn route_menu_entry(
+    tour: Option<Res<tutorial::TutorialTour>>,
     lesson: Option<Res<crate::lessons::LessonContext>>,
     generated_jam: Option<Res<crate::jam_backing::GeneratedJamSession>>,
     mut ret_song: ResMut<ReturnToSongList>,
@@ -796,6 +796,20 @@ fn route_menu_entry(
     mut next_page: ResMut<NextState<MenuPage>>,
     mut commands: Commands,
 ) {
+    // The guided tour takes full priority over every other routing flag
+    // below while it's running — a tour step re-entering `Menu` (e.g. after
+    // a live-gameplay step) must land wherever *the tour* says, not
+    // wherever an unrelated, possibly-stale flag from before the tour
+    // started says. Those flags are left untouched (not consumed) rather
+    // than acted on, so whichever one would have applied still does once
+    // the tour actually ends.
+    if let Some(tour) = tour {
+        next_page.set(tutorial::tour_menu_landing(&tour));
+        if tutorial::tour_finished(&tour) {
+            commands.remove_resource::<tutorial::TutorialTour>();
+        }
+        return;
+    }
     if lesson.is_some() {
         commands.remove_resource::<crate::lessons::LessonContext>();
         // "Quit Song" sets this unconditionally; for a lesson run the lesson
