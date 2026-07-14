@@ -162,10 +162,8 @@ fn setup(
         &mut commands,
         root,
         "\u{2190} Back to Options",
-        Some("BackToOptions"),
         &theme,
         &btn_mats,
-        "Theme",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Options),
     );
 }

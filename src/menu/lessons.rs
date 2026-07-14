@@ -319,10 +319,8 @@ fn spawn_back_to_main(
         commands,
         root,
         &loc.msg("back"),
-        Some("BackToMain"),
         theme,
         btn_mats,
-        "Lessons",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
     );
 }
@@ -413,10 +411,8 @@ pub(super) fn setup_lesson_reader(
                 &mut commands,
                 root,
                 &loc.msg("lesson-start"),
-                None,
                 &theme,
                 &btn_mats,
-                "Lessons",
                 move |_: On<Pointer<Click>>,
                       asset_server: Res<AssetServer>,
                       mut mode: ResMut<GameplayMode>,
@@ -449,10 +445,8 @@ pub(super) fn setup_lesson_reader(
                 &mut commands,
                 root,
                 &loc.msg("lesson-mark-done"),
-                None,
                 &theme,
                 &btn_mats,
-                "Lessons",
                 move |_: On<Pointer<Click>>,
                       mut profile: ResMut<PlayerProfile>,
                       mut page: ResMut<NextState<MenuPage>>| {
@@ -482,10 +476,8 @@ fn spawn_back_to_lessons(
         commands,
         root,
         &loc.msg("back"),
-        Some("BackToLessons"),
         theme,
         btn_mats,
-        "Lessons",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
             page.set(MenuPage::Lessons)
         },

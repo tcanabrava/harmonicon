@@ -298,52 +298,29 @@ pub(super) fn spawn_menu_root(
     root
 }
 
-/// Spawn a single button as a child of `parent`.
-///
-/// When the theme JSON defines coords for this button in `menu_id`, the button
-/// is absolutely positioned at those pixel coordinates. Otherwise it joins the
-/// normal flex flow of the parent.
+/// Spawn a single button as a child of `parent`, in the normal flex flow —
+/// themes control appearance (background/effects) only, never layout, so
+/// there's no per-button positioning to resolve here.
 ///
 /// When the theme has shaders the button also gets a smoke background layer,
 /// an optional icon, and audio on hover/click.
 ///
 /// `on_click` is the button's own dedicated click behaviour, wired inline as the
 /// `on(...)` callback (plain buttons) or via `observe` (themed buttons).
-/// `coord_id` is the optional theme-JSON key used to look up fixed coordinates.
 pub(super) fn spawn_button<M: 'static>(
     commands: &mut Commands,
     parent: Entity,
     label: &str,
-    coord_id: Option<&str>,
     theme: &LoadedTheme,
     btn_mats: &ButtonMaterials,
-    menu_id: &str,
     on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
 ) {
-    // Resolve pixel coords from the theme JSON (if defined for this button).
-    let coords = coord_id
-        .and_then(|id| theme.button_coords(menu_id, id))
-        .cloned();
-
-    // Build the layout node: absolute when coords exist, flex-flow otherwise.
-    let node = match &coords {
-        Some(c) => Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(c.x),
-            top: Val::Px(c.y),
-            width: Val::Px(c.width),
-            height: Val::Px(c.height),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        None => Node {
-            min_width: Val::Px(260.0),
-            padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        },
+    let node = Node {
+        min_width: Val::Px(260.0),
+        padding: UiRect::axes(Val::Px(32.0), Val::Px(14.0)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
     };
 
     // Children are `Pickable::IGNORE` so the pointer always hits the button
@@ -472,20 +449,16 @@ fn setup_main_menu(
         &mut commands,
         root,
         &loc.msg("menu-play"),
-        Some("Play"),
         &theme,
         &btn_mats,
-        "Main",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
     spawn_button(
         &mut commands,
         root,
         &loc.msg("menu-lessons"),
-        Some("Lessons"),
         &theme,
         &btn_mats,
-        "Main",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
             page.set(MenuPage::Lessons)
         },
@@ -493,33 +466,17 @@ fn setup_main_menu(
     spawn_button(
         &mut commands,
         root,
-        &loc.msg("menu-song-editor-2"),
-        Some("SongEditor2"),
-        &theme,
-        &btn_mats,
-        "Main",
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
-            state.set(AppState::SongEditor2)
-        },
-    );
-    spawn_button(
-        &mut commands,
-        root,
         &loc.msg("menu-options"),
-        Some("Options"),
         &theme,
         &btn_mats,
-        "Main",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Options),
     );
     spawn_button(
         &mut commands,
         root,
         &loc.msg("menu-credits"),
-        Some("Credits"),
         &theme,
         &btn_mats,
-        "Main",
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
             state.set(AppState::Credits)
         },
@@ -527,11 +484,19 @@ fn setup_main_menu(
     spawn_button(
         &mut commands,
         root,
-        &loc.msg("menu-quit"),
-        Some("Quit"),
+        &loc.msg("menu-song-editor-2"),
         &theme,
         &btn_mats,
-        "Main",
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
+            state.set(AppState::SongEditor2)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-quit"),
+        &theme,
+        &btn_mats,
         |_: On<Pointer<Click>>, mut exit: MessageWriter<AppExit>| {
             exit.write(AppExit::Success);
         },
@@ -551,10 +516,8 @@ fn setup_play_menu(
         &mut commands,
         root,
         &loc.msg("play-song"),
-        Some("PlaySong"),
         &theme,
         &btn_mats,
-        "Play",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
             page.set(MenuPage::ModeSelect)
         },
@@ -563,10 +526,8 @@ fn setup_play_menu(
         &mut commands,
         root,
         &loc.msg("jam-session"),
-        Some("JamSession"),
         &theme,
         &btn_mats,
-        "Play",
         |_: On<Pointer<Click>>,
          mut mode: ResMut<GameplayMode>,
          mut progression: ResMut<JamProgression>,
@@ -584,10 +545,8 @@ fn setup_play_menu(
         &mut commands,
         root,
         &loc.msg("jam-generate"),
-        Some("JamGenerate"),
         &theme,
         &btn_mats,
-        "Play",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
             page.set(MenuPage::JamGenerate)
         },
@@ -596,10 +555,8 @@ fn setup_play_menu(
         &mut commands,
         root,
         &loc.msg("bending-trainer"),
-        Some("BendingTrainer"),
         &theme,
         &btn_mats,
-        "Play",
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
             state.set(AppState::BendingTrainer)
         },
@@ -608,10 +565,8 @@ fn setup_play_menu(
         &mut commands,
         root,
         &loc.msg("back"),
-        Some("BackToMain"),
         &theme,
         &btn_mats,
-        "Play",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
     );
 }
@@ -655,10 +610,8 @@ fn setup_artist_list(
                 &mut commands,
                 root,
                 &label,
-                None,
                 &theme,
                 &btn_mats,
-                "ArtistList",
                 move |_: On<Pointer<Click>>,
                       mut selected: ResMut<SelectedArtist>,
                       mut page: ResMut<NextState<MenuPage>>| {
@@ -672,10 +625,8 @@ fn setup_artist_list(
         &mut commands,
         root,
         &loc.msg("back"),
-        Some("BackToPlay"),
         &theme,
         &btn_mats,
-        "ArtistList",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
 }
@@ -707,10 +658,8 @@ fn setup_song_list(
                 &mut commands,
                 root,
                 &song.name,
-                None,
                 &theme,
                 &btn_mats,
-                "SongList",
                 move |_: On<Pointer<Click>>,
                       asset_server: Res<AssetServer>,
                       mut state: ResMut<NextState<AppState>>,
@@ -727,10 +676,8 @@ fn setup_song_list(
         &mut commands,
         root,
         &loc.msg("back"),
-        Some("BackToArtistList"),
         &theme,
         &btn_mats,
-        "SongList",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
             page.set(MenuPage::ArtistList)
         },
@@ -755,10 +702,8 @@ fn setup_mode_select(
         &mut commands,
         root,
         &loc.msg("play-2d"),
-        Some("PlayMode2D"),
         &theme,
         &btn_mats,
-        "ModeSelect",
         |_: On<Pointer<Click>>,
          mut mode: ResMut<GameplayMode>,
          mut page: ResMut<NextState<MenuPage>>| {
@@ -770,10 +715,8 @@ fn setup_mode_select(
         &mut commands,
         root,
         &loc.msg("play-3d"),
-        Some("PlayMode3D"),
         &theme,
         &btn_mats,
-        "ModeSelect",
         |_: On<Pointer<Click>>,
          mut mode: ResMut<GameplayMode>,
          mut page: ResMut<NextState<MenuPage>>| {
@@ -785,10 +728,8 @@ fn setup_mode_select(
         &mut commands,
         root,
         &loc.msg("back"),
-        Some("BackToPlay"),
         &theme,
         &btn_mats,
-        "ModeSelect",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
 }

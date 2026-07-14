@@ -42,28 +42,11 @@
       }
     },
 
-    "coords": {
-      "description": "Absolute position and size in pixels for a UI element.",
-      "type": "object",
-      "required": ["x", "y", "width", "height"],
-      "additionalProperties": false,
-      "properties": {
-        "x":      { "type": "number" },
-        "y":      { "type": "number" },
-        "width":  { "type": "number", "minimum": 0 },
-        "height": { "type": "number", "minimum": 0 }
-      }
-    },
-
     "button_def": {
-      "description": "Appearance of a single button.  Used both for default_menu_button and for per-menu button overrides.  All fields are optional so a per-menu entry only needs to specify what differs from the default.",
+      "description": "Appearance of the default button style. Themes control appearance only (background image, icon, shaders, sounds) — never layout/position, which is always the page's own flex flow.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Button identifier.  Must match a MenuButton enum variant name (e.g. Play, BackToMain).  Required for per-menu buttons; omitted on default_menu_button."
-        },
         "description":      { "type": "string" },
         "background_image": { "$ref": "#/$defs/image_with_shader" },
         "icon": {
@@ -77,24 +60,18 @@
           }
         },
         "button_shaders": { "$ref": "#/$defs/state_shaders" },
-        "button_sounds":  { "$ref": "#/$defs/state_sounds" },
-        "coords":         { "$ref": "#/$defs/coords" }
+        "button_sounds":  { "$ref": "#/$defs/state_sounds" }
       }
     },
 
     "menu_def": {
-      "description": "One named menu screen.  Both background_image and buttons are optional: a screen can have only a background (e.g. Credits), only buttons (e.g. ArtistList), or both.",
+      "description": "One named menu screen. background_image is optional: a screen can have its own background image or fall back to default_background.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "background_image": {
           "type": "string",
           "description": "Path to the background image for this menu screen, relative to the theme directory."
-        },
-        "buttons": {
-          "type": "array",
-          "description": "Ordered list of buttons with fixed pixel positions on this screen.",
-          "items": { "$ref": "#/$defs/button_def" }
         }
       }
     }
@@ -112,7 +89,7 @@
     },
 
     "default_menu_button": {
-      "description": "Fallback button appearance used when a per-menu button entry omits a field.",
+      "description": "Appearance applied to every button in the app.",
       "$ref": "#/$defs/button_def"
     },
 

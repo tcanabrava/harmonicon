@@ -180,10 +180,8 @@ pub(super) fn setup_jam_generate_menu(
         &mut commands,
         root,
         &loc.msg("jam-generate-start"),
-        None,
         &theme,
         &btn_mats,
-        "JamGenerate",
         |_: On<Pointer<Click>>,
          config: Res<JamGenerateConfig>,
          theme: Res<LoadedTheme>,
@@ -222,10 +220,8 @@ pub(super) fn setup_jam_generate_menu(
         &mut commands,
         root,
         &loc.msg("back"),
-        Some("BackToPlay"),
         &theme,
         &btn_mats,
-        "JamGenerate",
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
 }

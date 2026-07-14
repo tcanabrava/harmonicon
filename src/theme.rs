@@ -69,22 +69,6 @@ struct BackgroundThemeJson {
 struct MenuThemeJson {
     #[serde(default)]
     background_image: Option<String>,
-    #[serde(default)]
-    buttons: Vec<ButtonEntryJson>,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-struct ButtonEntryJson {
-    id: String,
-    coords: CoordsJson,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-struct CoordsJson {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
 }
 
 /// Per-theme color overrides for optional subsystems. Add further fields here
@@ -210,18 +194,10 @@ impl Default for SongEditorColors {
 
 // ── Runtime resource ──────────────────────────────────────────────────────────
 
-/// Pixel rect for a single button, read from the theme JSON.
-#[derive(Clone, Debug)]
-pub struct ButtonCoords {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-}
-
 /// Theme assets resolved at startup from `themes/<selected>/theme.json`.
 /// Menus and buttons read this resource to apply backgrounds, icons, sounds,
-/// shader flags, and per-button coordinates.
+/// and shader flags — themes control appearance only; layout (where a
+/// button sits) is always the page's own flex flow, never theme-specified.
 #[derive(Resource, Default)]
 pub struct LoadedTheme {
     /// Background per named menu key (e.g. "Main", "Play", "Credits").
@@ -236,9 +212,6 @@ pub struct LoadedTheme {
     pub btn_sound_click: Option<Handle<AudioSource>>,
     /// True when the theme ships the three smoke-shader WGSL files.
     pub has_shaders: bool,
-    /// Per-menu, per-button pixel coordinates: `menu_id → button_id → coords`.
-    /// Button ids match the `MenuButton` variant names (e.g. "Play", "BackToMain").
-    pub button_coords: HashMap<String, HashMap<String, ButtonCoords>>,
     pub colors: Option<ThemeColorsJson>,
 }
 
@@ -248,11 +221,6 @@ impl LoadedTheme {
         self.menu_backgrounds
             .get(menu_id)
             .or(self.default_background.as_ref())
-    }
-
-    /// Pixel rect for `button_id` on `menu_id`, or `None` if not specified.
-    pub fn button_coords(&self, menu_id: &str, button_id: &str) -> Option<&ButtonCoords> {
-        self.button_coords.get(menu_id)?.get(button_id)
     }
 
     /// Song editor colors for the active theme, or [`SongEditorColors::default`]
@@ -371,24 +339,6 @@ fn load_theme(
                 .menu_backgrounds
                 .insert(menu_id.clone(), asset_server.load(format!("{prefix}{bg}")));
         }
-        if !menu.buttons.is_empty() {
-            let coords: HashMap<String, ButtonCoords> = menu
-                .buttons
-                .iter()
-                .map(|b| {
-                    (
-                        b.id.clone(),
-                        ButtonCoords {
-                            x: b.coords.x,
-                            y: b.coords.y,
-                            width: b.coords.width,
-                            height: b.coords.height,
-                        },
-                    )
-                })
-                .collect();
-            theme.button_coords.insert(menu_id.clone(), coords);
-        }
     }
 
     if let Some(icon) = &data.default_menu_button.icon {
@@ -447,31 +397,6 @@ mod tests {
     // ── JSON parsing ──────────────────────────────────────────────────────
 
     #[test]
-    fn theme_json_parses_button_coords() {
-        let json = r#"{
-            "name": "Test",
-            "default_background": { "image": "" },
-            "menus": {
-                "Main": {
-                    "buttons": [
-                        { "id": "Play",    "coords": { "x": 510, "y": 260, "width": 260, "height": 50 } },
-                        { "id": "Options", "coords": { "x": 510, "y": 326, "width": 260, "height": 50 } }
-                    ]
-                }
-            }
-        }"#;
-        let data: ThemeJson = serde_json::from_str(json).unwrap();
-        let main = data.menus.get("Main").unwrap();
-        assert_eq!(main.buttons.len(), 2);
-        let play = &main.buttons[0];
-        assert_eq!(play.id, "Play");
-        assert_eq!(play.coords.x, 510.0);
-        assert_eq!(play.coords.y, 260.0);
-        assert_eq!(play.coords.width, 260.0);
-        assert_eq!(play.coords.height, 50.0);
-    }
-
-    #[test]
     fn theme_json_shaders_field_is_optional() {
         let with_shaders = r#"{
             "name": "T",
@@ -496,67 +421,28 @@ mod tests {
     }
 
     #[test]
-    fn theme_json_menu_without_buttons_defaults_to_empty_vec() {
+    fn theme_json_menu_without_background_leaves_it_none() {
+        let json = r#"{
+            "name": "T",
+            "default_background": { "image": "" },
+            "menus": { "Credits": {} }
+        }"#;
+        let d: ThemeJson = serde_json::from_str(json).unwrap();
+        assert!(d.menus["Credits"].background_image.is_none());
+    }
+
+    #[test]
+    fn theme_json_menu_with_background_reads_it() {
         let json = r#"{
             "name": "T",
             "default_background": { "image": "" },
             "menus": { "Credits": { "background_image": "bg.png" } }
         }"#;
         let d: ThemeJson = serde_json::from_str(json).unwrap();
-        assert!(d.menus["Credits"].buttons.is_empty());
         assert_eq!(
             d.menus["Credits"].background_image.as_deref(),
             Some("bg.png")
         );
-    }
-
-    // ── LoadedTheme::button_coords ────────────────────────────────────────
-
-    fn theme_with_main_buttons() -> LoadedTheme {
-        let mut theme = LoadedTheme::default();
-        let mut btns = HashMap::new();
-        btns.insert(
-            "Play".into(),
-            ButtonCoords {
-                x: 510.0,
-                y: 260.0,
-                width: 260.0,
-                height: 50.0,
-            },
-        );
-        btns.insert(
-            "Quit".into(),
-            ButtonCoords {
-                x: 510.0,
-                y: 458.0,
-                width: 260.0,
-                height: 50.0,
-            },
-        );
-        theme.button_coords.insert("Main".into(), btns);
-        theme
-    }
-
-    #[test]
-    fn button_coords_returns_correct_values() {
-        let theme = theme_with_main_buttons();
-        let c = theme.button_coords("Main", "Play").unwrap();
-        assert_eq!(c.x, 510.0);
-        assert_eq!(c.y, 260.0);
-        assert_eq!(c.width, 260.0);
-        assert_eq!(c.height, 50.0);
-    }
-
-    #[test]
-    fn button_coords_returns_none_for_unknown_menu() {
-        let theme = theme_with_main_buttons();
-        assert!(theme.button_coords("Play", "Play").is_none());
-    }
-
-    #[test]
-    fn button_coords_returns_none_for_unknown_button() {
-        let theme = theme_with_main_buttons();
-        assert!(theme.button_coords("Main", "BackToMain").is_none());
     }
 
     // ── LoadedTheme::background_for ───────────────────────────────────────
