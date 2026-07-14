@@ -8,7 +8,10 @@ use bevy::{
 };
 use thiserror::Error;
 
-use super::{SongManifest, chart::HarpChart};
+use super::{
+    SongManifest,
+    chart::{CURRENT_FORMAT_VERSION, HarpChart, format_version_supported},
+};
 
 const SCHEMA: &str = include_str!("../../assets/song_schema.dtd.json");
 
@@ -61,6 +64,24 @@ impl AssetLoader for SongChartLoader {
 
         // Validation passed — deserialize into typed structs.
         let chart: HarpChart = serde_json::from_value(chart_value)?;
+
+        // Catch a chart authored for a newer spec than this build's loader
+        // understands up front, with a clear message — rather than either
+        // silently misreading a field whose meaning later changed, or
+        // failing on some confusing downstream `additionalProperties`
+        // schema error instead. See `chart::format_version_supported`.
+        let declared_version = chart
+            .metadata
+            .as_ref()
+            .and_then(|m| m.format_version.as_deref());
+        if !format_version_supported(declared_version, CURRENT_FORMAT_VERSION) {
+            return Err(SongLoadError::Validation(format!(
+                "chart declares metadata.format_version {declared:?}, which this build's loader \
+                 (understands up to {CURRENT_FORMAT_VERSION}) can't load — update Harmonicon, or \
+                 fix the chart's declared version if it was set in error",
+                declared = declared_version.unwrap_or("<missing>"),
+            )));
+        }
 
         // Materialise the parent path before calling load() to avoid holding
         // an immutable borrow on load_context across its mutable load() calls.

@@ -25,6 +25,80 @@ pub struct Metadata {
     pub description: Option<String>,
 }
 
+/// The newest `metadata.format_version` this build's loader understands —
+/// bump it whenever a chart-schema change lands (see CLAUDE.md's Chart
+/// format notes) so `song::loader` can catch a chart authored for a newer
+/// spec than this build supports up front, with a clear error, instead of
+/// failing on some confusing downstream `additionalProperties` schema
+/// rejection or (worse) silently misreading a field whose meaning changed.
+pub const CURRENT_FORMAT_VERSION: &str = "1.1.0";
+
+/// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
+/// `None` for anything that isn't exactly three dot-separated integers.
+fn parse_format_version(version: &str) -> Option<(u32, u32, u32)> {
+    let mut parts = version.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    let patch = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((major, minor, patch))
+}
+
+/// Whether this build's loader can load a chart declaring `chart_version`,
+/// compared against `current_version` (pass [`CURRENT_FORMAT_VERSION`] in
+/// production — a parameter only so tests can pin an expected value
+/// independent of whatever the constant currently is). `None` (no
+/// `metadata.format_version` at all — most charts predate this field) is
+/// always supported: an absent version can't be newer than anything. A
+/// malformed version string is treated as unsupported — that's more likely
+/// a content bug than a version the loader should silently accept.
+pub fn format_version_supported(chart_version: Option<&str>, current_version: &str) -> bool {
+    let Some(chart_version) = chart_version else {
+        return true;
+    };
+    let Some(current) = parse_format_version(current_version) else {
+        return false;
+    };
+    match parse_format_version(chart_version) {
+        Some(chart) => chart <= current,
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod format_version_tests {
+    use super::*;
+
+    #[test]
+    fn no_declared_version_is_always_supported() {
+        assert!(format_version_supported(None, "1.1.0"));
+    }
+
+    #[test]
+    fn an_older_or_equal_version_is_supported() {
+        assert!(format_version_supported(Some("1.0.0"), "1.1.0"));
+        assert!(format_version_supported(Some("1.1.0"), "1.1.0"));
+        assert!(format_version_supported(Some("0.9.9"), "1.1.0"));
+    }
+
+    #[test]
+    fn a_newer_version_is_not_supported() {
+        assert!(!format_version_supported(Some("1.2.0"), "1.1.0"));
+        assert!(!format_version_supported(Some("2.0.0"), "1.1.0"));
+        assert!(!format_version_supported(Some("1.1.1"), "1.1.0"));
+    }
+
+    #[test]
+    fn a_malformed_version_is_not_supported() {
+        assert!(!format_version_supported(Some("not-a-version"), "1.1.0"));
+        assert!(!format_version_supported(Some("1.1"), "1.1.0"));
+        assert!(!format_version_supported(Some("1.1.0.1"), "1.1.0"));
+        assert!(!format_version_supported(Some(""), "1.1.0"));
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Song {
     pub title: String,
