@@ -38,7 +38,7 @@ const SNAP_THRESHOLD_SECS: f64 = 0.5;
 /// sink's playback position) when it's known. `audio_pos` is `None` during
 /// the countdown, in Jam Session, and before the sink reports a position —
 /// callers fall back to plain frame-delta accumulation in those cases.
-fn advance_clock(current: f64, dt: f64, audio_pos: Option<f64>) -> f64 {
+const fn advance_clock(current: f64, dt: f64, audio_pos: Option<f64>) -> f64 {
     let projected = current + dt;
     let Some(audio_pos) = audio_pos else {
         return projected;
@@ -55,12 +55,12 @@ impl GameplayClock {
     /// Construct a clock already at `t` — for a freshly-inserted
     /// `GameplayClock` resource (setup, tests) there's no prior game state
     /// to invalidate and no sink to desync from, so no seeking is needed.
-    pub fn new(t: f64) -> Self {
+    pub const fn new(t: f64) -> Self {
         Self(t)
     }
 
     /// The current clock value (negative during the countdown).
-    pub fn get(&self) -> f64 {
+    pub const fn get(&self) -> f64 {
         self.0
     }
 
@@ -69,14 +69,14 @@ impl GameplayClock {
     /// the countdown, Jam Session, and the Bending Trainer (neither anchors
     /// to a music sink at all). Anything that might run while a song is
     /// actively anchored must use [`rewind_to`](Self::rewind_to) instead.
-    pub fn set_free(&mut self, t: f64) {
+    pub const fn set_free(&mut self, t: f64) {
         self.0 = t;
     }
 
     /// Advance the clock by `dt`, re-anchoring toward `audio_pos` when it's
     /// known. This is [`tick_clock`](super::tick_clock)'s own per-frame
     /// update, not a jump — see [`rewind_to`](Self::rewind_to) for that.
-    pub fn advance(&mut self, dt: f64, audio_pos: Option<f64>) {
+    pub const fn advance(&mut self, dt: f64, audio_pos: Option<f64>) {
         self.0 = advance_clock(self.0, dt, audio_pos);
     }
 
