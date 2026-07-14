@@ -53,6 +53,46 @@ pub fn small<M: 'static>(
     }
 }
 
+/// A button with an exact (not minimum) width and caller-chosen font size —
+/// for lists where every row must come out the same size regardless of how
+/// long its label is (e.g. the Lessons list: title lengths vary a lot, and
+/// `default`'s `min_width`-only sizing let long titles grow wider than
+/// short ones instead of lining every row up). Text wraps within `width` by
+/// bevy_ui's own default text layout if the caller's `font_size` doesn't
+/// keep the label to one line — pick `font_size` (see
+/// `menu::lessons::lesson_button_font_size` for the pattern) so that
+/// shouldn't happen in practice.
+pub fn sized<M: 'static>(
+    label: &str,
+    width: f32,
+    font_size: f32,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
+) -> impl Scene {
+    bsn! {
+        Button
+        BackgroundColor({color_default()})
+        on(on_click)
+        on(mouse_over)
+        on(mouse_out)
+        Node {
+            width: {Val::Px(width)},
+            padding: {UiRect::axes(Val::Px(16.0), Val::Px(12.0))},
+            justify_content: {JustifyContent::Center},
+            align_items: {AlignItems::Center},
+            flex_shrink: {0.0_f32},
+        }
+        Children [
+            (
+                Text({label.to_string()})
+                TextFont { font_size: {FontSize::Px(font_size)} }
+                TextColor({Color::WHITE})
+                TextLayout { justify: {Justify::Center} }
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
+}
+
 pub fn default<M: 'static>(
     label: &str,
     on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,

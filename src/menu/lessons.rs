@@ -11,6 +11,7 @@ use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 use bevy_fluent::Localization;
 
+use crate::dialogs::button;
 use crate::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 use crate::lessons::{AvailableLessons, LessonContext, LessonEntry, PassCriteria, group_by_unit, is_unlocked};
 use crate::localization::LocalizationExt;
@@ -174,8 +175,6 @@ pub(super) fn setup_lessons_menu(
         list,
         units[ix].1.as_slice(),
         &profile,
-        &theme,
-        &btn_mats,
         &loc,
     );
 
@@ -194,8 +193,6 @@ pub(super) fn repopulate_lesson_list(
     lessons: Res<AvailableLessons>,
     profile: Res<PlayerProfile>,
     selected_unit: Res<SelectedUnitIx>,
-    theme: Res<LoadedTheme>,
-    btn_mats: Res<ButtonMaterials>,
     loc: Res<Localization>,
     list: Query<Entity, With<LessonListBox>>,
     mut commands: Commands,
@@ -213,15 +210,28 @@ pub(super) fn repopulate_lesson_list(
     }
     let ix = selected_unit.0.min(units.len() - 1);
     commands.entity(list).despawn_related::<Children>();
-    populate_lesson_rows(
-        &mut commands,
-        list,
-        units[ix].1.as_slice(),
-        &profile,
-        &theme,
-        &btn_mats,
-        &loc,
-    );
+    populate_lesson_rows(&mut commands, list, units[ix].1.as_slice(), &profile, &loc);
+}
+
+/// Fixed width every lesson-list row (locked or not) is spawned at, so a
+/// long title never makes its row wider than a short one — matches the
+/// list container's own width (`setup_lessons_menu`) minus its padding.
+const LESSON_ROW_WIDTH: f32 = 500.0;
+
+/// Font size for a lesson-list row's label (already decorated with any
+/// 🔒/✓ prefix or " — locked" suffix — the caller passes the final display
+/// string). Bevy doesn't expose glyph metrics before layout, so this is a
+/// coarse character-count curve rather than a measured fit — chosen
+/// conservatively against the longest label any shipped locale actually
+/// produces (a long title plus the locked decoration, in the most verbose
+/// locale) so labels stay on one line at `LESSON_ROW_WIDTH` in practice.
+const fn lesson_button_font_size(char_count: usize) -> f32 {
+    match char_count {
+        0..=25 => 17.0,
+        26..=38 => 14.5,
+        39..=50 => 12.5,
+        _ => 11.0,
+    }
 }
 
 /// One row per lesson of the shown unit: a clickable button opening the
@@ -236,8 +246,6 @@ fn populate_lesson_rows(
     list: Entity,
     unit_lessons: &[&LessonEntry],
     profile: &PlayerProfile,
-    theme: &LoadedTheme,
-    btn_mats: &ButtonMaterials,
     loc: &Localization,
 ) {
     let passed = profile.passed_lesson_ids();
@@ -251,33 +259,49 @@ fn populate_lesson_rows(
         } else {
             title
         };
+        let font_size = lesson_button_font_size(label.chars().count());
         if unlocked {
             let id = entry.manifest.id.clone();
-            spawn_button(
-                commands,
-                list,
-                &label,
-                None,
-                theme,
-                btn_mats,
-                "Lessons",
-                move |_: On<Pointer<Click>>,
-                      mut selected: ResMut<SelectedLesson>,
-                      mut page: ResMut<NextState<MenuPage>>| {
-                    selected.0 = Some(id.clone());
-                    page.set(MenuPage::LessonReader);
-                },
-            );
+            commands.entity(list).with_children(|row| {
+                row.spawn_empty().apply_scene(button::sized(
+                    &label,
+                    LESSON_ROW_WIDTH,
+                    font_size,
+                    move |_: On<Pointer<Click>>,
+                          mut selected: ResMut<SelectedLesson>,
+                          mut page: ResMut<NextState<MenuPage>>| {
+                        selected.0 = Some(id.clone());
+                        page.set(MenuPage::LessonReader);
+                    },
+                ));
+            });
         } else {
             let row = commands
                 .spawn((
-                    Text::new(&label),
-                    TextFont {
-                        font_size: FontSize::Px(17.0),
+                    Node {
+                        width: Val::Px(LESSON_ROW_WIDTH),
+                        padding: UiRect::axes(Val::Px(16.0), Val::Px(12.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        flex_shrink: 0.0,
                         ..default()
                     },
-                    TextColor(Color::srgb(0.42, 0.44, 0.50)),
+                    BackgroundColor(Color::srgba(0.08, 0.08, 0.11, 0.6)),
                 ))
+                .with_children(|cell| {
+                    cell.spawn((
+                        Text::new(&label),
+                        TextFont {
+                            font_size: FontSize::Px(font_size),
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.42, 0.44, 0.50)),
+                        TextLayout {
+                            justify: Justify::Center,
+                            ..default()
+                        },
+                    ));
+                })
                 .id();
             commands.entity(list).add_child(row);
         }
@@ -466,4 +490,34 @@ fn spawn_back_to_lessons(
             page.set(MenuPage::Lessons)
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_titles_use_the_largest_size() {
+        assert_eq!(lesson_button_font_size(0), 17.0);
+        assert_eq!(lesson_button_font_size(25), 17.0);
+    }
+
+    #[test]
+    fn size_shrinks_in_steps_as_length_grows() {
+        assert_eq!(lesson_button_font_size(26), 14.5);
+        assert_eq!(lesson_button_font_size(38), 14.5);
+        assert_eq!(lesson_button_font_size(39), 12.5);
+        assert_eq!(lesson_button_font_size(50), 12.5);
+        assert_eq!(lesson_button_font_size(51), 11.0);
+    }
+
+    #[test]
+    fn the_longest_shipped_locked_label_still_fits_the_smallest_size() {
+        // "🔒 Leer la Rejilla del Blues de 12 Compases — bloqueada" (es-ES,
+        // the longest lesson title, decorated the way a locked row actually
+        // renders it) — the curve must not fall through to something even
+        // this doesn't have a tier for.
+        let longest = "\u{1F512} Leer la Rejilla del Blues de 12 Compases \u{2014} bloqueada";
+        assert!(lesson_button_font_size(longest.chars().count()) >= 11.0);
+    }
 }
