@@ -1,0 +1,20 @@
+# Summary
+
+[Introduction](introduction.md)
+
+- [Getting Started](getting-started.md)
+- [The Main Menu](main-menu.md)
+- [Playing a Song](playing-a-song.md)
+  - [Play 2D](play-2d.md)
+  - [Play 3D](play-3d.md)
+- [Jam Session](jam-session.md)
+- [Generate a Jam](jam-generate.md)
+- [Bending Trainer](bending-trainer.md)
+- [Lessons](lessons.md)
+- [Song Editor](song-editor.md)
+- [Options](options.md)
+- [Calibrating Input Lag](calibration.md)
+- [Themes](themes.md)
+- [Guided Tour](tutorial.md)
+- [Controls Reference](controls.md)
+- [Troubleshooting](troubleshooting.md)

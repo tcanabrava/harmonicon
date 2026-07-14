@@ -17,3 +17,6 @@ scripts/.venv/
 /packaging/flatpak/.flatpak-builder/
 /harmonicon.flatpak
 
+# mdbook build output (the source lives in docs/book/src/)
+/docs/book/book/
+

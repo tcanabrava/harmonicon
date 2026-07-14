@@ -1,0 +1,11 @@
+[book]
+title = "Harmonicon"
+description = "Player's guide to Harmonicon — a rhythm game for diatonic and chromatic harmonica."
+authors = ["Harmonicon contributors"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/tcanabrava/harmonicon"
