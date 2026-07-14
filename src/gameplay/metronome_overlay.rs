@@ -12,7 +12,7 @@ use crate::{
     localization::LocalizationExt,
     menu::{AppState, SelectedSong},
     settings::AudioSettings,
-    song::SongManifest,
+    song::{SongManifest, chart::Feel},
 };
 
 use super::{GameplayClock, Paused};
@@ -362,12 +362,25 @@ fn pill_out(ev: On<Pointer<Out>>, mut colors: Query<&mut BackgroundColor>) {
     }
 }
 
-/// On entering gameplay, seed the metronome tempo from the chosen song's chart.
-/// (The Bending Trainer sets `MetronomeTempo` itself, from its own controls.)
+/// Maps a chart's declared [`Feel`] onto the metronome's own feel type.
+/// `None` (the common case — most charts don't declare one) means "leave
+/// whatever the player currently has selected untouched", not "straight".
+fn feel_from_chart(chart_feel: Option<Feel>) -> Option<MetronomeFeel> {
+    match chart_feel? {
+        Feel::Straight => Some(MetronomeFeel::Straight),
+        Feel::Shuffle => Some(MetronomeFeel::Shuffle),
+    }
+}
+
+/// On entering gameplay, seed the metronome tempo — and, when the chart
+/// declares one, the feel — from the chosen song's chart. (The Bending
+/// Trainer sets `MetronomeTempo` itself, from its own controls, and has no
+/// chart to read a feel from.)
 fn set_tempo_from_song(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut tempo: ResMut<MetronomeTempo>,
+    mut feel: ResMut<MetronomeFeel>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
@@ -384,6 +397,9 @@ fn set_tempo_from_song(
         .next()
         .and_then(|n| n.parse::<usize>().ok())
         .unwrap_or(4);
+    if let Some(chart_feel) = feel_from_chart(manifest.chart.song.feel) {
+        *feel = chart_feel;
+    }
 }
 
 /// Keep the "♩ = NN" readout in step with the live tempo.
@@ -468,6 +484,23 @@ impl Plugin for MetronomePlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn feel_from_chart_maps_each_declared_feel() {
+        assert_eq!(
+            feel_from_chart(Some(crate::song::chart::Feel::Straight)),
+            Some(MetronomeFeel::Straight)
+        );
+        assert_eq!(
+            feel_from_chart(Some(crate::song::chart::Feel::Shuffle)),
+            Some(MetronomeFeel::Shuffle)
+        );
+    }
+
+    #[test]
+    fn feel_from_chart_is_none_when_the_chart_declares_nothing() {
+        assert_eq!(feel_from_chart(None), None);
+    }
 
     #[test]
     fn no_tick_before_the_song_starts() {

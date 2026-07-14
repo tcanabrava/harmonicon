@@ -147,6 +147,7 @@ pub fn generated_chart(key: &str, bpm: f32, progression: Progression, total_secs
             key: key.to_string(),
             time_signature: Some("4/4".to_string()),
             difficulty: Difficulty::Easy,
+            feel: None,
         },
         timing: Timing {
             resolution: 480,

@@ -70,6 +70,14 @@
             "advanced",
             "expert"
           ]
+        },
+        "feel": {
+          "type": "string",
+          "enum": [
+            "straight",
+            "shuffle"
+          ],
+          "description": "Metronome click subdivision this song is written for. Optional — omitting it leaves the player's current metronome feel choice untouched."
         }
       }
     },

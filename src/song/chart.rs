@@ -33,6 +33,10 @@ pub struct Song {
     pub key: String,
     pub time_signature: Option<String>,
     pub difficulty: Difficulty,
+    /// Metronome click subdivision this song is written for. `None` leaves
+    /// the player's current metronome feel choice untouched — see
+    /// `gameplay::metronome_overlay::set_tempo_from_song`.
+    pub feel: Option<Feel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +46,13 @@ pub enum Difficulty {
     Intermediate,
     Advanced,
     Expert,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Feel {
+    Straight,
+    Shuffle,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
