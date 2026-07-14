@@ -45,7 +45,7 @@ pub enum NoteOutcome {
 ///
 /// `offset` = `clock - note.time` (positive when the clock has passed the note).
 /// `playing_expected` is true when the player's current pitch matches the note.
-pub fn classify_note(
+pub const fn classify_note(
     offset: f64,
     playing_expected: bool,
     perfect_window: f64,
@@ -98,12 +98,12 @@ pub fn chord_is_sounding(expected: &[u8], harp_pitches: &HashSet<u8>) -> bool {
 }
 
 /// Score multiplier for the current combo level.
-pub fn compute_multiplier(combo: u32, base_mult: f32, step_mult: f32, max_mult: f32) -> f32 {
+pub const fn compute_multiplier(combo: u32, base_mult: f32, step_mult: f32, max_mult: f32) -> f32 {
     (base_mult + combo as f32 * step_mult).min(max_mult)
 }
 
 /// Points awarded for a single hit.
-pub fn compute_points(quality: HitQuality, multiplier: f32) -> u32 {
+pub const fn compute_points(quality: HitQuality, multiplier: f32) -> u32 {
     let base = match quality {
         HitQuality::Perfect => PERFECT_POINTS,
         HitQuality::Good => GOOD_POINTS,
@@ -115,7 +115,7 @@ pub fn compute_points(quality: HitQuality, multiplier: f32) -> u32 {
 /// pitch was held after the onset; `duration` is the note's length. Notes shorter
 /// than [`SUSTAIN_MIN_DURATION`] aren't sustain notes and earn nothing; held time
 /// is capped at the duration so over-holding can't over-score.
-pub fn sustain_points(held: f64, duration: f64) -> u32 {
+pub const fn sustain_points(held: f64, duration: f64) -> u32 {
     if duration < SUSTAIN_MIN_DURATION {
         return 0;
     }
@@ -204,17 +204,17 @@ pub fn measured_relative_oscillation_hz(samples: &[(f64, f32)], min_frac: f32) -
 /// True when `measured_hz` is within `tolerance_frac` of `target_hz` (e.g.
 /// `0.4` = ±40%) — generous, since hand vibrato/wah speed varies naturally
 /// between players and even between notes.
-pub fn oscillation_matches_rate(measured_hz: f32, target_hz: f32, tolerance_frac: f32) -> bool {
+pub const fn oscillation_matches_rate(measured_hz: f32, target_hz: f32, tolerance_frac: f32) -> bool {
     if target_hz <= 0.0 {
         return false;
     }
     let lower = target_hz * (1.0 - tolerance_frac);
     let upper = target_hz * (1.0 + tolerance_frac);
-    (lower..=upper).contains(&measured_hz)
+    measured_hz >= lower && measured_hz <= upper
 }
 
 /// True when the combo should reset due to inactivity.
-pub fn should_decay_combo(
+pub const fn should_decay_combo(
     combo: u32,
     clock: f64,
     last_hit_time: f64,
