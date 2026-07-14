@@ -32,10 +32,12 @@ use super::{
     ActivePitches, COUNTDOWN, CurrentBar, GameplayClock, GameplayRoot, MusicPlayer, MusicStarted,
 };
 
-/// Free-play screen: left half shows the 12-bar chart and the metronome stacked
-/// vertically; the right half is reserved for a future jam feature. The shared
-/// gameplay clock/music/pause systems run for this mode too, so the chart tracks
-/// the song and the metronome clicks — there are just no falling notes.
+/// Free-play screen, two columns: left has everything but the harmonica
+/// itself (title, loop toggle, 12-bar chart, metronome, spectrogram); right
+/// is entirely the harmonica — the reference bend diagram and the
+/// live-tinted hole map. The shared gameplay clock/music/pause systems run
+/// for this mode too, so the chart tracks the song and the metronome clicks
+/// — there are just no falling notes.
 pub fn setup(
     mut commands: Commands,
     selected: Res<SelectedSong>,
@@ -178,7 +180,6 @@ pub fn setup(
                         &GridConfig::for_2d(),
                         theme.twelve_bar_colors(),
                     );
-                    spawn_hole_map(grid, &holes_info, &loc);
                 });
                 left.spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -189,9 +190,20 @@ pub fn setup(
                 .with_children(|metro| {
                     spawn_metronome(metro, beats_per_bar, bpm);
                 });
+                left.spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_grow: 1.0,
+                        ..default()
+                    })
+                    .with_children(|spec| {
+                        spawn_spectrogram(spec, *spectrogram_style, &osc_material.0);
+                    });
             });
 
-            // ── Right half: harmonica bend diagram (top) + live spectrogram ──
+            // ── Right half: everything harmonica — the bend diagram and the
+            // live-tinted hole map both name/track holes on the same
+            // instrument, so they share this column rather than splitting
+            // across both halves.
             root.spawn(Node {
                 width: Val::Percent(50.0),
                 height: Val::Percent(100.0),
@@ -202,15 +214,7 @@ pub fn setup(
             })
             .with_children(|right| {
                 spawn_harmonica_overlay(right, &chart.harmonica, &loc);
-                right
-                    .spawn(Node {
-                        width: Val::Percent(100.0),
-                        flex_grow: 1.0,
-                        ..default()
-                    })
-                    .with_children(|spec| {
-                        spawn_spectrogram(spec, *spectrogram_style, &osc_material.0);
-                    });
+                spawn_hole_map(right, &holes_info, &loc);
             });
         });
 
