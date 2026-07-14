@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 //! Generated Jam Session backing: a simple synthesized 12-bar walking bass
-//! line for any key/tempo, so Jam Session doesn't require picking an
-//! existing song. See `PLAN.md`'s "Backing track variety" entry — this is
-//! the first slice of it, standard progression only; selectable
-//! progressions (quick-change, minor blues) are a natural follow-up once
-//! this foundation exists, not bundled in here.
+//! line for any key/tempo/progression, so Jam Session doesn't require
+//! picking an existing song. See `PLAN.md`'s "Backing track variety" entry.
 //!
 //! Deliberately not the harmonica-timbre synth `song_editor::playback`
 //! shares with `gameplay::call_response` — a backing bass is a different
@@ -25,7 +22,7 @@ use crate::song::chart::{
     Action, Difficulty, HarpChart, Metadata, NoteEvent, Scoring, Song, TempoPoint, Timing,
     TrackItem,
 };
-use crate::song::harmonica::{richter_harp, semitone, twelve_bar};
+use crate::song::harmonica::{Progression, progression_bars, richter_harp, semitone};
 use crate::song::{NoteCube3dConfig, NoteThemeConfig, SongManifest};
 
 /// Present while a generated-backing jam is in flight (from the "Start Jam"
@@ -82,8 +79,13 @@ fn bass_tone(freq_hz: f32, duration_secs: f32) -> Vec<f32> {
 
 /// The four beat frequencies (Hz) of one bar's root-fifth-root-fifth walking
 /// pattern, in the bass register (octave 2). `None` for a beat whose note
-/// name doesn't resolve — shouldn't happen for the roots `twelve_bar`
+/// name doesn't resolve — shouldn't happen for the roots `progression_bars`
 /// produces, but stays honest about the possibility rather than panicking.
+/// Quality-agnostic on purpose: root and fifth are the same notes whether
+/// the bar's chord is dominant or minor 7th (only the 3rd would differ, and
+/// this simple bass line doesn't play one), so a minor blues doesn't need
+/// any different treatment here — only its chord *roots* change from
+/// `Progression::Standard`'s, same as quick-change.
 fn bar_beat_freqs(root: &str) -> [Option<f32>; 4] {
     let fifth = semitone(root, 7);
     let freq =
@@ -93,13 +95,13 @@ fn bar_beat_freqs(root: &str) -> [Option<f32>; 4] {
     [r, f, r, f]
 }
 
-/// Renders [`CHORUSES`] repeats of a standard 12-bar walking bass line in
-/// `key` at `bpm` (4/4 throughout). Pure and deterministic — the whole
-/// backing loop is fully described by `key`/`bpm`.
-pub fn generate_bass_pcm(key: &str, bpm: f32) -> Vec<f32> {
+/// Renders [`CHORUSES`] repeats of a `progression`'s 12-bar walking bass
+/// line in `key` at `bpm` (4/4 throughout). Pure and deterministic — the
+/// whole backing loop is fully described by `key`/`bpm`/`progression`.
+pub fn generate_bass_pcm(key: &str, bpm: f32, progression: Progression) -> Vec<f32> {
     let secs_per_beat = 60.0 / bpm.max(1.0);
     let gap_samples = ((secs_per_beat * NOTE_GAP_FRAC) * SAMPLE_RATE as f32) as usize;
-    let roots = twelve_bar(key);
+    let roots = progression_bars(key, progression).map(|(root, _)| root);
     let mut buf = Vec::new();
     for _ in 0..CHORUSES {
         for root in &roots {
@@ -126,7 +128,7 @@ pub fn generate_bass_pcm(key: &str, bpm: f32) -> Vec<f32> {
 /// progression, and a single marker track item (Jam Session never scores
 /// notes, so its only job is satisfying the chart schema's `minItems: 1`
 /// and giving the progress bar something to measure against).
-pub fn generated_chart(key: &str, bpm: f32, total_secs: f64) -> HarpChart {
+pub fn generated_chart(key: &str, bpm: f32, progression: Progression, total_secs: f64) -> HarpChart {
     HarpChart {
         metadata: Some(Metadata {
             format_version: Some("1.1.0".to_string()),
@@ -134,7 +136,8 @@ pub fn generated_chart(key: &str, bpm: f32, total_secs: f64) -> HarpChart {
             source: Some("Procedurally generated".to_string()),
             license: Some("MIT".to_string()),
             description: Some(format!(
-                "Generated 12-bar blues jam backing, key of {key}, {bpm:.0} bpm."
+                "Generated {} 12-bar blues jam backing, key of {key}, {bpm:.0} bpm.",
+                progression.label()
             )),
         }),
         song: Song {
@@ -187,11 +190,12 @@ pub fn generated_chart(key: &str, bpm: f32, total_secs: f64) -> HarpChart {
 pub fn build_generated_manifest(
     key: &str,
     bpm: f32,
+    progression: Progression,
     background: Handle<Image>,
     elements: Handle<Image>,
     sources: &mut Assets<AudioSource>,
 ) -> SongManifest {
-    let pcm = generate_bass_pcm(key, bpm);
+    let pcm = generate_bass_pcm(key, bpm, progression);
     let music_duration_secs = pcm.len() as f64 / SAMPLE_RATE as f64;
     let waveform = bucket_peaks(&pcm, WAVEFORM_BUCKETS);
     let wav = encode_wav(&pcm, SAMPLE_RATE);
@@ -199,7 +203,7 @@ pub fn build_generated_manifest(
 
     SongManifest {
         path: PathBuf::from(format!("generated/{key}")),
-        chart: generated_chart(key, bpm, music_duration_secs),
+        chart: generated_chart(key, bpm, progression, music_duration_secs),
         background,
         music,
         waveform,
@@ -233,7 +237,7 @@ mod tests {
 
     #[test]
     fn generate_bass_pcm_is_audible() {
-        let pcm = generate_bass_pcm("C", 90.0);
+        let pcm = generate_bass_pcm("C", 90.0, Progression::Standard);
         assert!(!pcm.is_empty());
         assert!(
             pcm.iter().any(|&s| s.abs() > 0.01),
@@ -244,7 +248,7 @@ mod tests {
     #[test]
     fn generate_bass_pcm_length_matches_chorus_count_and_tempo() {
         let bpm = 120.0;
-        let pcm = generate_bass_pcm("C", bpm);
+        let pcm = generate_bass_pcm("C", bpm, Progression::Standard);
         let secs_per_beat = 60.0 / bpm;
         let expected_secs = CHORUSES as f64 * 12.0 * 4.0 * secs_per_beat as f64;
         let actual_secs = pcm.len() as f64 / SAMPLE_RATE as f64;
@@ -256,16 +260,27 @@ mod tests {
 
     #[test]
     fn faster_tempo_yields_a_shorter_loop() {
-        let slow = generate_bass_pcm("C", 60.0);
-        let fast = generate_bass_pcm("C", 120.0);
+        let slow = generate_bass_pcm("C", 60.0, Progression::Standard);
+        let fast = generate_bass_pcm("C", 120.0, Progression::Standard);
         assert!(fast.len() < slow.len());
+    }
+
+    #[test]
+    fn every_progression_renders_the_same_length_loop() {
+        // Only the chord *roots* differ between progressions — same 12
+        // bars, same beats per bar, so the rendered length shouldn't budge.
+        let standard = generate_bass_pcm("C", 90.0, Progression::Standard);
+        let quick = generate_bass_pcm("C", 90.0, Progression::QuickChange);
+        let minor = generate_bass_pcm("C", 90.0, Progression::Minor);
+        assert_eq!(standard.len(), quick.len());
+        assert_eq!(standard.len(), minor.len());
     }
 
     // ── generated_chart ──────────────────────────────────────────────────────
 
     #[test]
     fn generated_chart_carries_the_requested_key_and_tempo() {
-        let chart = generated_chart("G", 100.0, 30.0);
+        let chart = generated_chart("G", 100.0, Progression::Standard, 30.0);
         assert_eq!(chart.song.key, "G");
         assert_eq!(chart.song.tempo_bpm, 100.0);
         assert_eq!(chart.timing.tempo_map[0].bpm, 100.0);
@@ -273,7 +288,7 @@ mod tests {
 
     #[test]
     fn generated_chart_harmonica_is_a_diatonic_richter_harp_in_key() {
-        let chart = generated_chart("D", 90.0, 30.0);
+        let chart = generated_chart("D", 90.0, Progression::Standard, 30.0);
         match chart.harmonica {
             crate::song::harmonica::Harmonica::Diatonic { holes, layout, .. } => {
                 assert_eq!(holes, 10);
@@ -288,7 +303,7 @@ mod tests {
     fn generated_chart_track_is_never_empty() {
         // The chart schema requires `track.minItems: 1` — a generated jam
         // has no real notes to schedule, but must still satisfy it.
-        let chart = generated_chart("C", 90.0, 30.0);
+        let chart = generated_chart("C", 90.0, Progression::Standard, 30.0);
         assert!(!chart.track.is_empty());
         assert!(!chart.track[0].events.is_empty());
     }
@@ -301,6 +316,7 @@ mod tests {
         let manifest = build_generated_manifest(
             "C",
             90.0,
+            Progression::Standard,
             Handle::default(),
             Handle::default(),
             &mut sources,

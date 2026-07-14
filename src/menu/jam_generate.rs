@@ -15,10 +15,12 @@ use crate::dialogs::button;
 use crate::jam_backing::{GeneratedJamSession, build_generated_manifest};
 use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
+use crate::song::harmonica::Progression;
 use crate::theme::LoadedTheme;
 
 use super::{
-    AppState, ButtonMaterials, GameplayMode, MenuPage, SelectedSong, spawn_button, spawn_menu_root,
+    AppState, ButtonMaterials, GameplayMode, JamProgression, MenuPage, SelectedSong, spawn_button,
+    spawn_menu_root,
 };
 
 const MIN_BPM: f32 = 60.0;
@@ -32,6 +34,7 @@ const BPM_STEP: f32 = 5.0;
 pub(super) struct JamGenerateConfig {
     pub key: String,
     pub bpm: f32,
+    pub progression: Progression,
 }
 
 impl Default for JamGenerateConfig {
@@ -39,6 +42,7 @@ impl Default for JamGenerateConfig {
         Self {
             key: "C".to_string(),
             bpm: 90.0,
+            progression: Progression::Standard,
         }
     }
 }
@@ -47,6 +51,8 @@ impl Default for JamGenerateConfig {
 pub(super) struct KeyLabel;
 #[derive(Component)]
 pub(super) struct BpmLabel;
+#[derive(Component)]
+pub(super) struct ProgressionLabel;
 
 pub(super) fn setup_jam_generate_menu(
     mut commands: Commands,
@@ -133,6 +139,41 @@ pub(super) fn setup_jam_generate_menu(
                 },
             ));
         });
+
+        root.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(10.0),
+            ..default()
+        })
+        .with_children(|row| {
+            row.spawn_empty().apply_scene(button::small(
+                "\u{25C2}",
+                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                    cfg.progression = cfg.progression.prev();
+                },
+            ));
+            row.spawn((
+                Node {
+                    width: Val::Px(150.0),
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+                Text::new(format!("Progression: {}", config.progression.label())),
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.95, 0.80, 0.35)),
+                ProgressionLabel,
+            ));
+            row.spawn_empty().apply_scene(button::small(
+                "\u{25B8}",
+                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                    cfg.progression = cfg.progression.next();
+                },
+            ));
+        });
     });
 
     spawn_button(
@@ -149,12 +190,14 @@ pub(super) fn setup_jam_generate_menu(
          mut manifests: ResMut<Assets<SongManifest>>,
          mut sources: ResMut<Assets<AudioSource>>,
          mut mode: ResMut<GameplayMode>,
+         mut progression: ResMut<JamProgression>,
          mut commands: Commands,
          mut state: ResMut<NextState<AppState>>| {
             let background = theme.default_background.clone().unwrap_or_default();
             let manifest = build_generated_manifest(
                 &config.key,
                 config.bpm,
+                config.progression,
                 background,
                 Handle::default(),
                 &mut sources,
@@ -163,6 +206,7 @@ pub(super) fn setup_jam_generate_menu(
             commands.insert_resource(SelectedSong(handle));
             commands.insert_resource(GeneratedJamSession);
             *mode = GameplayMode::JamSession;
+            progression.0 = config.progression;
             // Synthesized synchronously above (no async asset load to wait
             // on), so this skips `AppState::SongLoading` entirely and goes
             // straight to `Playing` — `check_loading`'s only job is waiting
@@ -190,8 +234,30 @@ pub(super) fn setup_jam_generate_menu(
 /// [`JamGenerateConfig`], same pattern as `bending_trainer::update_key_label`.
 pub(super) fn update_jam_generate_labels(
     config: Res<JamGenerateConfig>,
-    mut keys: Query<&mut Text, (With<KeyLabel>, Without<BpmLabel>)>,
-    mut bpms: Query<&mut Text, (With<BpmLabel>, Without<KeyLabel>)>,
+    mut keys: Query<
+        &mut Text,
+        (
+            With<KeyLabel>,
+            Without<BpmLabel>,
+            Without<ProgressionLabel>,
+        ),
+    >,
+    mut bpms: Query<
+        &mut Text,
+        (
+            With<BpmLabel>,
+            Without<KeyLabel>,
+            Without<ProgressionLabel>,
+        ),
+    >,
+    mut progressions: Query<
+        &mut Text,
+        (
+            With<ProgressionLabel>,
+            Without<KeyLabel>,
+            Without<BpmLabel>,
+        ),
+    >,
 ) {
     if !config.is_changed() {
         return;
@@ -201,6 +267,9 @@ pub(super) fn update_jam_generate_labels(
     }
     for mut text in &mut bpms {
         *text = Text::new(format!("Tempo: {:.0}", config.bpm));
+    }
+    for mut text in &mut progressions {
+        *text = Text::new(format!("Progression: {}", config.progression.label()));
     }
 }
 

@@ -3,10 +3,10 @@
 use bevy::prelude::*;
 
 use crate::{
-    menu::{AppState, SelectedSong},
+    menu::{AppState, GameplayMode, JamProgression, SelectedSong},
     song::{
         SongManifest,
-        harmonica::{semitone, twelve_bar},
+        harmonica::{Progression, progression_bars, semitone},
     },
     theme::{LoadedTheme, TwelveBarColors},
 };
@@ -51,17 +51,23 @@ impl GridConfig {
     }
 }
 
-/// Background for `bar` (0-indexed) under `key`, colored by chord function
-/// (I / IV / V) using `colors` — pulled from the active theme via
-/// [`LoadedTheme::twelve_bar_colors`] so this stays consistent everywhere the
-/// 12-bar-blues progression is drawn (Jam Session grid, song editor grid).
-pub fn bar_bg(bar: usize, key: &str, colors: TwelveBarColors) -> Color {
+/// Background for `bar` (0-indexed) under `key`/`progression`, colored by
+/// chord function (I / IV / V) using `colors` — pulled from the active theme
+/// via [`LoadedTheme::twelve_bar_colors`] so this stays consistent everywhere
+/// the 12-bar-blues progression is drawn (Jam Session grid, song editor
+/// grid). `progression` is almost always [`Progression::Standard`] — only
+/// Jam Session's own grid/hole-map ever use a different one (see
+/// `gameplay::jam_session`); passing it explicitly here (rather than this
+/// function assuming Standard internally, the way it used to) is what keeps
+/// the color coding from disagreeing with a grid that's showing a different
+/// progression's chord names.
+pub fn bar_bg(bar: usize, key: &str, progression: Progression, colors: TwelveBarColors) -> Color {
     let iv = semitone(key, 5);
     let v = semitone(key, 7);
-    let chords = twelve_bar(key);
-    if chords[bar] == v {
+    let (root, _) = &progression_bars(key, progression)[bar];
+    if *root == v {
         colors.dominant
-    } else if chords[bar] == iv {
+    } else if *root == iv {
         colors.subdominant
     } else {
         colors.tonic
@@ -72,6 +78,7 @@ pub fn spawn_12_bar_grid(
     parent: &mut ChildSpawnerCommands,
     chords: &[String],
     key: &str,
+    progression: Progression,
     cfg: &GridConfig,
     colors: TwelveBarColors,
 ) {
@@ -95,7 +102,7 @@ pub fn spawn_12_bar_grid(
                             border: UiRect::all(Val::Px(1.0)),
                             ..default()
                         },
-                        BackgroundColor(bar_bg(idx, key, colors)),
+                        BackgroundColor(bar_bg(idx, key, progression, colors)),
                         BorderColor::all(Color::srgb(0.25, 0.25, 0.38)),
                         BarCell(idx),
                     ))
@@ -131,6 +138,8 @@ pub fn update_bar(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     theme: Res<LoadedTheme>,
+    mode: Res<GameplayMode>,
+    jam_progression: Res<JamProgression>,
     mut cells: Query<(&BarCell, &mut BackgroundColor)>,
 ) {
     if changed.read().count() == 0 {
@@ -141,12 +150,20 @@ pub fn update_bar(
     };
     let key = manifest.chart.song.key.as_str();
     let colors = theme.twelve_bar_colors();
+    // Only Jam Session's own progression is ever anything but Standard —
+    // scored gameplay's grid is an educational reference independent of the
+    // loaded chart, same reasoning as `twelve_bar`'s doc comment.
+    let progression = if *mode == GameplayMode::JamSession {
+        jam_progression.0
+    } else {
+        Progression::Standard
+    };
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current.0 {
             BackgroundColor(Color::srgba(0.75, 0.55, 0.08, 0.95))
         } else {
-            BackgroundColor(bar_bg(cell.0, key, colors))
+            BackgroundColor(bar_bg(cell.0, key, progression, colors))
         };
     }
 }
@@ -171,15 +188,27 @@ mod tests {
     fn bar_bg_colours_the_one_four_five_chords_distinctly() {
         let colors = TwelveBarColors::default();
         // C 12-bar: bars are [I,I,I,I,IV,IV,I,I,V,IV,I,V] (0-indexed).
-        let i = bar_bg(0, "C", colors); // tonic
-        let iv = bar_bg(4, "C", colors); // subdominant
-        let v = bar_bg(8, "C", colors); // dominant
+        let i = bar_bg(0, "C", Progression::Standard, colors); // tonic
+        let iv = bar_bg(4, "C", Progression::Standard, colors); // subdominant
+        let v = bar_bg(8, "C", Progression::Standard, colors); // dominant
         assert_ne!(i, iv);
         assert_ne!(i, v);
         assert_ne!(iv, v);
         // The last bar is also the V chord, so it shares the dominant colour.
-        assert_eq!(bar_bg(11, "C", colors), v);
+        assert_eq!(bar_bg(11, "C", Progression::Standard, colors), v);
         // The IV bars share the subdominant colour.
-        assert_eq!(bar_bg(9, "C", colors), iv);
+        assert_eq!(bar_bg(9, "C", Progression::Standard, colors), iv);
+    }
+
+    #[test]
+    fn bar_bg_reflects_a_non_standard_progression() {
+        let colors = TwelveBarColors::default();
+        // Quick change moves bar 1 (0-indexed) from I to IV.
+        let iv = bar_bg(4, "C", Progression::Standard, colors); // subdominant, for comparison
+        assert_eq!(bar_bg(1, "C", Progression::QuickChange, colors), iv);
+        assert_ne!(
+            bar_bg(1, "C", Progression::Standard, colors),
+            bar_bg(1, "C", Progression::QuickChange, colors),
+        );
     }
 }

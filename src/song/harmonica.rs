@@ -173,24 +173,129 @@ pub enum Harmonica {
     },
 }
 
-// Creates the twelve-bar key signature for the given key.
+// Creates the twelve-bar key signature for the given key. Always the
+// standard form (`Progression::Standard`) — the scored-gameplay/song-editor
+// grid overlays that call this are an educational reference independent of
+// what a loaded chart's actual chords do, not tied to Jam Session's
+// selectable progression (see [`progression_bars`]).
 pub fn twelve_bar(key: &str) -> [String; 12] {
+    progression_bars(key, Progression::Standard).map(|(root, _)| root)
+}
+
+/// A 12-bar blues variant — which chord roots land on which bars, and (for
+/// [`Minor`](Progression::Minor)) which bars change quality. Selectable in
+/// Jam Session (`gameplay::jam_session`, `jam_backing`) via the "Generate
+/// Jam" config page; every other 12-bar display (`twelve_bar`, the song
+/// editor's grid, scored gameplay's grid overlay) always uses `Standard`.
+/// `QuickChange` and `Minor` are ordinary blues-theory forms; a "jazz blues"
+/// variant is deliberately not included here — that belongs to the 0.6 Jazz
+/// milestone's chord-tone work (`ROADMAP.md`), not this one.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Progression {
+    #[default]
+    Standard,
+    /// Bar 2 moves to IV instead of staying on I — the "quick change" most
+    /// blues players default to today.
+    QuickChange,
+    /// i/iv chords are minor 7th instead of dominant 7th; V stays dominant
+    /// for the pull back to i, the standard minor-blues convention (e.g.
+    /// "Mr. P.C.", "The Thrill Is Gone").
+    Minor,
+}
+
+impl Progression {
+    /// Display label for the picker on the "Generate Jam" config page.
+    pub fn label(self) -> &'static str {
+        match self {
+            Progression::Standard => "Standard",
+            Progression::QuickChange => "Quick Change",
+            Progression::Minor => "Minor Blues",
+        }
+    }
+
+    /// Cycles to the next variant, wrapping — same "◂ ▸ over a small enum"
+    /// pattern as `audio_system::midi::next_key`, just with 3 states instead
+    /// of 12.
+    pub fn next(self) -> Self {
+        match self {
+            Progression::Standard => Progression::QuickChange,
+            Progression::QuickChange => Progression::Minor,
+            Progression::Minor => Progression::Standard,
+        }
+    }
+
+    /// Cycles to the previous variant, wrapping.
+    pub fn prev(self) -> Self {
+        match self {
+            Progression::Standard => Progression::Minor,
+            Progression::QuickChange => Progression::Standard,
+            Progression::Minor => Progression::QuickChange,
+        }
+    }
+}
+
+/// A chord's quality — which intervals above the root are its chord tones
+/// (see [`chord_intervals`]). Every chord in a standard/quick-change 12-bar
+/// blues is dominant 7th; a minor blues' i/iv chords are minor 7th instead
+/// (see [`Progression::Minor`]).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ChordQuality {
+    Dominant7,
+    Minor7,
+}
+
+/// Semitone intervals above the root for `quality`'s chord tones (root,
+/// 3rd, 5th, 7th).
+pub fn chord_intervals(quality: ChordQuality) -> [i32; 4] {
+    match quality {
+        ChordQuality::Dominant7 => [0, 4, 7, 10],
+        ChordQuality::Minor7 => [0, 3, 7, 10],
+    }
+}
+
+/// The 12 bars of `progression` in `key`: each bar's chord root + quality.
+/// Bars are 0-indexed, matching `CurrentBar`/`twelve_bar`'s existing
+/// convention.
+pub fn progression_bars(key: &str, progression: Progression) -> [(String, ChordQuality); 12] {
+    use ChordQuality::{Dominant7, Minor7};
+    let i = key.to_string();
     let iv = semitone(key, 5);
     let v = semitone(key, 7);
-    [
-        key.into(),
-        key.into(),
-        key.into(),
-        key.into(),
-        iv.clone(),
-        iv.clone(),
-        key.into(),
-        key.into(),
-        v.clone(),
-        iv.clone(),
-        key.into(),
-        v.clone(),
-    ]
+    let q = if progression == Progression::Minor {
+        Minor7
+    } else {
+        Dominant7
+    };
+    match progression {
+        Progression::Standard | Progression::Minor => [
+            (i.clone(), q),
+            (i.clone(), q),
+            (i.clone(), q),
+            (i.clone(), q),
+            (iv.clone(), q),
+            (iv.clone(), q),
+            (i.clone(), q),
+            (i.clone(), q),
+            (v.clone(), Dominant7),
+            (iv, q),
+            (i, q),
+            (v, Dominant7),
+        ],
+        Progression::QuickChange => [
+            (i.clone(), Dominant7),
+            (iv.clone(), Dominant7),
+            (i.clone(), Dominant7),
+            (i.clone(), Dominant7),
+            (iv.clone(), Dominant7),
+            (iv.clone(), Dominant7),
+            (i.clone(), Dominant7),
+            (i.clone(), Dominant7),
+            (v.clone(), Dominant7),
+            (iv, Dominant7),
+            (i, Dominant7),
+            (v, Dominant7),
+        ],
+    }
 }
 
 /// One-line "which harp to grab" hint. A Richter diatonic's key is its hole-1
@@ -501,6 +606,71 @@ mod tests {
         // IV of G = C,  V of G = D
         let expected = ["G", "G", "G", "G", "C", "C", "G", "G", "D", "C", "G", "D"];
         assert_eq!(bar, expected.map(str::to_string));
+    }
+
+    // ── progression_bars ─────────────────────────────────────────────────────
+
+    fn roots(bars: &[(String, ChordQuality); 12]) -> Vec<&str> {
+        bars.iter().map(|(root, _)| root.as_str()).collect()
+    }
+
+    #[test]
+    fn standard_progression_matches_twelve_bar() {
+        let bars = progression_bars("C", Progression::Standard);
+        assert_eq!(
+            roots(&bars),
+            vec!["C", "C", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]
+        );
+        assert!(bars.iter().all(|(_, q)| *q == ChordQuality::Dominant7));
+    }
+
+    #[test]
+    fn quick_change_moves_bar_two_to_the_iv() {
+        let bars = progression_bars("C", Progression::QuickChange);
+        assert_eq!(
+            roots(&bars),
+            vec!["C", "F", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]
+        );
+        assert!(bars.iter().all(|(_, q)| *q == ChordQuality::Dominant7));
+    }
+
+    #[test]
+    fn minor_blues_keeps_the_standard_roots_but_i_and_iv_go_minor() {
+        let bars = progression_bars("C", Progression::Minor);
+        // Same root sequence as Standard...
+        assert_eq!(
+            roots(&bars),
+            vec!["C", "C", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]
+        );
+        // ...but i/iv bars are minor 7th and the V bars stay dominant.
+        for (bar, (_, q)) in bars.iter().enumerate() {
+            let expected = if bar == 8 || bar == 11 {
+                ChordQuality::Dominant7
+            } else {
+                ChordQuality::Minor7
+            };
+            assert_eq!(*q, expected, "bar {bar}");
+        }
+    }
+
+    #[test]
+    fn progression_cycles_forward_and_wraps() {
+        assert_eq!(Progression::Standard.next(), Progression::QuickChange);
+        assert_eq!(Progression::QuickChange.next(), Progression::Minor);
+        assert_eq!(Progression::Minor.next(), Progression::Standard);
+    }
+
+    #[test]
+    fn progression_cycles_backward_and_wraps() {
+        assert_eq!(Progression::Standard.prev(), Progression::Minor);
+        assert_eq!(Progression::Minor.prev(), Progression::QuickChange);
+        assert_eq!(Progression::QuickChange.prev(), Progression::Standard);
+    }
+
+    #[test]
+    fn chord_intervals_are_dominant_or_minor_seventh() {
+        assert_eq!(chord_intervals(ChordQuality::Dominant7), [0, 4, 7, 10]);
+        assert_eq!(chord_intervals(ChordQuality::Minor7), [0, 3, 7, 10]);
     }
 
     #[test]

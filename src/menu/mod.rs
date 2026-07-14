@@ -11,6 +11,7 @@ use bevy_fluent::Localization;
 use crate::assets_management::AvailableSongs;
 use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
+use crate::song::harmonica::Progression;
 use crate::theme::LoadedTheme;
 use crate::song_editor;
 
@@ -37,6 +38,16 @@ pub enum GameplayMode {
     /// Free-play: the 12-bar chart + metronome, no falling notes.
     JamSession,
 }
+
+/// The 12-bar variant Jam Session's grid/hole-map/(for a generated jam)
+/// backing audio all follow — see `song::harmonica::Progression`. Only ever
+/// anything but `Standard` for a "Generate Jam" session (`menu::
+/// jam_generate` sets it explicitly on Start); the real-song "Jam Session"
+/// button resets it to `Standard` so a previous generated jam's pick can't
+/// leak into a real song (which always plays its own actual chords,
+/// regardless of this resource — see `twelve_bar_blues_overlay::update_bar`).
+#[derive(Resource, Default)]
+pub struct JamProgression(pub Progression);
 
 /// Set to `true` by the pause menu's "Quit Song" button so that re-entering
 /// `AppState::Menu` lands on the song list rather than the main menu.
@@ -121,6 +132,7 @@ impl Plugin for MenuPlugin {
             .add_message::<lessons::LessonUnitChanged>()
             .init_resource::<jam_generate::JamGenerateConfig>()
             .init_resource::<GameplayMode>()
+            .init_resource::<JamProgression>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
@@ -557,8 +569,14 @@ fn setup_play_menu(
         "Play",
         |_: On<Pointer<Click>>,
          mut mode: ResMut<GameplayMode>,
+         mut progression: ResMut<JamProgression>,
          mut page: ResMut<NextState<MenuPage>>| {
             *mode = GameplayMode::JamSession;
+            // A real song always plays its own actual chords regardless of
+            // this resource (see `twelve_bar_blues_overlay::update_bar`),
+            // but reset it anyway so a stale pick from an earlier generated
+            // jam can't linger and confuse anyone reading the resource value.
+            progression.0 = Progression::Standard;
             page.set(MenuPage::ArtistList);
         },
     );

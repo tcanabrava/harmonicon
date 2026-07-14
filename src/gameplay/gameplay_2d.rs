@@ -277,6 +277,7 @@ pub fn setup(
                             grid,
                             &chords,
                             key,
+                            crate::song::harmonica::Progression::Standard,
                             &GridConfig::for_2d(),
                             theme.twelve_bar_colors(),
                         );

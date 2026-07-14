@@ -8,11 +8,14 @@ use bevy::prelude::*;
 
 use crate::{
     dialogs::button,
-    menu::SelectedSong,
+    menu::{JamProgression, SelectedSong},
     settings::AudioSettings,
     song::SongManifest,
     song::chart::Action,
-    song::harmonica::{Harmonica, blues_scale_classes, harp_banner, semitone, twelve_bar},
+    song::harmonica::{
+        ChordQuality, Harmonica, Progression, blues_scale_classes, chord_intervals, harp_banner,
+        progression_bars, semitone,
+    },
     theme::LoadedTheme,
 };
 
@@ -40,6 +43,7 @@ pub fn setup(
     spectrogram_style: Res<SpectrogramStyle>,
     osc_material: Res<OscMaterial>,
     theme: Res<LoadedTheme>,
+    jam_progression: Res<JamProgression>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Jam Session");
@@ -51,7 +55,11 @@ pub fn setup(
     let chart = &manifest.chart;
     let key = chart.song.key.as_str();
     let bpm = chart.song.tempo_bpm;
-    let chords = twelve_bar(key);
+    let progression = jam_progression.0;
+    let chords: Vec<String> = progression_bars(key, progression)
+        .into_iter()
+        .map(|(root, _)| root)
+        .collect();
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     let beats_per_bar = {
         let ts = chart.song.time_signature.as_deref().unwrap_or("4/4");
@@ -65,7 +73,7 @@ pub fn setup(
     // the hole(s) the player is currently sounding, coloured by blues-scale fit
     // and — bar by bar — by whether the note is a tone of the chord currently
     // sounding (I, IV, or V), not just "somewhere in the blues scale".
-    let (holes_info, guide) = build_hole_guide(&chart.harmonica, key);
+    let (holes_info, guide) = build_hole_guide(&chart.harmonica, key, progression);
 
     // Which physical harp to grab: a Richter harp's key is its hole-1 blow note.
     let harp_hint = harp_banner(&chart.harmonica, key);
@@ -163,6 +171,7 @@ pub fn setup(
                         grid,
                         &chords,
                         key,
+                        progression,
                         &GridConfig::for_2d(),
                         theme.twelve_bar_colors(),
                     );
@@ -350,25 +359,29 @@ fn note_class(note: &str) -> &str {
     note.trim_end_matches(|c: char| c.is_ascii_digit())
 }
 
-/// The four note classes of the dominant-7th chord rooted on `chord_root`
-/// (root, major 3rd, perfect 5th, minor 7th) — every chord in a standard
-/// 12-bar blues (I7, IV7, V7) is dominant 7th.
-fn chord_tone_classes(chord_root: &str) -> HashSet<String> {
-    [0, 4, 7, 10]
+/// The four note classes of `quality`'s chord rooted on `chord_root` (root,
+/// 3rd, 5th, 7th — see `song::harmonica::chord_intervals`).
+fn chord_tone_classes(chord_root: &str, quality: ChordQuality) -> HashSet<String> {
+    chord_intervals(quality)
         .iter()
         .map(|&n| semitone(chord_root, n))
         .collect()
 }
 
 /// Build the per-hole render data and the live-feedback lookup from the harp
-/// layout, the song key, and its tempo (needed to track which bar — and thus
+/// layout, the song key, its `progression` (see `song::harmonica::
+/// Progression` — `Standard` for a real-song jam, player-selected for a
+/// generated one), and its tempo (needed to track which bar — and thus
 /// which chord — is currently sounding).
-fn build_hole_guide(harp: &Harmonica, key: &str) -> (Vec<HoleInfo>, JamHoleGuide) {
+fn build_hole_guide(harp: &Harmonica, key: &str, progression: Progression) -> (Vec<HoleInfo>, JamHoleGuide) {
     let dash = "\u{2014}";
     let scale_classes = blues_scale_classes(key);
     let chord_tones_by_bar: [HashSet<String>; 12] = {
-        let chords = twelve_bar(key);
-        std::array::from_fn(|i| chord_tone_classes(&chords[i]))
+        let bars = progression_bars(key, progression);
+        std::array::from_fn(|i| {
+            let (root, quality) = &bars[i];
+            chord_tone_classes(root, *quality)
+        })
     };
     let mut note_to_holes: HashMap<u8, Vec<u8>> = HashMap::new();
     let mut holes = Vec::new();
@@ -659,7 +672,7 @@ mod tests {
     #[test]
     fn guide_maps_a_shared_note_to_every_hole_that_sounds_it() {
         // On a C harp, G4 is both draw-2 and blow-3 — both holes should light.
-        let (_, guide) = build_hole_guide(&c_harp(), "C");
+        let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::Standard);
         let mut holes = guide.note_to_holes.get(&67u8).cloned().unwrap_or_default(); // G4
         holes.sort_unstable();
         assert_eq!(holes, vec![2, 3]);
@@ -667,7 +680,7 @@ mod tests {
 
     #[test]
     fn guide_marks_scale_membership_per_direction() {
-        let (holes, _) = build_hole_guide(&c_harp(), "C");
+        let (holes, _) = build_hole_guide(&c_harp(), "C", Progression::Standard);
         let hole1 = holes.iter().find(|h| h.hole == 1).unwrap();
         assert!(hole1.blow_in_scale, "blow C4 is the root → in scale");
         assert!(!hole1.draw_in_scale, "draw D4 (major 2nd) → outside");
@@ -677,7 +690,7 @@ mod tests {
 
     #[test]
     fn guide_covers_all_ten_holes() {
-        let (holes, _) = build_hole_guide(&c_harp(), "C");
+        let (holes, _) = build_hole_guide(&c_harp(), "C", Progression::Standard);
         assert_eq!(holes.len(), 10);
     }
 
@@ -695,14 +708,14 @@ mod tests {
 
     #[test]
     fn guide_covers_all_twelve_holes_for_a_chromatic_harp() {
-        let (holes, _) = build_hole_guide(&c_chromatic_harp(), "C");
+        let (holes, _) = build_hole_guide(&c_chromatic_harp(), "C", Progression::Standard);
         assert_eq!(holes.len(), 12);
     }
 
     #[test]
     fn chord_tone_classes_are_the_dominant_seventh() {
         // C7: C, E, G, Bb(=A#).
-        let s = chord_tone_classes("C");
+        let s = chord_tone_classes("C", ChordQuality::Dominant7);
         assert_eq!(s.len(), 4);
         for c in ["C", "E", "G", "A#"] {
             assert!(s.contains(c), "missing {c}");
@@ -711,10 +724,21 @@ mod tests {
     }
 
     #[test]
+    fn chord_tone_classes_are_the_minor_seventh_for_minor_quality() {
+        // Cm7: C, Eb(=D#), G, Bb(=A#).
+        let s = chord_tone_classes("C", ChordQuality::Minor7);
+        assert_eq!(s.len(), 4);
+        for c in ["C", "D#", "G", "A#"] {
+            assert!(s.contains(c), "missing {c}");
+        }
+        assert!(!s.contains("E"), "major 3rd is not a minor-7th chord tone");
+    }
+
+    #[test]
     fn guide_indexes_chord_tones_per_bar_of_the_twelve_bar_cycle() {
         // C 12-bar: bars are [I,I,I,I,IV,IV,I,I,V,IV,I,V] (0-indexed) — see
         // `twelve_bar`. Bar 4 is IV (F7); bar 8 is V (G7).
-        let (_, guide) = build_hole_guide(&c_harp(), "C");
+        let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::Standard);
         assert!(guide.chord_tones_by_bar[0].contains("C"), "bar 0 is I (C7)");
         assert!(
             guide.chord_tones_by_bar[4].contains("F"),
@@ -725,6 +749,31 @@ mod tests {
             !guide.chord_tones_by_bar[0].contains("F"),
             "F is not a tone of the I chord"
         );
+    }
+
+    #[test]
+    fn guide_follows_a_non_standard_progression() {
+        // Quick change: bar 1 (0-indexed) moves from I (C7) to IV (F7).
+        // C7 = C,E,G,A#; F7 = F,A,C,D# — "E" is the major 3rd of C7 and
+        // not a tone of F7 at all, so it distinguishes the two even though
+        // both chords happen to share the note C (F7's 5th).
+        let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::QuickChange);
+        assert!(
+            guide.chord_tones_by_bar[1].contains("F"),
+            "quick change moves bar 1 to IV (F7)"
+        );
+        assert!(!guide.chord_tones_by_bar[1].contains("E"));
+    }
+
+    #[test]
+    fn guide_uses_minor_seventh_chord_tones_for_a_minor_blues() {
+        let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::Minor);
+        // Bar 0 is i (Cm7): the minor 3rd (Eb=D#) is a chord tone, the
+        // major 3rd (E) is not.
+        assert!(guide.chord_tones_by_bar[0].contains("D#"));
+        assert!(!guide.chord_tones_by_bar[0].contains("E"));
+        // Bar 8 is still V (G7, dominant) even in a minor blues.
+        assert!(guide.chord_tones_by_bar[8].contains("B"));
     }
 
     #[test]
@@ -779,7 +828,7 @@ mod tests {
 
     fn improv_test_world() -> World {
         let mut world = World::new();
-        let (_, guide) = build_hole_guide(&c_harp(), "C");
+        let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::Standard);
         world.insert_resource(guide);
         world.insert_resource(CurrentBar(0)); // bar 0 is the I chord (C7)
         world.insert_resource(ImprovGate::default());

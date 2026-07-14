@@ -994,7 +994,14 @@ fn spawn_hud_overlay(
                 BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
             ))
             .with_children(|grid| {
-                spawn_12_bar_grid(grid, chords, key, &GridConfig::for_3d(), twelve_bar_colors);
+                spawn_12_bar_grid(
+                    grid,
+                    chords,
+                    key,
+                    crate::song::harmonica::Progression::Standard,
+                    &GridConfig::for_3d(),
+                    twelve_bar_colors,
+                );
             });
 
             row.spawn((

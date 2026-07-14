@@ -117,7 +117,12 @@ pub(super) fn rebuild_grid(
         // scrolls, so the grid reads as harmonic function (I/IV/V) even for
         // charts longer than 12 bars.
         let bar_index = (beat / BEATS_PER_BAR) % 12;
-        let bar_tint = bar_bg(bar_index, &state.key, bar_colors);
+        let bar_tint = bar_bg(
+            bar_index,
+            &state.key,
+            crate::song::harmonica::Progression::Standard,
+            bar_colors,
+        );
 
         let in_bar = beat % BEATS_PER_BAR + 1;
         items.push(
