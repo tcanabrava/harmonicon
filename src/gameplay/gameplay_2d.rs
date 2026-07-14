@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 
 use crate::{
+    localization::LocalizationExt,
     menu::SelectedSong,
     song::NoteThemeConfig,
     song::SongManifest,
@@ -12,6 +13,7 @@ use crate::{
 use bevy::asset::AssetPath;
 use bevy::prelude::*;
 use bevy::ui::ComputedNode;
+use bevy_fluent::Localization;
 
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
@@ -54,6 +56,7 @@ pub fn setup(
     note_theme: Res<crate::assets_management::SelectedNoteTheme2d>,
     theme: Res<crate::theme::LoadedTheme>,
     adaptive: Res<AdaptiveDifficulty>,
+    loc: Res<Localization>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
@@ -189,7 +192,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|col| {
-                    spawn_harmonica_strip(col, chart);
+                    spawn_harmonica_strip(col, chart, &loc);
                 });
             });
 
@@ -346,7 +349,7 @@ pub fn setup(
     );
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
-    spawn_countdown(&mut commands, Some(&harp_hint));
+    spawn_countdown(&mut commands, &loc, Some(&harp_hint));
 }
 
 /// Builds every note's score state (see `setup`'s doc comment) plus the
@@ -795,7 +798,11 @@ fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
     }
 }
 
-fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::chart::HarpChart) {
+fn spawn_harmonica_strip(
+    col: &mut ChildSpawnerCommands,
+    chart: &crate::song::chart::HarpChart,
+    loc: &Localization,
+) {
     let hole_count = chart.harmonica.hole_count();
     let lane_pct = 100.0 / hole_count as f32;
     col.spawn(Node {
@@ -862,7 +869,7 @@ fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::ch
     })
     .with_children(|leg| {
         leg.spawn((
-            Text::new("\u{25A0} BLOW"),
+            Text::new(String::from(loc.msg("gameplay-legend-blow"))),
             TextFont {
                 font_size: FontSize::Px(15.0),
                 ..default()
@@ -870,7 +877,7 @@ fn spawn_harmonica_strip(col: &mut ChildSpawnerCommands, chart: &crate::song::ch
             TextColor(Color::srgb(0.50, 0.75, 1.00)),
         ));
         leg.spawn((
-            Text::new("\u{25A0} DRAW"),
+            Text::new(String::from(loc.msg("gameplay-legend-draw"))),
             TextFont {
                 font_size: FontSize::Px(15.0),
                 ..default()

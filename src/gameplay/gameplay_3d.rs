@@ -3,12 +3,14 @@
 use std::collections::HashSet;
 
 use bevy::prelude::*;
+use bevy_fluent::Localization;
 
 use crate::{
     assets_management::{
         HarmonicaModelConfig, HoleConfig, SelectedHarmonicaModel, SelectedNoteTheme3d,
         ShowNoteNumbers,
     },
+    localization::LocalizationExt,
     menu::SelectedSong,
     song::NoteCube3dConfig,
     song::SongManifest,
@@ -671,6 +673,7 @@ pub fn setup(
     note_theme: Res<SelectedNoteTheme3d>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
     theme: Res<LoadedTheme>,
+    loc: Res<Localization>,
 ) {
     let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing (3D) state");
@@ -762,6 +765,7 @@ pub fn setup(
         beats_per_bar,
         shape_materials,
         theme.twelve_bar_colors(),
+        &loc,
     );
     let note_times: Vec<f64> = note_build.song_notes.notes.iter().map(|n| n.time).collect();
     spawn_song_progress(
@@ -774,7 +778,7 @@ pub fn setup(
     );
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
     let harp_hint = crate::song::harmonica::harp_banner(&chart.harmonica, key);
-    spawn_countdown(&mut commands, Some(&harp_hint));
+    spawn_countdown(&mut commands, &loc, Some(&harp_hint));
 }
 
 fn spawn_harmonica_3d(
@@ -836,6 +840,7 @@ fn spawn_hud_overlay(
     beats_per_bar: usize,
     mut shape_materials: ResMut<Assets<NoteTail2dMaterial>>,
     twelve_bar_colors: TwelveBarColors,
+    loc: &Localization,
 ) {
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     let info = format!(
@@ -922,7 +927,7 @@ fn spawn_hud_overlay(
             })
             .with_children(|leg| {
                 leg.spawn((
-                    Text::new("\u{25A0} BLOW"),
+                    Text::new(String::from(loc.msg("gameplay-legend-blow"))),
                     TextFont {
                         font_size: FontSize::Px(15.0),
                         ..default()
@@ -930,7 +935,7 @@ fn spawn_hud_overlay(
                     TextColor(Color::srgb(0.50, 0.75, 1.00)),
                 ));
                 leg.spawn((
-                    Text::new("\u{25A0} DRAW"),
+                    Text::new(String::from(loc.msg("gameplay-legend-draw"))),
                     TextFont {
                         font_size: FontSize::Px(15.0),
                         ..default()

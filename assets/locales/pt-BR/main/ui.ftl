@@ -224,3 +224,40 @@ lesson-using-your-feet-body =
     Neste exercício, um pulso constante de semínimas desliza no furo 4 — continue batendo o pé o tempo todo, mesmo entre as notas, e deixe cada sopro/sugada cair exatamente numa batida.
     A janela de tempo aqui é mais apertada que nos outros exercícios de propósito: esta lição é inteiramente sobre cair no tempo, não sobre nota ou técnica.
     Se estiver sempre adiantado ou atrasado, não olhe pra pista — feche os olhos e siga só o pé.
+
+# Jogo — contagem regressiva, legenda, dicas do diagrama da harmônica
+gameplay-get-ready = PREPARE-SE
+gameplay-legend-blow = ■ SOPRO
+gameplay-legend-draw = ■ SUGADA
+harmonica-overlay-hint-view = Harmônica  ·  acende conforme você toca
+harmonica-overlay-hint-select = Harmônica  ·  clique numa nota para selecioná-la
+
+# Overlay do metrônomo
+metronome-click-off = clique: desligado
+metronome-click-on = clique: ligado
+
+# Treinador de Bends
+bending-drill-off = Exercício: desligado
+bending-drill-on = Exercício: ligado · sequência %streak%
+bending-hint = Esc para voltar  ·  M silencia o clique  ·  feel alterna reto/shuffle
+bending-no-note-for-technique = Este furo não tem nota para essa técnica.
+
+# Jam Session
+jam-loop-off = Loop: desligado
+jam-loop-on = Loop: ligado
+jam-hole-map-hint = Sua harmônica  ·  dourado = tom do acorde agora  ·  verde = nota da escala de blues  ·  sopro em cima / sugada embaixo
+
+# Tela de resultados
+results-song-complete = MÚSICA CONCLUÍDA
+results-by-technique = Por técnica
+results-new-best = ★ NOVO RECORDE! ★
+
+# Calibração de latência
+calibration-title = Calibração de Latência
+calibration-mean-offset-placeholder = Deslocamento médio: —
+calibration-mean-offset = Deslocamento médio: %sign%%ms%ms
+calibration-suggested-placeholder = Atual: —   →   Sugerido: —
+calibration-suggested = Atual: %current%ms   →   Sugerido: %suggested%ms
+
+# Opções
+options-input-lag = Atraso de entrada

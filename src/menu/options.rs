@@ -16,11 +16,13 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, T
 use bevy::ui_widgets::{
     Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange, slider_self_update,
 };
+use bevy_fluent::Localization;
 
 const TRACK_BG: Color = Color::srgb(0.14, 0.14, 0.22);
 
 use crate::assets_management::{AvailableHarmonicas, SelectedHarmonicaModel, ShowNoteNumbers};
 use crate::audio_system::audio_input::{self, MicStatus};
+use crate::localization::LocalizationExt;
 use crate::settings::AudioSettings;
 
 use crate::theme::LoadedTheme;
@@ -127,6 +129,7 @@ fn audio_level(settings: &AudioSettings, kind: VolumeSlider) -> f32 {
 
 fn setup_options_menu(
     mut commands: Commands,
+    loc: Res<Localization>,
 
     settings: Res<AudioSettings>,
     mic_status: Res<MicStatus>,
@@ -156,7 +159,7 @@ fn setup_options_menu(
         settings.metronome_volume,
         set_metronome_volume,
     );
-    spawn_latency_slider(&mut commands, root, settings.input_latency_ms);
+    spawn_latency_slider(&mut commands, root, settings.input_latency_ms, &loc);
     spawn_mic_combobox(
         &mut commands,
         root,
@@ -795,7 +798,12 @@ const LATENCY_MAX_MS: i32 = 200;
 
 /// One labelled slider row for the mic input-latency offset.
 /// The track maps 0–200 ms linearly; the label shows "Xms".
-fn spawn_latency_slider(commands: &mut Commands, parent: Entity, value_ms: i32) {
+fn spawn_latency_slider(
+    commands: &mut Commands,
+    parent: Entity,
+    value_ms: i32,
+    loc: &Localization,
+) {
     let frac = (value_ms as f32 / LATENCY_MAX_MS as f32).clamp(0.0, 1.0);
 
     let row = commands
@@ -814,7 +822,7 @@ fn spawn_latency_slider(commands: &mut Commands, parent: Entity, value_ms: i32) 
                 width: Val::Px(110.0),
                 ..default()
             },
-            Text::new("Input lag"),
+            Text::new(String::from(loc.msg("options-input-lag"))),
             TextFont {
                 font_size: FontSize::Px(20.0),
                 ..default()

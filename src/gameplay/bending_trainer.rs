@@ -12,6 +12,7 @@
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
+use bevy_fluent::Localization;
 
 use crate::audio_system::midi::{next_key, prev_key};
 use crate::audio_system::pitch_detect::PitchRange;
@@ -19,6 +20,7 @@ use crate::audio_system::wav::encode_wav;
 use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_explanation};
 use crate::dialogs::button;
 use crate::dialogs::combobox;
+use crate::localization::LocalizationExt;
 use crate::menu::AppState;
 use crate::profile::{DrillRecord, PlayerProfile};
 use crate::settings::AudioSettings;
@@ -517,6 +519,7 @@ pub fn setup(
     mut pitch_range: ResMut<PitchRange>,
     mut drill: ResMut<DrillState>,
     profile: Res<PlayerProfile>,
+    loc: Res<Localization>,
 ) {
     clock.set_free(0.0);
     *pitch_range = pitch_range_for_key(&key.0);
@@ -549,7 +552,7 @@ pub fn setup(
     let root_id = root_ec.id();
     root_ec.with_children(|root| {
             root.spawn((
-                Text::new("Bending Trainer"),
+                Text::new(String::from(loc.msg("bending-trainer"))),
                 TextFont { font_size: FontSize::Px(26.0), ..default() },
                 TextColor(Color::WHITE),
             ));
@@ -670,7 +673,7 @@ pub fn setup(
                     .observe(show_drill_explanation)
                     .observe(hide_drill_explanation);
                 row.spawn((
-                    Text::new("Drill: off"),
+                    Text::new(String::from(loc.msg("bending-drill-off"))),
                     TextFont { font_size: FontSize::Px(15.0), ..default() },
                     TextColor(Color::srgb(0.70, 0.70, 0.80)),
                     DrillLabel,
@@ -692,6 +695,7 @@ pub fn setup(
                             host,
                             &richter_harp(&key.0),
                             on_diagram_cell_clicked,
+                            &loc,
                         );
                     });
 
@@ -761,7 +765,7 @@ pub fn setup(
             });
 
             root.spawn((
-                Text::new("Esc to go back  \u{00B7}  M mutes the click  \u{00B7}  feel toggles straight/shuffle"),
+                Text::new(String::from(loc.msg("bending-hint"))),
                 TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
@@ -778,6 +782,7 @@ pub fn rebuild_overlay(
     key: Res<TrainerKey>,
     hosts: Query<(Entity, Option<&Children>), With<OverlayHost>>,
     mut commands: Commands,
+    loc: Res<Localization>,
 ) {
     if !key.is_changed() {
         return;
@@ -790,7 +795,7 @@ pub fn rebuild_overlay(
             }
         }
         commands.entity(host).with_children(|h| {
-            spawn_harmonica_overlay_selectable(h, &harp, on_diagram_cell_clicked);
+            spawn_harmonica_overlay_selectable(h, &harp, on_diagram_cell_clicked, &loc);
         });
     }
 }
@@ -887,6 +892,7 @@ pub fn update_tuner_readout(
     key: Res<TrainerKey>,
     target: Res<TrainerTarget>,
     active: Res<ActivePitches>,
+    loc: Res<Localization>,
     mut labels: Query<(&mut Text, &mut TextColor), With<TunerReadout>>,
 ) {
     let Ok((mut text, mut color)) = labels.single_mut() else {
@@ -894,7 +900,7 @@ pub fn update_tuner_readout(
     };
     let harp = richter_harp(&key.0);
     let Some(target_note) = target_note(&harp, *target) else {
-        *text = Text::new("This hole has no note for that technique.");
+        *text = Text::new(String::from(loc.msg("bending-no-note-for-technique")));
         color.0 = Color::srgb(0.60, 0.60, 0.65);
         return;
     };
@@ -997,16 +1003,20 @@ pub fn save_drill_progress(drill: Res<DrillState>, mut profile: ResMut<PlayerPro
 }
 
 /// Keeps the "Drill: ..." readout in step with on/off state and streak.
-pub fn update_drill_label(drill: Res<DrillState>, mut labels: Query<&mut Text, With<DrillLabel>>) {
+pub fn update_drill_label(
+    drill: Res<DrillState>,
+    loc: Res<Localization>,
+    mut labels: Query<&mut Text, With<DrillLabel>>,
+) {
     if !drill.is_changed() {
         return;
     }
     for mut text in &mut labels {
-        *text = Text::new(if drill.enabled {
-            format!("Drill: on \u{00B7} streak {}", drill.streak)
+        *text = Text::new(String::from(if drill.enabled {
+            loc.msg_args("bending-drill-on", &[("streak", drill.streak.to_string())])
         } else {
-            "Drill: off".to_string()
-        });
+            loc.msg("bending-drill-off")
+        }));
     }
 }
 

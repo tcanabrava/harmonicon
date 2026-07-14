@@ -226,3 +226,40 @@ lesson-using-your-feet-body =
     In this drill, a steady quarter-note pulse scrolls by on hole 4 — keep your foot tapping the whole time, even between notes, and let each blow/draw land exactly on a tap.
     The timing window here is tighter than other drills on purpose: this lesson is entirely about landing on the beat, not about pitch or technique.
     If you're consistently early or late, don't watch the highway — close your eyes and just follow your foot.
+
+# Gameplay — countdown, legend, harmonica overlay hints
+gameplay-get-ready = GET READY
+gameplay-legend-blow = ■ BLOW
+gameplay-legend-draw = ■ DRAW
+harmonica-overlay-hint-view = Harmonica  ·  lights up as you play
+harmonica-overlay-hint-select = Harmonica  ·  click a note to select it
+
+# Metronome overlay
+metronome-click-off = click: off
+metronome-click-on = click: on
+
+# Bending Trainer
+bending-drill-off = Drill: off
+bending-drill-on = Drill: on · streak %streak%
+bending-hint = Esc to go back  ·  M mutes the click  ·  feel toggles straight/shuffle
+bending-no-note-for-technique = This hole has no note for that technique.
+
+# Jam Session
+jam-loop-off = Loop: off
+jam-loop-on = Loop: on
+jam-hole-map-hint = Your harmonica  ·  gold = chord tone right now  ·  green = blues-scale note  ·  top blow / bottom draw
+
+# Results screen
+results-song-complete = SONG COMPLETE
+results-by-technique = By technique
+results-new-best = ★ NEW BEST! ★
+
+# Latency calibration
+calibration-title = Latency Calibration
+calibration-mean-offset-placeholder = Mean offset: —
+calibration-mean-offset = Mean offset: %sign%%ms%ms
+calibration-suggested-placeholder = Current: —   →   Suggested: —
+calibration-suggested = Current: %current%ms   →   Suggested: %suggested%ms
+
+# Options
+options-input-lag = Input lag

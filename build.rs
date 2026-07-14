@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Build-time lint: reject raw string literals passed directly to `Text::new()`
-// inside `src/menu/song_editor/`.
+// anywhere under `src/`.
 //
 // A "raw" string literal here is one whose content contains at least one ASCII
 // letter AND at least one whitespace character — a reliable fingerprint of
@@ -16,8 +16,10 @@
 //   Text::new(format!(...)) — dynamic string (no leading `"`)
 //   Text::new(String::from(loc.msg("key"))) — already localized
 //
-// Only `src/menu/song_editor/` is checked here; other directories still have
-// raw strings to migrate and are not yet covered.
+// `mod tests { ... }` blocks are exempt — test fixture text is never
+// user-visible. Every `mod tests` in this codebase is the last item in its
+// file (convention, not enforced elsewhere), so once a `mod tests {` line is
+// seen the rest of the file is skipped rather than tracking brace depth.
 
 use std::path::Path;
 
@@ -33,22 +35,24 @@ fn main() {
 }
 
 fn build() {
-    println!("cargo:rerun-if-changed=src/menu/song_editor");
+    println!("cargo:rerun-if-changed=src");
 
-    let dir = Path::new("src/menu/song_editor");
+    let dir = Path::new("src");
     if !dir.exists() {
         return;
     }
 
     let mut violations: Vec<String> = Vec::new();
+    let mut rs_files: Vec<std::path::PathBuf> = Vec::new();
+    collect_rs_files(dir, &mut rs_files);
 
-    for entry in std::fs::read_dir(dir).expect("song_editor dir must be readable") {
-        let path = entry.unwrap().path();
-        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
-            continue;
-        }
+    for path in rs_files {
         let source = std::fs::read_to_string(&path).unwrap_or_default();
         for (lineno, line) in source.lines().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed == "mod tests {" {
+                break;
+            }
             if is_raw_text_new(line) {
                 violations.push(format!(
                     "{}:{}: Text::new(\"...\") with a natural-language literal — \
@@ -74,6 +78,21 @@ fn build() {
         eprintln!("────────────────────────────────────────────────────────────");
         eprintln!();
         std::process::exit(1);
+    }
+}
+
+/// Recursively collects every `.rs` file under `dir` into `out`.
+fn collect_rs_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            collect_rs_files(&path, out);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            out.push(path);
+        }
     }
 }
 

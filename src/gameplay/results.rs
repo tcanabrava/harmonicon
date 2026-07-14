@@ -159,7 +159,7 @@ pub(super) fn setup(
         ))
         .with_children(|root| {
             root.spawn((
-                Text::new("SONG COMPLETE"),
+                Text::new(String::from(loc.msg("results-song-complete"))),
                 TextFont {
                     font_size: FontSize::Px(28.0),
                     ..default()
@@ -239,7 +239,7 @@ pub(super) fn setup(
 
             if !technique_rows.is_empty() {
                 root.spawn((
-                    Text::new("By technique"),
+                    Text::new(String::from(loc.msg("results-by-technique"))),
                     TextFont {
                         font_size: FontSize::Px(15.0),
                         ..default()
@@ -306,7 +306,7 @@ pub(super) fn setup(
             if let Some((improved, best_score)) = new_best {
                 if improved {
                     root.spawn((
-                        Text::new("\u{2605} NEW BEST! \u{2605}"),
+                        Text::new(String::from(loc.msg("results-new-best"))),
                         TextFont {
                             font_size: FontSize::Px(18.0),
                             ..default()

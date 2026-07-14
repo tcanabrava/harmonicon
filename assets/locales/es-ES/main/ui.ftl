@@ -224,3 +224,40 @@ lesson-using-your-feet-body =
     En este ejercicio, un pulso constante de negras se desliza en el agujero 4 — sigue marcando el pie todo el tiempo, incluso entre notas, y deja que cada soplido/aspirado caiga exactamente en una marca.
     La ventana de tiempo aquí es más estrecha que en otros ejercicios a propósito: esta lección trata enteramente de caer en el tiempo, no de la nota ni de la técnica.
     Si vas siempre adelantado o atrasado, no mires el camino de notas — cierra los ojos y sigue solo tu pie.
+
+# Juego — cuenta atrás, leyenda, pistas del diagrama de armónica
+gameplay-get-ready = PREPÁRATE
+gameplay-legend-blow = ■ SOPLO
+gameplay-legend-draw = ■ ASPIRACIÓN
+harmonica-overlay-hint-view = Armónica  ·  se ilumina mientras tocas
+harmonica-overlay-hint-select = Armónica  ·  haz clic en una nota para seleccionarla
+
+# Overlay del metrónomo
+metronome-click-off = clic: apagado
+metronome-click-on = clic: encendido
+
+# Entrenador de Bends
+bending-drill-off = Ejercicio: apagado
+bending-drill-on = Ejercicio: encendido · racha %streak%
+bending-hint = Esc para volver  ·  M silencia el clic  ·  feel alterna recto/shuffle
+bending-no-note-for-technique = Este agujero no tiene nota para esa técnica.
+
+# Jam Session
+jam-loop-off = Bucle: apagado
+jam-loop-on = Bucle: encendido
+jam-hole-map-hint = Tu armónica  ·  dorado = tono del acorde ahora mismo  ·  verde = nota de la escala de blues  ·  soplo arriba / aspiración abajo
+
+# Pantalla de resultados
+results-song-complete = CANCIÓN COMPLETADA
+results-by-technique = Por técnica
+results-new-best = ★ ¡NUEVO RÉCORD! ★
+
+# Calibración de latencia
+calibration-title = Calibración de Latencia
+calibration-mean-offset-placeholder = Desfase medio: —
+calibration-mean-offset = Desfase medio: %sign%%ms%ms
+calibration-suggested-placeholder = Actual: —   →   Sugerido: —
+calibration-suggested = Actual: %current%ms   →   Sugerido: %suggested%ms
+
+# Opciones
+options-input-lag = Retardo de entrada

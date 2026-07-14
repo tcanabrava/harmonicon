@@ -4,8 +4,10 @@ use bevy::{
     audio::{AudioSource, Volume},
     prelude::*,
 };
+use bevy_fluent::Localization;
 
 use crate::{
+    localization::LocalizationExt,
     menu::{AppState, GameplayMode, SelectedSong},
     settings::AudioSettings,
     song::SongManifest,
@@ -19,7 +21,7 @@ pub struct CountdownOverlay;
 #[derive(Component)]
 pub struct CountdownText;
 
-pub fn spawn_countdown(commands: &mut Commands, harp_hint: Option<&str>) {
+pub fn spawn_countdown(commands: &mut Commands, loc: &Localization, harp_hint: Option<&str>) {
     // The full-screen overlay shell is static and font/handle-free, so it's a
     // `bsn!` scene. The countdown text children carry a custom `FontSource`,
     // which `bsn!` can't take directly in 0.19-rc.3, so they stay imperative.
@@ -42,7 +44,7 @@ pub fn spawn_countdown(commands: &mut Commands, harp_hint: Option<&str>) {
         .id();
     commands.entity(overlay).with_children(|ov| {
         ov.spawn((
-            Text::new("GET READY"),
+            Text::new(String::from(loc.msg("gameplay-get-ready"))),
             TextFont {
                 font_size: FontSize::Px(22.0),
                 ..default()

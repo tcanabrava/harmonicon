@@ -6,8 +6,10 @@ use bevy::{
     picking::events::{Click, Out, Over, Pointer},
     prelude::*,
 };
+use bevy_fluent::Localization;
 
 use crate::{
+    localization::LocalizationExt,
     menu::{AppState, SelectedSong},
     settings::AudioSettings,
     song::SongManifest,
@@ -411,6 +413,7 @@ fn update_feel_label(
 
 fn update_mute_label(
     muted: Res<MetronomeMuted>,
+    loc: Res<Localization>,
     mut labels: Query<(&mut Text, &mut TextColor), With<MetronomeMuteLabel>>,
 ) {
     // Written every frame: the mute state outlives the label (it survives
@@ -418,10 +421,10 @@ fn update_mute_label(
     // stale.
     for (mut text, mut color) in &mut labels {
         if muted.0 {
-            *text = Text::new("click: off");
+            *text = Text::new(String::from(loc.msg("metronome-click-off")));
             *color = TextColor(Color::srgb(0.40, 0.40, 0.45));
         } else {
-            *text = Text::new("click: on");
+            *text = Text::new(String::from(loc.msg("metronome-click-on")));
             *color = TextColor(Color::srgb(0.65, 0.65, 0.70));
         }
     }

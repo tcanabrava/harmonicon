@@ -5,9 +5,11 @@ use std::collections::{HashMap, HashSet};
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy_fluent::Localization;
 
 use crate::{
     dialogs::button,
+    localization::LocalizationExt,
     menu::{JamProgression, SelectedSong},
     settings::AudioSettings,
     song::SongManifest,
@@ -44,6 +46,7 @@ pub fn setup(
     osc_material: Res<OscMaterial>,
     theme: Res<LoadedTheme>,
     jam_progression: Res<JamProgression>,
+    loc: Res<Localization>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Jam Session");
@@ -152,7 +155,7 @@ pub fn setup(
                         },
                     ));
                     row.spawn((
-                        Text::new("Loop: off"),
+                        Text::new(String::from(loc.msg("jam-loop-off"))),
                         TextFont {
                             font_size: FontSize::Px(15.0),
                             ..default()
@@ -175,7 +178,7 @@ pub fn setup(
                         &GridConfig::for_2d(),
                         theme.twelve_bar_colors(),
                     );
-                    spawn_hole_map(grid, &holes_info);
+                    spawn_hole_map(grid, &holes_info, &loc);
                 });
                 left.spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -198,7 +201,7 @@ pub fn setup(
                 ..default()
             })
             .with_children(|right| {
-                spawn_harmonica_overlay(right, &chart.harmonica);
+                spawn_harmonica_overlay(right, &chart.harmonica, &loc);
                 right
                     .spawn(Node {
                         width: Val::Percent(100.0),
@@ -234,7 +237,7 @@ pub fn setup(
 
     // Jam already shows the harp hint on the persistent left panel, so the
     // countdown doesn't repeat it.
-    spawn_countdown(&mut commands, None);
+    spawn_countdown(&mut commands, &loc, None);
 }
 
 // ── Music loop toggle ────────────────────────────────────────────────────────
@@ -252,13 +255,18 @@ pub struct JamLoopLabel;
 /// Keeps the "Loop: ..." readout in step with the toggle.
 pub fn update_jam_loop_label(
     jam_loop: Res<JamLoop>,
+    loc: Res<Localization>,
     mut labels: Query<&mut Text, With<JamLoopLabel>>,
 ) {
     if !jam_loop.is_changed() {
         return;
     }
     for mut text in &mut labels {
-        *text = Text::new(if jam_loop.0 { "Loop: on" } else { "Loop: off" });
+        *text = Text::new(String::from(if jam_loop.0 {
+            loc.msg("jam-loop-on")
+        } else {
+            loc.msg("jam-loop-off")
+        }));
     }
 }
 
@@ -419,7 +427,7 @@ fn build_hole_guide(harp: &Harmonica, key: &str, progression: Progression) -> (V
 
 /// Spawn the bottom-strip hole map: a row of cells (blow note, hole number, draw
 /// note), with in-scale notes tinted green as a static guide.
-fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
+fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], loc: &Localization) {
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
@@ -431,7 +439,7 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo]) {
         })
         .with_children(|col| {
             col.spawn((
-                Text::new("Your harmonica  \u{00B7}  gold = chord tone right now  \u{00B7}  green = blues-scale note  \u{00B7}  top blow / bottom draw"),
+                Text::new(String::from(loc.msg("jam-hole-map-hint"))),
                 TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
             ));

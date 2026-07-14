@@ -12,8 +12,10 @@ use std::collections::HashSet;
 
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy_fluent::Localization;
 
 use crate::audio_system::midi::note_to_midi;
+use crate::localization::LocalizationExt;
 use crate::song::chart::Action;
 use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, valid_note};
 
@@ -102,9 +104,9 @@ fn note_for(h: &HoleNotes, hole: u8, row: Row) -> Option<&str> {
 /// Diatonic harps get the full bend/overblow/overdraw diagram; chromatic
 /// harps (no bends, no overblow/overdraw — just a slide button) get a
 /// simpler diagram, see [`spawn_chromatic_overlay`].
-pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) {
+pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica, loc: &Localization) {
     if matches!(harp, Harmonica::Chromatic { .. }) {
-        spawn_chromatic_overlay(parent, harp);
+        spawn_chromatic_overlay(parent, harp, loc);
         return;
     }
     let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
@@ -119,7 +121,7 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
         })
         .with_children(|panel| {
             panel.spawn((
-                Text::new("Harmonica  \u{00B7}  lights up as you play"),
+                Text::new(String::from(loc.msg("harmonica-overlay-hint-view"))),
                 TextFont {
                     font_size: FontSize::Px(15.0),
                     ..default()
@@ -191,9 +193,10 @@ pub fn spawn_harmonica_overlay_selectable<M: 'static>(
     parent: &mut ChildSpawnerCommands,
     harp: &Harmonica,
     on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
+    loc: &Localization,
 ) {
     if matches!(harp, Harmonica::Chromatic { .. }) {
-        spawn_chromatic_overlay(parent, harp);
+        spawn_chromatic_overlay(parent, harp, loc);
         return;
     }
     let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
@@ -208,7 +211,7 @@ pub fn spawn_harmonica_overlay_selectable<M: 'static>(
         })
         .with_children(|panel| {
             panel.spawn((
-                Text::new("Harmonica  \u{00B7}  click a note to select it"),
+                Text::new(String::from(loc.msg("harmonica-overlay-hint-select"))),
                 TextFont {
                     font_size: FontSize::Px(15.0),
                     ..default()
@@ -297,7 +300,7 @@ fn chromatic_note_for(harp: &Harmonica, hole: u8, row: ChromaticRow) -> Option<S
 /// pitch on each side, sized to `harp`'s actual hole count (12 or 16 — the
 /// bend/overblow/overdraw diagram in [`spawn_harmonica_overlay`] only applies
 /// to the fixed 10-hole diatonic layout).
-fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) {
+fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica, loc: &Localization) {
     let hole_count = harp.hole_count();
 
     parent
@@ -310,7 +313,7 @@ fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica) 
         })
         .with_children(|panel| {
             panel.spawn((
-                Text::new("Harmonica  \u{00B7}  lights up as you play"),
+                Text::new(String::from(loc.msg("harmonica-overlay-hint-view"))),
                 TextFont {
                     font_size: FontSize::Px(15.0),
                     ..default()

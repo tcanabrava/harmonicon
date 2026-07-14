@@ -26,8 +26,12 @@ use bevy::{
     picking::events::{Click, Pointer},
     prelude::*,
 };
+use bevy_fluent::Localization;
 
-use crate::{audio_system::pitch_detect::PitchEvent, dialogs::button, settings::AudioSettings};
+use crate::{
+    audio_system::pitch_detect::PitchEvent, dialogs::button, localization::LocalizationExt,
+    settings::AudioSettings,
+};
 
 use super::{AppState, ReturnToOptions};
 
@@ -421,6 +425,7 @@ fn update_status(cal: Res<CalState>, mut texts: Query<&mut Text, With<CalStatusT
 fn update_result_block(
     cal: Res<CalState>,
     audio: Res<AudioSettings>,
+    loc: Res<Localization>,
     mut mean_texts: Query<(&mut Text, &mut TextColor), With<CalMeanText>>,
     mut suggested_texts: Query<&mut Text, (With<CalSuggestedText>, Without<CalMeanText>)>,
 ) {
@@ -430,7 +435,12 @@ fn update_result_block(
     if let Some(ms) = cal.mean_offset_ms() {
         let sign = if ms >= 0.0 { "+" } else { "" };
         for (mut t, mut color) in &mut mean_texts {
-            t.0 = format!("Mean offset: {sign}{ms:.0}ms");
+            t.0 = loc
+                .msg_args(
+                    "calibration-mean-offset",
+                    &[("sign", sign.to_string()), ("ms", format!("{ms:.0}"))],
+                )
+                .into();
             color.0 = if ms.abs() < 10.0 {
                 Color::srgb(0.45, 1.00, 0.45)
             } else {
@@ -439,10 +449,15 @@ fn update_result_block(
         }
         let suggested = (audio.input_latency_ms + ms.round() as i32).max(0);
         for mut t in &mut suggested_texts {
-            t.0 = format!(
-                "Current: {}ms   →   Suggested: {}ms",
-                audio.input_latency_ms, suggested
-            );
+            t.0 = loc
+                .msg_args(
+                    "calibration-suggested",
+                    &[
+                        ("current", audio.input_latency_ms.to_string()),
+                        ("suggested", suggested.to_string()),
+                    ],
+                )
+                .into();
         }
     }
 }
@@ -521,7 +536,7 @@ fn handle_escape(
 
 // ── UI construction ───────────────────────────────────────────────────────────
 
-fn setup_ui(mut commands: Commands) {
+fn setup_ui(mut commands: Commands, loc: Res<Localization>) {
     let root = commands
         .spawn((
             Node {
@@ -541,7 +556,7 @@ fn setup_ui(mut commands: Commands) {
     commands.entity(root).with_children(|p| {
         // ── Title ─────────────────────────────────────────────────────────────
         p.spawn((
-            Text::new("Latency Calibration"),
+            Text::new(String::from(loc.msg("calibration-title"))),
             TextFont {
                 font_size: FontSize::Px(38.0),
                 ..default()
@@ -703,7 +718,7 @@ fn setup_ui(mut commands: Commands) {
         ))
         .with_children(|block| {
             block.spawn((
-                Text::new("Mean offset: —"),
+                Text::new(String::from(loc.msg("calibration-mean-offset-placeholder"))),
                 TextFont {
                     font_size: FontSize::Px(20.0),
                     ..default()
@@ -712,7 +727,7 @@ fn setup_ui(mut commands: Commands) {
                 CalMeanText,
             ));
             block.spawn((
-                Text::new("Current: —   →   Suggested: —"),
+                Text::new(String::from(loc.msg("calibration-suggested-placeholder"))),
                 TextFont {
                     font_size: FontSize::Px(16.0),
                     ..default()
