@@ -148,6 +148,15 @@ lesson-multiple-notes-body =
     Neste exercício, as levadas de acorde deslizam até a linha de acerto — o jogo escuta cada nota do acorde soando no mesmo instante, não uma depois da outra.
     Se só parte do acorde registrar, você provavelmente não está cobrindo todos os furos por igual; alargue a embocadura em vez de soprar mais forte.
 
+# Lição: bloqueio de língua (instrucional)
+lesson-tongue-blocking-title = Bloqueio de Língua
+lesson-tongue-blocking-body =
+    Até agora você deu forma às notas com os lábios (fazendo bico) — o bloqueio de língua é a outra embocadura clássica: cubra vários furos com a boca, e apoie a língua achatada na gaita para bloquear todos menos um.
+    Tire a língua de um furo e ele soa sozinho, exatamente como uma nota única de bico — o microfone não consegue mesmo distinguir as duas técnicas, então esta lição não pode verificar qual você está usando.
+    O que o bloqueio de língua destrava e o bico não consegue: afaste a língua de dois furos das pontas ao mesmo tempo (bloqueando só os do meio) e você ganha uma divisão de oitava — duas notas, uma oitava de distância, soando juntas.
+    Também deixa você bater a língua contra um furo em ritmo para um pulso percussivo tipo "tchaca-tchaca", e trocar de canto da boca no meio de uma frase sem perder a vedação do ar.
+    Tente a lição de divisão de oitava a seguir — é a recompensa concreta e mensurável dessa técnica: o jogo consegue ouvir se as duas notas da divisão soam juntas, mesmo sem conseguir ouvir o bloqueio de língua em si.
+
 # Lição: divisão de oitava (bloqueio de língua)
 lesson-octave-split-title = Divisão de Oitava
 lesson-octave-split-body =
@@ -156,6 +165,14 @@ lesson-octave-split-body =
     Nos furos 1 e 4 soprados juntos você ouve Dó4 e Dó5 — a mesma nota, uma oitava acima. Os furos 2 e 5, e os furos 3 e 6, funcionam do mesmo jeito.
     Neste exercício, os dois furos de cada divisão precisam soar juntos, igual a um acorde — o bloqueio de língua em si não dá pra verificar pelo microfone, mas a oitava que ele produz dá.
     Se só ouvir uma nota, confira se a língua está cobrindo os furos do meio por inteiro, em vez de ficar torta para um lado.
+
+# Lição: slides
+lesson-slides-title = Slides
+lesson-slides-body =
+    Duas técnicas diferentes dividem o nome "slide" na gaita — este exercício cobre as duas.
+    A primeira é um slide físico: mova a gaita de lado pela embocadura, de um furo pro outro, mantendo a vedação sem quebrar em vez de parar e recomeçar o sopro a cada nota. Neste exercício, deslize suavemente pelos furos 4-5-6 soprados — o jogo escuta três notas comuns, mas a técnica está em como você conecta elas, não só em acertá-las.
+    A segunda é a liberação de bend: ataque uma nota já dobrada pra baixo, e deixe ela subir suavemente até a nota natural — um choro clássico do blues. Neste exercício, dobre o furo 2 sugado meio tom pra baixo e segure, depois libere suavemente até a nota natural; o jogo valida a nota dobrada no momento em que você a toca.
+    Mantenha o ar constante nos dois — o slide deve soar como um sopro contínuo só, não uma série de ataques separados.
 
 # Lição: formato das mãos / wah
 lesson-hand-wah-title = O Formato das Mãos e o Wah
@@ -193,3 +210,12 @@ lesson-twelve-bar-body =
     O desenho clássico: quatro compassos de I, dois de IV, dois de I, um de V, um de IV e dois compassos finais de I (o último costuma virar V para lançar o próximo chorus — o "turnaround").
     Conte em voz alta: "UM dois três quatro, DOIS dois três quatro..." — doze compassos, e o ciclo recomeça.
     Você verá essa grade ao vivo na Jam Session, onde o compasso atual acende conforme a base toca. Depois desta lição, abra uma Jam Session e apenas observe alguns ciclos passarem, contando junto, antes de tocar qualquer nota.
+
+# Lição: usando os pés
+lesson-using-your-feet-title = Usando os Pés
+lesson-using-your-feet-body =
+    Um bom senso de tempo não vem de olhar pra tela — vem do seu corpo. Bata o pé em cada tempo, e deixe esse pulso físico guiar sua tocada em vez de correr atrás das notas que deslizam na tela.
+    Antes de começar, conte "1, 2, 3, 4" em voz alta algumas vezes no andamento do exercício, batendo o pé em cada número, até ficar automático em vez de contado.
+    Neste exercício, um pulso constante de semínimas desliza no furo 4 — continue batendo o pé o tempo todo, mesmo entre as notas, e deixe cada sopro/sugada cair exatamente numa batida.
+    A janela de tempo aqui é mais apertada que nos outros exercícios de propósito: esta lição é inteiramente sobre cair no tempo, não sobre nota ou técnica.
+    Se estiver sempre adiantado ou atrasado, não olhe pra pista — feche os olhos e siga só o pé.

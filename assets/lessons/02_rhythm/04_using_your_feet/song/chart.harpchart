@@ -1,0 +1,52 @@
+{
+  "metadata": {
+    "format_version": "1.1.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: a steady quarter-note pulse on hole 4 blow/draw against a click, to practice tapping your foot on the beat. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Keep Time Drill",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 90,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [ { "tick": 0, "bpm": 90 } ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+      "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+    }
+  },
+  "track": [
+    { "id": "beat_01", "time": 2.000, "duration": 0.3, "phrase": "Bar 1", "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "beat_02", "time": 2.667, "duration": 0.3, "events": [{ "hole": 4, "action": "draw", "note": "D5" }] },
+    { "id": "beat_03", "time": 3.333, "duration": 0.3, "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "beat_04", "time": 4.000, "duration": 0.3, "events": [{ "hole": 4, "action": "draw", "note": "D5" }] },
+
+    { "id": "beat_05", "time": 4.667, "duration": 0.3, "phrase": "Bar 2", "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "beat_06", "time": 5.333, "duration": 0.3, "events": [{ "hole": 4, "action": "draw", "note": "D5" }] },
+    { "id": "beat_07", "time": 6.000, "duration": 0.3, "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "beat_08", "time": 6.667, "duration": 0.3, "events": [{ "hole": 4, "action": "draw", "note": "D5" }] },
+
+    { "id": "beat_09", "time": 7.333, "duration": 0.3, "phrase": "Bar 3", "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "beat_10", "time": 8.000, "duration": 0.3, "events": [{ "hole": 4, "action": "draw", "note": "D5" }] },
+    { "id": "beat_11", "time": 8.667, "duration": 0.3, "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "beat_12", "time": 9.333, "duration": 0.3, "events": [{ "hole": 4, "action": "draw", "note": "D5" }] }
+  ],
+  "scoring": {
+    "perfect_window_ms": 80,
+    "good_window_ms": 180,
+    "miss_window_ms": 300
+  }
+}

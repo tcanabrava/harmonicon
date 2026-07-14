@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "format_version": "1.1.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: an adjacent-hole slide run (holes 4-5-6 blow), then a half-step draw bend released back to the natural note, on a C diatonic. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Slides Drill",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 76,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [ { "tick": 0, "bpm": 76 } ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+      "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+    }
+  },
+  "track": [
+    { "id": "slide_a", "time": 2.0, "duration": 0.75, "phrase": "Hole slide: 4-5-6 blow",
+      "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "slide_b", "time": 2.75, "duration": 0.75,
+      "events": [{ "hole": 5, "action": "blow", "note": "E5" }] },
+    { "id": "slide_c", "time": 3.5, "duration": 0.75,
+      "events": [{ "hole": 6, "action": "blow", "note": "G5" }] },
+    { "id": "slide_repeat_a", "time": 5.5, "duration": 0.75,
+      "events": [{ "hole": 4, "action": "blow", "note": "C5" }] },
+    { "id": "slide_repeat_b", "time": 6.25, "duration": 0.75,
+      "events": [{ "hole": 5, "action": "blow", "note": "E5" }] },
+    { "id": "slide_repeat_c", "time": 7.0, "duration": 0.75,
+      "events": [{ "hole": 6, "action": "blow", "note": "G5" }] },
+
+    { "id": "bend_in", "time": 9.5, "duration": 1.5, "phrase": "Bend and release: 2 draw",
+      "events": [{ "hole": 2, "action": "draw", "note": "G4", "modifiers": [{ "type": "bend", "semitones": -1 }] }] },
+    { "id": "bend_release", "time": 11.0, "duration": 1.0,
+      "events": [{ "hole": 2, "action": "draw", "note": "G4" }] }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 600
+  }
+}

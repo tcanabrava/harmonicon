@@ -148,6 +148,15 @@ lesson-multiple-notes-body =
     En este ejercicio, las levadas de acorde se deslizan hacia la línea de acierto — el juego escucha que cada nota del acorde suene en el mismo instante, no una tras otra.
     Si solo registra parte del acorde, seguramente no estás cubriendo todos los agujeros por igual; ensancha la embocadura en vez de soplar más fuerte.
 
+# Lección: bloqueo de lengua (instructiva)
+lesson-tongue-blocking-title = Bloqueo de Lengua
+lesson-tongue-blocking-body =
+    Hasta ahora diste forma a las notas con los labios (frunciendo) — el bloqueo de lengua es la otra embocadura clásica: cubre varios agujeros con la boca, y apoya la lengua plana sobre la armónica para bloquear todos menos uno.
+    Levanta la lengua de un agujero y suena solo, exactamente igual que una nota única con los labios fruncidos — el micrófono realmente no puede distinguir las dos técnicas, así que esta lección no puede verificar cuál estás usando.
+    Lo que el bloqueo de lengua desbloquea y el fruncido no puede: aparta la lengua de dos agujeros de los extremos a la vez (bloqueando solo los del medio) y consigues una división de octava — dos notas, una octava de distancia, sonando juntas.
+    También te deja golpear la lengua contra un agujero rítmicamente para un pulso percusivo tipo "chaca-chaca", y cambiar de esquina de la boca a mitad de frase sin perder el sello de aire.
+    Prueba la lección de división de octava a continuación — es la recompensa concreta y medible de esta técnica: el juego puede oír si las dos notas de la división suenan juntas, aunque no pueda oír el bloqueo de lengua en sí.
+
 # Lección: división de octava (bloqueo de lengua)
 lesson-octave-split-title = Divisiones de Octava
 lesson-octave-split-body =
@@ -156,6 +165,14 @@ lesson-octave-split-body =
     En los agujeros 1 y 4 soplados juntos suenan Do4 y Do5 — la misma nota, una octava más arriba. Los agujeros 2 y 5, y los agujeros 3 y 6, funcionan igual.
     En este ejercicio, los dos agujeros de cada división deben sonar juntos, igual que un acorde — el bloqueo de lengua en sí no se puede verificar por el micrófono, pero la octava que produce sí.
     Si solo oyes una nota, revisa que la lengua cubra del todo los agujeros del medio, en vez de quedar ladeada hacia un lado.
+
+# Lección: deslizamientos
+lesson-slides-title = Deslizamientos
+lesson-slides-body =
+    Dos técnicas distintas comparten el nombre "slide" en la armónica — este ejercicio cubre las dos.
+    La primera es un deslizamiento físico: mueve la armónica de lado por tu embocadura, de un agujero al siguiente, manteniendo el sello sin romperlo en vez de parar y reiniciar la respiración en cada nota. En este ejercicio, desliza suavemente por los agujeros 4-5-6 soplados — el juego escucha tres notas normales, pero la técnica está en cómo las conectas, no solo en tocarlas bien.
+    La segunda es una liberación de bend: ataca una nota ya doblada hacia abajo, y déjala subir suavemente hasta la nota natural — un lamento clásico del blues. En este ejercicio, dobla el agujero 2 aspirado medio tono hacia abajo y sostenla, luego libérala suavemente hasta la nota natural; el juego valida la nota doblada en el momento en que la tocas.
+    Mantén el aire constante en ambas — el deslizamiento debe sonar como una sola respiración continua, no una serie de ataques separados.
 
 # Lección: forma de las manos / wah
 lesson-hand-wah-title = La Forma de las Manos y el Wah
@@ -193,3 +210,12 @@ lesson-twelve-bar-body =
     El esquema clásico: cuatro compases de I, dos de IV, dos de I, uno de V, uno de IV y dos compases finales de I (el último suele cambiarse a V para lanzar el siguiente chorus — el "turnaround").
     Cuéntalo en voz alta: "UN dos tres cuatro, DOS dos tres cuatro..." — doce compases, y el ciclo vuelve a empezar.
     Verás esta rejilla en vivo en la Jam Session, donde el compás actual se ilumina mientras suena la base. Después de esta lección, abre una Jam Session y solo mira pasar unos ciclos, contando, antes de tocar una sola nota.
+
+# Lección: usar los pies
+lesson-using-your-feet-title = Usar los Pies
+lesson-using-your-feet-body =
+    El buen sentido del tiempo no viene de mirar la pantalla — viene de tu cuerpo. Marca el pie en cada tiempo, y deja que ese pulso físico guíe tu forma de tocar en vez de perseguir las notas mientras se deslizan.
+    Antes de empezar, cuenta "1, 2, 3, 4" en voz alta varias veces al tempo del ejercicio, marcando el pie en cada número, hasta que se sienta automático en vez de contado.
+    En este ejercicio, un pulso constante de negras se desliza en el agujero 4 — sigue marcando el pie todo el tiempo, incluso entre notas, y deja que cada soplido/aspirado caiga exactamente en una marca.
+    La ventana de tiempo aquí es más estrecha que en otros ejercicios a propósito: esta lección trata enteramente de caer en el tiempo, no de la nota ni de la técnica.
+    Si vas siempre adelantado o atrasado, no mires el camino de notas — cierra los ojos y sigue solo tu pie.

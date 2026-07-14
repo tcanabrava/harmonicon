@@ -150,6 +150,15 @@ lesson-multiple-notes-body =
     In this drill, chord shots scroll toward the hit line — the game listens for every note of the chord sounding at the same instant, not one after another.
     If only part of the chord registers, you're probably not covering all the holes evenly; widen the embouchure a touch rather than blowing harder.
 
+# Lesson: tongue blocking (instructional)
+lesson-tongue-blocking-title = Tongue Blocking
+lesson-tongue-blocking-body =
+    So far you've shaped single notes with your lips (puckering) — tongue blocking is the other classic embouchure: cover several holes with your mouth, then rest your tongue flat against the harmonica to block out all but one.
+    Lift the tongue off a hole and it sounds on its own, exactly like a puckered single note — the microphone genuinely can't tell the two techniques apart, so this lesson can't verify which one you're using.
+    What tongue blocking unlocks that puckering can't: pull the tongue away from two side holes at once (blocking only the ones in between) and you get an octave split — two notes, an octave apart, ringing together.
+    It also lets you slap the tongue on and off a hole rhythmically for a percussive "chukka-chukka" pulse, and switch corners of your mouth mid-phrase without losing your air seal.
+    Try the octave-split drill next — it's the concrete, scoreable payoff of this technique: the game can hear whether both notes of the split actually sound together, even though it can't hear tongue blocking itself.
+
 # Lesson: octave splits (tongue blocking)
 lesson-octave-split-title = Octave Splits
 lesson-octave-split-body =
@@ -158,6 +167,14 @@ lesson-octave-split-body =
     Holes 1 and 4 blown together give you C4 and C5 — the same note, an octave apart. Holes 2 and 5, and holes 3 and 6, work the same way.
     In this drill, both holes of each split must ring out together, exactly like a chord — the tongue-blocking technique itself can't be verified by the mic, but the octave it produces can.
     If you only hear one note, check that your tongue fully covers the middle holes rather than resting off to one side.
+
+# Lesson: slides
+lesson-slides-title = Slides
+lesson-slides-body =
+    Two different techniques share the name "slide" on harmonica — this drill covers both.
+    The first is a physical slide: move the harmonica sideways across your embouchure from one hole to the next, keeping the seal unbroken instead of stopping and re-starting your breath for each note. In this drill, slide smoothly through holes 4-5-6 blow — the game hears three ordinary notes, but the technique is in how you connect them, not just in playing them correctly.
+    The second is a bend release: attack a note already bent down, then let it glide back up to its natural pitch — a classic blues cry. In this drill, bend the 2 draw down a half step and hold it, then release smoothly up to the natural note; the game validates the bent pitch at the moment you strike it.
+    Keep your air steady through both — the slide should sound like one continuous breath, not a series of separate attacks.
 
 # Lesson: hand shape / wah
 lesson-hand-wah-title = Hand Shape and the Wah
@@ -195,3 +212,12 @@ lesson-twelve-bar-body =
     The classic layout: four bars of I, two bars of IV, two bars of I, one bar of V, one of IV, and two final bars of I (the last often swaps to V to launch the next chorus — the "turnaround").
     Count it out loud: "ONE two three four, TWO two three four..." — twelve bars, then the cycle repeats.
     You'll see this grid live in Jam Session, where the current bar lights up as the backing plays. Open a Jam Session afterwards and just watch a few cycles go by, counting along, before you play a single note.
+
+# Lesson: using your feet
+lesson-using-your-feet-title = Using Your Feet
+lesson-using-your-feet-body =
+    Great time doesn't come from watching a screen — it comes from your body. Tap your foot on every beat, and let that physical pulse guide your playing instead of chasing the notes as they scroll by.
+    Before you start, count "1, 2, 3, 4" out loud a few times at the drill's tempo, tapping your foot on each number, until it feels automatic rather than counted.
+    In this drill, a steady quarter-note pulse scrolls by on hole 4 — keep your foot tapping the whole time, even between notes, and let each blow/draw land exactly on a tap.
+    The timing window here is tighter than other drills on purpose: this lesson is entirely about landing on the beat, not about pitch or technique.
+    If you're consistently early or late, don't watch the highway — close your eyes and just follow your foot.

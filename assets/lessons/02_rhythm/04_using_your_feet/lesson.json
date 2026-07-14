@@ -1,0 +1,9 @@
+{
+  "id": "using-your-feet",
+  "unit": "rhythm",
+  "title_key": "lesson-using-your-feet-title",
+  "body_key": "lesson-using-your-feet-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["twelve-bar"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

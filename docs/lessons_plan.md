@@ -41,9 +41,9 @@ effort spent on a check that can't actually check anything.
 |---|---|---|
 | Single note (embouchure precision) | **Scored** | Existing pitch scoring already does this: a chart of single held notes, judged normally. The one gap is that today's scoring only checks whether the *expected* pitch is present within the window — it doesn't check for or penalize *other* simultaneous pitches, so a breathy multi-hole leak currently scores as a clean hit. A "clean single note" pass criterion needs `ActivePitches` to show only the expected MIDI note (see New engine work below). |
 | Multiple notes (2–3 hole blow/draw chords) | **Scored** | Needs a chord-target note type — see New engine work. `ActivePitches` is already `Vec<PitchInfo>` (multiple concurrent pitches), and NMF is explicitly a polyphonic-capable algorithm per its dictionary design, so simultaneous-pitch detection is feasible without new DSP; the gap is purely on the chart/scoring side. |
-| Tongue blocking (as an embouchure choice) | **Instructional only** | Acoustically identical output to puckering on a single note — unscoreable. Ships as a text/diagram explainer plus the *same* single-note chart from the lesson above, with copy that says "now try it with tongue blocking." |
-| Tongue blocking → octave splits / corner switches | **Scored via proxy** | This *is* distinguishable: two holes 3 apart sounding together (an octave chord) is a genuine tongue-blocking-specific technique with a distinct acoustic signature — two `PitchInfo` entries an octave apart. Reuses the same chord-target primitive as "multiple notes" above. This is the concrete, scoreable half of "tongue blocking," and should be framed as such in the lesson copy (teach the unverifiable embouchure first, then verify the musical result it unlocks).
-| Slides | **Scored via proxy** | Two different real techniques share this name: (a) a physical slide of the harmonica sideways across the mouth between adjacent holes, and (b) a bend release/attack glissando into a target note. (a) is acoustically identical to just switching holes normally — chart it as a same-direction adjacent-hole run and teach the physical technique in the instructional copy; scoring is just normal consecutive note hits. (b) is already fully scoreable — it's the existing `Bend` modifier, validated at onset via `target_pitch`. No new engine work for either; this lesson is a content/authoring task (author a chart that exercises hole-to-hole runs and bend releases), not a code task. |
+| Tongue blocking (as an embouchure choice) | **Instructional only — done** | `tongue-blocking` (Unit 1, no chart, Mark-as-Done): acoustically identical output to puckering on a single note — unscoreable, so it's explainer copy pointing at the octave-split lesson as its concrete, scoreable payoff. |
+| Tongue blocking → octave splits / corner switches | **Scored via proxy — done** | Shipped earlier as `octave-split` (see the chord-target primitive above). |
+| Slides | **Scored via proxy — done** | `slides` (Unit 1): (a) a physical slide of the harmonica sideways across the mouth between adjacent holes — charted as holes 4-5-6 blow, ordinary consecutive single notes (no new mechanism, the technique is taught in the copy, not verified); (b) a bend release/attack glissando — the existing `Bend` modifier on the 2 draw half-step bend, already fully scoreable via `target_pitch`. Pure content-authoring task, no engine work. |
 | Hand shape / wah (cupping for tone/wah-wah) | **Scored** | Already built end-to-end: `Modifier::WahWah`'s `oscillation_matches_rate` validates measured amplitude-oscillation rate against the chart's declared `oscillation_hz`. This lesson is pure content authoring on top of existing scoring — chart a held note with a `wah-wah` modifier and a generous tolerance for a first lesson, tightening in later ones. |
 
 ### Unit 2 — How to count the blues rhythm
@@ -51,7 +51,7 @@ effort spent on a check that can't actually check anything.
 | Lesson | Scoreable? | Mechanism |
 |---|---|---|
 | Reading the 12-bar blues grid | **Instructional + visual** | `TwelveBarBluesOverlay` already exists and visually highlights the current bar/chord. The lesson is: show the overlay large and explained, over a simple I-IV-V backing (reuse Jam Session's existing 12-bar cycle), with a light "does the player stay in time" pass criterion from ordinary timing-window scoring — no new mechanism. |
-| Using your feet (internalizing tempo by tapping) | **Instructional only** | Foot taps aren't harmonica pitch and can't be reliably separated from harmonica audio on a single mic channel — out of scope for the scoring pipeline. Ships as instructional copy plus a metronome-only "keep time" chart (the existing `MetronomeFeel`/tempo machinery), where the *implicit* check is just normal timing-window accuracy on notes played against the beat. |
+| Using your feet (internalizing tempo by tapping) | **Instructional + implicit check — done** | `using-your-feet` (Unit 2): foot taps aren't harmonica pitch and can't be reliably separated from harmonica audio on a single mic channel, so the lesson body just coaches tapping/counting; the chart is a steady quarter-note pulse on hole 4 blow/draw with *tighter than usual* scoring windows (80/180/300ms, vs. other beginner drills' 150+/350+/600+ms) — the implicit check the docs table originally called for, since this is the one lesson where timing precision, not pitch or technique, is actually the point. |
 | Call and response | **Scored — done** | `gameplay::call_response` synthesizes each chart's `call: true` phrase groups via the song editor's WAV synth (`song_editor::playback`) and plays them as a one-shot demo; the response is the same notes, force-frozen (`ScheduledNote::force_wait`) via the existing `WaitForNoteMode`/`first_due_unresolved_note` machinery, scored by the normal pipeline. The `call-response` lesson (Unit 2) is the concrete instance — see `PLAN.md`. |
 | Blues improvisation | **Scored via proxy — done** | `jam_session::ImprovStats` accumulates scale/chord-tone adherence over an open Jam Session (see "New engine work required" below); the `improvisation` lesson (Unit 2) pass criterion is `PassCriteria::ScaleAdherence{threshold: 0.8}`. |
 
@@ -252,10 +252,14 @@ Two things happen around those notes:
    the primitive lives in `gameplay`, not lesson-specific plumbing, so any
    future non-lesson use (Jam Session call-and-response, say) can reuse it
    directly.
-6. Content pass: author further lesson bodies/charts. Scale drills,
-   technique exercises, and the 12-bar chord-tone walkthrough are safe to
-   author freely (no copyrighted melody involved); anything built on a real
-   tune follows the same rights/judgment carve-out as `TODO.md`'s bundled-
-   song gap.
+6. **Done, for the content originally scoped in this doc.** `tongue-blocking`
+   (Unit 1, instructional), `slides` (Unit 1, adjacent-hole run + bend
+   release), `using-your-feet` (Unit 2, tight-window quarter-note pulse) —
+   all original scale/technique drills, not melodic content, per the
+   safe-to-author subset. Unit 1 is now `single-note → {hand-wah,
+   multiple-notes → tongue-blocking → octave-split, slides}`; Unit 2 is
+   `twelve-bar → {call-response → improvisation, using-your-feet}`. Further
+   content (more drills, harder variations) can still land under this step
+   any time — it's open-ended, not a one-shot task.
 7. Jazz unit — separate milestone (0.6), after the above ships and proves
    the chord-target/manifest machinery out.

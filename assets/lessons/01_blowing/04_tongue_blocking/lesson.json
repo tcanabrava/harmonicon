@@ -1,0 +1,7 @@
+{
+  "id": "tongue-blocking",
+  "unit": "blowing",
+  "title_key": "lesson-tongue-blocking-title",
+  "body_key": "lesson-tongue-blocking-body",
+  "prerequisites": ["multiple-notes"]
+}
