@@ -352,16 +352,26 @@ pub(super) fn spawn_note(
             },
         )
         .observe(
-            move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>, loc: Res<Localization>| {
+            move |ev: On<Pointer<Drag>>,
+                  mut state: ResMut<EditorState>,
+                  loc: Res<Localization>,
+                  ui_scale: Res<UiScale>| {
                 let Some(drag) = state.dragging else { return };
                 if drag.id != id || drag.kind != DragKind::Move {
                     return;
                 }
+                // `Pointer<Drag>::distance` is raw window-pixel motion, but
+                // `TICK_W`/`ROW_H` are logical sizes that `UiScale` (the
+                // arrow-key UI zoom, `dialogs::ui_scale`) multiplies up for
+                // display — without dividing it back out here, dragging a
+                // note moves it by the wrong number of ticks/holes at any
+                // zoom level other than 1x. Same fix as
+                // `gameplay_3d::note_label_position`.
                 let (hole, tick) = move_target(
                     drag.start_hole,
                     drag.start_tick,
-                    ev.distance.x,
-                    ev.distance.y,
+                    ev.distance.x / ui_scale.0,
+                    ev.distance.y / ui_scale.0,
                     state.hole_count(),
                 );
                 let pitch = state
@@ -468,7 +478,7 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge, l
                 state.dragging = Some(DragState::new(id, DragKind::Resize(edge), &n));
             }
         })
-        .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>| {
+        .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>, ui_scale: Res<UiScale>| {
             let Some(drag) = state.dragging else { return };
             if drag.id != id || drag.kind != DragKind::Resize(edge) { return; }
             let hole = drag.start_hole;
@@ -482,7 +492,10 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge, l
                     right_bound = Some(right_bound.map_or(n.tick, |r| r.min(n.tick)));
                 }
             }
-            let steps = (ev.distance.x / TICK_W).round() as i32;
+            // Same `UiScale` correction as the move-drag observer above —
+            // `ev.distance` is raw window pixels, `TICK_W` is a logical
+            // size `UiScale` multiplies up for display.
+            let steps = ((ev.distance.x / ui_scale.0) / TICK_W).round() as i32;
             let (tick, len) =
                 apply_resize(drag.start_tick, drag.start_len, edge, steps, left_bound, right_bound);
             if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
