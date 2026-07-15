@@ -8,21 +8,29 @@
 //! every missing file, grouped by song or by model, for quick local diagnosis.
 //!
 //! Paths checked (per the design docs / asset conventions):
-//!   assets/songs/<artist>/<song>/{background.png, elements.png, song/chart.harpchart, song/music.ogg}
+//!   assets/songs/<artist>/<song>/song/*.harpchart
 //!   assets/harmonicas/3d/<model>/{harmonica.glb, holes.json}
 //!   assets/themes/<name>/{theme.json (valid against schema), preview.png, + all files listed in theme.json}
 
 use std::path::{Path, PathBuf};
 
-/// Files every `assets/songs/<artist>/<song>/` directory must contain. The chart
-/// and music live in a `song/` subfolder; the 2D/3D note asset folders are
-/// optional (gameplay falls back to theme defaults), so they are not required.
-const SONG_FILES: [&str; 4] = [
-    "background.png",
-    "elements.png",
-    "song/chart.harpchart",
-    "song/music.ogg",
-];
+/// Whether `dir/song/` contains at least one `.harpchart` file (any name —
+/// `song::loader::SongChartLoader` is registered for the extension, not a
+/// fixed filename) — the only asset a song strictly needs.
+/// `background.png`/`elements.png`/`song/*.ogg` and the `2d/`/`3d/` note
+/// asset folders are all optional: the loader falls back to a generated
+/// background, silent (no) music, and the selected note theme's defaults
+/// respectively when they're missing, rather than hanging `SongLoading`
+/// waiting on a dependency that will never resolve. See `Example Song 3`
+/// for a deliberately minimal example exercising every one of those
+/// fallbacks at once.
+fn has_harpchart(dir: &Path) -> bool {
+    std::fs::read_dir(dir.join("song"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .any(|entry| entry.path().extension().and_then(|e| e.to_str()) == Some("harpchart"))
+}
 
 /// Files every `assets/harmonicas/3d/<model>/` directory must contain.
 const MODEL_FILES: [&str; 2] = ["harmonica.glb", "holes.json"];
@@ -71,13 +79,8 @@ fn song_assets_are_complete() {
 
     let mut report = String::new();
     for song in songs {
-        let missing = missing_files(&song, &SONG_FILES);
-        if !missing.is_empty() {
-            report.push_str(&format!(
-                "  {}: missing {}\n",
-                label(&song),
-                missing.join(", ")
-            ));
+        if !has_harpchart(&song) {
+            report.push_str(&format!("  {}: no *.harpchart file under song/\n", label(&song)));
         }
     }
 
@@ -116,12 +119,6 @@ fn harmonica_model_assets_are_complete() {
 
 // ── Lesson tests ──────────────────────────────────────────────────────────────
 
-/// Files a chart-backed lesson's directory must contain besides lesson.json —
-/// the same set a song needs, because the chart loads through the ordinary
-/// `SongManifest` pipeline, whose loader unconditionally depends on all of
-/// them (a missing one leaves `SongLoading` waiting forever).
-const LESSON_CHART_FILES: [&str; 3] = ["background.png", "elements.png", "song/music.ogg"];
-
 fn schema_validator(path: &str) -> jsonschema::Validator {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("Cannot read {path}: {e}"));
     let value: serde_json::Value =
@@ -139,10 +136,11 @@ fn validation_errors(validator: &jsonschema::Validator, instance: &serde_json::V
 }
 
 /// Every bundled lesson must have a schema-valid `lesson.json`; a
-/// chart-backed lesson must ship the full song file set, and its chart must
-/// validate against the song schema. Lesson ids must be unique, and every
-/// prerequisite must name a lesson that exists (a typo'd prerequisite would
-/// lock a lesson forever).
+/// chart-backed lesson's referenced chart must exist and validate against
+/// the song schema (background/music/note art are optional — same fallbacks
+/// as an ordinary song, see `has_harpchart`'s doc comment). Lesson ids must
+/// be unique, and every prerequisite must name a lesson that exists (a
+/// typo'd prerequisite would lock a lesson forever).
 #[test]
 fn lesson_assets_are_complete_and_valid() {
     let root = Path::new("assets/lessons");
@@ -195,7 +193,7 @@ fn lesson_assets_are_complete_and_valid() {
             }
         }
 
-        // Chart-backed lessons: the referenced chart + full song file set.
+        // Chart-backed lessons: the referenced chart must exist and validate.
         if let Some(chart_rel) = manifest["chart"].as_str() {
             let chart_path = dir.join(chart_rel);
             if !chart_path.exists() {
@@ -221,14 +219,6 @@ fn lesson_assets_are_complete_and_valid() {
                         label(dir)
                     )),
                 }
-            }
-            let missing = missing_files(dir, &LESSON_CHART_FILES);
-            if !missing.is_empty() {
-                report.push_str(&format!(
-                    "  {}: missing {}\n",
-                    label(dir),
-                    missing.join(", ")
-                ));
             }
         }
     }

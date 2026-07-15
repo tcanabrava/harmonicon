@@ -18,8 +18,15 @@ use bevy::{asset::AssetPath, audio::AudioSource, image::Image, prelude::*};
 pub struct SongManifest {
     pub path: PathBuf,
     pub chart: HarpChart,
+    /// Always present — a generated placeholder gradient when the song
+    /// doesn't ship its own `background.png` (see `song::loader`), so this
+    /// never needs to be optional.
     pub background: Handle<Image>,
-    pub music: Handle<AudioSource>,
+    /// `None` when the song doesn't ship a `song/*.ogg` — a scored/jam
+    /// session then simply plays no backing track (the chart-timed clock
+    /// free-runs instead of anchoring to a sink; see `gameplay::
+    /// should_anchor_to_sink`), rather than failing to load.
+    pub music: Option<Handle<AudioSource>>,
     /// Peak-amplitude waveform of `music`, pre-analyzed at load time (see
     /// `audio_system::waveform`) so the gameplay progress bar can draw it
     /// immediately instead of decoding audio on the main thread mid-setup.
@@ -32,6 +39,9 @@ pub struct SongManifest {
     /// marker) must use this, or it drifts out of sync with the waveform
     /// it's drawn on top of.
     pub music_duration_secs: f64,
+    /// Unused by gameplay today (`jam_backing`'s `build_generated_manifest`
+    /// notes this explicitly) — `Handle::default()` when the song doesn't
+    /// ship an `elements.png`, so there's nothing to fail to load.
     pub elements: Handle<Image>,
     /// Asset path of the song's own 2D note image, if it ships one. Stored as
     /// a full [`AssetPath`] (not a `Handle`, and not a bare `PathBuf`) so the

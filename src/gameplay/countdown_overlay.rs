@@ -91,7 +91,13 @@ pub fn update_countdown(
         }
         if !music_started.0 {
             music_started.0 = true;
-            if let Some(manifest) = manifests.get(&selected.0) {
+            // `manifest.music` is `None` for a song with no `song/*.ogg` —
+            // play the chart silently rather than not starting at all (the
+            // clock free-runs on frame delta instead of anchoring to a sink;
+            // see `gameplay::should_anchor_to_sink`).
+            if let Some(manifest) = manifests.get(&selected.0)
+                && let Some(music) = manifest.music.clone()
+            {
                 // Jam Session's own `restart_finished_jam_music` re-spawns
                 // this entity once it despawns itself, if Loop is on at that
                 // moment — so it always starts as a plain one-shot that
@@ -103,7 +109,7 @@ pub fn update_countdown(
                     PlaybackSettings::ONCE
                 };
                 commands.spawn((
-                    AudioPlayer::<AudioSource>(manifest.music.clone()),
+                    AudioPlayer::<AudioSource>(music),
                     settings.with_volume(Volume::Linear(audio.music_volume)),
                     MusicPlayer,
                     GameplayRoot,

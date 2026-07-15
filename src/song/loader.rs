@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::{
-    asset::{AssetLoader, AssetPath, LoadContext, io::Reader},
+    asset::{AssetLoader, AssetPath, LoadContext, RenderAssetUsages, io::Reader},
     audio::AudioSource,
     image::Image,
     prelude::*,
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 use thiserror::Error;
 
@@ -104,22 +105,55 @@ impl AssetLoader for SongChartLoader {
         let source = load_context.path().source().clone_owned();
         let sibling = |rel: std::path::PathBuf| AssetPath::from(rel).with_source(source.clone());
 
-        let background = load_context.load::<Image>(sibling(song_folder.join("background.png")));
-        let music_path = sibling(song_folder.join("song/music.ogg"));
-        let music = load_context.load::<AudioSource>(music_path.clone());
-        let elements = load_context.load::<Image>(sibling(song_folder.join("elements.png")));
+        // Every sibling asset below is checked for existence with
+        // `read_asset_bytes` *before* being handed to `load_context.load()`.
+        // `load()` registers the path as a hard dependency of this manifest
+        // asset; if that path doesn't exist, the dependency fails and
+        // `AssetServer::is_loaded_with_dependencies` never returns true for
+        // the manifest — `menu::check_loading` would then wait on
+        // `SongLoading` forever. Falling back instead (a generated
+        // background, no music, `Handle::default()` for the unused
+        // `elements`) is what lets a song ship with only a chart file, like
+        // `Example Song 3`.
+        let background_path = sibling(song_folder.join("background.png"));
+        let background = match load_context.read_asset_bytes(background_path.clone()).await {
+            Ok(_) => load_context.load::<Image>(background_path),
+            Err(_) => {
+                let seed = format!("{}\u{0}{}", chart.song.artist, chart.song.title);
+                load_context.add_labeled_asset(
+                    "generated_background".to_string(),
+                    generate_background_image(&seed),
+                )
+            }
+        };
+
+        let elements_path = sibling(song_folder.join("elements.png"));
+        let elements = match load_context.read_asset_bytes(elements_path.clone()).await {
+            Ok(_) => load_context.load::<Image>(elements_path),
+            Err(_) => Handle::default(),
+        };
 
         // Pre-analyze the waveform here (asset load time, off the main
         // thread) so the progress bar has it ready the instant the song
-        // starts.
-        let (waveform, music_duration_secs) = match load_context.read_asset_bytes(music_path).await
-        {
-            Ok(bytes) => crate::audio_system::waveform::analyze_ogg_waveform(
-                &bytes,
-                crate::audio_system::waveform::WAVEFORM_BUCKETS,
-            ),
-            Err(_) => (Vec::new(), 0.0),
-        };
+        // starts. The same read doubles as the existence check: no
+        // `song/*.ogg` means no backing track rather than a load failure —
+        // see `SongManifest::music`'s doc comment.
+        let music_path = sibling(song_folder.join("song/music.ogg"));
+        let (music, waveform, music_duration_secs) =
+            match load_context.read_asset_bytes(music_path.clone()).await {
+                Ok(bytes) => {
+                    let (waveform, duration) = crate::audio_system::waveform::analyze_ogg_waveform(
+                        &bytes,
+                        crate::audio_system::waveform::WAVEFORM_BUCKETS,
+                    );
+                    (
+                        Some(load_context.load::<AudioSource>(music_path)),
+                        waveform,
+                        duration,
+                    )
+                }
+                Err(_) => (None, Vec::new(), 0.0),
+            };
 
         // Note the song's own 2D image path if it ships one. We deliberately do
         // NOT `load()` it here: that would make it a manifest dependency, kept
@@ -193,5 +227,86 @@ impl AssetLoader for SongChartLoader {
 
     fn extensions(&self) -> &[&str] {
         &["harpchart"]
+    }
+}
+
+/// Side (px) of a generated placeholder background — small and stretched to
+/// fill the screen (like every other background), so the gradient reads as
+/// smooth rather than needing to be full resolution.
+const GENERATED_BACKGROUND_SIZE: u32 = 64;
+
+/// A vertical two-color gradient for a song that doesn't ship its own
+/// `background.png`, generated in memory (never touches disk, so it can
+/// never fail to load — see the dependency-hang note where this is called).
+/// `seed` (the song's own artist/title) picks the hue deterministically, so
+/// two songs without art still look distinct from each other rather than
+/// identical gray boxes, and the same song looks the same every run.
+fn generate_background_image(seed: &str) -> Image {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    seed.hash(&mut hasher);
+    let hue = (hasher.finish() % 360) as f32;
+
+    let top = Color::hsl(hue, 0.35, 0.16).to_srgba();
+    let bottom = Color::hsl((hue + 40.0) % 360.0, 0.35, 0.06).to_srgba();
+
+    let mut data = Vec::with_capacity((GENERATED_BACKGROUND_SIZE * GENERATED_BACKGROUND_SIZE * 4) as usize);
+    for y in 0..GENERATED_BACKGROUND_SIZE {
+        let t = y as f32 / (GENERATED_BACKGROUND_SIZE - 1) as f32;
+        let pixel = [
+            (top.red + (bottom.red - top.red) * t).clamp(0.0, 1.0) * 255.0,
+            (top.green + (bottom.green - top.green) * t).clamp(0.0, 1.0) * 255.0,
+            (top.blue + (bottom.blue - top.blue) * t).clamp(0.0, 1.0) * 255.0,
+            255.0,
+        ]
+        .map(|c| c as u8);
+        for _ in 0..GENERATED_BACKGROUND_SIZE {
+            data.extend_from_slice(&pixel);
+        }
+    }
+
+    Image::new(
+        Extent3d {
+            width: GENERATED_BACKGROUND_SIZE,
+            height: GENERATED_BACKGROUND_SIZE,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_background_image_is_the_expected_size_and_fully_opaque() {
+        let image = generate_background_image("Some Artist\u{0}Some Song");
+        let data = image.data.expect("generated image should have pixel data");
+        assert_eq!(
+            data.len(),
+            (GENERATED_BACKGROUND_SIZE * GENERATED_BACKGROUND_SIZE * 4) as usize
+        );
+        assert!(data.chunks_exact(4).all(|px| px[3] == 255));
+    }
+
+    #[test]
+    fn generate_background_image_is_deterministic_per_seed() {
+        let a = generate_background_image("Same Seed");
+        let b = generate_background_image("Same Seed");
+        assert_eq!(a.data, b.data);
+    }
+
+    #[test]
+    fn generate_background_image_varies_between_different_seeds() {
+        let a = generate_background_image("Artist One\u{0}Song One");
+        let b = generate_background_image("Artist Two\u{0}Song Two");
+        // Not a strict guarantee for every possible pair (hashes can
+        // collide), but true for these two — catches a seed that's
+        // accidentally ignored entirely.
+        assert_ne!(a.data, b.data);
     }
 }

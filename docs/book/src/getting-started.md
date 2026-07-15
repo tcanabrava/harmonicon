@@ -53,3 +53,10 @@ directory) as a second source of songs and themes, alongside what ships
 with the game — drop a song folder or a theme folder in there and it shows
 up in the song list / theme picker without needing to reinstall anything.
 See [Song Editor](song-editor.md) for how to author a chart of your own.
+
+A song folder only strictly needs one thing: a `.harpchart` file (any
+filename) inside its `song/` subfolder. Everything else is optional —
+`background.png`, `song/*.ogg` for the backing track, and the `2d/`/`3d/`
+note art folders — Harmonicon fills in a generated background, plays no
+backing track, and falls back to the selected note theme respectively for
+whatever's missing, rather than refusing to load the song.

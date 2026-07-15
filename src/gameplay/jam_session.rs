@@ -316,9 +316,14 @@ pub fn restart_finished_jam_music(
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
+    // A song with no `song/*.ogg` never had a `MusicPlayer` to begin with
+    // (see `countdown_overlay::update_countdown`) — nothing to loop.
+    let Some(music) = manifest.music.clone() else {
+        return;
+    };
     clock.set_free(0.0);
     commands.spawn((
-        AudioPlayer::<AudioSource>(manifest.music.clone()),
+        AudioPlayer::<AudioSource>(music),
         PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.music_volume)),
         MusicPlayer,
         GameplayRoot,

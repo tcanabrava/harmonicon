@@ -47,6 +47,7 @@ pause/resume, **M** metronome mute, **V** cycle spectrogram.
 
 ### All modes — entering `Playing`
 - [ ] **Audio starts.** After the 3-2-1 countdown, the backing track plays. *(manual: audio output)*
+- [ ] **A song missing optional assets still loads and plays, without hanging on `SongLoading` or logging an asset error.** Play "Example Song 3" (`assets/songs/Example Artist/Example Song 3/` — ships only `song/chart.harpchart`, deliberately, no `background.png`/`elements.png`/`song/*.ogg`/`2d/`/`3d/`): the countdown should still run, the chart should still play and score normally against a generated gradient background, with the theme's default note art, and **silently — no backing track, no error dialog, no stuck loading screen.** Load "Example Song" too (its chart is named `example_chart.harpchart`, not `chart.harpchart`) and confirm it's found and loads the same as any other song — song discovery matches on the `.harpchart` extension, not a fixed filename. *(manual: rendering + audio; the file-discovery/fallback logic is covered by `tests/asset_layout.rs::song_assets_are_complete` and `song::loader::tests::generate_background_image_*`, but the actual no-hang, no-backing-track behavior needs a live run — this is exactly the class of bug a passing `cargo test` can't see, since the old bug was a dependency that never resolved, not a panic)*
 - [ ] The HUD score/combo reads `0` and updates as you hit notes. *(the
   underlying score/combo/stats math is now covered end to end by
   `gameplay::tests::end_to_end_synthetic_song_drives_score_combo_and_stats`;

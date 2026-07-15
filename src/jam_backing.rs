@@ -238,7 +238,7 @@ pub fn build_generated_manifest(
         path: PathBuf::from(format!("generated/{key}")),
         chart: generated_chart(key, bpm, progression, music_duration_secs),
         background,
-        music,
+        music: Some(music),
         waveform,
         music_duration_secs,
         elements,
@@ -371,7 +371,8 @@ mod tests {
             Handle::default(),
             &mut sources,
         );
-        assert!(sources.get(&manifest.music).is_some());
+        let music = manifest.music.expect("generated jam always has music");
+        assert!(sources.get(&music).is_some());
         assert!(manifest.music_duration_secs > 0.0);
         assert_eq!(manifest.waveform.len(), WAVEFORM_BUCKETS);
     }
