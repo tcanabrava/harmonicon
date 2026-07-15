@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-//! midi-to-chart — turn a MIDI track into a Harmonicon `chart.hpchart`.
+//! midi-to-chart — turn a MIDI track into a Harmonicon `chart.harpchart`.
 //!
 //! Usage:
 //!   midi-to-chart <file.mid>                 # list the tracks in the file
-//!   midi-to-chart <file.mid> "<track name>"  # generate chart.hpchart from that
+//!   midi-to-chart <file.mid> "<track name>"  # generate chart.harpchart from that
 //!                                            # track, then write
 //!                                            # <file>_processed.midi without it
 //!
@@ -427,7 +427,7 @@ fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path) 
 
     validate(&chart);
 
-    let out = PathBuf::from("chart.hpchart");
+    let out = PathBuf::from("chart.harpchart");
     match std::fs::write(&out, serde_json::to_string_pretty(&chart).unwrap()) {
         Ok(()) => println!(
             "Wrote {} ({} notes -> {} items, {:.1} BPM, {ts_num}/{ts_den})",
