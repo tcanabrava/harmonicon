@@ -157,11 +157,21 @@ fn main() {
             };
             process_track(&smf, idx, &display, ticks_per_quarter, &midi_path, &dest);
 
-            // Remove the track and write the leftover MIDI.
+            // Remove the track and write the leftover MIDI to a *new* file —
+            // the original at `midi_path` is never modified, so re-running
+            // this tool against it again will still list every track,
+            // `name` included.
             smf.tracks.remove(idx);
             let out = processed_path(&midi_path);
             match smf.save(&out) {
-                Ok(()) => println!("Wrote {} (track {idx} removed)", out.display()),
+                Ok(()) => println!(
+                    "Wrote {} — a copy of {} with track {idx} ({name:?}) removed; \
+                     the original is untouched. To extract another track, run this \
+                     tool again against {} (not the original).",
+                    out.display(),
+                    midi_path.display(),
+                    out.display(),
+                ),
                 Err(e) => {
                     eprintln!("error: failed to write {}: {e}", out.display());
                     std::process::exit(1);
