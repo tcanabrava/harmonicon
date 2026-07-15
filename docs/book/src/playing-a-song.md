@@ -45,22 +45,25 @@ whether it was your bends or your timing that need work.
 
 Press **Esc**, or click the **⏸** button in the bottom-right corner, to
 pause mid-song — the on-screen button works the same as Esc, no keyboard
-required. The pause menu offers:
+required. The pause menu is two columns: **Resume** / **Restart** / **Quit
+Song** on the left, every practice aid on the right, so a slip of the mouse
+over one can't misclick the other. The practice aids:
 
-- **Resume** / **Restart** (reloads the song from the countdown).
-- **Quit Song** — returns to the song list, not the Main Menu.
 - **Wait for Note** — freezes the highway and music the instant an unhit
   note reaches the hit line, and holds there until you play it — useful
   for slowing down a hard passage without losing your place. There's no
   way to "miss" a frozen note; it just waits.
-- **Practice Speed** — slows the highway and metronome (down to 50%)
-  without pitch-shifting the audio; it mutes instead, so you never hear a
-  chipmunked backing track.
+- **Practice Speed** — a slider from 50% to 100% that slows the highway and
+  metronome without pitch-shifting the audio; it mutes instead below 100%,
+  so you never hear a chipmunked backing track.
+- **Adaptive Difficulty** — on by default: a song's notes unlock gradually
+  as you clear each phrase cleanly, instead of throwing the full chart at
+  you immediately. To override a specific phrase, click its rectangle on
+  the song-progress bar's bottom strip (it highlights gold once selected)
+  and drag the **Learned** slider that appears below — or turn the whole
+  feature off with the toggle.
 - **A–B Looping** — drag on the song-progress bar at the top of the screen
   to mark a section and loop it, for drilling one phrase repeatedly.
-- **Adaptive Difficulty** — on by default: a song's notes unlock
-  gradually as you clear each phrase cleanly, instead of throwing the full
-  chart at you immediately. You can override an individual phrase's
-  progress, or turn the whole feature off, from the pause menu.
+  **Clear Loop** removes it.
 
 See the [Controls Reference](controls.md) for every in-game keybinding.

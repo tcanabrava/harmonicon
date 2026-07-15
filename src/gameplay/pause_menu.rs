@@ -6,6 +6,7 @@
 
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy::ui_widgets::{Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange};
 
 use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::jam_session::ImprovStats;
@@ -72,38 +73,106 @@ impl Default for PracticeSpeed {
     }
 }
 
-/// Discrete steps a click cycles through, fastest first.
-const SPEED_STEPS: [f32; 6] = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5];
-
-/// The step after `current` in [`SPEED_STEPS`], wrapping back to the first.
-fn next_speed_step(current: f32) -> f32 {
-    let idx = SPEED_STEPS
-        .iter()
-        .position(|&s| (s - current).abs() < 1e-6)
-        .unwrap_or(SPEED_STEPS.len() - 1);
-    SPEED_STEPS[(idx + 1) % SPEED_STEPS.len()]
-}
-
-fn on_cycle_practice_speed(_: On<Pointer<Click>>, mut speed: ResMut<PracticeSpeed>) {
-    speed.0 = next_speed_step(speed.0);
-}
-
-/// The "Speed: ..." readout, kept in step with [`PracticeSpeed`].
+/// The "Speed: ..." readout beside the practice-speed slider, kept in step
+/// with [`PracticeSpeed`].
 #[derive(Component, Default, Clone)]
 pub(super) struct PracticeSpeedLabel;
+
+/// The fill bar inside the practice-speed slider track.
+#[derive(Component, Default, Clone)]
+pub(super) struct PracticeSpeedFill;
 
 fn practice_speed_label_text(speed: f32) -> String {
     format!("Speed: {:.0}%", speed * 100.0)
 }
 
-/// Keeps the "Speed: ..." readout in step with [`PracticeSpeed`]. Not gated
-/// on `Paused`, same reasoning as `update_wait_mode_label`.
-pub(super) fn update_practice_speed_label(
+/// `50%..=100%` in `10%` steps — same range the old click-to-cycle button
+/// stepped through.
+const PRACTICE_SPEED_MIN: f32 = 0.5;
+const PRACTICE_SPEED_MAX: f32 = 1.0;
+
+fn set_practice_speed(ev: On<ValueChange<f32>>, mut speed: ResMut<PracticeSpeed>) {
+    speed.0 = ev.value;
+}
+
+/// One row: a "Speed" slider (`50%..=100%`) + "Speed: NN%" readout, wired to
+/// [`PracticeSpeed`]. The track is a `bsn!` `Slider`; the label/readout stay
+/// imperative like every other pause-menu readout (custom font, which `bsn!`
+/// can't set in 0.19).
+fn spawn_practice_speed_row(commands: &mut Commands, parent: Entity, value: f32) {
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(10.0),
+            ..default()
+        })
+        .id();
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Text::new("\u{1F422}"),
+            TextFont {
+                font_size: FontSize::Px(15.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.70, 0.70, 0.80)),
+        ));
+    });
+    let track = commands
+        .spawn_scene(practice_speed_slider_scene(value))
+        .insert((
+            SliderRange::new(PRACTICE_SPEED_MIN, PRACTICE_SPEED_MAX),
+            SliderStep(0.1),
+        ))
+        .id();
+    commands.entity(row).add_child(track);
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Text::new(practice_speed_label_text(value)),
+            TextFont {
+                font_size: FontSize::Px(15.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.70, 0.70, 0.80)),
+            PracticeSpeedLabel,
+        ));
+    });
+    commands.entity(parent).add_child(row);
+}
+
+fn practice_speed_slider_scene(value: f32) -> impl Scene {
+    let frac = (value - PRACTICE_SPEED_MIN) / (PRACTICE_SPEED_MAX - PRACTICE_SPEED_MIN);
+    bsn! {
+        Slider { track_click: {TrackClick::Snap} }
+        SliderValue({value})
+        Node { width: {Val::Px(140.0)}, height: {Val::Px(12.0)} }
+        BackgroundColor({Color::srgb(0.14, 0.14, 0.22)})
+        on(set_practice_speed)
+        Children [
+            (
+                Node { width: {Val::Percent(frac * 100.0)}, height: {Val::Percent(100.0)} }
+                BackgroundColor({Color::srgb(0.35, 0.75, 1.0)})
+                PracticeSpeedFill
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
+}
+
+/// Keeps the practice-speed slider's fill and the "Speed: ..." readout in
+/// step with [`PracticeSpeed`]. Not gated on `Paused`, same reasoning as
+/// `update_wait_mode_label`.
+pub(super) fn update_practice_speed_slider(
     speed: Res<PracticeSpeed>,
+    mut fills: Query<&mut Node, With<PracticeSpeedFill>>,
     mut labels: Query<&mut Text, With<PracticeSpeedLabel>>,
 ) {
     if !speed.is_changed() {
         return;
+    }
+    let frac = (speed.0 - PRACTICE_SPEED_MIN) / (PRACTICE_SPEED_MAX - PRACTICE_SPEED_MIN);
+    for mut node in &mut fills {
+        node.width = Val::Percent(frac * 100.0);
     }
     for mut text in &mut labels {
         *text = Text::new(practice_speed_label_text(speed.0));
@@ -149,9 +218,12 @@ pub(super) fn update_loop_label(
 // ── Adaptive difficulty controls ──────────────────────────────────────────────
 
 /// Which of `AdaptiveDifficulty::sections` the pause menu's phrase selector
-/// is currently showing/editing. Not reset between restarts (like
-/// `WaitForNoteMode`/`PracticeSpeed`) — picking up where you left off is more
-/// useful than always snapping back to the first phrase.
+/// is currently showing/editing — set by clicking a section's rectangle on
+/// the song-progress overlay's phrase strip while paused (see
+/// `song_progress_overlay::on_phrase_rect_click`), not from within the pause
+/// menu itself. Not reset between restarts (like `WaitForNoteMode`/
+/// `PracticeSpeed`) — picking up where you left off is more useful than
+/// always snapping back to the first phrase.
 #[derive(Resource, Default)]
 pub struct SelectedPhraseIndex(pub usize);
 
@@ -169,39 +241,6 @@ fn song_key(selected: &SelectedSong, manifests: &Assets<SongManifest>) -> Option
     manifests
         .get(&selected.0)
         .map(|m| m.path.display().to_string())
-}
-
-/// Next index in `0..count`, wrapping — same wraparound style as
-/// `next_speed_step`. `0` for an empty (no-phrase-tags-yet-loaded) song.
-fn next_phrase_index(current: usize, count: usize) -> usize {
-    if count == 0 {
-        return 0;
-    }
-    (current + 1) % count
-}
-
-/// Previous index in `0..count`, wrapping.
-fn prev_phrase_index(current: usize, count: usize) -> usize {
-    if count == 0 {
-        return 0;
-    }
-    (current + count - 1) % count
-}
-
-fn on_prev_phrase(
-    _: On<Pointer<Click>>,
-    adaptive: Res<AdaptiveDifficulty>,
-    mut selected: ResMut<SelectedPhraseIndex>,
-) {
-    selected.0 = prev_phrase_index(selected.0, adaptive.sections.len());
-}
-
-fn on_next_phrase(
-    _: On<Pointer<Click>>,
-    adaptive: Res<AdaptiveDifficulty>,
-    mut selected: ResMut<SelectedPhraseIndex>,
-) {
-    selected.0 = next_phrase_index(selected.0, adaptive.sections.len());
 }
 
 /// Pure so the readout is unit-testable without a live `AdaptiveDifficulty`.
@@ -263,20 +302,35 @@ fn on_toggle_adaptive_difficulty(
     }
 }
 
-/// Clamps a learned fraction into `0.0..=1.0` after applying `delta` — split
-/// out for unit testing without the ECS plumbing.
-fn adjust_learned(current: f32, delta: f32) -> f32 {
-    (current + delta).clamp(0.0, 1.0)
+/// Marks the phrase-learned slider's track entity (the one carrying
+/// `SliderValue`), so [`update_phrase_learned_slider`] can re-sync it when
+/// the selected phrase changes.
+#[derive(Component, Default, Clone)]
+pub(super) struct PhraseLearnedSlider;
+
+/// The fill bar inside the phrase-learned slider track.
+#[derive(Component, Default, Clone)]
+pub(super) struct PhraseLearnedFill;
+
+/// The "NN%" readout beside the phrase-learned slider.
+#[derive(Component, Default, Clone)]
+pub(super) struct PhraseLearnedValueLabel;
+
+/// Clamps a learned fraction into `0.0..=1.0` — split out for unit testing
+/// without the ECS plumbing `set_selected_phrase_learned` needs (a real
+/// `SelectedSong`/`Assets<SongManifest>`/`PlayerProfile`).
+fn clamp_learned(value: f32) -> f32 {
+    value.clamp(0.0, 1.0)
 }
 
-/// Shared by the "-25%"/"+25%" buttons: adjusts the selected phrase's
-/// learned fraction in both the live `AdaptiveDifficulty` (so the progress
-/// bar's rectangle re-tints immediately, and so `resync_notes_on_adaptive_
-/// change` in `gameplay_2d`/`gameplay_3d` rebuilds the note highway on the
-/// very next frame) and the persisted `PlayerProfile` (so it survives a
-/// restart too).
-fn adjust_selected_phrase_learned(
-    delta: f32,
+/// Sets the selected phrase's learned fraction directly to `value` — the
+/// slider replacement for the old "-25%"/"+25%" buttons. Updates both the
+/// live `AdaptiveDifficulty` (so the progress bar's rectangle re-tints
+/// immediately, and so `resync_notes_on_adaptive_change` in
+/// `gameplay_2d`/`gameplay_3d` rebuilds the note highway on the very next
+/// frame) and the persisted `PlayerProfile` (so it survives a restart too).
+fn set_selected_phrase_learned(
+    value: f32,
     selected: &SelectedPhraseIndex,
     selected_song: &SelectedSong,
     manifests: &Assets<SongManifest>,
@@ -286,11 +340,11 @@ fn adjust_selected_phrase_learned(
     if selected.0 >= adaptive.sections.len() {
         return;
     }
+    let value = clamp_learned(value);
     if adaptive.learned.len() <= selected.0 {
         adaptive.learned.resize(selected.0 + 1, 0.0);
     }
-    let new_value = adjust_learned(adaptive.learned[selected.0], delta);
-    adaptive.learned[selected.0] = new_value;
+    adaptive.learned[selected.0] = value;
     let Some(key) = song_key(selected_song, manifests) else {
         return;
     };
@@ -298,20 +352,20 @@ fn adjust_selected_phrase_learned(
     if record.phrase_learned.len() <= selected.0 {
         record.phrase_learned.resize(selected.0 + 1, 0.0);
     }
-    record.phrase_learned[selected.0] = new_value;
+    record.phrase_learned[selected.0] = value;
     crate::profile::save_profile(profile);
 }
 
-fn on_decrease_phrase_learned(
-    _: On<Pointer<Click>>,
+fn on_phrase_learned_slider_change(
+    ev: On<ValueChange<f32>>,
     selected: Res<SelectedPhraseIndex>,
     selected_song: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut profile: ResMut<PlayerProfile>,
     mut adaptive: ResMut<AdaptiveDifficulty>,
 ) {
-    adjust_selected_phrase_learned(
-        -0.25,
+    set_selected_phrase_learned(
+        ev.value,
         &selected,
         &selected_song,
         &manifests,
@@ -320,28 +374,115 @@ fn on_decrease_phrase_learned(
     );
 }
 
-fn on_increase_phrase_learned(
-    _: On<Pointer<Click>>,
+/// One row: a "Learned" slider (`0%..=100%`) for the currently selected
+/// phrase section + "NN%" readout. Re-synced whenever `SelectedPhraseIndex`
+/// changes (clicking a different section on the progress-bar overlay) as
+/// well as when the value itself changes — see
+/// [`update_phrase_learned_slider`].
+fn spawn_phrase_learned_row(commands: &mut Commands, parent: Entity, value: f32) {
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(10.0),
+            ..default()
+        })
+        .id();
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Text::new("Learned:"),
+            TextFont {
+                font_size: FontSize::Px(15.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.70, 0.70, 0.80)),
+        ));
+    });
+    let track = commands
+        .spawn_scene(phrase_learned_slider_scene(value))
+        .insert((SliderRange::new(0.0, 1.0), SliderStep(0.01)))
+        .id();
+    commands.entity(row).add_child(track);
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Node {
+                width: Val::Px(50.0),
+                ..default()
+            },
+            Text::new(format!("{:.0}%", value * 100.0)),
+            TextFont {
+                font_size: FontSize::Px(15.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.70, 0.70, 0.80)),
+            PhraseLearnedValueLabel,
+        ));
+    });
+    commands.entity(parent).add_child(row);
+}
+
+fn phrase_learned_slider_scene(value: f32) -> impl Scene {
+    bsn! {
+        Slider { track_click: {TrackClick::Snap} }
+        SliderValue({value})
+        Node { width: {Val::Px(140.0)}, height: {Val::Px(12.0)} }
+        BackgroundColor({Color::srgb(0.14, 0.14, 0.22)})
+        PhraseLearnedSlider
+        on(on_phrase_learned_slider_change)
+        Children [
+            (
+                Node { width: {Val::Percent(value * 100.0)}, height: {Val::Percent(100.0)} }
+                BackgroundColor({Color::srgb(0.35, 0.75, 1.0)})
+                PhraseLearnedFill
+                Pickable { should_block_lower: {false}, is_hoverable: {false} }
+            )
+        ]
+    }
+}
+
+/// Keeps the phrase-learned slider's fill/value and readout in step with
+/// the currently selected phrase's learned fraction — needed both when
+/// `AdaptiveDifficulty` changes (dragging the slider itself, or any other
+/// source) and when `SelectedPhraseIndex` changes (clicking a different
+/// section on the progress-bar overlay), since either can mean this slider
+/// should now show a different number. Not gated on `Paused`, same
+/// reasoning as `update_wait_mode_label`.
+pub(super) fn update_phrase_learned_slider(
     selected: Res<SelectedPhraseIndex>,
-    selected_song: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    mut profile: ResMut<PlayerProfile>,
-    mut adaptive: ResMut<AdaptiveDifficulty>,
+    adaptive: Res<AdaptiveDifficulty>,
+    sliders: Query<Entity, With<PhraseLearnedSlider>>,
+    mut fills: Query<&mut Node, With<PhraseLearnedFill>>,
+    mut labels: Query<&mut Text, With<PhraseLearnedValueLabel>>,
+    mut commands: Commands,
 ) {
-    adjust_selected_phrase_learned(
-        0.25,
-        &selected,
-        &selected_song,
-        &manifests,
-        &mut profile,
-        &mut adaptive,
-    );
+    if !selected.is_changed() && !adaptive.is_changed() {
+        return;
+    }
+    let value = adaptive.learned.get(selected.0).copied().unwrap_or(0.0);
+    // `SliderValue` is an immutable component (bevy_ui_widgets), so it can
+    // only be replaced wholesale via `insert`, not mutated in place — same
+    // as `slider_self_update` does for a drag-driven change.
+    for entity in &sliders {
+        commands.entity(entity).insert(SliderValue(value));
+    }
+    for mut node in &mut fills {
+        node.width = Val::Percent(value * 100.0);
+    }
+    for mut text in &mut labels {
+        *text = Text::new(format!("{:.0}%", value * 100.0));
+    }
 }
 
 /// Spawns the (initially hidden) pause overlay. Tagged `GameplayRoot` so it is
-/// torn down with the rest of the scene. The whole tree — including each
-/// button's click/hover behaviour — is authored declaratively with `bsn!`.
-/// (Labels use the default font: `bsn!` can't set `TextFont.font` in 0.19.)
+/// torn down with the rest of the scene. Two columns, side by side: the left
+/// one is transport actions only (Resume/Restart/Quit Song, + Finish Lesson
+/// where it applies); the right one is every practice aid, so the two don't
+/// visually compete — a slip of the mouse over the "big" actions shouldn't be
+/// one misclick away from a tweak knob, or vice versa. Most of the tree is
+/// authored declaratively with `bsn!`; sliders and their readouts are
+/// imperative (`SliderRange`/`SliderStep` have no `Default`, so they can't be
+/// bsn! patches, and labels need the default font, which `bsn!` can't set in
+/// 0.19).
 ///
 /// Speed and Wait-for-Note are practice aids for a scored, fixed-length song
 /// — Jam Session has no notes to wait for and no fixed pacing to slow down —
@@ -354,6 +495,9 @@ pub(super) fn setup_pause_menu(
     mut commands: Commands,
     mode: Res<GameplayMode>,
     lesson: Option<Res<LessonContext>>,
+    speed: Res<PracticeSpeed>,
+    selected_phrase: Res<SelectedPhraseIndex>,
+    adaptive: Res<AdaptiveDifficulty>,
 ) {
     let is_jam = *mode == GameplayMode::JamSession;
     // A scale-adherence lesson (see `PassCriteria::ScaleAdherence`) is the
@@ -361,115 +505,77 @@ pub(super) fn setup_pause_menu(
     // Jam Session has no natural end — so it needs its own explicit
     // "submit for judgment" action here instead.
     let is_lesson_jam = is_jam && lesson.is_some();
-    commands
-        .spawn_scene(bsn! {
-            Node {
-                position_type: {PositionType::Absolute},
-                width: {Val::Percent(100.0)},
-                height: {Val::Percent(100.0)},
-                flex_direction: {FlexDirection::Column},
-                align_items: {AlignItems::Center},
-                justify_content: {JustifyContent::Center},
-                row_gap: {Val::Px(20.0)},
-            }
-            BackgroundColor({Color::srgba(0.0, 0.0, 0.0, 0.65)})
-            GlobalZIndex(200)
-            GameplayRoot
-            PauseMenuRoot
-            Children [
-                (
-                    Text({"PAUSED"})
-                    TextFont { font_size: {FontSize::Px(52.0)} }
-                    TextColor({Color::WHITE})
-                ),
-                button::default("Resume", on_resume),
-                button::default("Restart", on_restart),
-                button::default("Quit Song", on_quit),
-            ]
-        })
-        // bsn! can't express the `Visibility::Hidden` enum variant; set it here.
-        .insert(Visibility::Hidden)
-        .with_children(|children| {
-            if is_lesson_jam {
-                children
-                    .spawn_empty()
-                    .apply_scene(button::default("Finish Lesson", on_finish_lesson));
-            }
-            if !is_jam {
-                children.spawn_empty().apply_scene(bsn! {
-                    Node {
-                        flex_direction: {FlexDirection::Row},
-                        align_items: {AlignItems::Center},
-                        column_gap: {Val::Px(8.0)},
-                    }
-                    Children [
-                        button::small("\u{23F8} Wait for Note", on_toggle_wait_mode),
-                        (
-                            Text({"Wait for Note: off"})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                            WaitForNoteLabel
-                        ),
-                    ]
-                });
-                children.spawn_empty().apply_scene(bsn! {
-                    Node {
-                        flex_direction: {FlexDirection::Row},
-                        align_items: {AlignItems::Center},
-                        column_gap: {Val::Px(8.0)},
-                    }
-                    Children [
-                        button::small("\u{1F422} Speed", on_cycle_practice_speed),
-                        (
-                            Text({"Speed: 100%"})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                            PracticeSpeedLabel
-                        ),
-                    ]
-                });
-                children.spawn_empty().apply_scene(bsn! {
-                    Node {
-                        flex_direction: {FlexDirection::Row},
-                        align_items: {AlignItems::Center},
-                        column_gap: {Val::Px(8.0)},
-                    }
-                    Children [
-                        button::small("Adaptive Difficulty", on_toggle_adaptive_difficulty),
-                        (
-                            Text({"Adaptive Difficulty: on"})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                            AdaptiveDifficultyLabel
-                        ),
-                    ]
-                });
-                children.spawn_empty().apply_scene(bsn! {
-                    Node {
-                        flex_direction: {FlexDirection::Row},
-                        align_items: {AlignItems::Center},
-                        column_gap: {Val::Px(8.0)},
-                    }
-                    Children [
-                        button::small("\u{25C0}", on_prev_phrase),
-                        (
-                            Text({"No phrases in this song"})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                            PhraseSelectorLabel
-                        ),
-                        button::small("\u{25B6}", on_next_phrase),
-                        button::small("-25%", on_decrease_phrase_learned),
-                        button::small("+25%", on_increase_phrase_learned),
-                    ]
-                });
-                children.spawn_empty().apply_scene(bsn! {
-                    Text({"Notes update live — resume to see them"})
-                    TextFont { font_size: {FontSize::Px(13.0)} }
-                    TextColor({Color::srgb(0.55, 0.55, 0.62)})
-                });
-            }
+    let learned = adaptive
+        .learned
+        .get(selected_phrase.0)
+        .copied()
+        .unwrap_or(0.0);
+    let phrase_text = phrase_selector_text(
+        adaptive.sections.get(selected_phrase.0).map(|s| s.name.as_str()),
+        learned,
+    );
 
+    let root = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                column_gap: Val::Px(48.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.65)),
+            GlobalZIndex(200),
+            GameplayRoot,
+            PauseMenuRoot,
+            Visibility::Hidden,
+        ))
+        .id();
+
+    // ── Left column: transport actions ──────────────────────────────────
+    let actions = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(20.0),
+            ..default()
+        })
+        .id();
+    commands.entity(root).add_child(actions);
+    commands.entity(actions).with_children(|col| {
+        col.spawn((
+            Text::new("PAUSED"),
+            TextFont {
+                font_size: FontSize::Px(52.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+        col.spawn_empty().apply_scene(button::default("Resume", on_resume));
+        col.spawn_empty().apply_scene(button::default("Restart", on_restart));
+        col.spawn_empty().apply_scene(button::default("Quit Song", on_quit));
+        if is_lesson_jam {
+            col.spawn_empty()
+                .apply_scene(button::default("Finish Lesson", on_finish_lesson));
+        }
+    });
+
+    // ── Right column: practice aids ──────────────────────────────────────
+    let aids = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Start,
+            row_gap: Val::Px(12.0),
+            ..default()
+        })
+        .id();
+    commands.entity(root).add_child(aids);
+
+    if !is_jam {
+        commands.entity(aids).with_children(|children| {
             children.spawn_empty().apply_scene(bsn! {
                 Node {
                     flex_direction: {FlexDirection::Row},
@@ -477,21 +583,83 @@ pub(super) fn setup_pause_menu(
                     column_gap: {Val::Px(8.0)},
                 }
                 Children [
-                    button::small("Clear Loop", on_clear_loop),
+                    button::small("\u{23F8} Wait for Note", on_toggle_wait_mode),
                     (
-                        Text({"Loop: off"})
+                        Text({"Wait for Note: off"})
                         TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.70, 0.70, 0.80)})
-                        LoopRangeLabel
+                        WaitForNoteLabel
                     ),
                 ]
             });
+        });
+        spawn_practice_speed_row(&mut commands, aids, speed.0);
+        commands.entity(aids).with_children(|children| {
             children.spawn_empty().apply_scene(bsn! {
-                Text({"Drag on the progress bar above to set a loop range"})
+                Node {
+                    flex_direction: {FlexDirection::Row},
+                    align_items: {AlignItems::Center},
+                    column_gap: {Val::Px(8.0)},
+                }
+                Children [
+                    button::small("Adaptive Difficulty", on_toggle_adaptive_difficulty),
+                    (
+                        Text({adaptive_difficulty_label_text(adaptive.enabled)})
+                        TextFont { font_size: {FontSize::Px(15.0)} }
+                        TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                        AdaptiveDifficultyLabel
+                    ),
+                ]
+            });
+            // No prev/next buttons: the section itself is picked by clicking
+            // its rectangle on the song-progress overlay's phrase strip
+            // (`song_progress_overlay::on_phrase_rect_click`), only possible
+            // while paused — same as dragging that bar to set a loop range.
+            children.spawn_empty().apply_scene(bsn! {
+                Text({phrase_text})
                 TextFont { font_size: {FontSize::Px(15.0)} }
+                TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                PhraseSelectorLabel
+            });
+        });
+        spawn_phrase_learned_row(&mut commands, aids, learned);
+        commands.entity(aids).with_children(|children| {
+            children.spawn_empty().apply_scene(bsn! {
+                Text({"Click a section on the progress bar above to select it"})
+                TextFont { font_size: {FontSize::Px(13.0)} }
+                TextColor({Color::srgb(0.55, 0.55, 0.62)})
+            });
+            children.spawn_empty().apply_scene(bsn! {
+                Text({"Notes update live — resume to see them"})
+                TextFont { font_size: {FontSize::Px(13.0)} }
                 TextColor({Color::srgb(0.55, 0.55, 0.62)})
             });
         });
+    }
+
+    commands.entity(aids).with_children(|children| {
+        children.spawn_empty().apply_scene(bsn! {
+            Node {
+                flex_direction: {FlexDirection::Row},
+                align_items: {AlignItems::Center},
+                column_gap: {Val::Px(8.0)},
+            }
+            Children [
+                button::small("Clear Loop", on_clear_loop),
+                (
+                    Text({"Loop: off"})
+                    TextFont { font_size: {FontSize::Px(15.0)} }
+                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                    LoopRangeLabel
+                ),
+            ]
+        });
+        children.spawn_empty().apply_scene(bsn! {
+            Text({"Drag on the progress bar above to set a loop range"})
+            TextFont { font_size: {FontSize::Px(15.0)} }
+            TextColor({Color::srgb(0.55, 0.55, 0.62)})
+        });
+    });
 
     // Always-visible pause button, bottom-right — Escape's on-screen
     // equivalent. A separate top-level entity (not a child of the overlay
@@ -781,26 +949,7 @@ mod tests {
         assert_eq!(loop_label_text(&cfg), "Loop: 8s\u{2013}16s");
     }
 
-    // ── next_speed_step / practice_speed_label_text ───────────────────────────
-
-    #[test]
-    fn next_speed_step_walks_down_from_full_speed() {
-        assert_eq!(next_speed_step(1.0), 0.9);
-        assert_eq!(next_speed_step(0.9), 0.8);
-        assert_eq!(next_speed_step(0.6), 0.5);
-    }
-
-    #[test]
-    fn next_speed_step_wraps_back_to_full_speed() {
-        assert_eq!(next_speed_step(0.5), 1.0);
-    }
-
-    #[test]
-    fn next_speed_step_defaults_to_the_slowest_step_for_an_unknown_value() {
-        // Shouldn't happen — `PracticeSpeed` only ever holds a `SPEED_STEPS`
-        // value — but stay well-defined rather than panicking.
-        assert_eq!(next_speed_step(0.42), 1.0);
-    }
+    // ── practice_speed_label_text ──────────────────────────────────────────────
 
     #[test]
     fn practice_speed_label_formats_as_a_percentage() {
@@ -809,24 +958,6 @@ mod tests {
     }
 
     // ── phrase selector / adaptive difficulty controls ────────────────────────
-
-    #[test]
-    fn next_phrase_index_wraps_around() {
-        assert_eq!(next_phrase_index(0, 3), 1);
-        assert_eq!(next_phrase_index(2, 3), 0);
-    }
-
-    #[test]
-    fn prev_phrase_index_wraps_around() {
-        assert_eq!(prev_phrase_index(0, 3), 2);
-        assert_eq!(prev_phrase_index(1, 3), 0);
-    }
-
-    #[test]
-    fn phrase_index_stepping_is_a_no_op_with_no_sections() {
-        assert_eq!(next_phrase_index(0, 0), 0);
-        assert_eq!(prev_phrase_index(0, 0), 0);
-    }
 
     #[test]
     fn phrase_selector_text_shows_name_and_learned_percent() {
@@ -848,9 +979,9 @@ mod tests {
     }
 
     #[test]
-    fn adjust_learned_clamps_to_zero_and_one() {
-        assert_eq!(adjust_learned(0.0, -0.25), 0.0);
-        assert_eq!(adjust_learned(1.0, 0.25), 1.0);
-        assert!((adjust_learned(0.5, 0.25) - 0.75).abs() < 1e-6);
+    fn clamp_learned_clamps_to_zero_and_one() {
+        assert_eq!(clamp_learned(-0.5), 0.0);
+        assert_eq!(clamp_learned(1.5), 1.0);
+        assert_eq!(clamp_learned(0.42), 0.42);
     }
 }

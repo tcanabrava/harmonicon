@@ -16,7 +16,7 @@
 //! rather than writing `LoopConfig` directly, keeping the drag interaction
 //! and the loop-adoption policy decoupled.
 
-use bevy::picking::events::{Drag, DragEnd, DragStart, Pointer};
+use bevy::picking::events::{Click, Drag, DragEnd, DragStart, Pointer};
 use bevy::picking::pointer::PointerButton;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
@@ -24,6 +24,7 @@ use bevy::ui::RelativeCursorPosition;
 use crate::menu::AppState;
 
 use super::adaptive_difficulty::{AdaptiveDifficulty, PhraseSection};
+use super::pause_menu::SelectedPhraseIndex;
 use super::{GameplayClock, GameplayRoot, LoopConfig, Paused, SongEnd, loop_range_valid};
 
 /// Every bar keeps at least this much height (as a fraction 0..1) even during
@@ -251,21 +252,32 @@ pub fn spawn_song_progress(
                             continue;
                         };
                         let learned_frac = learned.get(i).copied().unwrap_or(0.0);
-                        strip.spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Percent(left * 100.0),
-                                top: Val::Px(0.0),
-                                width: Val::Percent(width * 100.0),
-                                height: Val::Percent(100.0),
-                                border: UiRect::all(Val::Px(PHRASE_RECT_BORDER)),
-                                ..default()
-                            },
-                            BackgroundColor(phrase_fill_color(learned_frac)),
-                            BorderColor::all(PHRASE_RECT_BORDER_COLOR),
-                            Pickable::IGNORE,
-                            PhraseSectionRect(i),
-                        ));
+                        // Deliberately pickable (unlike every other visual
+                        // in this bar) — this is what "click a section to
+                        // select it" clicks on; see `on_phrase_rect_click`.
+                        // Its default `Pickable` (`should_block_lower:
+                        // true`) means a drag *starting* inside the phrase
+                        // strip's band no longer reaches
+                        // `ProgressBarDragSurface` underneath, so a loop-
+                        // range drag has to start in the waveform/notes
+                        // bands above it instead — an acceptable trade for
+                        // making the strip's own rectangles clickable.
+                        strip
+                            .spawn((
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    left: Val::Percent(left * 100.0),
+                                    top: Val::Px(0.0),
+                                    width: Val::Percent(width * 100.0),
+                                    height: Val::Percent(100.0),
+                                    border: UiRect::all(Val::Px(PHRASE_RECT_BORDER)),
+                                    ..default()
+                                },
+                                BackgroundColor(phrase_fill_color(learned_frac)),
+                                BorderColor::all(PHRASE_RECT_BORDER_COLOR),
+                                PhraseSectionRect(i),
+                            ))
+                            .observe(on_phrase_rect_click);
                     }
                 }
             });
@@ -398,6 +410,11 @@ fn phrase_fill_color(learned: f32) -> Color {
 /// regardless of learned%, so the boundary between sections is always
 /// crisp even when two neighbors' fills are nearly the same color.
 const PHRASE_RECT_BORDER_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 1.0);
+
+/// Border color for whichever section is currently selected (see
+/// [`update_selected_phrase_border`]) — a bright gold, distinct from the
+/// plain white every other section's border stays.
+const SELECTED_PHRASE_RECT_BORDER_COLOR: Color = Color::srgba(1.0, 0.85, 0.25, 1.0);
 
 /// Converts a `RelativeCursorPosition::normalized` reading (-0.5..0.5 within
 /// the node's bounds, per its own doc comment; not clamped when the pointer
@@ -557,6 +574,51 @@ fn update_phrase_section_colors(
     }
 }
 
+/// The pause menu's phrase selector is now driven by clicking a section's
+/// rectangle here, not prev/next buttons — see `pause_menu::
+/// SelectedPhraseIndex`'s doc comment. Only while paused, matching every
+/// other interactive behaviour this bar has (dragging a loop range).
+fn on_phrase_rect_click(
+    ev: On<Pointer<Click>>,
+    rects: Query<&PhraseSectionRect>,
+    mode: Res<ProgressBarMode>,
+    mut selected: ResMut<SelectedPhraseIndex>,
+) {
+    if *mode != ProgressBarMode::Edit {
+        return;
+    }
+    let Ok(rect) = rects.get(ev.entity) else {
+        return;
+    };
+    selected.0 = rect.0;
+}
+
+/// A brighter border on whichever phrase-section rectangle is currently
+/// selected — the only on-bar confirmation of which section clicking will
+/// edit via the pause menu's "Learned" slider, since the rectangles
+/// otherwise carry no selection state of their own. Re-applied not just when
+/// `SelectedPhraseIndex` changes but whenever fresh rectangles just
+/// appeared (a new song's bar was just spawned in `spawn_song_progress`) —
+/// `SelectedPhraseIndex` deliberately isn't reset on a new song (see its
+/// doc comment), so it wouldn't otherwise read as "changed" the moment
+/// there's finally something new to paint it onto.
+fn update_selected_phrase_border(
+    selected: Res<SelectedPhraseIndex>,
+    mut rects: Query<(&PhraseSectionRect, &mut BorderColor)>,
+    fresh_rects: Query<(), Added<PhraseSectionRect>>,
+) {
+    if !selected.is_changed() && fresh_rects.is_empty() {
+        return;
+    }
+    for (rect, mut border) in &mut rects {
+        *border = BorderColor::all(if rect.0 == selected.0 {
+            SELECTED_PHRASE_RECT_BORDER_COLOR
+        } else {
+            PHRASE_RECT_BORDER_COLOR
+        });
+    }
+}
+
 pub struct SongProgressPlugin;
 
 impl Plugin for SongProgressPlugin {
@@ -581,7 +643,8 @@ impl Plugin for SongProgressPlugin {
             )
             .add_systems(
                 Update,
-                update_phrase_section_colors.run_if(in_state(AppState::Playing)),
+                (update_phrase_section_colors, update_selected_phrase_border)
+                    .run_if(in_state(AppState::Playing)),
             );
     }
 }

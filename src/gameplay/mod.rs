@@ -201,8 +201,9 @@ impl Plugin for GameplayPlugin {
             (
                 pause_menu::update_wait_mode_label,
                 pause_menu::update_loop_label,
-                pause_menu::update_practice_speed_label,
+                pause_menu::update_practice_speed_slider,
                 pause_menu::update_phrase_selector_label,
+                pause_menu::update_phrase_learned_slider,
                 pause_menu::update_adaptive_difficulty_label,
             )
                 .run_if(in_state(AppState::Playing)),

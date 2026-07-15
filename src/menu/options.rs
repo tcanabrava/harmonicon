@@ -130,7 +130,6 @@ fn audio_level(settings: &AudioSettings, kind: VolumeSlider) -> f32 {
 fn setup_options_menu(
     mut commands: Commands,
     loc: Res<Localization>,
-
     settings: Res<AudioSettings>,
     mic_status: Res<MicStatus>,
     harmonicas: Res<AvailableHarmonicas>,
@@ -142,27 +141,80 @@ fn setup_options_menu(
     show_numbers: Res<ShowNoteNumbers>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"), &theme, "Options");
-    spawn_mic_banner(&mut commands, root, &mic_status);
+
+    // Parent container spanning the whole screen
+    let main_layout = commands.spawn(Node {
+        width: Val::Percent(80.0),
+        height: Val::Percent(100.0),
+        // Align children horizontally as columns
+        flex_direction: FlexDirection::Row,
+        // Optional spacing between the two columns
+        column_gap: Val::Px(20.0),
+        ..default()
+    }).id();
+
+    let left_layout = commands.spawn(Node {
+        width: Val::Percent(100.0),
+        height: Val::Percent(100.0),
+        // Align children horizontally as columns
+        flex_direction: FlexDirection::Column,
+        // Optional spacing between the two columns
+        column_gap: Val::Px(20.0),
+        ..default()
+    }).id();
+
+    let right_layout = commands.spawn(Node {
+        width: Val::Percent(100.0),
+        height: Val::Percent(100.0),
+        // Align children horizontally as columns
+        flex_direction: FlexDirection::Column,
+        // Optional spacing between the two columns
+        column_gap: Val::Px(20.0),
+        row_gap: Val::Px(20.0),
+        ..default()
+    }).id();
+
+    commands.entity(root).add_child(main_layout);
+    commands.entity(main_layout).add_child(left_layout);
+    commands.entity(main_layout).add_child(right_layout);
+
+    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, loc, selected_harmonica, asset_server, images, show_numbers);
+    spawn_right_column(&mut commands, right_layout, theme, btn_mats);
+}
+
+fn spawn_left_column(
+    commands: &mut Commands,
+    parent: Entity,
+    mic_status: Res<MicStatus>,
+    settings: Res<AudioSettings>,
+    harmonicas: Res<AvailableHarmonicas>,
+    loc: Res<Localization>,
+    selected_harmonica: Res<SelectedHarmonicaModel>,
+    asset_server: Res<AssetServer>,
+    mut images: ResMut<Assets<Image>>,
+    show_numbers: Res<ShowNoteNumbers>,
+) {
+    spawn_mic_banner(commands, parent, &mic_status);
     spawn_volume_slider(
-        &mut commands,
-        root,
+        commands,
+        parent,
         "Music",
         VolumeSlider::Music,
         settings.music_volume,
         set_music_volume,
     );
     spawn_volume_slider(
-        &mut commands,
-        root,
+        commands,
+        parent,
         "Metronome",
         VolumeSlider::Metronome,
         settings.metronome_volume,
         set_metronome_volume,
     );
-    spawn_latency_slider(&mut commands, root, settings.input_latency_ms, &loc);
+    spawn_latency_slider(commands, parent, settings.input_latency_ms, &loc);
     spawn_mic_combobox(
-        &mut commands,
-        root,
+        commands,
+        parent,
         &audio_input::input_device_names(),
         connected_device_name(&mic_status),
     );
@@ -177,7 +229,7 @@ fn setup_options_menu(
         .enumerate()
         .map(|(i, m)| {
             let handle = spawn_harmonica_preview(
-                &mut commands,
+                commands,
                 &mut images,
                 &asset_server,
                 m,
@@ -188,36 +240,38 @@ fn setup_options_menu(
         .collect();
 
     spawn_harmonica_row(
-        &mut commands,
-        root,
+        commands,
+        parent,
         &previews_harmonica,
         &selected_harmonica.0,
     );
 
     combobox::spawn_combobox(
-        &mut commands,
-        root,
-        root,
+        commands,
+        parent,
+        parent,
         "Pitch detect",
         &algo_labels(),
         settings.pitch_algorithm.label(),
         on_algo_selected,
     );
-    spawn_algo_explanation(&mut commands, root, 560.0, settings.pitch_algorithm);
+    spawn_algo_explanation(commands, parent, 560.0, settings.pitch_algorithm);
 
-    spawn_note_numbers_toggle(&mut commands, root, show_numbers.0);
+    spawn_note_numbers_toggle(commands, parent, show_numbers.0);
+}
 
+fn spawn_right_column(commands: &mut Commands, parent: Entity, theme: Res<LoadedTheme>, btn_mats: Res<ButtonMaterials>) {
     spawn_button(
-        &mut commands,
-        root,
+        commands,
+        parent,
         "Theme",
         &theme,
         &btn_mats,
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme),
     );
     spawn_button(
-        &mut commands,
-        root,
+        commands,
+        parent,
         "Calibrate input lag",
         &theme,
         &btn_mats,
@@ -226,8 +280,8 @@ fn setup_options_menu(
         },
     );
     spawn_button(
-        &mut commands,
-        root,
+        commands,
+        parent,
         "\u{2190} Back",
         &theme,
         &btn_mats,
