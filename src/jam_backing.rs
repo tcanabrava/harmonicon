@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-//! Generated Jam Session backing: a simple synthesized 12-bar walking bass
-//! line for any key/tempo/progression, so Jam Session doesn't require
-//! picking an existing song. See `PLAN.md`'s "Backing track variety" entry.
+//! Generated Jam Session backing: a synthesized 12-bar bass line, in the
+//! classic swung "blues box" shape (`BLUES_BOX_PATTERN`), for any
+//! key/tempo/progression, so Jam Session doesn't require picking an
+//! existing song. See `PLAN.md`'s "Backing track variety" entry.
 //!
 //! Deliberately not the harmonica-timbre synth `song_editor::playback`
 //! shares with `gameplay::call_response` — a backing bass is a different
@@ -47,9 +48,26 @@ pub const CHORUSES: u32 = 8;
 
 const ATTACK_SECS: f32 = 0.01;
 const RELEASE_SECS: f32 = 0.05;
-/// Fraction of each beat left as silence between bass notes, so consecutive
-/// notes don't blur into one continuous tone.
+/// Fraction of each note's own slot left as silence before the next bass
+/// note, so consecutive notes don't blur into one continuous tone.
 const NOTE_GAP_FRAC: f32 = 0.08;
+
+/// Semitone offsets of the classic 12-bar "blues box" bass shape, relative
+/// to whatever chord root is currently sounding: root, root, 5th, 5th,
+/// flat-7th, flat-7th, 5th, flat-7th — 8 notes per bar, swung (see
+/// [`SWING_LONG_FRAC`]) rather than played as even eighths. Quality-agnostic
+/// like [`bar_beat_freqs`] itself: root/5th/flat-7th are all shared between
+/// a dominant-7th and a minor-7th chord (`song::harmonica::chord_intervals`)
+/// — only the 3rd differs, and this pattern never plays one.
+const BLUES_BOX_PATTERN: [i32; 8] = [0, 0, 7, 7, 10, 10, 7, 10];
+
+/// The long eighth of a swung pair takes this fraction of the beat (the
+/// short one takes the rest) — the same 2:1 "triplet swing" ratio
+/// `metronome_overlay`'s `MetronomeFeel::Shuffle` clicks to (a beat as three
+/// triplet-eighths, accenting sub 0 and sub 2), so a generated jam's bass
+/// swings in step with the shuffle-feel metronome a player would tap along
+/// to over it.
+const SWING_LONG_FRAC: f32 = 2.0 / 3.0;
 
 /// One simple bass tone: a sine fundamental plus a second and third harmonic
 /// for warmth, and a short attack/release envelope. The harmonics matter for
@@ -86,43 +104,44 @@ fn bass_tone(freq_hz: f32, duration_secs: f32) -> Vec<f32> {
         .collect()
 }
 
-/// The four beat frequencies (Hz) of one bar's root-fifth-root-fifth walking
-/// pattern, in the bass register (octave 3 — one octave higher than a real
-/// bass guitar would sit, deliberately: this is a single sine-ish voice with
-/// no amp/cabinet coloring, and octave 2's ~65–110 Hz fundamentals are below
-/// what small/laptop speakers reproduce at all, see [`bass_tone`]). `None`
-/// for a beat whose note name doesn't resolve — shouldn't happen for the
-/// roots `progression_bars` produces, but stays honest about the
-/// possibility rather than panicking. Quality-agnostic on purpose: root and
-/// fifth are the same notes whether the bar's chord is dominant or minor
-/// 7th (only the 3rd would differ, and this simple bass line doesn't play
-/// one), so a minor blues doesn't need any different treatment here — only
-/// its chord *roots* change from `Progression::Standard`'s, same as
-/// quick-change.
-fn bar_beat_freqs(root: &str) -> [Option<f32>; 4] {
-    let fifth = semitone(root, 7);
-    let freq =
-        |note_class: &str| note_to_midi(&format!("{note_class}3")).map(|m| midi_to_freq_hz(m as f32));
-    let r = freq(root);
-    let f = freq(&fifth);
-    [r, f, r, f]
+/// The 8 note frequencies (Hz) of one bar's swung "blues box" pattern (see
+/// [`BLUES_BOX_PATTERN`]), in the bass register (octave 3 — one octave
+/// higher than a real bass guitar would sit, deliberately: this is a single
+/// sine-ish voice with no amp/cabinet coloring, and octave 2's ~65–110 Hz
+/// fundamentals are below what small/laptop speakers reproduce at all, see
+/// [`bass_tone`]). `None` for a note whose resolved name doesn't parse —
+/// shouldn't happen for the roots `progression_bars` produces, but stays
+/// honest about the possibility rather than panicking.
+fn bar_beat_freqs(root: &str) -> [Option<f32>; 8] {
+    BLUES_BOX_PATTERN.map(|semitones| {
+        let note_class = semitone(root, semitones);
+        note_to_midi(&format!("{note_class}3")).map(|m| midi_to_freq_hz(m as f32))
+    })
 }
 
-/// Renders [`CHORUSES`] repeats of a `progression`'s 12-bar walking bass
-/// line in `key` at `bpm` (4/4 throughout). Pure and deterministic — the
-/// whole backing loop is fully described by `key`/`bpm`/`progression`.
+/// Renders [`CHORUSES`] repeats of a `progression`'s 12-bar "blues box" bass
+/// line in `key` at `bpm` (4/4 throughout, swung eighths). Pure and
+/// deterministic — the whole backing loop is fully described by
+/// `key`/`bpm`/`progression`.
 pub fn generate_bass_pcm(key: &str, bpm: f32, progression: Progression) -> Vec<f32> {
     let secs_per_beat = 60.0 / bpm.max(1.0);
-    let gap_samples = ((secs_per_beat * NOTE_GAP_FRAC) * SAMPLE_RATE as f32) as usize;
+    // Each bar's 8 notes are 4 swung pairs, one pair per beat: the long note
+    // of a pair takes `SWING_LONG_FRAC` of the beat, the short note the rest
+    // — long+short always sums to exactly one beat, so a bar's total length
+    // is unaffected by the swing (still 4 beats), only how it's subdivided.
+    let long_secs = secs_per_beat * SWING_LONG_FRAC;
+    let short_secs = secs_per_beat - long_secs;
     let roots = progression_bars(key, progression).map(|(root, _)| root);
     let mut buf = Vec::new();
     for _ in 0..CHORUSES {
         for root in &roots {
-            for freq in bar_beat_freqs(root) {
+            for (i, freq) in bar_beat_freqs(root).into_iter().enumerate() {
+                let note_secs = if i % 2 == 0 { long_secs } else { short_secs };
+                let gap_samples = ((note_secs * NOTE_GAP_FRAC) * SAMPLE_RATE as f32) as usize;
                 match freq {
-                    Some(hz) => buf.extend(bass_tone(hz, secs_per_beat * (1.0 - NOTE_GAP_FRAC))),
+                    Some(hz) => buf.extend(bass_tone(hz, note_secs * (1.0 - NOTE_GAP_FRAC))),
                     None => {
-                        let silent_samples = (secs_per_beat * SAMPLE_RATE as f32) as usize;
+                        let silent_samples = (note_secs * SAMPLE_RATE as f32) as usize;
                         buf.extend(std::iter::repeat_n(0.0, silent_samples));
                         continue;
                     }
@@ -237,22 +256,28 @@ mod tests {
     // ── bar_beat_freqs ───────────────────────────────────────────────────────
 
     #[test]
-    fn bar_beat_freqs_alternates_root_and_fifth() {
+    fn bar_beat_freqs_follows_the_blues_box_shape() {
+        // R R 5 5 b7 b7 5 b7 — see `BLUES_BOX_PATTERN`.
         let freqs = bar_beat_freqs("C");
-        let root_hz = midi_to_freq_hz(note_to_midi("C3").unwrap() as f32);
-        let fifth_hz = midi_to_freq_hz(note_to_midi("G3").unwrap() as f32);
-        assert!((freqs[0].unwrap() - root_hz).abs() < 0.01);
-        assert!((freqs[1].unwrap() - fifth_hz).abs() < 0.01);
-        assert!((freqs[2].unwrap() - root_hz).abs() < 0.01);
-        assert!((freqs[3].unwrap() - fifth_hz).abs() < 0.01);
+        let hz = |note: &str| midi_to_freq_hz(note_to_midi(note).unwrap() as f32);
+        let (root_hz, fifth_hz, flat7_hz) = (hz("C3"), hz("G3"), hz("A#3"));
+        let expected = [
+            root_hz, root_hz, fifth_hz, fifth_hz, flat7_hz, flat7_hz, fifth_hz, flat7_hz,
+        ];
+        for (i, (got, want)) in freqs.iter().zip(expected).enumerate() {
+            assert!(
+                (got.unwrap() - want).abs() < 0.01,
+                "note {i}: got {got:?}, expected {want}"
+            );
+        }
     }
 
     #[test]
     fn bar_beat_freqs_stays_above_typical_small_speaker_cutoff() {
         // Regression guard for the "technically playing, inaudible on a
-        // laptop speaker" bug: every root/fifth this can produce, across
-        // every key, must clear ~100 Hz. C is the lowest pitch class, so if
-        // it clears the bar every other key does too.
+        // laptop speaker" bug: every note this can produce, across every
+        // key, must clear ~100 Hz. C is the lowest pitch class, so if it
+        // clears the bar every other key does too.
         for &f in bar_beat_freqs("C").iter().flatten() {
             assert!(f > 100.0, "{f} Hz is below typical small-speaker cutoff");
         }

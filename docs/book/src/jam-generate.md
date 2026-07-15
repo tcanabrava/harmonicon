@@ -1,8 +1,8 @@
 # Generate a Jam
 
 **Play → Generate Jam** skips picking a song entirely: it synthesizes an
-endless 12-bar backing (a walking bass line, not a second harmonica part)
-on the spot, so you can jam without needing any existing content.
+endless 12-bar backing on the spot (a swung "blues box" bass line, not a
+second harmonica part), so you can jam without needing any existing content.
 
 ![Generate Jam setup screen](images/jam-generate.png)
 
