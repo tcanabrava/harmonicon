@@ -32,7 +32,7 @@ fluent_content = "0.0.5"
 unic-langid = "0.9"
 # Detect the OS UI language so the game starts in the player's locale.
 sys-locale = "0.3"
-regex = "1.12.4"
+regex = "1.13.0"
 rand = "0.10"
 clap = { version = "4.6.1", features = ["derive"] }
 
