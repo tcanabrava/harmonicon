@@ -1,0 +1,93 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: feel bars 11-12 of the 12-bar form \u2014 this chart rests through the rest of the form entirely, then lands the V-chord root in bar 12 and resolves to the I-chord root at the top of the next chorus. Lose count and you'll play into silence and miss the landing. Original rhythm exercise, no melody."
+  },
+  "song": {
+    "title": "The Turnaround",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 80,
+    "key": "G",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 80
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "2nd",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 33.0,
+      "duration": 2.0,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "Bar 12 (V) \u2014 the turnaround"
+    },
+    {
+      "id": "n02",
+      "time": 36.0,
+      "duration": 2.0,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "Bar 1 (I) \u2014 resolved"
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

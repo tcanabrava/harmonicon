@@ -86,6 +86,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<Paused>()
         .init_resource::<LoopConfig>()
         .init_resource::<CurrentBar>()
+        .init_resource::<AbsoluteBar>()
         .add_message::<BarChanged>()
         .add_message::<NoteScored>()
         .init_resource::<bending_trainer::TrainerKey>()
@@ -791,9 +792,16 @@ pub fn secs_per_bar(bpm: f64, beats: f64) -> f64 {
     (60.0 / bpm) * beats
 }
 
+/// How many whole bars have elapsed since the clock last hit 0 (song/jam
+/// start, or a loop rewind) — unlike [`current_bar_index`], not wrapped to
+/// the 12-bar cycle.
+pub fn absolute_bar_index(clock: f64, secs_per_bar: f64) -> usize {
+    (clock.max(0.0) / secs_per_bar) as usize
+}
+
 /// Which of the 12 bars in a twelve-bar cycle the clock is currently on.
 pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
-    (clock.max(0.0) / secs_per_bar) as usize % 12
+    absolute_bar_index(clock, secs_per_bar) % 12
 }
 
 /// The bar `track_current_bar` last computed — shared so
@@ -804,6 +812,13 @@ pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
 /// which didn't).
 #[derive(Resource, Default)]
 pub struct CurrentBar(pub usize);
+
+/// [`absolute_bar_index`]'s result, tracked the same frame as [`CurrentBar`]
+/// — `jam_session`'s phrase-discipline lesson primitive needs a play/rest
+/// bar pattern that repeats consistently across an open-ended jam, not one
+/// that resets every 12 bars the way `CurrentBar` does.
+#[derive(Resource, Default)]
+pub struct AbsoluteBar(pub usize);
 
 /// Emitted by [`track_current_bar`] whenever the current bar changes,
 /// forward or (on a loop rewind) backward — lets `update_bar` recolor the
@@ -826,6 +841,7 @@ fn track_current_bar(
     manifests: Res<Assets<SongManifest>>,
     config: Res<ScoringConfig>,
     mut current: ResMut<CurrentBar>,
+    mut absolute: ResMut<AbsoluteBar>,
     mut last: Local<Option<usize>>,
     mut changed: MessageWriter<BarChanged>,
 ) {
@@ -836,6 +852,7 @@ fn track_current_bar(
     let spb = secs_per_bar(bpm, config.beats_per_bar);
     let bar = current_bar_index(clock.get(), spb);
     current.0 = bar;
+    absolute.0 = absolute_bar_index(clock.get(), spb);
     if *last != Some(bar) {
         changed.write(BarChanged(bar));
     }

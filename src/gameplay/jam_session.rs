@@ -29,7 +29,8 @@ use super::metronome_overlay::spawn_metronome;
 use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
-    ActivePitches, COUNTDOWN, CurrentBar, GameplayClock, GameplayRoot, MusicPlayer, MusicStarted,
+    AbsoluteBar, ActivePitches, COUNTDOWN, CurrentBar, GameplayClock, GameplayRoot, MusicPlayer,
+    MusicStarted,
 };
 
 /// Free-play screen, two columns: left has everything but the harmonica
@@ -586,6 +587,11 @@ pub struct ImprovStats {
     pub chord_tone: u32,
     pub in_scale: u32,
     pub out_of_scale: u32,
+    /// Fresh attacks that landed inside a "rest" window of the phrase-
+    /// discipline pattern (see [`in_rest_window`]) — tallied regardless of
+    /// pitch/chord-tone classification, since phrase discipline judges
+    /// *when* you played, not *what*.
+    pub rest_violations: u32,
 }
 
 impl ImprovStats {
@@ -605,7 +611,53 @@ impl ImprovStats {
             Some((self.chord_tone + self.in_scale) as f32 / total as f32)
         }
     }
+
+    /// Fraction of attacks that were specifically chord tones — stricter
+    /// than [`adherence`](Self::adherence), which also accepts merely-in-
+    /// scale notes. The `chord-tone-improv` lesson's criterion.
+    pub fn chord_tone_adherence(&self) -> Option<f32> {
+        let total = self.total();
+        if total == 0 {
+            None
+        } else {
+            Some(self.chord_tone as f32 / total as f32)
+        }
+    }
+
+    /// Fraction of attacks that landed *outside* a rest window — "did you
+    /// leave space", not what was played. The `question-answer` lesson's
+    /// criterion.
+    pub fn phrase_discipline(&self) -> Option<f32> {
+        let total = self.total();
+        if total == 0 {
+            None
+        } else {
+            Some(1.0 - (self.rest_violations as f32 / total as f32))
+        }
+    }
 }
+
+/// Whether `bar_index` (an absolute, non-wrapped bar count — see
+/// `gameplay::AbsoluteBar`) falls inside a "rest" window of a repeating
+/// play/rest pattern: `play_bars` bars of playing, then `rest_bars` bars of
+/// rest, repeating. The phrase-discipline lesson's "leave space" primitive —
+/// pure so it's directly unit-testable. A zero-length cycle (both zero)
+/// never counts as rest, since there's no pattern to violate.
+pub(super) fn in_rest_window(bar_index: usize, play_bars: usize, rest_bars: usize) -> bool {
+    let cycle = play_bars + rest_bars;
+    if cycle == 0 {
+        return false;
+    }
+    bar_index % cycle >= play_bars
+}
+
+/// The phrase-discipline pattern every jam session measures against: 2 bars
+/// of playing, then 2 bars of rest — the "question and answer" phrasing
+/// discipline the lesson teaches (see `docs/lessons_plan.md`, engine item
+/// 3). Always-on, like every other `ImprovStats` tally, not gated on a
+/// lesson being in flight.
+const PHRASE_PLAY_BARS: usize = 2;
+const PHRASE_REST_BARS: usize = 2;
 
 /// Tallies each fresh note attack into [`ImprovStats`], classified by
 /// [`classify_note_fit`] against the bar it landed on — the live twin of
@@ -615,6 +667,7 @@ pub fn accumulate_improv_stats(
     active: Res<ActivePitches>,
     guide: Option<Res<JamHoleGuide>>,
     current: Res<CurrentBar>,
+    absolute: Res<AbsoluteBar>,
     mut gate: ResMut<ImprovGate>,
     mut stats: ResMut<ImprovStats>,
 ) {
@@ -630,6 +683,7 @@ pub fn accumulate_improv_stats(
     gate.0.release_absent(|m| sounding.contains(&m));
 
     let chord_tones = &guide.chord_tones_by_bar[current.0];
+    let resting = in_rest_window(absolute.0, PHRASE_PLAY_BARS, PHRASE_REST_BARS);
     for p in &active.0 {
         if !guide.note_to_holes.contains_key(&p.midi) || !gate.0.is_fresh(p.midi, true) {
             continue;
@@ -639,6 +693,9 @@ pub fn accumulate_improv_stats(
             NoteFit::ChordTone => stats.chord_tone += 1,
             NoteFit::InScale => stats.in_scale += 1,
             NoteFit::OutOfScale => stats.out_of_scale += 1,
+        }
+        if resting {
+            stats.rest_violations += 1;
         }
     }
 }
@@ -827,9 +884,56 @@ mod tests {
             chord_tone: 3,
             in_scale: 5,
             out_of_scale: 2,
+            rest_violations: 0,
         };
         assert_eq!(stats.total(), 10);
         assert!((stats.adherence().unwrap() - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn improv_stats_chord_tone_adherence_only_counts_chord_tones() {
+        let stats = ImprovStats {
+            chord_tone: 3,
+            in_scale: 5,
+            out_of_scale: 2,
+            rest_violations: 0,
+        };
+        assert!((stats.chord_tone_adherence().unwrap() - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn improv_stats_phrase_discipline_is_one_minus_the_violation_fraction() {
+        let stats = ImprovStats {
+            chord_tone: 4,
+            in_scale: 4,
+            out_of_scale: 2,
+            rest_violations: 3,
+        };
+        assert!((stats.phrase_discipline().unwrap() - 0.7).abs() < 1e-6);
+    }
+
+    #[test]
+    fn improv_stats_phrase_discipline_is_none_with_nothing_played() {
+        assert_eq!(ImprovStats::default().phrase_discipline(), None);
+    }
+
+    // ── in_rest_window ────────────────────────────────────────────────────────
+
+    #[test]
+    fn in_rest_window_alternates_by_the_given_pattern() {
+        // 2 on / 2 off: bars 0-1 play, 2-3 rest, repeating.
+        assert!(!in_rest_window(0, 2, 2));
+        assert!(!in_rest_window(1, 2, 2));
+        assert!(in_rest_window(2, 2, 2));
+        assert!(in_rest_window(3, 2, 2));
+        assert!(!in_rest_window(4, 2, 2));
+        assert!(in_rest_window(7, 2, 2));
+    }
+
+    #[test]
+    fn in_rest_window_is_never_resting_with_a_zero_length_cycle() {
+        assert!(!in_rest_window(0, 0, 0));
+        assert!(!in_rest_window(100, 0, 0));
     }
 
     // ── accumulate_improv_stats ───────────────────────────────────────────────
@@ -848,6 +952,7 @@ mod tests {
         let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::Standard);
         world.insert_resource(guide);
         world.insert_resource(CurrentBar(0)); // bar 0 is the I chord (C7)
+        world.insert_resource(AbsoluteBar(0)); // a "play" bar
         world.insert_resource(ImprovGate::default());
         world.insert_resource(ImprovStats::default());
         world
@@ -925,6 +1030,33 @@ mod tests {
         let stats = world.resource::<ImprovStats>();
         assert_eq!(stats.in_scale, 1);
         assert_eq!(stats.chord_tone, 0);
+    }
+
+    #[test]
+    fn accumulate_improv_stats_tallies_a_rest_violation_during_a_rest_bar() {
+        let mut world = improv_test_world();
+        *world.resource_mut::<AbsoluteBar>() = AbsoluteBar(2); // a rest bar (2 on / 2 off)
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(60, "C")]));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(accumulate_improv_stats);
+        schedule.run(&mut world);
+
+        let stats = world.resource::<ImprovStats>();
+        assert_eq!(stats.rest_violations, 1);
+        // Still classified normally — phrase discipline judges *when*, not
+        // *what*, so the ordinary chord-tone tally isn't suppressed.
+        assert_eq!(stats.chord_tone, 1);
+    }
+
+    #[test]
+    fn accumulate_improv_stats_does_not_tally_a_violation_during_a_play_bar() {
+        let mut world = improv_test_world(); // AbsoluteBar(0) — a play bar
+        world.insert_resource(ActivePitches(vec![improv_pitch_info(60, "C")]));
+        let mut schedule = Schedule::default();
+        schedule.add_systems(accumulate_improv_stats);
+        schedule.run(&mut world);
+
+        assert_eq!(world.resource::<ImprovStats>().rest_violations, 0);
     }
 
     #[test]

@@ -140,6 +140,8 @@ lesson-goal-accuracy = Objetivo: %pct%% de precisión general
 lesson-goal-technique = Objetivo: %pct%% de precisión en las notas de %technique%
 lesson-goal-finish = Objetivo: tocarla hasta el final
 lesson-goal-scale-adherence = Objetivo: %pct%% de las notas dentro de la escala o mejor
+lesson-goal-chord-tone-adherence = Objetivo: %pct%% de las notas como notas del acorde
+lesson-goal-phrase-discipline = Objetivo: %pct%% de las notas tocadas fuera de una pausa — deja espacio
 lesson-complete-banner = LECCIÓN SUPERADA
 lesson-failed-banner = Objetivo no alcanzado — relee la lección e inténtalo de nuevo
 

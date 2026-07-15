@@ -1,0 +1,380 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: repeated eighth notes on one hole at a time \u2014 re-articulate every note (\"ta-ka\" tonguing) rather than holding a slurred tone. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Articulation: Ta-Ka Tonguing",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 100,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 100
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Ta-ka on Blow 4"
+    },
+    {
+      "id": "n02",
+      "time": 0.3,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "time": 0.6,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "time": 0.9,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "time": 1.2,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "time": 1.5,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "time": 1.8,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "time": 2.1,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n09",
+      "time": 2.9,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "Ta-ka on Draw 4"
+    },
+    {
+      "id": "n10",
+      "time": 3.2,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "time": 3.5,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "time": 3.8,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n13",
+      "time": 4.1,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n14",
+      "time": 4.4,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n15",
+      "time": 4.7,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n16",
+      "time": 5.0,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n17",
+      "time": 5.8,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ],
+      "phrase": "Ta-ka on Blow 5"
+    },
+    {
+      "id": "n18",
+      "time": 6.1,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "n19",
+      "time": 6.4,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "n20",
+      "time": 6.7,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "n21",
+      "time": 7.0,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "n22",
+      "time": 7.3,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "n23",
+      "time": 7.6,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "n24",
+      "time": 7.9,
+      "duration": 0.27,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

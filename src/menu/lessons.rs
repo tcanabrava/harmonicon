@@ -17,10 +17,11 @@ use crate::lessons::{AvailableLessons, LessonContext, LessonEntry, PassCriteria,
 use crate::localization::LocalizationExt;
 use crate::profile::{PlayerProfile, record_lesson, save_profile};
 use crate::song::SongManifest;
+use crate::song::harmonica::Progression;
 use crate::theme::LoadedTheme;
 
 use super::{
-    AppState, ButtonMaterials, GameplayMode, MenuPage, SelectedSong, spawn_button,
+    AppState, ButtonMaterials, GameplayMode, JamProgression, MenuPage, SelectedSong, spawn_button,
     spawn_menu_root,
 };
 
@@ -87,10 +88,44 @@ fn goal_line(loc: &Localization, entry: &LessonEntry) -> Option<String> {
             loc.msg_args("lesson-goal-scale-adherence", &[("pct", pct(*threshold))])
                 .into(),
         ),
+        Some(PassCriteria::ChordToneAdherence { threshold }) => Some(
+            loc.msg_args("lesson-goal-chord-tone-adherence", &[("pct", pct(*threshold))])
+                .into(),
+        ),
+        Some(PassCriteria::PhraseDiscipline { threshold }) => Some(
+            loc.msg_args("lesson-goal-phrase-discipline", &[("pct", pct(*threshold))])
+                .into(),
+        ),
         None if entry.chart_asset_path.is_some() => {
             Some(loc.msg("lesson-goal-finish").into())
         }
         None => None,
+    }
+}
+
+/// Whether `criteria` routes a lesson into an open jam (`GameplayMode::
+/// JamSession`) instead of the ordinary chart pipeline — every criterion
+/// judged from `jam_session::ImprovStats` rather than a chart run, not just
+/// `ScaleAdherence`. Pure so it's directly unit-testable.
+fn is_jam_criteria(criteria: Option<&PassCriteria>) -> bool {
+    matches!(
+        criteria,
+        Some(PassCriteria::ScaleAdherence { .. })
+            | Some(PassCriteria::ChordToneAdherence { .. })
+            | Some(PassCriteria::PhraseDiscipline { .. })
+    )
+}
+
+/// Parses a lesson manifest's `progression` field (schema-enforced to
+/// `"standard"`/`"quick-change"`/`"minor"` when present) into the
+/// `Progression` it names. Absent or unrecognized both fall back to
+/// `Standard` — the same "don't let a stale pick linger" default the
+/// real-song Jam Session button applies.
+pub(super) fn parse_progression(s: Option<&str>) -> Progression {
+    match s {
+        Some("quick-change") => Progression::QuickChange,
+        Some("minor") => Progression::Minor,
+        _ => Progression::Standard,
     }
 }
 
@@ -407,6 +442,7 @@ pub(super) fn setup_lesson_reader(
             let chart_path = chart_path.clone();
             let lesson_id = entry.manifest.id.clone();
             let criteria = entry.manifest.pass_criteria.clone();
+            let progression = entry.manifest.progression.clone();
             spawn_button(
                 &mut commands,
                 root,
@@ -416,6 +452,7 @@ pub(super) fn setup_lesson_reader(
                 move |_: On<Pointer<Click>>,
                       asset_server: Res<AssetServer>,
                       mut mode: ResMut<GameplayMode>,
+                      mut jam_progression: ResMut<JamProgression>,
                       mut state: ResMut<NextState<AppState>>,
                       mut commands: Commands| {
                     commands.insert_resource(SelectedSong(
@@ -425,13 +462,15 @@ pub(super) fn setup_lesson_reader(
                         lesson_id: lesson_id.clone(),
                         pass_criteria: criteria.clone(),
                     });
-                    // A scale-adherence lesson is an open jam, not a chart
-                    // to play through — see `PassCriteria::ScaleAdherence`.
-                    *mode = if matches!(criteria, Some(PassCriteria::ScaleAdherence { .. })) {
-                        GameplayMode::JamSession
+                    // A jam-based lesson (scale-adherence/chord-tone-
+                    // adherence/phrase-discipline) is an open jam, not a
+                    // chart to play through — see `is_jam_criteria`.
+                    if is_jam_criteria(criteria.as_ref()) {
+                        *mode = GameplayMode::JamSession;
+                        jam_progression.0 = parse_progression(progression.as_deref());
                     } else {
-                        GameplayMode::Play2D
-                    };
+                        *mode = GameplayMode::Play2D;
+                    }
                     state.set(AppState::SongLoading);
                 },
             );
@@ -487,6 +526,49 @@ fn spawn_back_to_lessons(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── is_jam_criteria ───────────────────────────────────────────────────────
+
+    #[test]
+    fn every_jam_based_criterion_routes_into_jam_session() {
+        for c in [
+            PassCriteria::ScaleAdherence { threshold: 0.1 },
+            PassCriteria::ChordToneAdherence { threshold: 0.1 },
+            PassCriteria::PhraseDiscipline { threshold: 0.1 },
+        ] {
+            assert!(is_jam_criteria(Some(&c)));
+        }
+    }
+
+    #[test]
+    fn chart_based_criteria_and_none_stay_on_the_ordinary_pipeline() {
+        assert!(!is_jam_criteria(None));
+        assert!(!is_jam_criteria(Some(&PassCriteria::Accuracy {
+            threshold: 0.5
+        })));
+        assert!(!is_jam_criteria(Some(&PassCriteria::Technique {
+            technique: "bend".into(),
+            threshold: 0.5
+        })));
+    }
+
+    // ── parse_progression ─────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_progression_reads_each_known_value() {
+        assert_eq!(parse_progression(Some("standard")), Progression::Standard);
+        assert_eq!(
+            parse_progression(Some("quick-change")),
+            Progression::QuickChange
+        );
+        assert_eq!(parse_progression(Some("minor")), Progression::Minor);
+    }
+
+    #[test]
+    fn parse_progression_defaults_to_standard_when_absent_or_unknown() {
+        assert_eq!(parse_progression(None), Progression::Standard);
+        assert_eq!(parse_progression(Some("jazz")), Progression::Standard);
+    }
 
     #[test]
     fn short_titles_use_the_largest_size() {

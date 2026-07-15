@@ -142,6 +142,8 @@ lesson-goal-accuracy = Goal: %pct%% overall accuracy
 lesson-goal-technique = Goal: %pct%% accuracy on %technique% notes
 lesson-goal-finish = Goal: play it through to the end
 lesson-goal-scale-adherence = Goal: %pct%% of notes in-scale or better
+lesson-goal-chord-tone-adherence = Goal: %pct%% of notes as chord tones
+lesson-goal-phrase-discipline = Goal: %pct%% of notes played outside a rest — leave space
 lesson-complete-banner = LESSON PASSED
 lesson-failed-banner = Goal not reached — read the lesson again and retry
 

@@ -1,0 +1,163 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: the 4-draw half-step bend, alternating plain 4 draw and 4 draw bent a half step. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "First Bend: 4 Draw",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 60,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 60
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "2nd",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "4 Draw"
+    },
+    {
+      "id": "n02",
+      "time": 4.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ],
+      "phrase": "4 Draw bent"
+    },
+    {
+      "id": "n03",
+      "time": 8.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "time": 12.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "time": 16.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "time": 20.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

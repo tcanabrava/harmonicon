@@ -1,0 +1,432 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: count 1-2-3-4 aloud while playing \u2014 quarter notes on every beat, then beats 1 and 3 only, then beat 1 only, with the metronome prominent throughout. Original rhythm exercise, no melody."
+  },
+  "song": {
+    "title": "Counting Four",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 80,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 80
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Count every beat"
+    },
+    {
+      "id": "n02",
+      "time": 0.75,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "time": 1.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "time": 2.25,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "time": 3.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "time": 3.75,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "time": 4.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "time": 5.25,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n09",
+      "time": 6.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n10",
+      "time": 6.75,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "time": 7.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "time": 8.25,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n13",
+      "time": 9.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n14",
+      "time": 9.75,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n15",
+      "time": 10.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n16",
+      "time": 11.25,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n17",
+      "time": 12.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Beats 1 and 3"
+    },
+    {
+      "id": "n18",
+      "time": 13.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n19",
+      "time": 15.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n20",
+      "time": 16.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n21",
+      "time": 18.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n22",
+      "time": 19.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n23",
+      "time": 21.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n24",
+      "time": 22.5,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n25",
+      "time": 24.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Beat 1 only"
+    },
+    {
+      "id": "n26",
+      "time": 27.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n27",
+      "time": 30.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n28",
+      "time": 33.0,
+      "duration": 0.637,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

@@ -49,6 +49,18 @@ pub enum PassCriteria {
     /// menu directly, bypassing the results screen entirely (there's no
     /// score/grade that would mean anything for an open jam).
     ScaleAdherence { threshold: f32 },
+    /// Minimum fraction of jam attacks that were specifically chord tones
+    /// (`jam_session::ImprovStats::chord_tone_adherence`), 0..1 — stricter
+    /// than `ScaleAdherence` (which also accepts merely-in-scale notes).
+    /// Same jam-session routing and "Finish Lesson" judging as
+    /// `ScaleAdherence`.
+    ChordToneAdherence { threshold: f32 },
+    /// Minimum fraction of jam attacks that landed *outside* a rest window
+    /// of a repeating play/rest bar pattern
+    /// (`jam_session::ImprovStats::phrase_discipline`), 0..1 — judges "did
+    /// you leave space", not what was played. Same jam-session routing and
+    /// "Finish Lesson" judging as `ScaleAdherence`.
+    PhraseDiscipline { threshold: f32 },
 }
 
 /// One `lesson.json`, as authored. See `assets/lesson_schema.dtd.json` for
@@ -65,6 +77,14 @@ pub struct LessonManifest {
     pub prerequisites: Vec<String>,
     #[serde(default)]
     pub pass_criteria: Option<PassCriteria>,
+    /// A jam-based lesson's backing progression (`"standard"`/
+    /// `"quick-change"`/`"minor"`), seeded into `menu::JamProgression` when
+    /// routing into `GameplayMode::JamSession` — see
+    /// `menu::lessons::parse_progression`. `None` resets to `Standard`, the
+    /// same "don't let a stale pick from an earlier generated jam linger"
+    /// reasoning the real-song Jam Session button already applies.
+    #[serde(default)]
+    pub progression: Option<String>,
 }
 
 /// A discovered lesson: its manifest plus the asset path its chart loads
@@ -124,24 +144,28 @@ pub fn is_unlocked(manifest: &LessonManifest, passed_ids: &[&str]) -> bool {
 /// Judges a finished lesson run. `accuracy` is the overall weighted accuracy
 /// (`results::accuracy`); `technique_accuracy` pairs technique bucket names
 /// with their per-run accuracy — the same slice `results` already builds for
-/// `profile::record_play`; `scale_adherence` is `jam_session::ImprovStats::
-/// adherence`'s result, `None` for any chart-backed run (which never
-/// accumulates it) and always `Some` by the time a jam-based lesson's
-/// "Finish Lesson" button calls this (see [`PassCriteria::ScaleAdherence`]).
-/// A criteria-less lesson passes by finishing; a `Technique`/`ScaleAdherence`
-/// criterion the run never exercised fails (an empty run can't demonstrate
-/// anything).
+/// `profile::record_play`; `jam_fraction` is whichever single 0..1 fraction
+/// a jam-based criterion (`ScaleAdherence`/`ChordToneAdherence`/
+/// `PhraseDiscipline`) reads — the caller picks the right one off
+/// `jam_session::ImprovStats` for whichever criterion is actually active
+/// (see `gameplay::pause_menu::jam_fraction_for`); `None` for any
+/// chart-backed run (which never accumulates it) and always `Some` by the
+/// time a jam-based lesson's "Finish Lesson" button calls this. A
+/// criteria-less lesson passes by finishing; a `Technique`/jam criterion the
+/// run never exercised fails (an empty run can't demonstrate anything).
 pub fn lesson_passed(
     criteria: Option<&PassCriteria>,
     accuracy: f32,
     technique_accuracy: &[(&str, f32)],
-    scale_adherence: Option<f32>,
+    jam_fraction: Option<f32>,
 ) -> bool {
     match criteria {
         None => true,
         Some(PassCriteria::Accuracy { threshold }) => accuracy >= *threshold,
-        Some(PassCriteria::ScaleAdherence { threshold }) => {
-            scale_adherence.is_some_and(|a| a >= *threshold)
+        Some(PassCriteria::ScaleAdherence { threshold })
+        | Some(PassCriteria::ChordToneAdherence { threshold })
+        | Some(PassCriteria::PhraseDiscipline { threshold }) => {
+            jam_fraction.is_some_and(|a| a >= *threshold)
         }
         Some(PassCriteria::Technique {
             technique,
@@ -254,6 +278,7 @@ mod tests {
             chart: None,
             prerequisites: prereqs.iter().map(|s| s.to_string()).collect(),
             pass_criteria: None,
+            progression: None,
         }
     }
 
@@ -336,6 +361,57 @@ mod tests {
             m.pass_criteria,
             Some(PassCriteria::ScaleAdherence { threshold: 0.8 })
         );
+    }
+
+    #[test]
+    fn parses_a_chord_tone_adherence_criterion() {
+        let m = parse_lesson(
+            br#"{"id":"chord-tone-improv","unit":"blues","title_key":"t","body_key":"b",
+                 "pass_criteria":{"type":"chord-tone-adherence","threshold":0.4}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            m.pass_criteria,
+            Some(PassCriteria::ChordToneAdherence { threshold: 0.4 })
+        );
+    }
+
+    #[test]
+    fn parses_a_phrase_discipline_criterion() {
+        let m = parse_lesson(
+            br#"{"id":"question-answer","unit":"blues","title_key":"t","body_key":"b",
+                 "pass_criteria":{"type":"phrase-discipline","threshold":0.7}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            m.pass_criteria,
+            Some(PassCriteria::PhraseDiscipline { threshold: 0.7 })
+        );
+    }
+
+    #[test]
+    fn parses_a_progression_field() {
+        let m = parse_lesson(
+            br#"{"id":"minor-blues-improv","unit":"blues","title_key":"t","body_key":"b",
+                 "progression":"minor"}"#,
+        )
+        .unwrap();
+        assert_eq!(m.progression.as_deref(), Some("minor"));
+    }
+
+    #[test]
+    fn progression_defaults_to_none_when_absent() {
+        let m = parse_lesson(br#"{"id":"x","unit":"u","title_key":"t","body_key":"b"}"#).unwrap();
+        assert_eq!(m.progression, None);
+    }
+
+    #[test]
+    fn rejects_an_unknown_progression_value() {
+        let err = parse_lesson(
+            br#"{"id":"x","unit":"u","title_key":"t","body_key":"b","progression":"jazz"}"#,
+        )
+        .unwrap_err();
+        assert!(!err.is_empty());
     }
 
     #[test]
@@ -438,6 +514,31 @@ mod tests {
     fn scale_adherence_criterion_fails_when_nothing_was_played() {
         let c = PassCriteria::ScaleAdherence { threshold: 0.8 };
         assert!(!lesson_passed(Some(&c), 0.0, &[], None));
+    }
+
+    #[test]
+    fn chord_tone_adherence_criterion_compares_against_the_jam_fraction() {
+        let c = PassCriteria::ChordToneAdherence { threshold: 0.4 };
+        assert!(!lesson_passed(Some(&c), 0.0, &[], Some(0.39)));
+        assert!(lesson_passed(Some(&c), 0.0, &[], Some(0.4)));
+    }
+
+    #[test]
+    fn phrase_discipline_criterion_compares_against_the_jam_fraction() {
+        let c = PassCriteria::PhraseDiscipline { threshold: 0.7 };
+        assert!(!lesson_passed(Some(&c), 0.0, &[], Some(0.69)));
+        assert!(lesson_passed(Some(&c), 0.0, &[], Some(0.7)));
+    }
+
+    #[test]
+    fn jam_criteria_fail_when_nothing_was_played() {
+        for c in [
+            PassCriteria::ScaleAdherence { threshold: 0.1 },
+            PassCriteria::ChordToneAdherence { threshold: 0.1 },
+            PassCriteria::PhraseDiscipline { threshold: 0.1 },
+        ] {
+            assert!(!lesson_passed(Some(&c), 1.0, &[], None));
+        }
     }
 
     // ── group_by_unit ─────────────────────────────────────────────────────────

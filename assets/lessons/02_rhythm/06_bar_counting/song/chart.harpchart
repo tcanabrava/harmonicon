@@ -1,0 +1,224 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: through a full 12-bar cycle, play only the chord root on beat 1 of each bar \u2014 2 draw over the I chord, 4 blow over the IV chord, 4 draw over the V chord (2nd position). Teaches bar counting and hearing the changes at once. Original rhythm exercise, no melody."
+  },
+  "song": {
+    "title": "Counting the Bars",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 80,
+    "key": "G",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 80
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "2nd",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "Bar 1 (I)"
+    },
+    {
+      "id": "n02",
+      "time": 3.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "time": 6.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "time": 9.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "time": 12.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Bar 5 (IV)"
+    },
+    {
+      "id": "n06",
+      "time": 15.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "time": 18.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "time": 21.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n09",
+      "time": 24.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "Bar 9 (V)"
+    },
+    {
+      "id": "n10",
+      "time": 27.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "time": 30.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "time": 33.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

@@ -140,6 +140,8 @@ lesson-goal-accuracy = Meta: %pct%% de precisão geral
 lesson-goal-technique = Meta: %pct%% de precisão nas notas de %technique%
 lesson-goal-finish = Meta: tocar até o fim
 lesson-goal-scale-adherence = Meta: %pct%% das notas dentro da escala ou melhor
+lesson-goal-chord-tone-adherence = Meta: %pct%% das notas como notas do acorde
+lesson-goal-phrase-discipline = Meta: %pct%% das notas tocadas fora de uma pausa — deixe espaço
 lesson-complete-banner = LIÇÃO CONCLUÍDA
 lesson-failed-banner = Meta não atingida — releia a lição e tente de novo
 

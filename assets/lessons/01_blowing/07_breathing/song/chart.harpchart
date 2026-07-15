@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: diaphragm breathing and long tones on holes 1-4 blow/draw, held 3-4 beats at a slow tempo. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Breathing: Long Tones",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 60,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 60
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        }
+      ],
+      "phrase": "Hole 1"
+    },
+    {
+      "id": "n02",
+      "time": 4.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "time": 8.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        }
+      ],
+      "phrase": "Hole 2"
+    },
+    {
+      "id": "n04",
+      "time": 12.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "time": 16.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ],
+      "phrase": "Hole 3"
+    },
+    {
+      "id": "n06",
+      "time": 20.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "time": 24.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Hole 4"
+    },
+    {
+      "id": "n08",
+      "time": 28.0,
+      "duration": 3.5,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

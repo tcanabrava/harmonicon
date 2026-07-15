@@ -1,0 +1,145 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: throat/diaphragm vibrato on held middle-register notes, around 4-5 Hz. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Vibrato: Held Middle Notes",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 60,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 60
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 5.0,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 4.5
+            }
+          ]
+        }
+      ],
+      "phrase": "Blow 4"
+    },
+    {
+      "id": "n02",
+      "time": 6.0,
+      "duration": 5.0,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 4.5
+            }
+          ]
+        }
+      ],
+      "phrase": "Draw 4"
+    },
+    {
+      "id": "n03",
+      "time": 12.0,
+      "duration": 5.0,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 4.5
+            }
+          ]
+        }
+      ],
+      "phrase": "Blow 5"
+    },
+    {
+      "id": "n04",
+      "time": 18.0,
+      "duration": 5.0,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5",
+          "modifiers": [
+            {
+              "type": "vibrato",
+              "oscillation_hz": 4.5
+            }
+          ]
+        }
+      ],
+      "phrase": "Draw 5"
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

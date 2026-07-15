@@ -85,9 +85,40 @@
               "description": "Minimum fraction (0..1) of notes played during the jam that were at least in-scale. Routes the lesson into Jam Session instead of the normal chart pipeline — see PassCriteria::ScaleAdherence."
             }
           }
+        },
+        {
+          "required": ["type", "threshold"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "chord-tone-adherence" },
+            "threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "description": "Minimum fraction (0..1) of notes played during the jam that were specifically chord tones (stricter than scale-adherence). Routes into Jam Session like scale-adherence — see PassCriteria::ChordToneAdherence."
+            }
+          }
+        },
+        {
+          "required": ["type", "threshold"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "phrase-discipline" },
+            "threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "description": "Minimum fraction (0..1) of notes played outside a rest window of the jam's play/rest bar pattern. Routes into Jam Session like scale-adherence — see PassCriteria::PhraseDiscipline."
+            }
+          }
         }
       ],
-      "description": "How a chart-backed lesson is judged at the results screen (or, for a `scale-adherence` lesson, by its own \"Finish Lesson\" jam pause-menu button — see PassCriteria::ScaleAdherence). Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
+      "description": "How a chart-backed lesson is judged at the results screen (or, for a scale-adherence/chord-tone-adherence/phrase-discipline lesson, by its own \"Finish Lesson\" jam pause-menu button — see PassCriteria::ScaleAdherence). Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
+    },
+    "progression": {
+      "type": "string",
+      "enum": ["standard", "quick-change", "minor"],
+      "description": "A jam-based lesson's backing progression, seeded into the jam when Start routes into it. Absent = Standard. See menu::lessons::parse_progression."
     }
   }
 }

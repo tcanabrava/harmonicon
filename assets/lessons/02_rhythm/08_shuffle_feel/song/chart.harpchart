@@ -1,0 +1,275 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: straight vs. swung eighths \u2014 swung long-short pairs on hole 4, declared feel: shuffle so the metronome swings with it. Original rhythm exercise, no melody."
+  },
+  "song": {
+    "title": "Shuffle Feel",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 90,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy",
+    "feel": "shuffle"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 90
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Swung pairs on hole 4"
+    },
+    {
+      "id": "n02",
+      "time": 0.444,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "time": 0.667,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "time": 1.111,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "time": 1.333,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "time": 1.778,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "time": 2.0,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "time": 2.444,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n09",
+      "time": 2.667,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n10",
+      "time": 3.111,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "time": 3.333,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "time": 3.778,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n13",
+      "time": 4.0,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n14",
+      "time": 4.444,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "n15",
+      "time": 4.667,
+      "duration": 0.378,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n16",
+      "time": 5.111,
+      "duration": 0.189,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}
