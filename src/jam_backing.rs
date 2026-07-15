@@ -51,8 +51,15 @@ const RELEASE_SECS: f32 = 0.05;
 /// notes don't blur into one continuous tone.
 const NOTE_GAP_FRAC: f32 = 0.08;
 
-/// One simple bass tone: a sine fundamental with a soft second harmonic for
-/// a little warmth, and a short attack/release envelope.
+/// One simple bass tone: a sine fundamental plus a second and third harmonic
+/// for warmth, and a short attack/release envelope. The harmonics matter for
+/// more than tone color here — octave 2's fundamentals (see
+/// [`bar_beat_freqs`]) sit around 65–110 Hz, below what small/laptop
+/// speakers can reproduce at all, so the *speaker-audible* part of this
+/// tone is disproportionately the 2nd/3rd harmonics (130–330 Hz). Without
+/// them, the bass line is technically playing (real, non-silent PCM) but
+/// genuinely inaudible on that class of hardware — the classic "psychoacoustic
+/// bass" problem, not a playback bug.
 fn bass_tone(freq_hz: f32, duration_secs: f32) -> Vec<f32> {
     let n = (duration_secs * SAMPLE_RATE as f32).max(1.0) as usize;
     let attack = (SAMPLE_RATE as f32 * ATTACK_SECS) as usize;
@@ -71,25 +78,31 @@ fn bass_tone(freq_hz: f32, duration_secs: f32) -> Vec<f32> {
                 1.0
             };
             let env = atk.min(rel).clamp(0.0, 1.0);
-            let s = (TAU * freq_hz * t).sin() + 0.3 * (TAU * freq_hz * 2.0 * t).sin();
-            env * s * 0.55
+            let s = (TAU * freq_hz * t).sin()
+                + 0.4 * (TAU * freq_hz * 2.0 * t).sin()
+                + 0.22 * (TAU * freq_hz * 3.0 * t).sin();
+            env * s * 0.5
         })
         .collect()
 }
 
 /// The four beat frequencies (Hz) of one bar's root-fifth-root-fifth walking
-/// pattern, in the bass register (octave 2). `None` for a beat whose note
-/// name doesn't resolve — shouldn't happen for the roots `progression_bars`
-/// produces, but stays honest about the possibility rather than panicking.
-/// Quality-agnostic on purpose: root and fifth are the same notes whether
-/// the bar's chord is dominant or minor 7th (only the 3rd would differ, and
-/// this simple bass line doesn't play one), so a minor blues doesn't need
-/// any different treatment here — only its chord *roots* change from
-/// `Progression::Standard`'s, same as quick-change.
+/// pattern, in the bass register (octave 3 — one octave higher than a real
+/// bass guitar would sit, deliberately: this is a single sine-ish voice with
+/// no amp/cabinet coloring, and octave 2's ~65–110 Hz fundamentals are below
+/// what small/laptop speakers reproduce at all, see [`bass_tone`]). `None`
+/// for a beat whose note name doesn't resolve — shouldn't happen for the
+/// roots `progression_bars` produces, but stays honest about the
+/// possibility rather than panicking. Quality-agnostic on purpose: root and
+/// fifth are the same notes whether the bar's chord is dominant or minor
+/// 7th (only the 3rd would differ, and this simple bass line doesn't play
+/// one), so a minor blues doesn't need any different treatment here — only
+/// its chord *roots* change from `Progression::Standard`'s, same as
+/// quick-change.
 fn bar_beat_freqs(root: &str) -> [Option<f32>; 4] {
     let fifth = semitone(root, 7);
     let freq =
-        |note_class: &str| note_to_midi(&format!("{note_class}2")).map(|m| midi_to_freq_hz(m as f32));
+        |note_class: &str| note_to_midi(&format!("{note_class}3")).map(|m| midi_to_freq_hz(m as f32));
     let r = freq(root);
     let f = freq(&fifth);
     [r, f, r, f]
@@ -226,12 +239,23 @@ mod tests {
     #[test]
     fn bar_beat_freqs_alternates_root_and_fifth() {
         let freqs = bar_beat_freqs("C");
-        let root_hz = midi_to_freq_hz(note_to_midi("C2").unwrap() as f32);
-        let fifth_hz = midi_to_freq_hz(note_to_midi("G2").unwrap() as f32);
+        let root_hz = midi_to_freq_hz(note_to_midi("C3").unwrap() as f32);
+        let fifth_hz = midi_to_freq_hz(note_to_midi("G3").unwrap() as f32);
         assert!((freqs[0].unwrap() - root_hz).abs() < 0.01);
         assert!((freqs[1].unwrap() - fifth_hz).abs() < 0.01);
         assert!((freqs[2].unwrap() - root_hz).abs() < 0.01);
         assert!((freqs[3].unwrap() - fifth_hz).abs() < 0.01);
+    }
+
+    #[test]
+    fn bar_beat_freqs_stays_above_typical_small_speaker_cutoff() {
+        // Regression guard for the "technically playing, inaudible on a
+        // laptop speaker" bug: every root/fifth this can produce, across
+        // every key, must clear ~100 Hz. C is the lowest pitch class, so if
+        // it clears the bar every other key does too.
+        for &f in bar_beat_freqs("C").iter().flatten() {
+            assert!(f > 100.0, "{f} Hz is below typical small-speaker cutoff");
+        }
     }
 
     // ── generate_bass_pcm ────────────────────────────────────────────────────
