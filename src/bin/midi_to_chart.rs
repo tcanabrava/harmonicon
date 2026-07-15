@@ -803,60 +803,63 @@ mod tests {
         assert_eq!(round3(0.0), 0.0);
     }
 
-    // ── parse_args ────────────────────────────────────────────────────────────────
+    // ── Cli (clap derive) ────────────────────────────────────────────────────────
 
-    fn args(strs: &[&str]) -> Vec<String> {
-        strs.iter().map(|s| s.to_string()).collect()
+    /// `Cli::try_parse_from` wants argv[0] (the program name) as the first
+    /// element, same as `std::env::args()` — prepend it so callers only
+    /// have to list the actual arguments under test.
+    fn cli(args: &[&str]) -> Result<Cli, clap::Error> {
+        Cli::try_parse_from(std::iter::once("midi-to-chart").chain(args.iter().copied()))
     }
 
     #[test]
-    fn parse_args_reads_the_two_positionals() {
-        let cli = parse_args(&args(&["song.mid", "piano"])).unwrap();
-        assert_eq!(cli.midi_path, Path::new("song.mid"));
-        assert_eq!(cli.track_name.as_deref(), Some("piano"));
-        assert_eq!(cli.artist, None);
-        assert_eq!(cli.song, None);
-        assert!(!cli.user);
+    fn cli_reads_the_two_positionals() {
+        let c = cli(&["song.mid", "piano"]).unwrap();
+        assert_eq!(c.midi_path, Path::new("song.mid"));
+        assert_eq!(c.track_name.as_deref(), Some("piano"));
+        assert_eq!(c.artist, None);
+        assert_eq!(c.song, None);
+        assert!(!c.user);
     }
 
     #[test]
-    fn parse_args_track_name_is_optional() {
-        let cli = parse_args(&args(&["song.mid"])).unwrap();
-        assert_eq!(cli.track_name, None);
+    fn cli_track_name_is_optional() {
+        let c = cli(&["song.mid"]).unwrap();
+        assert_eq!(c.track_name, None);
     }
 
     #[test]
-    fn parse_args_flags_work_regardless_of_position() {
-        let cli = parse_args(&args(&[
+    fn cli_flags_work_regardless_of_position() {
+        let c = cli(&[
             "--artist", "Billy Joel", "song.mid", "piano", "--song", "Piano Man", "--user",
-        ]))
+        ])
         .unwrap();
-        assert_eq!(cli.midi_path, Path::new("song.mid"));
-        assert_eq!(cli.track_name.as_deref(), Some("piano"));
-        assert_eq!(cli.artist.as_deref(), Some("Billy Joel"));
-        assert_eq!(cli.song.as_deref(), Some("Piano Man"));
-        assert!(cli.user);
+        assert_eq!(c.midi_path, Path::new("song.mid"));
+        assert_eq!(c.track_name.as_deref(), Some("piano"));
+        assert_eq!(c.artist.as_deref(), Some("Billy Joel"));
+        assert_eq!(c.song.as_deref(), Some("Piano Man"));
+        assert!(c.user);
     }
 
     #[test]
-    fn parse_args_rejects_a_dangling_flag_value() {
-        assert!(parse_args(&args(&["song.mid", "--artist"])).is_err());
+    fn cli_rejects_a_dangling_flag_value() {
+        assert!(cli(&["song.mid", "--artist"]).is_err());
     }
 
     #[test]
-    fn parse_args_rejects_missing_midi_path() {
-        assert!(parse_args(&args(&["--artist", "X", "--song", "Y"])).is_err());
+    fn cli_rejects_missing_midi_path() {
+        assert!(cli(&["--artist", "X", "--song", "Y"]).is_err());
     }
 
     #[test]
-    fn parse_args_requires_artist_and_song_together() {
-        assert!(parse_args(&args(&["song.mid", "--artist", "Billy Joel"])).is_err());
-        assert!(parse_args(&args(&["song.mid", "--song", "Piano Man"])).is_err());
+    fn cli_requires_artist_and_song_together() {
+        assert!(cli(&["song.mid", "--artist", "Billy Joel"]).is_err());
+        assert!(cli(&["song.mid", "--song", "Piano Man"]).is_err());
     }
 
     #[test]
-    fn parse_args_rejects_user_without_artist_and_song() {
-        assert!(parse_args(&args(&["song.mid", "--user"])).is_err());
+    fn cli_rejects_user_without_artist_and_song() {
+        assert!(cli(&["song.mid", "--user"]).is_err());
     }
 
     // ── path_segment ──────────────────────────────────────────────────────────────
