@@ -34,6 +34,7 @@ unic-langid = "0.9"
 sys-locale = "0.3"
 regex = "1.12.4"
 rand = "0.10"
+clap = { version = "4.6.1", features = ["derive"] }
 
 [features]
 # Fast local iteration: dynamic-links Bevy and enables its dev tools + asset

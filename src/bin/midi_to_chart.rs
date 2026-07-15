@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: MIT
 
 //! midi-to-chart — turn a MIDI track into a Harmonicon `chart.harpchart`.
+//! Run with `--help` for the full flag/argument reference (defined
+//! declaratively below via `clap`'s derive API on [`Cli`]).
 //!
-//! Usage:
-//!   midi-to-chart <file.mid>                 # list the tracks in the file
-//!   midi-to-chart <file.mid> "<track name>"  # generate chart.harpchart from that
-//!                                            # track, then write
-//!                                            # <file>_processed.midi without it
+//! With no track name, lists every track's name and note count instead of
+//! generating a chart. `--artist NAME --song TITLE` (clap enforces they're
+//! given together, via `requires`) name the song in the generated chart's
+//! `song.artist`/`song.title` fields and, instead of writing a bare
+//! `chart.harpchart` to the working directory, place it at
+//! `assets/songs/<artist>/<song>/song/chart.harpchart` — the layout the game
+//! actually scans (see `assets_management::scan_artist_song`), so the chart
+//! is immediately playable with no manual file-shuffling. Add `--user` to
+//! write under `~/Harmonicon/songs/...` instead (the external drop-folder
+//! source), for a chart you don't want to add to the repo.
 //!
 //! The chart is validated against assets/song_schema.dtd.json before being
 //! written. MIDI pitches are mapped onto a standard C richter diatonic harp;
@@ -16,6 +23,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use clap::Parser;
 use harmonicon::audio_system::midi::{midi_to_note, note_to_midi};
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use serde_json::{Value, json};
@@ -26,14 +34,85 @@ const DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", 
 
 const DEFAULT_TEMPO_US: u32 = 500_000; // 120 BPM if the file specifies none
 
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        eprintln!("usage: {} <file.mid> [\"track name\"]", args[0]);
-        std::process::exit(2);
+/// Turn a MIDI track into a Harmonicon `chart.harpchart`.
+#[derive(Parser)]
+#[command(name = "midi-to-chart", version)]
+struct Cli {
+    /// Path to the MIDI file.
+    midi_path: PathBuf,
+
+    /// Track name (or numeric index) to convert. Omit to list every
+    /// track's name and note count instead of generating a chart.
+    track_name: Option<String>,
+
+    /// Song artist — written into the chart's song.artist field, and (with
+    /// --song) selects assets/songs/<artist>/<song>/song/ as the output
+    /// location instead of the working directory.
+    #[arg(long, requires = "song")]
+    artist: Option<String>,
+
+    /// Song title — written into the chart's song.title field. See --artist.
+    #[arg(long, requires = "artist")]
+    song: Option<String>,
+
+    /// Write under ~/Harmonicon/songs/... (the external drop-folder source)
+    /// instead of assets/songs/... Requires --artist and --song.
+    #[arg(long, requires = "artist")]
+    user: bool,
+}
+
+/// A single artist/song path segment as a real directory name — trimmed,
+/// and rejected outright (rather than silently sanitized) if it could
+/// escape the intended `songs/<artist>/<song>/` tree, since it's about to
+/// become a raw path component. Unlike `song_editor::harpchart::
+/// safe_path_segment` (which slugifies free-form text from a UI field),
+/// spaces and punctuation are kept as-is here — every bundled example song
+/// folder already uses a literal human-readable name (`"Example Song 3"`).
+fn path_segment(kind: &str, raw: &str) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed == "." || trimmed == ".." || trimmed.contains(['/', '\\']) {
+        return Err(format!("--{kind} {raw:?} isn't a valid folder name"));
     }
-    let midi_path = PathBuf::from(&args[1]);
-    let track_name = args.get(2).cloned();
+    Ok(trimmed.to_string())
+}
+
+/// The `--artist`/`--song`/`--user` trio, bundled so `process_track` takes
+/// one param instead of three (both for the chart's own `song.artist`/
+/// `song.title` fields and for [`output_dir`]).
+struct Destination<'a> {
+    artist: Option<&'a str>,
+    song: Option<&'a str>,
+    user: bool,
+}
+
+/// Where to write the generated chart: `assets/songs/<artist>/<song>/song/`
+/// (or `~/Harmonicon/songs/...` with `--user`) when both `--artist`/`--song`
+/// are given, matching the layout `assets_management::scan_artist_song`
+/// scans — otherwise the working directory, as before flags existed.
+fn output_dir(dest: &Destination) -> Result<PathBuf, String> {
+    let (Some(artist), Some(song)) = (dest.artist, dest.song) else {
+        return Ok(PathBuf::new());
+    };
+    let artist = path_segment("artist", artist)?;
+    let song = path_segment("song", song)?;
+
+    let songs_root = if dest.user {
+        dirs::home_dir()
+            .ok_or("could not determine the home directory for --user")?
+            .join("Harmonicon/songs")
+    } else {
+        PathBuf::from("assets/songs")
+    };
+    Ok(songs_root.join(artist).join(song).join("song"))
+}
+
+fn main() {
+    // `Cli::parse()` exits with code 2 and a formatted usage/error message
+    // on its own for anything it can validate declaratively — a missing
+    // <midi_path>, or --user/--song without --artist (see `requires` above).
+    let cli = Cli::parse();
+    let midi_path = cli.midi_path;
+    let track_name = cli.track_name;
 
     let bytes = match std::fs::read(&midi_path) {
         Ok(b) => b,
@@ -71,7 +150,12 @@ fn main() {
             };
             // Use the track's real name (not the raw selector) in the chart.
             let display = track_name_of(&smf.tracks[idx]).unwrap_or_else(|| format!("track {idx}"));
-            process_track(&smf, idx, &display, ticks_per_quarter, &midi_path);
+            let dest = Destination {
+                artist: cli.artist.as_deref(),
+                song: cli.song.as_deref(),
+                user: cli.user,
+            };
+            process_track(&smf, idx, &display, ticks_per_quarter, &midi_path, &dest);
 
             // Remove the track and write the leftover MIDI.
             smf.tracks.remove(idx);
@@ -321,7 +405,7 @@ fn map_pitch(target: u8, blow: &HashMap<u8, u8>, draw: &HashMap<u8, u8>) -> Mapp
 
 // ── Chart generation ─────────────────────────────────────────────────────────
 
-fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path) {
+fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path, dest: &Destination) {
     let tempo = collect_tempo_map(smf);
     let (ts_num, ts_den) = first_time_signature(smf);
     let initial_bpm = (60_000_000.0 / tempo[0].1 as f64).clamp(20.0, 300.0);
@@ -380,11 +464,14 @@ fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path) 
         .map(|&(tick, us)| json!({ "tick": tick, "bpm": round3((60_000_000.0 / us as f64).clamp(20.0, 300.0)) }))
         .collect();
 
-    let song_title = midi_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("Untitled")
-        .to_string();
+    let song_title = dest.song.map(str::to_string).unwrap_or_else(|| {
+        midi_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Untitled")
+            .to_string()
+    });
+    let song_artist = dest.artist.unwrap_or("Unknown").to_string();
 
     let last_index = items.len() - 1;
     let chart = json!({
@@ -397,7 +484,7 @@ fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path) 
         },
         "song": {
             "title": song_title,
-            "artist": "Unknown",
+            "artist": song_artist,
             "tempo_bpm": round3(initial_bpm),
             "key": "C",
             "time_signature": format!("{ts_num}/{ts_den}"),
@@ -427,7 +514,20 @@ fn process_track(smf: &Smf, idx: usize, name: &str, tpq: u32, midi_path: &Path) 
 
     validate(&chart);
 
-    let out = PathBuf::from("chart.harpchart");
+    let dir = match output_dir(dest) {
+        Ok(dir) => dir,
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(2);
+        }
+    };
+    if !dir.as_os_str().is_empty()
+        && let Err(e) = std::fs::create_dir_all(&dir)
+    {
+        eprintln!("error: failed to create {}: {e}", dir.display());
+        std::process::exit(1);
+    }
+    let out = dir.join("chart.harpchart");
     match std::fs::write(&out, serde_json::to_string_pretty(&chart).unwrap()) {
         Ok(()) => println!(
             "Wrote {} ({} notes -> {} items, {:.1} BPM, {ts_num}/{ts_den})",
@@ -701,5 +801,108 @@ mod tests {
         assert_eq!(round3(1.234_449), 1.234);
         assert_eq!(round3(1.234_5), 1.235);
         assert_eq!(round3(0.0), 0.0);
+    }
+
+    // ── parse_args ────────────────────────────────────────────────────────────────
+
+    fn args(strs: &[&str]) -> Vec<String> {
+        strs.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn parse_args_reads_the_two_positionals() {
+        let cli = parse_args(&args(&["song.mid", "piano"])).unwrap();
+        assert_eq!(cli.midi_path, Path::new("song.mid"));
+        assert_eq!(cli.track_name.as_deref(), Some("piano"));
+        assert_eq!(cli.artist, None);
+        assert_eq!(cli.song, None);
+        assert!(!cli.user);
+    }
+
+    #[test]
+    fn parse_args_track_name_is_optional() {
+        let cli = parse_args(&args(&["song.mid"])).unwrap();
+        assert_eq!(cli.track_name, None);
+    }
+
+    #[test]
+    fn parse_args_flags_work_regardless_of_position() {
+        let cli = parse_args(&args(&[
+            "--artist", "Billy Joel", "song.mid", "piano", "--song", "Piano Man", "--user",
+        ]))
+        .unwrap();
+        assert_eq!(cli.midi_path, Path::new("song.mid"));
+        assert_eq!(cli.track_name.as_deref(), Some("piano"));
+        assert_eq!(cli.artist.as_deref(), Some("Billy Joel"));
+        assert_eq!(cli.song.as_deref(), Some("Piano Man"));
+        assert!(cli.user);
+    }
+
+    #[test]
+    fn parse_args_rejects_a_dangling_flag_value() {
+        assert!(parse_args(&args(&["song.mid", "--artist"])).is_err());
+    }
+
+    #[test]
+    fn parse_args_rejects_missing_midi_path() {
+        assert!(parse_args(&args(&["--artist", "X", "--song", "Y"])).is_err());
+    }
+
+    #[test]
+    fn parse_args_requires_artist_and_song_together() {
+        assert!(parse_args(&args(&["song.mid", "--artist", "Billy Joel"])).is_err());
+        assert!(parse_args(&args(&["song.mid", "--song", "Piano Man"])).is_err());
+    }
+
+    #[test]
+    fn parse_args_rejects_user_without_artist_and_song() {
+        assert!(parse_args(&args(&["song.mid", "--user"])).is_err());
+    }
+
+    // ── path_segment ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn path_segment_trims_whitespace() {
+        assert_eq!(path_segment("artist", "  Billy Joel  ").unwrap(), "Billy Joel");
+    }
+
+    #[test]
+    fn path_segment_rejects_empty_or_traversal() {
+        assert!(path_segment("artist", "").is_err());
+        assert!(path_segment("artist", "   ").is_err());
+        assert!(path_segment("artist", ".").is_err());
+        assert!(path_segment("artist", "..").is_err());
+        assert!(path_segment("artist", "../escape").is_err());
+        assert!(path_segment("artist", "a/b").is_err());
+        assert!(path_segment("artist", "a\\b").is_err());
+    }
+
+    // ── output_dir ────────────────────────────────────────────────────────────────
+
+    fn dest<'a>(artist: Option<&'a str>, song: Option<&'a str>, user: bool) -> Destination<'a> {
+        Destination { artist, song, user }
+    }
+
+    #[test]
+    fn output_dir_is_empty_without_artist_and_song() {
+        assert_eq!(output_dir(&dest(None, None, false)).unwrap(), Path::new(""));
+    }
+
+    #[test]
+    fn output_dir_uses_the_bundled_assets_tree_by_default() {
+        let dir = output_dir(&dest(Some("Billy Joel"), Some("Piano Man"), false)).unwrap();
+        assert_eq!(dir, Path::new("assets/songs/Billy Joel/Piano Man/song"));
+    }
+
+    #[test]
+    fn output_dir_uses_the_home_drop_folder_with_user() {
+        let dir = output_dir(&dest(Some("Billy Joel"), Some("Piano Man"), true)).unwrap();
+        let home = dirs::home_dir().unwrap();
+        assert_eq!(dir, home.join("Harmonicon/songs/Billy Joel/Piano Man/song"));
+    }
+
+    #[test]
+    fn output_dir_rejects_an_unsafe_segment() {
+        assert!(output_dir(&dest(Some("../escape"), Some("Piano Man"), false)).is_err());
     }
 }
