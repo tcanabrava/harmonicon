@@ -246,6 +246,19 @@ fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
     );
 }
 
+fn clean_song_path(full_path: &std::path::Path) -> Option<String> {
+    let mut ancestor = full_path;
+    while let Some(parent) = ancestor.parent() {
+        if ancestor.file_name().map_or(false, |name| name == "songs") {
+            break;
+        }
+        ancestor = parent;
+    }
+
+    let relative_path = full_path.strip_prefix(ancestor.parent()?).ok()?;
+    Some(relative_path.to_string_lossy().into_owned())
+}
+
 /// `source_prefix` is prepended to the built `SongEntry::asset_path` so it
 /// loads from the right [`AssetSource`](bevy::asset::io::AssetSource): empty
 /// for the bundled `assets/` root, or `"external://"` for the `~/Harmonicon`
@@ -255,6 +268,7 @@ pub fn scan_artist_song(
     available: &mut ResMut<AvailableSongs>,
     source_prefix: &str,
 ) {
+    println!("Looking for artist songs inside of {:?}", artist_dir);
     let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
         return;
     };
@@ -265,20 +279,37 @@ pub fn scan_artist_song(
             continue;
         }
 
-        // Inside of the music directory, there may be a 3d, 2d models, and a song subfolder containing
-        // the actual song files and chart.harpchart metadata file.
-        if !song_dir.path().join("song/chart.harpchart").exists() {
+        // The files for the music are inside of `song` subdirectory.
+        let song_file = (||{
+            for song_file in std::fs::read_dir(song_dir.path().join("song")).ok()? {
+                let entry = song_file.ok()?;
+                let path = entry.path();
+                let is_music_file = path.extension().map_or(false, |ext| ext == "harpchart");
+
+                if is_music_file {
+                    return Some(entry);
+                }
+            }
+            return None;
+        })();
+
+        let Some(song_file) = song_file else {
             continue;
-        }
+        };
+
+        let Some(cleaned_path) = clean_song_path(&song_file.path()) else {
+            continue;
+        };
 
         let name = song_dir.file_name().to_string_lossy().into_owned();
+        let full_path = format!("{source_prefix}{cleaned_path}");
 
         available
             .0
             .entry(artist.clone())
             .or_default()
             .push(SongEntry {
-                asset_path: format!("{source_prefix}songs/{artist}/{name}/song/chart.harpchart"),
+                asset_path: full_path,
                 artist: artist.clone(),
                 name,
             });
