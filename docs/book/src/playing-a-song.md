@@ -43,7 +43,9 @@ whether it was your bends or your timing that need work.
 
 ## Pausing and quitting
 
-Press **Esc** mid-song to pause. The pause menu offers:
+Press **Esc**, or click the **⏸** button in the bottom-right corner, to
+pause mid-song — the on-screen button works the same as Esc, no keyboard
+required. The pause menu offers:
 
 - **Resume** / **Restart** (reloads the song from the countdown).
 - **Quit Song** — returns to the song list, not the Main Menu.

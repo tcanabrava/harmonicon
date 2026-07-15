@@ -60,6 +60,18 @@ pub struct ReturnToSongList(pub bool);
 #[derive(Resource, Default)]
 pub struct ReturnToOptions(pub bool);
 
+/// Set to `true` by the Song Editor (`AppState::SongEditor2`) on every exit
+/// path so that returning to `AppState::Menu` lands on the Play page (where
+/// "Create Song" lives) rather than the substate's own default of Main.
+#[derive(Resource, Default)]
+pub struct ReturnToPlay(pub bool);
+
+/// Set to `true` by the Credits screen (`AppState::Credits`) on every exit
+/// path so that returning to `AppState::Menu` lands on the Help/About page
+/// (where "Credits" lives) rather than the substate's own default of Main.
+#[derive(Resource, Default)]
+pub struct ReturnToHelpAbout(pub bool);
+
 pub struct MenuPlugin;
 
 // ── App-level states ──────────────────────────────────────────────────────────
@@ -101,10 +113,19 @@ pub(crate) enum MenuPage {
     Lessons,
     /// One lesson's instructional page (+ Start for chart-backed lessons).
     LessonReader,
+    /// The "Jam Session" choice on the Play menu lands here first: pick a
+    /// real song (`ArtistList`) or synthesize one (`JamGenerate`) — see
+    /// `setup_jam_session_menu`.
+    JamSessionMenu,
     /// Key/tempo picker for a synthesized Jam Session backing (see
     /// `crate::jam_backing`) — the no-existing-song alternative to
     /// `ArtistList`'s real-song Jam Session flow.
     JamGenerate,
+    /// Documentation link, About, Tutorial, and Credits — see
+    /// `setup_help_about_menu`.
+    HelpAbout,
+    /// Static "what is this app" page, reached from `HelpAbout`.
+    About,
 }
 
 // ── Public resources ──────────────────────────────────────────────────────────
@@ -136,6 +157,8 @@ impl Plugin for MenuPlugin {
             .init_resource::<JamProgression>()
             .init_resource::<ReturnToSongList>()
             .init_resource::<ReturnToOptions>()
+            .init_resource::<ReturnToPlay>()
+            .init_resource::<ReturnToHelpAbout>()
             // The Options, Calibration, Credits, and Theme pages own their own lifecycles.
             .add_plugins(ButtonMaterialPlugin)
             .add_plugins(options::OptionsPlugin)
@@ -159,6 +182,8 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::Lessons), cleanup_menu)
             .add_systems(OnEnter(MenuPage::LessonReader), lessons::setup_lesson_reader)
             .add_systems(OnExit(MenuPage::LessonReader), cleanup_menu)
+            .add_systems(OnEnter(MenuPage::JamSessionMenu), setup_jam_session_menu)
+            .add_systems(OnExit(MenuPage::JamSessionMenu), cleanup_menu)
             .add_systems(
                 OnEnter(MenuPage::JamGenerate),
                 jam_generate::setup_jam_generate_menu,
@@ -168,6 +193,10 @@ impl Plugin for MenuPlugin {
                 Update,
                 jam_generate::update_jam_generate_labels.run_if(in_state(MenuPage::JamGenerate)),
             )
+            .add_systems(OnEnter(MenuPage::HelpAbout), setup_help_about_menu)
+            .add_systems(OnExit(MenuPage::HelpAbout), cleanup_menu)
+            .add_systems(OnEnter(MenuPage::About), setup_about_page)
+            .add_systems(OnExit(MenuPage::About), cleanup_menu)
             .add_systems(
                 Update,
                 check_loading.run_if(in_state(AppState::SongLoading)),
@@ -217,6 +246,7 @@ impl Plugin for MenuPlugin {
 fn handle_menu_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     page: Res<State<MenuPage>>,
+    mode: Res<GameplayMode>,
     mut next_page: ResMut<NextState<MenuPage>>,
 ) {
     if !keyboard.just_pressed(KeyCode::Escape) {
@@ -224,11 +254,21 @@ fn handle_menu_escape(
     }
     let target = match page.get() {
         MenuPage::Main => return,
-        MenuPage::Play | MenuPage::Options | MenuPage::Lessons => MenuPage::Main,
-        MenuPage::ArtistList | MenuPage::ModeSelect | MenuPage::JamGenerate => MenuPage::Play,
+        MenuPage::Play | MenuPage::Options | MenuPage::HelpAbout => MenuPage::Main,
+        MenuPage::Lessons | MenuPage::JamSessionMenu => MenuPage::Play,
+        MenuPage::ModeSelect => MenuPage::Play,
+        // Shared by two flows — Play Song (via ModeSelect) and Jam
+        // Session's "Pick a Song" — see the Back button in
+        // `setup_artist_list` for why `GameplayMode` is what disambiguates.
+        MenuPage::ArtistList => match *mode {
+            GameplayMode::JamSession => MenuPage::JamSessionMenu,
+            GameplayMode::Play2D | GameplayMode::Play3D => MenuPage::ModeSelect,
+        },
+        MenuPage::JamGenerate => MenuPage::JamSessionMenu,
         MenuPage::SongList => MenuPage::ArtistList,
         MenuPage::Theme => MenuPage::Options,
         MenuPage::LessonReader => MenuPage::Lessons,
+        MenuPage::About => MenuPage::HelpAbout,
     };
     next_page.set(target);
 }
@@ -475,16 +515,6 @@ fn setup_main_menu(
     spawn_button(
         &mut commands,
         root,
-        &loc.msg("menu-lessons"),
-        &theme,
-        &btn_mats,
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
-            page.set(MenuPage::Lessons)
-        },
-    );
-    spawn_button(
-        &mut commands,
-        root,
         &loc.msg("menu-options"),
         &theme,
         &btn_mats,
@@ -493,29 +523,11 @@ fn setup_main_menu(
     spawn_button(
         &mut commands,
         root,
-        &loc.msg("menu-credits"),
+        &loc.msg("menu-help"),
         &theme,
         &btn_mats,
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
-            state.set(AppState::Credits)
-        },
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("menu-tutorial"),
-        &theme,
-        &btn_mats,
-        tutorial::start_tutorial_tour,
-    );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("menu-song-editor-2"),
-        &theme,
-        &btn_mats,
-        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
-            state.set(AppState::SongEditor2)
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::HelpAbout)
         },
     );
     spawn_button(
@@ -552,7 +564,71 @@ fn setup_play_menu(
     spawn_button(
         &mut commands,
         root,
+        &loc.msg("menu-create-song"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
+            state.set(AppState::SongEditor2)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
         &loc.msg("jam-session"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::JamSessionMenu)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("bending-trainer"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
+            state.set(AppState::BendingTrainer)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-lessons"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::Lessons)
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("back"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
+    );
+}
+
+fn setup_jam_session_menu(
+    mut commands: Commands,
+
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+    loc: Res<Localization>,
+) {
+    let root = spawn_menu_root(
+        &mut commands,
+        &loc.msg("jam-session"),
+        None,
+        &theme,
+        "JamSessionMenu",
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("jam-session-pick-song"),
         &theme,
         &btn_mats,
         |_: On<Pointer<Click>>,
@@ -581,13 +657,127 @@ fn setup_play_menu(
     spawn_button(
         &mut commands,
         root,
-        &loc.msg("bending-trainer"),
+        &loc.msg("back"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
+    );
+}
+
+/// Marks the status line on the Help/About page that reports why the
+/// Documentation button couldn't open (missing local build, or the OS
+/// couldn't launch a handler for it).
+#[derive(Component)]
+struct DocsStatusLabel;
+
+/// Finds a locally-built mdBook index, checking both the packaged layout
+/// (next to the executable) and the dev-tree layout (`docs/book/book/`,
+/// gitignored — built on demand via `mdbook build`). Returns `None` if
+/// neither exists; the docs aren't bundled into builds yet (see CLAUDE.md).
+fn locate_docs_index() -> Option<std::path::PathBuf> {
+    let candidates = [
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|dir| dir.join("docs/book/book/index.html"))),
+        Some(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/book/book/index.html")),
+    ];
+    candidates.into_iter().flatten().find(|p| p.exists())
+}
+
+/// Hands a local file path to the OS's default handler. Best-effort: the
+/// caller reports failure via `DocsStatusLabel` rather than treating it as
+/// fatal.
+fn open_in_default_app(path: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open").arg(path).spawn()?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg(path).spawn()?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", ""])
+            .arg(path)
+            .spawn()?;
+    }
+    Ok(())
+}
+
+fn setup_help_about_menu(
+    mut commands: Commands,
+
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+    loc: Res<Localization>,
+) {
+    let root = spawn_menu_root(
+        &mut commands,
+        &loc.msg("help-about-title"),
+        None,
+        &theme,
+        "HelpAbout",
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("help-documentation"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>,
+         mut status: Query<&mut Text, With<DocsStatusLabel>>,
+         loc: Res<Localization>| {
+            let message = match locate_docs_index() {
+                Some(path) => open_in_default_app(&path).err().map(|err| err.to_string()),
+                None => Some(String::from(loc.msg("help-docs-not-found"))),
+            };
+            if let Some(message) = message
+                && let Ok(mut text) = status.single_mut()
+            {
+                text.0 = message;
+            }
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-about"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::About),
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-tutorial"),
+        &theme,
+        &btn_mats,
+        tutorial::start_tutorial_tour,
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("menu-credits"),
         &theme,
         &btn_mats,
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
-            state.set(AppState::BendingTrainer)
+            state.set(AppState::Credits)
         },
     );
+    let status = commands
+        .spawn((
+            Text::new(""),
+            TextFont {
+                font_size: FontSize::Px(16.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.8, 0.4, 0.4)),
+            DocsStatusLabel,
+        ))
+        .id();
+    commands.entity(root).add_child(status);
     spawn_button(
         &mut commands,
         root,
@@ -595,6 +785,61 @@ fn setup_play_menu(
         &theme,
         &btn_mats,
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
+    );
+}
+
+fn setup_about_page(
+    mut commands: Commands,
+
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+    loc: Res<Localization>,
+) {
+    let root = spawn_menu_root(
+        &mut commands,
+        &loc.msg("about-title"),
+        None,
+        &theme,
+        "About",
+    );
+    let body = commands
+        .spawn((
+            Text::new(loc.msg("about-body")),
+            TextFont {
+                font_size: FontSize::Px(18.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.85, 0.85, 0.9)),
+            Node {
+                max_width: Val::Px(560.0),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(root).add_child(body);
+    let version = commands
+        .spawn((
+            Text::new(String::from(loc.msg_args(
+                "about-version",
+                &[("version", String::from(env!("CARGO_PKG_VERSION")))],
+            ))),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.6, 0.6, 0.7)),
+        ))
+        .id();
+    commands.entity(root).add_child(version);
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("back"),
+        &theme,
+        &btn_mats,
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::HelpAbout)
+        },
     );
 }
 
@@ -654,7 +899,16 @@ fn setup_artist_list(
         &loc.msg("back"),
         &theme,
         &btn_mats,
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
+        // ArtistList is shared by two flows — Play Song (via ModeSelect) and
+        // Jam Session's "Pick a Song" — that set `GameplayMode` before
+        // navigating here, so it doubles as the flag for which page Back
+        // should return to.
+        |_: On<Pointer<Click>>, mode: Res<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(match *mode {
+                GameplayMode::JamSession => MenuPage::JamSessionMenu,
+                GameplayMode::Play2D | GameplayMode::Play3D => MenuPage::ModeSelect,
+            });
+        },
     );
 }
 
@@ -793,6 +1047,8 @@ fn route_menu_entry(
     generated_jam: Option<Res<crate::jam_backing::GeneratedJamSession>>,
     mut ret_song: ResMut<ReturnToSongList>,
     mut ret_opts: ResMut<ReturnToOptions>,
+    mut ret_play: ResMut<ReturnToPlay>,
+    mut ret_help: ResMut<ReturnToHelpAbout>,
     mut next_page: ResMut<NextState<MenuPage>>,
     mut commands: Commands,
 ) {
@@ -829,6 +1085,12 @@ fn route_menu_entry(
     } else if ret_opts.0 {
         ret_opts.0 = false;
         next_page.set(MenuPage::Options);
+    } else if ret_play.0 {
+        ret_play.0 = false;
+        next_page.set(MenuPage::Play);
+    } else if ret_help.0 {
+        ret_help.0 = false;
+        next_page.set(MenuPage::HelpAbout);
     }
 }
 #[cfg(test)]

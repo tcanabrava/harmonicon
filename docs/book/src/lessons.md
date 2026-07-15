@@ -1,6 +1,6 @@
 # Lessons
 
-**Main Menu → Lessons** is a guided curriculum, grouped into units shown as
+**Play → Lessons** is a guided curriculum, grouped into units shown as
 tabs across the top, with a scrollable list of that unit's lessons below.
 
 ![Lessons list](images/lessons-list.png)

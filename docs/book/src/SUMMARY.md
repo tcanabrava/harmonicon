@@ -4,6 +4,7 @@
 
 - [Getting Started](getting-started.md)
 - [The Main Menu](main-menu.md)
+- [The Play Menu](play-menu.md)
 - [Playing a Song](playing-a-song.md)
   - [Play 2D](play-2d.md)
   - [Play 3D](play-3d.md)
@@ -15,6 +16,7 @@
 - [Options](options.md)
 - [Calibrating Input Lag](calibration.md)
 - [Themes](themes.md)
+- [Help / About](help-about.md)
 - [Guided Tour](tutorial.md)
 - [Controls Reference](controls.md)
 - [Troubleshooting](troubleshooting.md)

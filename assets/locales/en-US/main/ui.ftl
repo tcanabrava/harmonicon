@@ -8,17 +8,30 @@ app-title = Harmonicon
 
 # Main menu
 menu-play = Play
-menu-song-editor-2 = Song Editor
 menu-options = Options
+menu-help = Help / About
 menu-credits = Credits
 menu-tutorial = Tutorial
 menu-quit = Quit
 
 # Play menu
 play-song = Play Song
+menu-create-song = Create Song
 jam-session = Jam Session
-jam-generate = Generate Jam
 bending-trainer = Bending Trainer
+
+# Jam Session submenu
+jam-session-pick-song = Pick a Song
+jam-generate = Generate Jam
+
+# Help / About menu
+help-about-title = Help / About
+help-documentation = Documentation
+help-docs-not-found = Documentation isn't built locally yet — run `mdbook build` in docs/book/.
+menu-about = About
+about-title = About Harmonicon
+about-body = Harmonicon is a rhythm game for diatonic and chromatic harmonica: play a real harmonica into your microphone and it's scored in real time against a scrolling chart, built to teach blues and jazz harmonica through play.
+about-version = Version { $version }
 
 # Mode select
 select-mode = Select Mode
@@ -269,13 +282,15 @@ options-input-lag = Input lag
 tutorial-step = Step %n% of %total%
 tutorial-skip = Skip Tutorial
 tutorial-title-main = Main Menu
-tutorial-body-main = Your home base — jump into a song, browse lessons, or open Options from here.
+tutorial-body-main = Your home base — head into Play, open Options, or find Help / About from here.
 tutorial-title-play = Play
-tutorial-body-play = Pick a real song, start a free jam, or practice bends — choose how you want to play.
+tutorial-body-play = Pick a real song, create one, start a jam, practice bends, or work through lessons — choose how you want to play.
 tutorial-title-mode-select = Select Mode
 tutorial-body-mode-select = Choose 2D (a scrolling note highway) or 3D (a harmonica model you play along with).
 tutorial-title-gameplay = Playing a Song
 tutorial-body-gameplay = Notes fall toward the hit line — play the right pitch on your harmonica at the right time to score them.
+tutorial-title-jam-session-menu = Jam Session
+tutorial-body-jam-session-menu = Pick a real song to jam over, or generate an instant backing track instead.
 tutorial-title-jam-session = Jam Session
 tutorial-body-jam-session = Free play: the 12-bar grid and a live hole map guide your improvising — nothing here is scored.
 tutorial-title-bending-trainer = Bending Trainer
@@ -290,3 +305,5 @@ tutorial-title-jam-generate = Generate Jam
 tutorial-body-jam-generate = Spin up an instant backing track in any key and tempo — no song required.
 tutorial-title-song-editor = Song Editor
 tutorial-body-song-editor = Build or edit a chart by hand on this grid, then play it back or practice along with it live.
+tutorial-title-help-about = Help / About
+tutorial-body-help-about = Open the documentation, read about Harmonicon, retake this tour, or check the credits.

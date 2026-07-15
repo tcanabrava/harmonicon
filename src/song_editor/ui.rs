@@ -427,7 +427,10 @@ fn spawn_mod_panel(
             loc.msg("back"),
             loc.msg("editor-back-tooltip"),
             Color::srgb(0.22, 0.22, 0.28),
-            |_: On<Pointer<Click>>, mut next: ResMut<NextState<AppState>>| {
+            |_: On<Pointer<Click>>,
+             mut next: ResMut<NextState<AppState>>,
+             mut ret_play: ResMut<crate::menu::ReturnToPlay>| {
+                ret_play.0 = true;
                 next.set(AppState::Menu);
             },
         );

@@ -738,6 +738,19 @@ pub fn setup(
                 TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
+
+            // A visible Back — this screen has no pause menu (unlike a
+            // song/Jam Session), so Escape was the only way out; a touch
+            // target matters for a future mobile build with no keyboard.
+            left.spawn_empty().apply_scene(button::small(
+                &String::from(loc.msg("back")),
+                |_: On<Pointer<Click>>,
+                 mut next_state: ResMut<NextState<AppState>>,
+                 mut ret_play: ResMut<crate::menu::ReturnToPlay>| {
+                    ret_play.0 = true;
+                    next_state.set(AppState::Menu);
+                },
+            ));
             });
 
             // ── Right half: the harmonica — bend diagram + its explanatory
@@ -841,12 +854,15 @@ pub fn update_key_label(key: Res<TrainerKey>, mut labels: Query<&mut Text, With<
     }
 }
 
-/// Esc returns to the menu.
+/// Esc returns to the menu — specifically the Play page, where "Bending
+/// Trainer" lives, rather than `MenuPage`'s own default of Main.
 pub fn handle_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut ret_play: ResMut<crate::menu::ReturnToPlay>,
 ) {
     if keyboard.just_pressed(KeyCode::Escape) {
+        ret_play.0 = true;
         next_state.set(AppState::Menu);
     }
 }

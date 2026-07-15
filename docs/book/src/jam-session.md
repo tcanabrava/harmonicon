@@ -1,9 +1,9 @@
 # Jam Session
 
-**Play → Jam Session** is free play: pick an artist and song the same way
-as [Playing a Song](playing-a-song.md), but instead of scored falling
-notes, you get an open 12-bar backing to improvise over, for as long as you
-like — there's no finite end and nothing is scored.
+**Play → Jam Session → Pick a Song** is free play: pick an artist and song
+the same way as [Playing a Song](playing-a-song.md), but instead of scored
+falling notes, you get an open 12-bar backing to improvise over, for as
+long as you like — there's no finite end and nothing is scored.
 
 The screen is split into two columns:
 
@@ -27,3 +27,6 @@ practicing here and in that lesson builds the same skill.
 
 Want a backing track without picking an existing song? See
 [Generate a Jam](jam-generate.md).
+
+Press **Esc**, or click the **⏸** button in the bottom-right corner, to
+pause and reach the pause menu's Restart/Quit Session controls.

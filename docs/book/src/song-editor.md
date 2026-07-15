@@ -1,6 +1,6 @@
 # Song Editor
 
-**Main Menu → Song Editor** is Harmonicon's chart authoring tool — a piano-
+**Play → Create Song** is Harmonicon's chart authoring tool — a piano-
 roll-style grid for building or editing a `.harpchart` file by hand,
 without writing JSON directly.
 

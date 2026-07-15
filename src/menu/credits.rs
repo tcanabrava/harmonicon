@@ -219,7 +219,10 @@ fn spawn_ui(commands: &mut Commands) {
     // font: bsn! can't set TextFont.font in 0.19.)
     commands.spawn_scene(button::default(
         "Back to Menu",
-        |_: On<Pointer<Click>>, mut next_state: ResMut<NextState<AppState>>| {
+        |_: On<Pointer<Click>>,
+         mut next_state: ResMut<NextState<AppState>>,
+         mut ret_help: ResMut<super::ReturnToHelpAbout>| {
+            ret_help.0 = true;
             next_state.set(AppState::Menu);
         },
     ));
@@ -437,8 +440,13 @@ fn propagate_scene_layers(
 }
 
 /// Esc leaves the credits screen (the Back button does it via its own on()).
-fn handle_input(keyboard: Res<ButtonInput<KeyCode>>, mut next_state: ResMut<NextState<AppState>>) {
+fn handle_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+    mut ret_help: ResMut<super::ReturnToHelpAbout>,
+) {
     if keyboard.just_pressed(KeyCode::Escape) {
+        ret_help.0 = true;
         next_state.set(AppState::Menu);
     }
 }

@@ -126,7 +126,7 @@ pub(super) fn setup_lessons_menu(
             ))
             .id();
         commands.entity(root).add_child(msg);
-        spawn_back_to_main(&mut commands, root, &theme, &btn_mats, &loc);
+        spawn_back_to_play(&mut commands, root, &theme, &btn_mats, &loc);
         return;
     }
 
@@ -178,7 +178,7 @@ pub(super) fn setup_lessons_menu(
         &loc,
     );
 
-    spawn_back_to_main(&mut commands, root, &theme, &btn_mats, &loc);
+    spawn_back_to_play(&mut commands, root, &theme, &btn_mats, &loc);
 }
 
 /// Swaps the scrollbox's rows for the newly selected unit's. Runs only
@@ -308,7 +308,7 @@ fn populate_lesson_rows(
     }
 }
 
-fn spawn_back_to_main(
+fn spawn_back_to_play(
     commands: &mut Commands,
     root: Entity,
     theme: &LoadedTheme,
@@ -321,7 +321,7 @@ fn spawn_back_to_main(
         &loc.msg("back"),
         theme,
         btn_mats,
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
     );
 }
 

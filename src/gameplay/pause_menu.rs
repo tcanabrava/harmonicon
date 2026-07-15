@@ -492,6 +492,36 @@ pub(super) fn setup_pause_menu(
                 TextColor({Color::srgb(0.55, 0.55, 0.62)})
             });
         });
+
+    // Always-visible pause button, bottom-right — Escape's on-screen
+    // equivalent. A separate top-level entity (not a child of the overlay
+    // above, which starts `Visibility::Hidden`) so it stays visible while
+    // playing; it's naturally unreachable to clicks once paused, since the
+    // overlay is a full-screen backdrop on top of it. Matters most for a
+    // future touch/mobile build, which has no Escape key at all.
+    //
+    // Needs its own `GlobalZIndex` strictly between the background layer
+    // each gameplay mode paints at `GlobalZIndex(1)` (gameplay_2d/3d,
+    // jam_session — being a sibling top-level node rather than a child of
+    // that background root, it wouldn't otherwise inherit painting above
+    // it) and the pause overlay's `GlobalZIndex(200)` (so pausing still
+    // visually and click-wise covers it, per the paragraph above).
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(20.0),
+                bottom: Val::Px(20.0),
+                ..default()
+            },
+            GlobalZIndex(100),
+            GameplayRoot,
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn_empty()
+                .apply_scene(button::small("\u{23F8}", on_pause_button_click));
+        });
 }
 
 // ── Dedicated button callbacks ────────────────────────────────────────────────
@@ -589,6 +619,31 @@ fn apply_quit(
     next_state.set(AppState::Menu);
 }
 
+/// Flips [`Paused`], the overlay's visibility, and the song audio — shared
+/// by Escape ([`handle_pause_input`]) and the on-screen pause button
+/// ([`on_pause_button_click`]) so the two stay in lockstep.
+fn toggle_pause(
+    paused: &mut Paused,
+    overlay: &mut Query<&mut Visibility, With<PauseMenuRoot>>,
+    sinks: &Query<&AudioSink, With<MusicPlayer>>,
+) {
+    paused.0 = !paused.0;
+    for mut vis in overlay.iter_mut() {
+        *vis = if paused.0 {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+    for sink in sinks.iter() {
+        if paused.0 {
+            sink.pause();
+        } else {
+            sink.play();
+        }
+    }
+}
+
 /// Escape toggles the pause state, the overlay's visibility, and the song audio.
 pub(super) fn handle_pause_input(
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -599,21 +654,20 @@ pub(super) fn handle_pause_input(
     if !keyboard.just_pressed(KeyCode::Escape) {
         return;
     }
-    paused.0 = !paused.0;
-    for mut vis in &mut overlay {
-        *vis = if paused.0 {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-    }
-    for sink in &sinks {
-        if paused.0 {
-            sink.pause();
-        } else {
-            sink.play();
-        }
-    }
+    toggle_pause(&mut paused, &mut overlay, &sinks);
+}
+
+/// The on-screen pause button's click — same effect as Escape (see
+/// [`toggle_pause`]). It can only ever be clicked while unpaused, since the
+/// pause overlay is a full-screen backdrop on top of it once visible, but
+/// toggling (rather than only opening) keeps it a drop-in Escape equivalent.
+fn on_pause_button_click(
+    _: On<Pointer<Click>>,
+    mut paused: ResMut<Paused>,
+    mut overlay: Query<&mut Visibility, With<PauseMenuRoot>>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    toggle_pause(&mut paused, &mut overlay, &sinks);
 }
 
 #[cfg(test)]

@@ -10,8 +10,8 @@ The screen splits into two columns:
   algorithm picker (which pitch-detection method to use — the same setting
   Options uses), an ear-training **target** readout with a **Listen**
   button (plays a synthesized reference tone for the current target), a
-  live **cents-off tuner readout**, an adaptive **Drill** toggle, and the
-  tempo/metronome controls.
+  live **cents-off tuner readout**, an adaptive **Drill** toggle, the
+  tempo/metronome controls, and a **Back** button.
 - **Right — the harmonica**: the full bend diagram (every hole's blow,
   draw, bend, overblow, and overdraw notes), with its explanatory hint text
   and drill explanation beneath it.
@@ -34,3 +34,9 @@ ones you haven't tried yet or have a lower accuracy on — a spaced-practice
 loop instead of you deciding what to work on. Your hit rate per
 hole/technique is saved across sessions, so Drill mode gets smarter about
 what you personally need to practice the longer you use it.
+
+## Leaving
+
+There's no pause menu here (there's no song to pause) — click **Back**, or
+press **Esc**, to return to the Play menu. Either way your drill progress
+is saved on the way out.

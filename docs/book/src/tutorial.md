@@ -1,18 +1,19 @@
 # Guided Tour
 
-**Main Menu → Tutorial** is a quick, hands-off tour: click it and
-Harmonicon automatically walks through every top-level screen — including
-a few seconds of **live play**, not just menu captions — before returning
-you right back to where you started:
+**Main Menu → Help / About → Tutorial** is a quick, hands-off tour: click
+it and Harmonicon automatically walks through every top-level screen —
+including a few seconds of **live play**, not just menu captions — before
+returning you right back to where you started:
 
-Main → Play → Select Mode → **a live [Play 2D](play-2d.md) demo** → **a
-live [Jam Session](jam-session.md) demo** → **[Bending Trainer](
-bending-trainer.md)** → Options → Theme → Lessons → Generate Jam →
-**[Song Editor](song-editor.md)** → back to Main.
+Main → Play → Select Mode → **a live [Play 2D](play-2d.md) demo** → Jam
+Session Menu → **a live [Jam Session](jam-session.md) demo** → [Generate a
+Jam](jam-generate.md) → **[Bending Trainer](bending-trainer.md)** →
+Lessons → **[Song Editor](song-editor.md)** → Options → Theme →
+Help / About → back to where you started.
 
 ![Guided tour overlay](images/tutorial-overlay.png)
 
-- A **step counter** ("Step 6 of 11") in the overlay shows your progress
+- A **step counter** ("Step 6 of 13") in the overlay shows your progress
   through the tour.
 - Menu steps switch beneath the overlay exactly as if you'd clicked through
   them yourself; the live-play steps actually enter that screen for real —
@@ -27,8 +28,8 @@ bending-trainer.md)** → Options → Theme → Lessons → Generate Jam →
   the tour always cuts away first, and nothing from a demo step is ever
   saved to your profile.
 - Click **Skip Tutorial** at any point — including during a live-play step
-  — to end the tour immediately and return to the Main Menu, instead of
-  waiting for the remaining steps.
+  — to end the tour immediately and return to wherever you started it
+  from, instead of waiting for the remaining steps.
 
 This is meant as a fast first orientation, not a substitute for the rest of
 this book — it covers *what each screen is* (and, for the live-play steps,

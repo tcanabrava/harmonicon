@@ -161,6 +161,7 @@ pub(super) fn grid_keys(
     mut state: ResMut<EditorState>,
     file_dialog: Res<FileDialog>,
     mut next_state: ResMut<NextState<AppState>>,
+    mut ret_play: ResMut<crate::menu::ReturnToPlay>,
 ) {
     if state.focus.is_some() {
         return;
@@ -172,6 +173,7 @@ pub(super) fn grid_keys(
         if state.selected.is_some() {
             state.selected = None;
         } else {
+            ret_play.0 = true;
             next_state.set(AppState::Menu);
         }
     }

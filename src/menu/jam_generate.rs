@@ -222,7 +222,9 @@ pub(super) fn setup_jam_generate_menu(
         &loc.msg("back"),
         &theme,
         &btn_mats,
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::JamSessionMenu)
+        },
     );
 }
 

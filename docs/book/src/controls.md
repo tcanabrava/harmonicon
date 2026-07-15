@@ -18,6 +18,9 @@ for playing notes.
 | `M` | Mute/unmute the metronome click (visual beat indicator keeps working). |
 | `V` | Cycle the spectrogram's visual style. |
 
+A **⏸** button in the bottom-right corner does the same thing as `Esc` for
+pausing — no keyboard required.
+
 ## Menus and dialogs
 
 | Key | Action |

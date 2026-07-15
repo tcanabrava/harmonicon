@@ -6,17 +6,30 @@ app-title = Harmonicon
 
 # Menu principal
 menu-play = Tocar
-menu-song-editor-2 = Editor de Músicas
 menu-options = Opções
+menu-help = Ajuda / Sobre
 menu-credits = Créditos
 menu-tutorial = Tutorial
 menu-quit = Sair
 
 # Menu de tocar
 play-song = Tocar Música
+menu-create-song = Criar Música
 jam-session = Jam Session
-jam-generate = Gerar Jam
 bending-trainer = Treino de Bends
+
+# Submenu de Jam Session
+jam-session-pick-song = Escolher uma Música
+jam-generate = Gerar Jam
+
+# Menu de Ajuda / Sobre
+help-about-title = Ajuda / Sobre
+help-documentation = Documentação
+help-docs-not-found = A documentação ainda não foi gerada localmente — rode `mdbook build` em docs/book/.
+menu-about = Sobre
+about-title = Sobre o Harmonicon
+about-body = Harmonicon é um jogo de ritmo para gaita diatônica e cromática: toque uma gaita de verdade no microfone e seja pontuado em tempo real contra uma partitura, feito para ensinar gaita de blues e jazz através do jogo.
+about-version = Versão { $version }
 
 # Seleção de modo
 select-mode = Selecionar Modo
@@ -267,13 +280,15 @@ options-input-lag = Atraso de entrada
 tutorial-step = Passo %n% de %total%
 tutorial-skip = Pular Tutorial
 tutorial-title-main = Menu Principal
-tutorial-body-main = Sua base — entre em uma música, veja as lições ou abra as Opções por aqui.
+tutorial-body-main = Sua base — vá para Jogar, abra as Opções ou encontre Ajuda / Sobre por aqui.
 tutorial-title-play = Jogar
-tutorial-body-play = Escolha uma música de verdade, comece uma jam livre ou pratique bends — escolha como quer jogar.
+tutorial-body-play = Escolha uma música de verdade, crie uma, comece uma jam, pratique bends ou siga as lições — escolha como quer jogar.
 tutorial-title-mode-select = Selecionar Modo
 tutorial-body-mode-select = Escolha 2D (uma pista de notas rolando) ou 3D (uma harmônica que você toca junto).
 tutorial-title-gameplay = Tocando uma Música
 tutorial-body-gameplay = As notas caem em direção à linha de acerto — toque a nota certa na harmônica no momento certo para pontuar.
+tutorial-title-jam-session-menu = Jam Session
+tutorial-body-jam-session-menu = Escolha uma música de verdade para improvisar, ou gere uma base instantânea.
 tutorial-title-jam-session = Jam Session
 tutorial-body-jam-session = Jogo livre: a grade de 12 compassos e um mapa de furos ao vivo guiam sua improvisação — nada aqui é pontuado.
 tutorial-title-bending-trainer = Treinador de Bends
@@ -288,3 +303,5 @@ tutorial-title-jam-generate = Gerar Jam
 tutorial-body-jam-generate = Gere uma base instantânea em qualquer tom e andamento — sem precisar de uma música.
 tutorial-title-song-editor = Editor de Canções
 tutorial-body-song-editor = Monte ou edite uma partitura nesta grade, depois toque-a ou pratique junto com ela ao vivo.
+tutorial-title-help-about = Ajuda / Sobre
+tutorial-body-help-about = Abra a documentação, leia sobre o Harmonicon, refaça este tour ou veja os créditos.

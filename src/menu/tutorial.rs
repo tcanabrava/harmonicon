@@ -79,15 +79,39 @@ const TOUR_STEPS: &[(TourTarget, &str, &str, f32)] = &[
         PLAYING_STEP_SECONDS,
     ),
     (
+        TourTarget::Page(MenuPage::JamSessionMenu),
+        "tutorial-title-jam-session-menu",
+        "tutorial-body-jam-session-menu",
+        PAGE_STEP_SECONDS,
+    ),
+    (
         TourTarget::Playing(GameplayMode::JamSession),
         "tutorial-title-jam-session",
         "tutorial-body-jam-session",
         PLAYING_STEP_SECONDS,
     ),
     (
+        TourTarget::Page(MenuPage::JamGenerate),
+        "tutorial-title-jam-generate",
+        "tutorial-body-jam-generate",
+        PAGE_STEP_SECONDS,
+    ),
+    (
         TourTarget::BendingTrainer,
         "tutorial-title-bending-trainer",
         "tutorial-body-bending-trainer",
+        LIVE_SCREEN_STEP_SECONDS,
+    ),
+    (
+        TourTarget::Page(MenuPage::Lessons),
+        "tutorial-title-lessons",
+        "tutorial-body-lessons",
+        PAGE_STEP_SECONDS,
+    ),
+    (
+        TourTarget::SongEditor,
+        "tutorial-title-song-editor",
+        "tutorial-body-song-editor",
         LIVE_SCREEN_STEP_SECONDS,
     ),
     (
@@ -103,22 +127,10 @@ const TOUR_STEPS: &[(TourTarget, &str, &str, f32)] = &[
         PAGE_STEP_SECONDS,
     ),
     (
-        TourTarget::Page(MenuPage::Lessons),
-        "tutorial-title-lessons",
-        "tutorial-body-lessons",
+        TourTarget::Page(MenuPage::HelpAbout),
+        "tutorial-title-help-about",
+        "tutorial-body-help-about",
         PAGE_STEP_SECONDS,
-    ),
-    (
-        TourTarget::Page(MenuPage::JamGenerate),
-        "tutorial-title-jam-generate",
-        "tutorial-body-jam-generate",
-        PAGE_STEP_SECONDS,
-    ),
-    (
-        TourTarget::SongEditor,
-        "tutorial-title-song-editor",
-        "tutorial-body-song-editor",
-        LIVE_SCREEN_STEP_SECONDS,
     ),
 ];
 
