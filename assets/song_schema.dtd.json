@@ -28,6 +28,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "audio_file": {
+          "type": "string",
+          "description": "Song Editor round-trip only — the backing-track filename shown/edited in its metadata form. Gameplay always loads song/*.ogg by convention regardless of this field."
         }
       }
     },
@@ -523,7 +527,7 @@
 
         "end_index": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 0
         }
       }
     },

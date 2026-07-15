@@ -179,13 +179,22 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
         }
     };
 
+    // `audio_file` is optional in the schema and purely a Song Editor
+    // round-trip convenience (gameplay always loads `song/*.ogg` by
+    // convention, never this field) — omit it entirely rather than writing
+    // an empty string when no audio file has been picked yet.
+    let mut metadata = json!({
+        "format_version": "1.0.0",
+        "author": artist,
+        "description": "Created with Harmonicon Song Editor 2"
+    });
+    let audio_file = state.music.trim();
+    if !audio_file.is_empty() {
+        metadata["audio_file"] = json!(audio_file);
+    }
+
     let chart = json!({
-        "metadata": {
-            "format_version": "1.0.0",
-            "author": artist,
-            "description": "Created with Harmonicon Song Editor 2",
-            "audio_file": state.music.trim()
-        },
+        "metadata": metadata,
         "song": {
             "title": title,
             "artist": artist,

@@ -719,6 +719,76 @@ mod tests {
     }
 
     #[test]
+    fn serialize_harpchart_omits_audio_file_when_no_music_is_picked() {
+        let mut s = EditorState {
+            name: "Test Song".into(),
+            key: "G".into(),
+            ..Default::default()
+        };
+        select_or_add(&mut s, 2, 0);
+
+        let v: serde_json::Value =
+            serde_json::from_str(&serialize_harpchart(&s)).expect("valid JSON");
+        assert!(
+            v["metadata"].get("audio_file").is_none(),
+            "an empty/never-picked audio file shouldn't be written at all, \
+             not even as an empty string — it's optional in the schema"
+        );
+    }
+
+    #[test]
+    fn serialize_harpchart_writes_audio_file_once_music_is_picked() {
+        let mut s = EditorState {
+            name: "Test Song".into(),
+            key: "G".into(),
+            music: " music.ogg ".into(),
+            ..Default::default()
+        };
+        select_or_add(&mut s, 2, 0);
+
+        let v: serde_json::Value =
+            serde_json::from_str(&serialize_harpchart(&s)).expect("valid JSON");
+        assert_eq!(v["metadata"]["audio_file"], "music.ogg");
+    }
+
+    /// A chart the Song Editor writes must pass the exact schema
+    /// `song::loader::SongChartLoader` validates against at load time — a
+    /// field the editor writes but the schema doesn't declare (with
+    /// `additionalProperties: false` at every level, an *undeclared* field
+    /// fails validation outright, not just gets ignored) makes every song
+    /// saved by the editor unplayable. Caught `metadata.audio_file` missing
+    /// from the schema this way.
+    #[test]
+    fn serialize_harpchart_validates_against_the_song_schema() {
+        let mut s = EditorState {
+            name: "Test Song".into(),
+            author: "Test Artist".into(),
+            tempo: "120".into(),
+            key: "G".into(),
+            music: "music.ogg".into(),
+            ..Default::default()
+        };
+        select_or_add(&mut s, 2, 0);
+
+        let json_str = serialize_harpchart(&s);
+        let value: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../../assets/song_schema.dtd.json"))
+                .expect("schema is valid JSON");
+        let validator = jsonschema::validator_for(&schema).expect("schema compiles");
+        let errors: Vec<String> = validator
+            .iter_errors(&value)
+            .map(|e| format!("  - {e} (at /{path})", path = e.instance_path))
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "chart saved by the Song Editor must pass its own schema:\n{}",
+            errors.join("\n")
+        );
+    }
+
+    #[test]
     fn serialize_harpchart_writes_the_notes_own_oscillation_hz() {
         let mut s = EditorState::default();
         select_or_add(&mut s, 2, 0);
