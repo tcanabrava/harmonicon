@@ -175,7 +175,14 @@ pub(super) fn on_timeline_click(
                 request_confirm(&mut state, &loc, &mut open, start, end);
             }
         }
-        Some(TimelineDrag::Span { .. }) => state.timeline_drag = None,
+        // `bevy_picking` fires `Click` *and* `DragEnd` on the same release
+        // whenever the pointer is still over this entity at release —
+        // true for most drags, since only a large enough motion carries
+        // the pointer off the ruler's thin `HEADER_H`-tall strip — with
+        // `Click` first. `on_timeline_drag_end` is the sole authority for
+        // finishing a span; touching `timeline_drag` here would clear the
+        // very state it's about to read on the same release.
+        Some(TimelineDrag::Span { .. }) => {}
     }
 }
 
