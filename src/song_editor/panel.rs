@@ -6,7 +6,7 @@ use super::practice::PracticeState;
 use super::state::{Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
 use super::ui::{
     BendDot, EditModeGroup, HarmonicaKindText, MetaFieldBox, MetaFieldText, ModButton,
-    ModButtonLabel, ModeButton, PerformModeGroup, StatusMsg,
+    ModButtonLabel, ModeButton, PerformModeGroup, StatusMsg, TimelineToolButton,
 };
 use crate::localization::LocalizationExt;
 use crate::theme::LoadedTheme;
@@ -105,6 +105,21 @@ pub(super) fn update_mode_buttons(
             ModeButton::Lock => state.locked(),
         };
         bg.0 = if active {
+            colors.btn_active
+        } else {
+            colors.btn_bg
+        };
+    }
+}
+
+pub(super) fn update_timeline_tool_buttons(
+    state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
+    mut buttons: Query<(&TimelineToolButton, &mut BackgroundColor)>,
+) {
+    let colors = theme.song_editor_colors();
+    for (kind, mut bg) in &mut buttons {
+        bg.0 = if kind.0 == state.timeline_tool {
             colors.btn_active
         } else {
             colors.btn_bg

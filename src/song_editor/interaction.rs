@@ -170,7 +170,9 @@ pub(super) fn grid_keys(
         delete_selected(&mut state);
     }
     if keyboard.just_pressed(KeyCode::Escape) && !file_dialog.open {
-        if state.selected.is_some() {
+        if state.timeline_drag.is_some() {
+            state.timeline_drag = None;
+        } else if state.selected.is_some() {
             state.selected = None;
         } else {
             ret_play.0 = true;

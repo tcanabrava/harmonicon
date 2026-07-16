@@ -73,6 +73,55 @@ impl Dir {
     }
 }
 
+// ── Timeline erase/remove tool ───────────────────────────────────────────────
+
+/// Which destructive timeline operation is currently selected, if any —
+/// toggled by the Erase/Remove buttons, and read by the timeline surface's
+/// click/drag observers to decide whether they do anything at all. Mutually
+/// exclusive; picking one deselects the other rather than stacking.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub(super) enum TimelineTool {
+    #[default]
+    None,
+    /// Deletes every note in the picked range, leaving a gap — the song's
+    /// own length and every other note's position are untouched.
+    Erase,
+    /// Deletes every note in the picked range *and* shifts every note after
+    /// it earlier by the range's length, closing the gap — the song gets
+    /// shorter.
+    Remove,
+}
+
+impl TimelineTool {
+    pub(super) fn is_active(self) -> bool {
+        self != TimelineTool::None
+    }
+}
+
+/// Which side of a placed split point the pointer is currently hovering —
+/// determines what a follow-up click on the timeline acts on.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Side {
+    Left,
+    Right,
+}
+
+/// In-progress timeline selection, live-updated by the timeline surface's
+/// observers/hover system — mirrors [`DragState`]'s role for note dragging.
+/// Cleared once a range is committed to a confirmation request (or the tool
+/// is switched/deselected).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) enum TimelineDrag {
+    /// A single click placed a split point at `tick`; `hover` is the
+    /// pointer's current tick position, used to decide [`Side`] and to draw
+    /// the live highlight over the candidate range.
+    Split { tick: usize, hover: usize },
+    /// A click-drag-release span selection in progress; `start` is fixed at
+    /// the press position, `end` follows the pointer. Not normalized —
+    /// `end` can be less than `start` — see [`normalize_range`].
+    Span { start: usize, end: usize },
+}
+
 /// One placed note: a hole (1..=10) starting at `tick` and lasting `len` ticks,
 /// plus its techniques. `id` is a stable handle so the note keeps its identity
 /// while its `tick`/`len` change under a drag.
@@ -190,6 +239,13 @@ pub(super) struct EditorState {
     /// User's own Lock toggle, independent of `mode`. See [`EditorState::locked`].
     pub(super) user_locked: bool,
     pub(super) harmonica_kind: HarmonicaKind,
+    pub(super) timeline_tool: TimelineTool,
+    pub(super) timeline_drag: Option<TimelineDrag>,
+    /// A range the user has committed to (a placed split's side, or a
+    /// released drag span) and is now waiting on the confirm dialog's
+    /// answer for. Set right before opening the dialog; read and cleared
+    /// once `ConfirmChosen` arrives — see `timeline::handle_timeline_confirm`.
+    pub(super) pending_timeline_op: Option<(TimelineTool, usize, usize)>,
 }
 
 impl Default for EditorState {
@@ -211,6 +267,9 @@ impl Default for EditorState {
             mode: Mode::default(),
             user_locked: false,
             harmonica_kind: HarmonicaKind::default(),
+            timeline_tool: TimelineTool::default(),
+            timeline_drag: None,
+            pending_timeline_op: None,
         }
     }
 }
@@ -494,4 +553,64 @@ pub(super) fn note_rect(note: &GridNote) -> (f32, f32, f32, f32) {
     let width = note.len as f32 * TICK_W - 2.0;
     let height = ROW_H - 2.0 * NOTE_PAD;
     (left, top, width, height)
+}
+
+// ── Timeline erase/remove ────────────────────────────────────────────────────
+
+/// One past the last tick any note currently occupies — the right-hand
+/// bound for a "from the split point to the end of the song" range. `0` for
+/// an empty song.
+pub(super) fn song_end_tick(notes: &[GridNote]) -> usize {
+    notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0)
+}
+
+/// Orders a possibly-backwards drag span into `(start, end)` with
+/// `start <= end`.
+pub(super) fn normalize_range(a: usize, b: usize) -> (usize, usize) {
+    if a <= b { (a, b) } else { (b, a) }
+}
+
+/// The whole-side range a split point resolves to once the user clicks the
+/// highlighted side: from the start of the song up to `split` (`Side::Left`,
+/// the pointer was hovering left of the split), or from `split` to the end
+/// of the song (`Side::Right`).
+pub(super) fn split_side_range(split: usize, side: Side, notes: &[GridNote]) -> (usize, usize) {
+    match side {
+        Side::Left => (0, split),
+        Side::Right => (split, song_end_tick(notes).max(split)),
+    }
+}
+
+/// Whether a note spanning `[tick, tick+len)` overlaps `[start, end)`.
+fn range_overlaps(tick: usize, len: usize, start: usize, end: usize) -> bool {
+    tick < end && start < tick + len
+}
+
+/// Deletes every note overlapping `[start, end)`, leaving every other note
+/// exactly where it is — the song's own length is unaffected, just a gap
+/// where those notes used to be. The **Erase** tool.
+pub(super) fn erase_range(notes: &[GridNote], start: usize, end: usize) -> Vec<GridNote> {
+    notes
+        .iter()
+        .copied()
+        .filter(|n| !range_overlaps(n.tick, n.len, start, end))
+        .collect()
+}
+
+/// Deletes every note overlapping `[start, end)`, *and* shifts every note
+/// that starts at or after `end` earlier by `end - start` ticks, closing the
+/// gap — the song gets shorter. The **Remove** tool.
+pub(super) fn remove_range(notes: &[GridNote], start: usize, end: usize) -> Vec<GridNote> {
+    let span = end.saturating_sub(start);
+    notes
+        .iter()
+        .copied()
+        .filter(|n| !range_overlaps(n.tick, n.len, start, end))
+        .map(|mut n| {
+            if n.tick >= end {
+                n.tick -= span;
+            }
+            n
+        })
+        .collect()
 }

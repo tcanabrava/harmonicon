@@ -73,6 +73,8 @@ mod-slide = Slide
 mod-wah = Wah
 mod-vibrato = Vibrato
 mod-delete = Apagar
+editor-tool-erase = ✂ Apagar Trecho
+editor-tool-remove = ✂ Remover Trecho
 
 # Editor de Músicas 2 — rótulos dos campos de metadados
 editor-field-tempo = Andamento da Música
@@ -97,6 +99,10 @@ drag-denied-bend = Este buraco não suporta esta profundidade de dobra
 drag-denied-overblow = Oversopro está disponível apenas nos buracos 1–6
 drag-denied-overdraw = Overpuxar está disponível apenas nos buracos 7–10
 drag-denied-overlap = Já existe uma nota aqui
+
+# Editor de Músicas 2 — confirmação da ferramenta Apagar/Remover da linha do tempo
+editor-confirm-erase = Apagar do compasso %from% ao %to%? Toda nota nesse trecho será apagada — o resto da música fica exatamente onde está.
+editor-confirm-remove = Remover do compasso %from% ao %to%? Toda nota nesse trecho será apagada, e tudo depois vai se deslocar pra frente pra fechar o vazio.
 
 # Editor de Músicas 2 — feedback do modo de prática
 practice-no-music = Nenhuma música de fundo definida — toque seguindo a partitura!
@@ -127,6 +133,8 @@ mod-slide-tooltip = Definir a nota selecionada para usar o botão slide (apenas 
 mod-wah-tooltip = Alternar a taxa de wah-wah da nota selecionada
 mod-vibrato-tooltip = Alternar a taxa de vibrato da nota selecionada
 mod-delete-tooltip = Apagar a nota selecionada
+editor-tool-erase-tooltip = Clique num ponto da linha do tempo e depois num dos lados (ou clique e arraste um trecho) para apagar as notas dali, deixando um vazio
+editor-tool-remove-tooltip = Clique num ponto da linha do tempo e depois num dos lados (ou clique e arraste um trecho) para apagar as notas dali e deslocar tudo depois pra frente, fechando o vazio
 editor-harmonica-toggle-tooltip = Clique para alternar entre gaita Diatônica e Cromática
 editor-field-key-tooltip = Clique para alternar entre os tons da gaita
 editor-field-position-tooltip = Clique para alternar entre as posições de execução

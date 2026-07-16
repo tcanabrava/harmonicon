@@ -31,6 +31,7 @@ mod panel;
 pub(crate) mod playback;
 mod practice;
 mod state;
+mod timeline;
 mod ui;
 
 // ── Dialog purposes ───────────────────────────────────────────────────────────
@@ -136,11 +137,21 @@ impl Plugin for SongEditor2Plugin {
                     harpchart::handle_save_chosen,
                     harpchart::handle_load_chosen,
                     harpchart::handle_music_chosen,
+                )
+                    .run_if(in_state(AppState::SongEditor2)),
+            )
+            .add_systems(
+                Update,
+                (
                     (
                         midi_import::handle_midi_chosen,
                         midi_import::rebuild_midi_track_combobox,
                     )
                         .chain(),
+                    timeline::update_timeline_overlays,
+                    timeline::handle_timeline_confirm,
+                    panel::update_timeline_tool_buttons
+                        .run_if(resource_exists_and_changed::<state::EditorState>),
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             )
@@ -162,8 +173,9 @@ mod tests {
     };
     use super::state::Scroll;
     use super::state::{
-        Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, apply_resize, can_place,
-        enforce_direction, enforce_expr, move_target, note_rect,
+        Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
+        apply_resize, can_place, enforce_direction, enforce_expr, erase_range, move_target,
+        normalize_range, note_rect, remove_range, song_end_tick, split_side_range,
     };
     use super::ui::ModButton;
     use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -1167,5 +1179,108 @@ mod tests {
                 assert!((0.0..=1.0).contains(&e));
             }
         }
+    }
+
+    // ── Timeline erase/remove ────────────────────────────────────────────────────
+
+    fn timeline_note(id: u32, hole: u8, tick: usize, len: usize) -> GridNote {
+        GridNote {
+            id,
+            hole,
+            tick,
+            len,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        }
+    }
+
+    #[test]
+    fn song_end_tick_is_the_last_notes_end() {
+        let notes = vec![
+            timeline_note(0, 1, 0, 4),
+            timeline_note(1, 2, 10, 2),
+            timeline_note(2, 3, 4, 4),
+        ];
+        assert_eq!(song_end_tick(&notes), 12);
+    }
+
+    #[test]
+    fn song_end_tick_of_an_empty_song_is_zero() {
+        assert_eq!(song_end_tick(&[]), 0);
+    }
+
+    #[test]
+    fn normalize_range_orders_a_backwards_span() {
+        assert_eq!(normalize_range(10, 4), (4, 10));
+        assert_eq!(normalize_range(4, 10), (4, 10));
+        assert_eq!(normalize_range(5, 5), (5, 5));
+    }
+
+    #[test]
+    fn split_side_range_left_is_song_start_to_the_split() {
+        let notes = vec![timeline_note(0, 1, 0, 20)];
+        assert_eq!(split_side_range(8, Side::Left, &notes), (0, 8));
+    }
+
+    #[test]
+    fn split_side_range_right_is_the_split_to_song_end() {
+        let notes = vec![timeline_note(0, 1, 0, 20)];
+        assert_eq!(split_side_range(8, Side::Right, &notes), (8, 20));
+    }
+
+    #[test]
+    fn split_side_range_right_never_ends_before_the_split_on_an_empty_song() {
+        assert_eq!(split_side_range(8, Side::Right, &[]), (8, 8));
+    }
+
+    #[test]
+    fn erase_range_deletes_only_overlapping_notes_and_shifts_nothing() {
+        let notes = vec![
+            timeline_note(0, 1, 0, 4),  // 0..4, fully before the range
+            timeline_note(1, 2, 4, 4),  // 4..8, inside the range
+            timeline_note(2, 3, 6, 4),  // 6..10, partially overlaps
+            timeline_note(3, 4, 12, 4), // 12..16, fully after the range
+        ];
+        let out = erase_range(&notes, 4, 10);
+        let ids: Vec<u32> = out.iter().map(|n| n.id).collect();
+        assert_eq!(ids, vec![0, 3]);
+        // Untouched notes keep their original position.
+        assert_eq!(out.iter().find(|n| n.id == 3).unwrap().tick, 12);
+    }
+
+    #[test]
+    fn remove_range_deletes_overlapping_notes_and_shifts_the_rest_earlier() {
+        let notes = vec![
+            timeline_note(0, 1, 0, 4),  // 0..4, before the range — untouched
+            timeline_note(1, 2, 4, 4),  // 4..8, inside the range — deleted
+            timeline_note(2, 3, 10, 4), // 10..14, after the range — shifts left by 6
+        ];
+        let out = remove_range(&notes, 4, 10);
+        let ids: Vec<u32> = out.iter().map(|n| n.id).collect();
+        assert_eq!(ids, vec![0, 2]);
+        assert_eq!(out.iter().find(|n| n.id == 0).unwrap().tick, 0);
+        assert_eq!(out.iter().find(|n| n.id == 2).unwrap().tick, 4);
+    }
+
+    #[test]
+    fn remove_range_closes_the_gap_exactly_the_removed_length() {
+        let notes = vec![timeline_note(0, 1, 20, 4)];
+        let out = remove_range(&notes, 5, 8); // remove a 3-tick span before it
+        assert_eq!(out[0].tick, 17);
+    }
+
+    #[test]
+    fn erase_and_remove_on_a_zero_length_range_are_no_ops() {
+        let notes = vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 8, 4)];
+        assert_eq!(erase_range(&notes, 6, 6), notes);
+        assert_eq!(remove_range(&notes, 6, 6), notes);
+    }
+
+    #[test]
+    fn timeline_tool_is_active_is_false_only_for_none() {
+        assert!(!TimelineTool::None.is_active());
+        assert!(TimelineTool::Erase.is_active());
+        assert!(TimelineTool::Remove.is_active());
     }
 }

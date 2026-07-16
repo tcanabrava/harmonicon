@@ -28,6 +28,23 @@ playing position, harmonica type (diatonic/chromatic, and hole layout),
 background music file, and song name/author — everything under `song` and
 `harmonica` in the `.harpchart` format.
 
+## Erasing and removing parts of a song
+
+The **Erase** and **Remove** buttons in the mod panel (next to Delete) turn
+the ruler above the grid into an editing tool for a whole span of time
+rather than one note at a time — handy for a song built from an imported
+MIDI track that starts later than beat 1, or just cutting a section you
+don't want.
+
+With one of them selected: click a point on the ruler to drop a split
+marker, then click either side of it to act on everything from there to
+that edge of the song — or click-drag-release across a span instead to
+pick an explicit range. Either way, a confirmation dialog names the exact
+range before anything happens. **Erase** deletes the notes in that range
+and leaves a gap; **Remove** deletes them *and* shifts every note after the
+range earlier to close the gap, shortening the song. Escape cancels a
+pending split or drag before you confirm it.
+
 ## Importing MIDI
 
 **Import MIDI** loads a `.mid`/`.midi` file and lists its tracks in a

@@ -75,6 +75,8 @@ mod-slide = Slide
 mod-wah = Wah
 mod-vibrato = Vibrato
 mod-delete = Delete
+editor-tool-erase = ✂ Erase
+editor-tool-remove = ✂ Remove
 
 # Song Editor 2 — meta-form field labels
 editor-field-tempo = Music Tempo
@@ -99,6 +101,10 @@ drag-denied-bend = This hole does not support this bend depth
 drag-denied-overblow = Overblow is only available on holes 1–6
 drag-denied-overdraw = Overdraw is only available on holes 7–10
 drag-denied-overlap = Another note is already here
+
+# Song Editor 2 — Erase/Remove timeline tool confirmation
+editor-confirm-erase = Erase bar %from% to bar %to%? Every note in that range will be deleted — the rest of the song stays exactly where it is.
+editor-confirm-remove = Remove bar %from% to bar %to%? Every note in that range will be deleted, and everything after it will shift earlier to close the gap.
 
 # Song Editor 2 — practice mode feedback
 practice-no-music = No background music set — play along with the chart!
@@ -129,6 +135,8 @@ mod-slide-tooltip = Set the selected note to use the slide button (chromatic har
 mod-wah-tooltip = Cycle the selected note's wah-wah rate
 mod-vibrato-tooltip = Cycle the selected note's vibrato rate
 mod-delete-tooltip = Delete the selected note
+editor-tool-erase-tooltip = Click a point on the timeline then click a side (or click-drag a range) to delete its notes, leaving a gap
+editor-tool-remove-tooltip = Click a point on the timeline then click a side (or click-drag a range) to delete its notes and shift everything after it earlier, closing the gap
 editor-harmonica-toggle-tooltip = Click to switch between Diatonic and Chromatic harmonica layouts
 editor-field-key-tooltip = Click to cycle through harp keys
 editor-field-position-tooltip = Click to cycle through playing positions

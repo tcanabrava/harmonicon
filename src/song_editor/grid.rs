@@ -79,7 +79,7 @@ pub(super) fn rebuild_grid(
     mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
     theme: Res<LoadedTheme>,
 ) {
-    if state.dragging.is_some() {
+    if state.dragging.is_some() || state.timeline_drag.is_some() {
         return;
     }
     let colors = theme.song_editor_colors();
@@ -259,6 +259,26 @@ pub(super) fn rebuild_grid(
             );
         }
     }
+
+    // The Erase/Remove tool's click/drag catcher, spanning the header strip
+    // across every currently-rendered beat column — see `timeline`'s module
+    // docs. Always spawned (not gated on a tool being active); its own
+    // observers no-op when `state.timeline_tool` is `None`.
+    items.push(
+        commands
+            .spawn((
+                GridItem,
+                super::timeline::timeline_surface_bundle(
+                    state.scroll_beat,
+                    (cols + 1) as f32 * BEAT_W,
+                ),
+            ))
+            .observe(super::timeline::on_timeline_click)
+            .observe(super::timeline::on_timeline_drag_start)
+            .observe(super::timeline::on_timeline_drag)
+            .observe(super::timeline::on_timeline_drag_end)
+            .id(),
+    );
 
     let first_tick = state.scroll_beat * TICKS_PER_BEAT;
     let last_tick = (state.scroll_beat + cols + 1) * TICKS_PER_BEAT;

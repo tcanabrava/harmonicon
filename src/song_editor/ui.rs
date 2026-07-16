@@ -12,7 +12,9 @@ use super::playback::{
     EditorAudio, EditorProgressFill, Playhead, PlayheadLine, start_playback, toggle_pause,
 };
 use super::practice::{PracticeState, start_practice, stop_practice};
-use super::state::{EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, Mode, POSITIONS, Scroll};
+use super::state::{
+    EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, Mode, POSITIONS, Scroll, TimelineTool,
+};
 use super::{
     AppState, BEAT_W, HEADER_H, HOLE_COL_W, LOAD_PURPOSE, MIDI_PURPOSE, MUSIC_PURPOSE, NOTE_PAD,
     ROW_H, SAVE_PURPOSE, grid_height,
@@ -86,6 +88,13 @@ pub(super) enum ModeButton {
     Perform,
     Lock,
 }
+
+/// The Erase/Remove timeline-tool toggle buttons — see `timeline`'s module
+/// docs. Picking one sets `EditorState::timeline_tool`; picking the
+/// already-active one deselects it back to `TimelineTool::None`, same
+/// deselect-by-reclicking convention as the mod-panel's other toggles.
+#[derive(Component, Clone, Copy, PartialEq)]
+pub(super) struct TimelineToolButton(pub(super) TimelineTool);
 
 /// Wraps the note-editing button cluster (Blow, Draw, Bend, ...), shown only
 /// in [`Mode::Edit`]. See `update_mode_visibility`.
@@ -180,6 +189,8 @@ pub(super) fn sync_chrome_height(
             With<GridArea>,
             With<GridContent>,
             With<PlayheadLine>,
+            With<super::timeline::TimelineSplitLine>,
+            With<super::timeline::TimelineHighlight>,
         )>,
     >,
 ) {
@@ -322,6 +333,39 @@ pub(super) fn setup(
                                 ..default()
                             },
                             BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
+                            Visibility::Hidden,
+                            Pickable::IGNORE,
+                        ));
+                        // Erase/Remove tool overlays — see `timeline`'s
+                        // module docs. Both hidden until a tool picks a
+                        // split point or drag span; `update_timeline_
+                        // overlays` (unconditional, like the playhead/move
+                        // ghost above) repositions and shows/hides them
+                        // every frame.
+                        content.spawn((
+                            super::timeline::TimelineSplitLine,
+                            ZIndex(3),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                top: Val::Px(0.0),
+                                width: Val::Px(2.0),
+                                height: Val::Px(grid_height(hole_count)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(0.95, 0.75, 0.20)),
+                            Visibility::Hidden,
+                            Pickable::IGNORE,
+                        ));
+                        content.spawn((
+                            super::timeline::TimelineHighlight,
+                            ZIndex(1),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                top: Val::Px(0.0),
+                                height: Val::Px(grid_height(hole_count)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.95, 0.30, 0.20, 0.22)),
                             Visibility::Hidden,
                             Pickable::IGNORE,
                         ));
@@ -577,6 +621,21 @@ fn spawn_mod_panel(
                     loc.msg("mod-delete-tooltip"),
                     colors,
                 );
+                panel_separator(g);
+                timeline_tool_button(
+                    g,
+                    TimelineToolButton(TimelineTool::Erase),
+                    loc.msg("editor-tool-erase"),
+                    loc.msg("editor-tool-erase-tooltip"),
+                    colors,
+                );
+                timeline_tool_button(
+                    g,
+                    TimelineToolButton(TimelineTool::Remove),
+                    loc.msg("editor-tool-remove"),
+                    loc.msg("editor-tool-remove-tooltip"),
+                    colors,
+                );
             });
 
         panel
@@ -625,6 +684,52 @@ pub(super) fn mode_button<M: 'static>(
             Tooltip(String::from(tooltip)),
         ))
         .observe(on_click)
+        .with_children(|b| {
+            b.spawn((
+                Text::new(String::from(label)),
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
+            ));
+        });
+}
+
+/// An Erase/Remove timeline-tool toggle button — see [`TimelineToolButton`].
+fn timeline_tool_button(
+    panel: &mut ChildSpawnerCommands,
+    kind: TimelineToolButton,
+    label: LocalizedStr,
+    tooltip: LocalizedStr,
+    colors: SongEditorColors,
+) {
+    panel
+        .spawn((
+            Button,
+            kind,
+            Node {
+                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(colors.btn_bg),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(tooltip)),
+        ))
+        .observe(
+            move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.timeline_tool = if state.timeline_tool == kind.0 {
+                    TimelineTool::None
+                } else {
+                    kind.0
+                };
+                state.timeline_drag = None;
+            },
+        )
         .with_children(|b| {
             b.spawn((
                 Text::new(String::from(label)),

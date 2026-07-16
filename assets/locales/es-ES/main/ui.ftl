@@ -73,6 +73,8 @@ mod-slide = Slide
 mod-wah = Wah
 mod-vibrato = Vibrato
 mod-delete = Eliminar
+editor-tool-erase = ✂ Borrar Tramo
+editor-tool-remove = ✂ Quitar Tramo
 
 # Song Editor 2 — etiquetas de los campos de metadatos
 editor-field-tempo = Tempo de la Música
@@ -97,6 +99,10 @@ drag-denied-bend = Este orificio no admite esta profundidad de doblado
 drag-denied-overblow = El oversoplo solo está disponible en los orificios 1–6
 drag-denied-overdraw = La overaspiración solo está disponible en los orificios 7–10
 drag-denied-overlap = Ya hay otra nota aquí
+
+# Song Editor 2 — confirmación de la herramienta Borrar/Quitar de la línea de tiempo
+editor-confirm-erase = ¿Borrar del compás %from% al %to%? Se eliminará cada nota de ese tramo — el resto de la canción se queda exactamente donde está.
+editor-confirm-remove = ¿Quitar del compás %from% al %to%? Se eliminará cada nota de ese tramo, y todo lo siguiente se desplazará hacia atrás para cerrar el hueco.
 
 # Song Editor 2 — mensajes del modo de práctica
 practice-no-music = No hay música de fondo configurada — ¡toca junto con la partitura!
@@ -127,6 +133,8 @@ mod-slide-tooltip = Establecer la nota seleccionada para usar el botón slide (s
 mod-wah-tooltip = Alternar la velocidad de wah-wah de la nota seleccionada
 mod-vibrato-tooltip = Alternar la velocidad de vibrato de la nota seleccionada
 mod-delete-tooltip = Eliminar la nota seleccionada
+editor-tool-erase-tooltip = Haz clic en un punto de la línea de tiempo y luego en un lado (o haz clic y arrastra un tramo) para borrar sus notas, dejando un hueco
+editor-tool-remove-tooltip = Haz clic en un punto de la línea de tiempo y luego en un lado (o haz clic y arrastra un tramo) para borrar sus notas y desplazar todo lo siguiente hacia atrás, cerrando el hueco
 editor-harmonica-toggle-tooltip = Haz clic para alternar entre armónica Diatónica y Cromática
 editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación
