@@ -226,6 +226,89 @@ mod tests {
         );
     }
 
+    // ── Sticky modifiers ──────────────────────────────────────────────────────
+
+    #[test]
+    fn clicking_a_mod_button_with_nothing_selected_arms_it_for_new_notes() {
+        let mut s = EditorState::default();
+        apply_modifier(&mut s, ModButton::Draw);
+        apply_modifier(&mut s, ModButton::Wah); // -> 2.0
+        select_or_add(&mut s, 3, 0);
+        let n = &s.notes[0];
+        assert_eq!(n.dir, Dir::Draw);
+        assert_eq!(n.expr, Expr::Wah(2.0));
+    }
+
+    #[test]
+    fn sticky_bend_arms_without_a_selection_and_applies_to_a_compatible_hole() {
+        let mut s = EditorState::default();
+        apply_modifier(&mut s, ModButton::Bend); // -> 0.5
+        select_or_add(&mut s, 2, 0); // hole 2: max_bend 1.5, compatible
+        assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    }
+
+    #[test]
+    fn sticky_pitch_falls_back_to_normal_on_an_incompatible_hole_but_stays_armed() {
+        let mut s = EditorState::default();
+        apply_modifier(&mut s, ModButton::Overblow);
+        // Hole 8 can't overblow (only 1..=6) — this one note falls back...
+        select_or_add(&mut s, 8, 0);
+        assert_eq!(s.notes[0].pitch, Pitch::Normal);
+        // ...but the sticky arm itself wasn't cleared by that rejection.
+        select_or_add(&mut s, 3, 4);
+        assert_eq!(
+            s.notes.iter().find(|n| n.hole == 3).unwrap().pitch,
+            Pitch::Overblow
+        );
+    }
+
+    #[test]
+    fn cycling_sticky_bend_past_the_richest_cap_turns_it_off() {
+        let mut s = EditorState::default();
+        for _ in 0..3 {
+            apply_modifier(&mut s, ModButton::Bend); // 0.5, 1.0, 1.5
+        }
+        apply_modifier(&mut s, ModButton::Bend); // past 1.5 -> Normal (off)
+        select_or_add(&mut s, 2, 0);
+        assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    }
+
+    #[test]
+    fn selecting_an_existing_note_and_editing_it_also_arms_sticky() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 2, 0);
+        apply_modifier(&mut s, ModButton::Bend); // edits the selected note...
+        assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+        // ...and arms sticky the same way a nothing-selected click would.
+        select_or_add(&mut s, 3, 4);
+        assert_eq!(
+            s.notes.iter().find(|n| n.hole == 3).unwrap().pitch,
+            Pitch::Bend(0.5)
+        );
+    }
+
+    #[test]
+    fn armed_sticky_wah_propagates_to_a_simultaneous_chord_note() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 2, 0);
+        apply_modifier(&mut s, ModButton::Wah); // arms sticky Wah, applies to hole 2
+        select_or_add(&mut s, 5, 0); // same tick, different hole — a chord
+        assert_eq!(s.notes.iter().find(|n| n.hole == 2).unwrap().expr, s.notes.iter().find(|n| n.hole == 5).unwrap().expr);
+        assert!(matches!(
+            s.notes.iter().find(|n| n.hole == 5).unwrap().expr,
+            Expr::Wah(_)
+        ));
+    }
+
+    #[test]
+    fn switching_harmonica_kind_sanitizes_an_incompatible_sticky_pitch() {
+        let mut s = EditorState::default();
+        apply_modifier(&mut s, ModButton::Overblow);
+        assert_eq!(s.sticky_pitch, Pitch::Overblow);
+        s.set_harmonica_kind(HarmonicaKind::Chromatic);
+        assert_eq!(s.sticky_pitch, Pitch::Normal);
+    }
+
     #[test]
     fn pitch_and_expression_stack() {
         let mut s = EditorState::default();
