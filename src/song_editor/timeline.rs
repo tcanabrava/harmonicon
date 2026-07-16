@@ -4,12 +4,26 @@
 //! (`EditorState::timeline_tool`), the header strip above the note grid
 //! becomes interactive two ways:
 //!
-//! - **Click, hover, click**: a plain click drops a split point; hovering
-//!   left or right of it previews that whole side (song start..split, or
-//!   split..song end); clicking again on the highlighted side requests
-//!   confirmation of the tool's effect on that range.
+//! - **Click, hover, click**: a plain click drops a split point
+//!   (`EditorState::timeline_split`); hovering left or right of it previews
+//!   that whole side (song start..split, or split..song end); clicking
+//!   again on the highlighted side requests confirmation of the tool's
+//!   effect on that range.
 //! - **Click, drag, release**: picks an explicit span instead, previewed
 //!   live as it's dragged, requesting confirmation on release.
+//!
+//! Both paths are driven entirely by `Pointer<DragStart>`/`Drag`/`DragEnd`
+//! — deliberately *not* `Pointer<Click>` at all, even for the "plain click"
+//! case: `bevy_picking` fires `DragStart` on any nonzero pixel motion while
+//! pressed, so ordinary mouse jitter during an intended click routinely
+//! produces a same-tick drag anyway, and a `Click` event fires *alongside*
+//! `DragEnd` on the same release whenever the pointer is still over the
+//! surface at release (true for most drags — only a large enough motion
+//! carries it off the ruler's thin `HEADER_H`-tall strip), with `Click`
+//! firing first. Routing every decision through the one `Drag*` chain
+//! avoids that race outright instead of coordinating two competing
+//! handlers; [`on_timeline_drag_end`] tells a real drag apart from a
+//! same-tick click by whether the span actually moved.
 //!
 //! Either way nothing is deleted until the confirm dialog
 //! (`dialogs::confirm_dialog`) comes back `confirmed: true` — see
@@ -18,7 +32,7 @@
 //! interaction/UI wiring around them.
 
 use bevy::picking::Pickable;
-use bevy::picking::events::{Click, Drag, DragEnd, DragStart, Pointer};
+use bevy::picking::events::{Drag, DragEnd, DragStart, Pointer};
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy_fluent::prelude::Localization;
@@ -124,13 +138,7 @@ fn request_confirm(
     };
     state.pending_timeline_op = Some((tool, start, end));
     let message = loc
-        .msg_args(
-            key,
-            &[
-                ("from", describe_tick(start)),
-                ("to", describe_tick(end)),
-            ],
-        )
+        .msg_args(key, &[("from", describe_tick(start)), ("to", describe_tick(end))])
         .to_string();
     open.write(OpenConfirmDialog {
         purpose: TIMELINE_CONFIRM_PURPOSE,
@@ -150,42 +158,6 @@ fn hovered_tick(
     Some(geom.tick_at(rel.normalized?.x))
 }
 
-pub(super) fn on_timeline_click(
-    ev: On<Pointer<Click>>,
-    geoms: Query<&TimelineSurfaceGeometry>,
-    rels: Query<&RelativeCursorPosition>,
-    mut state: ResMut<EditorState>,
-    loc: Res<Localization>,
-    mut open: MessageWriter<OpenConfirmDialog>,
-) {
-    if !state.timeline_tool.is_active() {
-        return;
-    }
-    let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
-        return;
-    };
-
-    match state.timeline_drag {
-        None => state.timeline_drag = Some(TimelineDrag::Split { tick, hover: tick }),
-        Some(TimelineDrag::Split { tick: split, .. }) => {
-            let side = if tick < split { Side::Left } else { Side::Right };
-            let (start, end) = split_side_range(split, side, &state.notes);
-            state.timeline_drag = None;
-            if end > start {
-                request_confirm(&mut state, &loc, &mut open, start, end);
-            }
-        }
-        // `bevy_picking` fires `Click` *and* `DragEnd` on the same release
-        // whenever the pointer is still over this entity at release —
-        // true for most drags, since only a large enough motion carries
-        // the pointer off the ruler's thin `HEADER_H`-tall strip — with
-        // `Click` first. `on_timeline_drag_end` is the sole authority for
-        // finishing a span; touching `timeline_drag` here would clear the
-        // very state it's about to read on the same release.
-        Some(TimelineDrag::Span { .. }) => {}
-    }
-}
-
 pub(super) fn on_timeline_drag_start(
     ev: On<Pointer<DragStart>>,
     geoms: Query<&TimelineSurfaceGeometry>,
@@ -198,7 +170,7 @@ pub(super) fn on_timeline_drag_start(
     let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
         return;
     };
-    state.timeline_drag = Some(TimelineDrag::Span {
+    state.timeline_drag = Some(TimelineDrag {
         start: tick,
         end: tick,
     });
@@ -225,11 +197,11 @@ pub(super) fn on_timeline_drag(
     if !state.timeline_tool.is_active() {
         return;
     }
-    let Some(TimelineDrag::Span { start, .. }) = state.timeline_drag else {
+    let Some(TimelineDrag { start, .. }) = state.timeline_drag else {
         return;
     };
     let end = drag_end_tick(start, ev.distance.x, ui_scale.0);
-    state.timeline_drag = Some(TimelineDrag::Span { start, end });
+    state.timeline_drag = Some(TimelineDrag { start, end });
 }
 
 pub(super) fn on_timeline_drag_end(
@@ -241,11 +213,28 @@ pub(super) fn on_timeline_drag_end(
     if !state.timeline_tool.is_active() {
         return;
     }
-    if let Some(TimelineDrag::Span { start, end }) = state.timeline_drag {
-        state.timeline_drag = None;
-        let (start, end) = normalize_range(start, end);
-        if end > start {
-            request_confirm(&mut state, &loc, &mut open, start, end);
+    let Some(TimelineDrag { start, end }) = state.timeline_drag.take() else {
+        return;
+    };
+    let (s, e) = normalize_range(start, end);
+    if e > s {
+        // A real drag: an explicit span, superseding any stale split point
+        // from an earlier, abandoned click sequence.
+        state.timeline_split = None;
+        request_confirm(&mut state, &loc, &mut open, s, e);
+        return;
+    }
+    // The span never moved a tick — an ordinary click (see the module docs
+    // for why this, not `Pointer<Click>`, is what decides that).
+    match state.timeline_split {
+        None => state.timeline_split = Some(s),
+        Some(split) => {
+            let side = if s < split { Side::Left } else { Side::Right };
+            let (start, end) = split_side_range(split, side, &state.notes);
+            state.timeline_split = None;
+            if end > start {
+                request_confirm(&mut state, &loc, &mut open, start, end);
+            }
         }
     }
 }
@@ -279,16 +268,16 @@ pub(super) fn handle_timeline_confirm(
 
 // ── Per-frame overlay update ─────────────────────────────────────────────────
 
-/// Keeps the live hover tick current while a split point is pending (so the
-/// highlighted side follows the pointer), and redraws the split-line/
-/// highlight overlay entities every frame — unconditional, like
-/// `playback::update_playhead_view`/`interaction::update_move_ghost`, so it
-/// still runs while `timeline_drag`'s own mutation below is what's making
-/// `EditorState` look "changed" every frame (`grid::rebuild_grid` itself
-/// early-returns on `timeline_drag.is_some()`, the same guard note dragging
-/// already relies on, so that mutation doesn't thrash a full grid rebuild).
+/// Redraws the split-line/highlight overlay entities every frame —
+/// unconditional, like `playback::update_playhead_view`/`interaction::
+/// update_move_ghost`. Purely a rendering pass: the live hover-side preview
+/// reads `RelativeCursorPosition` fresh each frame as a local value rather
+/// than writing it back to `EditorState` (unlike the in-progress drag span,
+/// which genuinely is state), so this never marks `EditorState` "changed"
+/// and can't fight `grid::rebuild_grid`'s `timeline_drag`-only early-return
+/// guard.
 pub(super) fn update_timeline_overlays(
-    mut state: ResMut<EditorState>,
+    state: Res<EditorState>,
     surfaces: Query<(&TimelineSurfaceGeometry, &RelativeCursorPosition), With<TimelineSurface>>,
     mut split_lines: Query<
         (&mut Node, &mut Visibility),
@@ -299,41 +288,32 @@ pub(super) fn update_timeline_overlays(
         (With<TimelineHighlight>, Without<TimelineSplitLine>),
     >,
 ) {
-    if let Some(TimelineDrag::Split { tick, hover }) = state.timeline_drag {
-        for (geom, rel) in &surfaces {
-            if let Some(norm) = rel.normalized {
-                let live_hover = geom.tick_at(norm.x);
-                if live_hover != hover {
-                    state.timeline_drag = Some(TimelineDrag::Split {
-                        tick,
-                        hover: live_hover,
-                    });
-                }
-                break;
-            }
-        }
+    if let Some(TimelineDrag { start, end }) = state.timeline_drag {
+        hide(&mut split_lines);
+        let (s, e) = normalize_range(start, end);
+        set_highlight(&mut highlights, s, e.max(s + 1));
+        return;
     }
 
-    match state.timeline_drag {
-        Some(TimelineDrag::Split { tick, hover }) => {
-            if let Ok((mut node, mut vis)) = split_lines.single_mut() {
-                node.left = Val::Px(tick as f32 * TICK_W);
-                *vis = Visibility::Inherited;
-            }
-            let side = if hover < tick { Side::Left } else { Side::Right };
-            let (start, end) = split_side_range(tick, side, &state.notes);
-            set_highlight(&mut highlights, start, end.max(start + 1));
-        }
-        Some(TimelineDrag::Span { start, end }) => {
-            hide(&mut split_lines);
-            let (s, e) = normalize_range(start, end);
-            set_highlight(&mut highlights, s, e.max(s + 1));
-        }
-        None => {
-            hide(&mut split_lines);
-            hide(&mut highlights);
-        }
+    let Some(split) = state.timeline_split else {
+        hide(&mut split_lines);
+        hide(&mut highlights);
+        return;
+    };
+    if let Ok((mut node, mut vis)) = split_lines.single_mut() {
+        node.left = Val::Px(split as f32 * TICK_W);
+        *vis = Visibility::Inherited;
     }
+
+    let Some(hover) = surfaces.iter().find_map(|(geom, rel)| {
+        rel.normalized.map(|n| geom.tick_at(n.x))
+    }) else {
+        hide(&mut highlights);
+        return;
+    };
+    let side = if hover < split { Side::Left } else { Side::Right };
+    let (start, end) = split_side_range(split, side, &state.notes);
+    set_highlight(&mut highlights, start, end.max(start + 1));
 }
 
 fn hide<F: bevy::ecs::query::QueryFilter>(q: &mut Query<(&mut Node, &mut Visibility), F>) {

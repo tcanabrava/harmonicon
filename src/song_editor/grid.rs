@@ -273,7 +273,6 @@ pub(super) fn rebuild_grid(
                     (cols + 1) as f32 * BEAT_W,
                 ),
             ))
-            .observe(super::timeline::on_timeline_click)
             .observe(super::timeline::on_timeline_drag_start)
             .observe(super::timeline::on_timeline_drag)
             .observe(super::timeline::on_timeline_drag_end)

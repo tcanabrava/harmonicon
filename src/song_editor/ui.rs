@@ -728,6 +728,7 @@ fn timeline_tool_button(
                     kind.0
                 };
                 state.timeline_drag = None;
+                state.timeline_split = None;
             },
         )
         .with_children(|b| {

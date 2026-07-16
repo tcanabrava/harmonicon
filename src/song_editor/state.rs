@@ -106,20 +106,26 @@ pub(super) enum Side {
     Right,
 }
 
-/// In-progress timeline selection, live-updated by the timeline surface's
-/// observers/hover system — mirrors [`DragState`]'s role for note dragging.
-/// Cleared once a range is committed to a confirmation request (or the tool
-/// is switched/deselected).
+/// An in-progress press-drag gesture on the timeline ruler: `start` is
+/// fixed at the press position, `end` follows the pointer. Not normalized —
+/// `end` can be less than `start` — see [`normalize_range`]. Mirrors
+/// [`DragState`]'s role for note dragging: set by `Pointer<DragStart>`,
+/// live-updated by `Pointer<Drag>`, and always cleared by
+/// `Pointer<DragEnd>`, which then either confirms it as an explicit span
+/// (`end` genuinely moved past `start`) or, since `bevy_picking` fires
+/// `DragStart` on any nonzero pixel motion — meaning ordinary mouse jitter
+/// during a plain click routinely produces one of these — falls back to
+/// treating a same-tick `start`/`end` exactly like the click it was meant
+/// to be, against [`EditorState::timeline_split`]. Deliberately *not* what
+/// drives `Pointer<Click>`: a `Click` and a `DragEnd` fire on the same
+/// release whenever the pointer is still over the ruler at release (true
+/// for most drags), `Click` first — routing every decision through the
+/// `Drag*` chain alone avoids that race outright instead of coordinating
+/// two competing handlers.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub(super) enum TimelineDrag {
-    /// A single click placed a split point at `tick`; `hover` is the
-    /// pointer's current tick position, used to decide [`Side`] and to draw
-    /// the live highlight over the candidate range.
-    Split { tick: usize, hover: usize },
-    /// A click-drag-release span selection in progress; `start` is fixed at
-    /// the press position, `end` follows the pointer. Not normalized —
-    /// `end` can be less than `start` — see [`normalize_range`].
-    Span { start: usize, end: usize },
+pub(super) struct TimelineDrag {
+    pub(super) start: usize,
+    pub(super) end: usize,
 }
 
 /// One placed note: a hole (1..=10) starting at `tick` and lasting `len` ticks,
@@ -240,6 +246,11 @@ pub(super) struct EditorState {
     pub(super) user_locked: bool,
     pub(super) harmonica_kind: HarmonicaKind,
     pub(super) timeline_tool: TimelineTool,
+    /// A split point placed by a plain click-and-release on the timeline
+    /// ruler (no meaningful drag) — persists across frames (unlike
+    /// `timeline_drag`, which only lives for one gesture) until a second
+    /// such click picks a side and consumes it, or the tool is switched.
+    pub(super) timeline_split: Option<usize>,
     pub(super) timeline_drag: Option<TimelineDrag>,
     /// A range the user has committed to (a placed split's side, or a
     /// released drag span) and is now waiting on the confirm dialog's
@@ -268,6 +279,7 @@ impl Default for EditorState {
             user_locked: false,
             harmonica_kind: HarmonicaKind::default(),
             timeline_tool: TimelineTool::default(),
+            timeline_split: None,
             timeline_drag: None,
             pending_timeline_op: None,
         }
