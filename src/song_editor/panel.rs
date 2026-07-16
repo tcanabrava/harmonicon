@@ -12,6 +12,25 @@ use crate::localization::LocalizationExt;
 use crate::theme::LoadedTheme;
 use bevy_fluent::prelude::Localization;
 
+/// Whether `kind`'s button should read as "on" for a note carrying `dir`/
+/// `pitch`/`expr` — shared by the selected-note case (an existing
+/// `GridNote`'s own fields) and the nothing-selected case (`EditorState`'s
+/// `sticky_dir`/`sticky_pitch`/`sticky_expr`, previewing what a *new* note
+/// would get), so the two can't drift out of sync with each other.
+fn mod_button_active(kind: ModButton, dir: Dir, pitch: Pitch, expr: Expr) -> bool {
+    match kind {
+        ModButton::Blow => dir == Dir::Blow,
+        ModButton::Draw => dir == Dir::Draw,
+        ModButton::Bend => matches!(pitch, Pitch::Bend(_)),
+        ModButton::Overblow => pitch == Pitch::Overblow,
+        ModButton::Overdraw => pitch == Pitch::Overdraw,
+        ModButton::Slide => pitch == Pitch::Slide,
+        ModButton::Wah => matches!(expr, Expr::Wah(_)),
+        ModButton::Vibrato => matches!(expr, Expr::Vibrato(_)),
+        ModButton::Delete => false,
+    }
+}
+
 pub(super) fn update_mod_panel(
     state: Res<EditorState>,
     theme: Res<LoadedTheme>,
@@ -21,25 +40,24 @@ pub(super) fn update_mod_panel(
 ) {
     let colors = theme.song_editor_colors();
     let selected = state.selected_note().copied();
+    // The selected note's own fields take priority when there is one — a
+    // sticky setting armed from an earlier, now-deselected note shouldn't
+    // visually compete with what's actually selected right now. With
+    // nothing selected, the sticky fields preview what a newly *added*
+    // note would get, exactly matching `select_or_add`.
+    let (dir, pitch, expr) = match selected {
+        Some(n) => (n.dir, n.pitch, n.expr),
+        None => (state.sticky_dir, state.sticky_pitch, state.sticky_expr),
+    };
     for (kind, mut bg) in &mut buttons {
-        let active = selected.is_some_and(|n| match kind {
-            ModButton::Blow => n.dir == Dir::Blow,
-            ModButton::Draw => n.dir == Dir::Draw,
-            ModButton::Bend => matches!(n.pitch, Pitch::Bend(_)),
-            ModButton::Overblow => n.pitch == Pitch::Overblow,
-            ModButton::Overdraw => n.pitch == Pitch::Overdraw,
-            ModButton::Slide => n.pitch == Pitch::Slide,
-            ModButton::Wah => matches!(n.expr, Expr::Wah(_)),
-            ModButton::Vibrato => matches!(n.expr, Expr::Vibrato(_)),
-            ModButton::Delete => false,
-        });
+        let active = mod_button_active(*kind, dir, pitch, expr);
         bg.0 = if active {
             colors.btn_active
         } else {
             colors.btn_bg
         };
     }
-    let bent = selected.is_some_and(|n| matches!(n.pitch, Pitch::Bend(_)));
+    let bent = matches!(pitch, Pitch::Bend(_));
     for mut vis in &mut dot {
         *vis = if bent {
             Visibility::Inherited
@@ -47,14 +65,15 @@ pub(super) fn update_mod_panel(
             Visibility::Hidden
         };
     }
-    // Show the selected note's configured rate next to Wah/Vibrato (e.g.
-    // "Vibrato 5Hz") so cycling the rate with repeated clicks is legible.
+    // Show the selected (or, with nothing selected, sticky-armed) rate next
+    // to Wah/Vibrato (e.g. "Vibrato 5Hz") so cycling the rate with repeated
+    // clicks is legible.
     for (label, mut text) in &mut labels {
-        let hz = selected.and_then(|n| match (label.kind, n.expr) {
+        let hz = match (label.kind, expr) {
             (ModButton::Vibrato, Expr::Vibrato(hz)) => Some(hz),
             (ModButton::Wah, Expr::Wah(hz)) => Some(hz),
             _ => None,
-        });
+        };
         **text = match hz {
             Some(hz) => format!("{} {hz:.0}Hz", label.base),
             None => label.base.clone(),
@@ -292,14 +311,25 @@ mod tests {
     }
 
     #[test]
-    fn update_mod_panel_hides_the_bend_dot_and_deactivates_every_button_when_nothing_selected() {
+    fn update_mod_panel_falls_back_to_sticky_defaults_when_nothing_selected() {
         let mut world = World::new();
         world.insert_resource(EditorState::default());
         world.insert_resource(LoadedTheme::default());
         let colors = LoadedTheme::default().song_editor_colors();
 
+        // `EditorState::default()`'s `sticky_dir` is `Dir::Blow` — a note
+        // added right now would be Blow, so the Blow button should already
+        // read "on" even though nothing is selected. Every pitch/expr
+        // button stays off, since `sticky_pitch`/`sticky_expr` default to
+        // their own "off" variants.
         let blow = world
-            .spawn((ModButton::Blow, BackgroundColor(colors.btn_active)))
+            .spawn((ModButton::Blow, BackgroundColor(colors.btn_bg)))
+            .id();
+        let draw = world
+            .spawn((ModButton::Draw, BackgroundColor(colors.btn_active)))
+            .id();
+        let bend = world
+            .spawn((ModButton::Bend, BackgroundColor(colors.btn_active)))
             .id();
         let bend_dot = world.spawn((BendDot, Visibility::Inherited)).id();
 
@@ -307,8 +337,56 @@ mod tests {
         schedule.add_systems(update_mod_panel);
         schedule.run(&mut world);
 
-        assert_eq!(world.get::<BackgroundColor>(blow).unwrap().0, colors.btn_bg);
+        assert_eq!(world.get::<BackgroundColor>(blow).unwrap().0, colors.btn_active);
+        assert_eq!(world.get::<BackgroundColor>(draw).unwrap().0, colors.btn_bg);
+        assert_eq!(world.get::<BackgroundColor>(bend).unwrap().0, colors.btn_bg);
         assert_eq!(*world.get::<Visibility>(bend_dot).unwrap(), Visibility::Hidden);
+    }
+
+    #[test]
+    fn update_mod_panel_reflects_an_armed_sticky_modifier_when_nothing_selected() {
+        let mut world = World::new();
+        world.insert_resource(EditorState {
+            sticky_dir: Dir::Draw,
+            sticky_pitch: Pitch::Bend(1.0),
+            sticky_expr: Expr::Wah(3.0),
+            ..Default::default()
+        });
+        world.insert_resource(LoadedTheme::default());
+        let colors = LoadedTheme::default().song_editor_colors();
+
+        let draw = world
+            .spawn((ModButton::Draw, BackgroundColor(colors.btn_bg)))
+            .id();
+        let bend = world
+            .spawn((ModButton::Bend, BackgroundColor(colors.btn_bg)))
+            .id();
+        let wah = world
+            .spawn((ModButton::Wah, BackgroundColor(colors.btn_bg)))
+            .id();
+        let bend_dot = world.spawn((BendDot, Visibility::Hidden)).id();
+        let wah_label = world
+            .spawn((
+                ModButtonLabel {
+                    kind: ModButton::Wah,
+                    base: "Wah".into(),
+                },
+                Text::new("Wah"),
+            ))
+            .id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_mod_panel);
+        schedule.run(&mut world);
+
+        assert_eq!(world.get::<BackgroundColor>(draw).unwrap().0, colors.btn_active);
+        assert_eq!(world.get::<BackgroundColor>(bend).unwrap().0, colors.btn_active);
+        assert_eq!(world.get::<BackgroundColor>(wah).unwrap().0, colors.btn_active);
+        assert_eq!(
+            *world.get::<Visibility>(bend_dot).unwrap(),
+            Visibility::Inherited
+        );
+        assert_eq!(world.get::<Text>(wah_label).unwrap().0, "Wah 3Hz");
     }
 
     // ── update_meta_fields ────────────────────────────────────────────────────
