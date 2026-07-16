@@ -41,19 +41,15 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         .map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT))
         .max(1);
 
-    let dir = state.dir_at(tick).unwrap_or(state.current_direction);
+    // Whatever's already sounding at this exact tick (on another hole)
+    // wins over the armed sticky direction — a brand-new chord note has to
+    // match its siblings, not fight them. `sticky_dir` only applies when
+    // there's nothing there yet to match.
+    let dir = state.dir_at(tick).unwrap_or(state.sticky_dir);
+    let expr = state.sticky_expr;
 
     let id = state.next_id;
     state.next_id += 1;
-
-    let expr: Expr = if state.wah_is_selected {
-        Expr::Wah(state.curr_modifier_intensity)
-    } else if state.vibratto_is_selected {
-        Expr::Vibrato(state.curr_modifier_intensity)
-    } else {
-        Expr::None
-    };
-
     state.notes.push(GridNote {
         id,
         hole,
@@ -61,9 +57,15 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         len,
         dir,
         pitch: Pitch::Normal,
-        expr: expr,
+        expr,
     });
     state.selected = Some(id);
+    // Wah/vibrato is a whole-player technique — an armed sticky expr must
+    // propagate to every note already sounding at this instant too, or a
+    // chord could end up with only one hole "doing" it.
+    if expr != Expr::None {
+        enforce_expr(state, id);
+    }
 }
 
 pub(super) fn delete_selected(state: &mut EditorState) {
@@ -77,32 +79,40 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         delete_selected(state);
         return;
     }
-    let Some(id) = state.selected else { return };
-
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
         let dir = if kind == ModButton::Blow {
             Dir::Blow
         } else {
             Dir::Draw
         };
-        if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
-            n.dir = dir;
+        // Arms the sticky direction regardless of whether anything is
+        // selected — a note to edit is optional, arming for future notes
+        // isn't.
+        state.sticky_dir = dir;
+        if let Some(id) = state.selected {
+            if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
+                n.dir = dir;
+            }
+            enforce_direction(state, id);
         }
-        state.current_direction = dir;
-        enforce_direction(state, id);
         return;
     }
 
-    // Copy the selected note, so we don't break rust borrow rules
-    let Some(note) = state.selected_note() else {
+    let Some(id) = state.selected else {
+        // Nothing to edit, but Wah/Vibrato still need to arm/cycle for
+        // notes not yet placed — cycles `sticky_expr` directly instead of
+        // a selected note's own field.
+        match kind {
+            ModButton::Wah => cycle_sticky_wah(state),
+            ModButton::Vibrato => cycle_sticky_vibrato(state),
+            _ => {}
+        }
         return;
     };
-    let mut note: GridNote = note.clone();
 
-    // Those will be calculated on the next match.
-    state.vibratto_is_selected = false;
-    state.wah_is_selected = false;
-
+    let Some(note) = state.selected_note_mut() else {
+        return;
+    };
     match kind {
         ModButton::Blow | ModButton::Draw => unreachable!(),
         ModButton::Bend => {
@@ -148,13 +158,10 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 _ => WAH_HZ_MIN,
             };
             note.expr = if next > WAH_HZ_MAX + f32::EPSILON {
-                state.wah_is_selected = false;
                 Expr::None
             } else {
-                state.wah_is_selected = true;
                 Expr::Wah(next)
             };
-            state.curr_modifier_intensity = next;
         }
         ModButton::Vibrato => {
             let next = match note.expr {
@@ -162,23 +169,47 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 _ => VIBRATO_HZ_MIN,
             };
             note.expr = if next > VIBRATO_HZ_MAX + f32::EPSILON {
-                state.vibratto_is_selected = false;
                 Expr::None
             } else {
-                state.vibratto_is_selected = true;
                 Expr::Vibrato(next)
             };
-            state.curr_modifier_intensity = next;
         }
         ModButton::Delete => unreachable!(),
     }
+    // Read the note's resulting expr out before writing to `state` again
+    // below — `note` is still borrowing it at this point.
+    let new_expr = note.expr;
 
-    // then update the selected note with our changes.
-    state.update_selected_note(note);
-
+    // Arm sticky to match whatever the selected note now holds, so the
+    // next *added* note (`select_or_add`) picks up the same setting.
     if matches!(kind, ModButton::Wah | ModButton::Vibrato) {
+        state.sticky_expr = new_expr;
         enforce_expr(state, id);
     }
+}
+
+fn cycle_sticky_wah(state: &mut EditorState) {
+    let next = match state.sticky_expr {
+        Expr::Wah(hz) => hz + WAH_HZ_STEP,
+        _ => WAH_HZ_MIN,
+    };
+    state.sticky_expr = if next > WAH_HZ_MAX + f32::EPSILON {
+        Expr::None
+    } else {
+        Expr::Wah(next)
+    };
+}
+
+fn cycle_sticky_vibrato(state: &mut EditorState) {
+    let next = match state.sticky_expr {
+        Expr::Vibrato(hz) => hz + VIBRATO_HZ_STEP,
+        _ => VIBRATO_HZ_MIN,
+    };
+    state.sticky_expr = if next > VIBRATO_HZ_MAX + f32::EPSILON {
+        Expr::None
+    } else {
+        Expr::Vibrato(next)
+    };
 }
 
 // ── Keyboard / scroll systems ─────────────────────────────────────────────────
