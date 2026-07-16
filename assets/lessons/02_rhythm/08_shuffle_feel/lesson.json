@@ -1,0 +1,9 @@
+{
+  "id": "shuffle-feel",
+  "unit": "rhythm",
+  "title_key": "lesson-shuffle-feel-title",
+  "body_key": "lesson-shuffle-feel-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["counting-four"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

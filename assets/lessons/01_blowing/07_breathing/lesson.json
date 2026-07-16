@@ -1,0 +1,9 @@
+{
+  "id": "breathing",
+  "unit": "blowing",
+  "title_key": "lesson-breathing-title",
+  "body_key": "lesson-breathing-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["single-note"],
+  "pass_criteria": { "type": "technique", "technique": "clean-attack", "threshold": 0.5 }
+}

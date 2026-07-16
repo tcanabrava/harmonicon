@@ -204,6 +204,51 @@ lesson-hand-wah-body =
     En este ejercicio, sostén cada nota con firmeza y abre-y-cierra la copa unas dos veces por segundo — el juego escucha ese pulso en tu sonido.
     Mantén la respiración constante; solo se mueven las manos. Si no registra nada, aprieta el sello de la copa — casi todo el efecto vive en el último centímetro del cierre.
 
+# Lección: respiración
+lesson-breathing-title = Respiración y Notas Largas
+lesson-breathing-body =
+    Las notas largas y estables son la base sobre la que se construye todo lo demás — antes de los bends, el vibrato o los licks rápidos, tu aire necesita estar calmado y controlado.
+    Respira desde el diafragma, no desde el pecho: deja que el vientre se expanda al inhalar, y mantén los hombros relajados y quietos.
+    En este ejercicio, los agujeros 1 al 4 (soplado y aspirado) se sostienen de tres a cuatro tiempos cada uno — respira a través de la armónica, no empujes el aire.
+    Una nota temblorosa o que se escapa no puntúa como limpia; una nota firme y estable sí, incluso a bajo volumen.
+    Si te quedas sin aire a mitad de la nota, estás usando más del que necesitas — relájate y deja que la armónica haga menos esfuerzo por más sonido.
+
+# Lección: primer bend
+lesson-first-bend-title = Tu Primer Bend: 4 Aspirado
+lesson-first-bend-body =
+    El bend de medio tono en el 4 aspirado es el clásico primer bend que aprende todo armonicista — baja levemente la lengua y la mandíbula mientras aspiras, como si dijeras "iii" deslizando hacia "ooo".
+    No tenses la garganta; el bend viene de la forma dentro de la boca, no de apretar más fuerte.
+    En este ejercicio, el 4 aspirado normal alterna con el 4 aspirado con bend — escucha cómo la altura baja medio tono cada vez que haces el bend.
+    Practica en el Entrenador de Bends (en el menú Jugar) si quieres oír la nota objetivo y comprobar tu afinación antes de volver aquí.
+    Un bend impreciso todavía cuenta si se acerca lo suficiente — la precisión llega con la práctica, así que no busques la perfección el primer día.
+
+# Lección: bends profundos
+lesson-deep-bends-title = Bends Profundos: 2 y 3 Aspirado
+lesson-deep-bends-body =
+    Los agujeros 2 y 3 aspirados son donde realmente vive el blues de 2ª posición — ambos pueden bajar más que el agujero 4, medio tono y un tono entero.
+    Cuanto más profundo el bend, más atrás necesitan ir la lengua y la mandíbula — piensa en la vocal deslizando de "i" a "o" a "u".
+    En este ejercicio, el 2 aspirado hace medio tono y luego un tono entero, y el 3 aspirado hace lo mismo — escucha dos alturas distintas por debajo de la nota natural en cada agujero.
+    Estas son las dos notas más expresivas de toda la armónica — las notas "azules" que le dan su voz al instrumento.
+    Si el bend de tono entero no baja lo suficiente, no fuerces con presión — relaja aún más la garganta; la tensión ahoga el bend en vez de profundizarlo.
+
+# Lección: vibrato
+lesson-vibrato-title = Vibrato
+lesson-vibrato-body =
+    El vibrato añade una leve oscilación a una nota sostenida — un pequeño movimiento de altura o volumen que hace que una nota larga suene viva en vez de estática.
+    La fuente clásica es el diafragma: un pulso suave "ja-ja-ja" en la respiración, el mismo músculo del ejercicio de respiración.
+    En este ejercicio, sostén cada nota con firmeza y deja que un pulso lento (unas cuatro o cinco veces por segundo) la recorra — el juego escucha esa oscilación.
+    Demasiado rápido suena como un temblor; demasiado lento suena como notas separadas. Busca una onda suave y uniforme.
+    Si no registra nada, exagera el pulso más de lo que parece natural al principio — siempre puedes suavizarlo después de que el micrófono confirme que está ahí.
+
+# Lección: articulación
+lesson-articulation-title = Articulación: Tonguing Ta-Ka
+lesson-articulation-body =
+    El tonguing es cómo separas notas con claridad sin mover la respiración ni la embocadura — di "ta" o "ka" con la lengua en cada nota nueva, como pulsar un interruptor.
+    "Ta-ka" alterna el frente y el fondo de la lengua, permitiéndote articular notas repetidas rápidas sin cansar el aire.
+    En este ejercicio, el mismo agujero se repite en corcheas constantes — el juego no puede oír tu lengua directamente, pero una serie de notas ligadas, sin tonguing, solo puntúa el primer ataque. Rearticular cada una es lo que hace que el resto cuente.
+    Empieza despacio y exagerado; la velocidad llega después, la claridad primero.
+    Si tus notas se difuminan en un solo tono largo en la pista, no estás deteniendo el aire por completo entre ellas — una lengua más firme lo arregla.
+
 # Lección: llamada y respuesta
 lesson-call-response-title = Llamada y Respuesta
 lesson-call-response-body =
@@ -240,6 +285,69 @@ lesson-using-your-feet-body =
     En este ejercicio, un pulso constante de negras se desliza en el agujero 4 — sigue marcando el pie todo el tiempo, incluso entre notas, y deja que cada soplido/aspirado caiga exactamente en una marca.
     La ventana de tiempo aquí es más estrecha que en otros ejercicios a propósito: esta lección trata enteramente de caer en el tiempo, no de la nota ni de la técnica.
     Si vas siempre adelantado o atrasado, no mires el camino de notas — cierra los ojos y sigue solo tu pie.
+
+# Lección: contando de cuatro
+lesson-counting-four-title = Contando de Cuatro
+lesson-counting-four-body =
+    Toda habilidad rítmica de aquí en adelante se apoya en un solo hábito: contar el tiempo en voz alta, o al menos mentalmente, mientras tocas.
+    Cuenta "1, 2, 3, 4" con firmeza junto al metrónomo antes de empezar, y sigue contando una vez que empiecen las notas — no dejes de contar solo porque estás tocando.
+    En este ejercicio, una nota cae en cada tiempo, luego solo en los tiempos 1 y 3, luego solo en el tiempo 1 — los huecos se agrandan, pero tu cuenta interna nunca debe saltarse nada.
+    Si pierdes el tiempo, no adivines — para, reinicia la cuenta desde 1, y vuelve a entrar en el siguiente primer tiempo.
+    Este es el hábito más útil de todo este currículo: todo, desde la forma de 12 compases hasta el turnaround, depende de saber siempre exactamente dónde está el tiempo 1.
+
+# Lección: contando los compases
+lesson-bar-counting-title = Contando los Compases
+lesson-bar-counting-body =
+    Ahora cuenta compases en vez de tiempos: este ejercicio recorre la forma completa de 12 compases, una nota raíz en el tiempo 1 de cada compás, para que sientas llegar los cambios de acorde sin necesidad de mirar.
+    Esto es 2ª posición: tu armónica en Do toca en la tonalidad de Sol, así que el 2 aspirado es la raíz del acorde I, el 4 soplado es la raíz del acorde IV, y el 4 aspirado es la raíz del acorde V.
+    Observa la rejilla de 12 compases iluminarse conforme suena cada compás — combina lo que oyes y tocas con lo que ves, luego intenta contar con los ojos cerrados.
+    El patrón es cuatro compases de I, dos de IV, dos de I, uno de V, uno de IV, uno de I y uno de V — la misma forma que leíste en "Leer la Rejilla del Blues de 12 Compases".
+    Si caes en la raíz equivocada, probablemente perdiste la cuenta en algún punto intermedio — la solución es siempre la misma: para, recuenta desde el compás 1 en el siguiente chorus.
+
+# Lección: el turnaround
+lesson-turnaround-title = El Turnaround
+lesson-turnaround-body =
+    El turnaround son los últimos dos compases de la forma de 12 compases — el momento en que la música se inclina de vuelta hacia el inicio del siguiente chorus, y la parte que todo armonicista de blues necesita sentir llegar.
+    Este ejercicio descansa casi toda la forma a propósito: no hay nada que tocar hasta el compás 12, así que la única forma de acertarlo es seguir contando en silencio todo el camino.
+    Cuando llegue el compás 12, toca la raíz del acorde V; luego, justo al inicio del siguiente chorus, toca la raíz del acorde I — eso es el turnaround resolviendo a casa.
+    Si tocas en el silencio antes del compás 12, perdiste la cuenta en algún punto anterior — ahí no hay nota que perseguir, solo el tiempo que mantener.
+    Esta es la misma llegada que necesitarás oír en jams de verdad: el turnaround suele ser el único momento en que toda una banda se realinea junta.
+
+# Lección: sensación de shuffle
+lesson-shuffle-feel-title = Sensación de Shuffle
+lesson-shuffle-feel-body =
+    La mayor parte del blues no se apoya en corcheas rectas y uniformes — se balancea, con un rebote "shuffle" largo-corto en su lugar.
+    Di "tam-TAM, tam-TAM" para sentir la proporción: la primera mitad de cada par dura casi el doble que la segunda.
+    Esta partitura declara sensación de shuffle, así que el clic del metrónomo se balancea junto con las notas — escucha el clic, no solo las notas, para engancharte al balanceo.
+    En este ejercicio, pares largo-corto alternan soplado y aspirado en el agujero 4 — encaja la nota larga justo en el tiempo y deja que la nota corta rebote desde ahí.
+    Si tus pares salen uniformes en vez de balanceados, probablemente sigues contando corcheas rectas en tu cabeza — intenta contar el shuffle como un tresillo, sosteniendo los dos primeros tiempos juntos.
+
+# Lección: chug del tren
+lesson-train-chug-title = Tren: El Chug
+lesson-train-chug-body =
+    El chug es el clásico sonido de tren de la armónica — y en secreto un ejercicio de ritmo y control de la respiración disfrazado.
+    Alterna un acorde soplado y un acorde aspirado en los agujeros 1-2-3, firme y uniforme, como una locomotora lenta ganando vapor.
+    Respira el ritmo en vez de usar la lengua: deja que la propia respiración haga "juf... paf... juf... paf", no una lengua golpeando para encender y apagar.
+    En este ejercicio, el acorde alterna en corcheas constantes a un tempo lento y paciente — todas las notas de cada acorde necesitan sonar juntas para que cuente.
+    Si solo registra parte del acorde, abre la embocadura de forma uniforme en los tres agujeros en vez de apretar más de un lado.
+
+# Lección: tren rodando
+lesson-train-rolling-title = Tren: Rodando
+lesson-train-rolling-body =
+    Ahora el tren sale de la estación: el mismo chug que acabas de aprender, pero acelerando gradualmente mientras coge velocidad.
+    No persigas la velocidad — deja que crezca naturalmente, igual que un tren de verdad no salta directamente a máxima velocidad.
+    Esta partitura es la primera del currículo construida sobre un mapa de tempo en vez de un tempo fijo — las notas están posicionadas por tick, y la base realmente acelera bajo tus pies.
+    Sigue respirando el patrón juf-paf de la lección anterior; solo cambia el tempo, no la forma de tu respiración.
+    Si te quedas atrás mientras acelera, es normal en tus primeros intentos — el objetivo es mantenerte suelto, no rígido, mientras el tempo cambia.
+
+# Lección: silbato del tren
+lesson-train-whistle-title = Tren: El Silbato
+lesson-train-whistle-body =
+    Todo chug de tren necesita un silbato — un acorde largo y lastimero de dos notas que corta a través del ritmo del chug.
+    El silbato va en los agujeros 4 y 5 aspirados juntos, sostenido largamente, con un wah trabajado en él — la misma técnica de manos en copa de la lección del wah.
+    En este ejercicio, los coros de chug alternan con un acorde de silbato sostenido — mantén el chug firme, luego abre hacia el silbato y deja que tu mano haga el "wah" mientras sostienes la nota.
+    El silbato necesita tanto el acorde (dos notas sonando juntas) como el pulso de wah a la vez — si uno falla, comprueba que estás sosteniendo ambos agujeros por igual mientras tu mano sigue moviéndose.
+    Esto combina todo lo de los ejercicios de chug con la técnica de hand-wah — una buena señal de que estás listo para llevar ambos a una jam de verdad.
 
 # Juego — cuenta atrás, leyenda, pistas del diagrama de armónica
 gameplay-get-ready = PREPÁRATE

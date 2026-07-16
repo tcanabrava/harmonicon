@@ -1,0 +1,9 @@
+{
+  "id": "turnaround",
+  "unit": "rhythm",
+  "title_key": "lesson-turnaround-title",
+  "body_key": "lesson-turnaround-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["bar-counting"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

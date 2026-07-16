@@ -206,6 +206,51 @@ lesson-hand-wah-body =
     In this drill, hold each note steadily and open-close your cup about twice per second — the game listens for that pulse in your sound.
     Keep the breath constant; only the hands move. If nothing registers, tighten the cup seal — most of the effect lives in the last centimetre of closure.
 
+# Lesson: breathing
+lesson-breathing-title = Breathing and Long Tones
+lesson-breathing-body =
+    Long, steady tones are the foundation everything else builds on — before bends, vibrato or fast licks, your air needs to be calm and controlled.
+    Breathe from your diaphragm, not your chest: let your belly expand as you inhale, and keep your shoulders relaxed and still.
+    In this drill, holes 1 through 4 (both blow and draw) hold for three to four beats each — breathe through the harp, don't push.
+    A wavering or leaky tone won't score as clean; a steady, unwavering one will, even at a quiet volume.
+    If you run out of air mid-note, you're using more than you need — back off and let the harmonica do less work for more sound.
+
+# Lesson: first bend
+lesson-first-bend-title = Your First Bend: 4 Draw
+lesson-first-bend-body =
+    The 4-draw half-step bend is the classic first bend every harmonica player learns — lower your tongue and jaw slightly while drawing, as if saying "eee" sliding to "ohh".
+    Don't clench your throat; the bend comes from shaping the inside of your mouth, not from squeezing harder.
+    In this drill, plain 4 draw alternates with a bent 4 draw — listen for the pitch dropping a half step lower each time you bend.
+    Play with the Bending Trainer (from the Play menu) if you want to hear the target pitch and check your intonation before coming back here.
+    A flat, wandering bend still counts if it lands close enough — precision comes with practice, so don't chase perfection on day one.
+
+# Lesson: deep bends
+lesson-deep-bends-title = Deep Bends: 2 and 3 Draw
+lesson-deep-bends-body =
+    Holes 2 and 3 draw are where 2nd-position blues really lives — both can bend down further than hole 4, a half step and a full whole step.
+    The deeper the bend, the further back your tongue and jaw need to move — think the vowel sliding from "ee" through "oh" to "oo".
+    In this drill, 2 draw bends a half step then a whole step, then 3 draw does the same — listen for two distinct pitches below the natural note on each hole.
+    These are the two most expressive notes on the whole harmonica — the "blue" notes that give the instrument its voice.
+    If the whole-step bend won't drop far enough, don't force it with pressure — relax your throat further instead; tension chokes the bend rather than deepening it.
+
+# Lesson: vibrato
+lesson-vibrato-title = Vibrato
+lesson-vibrato-body =
+    Vibrato adds a subtle wobble to a held note — a little movement in pitch or volume that makes a long tone feel alive instead of static.
+    The classic source is your diaphragm: a gentle pulsing "huh-huh-huh" in your breath, the same muscle you used in the breathing drill.
+    In this drill, hold each note steady, then let a slow pulse (about four or five times a second) ripple through it — the game listens for that oscillation.
+    Too fast sounds like a shiver; too slow just sounds like separate notes. Aim for a smooth, even wave.
+    If nothing registers, exaggerate the pulse more than feels natural at first — you can always dial it back once the mic confirms it's actually there.
+
+# Lesson: articulation
+lesson-articulation-title = Articulation: Ta-Ka Tonguing
+lesson-articulation-body =
+    Tonguing is how you separate notes cleanly without moving your breath or embouchure — say "ta" or "ka" with your tongue on each new note, like tapping a light switch.
+    "Ta-ka" alternates the front and back of the tongue, letting you articulate fast repeated notes without tiring your air.
+    In this drill, the same hole repeats in steady eighth notes — the game can't hear your tongue directly, but a slurred, un-tongued run of notes only scores its very first onset. Re-articulating each one is what makes the rest actually count.
+    Start slow and exaggerated; speed comes later, clarity first.
+    If your notes blur into one long tone on the highway, you're not fully stopping the air between them — a firmer tongue tap will fix it.
+
 # Lesson: call and response
 lesson-call-response-title = Call and Response
 lesson-call-response-body =
@@ -242,6 +287,69 @@ lesson-using-your-feet-body =
     In this drill, a steady quarter-note pulse scrolls by on hole 4 — keep your foot tapping the whole time, even between notes, and let each blow/draw land exactly on a tap.
     The timing window here is tighter than other drills on purpose: this lesson is entirely about landing on the beat, not about pitch or technique.
     If you're consistently early or late, don't watch the highway — close your eyes and just follow your foot.
+
+# Lesson: counting four
+lesson-counting-four-title = Counting Four
+lesson-counting-four-body =
+    Every rhythm skill from here on builds on one habit: counting the beat out loud, or at least in your head, while you play.
+    Count "1, 2, 3, 4" steadily with the metronome before you start, and keep counting once the notes begin — don't let the counting stop just because you're playing.
+    In this drill, a note lands on every beat, then only on beats 1 and 3, then only on beat 1 — the gaps get wider, but your internal count should never skip.
+    If you lose the beat, don't guess — stop, restart the count from 1, and come back in on the next downbeat.
+    This is the single most useful habit in this whole curriculum: everything from the 12-bar form to the turnaround depends on always knowing exactly where beat 1 is.
+
+# Lesson: bar counting
+lesson-bar-counting-title = Counting the Bars
+lesson-bar-counting-body =
+    Now count bars instead of beats: this drill walks the full 12-bar form, one root note on beat 1 of each bar, so you can feel the changes arrive without needing to see them.
+    This is 2nd position: your C harmonica plays in the key of G, so 2 draw is the I chord's root, 4 blow is the IV chord's root, and 4 draw is the V chord's root.
+    Watch the 12-bar grid overlay light up as each bar plays — match what you hear and play to what you see, then try counting along with your eyes closed.
+    The pattern is four bars of I, two of IV, two of I, one of V, one of IV, one of I, and one of V — the same shape you read about in "Reading the 12-Bar Blues Grid".
+    If you land on the wrong root, you likely lost count somewhere in the middle — the fix is always the same: stop, recount from bar 1 on the next chorus.
+
+# Lesson: the turnaround
+lesson-turnaround-title = The Turnaround
+lesson-turnaround-body =
+    The turnaround is the last two bars of the 12-bar form — the moment the music tips back toward the top of the next chorus, and the part every blues player has to feel coming.
+    This drill rests through almost the entire form on purpose: there is nothing to play until bar 12, so the only way to land it is to keep counting silently the whole way through.
+    When bar 12 arrives, play the V chord's root; then, right at the top of the next chorus, play the I chord's root — that's the turnaround resolving home.
+    If you play into the silence before bar 12, you lost count somewhere earlier — there's no note to chase there, only the beat to keep.
+    This is the same landing you'll need to hear in real jams: the turnaround is often the one moment where a whole band lines back up together.
+
+# Lesson: shuffle feel
+lesson-shuffle-feel-title = Shuffle Feel
+lesson-shuffle-feel-body =
+    Most blues doesn't sit on straight, even eighth notes — it swings, with a long-short "shuffle" bounce instead.
+    Say "huh-DUH, huh-DUH" to feel the ratio: the first half of each pair is about twice as long as the second.
+    This chart declares a shuffle feel, so the metronome click swings along with the notes — listen to the click, not just the notes, to lock onto the bounce.
+    In this drill, long-short pairs alternate blow and draw on hole 4 — land the long note squarely on the beat and let the short note bounce off it.
+    If your pairs come out even instead of swung, you're probably still counting straight eighths in your head — try counting the shuffle as a triplet, holding the first two beats together.
+
+# Lesson: train chug
+lesson-train-chug-title = Train: The Chug
+lesson-train-chug-body =
+    The chug is the classic harmonica train sound — and secretly a rhythm and breath-control drill in disguise.
+    Alternate a blow chord and a draw chord on holes 1-2-3, steady and even, like a slow locomotive building up steam.
+    Breathe the rhythm rather than tonguing it: let your breath itself go "huff... puff... huff... puff", not a tongue tapping on and off.
+    In this drill, the chord alternates in steady eighth notes at a slow, patient tempo — every note of each chord needs to sound together for it to count.
+    If only part of a chord registers, widen your embouchure evenly across all three holes rather than pressing harder on one side.
+
+# Lesson: train rolling
+lesson-train-rolling-title = Train: Rolling
+lesson-train-rolling-body =
+    Now the train leaves the station: the same chug you just learned, but speeding up gradually as it gets rolling.
+    Don't chase the speed — let it build naturally, the same way a real train doesn't jump straight to full speed.
+    This chart is the first one in the curriculum built on a tempo map instead of a fixed tempo — the notes are positioned by tick, and the backing genuinely accelerates under you.
+    Keep breathing the huff-puff pattern from the previous lesson; only the tempo changes, not the shape of your breath.
+    If you fall behind as it speeds up, that's normal on your first few tries — the goal is staying loose, not rigid, as the tempo shifts.
+
+# Lesson: train whistle
+lesson-train-whistle-title = Train: The Whistle
+lesson-train-whistle-body =
+    Every train chug needs a whistle — a long, wailing two-note chord that cuts through the chugging rhythm.
+    The whistle sits on holes 4 and 5 draw together, held long, with a wah worked into it — the same hand-cupping technique from the wah lesson.
+    In this drill, chug choruses alternate with a held whistle chord — keep the chug steady, then open into the whistle and let your hand do the "wah" while you hold the note.
+    The whistle needs both the chord (two notes sounding together) and the wah pulse at once — if one drops out, check that you're holding both holes evenly while your hand keeps moving.
+    This combines everything from the chugging drills with the hand-wah technique — a good sign you're ready to bring both into a real jam.
 
 # Gameplay — countdown, legend, harmonica overlay hints
 gameplay-get-ready = GET READY

@@ -1,0 +1,9 @@
+{
+  "id": "train-chug",
+  "unit": "rhythm",
+  "title_key": "lesson-train-chug-title",
+  "body_key": "lesson-train-chug-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["multiple-notes"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.5 }
+}

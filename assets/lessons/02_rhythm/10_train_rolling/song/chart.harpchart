@@ -1,0 +1,1570 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: the same chug, accelerating from about 70 to 110 BPM as the train leaves the station \u2014 a tick-positioned chart driven by a tempo map instead of fixed seconds. Original rhythm exercise, no melody."
+  },
+  "song": {
+    "title": "Train: Rolling",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 70,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 70.0
+      },
+      {
+        "tick": 1920,
+        "bpm": 75.0
+      },
+      {
+        "tick": 3840,
+        "bpm": 80.0
+      },
+      {
+        "tick": 5760,
+        "bpm": 85.0
+      },
+      {
+        "tick": 7680,
+        "bpm": 90.0
+      },
+      {
+        "tick": 9600,
+        "bpm": 95.0
+      },
+      {
+        "tick": 11520,
+        "bpm": 100.0
+      },
+      {
+        "tick": 13440,
+        "bpm": 105.0
+      },
+      {
+        "tick": 15360,
+        "bpm": 110.0
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "tick": 0,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ],
+      "phrase": "The train leaves the station"
+    },
+    {
+      "id": "n02",
+      "tick": 240,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "tick": 480,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "tick": 720,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "tick": 960,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "tick": 1200,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "tick": 1440,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "tick": 1680,
+      "duration": 0.343,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n09",
+      "tick": 1920,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n10",
+      "tick": 2160,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "tick": 2400,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "tick": 2640,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n13",
+      "tick": 2880,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n14",
+      "tick": 3120,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n15",
+      "tick": 3360,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n16",
+      "tick": 3600,
+      "duration": 0.32,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n17",
+      "tick": 3840,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n18",
+      "tick": 4080,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n19",
+      "tick": 4320,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n20",
+      "tick": 4560,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n21",
+      "tick": 4800,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n22",
+      "tick": 5040,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n23",
+      "tick": 5280,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n24",
+      "tick": 5520,
+      "duration": 0.3,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n25",
+      "tick": 5760,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n26",
+      "tick": 6000,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n27",
+      "tick": 6240,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n28",
+      "tick": 6480,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n29",
+      "tick": 6720,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n30",
+      "tick": 6960,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n31",
+      "tick": 7200,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n32",
+      "tick": 7440,
+      "duration": 0.282,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n33",
+      "tick": 7680,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n34",
+      "tick": 7920,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n35",
+      "tick": 8160,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n36",
+      "tick": 8400,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n37",
+      "tick": 8640,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n38",
+      "tick": 8880,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n39",
+      "tick": 9120,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n40",
+      "tick": 9360,
+      "duration": 0.267,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n41",
+      "tick": 9600,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n42",
+      "tick": 9840,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n43",
+      "tick": 10080,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n44",
+      "tick": 10320,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n45",
+      "tick": 10560,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n46",
+      "tick": 10800,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n47",
+      "tick": 11040,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n48",
+      "tick": 11280,
+      "duration": 0.253,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n49",
+      "tick": 11520,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n50",
+      "tick": 11760,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n51",
+      "tick": 12000,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n52",
+      "tick": 12240,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n53",
+      "tick": 12480,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n54",
+      "tick": 12720,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n55",
+      "tick": 12960,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n56",
+      "tick": 13200,
+      "duration": 0.24,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n57",
+      "tick": 13440,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n58",
+      "tick": 13680,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n59",
+      "tick": 13920,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n60",
+      "tick": 14160,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n61",
+      "tick": 14400,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n62",
+      "tick": 14640,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n63",
+      "tick": 14880,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n64",
+      "tick": 15120,
+      "duration": 0.229,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

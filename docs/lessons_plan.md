@@ -79,45 +79,39 @@ Also available to charts and relevant below: `tick` + tempo-map timing
 per-chart scoring windows (how `using-your-feet` tightens timing), and
 `Progression` (standard / quick-change / minor) for jam backings.
 
-## Wave 2 — planned
+## Wave 2, part 1 — shipped
 
-The next batch: harmonica basics, counting the bars, train sounds, blues
-licks, blues improvisation, and the jazz unit. Almost everything rides the
-five primitives above — only three engine items are needed, listed after
-the content tables. All charts named here are original scale/chord-tone/
+Unit 1's harmonica-basics extensions, Unit 2's bar-counting drills, and the
+train trio are all live — 12 lessons, `assets/lessons/`:
+
+- **Unit 1 additions** (`01_blowing/`): `breathing` (`07_breathing`,
+  clean-attack sustain), `first-bend` (`08_first_bend`, the 4-draw
+  half-step, `bend` technique), `deep-bends` (`09_deep_bends`, 2/3-draw
+  half- and whole-step bends), `vibrato` (`10_vibrato`, sustain
+  oscillation), `articulation` (`11_articulation`, "ta-ka" tonguing via the
+  fresh-attack proxy).
+- **Unit 2 additions** (`02_rhythm/`): `counting-four` (`05_counting_four`),
+  `bar-counting` (`06_bar_counting`, 2D/4B/4D roots over the 12-bar form,
+  2nd position), `turnaround` (`07_turnaround`, rests through the form to
+  the bar-12 landing), `shuffle-feel` (`08_shuffle_feel`, `feel: shuffle`
+  swung pairs), then the train trio: `train-chug` (`09_train_chug`, chord
+  targets), `train-rolling` (`10_train_rolling` — the first bundled chart
+  built on `tick` + a tempo map instead of fixed seconds, a genuine
+  end-to-end exercise of that timing path), `train-whistle`
+  (`11_train_whistle`, chord targets + wah oscillation combined).
+- **All three wave-2 engine items are built** (see "Engine work" below,
+  kept for reference): `PassCriteria::ChordToneAdherence`, the lesson
+  manifest's `progression` field, and `PassCriteria::PhraseDiscipline` +
+  `jam_session::in_rest_window`/`ImprovStats::rest_violations`. Nothing
+  left to build for the rest of wave 2 — what remains below is pure content
+  authoring.
+
+## Wave 2, part 2 — planned
+
+What's left: Unit 3 (blues vocabulary, licks, improvisation) and the Unit 4
+jazz milestone. All charts named here are original scale/chord-tone/
 vocabulary drills (the safe-to-author subset per `TODO.md`); nothing
 melodic or rights-sensitive except where explicitly flagged.
-
-### Unit 1 additions — harmonica basics (`01_blowing/`)
-
-| Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
-|---|---|---|---|---|
-| **Breathing** (`breathing`, `07_breathing`) — diaphragm breathing and long tones: whole notes held 3–4 beats on holes 1–4 blow/draw at a slow tempo; body copy teaches breathing *through* the harp, relaxed shoulders, steady air | **Scored** | Existing sustain + clean-attack scoring — a wavering or leaky long tone fails clean attack | `single-note` | technique `clean-attack` ≥ 0.5 |
-| **First bend** (`first-bend`, `08_first_bend`) — the 4-draw half-step bend, charted: alternating 4D and 4D' whole notes; body copy points at the Bending Trainer as the freeform companion tool | **Scored** | `Modifier::Bend` onset validation via `target_pitch` — already fully built | `single-note` | technique `bend` ≥ 0.5 |
-| **Deep bends** (`deep-bends`, `09_deep_bends`) — 2-draw half/whole-step and 3-draw half/whole-step bends, the notes 2nd-position blues lives on | **Scored** | Same as above, more of it | `first-bend` | technique `bend` ≥ 0.6 |
-| **Vibrato** (`vibrato`, `10_vibrato`) — throat/diaphragm vibrato on held middle-register notes, generous `oscillation_hz` (~4–5 Hz, ±40% tolerance is built in) | **Scored** | `Modifier::Vibrato` sustain-oscillation scoring — already fully built | `breathing` (diaphragm control is the mechanism) | technique `vibrato` ≥ 0.5 |
-| **Articulation** (`articulation`, `11_articulation`) — "ta / ka / ta-ka" tonguing: repeated eighth notes on one hole, several bars per hole | **Scored via proxy** | `PitchGate`'s fresh-attack requirement means a slurred held note scores only its first onset — re-articulating each note is genuinely required to hit the chart, which is exactly what tonguing is for | `single-note` | accuracy ≥ 0.6 |
-
-### Unit 2 additions — counting the bars & train sounds (`02_rhythm/`)
-
-Counting first — these teach *where you are* in the bar and in the form:
-
-| Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
-|---|---|---|---|---|
-| **Counting four** (`counting-four`, `05_counting_four`) — count 1-2-3-4: quarter notes on every beat, then beats 1+3 only, then beat 1 only, metronome prominent; body copy teaches counting aloud | **Scored** | Ordinary timing windows, moderately tightened (the `using-your-feet` pattern) | none (second Unit 2 entry point, parallel to `twelve-bar`) | accuracy ≥ 0.6 |
-| **Counting the bars** (`bar-counting`, `06_bar_counting`) — through a full 12-bar cycle, play only the chord root on beat 1 of each bar: 2D over I, 4B over IV, 4D over V (2nd position); `TwelveBarBluesOverlay` explained in the body | **Scored** | Timing + pitch over the existing 12-bar machinery; teaches bar counting *and* hearing the changes at once | `counting-four`, `twelve-bar` | accuracy ≥ 0.6 |
-| **The turnaround** (`turnaround`, `07_turnaround`) — feel bars 11–12: sparse chart that rests through most of the form, lands the V root in bar 12 and resolves to I at the top of the next chorus | **Scored** | Same; the *rests* are the lesson — a player who loses count plays into silence and misses the landing | `bar-counting` | accuracy ≥ 0.6 |
-| **Shuffle feel** (`shuffle-feel`, `08_shuffle_feel`) — straight vs. swung eighths: swung eighth-note pairs on one hole, chart declares `feel: shuffle` so the metronome swings with it | **Scored** | Timing windows against swung note placement; `Song::feel` already drives the metronome | `counting-four` | accuracy ≥ 0.6 |
-
-Then the train — the classic harmonica rhythm study, and the payoff for the
-chord work in Unit 1. It's breathing, chords, and tempo control disguised
-as a sound effect:
-
-| Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
-|---|---|---|---|---|
-| **Train: the chug** (`train-chug`, `09_train_chug`) — alternating 1-2-3 blow / 1-2-3 draw chords in steady eighths at a slow tempo ("huff-puff"); body copy: breathe the rhythm, don't tongue it | **Scored** | Chord-target primitive (`chord_is_sounding`) — every note is a 3-hole chord | `multiple-notes` (Unit 1) | accuracy ≥ 0.5 |
-| **Train: rolling** (`train-rolling`, `10_train_rolling`) — the same chug accelerating from ~70 to ~110 BPM via a tick-time chart with a tempo map (the train leaves the station) | **Scored** | Chord targets + the chart format's tempo map — this would be the first bundled chart to exercise tempo-map timing in anger, worth shipping for that validation alone | `train-chug` | accuracy ≥ 0.5 |
-| **Train: the whistle** (`train-whistle`, `11_train_whistle`) — chug choruses punctuated by the whistle: a held 4-5 draw two-hole chord with a `wah-wah` modifier | **Scored** | Chord targets + wah oscillation scoring, combined in one chart | `train-rolling`, `hand-wah` | technique `wah-wah` ≥ 0.5 |
 
 ### New Unit 3 — blues vocabulary & improvisation (`03_blues/`)
 
@@ -131,9 +125,9 @@ the primitive was built for exactly this — and improvisation deepens from
 | **First licks** (`first-licks`, `02_first_licks`) — three short original licks (3–4 blues-scale notes each, no bends: e.g. 2D-3D-4B, 4B-4D-5D, 6B-5D-4D), each taught call-and-response | **Scored** | Call-and-response primitive, unchanged | `call-response` (Unit 2) | accuracy ≥ 0.7 (frozen waits make this pitch-recognition, not timing — same rationale as `call-response`) |
 | **Bent licks** (`bent-licks`, `03_bent_licks`) — licks built around 3D' and 4D' ("the crying notes"), call-and-response | **Scored** | Call-and-response + bend scoring | `first-licks`, `deep-bends` | technique `bend` ≥ 0.5 |
 | **Licks over the changes** (`licks-over-changes`, `04_licks_over_changes`) — a full 12-bar chorus placing one lick per chord (adapted to I/IV/V), phrase-tagged per 4-bar line so the phrase overlay shows the form | **Scored** | Plain chart over the 12-bar; combines everything above | `bent-licks`, `bar-counting` | accuracy ≥ 0.6 |
-| **Chord-tone improvisation** (`chord-tone-improv`, `05_chord_tone_improv`) — open jam; don't just stay in the scale, *land on chord tones* when the chord changes | **Scored via proxy** | `ImprovStats` already counts `chord_tone` separately from `in_scale` — needs only the new `ChordToneAdherence` criterion (engine item 1) | `improvisation` (Unit 2), `blues-scale` | chord-tone fraction ≥ 0.4 |
-| **Minor blues** (`minor-blues-improv`, `06_minor_blues`) — improvise over the minor blues progression; body copy covers what changes (b3 is home now) | **Scored via proxy** | `Progression::MinorBlues` already drives backing/hole-map; needs the lesson-manifest progression field (engine item 2) | `chord-tone-improv` | `ScaleAdherence` ≥ 0.8 |
-| **Question & answer** (`question-answer`, `07_question_answer`) — phrasing: improvise for 2 bars, *rest* for 2 bars, alternating through the form; leaving space is the lesson | **Scored via proxy** | Needs the phrase-discipline primitive (engine item 3) — the one genuinely new mechanism in this wave | `improvisation` | phrase discipline ≥ 0.7 |
+| **Chord-tone improvisation** (`chord-tone-improv`, `05_chord_tone_improv`) — open jam; don't just stay in the scale, *land on chord tones* when the chord changes | **Scored via proxy** | `PassCriteria::ChordToneAdherence` — built, reads `ImprovStats::chord_tone_adherence()` | `improvisation` (Unit 2), `blues-scale` | chord-tone fraction ≥ 0.4 |
+| **Minor blues** (`minor-blues-improv`, `06_minor_blues`) — improvise over the minor blues progression; body copy covers what changes (b3 is home now) | **Scored via proxy** | `Progression::Minor` — the lesson manifest's `progression: "minor"` field (built) seeds `menu::JamProgression` on Start | `chord-tone-improv` | `ScaleAdherence` ≥ 0.8 |
+| **Question & answer** (`question-answer`, `07_question_answer`) — phrasing: improvise for 2 bars, *rest* for 2 bars, alternating through the form; leaving space is the lesson | **Scored via proxy** | `PassCriteria::PhraseDiscipline` — built, reads `ImprovStats::phrase_discipline()`; the 2-on/2-off pattern is fixed (`jam_session::PHRASE_PLAY_BARS`/`PHRASE_REST_BARS`) | `improvisation` | phrase discipline ≥ 0.7 |
 
 ### Unit 4 — jazz (`04_jazz/`, the 0.6 milestone)
 
@@ -150,33 +144,17 @@ drills and public-domain jazz-blues heads). Planned shape:
 | **Chromatic slide basics** — half-steps with the slide button, on a chromatic chart | **Scored** | `Modifier::Slide` onset scoring already exists; chromatic charts fully supported | First bundled chromatic lesson content |
 | **Jazz heads** — actual repertoire | **Scored** | Ordinary charts | Rights-sensitive: public-domain only, human judgment required (`TODO.md`) |
 
-### New engine work required (wave 2)
+### Engine work (done)
 
-Only three items; everything else above is pure content authoring.
-
-1. **`PassCriteria::ChordToneAdherence { threshold }`** (tiny). The
-   counter already exists (`ImprovStats::chord_tone`); add the variant, a
-   `chord_tone / total` sibling of `.adherence()`, the schema enum entry in
-   `lesson_schema.dtd.json`, and judge it in the same "Finish Lesson" path
-   `ScaleAdherence` uses. Locale keys ×3 for any new reader/results copy.
-2. **Lesson-selected jam progression** (tiny). An optional manifest field
-   (`progression: "minor"` etc.) that the lesson reader's Start button
-   seeds into `menu::JamProgression` when routing into `JamSession`;
-   `JamProgression` already resets to Standard elsewhere, so end-of-life
-   is free. Needed by `minor-blues-improv` (and later any ii–V–I jam).
-3. **Phrase-discipline primitive** (medium — the one new mechanism).
-   Measures "did you leave space": during an open jam, bars alternate
-   between *play* and *rest* windows (e.g. 2 on / 2 off, derived from the
-   same bar clock the metronome/12-bar overlay already track). Extend
-   `ImprovStats` with a `rest_violations: u32` counter — an `ImprovGate`
-   fresh attack landing inside a rest window — and add `PassCriteria::
-   PhraseDiscipline { threshold }` = `1 − violations / total_attacks`,
-   judged via Finish Lesson like the other jam criteria. Honest per the
-   design principle: it can't judge whether the played phrases were *good*,
-   but "stopped playing when the phrase should breathe" is exactly the
-   teachable, verifiable outcome. Pure function first
-   (`in_rest_window(bar_index, pattern) -> bool`), tests, then the system —
-   per the testing convention.
+All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"
+above): `PassCriteria::ChordToneAdherence`/`PhraseDiscipline`, the lesson
+manifest's `progression` field, and `jam_session::in_rest_window` +
+`ImprovStats::rest_violations`/`chord_tone_adherence`/`phrase_discipline`.
+`menu::lessons::is_jam_criteria` routes all three jam-based criteria (plus
+`ScaleAdherence`) into `GameplayMode::JamSession`;
+`gameplay::pause_menu::jam_fraction_for` picks the right `ImprovStats`
+fraction for whichever criterion a given lesson declares. Everything left
+in Unit 3/4 below is pure content authoring.
 
 Cross-cutting authoring notes:
 
@@ -191,19 +169,15 @@ Cross-cutting authoring notes:
   bump; `train-rolling`'s tempo map and the multi-modifier charts all use
   long-supported fields.
 
-### Suggested build order (wave 2)
+### Suggested build order (wave 2, part 2 — what's left)
 
-1. **Zero-engine-work batch, basics first**: `breathing`, `first-bend`,
-   `deep-bends`, `vibrato`, `articulation`; then `counting-four`,
-   `bar-counting`, `turnaround`, `shuffle-feel`. Pure authoring, each
-   independently shippable.
-2. **The train trio**: `train-chug`, `train-rolling`, `train-whistle`.
-   Validate tempo-map gameplay timing with `train-rolling` before shipping
-   it (add a `gameplay_validation.md` entry).
-3. **Unit 3 licks**: `blues-scale`, `first-licks`, `bent-licks`,
-   `licks-over-changes`. Still zero engine work; this is where content
-   judgment matters most — keep licks original vocabulary, not quotes.
-4. **Small engine items 1–2** → `chord-tone-improv`, `minor-blues-improv`.
-5. **Engine item 3 (phrase discipline)** → `question-answer`.
-6. **Unit 4 jazz** — gated on the 0.6 milestone's chord-tone tables and
+1. **Unit 3 licks**: `blues-scale`, `first-licks`, `bent-licks`,
+   `licks-over-changes`. Zero engine work (everything it needs already
+   shipped); this is where content judgment matters most — keep licks
+   original vocabulary, not quotes.
+2. **The three jam-criteria lessons**: `chord-tone-improv`,
+   `minor-blues-improv`, `question-answer` — content authoring only now
+   that the engine side is done; each just needs `lesson.json` + locale
+   keys, no chart (they route into an open Jam Session).
+3. **Unit 4 jazz** — gated on the 0.6 milestone's chord-tone tables and
    progression work (`ROADMAP.md`).

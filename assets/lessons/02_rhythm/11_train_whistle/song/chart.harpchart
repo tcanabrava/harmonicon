@@ -1,0 +1,495 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: chug choruses punctuated by the whistle \u2014 a held 4-5 draw two-hole chord shaped with a wah-wah, combining chord targets and wah oscillation scoring in one chart. Original rhythm exercise, no melody."
+  },
+  "song": {
+    "title": "Train: The Whistle",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 90,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 90
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ],
+      "phrase": "Chug"
+    },
+    {
+      "id": "n02",
+      "time": 0.333,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n03",
+      "time": 0.667,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n04",
+      "time": 1.0,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n05",
+      "time": 1.333,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "time": 1.667,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "time": 2.0,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "time": 2.333,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n09",
+      "time": 2.667,
+      "duration": 3.0,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 2.5
+            }
+          ]
+        },
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5",
+          "modifiers": [
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 2.5
+            }
+          ]
+        }
+      ],
+      "phrase": "Whistle (4-5 draw, wah)"
+    },
+    {
+      "id": "n10",
+      "time": 6.167,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "time": 6.5,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "time": 6.833,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n13",
+      "time": 7.167,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n14",
+      "time": 7.5,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n15",
+      "time": 7.833,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n16",
+      "time": 8.167,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        },
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        },
+        {
+          "hole": 3,
+          "action": "blow",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "n17",
+      "time": 8.5,
+      "duration": 0.283,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        },
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "n18",
+      "time": 8.833,
+      "duration": 3.0,
+      "play_mode": "chord",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 2.5
+            }
+          ]
+        },
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5",
+          "modifiers": [
+            {
+              "type": "wah-wah",
+              "oscillation_hz": 2.5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

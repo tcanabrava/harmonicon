@@ -1,0 +1,9 @@
+{
+  "id": "vibrato",
+  "unit": "blowing",
+  "title_key": "lesson-vibrato-title",
+  "body_key": "lesson-vibrato-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["breathing"],
+  "pass_criteria": { "type": "technique", "technique": "vibrato", "threshold": 0.5 }
+}

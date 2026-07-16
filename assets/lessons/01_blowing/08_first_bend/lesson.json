@@ -1,0 +1,9 @@
+{
+  "id": "first-bend",
+  "unit": "blowing",
+  "title_key": "lesson-first-bend-title",
+  "body_key": "lesson-first-bend-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["single-note"],
+  "pass_criteria": { "type": "technique", "technique": "bend", "threshold": 0.5 }
+}

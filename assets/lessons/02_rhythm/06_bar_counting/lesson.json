@@ -1,0 +1,9 @@
+{
+  "id": "bar-counting",
+  "unit": "rhythm",
+  "title_key": "lesson-bar-counting-title",
+  "body_key": "lesson-bar-counting-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["counting-four", "twelve-bar"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

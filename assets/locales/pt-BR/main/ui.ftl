@@ -204,6 +204,51 @@ lesson-hand-wah-body =
     Neste exercício, sustente cada nota com firmeza e abra-e-feche a concha cerca de duas vezes por segundo — o jogo escuta esse pulso no seu som.
     Mantenha o sopro constante; só as mãos se movem. Se nada registrar, aperte a vedação da concha — quase todo o efeito mora no último centímetro do fechamento.
 
+# Lição: respiração
+lesson-breathing-title = Respiração e Notas Longas
+lesson-breathing-body =
+    Notas longas e estáveis são a base de tudo o que vem depois — antes de bends, vibrato ou licks rápidos, seu ar precisa estar calmo e controlado.
+    Respire pelo diafragma, não pelo peito: deixe a barriga expandir ao inspirar, e mantenha os ombros relaxados e parados.
+    Neste exercício, os furos 1 a 4 (sopro e sugada) sustentam por três a quatro tempos cada — respire através da gaita, não empurre o ar.
+    Uma nota trêmula ou vazando não pontua como limpa; uma nota firme e estável pontua, mesmo em volume baixo.
+    Se o ar acabar no meio da nota, você está usando mais do que precisa — relaxe e deixe a gaita fazer menos esforço por mais som.
+
+# Lição: primeiro bend
+lesson-first-bend-title = Seu Primeiro Bend: 4 Sugado
+lesson-first-bend-body =
+    O bend de meio-tom no 4 sugado é o clássico primeiro bend que todo gaitista aprende — abaixe levemente a língua e o queixo enquanto suga, como se dissesse "iii" deslizando para "óoo".
+    Não trave a garganta; o bend vem do formato dentro da boca, não de apertar mais forte.
+    Neste exercício, o 4 sugado normal alterna com o 4 sugado com bend — escute a altura caindo meio tom cada vez que você faz o bend.
+    Pratique no Treinador de Bends (no menu Jogar) se quiser ouvir a nota-alvo e conferir sua afinação antes de voltar aqui.
+    Um bend impreciso ainda conta se chegar perto o suficiente — a precisão vem com a prática, então não busque a perfeição no primeiro dia.
+
+# Lição: bends profundos
+lesson-deep-bends-title = Bends Profundos: 2 e 3 Sugado
+lesson-deep-bends-body =
+    Os furos 2 e 3 sugados são onde o blues de 2ª posição realmente vive — os dois podem baixar mais que o furo 4, meio tom e um tom inteiro.
+    Quanto mais fundo o bend, mais para trás a língua e o queixo precisam ir — pense na vogal deslizando de "i" pra "o" pra "u".
+    Neste exercício, o 2 sugado faz meio tom e depois um tom inteiro, e o 3 sugado faz o mesmo — escute duas alturas distintas abaixo da nota natural em cada furo.
+    Essas são as duas notas mais expressivas de toda a gaita — as notas "azuis" que dão a voz do instrumento.
+    Se o bend de tom inteiro não descer o suficiente, não force com pressão — relaxe ainda mais a garganta; a tensão sufoca o bend em vez de aprofundá-lo.
+
+# Lição: vibrato
+lesson-vibrato-title = Vibrato
+lesson-vibrato-body =
+    O vibrato adiciona uma pequena oscilação a uma nota sustentada — um leve movimento de altura ou volume que faz uma nota longa soar viva em vez de parada.
+    A fonte clássica é o diafragma: um pulso suave "rá-rá-rá" na respiração, o mesmo músculo do exercício de respiração.
+    Neste exercício, sustente cada nota com firmeza e deixe um pulso lento (cerca de quatro a cinco vezes por segundo) ondular por ela — o jogo escuta essa oscilação.
+    Rápido demais soa como um tremor; lento demais soa como notas separadas. Busque uma onda suave e uniforme.
+    Se nada registrar, exagere o pulso mais do que parece natural no início — você sempre pode suavizar depois que o microfone confirmar que ele está lá.
+
+# Lição: articulação
+lesson-articulation-title = Articulação: Tonguing Ta-Ka
+lesson-articulation-body =
+    Tonguing é como você separa notas com clareza sem mover o sopro ou a embocadura — diga "ta" ou "ka" com a língua em cada nota nova, como apertar um interruptor.
+    "Ta-ka" alterna a frente e o fundo da língua, permitindo articular notas repetidas rápidas sem cansar o ar.
+    Neste exercício, o mesmo furo se repete em colcheias constantes — o jogo não escuta sua língua diretamente, mas uma sequência de notas presas, sem tonguing, só pontua o primeiro ataque. Rearticular cada uma é o que faz o resto valer.
+    Comece devagar e exagerado; a velocidade vem depois, a clareza vem primeiro.
+    Se suas notas embaçarem numa nota longa só na pista, você não está parando o ar completamente entre elas — uma língua mais firme resolve.
+
 # Lição: chamada e resposta
 lesson-call-response-title = Chamada e Resposta
 lesson-call-response-body =
@@ -240,6 +285,69 @@ lesson-using-your-feet-body =
     Neste exercício, um pulso constante de semínimas desliza no furo 4 — continue batendo o pé o tempo todo, mesmo entre as notas, e deixe cada sopro/sugada cair exatamente numa batida.
     A janela de tempo aqui é mais apertada que nos outros exercícios de propósito: esta lição é inteiramente sobre cair no tempo, não sobre nota ou técnica.
     Se estiver sempre adiantado ou atrasado, não olhe pra pista — feche os olhos e siga só o pé.
+
+# Lição: contando de quatro
+lesson-counting-four-title = Contando de Quatro
+lesson-counting-four-body =
+    Toda habilidade de ritmo daqui pra frente se apoia num único hábito: contar o tempo em voz alta, ou pelo menos na cabeça, enquanto você toca.
+    Conte "1, 2, 3, 4" com firmeza junto do metrônomo antes de começar, e continue contando depois que as notas começarem — não pare de contar só porque está tocando.
+    Neste exercício, uma nota cai em cada tempo, depois só nos tempos 1 e 3, depois só no tempo 1 — os espaços ficam maiores, mas sua contagem interna nunca deve pular.
+    Se perder o tempo, não adivinhe — pare, reinicie a contagem do 1, e volte a entrar na próxima cabeça de compasso.
+    Este é o hábito mais útil de todo esse currículo: tudo, da forma de 12 compassos ao turnaround, depende de sempre saber exatamente onde está o tempo 1.
+
+# Lição: contando os compassos
+lesson-bar-counting-title = Contando os Compassos
+lesson-bar-counting-body =
+    Agora conte compassos em vez de tempos: este exercício percorre a forma completa de 12 compassos, uma nota-raiz no tempo 1 de cada compasso, para você sentir as trocas de acorde chegarem sem precisar olhar.
+    Isso é 2ª posição: sua gaita em Dó toca no tom de Sol, então o 2 sugado é a raiz do acorde I, o 4 soprado é a raiz do acorde IV, e o 4 sugado é a raiz do acorde V.
+    Observe a grade de 12 compassos acender conforme cada compasso toca — combine o que você ouve e toca com o que vê, depois tente contar de olhos fechados.
+    O desenho é quatro compassos de I, dois de IV, dois de I, um de V, um de IV, um de I e um de V — o mesmo formato de "Lendo a Grade do Blues de 12 Compassos".
+    Se você cair na raiz errada, provavelmente perdeu a contagem em algum ponto do meio — o jeito de corrigir é sempre o mesmo: pare, reconte a partir do compasso 1 no próximo chorus.
+
+# Lição: o turnaround
+lesson-turnaround-title = O Turnaround
+lesson-turnaround-body =
+    O turnaround é os últimos dois compassos da forma de 12 compassos — o momento em que a música se inclina de volta para o topo do próximo chorus, e a parte que todo gaitista de blues precisa sentir chegando.
+    Este exercício descansa quase a forma inteira de propósito: não há nada pra tocar até o compasso 12, então o único jeito de acertar é continuar contando em silêncio o caminho todo.
+    Quando o compasso 12 chegar, toque a raiz do acorde V; depois, bem no topo do próximo chorus, toque a raiz do acorde I — isso é o turnaround resolvendo pra casa.
+    Se você tocar no silêncio antes do compasso 12, perdeu a contagem em algum ponto anterior — não há nota pra perseguir ali, só o tempo pra manter.
+    Essa é a mesma chegada que você vai precisar ouvir em jams de verdade: o turnaround costuma ser o único momento em que uma banda inteira se realinha junta.
+
+# Lição: sensação de shuffle
+lesson-shuffle-feel-title = Sensação de Shuffle
+lesson-shuffle-feel-body =
+    A maior parte do blues não fica em colcheias retas e uniformes — ele balança, com um bounce "shuffle" longo-curto no lugar.
+    Diga "tam-TAM, tam-TAM" pra sentir a proporção: a primeira metade de cada par dura cerca do dobro da segunda.
+    Esta partitura declara sensação de shuffle, então a batida do metrônomo balança junto das notas — escute a batida, não só as notas, pra travar no balanço.
+    Neste exercício, pares longo-curto alternam sopro e sugada no furo 4 — encaixe a nota longa bem no tempo e deixe a nota curta saltar dela.
+    Se seus pares saírem uniformes em vez de balançados, você provavelmente ainda está contando colcheias retas na cabeça — tente contar o shuffle como uma tercina, segurando os dois primeiros tempos juntos.
+
+# Lição: chug do trem
+lesson-train-chug-title = Trem: O Chug
+lesson-train-chug-body =
+    O chug é o clássico som de trem da gaita — e secretamente um exercício de ritmo e controle de respiração disfarçado.
+    Alterne um acorde soprado e um acorde sugado nos furos 1-2-3, firme e uniforme, como uma locomotiva lenta ganhando vapor.
+    Respire o ritmo em vez de usar a língua: deixe a própria respiração fazer "huft... puft... huft... puft", não uma língua batendo pra ligar e desligar.
+    Neste exercício, o acorde alterna em colcheias constantes num andamento lento e paciente — todas as notas de cada acorde precisam soar juntas pra contar.
+    Se só parte do acorde registrar, abra a embocadura de forma uniforme nos três furos em vez de apertar mais de um lado.
+
+# Lição: trem rolando
+lesson-train-rolling-title = Trem: Rolando
+lesson-train-rolling-body =
+    Agora o trem sai da estação: o mesmo chug que você acabou de aprender, mas acelerando gradualmente conforme ganha velocidade.
+    Não corra atrás da velocidade — deixe ela crescer naturalmente, do mesmo jeito que um trem de verdade não pula direto pra velocidade máxima.
+    Esta partitura é a primeira do currículo construída sobre um mapa de andamento em vez de um tempo fixo — as notas são posicionadas por tick, e a base realmente acelera embaixo de você.
+    Continue respirando o padrão huff-puff da lição anterior; só o andamento muda, não o formato da sua respiração.
+    Se você ficar pra trás conforme acelera, isso é normal nas primeiras tentativas — o objetivo é ficar solto, não rígido, enquanto o andamento muda.
+
+# Lição: apito do trem
+lesson-train-whistle-title = Trem: O Apito
+lesson-train-whistle-body =
+    Todo chug de trem precisa de um apito — um acorde longo e chorado de duas notas que corta através do ritmo do chug.
+    O apito fica nos furos 4 e 5 sugados juntos, sustentado por bastante tempo, com um wah trabalhado nele — a mesma técnica de mão em concha da lição do wah.
+    Neste exercício, choruses de chug alternam com um acorde de apito sustentado — mantenha o chug firme, depois abra pro apito e deixe sua mão fazer o "wah" enquanto você sustenta a nota.
+    O apito precisa do acorde (duas notas soando juntas) e do pulso de wah ao mesmo tempo — se um deles falhar, confira se você está segurando os dois furos igualmente enquanto sua mão continua se movendo.
+    Isso combina tudo dos exercícios de chug com a técnica de hand-wah — um bom sinal de que você está pronto pra levar os dois pra uma jam de verdade.
 
 # Jogo — contagem regressiva, legenda, dicas do diagrama da harmônica
 gameplay-get-ready = PREPARE-SE

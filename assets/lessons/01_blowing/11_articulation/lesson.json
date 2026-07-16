@@ -1,0 +1,9 @@
+{
+  "id": "articulation",
+  "unit": "blowing",
+  "title_key": "lesson-articulation-title",
+  "body_key": "lesson-articulation-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["single-note"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "train-whistle",
+  "unit": "rhythm",
+  "title_key": "lesson-train-whistle-title",
+  "body_key": "lesson-train-whistle-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["train-rolling", "hand-wah"],
+  "pass_criteria": { "type": "technique", "technique": "wah-wah", "threshold": 0.5 }
+}
