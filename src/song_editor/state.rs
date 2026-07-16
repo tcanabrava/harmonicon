@@ -266,10 +266,17 @@ pub(super) struct EditorState {
     /// button always updates the relevant one of these, regardless of
     /// whether a note is currently selected, and it stays armed (see
     /// `interaction::apply_modifier`) until cycled back to its own "off"
-    /// value (`Expr::None`; direction has no "off" value — a note is always
-    /// Blow or Draw — so `sticky_dir` only switches, never clears).
-    /// `select_or_add` applies these to every newly placed note.
+    /// value (`Pitch::Normal`/`Expr::None`; direction has no "off" value —
+    /// a note is always Blow or Draw — so `sticky_dir` only switches, never
+    /// clears) or `set_harmonica_kind` sanitizes it away, same as it
+    /// already does for every placed note's own pitch. `select_or_add`
+    /// applies these to every newly placed note, silently skipping
+    /// `sticky_pitch` (falling back to `Pitch::Normal` for that one note)
+    /// when it doesn't fit the hole — the same "silently do nothing on an
+    /// incompatible hole" rule clicking a pitch button on a selected note
+    /// already has.
     pub(super) sticky_dir: Dir,
+    pub(super) sticky_pitch: Pitch,
     pub(super) sticky_expr: Expr,
 }
 
@@ -297,6 +304,7 @@ impl Default for EditorState {
             timeline_drag: None,
             pending_timeline_op: None,
             sticky_dir: Dir::Blow,
+            sticky_pitch: Pitch::Normal,
             sticky_expr: Expr::None,
         }
     }
@@ -376,15 +384,17 @@ impl EditorState {
         self.harmonica_kind = kind;
         let hole_count = self.hole_count();
         self.notes.retain(|n| n.hole <= hole_count);
+        let sanitize = |kind: HarmonicaKind, pitch: Pitch| match (kind, pitch) {
+            (HarmonicaKind::Diatonic, Pitch::Slide) => Pitch::Normal,
+            (HarmonicaKind::Chromatic, Pitch::Bend(_) | Pitch::Overblow | Pitch::Overdraw) => {
+                Pitch::Normal
+            }
+            (_, p) => p,
+        };
         for n in &mut self.notes {
-            n.pitch = match (kind, n.pitch) {
-                (HarmonicaKind::Diatonic, Pitch::Slide) => Pitch::Normal,
-                (HarmonicaKind::Chromatic, Pitch::Bend(_) | Pitch::Overblow | Pitch::Overdraw) => {
-                    Pitch::Normal
-                }
-                (_, p) => p,
-            };
+            n.pitch = sanitize(kind, n.pitch);
         }
+        self.sticky_pitch = sanitize(kind, self.sticky_pitch);
         if let Some(id) = self.selected
             && !self.notes.iter().any(|n| n.id == id)
         {

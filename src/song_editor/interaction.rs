@@ -11,7 +11,7 @@ use super::playback::Playhead;
 use super::state::{
     Dir, DragKind, EditorState, Expr, GridNote, Pitch, Scroll, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN,
     VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction, enforce_expr,
-    max_bend, note_rect, overblow_ok, overdraw_ok,
+    max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible,
 };
 use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
 use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -46,6 +46,16 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     // match its siblings, not fight them. `sticky_dir` only applies when
     // there's nothing there yet to match.
     let dir = state.dir_at(tick).unwrap_or(state.sticky_dir);
+    // A sticky pitch that doesn't fit *this particular* hole (e.g. armed
+    // Overblow while placing a note on hole 8) silently falls back to
+    // Normal for just this note — same "silently do nothing on an
+    // incompatible hole" rule clicking the button on a selected note
+    // already has — rather than rejecting the whole placement.
+    let pitch = if pitch_compatible(state.sticky_pitch, hole) {
+        state.sticky_pitch
+    } else {
+        Pitch::Normal
+    };
     let expr = state.sticky_expr;
 
     let id = state.next_id;
@@ -56,7 +66,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         tick,
         len,
         dir,
-        pitch: Pitch::Normal,
+        pitch,
         expr,
     });
     state.selected = Some(id);
@@ -99,10 +109,14 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     }
 
     let Some(id) = state.selected else {
-        // Nothing to edit, but Wah/Vibrato still need to arm/cycle for
-        // notes not yet placed — cycles `sticky_expr` directly instead of
-        // a selected note's own field.
+        // Nothing to edit, but every pitch/expr button still needs to
+        // arm/cycle for notes not yet placed — cycles `sticky_pitch`/
+        // `sticky_expr` directly instead of a selected note's own field.
         match kind {
+            ModButton::Bend => cycle_sticky_bend(state),
+            ModButton::Overblow => cycle_sticky_pitch(state, Pitch::Overblow),
+            ModButton::Overdraw => cycle_sticky_pitch(state, Pitch::Overdraw),
+            ModButton::Slide => cycle_sticky_pitch(state, Pitch::Slide),
             ModButton::Wah => cycle_sticky_wah(state),
             ModButton::Vibrato => cycle_sticky_vibrato(state),
             _ => {}
@@ -176,16 +190,52 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         }
         ModButton::Delete => unreachable!(),
     }
-    // Read the note's resulting expr out before writing to `state` again
-    // below — `note` is still borrowing it at this point.
-    let new_expr = note.expr;
+    // Read the note's resulting pitch/expr out before writing to `state`
+    // again below — `note` is still borrowing it at this point.
+    let (new_pitch, new_expr) = (note.pitch, note.expr);
 
     // Arm sticky to match whatever the selected note now holds, so the
     // next *added* note (`select_or_add`) picks up the same setting.
-    if matches!(kind, ModButton::Wah | ModButton::Vibrato) {
-        state.sticky_expr = new_expr;
-        enforce_expr(state, id);
+    match kind {
+        ModButton::Bend | ModButton::Overblow | ModButton::Overdraw | ModButton::Slide => {
+            state.sticky_pitch = new_pitch;
+        }
+        ModButton::Wah | ModButton::Vibrato => {
+            state.sticky_expr = new_expr;
+            enforce_expr(state, id);
+        }
+        _ => {}
     }
+}
+
+/// Cycles `sticky_pitch`'s bend depth with nothing selected, so there's no
+/// specific hole to cap it against — uses 1.5, the richest cap any hole has
+/// (holes 2/3/10, see `max_bend`), so cycling here is never cut short by a
+/// hole that isn't even involved yet. `select_or_add` re-validates against
+/// the real hole once a note actually gets placed.
+fn cycle_sticky_bend(state: &mut EditorState) {
+    let current = match state.sticky_pitch {
+        Pitch::Bend(depth) => depth,
+        _ => 0.0,
+    };
+    let next = current + 0.5;
+    state.sticky_pitch = if next > 1.5 + f32::EPSILON {
+        Pitch::Normal
+    } else {
+        Pitch::Bend(next)
+    };
+}
+
+/// Toggles `sticky_pitch` between `Pitch::Normal` and `pitch` — the
+/// hole-free sticky-only equivalent of the selected-note Overblow/
+/// Overdraw/Slide toggles below (which additionally gate on the selected
+/// note's own hole via `overblow_ok`/`overdraw_ok`).
+fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
+    state.sticky_pitch = if state.sticky_pitch == pitch {
+        Pitch::Normal
+    } else {
+        pitch
+    };
 }
 
 fn cycle_sticky_wah(state: &mut EditorState) {
