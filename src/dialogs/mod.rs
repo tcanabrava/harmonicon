@@ -2,6 +2,7 @@ pub mod algo_picker;
 pub mod button;
 pub mod button_material;
 pub mod combobox;
+pub mod confirm_dialog;
 pub mod file_dialog;
 pub mod font_fallback;
 pub mod tab_bar;
