@@ -191,21 +191,32 @@ pub(super) fn on_timeline_drag_start(
     });
 }
 
+/// The current end tick of a span drag, `distance_x` raw window pixels from
+/// its `start` tick — the same quantity/correction note-move dragging
+/// already uses in `grid.rs` (`ev.distance` divided by `UiScale`, the
+/// arrow-key UI zoom), deliberately reused here rather than re-deriving the
+/// current tick from `RelativeCursorPosition`: a drag routinely carries the
+/// pointer well outside the ruler's own thin `HEADER_H`-tall box (down over
+/// the note grid, since that's a natural drag motion), and `distance` keeps
+/// tracking correctly regardless of where the pointer physically ends up.
+pub(super) fn drag_end_tick(start: usize, distance_x: f32, ui_scale: f32) -> usize {
+    let delta_ticks = (distance_x / ui_scale.max(f32::EPSILON) / TICK_W).round() as i64;
+    (start as i64 + delta_ticks).max(0) as usize
+}
+
 pub(super) fn on_timeline_drag(
     ev: On<Pointer<Drag>>,
-    geoms: Query<&TimelineSurfaceGeometry>,
-    rels: Query<&RelativeCursorPosition>,
     mut state: ResMut<EditorState>,
+    ui_scale: Res<UiScale>,
 ) {
     if !state.timeline_tool.is_active() {
         return;
     }
-    let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
+    let Some(TimelineDrag::Span { start, .. }) = state.timeline_drag else {
         return;
     };
-    if let Some(TimelineDrag::Span { start, .. }) = state.timeline_drag {
-        state.timeline_drag = Some(TimelineDrag::Span { start, end: tick });
-    }
+    let end = drag_end_tick(start, ev.distance.x, ui_scale.0);
+    state.timeline_drag = Some(TimelineDrag::Span { start, end });
 }
 
 pub(super) fn on_timeline_drag_end(

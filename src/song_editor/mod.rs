@@ -168,6 +168,7 @@ mod tests {
         load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart,
     };
     use super::interaction::{apply_modifier, select_or_add};
+    use super::timeline::drag_end_tick;
     use super::playback::{
         PhraseNote, SAMPLE_RATE, build_harp, encode_wav, envelope, note_freq, render_pcm,
     };
@@ -1282,5 +1283,28 @@ mod tests {
         assert!(!TimelineTool::None.is_active());
         assert!(TimelineTool::Erase.is_active());
         assert!(TimelineTool::Remove.is_active());
+    }
+
+    // ── drag_end_tick ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn drag_end_tick_advances_by_whole_ticks_moved_right() {
+        assert_eq!(drag_end_tick(4, TICK_W, 1.0), 5);
+        assert_eq!(drag_end_tick(4, 3.0 * TICK_W, 1.0), 7);
+    }
+
+    #[test]
+    fn drag_end_tick_moves_back_left_and_clamps_at_zero() {
+        assert_eq!(drag_end_tick(4, -TICK_W, 1.0), 3);
+        assert_eq!(drag_end_tick(4, -10.0 * TICK_W, 1.0), 0);
+    }
+
+    #[test]
+    fn drag_end_tick_divides_out_the_ui_scale_before_converting() {
+        // At 2x UI zoom, the same visual tick of motion is twice as many
+        // raw window pixels — dividing by `ui_scale` first is what keeps
+        // the drag tracking the pointer 1:1 regardless of zoom level, the
+        // same correction `grid.rs`'s note-move drag already applies.
+        assert_eq!(drag_end_tick(4, 2.0 * TICK_W, 2.0), 5);
     }
 }
