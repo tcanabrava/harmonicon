@@ -73,6 +73,7 @@ mod-slide = Slide
 mod-wah = Wah
 mod-vibrato = Vibrato
 mod-delete = Eliminar
+editor-tool-select = ✂ ⟕ Selecionar
 editor-tool-erase = ✂ Borrar Tramo
 editor-tool-remove = ✂ Quitar Tramo
 
@@ -133,6 +134,7 @@ mod-slide-tooltip = Establecer la nota seleccionada para usar el botón slide (s
 mod-wah-tooltip = Alternar la velocidad de wah-wah de la nota seleccionada
 mod-vibrato-tooltip = Alternar la velocidad de vibrato de la nota seleccionada
 mod-delete-tooltip = Eliminar la nota seleccionada
+editor-tool-select-tooltip = Click a point on the timeline then click a side (or click-drag a range)
 editor-tool-erase-tooltip = Haz clic en un punto de la línea de tiempo y luego en un lado (o haz clic y arrastra un tramo) para borrar sus notas, dejando un hueco
 editor-tool-remove-tooltip = Haz clic en un punto de la línea de tiempo y luego en un lado (o haz clic y arrastra un tramo) para borrar sus notas y desplazar todo lo siguiente hacia atrás, cerrando el hueco
 editor-harmonica-toggle-tooltip = Haz clic para alternar entre armónica Diatónica y Cromática

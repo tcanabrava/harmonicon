@@ -83,6 +83,9 @@ impl Dir {
 pub(super) enum TimelineTool {
     #[default]
     None,
+    // Creates a span of selection on the timeline, that the Erase and Remove buttons
+    // will act upon.
+    Select,
     /// Deletes every note in the picked range, leaving a gap — the song's
     /// own length and every other note's position are untouched.
     Erase,

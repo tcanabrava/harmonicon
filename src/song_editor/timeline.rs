@@ -123,7 +123,7 @@ fn describe_tick(tick: usize) -> String {
     format!("{bar}.{beat_in_bar}")
 }
 
-fn request_confirm(
+pub (super) fn request_confirm(
     state: &mut EditorState,
     loc: &Localization,
     open: &mut MessageWriter<OpenConfirmDialog>,
@@ -135,6 +135,7 @@ fn request_confirm(
         TimelineTool::Erase => "editor-confirm-erase",
         TimelineTool::Remove => "editor-confirm-remove",
         TimelineTool::None => return,
+        TimelineTool::Select => return,
     };
     state.pending_timeline_op = Some((tool, start, end));
     let message = loc
@@ -167,6 +168,11 @@ pub(super) fn on_timeline_drag_start(
     if !state.timeline_tool.is_active() {
         return;
     }
+
+    if state.timeline_tool != TimelineTool::Select {
+        return;
+    }
+
     let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
         return;
     };
@@ -213,7 +219,7 @@ pub(super) fn on_timeline_drag_end(
     if !state.timeline_tool.is_active() {
         return;
     }
-    let Some(TimelineDrag { start, end }) = state.timeline_drag.take() else {
+    let Some(TimelineDrag { start, end }) = state.timeline_drag else {
         return;
     };
     let (s, e) = normalize_range(start, end);
@@ -261,6 +267,7 @@ pub(super) fn handle_timeline_confirm(
             TimelineTool::Erase => erase_range(&state.notes, start, end),
             TimelineTool::Remove => remove_range(&state.notes, start, end),
             TimelineTool::None => continue,
+            TimelineTool::Select => continue,
         };
         state.selected = None;
     }

@@ -21,6 +21,9 @@ use super::{
 };
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::dialogs::tooltip::Tooltip;
+use crate::dialogs::confirm_dialog::OpenConfirmDialog;
+use crate::song_editor::state::{TimelineDrag, normalize_range};
+use crate::song_editor::timeline::request_confirm;
 use crate::localization::{LocalizationExt, LocalizedStr};
 use crate::settings::AudioSettings;
 use crate::theme::{LoadedTheme, SongEditorColors};
@@ -93,7 +96,7 @@ pub(super) enum ModeButton {
 /// docs. Picking one sets `EditorState::timeline_tool`; picking the
 /// already-active one deselects it back to `TimelineTool::None`, same
 /// deselect-by-reclicking convention as the mod-panel's other toggles.
-#[derive(Component, Clone, Copy, PartialEq)]
+#[derive(Component, Clone, Copy, PartialEq, Debug)]
 pub(super) struct TimelineToolButton(pub(super) TimelineTool);
 
 /// Wraps the note-editing button cluster (Blow, Draw, Bend, ...), shown only
@@ -624,6 +627,13 @@ fn spawn_mod_panel(
                 panel_separator(g);
                 timeline_tool_button(
                     g,
+                    TimelineToolButton(TimelineTool::Select),
+                    loc.msg("editor-tool-select"),
+                    loc.msg("editor-tool-select-tooltip"),
+                    colors,
+                );
+                timeline_tool_button(
+                    g,
                     TimelineToolButton(TimelineTool::Erase),
                     loc.msg("editor-tool-erase"),
                     loc.msg("editor-tool-erase-tooltip"),
@@ -721,7 +731,21 @@ fn timeline_tool_button(
             Tooltip(String::from(tooltip)),
         ))
         .observe(
-            move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+            move |_: On<Pointer<Click>>,
+                loc: Res<Localization>,
+                mut state: ResMut<EditorState>,
+                mut open: MessageWriter<OpenConfirmDialog>| {
+                if let Some(TimelineDrag { start, end }) = state.timeline_drag {
+                    let (s, e) = normalize_range(start, end);
+                    if kind == TimelineToolButton(TimelineTool::Erase) {
+                        state.timeline_tool = TimelineTool::Erase;
+                        request_confirm(&mut state, &loc, &mut open, s, e);
+                    } else if kind == TimelineToolButton(TimelineTool::Remove) {
+                        state.timeline_tool = TimelineTool::Remove;
+                        request_confirm(&mut state, &loc, &mut open, s, e);
+                    }
+                };
+
                 state.timeline_tool = if state.timeline_tool == kind.0 {
                     TimelineTool::None
                 } else {
