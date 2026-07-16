@@ -168,7 +168,7 @@ mod tests {
         load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart,
     };
     use super::interaction::{apply_modifier, select_or_add};
-    use super::timeline::drag_end_tick;
+    use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
     use super::playback::{
         PhraseNote, SAMPLE_RATE, build_harp, encode_wav, envelope, note_freq, render_pcm,
     };
@@ -1306,5 +1306,42 @@ mod tests {
         // the drag tracking the pointer 1:1 regardless of zoom level, the
         // same correction `grid.rs`'s note-move drag already applies.
         assert_eq!(drag_end_tick(4, 2.0 * TICK_W, 2.0), 5);
+    }
+
+    // ── TimelineSurfaceGeometry::tick_at ─────────────────────────────────────────
+
+    #[test]
+    fn tick_at_recenters_the_minus_half_to_half_normalized_range() {
+        // `RelativeCursorPosition::normalized` is -0.5..0.5 across the
+        // surface's own width, not 0..1 — a click at the surface's left
+        // edge (-0.5) must resolve to tick 0, not get clamped away.
+        let geom = TimelineSurfaceGeometry {
+            scroll_beat: 0,
+            width_px: 20.0 * TICK_W,
+        };
+        assert_eq!(geom.tick_at(-0.5), 0);
+        assert_eq!(geom.tick_at(0.0), 10);
+        assert_eq!(geom.tick_at(0.5), 20);
+    }
+
+    #[test]
+    fn tick_at_offsets_by_the_surfaces_own_scroll_beat() {
+        let geom = TimelineSurfaceGeometry {
+            scroll_beat: 4,
+            width_px: 20.0 * TICK_W,
+        };
+        // scroll_beat=4 beats = 16 ticks (TICKS_PER_BEAT=4) added on top of
+        // the in-surface position.
+        assert_eq!(geom.tick_at(-0.5), 16);
+    }
+
+    #[test]
+    fn tick_at_clamps_outside_the_surfaces_own_bounds() {
+        let geom = TimelineSurfaceGeometry {
+            scroll_beat: 0,
+            width_px: 20.0 * TICK_W,
+        };
+        assert_eq!(geom.tick_at(-5.0), 0);
+        assert_eq!(geom.tick_at(5.0), 20);
     }
 }

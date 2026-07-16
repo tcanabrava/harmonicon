@@ -54,9 +54,15 @@ pub(super) struct TimelineSurfaceGeometry {
 }
 
 impl TimelineSurfaceGeometry {
-    fn tick_at(&self, normalized_x: f32) -> usize {
-        let abs_px =
-            self.scroll_beat as f32 * BEAT_W + normalized_x.clamp(0.0, 1.0) * self.width_px;
+    /// `normalized_x` is a `RelativeCursorPosition::normalized.x` reading —
+    /// **-0.5..0.5** across the surface's own width (its own doc comment;
+    /// confirmed against the working pattern in `gameplay::
+    /// song_progress_overlay::cursor_to_time`), *not* 0..1. Skipping the
+    /// `+ 0.5` re-centering step collapses every click left of the
+    /// surface's center down to its leftmost tick.
+    pub(super) fn tick_at(&self, normalized_x: f32) -> usize {
+        let frac = (normalized_x + 0.5).clamp(0.0, 1.0);
+        let abs_px = self.scroll_beat as f32 * BEAT_W + frac * self.width_px;
         (abs_px / TICK_W).round().max(0.0) as usize
     }
 }
