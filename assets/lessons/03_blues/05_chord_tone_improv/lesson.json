@@ -1,0 +1,9 @@
+{
+  "id": "chord-tone-improv",
+  "unit": "blues",
+  "title_key": "lesson-chord-tone-improv-title",
+  "body_key": "lesson-chord-tone-improv-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["improvisation", "blues-scale"],
+  "pass_criteria": { "type": "chord-tone-adherence", "threshold": 0.4 }
+}

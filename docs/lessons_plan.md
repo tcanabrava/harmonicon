@@ -106,28 +106,34 @@ train trio are all live — 12 lessons, `assets/lessons/`:
   left to build for the rest of wave 2 — what remains below is pure content
   authoring.
 
-## Wave 2, part 2 — planned
+## Wave 2, part 2 — shipped
 
-What's left: Unit 3 (blues vocabulary, licks, improvisation) and the Unit 4
-jazz milestone. All charts named here are original scale/chord-tone/
-vocabulary drills (the safe-to-author subset per `TODO.md`); nothing
-melodic or rights-sensitive except where explicitly flagged.
-
-### New Unit 3 — blues vocabulary & improvisation (`03_blues/`)
-
-The bridge from drills to *music*. Licks are taught call-and-response —
-the primitive was built for exactly this — and improvisation deepens from
-"stay in the scale" to chord-tone targeting and phrasing.
+Unit 3, the bridge from drills to *music*, is live — 7 lessons,
+`assets/lessons/03_blues/`. Licks are taught call-and-response — the
+primitive built in wave 1 for exactly this — and improvisation deepens from
+"stay in the scale" (wave 1's `improvisation`) to chord-tone targeting and
+phrasing. All charts are original scale/chord-tone/vocabulary drills (the
+safe-to-author subset per `TODO.md`); nothing melodic or rights-sensitive.
 
 | Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
 |---|---|---|---|---|
 | **The blues scale** (`blues-scale`, `01_blues_scale`) — 2nd-position blues scale up and down: 2D · 3D' · 4B · 4D' · 4D · 5D · 6B (needs the two bends, which is why bending comes first) | **Scored** | Plain chart + existing bend scoring | `deep-bends` (Unit 1) | accuracy ≥ 0.6 |
-| **First licks** (`first-licks`, `02_first_licks`) — three short original licks (3–4 blues-scale notes each, no bends: e.g. 2D-3D-4B, 4B-4D-5D, 6B-5D-4D), each taught call-and-response | **Scored** | Call-and-response primitive, unchanged | `call-response` (Unit 2) | accuracy ≥ 0.7 (frozen waits make this pitch-recognition, not timing — same rationale as `call-response`) |
+| **First licks** (`first-licks`, `02_first_licks`) — three short original licks (three blues-scale notes each, no bends: 2D-3D-4B, 4B-4D-5D, 6B-5D-4D), each taught call-and-response | **Scored** | Call-and-response primitive, unchanged | `call-response` (Unit 2) | accuracy ≥ 0.7 (frozen waits make this pitch-recognition, not timing — same rationale as `call-response`) |
 | **Bent licks** (`bent-licks`, `03_bent_licks`) — licks built around 3D' and 4D' ("the crying notes"), call-and-response | **Scored** | Call-and-response + bend scoring | `first-licks`, `deep-bends` | technique `bend` ≥ 0.5 |
 | **Licks over the changes** (`licks-over-changes`, `04_licks_over_changes`) — a full 12-bar chorus placing one lick per chord (adapted to I/IV/V), phrase-tagged per 4-bar line so the phrase overlay shows the form | **Scored** | Plain chart over the 12-bar; combines everything above | `bent-licks`, `bar-counting` | accuracy ≥ 0.6 |
-| **Chord-tone improvisation** (`chord-tone-improv`, `05_chord_tone_improv`) — open jam; don't just stay in the scale, *land on chord tones* when the chord changes | **Scored via proxy** | `PassCriteria::ChordToneAdherence` — built, reads `ImprovStats::chord_tone_adherence()` | `improvisation` (Unit 2), `blues-scale` | chord-tone fraction ≥ 0.4 |
-| **Minor blues** (`minor-blues-improv`, `06_minor_blues`) — improvise over the minor blues progression; body copy covers what changes (b3 is home now) | **Scored via proxy** | `Progression::Minor` — the lesson manifest's `progression: "minor"` field (built) seeds `menu::JamProgression` on Start | `chord-tone-improv` | `ScaleAdherence` ≥ 0.8 |
-| **Question & answer** (`question-answer`, `07_question_answer`) — phrasing: improvise for 2 bars, *rest* for 2 bars, alternating through the form; leaving space is the lesson | **Scored via proxy** | `PassCriteria::PhraseDiscipline` — built, reads `ImprovStats::phrase_discipline()`; the 2-on/2-off pattern is fixed (`jam_session::PHRASE_PLAY_BARS`/`PHRASE_REST_BARS`) | `improvisation` | phrase discipline ≥ 0.7 |
+| **Chord-tone improvisation** (`chord-tone-improv`, `05_chord_tone_improv`) — open jam; don't just stay in the scale, *land on chord tones* when the chord changes | **Scored via proxy** | `PassCriteria::ChordToneAdherence`, reads `ImprovStats::chord_tone_adherence()` | `improvisation` (Unit 2), `blues-scale` | chord-tone fraction ≥ 0.4 |
+| **Minor blues** (`minor-blues-improv`, `06_minor_blues`) — improvise over the minor blues progression; body copy covers what changes (b3 is home now) | **Scored via proxy** | `Progression::Minor` — the lesson manifest's `progression: "minor"` field seeds `menu::JamProgression` on Start | `chord-tone-improv` | `ScaleAdherence` ≥ 0.8 |
+| **Question & answer** (`question-answer`, `07_question_answer`) — phrasing: improvise for 2 bars, *rest* for 2 bars, alternating through the form; leaving space is the lesson | **Scored via proxy** | `PassCriteria::PhraseDiscipline`, reads `ImprovStats::phrase_discipline()`; the 2-on/2-off pattern is fixed (`jam_session::PHRASE_PLAY_BARS`/`PHRASE_REST_BARS`) | `improvisation` | phrase discipline ≥ 0.7 |
+
+Like the `improvisation` lesson it builds on, each of the three jam-criteria
+lessons still needs a minimal `chart` field — a single long placeholder
+`TrackItem` spanning the jam, supplying `song.key`/`harmonica` for
+`JamHoleGuide` construction — even though no notes are individually scored.
+(An earlier draft of this doc said these three needed "no chart"; that was
+imprecise — the code has always required one, and the shipped lessons
+follow that pattern.)
+
+What's left of wave 2 is only the Unit 4 jazz milestone, below.
 
 ### Unit 4 — jazz (`04_jazz/`, the 0.6 milestone)
 
@@ -153,8 +159,9 @@ manifest's `progression` field, and `jam_session::in_rest_window` +
 `menu::lessons::is_jam_criteria` routes all three jam-based criteria (plus
 `ScaleAdherence`) into `GameplayMode::JamSession`;
 `gameplay::pause_menu::jam_fraction_for` picks the right `ImprovStats`
-fraction for whichever criterion a given lesson declares. Everything left
-in Unit 3/4 below is pure content authoring.
+fraction for whichever criterion a given lesson declares. Unit 3 (above)
+used every one of these with no further engine changes; Unit 4 below is
+the only thing left needing new engine work.
 
 Cross-cutting authoring notes:
 
@@ -169,15 +176,8 @@ Cross-cutting authoring notes:
   bump; `train-rolling`'s tempo map and the multi-modifier charts all use
   long-supported fields.
 
-### Suggested build order (wave 2, part 2 — what's left)
+### Suggested build order (what's left)
 
-1. **Unit 3 licks**: `blues-scale`, `first-licks`, `bent-licks`,
-   `licks-over-changes`. Zero engine work (everything it needs already
-   shipped); this is where content judgment matters most — keep licks
-   original vocabulary, not quotes.
-2. **The three jam-criteria lessons**: `chord-tone-improv`,
-   `minor-blues-improv`, `question-answer` — content authoring only now
-   that the engine side is done; each just needs `lesson.json` + locale
-   keys, no chart (they route into an open Jam Session).
-3. **Unit 4 jazz** — gated on the 0.6 milestone's chord-tone tables and
-   progression work (`ROADMAP.md`).
+Unit 3 is fully shipped. All that's left of the lessons curriculum is
+**Unit 4 jazz** — gated on the 0.6 milestone's jazz chord-tone tables and
+a ii–V–I/jazz-blues `Progression` variant (`ROADMAP.md`).

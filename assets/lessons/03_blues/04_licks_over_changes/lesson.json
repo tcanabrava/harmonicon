@@ -1,0 +1,9 @@
+{
+  "id": "licks-over-changes",
+  "unit": "blues",
+  "title_key": "lesson-licks-over-changes-title",
+  "body_key": "lesson-licks-over-changes-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["bent-licks", "bar-counting"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

@@ -1,0 +1,209 @@
+{
+  "metadata": {
+    "format_version": "1.1.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: three original blues licks built around the 3 draw and 4 draw bends \u2014 the 'crying notes' \u2014 on a C diatonic in 2nd position. Each phrase plays as a synthesized demo, then waits for the player to echo it. Original technique exercise, no melody."
+  },
+  "song": {
+    "title": "Bent Licks",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 80,
+    "key": "G",
+    "time_signature": "4/4",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 80
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "2nd",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "call_1_note_a",
+      "time": 3.0,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ],
+      "phrase": "Cry and release"
+    },
+    {
+      "id": "call_1_note_b",
+      "time": 3.9,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "call_1_note_c",
+      "time": 4.8,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "call_2_note_a",
+      "time": 9.5,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ],
+      "phrase": "Deep cry"
+    },
+    {
+      "id": "call_2_note_b",
+      "time": 10.4,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "call_2_note_c",
+      "time": 11.3,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "call_3_note_a",
+      "time": 16.0,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ],
+      "phrase": "Both cries"
+    },
+    {
+      "id": "call_3_note_b",
+      "time": 16.9,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "call_3_note_c",
+      "time": 17.8,
+      "duration": 0.9,
+      "call": true,
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

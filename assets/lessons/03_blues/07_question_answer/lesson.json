@@ -1,0 +1,9 @@
+{
+  "id": "question-answer",
+  "unit": "blues",
+  "title_key": "lesson-question-answer-title",
+  "body_key": "lesson-question-answer-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["improvisation"],
+  "pass_criteria": { "type": "phrase-discipline", "threshold": 0.7 }
+}

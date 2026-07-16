@@ -150,6 +150,7 @@ lesson-failed-banner = Goal not reached — read the lesson again and retry
 # Lessons — unit headings (keyed by each lesson.json's "unit" field)
 lesson-unit-blowing = Unit 1 · Blowing the Harmonica
 lesson-unit-rhythm = Unit 2 · Counting the Blues
+lesson-unit-blues = Unit 3 · Blues Vocabulary
 
 # Lesson: single note
 lesson-single-note-title = Playing a Single Note
@@ -350,6 +351,69 @@ lesson-train-whistle-body =
     In this drill, chug choruses alternate with a held whistle chord — keep the chug steady, then open into the whistle and let your hand do the "wah" while you hold the note.
     The whistle needs both the chord (two notes sounding together) and the wah pulse at once — if one drops out, check that you're holding both holes evenly while your hand keeps moving.
     This combines everything from the chugging drills with the hand-wah technique — a good sign you're ready to bring both into a real jam.
+
+# Lesson: blues scale
+lesson-blues-scale-title = The Blues Scale
+lesson-blues-scale-body =
+    Seven notes, up and down: 2 draw, 3 draw bent, 4 blow, 4 draw bent, 4 draw, 5 draw, 6 blow.
+    This is the same 2nd-position blues scale every lick in this unit — and most blues harmonica playing — draws from.
+    You already have both bends from the deep-bends drill; this lesson is about stringing them into one shape you can play without thinking.
+    Play it slowly at first, listening for how the bent notes sit between the natural ones rather than replacing them.
+    Once this scale feels familiar under your fingers, everything else in this unit is just this same handful of notes rearranged.
+
+# Lesson: first licks
+lesson-first-licks-title = First Licks
+lesson-first-licks-body =
+    Three short phrases, three notes each, all drawn from the blues scale you just learned — no bends yet.
+    Each one plays as a demo, then waits for you to echo it back, exactly like the call-and-response drill.
+    These aren't just exercises — they're real blues phrases, the kind of thing you'll reach for instinctively once they're under your fingers.
+    Take as long as you need on each echo; the game waits for you, so there's no rush to get there.
+    Once you can play all three from memory, try mixing them into a jam session and see how they feel over the changes.
+
+# Lesson: bent licks
+lesson-bent-licks-title = Bent Licks
+lesson-bent-licks-body =
+    Now the licks get their voice: three phrases built around the 3 draw and 4 draw bends, the "crying" notes of the blues scale.
+    Each one plays as a demo, then waits for you to echo it — same call-and-response pattern as the last lesson, but every phrase leans on a bend.
+    Listen for the difference between a clean bend and a wavering one; a confident, held bend is what gives these licks their character.
+    If a phrase feels out of reach, go back to the deep-bends drill for a few minutes and come back — the bend itself, not the phrase, is usually the sticking point.
+    These are the same crying notes you'll hear in almost every blues harmonica solo — get comfortable with them here and they'll show up everywhere.
+
+# Lesson: licks over the changes
+lesson-licks-over-changes-title = Licks Over the Changes
+lesson-licks-over-changes-body =
+    A full 12-bar chorus, but instead of just roots or a scale run, each chord gets its own short lick: one shape over the I chord, another over the IV, another over the V, and the turnaround to close it out.
+    This is the bar-counting drill and your new licks combined — you need to know where you are in the form and have the right phrase ready for it.
+    The phrase overlay marks each 4-bar line so you can see the form's shape while you play.
+    If you lose the thread, fall back on the blues scale you already know rather than freezing — landing something over the right chord beats landing nothing at all.
+    Play this one through a few times until the licks start to feel like they belong to the chords they sit over, not just notes you're reciting in order.
+
+# Lesson: chord-tone improvisation
+lesson-chord-tone-improv-title = Chord-Tone Improvisation
+lesson-chord-tone-improv-body =
+    The improvisation drill judged you on staying in the blues scale. This one raises the bar: land specifically on a chord tone as each chord changes, not just anywhere safe in the scale.
+    It opens the same kind of open Jam Session — the hole map recolors gold for a chord tone, green for in-scale, amber for outside it — but this time gold is the target, not just a nice surprise.
+    Try anticipating the change a beat early: know the IV chord is coming and have your target note ready before it arrives, rather than reacting after the fact.
+    There's still no fixed melody — play whatever you like, just make more of it land gold than the last drill asked for.
+    When you feel ready to stop, open the pause menu and press "Finish Lesson" to have the game tally your chord-tone fraction.
+
+# Lesson: minor blues improvisation
+lesson-minor-blues-improv-title = Minor Blues
+lesson-minor-blues-improv-body =
+    Same open jam, same C harmonica, but the backing progression shifts to a minor blues — the flatted 3rd is home now instead of just a passing color tone.
+    This changes what "in the scale" and "on a chord tone" mean under your fingers, even though you haven't touched a different harmonica or position.
+    Lean into the darker, more mournful sound the minor progression brings out — it's a different mood from the major blues you've been playing, not a mistake to correct.
+    The hole map still recolors live exactly like the other jam lessons; trust the color, not what you'd expect from a major blues.
+    When you feel ready to stop, open the pause menu and press "Finish Lesson" — this one is judged the same way as the original improvisation drill, scale adherence against the minor blues scale.
+
+# Lesson: question and answer
+lesson-question-answer-title = Question and Answer
+lesson-question-answer-body =
+    This lesson isn't about what you play — it's about what you don't. Play for two bars, then actually stop for two bars, alternating through the whole form.
+    Leaving real silence is the point: a phrase that gets an answer needs room for the answer, and that room only exists if you stop asking.
+    It's tempting to keep noodling through the rest — resist it. The hole map and your own ears both know the difference between a rest and a held note.
+    This is the same open Jam Session as the other improvisation lessons; play whatever licks or scale runs feel right in your two bars, then genuinely let go of the harmonica.
+    When you feel ready to stop, open the pause menu and press "Finish Lesson" — the game judges how much of what you played landed outside those rest windows.
 
 # Gameplay — countdown, legend, harmonica overlay hints
 gameplay-get-ready = GET READY

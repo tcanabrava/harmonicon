@@ -1,0 +1,9 @@
+{
+  "id": "first-licks",
+  "unit": "blues",
+  "title_key": "lesson-first-licks-title",
+  "body_key": "lesson-first-licks-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["call-response"],
+  "pass_criteria": { "type": "accuracy", "threshold": 0.7 }
+}

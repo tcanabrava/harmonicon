@@ -1,0 +1,76 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: an open Jam Session, C harmonica in 2nd position over the minor blues progression (the lesson's own `progression: \"minor\"` field seeds this on Start, overriding whatever jam progression was last selected elsewhere) \u2014 the b3 is home now. Judged live by scale adherence, same as the Improvisation drill."
+  },
+  "song": {
+    "title": "Minor Blues Improvisation Drill",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 80,
+    "key": "G",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 80
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "2nd",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "jam_marker",
+      "time": 0.0,
+      "duration": 36.0,
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 600
+  }
+}

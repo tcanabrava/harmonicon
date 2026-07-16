@@ -148,6 +148,7 @@ lesson-failed-banner = Objetivo no alcanzado — relee la lección e inténtalo 
 # Lecciones — títulos de unidad (la clave sale del campo "unit" de cada lesson.json)
 lesson-unit-blowing = Unidad 1 · Soplar la Armónica
 lesson-unit-rhythm = Unidad 2 · Contar el Blues
+lesson-unit-blues = Unidad 3 · Vocabulario del Blues
 
 # Lección: nota única
 lesson-single-note-title = Tocar una Sola Nota
@@ -348,6 +349,69 @@ lesson-train-whistle-body =
     En este ejercicio, los coros de chug alternan con un acorde de silbato sostenido — mantén el chug firme, luego abre hacia el silbato y deja que tu mano haga el "wah" mientras sostienes la nota.
     El silbato necesita tanto el acorde (dos notas sonando juntas) como el pulso de wah a la vez — si uno falla, comprueba que estás sosteniendo ambos agujeros por igual mientras tu mano sigue moviéndose.
     Esto combina todo lo de los ejercicios de chug con la técnica de hand-wah — una buena señal de que estás listo para llevar ambos a una jam de verdad.
+
+# Lección: escala de blues
+lesson-blues-scale-title = La Escala de Blues
+lesson-blues-scale-body =
+    Siete notas, subiendo y bajando: 2 aspirado, 3 aspirado con bend, 4 soplado, 4 aspirado con bend, 4 aspirado, 5 aspirado, 6 soplado.
+    Esta es la misma escala de blues en 2ª posición de la que sale cada frase de esta unidad — y la mayor parte de la armónica blues.
+    Ya tienes ambos bends del ejercicio de bends profundos; esta lección trata de encadenarlos en una sola forma que toques sin pensar.
+    Tócala despacio al principio, escuchando cómo las notas con bend encajan entre las naturales, en lugar de reemplazarlas.
+    En cuanto esta escala te resulte familiar bajo los dedos, todo lo demás en esta unidad es solo este mismo puñado de notas reordenado.
+
+# Lección: primeras frases
+lesson-first-licks-title = Primeras Frases
+lesson-first-licks-body =
+    Tres frases cortas, tres notas cada una, todas sacadas de la escala de blues que acabas de aprender — sin bends todavía.
+    Cada una suena como demostración, luego espera a que la repitas — exactamente igual que el ejercicio de pregunta y respuesta.
+    No son solo ejercicios — son frases reales de blues, del tipo que buscarás por instinto en cuanto las tengas bajo los dedos.
+    Tómate el tiempo que necesites en cada eco; el juego te espera, así que no hay prisa por llegar.
+    En cuanto puedas tocar las tres de memoria, prueba a mezclarlas en una jam session y ve cómo se sienten sobre los cambios.
+
+# Lección: frases con bend
+lesson-bent-licks-title = Frases con Bend
+lesson-bent-licks-body =
+    Ahora las frases encuentran su voz: tres frases construidas alrededor de los bends de 3 y 4 aspirado, las notas "lastimeras" de la escala de blues.
+    Cada una suena como demostración, luego espera a que la repitas — el mismo patrón de pregunta y respuesta de la lección anterior, pero cada frase se apoya en un bend.
+    Escucha la diferencia entre un bend limpio y uno tembloroso; un bend firme y sostenido es lo que da carácter a estas frases.
+    Si una frase se te resiste, vuelve al ejercicio de bends profundos unos minutos y regresa — normalmente el bend en sí, no la frase, es el punto difícil.
+    Estas son las mismas notas lastimeras que oirás en casi todo solo de armónica blues — acostúmbrate a ellas aquí y aparecerán en todas partes.
+
+# Lección: frases sobre los cambios
+lesson-licks-over-changes-title = Frases Sobre los Cambios
+lesson-licks-over-changes-body =
+    Un coro completo de 12 compases, pero en lugar de solo raíces o una escala corrida, cada acorde recibe su propia frase corta: una forma sobre el acorde I, otra sobre el IV, otra sobre el V, y el giro final para cerrar.
+    Esto combina el ejercicio de contar compases con tus nuevas frases — necesitas saber dónde estás en la forma y tener la frase correcta lista para ella.
+    La superposición de frases marca cada línea de 4 compases para que veas la forma de la estructura mientras tocas.
+    Si pierdes el hilo, vuelve a la escala de blues que ya conoces en lugar de bloquearte — acertar algo sobre el acorde correcto es mejor que no tocar nada.
+    Toca esto varias veces hasta que las frases empiecen a sentirse parte de los acordes sobre los que suenan, no solo notas que recitas en orden.
+
+# Lección: improvisación sobre notas del acorde
+lesson-chord-tone-improv-title = Improvisación Sobre Notas del Acorde
+lesson-chord-tone-improv-body =
+    El ejercicio de improvisación te juzgaba por quedarte en la escala de blues. Este sube el listón: cae específicamente en una nota del acorde a medida que cada acorde cambia, no solo en cualquier lugar seguro de la escala.
+    Abre el mismo tipo de Jam Session abierta — el mapa de agujeros recolorea en dorado para una nota del acorde, verde para dentro de la escala, ámbar para fuera de ella — pero esta vez el dorado es el objetivo, no solo una sorpresa agradable.
+    Intenta anticipar el cambio un tiempo antes: sabe que el acorde IV está por llegar y ten tu nota objetivo lista antes de que llegue, en lugar de reaccionar después.
+    Sigue sin haber melodía fija — toca lo que quieras, solo haz que más notas caigan en dorado que en el ejercicio anterior.
+    Cuando sientas que estás listo para parar, abre el menú de pausa y pulsa "Finalizar Lección" para que el juego sume tu fracción de notas del acorde.
+
+# Lección: blues menor
+lesson-minor-blues-improv-title = Blues Menor
+lesson-minor-blues-improv-body =
+    Misma jam abierta, misma armónica en Do, pero la progresión base cambia a un blues menor — la 3ª bemol es ahora la nota de reposo, no solo un color de paso.
+    Esto cambia lo que significan "estar en la escala" y "caer en una nota del acorde" bajo tus dedos, aunque no hayas cambiado de armónica ni de posición.
+    Déjate llevar por el sonido más oscuro y melancólico que trae la progresión menor — es un ambiente distinto del blues mayor que has estado tocando, no un error que corregir.
+    El mapa de agujeros sigue recoloreando en vivo exactamente igual que en las demás lecciones de jam; confía en el color, no en lo que esperarías de un blues mayor.
+    Cuando sientas que estás listo para parar, abre el menú de pausa y pulsa "Finalizar Lección" — se juzga igual que el ejercicio de improvisación original, adherencia a la escala contra la escala de blues menor.
+
+# Lección: pregunta y respuesta
+lesson-question-answer-title = Pregunta y Respuesta
+lesson-question-answer-body =
+    Esta lección no trata de lo que tocas — trata de lo que no tocas. Toca durante dos compases, luego para de verdad durante dos compases, alternando por toda la forma.
+    Dejar un silencio de verdad es la clave: una frase que recibe respuesta necesita espacio para la respuesta, y ese espacio solo existe si dejas de preguntar.
+    Es tentador seguir toqueteando durante el descanso — resístete. El mapa de agujeros y tus propios oídos saben la diferencia entre un descanso y una nota sostenida.
+    Esta es la misma Jam Session abierta de las demás lecciones de improvisación; toca las frases o escalas que te parezcan bien en tus dos compases, luego suelta la armónica de verdad.
+    Cuando sientas que estás listo para parar, abre el menú de pausa y pulsa "Finalizar Lección" — el juego juzga cuánto de lo que tocaste cayó fuera de esas ventanas de descanso.
 
 # Juego — cuenta atrás, leyenda, pistas del diagrama de armónica
 gameplay-get-ready = PREPÁRATE

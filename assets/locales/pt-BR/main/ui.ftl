@@ -148,6 +148,7 @@ lesson-failed-banner = Meta não atingida — releia a lição e tente de novo
 # Lições — títulos das unidades (chave vem do campo "unit" de cada lesson.json)
 lesson-unit-blowing = Unidade 1 · Soprando a Gaita
 lesson-unit-rhythm = Unidade 2 · Contando o Blues
+lesson-unit-blues = Unidade 3 · Vocabulário do Blues
 
 # Lição: nota única
 lesson-single-note-title = Tocando uma Nota Só
@@ -348,6 +349,69 @@ lesson-train-whistle-body =
     Neste exercício, choruses de chug alternam com um acorde de apito sustentado — mantenha o chug firme, depois abra pro apito e deixe sua mão fazer o "wah" enquanto você sustenta a nota.
     O apito precisa do acorde (duas notas soando juntas) e do pulso de wah ao mesmo tempo — se um deles falhar, confira se você está segurando os dois furos igualmente enquanto sua mão continua se movendo.
     Isso combina tudo dos exercícios de chug com a técnica de hand-wah — um bom sinal de que você está pronto pra levar os dois pra uma jam de verdade.
+
+# Lição: escala de blues
+lesson-blues-scale-title = A Escala de Blues
+lesson-blues-scale-body =
+    Sete notas, subindo e descendo: 2 sugado, 3 sugado bendado, 4 soprado, 4 sugado bendado, 4 sugado, 5 sugado, 6 soprado.
+    Essa é a mesma escala de blues em 2ª posição de onde vem cada frase desta unidade — e a maior parte da gaita blues.
+    Você já tem os dois bends do exercício de bends profundos; esta lição é sobre encadeá-los numa única forma que você toca sem pensar.
+    Toque devagar no início, ouvindo como as notas bendadas se encaixam entre as naturais, em vez de substituí-las.
+    Assim que essa escala ficar familiar sob seus dedos, tudo mais nesta unidade é só esse mesmo punhado de notas rearranjado.
+
+# Lição: primeiras frases
+lesson-first-licks-title = Primeiras Frases
+lesson-first-licks-body =
+    Três frases curtas, três notas cada, todas tiradas da escala de blues que você acabou de aprender — sem bends ainda.
+    Cada uma toca como demonstração, depois espera você repeti-la de volta, exatamente como no exercício de pergunta-e-resposta.
+    Não são só exercícios — são frases reais de blues, do tipo que você vai buscar por instinto assim que estiverem sob seus dedos.
+    Leve o tempo que precisar em cada resposta; o jogo espera por você, então não há pressa pra chegar lá.
+    Assim que conseguir tocar as três de memória, tente misturá-las numa jam session e veja como se sentem sobre os acordes.
+
+# Lição: frases bendadas
+lesson-bent-licks-title = Frases Bendadas
+lesson-bent-licks-body =
+    Agora as frases ganham voz: três frases construídas em torno dos bends de 3 e 4 sugado, as notas "choronas" da escala de blues.
+    Cada uma toca como demonstração, depois espera você repeti-la — o mesmo padrão de pergunta-e-resposta da lição anterior, mas cada frase se apoia num bend.
+    Preste atenção na diferença entre um bend limpo e um trêmulo; um bend firme e sustentado é o que dá caráter a essas frases.
+    Se uma frase parecer fora de alcance, volte pro exercício de bends profundos por alguns minutos e retorne — geralmente o bend em si, não a frase, é o ponto difícil.
+    Essas são as mesmas notas choronas que você vai ouvir em quase todo solo de gaita blues — fique confortável com elas aqui e elas vão aparecer em todo lugar.
+
+# Lição: frases sobre os acordes
+lesson-licks-over-changes-title = Frases Sobre os Acordes
+lesson-licks-over-changes-body =
+    Um chorus completo de 12 compassos, mas em vez de só raízes ou uma escala corrida, cada acorde ganha sua própria frase curta: uma forma sobre o acorde I, outra sobre o IV, outra sobre o V, e a virada pra fechar.
+    Isso combina o exercício de contagem de compassos com suas novas frases — você precisa saber onde está na forma e ter a frase certa pronta pra ela.
+    A sobreposição de frases marca cada linha de 4 compassos pra você ver a forma da estrutura enquanto toca.
+    Se perder o fio, volte pra escala de blues que já conhece em vez de travar — acertar algo sobre o acorde certo é melhor que não tocar nada.
+    Toque essa algumas vezes até as frases começarem a parecer que pertencem aos acordes sobre os quais estão, não só notas que você está recitando em ordem.
+
+# Lição: improvisação sobre notas do acorde
+lesson-chord-tone-improv-title = Improvisação Sobre Notas do Acorde
+lesson-chord-tone-improv-body =
+    O exercício de improvisação te julgou por ficar na escala de blues. Este eleva a régua: caia especificamente numa nota do acorde conforme cada acorde muda, não só em qualquer lugar seguro da escala.
+    Ele abre o mesmo tipo de Jam Session aberta — o mapa de furos recolore dourado pra uma nota do acorde, verde pra dentro da escala, âmbar pra fora dela — mas dessa vez dourado é o alvo, não só uma surpresa boa.
+    Tente antecipar a mudança um tempo antes: saiba que o acorde IV está chegando e tenha sua nota alvo pronta antes dele chegar, em vez de reagir depois do fato.
+    Ainda não há melodia fixa — toque o que quiser, só faça mais coisas caírem em dourado do que o exercício anterior pedia.
+    Quando sentir que está pronto pra parar, abra o menu de pausa e aperte "Finalizar Lição" pra o jogo somar sua fração de notas do acorde.
+
+# Lição: blues menor
+lesson-minor-blues-improv-title = Blues Menor
+lesson-minor-blues-improv-body =
+    Mesma jam aberta, mesma gaita em Dó, mas a progressão de base muda pra um blues menor — a 3ª bemol é a nota de repouso agora, não só uma cor de passagem.
+    Isso muda o que "estar na escala" e "cair numa nota do acorde" significam sob seus dedos, mesmo sem trocar de gaita ou de posição.
+    Deixe-se levar pelo som mais sombrio e melancólico que a progressão menor traz — é um clima diferente do blues maior que você vem tocando, não um erro pra corrigir.
+    O mapa de furos ainda recolore ao vivo exatamente como nas outras lições de jam; confie na cor, não no que você esperaria de um blues maior.
+    Quando sentir que está pronto pra parar, abra o menu de pausa e aperte "Finalizar Lição" — esta é julgada do mesmo jeito que o exercício de improvisação original, aderência à escala contra a escala de blues menor.
+
+# Lição: pergunta e resposta
+lesson-question-answer-title = Pergunta e Resposta
+lesson-question-answer-body =
+    Esta lição não é sobre o que você toca — é sobre o que você não toca. Toque por dois compassos, depois pare de verdade por dois compassos, alternando pela forma inteira.
+    Deixar um silêncio de verdade é o ponto: uma frase que recebe uma resposta precisa de espaço pra resposta, e esse espaço só existe se você parar de perguntar.
+    É tentador continuar dedilhando durante o descanso — resista. O mapa de furos e seus próprios ouvidos sabem a diferença entre um descanso e uma nota sustentada.
+    Esta é a mesma Jam Session aberta das outras lições de improvisação; toque as frases ou escalas que fizerem sentido nos seus dois compassos, depois solte a gaita de verdade.
+    Quando sentir que está pronto pra parar, abra o menu de pausa e aperte "Finalizar Lição" — o jogo julga quanto do que você tocou caiu fora dessas janelas de descanso.
 
 # Jogo — contagem regressiva, legenda, dicas do diagrama da harmônica
 gameplay-get-ready = PREPARE-SE

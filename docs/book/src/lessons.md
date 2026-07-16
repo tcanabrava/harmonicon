@@ -44,3 +44,19 @@ Most drills are scored exactly like a normal [Play 2D](play-2d.md) song
 underneath — same falling notes, same HUD — with the pass/fail judgment
 layered on top of the ordinary results screen instead of a song's usual
 best-score tracking.
+
+## Unit 3 — Blues Vocabulary
+
+The bridge from drills to music. You start with the 2nd-position blues
+scale itself, then learn three short original licks call-and-response
+style — the game plays each one, you echo it back — followed by a set of
+licks built specifically around the "crying" bent notes, and finally a full
+12-bar chorus that places a different lick over each chord.
+
+From there it's three more open-jam lessons, each judged on a different
+slice of your playing: land specifically on chord tones as the chords
+change (not just anywhere in the scale), improvise over a minor blues
+progression instead of the usual major one, and — the last lesson — leave
+real space, playing two bars and resting two bars through the whole form.
+All three use the same "Finish Lesson" pause-menu flow as Unit 2's
+improvisation lesson.

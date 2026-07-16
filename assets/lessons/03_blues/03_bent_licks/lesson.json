@@ -1,0 +1,9 @@
+{
+  "id": "bent-licks",
+  "unit": "blues",
+  "title_key": "lesson-bent-licks-title",
+  "body_key": "lesson-bent-licks-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": ["first-licks", "deep-bends"],
+  "pass_criteria": { "type": "technique", "technique": "bend", "threshold": 0.5 }
+}
