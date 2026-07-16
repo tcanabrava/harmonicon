@@ -22,6 +22,9 @@ scored).
 Single clean notes, chords, tongue blocking, octave splits, slides, and
 hand-shape/wah — the physical fundamentals of getting a controlled sound
 out of the instrument, before rhythm or improvisation enter the picture.
+Breathing and long tones, your first bends (working up to the deep 2- and
+3-draw bends 2nd-position blues lives on), vibrato, and "ta-ka" tongued
+articulation round out the fundamentals.
 
 ## Unit 2 — Counting the Blues
 
@@ -32,6 +35,10 @@ notes to hit at all. It opens an ordinary [Jam Session](jam-session.md) and
 judges you on how much of what you played landed on a chord tone or in the
 blues scale, via the same live hole-map coloring Jam Session itself uses.
 When you feel done, open the pause menu and click **Finish Lesson**.
+Counting drills (four-on-the-floor down to just beat 1, then a full 12-bar
+walk of chord roots and the turnaround that leads back to the top), a
+straight-vs-shuffle feel drill, and the classic train chug — including a
+chorus that genuinely speeds up — round out the unit.
 
 Most drills are scored exactly like a normal [Play 2D](play-2d.md) song
 underneath — same falling notes, same HUD — with the pass/fail judgment
