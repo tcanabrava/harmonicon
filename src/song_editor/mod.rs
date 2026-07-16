@@ -23,6 +23,7 @@ mod grid;
 mod harpchart;
 mod interaction;
 mod material;
+mod midi_import;
 mod panel;
 // `pub(crate)`, not private like its neighbours: `gameplay::call_response`
 // shares this module's synth (`PhraseNote`/`render_pcm`/`encode_wav`) for
@@ -39,6 +40,7 @@ use crate::dialogs::file_dialog::DialogId;
 const SAVE_PURPOSE: DialogId = DialogId("song_editor_2_save");
 const LOAD_PURPOSE: DialogId = DialogId("song_editor_2_load");
 const MUSIC_PURPOSE: DialogId = DialogId("song_editor_2_music");
+const MIDI_PURPOSE: DialogId = DialogId("song_editor_2_midi");
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
 
@@ -134,9 +136,15 @@ impl Plugin for SongEditor2Plugin {
                     harpchart::handle_save_chosen,
                     harpchart::handle_load_chosen,
                     harpchart::handle_music_chosen,
+                    (
+                        midi_import::handle_midi_chosen,
+                        midi_import::rebuild_midi_track_combobox,
+                    )
+                        .chain(),
                 )
                     .run_if(in_state(AppState::SongEditor2)),
-            );
+            )
+            .add_message::<midi_import::MidiFileLoaded>();
     }
 }
 

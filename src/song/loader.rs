@@ -136,23 +136,42 @@ impl AssetLoader for SongChartLoader {
         // Pre-analyze the waveform here (asset load time, off the main
         // thread) so the progress bar has it ready the instant the song
         // starts. The same read doubles as the existence check: no
-        // `song/*.ogg` means no backing track rather than a load failure —
-        // see `SongManifest::music`'s doc comment.
-        let music_path = sibling(song_folder.join("song/music.ogg"));
+        // `song/*.ogg` (or, as a fallback, `song/*.wav` — the Song Editor's
+        // MIDI import writes one of these, a synthesized backing track,
+        // since the engine can't play a raw `.mid` and no OGG encoder is in
+        // the dependency tree; see `song_editor::midi_import`) means no
+        // backing track rather than a load failure — see
+        // `SongManifest::music`'s doc comment.
+        let ogg_path = sibling(song_folder.join("song/music.ogg"));
+        let wav_path = sibling(song_folder.join("song/music.wav"));
         let (music, waveform, music_duration_secs) =
-            match load_context.read_asset_bytes(music_path.clone()).await {
+            match load_context.read_asset_bytes(ogg_path.clone()).await {
                 Ok(bytes) => {
                     let (waveform, duration) = crate::audio_system::waveform::analyze_ogg_waveform(
                         &bytes,
                         crate::audio_system::waveform::WAVEFORM_BUCKETS,
                     );
                     (
-                        Some(load_context.load::<AudioSource>(music_path)),
+                        Some(load_context.load::<AudioSource>(ogg_path)),
                         waveform,
                         duration,
                     )
                 }
-                Err(_) => (None, Vec::new(), 0.0),
+                Err(_) => match load_context.read_asset_bytes(wav_path.clone()).await {
+                    Ok(bytes) => {
+                        let (waveform, duration) =
+                            crate::audio_system::waveform::analyze_wav_waveform(
+                                &bytes,
+                                crate::audio_system::waveform::WAVEFORM_BUCKETS,
+                            );
+                        (
+                            Some(load_context.load::<AudioSource>(wav_path)),
+                            waveform,
+                            duration,
+                        )
+                    }
+                    Err(_) => (None, Vec::new(), 0.0),
+                },
             };
 
         // Note the song's own 2D image path if it ships one. We deliberately do

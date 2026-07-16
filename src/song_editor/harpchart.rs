@@ -406,22 +406,95 @@ pub(super) fn handle_music_chosen(
     }
 }
 
-pub(super) fn handle_save_chosen(mut chosen: MessageReader<FileChosen>, state: Res<EditorState>) {
+pub(super) fn handle_save_chosen(
+    mut chosen: MessageReader<FileChosen>,
+    mut state: ResMut<EditorState>,
+    midi: Option<Res<super::midi_import::MidiImport>>,
+) {
     for ev in chosen.read() {
         if ev.purpose != SAVE_PURPOSE {
             continue;
         }
-        let json = serialize_harpchart(&state);
         if let Some(parent) = ev.path.parent()
             && let Err(e) = std::fs::create_dir_all(parent)
         {
             println!("Save failed (mkdir): {e}");
             continue;
         }
+
+        // If a MIDI track is currently imported, write its backing audio
+        // and processed copy *before* serializing the chart, so this same
+        // save records the freshly-written backing track in
+        // `metadata.audio_file` rather than whatever `state.music` held
+        // before (see `save_midi_backing`).
+        if let (Some(midi), Some(parent)) = (midi.as_deref(), ev.path.parent())
+            && let Some(track_index) = midi.selected
+        {
+            save_midi_backing(parent, midi, track_index, &mut state);
+        }
+
+        let json = serialize_harpchart(&state);
         match std::fs::write(&ev.path, json.as_bytes()) {
             Ok(()) => println!("Saved: {}", ev.path.display()),
             Err(e) => println!("Save failed (write): {e}"),
         }
+    }
+}
+
+/// Writes the two extra files a MIDI-backed save produces alongside the
+/// chart itself: a copy of the original MIDI with the imported track
+/// removed (the same "processed" copy `bin/midi_to_chart` writes — the
+/// original the user picked is never modified), and a synthesized WAV
+/// mixdown of every *other* track as the song's backing audio. The engine
+/// can't play a raw `.mid` file, so this is what "use the MIDI file as the
+/// background song" resolves to — see `song::loader`'s `song/music.wav`
+/// fallback. Sets `EditorState::music` to the new WAV's path on success, so
+/// the chart being saved right after this records it, and the editor's own
+/// Play preview picks it up too.
+fn save_midi_backing(
+    dir: &std::path::Path,
+    midi: &super::midi_import::MidiImport,
+    track_index: usize,
+    state: &mut EditorState,
+) {
+    match super::midi_import::remove_track_bytes(&midi.bytes, track_index) {
+        Ok(bytes) => {
+            let stem = midi
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("song");
+            let out = dir.join(format!("{stem}_processed.mid"));
+            match std::fs::write(&out, &bytes) {
+                Ok(()) => println!(
+                    "Wrote {} \u{2014} a copy of {} with the imported track removed; \
+                     the original is untouched.",
+                    out.display(),
+                    midi.path.display()
+                ),
+                Err(e) => println!("Save failed (processed MIDI): {e}"),
+            }
+        }
+        Err(e) => println!("Save failed (processed MIDI): {e}"),
+    }
+
+    match super::midi_import::render_backing_pcm(&midi.bytes, track_index) {
+        Ok((_bpm, pcm)) => {
+            let wav = super::playback::encode_wav(&pcm, super::playback::SAMPLE_RATE);
+            let out = dir.join("music.wav");
+            match std::fs::write(&out, &wav) {
+                Ok(()) => {
+                    println!(
+                        "Wrote {} \u{2014} a synthesized backing track from the MIDI file's \
+                         other tracks.",
+                        out.display()
+                    );
+                    state.music = out.to_string_lossy().into_owned();
+                }
+                Err(e) => println!("Save failed (backing track): {e}"),
+            }
+        }
+        Err(e) => println!("No backing track written: {e}"),
     }
 }
 

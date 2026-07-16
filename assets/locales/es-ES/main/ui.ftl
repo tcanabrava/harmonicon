@@ -63,6 +63,7 @@ editor-practice = 🎤 Practicar
 editor-save = 💾 Guardar
 editor-load = 📂 Cargar
 editor-browse = 📂 Examinar
+editor-import-midi = 🎹 Importar MIDI
 mod-blow = Soplar
 mod-draw = Aspirar
 mod-bend = Doblar
@@ -81,6 +82,7 @@ editor-field-harmonica = Armónica
 editor-field-music = Música de Fondo
 editor-field-name = Nombre
 editor-field-author = Autor
+editor-field-midi-track = Pista MIDI
 editor-harmonica-diatonic = ‹ Diatónica (10 orificios) ›
 editor-harmonica-chromatic = ‹ Cromática (12 orificios) ›
 
@@ -88,6 +90,7 @@ editor-harmonica-chromatic = ‹ Cromática (12 orificios) ›
 dialog-save-chart = Guardar partitura
 dialog-load-chart = Cargar partitura
 dialog-select-music = Seleccionar música de fondo
+dialog-select-midi = Seleccionar archivo MIDI
 
 # Song Editor 2 — mensajes de validación al arrastrar
 drag-denied-bend = Este orificio no admite esta profundidad de doblado
@@ -128,6 +131,7 @@ editor-harmonica-toggle-tooltip = Haz clic para alternar entre armónica Diatón
 editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación
 editor-browse-tooltip = Elegir un archivo de audio de música de fondo para esta partitura
+editor-import-midi-tooltip = Cargar un archivo MIDI y elegir una pista para colocarla en la cuadrícula de notas — Guardar escribe entonces una pista de acompañamiento a partir de sus otras pistas
 
 # Lecciones — menú, lector, veredicto en resultados
 menu-lessons = Lecciones

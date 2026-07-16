@@ -61,6 +61,25 @@ pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
     (bucket_peaks(&mono, buckets), duration_secs)
 }
 
+/// Same as [`analyze_ogg_waveform`], but for a `song/music.wav` backing
+/// track — the Song Editor's MIDI import writes one of these (a synthesized
+/// mixdown, see `song_editor::midi_import::render_backing_pcm`) since the
+/// engine can't play a raw MIDI file and no OGG encoder is in the
+/// dependency tree. Uses [`crate::audio_system::wav::decode_wav_pcm16`]
+/// rather than `rodio::Decoder` (whose WAV support isn't enabled — see
+/// `Cargo.toml`'s comment on the `rodio` dependency) since the only WAV
+/// files this ever needs to read are ones this same codebase wrote.
+pub fn analyze_wav_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
+    let Some((samples, channels, sample_rate)) =
+        crate::audio_system::wav::decode_wav_pcm16(bytes)
+    else {
+        return (vec![0.0; buckets], 0.0);
+    };
+    let mono = downmix_to_mono(&samples, channels as usize);
+    let duration_secs = mono.len() as f64 / sample_rate as f64;
+    (bucket_peaks(&mono, buckets), duration_secs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,6 +134,23 @@ mod tests {
         // waveform back (and a zero duration) instead of a panic or an error
         // the caller must handle.
         let (waveform, duration) = analyze_ogg_waveform(b"not an ogg file", 16);
+        assert_eq!(waveform, vec![0.0; 16]);
+        assert_eq!(duration, 0.0);
+    }
+
+    #[test]
+    fn analyze_wav_waveform_reads_a_real_wav_and_its_duration() {
+        let samples: Vec<f32> = (0..44_100).map(|i| ((i % 100) as f32 / 50.0) - 1.0).collect();
+        let wav = crate::audio_system::wav::encode_wav(&samples, 44_100);
+        let (waveform, duration) = analyze_wav_waveform(&wav, 8);
+        assert_eq!(waveform.len(), 8);
+        assert!((duration - 1.0).abs() < 1e-6);
+        assert!(waveform.iter().any(|&p| p > 0.0), "should be audible");
+    }
+
+    #[test]
+    fn analyze_wav_waveform_degrades_gracefully_on_bad_bytes() {
+        let (waveform, duration) = analyze_wav_waveform(b"not a wav file", 16);
         assert_eq!(waveform, vec![0.0; 16]);
         assert_eq!(duration, 0.0);
     }

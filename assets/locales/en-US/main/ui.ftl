@@ -65,6 +65,7 @@ editor-practice = 🎤 Practice
 editor-save = 💾 Save
 editor-load = 📂 Load
 editor-browse = 📂 Browse
+editor-import-midi = 🎹 Import MIDI
 mod-blow = Blow
 mod-draw = Draw
 mod-bend = Bend
@@ -83,6 +84,7 @@ editor-field-harmonica = Harmonica
 editor-field-music = Background Music
 editor-field-name = Name
 editor-field-author = Author
+editor-field-midi-track = MIDI Track
 editor-harmonica-diatonic = ‹ Diatonic (10 holes) ›
 editor-harmonica-chromatic = ‹ Chromatic (12 holes) ›
 
@@ -90,6 +92,7 @@ editor-harmonica-chromatic = ‹ Chromatic (12 holes) ›
 dialog-save-chart = Save chart
 dialog-load-chart = Load chart
 dialog-select-music = Select background music
+dialog-select-midi = Select MIDI file
 
 # Song Editor 2 — drag validation messages
 drag-denied-bend = This hole does not support this bend depth
@@ -130,6 +133,7 @@ editor-harmonica-toggle-tooltip = Click to switch between Diatonic and Chromatic
 editor-field-key-tooltip = Click to cycle through harp keys
 editor-field-position-tooltip = Click to cycle through playing positions
 editor-browse-tooltip = Choose a background-music audio file for this chart
+editor-import-midi-tooltip = Load a MIDI file and pick a track to drop onto the note grid — Save then writes a backing track from its other tracks
 
 # Lessons — menu, reader, results verdict
 menu-lessons = Lessons

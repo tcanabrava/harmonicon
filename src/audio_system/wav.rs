@@ -41,6 +41,50 @@ pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     v
 }
 
+/// Decodes a 16-bit PCM WAV file — the format [`encode_wav`] itself
+/// produces — into `(samples, channels, sample_rate)`, normalizing samples
+/// to `[-1.0, 1.0]`. `None` for anything that isn't `RIFF`/`WAVE`/16-bit
+/// PCM. Deliberately not a general-purpose WAV decoder (no float/24-bit/
+/// ADPCM support): just enough to read back what this module writes, for
+/// `audio_system::waveform::analyze_wav_waveform`'s progress-bar analysis of
+/// a Song Editor MIDI import's synthesized `song/music.wav` backing track.
+pub fn decode_wav_pcm16(bytes: &[u8]) -> Option<(Vec<f32>, u16, u32)> {
+    if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
+        return None;
+    }
+    let mut pos = 12;
+    let mut channels = 1u16;
+    let mut sample_rate = 44_100u32;
+    let mut bits_per_sample = 16u16;
+    let mut data: Option<&[u8]> = None;
+    while pos + 8 <= bytes.len() {
+        let id = &bytes[pos..pos + 4];
+        let size = u32::from_le_bytes(bytes[pos + 4..pos + 8].try_into().ok()?) as usize;
+        let body_start = pos + 8;
+        let body_end = (body_start + size).min(bytes.len());
+        let body = &bytes[body_start..body_end];
+        match id {
+            b"fmt " if body.len() >= 16 => {
+                channels = u16::from_le_bytes(body[2..4].try_into().ok()?);
+                sample_rate = u32::from_le_bytes(body[4..8].try_into().ok()?);
+                bits_per_sample = u16::from_le_bytes(body[14..16].try_into().ok()?);
+            }
+            b"data" => data = Some(body),
+            _ => {}
+        }
+        // Chunks are word-aligned; an odd-sized chunk has one pad byte.
+        pos = body_start + size + (size % 2);
+    }
+    if bits_per_sample != 16 {
+        return None;
+    }
+    let samples = data?
+        .chunks_exact(2)
+        .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / i16::MAX as f32)
+        .collect();
+    Some((samples, channels.max(1), sample_rate.max(1)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,5 +105,28 @@ mod tests {
         let s1 = i16::from_le_bytes([wav[46], wav[47]]);
         assert_eq!(s0, i16::MAX);
         assert_eq!(s1, -i16::MAX);
+    }
+
+    #[test]
+    fn decode_wav_pcm16_round_trips_encode_wav() {
+        let samples = vec![0.0, 0.5, -0.5, 1.0, -1.0];
+        let wav = encode_wav(&samples, 22_050);
+        let (decoded, channels, sample_rate) = decode_wav_pcm16(&wav).unwrap();
+        assert_eq!(channels, 1);
+        assert_eq!(sample_rate, 22_050);
+        assert_eq!(decoded.len(), samples.len());
+        for (a, b) in decoded.iter().zip(&samples) {
+            assert!((a - b).abs() < 1e-3, "{a} != {b}");
+        }
+    }
+
+    #[test]
+    fn decode_wav_pcm16_rejects_non_riff_bytes() {
+        assert!(decode_wav_pcm16(b"not a wav file at all").is_none());
+    }
+
+    #[test]
+    fn decode_wav_pcm16_rejects_a_truncated_header() {
+        assert!(decode_wav_pcm16(b"RIFF").is_none());
     }
 }

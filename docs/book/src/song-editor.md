@@ -28,6 +28,23 @@ playing position, harmonica type (diatonic/chromatic, and hole layout),
 background music file, and song name/author — everything under `song` and
 `harmonica` in the `.harpchart` format.
 
+## Importing MIDI
+
+**Import MIDI** loads a `.mid`/`.midi` file and lists its tracks in a
+dropdown; picking one drops that track's notes onto the grid, mapped onto
+your currently selected harp key and type — an exact note where one exists,
+a bend or (on a chromatic harp) a slide where one doesn't, otherwise the
+nearest playable note — and sets the chart's tempo to match. Switching the
+dropdown to a different track re-imports from that track instead.
+
+Saving while a MIDI track is selected also writes two extra files next to
+the chart: a copy of the MIDI file with the imported track removed (your
+original file is never touched), and a synthesized backing track —
+`song/music.wav` — built from every *other* track in the file, since
+Harmonicon can't play a raw MIDI file directly. That backing track plays
+automatically both in the editor's own Play preview and, once the song is
+in place, during the real game.
+
 ## Saving and loading
 
 **Save**/**Load** work with `.harpchart` files directly; **Browse** picks

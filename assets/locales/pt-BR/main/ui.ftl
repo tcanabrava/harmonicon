@@ -63,6 +63,7 @@ editor-practice = 🎤 Praticar
 editor-save = 💾 Salvar
 editor-load = 📂 Carregar
 editor-browse = 📂 Procurar
+editor-import-midi = 🎹 Importar MIDI
 mod-blow = Soprar
 mod-draw = Puxar
 mod-bend = Dobrar
@@ -81,6 +82,7 @@ editor-field-harmonica = Gaita
 editor-field-music = Música de Fundo
 editor-field-name = Nome
 editor-field-author = Autor
+editor-field-midi-track = Faixa MIDI
 editor-harmonica-diatonic = ‹ Diatônica (10 buracos) ›
 editor-harmonica-chromatic = ‹ Cromática (12 buracos) ›
 
@@ -88,6 +90,7 @@ editor-harmonica-chromatic = ‹ Cromática (12 buracos) ›
 dialog-save-chart = Salvar partitura
 dialog-load-chart = Carregar partitura
 dialog-select-music = Selecionar música de fundo
+dialog-select-midi = Selecionar arquivo MIDI
 
 # Editor de Músicas 2 — mensagens de validação de arrastar
 drag-denied-bend = Este buraco não suporta esta profundidade de dobra
@@ -128,6 +131,7 @@ editor-harmonica-toggle-tooltip = Clique para alternar entre gaita Diatônica e 
 editor-field-key-tooltip = Clique para alternar entre os tons da gaita
 editor-field-position-tooltip = Clique para alternar entre as posições de execução
 editor-browse-tooltip = Escolher um arquivo de áudio de música de fundo para esta partitura
+editor-import-midi-tooltip = Carregar um arquivo MIDI e escolher uma faixa para colocar na grade de notas — Salvar então grava uma trilha de fundo a partir das outras faixas
 
 # Lições — menu, leitor, veredito nos resultados
 menu-lessons = Lições

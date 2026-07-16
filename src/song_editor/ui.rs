@@ -14,8 +14,8 @@ use super::playback::{
 use super::practice::{PracticeState, start_practice, stop_practice};
 use super::state::{EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, Mode, POSITIONS, Scroll};
 use super::{
-    AppState, BEAT_W, HEADER_H, HOLE_COL_W, LOAD_PURPOSE, MUSIC_PURPOSE, NOTE_PAD, ROW_H,
-    SAVE_PURPOSE, grid_height,
+    AppState, BEAT_W, HEADER_H, HOLE_COL_W, LOAD_PURPOSE, MIDI_PURPOSE, MUSIC_PURPOSE, NOTE_PAD,
+    ROW_H, SAVE_PURPOSE, grid_height,
 };
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::dialogs::tooltip::Tooltip;
@@ -118,6 +118,13 @@ pub(super) struct MetaFieldText(pub(super) Field);
 
 #[derive(Component)]
 pub(super) struct StatusMsg;
+
+/// Empty container [`super::midi_import::rebuild_midi_track_combobox`]
+/// (re)spawns the MIDI track-picker combobox under, once a MIDI file has
+/// been imported — empty until then, since the track list isn't known
+/// before that.
+#[derive(Component)]
+pub(super) struct MidiTrackComboboxSlot;
 
 // ── Lifecycle systems ─────────────────────────────────────────────────────────
 
@@ -1061,5 +1068,71 @@ fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: 
                 }
             });
         }
+
+        form.spawn(Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(10.0),
+            ..default()
+        })
+        .with_children(|line| {
+            line.spawn((
+                Node {
+                    width: Val::Px(150.0),
+                    ..default()
+                },
+                Text::new(format!("{}:", loc.msg("editor-field-midi-track"))),
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
+                TextColor(colors.label),
+            ));
+            line.spawn((
+                Button,
+                Node {
+                    height: Val::Px(26.0),
+                    align_items: AlignItems::Center,
+                    padding: UiRect::horizontal(Val::Px(10.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.24, 0.30, 0.20)),
+                BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+                Tooltip(String::from(loc.msg("editor-import-midi-tooltip"))),
+            ))
+            .observe(
+                |_: On<Pointer<Click>>,
+                 loc: Res<Localization>,
+                 mut open: MessageWriter<OpenFileDialog>| {
+                    open.write(OpenFileDialog {
+                        purpose: MIDI_PURPOSE,
+                        title: String::from(loc.msg("dialog-select-midi")),
+                        extensions: vec!["mid".into(), "midi".into()],
+                        start_dir: dirs::home_dir(),
+                        mode: DialogMode::Open,
+                    });
+                },
+            )
+            .with_children(|b| {
+                b.spawn((
+                    Text::new(String::from(loc.msg("editor-import-midi"))),
+                    TextFont {
+                        font_size: FontSize::Px(13.0),
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                    Pickable::IGNORE,
+                ));
+            });
+            line.spawn((
+                MidiTrackComboboxSlot,
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                },
+            ));
+        });
     });
 }
