@@ -58,6 +58,7 @@ impl Plugin for OptionsPlugin {
                     update_mic_banner,
                     sync_mic_combobox,
                     update_note_numbers_label,
+                    update_adaptive_difficulty_label,
                 )
                     .run_if(in_state(MenuPage::Options)),
             );
@@ -117,6 +118,10 @@ struct LatencySliderLabel;
 #[derive(Component)]
 struct NoteNumbersLabel;
 
+/// The "Adaptive Difficulty: on/off" readout beside its toggle.
+#[derive(Component)]
+struct AdaptiveDifficultyLabel;
+
 /// Current level for a given slider kind.
 fn audio_level(settings: &AudioSettings, kind: VolumeSlider) -> f32 {
     match kind {
@@ -139,6 +144,7 @@ fn setup_options_menu(
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
     show_numbers: Res<ShowNoteNumbers>,
+    adaptive_difficulty: Res<crate::settings::AdaptiveDifficultyEnabled>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"), &theme, "Options");
 
@@ -178,7 +184,7 @@ fn setup_options_menu(
     commands.entity(main_layout).add_child(left_layout);
     commands.entity(main_layout).add_child(right_layout);
 
-    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, loc, selected_harmonica, asset_server, images, show_numbers);
+    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, loc, selected_harmonica, asset_server, images, show_numbers, adaptive_difficulty);
     spawn_right_column(&mut commands, right_layout, theme, btn_mats);
 }
 
@@ -193,6 +199,7 @@ fn spawn_left_column(
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
     show_numbers: Res<ShowNoteNumbers>,
+    adaptive_difficulty: Res<crate::settings::AdaptiveDifficultyEnabled>,
 ) {
     spawn_mic_banner(commands, parent, &mic_status);
     spawn_volume_slider(
@@ -258,6 +265,7 @@ fn spawn_left_column(
     spawn_algo_explanation(commands, parent, 560.0, settings.pitch_algorithm);
 
     spawn_note_numbers_toggle(commands, parent, show_numbers.0);
+    spawn_adaptive_difficulty_toggle(commands, parent, adaptive_difficulty.0, &loc);
 }
 
 fn spawn_right_column(commands: &mut Commands, parent: Entity, theme: Res<LoadedTheme>, btn_mats: Res<ButtonMaterials>) {
@@ -342,6 +350,76 @@ fn update_note_numbers_label(
     }
     for mut text in &mut labels {
         *text = Text::new(note_numbers_label_text(show.0));
+    }
+}
+
+/// Flips the single global adaptive-difficulty setting — not per-song, see
+/// `settings::AdaptiveDifficultyEnabled`'s doc comment. Persisted
+/// automatically by `settings`'s debounced-save machinery, same as every
+/// other Options-page toggle; doesn't touch the live per-session
+/// `gameplay::adaptive_difficulty::AdaptiveDifficulty` cache — that only
+/// gets (re)seeded from this setting at the next song's start, or flipped
+/// directly by the pause menu's own toggle for an immediate mid-song effect.
+fn toggle_adaptive_difficulty(
+    _: On<Pointer<Click>>,
+    mut enabled: ResMut<crate::settings::AdaptiveDifficultyEnabled>,
+) {
+    enabled.0 = !enabled.0;
+}
+
+fn adaptive_difficulty_label_text(loc: &Localization, enabled: bool) -> String {
+    if enabled {
+        loc.msg("options-adaptive-difficulty-on").into()
+    } else {
+        loc.msg("options-adaptive-difficulty-off").into()
+    }
+}
+
+/// A row with a pill button that flips the global adaptive-difficulty
+/// setting plus a label reflecting the current choice — same shape as
+/// [`spawn_note_numbers_toggle`].
+fn spawn_adaptive_difficulty_toggle(
+    commands: &mut Commands,
+    parent: Entity,
+    enabled: bool,
+    loc: &Localization,
+) {
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(8.0),
+            ..default()
+        })
+        .id();
+    commands.entity(row).with_children(|r| {
+        r.spawn_empty().apply_scene(button::small(
+            &loc.msg("options-adaptive-difficulty"),
+            toggle_adaptive_difficulty,
+        ));
+        r.spawn((
+            Text::new(adaptive_difficulty_label_text(loc, enabled)),
+            TextFont {
+                font_size: FontSize::Px(16.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            AdaptiveDifficultyLabel,
+        ));
+    });
+    commands.entity(parent).add_child(row);
+}
+
+fn update_adaptive_difficulty_label(
+    enabled: Res<crate::settings::AdaptiveDifficultyEnabled>,
+    loc: Res<Localization>,
+    mut labels: Query<&mut Text, With<AdaptiveDifficultyLabel>>,
+) {
+    if !enabled.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(adaptive_difficulty_label_text(&loc, enabled.0));
     }
 }
 
@@ -969,5 +1047,21 @@ mod tests {
     fn note_numbers_label_reflects_the_current_choice() {
         assert_eq!(note_numbers_label_text(false), "Note labels: arrows");
         assert_eq!(note_numbers_label_text(true), "Note labels: numbers");
+    }
+
+    #[test]
+    fn adaptive_difficulty_label_picks_the_on_or_off_key() {
+        // `Localization::default()` has no bundle loaded, so `loc.msg(key)`
+        // falls back to the key itself — this only exercises which key the
+        // on/off dispatch picks, not the translated text.
+        let loc = Localization::default();
+        assert_eq!(
+            adaptive_difficulty_label_text(&loc, true),
+            "options-adaptive-difficulty-on"
+        );
+        assert_eq!(
+            adaptive_difficulty_label_text(&loc, false),
+            "options-adaptive-difficulty-off"
+        );
     }
 }

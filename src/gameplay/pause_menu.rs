@@ -288,18 +288,17 @@ pub(super) fn update_adaptive_difficulty_label(
     }
 }
 
+/// Flips both the live per-session cache (for an immediate mid-song
+/// re-unlock, via `resync_notes_on_adaptive_change` reacting to
+/// `AdaptiveDifficulty::is_changed()`) and the persisted global setting —
+/// a single on/off switch shared by every song, not stored per-song.
 fn on_toggle_adaptive_difficulty(
     _: On<Pointer<Click>>,
-    selected_song: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    mut profile: ResMut<PlayerProfile>,
+    mut setting: ResMut<crate::settings::AdaptiveDifficultyEnabled>,
     mut adaptive: ResMut<AdaptiveDifficulty>,
 ) {
     adaptive.enabled = !adaptive.enabled;
-    if let Some(key) = song_key(&selected_song, &manifests) {
-        profile.songs.entry(key).or_default().adaptive_difficulty_enabled = adaptive.enabled;
-        crate::profile::save_profile(&profile);
-    }
+    setting.0 = adaptive.enabled;
 }
 
 /// Marks the phrase-learned slider's track entity (the one carrying

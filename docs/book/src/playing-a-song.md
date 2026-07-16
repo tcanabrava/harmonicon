@@ -56,12 +56,15 @@ over one can't misclick the other. The practice aids:
 - **Practice Speed** — a slider from 50% to 100% that slows the highway and
   metronome without pitch-shifting the audio; it mutes instead below 100%,
   so you never hear a chipmunked backing track.
-- **Adaptive Difficulty** — on by default: a song's notes unlock gradually
-  as you clear each phrase cleanly, instead of throwing the full chart at
-  you immediately. To override a specific phrase, click its rectangle on
-  the song-progress bar's bottom strip (it highlights gold once selected)
-  and drag the **Learned** slider that appears below — or turn the whole
-  feature off with the toggle.
+- **Adaptive Difficulty** — off by default (turn it on in **Options**,
+  under Audio); once on, a song's notes unlock gradually as you clear each
+  phrase cleanly, instead of throwing the full chart at you immediately.
+  This is one setting shared by every song, not something you pick per
+  song. To override a specific phrase, click its rectangle on the
+  song-progress bar's bottom strip (it highlights gold once selected) and
+  drag the **Learned** slider that appears below — or flip the pause
+  menu's own toggle to switch it off/on immediately, mid-song (this also
+  updates the Options-menu setting).
 - **A–B Looping** — drag on the song-progress bar at the top of the screen
   to mark a section and loop it, for drilling one phrase repeatedly.
   **Clear Loop** removes it.

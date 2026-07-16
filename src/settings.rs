@@ -53,6 +53,19 @@ impl Default for AudioSettings {
     }
 }
 
+/// Whether adaptive difficulty (`gameplay::adaptive_difficulty`) gates note
+/// visibility at all — a single global preference, not per-song (unlike the
+/// "learned" progress it uses once on, which stays per-song in
+/// `profile::SongRecord::phrase_learned`). Off by default: it's an opt-in
+/// aid, not something a new player should discover mid-song via a pause
+/// menu toggle they didn't know existed. Edited on the Options page;
+/// `gameplay::adaptive_difficulty::setup_adaptive_difficulty` reads it when
+/// seeding a song's live `AdaptiveDifficulty::enabled`, and the pause
+/// menu's own toggle flips both this and that live resource together, for
+/// an immediate mid-song effect that also persists as the new default.
+#[derive(Resource, Default)]
+pub struct AdaptiveDifficultyEnabled(pub bool);
+
 /// The on-disk shape of the settings. `#[serde(default)]` lets an older or
 /// hand-edited file omit fields and still load.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -68,6 +81,7 @@ struct Settings {
     pitch_algorithm: PitchAlgorithm,
     input_device: String,
     show_note_numbers: bool,
+    adaptive_difficulty_enabled: bool,
 }
 
 impl Default for Settings {
@@ -83,6 +97,7 @@ impl Default for Settings {
             pitch_algorithm: PitchAlgorithm::default(),
             input_device: String::new(),
             show_note_numbers: false,
+            adaptive_difficulty_enabled: false,
         }
     }
 }
@@ -140,6 +155,7 @@ pub struct SettingsPlugin;
 impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AudioSettings>()
+            .init_resource::<AdaptiveDifficultyEnabled>()
             .init_resource::<PendingSave>()
             .add_systems(Startup, apply_loaded_settings)
             // Save whenever either settings resource changes. The Startup load
@@ -154,13 +170,15 @@ impl Plugin for SettingsPlugin {
                          theme_3d: Res<SelectedNoteTheme3d>,
                          model: Res<SelectedHarmonicaModel>,
                          ui_theme: Res<SelectedTheme>,
-                         note_numbers: Res<ShowNoteNumbers>| {
+                         note_numbers: Res<ShowNoteNumbers>,
+                         adaptive_difficulty: Res<AdaptiveDifficultyEnabled>| {
                             audio.is_changed()
                                 || theme_2d.is_changed()
                                 || theme_3d.is_changed()
                                 || model.is_changed()
                                 || ui_theme.is_changed()
                                 || note_numbers.is_changed()
+                                || adaptive_difficulty.is_changed()
                         },
                     ),
                     tick_pending_save,
@@ -183,6 +201,7 @@ pub fn apply_loaded_settings(
     mut model: ResMut<SelectedHarmonicaModel>,
     mut ui_theme: ResMut<SelectedTheme>,
     mut note_numbers: ResMut<ShowNoteNumbers>,
+    mut adaptive_difficulty: ResMut<AdaptiveDifficultyEnabled>,
 ) {
     let settings = load_settings();
     audio.music_volume = settings.music_volume;
@@ -195,8 +214,9 @@ pub fn apply_loaded_settings(
     model.0 = settings.harmonica_model;
     ui_theme.0 = settings.ui_theme;
     note_numbers.0 = settings.show_note_numbers;
+    adaptive_difficulty.0 = settings.adaptive_difficulty_enabled;
     info!(
-        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={} note_numbers={}",
+        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={} note_numbers={} adaptive_difficulty={}",
         audio.music_volume,
         audio.metronome_volume,
         audio.input_latency_ms,
@@ -205,6 +225,7 @@ pub fn apply_loaded_settings(
         model.0,
         ui_theme.0,
         note_numbers.0,
+        adaptive_difficulty.0,
     );
 }
 
@@ -216,6 +237,7 @@ fn save_current(
     model: &SelectedHarmonicaModel,
     ui_theme: &SelectedTheme,
     note_numbers: &ShowNoteNumbers,
+    adaptive_difficulty: &AdaptiveDifficultyEnabled,
 ) {
     save_settings(&Settings {
         music_volume: audio.music_volume,
@@ -228,6 +250,7 @@ fn save_current(
         harmonica_model: model.0.clone(),
         ui_theme: ui_theme.0.clone(),
         show_note_numbers: note_numbers.0,
+        adaptive_difficulty_enabled: adaptive_difficulty.0,
     });
 }
 
@@ -263,6 +286,7 @@ fn tick_pending_save(
     model: Res<SelectedHarmonicaModel>,
     ui_theme: Res<SelectedTheme>,
     note_numbers: Res<ShowNoteNumbers>,
+    adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
 ) {
     let (should_save, remaining) = tick_debounce(pending.0, time.delta_secs());
     pending.0 = remaining;
@@ -274,6 +298,7 @@ fn tick_pending_save(
             &model,
             &ui_theme,
             &note_numbers,
+            &adaptive_difficulty,
         );
     }
 }
@@ -289,6 +314,7 @@ fn flush_pending_save_on_exit(
     model: Res<SelectedHarmonicaModel>,
     ui_theme: Res<SelectedTheme>,
     note_numbers: Res<ShowNoteNumbers>,
+    adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
 ) {
     if exit.read().next().is_none() || pending.0.is_none() {
         return;
@@ -301,12 +327,29 @@ fn flush_pending_save_on_exit(
         &model,
         &ui_theme,
         &note_numbers,
+        &adaptive_difficulty,
     );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── AdaptiveDifficultyEnabled ────────────────────────────────────────────────
+
+    #[test]
+    fn adaptive_difficulty_is_off_by_default() {
+        assert!(!AdaptiveDifficultyEnabled::default().0);
+        assert!(!Settings::default().adaptive_difficulty_enabled);
+    }
+
+    #[test]
+    fn missing_adaptive_difficulty_field_defaults_off_via_serde_default() {
+        // An older settings.json predating this field should load with it
+        // off, not silently on.
+        let s: Settings = serde_json::from_str("{}").unwrap();
+        assert!(!s.adaptive_difficulty_enabled);
+    }
 
     // ── tick_debounce ────────────────────────────────────────────────────────
 

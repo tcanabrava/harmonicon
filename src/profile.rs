@@ -37,13 +37,11 @@ pub struct SongRecord {
     /// phrase section, indexed by the section's ordinal position in the
     /// chart track — see `gameplay::adaptive_difficulty`. Empty until the
     /// song's first play or manual adjustment; a missing/short index reads
-    /// as unlearned (0.0).
+    /// as unlearned (0.0). Whether adaptive difficulty is on at all is a
+    /// single global setting (`settings::AdaptiveDifficultyEnabled`, an
+    /// Options-menu toggle), not per-song — only the learned progress
+    /// itself lives here.
     pub phrase_learned: Vec<f32>,
-    /// Whether adaptive difficulty gates note visibility for this song.
-    /// Defaults to `true` (see the hand-written `Default` impl below —
-    /// `#[serde(default)]` on the struct fills a missing field from it, so
-    /// older `profile.json` files without this field load with it on).
-    pub adaptive_difficulty_enabled: bool,
 }
 
 impl Default for SongRecord {
@@ -54,7 +52,6 @@ impl Default for SongRecord {
             plays: 0,
             technique_best_accuracy: HashMap::new(),
             phrase_learned: Vec::new(),
-            adaptive_difficulty_enabled: true,
         }
     }
 }
@@ -221,18 +218,14 @@ mod tests {
     }
 
     #[test]
-    fn default_song_record_has_adaptive_difficulty_on_and_nothing_learned() {
+    fn default_song_record_has_nothing_learned() {
         let r = record();
-        assert!(r.adaptive_difficulty_enabled);
         assert!(r.phrase_learned.is_empty());
     }
 
     #[test]
-    fn missing_adaptive_fields_default_from_json_via_serde_default() {
-        // An older profile.json predating these fields should still load
-        // with adaptive difficulty on, not `bool::default()` (false).
+    fn missing_phrase_learned_defaults_from_json_via_serde_default() {
         let r: SongRecord = serde_json::from_str("{}").unwrap();
-        assert!(r.adaptive_difficulty_enabled);
         assert!(r.phrase_learned.is_empty());
     }
 

@@ -235,13 +235,15 @@ pub fn first_unresolved_index(notes: &[ScheduledNote]) -> usize {
 
 /// Live per-session cache of a song's phrase sections + adaptive-difficulty
 /// state — built once at song start (`setup_adaptive_difficulty`) from the
-/// chart + [`PlayerProfile`], read by the note-unlock filter (`gameplay_2d`/
-/// `gameplay_3d` setup), the progress-bar phrase strip
-/// (`song_progress_overlay`), and the pause menu's manual phrase selector.
-/// Pause-menu edits write through to both `PlayerProfile` (persisted) and
-/// this resource — changing it here is also what drives the immediate
-/// mid-song note re-unlock (`resync_notes_on_adaptive_change` in each
-/// gameplay mode) and the progress-bar overlay's live re-tint.
+/// chart, [`PlayerProfile`] (learned progress), and the global
+/// `settings::AdaptiveDifficultyEnabled` setting (on/off), read by the
+/// note-unlock filter (`gameplay_2d`/`gameplay_3d` setup), the progress-bar
+/// phrase strip (`song_progress_overlay`), and the pause menu's manual
+/// phrase selector. The pause menu's own on/off toggle writes through to
+/// both `settings::AdaptiveDifficultyEnabled` (persisted, global) and this
+/// resource's `enabled` directly — changing it here is also what drives the
+/// immediate mid-song note re-unlock (`resync_notes_on_adaptive_change` in
+/// each gameplay mode) and the progress-bar overlay's live re-tint.
 #[derive(Resource, Default)]
 pub struct AdaptiveDifficulty {
     pub enabled: bool,
@@ -249,9 +251,10 @@ pub struct AdaptiveDifficulty {
     pub learned: Vec<f32>,
 }
 
-/// Populates [`AdaptiveDifficulty`] from the selected song's chart and its
-/// `PlayerProfile` record (defaulting to enabled + nothing learned yet for a
-/// song with no record). Must run before `gameplay_2d::setup`/
+/// Populates [`AdaptiveDifficulty`] from the selected song's chart, its
+/// `PlayerProfile` record (learned progress only), and the global
+/// `AdaptiveDifficultyEnabled` Options-menu setting (whether it's on at
+/// all — not per-song). Must run before `gameplay_2d::setup`/
 /// `gameplay_3d::setup` so they see this run's unlock state — ordered by
 /// tuple position in `GameplayPlugin::build`, same as `setup_scoring_config`
 /// precedes them today.
@@ -259,6 +262,7 @@ pub(super) fn setup_adaptive_difficulty(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     profile: Res<PlayerProfile>,
+    setting: Res<crate::settings::AdaptiveDifficultyEnabled>,
     lesson: Option<Res<crate::lessons::LessonContext>>,
     mut adaptive: ResMut<AdaptiveDifficulty>,
 ) {
@@ -273,15 +277,14 @@ pub(super) fn setup_adaptive_difficulty(
 
     // A lesson chart is a curriculum unit, not a song being learned
     // phrase-by-phrase: its pass criteria assume every note is present, so
-    // adaptive gating stays off for lesson runs regardless of any profile
-    // record.
+    // adaptive gating stays off for lesson runs regardless of the global
+    // setting.
     let enabled_for_lesson = lesson.is_none();
 
     let key = manifest.path.display().to_string();
     let record = profile.songs.get(&key);
     *adaptive = AdaptiveDifficulty {
-        enabled: enabled_for_lesson
-            && record.map(|r| r.adaptive_difficulty_enabled).unwrap_or(true),
+        enabled: enabled_for_lesson && setting.0,
         learned: record.map(|r| r.phrase_learned.clone()).unwrap_or_default(),
         sections,
     };

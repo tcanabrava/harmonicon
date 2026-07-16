@@ -309,6 +309,91 @@ mod tests {
         assert_eq!(s.sticky_pitch, Pitch::Normal);
     }
 
+    // ── Overblow/Overdraw direction pairing ──────────────────────────────────────
+    //
+    // Overblow only exists while blowing and Overdraw only while drawing
+    // (see `state::pitch_forced_dir`'s doc comment) — a note (or the sticky
+    // arm) must never end up with e.g. `pitch: Overblow, dir: Draw`, a
+    // physically impossible combination that used to be reachable by
+    // arming direction and pitch independently.
+
+    #[test]
+    fn arming_overblow_then_draw_with_nothing_selected_clears_the_pitch() {
+        let mut s = EditorState::default();
+        apply_modifier(&mut s, ModButton::Overblow);
+        assert_eq!(s.sticky_pitch, Pitch::Overblow);
+        assert_eq!(s.sticky_dir, Dir::Blow);
+        apply_modifier(&mut s, ModButton::Draw);
+        assert_eq!(s.sticky_dir, Dir::Draw);
+        assert_eq!(
+            s.sticky_pitch,
+            Pitch::Normal,
+            "overblow can't survive a switch to Draw"
+        );
+    }
+
+    #[test]
+    fn arming_overdraw_then_blow_with_nothing_selected_clears_the_pitch() {
+        let mut s = EditorState::default();
+        apply_modifier(&mut s, ModButton::Overdraw);
+        assert_eq!(s.sticky_pitch, Pitch::Overdraw);
+        assert_eq!(s.sticky_dir, Dir::Draw);
+        apply_modifier(&mut s, ModButton::Blow);
+        assert_eq!(s.sticky_dir, Dir::Blow);
+        assert_eq!(s.sticky_pitch, Pitch::Normal);
+    }
+
+    #[test]
+    fn a_new_note_placed_with_armed_overblow_is_never_tagged_draw() {
+        let mut s = EditorState::default();
+        // Arm Draw first, then Overblow — before the fix these were two
+        // independent sticky fields, so a hole-1..=6 note placed here would
+        // have landed as `pitch: Overblow, dir: Draw`.
+        apply_modifier(&mut s, ModButton::Draw);
+        apply_modifier(&mut s, ModButton::Overblow);
+        select_or_add(&mut s, 3, 0);
+        let n = &s.notes[0];
+        assert_eq!(n.pitch, Pitch::Overblow);
+        assert_eq!(n.dir, Dir::Blow);
+    }
+
+    #[test]
+    fn a_new_note_placed_with_armed_overdraw_is_never_tagged_blow() {
+        let mut s = EditorState::default();
+        apply_modifier(&mut s, ModButton::Blow);
+        apply_modifier(&mut s, ModButton::Overdraw);
+        select_or_add(&mut s, 8, 0);
+        let n = &s.notes[0];
+        assert_eq!(n.pitch, Pitch::Overdraw);
+        assert_eq!(n.dir, Dir::Draw);
+    }
+
+    #[test]
+    fn setting_overblow_on_a_selected_note_forces_its_direction_and_propagates() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 3, 0);
+        apply_modifier(&mut s, ModButton::Draw); // starts as Draw
+        select_or_add(&mut s, 5, 0); // a simultaneous chord note, also Draw
+        s.selected = Some(s.note_at(3, 0).unwrap().id);
+        apply_modifier(&mut s, ModButton::Overblow);
+        let hole3 = s.notes.iter().find(|n| n.hole == 3).unwrap();
+        assert_eq!(hole3.pitch, Pitch::Overblow);
+        assert_eq!(hole3.dir, Dir::Blow);
+        // The whole chord follows — direction is whole-player, not per-hole.
+        assert_eq!(s.notes.iter().find(|n| n.hole == 5).unwrap().dir, Dir::Blow);
+    }
+
+    #[test]
+    fn clicking_draw_on_a_selected_overblow_note_clears_its_pitch() {
+        let mut s = EditorState::default();
+        select_or_add(&mut s, 3, 0);
+        apply_modifier(&mut s, ModButton::Overblow);
+        assert_eq!(s.notes[0].pitch, Pitch::Overblow);
+        apply_modifier(&mut s, ModButton::Draw);
+        assert_eq!(s.notes[0].dir, Dir::Draw);
+        assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    }
+
     #[test]
     fn pitch_and_expression_stack() {
         let mut s = EditorState::default();

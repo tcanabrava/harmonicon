@@ -48,6 +48,9 @@ no-songs-found = Nenhuma música encontrada. Adicione pastas em assets/songs/<ar
 # Opções
 options-title = Opções
 options-language = Idioma
+options-adaptive-difficulty = Dificuldade Adaptativa
+options-adaptive-difficulty-on = Dificuldade Adaptativa: ativada
+options-adaptive-difficulty-off = Dificuldade Adaptativa: desativada
 
 # Compartilhado
 back = ← Voltar

@@ -471,6 +471,24 @@ pub(super) fn overdraw_ok(hole: u8) -> bool {
     (7..=10).contains(&hole)
 }
 
+/// The breath direction `pitch` physically requires, if any — `Overblow`
+/// only exists while *blowing* (the name says so), `Overdraw` only while
+/// *drawing*, regardless of which reed the resulting pitch happens to sit
+/// near (`song::harmonica::hole_notes`'s doc comment: overblow sounds a
+/// semitone above the *draw* reed, overdraw above the *blow* reed — the
+/// technique name is about the breath action, not the reed). `Bend`/`Slide`
+/// have no such constraint — a bend can be dialed in on either a blow or a
+/// draw note depending on the hole. Used to keep a note's `dir` and `pitch`
+/// from drifting into a physically impossible pairing (e.g. "overblow"
+/// tagged on a draw note) as either one changes independently.
+pub(super) fn pitch_forced_dir(pitch: Pitch) -> Option<Dir> {
+    match pitch {
+        Pitch::Overblow => Some(Dir::Blow),
+        Pitch::Overdraw => Some(Dir::Draw),
+        _ => None,
+    }
+}
+
 pub(super) fn pitch_color(pitch: Pitch) -> Color {
     match pitch {
         Pitch::Normal => Color::srgb(0.30, 0.60, 0.95),

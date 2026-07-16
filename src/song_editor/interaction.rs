@@ -11,7 +11,7 @@ use super::playback::Playhead;
 use super::state::{
     Dir, DragKind, EditorState, Expr, GridNote, Pitch, Scroll, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN,
     VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction, enforce_expr,
-    max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible,
+    max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
 use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -45,7 +45,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     // wins over the armed sticky direction — a brand-new chord note has to
     // match its siblings, not fight them. `sticky_dir` only applies when
     // there's nothing there yet to match.
-    let dir = state.dir_at(tick).unwrap_or(state.sticky_dir);
+    let mut dir = state.dir_at(tick).unwrap_or(state.sticky_dir);
     // A sticky pitch that doesn't fit *this particular* hole (e.g. armed
     // Overblow while placing a note on hole 8) silently falls back to
     // Normal for just this note — same "silently do nothing on an
@@ -56,6 +56,13 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     } else {
         Pitch::Normal
     };
+    // Overblow/Overdraw physically require a specific breath direction
+    // (see `pitch_forced_dir`) — that always wins, even over whatever's
+    // already sounding at this tick, since a mismatched pairing (e.g.
+    // "overblow" on a note tagged Draw) can't exist for real.
+    if let Some(forced) = pitch_forced_dir(pitch) {
+        dir = forced;
+    }
     let expr = state.sticky_expr;
 
     let id = state.next_id;
@@ -70,9 +77,13 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         expr,
     });
     state.selected = Some(id);
-    // Wah/vibrato is a whole-player technique — an armed sticky expr must
-    // propagate to every note already sounding at this instant too, or a
-    // chord could end up with only one hole "doing" it.
+    // A chord note whose direction was forced (above), or that's carrying
+    // an armed sticky expr, must pull any simultaneous notes on other
+    // holes into agreement too — direction and wah/vibrato are both
+    // whole-player techniques, not per-hole.
+    if pitch_forced_dir(pitch).is_some() {
+        enforce_direction(state, id);
+    }
     if expr != Expr::None {
         enforce_expr(state, id);
     }
@@ -97,11 +108,19 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         };
         // Arms the sticky direction regardless of whether anything is
         // selected — a note to edit is optional, arming for future notes
-        // isn't.
+        // isn't. An armed Overblow/Overdraw that no longer matches this
+        // direction can't survive the switch (see `pitch_forced_dir`) —
+        // clear it rather than leave e.g. "overblow" armed alongside Draw.
         state.sticky_dir = dir;
+        if pitch_forced_dir(state.sticky_pitch).is_some_and(|d| d != dir) {
+            state.sticky_pitch = Pitch::Normal;
+        }
         if let Some(id) = state.selected {
             if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                 n.dir = dir;
+                if pitch_forced_dir(n.pitch).is_some_and(|d| d != dir) {
+                    n.pitch = Pitch::Normal;
+                }
             }
             enforce_direction(state, id);
         }
@@ -148,6 +167,11 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 } else {
                     Pitch::Overblow
                 };
+                // Overblow only exists while blowing — force it so the
+                // note can't end up "overblow" while tagged Draw.
+                if note.pitch == Pitch::Overblow {
+                    note.dir = Dir::Blow;
+                }
             }
         }
         ModButton::Overdraw => {
@@ -157,6 +181,9 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 } else {
                     Pitch::Overdraw
                 };
+                if note.pitch == Pitch::Overdraw {
+                    note.dir = Dir::Draw;
+                }
             }
         }
         ModButton::Slide => {
@@ -190,15 +217,23 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         }
         ModButton::Delete => unreachable!(),
     }
-    // Read the note's resulting pitch/expr out before writing to `state`
-    // again below — `note` is still borrowing it at this point.
-    let (new_pitch, new_expr) = (note.pitch, note.expr);
+    // Read the note's resulting pitch/expr/dir out before writing to
+    // `state` again below — `note` is still borrowing it at this point.
+    let (new_pitch, new_expr, new_dir) = (note.pitch, note.expr, note.dir);
 
     // Arm sticky to match whatever the selected note now holds, so the
     // next *added* note (`select_or_add`) picks up the same setting.
     match kind {
         ModButton::Bend | ModButton::Overblow | ModButton::Overdraw | ModButton::Slide => {
             state.sticky_pitch = new_pitch;
+            // Overblow/Overdraw forced `note.dir` above — mirror that into
+            // the sticky direction too, and pull any simultaneous notes on
+            // other holes into agreement (direction is whole-player, not
+            // per-hole).
+            if pitch_forced_dir(new_pitch).is_some() {
+                state.sticky_dir = new_dir;
+                enforce_direction(state, id);
+            }
         }
         ModButton::Wah | ModButton::Vibrato => {
             state.sticky_expr = new_expr;
@@ -236,6 +271,13 @@ fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
     } else {
         pitch
     };
+    // Arming Overblow/Overdraw with nothing selected must arm the
+    // direction it requires too — otherwise a subsequently placed note
+    // could still end up with e.g. `sticky_pitch: Overblow` alongside a
+    // stale `sticky_dir: Draw` from something clicked earlier.
+    if let Some(dir) = pitch_forced_dir(state.sticky_pitch) {
+        state.sticky_dir = dir;
+    }
 }
 
 fn cycle_sticky_wah(state: &mut EditorState) {

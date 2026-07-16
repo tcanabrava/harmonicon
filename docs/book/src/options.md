@@ -24,6 +24,10 @@
 - **Note labels** — swaps the up/down arrow on falling notes for the
   actual hole number, in both [Play 2D](play-2d.md) and [Play 3D](
   play-3d.md).
+- **Adaptive Difficulty** — off by default; turns on gradual note
+  unlocking for every song (see [Playing a Song](playing-a-song.md)). One
+  setting shared by every song, not picked per song — the pause menu's own
+  toggle during a song changes this same setting.
 - **Theme** — opens the [theme picker](themes.md).
 - **Calibrate input lag** — opens [input-lag calibration](calibration.md).
 

@@ -50,6 +50,9 @@ no-songs-found = No songs found. Add folders under assets/songs/<artist>/<song>/
 # Options
 options-title = Options
 options-language = Language
+options-adaptive-difficulty = Adaptive Difficulty
+options-adaptive-difficulty-on = Adaptive Difficulty: on
+options-adaptive-difficulty-off = Adaptive Difficulty: off
 
 # Shared
 back = ← Back
