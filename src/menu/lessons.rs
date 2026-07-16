@@ -387,21 +387,28 @@ pub(super) fn setup_lesson_reader(
     };
 
     // Instructional body — width-capped so long text wraps like a page
-    // rather than spanning the whole window.
+    // rather than spanning the whole window, on a dark translucent card so
+    // it stays readable over a busy background image.
     let body = commands
         .spawn((
-            Text::new(String::from(loc.msg(&entry.manifest.body_key))),
-            TextFont {
-                font_size: FontSize::Px(18.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.82, 0.84, 0.90)),
             Node {
                 max_width: Val::Px(760.0),
                 margin: UiRect::axes(Val::Px(24.0), Val::Px(8.0)),
+                padding: UiRect::axes(Val::Px(18.0), Val::Px(14.0)),
                 ..default()
             },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.95)),
         ))
+        .with_children(|card| {
+            card.spawn((
+                Text::new(String::from(loc.msg(&entry.manifest.body_key))),
+                TextFont {
+                    font_size: FontSize::Px(18.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.82, 0.84, 0.90)),
+            ));
+        })
         .id();
     commands.entity(root).add_child(body);
 
