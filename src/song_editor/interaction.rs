@@ -29,18 +29,31 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         state.selected = Some(existing.id);
         return;
     }
+
     let next_start = state
         .notes
         .iter()
         .filter(|n| n.hole == hole && n.tick > tick)
         .map(|n| n.tick)
         .min();
+
     let len = next_start
         .map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT))
         .max(1);
-    let dir = state.dir_at(tick).unwrap_or(Dir::Blow);
+
+    let dir = state.dir_at(tick).unwrap_or(state.current_direction);
+
     let id = state.next_id;
     state.next_id += 1;
+
+    let expr: Expr = if state.wah_is_selected {
+        Expr::Wah(state.curr_modifier_intensity)
+    } else if state.vibratto_is_selected {
+        Expr::Vibrato(state.curr_modifier_intensity)
+    } else {
+        Expr::None
+    };
+
     state.notes.push(GridNote {
         id,
         hole,
@@ -48,7 +61,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         len,
         dir,
         pitch: Pitch::Normal,
-        expr: Expr::None,
+        expr: expr,
     });
     state.selected = Some(id);
 }
@@ -75,13 +88,21 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
             n.dir = dir;
         }
+        state.current_direction = dir;
         enforce_direction(state, id);
         return;
     }
 
-    let Some(note) = state.selected_note_mut() else {
+    // Copy the selected note, so we don't break rust borrow rules
+    let Some(note) = state.selected_note() else {
         return;
     };
+    let mut note: GridNote = note.clone();
+
+    // Those will be calculated on the next match.
+    state.vibratto_is_selected = false;
+    state.wah_is_selected = false;
+
     match kind {
         ModButton::Blow | ModButton::Draw => unreachable!(),
         ModButton::Bend => {
@@ -127,10 +148,13 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 _ => WAH_HZ_MIN,
             };
             note.expr = if next > WAH_HZ_MAX + f32::EPSILON {
+                state.wah_is_selected = false;
                 Expr::None
             } else {
+                state.wah_is_selected = true;
                 Expr::Wah(next)
             };
+            state.curr_modifier_intensity = next;
         }
         ModButton::Vibrato => {
             let next = match note.expr {
@@ -138,13 +162,20 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 _ => VIBRATO_HZ_MIN,
             };
             note.expr = if next > VIBRATO_HZ_MAX + f32::EPSILON {
+                state.vibratto_is_selected = false;
                 Expr::None
             } else {
+                state.vibratto_is_selected = true;
                 Expr::Vibrato(next)
             };
+            state.curr_modifier_intensity = next;
         }
         ModButton::Delete => unreachable!(),
     }
+
+    // then update the selected note with our changes.
+    state.update_selected_note(note);
+
     if matches!(kind, ModButton::Wah | ModButton::Vibrato) {
         enforce_expr(state, id);
     }

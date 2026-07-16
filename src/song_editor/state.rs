@@ -257,6 +257,12 @@ pub(super) struct EditorState {
     /// answer for. Set right before opening the dialog; read and cleared
     /// once `ConfirmChosen` arrives — see `timeline::handle_timeline_confirm`.
     pub(super) pending_timeline_op: Option<(TimelineTool, usize, usize)>,
+
+    // button state for features that should be sticky.
+    pub(super) wah_is_selected: bool,
+    pub(super) vibratto_is_selected: bool,
+    pub(super) curr_modifier_intensity: f32,
+    pub(super) current_direction: Dir,
 }
 
 impl Default for EditorState {
@@ -282,6 +288,10 @@ impl Default for EditorState {
             timeline_split: None,
             timeline_drag: None,
             pending_timeline_op: None,
+            wah_is_selected: false,
+            vibratto_is_selected: false,
+            curr_modifier_intensity: 0.0,
+            current_direction: Dir::Blow
         }
     }
 }
@@ -305,6 +315,15 @@ impl EditorState {
 
     pub(super) fn selected_note(&self) -> Option<&GridNote> {
         self.selected.and_then(|id| self.note_by_id(id))
+    }
+
+    pub(super) fn update_selected_note(&mut self, new_note: GridNote) {
+        let curr_id = self.selected
+            .expect("Tried to get a note but there is no selection");
+        let curr_note = self.notes.iter_mut().find(|n| n.id == curr_id)
+            .expect("Valid id but invalid note.");
+
+        *curr_note = new_note;
     }
 
     pub(super) fn selected_note_mut(&mut self) -> Option<&mut GridNote> {
