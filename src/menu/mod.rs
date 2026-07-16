@@ -448,15 +448,8 @@ pub(super) fn spawn_button<M: 'static>(
         commands.entity(e).observe(
             move |_: On<Pointer<Over>>,
                   mats: Res<ButtonMaterials>,
-                  theme: Res<LoadedTheme>,
                   mut commands: Commands| {
                 set_button_visual(&mut commands, layer, ButtonVisual::Hover, &mats);
-                if let Some(ref snd) = theme.btn_sound_hover {
-                    commands.spawn((
-                        AudioPlayer::<AudioSource>(snd.clone()),
-                        PlaybackSettings::DESPAWN,
-                    ));
-                }
             },
         );
         commands.entity(e).observe(
@@ -467,15 +460,8 @@ pub(super) fn spawn_button<M: 'static>(
         commands.entity(e).observe(
             move |_: On<Pointer<Press>>,
                   mats: Res<ButtonMaterials>,
-                  theme: Res<LoadedTheme>,
                   mut commands: Commands| {
                 set_button_visual(&mut commands, layer, ButtonVisual::Click, &mats);
-                if let Some(ref snd) = theme.btn_sound_click {
-                    commands.spawn((
-                        AudioPlayer::<AudioSource>(snd.clone()),
-                        PlaybackSettings::DESPAWN,
-                    ));
-                }
             },
         );
 
