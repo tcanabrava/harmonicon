@@ -2,6 +2,7 @@
 
 pub mod audio_input;
 pub mod midi;
+pub mod pipeline;
 pub mod pitch_detect;
 pub(crate) mod synth;
 pub mod wav;
