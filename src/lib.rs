@@ -13,6 +13,7 @@
 // Allowed crate-wide rather than annotating every system individually.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
+pub mod app;
 pub mod assets_management;
 pub mod audio_system;
 pub mod dialogs;
