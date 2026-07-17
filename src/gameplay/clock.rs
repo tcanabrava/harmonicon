@@ -14,6 +14,17 @@
 
 use bevy::prelude::*;
 
+use crate::app::GameplayMode;
+
+use super::notes::{SongNotes, loop_reset_range, wait_freeze_index};
+use super::pause_menu;
+use super::state::{LoopConfig, MusicPlayer, MusicStarted};
+use super::wait_freeze_overlay;
+
+/// Length of the pre-song countdown, in seconds. The clock starts at
+/// `-COUNTDOWN` and counts up to 0, when the music starts.
+pub const COUNTDOWN: f64 = 3.0;
+
 /// The single clock all gameplay systems read. Negative during the 3s
 /// countdown; music starts at clock 0.
 #[derive(Resource, Default)]
@@ -94,6 +105,132 @@ impl GameplayClock {
             warn!("GameplayClock::rewind_to({t}): failed to seek music sink: {e:?}");
         }
     }
+}
+
+/// Ticks the single [`GameplayClock`] all gameplay systems read. Once the
+/// countdown finishes and the song's music starts, the clock is kept
+/// anchored to the `AudioSink` playback position instead of free-running on
+/// `Time::delta` — otherwise decoder start-up delay and frame hitches drift
+/// the notes out of sync with the audio over a long song. Jam Session has no
+/// long track to drift against and stays frame-timer driven (metronome-led).
+///
+/// Two things can take the clock off that path, and both work the same way:
+/// the music sink should or shouldn't be audible right now
+/// (`should_play`), computed once and compared against the sink's own
+/// `is_paused()` so `AudioSink::pause`/`play` only ever fires on the actual
+/// edge — calling it ~60 times a second turned out to visibly upset the
+/// audio backend (observed as odd behaviour in the *microphone* input, a
+/// fully separate pipeline, which only makes sense if repeatedly toggling
+/// the output stream was disturbing a shared audio graph/server).
+///
+/// - `WaitForNoteMode` on (or the due note's own `ScheduledNote::force_wait`
+///   — a call-and-response phrase's response notes always freeze, whether
+///   or not the player has that practice toggle on) and a playable note due
+///   and still unhit (`first_due_unresolved_note`): the clock simply isn't
+///   advanced this frame, holding it exactly at the hit line. `judge::
+///   score_notes` keeps re-judging the same held instant every frame, so
+///   the moment the player plays the note it scores (typically a Perfect,
+///   since the offset never moved) and the very next frame the condition is
+///   false again. Jam Session never populates `SongNotes`, so this is a
+///   no-op there.
+/// - `PracticeSpeed` below 100%: real time-stretched audio isn't
+///   implemented, so the sink just pauses instead of playing pitch-shifted,
+///   and the clock free-runs on `Time::delta` scaled by the speed instead of
+///   anchoring (the sink's position wouldn't mean anything at the wrong
+///   speed anyway). Coming back to 100% re-seeks the sink to the clock's
+///   current position (`GameplayClock::rewind_to`) before resuming it, since
+///   it sat still the whole time the clock kept moving.
+pub(crate) fn tick_clock(
+    mut clock: ResMut<GameplayClock>,
+    time: Res<Time>,
+    mode: Res<GameplayMode>,
+    music_started: Res<MusicStarted>,
+    wait_mode: Res<pause_menu::WaitForNoteMode>,
+    mut wait_freeze: ResMut<wait_freeze_overlay::WaitFreezeState>,
+    practice_speed: Res<pause_menu::PracticeSpeed>,
+    song_notes: Res<SongNotes>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    let due = wait_freeze_index(&song_notes.notes, song_notes.cursor, clock.get(), wait_mode.0);
+    // Gated so `ResMut`'s change detection (which `wait_freeze_overlay`'s
+    // prompt reacts to) only fires on an actual transition, not every frame.
+    if due != wait_freeze.0 {
+        wait_freeze.0 = due;
+    }
+
+    let full_speed = practice_speed.0 == 1.0;
+    let should_play = due.is_none() && full_speed;
+    if let Ok(sink) = sinks.single() {
+        if should_play && sink.is_paused() {
+            let t = clock.get();
+            clock.rewind_to(t, Some(sink));
+            sink.play();
+        } else if !should_play && !sink.is_paused() {
+            sink.pause();
+        }
+    }
+
+    if due.is_some() {
+        return;
+    }
+    if !full_speed {
+        clock.advance(time.delta_secs_f64() * practice_speed.0 as f64, None);
+        return;
+    }
+
+    let dt = time.delta_secs_f64();
+    let audio_pos = sinks
+        .single()
+        .ok()
+        .filter(|sink| should_anchor_to_sink(clock.get(), music_started.0, &mode, sink.empty()))
+        .map(|sink| sink.position().as_secs_f64());
+    clock.advance(dt, audio_pos);
+}
+
+/// Whether [`tick_clock`] should anchor the clock to the music sink's
+/// reported position this frame, rather than free-running on frame delta:
+/// past the countdown, once music has actually started, and never in Jam
+/// Session (no long track to drift against there — see `tick_clock`'s doc
+/// comment).
+///
+/// Also `false` once the sink's queue is empty. A finished sink's
+/// `position()` freezes at its last value instead of continuing to advance,
+/// so anchoring to it would make `advance_clock` repeatedly snap the clock
+/// back to that frozen point once real time drifts past
+/// `SNAP_THRESHOLD_SECS` — better to free-run past that point instead.
+pub(crate) fn should_anchor_to_sink(clock: f64, music_started: bool, mode: &GameplayMode, sink_empty: bool) -> bool {
+    clock >= 0.0 && music_started && *mode != GameplayMode::JamSession && !sink_empty
+}
+
+pub(crate) fn handle_loop_boundary(
+    loop_cfg: Res<LoopConfig>,
+    mut clock: ResMut<GameplayClock>,
+    mut song_notes: ResMut<SongNotes>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    if !loop_cfg.active || clock.get() < loop_cfg.end_time {
+        return;
+    }
+    // `rewind_to` also seeks the sink, so `tick_clock`'s anchoring doesn't
+    // see it far ahead of the just-rewound clock next frame and drag the
+    // clock forward again — see the doc comment on `GameplayClock`.
+    clock.rewind_to(loop_cfg.start_time, sinks.single().ok());
+
+    // `notes` is sorted by `time`, so the reset range is one contiguous
+    // slice — binary search it instead of scanning the whole song.
+    let (start_idx, end_idx) =
+        loop_reset_range(&song_notes.notes, loop_cfg.start_time, loop_cfg.end_time);
+    for note in &mut song_notes.notes[start_idx..end_idx] {
+        note.hit = false;
+        note.missed = false;
+        note.held = 0.0;
+        note.sustain_scored = false;
+    }
+    // These notes are playable again, so `judge::score_notes`'s cursor
+    // (which only ever advances past *permanently* resolved notes) can't
+    // stay ahead of them — `min` in case the loop wraps before ever
+    // reaching this section.
+    song_notes.cursor = song_notes.cursor.min(start_idx);
 }
 
 #[cfg(test)]

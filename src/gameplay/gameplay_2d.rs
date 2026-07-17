@@ -25,10 +25,15 @@ use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
 use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
-    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HIT_H_PCT,
+    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot,
     HoleCell, HoleState, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote, ScoreText, SongNotes,
     ValidHarpNotes,
 };
+
+/// Height of the hit line, as a percentage of the play area — the region a
+/// note's leading edge must reach to be judged. Only ever used by the 2D
+/// scroll layout (the 3D lane has no equivalent strip).
+pub const HIT_H_PCT: f32 = 7.0;
 
 /// Chart-level (not per-note) rendering config `spawn_visible_notes` needs
 /// once a note's `LOOKAHEAD` window arrives — set once at song load
