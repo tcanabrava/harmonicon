@@ -21,20 +21,21 @@ use crate::song::harmonica::Progression;
 use crate::theme::LoadedTheme;
 
 use crate::app::{AppState, GameplayMode, JamProgression, SelectedSong};
-
-use super::{ButtonMaterials, MenuPage, spawn_button, spawn_menu_root};
+use crate::dialogs::button_material::ButtonMaterials;
+use crate::menu::routing::MenuPage;
+use crate::menu::scene::{spawn_button, spawn_menu_root};
 
 /// The lesson the reader page shows — set by the list page's buttons right
 /// before switching to [`MenuPage::LessonReader`].
 #[derive(Resource, Default)]
-pub(super) struct SelectedLesson(pub Option<String>);
+pub(crate) struct SelectedLesson(pub Option<String>);
 
 /// The unit tab currently shown on the list page — an index into
 /// [`group_by_unit`]'s order. Persists across visits (returning from a
 /// lesson lands back on the same tab); clamped on read so a shrunk lesson
 /// set can't leave it dangling.
 #[derive(Resource, Default)]
-pub(super) struct SelectedUnitIx(pub usize);
+pub(crate) struct SelectedUnitIx(pub usize);
 
 /// Fired by the tab bar's `on_select` observer when the user actually
 /// switches units — [`repopulate_lesson_list`] reacts to this instead of
@@ -47,14 +48,14 @@ pub(super) struct SelectedUnitIx(pub usize);
 /// have finished processing yet, which panics ("Entity despawned") when
 /// its deferred command applies against the now-recycled entity index.
 #[derive(Message)]
-pub(super) struct LessonUnitChanged;
+pub(crate) struct LessonUnitChanged;
 
 /// The scrollbox holding the selected unit's lesson rows, so
 /// [`repopulate_lesson_list`] can swap its children when the tab changes.
-/// `pub(super)` only because it appears in that system's signature, which
+/// `pub(crate)` only because it appears in that system's signature, which
 /// `menu::MenuPlugin` names when registering it.
 #[derive(Component)]
-pub(super) struct LessonListBox;
+pub(crate) struct LessonListBox;
 
 /// Looks a lesson up by id. The list page always sets [`SelectedLesson`]
 /// before opening the reader, so a miss only happens if something desyncs —
@@ -120,7 +121,7 @@ fn is_jam_criteria(criteria: Option<&PassCriteria>) -> bool {
 /// `Progression` it names. Absent or unrecognized both fall back to
 /// `Standard` — the same "don't let a stale pick linger" default the
 /// real-song Jam Session button applies.
-pub(super) fn parse_progression(s: Option<&str>) -> Progression {
+pub(crate) fn parse_progression(s: Option<&str>) -> Progression {
     match s {
         Some("quick-change") => Progression::QuickChange,
         Some("minor") => Progression::Minor,
@@ -130,7 +131,7 @@ pub(super) fn parse_progression(s: Option<&str>) -> Progression {
 
 // ── Lesson list page ──────────────────────────────────────────────────────────
 
-pub(super) fn setup_lessons_menu(
+pub(crate) fn setup_lessons_menu(
     mut commands: Commands,
     lessons: Res<AvailableLessons>,
     profile: Res<PlayerProfile>,
@@ -222,7 +223,7 @@ pub(super) fn setup_lessons_menu(
 /// distinguish "the user just switched tabs" from "this run condition has
 /// never observed this resource before" (see the doc comment on
 /// [`LessonUnitChanged`]).
-pub(super) fn repopulate_lesson_list(
+pub(crate) fn repopulate_lesson_list(
     mut changed: MessageReader<LessonUnitChanged>,
     lessons: Res<AvailableLessons>,
     profile: Res<PlayerProfile>,
@@ -361,7 +362,7 @@ fn spawn_back_to_play(
 
 // ── Lesson reader page ────────────────────────────────────────────────────────
 
-pub(super) fn setup_lesson_reader(
+pub(crate) fn setup_lesson_reader(
     mut commands: Commands,
     selected: Res<SelectedLesson>,
     lessons: Res<AvailableLessons>,

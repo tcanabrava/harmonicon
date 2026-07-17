@@ -19,8 +19,9 @@ use crate::song::harmonica::Progression;
 use crate::theme::LoadedTheme;
 
 use crate::app::{AppState, GameplayMode, JamProgression, SelectedSong};
-
-use super::{ButtonMaterials, MenuPage, spawn_button, spawn_menu_root};
+use crate::dialogs::button_material::ButtonMaterials;
+use crate::menu::routing::MenuPage;
+use crate::menu::scene::{spawn_button, spawn_menu_root};
 
 const MIN_BPM: f32 = 60.0;
 const MAX_BPM: f32 = 160.0;
@@ -30,7 +31,7 @@ const BPM_STEP: f32 = 5.0;
 /// (like `bending_trainer::TrainerKey`/`TrainerTarget`), so re-opening the
 /// page keeps your last choice instead of resetting to the default.
 #[derive(Resource)]
-pub(super) struct JamGenerateConfig {
+pub(crate) struct JamGenerateConfig {
     pub key: String,
     pub bpm: f32,
     pub progression: Progression,
@@ -47,13 +48,13 @@ impl Default for JamGenerateConfig {
 }
 
 #[derive(Component)]
-pub(super) struct KeyLabel;
+pub(crate) struct KeyLabel;
 #[derive(Component)]
-pub(super) struct BpmLabel;
+pub(crate) struct BpmLabel;
 #[derive(Component)]
-pub(super) struct ProgressionLabel;
+pub(crate) struct ProgressionLabel;
 
-pub(super) fn setup_jam_generate_menu(
+pub(crate) fn setup_jam_generate_menu(
     mut commands: Commands,
     config: Res<JamGenerateConfig>,
     theme: Res<LoadedTheme>,
@@ -229,7 +230,7 @@ pub(super) fn setup_jam_generate_menu(
 
 /// Keeps the "Key: ..." / "Tempo: ..." readouts in step with
 /// [`JamGenerateConfig`], same pattern as `bending_trainer::update_key_label`.
-pub(super) fn update_jam_generate_labels(
+pub(crate) fn update_jam_generate_labels(
     config: Res<JamGenerateConfig>,
     mut keys: Query<
         &mut Text,

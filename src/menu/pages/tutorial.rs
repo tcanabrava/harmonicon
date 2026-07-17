@@ -23,8 +23,7 @@ use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
 
 use crate::app::{AppState, GameplayMode, SelectedSong};
-
-use super::MenuPage;
+use crate::menu::routing::MenuPage;
 
 /// The bundled song a live-gameplay tour step plays a few seconds of. Long
 /// enough (well over two minutes) that no tour step could ever run it to
@@ -160,7 +159,7 @@ pub(crate) struct TutorialTour {
 /// screens the tour itself drives through despawn it as part of their own
 /// teardown; only the tour's own end logic does.
 #[derive(Component)]
-pub(super) struct TutorialOverlayRoot;
+pub(crate) struct TutorialOverlayRoot;
 
 /// True while a tour is running — the gate every screen the tour can drive
 /// through (gameplay's pause menu, the Bending Trainer, the Song Editor,
@@ -179,7 +178,7 @@ pub(crate) fn tour_active(tour: Option<Res<TutorialTour>>) -> bool {
 /// entering `AppState::Menu` — a `Playing`/`BendingTrainer`/`SongEditor`
 /// step never targets `Menu` directly, see [`enter_tour_target`] — but a
 /// missing entry falls back to `Main` rather than panicking regardless).
-pub(super) fn tour_menu_landing(tour: &TutorialTour) -> MenuPage {
+pub(crate) fn tour_menu_landing(tour: &TutorialTour) -> MenuPage {
     if tour.step >= TOUR_STEPS.len() {
         return tour.return_to.clone();
     }
@@ -192,7 +191,7 @@ pub(super) fn tour_menu_landing(tour: &TutorialTour) -> MenuPage {
 /// Whether the tour resource should be dropped once `route_menu_entry` has
 /// used it to route this `OnEnter(AppState::Menu)` — true once it's past
 /// its last real step (the "ending" sentinel described on [`TutorialTour`]).
-pub(super) fn tour_finished(tour: &TutorialTour) -> bool {
+pub(crate) fn tour_finished(tour: &TutorialTour) -> bool {
     tour.step >= TOUR_STEPS.len()
 }
 
@@ -202,7 +201,7 @@ pub(super) fn tour_finished(tour: &TutorialTour) -> bool {
 /// `AppState::Menu` to click it from, so this can set `NextState<MenuPage>`
 /// directly rather than going through `route_menu_entry` — see
 /// [`enter_tour_target`]'s doc comment for why later steps can't.
-pub(super) fn start_tutorial_tour(
+pub(crate) fn start_tutorial_tour(
     _: On<Pointer<Click>>,
     page: Res<State<MenuPage>>,
     mut commands: Commands,
@@ -277,7 +276,7 @@ fn skip_tutorial_tour(
 
 /// Ticks the active step's timer and, once it finishes, either advances to
 /// the next step or ends the tour.
-pub(super) fn advance_tutorial_tour(
+pub(crate) fn advance_tutorial_tour(
     time: Res<Time>,
     tour: Option<ResMut<TutorialTour>>,
     mut next_app_state: ResMut<NextState<AppState>>,
@@ -318,7 +317,7 @@ pub(super) fn advance_tutorial_tour(
 /// text for the current step) whenever the tour resource changes — inserted
 /// (tour just started) or its `step` just advanced — and despawns it the
 /// instant the tour resource is gone (skipped, or ran out of steps).
-pub(super) fn sync_tutorial_overlay(
+pub(crate) fn sync_tutorial_overlay(
     tour: Option<Res<TutorialTour>>,
     existing: Query<Entity, With<TutorialOverlayRoot>>,
     mut commands: Commands,

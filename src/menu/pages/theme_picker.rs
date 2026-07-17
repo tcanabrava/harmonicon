@@ -22,7 +22,8 @@ use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
 use crate::theme::{LoadedTheme, theme_source_prefix};
 
-use super::{MenuPage, MenuRoot, cleanup_menu, spawn_button};
+use crate::menu::routing::MenuPage;
+use crate::menu::scene::{MenuRoot, cleanup_menu, spawn_button};
 
 const THEME_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
 const THEME_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
