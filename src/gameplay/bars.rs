@@ -2,7 +2,7 @@
 
 //! Bar-position math: time-signature parsing, bar-index arithmetic, and the
 //! per-frame [`CurrentBar`]/[`AbsoluteBar`] tracker shared by
-//! `twelve_bar_blues_overlay` and `jam_session`.
+//! `twelve_bar_blues_overlay` and `jam::session`.
 
 use bevy::prelude::*;
 
@@ -38,7 +38,7 @@ pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
 }
 
 /// The bar `track_current_bar` last computed — shared so
-/// `twelve_bar_blues_overlay::update_bar` and `jam_session::update_hole_map`
+/// `twelve_bar_blues_overlay::update_bar` and `jam::session::update_hole_map`
 /// don't each recompute it (previously from two different beats-per-bar
 /// sources that could disagree: `ScoringConfig::beats_per_bar`, which honors
 /// a chart's `time_signature_map` override, vs `JamHoleGuide`'s own copy,
@@ -47,7 +47,7 @@ pub fn current_bar_index(clock: f64, secs_per_bar: f64) -> usize {
 pub struct CurrentBar(pub usize);
 
 /// [`absolute_bar_index`]'s result, tracked the same frame as [`CurrentBar`]
-/// — `jam_session`'s phrase-discipline lesson primitive needs a play/rest
+/// — `jam::improv`'s phrase-discipline lesson primitive needs a play/rest
 /// bar pattern that repeats consistently across an open-ended jam, not one
 /// that resets every 12 bars the way `CurrentBar` does.
 #[derive(Resource, Default)]

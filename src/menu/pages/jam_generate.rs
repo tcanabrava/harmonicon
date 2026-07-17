@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Generated Jam Session setup: pick a key and tempo, then start an
-//! endless synthesized 12-bar backing (`crate::jam_backing`) without first
+//! endless synthesized 12-bar backing (`crate::jam::backing`) without first
 //! picking an existing song — a second way into `GameplayMode::JamSession`
 //! alongside the "Jam Session" button's real-song flow.
 
@@ -12,7 +12,7 @@ use bevy_fluent::Localization;
 
 use crate::audio_system::midi::{next_key, prev_key};
 use crate::dialogs::button;
-use crate::jam_backing::{GeneratedJamSession, build_generated_manifest};
+use crate::jam::backing::{GeneratedJamSession, build_generated_manifest};
 use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
 use crate::song::harmonica::Progression;

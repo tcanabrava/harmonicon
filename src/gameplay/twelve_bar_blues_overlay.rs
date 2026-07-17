@@ -57,7 +57,7 @@ impl GridConfig {
 /// the 12-bar-blues progression is drawn (Jam Session grid, song editor
 /// grid). `progression` is almost always [`Progression::Standard`] — only
 /// Jam Session's own grid/hole-map ever use a different one (see
-/// `gameplay::jam_session`); passing it explicitly here (rather than this
+/// `jam::session`); passing it explicitly here (rather than this
 /// function assuming Standard internally, the way it used to) is what keeps
 /// the color coding from disagreeing with a grid that's showing a different
 /// progression's chord names.

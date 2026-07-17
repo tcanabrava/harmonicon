@@ -36,7 +36,7 @@ pub(crate) enum MenuPage {
     /// `pages::jam_session::setup_jam_session_menu`.
     JamSessionMenu,
     /// Key/tempo picker for a synthesized Jam Session backing (see
-    /// `crate::jam_backing`) — the no-existing-song alternative to
+    /// `crate::jam::backing`) — the no-existing-song alternative to
     /// `ArtistList`'s real-song Jam Session flow.
     JamGenerate,
     /// Documentation link, About, Tutorial, and Credits — see
@@ -101,7 +101,7 @@ pub(crate) fn check_loading(
 pub(crate) fn route_menu_entry(
     tour: Option<Res<tutorial::TutorialTour>>,
     lesson: Option<Res<crate::lessons::LessonContext>>,
-    generated_jam: Option<Res<crate::jam_backing::GeneratedJamSession>>,
+    generated_jam: Option<Res<crate::jam::backing::GeneratedJamSession>>,
     mut ret_song: ResMut<ReturnToSongList>,
     mut ret_opts: ResMut<ReturnToOptions>,
     mut ret_play: ResMut<ReturnToPlay>,
@@ -130,7 +130,7 @@ pub(crate) fn route_menu_entry(
         ret_song.0 = false;
         next_page.set(MenuPage::Lessons);
     } else if generated_jam.is_some() {
-        commands.remove_resource::<crate::jam_backing::GeneratedJamSession>();
+        commands.remove_resource::<crate::jam::backing::GeneratedJamSession>();
         // Same reasoning as the lesson branch above: a generated jam never
         // went through the song list, so land back on its own setup page
         // instead (ready to jam again with one click).

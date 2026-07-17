@@ -184,7 +184,7 @@ pub fn twelve_bar(key: &str) -> [String; 12] {
 
 /// A 12-bar blues variant — which chord roots land on which bars, and (for
 /// [`Minor`](Progression::Minor)) which bars change quality. Selectable in
-/// Jam Session (`gameplay::jam_session`, `jam_backing`) via the "Generate
+/// Jam Session (`jam::session`, `jam::backing`) via the "Generate
 /// Jam" config page; every other 12-bar display (`twelve_bar`, the song
 /// editor's grid, scored gameplay's grid overlay) always uses `Standard`.
 /// `QuickChange` and `Minor` are ordinary blues-theory forms; a "jazz blues"

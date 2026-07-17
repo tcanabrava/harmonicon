@@ -9,13 +9,14 @@ use bevy::prelude::*;
 
 use crate::app::{AppState, GameplayMode};
 use crate::audio_system::pitch_detect::PitchRange;
+use crate::jam::{improv, session as jam_session};
 use crate::menu::tutorial::tour_active;
 use crate::settings::AudioSettings;
 
 use super::{
     adaptive_difficulty, bending_trainer, call_response, countdown_overlay, gameplay_2d,
-    gameplay_3d, harmonica_overlay, jam_session, metronome_overlay, modifier_legend,
-    note_tail_2d, note_tail_3d, pause_menu, phrase_overlay, results, song_progress_overlay,
+    gameplay_3d, harmonica_overlay, metronome_overlay, modifier_legend, note_tail_2d,
+    note_tail_3d, pause_menu, phrase_overlay, results, song_progress_overlay,
     twelve_bar_blues_overlay, wait_freeze_overlay,
 };
 use super::bars::{self, AbsoluteBar, BarChanged, CurrentBar};
@@ -81,8 +82,8 @@ impl Plugin for GameplayPlugin {
         .init_resource::<bending_trainer::TrainerTarget>()
         .init_resource::<bending_trainer::DrillState>()
         .init_resource::<jam_session::JamLoop>()
-        .init_resource::<jam_session::ImprovGate>()
-        .init_resource::<jam_session::ImprovStats>()
+        .init_resource::<improv::ImprovGate>()
+        .init_resource::<improv::ImprovStats>()
         .init_resource::<call_response::CallCues>()
         .init_resource::<pause_menu::WaitForNoteMode>()
         .init_resource::<pause_menu::PracticeSpeed>()
@@ -241,7 +242,7 @@ impl Plugin for GameplayPlugin {
             Update,
             (
                 jam_session::update_hole_map,
-                jam_session::accumulate_improv_stats,
+                improv::accumulate_improv_stats,
             )
                 .after(GameplayLogic)
                 .run_if(

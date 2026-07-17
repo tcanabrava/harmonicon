@@ -9,7 +9,7 @@
 //! chosen key (transposed Richter layout) and the diagram is rebuilt whenever
 //! the key changes.
 //!
-//! Two columns, the same split `gameplay::jam_session` uses: left has
+//! Two columns, the same split `jam::session` uses: left has
 //! everything but the harmonica itself (title, key control, detect-algorithm
 //! picker, ear-training target/Listen, tuner readout, drill toggle, tempo
 //! control, hint line); right is entirely the harmonica — the bend diagram
@@ -754,7 +754,7 @@ pub fn setup(
             });
 
             // ── Right half: the harmonica — bend diagram + its explanatory
-            // text, the same grouping `jam_session::setup` uses for its own
+            // text, the same grouping `jam::session::setup` uses for its own
             // harmonica column.
             root.spawn(Node {
                 width: Val::Percent(50.0),

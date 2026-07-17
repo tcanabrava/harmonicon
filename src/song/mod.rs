@@ -39,7 +39,7 @@ pub struct SongManifest {
     /// marker) must use this, or it drifts out of sync with the waveform
     /// it's drawn on top of.
     pub music_duration_secs: f64,
-    /// Unused by gameplay today (`jam_backing`'s `build_generated_manifest`
+    /// Unused by gameplay today (`jam::backing`'s `build_generated_manifest`
     /// notes this explicitly) — `Handle::default()` when the song doesn't
     /// ship an `elements.png`, so there's nothing to fail to load.
     pub elements: Handle<Image>,

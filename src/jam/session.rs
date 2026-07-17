@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 
+//! Jam Session: free-play screen (12-bar chart + metronome + spectrogram,
+//! no falling notes) plus the live harmonica hole-map feedback and the
+//! background-music loop toggle.
+
 use std::collections::{HashMap, HashSet};
 
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
@@ -8,9 +12,13 @@ use bevy::prelude::*;
 use bevy_fluent::Localization;
 
 use crate::{
-    dialogs::button,
-    localization::LocalizationExt,
     app::{JamProgression, SelectedSong},
+    dialogs::button,
+    gameplay::{
+        ActivePitches, COUNTDOWN, CurrentBar, GameplayClock, GameplayRoot, MusicPlayer,
+        MusicStarted, resolve_item_time,
+    },
+    localization::LocalizationExt,
     settings::AudioSettings,
     song::SongManifest,
     song::chart::Action,
@@ -21,17 +29,14 @@ use crate::{
     theme::LoadedTheme,
 };
 
+use crate::gameplay::countdown_overlay::spawn_countdown;
+use crate::gameplay::harmonica_overlay::spawn_harmonica_overlay;
+use crate::gameplay::metronome_overlay::spawn_metronome;
+use crate::gameplay::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
+use crate::gameplay::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 
-use super::countdown_overlay::spawn_countdown;
-use super::harmonica_overlay::spawn_harmonica_overlay;
-use super::metronome_overlay::spawn_metronome;
-use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
-use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
-use super::{
-    AbsoluteBar, ActivePitches, COUNTDOWN, CurrentBar, GameplayClock, GameplayRoot, MusicPlayer,
-    MusicStarted,
-};
+use super::improv::classify_note_fit;
 
 /// Free-play screen, two columns: left has everything but the harmonica
 /// itself (title, loop toggle, 12-bar chart, metronome, spectrogram); right
@@ -43,7 +48,7 @@ pub fn setup(
     mut commands: Commands,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
-    mut clock: ResMut<super::GameplayClock>,
+    mut clock: ResMut<GameplayClock>,
     mut music_started: ResMut<MusicStarted>,
     spectrogram_style: Res<SpectrogramStyle>,
     osc_material: Res<OscMaterial>,
@@ -227,7 +232,7 @@ pub fn setup(
     let note_times: Vec<f64> = chart
         .track
         .iter()
-        .map(|item| super::resolve_item_time(item, &chart.timing))
+        .map(|item| resolve_item_time(item, &chart.timing))
         .collect();
     // No phrase sections either — adaptive difficulty is a scored-mode
     // concept, so Jam Session's bar just shows no phrase strip rectangles.
@@ -338,13 +343,17 @@ pub fn restart_finished_jam_music(
 /// scale generally; and, per bar of the 12-bar cycle, which note classes are
 /// tones of *that bar's* chord (I, IV, or V) — chord-tone awareness is a
 /// distinct, more advanced skill than just staying in the scale.
+///
+/// Fields are `pub(crate)`, not private: `jam::improv::accumulate_improv_
+/// stats` reads them directly, the same lookup `update_hole_map`'s tint
+/// uses, so the two can't disagree.
 #[derive(Resource)]
 pub struct JamHoleGuide {
     /// MIDI note number → the holes that can sound it (may be more than one
     /// — e.g. draw-2 and blow-3 are both G4 on a C harp).
-    note_to_holes: HashMap<u8, Vec<u8>>,
-    scale_classes: HashSet<String>,
-    chord_tones_by_bar: [HashSet<String>; 12],
+    pub(crate) note_to_holes: HashMap<u8, Vec<u8>>,
+    pub(crate) scale_classes: HashSet<String>,
+    pub(crate) chord_tones_by_bar: [HashSet<String>; 12],
 }
 
 /// One hole cell in the map; its background is tinted each frame by play state.
@@ -355,7 +364,7 @@ pub struct JamHoleCell {
 
 /// Static rendering data for one hole: its blow/draw notes and whether each sits
 /// in the blues scale (for the green "safe note" hint).
-struct HoleInfo {
+pub(crate) struct HoleInfo {
     hole: u8,
     blow: String,
     draw: String,
@@ -391,7 +400,7 @@ fn chord_tone_classes(chord_root: &str, quality: ChordQuality) -> HashSet<String
 /// Progression` — `Standard` for a real-song jam, player-selected for a
 /// generated one), and its tempo (needed to track which bar — and thus
 /// which chord — is currently sounding).
-fn build_hole_guide(harp: &Harmonica, key: &str, progression: Progression) -> (Vec<HoleInfo>, JamHoleGuide) {
+pub(crate) fn build_hole_guide(harp: &Harmonica, key: &str, progression: Progression) -> (Vec<HoleInfo>, JamHoleGuide) {
     let dash = "\u{2014}";
     let scale_classes = blues_scale_classes(key);
     let chord_tones_by_bar: [HashSet<String>; 12] = {
@@ -495,34 +504,6 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], loc: &L
         });
 }
 
-/// How "targeted" a sounding note is, worst to best.
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-pub(super) enum NoteFit {
-    OutOfScale,
-    InScale,
-    ChordTone,
-}
-
-/// Classifies one played note class (e.g. `"G"`, no octave — see
-/// `PitchInfo::note`) by how well it fits the harmonic context right now:
-/// a tone of the bar's current chord is the most targeted choice, elsewhere
-/// in the blues scale is still "safe," anything else is out. Shared by the
-/// live hole-map tint (`update_hole_map`) and the improv-lesson accumulator
-/// (`accumulate_improv_stats`) so the two can never silently disagree.
-pub(super) fn classify_note_fit(
-    note: &str,
-    chord_tones: &HashSet<String>,
-    scale_classes: &HashSet<String>,
-) -> NoteFit {
-    if chord_tones.contains(note) {
-        NoteFit::ChordTone
-    } else if scale_classes.contains(note) {
-        NoteFit::InScale
-    } else {
-        NoteFit::OutOfScale
-    }
-}
-
 /// Tint each hole cell from the live mic pitches, three tiers: gold if the
 /// sounding note is a tone of the chord currently sounding (the most targeted
 /// choice — chord-tone awareness, not just scale membership), green if it's
@@ -540,7 +521,7 @@ pub fn update_hole_map(
     let chord_tones = &guide.chord_tones_by_bar[current.0];
 
     // Map each currently-lit hole to the best fit among all notes sounding it.
-    let mut lit: HashMap<u8, NoteFit> = HashMap::new();
+    let mut lit: HashMap<u8, super::improv::NoteFit> = HashMap::new();
     for p in &active.0 {
         if let Some(holes) = guide.note_to_holes.get(&p.midi) {
             let fit = classify_note_fit(&p.note, chord_tones, &guide.scale_classes);
@@ -558,145 +539,11 @@ pub fn update_hole_map(
 
     for (cell, mut bg) in &mut cells {
         bg.0 = match lit.get(&cell.hole) {
-            Some(NoteFit::ChordTone) => PLAY_CHORD_TONE,
-            Some(NoteFit::InScale) => PLAY_IN_SCALE,
-            Some(NoteFit::OutOfScale) => PLAY_OUT_SCALE,
+            Some(super::improv::NoteFit::ChordTone) => PLAY_CHORD_TONE,
+            Some(super::improv::NoteFit::InScale) => PLAY_IN_SCALE,
+            Some(super::improv::NoteFit::OutOfScale) => PLAY_OUT_SCALE,
             None => HOLE_DEFAULT,
         };
-    }
-}
-
-// ── Improv-lesson scale-adherence accumulator ───────────────────────────────
-
-/// Enforces a fresh attack per pitch for [`accumulate_improv_stats`] — the
-/// same fresh-attack idea `gameplay::PitchGate` uses for scored modes
-/// (`crate::scoring::AttackGate`), so holding one note doesn't tally it
-/// again every frame it stays sounding.
-#[derive(Resource, Default)]
-pub struct ImprovGate(crate::scoring::AttackGate<u8>);
-
-/// Running tally of every fresh note attack played during an open Jam
-/// Session, classified by [`NoteFit`] against the bar it landed on. Reset
-/// at the start of every `Playing` session (`gameplay::reset_score`) — not
-/// jam-only, so it's always in a known state, but only [`accumulate_improv_
-/// stats`] (jam-only) ever writes to it. The improv lesson's pass criterion
-/// (`lessons::PassCriteria::ScaleAdherence`) reads [`adherence`](Self::
-/// adherence) when the player ends the session.
-#[derive(Resource, Default, Clone, Copy)]
-pub struct ImprovStats {
-    pub chord_tone: u32,
-    pub in_scale: u32,
-    pub out_of_scale: u32,
-    /// Fresh attacks that landed inside a "rest" window of the phrase-
-    /// discipline pattern (see [`in_rest_window`]) — tallied regardless of
-    /// pitch/chord-tone classification, since phrase discipline judges
-    /// *when* you played, not *what*.
-    pub rest_violations: u32,
-}
-
-impl ImprovStats {
-    pub fn total(&self) -> u32 {
-        self.chord_tone + self.in_scale + self.out_of_scale
-    }
-
-    /// Fraction of attacks that were at least in-scale (a chord tone is the
-    /// strictly better case within "in scale", so it counts too) — `None`
-    /// with nothing played yet, same "nothing to report" convention as
-    /// `gameplay::TechniqueStats::accuracy`.
-    pub fn adherence(&self) -> Option<f32> {
-        let total = self.total();
-        if total == 0 {
-            None
-        } else {
-            Some((self.chord_tone + self.in_scale) as f32 / total as f32)
-        }
-    }
-
-    /// Fraction of attacks that were specifically chord tones — stricter
-    /// than [`adherence`](Self::adherence), which also accepts merely-in-
-    /// scale notes. The `chord-tone-improv` lesson's criterion.
-    pub fn chord_tone_adherence(&self) -> Option<f32> {
-        let total = self.total();
-        if total == 0 {
-            None
-        } else {
-            Some(self.chord_tone as f32 / total as f32)
-        }
-    }
-
-    /// Fraction of attacks that landed *outside* a rest window — "did you
-    /// leave space", not what was played. The `question-answer` lesson's
-    /// criterion.
-    pub fn phrase_discipline(&self) -> Option<f32> {
-        let total = self.total();
-        if total == 0 {
-            None
-        } else {
-            Some(1.0 - (self.rest_violations as f32 / total as f32))
-        }
-    }
-}
-
-/// Whether `bar_index` (an absolute, non-wrapped bar count — see
-/// `gameplay::AbsoluteBar`) falls inside a "rest" window of a repeating
-/// play/rest pattern: `play_bars` bars of playing, then `rest_bars` bars of
-/// rest, repeating. The phrase-discipline lesson's "leave space" primitive —
-/// pure so it's directly unit-testable. A zero-length cycle (both zero)
-/// never counts as rest, since there's no pattern to violate.
-pub(super) fn in_rest_window(bar_index: usize, play_bars: usize, rest_bars: usize) -> bool {
-    let cycle = play_bars + rest_bars;
-    if cycle == 0 {
-        return false;
-    }
-    bar_index % cycle >= play_bars
-}
-
-/// The phrase-discipline pattern every jam session measures against: 2 bars
-/// of playing, then 2 bars of rest — the "question and answer" phrasing
-/// discipline the lesson teaches (see `docs/lessons_plan.md`, engine item
-/// 3). Always-on, like every other `ImprovStats` tally, not gated on a
-/// lesson being in flight.
-const PHRASE_PLAY_BARS: usize = 2;
-const PHRASE_REST_BARS: usize = 2;
-
-/// Tallies each fresh note attack into [`ImprovStats`], classified by
-/// [`classify_note_fit`] against the bar it landed on — the live twin of
-/// `update_hole_map`'s per-frame tint, but counting discrete attacks once
-/// each instead of repainting every frame a pitch stays held.
-pub fn accumulate_improv_stats(
-    active: Res<ActivePitches>,
-    guide: Option<Res<JamHoleGuide>>,
-    current: Res<CurrentBar>,
-    absolute: Res<AbsoluteBar>,
-    mut gate: ResMut<ImprovGate>,
-    mut stats: ResMut<ImprovStats>,
-) {
-    let Some(guide) = guide else {
-        return;
-    };
-    let sounding: HashSet<u8> = active
-        .0
-        .iter()
-        .filter(|p| guide.note_to_holes.contains_key(&p.midi))
-        .map(|p| p.midi)
-        .collect();
-    gate.0.release_absent(|m| sounding.contains(&m));
-
-    let chord_tones = &guide.chord_tones_by_bar[current.0];
-    let resting = in_rest_window(absolute.0, PHRASE_PLAY_BARS, PHRASE_REST_BARS);
-    for p in &active.0 {
-        if !guide.note_to_holes.contains_key(&p.midi) || !gate.0.is_fresh(p.midi, true) {
-            continue;
-        }
-        gate.0.consume(p.midi);
-        match classify_note_fit(&p.note, chord_tones, &guide.scale_classes) {
-            NoteFit::ChordTone => stats.chord_tone += 1,
-            NoteFit::InScale => stats.in_scale += 1,
-            NoteFit::OutOfScale => stats.out_of_scale += 1,
-        }
-        if resting {
-            stats.rest_violations += 1;
-        }
     }
 }
 

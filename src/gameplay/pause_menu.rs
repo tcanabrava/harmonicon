@@ -9,11 +9,12 @@ use bevy::prelude::*;
 use bevy::ui_widgets::{Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange};
 
 use super::adaptive_difficulty::AdaptiveDifficulty;
-use super::jam_session::ImprovStats;
 use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused};
-use crate::dialogs::button;
-use crate::lessons::{LessonContext, PassCriteria, lesson_passed};
 use crate::app::{AppState, GameplayMode, ReturnToSongList, SelectedSong};
+use crate::dialogs::button;
+use crate::jam::backing;
+use crate::jam::improv::ImprovStats;
+use crate::lessons::{LessonContext, PassCriteria, lesson_passed};
 use crate::profile::{PlayerProfile, record_lesson, save_profile};
 use crate::song::SongManifest;
 
@@ -712,7 +713,7 @@ fn on_restart(
     _: On<Pointer<Click>>,
     mut paused: ResMut<Paused>,
     mut next_state: ResMut<NextState<AppState>>,
-    generated_jam: Option<Res<crate::jam_backing::GeneratedJamSession>>,
+    generated_jam: Option<Res<backing::GeneratedJamSession>>,
 ) {
     // A generated jam's `SelectedSong` was built by `Assets::add`, not
     // `AssetServer::load` — it has no tracked `LoadState`, so routing
@@ -720,7 +721,7 @@ fn on_restart(
     // `check_loading`'s `is_loaded_with_dependencies` (see
     // `GeneratedJamSession`'s doc comment). Skip straight back to `Playing`
     // instead; `OnEnter(AppState::Playing)`'s own systems (`reset_score`,
-    // `jam_session::setup`, ...) already do the "fresh restart" work that
+    // `jam::session::setup`, ...) already do the "fresh restart" work that
     // `SongLoading` exists to wait for on the normal, asset-server path.
     let target = if generated_jam.is_some() {
         AppState::Playing

@@ -13,12 +13,12 @@ use crate::song::SongManifest;
 
 use super::bars::parse_beats;
 use super::clock::GameplayClock;
-use super::jam_session;
 use super::notes::{last_note_end, resolve_item_time};
 use super::state::{
     GameplayRoot, HitFeedback, LoopConfig, MusicPlayer, MusicStarted, Paused, PitchGate, Score,
     ScoringConfig, SongEnd, SongStats,
 };
+use crate::jam::improv;
 
 pub(crate) fn reset_score(
     mut score: ResMut<Score>,
@@ -26,16 +26,16 @@ pub(crate) fn reset_score(
     mut feedback: ResMut<HitFeedback>,
     mut paused: ResMut<Paused>,
     mut gate: ResMut<PitchGate>,
-    mut improv_gate: ResMut<jam_session::ImprovGate>,
-    mut improv_stats: ResMut<jam_session::ImprovStats>,
+    mut improv_gate: ResMut<improv::ImprovGate>,
+    mut improv_stats: ResMut<improv::ImprovStats>,
 ) {
     *score = Score::default();
     *stats = SongStats::default();
     *feedback = HitFeedback::default();
     paused.0 = false;
     *gate = PitchGate::default();
-    *improv_gate = jam_session::ImprovGate::default();
-    *improv_stats = jam_session::ImprovStats::default();
+    *improv_gate = improv::ImprovGate::default();
+    *improv_stats = improv::ImprovStats::default();
 }
 
 /// Semitone margin added on each side of the harmonica's natural range when

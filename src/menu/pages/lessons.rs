@@ -105,7 +105,7 @@ fn goal_line(loc: &Localization, entry: &LessonEntry) -> Option<String> {
 
 /// Whether `criteria` routes a lesson into an open jam (`GameplayMode::
 /// JamSession`) instead of the ordinary chart pipeline — every criterion
-/// judged from `jam_session::ImprovStats` rather than a chart run, not just
+/// judged from `jam::improv::ImprovStats` rather than a chart run, not just
 /// `ScaleAdherence`. Pure so it's directly unit-testable.
 fn is_jam_criteria(criteria: Option<&PassCriteria>) -> bool {
     matches!(

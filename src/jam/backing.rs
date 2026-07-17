@@ -218,7 +218,7 @@ pub fn generated_chart(key: &str, bpm: f32, progression: Progression, total_secs
 /// registers it as a real `AudioSource` asset, and assembles the chart
 /// around it. `background`/`elements` are the caller's choice of
 /// placeholder art — Jam Session never reads `elements` at all; `background`
-/// paints behind the hole map/12-bar grid (see `jam_session::setup`), so a
+/// paints behind the hole map/12-bar grid (see `jam::session::setup`), so a
 /// theme's generic `default_background` is the natural choice.
 pub fn build_generated_manifest(
     key: &str,
