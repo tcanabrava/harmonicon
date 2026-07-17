@@ -12,10 +12,12 @@ use super::playback::{build_harp, note_freq};
 use super::state::{
     DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch, can_place, enforce_direction,
     enforce_expr, move_target, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
+    silence_gaps,
 };
 use super::ui::{GridContent, GridItem, NoteView};
 use super::{
-    BEAT_W, BEATS_PER_BAR, HANDLE_W, HEADER_H, ROW_H, TICK_W, TICKS_PER_BEAT, grid_height,
+    BEAT_W, BEATS_PER_BAR, HANDLE_W, HEADER_H, ROW_H, SILENCE_ROW_H, TICK_W, TICKS_PER_BEAT,
+    grid_height, silence_row_top,
 };
 use crate::audio_system::midi::{freq_to_midi, midi_to_note};
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
@@ -206,6 +208,27 @@ pub(super) fn rebuild_grid(
             items.push(cell.id());
         }
 
+        // The silence track's background strip, below the hole lanes — pure
+        // display, `Pickable::IGNORE` throughout (see `silence_gaps`'s
+        // callers below for the actual gap blocks drawn on top of it).
+        items.push(
+            commands
+                .spawn((
+                    GridItem,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x),
+                        top: Val::Px(silence_row_top(hole_count)),
+                        width: Val::Px(BEAT_W),
+                        height: Val::Px(SILENCE_ROW_H),
+                        ..default()
+                    },
+                    BackgroundColor(colors.panel_bg),
+                    Pickable::IGNORE,
+                ))
+                .id(),
+        );
+
         // Divider lines are spawned after the lane cells (not before) so they
         // render on top of them — otherwise the opaque lane backgrounds would
         // cover the lines everywhere except the header strip above the lanes,
@@ -297,7 +320,66 @@ pub(super) fn rebuild_grid(
         }
     }
 
+    let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
+    let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+    for (start, end) in silence_gaps(&state.notes) {
+        if start < last_tick && end > first_tick {
+            items.push(spawn_silence_gap(
+                &mut commands,
+                start,
+                end,
+                (end - start) as f32 * secs_per_tick,
+                hole_count,
+                colors,
+            ));
+        }
+    }
+
     commands.entity(content).add_children(&items);
+}
+
+/// One block of the silence track, spanning `[start, end)` ticks — labeled
+/// with its duration so the gap's length reads at a glance without having to
+/// count grid squares.
+fn spawn_silence_gap(
+    commands: &mut Commands,
+    start: usize,
+    end: usize,
+    duration_secs: f32,
+    hole_count: u8,
+    colors: SongEditorColors,
+) -> Entity {
+    let left = start as f32 * TICK_W + 1.0;
+    let width = (end - start) as f32 * TICK_W - 2.0;
+    commands
+        .spawn((
+            GridItem,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(left),
+                top: Val::Px(silence_row_top(hole_count) + 2.0),
+                width: Val::Px(width.max(0.0)),
+                height: Val::Px(SILENCE_ROW_H - 4.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(colors.label.with_alpha(0.20)),
+            Pickable::IGNORE,
+        ))
+        .with_children(|b| {
+            b.spawn((
+                Text::new(format!("{duration_secs:.1}s")),
+                TextFont {
+                    font_size: FontSize::Px(11.0),
+                    ..default()
+                },
+                TextColor(colors.label),
+                Pickable::IGNORE,
+            ));
+        })
+        .id()
 }
 
 pub(super) fn spawn_note(

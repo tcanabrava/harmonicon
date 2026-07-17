@@ -145,6 +145,8 @@ editor-field-key-tooltip = Clique para alternar entre os tons da gaita
 editor-field-position-tooltip = Clique para alternar entre as posições de execução
 editor-browse-tooltip = Escolher um arquivo de áudio de música de fundo para esta partitura
 editor-import-midi-tooltip = Carregar um arquivo MIDI e escolher uma faixa para colocar na grade de notas — Salvar então grava uma trilha de fundo a partir das outras faixas
+editor-silence-track-label = Silêncio
+editor-silence-track-tooltip = O intervalo, em segundos, entre cada par de notas consecutivas
 
 # Lições — menu, leitor, veredito nos resultados
 menu-lessons = Lições

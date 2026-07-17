@@ -626,6 +626,28 @@ pub(super) fn normalize_range(a: usize, b: usize) -> (usize, usize) {
     if a <= b { (a, b) } else { (b, a) }
 }
 
+// ── Silence track ────────────────────────────────────────────────────────────
+
+/// The tick ranges strictly *between* two sounding notes — merging every
+/// note's `[tick, tick+len)` interval across all holes first, since silence
+/// means nothing at all is sounding, not just one particular hole (two holes
+/// overlapping as a chord, or one note's tail overlapping the next note's
+/// onset, must not read as a gap). Leading silence (before the first note)
+/// and trailing silence (after the last) are deliberately excluded — the
+/// silence track shows the space *between* notes, not lead-in/lead-out.
+pub(super) fn silence_gaps(notes: &[GridNote]) -> Vec<(usize, usize)> {
+    let mut intervals: Vec<(usize, usize)> = notes.iter().map(|n| (n.tick, n.tick + n.len)).collect();
+    intervals.sort_by_key(|&(start, _)| start);
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    for (start, end) in intervals {
+        match merged.last_mut() {
+            Some(last) if start <= last.1 => last.1 = last.1.max(end),
+            _ => merged.push((start, end)),
+        }
+    }
+    merged.windows(2).map(|w| (w[0].1, w[1].0)).collect()
+}
+
 /// The whole-side range a split point resolves to once the user clicks the
 /// highlighted side: from the start of the song up to `split` (`Side::Left`,
 /// the pointer was hovering left of the split), or from `split` to the end

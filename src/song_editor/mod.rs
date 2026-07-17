@@ -57,8 +57,19 @@ const HANDLE_W: f32 = 8.0;
 // phrases into the ticks `playback::render_pcm` expects.
 pub(crate) const TICKS_PER_BEAT: usize = 4;
 const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
+// The silence track: a summary row below the hole lanes showing the gap, in
+// seconds, between consecutive notes — see `state::silence_gaps`. Shorter
+// than an ordinary hole lane since it's read-only display, not an editable
+// row of its own.
+const SILENCE_ROW_H: f32 = 24.0;
 
 fn grid_height(hole_count: u8) -> f32 {
+    HEADER_H + ROW_H * hole_count as f32 + SILENCE_ROW_H
+}
+
+/// Top of the silence track, inside `GridContent`'s coordinate space —
+/// directly below the last hole lane.
+fn silence_row_top(hole_count: u8) -> f32 {
     HEADER_H + ROW_H * hole_count as f32
 }
 
@@ -176,7 +187,7 @@ mod tests {
     use super::state::{
         Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
         apply_resize, can_place, enforce_direction, enforce_expr, erase_range, move_target,
-        normalize_range, note_rect, remove_range, song_end_tick, split_side_range,
+        normalize_range, note_rect, remove_range, silence_gaps, song_end_tick, split_side_range,
     };
     use super::ui::ModButton;
     use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -1377,6 +1388,45 @@ mod tests {
     #[test]
     fn song_end_tick_of_an_empty_song_is_zero() {
         assert_eq!(song_end_tick(&[]), 0);
+    }
+
+    // ── Silence track ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn silence_gaps_reports_the_space_between_consecutive_notes() {
+        let notes = vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 10, 2)];
+        assert_eq!(silence_gaps(&notes), vec![(4, 10)]);
+    }
+
+    #[test]
+    fn silence_gaps_ignores_leading_and_trailing_silence() {
+        // A single note has no "next" note to measure a gap up to.
+        let notes = vec![timeline_note(0, 1, 4, 4)];
+        assert!(silence_gaps(&notes).is_empty());
+    }
+
+    #[test]
+    fn silence_gaps_treats_overlapping_notes_across_holes_as_one_sounding_span() {
+        // A chord (same tick, different holes) and a note whose tail
+        // overlaps the next note's onset must not read as silence.
+        let notes = vec![
+            timeline_note(0, 1, 0, 4),
+            timeline_note(1, 2, 0, 4),  // chord with note 0
+            timeline_note(2, 3, 2, 6),  // overlaps note 0's tail
+            timeline_note(3, 4, 20, 2), // a real gap follows
+        ];
+        assert_eq!(silence_gaps(&notes), vec![(8, 20)]);
+    }
+
+    #[test]
+    fn silence_gaps_skips_touching_notes_since_nothing_is_ever_silent() {
+        let notes = vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 4, 4)];
+        assert!(silence_gaps(&notes).is_empty());
+    }
+
+    #[test]
+    fn silence_gaps_of_an_empty_song_is_empty() {
+        assert!(silence_gaps(&[]).is_empty());
     }
 
     #[test]

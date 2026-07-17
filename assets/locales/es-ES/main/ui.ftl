@@ -145,6 +145,8 @@ editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación
 editor-browse-tooltip = Elegir un archivo de audio de música de fondo para esta partitura
 editor-import-midi-tooltip = Cargar un archivo MIDI y elegir una pista para colocarla en la cuadrícula de notas — Guardar escribe entonces una pista de acompañamiento a partir de sus otras pistas
+editor-silence-track-label = Silencio
+editor-silence-track-tooltip = El intervalo, en segundos, entre cada par de notas consecutivas
 
 # Lecciones — menú, lector, veredicto en resultados
 menu-lessons = Lecciones

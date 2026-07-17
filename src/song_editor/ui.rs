@@ -17,7 +17,7 @@ use super::state::{
 };
 use super::{
     AppState, BEAT_W, HEADER_H, HOLE_COL_W, LOAD_PURPOSE, MIDI_PURPOSE, MUSIC_PURPOSE, NOTE_PAD,
-    ROW_H, SAVE_PURPOSE, grid_height,
+    ROW_H, SAVE_PURPOSE, SILENCE_ROW_H, grid_height,
 };
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::dialogs::tooltip::Tooltip;
@@ -210,6 +210,7 @@ pub(super) fn sync_hole_column(
     mut commands: Commands,
     state: Res<EditorState>,
     theme: Res<LoadedTheme>,
+    loc: Res<Localization>,
     col: Query<(Entity, Option<&Children>), With<HoleColumnContent>>,
 ) {
     let Ok((entity, children)) = col.single() else {
@@ -230,7 +231,7 @@ pub(super) fn sync_hole_column(
         ..default()
     });
     commands.entity(entity).with_children(|col| {
-        spawn_hole_column_rows(col, colors, hole_count);
+        spawn_hole_column_rows(col, colors, hole_count, &loc);
     });
 }
 
@@ -288,7 +289,7 @@ pub(super) fn setup(
                 },
             ))
             .with_children(|row| {
-                spawn_hole_column(row, colors, hole_count);
+                spawn_hole_column(row, colors, hole_count, &loc);
                 row.spawn((
                     GridArea,
                     Node {
@@ -396,7 +397,12 @@ pub(super) fn setup(
         });
 }
 
-fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
+fn spawn_hole_column(
+    row: &mut ChildSpawnerCommands,
+    colors: SongEditorColors,
+    hole_count: u8,
+    loc: &Localization,
+) {
     row.spawn((
         HoleColumnContent,
         Node {
@@ -408,7 +414,7 @@ fn spawn_hole_column(row: &mut ChildSpawnerCommands, colors: SongEditorColors, h
         },
     ))
     .with_children(|col| {
-        spawn_hole_column_rows(col, colors, hole_count);
+        spawn_hole_column_rows(col, colors, hole_count, loc);
     });
 }
 
@@ -418,6 +424,7 @@ fn spawn_hole_column_rows(
     col: &mut ChildSpawnerCommands,
     colors: SongEditorColors,
     hole_count: u8,
+    loc: &Localization,
 ) {
     col.spawn(Node {
         width: Val::Percent(100.0),
@@ -455,6 +462,30 @@ fn spawn_hole_column_rows(
             ));
         });
     }
+    // Label for the silence track's background strip (spawned in
+    // `grid::rebuild_grid`) — keeps this column's total height matching
+    // `grid_height` so the hole rows on the right stay aligned with it.
+    col.spawn((
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(SILENCE_ROW_H),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        Tooltip(String::from(loc.msg("editor-silence-track-tooltip"))),
+    ))
+    .with_children(|r| {
+        r.spawn((
+            Text::new(loc.msg("editor-silence-track-label").to_string()),
+            TextFont {
+                font_size: FontSize::Px(11.0),
+                ..default()
+            },
+            TextColor(colors.label),
+            Pickable::IGNORE,
+        ));
+    });
 }
 
 fn spawn_mod_panel(

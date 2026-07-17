@@ -147,6 +147,8 @@ editor-field-key-tooltip = Click to cycle through harp keys
 editor-field-position-tooltip = Click to cycle through playing positions
 editor-browse-tooltip = Choose a background-music audio file for this chart
 editor-import-midi-tooltip = Load a MIDI file and pick a track to drop onto the note grid — Save then writes a backing track from its other tracks
+editor-silence-track-label = Silence
+editor-silence-track-tooltip = The gap, in seconds, between each pair of consecutive notes
 
 # Lessons — menu, reader, results verdict
 menu-lessons = Lessons

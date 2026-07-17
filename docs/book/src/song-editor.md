@@ -45,6 +45,16 @@ and leaves a gap; **Remove** deletes them *and* shifts every note after the
 range earlier to close the gap, shortening the song. Escape cancels a
 pending split or drag before you confirm it.
 
+## Silence track
+
+A thin strip below the last hole lane, labeled "Silence", shows the gap
+between consecutive notes as a block giving its length in seconds —
+useful for spotting an unintentionally long rest, or confirming a deliberate
+one lines up with the phrasing you meant. A chord, or notes placed back to
+back with no rest between them, shows no block; there's also none before the
+first note or after the last, since there's no gap to measure there. It's
+purely a display — nothing on it is clickable.
+
 ## Importing MIDI
 
 **Import MIDI** loads a `.mid`/`.midi` file and lists its tracks in a
