@@ -20,10 +20,9 @@ use crate::song::SongManifest;
 use crate::song::harmonica::Progression;
 use crate::theme::LoadedTheme;
 
-use super::{
-    AppState, ButtonMaterials, GameplayMode, JamProgression, MenuPage, SelectedSong, spawn_button,
-    spawn_menu_root,
-};
+use crate::app::{AppState, GameplayMode, JamProgression, SelectedSong};
+
+use super::{ButtonMaterials, MenuPage, spawn_button, spawn_menu_root};
 
 /// The lesson the reader page shows — set by the list page's buttons right
 /// before switching to [`MenuPage::LessonReader`].

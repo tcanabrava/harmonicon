@@ -27,7 +27,9 @@ use crate::settings::AudioSettings;
 
 use crate::theme::LoadedTheme;
 
-use super::{AppState, MenuPage, MenuRoot, cleanup_menu, spawn_button, spawn_menu_root};
+use crate::app::AppState;
+
+use super::{MenuPage, MenuRoot, cleanup_menu, spawn_button, spawn_menu_root};
 
 use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_explanation};
 use crate::dialogs::button;

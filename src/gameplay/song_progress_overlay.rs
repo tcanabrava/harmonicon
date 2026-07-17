@@ -21,7 +21,7 @@ use bevy::picking::pointer::PointerButton;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
-use crate::menu::AppState;
+use crate::app::AppState;
 
 use super::adaptive_difficulty::{AdaptiveDifficulty, PhraseSection};
 use super::pause_menu::SelectedPhraseIndex;

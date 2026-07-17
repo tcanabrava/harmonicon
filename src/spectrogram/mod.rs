@@ -19,7 +19,7 @@ use bevy::prelude::*;
 use bevy::ui_render::prelude::UiMaterialPlugin;
 
 use crate::audio_system::pitch_detect::AudioFrame;
-use crate::menu::AppState;
+use crate::app::AppState;
 
 pub use oscilloscope::OscMaterial;
 use oscilloscope::OscilloscopeMaterial;

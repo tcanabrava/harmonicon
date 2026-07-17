@@ -16,7 +16,7 @@ use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use crate::assets_management::SelectedHarmonicaModel;
 use crate::dialogs::button;
 
-use super::AppState;
+use crate::app::AppState;
 
 // The credits 3D scene lives on its own render layer so it never touches the
 // gameplay or options-preview layers.
@@ -221,7 +221,7 @@ fn spawn_ui(commands: &mut Commands) {
         "Back to Menu",
         |_: On<Pointer<Click>>,
          mut next_state: ResMut<NextState<AppState>>,
-         mut ret_help: ResMut<super::ReturnToHelpAbout>| {
+         mut ret_help: ResMut<crate::app::ReturnToHelpAbout>| {
             ret_help.0 = true;
             next_state.set(AppState::Menu);
         },
@@ -443,7 +443,7 @@ fn propagate_scene_layers(
 fn handle_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut ret_help: ResMut<super::ReturnToHelpAbout>,
+    mut ret_help: ResMut<crate::app::ReturnToHelpAbout>,
 ) {
     if keyboard.just_pressed(KeyCode::Escape) {
         ret_help.0 = true;

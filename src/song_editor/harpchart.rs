@@ -480,7 +480,10 @@ fn save_midi_backing(
 
     match super::midi_import::render_backing_pcm(&midi.bytes, track_index) {
         Ok((_bpm, pcm)) => {
-            let wav = super::playback::encode_wav(&pcm, super::playback::SAMPLE_RATE);
+            let wav = crate::audio_system::wav::encode_wav(
+                &pcm,
+                crate::audio_system::synth::SAMPLE_RATE,
+            );
             let out = dir.join("music.wav");
             match std::fs::write(&out, &wav) {
                 Ok(()) => {

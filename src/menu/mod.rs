@@ -31,10 +31,7 @@ use super::dialogs::button_material::{
     set_button_visual,
 };
 
-// Re-export shims: these types moved to `crate::app` (they're app-wide
-// vocabulary, not menu concerns). Kept for one commit while importers
-// migrate.
-pub use crate::app::{
+use crate::app::{
     AppState, GameplayMode, JamProgression, ReturnToHelpAbout, ReturnToOptions, ReturnToPlay,
     ReturnToSongList, SelectedArtist, SelectedSong,
 };

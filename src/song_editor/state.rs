@@ -34,15 +34,10 @@ pub(super) enum HarmonicaKind {
 /// An expression technique layered on top of the pitch. At most one at a time;
 /// either may combine with any [`Pitch`]. Both carry their oscillation rate in
 /// Hz, cycled through by repeatedly clicking the mod button — same pattern as
-/// `Bend`'s depth. `pub(crate)`, not `pub(super)` like its neighbours: also
-/// used by `gameplay::call_response`, which shares `playback::render_pcm`'s
-/// synth for the call-and-response lesson feature's audio cue.
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub(crate) enum Expr {
-    None,
-    Wah(f32),
-    Vibrato(f32),
-}
+/// `Bend`'s depth. Defined in `audio_system::synth` (shared synthesis
+/// vocabulary, also used by `gameplay::call_response`'s call-and-response
+/// demo audio); re-exported here under its established name.
+pub(super) use crate::audio_system::synth::Expr;
 
 /// Breath direction: blow (exhale) or draw (inhale). Every note is one or the
 /// other; toggled with the Blow/Draw buttons.

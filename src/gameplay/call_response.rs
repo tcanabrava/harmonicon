@@ -2,8 +2,8 @@
 
 //! Call-and-response phrases: a chart's consecutive `TrackItem::call: true`
 //! items are synthesized into a one-shot "call" demo (reusing
-//! `song_editor::playback`'s synth — the same one behind the song editor's
-//! own Play button), played automatically before the phrase's notes arrive
+//! `audio_system::synth` — the same one behind the song editor's own Play
+//! button), played automatically before the phrase's notes arrive
 //! as the scored "response." The response notes are ordinary
 //! `ScheduledNote`s with `force_wait: true` (see `gameplay::wait_freeze_
 //! index`), so the player is always given the freeze-and-wait treatment to
@@ -20,13 +20,13 @@
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 
+use crate::app::SelectedSong;
 use crate::audio_system::midi::midi_to_freq_hz;
-use crate::menu::SelectedSong;
+use crate::audio_system::synth::{Expr, PhraseNote, SAMPLE_RATE, TICKS_PER_BEAT, render_pcm};
+use crate::audio_system::wav::encode_wav;
 use crate::settings::AudioSettings;
 use crate::song::SongManifest;
 use crate::song::chart::{HarpChart, Modifier, TrackItem};
-use crate::song_editor::playback::{Expr, PhraseNote, SAMPLE_RATE, encode_wav, render_pcm};
-use crate::song_editor::TICKS_PER_BEAT;
 
 use super::{GameplayClock, GameplayRoot, resolve_item_time, target_pitch};
 
@@ -85,7 +85,7 @@ fn natural_pitch(chart: &HarpChart, event: &crate::song::chart::NoteEvent) -> St
 }
 
 /// The expression LFO a call-phrase note's demo audio should carry, mapped
-/// 1:1 from the chart modifiers that have a `song_editor::playback::Expr`
+/// 1:1 from the chart modifiers that have an `audio_system::synth::Expr`
 /// equivalent. Every other modifier (bend, overblow/overdraw, slide) is
 /// already baked into the resolved MIDI pitch the caller passes as `freq`
 /// (see `target_pitch`), so there's nothing further to render for them —
@@ -103,8 +103,8 @@ fn demo_expr(modifiers: &[Modifier]) -> Expr {
 }
 
 /// Builds the [`PhraseNote`]s for one call-phrase group (`track[start..end]`,
-/// as returned by [`call_phrase_groups`]), on the tick grid `song_editor::
-/// playback::render_pcm` expects — ticks relative to the group's own first
+/// as returned by [`call_phrase_groups`]), on the tick grid `audio_system::
+/// synth::render_pcm` expects — ticks relative to the group's own first
 /// item, not the song's start. `bpm` is the chart's nominal tempo; a chart
 /// with tempo automation mid-phrase renders against that single nominal
 /// value, same simplification the song editor itself makes (one tempo
@@ -162,7 +162,8 @@ pub(super) fn setup_call_cues(
         let group_start_time = resolve_item_time(first, &chart.timing);
 
         let phrase_notes = build_phrase_notes(chart, group, group_start_time, bpm);
-        let pcm = render_pcm(&phrase_notes, bpm);
+        let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+        let pcm = render_pcm(&phrase_notes, secs_per_tick);
         if pcm.is_empty() {
             continue;
         }

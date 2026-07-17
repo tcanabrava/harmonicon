@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    menu::{AppState, SelectedSong},
+    app::{AppState, SelectedSong},
     song::SongManifest,
     song::chart::{Action, Modifier, NoteEvent},
 };

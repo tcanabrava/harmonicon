@@ -9,7 +9,7 @@ use bevy_fluent::Localization;
 use crate::dialogs::button;
 use crate::lessons::{LessonContext, lesson_passed};
 use crate::localization::LocalizationExt;
-use crate::menu::{AppState, ReturnToSongList, SelectedSong};
+use crate::app::{AppState, ReturnToSongList, SelectedSong};
 use crate::profile::{PlayerProfile, record_lesson, record_play, save_profile};
 use crate::settings::AudioSettings;
 use crate::song::SongManifest;

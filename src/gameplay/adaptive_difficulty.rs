@@ -17,7 +17,7 @@
 
 use bevy::prelude::*;
 
-use crate::menu::SelectedSong;
+use crate::app::SelectedSong;
 use crate::profile::PlayerProfile;
 use crate::song::SongManifest;
 use crate::song::chart::{Timing, TrackItem};

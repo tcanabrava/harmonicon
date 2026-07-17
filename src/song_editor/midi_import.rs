@@ -19,12 +19,13 @@ use bevy::prelude::*;
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use std::collections::HashMap;
 
-use super::playback::{PhraseNote, build_harp, render_pcm};
+use super::playback::build_harp;
 use super::state::{
     Dir, EditorState, Expr, GridNote, HarmonicaKind, Pitch, max_bend, pitch_compatible,
 };
 use super::{MIDI_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::midi_to_freq_hz;
+use crate::audio_system::synth::{PhraseNote, render_pcm};
 use crate::dialogs::combobox::{ComboboxSelect, spawn_combobox};
 use crate::dialogs::file_dialog::FileChosen;
 use crate::localization::LocalizationExt;
@@ -344,7 +345,7 @@ pub(super) fn remove_track_bytes(bytes: &[u8], track_index: usize) -> Result<Vec
 }
 
 /// Mixes every track *except* `skip_track` down to a single PCM buffer via
-/// the editor's own synth (`playback::render_pcm`, which already sums
+/// the shared `audio_system::synth::render_pcm` (which already sums
 /// overlapping notes — the same machinery a chord preview uses) — a
 /// synthesized stand-in backing track, not a sampled/GM-accurate mix, since
 /// the editor has only ever had one instrument voice to render with.
@@ -376,7 +377,7 @@ pub(super) fn render_backing_pcm(bytes: &[u8], skip_track: usize) -> Result<(f32
     if phrase.is_empty() {
         return Err("no notes left outside the selected track".to_string());
     }
-    Ok((initial_bpm, render_pcm(&phrase, initial_bpm)))
+    Ok((initial_bpm, render_pcm(&phrase, secs_per_tick as f32)))
 }
 
 // ── Systems ───────────────────────────────────────────────────────────────────

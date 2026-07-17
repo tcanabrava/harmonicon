@@ -3,7 +3,7 @@
 //! Standalone Bending Trainer: the Let's Bend-style harmonica bend diagram + the
 //! metronome, with a directly pickable key and an adjustable tempo — no song.
 //!
-//! It's its own [`AppState::BendingTrainer`](crate::menu::AppState), driving the
+//! It's its own [`AppState::BendingTrainer`](crate::app::AppState), driving the
 //! decoupled [`MetronomeTempo`] and its own copy of the gameplay clock so the
 //! metronome ticks without any song loaded. The harp is synthesised for the
 //! chosen key (transposed Richter layout) and the diagram is rebuilt whenever
@@ -27,7 +27,7 @@ use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_expl
 use crate::dialogs::button;
 use crate::dialogs::combobox;
 use crate::localization::LocalizationExt;
-use crate::menu::AppState;
+use crate::app::AppState;
 use crate::profile::{DrillRecord, PlayerProfile};
 use crate::settings::AudioSettings;
 use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, richter_harp};
@@ -746,7 +746,7 @@ pub fn setup(
                 &String::from(loc.msg("back")),
                 |_: On<Pointer<Click>>,
                  mut next_state: ResMut<NextState<AppState>>,
-                 mut ret_play: ResMut<crate::menu::ReturnToPlay>| {
+                 mut ret_play: ResMut<crate::app::ReturnToPlay>| {
                     ret_play.0 = true;
                     next_state.set(AppState::Menu);
                 },
@@ -859,7 +859,7 @@ pub fn update_key_label(key: Res<TrainerKey>, mut labels: Query<&mut Text, With<
 pub fn handle_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut ret_play: ResMut<crate::menu::ReturnToPlay>,
+    mut ret_play: ResMut<crate::app::ReturnToPlay>,
 ) {
     if keyboard.just_pressed(KeyCode::Escape) {
         ret_play.0 = true;

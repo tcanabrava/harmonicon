@@ -22,7 +22,9 @@ use crate::dialogs::button;
 use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
 
-use super::{AppState, GameplayMode, MenuPage, SelectedSong};
+use crate::app::{AppState, GameplayMode, SelectedSong};
+
+use super::MenuPage;
 
 /// The bundled song a live-gameplay tour step plays a few seconds of. Long
 /// enough (well over two minutes) that no tour step could ever run it to

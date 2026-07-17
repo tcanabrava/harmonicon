@@ -18,10 +18,9 @@ use crate::song::SongManifest;
 use crate::song::harmonica::Progression;
 use crate::theme::LoadedTheme;
 
-use super::{
-    AppState, ButtonMaterials, GameplayMode, JamProgression, MenuPage, SelectedSong, spawn_button,
-    spawn_menu_root,
-};
+use crate::app::{AppState, GameplayMode, JamProgression, SelectedSong};
+
+use super::{ButtonMaterials, MenuPage, spawn_button, spawn_menu_root};
 
 const MIN_BPM: f32 = 60.0;
 const MAX_BPM: f32 = 160.0;

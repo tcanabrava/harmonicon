@@ -15,7 +15,7 @@
 
 use bevy::prelude::*;
 
-use crate::menu::AppState;
+use crate::app::AppState;
 use crate::menu::tutorial::tour_active;
 use crate::theme::LoadedTheme;
 
@@ -53,10 +53,11 @@ const BEAT_W: f32 = 60.0;
 const BEATS_PER_BAR: usize = 4;
 const NOTE_PAD: f32 = 4.0;
 const HANDLE_W: f32 = 8.0;
-// `pub(crate)`, not private like its neighbours here: `gameplay::
-// call_response` needs the same tick grid to convert chart-time call
-// phrases into the ticks `playback::render_pcm` expects.
-pub(crate) const TICKS_PER_BEAT: usize = 4;
+// Defined in `audio_system::synth` (shared tick-grid vocabulary: the same
+// resolution `gameplay::call_response` uses to convert chart-time call
+// phrases into the ticks `render_pcm` expects); re-exported here under its
+// established name for this module's own grid/UI math.
+pub(crate) use crate::audio_system::synth::TICKS_PER_BEAT;
 const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
 // The silence track: a summary row below the hole lanes showing the gap, in
 // seconds, between consecutive notes — see `state::silence_gaps`. Shorter
@@ -186,9 +187,7 @@ mod tests {
     };
     use super::interaction::{apply_modifier, select_or_add};
     use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
-    use super::playback::{
-        PhraseNote, SAMPLE_RATE, build_harp, encode_wav, envelope, note_freq, render_pcm,
-    };
+    use super::playback::{build_harp, note_freq};
     use super::state::Scroll;
     use super::state::{
         Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
@@ -197,6 +196,8 @@ mod tests {
     };
     use super::ui::ModButton;
     use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
+    use crate::audio_system::synth::{PhraseNote, SAMPLE_RATE, envelope, render_pcm};
+    use crate::audio_system::wav::encode_wav;
     use crate::song::harmonica::blues_scale_classes;
 
     #[test]
@@ -827,7 +828,8 @@ mod tests {
                 expr: n.expr,
             })
             .collect();
-        let pcm = render_pcm(&phrase, 120.0);
+        let secs_per_tick = 60.0 / 120.0 / TICKS_PER_BEAT as f32;
+        let pcm = render_pcm(&phrase, secs_per_tick);
         let expected = ((0.5 + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
         assert_eq!(pcm.len(), expected);
         assert!(

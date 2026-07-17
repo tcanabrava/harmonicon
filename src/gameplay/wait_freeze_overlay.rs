@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 
-use crate::menu::AppState;
+use crate::app::AppState;
 
 use super::{GameplayRoot, SongNotes};
 

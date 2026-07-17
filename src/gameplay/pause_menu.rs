@@ -13,7 +13,7 @@ use super::jam_session::ImprovStats;
 use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused};
 use crate::dialogs::button;
 use crate::lessons::{LessonContext, PassCriteria, lesson_passed};
-use crate::menu::{AppState, GameplayMode, ReturnToSongList, SelectedSong};
+use crate::app::{AppState, GameplayMode, ReturnToSongList, SelectedSong};
 use crate::profile::{PlayerProfile, record_lesson, save_profile};
 use crate::song::SongManifest;
 

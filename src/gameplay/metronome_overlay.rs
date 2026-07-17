@@ -10,7 +10,7 @@ use bevy_fluent::Localization;
 
 use crate::{
     localization::LocalizationExt,
-    menu::{AppState, SelectedSong},
+    app::{AppState, SelectedSong},
     settings::AudioSettings,
     song::{SongManifest, chart::Feel},
 };

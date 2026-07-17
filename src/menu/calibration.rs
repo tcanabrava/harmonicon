@@ -33,7 +33,7 @@ use crate::{
     settings::AudioSettings,
 };
 
-use super::{AppState, ReturnToOptions};
+use crate::app::{AppState, ReturnToOptions};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

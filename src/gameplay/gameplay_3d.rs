@@ -11,7 +11,7 @@ use crate::{
         ShowNoteNumbers,
     },
     localization::LocalizationExt,
-    menu::SelectedSong,
+    app::SelectedSong,
     song::NoteCube3dConfig,
     song::SongManifest,
     song::chart::{Action, HarpChart, Modifier},

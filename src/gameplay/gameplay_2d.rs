@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use crate::{
     localization::LocalizationExt,
-    menu::SelectedSong,
+    app::SelectedSong,
     song::NoteThemeConfig,
     song::SongManifest,
     song::chart::{Action, Modifier, PlayMode},

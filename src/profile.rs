@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::menu::AppState;
+use crate::app::AppState;
 
 /// Best result recorded for one song, keyed by its manifest path (stable
 /// across restarts, unlike a `Handle`/`AssetId`) in [`PlayerProfile::songs`].

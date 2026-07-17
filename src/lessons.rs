@@ -78,7 +78,7 @@ pub struct LessonManifest {
     #[serde(default)]
     pub pass_criteria: Option<PassCriteria>,
     /// A jam-based lesson's backing progression (`"standard"`/
-    /// `"quick-change"`/`"minor"`), seeded into `menu::JamProgression` when
+    /// `"quick-change"`/`"minor"`), seeded into `crate::app::JamProgression` when
     /// routing into `GameplayMode::JamSession` — see
     /// `menu::lessons::parse_progression`. `None` resets to `Standard`, the
     /// same "don't let a stale pick from an earlier generated jam linger"

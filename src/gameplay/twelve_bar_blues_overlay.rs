@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    menu::{AppState, GameplayMode, JamProgression, SelectedSong},
+    app::{AppState, GameplayMode, JamProgression, SelectedSong},
     song::{
         SongManifest,
         harmonica::{Progression, progression_bars, semitone},

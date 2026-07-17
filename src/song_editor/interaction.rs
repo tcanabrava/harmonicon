@@ -315,7 +315,7 @@ pub(super) fn grid_keys(
     mut state: ResMut<EditorState>,
     file_dialog: Res<FileDialog>,
     mut next_state: ResMut<NextState<AppState>>,
-    mut ret_play: ResMut<crate::menu::ReturnToPlay>,
+    mut ret_play: ResMut<crate::app::ReturnToPlay>,
 ) {
     if state.focus.is_some() {
         return;

@@ -10,7 +10,7 @@ use bevy_fluent::Localization;
 use crate::{
     dialogs::button,
     localization::LocalizationExt,
-    menu::{JamProgression, SelectedSong},
+    app::{JamProgression, SelectedSong},
     settings::AudioSettings,
     song::SongManifest,
     song::chart::Action,

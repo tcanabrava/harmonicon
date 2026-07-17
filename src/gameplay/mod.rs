@@ -34,9 +34,10 @@ use std::collections::HashSet;
 use bevy::audio::Volume;
 
 use crate::{
+    app::{AppState, GameplayMode, SelectedSong},
     audio_system::midi::{midi_to_freq_hz, note_to_midi},
     audio_system::pitch_detect::{AudioFrame, PitchEvent, PitchInfo, PitchRange},
-    menu::{AppState, GameplayMode, SelectedSong, tutorial::tour_active},
+    menu::tutorial::tour_active,
     settings::AudioSettings,
     song::{SongManifest, chart::Modifier},
 };
