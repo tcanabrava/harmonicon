@@ -17,7 +17,9 @@ without writing JSON directly.
   switches to **Practice** mode: play along on your actual harmonica and
   get the same live pitch feedback a real song gives, against the chart
   you're currently editing — the fastest way to sanity-check a chart
-  actually feels right before saving it.
+  actually feels right before saving it. **⏺ Record** goes the other
+  direction: play your harmonica and have it write notes onto the grid for
+  you (see [Recording notes live](#recording-notes-live) below).
 - **Lock** — freezes the grid against accidental edits while you're just
   reviewing or practicing.
 
@@ -71,6 +73,26 @@ original file is never touched), and a synthesized backing track —
 Harmonicon can't play a raw MIDI file directly. That backing track plays
 automatically both in the editor's own Play preview and, once the song is
 in place, during the real game.
+
+## Recording notes live
+
+**⏺ Record** (Perform mode) writes a chart by ear: click it — the button
+changes to **⏹ Stop Recording** — then play your harmonica. Each note
+appears on the grid the instant you start playing it and keeps growing for
+as long as you hold it, so you watch it take shape in real time rather than
+only seeing it once you stop. Notes are mapped onto your currently selected
+harp key and type exactly the way MIDI import maps a file's notes (an exact
+note where one exists, a bend or slide where one doesn't) — a bend you
+actually play and hold is recorded as a bend, not snapped to the nearest
+natural note. The status bar shows a running count of notes captured while
+you play. Click Stop Recording, or Stop, to end the take — whatever note
+you're still holding at that instant stops growing right there.
+
+Recording only ever *adds* notes; it never deletes or replaces what's
+already on the grid, so you can record several takes (or record over an
+imported/hand-placed part) without losing earlier work. If the chart has
+background music set, it plays automatically while you record, the same as
+Play and Practice, so you can play along to it.
 
 ## Saving and loading
 

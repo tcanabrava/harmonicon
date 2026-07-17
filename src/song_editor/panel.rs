@@ -3,10 +3,12 @@
 use bevy::prelude::*;
 
 use super::practice::PracticeState;
+use super::record::RecordState;
 use super::state::{Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
 use super::ui::{
     BendDot, EditModeGroup, HarmonicaKindText, MetaFieldBox, MetaFieldText, ModButton,
-    ModButtonLabel, ModeButton, PerformModeGroup, StatusMsg, TimelineToolButton,
+    ModButtonLabel, ModeButton, PerformModeGroup, RecordButtonLabel, StatusMsg,
+    TimelineToolButton,
 };
 use crate::localization::LocalizationExt;
 use crate::theme::LoadedTheme;
@@ -212,18 +214,48 @@ pub(super) fn update_harmonica_kind_text(
 pub(super) fn update_status_bar(
     state: Res<EditorState>,
     practice: Res<PracticeState>,
+    record: Res<RecordState>,
+    loc: Res<Localization>,
     mut texts: Query<&mut Text, With<StatusMsg>>,
 ) {
     let Ok(mut text) = texts.single_mut() else {
         return;
     };
-    // Drag messages take priority (they're ephemeral and action-specific).
-    // Practice messages fill the bar while no drag is in progress.
+    // Drag messages take priority (they're ephemeral and action-specific);
+    // a live recording comes next (it's actively running, unlike the
+    // practice message which just sits there between hits); practice
+    // messages fill the bar otherwise.
     **text = if !state.drag_msg.is_empty() {
         state.drag_msg.to_string()
+    } else if record.active {
+        loc.msg_args(
+            "editor-record-status",
+            &[("count", record.note_count.to_string())],
+        )
+        .to_string()
     } else {
         practice.msg.to_string()
     };
+}
+
+/// Swaps the Record button's own label between its idle and
+/// actively-recording text (see [`RecordButtonLabel`]) — separate from
+/// `update_status_bar`'s message, which is transient per-note feedback;
+/// this is the button's persistent on/off state.
+pub(super) fn update_record_button_label(
+    record: Res<RecordState>,
+    mut labels: Query<(&RecordButtonLabel, &mut Text)>,
+) {
+    for (label, mut text) in &mut labels {
+        let want = if record.active {
+            &label.active
+        } else {
+            &label.idle
+        };
+        if text.0 != *want {
+            text.0 = want.clone();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -588,6 +620,8 @@ mod tests {
             p
         };
         world.insert_resource(practice);
+        world.insert_resource(RecordState::default());
+        world.insert_resource(loc);
 
         let status = world.spawn((StatusMsg, Text::new(""))).id();
 
@@ -610,6 +644,8 @@ mod tests {
             p
         };
         world.insert_resource(practice);
+        world.insert_resource(RecordState::default());
+        world.insert_resource(loc);
 
         let status = world.spawn((StatusMsg, Text::new(""))).id();
 
@@ -618,5 +654,44 @@ mod tests {
         schedule.run(&mut world);
 
         assert_eq!(world.get::<Text>(status).unwrap().0, "editor-practice-msg");
+    }
+
+    #[test]
+    fn update_status_bar_prefers_the_recording_message_over_the_practice_message() {
+        let mut world = World::new();
+        let loc = Localization::default();
+        world.insert_resource(EditorState::default());
+        #[allow(clippy::field_reassign_with_default)]
+        let practice = {
+            let mut p = PracticeState::default();
+            p.msg = loc.msg("editor-practice-msg");
+            p
+        };
+        world.insert_resource(practice);
+        // `RecordState::open` is private to the `record` module, so build
+        // this via field mutation (`active` is `pub(super)`) rather than a
+        // struct literal, which would need every field visible here.
+        #[allow(clippy::field_reassign_with_default)]
+        let record = {
+            let mut r = RecordState::default();
+            r.active = true;
+            r
+        };
+        world.insert_resource(record);
+        world.insert_resource(loc);
+
+        let status = world.spawn((StatusMsg, Text::new(""))).id();
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_status_bar);
+        schedule.run(&mut world);
+
+        // `Localization::default()` has no bundle loaded, so `loc.msg_args`
+        // falls back to returning the key itself — just confirm it picked
+        // the recording branch over the (also-set) practice message.
+        assert_eq!(
+            world.get::<Text>(status).unwrap().0,
+            "editor-record-status"
+        );
     }
 }

@@ -12,6 +12,7 @@ use super::playback::{
     EditorAudio, EditorProgressFill, Playhead, PlayheadLine, start_playback, toggle_pause,
 };
 use super::practice::{PracticeState, start_practice, stop_practice};
+use super::record::{RecordState, start_record, stop_record};
 use super::state::{
     EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, Mode, POSITIONS, Scroll, TimelineTool,
 };
@@ -120,6 +121,16 @@ pub(super) struct BendDot;
 pub(super) struct ModButtonLabel {
     pub(super) kind: ModButton,
     pub(super) base: String,
+}
+
+/// Marks the Record button's label text so
+/// [`super::panel::update_record_button_label`] can swap it between its
+/// idle and actively-recording text — cached at spawn time, same reasoning
+/// as [`ModButtonLabel::base`].
+#[derive(Component)]
+pub(super) struct RecordButtonLabel {
+    pub(super) idle: String,
+    pub(super) active: String,
 }
 
 #[derive(Component)]
@@ -533,12 +544,15 @@ fn spawn_mod_panel(
              mut state: ResMut<EditorState>,
              playing: Query<Entity, With<EditorAudio>>,
              mut practice: ResMut<PracticeState>,
+             mut record: ResMut<RecordState>,
              mut playhead: ResMut<Playhead>,
              mut commands: Commands| {
                 state.mode = Mode::Edit;
-                // Leaving Perform mode hides Play/Pause/Stop/Practice, so
-                // nothing would be left to stop anything that's running.
+                // Leaving Perform mode hides Play/Pause/Stop/Practice/
+                // Record, so nothing would be left to stop anything that's
+                // running.
                 stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
             },
         );
         mode_button(
@@ -923,12 +937,13 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
         loc.msg("editor-play-tooltip"),
         Color::srgb(0.20, 0.40, 0.24),
         |_: On<Pointer<Click>>,
-         state: Res<EditorState>,
+         mut state: ResMut<EditorState>,
          mut sources: ResMut<Assets<AudioSource>>,
          settings: Res<AudioSettings>,
          playing: Query<Entity, With<EditorAudio>>,
          sinks: Query<&AudioSink, With<EditorAudio>>,
          mut practice: ResMut<PracticeState>,
+         mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
          mut commands: Commands| {
             // Paused, not stopped: resume in place rather than restarting.
@@ -937,6 +952,11 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
                 return;
             }
             practice.reset(); // exit practice mode before starting preview playback
+            // A recording in progress owns the shared `Playhead` clock —
+            // close it out (rather than letting `start_playback` below
+            // silently repurpose it out from under `record.open`) before
+            // taking over.
+            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
             start_playback(
                 &state,
                 &mut sources,
@@ -964,11 +984,14 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
         loc.msg("editor-stop-tooltip"),
         Color::srgb(0.36, 0.20, 0.20),
         |_: On<Pointer<Click>>,
+         mut state: ResMut<EditorState>,
          playing: Query<Entity, With<EditorAudio>>,
          mut practice: ResMut<PracticeState>,
+         mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
          mut commands: Commands| {
             stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
         },
     );
     transport_button(
@@ -977,11 +1000,12 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
         loc.msg("editor-practice-tooltip"),
         Color::srgb(0.25, 0.18, 0.42),
         |_: On<Pointer<Click>>,
-         state: Res<EditorState>,
+         mut state: ResMut<EditorState>,
          mut sources: ResMut<Assets<AudioSource>>,
          settings: Res<AudioSettings>,
          playing: Query<Entity, With<EditorAudio>>,
          mut practice: ResMut<PracticeState>,
+         mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
          mut commands: Commands,
          loc: Res<Localization>,
@@ -994,6 +1018,9 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
             if practice.active {
                 stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
             } else {
+                // A recording in progress owns the shared `Playhead` clock —
+                // close it out before `start_practice` below repurposes it.
+                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
                 start_practice(
                     &state,
                     &mut sources,
@@ -1003,6 +1030,36 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
                     &mut playhead,
                     &mut commands,
                     &loc,
+                );
+            }
+        },
+    );
+    spawn_record_button(
+        panel,
+        loc.msg("editor-record"),
+        loc.msg("editor-record-stop"),
+        loc.msg("editor-record-tooltip"),
+        |_: On<Pointer<Click>>,
+         mut state: ResMut<EditorState>,
+         mut sources: ResMut<Assets<AudioSource>>,
+         settings: Res<AudioSettings>,
+         playing: Query<Entity, With<EditorAudio>>,
+         mut practice: ResMut<PracticeState>,
+         mut record: ResMut<RecordState>,
+         mut playhead: ResMut<Playhead>,
+         mut commands: Commands| {
+            if record.active {
+                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
+            } else {
+                practice.reset(); // exit practice mode before recording, same as Play does
+                start_record(
+                    &state,
+                    &mut sources,
+                    &settings,
+                    &playing,
+                    &mut record,
+                    &mut playhead,
+                    &mut commands,
                 );
             }
         },
@@ -1040,6 +1097,50 @@ pub(super) fn transport_button<M: 'static>(
                 },
                 TextColor(Color::WHITE),
                 Pickable::IGNORE,
+            ));
+        });
+}
+
+/// Like [`transport_button`], except its label swaps between `idle_label`
+/// and `active_label` at runtime — [`super::panel::update_record_button_label`]
+/// picks one based on [`RecordState::active`]. Kept separate from
+/// `transport_button` rather than adding an optional param there, since
+/// every other transport button has a fixed label.
+fn spawn_record_button<M: 'static>(
+    panel: &mut ChildSpawnerCommands,
+    idle_label: LocalizedStr,
+    active_label: LocalizedStr,
+    tooltip: LocalizedStr,
+    on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
+) {
+    panel
+        .spawn((
+            Button,
+            Node {
+                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.42, 0.15, 0.15)),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(tooltip)),
+        ))
+        .observe(on_click)
+        .with_children(|b| {
+            b.spawn((
+                Text::new(String::from(idle_label.clone())),
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
+                RecordButtonLabel {
+                    idle: String::from(idle_label),
+                    active: String::from(active_label),
+                },
             ));
         });
 }

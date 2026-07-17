@@ -30,6 +30,7 @@ mod panel;
 // the call-and-response lesson feature's audio cue.
 pub(crate) mod playback;
 mod practice;
+mod record;
 mod state;
 mod timeline;
 mod ui;
@@ -94,6 +95,7 @@ impl Plugin for SongEditor2Plugin {
             .add_systems(OnExit(AppState::SongEditor2), ui::cleanup)
             .init_resource::<state::Scroll>()
             .init_resource::<practice::PracticeState>()
+            .init_resource::<record::RecordState>()
             .add_systems(
                 Update,
                 (
@@ -114,8 +116,9 @@ impl Plugin for SongEditor2Plugin {
                         .chain(),
                     playback::update_playhead_view.after(playback::advance_playhead),
                     playback::update_progress_bar.after(playback::advance_playhead),
-                    // Practice tick runs after the playhead advances so `elapsed` is current.
+                    // Practice/record ticks run after the playhead advances so `elapsed` is current.
                     practice::practice_tick.after(playback::advance_playhead),
+                    record::record_tick.after(playback::advance_playhead),
                     // Suspended while the guided tour is showing this
                     // screen — Esc/Delete shouldn't act on it out from
                     // under the tour (see `menu::tutorial`).
@@ -143,8 +146,11 @@ impl Plugin for SongEditor2Plugin {
                         .run_if(resource_exists_and_changed::<state::EditorState>),
                     panel::update_status_bar.run_if(
                         resource_exists_and_changed::<state::EditorState>
-                            .or_else(resource_changed::<practice::PracticeState>),
+                            .or_else(resource_changed::<practice::PracticeState>)
+                            .or_else(resource_changed::<record::RecordState>),
                     ),
+                    panel::update_record_button_label
+                        .run_if(resource_changed::<record::RecordState>),
                     harpchart::handle_save_chosen,
                     harpchart::handle_load_chosen,
                     harpchart::handle_music_chosen,

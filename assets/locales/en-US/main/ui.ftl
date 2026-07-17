@@ -65,6 +65,8 @@ editor-play = ▶ Play
 editor-pause = ⏸ Pause
 editor-stop = ■ Stop
 editor-practice = 🎤 Practice
+editor-record = ⏺ Record
+editor-record-stop = ⏹ Stop Recording
 editor-save = 💾 Save
 editor-load = 📂 Load
 editor-browse = 📂 Browse
@@ -118,6 +120,7 @@ practice-hit-perfect = ✓ PERFECT  %note%  +%pts% pts
 practice-hit-good = ✓ GOOD  %note%  +%pts% pts
 practice-missed = ✗ Missed %note%
 practice-done = Done — %hits%/%total% notes  ·  %score% pts
+editor-record-status = ⏺ Recording — %count% notes captured
 
 # Song Editor 2 — button tooltips
 editor-back-tooltip = Leave the editor and return to the main menu
@@ -130,6 +133,7 @@ editor-play-tooltip = Start or resume playback of the chart
 editor-pause-tooltip = Pause playback in place
 editor-stop-tooltip = Stop playback and reset the playhead to the start
 editor-practice-tooltip = Practice mode — play along on your harmonica with live feedback
+editor-record-tooltip = Record notes played live on your harmonica straight onto the grid — click again (or Stop) to finish
 mod-blow-tooltip = Set the selected note to a blow (exhale) note
 mod-draw-tooltip = Set the selected note to a draw (inhale) note
 mod-bend-tooltip = Cycle the selected note's bend depth: none → half step → whole step → step and a half

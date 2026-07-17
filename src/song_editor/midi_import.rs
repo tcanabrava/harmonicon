@@ -190,7 +190,7 @@ fn extract_notes(track: &[midly::TrackEvent]) -> Vec<RawNote> {
 /// reachable that way); otherwise the nearest playable natural note, so
 /// this always resolves to *something* rather than silently dropping the
 /// MIDI note.
-fn map_pitch(target: u8, harp: &Harmonica, kind: HarmonicaKind) -> (u8, Dir, Pitch) {
+pub(super) fn map_pitch(target: u8, harp: &Harmonica, kind: HarmonicaKind) -> (u8, Dir, Pitch) {
     let hole_count = harp.hole_count();
 
     for hole in 1..=hole_count {

@@ -63,6 +63,8 @@ editor-play = ▶ Tocar
 editor-pause = ⏸ Pausar
 editor-stop = ■ Parar
 editor-practice = 🎤 Praticar
+editor-record = ⏺ Gravar
+editor-record-stop = ⏹ Parar Gravação
 editor-save = 💾 Salvar
 editor-load = 📂 Carregar
 editor-browse = 📂 Procurar
@@ -116,6 +118,7 @@ practice-hit-perfect = ✓ PERFEITO  %note%  +%pts% pts
 practice-hit-good = ✓ BOM  %note%  +%pts% pts
 practice-missed = ✗ Perdeu %note%
 practice-done = Feito — %hits%/%total% notas  ·  %score% pts
+editor-record-status = ⏺ Gravando — %count% notas capturadas
 
 # Editor de Músicas 2 — dicas dos botões
 editor-back-tooltip = Sair do editor e voltar ao menu principal
@@ -128,6 +131,7 @@ editor-play-tooltip = Iniciar ou retomar a reprodução da partitura
 editor-pause-tooltip = Pausar a reprodução onde está
 editor-stop-tooltip = Parar a reprodução e voltar o cursor ao início
 editor-practice-tooltip = Modo prática — toque junto com sua gaita e receba feedback ao vivo
+editor-record-tooltip = Grava as notas tocadas ao vivo na sua gaita direto na grade — clique de novo (ou Parar) para terminar
 mod-blow-tooltip = Definir a nota selecionada como sopro (expirar)
 mod-draw-tooltip = Definir a nota selecionada como puxada (inspirar)
 mod-bend-tooltip = Alternar a profundidade da dobra da nota selecionada: nenhuma → meio tom → tom inteiro → tom e meio

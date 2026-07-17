@@ -63,6 +63,8 @@ editor-play = ▶ Reproducir
 editor-pause = ⏸ Pausar
 editor-stop = ■ Detener
 editor-practice = 🎤 Practicar
+editor-record = ⏺ Grabar
+editor-record-stop = ⏹ Detener Grabación
 editor-save = 💾 Guardar
 editor-load = 📂 Cargar
 editor-browse = 📂 Examinar
@@ -116,6 +118,7 @@ practice-hit-perfect = ✓ PERFECTO  %note%  +%pts% pts
 practice-hit-good = ✓ BIEN  %note%  +%pts% pts
 practice-missed = ✗ Fallaste %note%
 practice-done = Hecho — %hits%/%total% notas  ·  %score% pts
+editor-record-status = ⏺ Grabando — %count% notas capturadas
 
 # Song Editor 2 — descripciones de los botones
 editor-back-tooltip = Salir del editor y volver al menú principal
@@ -128,6 +131,7 @@ editor-play-tooltip = Iniciar o reanudar la reproducción de la partitura
 editor-pause-tooltip = Pausar la reproducción en el mismo punto
 editor-stop-tooltip = Detener la reproducción y volver el cursor al inicio
 editor-practice-tooltip = Modo práctica — toca junto con tu armónica y recibe retroalimentación en vivo
+editor-record-tooltip = Graba las notas tocadas en vivo en tu armónica directo en la cuadrícula — haz clic de nuevo (o Detener) para terminar
 mod-blow-tooltip = Establecer la nota seleccionada como soplo (exhalar)
 mod-draw-tooltip = Establecer la nota seleccionada como aspiración (inhalar)
 mod-bend-tooltip = Alternar la profundidad de doblado de la nota seleccionada: ninguno → medio tono → tono completo → tono y medio
