@@ -33,7 +33,6 @@ const ALLOWLIST: &[&str] = &[
     "src/menu/pages/options.rs",       // split: one section per file
     "src/menu/pages/calibration.rs",   // split: measurement logic vs UI
     // Other current offenders, no assigned destination yet:
-    "src/song_editor/ui.rs",
     "src/gameplay/pause_menu.rs",
     "src/audio_system/pitch_detect.rs",
     "src/song_editor/state.rs",

@@ -92,12 +92,38 @@ fn on_hover_end(ev: On<Pointer<Out>>, mut hovered: ResMut<HoveredTooltip>) {
     }
 }
 
+/// The tooltip panel's top-left corner for a cursor at `(cursor_x, cursor_y)`,
+/// a panel sized `(panel_w, panel_h)`, and a window sized `(window_w,
+/// window_h)` — all in the same length unit (the caller's job to convert;
+/// see `update_tooltip`). Offsets from the cursor by [`CURSOR_OFFSET`] on
+/// each axis, but never past the point where the panel's far edge would
+/// leave the window: past that point the axis holds at the window edge
+/// instead, so the cursor ends up somewhere inside the panel rather than
+/// always at its top-left corner. Deliberately not "flip to the cursor's
+/// other side": that can overflow just as easily near a corner (both the
+/// offset *and* the flipped position push the same edge past the window),
+/// where holding at the window edge always keeps the whole panel on-screen.
+/// Never returns a negative coordinate, even if the panel itself is larger
+/// than the window.
+fn clamp_popup_position(
+    cursor_x: f32,
+    cursor_y: f32,
+    panel_w: f32,
+    panel_h: f32,
+    window_w: f32,
+    window_h: f32,
+) -> (f32, f32) {
+    let left = (cursor_x + CURSOR_OFFSET).min((window_w - panel_w).max(0.0));
+    let top = (cursor_y + CURSOR_OFFSET).min((window_h - panel_h).max(0.0));
+    (left.max(0.0), top.max(0.0))
+}
+
 /// Keeps the tooltip panel's visibility, text, and position in step with
 /// [`HoveredTooltip`] — written every frame while visible so it tracks the
-/// cursor, not just once on hover start. Clamped against the window so a
-/// widget near the right/bottom edge (the song editor's mod-panel buttons
-/// sit right up against it) can't push the panel partly or fully off-screen
-/// — flips to the other side of the cursor instead when it would.
+/// cursor, not just once on hover start. Positioned by [`clamp_popup_position`]
+/// so a widget near the right/bottom edge (the song editor's mod-panel
+/// buttons sit right up against it) can't push the panel partly or fully
+/// off-screen.
 fn update_tooltip(
     hovered: Res<HoveredTooltip>,
     tooltips: Query<&Tooltip>,
@@ -135,23 +161,17 @@ fn update_tooltip(
     // and likewise for the window bounds and the panel's own computed size
     // (physical px — see `gameplay_2d::size_note_tails`'s identical
     // conversion) so every quantity below is in the same `Val::Px` units.
-    let cursor_x = cursor.x / ui_scale.0;
-    let cursor_y = cursor.y / ui_scale.0;
-    let window_w = window.width() / ui_scale.0;
-    let window_h = window.height() / ui_scale.0;
-    let tooltip_w = TOOLTIP_MAX_WIDTH;
     let tooltip_h = computed.size().y * computed.inverse_scale_factor();
-
-    let mut left = cursor_x + CURSOR_OFFSET;
-    if left + tooltip_w > window_w {
-        left = cursor_x - CURSOR_OFFSET - tooltip_w;
-    }
-    let mut top = cursor_y + CURSOR_OFFSET;
-    if top + tooltip_h > window_h {
-        top = cursor_y - CURSOR_OFFSET - tooltip_h;
-    }
-    node.left = Val::Px(left.max(0.0));
-    node.top = Val::Px(top.max(0.0));
+    let (left, top) = clamp_popup_position(
+        cursor.x / ui_scale.0,
+        cursor.y / ui_scale.0,
+        TOOLTIP_MAX_WIDTH,
+        tooltip_h,
+        window.width() / ui_scale.0,
+        window.height() / ui_scale.0,
+    );
+    node.left = Val::Px(left);
+    node.top = Val::Px(top);
 
     for mut text in &mut texts {
         if text.0 != tooltip.0 {
@@ -169,5 +189,51 @@ impl Plugin for TooltipPlugin {
             .add_observer(on_hover_start)
             .add_observer(on_hover_end)
             .add_systems(Update, update_tooltip);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn follows_the_cursor_away_from_any_edge() {
+        let (left, top) = clamp_popup_position(100.0, 100.0, 320.0, 60.0, 1920.0, 1080.0);
+        assert_eq!(left, 100.0 + CURSOR_OFFSET);
+        assert_eq!(top, 100.0 + CURSOR_OFFSET);
+    }
+
+    #[test]
+    fn holds_at_the_right_edge_instead_of_flipping_past_it() {
+        // Cursor 50px from the right edge of a 1920-wide window; a 320-wide
+        // panel offset the usual amount would run 246px past the edge.
+        let (left, _) = clamp_popup_position(1870.0, 100.0, 320.0, 60.0, 1920.0, 1080.0);
+        assert_eq!(left, 1920.0 - 320.0);
+        // The cursor is still inside the panel's horizontal span, not past
+        // its right edge and not at its left edge either.
+        assert!(left < 1870.0 && 1870.0 < left + 320.0);
+    }
+
+    #[test]
+    fn holds_at_the_bottom_edge_instead_of_flipping_past_it() {
+        // Cursor 30px from the bottom of a 1080-tall window; a 200-tall
+        // panel offset the usual amount would run well past the edge.
+        let (_, top) = clamp_popup_position(100.0, 1050.0, 320.0, 200.0, 1920.0, 1080.0);
+        assert_eq!(top, 1080.0 - 200.0);
+        assert!(top < 1050.0 && 1050.0 < top + 200.0);
+    }
+
+    #[test]
+    fn holds_at_the_corner_when_both_axes_would_overflow() {
+        let (left, top) = clamp_popup_position(1900.0, 1070.0, 320.0, 200.0, 1920.0, 1080.0);
+        assert_eq!(left, 1920.0 - 320.0);
+        assert_eq!(top, 1080.0 - 200.0);
+    }
+
+    #[test]
+    fn never_goes_negative_even_if_the_panel_is_larger_than_the_window() {
+        let (left, top) = clamp_popup_position(10.0, 10.0, 400.0, 300.0, 320.0, 200.0);
+        assert_eq!(left, 0.0);
+        assert_eq!(top, 0.0);
     }
 }
