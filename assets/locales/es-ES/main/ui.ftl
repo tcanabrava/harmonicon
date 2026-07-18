@@ -506,6 +506,11 @@ jam-loop-button = ↻ Bucle
 jam-loop-off = Bucle: apagado
 jam-loop-on = Bucle: encendido
 jam-hole-map-hint = Tu armónica  ·  dorado = tono del acorde ahora mismo  ·  verde = nota de la escala de blues  ·  soplo arriba / aspiración abajo
+jam-call-response-button = 🗣 Pregunta y Respuesta
+jam-call-response-off = Pregunta y Respuesta: apagado
+jam-call-response-on = Pregunta y Respuesta: encendido
+jam-call-response-listen = Escucha…
+jam-call-response-your-turn = Tu turno
 
 # Pantalla de resultados
 results-song-complete = CANCIÓN COMPLETADA

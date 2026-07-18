@@ -508,6 +508,11 @@ jam-loop-button = ↻ Loop
 jam-loop-off = Loop: off
 jam-loop-on = Loop: on
 jam-hole-map-hint = Your harmonica  ·  gold = chord tone right now  ·  green = blues-scale note  ·  top blow / bottom draw
+jam-call-response-button = 🗣 Call & Response
+jam-call-response-off = Call & Response: off
+jam-call-response-on = Call & Response: on
+jam-call-response-listen = Listen…
+jam-call-response-your-turn = Your turn
 
 # Results screen
 results-song-complete = SONG COMPLETE

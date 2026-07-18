@@ -506,6 +506,11 @@ jam-loop-button = ↻ Loop
 jam-loop-off = Loop: desligado
 jam-loop-on = Loop: ligado
 jam-hole-map-hint = Sua harmônica  ·  dourado = tom do acorde agora  ·  verde = nota da escala de blues  ·  sopro em cima / sugada embaixo
+jam-call-response-button = 🗣 Pergunta & Resposta
+jam-call-response-off = Pergunta & Resposta: desligado
+jam-call-response-on = Pergunta & Resposta: ligado
+jam-call-response-listen = Escute…
+jam-call-response-your-turn = Sua vez
 
 # Tela de resultados
 results-song-complete = MÚSICA CONCLUÍDA

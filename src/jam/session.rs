@@ -173,6 +173,29 @@ pub fn setup(
                     ));
                 });
                 left.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(8.0),
+                    ..default()
+                })
+                .with_children(|row| {
+                    row.spawn_empty().apply_scene(button::small(
+                        &loc.msg("jam-call-response-button"),
+                        |_: On<Pointer<Click>>, mut enabled: ResMut<super::call_response::CallResponseEnabled>| {
+                            enabled.0 = !enabled.0;
+                        },
+                    ));
+                    row.spawn((
+                        Text::new(String::from(loc.msg("jam-call-response-off"))),
+                        TextFont {
+                            font_size: FontSize::Px(15.0),
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.70, 0.70, 0.80)),
+                        super::call_response::CallResponseLabel,
+                    ));
+                });
+                left.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(4.0),
                     ..default()
@@ -248,6 +271,8 @@ pub fn setup(
     // Jam already shows the harp hint on the persistent left panel, so the
     // countdown doesn't repeat it.
     spawn_countdown(&mut commands, &loc, None);
+
+    super::call_response::spawn_call_response_banner(&mut commands);
 }
 
 // ── Music loop toggle ────────────────────────────────────────────────────────
@@ -380,9 +405,15 @@ const PLAY_IN_SCALE: Color = Color::srgb(0.20, 0.80, 0.35);
 const PLAY_OUT_SCALE: Color = Color::srgb(0.90, 0.55, 0.15);
 const LABEL_IN_SCALE: Color = Color::srgb(0.45, 0.85, 0.50);
 const LABEL_OUT_SCALE: Color = Color::srgb(0.50, 0.50, 0.55);
+/// A hole used by the current call-and-response lick, shown while nothing's
+/// actually sounding it right now — a visual memory aid for the echo, not a
+/// graded outcome (see `call_response`'s module doc comment).
+const PLAY_GHOST_LICK: Color = Color::srgba(0.45, 0.40, 0.85, 0.85);
 
 /// The note class (drop the trailing octave digit) of e.g. `"D#5"` → `"D#"`.
-fn note_class(note: &str) -> &str {
+/// `pub(super)` so `jam::call_response`'s lick generator can classify a
+/// MIDI pitch's note class the same way the hole map's own tint does.
+pub(super) fn note_class(note: &str) -> &str {
     note.trim_end_matches(|c: char| c.is_ascii_digit())
 }
 
@@ -507,12 +538,16 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], loc: &L
 /// Tint each hole cell from the live mic pitches, three tiers: gold if the
 /// sounding note is a tone of the chord currently sounding (the most targeted
 /// choice — chord-tone awareness, not just scale membership), green if it's
-/// elsewhere in the blues scale, amber if outside the scale, default when
-/// silent. Reuses the same `ActivePitches` the scored modes detect.
+/// elsewhere in the blues scale, amber if outside the scale; a hole that's
+/// part of the current call-and-response lick (`call_response::
+/// CallResponseState`) but not currently sounding gets the ghost tint
+/// instead of the plain default, so the player has a visual reference for
+/// what to echo. Reuses the same `ActivePitches` the scored modes detect.
 pub fn update_hole_map(
     active: Res<ActivePitches>,
     guide: Option<Res<JamHoleGuide>>,
     current: Res<CurrentBar>,
+    call_response: Option<Res<super::call_response::CallResponseState>>,
     mut cells: Query<(&JamHoleCell, &mut BackgroundColor)>,
 ) {
     let Some(guide) = guide else {
@@ -537,11 +572,17 @@ pub fn update_hole_map(
         }
     }
 
+    let ghost_holes: &[u8] = call_response
+        .as_deref()
+        .map(|s| s.lick_holes.as_slice())
+        .unwrap_or(&[]);
+
     for (cell, mut bg) in &mut cells {
         bg.0 = match lit.get(&cell.hole) {
             Some(super::improv::NoteFit::ChordTone) => PLAY_CHORD_TONE,
             Some(super::improv::NoteFit::InScale) => PLAY_IN_SCALE,
             Some(super::improv::NoteFit::OutOfScale) => PLAY_OUT_SCALE,
+            None if ghost_holes.contains(&cell.hole) => PLAY_GHOST_LICK,
             None => HOLE_DEFAULT,
         };
     }

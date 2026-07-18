@@ -9,7 +9,7 @@ use bevy::prelude::*;
 
 use crate::app::{AppState, GameplayMode};
 use crate::audio_system::pitch_detect::PitchRange;
-use crate::jam::{improv, session as jam_session};
+use crate::jam::{call_response as jam_call_response, improv, session as jam_session};
 use crate::menu::tutorial::tour_active;
 use crate::settings::AudioSettings;
 
@@ -84,6 +84,8 @@ impl Plugin for GameplayPlugin {
         .init_resource::<jam_session::JamLoop>()
         .init_resource::<improv::ImprovGate>()
         .init_resource::<improv::ImprovStats>()
+        .init_resource::<jam_call_response::CallResponseEnabled>()
+        .init_resource::<jam_call_response::CallResponseState>()
         .init_resource::<call_response::CallCues>()
         .init_resource::<pause_menu::WaitForNoteMode>()
         .init_resource::<pause_menu::PracticeSpeed>()
@@ -243,6 +245,9 @@ impl Plugin for GameplayPlugin {
             (
                 jam_session::update_hole_map,
                 improv::accumulate_improv_stats,
+                jam_call_response::drive_call_response,
+                jam_call_response::update_call_response_banner,
+                jam_call_response::update_call_response_label,
             )
                 .after(GameplayLogic)
                 .run_if(
