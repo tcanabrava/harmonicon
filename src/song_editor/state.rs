@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::{HEADER_H, NOTE_PAD, ROW_H, TICK_W};
+use super::{HEADER_H, NOTE_PAD, ROW_H, TICKS_PER_BEAT, TICK_W};
 
 // ── Note model types ─────────────────────────────────────────────────────────
 
@@ -88,6 +88,13 @@ pub(super) enum TimelineTool {
     /// it earlier by the range's length, closing the gap — the song gets
     /// shorter.
     Remove,
+    /// Click-to-toggle a tempo-change point at the clicked tick — unlike
+    /// Select/Erase/Remove, a single plain click (not a two-step
+    /// select-then-confirm span) either adds or removes one point, with no
+    /// confirm dialog (non-destructive to notes, trivially undone by
+    /// clicking again). See `timeline::on_timeline_click_tempo`/
+    /// `toggle_tempo_point`.
+    Tempo,
 }
 
 impl TimelineTool {
@@ -232,6 +239,12 @@ pub(super) struct EditorState {
     pub(super) scroll_beat: usize,
     pub(super) dragging: Option<DragState>,
     pub(super) tempo: String,
+    /// Tempo changes after the song's opening tempo (`tempo`, tick 0) —
+    /// `(tick, bpm)` pairs in the editor's own tick unit, added via the
+    /// timeline's Tempo tool (`timeline::tempo_tool_click`). Not
+    /// necessarily sorted as edits land; [`EditorState::tempo_map`] sorts
+    /// on read. Empty for the overwhelmingly common single-tempo case.
+    pub(super) tempo_changes: Vec<(usize, f32)>,
     pub(super) key: String,
     pub(super) position: String,
     pub(super) music: String,
@@ -284,6 +297,7 @@ impl Default for EditorState {
             scroll_beat: 0,
             dragging: None,
             tempo: "120".into(),
+            tempo_changes: Vec::new(),
             key: "C".into(),
             position: "2nd".into(),
             music: String::new(),
@@ -329,6 +343,15 @@ impl EditorState {
     pub(super) fn selected_note_mut(&mut self) -> Option<&mut GridNote> {
         let id = self.selected?;
         self.notes.iter_mut().find(|n| n.id == id)
+    }
+
+    /// The full tempo map (sorted, always starting at tick 0), built from
+    /// the song's opening tempo (`tempo`) and any [`EditorState::
+    /// tempo_changes`] — the representation every tick↔real-time
+    /// conversion in the editor reads, via `song::chart::
+    /// tick_to_seconds`/`seconds_to_tick`. See [`build_tempo_map`].
+    pub(super) fn tempo_map(&self) -> Vec<crate::song::chart::TempoPoint> {
+        build_tempo_map(&self.tempo, &self.tempo_changes)
     }
 
     pub(super) fn field_text(&self, field: Field) -> &str {
@@ -604,6 +627,36 @@ pub(super) fn note_rect(note: &GridNote) -> (f32, f32, f32, f32) {
     let width = note.len as f32 * TICK_W - 2.0;
     let height = ROW_H - 2.0 * NOTE_PAD;
     (left, top, width, height)
+}
+
+// ── Tempo map ─────────────────────────────────────────────────────────────────
+
+/// Builds the full tempo map (sorted, always starting at tick 0) from the
+/// song's opening tempo (`tempo`, the `Field::Tempo` text value) and any
+/// additional tempo-change points (`tempo_changes`, added via the
+/// timeline's Tempo tool) — the representation every tick↔real-time
+/// conversion in the editor reads, via `song::chart::
+/// tick_to_seconds`/`seconds_to_tick`. Ticks here are the editor's own
+/// tick unit (`TICKS_PER_BEAT` per beat), which is also exactly the
+/// `resolution` the editor writes to a saved chart's `timing.resolution`
+/// (`harpchart::serialize_harpchart`) — so this can be handed straight to
+/// those functions with no unit conversion. A duplicate tick (e.g. a
+/// tempo-change point placed at tick 0, where the opening tempo already
+/// applies) silently keeps the earlier-sorted entry rather than erroring —
+/// same "always resolves to something reasonable" spirit the rest of the
+/// editor's fallback chains follow.
+pub(super) fn build_tempo_map(tempo: &str, tempo_changes: &[(usize, f32)]) -> Vec<crate::song::chart::TempoPoint> {
+    use crate::song::chart::TempoPoint;
+    let bpm0: f32 = tempo.parse::<f32>().unwrap_or(120.0).max(1.0);
+    let mut map = vec![TempoPoint { tick: 0, bpm: bpm0 }];
+    map.extend(
+        tempo_changes
+            .iter()
+            .map(|&(tick, bpm)| TempoPoint { tick: tick as u64, bpm: bpm.max(1.0) }),
+    );
+    map.sort_by_key(|p| p.tick);
+    map.dedup_by_key(|p| p.tick);
+    map
 }
 
 // ── Timeline erase/remove ────────────────────────────────────────────────────

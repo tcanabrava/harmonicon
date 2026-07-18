@@ -321,8 +321,7 @@ pub(super) fn rebuild_grid(
         }
     }
 
-    let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
-    let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+    let tempo_map = state.tempo_map();
 
     let bucket_count = waveform.buckets.len();
     let visible = super::waveform::visible_waveform_buckets(
@@ -330,10 +329,15 @@ pub(super) fn rebuild_grid(
         cols,
         bucket_count,
         waveform.duration_secs,
-        bpm,
+        &tempo_map,
     );
     for i in visible {
-        let (x, w) = super::waveform::waveform_bar_geometry(i, bucket_count, waveform.duration_secs, bpm);
+        let (x, w) = super::waveform::waveform_bar_geometry(
+            i,
+            bucket_count,
+            waveform.duration_secs,
+            &tempo_map,
+        );
         let amplitude = waveform.buckets[i].clamp(0.0, 1.0);
         let h = (amplitude * WAVEFORM_H).max(1.0);
         items.push(
@@ -357,11 +361,20 @@ pub(super) fn rebuild_grid(
 
     for (start, end) in silence_gaps(&state.notes) {
         if start < last_tick && end > first_tick {
+            let duration_secs = crate::song::chart::tick_to_seconds(
+                end as u64,
+                TICKS_PER_BEAT as u32,
+                &tempo_map,
+            ) - crate::song::chart::tick_to_seconds(
+                start as u64,
+                TICKS_PER_BEAT as u32,
+                &tempo_map,
+            );
             items.push(spawn_silence_gap(
                 &mut commands,
                 start,
                 end,
-                (end - start) as f32 * secs_per_tick,
+                duration_secs as f32,
                 hole_count,
                 colors,
             ));

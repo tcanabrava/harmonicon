@@ -314,6 +314,35 @@ pub fn tick_to_seconds(tick: u64, resolution: u32, tempo_map: &[TempoPoint]) -> 
     elapsed
 }
 
+/// Convert an absolute-seconds position back to a tick — the inverse of
+/// [`tick_to_seconds`], for anything that needs to place a real-time
+/// position (an audio playhead, an imported track's waveform) against the
+/// tick grid a variable tempo map describes. `resolution`/`tempo_map` share
+/// `tick_to_seconds`'s meaning and requirements. `secs <= 0.0` or an empty
+/// map both resolve to tick 0.
+pub fn seconds_to_tick(secs: f64, resolution: u32, tempo_map: &[TempoPoint]) -> u64 {
+    if tempo_map.is_empty() || resolution == 0 || secs <= 0.0 {
+        return 0;
+    }
+    let mut elapsed = 0.0f64;
+    let mut prev_tick = tempo_map[0].tick;
+    let mut prev_bpm = tempo_map[0].bpm as f64;
+
+    for point in tempo_map.iter().skip(1) {
+        let seg_ticks = point.tick - prev_tick;
+        let seg_secs = (seg_ticks as f64 / resolution as f64) * (60.0 / prev_bpm);
+        if secs <= elapsed + seg_secs {
+            let remaining_ticks = (secs - elapsed) / (60.0 / prev_bpm) * resolution as f64;
+            return prev_tick + remaining_ticks.round() as u64;
+        }
+        elapsed += seg_secs;
+        prev_tick = point.tick;
+        prev_bpm = point.bpm as f64;
+    }
+    let remaining_ticks = (secs - elapsed) / (60.0 / prev_bpm) * resolution as f64;
+    prev_tick + remaining_ticks.round() as u64
+}
+
 /// Return the time-signature string active at `tick`, scanning `time_sig_map`
 /// (which must be sorted by tick). Returns `None` when the map is empty.
 pub fn time_sig_at_tick(tick: u64, time_sig_map: &[TimeSigPoint]) -> Option<&str> {
@@ -495,6 +524,56 @@ mod tests {
     #[test]
     fn empty_tempo_map_returns_zero() {
         assert_eq!(tick_to_seconds(999, 480, &[]), 0.0);
+    }
+
+    // ── seconds_to_tick ───────────────────────────────────────────────────────
+
+    #[test]
+    fn zero_seconds_is_tick_zero() {
+        let map = vec![TempoPoint {
+            tick: 0,
+            bpm: 120.0,
+        }];
+        assert_eq!(seconds_to_tick(0.0, 480, &map), 0);
+    }
+
+    #[test]
+    fn half_a_second_at_120bpm_is_one_beat() {
+        let map = vec![TempoPoint {
+            tick: 0,
+            bpm: 120.0,
+        }];
+        assert_eq!(seconds_to_tick(0.5, 480, &map), 480);
+    }
+
+    #[test]
+    fn seconds_to_tick_inverts_tick_to_seconds_across_a_tempo_change() {
+        // Same map as `tempo_change_midway`: 0..960 @ 120bpm, then @ 180bpm.
+        let map = vec![
+            TempoPoint {
+                tick: 0,
+                bpm: 120.0,
+            },
+            TempoPoint {
+                tick: 960,
+                bpm: 180.0,
+            },
+        ];
+        for tick in [0u64, 240, 480, 960, 1200, 1440] {
+            let secs = tick_to_seconds(tick, 480, &map);
+            let round_tripped = seconds_to_tick(secs, 480, &map);
+            assert_eq!(round_tripped, tick, "tick {tick} -> {secs}s -> {round_tripped}");
+        }
+    }
+
+    #[test]
+    fn negative_or_zero_seconds_and_empty_map_resolve_to_tick_zero() {
+        let map = vec![TempoPoint {
+            tick: 0,
+            bpm: 120.0,
+        }];
+        assert_eq!(seconds_to_tick(-1.0, 480, &map), 0);
+        assert_eq!(seconds_to_tick(1.0, 480, &[]), 0);
     }
 
     // ── time_sig_at_tick ──────────────────────────────────────────────────────

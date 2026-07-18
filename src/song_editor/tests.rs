@@ -10,8 +10,9 @@ use super::playback::{build_harp, note_freq};
 use super::state::Scroll;
 use super::state::{
     Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
-    apply_resize, can_place, enforce_direction, enforce_expr, erase_range, move_target,
-    normalize_range, note_rect, remove_range, silence_gaps, song_end_tick, split_side_range,
+    apply_resize, build_tempo_map, can_place, enforce_direction, enforce_expr, erase_range,
+    move_target, normalize_range, note_rect, remove_range, silence_gaps, song_end_tick,
+    split_side_range,
 };
 use super::ui::ModButton;
 use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -913,6 +914,88 @@ fn saved_position_round_trips_through_load() {
 }
 
 #[test]
+fn serialize_harpchart_writes_every_tempo_change_point() {
+    let s = EditorState {
+        tempo: "120".into(),
+        tempo_changes: vec![(960, 180.0)],
+        ..Default::default()
+    };
+    let json_str = serialize_harpchart(&s);
+    let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+    let map = v["timing"]["tempo_map"].as_array().expect("tempo_map array");
+    assert_eq!(map.len(), 2);
+    assert_eq!(map[0]["tick"], 0);
+    assert_eq!(map[0]["bpm"], 120.0);
+    assert_eq!(map[1]["tick"], 960);
+    assert_eq!(map[1]["bpm"], 180.0);
+}
+
+#[test]
+fn a_multi_point_tempo_map_round_trips_through_save_and_load() {
+    let s = EditorState {
+        tempo: "120".into(),
+        tempo_changes: vec![(960, 180.0)],
+        ..Default::default()
+    };
+    let json_str = serialize_harpchart(&s);
+    let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+
+    let mut loaded = EditorState::default();
+    let mut scroll = Scroll::default();
+    load_harpchart(&v, &mut loaded, &mut scroll);
+
+    assert_eq!(loaded.tempo, "120");
+    assert_eq!(loaded.tempo_changes, vec![(960, 180.0)]);
+}
+
+#[test]
+fn a_note_placed_after_a_tempo_change_keeps_its_tick_across_save_and_load() {
+    let mut s = EditorState {
+        tempo: "120".into(),
+        tempo_changes: vec![(960, 180.0)],
+        ..Default::default()
+    };
+    // Tick 960 is exactly the tempo-change boundary; this note starts a
+    // beat later, well inside the faster section.
+    select_or_add(&mut s, 3, 960 + TICKS_PER_BEAT);
+
+    let json_str = serialize_harpchart(&s);
+    let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+
+    let mut loaded = EditorState::default();
+    let mut scroll = Scroll::default();
+    load_harpchart(&v, &mut loaded, &mut scroll);
+
+    assert_eq!(loaded.notes.len(), 1);
+    assert_eq!(loaded.notes[0].tick, 960 + TICKS_PER_BEAT);
+}
+
+#[test]
+fn loading_a_foreign_resolution_rescales_ticks_into_the_editors_own_unit() {
+    // A chart authored at MIDI-style resolution 480 (4x the editor's own
+    // TICKS_PER_BEAT of 4) with a note at tick 480 (one beat in) and a
+    // tempo change at tick 960 (two beats in).
+    let v = serde_json::json!({
+        "song": { "tempo_bpm": 120.0 },
+        "timing": {
+            "resolution": 480,
+            "tempo_map": [{"tick": 0, "bpm": 120.0}, {"tick": 960, "bpm": 180.0}]
+        },
+        "track": [
+            {"tick": 480, "duration": 0.5, "events": [{"hole": 3, "action": "blow"}]}
+        ]
+    });
+    let mut loaded = EditorState::default();
+    let mut scroll = Scroll::default();
+    load_harpchart(&v, &mut loaded, &mut scroll);
+
+    // 480 file-ticks * (4 editor-ticks / 480 file-ticks) = 4 editor-ticks.
+    assert_eq!(loaded.notes[0].tick, TICKS_PER_BEAT);
+    // 960 file-ticks -> 8 editor-ticks.
+    assert_eq!(loaded.tempo_changes, vec![(2 * TICKS_PER_BEAT, 180.0)]);
+}
+
+#[test]
 fn loading_an_unknown_position_keeps_the_default() {
     let v: serde_json::Value = serde_json::json!({
         "harmonica": { "position": "9th" }
@@ -1215,6 +1298,40 @@ fn song_end_tick_is_the_last_notes_end() {
 #[test]
 fn song_end_tick_of_an_empty_song_is_zero() {
     assert_eq!(song_end_tick(&[]), 0);
+}
+
+// ── Tempo map ──────────────────────────────────────────────────────────────
+
+#[test]
+fn tempo_map_with_no_changes_is_a_single_tick_zero_point() {
+    let map = build_tempo_map("140", &[]);
+    assert_eq!(map.len(), 1);
+    assert_eq!(map[0].tick, 0);
+    assert_eq!(map[0].bpm, 140.0);
+}
+
+#[test]
+fn tempo_map_sorts_changes_by_tick_regardless_of_insertion_order() {
+    let map = build_tempo_map("120", &[(960, 180.0), (480, 150.0)]);
+    let ticks: Vec<u64> = map.iter().map(|p| p.tick).collect();
+    assert_eq!(ticks, vec![0, 480, 960]);
+    assert_eq!(map[1].bpm, 150.0);
+    assert_eq!(map[2].bpm, 180.0);
+}
+
+#[test]
+fn tempo_map_falls_back_to_120_for_an_unparseable_opening_tempo() {
+    let map = build_tempo_map("not a number", &[]);
+    assert_eq!(map[0].bpm, 120.0);
+}
+
+#[test]
+fn tempo_map_keeps_the_opening_tempo_when_a_change_collides_with_tick_zero() {
+    // A tempo-change point placed at tick 0 (where the opening tempo
+    // already applies) shouldn't produce two competing tick-0 entries.
+    let map = build_tempo_map("120", &[(0, 200.0)]);
+    assert_eq!(map.len(), 1);
+    assert_eq!(map[0].bpm, 120.0);
 }
 
 // ── Silence track ──────────────────────────────────────────────────────────

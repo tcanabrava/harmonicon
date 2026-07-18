@@ -9,7 +9,7 @@ use super::state::{
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::dialogs::file_dialog::FileChosen;
-use crate::song::chart::Action;
+use crate::song::chart::{Action, TempoPoint, seconds_to_tick, tick_to_seconds};
 use crate::song::harmonica::{Harmonica, hole_notes};
 
 // ── Serialisation ────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
     use std::collections::BTreeMap;
 
     let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
-    let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+    let tempo_map = state.tempo_map();
     let harp = build_harp(&state.key, state.harmonica_kind);
 
     let mut by_tick: BTreeMap<usize, Vec<&GridNote>> = BTreeMap::new();
@@ -65,7 +65,12 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
         .enumerate()
         .map(|(idx, (&tick, notes))| {
             let max_len = notes.iter().map(|n| n.len).max().unwrap_or(1);
-            let duration_secs = max_len as f64 * secs_per_tick as f64;
+            // Via the real tempo map, not a flat bpm — correct even for the
+            // rare phrase whose sustain crosses a tempo-change boundary.
+            let start_secs = tick_to_seconds(tick as u64, TICKS_PER_BEAT as u32, &tempo_map);
+            let end_secs =
+                tick_to_seconds((tick + max_len) as u64, TICKS_PER_BEAT as u32, &tempo_map);
+            let duration_secs = end_secs - start_secs;
             let play_mode = if notes.len() == 1 { "single" } else { "chord" };
 
             let events: Vec<Value> = notes
@@ -205,7 +210,10 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
         },
         "timing": {
             "resolution": TICKS_PER_BEAT,
-            "tempo_map": [{ "tick": 0, "bpm": bpm }]
+            "tempo_map": tempo_map
+                .iter()
+                .map(|p| json!({ "tick": p.tick, "bpm": p.bpm }))
+                .collect::<Vec<_>>()
         },
         "harmonica": harmonica,
         "track": track,
@@ -303,8 +311,49 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         state.music = audio.to_string();
     }
 
-    let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
-    let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+    // The file's own resolution/tempo map — independent of `state.tempo`/
+    // `tempo_changes` below, which get *populated from* this data, not read
+    // by it. A chart missing (or declaring an empty) `timing.tempo_map`
+    // falls back to a single tick-0 point at `song.tempo_bpm` (already in
+    // `state.tempo` from above) — the same "always resolves to something
+    // reasonable" fallback the rest of the editor's load path already uses.
+    let file_resolution = v["timing"]["resolution"]
+        .as_u64()
+        .map(|r| r as u32)
+        .filter(|&r| r > 0)
+        .unwrap_or(TICKS_PER_BEAT as u32);
+    let file_tempo_map: Vec<TempoPoint> = v["timing"]["tempo_map"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|p| {
+                    Some(TempoPoint {
+                        tick: p["tick"].as_u64()?,
+                        bpm: p["bpm"].as_f64()? as f32,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .filter(|m| !m.is_empty())
+        .unwrap_or_else(|| {
+            vec![TempoPoint {
+                tick: 0,
+                bpm: state.tempo.parse::<f32>().unwrap_or(120.0).max(1.0),
+            }]
+        });
+
+    // Editor ticks and file ticks are both "N per quarter note" grids
+    // sharing the same real-time axis — rescaling between them is a
+    // constant ratio, independent of tempo entirely (tempo affects
+    // tick-to-*seconds*, not tick-to-tick). `tempo_map`'s own tempo values
+    // carry over unchanged; only their tick anchors get rescaled.
+    let scale = TICKS_PER_BEAT as f64 / file_resolution as f64;
+    state.tempo = format!("{}", file_tempo_map[0].bpm.round() as u32);
+    state.tempo_changes = file_tempo_map[1..]
+        .iter()
+        .map(|p| ((p.tick as f64 * scale).round() as usize, p.bpm))
+        .collect();
+    let editor_tempo_map = state.tempo_map();
 
     let mut notes: Vec<GridNote> = Vec::new();
     let mut next_id = 0u32;
@@ -314,18 +363,24 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     if let Some(track) = v["track"].as_array() {
         for phrase in track {
             let start_tick = if let Some(t) = phrase["tick"].as_u64() {
-                t as usize
+                (t as f64 * scale).round() as usize
             } else if let Some(t) = phrase["time"].as_f64() {
-                (t as f32 / secs_per_tick).round() as usize
+                seconds_to_tick(t, TICKS_PER_BEAT as u32, &editor_tempo_map) as usize
             } else {
                 continue;
             };
 
-            let duration_secs = phrase["duration"]
-                .as_f64()
-                .unwrap_or(secs_per_tick as f64 * TICKS_PER_BEAT as f64)
-                as f32;
-            let len = ((duration_secs / secs_per_tick).round() as usize).max(1);
+            let start_secs =
+                tick_to_seconds(start_tick as u64, TICKS_PER_BEAT as u32, &editor_tempo_map);
+            let default_beat_secs = tick_to_seconds(
+                (start_tick + TICKS_PER_BEAT) as u64,
+                TICKS_PER_BEAT as u32,
+                &editor_tempo_map,
+            ) - start_secs;
+            let duration_secs = phrase["duration"].as_f64().unwrap_or(default_beat_secs);
+            let end_tick =
+                seconds_to_tick(start_secs + duration_secs, TICKS_PER_BEAT as u32, &editor_tempo_map);
+            let len = (end_tick as usize).saturating_sub(start_tick).max(1);
 
             let events = phrase["events"].as_array().unwrap_or(&empty);
             for event in events {
