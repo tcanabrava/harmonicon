@@ -4,6 +4,7 @@ use bevy::audio::AudioSource;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use bevy::ui_widgets::ScrollArea;
 use bevy::window::WindowResized;
 
 use super::harpchart::safe_path_segment;
@@ -290,121 +291,146 @@ pub(super) fn setup(
                 ));
             });
 
+            // Everything below the progress bar, in a scrollable column —
+            // total content height (grid + mod panel + meta form + status
+            // bar) routinely exceeds a laptop window's height, and without
+            // this whatever's last in the tree (the meta form's MIDI-track
+            // combobox) is simply pushed off-screen with no way to reach it.
+            // Same `Overflow::scroll_y()` + `ScrollArea` pattern
+            // `menu::pages::lessons`/`dialogs::file_dialog` already
+            // establish; `min_height: Val::Px(0.0)` lets this flex item
+            // actually shrink below its content size instead of refusing to
+            // clip (the standard flexbox "min-height: auto" gotcha).
             root.spawn((
-                GridRowContainer,
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Px(grid_height(hole_count)),
-                    flex_direction: FlexDirection::Row,
+                    flex_direction: FlexDirection::Column,
+                    flex_grow: 1.0,
+                    min_height: Val::Px(0.0),
+                    overflow: Overflow::scroll_y(),
                     ..default()
                 },
+                ScrollArea,
             ))
-            .with_children(|row| {
-                spawn_hole_column(row, colors, hole_count, &loc);
-                row.spawn((
-                    GridArea,
-                    Node {
-                        flex_grow: 1.0,
-                        height: Val::Px(grid_height(hole_count)),
-                        overflow: Overflow::clip(),
-                        ..default()
-                    },
-                ))
-                .with_children(|ga| {
-                    ga.spawn((
-                        GridContent,
+            .with_children(|scroll| {
+                scroll
+                    .spawn((
+                        GridRowContainer,
                         Node {
-                            position_type: PositionType::Absolute,
-                            left: Val::Px(0.0),
-                            top: Val::Px(0.0),
+                            width: Val::Percent(100.0),
                             height: Val::Px(grid_height(hole_count)),
+                            flex_direction: FlexDirection::Row,
+                            flex_shrink: 0.0,
                             ..default()
                         },
                     ))
-                    .with_children(|content| {
-                        content.spawn((
-                            MoveGhost,
-                            ZIndex(2),
+                    .with_children(|row| {
+                        spawn_hole_column(row, colors, hole_count, &loc);
+                        row.spawn((
+                            GridArea,
                             Node {
-                                position_type: PositionType::Absolute,
-                                width: Val::Px(BEAT_W - 2.0),
-                                height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
-                                border: UiRect::all(Val::Px(2.0)),
-                                ..default()
-                            },
-                            BackgroundColor(colors.ghost_ok.with_alpha(0.30)),
-                            BorderColor::all(colors.ghost_ok),
-                            Visibility::Hidden,
-                            Pickable::IGNORE,
-                        ));
-                        content.spawn((
-                            PlayheadLine,
-                            ZIndex(3),
-                            Node {
-                                position_type: PositionType::Absolute,
-                                top: Val::Px(0.0),
-                                width: Val::Px(2.0),
+                                flex_grow: 1.0,
                                 height: Val::Px(grid_height(hole_count)),
+                                overflow: Overflow::clip(),
                                 ..default()
                             },
-                            BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
-                            Visibility::Hidden,
-                            Pickable::IGNORE,
-                        ));
-                        // Erase/Remove tool overlays — see `timeline`'s
-                        // module docs. Both hidden until a tool picks a
-                        // split point or drag span; `update_timeline_
-                        // overlays` (unconditional, like the playhead/move
-                        // ghost above) repositions and shows/hides them
-                        // every frame.
-                        content.spawn((
-                            super::timeline::TimelineSplitLine,
-                            ZIndex(3),
-                            Node {
-                                position_type: PositionType::Absolute,
-                                top: Val::Px(0.0),
-                                width: Val::Px(2.0),
-                                height: Val::Px(grid_height(hole_count)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.95, 0.75, 0.20)),
-                            Visibility::Hidden,
-                            Pickable::IGNORE,
-                        ));
-                        content.spawn((
-                            super::timeline::TimelineHighlight,
-                            ZIndex(1),
-                            Node {
-                                position_type: PositionType::Absolute,
-                                top: Val::Px(0.0),
-                                height: Val::Px(grid_height(hole_count)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.95, 0.30, 0.20, 0.22)),
-                            Visibility::Hidden,
-                            Pickable::IGNORE,
-                        ));
+                        ))
+                        .with_children(|ga| {
+                            ga.spawn((
+                                GridContent,
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    left: Val::Px(0.0),
+                                    top: Val::Px(0.0),
+                                    height: Val::Px(grid_height(hole_count)),
+                                    ..default()
+                                },
+                            ))
+                            .with_children(|content| {
+                                content.spawn((
+                                    MoveGhost,
+                                    ZIndex(2),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        width: Val::Px(BEAT_W - 2.0),
+                                        height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
+                                        border: UiRect::all(Val::Px(2.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(colors.ghost_ok.with_alpha(0.30)),
+                                    BorderColor::all(colors.ghost_ok),
+                                    Visibility::Hidden,
+                                    Pickable::IGNORE,
+                                ));
+                                content.spawn((
+                                    PlayheadLine,
+                                    ZIndex(3),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        top: Val::Px(0.0),
+                                        width: Val::Px(2.0),
+                                        height: Val::Px(grid_height(hole_count)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
+                                    Visibility::Hidden,
+                                    Pickable::IGNORE,
+                                ));
+                                // Erase/Remove tool overlays — see `timeline`'s
+                                // module docs. Both hidden until a tool picks a
+                                // split point or drag span; `update_timeline_
+                                // overlays` (unconditional, like the playhead/move
+                                // ghost above) repositions and shows/hides them
+                                // every frame.
+                                content.spawn((
+                                    super::timeline::TimelineSplitLine,
+                                    ZIndex(3),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        top: Val::Px(0.0),
+                                        width: Val::Px(2.0),
+                                        height: Val::Px(grid_height(hole_count)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgb(0.95, 0.75, 0.20)),
+                                    Visibility::Hidden,
+                                    Pickable::IGNORE,
+                                ));
+                                content.spawn((
+                                    super::timeline::TimelineHighlight,
+                                    ZIndex(1),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        top: Val::Px(0.0),
+                                        height: Val::Px(grid_height(hole_count)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(0.95, 0.30, 0.20, 0.22)),
+                                    Visibility::Hidden,
+                                    Pickable::IGNORE,
+                                ));
+                            });
+                        });
                     });
-                });
+
+                spawn_mod_panel(scroll, &loc, colors, mode);
+                spawn_meta_form(scroll, &loc, colors);
+
+                scroll.spawn((
+                    StatusMsg,
+                    Text::new(""),
+                    TextFont {
+                        font_size: FontSize::Px(12.0),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(1.0, 0.40, 0.15)),
+                    Node {
+                        width: Val::Percent(100.0),
+                        padding: UiRect::axes(Val::Px(10.0), Val::Px(4.0)),
+                        ..default()
+                    },
+                ));
             });
-
-            spawn_mod_panel(root, &loc, colors, mode);
-            spawn_meta_form(root, &loc, colors);
-
-            root.spawn((
-                StatusMsg,
-                Text::new(""),
-                TextFont {
-                    font_size: FontSize::Px(12.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(1.0, 0.40, 0.15)),
-                Node {
-                    width: Val::Percent(100.0),
-                    padding: UiRect::axes(Val::Px(10.0), Val::Px(4.0)),
-                    ..default()
-                },
-            ));
         });
 }
 
@@ -499,6 +525,15 @@ fn spawn_hole_column_rows(
     });
 }
 
+/// The mod panel: a short, fixed global-transport strip (Back / Edit /
+/// Perform / Lock / Save / Load — always the same regardless of mode), then
+/// a `flex_wrap: Wrap` contextual tool strip below it (the current mode's
+/// whole tool palette — up to 13 buttons + 3 separators in Edit mode). Two
+/// stacked rows rather than one ever-growing row, so a narrow/small window
+/// wraps the tool strip onto a second line instead of rendering buttons past
+/// the right edge with no way to reach them. The panel's own height is
+/// therefore auto (driven by its two rows' content) rather than the fixed
+/// `Val::Px(52.0)` a single non-wrapping row could get away with.
 fn spawn_mod_panel(
     root: &mut ChildSpawnerCommands,
     loc: &Localization,
@@ -508,86 +543,95 @@ fn spawn_mod_panel(
     root.spawn((
         Node {
             width: Val::Percent(100.0),
-            height: Val::Px(52.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(8.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(6.0),
             padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
             ..default()
         },
         BackgroundColor(colors.panel_bg),
     ))
     .with_children(|panel| {
-        transport_button(
-            panel,
-            loc.msg("back"),
-            loc.msg("editor-back-tooltip"),
-            Color::srgb(0.22, 0.22, 0.28),
-            |_: On<Pointer<Click>>,
-             mut next: ResMut<NextState<AppState>>,
-             mut ret_play: ResMut<crate::app::ReturnToPlay>| {
-                ret_play.0 = true;
-                next.set(AppState::Menu);
-            },
-        );
-        panel_separator(panel);
+        panel
+            .spawn(Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(8.0),
+                ..default()
+            })
+            .with_children(|transport| {
+                transport_button(
+                    transport,
+                    loc.msg("back"),
+                    loc.msg("editor-back-tooltip"),
+                    colors.transport_back,
+                    |_: On<Pointer<Click>>,
+                     mut next: ResMut<NextState<AppState>>,
+                     mut ret_play: ResMut<crate::app::ReturnToPlay>| {
+                        ret_play.0 = true;
+                        next.set(AppState::Menu);
+                    },
+                );
+                panel_separator(transport);
 
-        // Edit/Perform/Lock: always visible, regardless of which mode-group
-        // below is currently shown.
-        mode_button(
-            panel,
-            ModeButton::Edit,
-            loc.msg("editor-mode-edit"),
-            loc.msg("editor-mode-edit-tooltip"),
-            colors,
-            |_: On<Pointer<Click>>,
-             mut state: ResMut<EditorState>,
-             playing: Query<Entity, With<EditorAudio>>,
-             mut practice: ResMut<PracticeState>,
-             mut record: ResMut<RecordState>,
-             mut playhead: ResMut<Playhead>,
-             mut commands: Commands| {
-                state.mode = Mode::Edit;
-                // Leaving Perform mode hides Play/Pause/Stop/Practice/
-                // Record, so nothing would be left to stop anything that's
-                // running.
-                stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
-                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
-            },
-        );
-        mode_button(
-            panel,
-            ModeButton::Perform,
-            loc.msg("editor-mode-perform"),
-            loc.msg("editor-mode-perform-tooltip"),
-            colors,
-            |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                state.mode = Mode::Perform;
-            },
-        );
-        mode_button(
-            panel,
-            ModeButton::Lock,
-            loc.msg("editor-lock"),
-            loc.msg("editor-lock-tooltip"),
-            colors,
-            |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                state.user_locked = !state.user_locked;
-            },
-        );
-        panel_separator(panel);
+                // Edit/Perform/Lock: always visible, regardless of which
+                // mode-group below is currently shown.
+                mode_button(
+                    transport,
+                    ModeButton::Edit,
+                    loc.msg("editor-mode-edit"),
+                    loc.msg("editor-mode-edit-tooltip"),
+                    colors,
+                    |_: On<Pointer<Click>>,
+                     mut state: ResMut<EditorState>,
+                     playing: Query<Entity, With<EditorAudio>>,
+                     mut practice: ResMut<PracticeState>,
+                     mut record: ResMut<RecordState>,
+                     mut playhead: ResMut<Playhead>,
+                     mut commands: Commands| {
+                        state.mode = Mode::Edit;
+                        // Leaving Perform mode hides Play/Pause/Stop/Practice/
+                        // Record, so nothing would be left to stop anything
+                        // that's running.
+                        stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+                        stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
+                    },
+                );
+                mode_button(
+                    transport,
+                    ModeButton::Perform,
+                    loc.msg("editor-mode-perform"),
+                    loc.msg("editor-mode-perform-tooltip"),
+                    colors,
+                    |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                        state.mode = Mode::Perform;
+                    },
+                );
+                mode_button(
+                    transport,
+                    ModeButton::Lock,
+                    loc.msg("editor-lock"),
+                    loc.msg("editor-lock-tooltip"),
+                    colors,
+                    |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                        state.user_locked = !state.user_locked;
+                    },
+                );
+                panel_separator(transport);
 
-        spawn_file_buttons(panel, loc);
-        panel_separator(panel);
+                spawn_file_buttons(transport, loc, colors);
+            });
 
         panel
             .spawn((
                 EditModeGroup,
                 Node {
+                    width: Val::Percent(100.0),
                     flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
                     align_items: AlignItems::Center,
                     column_gap: Val::Px(8.0),
-                    flex_grow: 1.0,
+                    row_gap: Val::Px(6.0),
                     // `Display::None`, not `Visibility::Hidden` — Visibility
                     // only skips rendering, it still reserves this group's
                     // full layout width, which pushed the other group off to
@@ -697,10 +741,12 @@ fn spawn_mod_panel(
             .spawn((
                 PerformModeGroup,
                 Node {
+                    width: Val::Percent(100.0),
                     flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
                     align_items: AlignItems::Center,
                     column_gap: Val::Px(8.0),
-                    flex_grow: 1.0,
+                    row_gap: Val::Px(6.0),
                     display: if mode == Mode::Perform {
                         Display::Flex
                     } else {
@@ -710,7 +756,7 @@ fn spawn_mod_panel(
                 },
             ))
             .with_children(|g| {
-                spawn_playback_buttons(g, loc);
+                spawn_playback_buttons(g, loc, colors);
             });
     });
 }
@@ -884,12 +930,12 @@ fn panel_separator(panel: &mut ChildSpawnerCommands) {
 }
 
 /// Chart file I/O — always visible, in both Edit and Perform mode.
-fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
+fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     transport_button(
         panel,
         loc.msg("editor-save"),
         loc.msg("editor-save-tooltip"),
-        Color::srgb(0.18, 0.28, 0.45),
+        colors.transport_save,
         |_: On<Pointer<Click>>,
          state: Res<EditorState>,
          loc: Res<Localization>,
@@ -915,7 +961,7 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
         panel,
         loc.msg("editor-load"),
         loc.msg("editor-load-tooltip"),
-        Color::srgb(0.24, 0.30, 0.20),
+        colors.transport_load,
         |_: On<Pointer<Click>>, loc: Res<Localization>, mut open: MessageWriter<OpenFileDialog>| {
             open.write(OpenFileDialog {
                 purpose: LOAD_PURPOSE,
@@ -930,12 +976,12 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
 
 /// Play/Pause/Stop/Practice — only shown in [`Mode::Perform`] (wrapped in
 /// [`PerformModeGroup`] by the caller).
-fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) {
+fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     transport_button(
         panel,
         loc.msg("editor-play"),
         loc.msg("editor-play-tooltip"),
-        Color::srgb(0.20, 0.40, 0.24),
+        colors.transport_play,
         |_: On<Pointer<Click>>,
          mut state: ResMut<EditorState>,
          mut sources: ResMut<Assets<AudioSource>>,
@@ -971,7 +1017,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
         panel,
         loc.msg("editor-pause"),
         loc.msg("editor-pause-tooltip"),
-        Color::srgb(0.36, 0.32, 0.16),
+        colors.transport_pause,
         |_: On<Pointer<Click>>,
          mut playhead: ResMut<Playhead>,
          sinks: Query<&AudioSink, With<EditorAudio>>| {
@@ -982,7 +1028,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
         panel,
         loc.msg("editor-stop"),
         loc.msg("editor-stop-tooltip"),
-        Color::srgb(0.36, 0.20, 0.20),
+        colors.transport_stop,
         |_: On<Pointer<Click>>,
          mut state: ResMut<EditorState>,
          playing: Query<Entity, With<EditorAudio>>,
@@ -998,7 +1044,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
         panel,
         loc.msg("editor-practice"),
         loc.msg("editor-practice-tooltip"),
-        Color::srgb(0.25, 0.18, 0.42),
+        colors.transport_practice,
         |_: On<Pointer<Click>>,
          mut state: ResMut<EditorState>,
          mut sources: ResMut<Assets<AudioSource>>,
@@ -1039,6 +1085,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization) 
         loc.msg("editor-record"),
         loc.msg("editor-record-stop"),
         loc.msg("editor-record-tooltip"),
+        colors.transport_record,
         |_: On<Pointer<Click>>,
          mut state: ResMut<EditorState>,
          mut sources: ResMut<Assets<AudioSource>>,
@@ -1111,6 +1158,7 @@ fn spawn_record_button<M: 'static>(
     idle_label: LocalizedStr,
     active_label: LocalizedStr,
     tooltip: LocalizedStr,
+    bg: Color,
     on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
 ) {
     panel
@@ -1123,7 +1171,7 @@ fn spawn_record_button<M: 'static>(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.42, 0.15, 0.15)),
+            BackgroundColor(bg),
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
             Tooltip(String::from(tooltip)),
         ))

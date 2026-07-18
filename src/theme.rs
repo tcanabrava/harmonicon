@@ -166,6 +166,26 @@ pub struct SongEditorColors {
     pub ghost_ok: Color,
     #[serde(deserialize_with = "hex_color")]
     pub ghost_bad: Color,
+    /// Distinct per-button backgrounds for the transport strip
+    /// (`song_editor::panel_widgets::transport_button`'s callers) — unlike
+    /// `btn_bg` (uniform across every mod/mode/timeline-tool button), these
+    /// are colour-coded per action for quick visual recognition.
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_back: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_save: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_load: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_play: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_pause: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_stop: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_practice: Color,
+    #[serde(deserialize_with = "hex_color")]
+    pub transport_record: Color,
 }
 
 impl Default for SongEditorColors {
@@ -188,6 +208,14 @@ impl Default for SongEditorColors {
             field_bg_focus: Color::srgba(0.16, 0.16, 0.24, 1.0),
             ghost_ok: Color::srgb(0.98, 0.85, 0.20),
             ghost_bad: Color::srgb(0.90, 0.25, 0.20),
+            transport_back: Color::srgb(0.22, 0.22, 0.28),
+            transport_save: Color::srgb(0.18, 0.28, 0.45),
+            transport_load: Color::srgb(0.24, 0.30, 0.20),
+            transport_play: Color::srgb(0.20, 0.40, 0.24),
+            transport_pause: Color::srgb(0.36, 0.32, 0.16),
+            transport_stop: Color::srgb(0.36, 0.20, 0.20),
+            transport_practice: Color::srgb(0.25, 0.18, 0.42),
+            transport_record: Color::srgb(0.42, 0.15, 0.15),
         }
     }
 }
