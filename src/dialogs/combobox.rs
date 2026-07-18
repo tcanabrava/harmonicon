@@ -21,11 +21,20 @@
 //! Register [`ComboboxPlugin`] once per app. If some other Escape handler
 //! (e.g. "go back a menu page") should only fire when no dropdown was open
 //! to close, order it `.after(close_open_comboboxes_on_escape)`.
+//!
+//! The dropdown list's on-screen position is managed by `bevy::ui_widgets`'
+//! [`Popover`] component, not a fixed `top`/`left` — it opens below the
+//! toggle normally, above it instead if that would run past the bottom of
+//! the window, and is clamped so it can't render off-screen either way.
+//! `PopoverPlugin` runs this: it's part of `bevy_ui_widgets::UiWidgetsPlugins`,
+//! which `DefaultPlugins` already includes whenever the `bevy_ui_widgets`
+//! Cargo feature is on (as it is here) — nothing to register separately.
 
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
+use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, PopoverSide};
 
 use super::button;
 
@@ -116,65 +125,78 @@ pub fn spawn_combobox<M: 'static>(
         .id();
     commands.entity(root).observe(on_select);
 
-    commands.entity(root).with_children(|c| {
-        c.spawn(Node {
+    let row = commands
+        .spawn(Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(LABEL_GAP),
             ..default()
         })
-        .with_children(|r| {
-            r.spawn((
-                Node {
-                    width: Val::Px(LABEL_WIDTH),
-                    ..default()
-                },
-                Text::new(label.to_string()),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-            // `ComboboxRoot`/`ComboboxToggleLabel` wrap a bare `Entity`, which
-            // has no meaningful `Default`, so `bsn!`'s inline component-value
-            // syntax (which needs `Default + Clone`) can't embed them —
-            // attach them imperatively instead.
-            r.spawn_empty()
-                .apply_scene(toggle_scene())
-                .insert(ComboboxRoot(root))
-                .with_children(|t| {
-                    t.spawn((
-                        Text::new(toggle_label(current)),
-                        TextFont {
-                            font_size: FontSize::Px(16.0),
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                        Pickable {
-                            should_block_lower: false,
-                            is_hoverable: false,
-                        },
-                        ComboboxToggleLabel(root),
-                    ));
-                });
-        });
+        .id();
+    commands.entity(root).add_child(row);
+
+    let label_entity = commands
+        .spawn((
+            Node {
+                width: Val::Px(LABEL_WIDTH),
+                ..default()
+            },
+            Text::new(label.to_string()),
+            TextFont {
+                font_size: FontSize::Px(20.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ))
+        .id();
+    commands.entity(row).add_child(label_entity);
+
+    // `ComboboxRoot`/`ComboboxToggleLabel` wrap a bare `Entity`, which
+    // has no meaningful `Default`, so `bsn!`'s inline component-value
+    // syntax (which needs `Default + Clone`) can't embed them —
+    // attach them imperatively instead. Spawned at the top level (not
+    // nested in a `with_children` closure) so its `Entity` id is available
+    // below, for the dropdown list to parent itself to directly — see the
+    // `list` comment for why.
+    let toggle = commands
+        .spawn_empty()
+        .apply_scene(toggle_scene())
+        .insert(ComboboxRoot(root))
+        .id();
+    commands.entity(row).add_child(toggle);
+    commands.entity(toggle).with_children(|t| {
+        t.spawn((
+            Text::new(toggle_label(current)),
+            TextFont {
+                font_size: FontSize::Px(16.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Pickable {
+                should_block_lower: false,
+                is_hoverable: false,
+            },
+            ComboboxToggleLabel(root),
+        ));
     });
 
     // Absolutely positioned (out of flow) so opening it overlays the rest of
-    // the page instead of pushing it down; `top: 100%` anchors it to just
-    // below the label+toggle row's own box, wherever that ends up on the
-    // page. `GlobalZIndex` puts it above both normal page content and the
-    // backdrop below.
+    // the page instead of pushing it down. A child of `toggle` (not `root`,
+    // which spans the whole label+toggle row) so `Popover`'s `Start`
+    // alignment lands it flush with the toggle's own left edge, same as the
+    // old hand-authored `left: Px(LABEL_WIDTH + LABEL_GAP)` offset it
+    // replaces. `Popover` (`bevy::ui_widgets`) repositions it every frame to
+    // whichever of its candidate placements fits the window best — opening
+    // below the toggle normally, above it if that would run past the bottom
+    // edge — instead of a fixed `top: 100%` that has no idea where the
+    // window's edges are. `GlobalZIndex` puts it above both normal page
+    // content and the backdrop below.
     let list = commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Percent(100.0),
-                left: Val::Px(LABEL_WIDTH + LABEL_GAP),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(4.0),
-                margin: UiRect::top(Val::Px(4.0)),
                 padding: UiRect::all(Val::Px(6.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 display: Display::None,
@@ -183,6 +205,21 @@ pub fn spawn_combobox<M: 'static>(
             BackgroundColor(PANEL_BG),
             BorderColor::all(PANEL_BORDER),
             GlobalZIndex(250),
+            Popover {
+                positions: vec![
+                    PopoverPlacement {
+                        side: PopoverSide::Bottom,
+                        align: PopoverAlign::Start,
+                        gap: 4.0,
+                    },
+                    PopoverPlacement {
+                        side: PopoverSide::Top,
+                        align: PopoverAlign::Start,
+                        gap: 4.0,
+                    },
+                ],
+                window_margin: 8.0,
+            },
         ))
         .id();
     commands.entity(list).with_children(|l| {
@@ -196,7 +233,7 @@ pub fn spawn_combobox<M: 'static>(
                 });
         }
     });
-    commands.entity(root).add_child(list);
+    commands.entity(toggle).add_child(list);
 
     // Full-screen invisible click-catcher, a *direct* child of
     // `backdrop_parent` (not nested under `root`) so its 100% size resolves
