@@ -2,18 +2,26 @@
 
 //! Import a MIDI file's track into the note grid — the Song Editor's
 //! analogue of `bin/midi_to_chart`, but generalized to whatever harmonica
-//! key/kind the editor session is currently set to (not a fixed C
-//! diatonic), and producing [`GridNote`]s in memory instead of writing a
-//! chart file, since here the destination is [`EditorState`], not disk.
+//! key the editor session is currently set to (not a fixed C diatonic),
+//! and producing [`GridNote`]s in memory instead of writing a chart file,
+//! since here the destination is [`EditorState`], not disk. The *key*
+//! isn't actually fixed to whatever was already selected, though: picking
+//! a track ([`on_midi_track_selected`]) auto-picks whichever [`HARP_KEYS`]
+//! entry needs the fewest bend/slide/nearest-note fallbacks to play the
+//! track ([`suggest_key`]), the same "always resolve to something
+//! reasonable, don't make the user discover a bad fit the hard way"
+//! spirit as [`map_pitch`]'s own fallback chain — the harmonica *kind*
+//! (diatonic vs. chromatic) is left alone, since switching that is a much
+//! bigger, more disruptive change than a key (one more click to undo).
 //!
 //! Kept independent from `bin/midi_to_chart`'s own tempo/note-extraction
 //! code (a small amount of duplication) rather than sharing it, since the
 //! bin's pitch mapping is intentionally simpler (fixed C diatonic, no
-//! chromatic/slide support) and already shipped/tested — reusing it here
-//! would mean either generalizing it (churn on a working tool for a
-//! feature that doesn't need it changed) or accepting its
-//! C-diatonic-only limitation inside the editor, which does need to
-//! support both harmonica kinds and any key.
+//! chromatic/slide support, no key suggestion) and already shipped/tested
+//! — reusing it here would mean either generalizing it (churn on a
+//! working tool for a feature that doesn't need it changed) or accepting
+//! its C-diatonic-only limitation inside the editor, which does need to
+//! support both harmonica kinds, any key, and now key suggestion too.
 
 use bevy::prelude::*;
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
@@ -21,7 +29,7 @@ use std::collections::HashMap;
 
 use super::playback::build_harp;
 use super::state::{
-    Dir, EditorState, Expr, GridNote, HarmonicaKind, Pitch, max_bend, pitch_compatible,
+    Dir, EditorState, Expr, GridNote, HARP_KEYS, HarmonicaKind, Pitch, max_bend, pitch_compatible,
 };
 use super::{MIDI_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::midi_to_freq_hz;
@@ -261,6 +269,63 @@ pub(super) fn map_pitch(target: u8, harp: &Harmonica, kind: HarmonicaKind) -> (u
         .unwrap_or((1, Dir::Blow, Pitch::Normal))
 }
 
+/// Fraction of `midi_keys` that land on `key`/`kind`'s harp via an *exact*
+/// natural blow/draw match (no bend/slide/nearest-note fallback needed) —
+/// the fitness measure [`suggest_key`] maximizes. `midi_keys` empty scores
+/// `0.0` rather than dividing by zero (never actually reached in practice:
+/// `import_track_notes` already rejects an empty track before this would
+/// run on one).
+fn key_fit_score(midi_keys: &[u8], key: &str, kind: HarmonicaKind) -> f32 {
+    if midi_keys.is_empty() {
+        return 0.0;
+    }
+    let harp = build_harp(key, kind);
+    let exact = midi_keys
+        .iter()
+        .filter(|&&target| {
+            (1..=harp.hole_count()).any(|hole| {
+                harp.wind_direction_midi(hole, &Action::Blow) == Some(target)
+                    || harp.wind_direction_midi(hole, &Action::Draw) == Some(target)
+            })
+        })
+        .count();
+    exact as f32 / midi_keys.len() as f32
+}
+
+/// The [`HARP_KEYS`] entry that best fits `midi_keys` for `kind` — the one
+/// needing the fewest bends/slides/nearest-note fallbacks to play (highest
+/// [`key_fit_score`]). Ties keep whichever key sorts earlier in
+/// `HARP_KEYS`, so the result is deterministic regardless of float
+/// rounding. Lets MIDI import pick a sensible key on its own — the same
+/// "always resolves to something reasonable" spirit as [`map_pitch`]'s own
+/// bend/slide/nearest-note fallback chain, rather than requiring the user
+/// to already have the right key selected (or to discover a bad fit only
+/// after seeing how many notes needed a fallback).
+pub(super) fn suggest_key(midi_keys: &[u8], kind: HarmonicaKind) -> &'static str {
+    let mut best_key = HARP_KEYS[0];
+    let mut best_score = -1.0;
+    for &key in &HARP_KEYS {
+        let score = key_fit_score(midi_keys, key, kind);
+        if score > best_score {
+            best_score = score;
+            best_key = key;
+        }
+    }
+    best_key
+}
+
+/// The raw MIDI key numbers of every note in `track_index`, in the order
+/// [`extract_notes`] produces them — the input [`suggest_key`] scores
+/// candidate harp keys against.
+pub(super) fn track_midi_keys(bytes: &[u8], track_index: usize) -> Result<Vec<u8>, String> {
+    let smf = Smf::parse(bytes).map_err(|e| e.to_string())?;
+    let track = smf
+        .tracks
+        .get(track_index)
+        .ok_or_else(|| "track index out of range".to_string())?;
+    Ok(extract_notes(track).into_iter().map(|n| n.key).collect())
+}
+
 // ── Track listing / import ───────────────────────────────────────────────────
 
 pub(super) fn list_midi_tracks(bytes: &[u8]) -> Result<Vec<MidiTrackInfo>, String> {
@@ -472,16 +537,28 @@ fn on_midi_track_selected(
     else {
         return;
     };
-    match import_track_notes(&midi.bytes, info.index, &state.key, state.harmonica_kind) {
+    // Auto-pick the best-fitting key for this track rather than importing
+    // onto whatever key the editor already happened to be set to — same
+    // "don't make the user discover a bad fit the hard way" reasoning as
+    // `map_pitch`'s own fallback chain. Kept within the harmonica *kind*
+    // already selected (diatonic vs. chromatic is a much bigger, more
+    // disruptive choice than a key, which is just one more click to
+    // change if this guess isn't the one the user wanted).
+    let key = match track_midi_keys(&midi.bytes, info.index) {
+        Ok(keys) => suggest_key(&keys, state.harmonica_kind).to_string(),
+        Err(_) => state.key.clone(),
+    };
+    match import_track_notes(&midi.bytes, info.index, &key, state.harmonica_kind) {
         Ok(imported) => {
             state.next_id = imported.notes.len() as u32;
             state.notes = imported.notes;
             state.selected = None;
             state.dragging = None;
             state.tempo = format!("{}", imported.initial_bpm.round() as u32);
+            state.key = key.clone();
             midi.selected = Some(info.index);
             println!(
-                "Imported MIDI track {}: {} ({} notes)",
+                "Imported MIDI track {}: {} ({} notes), auto-picked key {key}",
                 info.index, info.name, info.note_count
             );
         }
@@ -659,6 +736,68 @@ mod tests {
         let (hole, _dir, pitch) = map_pitch(0, &harp, HarmonicaKind::Diatonic);
         assert_eq!(pitch, Pitch::Normal);
         assert!((1..=10).contains(&hole));
+    }
+
+    // ── key_fit_score / suggest_key ──────────────────────────────────────────────
+
+    fn midi(note: &str) -> u8 {
+        crate::audio_system::midi::note_to_midi(note).unwrap() as u8
+    }
+
+    #[test]
+    fn key_fit_score_is_perfect_for_notes_that_are_all_natural_on_that_key() {
+        // C4/E4/G4 are hole 1/2/3 blow on a C richter harp — no bend needed.
+        let keys = [midi("C4"), midi("E4"), midi("G4")];
+        assert_eq!(key_fit_score(&keys, "C", HarmonicaKind::Diatonic), 1.0);
+    }
+
+    #[test]
+    fn key_fit_score_is_lower_when_notes_need_a_fallback() {
+        // The same notes, scored against a harp a tritone away, won't line
+        // up on natural blow/draw reeds nearly as often.
+        let keys = [midi("C4"), midi("E4"), midi("G4")];
+        let c_score = key_fit_score(&keys, "C", HarmonicaKind::Diatonic);
+        let off_score = key_fit_score(&keys, "F#", HarmonicaKind::Diatonic);
+        assert!(off_score < c_score);
+    }
+
+    #[test]
+    fn key_fit_score_is_zero_for_no_notes() {
+        assert_eq!(key_fit_score(&[], "C", HarmonicaKind::Diatonic), 0.0);
+    }
+
+    #[test]
+    fn suggest_key_picks_the_key_whose_harp_the_notes_are_natural_on() {
+        // A transposed-up-a-tone version of the same C-harp-natural notes
+        // should suggest D, not C.
+        let keys = [midi("D4"), midi("F#4"), midi("A4")];
+        assert_eq!(suggest_key(&keys, HarmonicaKind::Diatonic), "D");
+    }
+
+    #[test]
+    fn suggest_key_breaks_ties_by_harp_keys_own_order() {
+        // No notes at all fits every key equally (badly) — the first
+        // HARP_KEYS entry wins, deterministically.
+        assert_eq!(suggest_key(&[], HarmonicaKind::Diatonic), HARP_KEYS[0]);
+    }
+
+    // ── track_midi_keys ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn track_midi_keys_extracts_every_notes_pitch_in_order() {
+        let bytes = smf_bytes(vec![vec![
+            note_on(0, 60, 100),
+            note_off(10, 60),
+            note_on(0, 64, 100),
+            note_off(10, 64),
+        ]]);
+        assert_eq!(track_midi_keys(&bytes, 0).unwrap(), vec![60, 64]);
+    }
+
+    #[test]
+    fn track_midi_keys_rejects_an_out_of_range_track() {
+        let bytes = smf_bytes(vec![vec![note_on(0, 60, 100), note_off(10, 60)]]);
+        assert!(track_midi_keys(&bytes, 5).is_err());
     }
 
     // ── list_midi_tracks / option_label ──────────────────────────────────────────
