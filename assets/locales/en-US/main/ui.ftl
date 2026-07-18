@@ -41,6 +41,12 @@ play-3d = Play 3D
 # Generate Jam (synthesized backing, no song required)
 jam-generate-title = Generate a Jam Backing
 jam-generate-start = Start Jam
+jam-generate-key = Key: %key%
+jam-generate-tempo = Tempo: %bpm%
+jam-generate-progression = Progression: %progression%
+
+# Credits
+credits-back-to-menu = Back to Menu
 
 # Song / artist selection
 select-artist = Select Artist
@@ -53,6 +59,13 @@ options-language = Language
 options-adaptive-difficulty = Adaptive Difficulty
 options-adaptive-difficulty-on = Adaptive Difficulty: on
 options-adaptive-difficulty-off = Adaptive Difficulty: off
+options-pitch-detect = Pitch detect
+options-microphone = Microphone
+options-note-labels-button = Note labels
+options-note-labels-arrows = Note labels: arrows
+options-note-labels-numbers = Note labels: numbers
+options-calibrate-input-lag = Calibrate input lag
+theme-back-to-options = ← Back to Options
 
 # Shared
 back = ← Back
@@ -101,6 +114,8 @@ dialog-save-chart = Save chart
 dialog-load-chart = Load chart
 dialog-select-music = Select background music
 dialog-select-midi = Select MIDI file
+dialog-file-name = File name:
+dialog-cancel-esc = Cancel  (Esc)
 
 # Song Editor 2 — drag validation messages
 drag-denied-bend = This hole does not support this bend depth
@@ -444,18 +459,51 @@ gameplay-legend-blow = ■ BLOW
 gameplay-legend-draw = ■ DRAW
 harmonica-overlay-hint-view = Harmonica  ·  lights up as you play
 harmonica-overlay-hint-select = Harmonica  ·  click a note to select it
+gameplay-chart-info = Key: %key%  ♩ = %bpm%  %time_sig%
+gameplay-chart-author = Chart: %author%
+gameplay-techniques-toggle = %arrow% TECHNIQUES
+
+# Pause menu
+pause-quit-song = Quit Song
+pause-finish-lesson = Finish Lesson
+pause-wait-for-note-button = ⏸ Wait for Note
+pause-wait-for-note-on = Wait for Note: on
+pause-wait-for-note-off = Wait for Note: off
+pause-speed = Speed: %pct%%
+pause-adaptive-difficulty-button = Adaptive Difficulty
+pause-adaptive-difficulty-on = Adaptive Difficulty: on
+pause-adaptive-difficulty-off = Adaptive Difficulty: off
+pause-phrase-section = Section: %name% — Learned: %pct%%
+pause-phrase-no-sections = No phrases in this song
+pause-drag-section-hint = Click a section on the progress bar above to select it
+pause-notes-update-hint = Notes update live — resume to see them
+pause-clear-loop = Clear Loop
+pause-loop-off = Loop: off
+pause-loop-range = Loop: %start%s–%end%s
+pause-drag-loop-hint = Drag on the progress bar above to set a loop range
 
 # Metronome overlay
 metronome-click-off = click: off
 metronome-click-on = click: on
+metronome-feel-straight = feel: straight
+metronome-feel-shuffle = feel: shuffle
 
 # Bending Trainer
 bending-drill-off = Drill: off
 bending-drill-on = Drill: on · streak %streak%
 bending-hint = Esc to go back  ·  M mutes the click  ·  feel toggles straight/shuffle
 bending-no-note-for-technique = This hole has no note for that technique.
+bending-key-label = Key: %key%
+bending-listen-button = 🔊 Listen
+bending-drill-button = 🎲 Drill
+bending-play-it-target = Play it — target %note%
+bending-in-tune = ✓ In tune  (%note%)
+bending-cents-sharp = ↑ %cents% cents sharp  (target %note%)
+bending-cents-flat = ↓ %cents% cents flat  (target %note%)
+bending-detect-label = Detect
 
 # Jam Session
+jam-loop-button = ↻ Loop
 jam-loop-off = Loop: off
 jam-loop-on = Loop: on
 jam-hole-map-hint = Your harmonica  ·  gold = chord tone right now  ·  green = blues-scale note  ·  top blow / bottom draw
@@ -464,6 +512,25 @@ jam-hole-map-hint = Your harmonica  ·  gold = chord tone right now  ·  green =
 results-song-complete = SONG COMPLETE
 results-by-technique = By technique
 results-new-best = ★ NEW BEST! ★
+results-biggest-combo = Biggest combo
+results-perfect-hits = Perfect hits
+results-good-hits = Good hits
+results-hits = Hits
+results-delayed-hits = Delayed hits
+results-misses = Misses
+results-technique-normal = Normal notes
+results-technique-bend = Bends
+results-technique-vibrato = Vibrato
+results-technique-wah = Wah
+results-technique-overblow = Overblow
+results-technique-overdraw = Overdraw
+results-technique-slide = Slide
+results-technique-clean-attack = Clean attack
+results-avg-timing-offset = Avg timing offset
+results-increase-latency = Increase Input lag to %ms%ms
+results-decrease-latency = Decrease Input lag to %ms%ms
+results-score = Score: %points%
+results-best-score = Best score
 
 # Latency calibration
 calibration-title = Latency Calibration

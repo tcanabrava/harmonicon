@@ -157,7 +157,7 @@ pub fn setup(
                 })
                 .with_children(|row| {
                     row.spawn_empty().apply_scene(button::small(
-                        "\u{21BB} Loop",
+                        &loc.msg("jam-loop-button"),
                         |_: On<Pointer<Click>>, mut jam_loop: ResMut<JamLoop>| {
                             jam_loop.0 = !jam_loop.0;
                         },
@@ -194,7 +194,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|metro| {
-                    spawn_metronome(metro, beats_per_bar, bpm);
+                    spawn_metronome(metro, &loc, beats_per_bar, bpm);
                 });
                 left.spawn(Node {
                         width: Val::Percent(100.0),

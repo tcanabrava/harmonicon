@@ -16,10 +16,12 @@
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
+use bevy_fluent::Localization;
 
 use crate::assets_management::{AvailableThemes, SelectedTheme};
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
+use crate::localization::LocalizationExt;
 use crate::theme::{LoadedTheme, theme_source_prefix};
 
 use crate::menu::routing::MenuPage;
@@ -62,6 +64,7 @@ fn setup(
     asset_server: Res<AssetServer>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
+    loc: Res<Localization>,
 ) {
     // ── Root: full-screen column ───────────────────────────────────────────────
     let root = commands
@@ -162,7 +165,7 @@ fn setup(
     spawn_button(
         &mut commands,
         root,
-        "\u{2190} Back to Options",
+        &loc.msg("theme-back-to-options"),
         &theme,
         &btn_mats,
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Options),

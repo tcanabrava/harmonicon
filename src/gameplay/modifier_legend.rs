@@ -4,9 +4,11 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::ui_render::prelude::MaterialNode;
+use bevy_fluent::Localization;
 
 use super::gameplay_2d::{note_anim_mode, note_techniques};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
+use crate::localization::LocalizationExt;
 use crate::song::chart::Modifier;
 
 /// Whether the techniques legend body is collapsed, toggled by clicking its
@@ -94,12 +96,24 @@ fn toggle_arrow(collapsed: bool) -> &'static str {
     if collapsed { "\u{25B6}" } else { "\u{25BC}" }
 }
 
+/// The "▼ TECHNIQUES" toggle-header text for the given collapsed state —
+/// shared by the initial `bsn!` placeholder and
+/// [`update_technique_legend_visibility`] so the two can't drift apart.
+fn technique_legend_toggle_text(loc: &Localization, collapsed: bool) -> String {
+    loc.msg_args(
+        "gameplay-techniques-toggle",
+        &[("arrow", toggle_arrow(collapsed).to_string())],
+    )
+    .into()
+}
+
 /// Spawns the techniques legend: a small *animated tail* preview beside each
 /// technique's name, so players learn to read a note by its motion, stacked
 /// one per row under a clickable header that collapses/expands the list. Used
 /// by both the 2D and 3D HUDs. `entries` come from [`build_legend_materials`].
 pub fn spawn_modifier_legend(
     parent: &mut ChildSpawnerCommands,
+    loc: &Localization,
     entries: &[(Handle<NoteTail2dMaterial>, &'static str)],
 ) {
     parent
@@ -116,7 +130,7 @@ pub fn spawn_modifier_legend(
                 on(toggle_technique_legend)
                 Children [
                     (
-                        Text({format!("{} TECHNIQUES", toggle_arrow(false))})
+                        Text({technique_legend_toggle_text(loc, false)})
                         TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.55, 0.55, 0.62)})
                         TechniqueLegendToggleLabel
@@ -177,6 +191,7 @@ fn toggle_technique_legend(_: On<Pointer<Click>>, mut collapsed: ResMut<Techniqu
 /// freshly spawned legend — a new one is spawned per song — isn't stale.
 fn update_technique_legend_visibility(
     collapsed: Res<TechniqueLegendCollapsed>,
+    loc: Res<Localization>,
     mut bodies: Query<&mut Node, With<TechniqueLegendBody>>,
     mut labels: Query<&mut Text, With<TechniqueLegendToggleLabel>>,
 ) {
@@ -188,7 +203,7 @@ fn update_technique_legend_visibility(
         };
     }
     for mut text in &mut labels {
-        *text = Text::new(format!("{} TECHNIQUES", toggle_arrow(collapsed.0)));
+        *text = Text::new(technique_legend_toggle_text(&loc, collapsed.0));
     }
 }
 

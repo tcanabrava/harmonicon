@@ -89,7 +89,9 @@ pub(crate) fn setup_jam_generate_menu(
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                Text::new(format!("Key: {}", config.key)),
+                Text::new(String::from(
+                    loc.msg_args("jam-generate-key", &[("key", config.key.clone())]),
+                )),
                 TextFont {
                     font_size: FontSize::Px(20.0),
                     ..default()
@@ -124,7 +126,10 @@ pub(crate) fn setup_jam_generate_menu(
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                Text::new(format!("Tempo: {:.0}", config.bpm)),
+                Text::new(String::from(loc.msg_args(
+                    "jam-generate-tempo",
+                    &[("bpm", format!("{:.0}", config.bpm))],
+                ))),
                 TextFont {
                     font_size: FontSize::Px(20.0),
                     ..default()
@@ -159,7 +164,10 @@ pub(crate) fn setup_jam_generate_menu(
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                Text::new(format!("Progression: {}", config.progression.label())),
+                Text::new(String::from(loc.msg_args(
+                    "jam-generate-progression",
+                    &[("progression", config.progression.label().to_string())],
+                ))),
                 TextFont {
                     font_size: FontSize::Px(20.0),
                     ..default()
@@ -232,6 +240,7 @@ pub(crate) fn setup_jam_generate_menu(
 /// [`JamGenerateConfig`], same pattern as `bending_trainer::update_key_label`.
 pub(crate) fn update_jam_generate_labels(
     config: Res<JamGenerateConfig>,
+    loc: Res<Localization>,
     mut keys: Query<
         &mut Text,
         (
@@ -261,13 +270,21 @@ pub(crate) fn update_jam_generate_labels(
         return;
     }
     for mut text in &mut keys {
-        *text = Text::new(format!("Key: {}", config.key));
+        *text = Text::new(String::from(
+            loc.msg_args("jam-generate-key", &[("key", config.key.clone())]),
+        ));
     }
     for mut text in &mut bpms {
-        *text = Text::new(format!("Tempo: {:.0}", config.bpm));
+        *text = Text::new(String::from(loc.msg_args(
+            "jam-generate-tempo",
+            &[("bpm", format!("{:.0}", config.bpm))],
+        )));
     }
     for mut text in &mut progressions {
-        *text = Text::new(format!("Progression: {}", config.progression.label()));
+        *text = Text::new(String::from(loc.msg_args(
+            "jam-generate-progression",
+            &[("progression", config.progression.label().to_string())],
+        )));
     }
 }
 

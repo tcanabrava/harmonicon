@@ -144,7 +144,12 @@ pub const fn click_for_tick(tick: i64, beats_per_bar: f64, feel: MetronomeFeel) 
 
 // ── UI ────────────────────────────────────────────────────────────────────────
 
-pub fn spawn_metronome(parent: &mut ChildSpawnerCommands, beats_per_bar: usize, bpm: f32) {
+pub fn spawn_metronome(
+    parent: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    beats_per_bar: usize,
+    bpm: f32,
+) {
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -181,7 +186,7 @@ pub fn spawn_metronome(parent: &mut ChildSpawnerCommands, beats_per_bar: usize, 
                     on(pill_out)
                     Children [
                         (
-                            Text({"click: on".to_string()})
+                            Text({String::from(loc.msg("metronome-click-on"))})
                             TextFont { font_size: {FontSize::Px(15.0)} }
                             TextColor({Color::srgb(0.65, 0.65, 0.70)})
                             MetronomeMuteLabel
@@ -206,7 +211,7 @@ pub fn spawn_metronome(parent: &mut ChildSpawnerCommands, beats_per_bar: usize, 
                     on(pill_out)
                     Children [
                         (
-                            Text({"feel: shuffle".to_string()})
+                            Text({String::from(loc.msg(feel_label_key(MetronomeFeel::default())))})
                             TextFont { font_size: {FontSize::Px(15.0)} }
                             TextColor({Color::srgb(0.65, 0.65, 0.70)})
                             MetronomeFeelLabel
@@ -413,18 +418,25 @@ fn update_tempo_label(
     }
 }
 
+/// The Fluent key for `feel`'s button label — shared by the initial `bsn!`
+/// placeholder and [`update_feel_label`] so the two can't drift apart.
+fn feel_label_key(feel: MetronomeFeel) -> &'static str {
+    match feel {
+        MetronomeFeel::Straight => "metronome-feel-straight",
+        MetronomeFeel::Shuffle => "metronome-feel-shuffle",
+    }
+}
+
 /// Mirror the current feel onto its button label (written every frame, like
 /// `update_mute_label`, so a freshly spawned label isn't stale across songs).
 fn update_feel_label(
     feel: Res<MetronomeFeel>,
+    loc: Res<Localization>,
     mut labels: Query<&mut Text, With<MetronomeFeelLabel>>,
 ) {
-    let label = match *feel {
-        MetronomeFeel::Straight => "feel: straight",
-        MetronomeFeel::Shuffle => "feel: shuffle",
-    };
-    for mut text in &mut labels {
-        *text = Text::new(label);
+    let text = String::from(loc.msg(feel_label_key(*feel)));
+    for mut label in &mut labels {
+        *label = Text::new(text.clone());
     }
 }
 

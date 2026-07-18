@@ -20,8 +20,10 @@ use bevy::input::keyboard::KeyboardInput;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
+use bevy_fluent::Localization;
 
 use crate::dialogs::button;
+use crate::localization::LocalizationExt;
 
 /// Identifies who opened a dialog, so a caller only reacts to its own results.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -139,6 +141,7 @@ fn handle_open(
     mut dialog: ResMut<FileDialog>,
     mut next_state: ResMut<NextState<FileDialogState>>,
     mut refresh_req: MessageWriter<RefreshFileList>,
+    loc: Res<Localization>,
     mut commands: Commands,
 ) {
     let Some(req) = requests.read().last() else {
@@ -220,7 +223,7 @@ fn handle_open(
                 }
                 Children [
                     (
-                        Text({"File name:".to_string()})
+                        Text({String::from(loc.msg("dialog-file-name"))})
                         TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.75, 0.75, 0.85)})
                     ),
@@ -281,7 +284,7 @@ fn handle_open(
                 })
                 Children [
                     (
-                        Text({"Cancel  (Esc)".to_string()})
+                        Text({String::from(loc.msg("dialog-cancel-esc"))})
                         TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.85, 0.7, 0.7)})
                     )

@@ -186,8 +186,8 @@ fn setup_options_menu(
     commands.entity(main_layout).add_child(left_layout);
     commands.entity(main_layout).add_child(right_layout);
 
-    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, loc, selected_harmonica, asset_server, images, show_numbers, adaptive_difficulty);
-    spawn_right_column(&mut commands, right_layout, theme, btn_mats);
+    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, &loc, selected_harmonica, asset_server, images, show_numbers, adaptive_difficulty);
+    spawn_right_column(&mut commands, right_layout, theme, btn_mats, &loc);
 }
 
 fn spawn_left_column(
@@ -196,7 +196,7 @@ fn spawn_left_column(
     mic_status: Res<MicStatus>,
     settings: Res<AudioSettings>,
     harmonicas: Res<AvailableHarmonicas>,
-    loc: Res<Localization>,
+    loc: &Localization,
     selected_harmonica: Res<SelectedHarmonicaModel>,
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
@@ -220,10 +220,11 @@ fn spawn_left_column(
         settings.metronome_volume,
         set_metronome_volume,
     );
-    spawn_latency_slider(commands, parent, settings.input_latency_ms, &loc);
+    spawn_latency_slider(commands, parent, settings.input_latency_ms, loc);
     spawn_mic_combobox(
         commands,
         parent,
+        loc,
         &audio_input::input_device_names(),
         connected_device_name(&mic_status),
     );
@@ -259,18 +260,24 @@ fn spawn_left_column(
         commands,
         parent,
         parent,
-        "Pitch detect",
+        &loc.msg("options-pitch-detect"),
         &algo_labels(),
         settings.pitch_algorithm.label(),
         on_algo_selected,
     );
     spawn_algo_explanation(commands, parent, 560.0, settings.pitch_algorithm);
 
-    spawn_note_numbers_toggle(commands, parent, show_numbers.0);
-    spawn_adaptive_difficulty_toggle(commands, parent, adaptive_difficulty.0, &loc);
+    spawn_note_numbers_toggle(commands, parent, loc, show_numbers.0);
+    spawn_adaptive_difficulty_toggle(commands, parent, adaptive_difficulty.0, loc);
 }
 
-fn spawn_right_column(commands: &mut Commands, parent: Entity, theme: Res<LoadedTheme>, btn_mats: Res<ButtonMaterials>) {
+fn spawn_right_column(
+    commands: &mut Commands,
+    parent: Entity,
+    theme: Res<LoadedTheme>,
+    btn_mats: Res<ButtonMaterials>,
+    loc: &Localization,
+) {
     spawn_button(
         commands,
         parent,
@@ -282,7 +289,7 @@ fn spawn_right_column(commands: &mut Commands, parent: Entity, theme: Res<Loaded
     spawn_button(
         commands,
         parent,
-        "Calibrate input lag",
+        &loc.msg("options-calibrate-input-lag"),
         &theme,
         &btn_mats,
         |_: On<Pointer<Click>>, mut state: ResMut<NextState<AppState>>| {
@@ -292,7 +299,7 @@ fn spawn_right_column(commands: &mut Commands, parent: Entity, theme: Res<Loaded
     spawn_button(
         commands,
         parent,
-        "\u{2190} Back",
+        &loc.msg("back"),
         &theme,
         &btn_mats,
         |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
@@ -305,19 +312,23 @@ fn toggle_note_numbers(_: On<Pointer<Click>>, mut show: ResMut<ShowNoteNumbers>)
     show.0 = !show.0;
 }
 
-/// Pure so both readouts are unit-testable without spinning up an `App`.
-fn note_numbers_label_text(show: bool) -> &'static str {
+fn note_numbers_label_text(loc: &Localization, show: bool) -> String {
     if show {
-        "Note labels: numbers"
+        loc.msg("options-note-labels-numbers").into()
     } else {
-        "Note labels: arrows"
+        loc.msg("options-note-labels-arrows").into()
     }
 }
 
 /// A row with a pill button that flips [`ShowNoteNumbers`] plus a label
 /// reflecting the current choice — same shape as the pause menu's
 /// `WaitForNoteMode` toggle.
-fn spawn_note_numbers_toggle(commands: &mut Commands, parent: Entity, show_numbers: bool) {
+fn spawn_note_numbers_toggle(
+    commands: &mut Commands,
+    parent: Entity,
+    loc: &Localization,
+    show_numbers: bool,
+) {
     let row = commands
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -327,10 +338,12 @@ fn spawn_note_numbers_toggle(commands: &mut Commands, parent: Entity, show_numbe
         })
         .id();
     commands.entity(row).with_children(|r| {
-        r.spawn_empty()
-            .apply_scene(button::small("Note labels", toggle_note_numbers));
+        r.spawn_empty().apply_scene(button::small(
+            &loc.msg("options-note-labels-button"),
+            toggle_note_numbers,
+        ));
         r.spawn((
-            Text::new(note_numbers_label_text(show_numbers)),
+            Text::new(note_numbers_label_text(loc, show_numbers)),
             TextFont {
                 font_size: FontSize::Px(16.0),
                 ..default()
@@ -345,13 +358,14 @@ fn spawn_note_numbers_toggle(commands: &mut Commands, parent: Entity, show_numbe
 /// Keeps the toggle's label in step with [`ShowNoteNumbers`].
 fn update_note_numbers_label(
     show: Res<ShowNoteNumbers>,
+    loc: Res<Localization>,
     mut labels: Query<&mut Text, With<NoteNumbersLabel>>,
 ) {
     if !show.is_changed() {
         return;
     }
     for mut text in &mut labels {
-        *text = Text::new(note_numbers_label_text(show.0));
+        *text = Text::new(note_numbers_label_text(&loc, show.0));
     }
 }
 
@@ -777,6 +791,7 @@ struct MicCombobox;
 fn spawn_mic_combobox(
     commands: &mut Commands,
     parent: Entity,
+    loc: &Localization,
     devices: &[String],
     connected: Option<&str>,
 ) {
@@ -784,7 +799,7 @@ fn spawn_mic_combobox(
         commands,
         parent,
         parent,
-        "Microphone",
+        &loc.msg("options-microphone"),
         devices,
         connected.unwrap_or("None"),
         on_mic_selected,
@@ -1046,9 +1061,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn note_numbers_label_reflects_the_current_choice() {
-        assert_eq!(note_numbers_label_text(false), "Note labels: arrows");
-        assert_eq!(note_numbers_label_text(true), "Note labels: numbers");
+    fn note_numbers_label_picks_the_arrows_or_numbers_key() {
+        let loc = Localization::default();
+        assert_eq!(
+            note_numbers_label_text(&loc, false),
+            "options-note-labels-arrows"
+        );
+        assert_eq!(
+            note_numbers_label_text(&loc, true),
+            "options-note-labels-numbers"
+        );
     }
 
     #[test]

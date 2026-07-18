@@ -204,18 +204,30 @@ pub(super) fn setup(
             // Stat lines.
             let rows = [
                 (
-                    "Biggest combo",
+                    "results-biggest-combo",
                     score.max_combo,
                     Color::srgb(0.90, 0.72, 0.20),
                 ),
-                ("Perfect hits", stats.perfect, Color::srgb(1.00, 0.85, 0.20)),
-                ("Good hits", stats.good, Color::srgb(0.45, 1.00, 0.45)),
-                ("Hits", hits, Color::srgb(0.75, 0.85, 0.95)),
-                ("Delayed hits", stats.delayed, Color::srgb(0.95, 0.62, 0.30)),
-                ("Misses", stats.miss, Color::srgb(0.95, 0.35, 0.35)),
+                (
+                    "results-perfect-hits",
+                    stats.perfect,
+                    Color::srgb(1.00, 0.85, 0.20),
+                ),
+                (
+                    "results-good-hits",
+                    stats.good,
+                    Color::srgb(0.45, 1.00, 0.45),
+                ),
+                ("results-hits", hits, Color::srgb(0.75, 0.85, 0.95)),
+                (
+                    "results-delayed-hits",
+                    stats.delayed,
+                    Color::srgb(0.95, 0.62, 0.30),
+                ),
+                ("results-misses", stats.miss, Color::srgb(0.95, 0.35, 0.35)),
             ];
-            for (label, value, color) in rows {
-                spawn_stat_row(root, label, value, color);
+            for (key, value, color) in rows {
+                spawn_stat_row(root, &loc.msg(key), value, color);
             }
 
             // Per-technique accuracy — only techniques the song actually used,
@@ -224,14 +236,14 @@ pub(super) fn setup(
             // just "you scored 82%" but "your bends are solid, your overblows
             // need work".
             let technique_rows: Vec<(&str, TechniqueStats)> = [
-                ("Normal notes", stats.normal),
-                ("Bends", stats.bend),
-                ("Vibrato", stats.vibrato),
-                ("Wah", stats.wah),
-                ("Overblow", stats.overblow),
-                ("Overdraw", stats.overdraw),
-                ("Slide", stats.slide),
-                ("Clean attack", stats.clean_attack),
+                ("results-technique-normal", stats.normal),
+                ("results-technique-bend", stats.bend),
+                ("results-technique-vibrato", stats.vibrato),
+                ("results-technique-wah", stats.wah),
+                ("results-technique-overblow", stats.overblow),
+                ("results-technique-overdraw", stats.overdraw),
+                ("results-technique-slide", stats.slide),
+                ("results-technique-clean-attack", stats.clean_attack),
             ]
             .into_iter()
             .filter(|(_, s)| s.total() > 0)
@@ -250,8 +262,8 @@ pub(super) fn setup(
                         ..default()
                     },
                 ));
-                for (label, s) in technique_rows {
-                    spawn_technique_row(root, label, s);
+                for (key, s) in technique_rows {
+                    spawn_technique_row(root, &loc.msg(key), s);
                 }
             }
 
@@ -265,7 +277,7 @@ pub(super) fn setup(
                 };
                 spawn_text_row(
                     root,
-                    "Avg timing offset",
+                    &loc.msg("results-avg-timing-offset"),
                     &format!("{sign}{ms:.0}ms"),
                     offset_color,
                 );
@@ -273,11 +285,12 @@ pub(super) fn setup(
                 let adjustment = ms.round() as i32;
                 let new_latency = (audio.input_latency_ms + adjustment).max(0);
                 if adjustment.abs() >= 5 {
-                    let label = if adjustment > 0 {
-                        format!("Increase Input lag to {new_latency}ms")
+                    let key = if adjustment > 0 {
+                        "results-increase-latency"
                     } else {
-                        format!("Decrease Input lag to {new_latency}ms")
+                        "results-decrease-latency"
                     };
+                    let label = loc.msg_args(key, &[("ms", new_latency.to_string())]);
                     root.spawn_empty().apply_scene(button::small(
                         &label,
                         move |_: On<Pointer<Click>>, mut audio: ResMut<AudioSettings>| {
@@ -289,7 +302,9 @@ pub(super) fn setup(
 
             // Final score.
             root.spawn((
-                Text::new(format!("Score: {}", score.points)),
+                Text::new(String::from(
+                    loc.msg_args("results-score", &[("points", score.points.to_string())]),
+                )),
                 TextFont {
                     font_size: FontSize::Px(20.0),
                     ..default()
@@ -314,7 +329,12 @@ pub(super) fn setup(
                         TextColor(Color::srgb(0.95, 0.85, 0.20)),
                     ));
                 } else {
-                    spawn_stat_row(root, "Best score", best_score, Color::srgb(0.70, 0.72, 0.80));
+                    spawn_stat_row(
+                        root,
+                        &loc.msg("results-best-score"),
+                        best_score,
+                        Color::srgb(0.70, 0.72, 0.80),
+                    );
                 }
             }
 

@@ -7,6 +7,7 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy::ui_widgets::{Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange};
+use bevy_fluent::Localization;
 
 use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::{GameplayRoot, LoopConfig, MusicPlayer, Paused};
@@ -15,6 +16,7 @@ use crate::dialogs::button;
 use crate::jam::backing;
 use crate::jam::improv::ImprovStats;
 use crate::lessons::{LessonContext, PassCriteria, lesson_passed};
+use crate::localization::LocalizationExt;
 use crate::profile::{PlayerProfile, record_lesson, save_profile};
 use crate::song::SongManifest;
 
@@ -39,23 +41,28 @@ fn on_toggle_wait_mode(_: On<Pointer<Click>>, mut wait_mode: ResMut<WaitForNoteM
     wait_mode.0 = !wait_mode.0;
 }
 
+fn wait_mode_label_text(loc: &Localization, enabled: bool) -> String {
+    if enabled {
+        loc.msg("pause-wait-for-note-on").into()
+    } else {
+        loc.msg("pause-wait-for-note-off").into()
+    }
+}
+
 /// Keeps the "Wait for Note: ..." readout in step with the toggle. Not
 /// gated on `Paused` — the button only lives on the (otherwise hidden)
 /// pause overlay, so it can only be clicked while already paused, same as
 /// `apply_music_volume` intentionally keeps running through a pause.
 pub(super) fn update_wait_mode_label(
     wait_mode: Res<WaitForNoteMode>,
+    loc: Res<Localization>,
     mut labels: Query<&mut Text, With<WaitForNoteLabel>>,
 ) {
     if !wait_mode.is_changed() {
         return;
     }
     for mut text in &mut labels {
-        *text = Text::new(if wait_mode.0 {
-            "Wait for Note: on"
-        } else {
-            "Wait for Note: off"
-        });
+        *text = Text::new(wait_mode_label_text(&loc, wait_mode.0));
     }
 }
 
@@ -83,8 +90,9 @@ pub(super) struct PracticeSpeedLabel;
 #[derive(Component, Default, Clone)]
 pub(super) struct PracticeSpeedFill;
 
-fn practice_speed_label_text(speed: f32) -> String {
-    format!("Speed: {:.0}%", speed * 100.0)
+fn practice_speed_label_text(loc: &Localization, speed: f32) -> String {
+    loc.msg_args("pause-speed", &[("pct", format!("{:.0}", speed * 100.0))])
+        .into()
 }
 
 /// `50%..=100%` in `10%` steps — same range the old click-to-cycle button
@@ -100,7 +108,7 @@ fn set_practice_speed(ev: On<ValueChange<f32>>, mut speed: ResMut<PracticeSpeed>
 /// [`PracticeSpeed`]. The track is a `bsn!` `Slider`; the label/readout stay
 /// imperative like every other pause-menu readout (custom font, which `bsn!`
 /// can't set in 0.19).
-fn spawn_practice_speed_row(commands: &mut Commands, parent: Entity, value: f32) {
+fn spawn_practice_speed_row(commands: &mut Commands, parent: Entity, loc: &Localization, value: f32) {
     let row = commands
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -129,7 +137,7 @@ fn spawn_practice_speed_row(commands: &mut Commands, parent: Entity, value: f32)
     commands.entity(row).add_child(track);
     commands.entity(row).with_children(|r| {
         r.spawn((
-            Text::new(practice_speed_label_text(value)),
+            Text::new(practice_speed_label_text(loc, value)),
             TextFont {
                 font_size: FontSize::Px(15.0),
                 ..default()
@@ -165,6 +173,7 @@ fn practice_speed_slider_scene(value: f32) -> impl Scene {
 /// `update_wait_mode_label`.
 pub(super) fn update_practice_speed_slider(
     speed: Res<PracticeSpeed>,
+    loc: Res<Localization>,
     mut fills: Query<&mut Node, With<PracticeSpeedFill>>,
     mut labels: Query<&mut Text, With<PracticeSpeedLabel>>,
 ) {
@@ -176,7 +185,7 @@ pub(super) fn update_practice_speed_slider(
         node.width = Val::Percent(frac * 100.0);
     }
     for mut text in &mut labels {
-        *text = Text::new(practice_speed_label_text(speed.0));
+        *text = Text::new(practice_speed_label_text(&loc, speed.0));
     }
 }
 
@@ -194,11 +203,18 @@ fn on_clear_loop(_: On<Pointer<Click>>, mut loop_cfg: ResMut<LoopConfig>) {
 
 /// Pure so both possible readouts (off / a valid range) are unit-testable
 /// without spinning up an `App`.
-fn loop_label_text(cfg: &LoopConfig) -> String {
+fn loop_label_text(loc: &Localization, cfg: &LoopConfig) -> String {
     if cfg.active {
-        format!("Loop: {:.0}s\u{2013}{:.0}s", cfg.start_time, cfg.end_time)
+        loc.msg_args(
+            "pause-loop-range",
+            &[
+                ("start", format!("{:.0}", cfg.start_time)),
+                ("end", format!("{:.0}", cfg.end_time)),
+            ],
+        )
+        .into()
     } else {
-        "Loop: off".to_string()
+        loc.msg("pause-loop-off").into()
     }
 }
 
@@ -206,13 +222,14 @@ fn loop_label_text(cfg: &LoopConfig) -> String {
 /// `Paused`, same reasoning as `update_wait_mode_label`.
 pub(super) fn update_loop_label(
     loop_cfg: Res<LoopConfig>,
+    loc: Res<Localization>,
     mut labels: Query<&mut Text, With<LoopRangeLabel>>,
 ) {
     if !loop_cfg.is_changed() {
         return;
     }
     for mut text in &mut labels {
-        *text = Text::new(loop_label_text(&loop_cfg));
+        *text = Text::new(loop_label_text(&loc, &loop_cfg));
     }
 }
 
@@ -245,10 +262,18 @@ fn song_key(selected: &SelectedSong, manifests: &Assets<SongManifest>) -> Option
 }
 
 /// Pure so the readout is unit-testable without a live `AdaptiveDifficulty`.
-fn phrase_selector_text(name: Option<&str>, learned: f32) -> String {
+fn phrase_selector_text(loc: &Localization, name: Option<&str>, learned: f32) -> String {
     match name {
-        Some(name) => format!("Section: {name} \u{2014} Learned: {:.0}%", learned * 100.0),
-        None => "No phrases in this song".to_string(),
+        Some(name) => loc
+            .msg_args(
+                "pause-phrase-section",
+                &[
+                    ("name", name.to_string()),
+                    ("pct", format!("{:.0}", learned * 100.0)),
+                ],
+            )
+            .into(),
+        None => loc.msg("pause-phrase-no-sections").into(),
     }
 }
 
@@ -258,6 +283,7 @@ fn phrase_selector_text(name: Option<&str>, learned: f32) -> String {
 pub(super) fn update_phrase_selector_label(
     selected: Res<SelectedPhraseIndex>,
     adaptive: Res<AdaptiveDifficulty>,
+    loc: Res<Localization>,
     mut labels: Query<&mut Text, With<PhraseSelectorLabel>>,
 ) {
     if !selected.is_changed() && !adaptive.is_changed() {
@@ -267,25 +293,30 @@ pub(super) fn update_phrase_selector_label(
     let learned = section
         .map(|_| adaptive.learned.get(selected.0).copied().unwrap_or(0.0))
         .unwrap_or(0.0);
-    let text = phrase_selector_text(section.map(|s| s.name.as_str()), learned);
+    let text = phrase_selector_text(&loc, section.map(|s| s.name.as_str()), learned);
     for mut label in &mut labels {
         *label = Text::new(text.clone());
     }
 }
 
-fn adaptive_difficulty_label_text(enabled: bool) -> String {
-    format!("Adaptive Difficulty: {}", if enabled { "on" } else { "off" })
+fn adaptive_difficulty_label_text(loc: &Localization, enabled: bool) -> String {
+    if enabled {
+        loc.msg("pause-adaptive-difficulty-on").into()
+    } else {
+        loc.msg("pause-adaptive-difficulty-off").into()
+    }
 }
 
 pub(super) fn update_adaptive_difficulty_label(
     adaptive: Res<AdaptiveDifficulty>,
+    loc: Res<Localization>,
     mut labels: Query<&mut Text, With<AdaptiveDifficultyLabel>>,
 ) {
     if !adaptive.is_changed() {
         return;
     }
     for mut label in &mut labels {
-        *label = Text::new(adaptive_difficulty_label_text(adaptive.enabled));
+        *label = Text::new(adaptive_difficulty_label_text(&loc, adaptive.enabled));
     }
 }
 
@@ -498,6 +529,7 @@ pub(super) fn setup_pause_menu(
     speed: Res<PracticeSpeed>,
     selected_phrase: Res<SelectedPhraseIndex>,
     adaptive: Res<AdaptiveDifficulty>,
+    loc: Res<Localization>,
 ) {
     let is_jam = *mode == GameplayMode::JamSession;
     // A scale-adherence lesson (see `PassCriteria::ScaleAdherence`) is the
@@ -511,6 +543,7 @@ pub(super) fn setup_pause_menu(
         .copied()
         .unwrap_or(0.0);
     let phrase_text = phrase_selector_text(
+        &loc,
         adaptive.sections.get(selected_phrase.0).map(|s| s.name.as_str()),
         learned,
     );
@@ -556,10 +589,13 @@ pub(super) fn setup_pause_menu(
         ));
         col.spawn_empty().apply_scene(button::default("Resume", on_resume));
         col.spawn_empty().apply_scene(button::default("Restart", on_restart));
-        col.spawn_empty().apply_scene(button::default("Quit Song", on_quit));
+        col.spawn_empty()
+            .apply_scene(button::default(&loc.msg("pause-quit-song"), on_quit));
         if is_lesson_jam {
-            col.spawn_empty()
-                .apply_scene(button::default("Finish Lesson", on_finish_lesson));
+            col.spawn_empty().apply_scene(button::default(
+                &loc.msg("pause-finish-lesson"),
+                on_finish_lesson,
+            ));
         }
     });
 
@@ -583,9 +619,9 @@ pub(super) fn setup_pause_menu(
                     column_gap: {Val::Px(8.0)},
                 }
                 Children [
-                    button::small("\u{23F8} Wait for Note", on_toggle_wait_mode),
+                    button::small(&loc.msg("pause-wait-for-note-button"), on_toggle_wait_mode),
                     (
-                        Text({"Wait for Note: off"})
+                        Text({wait_mode_label_text(&loc, false)})
                         TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.70, 0.70, 0.80)})
                         WaitForNoteLabel
@@ -593,7 +629,7 @@ pub(super) fn setup_pause_menu(
                 ]
             });
         });
-        spawn_practice_speed_row(&mut commands, aids, speed.0);
+        spawn_practice_speed_row(&mut commands, aids, &loc, speed.0);
         commands.entity(aids).with_children(|children| {
             children.spawn_empty().apply_scene(bsn! {
                 Node {
@@ -602,9 +638,9 @@ pub(super) fn setup_pause_menu(
                     column_gap: {Val::Px(8.0)},
                 }
                 Children [
-                    button::small("Adaptive Difficulty", on_toggle_adaptive_difficulty),
+                    button::small(&loc.msg("pause-adaptive-difficulty-button"), on_toggle_adaptive_difficulty),
                     (
-                        Text({adaptive_difficulty_label_text(adaptive.enabled)})
+                        Text({adaptive_difficulty_label_text(&loc, adaptive.enabled)})
                         TextFont { font_size: {FontSize::Px(15.0)} }
                         TextColor({Color::srgb(0.70, 0.70, 0.80)})
                         AdaptiveDifficultyLabel
@@ -625,12 +661,12 @@ pub(super) fn setup_pause_menu(
         spawn_phrase_learned_row(&mut commands, aids, learned);
         commands.entity(aids).with_children(|children| {
             children.spawn_empty().apply_scene(bsn! {
-                Text({"Click a section on the progress bar above to select it"})
+                Text({String::from(loc.msg("pause-drag-section-hint"))})
                 TextFont { font_size: {FontSize::Px(13.0)} }
                 TextColor({Color::srgb(0.55, 0.55, 0.62)})
             });
             children.spawn_empty().apply_scene(bsn! {
-                Text({"Notes update live — resume to see them"})
+                Text({String::from(loc.msg("pause-notes-update-hint"))})
                 TextFont { font_size: {FontSize::Px(13.0)} }
                 TextColor({Color::srgb(0.55, 0.55, 0.62)})
             });
@@ -645,9 +681,9 @@ pub(super) fn setup_pause_menu(
                 column_gap: {Val::Px(8.0)},
             }
             Children [
-                button::small("Clear Loop", on_clear_loop),
+                button::small(&loc.msg("pause-clear-loop"), on_clear_loop),
                 (
-                    Text({"Loop: off"})
+                    Text({loop_label_text(&loc, &LoopConfig::default())})
                     TextFont { font_size: {FontSize::Px(15.0)} }
                     TextColor({Color::srgb(0.70, 0.70, 0.80)})
                     LoopRangeLabel
@@ -655,7 +691,7 @@ pub(super) fn setup_pause_menu(
             ]
         });
         children.spawn_empty().apply_scene(bsn! {
-            Text({"Drag on the progress bar above to set a loop range"})
+            Text({String::from(loc.msg("pause-drag-loop-hint"))})
             TextFont { font_size: {FontSize::Px(15.0)} }
             TextColor({Color::srgb(0.55, 0.55, 0.62)})
         });
@@ -976,61 +1012,83 @@ mod tests {
     }
 
     // ── loop_label_text ───────────────────────────────────────────────────────
+    //
+    // `Localization::default()` has no bundle loaded, so `loc.msg(key)`/
+    // `loc.msg_args(key, ...)` fall back to the key itself with no `%name%`
+    // placeholders to substitute into — these only exercise which key (and,
+    // for the active case, which args) the active/inactive dispatch picks,
+    // not the translated/formatted text.
 
     #[test]
     fn loop_label_is_off_by_default() {
-        assert_eq!(loop_label_text(&LoopConfig::default()), "Loop: off");
+        let loc = Localization::default();
+        assert_eq!(loop_label_text(&loc, &LoopConfig::default()), "pause-loop-off");
     }
 
     #[test]
     fn loop_label_is_off_for_an_inactive_nonzero_range() {
         // A zero-width range (e.g. a degenerate drag) leaves start/end
         // nonzero but inactive — the readout should still read "off".
+        let loc = Localization::default();
         let cfg = LoopConfig {
             active: false,
             start_time: 8.0,
             end_time: 8.0,
         };
-        assert_eq!(loop_label_text(&cfg), "Loop: off");
+        assert_eq!(loop_label_text(&loc, &cfg), "pause-loop-off");
     }
 
     #[test]
     fn loop_label_shows_the_range_once_active() {
+        let loc = Localization::default();
         let cfg = LoopConfig {
             active: true,
             start_time: 8.0,
             end_time: 16.0,
         };
-        assert_eq!(loop_label_text(&cfg), "Loop: 8s\u{2013}16s");
+        assert_eq!(loop_label_text(&loc, &cfg), "pause-loop-range");
     }
 
     // ── practice_speed_label_text ──────────────────────────────────────────────
 
     #[test]
-    fn practice_speed_label_formats_as_a_percentage() {
-        assert_eq!(practice_speed_label_text(1.0), "Speed: 100%");
-        assert_eq!(practice_speed_label_text(0.7), "Speed: 70%");
+    fn practice_speed_label_picks_the_speed_key() {
+        let loc = Localization::default();
+        assert_eq!(practice_speed_label_text(&loc, 1.0), "pause-speed");
+        assert_eq!(practice_speed_label_text(&loc, 0.7), "pause-speed");
     }
 
     // ── phrase selector / adaptive difficulty controls ────────────────────────
 
     #[test]
-    fn phrase_selector_text_shows_name_and_learned_percent() {
+    fn phrase_selector_text_picks_the_section_key_when_named() {
+        let loc = Localization::default();
         assert_eq!(
-            phrase_selector_text(Some("intro"), 0.25),
-            "Section: intro \u{2014} Learned: 25%"
+            phrase_selector_text(&loc, Some("intro"), 0.25),
+            "pause-phrase-section"
         );
     }
 
     #[test]
     fn phrase_selector_text_handles_no_sections() {
-        assert_eq!(phrase_selector_text(None, 0.0), "No phrases in this song");
+        let loc = Localization::default();
+        assert_eq!(
+            phrase_selector_text(&loc, None, 0.0),
+            "pause-phrase-no-sections"
+        );
     }
 
     #[test]
     fn adaptive_difficulty_label_reflects_state() {
-        assert_eq!(adaptive_difficulty_label_text(true), "Adaptive Difficulty: on");
-        assert_eq!(adaptive_difficulty_label_text(false), "Adaptive Difficulty: off");
+        let loc = Localization::default();
+        assert_eq!(
+            adaptive_difficulty_label_text(&loc, true),
+            "pause-adaptive-difficulty-on"
+        );
+        assert_eq!(
+            adaptive_difficulty_label_text(&loc, false),
+            "pause-adaptive-difficulty-off"
+        );
     }
 
     #[test]

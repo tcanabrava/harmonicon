@@ -11,10 +11,12 @@ use bevy::{
     picking::events::{Click, Pointer},
     prelude::*,
 };
+use bevy_fluent::Localization;
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 use crate::assets_management::SelectedHarmonicaModel;
 use crate::dialogs::button;
+use crate::localization::LocalizationExt;
 
 use crate::app::AppState;
 
@@ -77,6 +79,7 @@ fn setup(
     mut commands: Commands,
     harmonica_model: Res<SelectedHarmonicaModel>,
     asset_server: Res<AssetServer>,
+    loc: Res<Localization>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
 ) {
     // Same trick as 3D gameplay: push the shared Camera2d behind so the
@@ -88,7 +91,7 @@ fn setup(
 
     let layers = RenderLayers::layer(CREDITS_LAYER);
     spawn_3d_scene(&mut commands, &asset_server, &harmonica_model.0, &layers);
-    spawn_ui(&mut commands);
+    spawn_ui(&mut commands, &loc);
 }
 
 fn cleanup(mut commands: Commands, roots: Query<Entity, With<CreditsRoot>>) {
@@ -168,7 +171,7 @@ fn spawn_3d_scene(
 
 // ── UI overlay ────────────────────────────────────────────────────────────────
 
-fn spawn_ui(commands: &mut Commands) {
+fn spawn_ui(commands: &mut Commands, loc: &Localization) {
     // Full-screen dark overlay that clips the scrolling text.
     let overlay = commands
         .spawn((
@@ -218,7 +221,7 @@ fn spawn_ui(commands: &mut Commands) {
     // click/hover behaviour rides along as inline on(...) observers. (Default
     // font: bsn! can't set TextFont.font in 0.19.)
     commands.spawn_scene(button::default(
-        "Back to Menu",
+        &loc.msg("credits-back-to-menu"),
         |_: On<Pointer<Click>>,
          mut next_state: ResMut<NextState<AppState>>,
          mut ret_help: ResMut<crate::app::ReturnToHelpAbout>| {

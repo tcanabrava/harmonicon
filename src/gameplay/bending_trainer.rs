@@ -593,7 +593,9 @@ pub fn setup(
                 ));
                 row.spawn((
                     Node { width: Val::Px(110.0), justify_content: JustifyContent::Center, ..default() },
-                    Text::new(format!("Key: {}", key.0)),
+                    Text::new(String::from(
+                        loc.msg_args("bending-key-label", &[("key", key.0.clone())]),
+                    )),
                     TextFont { font_size: FontSize::Px(20.0), ..default() },
                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                     KeyLabel,
@@ -613,7 +615,7 @@ pub fn setup(
                 left.commands_mut(),
                 left_id,
                 root_id,
-                "Detect",
+                &loc.msg("bending-detect-label"),
                 &algo_labels(),
                 audio.pitch_algorithm.label(),
                 on_algo_selected,
@@ -638,7 +640,7 @@ pub fn setup(
                     TargetLabel,
                 ));
                 row.spawn_empty().apply_scene(button::small(
-                    "\u{1F50A} Listen",
+                    &loc.msg("bending-listen-button"),
                     |_: On<Pointer<Click>>,
                      key: Res<TrainerKey>,
                      target: Res<TrainerTarget>,
@@ -674,7 +676,7 @@ pub fn setup(
             .with_children(|row| {
                 row.spawn_empty()
                     .apply_scene(button::small(
-                        "\u{1F3B2} Drill",
+                        &loc.msg("bending-drill-button"),
                         |_: On<Pointer<Click>>,
                          key: Res<TrainerKey>,
                          mut target: ResMut<TrainerTarget>,
@@ -722,7 +724,7 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|metro| {
-                    spawn_metronome(metro, tempo.beats_per_bar, tempo.bpm);
+                    spawn_metronome(metro, &loc, tempo.beats_per_bar, tempo.bpm);
                 });
                 row.spawn_empty().apply_scene(button::small(
                     "+",
@@ -845,12 +847,18 @@ pub fn update_pitch_range(key: Res<TrainerKey>, mut pitch_range: ResMut<PitchRan
 }
 
 /// Keep the "Key: X" readout in step with the chosen key.
-pub fn update_key_label(key: Res<TrainerKey>, mut labels: Query<&mut Text, With<KeyLabel>>) {
+pub fn update_key_label(
+    key: Res<TrainerKey>,
+    loc: Res<Localization>,
+    mut labels: Query<&mut Text, With<KeyLabel>>,
+) {
     if !key.is_changed() {
         return;
     }
     for mut text in &mut labels {
-        *text = Text::new(format!("Key: {}", key.0));
+        *text = Text::new(String::from(
+            loc.msg_args("bending-key-label", &[("key", key.0.clone())]),
+        ));
     }
 }
 
@@ -952,24 +960,30 @@ pub fn update_tuner_readout(
             .abs()
             .total_cmp(&(b.frequency.log2() - target_freq.log2()).abs())
     }) else {
-        *text = Text::new(format!("Play it \u{2014} target {target_note}"));
+        *text = Text::new(String::from(
+            loc.msg_args("bending-play-it-target", &[("note", target_note)]),
+        ));
         color.0 = Color::srgb(0.60, 0.60, 0.65);
         return;
     };
 
     let cents = 1200.0 * (heard.frequency / target_freq).log2();
     if cents.abs() <= IN_TUNE_CENTS {
-        *text = Text::new(format!("\u{2713} In tune  ({target_note})"));
+        *text = Text::new(String::from(
+            loc.msg_args("bending-in-tune", &[("note", target_note)]),
+        ));
         color.0 = Color::srgb(0.45, 0.85, 0.50);
     } else if cents > 0.0 {
-        *text = Text::new(format!(
-            "\u{2191} {cents:+.0} cents sharp  (target {target_note})"
-        ));
+        *text = Text::new(String::from(loc.msg_args(
+            "bending-cents-sharp",
+            &[("cents", format!("{cents:+.0}")), ("note", target_note)],
+        )));
         color.0 = Color::srgb(0.90, 0.70, 0.30);
     } else {
-        *text = Text::new(format!(
-            "\u{2193} {cents:+.0} cents flat  (target {target_note})"
-        ));
+        *text = Text::new(String::from(loc.msg_args(
+            "bending-cents-flat",
+            &[("cents", format!("{cents:+.0}")), ("note", target_note)],
+        )));
         color.0 = Color::srgb(0.90, 0.70, 0.30);
     }
 }

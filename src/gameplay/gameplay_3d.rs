@@ -843,12 +843,17 @@ fn spawn_hud_overlay(
     loc: &Localization,
 ) {
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
-    let info = format!(
-        "Key: {}  \u{2669} = {}  {}",
-        key,
-        chart.song.tempo_bpm as u32,
-        chart.song.time_signature.as_deref().unwrap_or("4/4"),
-    );
+    let info = String::from(loc.msg_args(
+        "gameplay-chart-info",
+        &[
+            ("key", key.to_string()),
+            ("bpm", (chart.song.tempo_bpm as u32).to_string()),
+            (
+                "time_sig",
+                chart.song.time_signature.as_deref().unwrap_or("4/4").to_string(),
+            ),
+        ],
+    ));
     let harp_info = chart.harmonica.display();
     let description = chart
         .metadata
@@ -904,7 +909,10 @@ fn spawn_hud_overlay(
             }
             if let Some(author) = chart_author {
                 p.spawn((
-                    Text::new(format!("Chart: {author}")),
+                    Text::new(String::from(loc.msg_args(
+                        "gameplay-chart-author",
+                        &[("author", author.to_string())],
+                    ))),
                     TextFont {
                         font_size: FontSize::Px(15.0),
                         ..default()
@@ -952,7 +960,7 @@ fn spawn_hud_overlay(
                 ..default()
             })
             .with_children(|metro| {
-                spawn_metronome(metro, beats_per_bar, bpm);
+                spawn_metronome(metro, loc, beats_per_bar, bpm);
             });
 
             // Animated tail previews for the techniques legend (built up front so the UI
@@ -965,7 +973,7 @@ fn spawn_hud_overlay(
                 ..default()
             })
             .with_children(|leg| {
-                spawn_modifier_legend(leg, &legend_materials);
+                spawn_modifier_legend(leg, loc, &legend_materials);
             });
         });
 

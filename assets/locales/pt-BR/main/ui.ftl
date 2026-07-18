@@ -39,6 +39,12 @@ play-3d = Tocar em 3D
 # Gerar Jam (base sintetizada, sem precisar de uma música)
 jam-generate-title = Gerar uma Base de Jam
 jam-generate-start = Começar a Jam
+jam-generate-key = Tom: %key%
+jam-generate-tempo = Andamento: %bpm%
+jam-generate-progression = Progressão: %progression%
+
+# Créditos
+credits-back-to-menu = Voltar ao Menu
 
 # Seleção de música / artista
 select-artist = Selecionar Artista
@@ -51,6 +57,13 @@ options-language = Idioma
 options-adaptive-difficulty = Dificuldade Adaptativa
 options-adaptive-difficulty-on = Dificuldade Adaptativa: ativada
 options-adaptive-difficulty-off = Dificuldade Adaptativa: desativada
+options-pitch-detect = Detecção de tom
+options-microphone = Microfone
+options-note-labels-button = Rótulos das notas
+options-note-labels-arrows = Rótulos das notas: setas
+options-note-labels-numbers = Rótulos das notas: números
+options-calibrate-input-lag = Calibrar a latência de entrada
+theme-back-to-options = ← Voltar às Opções
 
 # Compartilhado
 back = ← Voltar
@@ -99,6 +112,8 @@ dialog-save-chart = Salvar partitura
 dialog-load-chart = Carregar partitura
 dialog-select-music = Selecionar música de fundo
 dialog-select-midi = Selecionar arquivo MIDI
+dialog-file-name = Nome do arquivo:
+dialog-cancel-esc = Cancelar  (Esc)
 
 # Editor de Músicas 2 — mensagens de validação de arrastar
 drag-denied-bend = Este buraco não suporta esta profundidade de dobra
@@ -442,18 +457,51 @@ gameplay-legend-blow = ■ SOPRO
 gameplay-legend-draw = ■ SUGADA
 harmonica-overlay-hint-view = Harmônica  ·  acende conforme você toca
 harmonica-overlay-hint-select = Harmônica  ·  clique numa nota para selecioná-la
+gameplay-chart-info = Tom: %key%  ♩ = %bpm%  %time_sig%
+gameplay-chart-author = Partitura: %author%
+gameplay-techniques-toggle = %arrow% TÉCNICAS
+
+# Menu de pausa
+pause-quit-song = Sair da música
+pause-finish-lesson = Concluir lição
+pause-wait-for-note-button = ⏸ Esperar nota
+pause-wait-for-note-on = Esperar nota: ligado
+pause-wait-for-note-off = Esperar nota: desligado
+pause-speed = Velocidade: %pct%%
+pause-adaptive-difficulty-button = Dificuldade adaptativa
+pause-adaptive-difficulty-on = Dificuldade adaptativa: ligada
+pause-adaptive-difficulty-off = Dificuldade adaptativa: desligada
+pause-phrase-section = Seção: %name% — Aprendido: %pct%%
+pause-phrase-no-sections = Nenhuma frase nesta música
+pause-drag-section-hint = Clique numa seção na barra de progresso acima para selecioná-la
+pause-notes-update-hint = As notas são atualizadas ao vivo — retome para vê-las
+pause-clear-loop = Limpar repetição
+pause-loop-off = Repetição: desligada
+pause-loop-range = Repetição: %start%s–%end%s
+pause-drag-loop-hint = Arraste na barra de progresso acima para definir um intervalo de repetição
 
 # Overlay do metrônomo
 metronome-click-off = clique: desligado
 metronome-click-on = clique: ligado
+metronome-feel-straight = ritmo: reto
+metronome-feel-shuffle = ritmo: shuffle
 
 # Treinador de Bends
 bending-drill-off = Exercício: desligado
 bending-drill-on = Exercício: ligado · sequência %streak%
 bending-hint = Esc para voltar  ·  M silencia o clique  ·  feel alterna reto/shuffle
 bending-no-note-for-technique = Este furo não tem nota para essa técnica.
+bending-key-label = Tom: %key%
+bending-listen-button = 🔊 Ouvir
+bending-drill-button = 🎲 Exercício
+bending-play-it-target = Toque — alvo %note%
+bending-in-tune = ✓ Afinado  (%note%)
+bending-cents-sharp = ↑ %cents% cents agudo  (alvo %note%)
+bending-cents-flat = ↓ %cents% cents grave  (alvo %note%)
+bending-detect-label = Detectar
 
 # Jam Session
+jam-loop-button = ↻ Loop
 jam-loop-off = Loop: desligado
 jam-loop-on = Loop: ligado
 jam-hole-map-hint = Sua harmônica  ·  dourado = tom do acorde agora  ·  verde = nota da escala de blues  ·  sopro em cima / sugada embaixo
@@ -462,6 +510,25 @@ jam-hole-map-hint = Sua harmônica  ·  dourado = tom do acorde agora  ·  verde
 results-song-complete = MÚSICA CONCLUÍDA
 results-by-technique = Por técnica
 results-new-best = ★ NOVO RECORDE! ★
+results-biggest-combo = Maior combo
+results-perfect-hits = Acertos perfeitos
+results-good-hits = Bons acertos
+results-hits = Acertos
+results-delayed-hits = Acertos atrasados
+results-misses = Erros
+results-technique-normal = Notas normais
+results-technique-bend = Bends
+results-technique-vibrato = Vibrato
+results-technique-wah = Wah
+results-technique-overblow = Overblow
+results-technique-overdraw = Overdraw
+results-technique-slide = Slide
+results-technique-clean-attack = Ataque limpo
+results-avg-timing-offset = Desvio médio de tempo
+results-increase-latency = Aumentar a latência de entrada para %ms%ms
+results-decrease-latency = Diminuir a latência de entrada para %ms%ms
+results-score = Pontuação: %points%
+results-best-score = Melhor pontuação
 
 # Calibração de latência
 calibration-title = Calibração de Latência
