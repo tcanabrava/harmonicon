@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 use bevy::window::WindowResized;
 
+use super::interaction::drag_grid_scrollbar;
 use super::meta_form::{spawn_hole_column, spawn_hole_column_rows, spawn_meta_form};
 use super::mod_panel::spawn_mod_panel;
 use super::playback::{EditorAudio, EditorProgressFill, Playhead, PlayheadLine};
@@ -31,6 +32,18 @@ pub(super) struct GridItem;
 /// [`grid_height`] — resized when the harmonica's hole count changes.
 #[derive(Component)]
 pub(super) struct GridRowContainer;
+
+/// The horizontal scrollbar's track, spanning only the grid area's own
+/// width (not the hole column) below it — hidden entirely when the song's
+/// notes all fit within the visible width, since there's nothing to scroll
+/// to. See `interaction::update_grid_scrollbar`.
+#[derive(Component)]
+pub(super) struct GridScrollTrack;
+
+/// The scrollbar's thumb, sized/positioned each frame from [`Scroll`] vs.
+/// the notes' total span vs. the track's own width.
+#[derive(Component)]
+pub(super) struct GridScrollThumb;
 
 /// The fixed-width hole column's container (number + box per hole). Its
 /// per-hole rows are (re)spawned by `grid::rebuild_grid` alongside the grid
@@ -392,6 +405,51 @@ pub(super) fn setup(
                                     Pickable::IGNORE,
                                 ));
                             });
+                        });
+                    });
+
+                // Horizontal scrollbar for the grid, spanning only the grid
+                // area's own width (the empty leading spacer matches
+                // `HOLE_COL_W`) — hidden by `update_grid_scrollbar` whenever
+                // the song's notes all fit within the visible width.
+                scroll
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Row,
+                        flex_shrink: 0.0,
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        row.spawn(Node {
+                            width: Val::Px(HOLE_COL_W),
+                            flex_shrink: 0.0,
+                            ..default()
+                        });
+                        row.spawn((
+                            GridScrollTrack,
+                            Node {
+                                flex_grow: 1.0,
+                                height: Val::Px(8.0),
+                                margin: UiRect::top(Val::Px(4.0)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
+                            Visibility::Hidden,
+                        ))
+                        .with_children(|track| {
+                            track
+                                .spawn((
+                                    GridScrollThumb,
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        top: Val::Px(0.0),
+                                        left: Val::Px(0.0),
+                                        height: Val::Percent(100.0),
+                                        ..default()
+                                    },
+                                    BackgroundColor(colors.accent.with_alpha(0.65)),
+                                ))
+                                .observe(drag_grid_scrollbar);
                         });
                     });
 

@@ -3,7 +3,9 @@
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
+use bevy::picking::events::{Drag, Pointer};
 use bevy::prelude::*;
+use bevy::ui::ComputedNode;
 use bevy::ui_render::prelude::MaterialNode;
 
 use super::material::EditorNoteMaterial;
@@ -13,7 +15,7 @@ use super::state::{
     VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction, enforce_expr,
     max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
 };
-use super::ui::{GridContent, ModButton, MoveGhost, NoteView};
+use super::ui::{GridContent, GridScrollThumb, GridScrollTrack, ModButton, MoveGhost, NoteView};
 use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::dialogs::file_dialog::FileDialog;
 use crate::theme::LoadedTheme;
@@ -434,6 +436,101 @@ pub(super) fn auto_scroll(
     }
 }
 
+// ── Horizontal scrollbar ─────────────────────────────────────────────────────
+
+/// Whether the grid's horizontal scrollbar should be shown at all — only
+/// once the notes' total span (`total_px`) is wider than what's currently
+/// visible (`view_w`); an empty or short song has nothing to scroll to.
+fn scrollbar_needed(total_px: f32, view_w: f32) -> bool {
+    total_px > view_w
+}
+
+/// The narrowest a scrollbar thumb is ever drawn, regardless of how long the
+/// song is relative to the view — a proportionally-accurate but vanishingly
+/// thin thumb would be unusable to grab.
+const MIN_THUMB_W: f32 = 24.0;
+
+/// The scrollbar thumb's width and left offset, in the same px unit as
+/// `scroll_px`/`total_px`/`view_w`/`track_w` (the caller's job to keep
+/// consistent — see `update_grid_scrollbar`). `total_px` is floored at
+/// `view_w` so a song shorter than the view (or empty) still yields a
+/// full-width thumb rather than dividing by something smaller than the
+/// view — [`scrollbar_needed`] is what actually decides whether to show it
+/// at all. The thumb's left offset is clamped to the track so it can't run
+/// past the track's own right edge even if `scroll_px` is momentarily
+/// larger than the song supports (e.g. right after deleting notes shortens
+/// it out from under the current scroll position).
+fn scrollbar_thumb(scroll_px: f32, total_px: f32, view_w: f32, track_w: f32) -> (f32, f32) {
+    let total_px = total_px.max(view_w).max(1.0);
+    let width = (view_w / total_px * track_w).clamp(MIN_THUMB_W.min(track_w), track_w);
+    let max_left = (track_w - width).max(0.0);
+    let left = (scroll_px / total_px * track_w).clamp(0.0, max_left);
+    (width, left)
+}
+
+/// Keeps the scrollbar track's visibility and the thumb's size/position in
+/// step with [`Scroll`] and the notes' current span — shown only while
+/// there's more song than fits in view (see [`scrollbar_needed`]).
+pub(super) fn update_grid_scrollbar(
+    scroll: Res<Scroll>,
+    state: Res<EditorState>,
+    windows: Query<&Window>,
+    ui_scale: Res<UiScale>,
+    mut tracks: Query<(&ComputedNode, &mut Visibility), With<GridScrollTrack>>,
+    mut thumbs: Query<&mut Node, With<GridScrollThumb>>,
+) {
+    let Ok((track, mut vis)) = tracks.single_mut() else {
+        return;
+    };
+    let Ok(mut thumb) = thumbs.single_mut() else {
+        return;
+    };
+    let view_w = windows
+        .iter()
+        .next()
+        .map(|w| w.width() / ui_scale.0)
+        .unwrap_or(1280.0)
+        - super::HOLE_COL_W;
+    let total_px = super::state::song_end_tick(&state.notes) as f32 * TICK_W;
+
+    if !scrollbar_needed(total_px, view_w) {
+        if *vis != Visibility::Hidden {
+            *vis = Visibility::Hidden;
+        }
+        return;
+    }
+    if *vis != Visibility::Visible {
+        *vis = Visibility::Visible;
+    }
+    let track_w = track.size().x * track.inverse_scale_factor();
+    let (width, left) = scrollbar_thumb(scroll.px, total_px, view_w, track_w);
+    thumb.width = Val::Px(width);
+    thumb.left = Val::Px(left);
+}
+
+/// Drags the thumb to scroll the grid — the drag delta (screen px) is
+/// scaled from track-space into content-space (`total_px / track_w`) so
+/// dragging the thumb all the way across the track scrolls the full song,
+/// not just `track_w` worth of it.
+pub(super) fn drag_grid_scrollbar(
+    ev: On<Pointer<Drag>>,
+    ui_scale: Res<UiScale>,
+    state: Res<EditorState>,
+    tracks: Query<&ComputedNode, With<GridScrollTrack>>,
+    mut scroll: ResMut<Scroll>,
+) {
+    let Ok(track) = tracks.single() else {
+        return;
+    };
+    let track_w = track.size().x * track.inverse_scale_factor();
+    let total_px = super::state::song_end_tick(&state.notes) as f32 * TICK_W;
+    if track_w <= 0.0 {
+        return;
+    }
+    let delta_px = ev.delta.x / ui_scale.0;
+    scroll.px = (scroll.px + delta_px * (total_px / track_w)).max(0.0);
+}
+
 // ── Resize live-update ────────────────────────────────────────────────────────
 
 /// Live width/position during a resize drag. Also nudges the vibrato/wah
@@ -503,5 +600,62 @@ pub(super) fn update_move_ghost(
             *border = BorderColor::all(color);
         }
         _ => *vis = Visibility::Hidden,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── scrollbar_needed ─────────────────────────────────────────────────────
+
+    #[test]
+    fn scrollbar_not_needed_when_the_song_fits_the_view() {
+        assert!(!scrollbar_needed(800.0, 1000.0));
+        assert!(!scrollbar_needed(1000.0, 1000.0));
+    }
+
+    #[test]
+    fn scrollbar_needed_when_the_song_is_wider_than_the_view() {
+        assert!(scrollbar_needed(1200.0, 1000.0));
+    }
+
+    // ── scrollbar_thumb ──────────────────────────────────────────────────────
+
+    #[test]
+    fn thumb_width_is_proportional_to_the_visible_fraction() {
+        // Twice as much song as fits in view -> half-width thumb.
+        let (width, _) = scrollbar_thumb(0.0, 2000.0, 1000.0, 500.0);
+        assert!((width - 250.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn thumb_width_is_never_smaller_than_the_minimum() {
+        // 100x as much song as fits in view -> a proportional thumb would be
+        // a sliver, but it's floored at MIN_THUMB_W.
+        let (width, _) = scrollbar_thumb(0.0, 100_000.0, 1000.0, 500.0);
+        assert_eq!(width, MIN_THUMB_W);
+    }
+
+    #[test]
+    fn thumb_left_tracks_the_scroll_fraction() {
+        // Scrolled a quarter of the way through a song twice the view width.
+        let (_, left) = scrollbar_thumb(500.0, 2000.0, 1000.0, 500.0);
+        assert!((left - 125.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn thumb_left_never_runs_past_the_tracks_right_edge() {
+        // A scroll position beyond what the (now-shorter) song supports —
+        // e.g. right after notes were deleted — must still clamp on-track.
+        let (width, left) = scrollbar_thumb(10_000.0, 2000.0, 1000.0, 500.0);
+        assert!(left + width <= 500.0 + 0.01);
+    }
+
+    #[test]
+    fn thumb_fills_the_track_when_the_song_is_shorter_than_the_view() {
+        let (width, left) = scrollbar_thumb(0.0, 200.0, 1000.0, 500.0);
+        assert_eq!(width, 500.0);
+        assert_eq!(left, 0.0);
     }
 }

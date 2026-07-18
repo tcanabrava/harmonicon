@@ -110,28 +110,33 @@ pub(super) fn spawn_hole_column_rows(
     });
 }
 
+/// The chart metadata form: a single `flex_wrap: Wrap` row of compact
+/// "label: box" clusters (harmonica kind, then each of [`FIELDS`], then the
+/// MIDI-track row) instead of one full-width row per field — with 8 fields
+/// each claiming a full row, that stacked layout alone routinely ran taller
+/// than a default-sized window. Wrapping the same clusters onto as many
+/// lines as the window's width actually allows (rather than always
+/// reserving one) uses far less vertical space, the same fix already
+/// applied to the mod panel's own button row (`mod_panel::spawn_mod_panel`).
 pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     root.spawn(Node {
         width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(6.0),
+        flex_direction: FlexDirection::Row,
+        flex_wrap: FlexWrap::Wrap,
+        column_gap: Val::Px(16.0),
+        row_gap: Val::Px(8.0),
         padding: UiRect::all(Val::Px(12.0)),
         ..default()
     })
     .with_children(|form| {
         form.spawn(Node {
-            width: Val::Percent(100.0),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
+            column_gap: Val::Px(8.0),
             ..default()
         })
         .with_children(|line| {
             line.spawn((
-                Node {
-                    width: Val::Px(150.0),
-                    ..default()
-                },
                 Text::new(format!("{}:", loc.msg("editor-field-harmonica"))),
                 TextFont {
                     font_size: FontSize::Px(14.0),
@@ -176,18 +181,13 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
 
         for (field, label) in FIELDS {
             form.spawn(Node {
-                width: Val::Percent(100.0),
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
-                column_gap: Val::Px(10.0),
+                column_gap: Val::Px(8.0),
                 ..default()
             })
             .with_children(|line| {
                 line.spawn((
-                    Node {
-                        width: Val::Px(150.0),
-                        ..default()
-                    },
                     Text::new(format!("{}:", loc.msg(label))),
                     TextFont {
                         font_size: FontSize::Px(14.0),
@@ -297,18 +297,13 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
         }
 
         form.spawn(Node {
-            width: Val::Percent(100.0),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
+            column_gap: Val::Px(8.0),
             ..default()
         })
         .with_children(|line| {
             line.spawn((
-                Node {
-                    width: Val::Px(150.0),
-                    ..default()
-                },
                 Text::new(format!("{}:", loc.msg("editor-field-midi-track"))),
                 TextFont {
                     font_size: FontSize::Px(14.0),
