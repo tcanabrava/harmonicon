@@ -17,7 +17,7 @@ use super::state::{
 use super::ui::{GridContent, GridItem, NoteView};
 use super::{
     BEAT_W, BEATS_PER_BAR, HANDLE_W, HEADER_H, ROW_H, SILENCE_ROW_H, TICK_W, TICKS_PER_BEAT,
-    grid_height, silence_row_top,
+    WAVEFORM_H, WAVEFORM_TOP, grid_height, silence_row_top,
 };
 use crate::audio_system::midi::{freq_to_midi, midi_to_note};
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
@@ -75,6 +75,7 @@ pub(super) fn note_in_scale(note: &GridNote, harp: &Harmonica, scale: &HashSet<S
 pub(super) fn rebuild_grid(
     mut commands: Commands,
     state: Res<EditorState>,
+    waveform: Res<super::waveform::MusicWaveform>,
     content: Query<Entity, With<GridContent>>,
     old: Query<Entity, With<GridItem>>,
     windows: Query<&Window>,
@@ -322,6 +323,38 @@ pub(super) fn rebuild_grid(
 
     let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
     let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
+
+    let bucket_count = waveform.buckets.len();
+    let visible = super::waveform::visible_waveform_buckets(
+        state.scroll_beat,
+        cols,
+        bucket_count,
+        waveform.duration_secs,
+        bpm,
+    );
+    for i in visible {
+        let (x, w) = super::waveform::waveform_bar_geometry(i, bucket_count, waveform.duration_secs, bpm);
+        let amplitude = waveform.buckets[i].clamp(0.0, 1.0);
+        let h = (amplitude * WAVEFORM_H).max(1.0);
+        items.push(
+            commands
+                .spawn((
+                    GridItem,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x),
+                        top: Val::Px(WAVEFORM_TOP + (WAVEFORM_H - h)),
+                        width: Val::Px(w.max(1.0) - 1.0),
+                        height: Val::Px(h),
+                        ..default()
+                    },
+                    BackgroundColor(colors.accent.with_alpha(0.35)),
+                    Pickable::IGNORE,
+                ))
+                .id(),
+        );
+    }
+
     for (start, end) in silence_gaps(&state.notes) {
         if start < last_tick && end > first_tick {
             items.push(spawn_silence_gap(

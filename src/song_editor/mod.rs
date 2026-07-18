@@ -38,6 +38,7 @@ mod record;
 mod state;
 mod timeline;
 mod ui;
+mod waveform;
 
 // ── Dialog purposes ───────────────────────────────────────────────────────────
 
@@ -51,7 +52,14 @@ const MIDI_PURPOSE: DialogId = DialogId("song_editor_2_midi");
 // ── Geometry ──────────────────────────────────────────────────────────────────
 
 const HOLE_COL_W: f32 = 78.0;
-const HEADER_H: f32 = 30.0;
+// Beat/bar number labels occupy the top of the header (unchanged, `top: 6.0`
+// in `grid.rs`); the waveform reference strip (`waveform::MusicWaveform`)
+// occupies the rest of it, so growing `HEADER_H` alone is all that's needed
+// to make room for it — every other module that reads `HEADER_H` (as "where
+// hole row 1 starts") adjusts automatically.
+const WAVEFORM_TOP: f32 = 20.0;
+const WAVEFORM_H: f32 = 36.0;
+const HEADER_H: f32 = WAVEFORM_TOP + WAVEFORM_H + 4.0;
 const ROW_H: f32 = 34.0;
 const BEAT_W: f32 = 60.0;
 const BEATS_PER_BAR: usize = 4;
@@ -101,6 +109,7 @@ impl Plugin for SongEditor2Plugin {
             .init_resource::<state::Scroll>()
             .init_resource::<practice::PracticeState>()
             .init_resource::<record::RecordState>()
+            .init_resource::<waveform::MusicWaveform>()
             .add_systems(
                 Update,
                 (
@@ -115,6 +124,13 @@ impl Plugin for SongEditor2Plugin {
                         ui::sync_chrome_height
                             .run_if(resource_exists_and_changed::<state::EditorState>),
                         ui::sync_hole_column
+                            .run_if(resource_exists_and_changed::<state::EditorState>),
+                        // Must run before `rebuild_grid` so a music-path
+                        // change (which also mutates `EditorState`, e.g. via
+                        // the meta form's Browse button) is decoded and
+                        // ready the same frame the grid rebuilds around it,
+                        // not one frame late.
+                        waveform::sync_music_waveform
                             .run_if(resource_exists_and_changed::<state::EditorState>),
                         grid::rebuild_grid
                             .run_if(resource_exists_and_changed::<state::EditorState>),
