@@ -110,207 +110,167 @@ pub(super) fn spawn_hole_column_rows(
     });
 }
 
-/// The chart metadata form: a single `flex_wrap: Wrap` row of compact
-/// "label: box" clusters (harmonica kind, then each of [`FIELDS`], then the
-/// MIDI-track row) instead of one full-width row per field — with 8 fields
-/// each claiming a full row, that stacked layout alone routinely ran taller
-/// than a default-sized window. Wrapping the same clusters onto as many
-/// lines as the window's width actually allows (rather than always
-/// reserving one) uses far less vertical space, the same fix already
-/// applied to the mod panel's own button row (`mod_panel::spawn_mod_panel`).
-pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+/// Label width within a form column — fixed so a column's field boxes all
+/// line up at the same x position, same reasoning the pre-two-column layout
+/// used a fixed label width for.
+const FORM_LABEL_W: f32 = 110.0;
+
+/// A form column: one of the two side-by-side stacks [`spawn_meta_form`]
+/// splits its 8 rows across.
+fn spawn_form_column(root: &mut ChildSpawnerCommands, build: impl FnOnce(&mut ChildSpawnerCommands)) {
     root.spawn(Node {
-        width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
-        flex_wrap: FlexWrap::Wrap,
-        column_gap: Val::Px(16.0),
-        row_gap: Val::Px(8.0),
-        padding: UiRect::all(Val::Px(12.0)),
+        flex_direction: FlexDirection::Column,
+        row_gap: Val::Px(6.0),
+        flex_grow: 1.0,
         ..default()
     })
-    .with_children(|form| {
-        form.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(8.0),
-            ..default()
+    .with_children(build);
+}
+
+fn spawn_harmonica_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        ..default()
+    })
+    .with_children(|line| {
+        line.spawn((
+            Node {
+                width: Val::Px(FORM_LABEL_W),
+                ..default()
+            },
+            Text::new(format!("{}:", loc.msg("editor-field-harmonica"))),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(colors.label),
+        ));
+        line.spawn((
+            Button,
+            Node {
+                width: Val::Px(240.0),
+                height: Val::Px(26.0),
+                align_items: AlignItems::Center,
+                padding: UiRect::horizontal(Val::Px(8.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(colors.field_bg),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(loc.msg("editor-harmonica-toggle-tooltip"))),
+        ))
+        .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+            let next = match state.harmonica_kind {
+                HarmonicaKind::Diatonic => HarmonicaKind::Chromatic,
+                HarmonicaKind::Chromatic => HarmonicaKind::Diatonic,
+            };
+            state.set_harmonica_kind(next);
         })
-        .with_children(|line| {
-            line.spawn((
-                Text::new(format!("{}:", loc.msg("editor-field-harmonica"))),
+        .with_children(|b| {
+            b.spawn((
+                HarmonicaKindText,
+                Text::new(String::new()),
                 TextFont {
                     font_size: FontSize::Px(14.0),
                     ..default()
                 },
-                TextColor(colors.label),
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
             ));
-            line.spawn((
-                Button,
-                Node {
-                    width: Val::Px(240.0),
-                    height: Val::Px(26.0),
-                    align_items: AlignItems::Center,
-                    padding: UiRect::horizontal(Val::Px(8.0)),
-                    border: UiRect::all(Val::Px(1.0)),
-                    ..default()
-                },
-                BackgroundColor(colors.field_bg),
-                BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-                Tooltip(String::from(loc.msg("editor-harmonica-toggle-tooltip"))),
-            ))
-            .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                let next = match state.harmonica_kind {
-                    HarmonicaKind::Diatonic => HarmonicaKind::Chromatic,
-                    HarmonicaKind::Chromatic => HarmonicaKind::Diatonic,
-                };
-                state.set_harmonica_kind(next);
-            })
-            .with_children(|b| {
-                b.spawn((
-                    HarmonicaKindText,
-                    Text::new(String::new()),
-                    TextFont {
-                        font_size: FontSize::Px(14.0),
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                    Pickable::IGNORE,
-                ));
-            });
         });
+    });
+}
 
-        for (field, label) in FIELDS {
-            form.spawn(Node {
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                column_gap: Val::Px(8.0),
+fn spawn_field_row(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+    field: Field,
+    label: &str,
+) {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        ..default()
+    })
+    .with_children(|line| {
+        line.spawn((
+            Node {
+                width: Val::Px(FORM_LABEL_W),
                 ..default()
-            })
-            .with_children(|line| {
-                line.spawn((
-                    Text::new(format!("{}:", loc.msg(label))),
-                    TextFont {
-                        font_size: FontSize::Px(14.0),
-                        ..default()
-                    },
-                    TextColor(colors.label),
-                ));
+            },
+            Text::new(format!("{}:", loc.msg(label))),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(colors.label),
+        ));
 
-                let mut btn = line.spawn((
-                    Button,
-                    MetaFieldBox(field),
-                    Node {
-                        width: Val::Px(240.0),
-                        height: Val::Px(26.0),
-                        align_items: AlignItems::Center,
-                        padding: UiRect::horizontal(Val::Px(8.0)),
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BackgroundColor(colors.field_bg),
-                    BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-                ));
+        let mut btn = line.spawn((
+            Button,
+            MetaFieldBox(field),
+            Node {
+                width: Val::Px(240.0),
+                height: Val::Px(26.0),
+                align_items: AlignItems::Center,
+                padding: UiRect::horizontal(Val::Px(8.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(colors.field_bg),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+        ));
 
-                if field == Field::Key {
-                    btn.insert(Tooltip(String::from(loc.msg("editor-field-key-tooltip"))))
-                        .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                            let idx = HARP_KEYS
-                                .iter()
-                                .position(|&k| k == state.key.as_str())
-                                .unwrap_or(0);
-                            state.key = HARP_KEYS[(idx + 1) % HARP_KEYS.len()].into();
-                        });
-                } else if field == Field::Position {
-                    btn.insert(Tooltip(String::from(
-                        loc.msg("editor-field-position-tooltip"),
-                    )))
-                    .observe(
-                        |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                            let idx = POSITIONS
-                                .iter()
-                                .position(|&p| p == state.position.as_str())
-                                .unwrap_or(0);
-                            state.position = POSITIONS[(idx + 1) % POSITIONS.len()].into();
-                        },
-                    );
-                } else {
-                    btn.observe(
-                        move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                            state.focus = Some(field);
-                        },
-                    );
-                }
-
-                btn.with_children(|b| {
-                    b.spawn((
-                        MetaFieldText(field),
-                        Text::new(String::new()),
-                        TextFont {
-                            font_size: FontSize::Px(14.0),
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                        Pickable::IGNORE,
-                    ));
+        if field == Field::Key {
+            btn.insert(Tooltip(String::from(loc.msg("editor-field-key-tooltip"))))
+                .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                    let idx = HARP_KEYS
+                        .iter()
+                        .position(|&k| k == state.key.as_str())
+                        .unwrap_or(0);
+                    state.key = HARP_KEYS[(idx + 1) % HARP_KEYS.len()].into();
                 });
-
-                if field == Field::Music {
-                    line.spawn((
-                        Button,
-                        Node {
-                            height: Val::Px(26.0),
-                            align_items: AlignItems::Center,
-                            padding: UiRect::horizontal(Val::Px(10.0)),
-                            border: UiRect::all(Val::Px(1.0)),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.18, 0.24, 0.36)),
-                        BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-                        Tooltip(String::from(loc.msg("editor-browse-tooltip"))),
-                    ))
-                    .observe(
-                        |_: On<Pointer<Click>>,
-                         loc: Res<Localization>,
-                         mut open: MessageWriter<OpenFileDialog>| {
-                            open.write(OpenFileDialog {
-                                purpose: MUSIC_PURPOSE,
-                                title: String::from(loc.msg("dialog-select-music")),
-                                extensions: vec!["ogg".into()],
-                                start_dir: dirs::home_dir(),
-                                mode: DialogMode::Open,
-                            });
-                        },
-                    )
-                    .with_children(|b| {
-                        b.spawn((
-                            Text::new(String::from(loc.msg("editor-browse"))),
-                            TextFont {
-                                font_size: FontSize::Px(13.0),
-                                ..default()
-                            },
-                            TextColor(Color::WHITE),
-                            Pickable::IGNORE,
-                        ));
-                    });
-                }
-            });
+        } else if field == Field::Position {
+            btn.insert(Tooltip(String::from(
+                loc.msg("editor-field-position-tooltip"),
+            )))
+            .observe(
+                |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                    let idx = POSITIONS
+                        .iter()
+                        .position(|&p| p == state.position.as_str())
+                        .unwrap_or(0);
+                    state.position = POSITIONS[(idx + 1) % POSITIONS.len()].into();
+                },
+            );
+        } else {
+            btn.observe(
+                move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                    state.focus = Some(field);
+                },
+            );
         }
 
-        form.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(8.0),
-            ..default()
-        })
-        .with_children(|line| {
-            line.spawn((
-                Text::new(format!("{}:", loc.msg("editor-field-midi-track"))),
+        btn.with_children(|b| {
+            b.spawn((
+                MetaFieldText(field),
+                Text::new(String::new()),
                 TextFont {
                     font_size: FontSize::Px(14.0),
                     ..default()
                 },
-                TextColor(colors.label),
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
             ));
+        });
+
+        if field == Field::Music {
             line.spawn((
                 Button,
                 Node {
@@ -320,18 +280,18 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.24, 0.30, 0.20)),
+                BackgroundColor(Color::srgb(0.18, 0.24, 0.36)),
                 BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-                Tooltip(String::from(loc.msg("editor-import-midi-tooltip"))),
+                Tooltip(String::from(loc.msg("editor-browse-tooltip"))),
             ))
             .observe(
                 |_: On<Pointer<Click>>,
                  loc: Res<Localization>,
                  mut open: MessageWriter<OpenFileDialog>| {
                     open.write(OpenFileDialog {
-                        purpose: MIDI_PURPOSE,
-                        title: String::from(loc.msg("dialog-select-midi")),
-                        extensions: vec!["mid".into(), "midi".into()],
+                        purpose: MUSIC_PURPOSE,
+                        title: String::from(loc.msg("dialog-select-music")),
+                        extensions: vec!["ogg".into()],
                         start_dir: dirs::home_dir(),
                         mode: DialogMode::Open,
                     });
@@ -339,7 +299,7 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
             )
             .with_children(|b| {
                 b.spawn((
-                    Text::new(String::from(loc.msg("editor-import-midi"))),
+                    Text::new(String::from(loc.msg("editor-browse"))),
                     TextFont {
                         font_size: FontSize::Px(13.0),
                         ..default()
@@ -348,13 +308,107 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
                     Pickable::IGNORE,
                 ));
             });
-            line.spawn((
-                MidiTrackComboboxSlot,
-                Node {
-                    flex_direction: FlexDirection::Column,
+        }
+    });
+}
+
+fn spawn_midi_track_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        ..default()
+    })
+    .with_children(|line| {
+        line.spawn((
+            Node {
+                width: Val::Px(FORM_LABEL_W),
+                ..default()
+            },
+            Text::new(format!("{}:", loc.msg("editor-field-midi-track"))),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(colors.label),
+        ));
+        line.spawn((
+            Button,
+            Node {
+                height: Val::Px(26.0),
+                align_items: AlignItems::Center,
+                padding: UiRect::horizontal(Val::Px(10.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.24, 0.30, 0.20)),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(loc.msg("editor-import-midi-tooltip"))),
+        ))
+        .observe(
+            |_: On<Pointer<Click>>,
+             loc: Res<Localization>,
+             mut open: MessageWriter<OpenFileDialog>| {
+                open.write(OpenFileDialog {
+                    purpose: MIDI_PURPOSE,
+                    title: String::from(loc.msg("dialog-select-midi")),
+                    extensions: vec!["mid".into(), "midi".into()],
+                    start_dir: dirs::home_dir(),
+                    mode: DialogMode::Open,
+                });
+            },
+        )
+        .with_children(|b| {
+            b.spawn((
+                Text::new(String::from(loc.msg("editor-import-midi"))),
+                TextFont {
+                    font_size: FontSize::Px(13.0),
                     ..default()
                 },
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
             ));
+        });
+        line.spawn((
+            MidiTrackComboboxSlot,
+            Node {
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+        ));
+    });
+}
+
+/// The chart metadata form: two side-by-side columns instead of one
+/// full-width row per field — with 8 rows (harmonica kind, [`FIELDS`]'s 6,
+/// and the MIDI-track row), stacking them all in one column routinely ran
+/// taller than a default-sized window. Split evenly (`FIELDS.len() / 2`, so
+/// each column gets at least 4 rows for today's 8): harmonica kind + the
+/// first half of `FIELDS` in the left column, the second half + the
+/// MIDI-track row in the right — halving the form's height for the same
+/// content.
+pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    const MID: usize = FIELDS.len() / 2;
+    root.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        column_gap: Val::Px(24.0),
+        padding: UiRect::all(Val::Px(12.0)),
+        ..default()
+    })
+    .with_children(|form| {
+        spawn_form_column(form, |col| {
+            spawn_harmonica_kind_row(col, loc, colors);
+            for &(field, label) in &FIELDS[..MID] {
+                spawn_field_row(col, loc, colors, field, label);
+            }
+        });
+        spawn_form_column(form, |col| {
+            for &(field, label) in &FIELDS[MID..] {
+                spawn_field_row(col, loc, colors, field, label);
+            }
+            spawn_midi_track_row(col, loc, colors);
         });
     });
 }
