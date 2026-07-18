@@ -27,8 +27,8 @@ use bevy::prelude::*;
 use midly::Smf;
 
 use super::midi_parse::{
-    collect_tempo_map, extract_notes, note_on_count, tick_to_seconds, ticks_per_quarter,
-    track_name_of,
+    collect_tempo_map, editor_tempo_map, extract_notes, note_on_count, tick_to_seconds,
+    ticks_per_quarter, track_name_of,
 };
 use super::playback::build_harp;
 use super::state::{
@@ -38,7 +38,7 @@ use super::{MIDI_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::midi_to_freq_hz;
 use crate::audio_system::synth::{PhraseNote, render_pcm};
 use crate::dialogs::combobox::{ComboboxSelect, spawn_combobox};
-use crate::song::chart::{TempoPoint, seconds_to_tick};
+use crate::song::chart::seconds_to_tick;
 use crate::dialogs::file_dialog::FileChosen;
 use crate::localization::LocalizationExt;
 use crate::song::chart::Action;
@@ -245,35 +245,6 @@ pub(super) struct ImportedTrack {
     /// of a MIDI file with no mid-song tempo automation.
     pub(super) tempo_changes: Vec<(usize, f32)>,
     pub(super) notes: Vec<GridNote>,
-}
-
-/// Converts a MIDI tempo map (`(tick, microseconds_per_quarter)`, in the
-/// file's own `tpq` resolution) into the editor's own tempo map (ticks in
-/// `TICKS_PER_BEAT` units, `bpm` instead of microseconds) — each point's
-/// *real time* position is preserved (via `tick_to_seconds`/
-/// `seconds_to_tick`), not its raw tick number, since a MIDI file's `tpq`
-/// has no fixed ratio to the editor's own resolution the way two charts
-/// both declaring `resolution: TICKS_PER_BEAT` would (see
-/// `harpchart::load_harpchart`'s simpler constant-ratio rescaling for
-/// that case). Built incrementally: each new point is placed by
-/// `seconds_to_tick` against the *already-converted* prefix of the map,
-/// which is exactly the segment it's the end of.
-fn editor_tempo_map(midi_tempo: &[(u64, u32)], tpq: u32) -> Vec<TempoPoint> {
-    let mut editor_map: Vec<TempoPoint> = Vec::with_capacity(midi_tempo.len());
-    for &(tick, us) in midi_tempo {
-        let bpm = (60_000_000.0 / us as f64).clamp(20.0, 300.0) as f32;
-        let editor_tick = if editor_map.is_empty() {
-            0
-        } else {
-            let secs = tick_to_seconds(tick, tpq, midi_tempo);
-            seconds_to_tick(secs, TICKS_PER_BEAT as u32, &editor_map)
-        };
-        editor_map.push(TempoPoint {
-            tick: editor_tick,
-            bpm,
-        });
-    }
-    editor_map
 }
 
 /// Extracts `track_index`'s notes, quantized onto the editor's own tick
@@ -665,6 +636,26 @@ mod tests {
         // One beat at TICKS_PER_BEAT (4) resolution is 4 internal ticks.
         assert_eq!(n.tick, 0);
         assert_eq!(n.len, TICKS_PER_BEAT);
+    }
+
+    #[test]
+    fn import_track_notes_carries_a_mid_song_tempo_change_into_tempo_changes() {
+        let bytes = smf_bytes(vec![vec![
+            meta(0, MetaMessage::Tempo(u24::from(500_000))), // 120 BPM
+            note_on(0, 60, 100),
+            note_off(480, 60), // one beat @ 120bpm
+            meta(0, MetaMessage::Tempo(u24::from(250_000))), // doubles to 240 BPM
+            note_on(0, 62, 100),
+            note_off(480, 62), // one more beat, now @ 240bpm
+        ]]);
+        let imported = import_track_notes(&bytes, 0, "C", HarmonicaKind::Diatonic).unwrap();
+        assert_eq!(imported.initial_bpm.round(), 120.0);
+        assert_eq!(imported.tempo_changes.len(), 1);
+        // The tempo doubles exactly one beat in -> editor tick TICKS_PER_BEAT.
+        assert_eq!(imported.tempo_changes[0].0, TICKS_PER_BEAT);
+        assert_eq!(imported.tempo_changes[0].1.round(), 240.0);
+        // The second note starts right where the first one ends.
+        assert_eq!(imported.notes[1].tick, TICKS_PER_BEAT);
     }
 
     #[test]

@@ -9,6 +9,9 @@
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use std::collections::HashMap;
 
+use super::TICKS_PER_BEAT;
+use crate::song::chart::{TempoPoint, seconds_to_tick};
+
 pub(super) const DEFAULT_TEMPO_US: u32 = 500_000; // 120 BPM if the file specifies none
 
 pub(super) fn ticks_per_quarter(smf: &Smf) -> Result<u32, String> {
@@ -78,6 +81,35 @@ pub(super) fn tick_to_seconds(tick: u64, tpq: u32, tempo: &[(u64, u32)]) -> f64 
     }
     seconds += (tick - prev_tick) as f64 * us as f64 / tpq as f64 / 1_000_000.0;
     seconds
+}
+
+/// Converts a MIDI tempo map (`(tick, microseconds_per_quarter)`, in the
+/// file's own `tpq` resolution) into the editor's own tempo map (ticks in
+/// `TICKS_PER_BEAT` units, `bpm` instead of microseconds) — each point's
+/// *real time* position is preserved (via `tick_to_seconds`/
+/// `seconds_to_tick`), not its raw tick number, since a MIDI file's `tpq`
+/// has no fixed ratio to the editor's own resolution the way two charts
+/// both declaring `resolution: TICKS_PER_BEAT` would (see
+/// `harpchart::load_harpchart`'s simpler constant-ratio rescaling for that
+/// case). Built incrementally: each new point is placed by `seconds_to_tick`
+/// against the *already-converted* prefix of the map, which is exactly the
+/// segment it's the end of.
+pub(super) fn editor_tempo_map(midi_tempo: &[(u64, u32)], tpq: u32) -> Vec<TempoPoint> {
+    let mut editor_map: Vec<TempoPoint> = Vec::with_capacity(midi_tempo.len());
+    for &(tick, us) in midi_tempo {
+        let bpm = (60_000_000.0 / us as f64).clamp(20.0, 300.0) as f32;
+        let editor_tick = if editor_map.is_empty() {
+            0
+        } else {
+            let secs = tick_to_seconds(tick, tpq, midi_tempo);
+            seconds_to_tick(secs, TICKS_PER_BEAT as u32, &editor_map)
+        };
+        editor_map.push(TempoPoint {
+            tick: editor_tick,
+            bpm,
+        });
+    }
+    editor_map
 }
 
 pub(super) struct RawNote {
