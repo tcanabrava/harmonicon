@@ -42,6 +42,7 @@ jam-generate-start = Começar a Jam
 jam-generate-key = Tom: %key%
 jam-generate-tempo = Andamento: %bpm%
 jam-generate-progression = Progressão: %progression%
+jam-generate-position = Posição: %position%
 
 # Créditos
 credits-back-to-menu = Voltar ao Menu

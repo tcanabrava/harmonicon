@@ -15,7 +15,7 @@ use crate::dialogs::button;
 use crate::jam::backing::{GeneratedJamSession, build_generated_manifest};
 use crate::localization::LocalizationExt;
 use crate::song::SongManifest;
-use crate::song::harmonica::Progression;
+use crate::song::harmonica::{Position, Progression};
 use crate::theme::LoadedTheme;
 
 use crate::app::{AppState, GameplayMode, JamProgression, SelectedSong};
@@ -35,6 +35,7 @@ pub(crate) struct JamGenerateConfig {
     pub key: String,
     pub bpm: f32,
     pub progression: Progression,
+    pub position: Position,
 }
 
 impl Default for JamGenerateConfig {
@@ -43,6 +44,7 @@ impl Default for JamGenerateConfig {
             key: "C".to_string(),
             bpm: 90.0,
             progression: Progression::Standard,
+            position: Position::First,
         }
     }
 }
@@ -53,6 +55,8 @@ pub(crate) struct KeyLabel;
 pub(crate) struct BpmLabel;
 #[derive(Component)]
 pub(crate) struct ProgressionLabel;
+#[derive(Component)]
+pub(crate) struct PositionLabel;
 
 pub(crate) fn setup_jam_generate_menu(
     mut commands: Commands,
@@ -182,6 +186,44 @@ pub(crate) fn setup_jam_generate_menu(
                 },
             ));
         });
+
+        root.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(10.0),
+            ..default()
+        })
+        .with_children(|row| {
+            row.spawn_empty().apply_scene(button::small(
+                "\u{25C2}",
+                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                    cfg.position = cfg.position.prev();
+                },
+            ));
+            row.spawn((
+                Node {
+                    width: Val::Px(150.0),
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+                Text::new(String::from(loc.msg_args(
+                    "jam-generate-position",
+                    &[("position", config.position.label().to_string())],
+                ))),
+                TextFont {
+                    font_size: FontSize::Px(20.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.95, 0.80, 0.35)),
+                PositionLabel,
+            ));
+            row.spawn_empty().apply_scene(button::small(
+                "\u{25B8}",
+                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                    cfg.position = cfg.position.next();
+                },
+            ));
+        });
     });
 
     spawn_button(
@@ -204,6 +246,7 @@ pub(crate) fn setup_jam_generate_menu(
                 &config.key,
                 config.bpm,
                 config.progression,
+                config.position,
                 background,
                 Handle::default(),
                 &mut sources,
@@ -263,6 +306,16 @@ pub(crate) fn update_jam_generate_labels(
             With<ProgressionLabel>,
             Without<KeyLabel>,
             Without<BpmLabel>,
+            Without<PositionLabel>,
+        ),
+    >,
+    mut positions: Query<
+        &mut Text,
+        (
+            With<PositionLabel>,
+            Without<KeyLabel>,
+            Without<BpmLabel>,
+            Without<ProgressionLabel>,
         ),
     >,
 ) {
@@ -284,6 +337,12 @@ pub(crate) fn update_jam_generate_labels(
         *text = Text::new(String::from(loc.msg_args(
             "jam-generate-progression",
             &[("progression", config.progression.label().to_string())],
+        )));
+    }
+    for mut text in &mut positions {
+        *text = Text::new(String::from(loc.msg_args(
+            "jam-generate-position",
+            &[("position", config.position.label().to_string())],
         )));
     }
 }

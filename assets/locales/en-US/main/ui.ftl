@@ -44,6 +44,7 @@ jam-generate-start = Start Jam
 jam-generate-key = Key: %key%
 jam-generate-tempo = Tempo: %bpm%
 jam-generate-progression = Progression: %progression%
+jam-generate-position = Position: %position%
 
 # Credits
 credits-back-to-menu = Back to Menu

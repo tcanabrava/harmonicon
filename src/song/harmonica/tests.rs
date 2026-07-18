@@ -131,6 +131,37 @@ fn progression_cycles_backward_and_wraps() {
 }
 
 #[test]
+fn position_cycles_forward_and_wraps() {
+    assert_eq!(Position::First.next(), Position::Second);
+    assert_eq!(Position::Second.next(), Position::Third);
+    assert_eq!(Position::Third.next(), Position::First);
+}
+
+#[test]
+fn position_cycles_backward_and_wraps() {
+    assert_eq!(Position::First.prev(), Position::Third);
+    assert_eq!(Position::Third.prev(), Position::Second);
+    assert_eq!(Position::Second.prev(), Position::First);
+}
+
+#[test]
+fn first_position_harp_key_matches_the_jam_key() {
+    assert_eq!(Position::First.harp_key("G"), "G");
+}
+
+#[test]
+fn second_position_harp_is_a_fourth_below_the_jam_key() {
+    // Classic cross harp: a C harp jams in G.
+    assert_eq!(Position::Second.harp_key("G"), "C");
+}
+
+#[test]
+fn third_position_harp_is_a_whole_step_below_the_jam_key() {
+    // A C harp, 3rd position, jams in D.
+    assert_eq!(Position::Third.harp_key("D"), "C");
+}
+
+#[test]
 fn chord_intervals_are_dominant_or_minor_seventh() {
     assert_eq!(chord_intervals(ChordQuality::Dominant7), [0, 4, 7, 10]);
     assert_eq!(chord_intervals(ChordQuality::Minor7), [0, 3, 7, 10]);

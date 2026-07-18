@@ -234,6 +234,70 @@ impl Progression {
     }
 }
 
+/// Cross-harp playing position: which harp key to grab relative to the jam's
+/// own key. Selectable on the "Generate Jam" config page (`jam::backing`,
+/// `menu::pages::jam_generate`) the same way [`Progression`] is; a hand-authored
+/// chart instead states its own position directly via `Harmonica::position`
+/// (see [`harp_banner`]) since its harmonica layout is already authored in
+/// whatever key the chart needs.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Position {
+    /// Straight harp: the harp's key is the jam's key.
+    #[default]
+    First,
+    /// Cross harp: the harp is pitched a 4th below the jam's key (e.g. a C
+    /// harp jamming in G) — the classic blues draw-note position.
+    Second,
+    /// The harp is pitched a whole step below the jam's key (e.g. a C harp
+    /// jamming in D) — minor/dorian flavored.
+    Third,
+}
+
+impl Position {
+    /// Display label for the picker and [`harp_banner`].
+    pub fn label(self) -> &'static str {
+        match self {
+            Position::First => "1st",
+            Position::Second => "2nd",
+            Position::Third => "3rd",
+        }
+    }
+
+    /// Cycles to the next variant, wrapping — same pattern as
+    /// [`Progression::next`].
+    pub fn next(self) -> Self {
+        match self {
+            Position::First => Position::Second,
+            Position::Second => Position::Third,
+            Position::Third => Position::First,
+        }
+    }
+
+    /// Cycles to the previous variant, wrapping.
+    pub fn prev(self) -> Self {
+        match self {
+            Position::First => Position::Third,
+            Position::Second => Position::First,
+            Position::Third => Position::Second,
+        }
+    }
+
+    /// Semitones the harp key sits below the jam key for this position.
+    fn interval_below_jam_key(self) -> i32 {
+        match self {
+            Position::First => 0,
+            Position::Second => 7,
+            Position::Third => 2,
+        }
+    }
+
+    /// The harp key to grab so playing this position lands in `jam_key`
+    /// (e.g. `Second.harp_key("G") == "C"`).
+    pub fn harp_key(self, jam_key: &str) -> String {
+        semitone(jam_key, -self.interval_below_jam_key())
+    }
+}
+
 /// A chord's quality — which intervals above the root are its chord tones
 /// (see [`chord_intervals`]). Every chord in a standard/quick-change 12-bar
 /// blues is dominant 7th; a minor blues' i/iv chords are minor 7th instead

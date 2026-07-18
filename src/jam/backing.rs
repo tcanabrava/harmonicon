@@ -23,7 +23,7 @@ use crate::song::chart::{
     Action, Difficulty, HarpChart, Metadata, NoteEvent, Scoring, Song, TempoPoint, Timing,
     TrackItem,
 };
-use crate::song::harmonica::{Progression, progression_bars, richter_harp, semitone};
+use crate::song::harmonica::{Position, Progression, progression_bars, richter_harp, semitone};
 use crate::song::{NoteCube3dConfig, NoteThemeConfig, SongManifest};
 
 /// Present while a generated-backing jam is in flight (from the "Start Jam"
@@ -153,14 +153,24 @@ pub fn generate_bass_pcm(key: &str, bpm: f32, progression: Progression) -> Vec<f
     buf
 }
 
-/// The chart half of a generated jam: a diatonic Richter harp in `key`
-/// (1st position — the physical harp and the jam key are the same for now;
-/// cross-harp position selection is a natural follow-up, not core to
-/// whether generated backing works at all), timed to a standard 12-bar
+/// The chart half of a generated jam: a diatonic Richter harp for `position`
+/// in the jam's `key` (e.g. `Position::Second` picks a harp a 4th below
+/// `key` — see `Position::harp_key`), timed to a standard 12-bar
 /// progression, and a single marker track item (Jam Session never scores
 /// notes, so its only job is satisfying the chart schema's `minItems: 1`
 /// and giving the progress bar something to measure against).
-pub fn generated_chart(key: &str, bpm: f32, progression: Progression, total_secs: f64) -> HarpChart {
+pub fn generated_chart(
+    key: &str,
+    bpm: f32,
+    progression: Progression,
+    position: Position,
+    total_secs: f64,
+) -> HarpChart {
+    let harp_key = position.harp_key(key);
+    let mut harmonica = richter_harp(&harp_key);
+    if let crate::song::harmonica::Harmonica::Diatonic { position: pos, .. } = &mut harmonica {
+        *pos = Some(position.label().to_string());
+    }
     HarpChart {
         metadata: Some(Metadata {
             format_version: Some("1.1.0".to_string()),
@@ -186,7 +196,7 @@ pub fn generated_chart(key: &str, bpm: f32, progression: Progression, total_secs
             tempo_map: vec![TempoPoint { tick: 0, bpm }],
             time_signature_map: None,
         },
-        harmonica: richter_harp(key),
+        harmonica,
         track: vec![TrackItem {
             id: None,
             time: Some(0.0),
@@ -224,6 +234,7 @@ pub fn build_generated_manifest(
     key: &str,
     bpm: f32,
     progression: Progression,
+    position: Position,
     background: Handle<Image>,
     elements: Handle<Image>,
     sources: &mut Assets<AudioSource>,
@@ -236,7 +247,7 @@ pub fn build_generated_manifest(
 
     SongManifest {
         path: PathBuf::from(format!("generated/{key}")),
-        chart: generated_chart(key, bpm, progression, music_duration_secs),
+        chart: generated_chart(key, bpm, progression, position, music_duration_secs),
         background,
         music: Some(music),
         waveform,
@@ -330,20 +341,42 @@ mod tests {
 
     #[test]
     fn generated_chart_carries_the_requested_key_and_tempo() {
-        let chart = generated_chart("G", 100.0, Progression::Standard, 30.0);
+        let chart = generated_chart("G", 100.0, Progression::Standard, Position::First, 30.0);
         assert_eq!(chart.song.key, "G");
         assert_eq!(chart.song.tempo_bpm, 100.0);
         assert_eq!(chart.timing.tempo_map[0].bpm, 100.0);
     }
 
     #[test]
-    fn generated_chart_harmonica_is_a_diatonic_richter_harp_in_key() {
-        let chart = generated_chart("D", 90.0, Progression::Standard, 30.0);
+    fn generated_chart_harmonica_is_a_diatonic_richter_harp_in_key_at_first_position() {
+        let chart = generated_chart("D", 90.0, Progression::Standard, Position::First, 30.0);
         match chart.harmonica {
-            crate::song::harmonica::Harmonica::Diatonic { holes, layout, .. } => {
+            crate::song::harmonica::Harmonica::Diatonic {
+                holes,
+                layout,
+                position,
+                ..
+            } => {
                 assert_eq!(holes, 10);
                 let layout = layout.expect("richter_harp always sets a layout");
                 assert_eq!(layout.blow.unwrap()[0], "D4");
+                assert_eq!(position.as_deref(), Some("1st"));
+            }
+            _ => panic!("expected a diatonic harp"),
+        }
+    }
+
+    #[test]
+    fn generated_chart_second_position_picks_a_harp_a_fourth_below_the_jam_key() {
+        // A cross-harp jam in G is played on a C harp.
+        let chart = generated_chart("G", 90.0, Progression::Standard, Position::Second, 30.0);
+        match chart.harmonica {
+            crate::song::harmonica::Harmonica::Diatonic {
+                layout, position, ..
+            } => {
+                let layout = layout.expect("richter_harp always sets a layout");
+                assert_eq!(layout.blow.unwrap()[0], "C4");
+                assert_eq!(position.as_deref(), Some("2nd"));
             }
             _ => panic!("expected a diatonic harp"),
         }
@@ -353,7 +386,7 @@ mod tests {
     fn generated_chart_track_is_never_empty() {
         // The chart schema requires `track.minItems: 1` — a generated jam
         // has no real notes to schedule, but must still satisfy it.
-        let chart = generated_chart("C", 90.0, Progression::Standard, 30.0);
+        let chart = generated_chart("C", 90.0, Progression::Standard, Position::First, 30.0);
         assert!(!chart.track.is_empty());
         assert!(!chart.track[0].events.is_empty());
     }
@@ -367,6 +400,7 @@ mod tests {
             "C",
             90.0,
             Progression::Standard,
+            Position::First,
             Handle::default(),
             Handle::default(),
             &mut sources,
