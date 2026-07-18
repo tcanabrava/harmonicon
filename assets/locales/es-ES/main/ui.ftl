@@ -95,6 +95,7 @@ mod-delete = Eliminar
 editor-tool-select = ✂ ⟕ Selecionar
 editor-tool-erase = ✂ Borrar Tramo
 editor-tool-remove = ✂ Quitar Tramo
+editor-tool-tempo = ♩ Tempo
 
 # Song Editor 2 — etiquetas de los campos de metadatos
 editor-field-tempo = Tempo de la Música
@@ -160,6 +161,7 @@ mod-delete-tooltip = Eliminar la nota seleccionada
 editor-tool-select-tooltip = Click a point on the timeline then click a side (or click-drag a range)
 editor-tool-erase-tooltip = Haz clic en un punto de la línea de tiempo y luego en un lado (o haz clic y arrastra un tramo) para borrar sus notas, dejando un hueco
 editor-tool-remove-tooltip = Haz clic en un punto de la línea de tiempo y luego en un lado (o haz clic y arrastra un tramo) para borrar sus notas y desplazar todo lo siguiente hacia atrás, cerrando el hueco
+editor-tool-tempo-tooltip = Haz clic en la regla para añadir un cambio de tempo ahí, o haz clic en uno existente para quitarlo
 editor-harmonica-toggle-tooltip = Haz clic para alternar entre armónica Diatónica y Cromática
 editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación

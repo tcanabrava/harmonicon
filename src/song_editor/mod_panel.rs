@@ -238,6 +238,13 @@ pub(super) fn spawn_mod_panel(
                     loc.msg("editor-tool-remove-tooltip"),
                     colors,
                 );
+                timeline_tool_button(
+                    g,
+                    TimelineToolButton(TimelineTool::Tempo),
+                    loc.msg("editor-tool-tempo"),
+                    loc.msg("editor-tool-tempo-tooltip"),
+                    colors,
+                );
             });
 
         panel

@@ -38,6 +38,7 @@ use super::{MIDI_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::midi_to_freq_hz;
 use crate::audio_system::synth::{PhraseNote, render_pcm};
 use crate::dialogs::combobox::{ComboboxSelect, spawn_combobox};
+use crate::song::chart::{TempoPoint, seconds_to_tick};
 use crate::dialogs::file_dialog::FileChosen;
 use crate::localization::LocalizationExt;
 use crate::song::chart::Action;
@@ -239,15 +240,46 @@ pub(super) fn list_midi_tracks(bytes: &[u8]) -> Result<Vec<MidiTrackInfo>, Strin
 
 pub(super) struct ImportedTrack {
     pub(super) initial_bpm: f32,
+    /// Every tempo change after the opening one, already in the editor's
+    /// own tick unit — see [`editor_tempo_map`]. Empty for the common case
+    /// of a MIDI file with no mid-song tempo automation.
+    pub(super) tempo_changes: Vec<(usize, f32)>,
     pub(super) notes: Vec<GridNote>,
 }
 
-/// Extracts `track_index`'s notes, quantized onto the editor's own tick grid
-/// at that track's initial tempo (the editor has no tempo-map support — see
-/// `ROADMAP.md` 0.5 — so a MIDI file with real tempo changes plays back at
-/// its first tempo throughout; notes still land at the right *real* time up
-/// to that quantization, since positions are computed from absolute
-/// seconds, not raw ticks).
+/// Converts a MIDI tempo map (`(tick, microseconds_per_quarter)`, in the
+/// file's own `tpq` resolution) into the editor's own tempo map (ticks in
+/// `TICKS_PER_BEAT` units, `bpm` instead of microseconds) — each point's
+/// *real time* position is preserved (via `tick_to_seconds`/
+/// `seconds_to_tick`), not its raw tick number, since a MIDI file's `tpq`
+/// has no fixed ratio to the editor's own resolution the way two charts
+/// both declaring `resolution: TICKS_PER_BEAT` would (see
+/// `harpchart::load_harpchart`'s simpler constant-ratio rescaling for
+/// that case). Built incrementally: each new point is placed by
+/// `seconds_to_tick` against the *already-converted* prefix of the map,
+/// which is exactly the segment it's the end of.
+fn editor_tempo_map(midi_tempo: &[(u64, u32)], tpq: u32) -> Vec<TempoPoint> {
+    let mut editor_map: Vec<TempoPoint> = Vec::with_capacity(midi_tempo.len());
+    for &(tick, us) in midi_tempo {
+        let bpm = (60_000_000.0 / us as f64).clamp(20.0, 300.0) as f32;
+        let editor_tick = if editor_map.is_empty() {
+            0
+        } else {
+            let secs = tick_to_seconds(tick, tpq, midi_tempo);
+            seconds_to_tick(secs, TICKS_PER_BEAT as u32, &editor_map)
+        };
+        editor_map.push(TempoPoint {
+            tick: editor_tick,
+            bpm,
+        });
+    }
+    editor_map
+}
+
+/// Extracts `track_index`'s notes, quantized onto the editor's own tick
+/// grid — a MIDI file's own tempo *map* (not just its first tempo) carries
+/// over via [`editor_tempo_map`], so a note lands at the right editor tick
+/// even after a mid-song tempo change.
 pub(super) fn import_track_notes(
     bytes: &[u8],
     track_index: usize,
@@ -265,18 +297,19 @@ pub(super) fn import_track_notes(
         return Err("selected track has no notes".to_string());
     }
 
-    let tempo = collect_tempo_map(&smf);
-    let initial_bpm = (60_000_000.0 / tempo[0].1 as f64).clamp(20.0, 300.0) as f32;
-    let secs_per_tick = 60.0 / initial_bpm.max(1.0) as f64 / TICKS_PER_BEAT as f64;
+    let midi_tempo = collect_tempo_map(&smf);
+    let editor_map = editor_tempo_map(&midi_tempo, tpq);
+    let initial_bpm = editor_map[0].bpm;
 
     let harp = build_harp(key, kind);
     let mut notes = Vec::with_capacity(raw_notes.len());
     for (id, n) in raw_notes.into_iter().enumerate() {
         let (hole, dir, pitch) = map_pitch(n.key, &harp, kind);
-        let start_secs = tick_to_seconds(n.start_tick, tpq, &tempo);
-        let end_secs = tick_to_seconds(n.start_tick + n.dur_ticks, tpq, &tempo);
-        let tick = (start_secs / secs_per_tick).round() as usize;
-        let len = (((end_secs - start_secs) / secs_per_tick).round() as usize).max(1);
+        let start_secs = tick_to_seconds(n.start_tick, tpq, &midi_tempo);
+        let end_secs = tick_to_seconds(n.start_tick + n.dur_ticks, tpq, &midi_tempo);
+        let tick = seconds_to_tick(start_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
+        let end_tick = seconds_to_tick(end_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
+        let len = end_tick.saturating_sub(tick).max(1);
         notes.push(GridNote {
             id: id as u32,
             hole,
@@ -287,7 +320,15 @@ pub(super) fn import_track_notes(
             expr: Expr::None,
         });
     }
-    Ok(ImportedTrack { initial_bpm, notes })
+    let tempo_changes = editor_map[1..]
+        .iter()
+        .map(|p| (p.tick as usize, p.bpm))
+        .collect();
+    Ok(ImportedTrack {
+        initial_bpm,
+        tempo_changes,
+        notes,
+    })
 }
 
 /// A copy of the MIDI file with `track_index` removed — the same
@@ -450,6 +491,7 @@ fn on_midi_track_selected(
             state.selected = None;
             state.dragging = None;
             state.tempo = format!("{}", imported.initial_bpm.round() as u32);
+            state.tempo_changes = imported.tempo_changes;
             state.key = key.clone();
             midi.selected = Some(info.index);
             println!(

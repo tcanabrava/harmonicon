@@ -32,14 +32,14 @@
 //! interaction/UI wiring around them.
 
 use bevy::picking::Pickable;
-use bevy::picking::events::{Drag, DragEnd, DragStart, Pointer};
+use bevy::picking::events::{Click, Drag, DragEnd, DragStart, Pointer};
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy_fluent::prelude::Localization;
 
 use super::state::{
     EditorState, Side, TimelineDrag, TimelineTool, erase_range, normalize_range, remove_range,
-    split_side_range,
+    split_side_range, toggle_tempo_point,
 };
 use super::{BEATS_PER_BAR, BEAT_W, HEADER_H, TICKS_PER_BEAT, TICK_W};
 use crate::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
@@ -136,6 +136,9 @@ pub (super) fn request_confirm(
         TimelineTool::Remove => "editor-confirm-remove",
         TimelineTool::None => return,
         TimelineTool::Select => return,
+        // Toggled directly by `on_timeline_click_tempo` — never goes
+        // through the confirm-dialog path this function drives.
+        TimelineTool::Tempo => return,
     };
     state.pending_timeline_op = Some((tool, start, end));
     let message = loc
@@ -157,6 +160,29 @@ fn hovered_tick(
     let geom = geoms.get(entity).ok()?;
     let rel = rels.get(entity).ok()?;
     Some(geom.tick_at(rel.normalized?.x))
+}
+
+/// The Tempo tool's whole interaction: a plain click toggles a tempo-change
+/// point at the clicked tick (see `state::toggle_tempo_point`) — no confirm
+/// dialog, no drag-span selection, unlike Select/Erase/Remove. Reacting to
+/// `Pointer<Click>` directly (rather than routing through `Drag*` like
+/// every other timeline tool) is safe *only* because this tool never cares
+/// about a drag span at all; the module doc's "`Click`/`DragEnd` race" only
+/// matters for tools that read `EditorState::timeline_drag`, which this one
+/// doesn't touch.
+pub(super) fn on_timeline_click_tempo(
+    ev: On<Pointer<Click>>,
+    geoms: Query<&TimelineSurfaceGeometry>,
+    rels: Query<&RelativeCursorPosition>,
+    mut state: ResMut<EditorState>,
+) {
+    if state.timeline_tool != TimelineTool::Tempo {
+        return;
+    }
+    let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
+        return;
+    };
+    toggle_tempo_point(&mut state, tick);
 }
 
 pub(super) fn on_timeline_drag_start(
@@ -268,6 +294,7 @@ pub(super) fn handle_timeline_confirm(
             TimelineTool::Remove => remove_range(&state.notes, start, end),
             TimelineTool::None => continue,
             TimelineTool::Select => continue,
+            TimelineTool::Tempo => continue,
         };
         state.selected = None;
     }

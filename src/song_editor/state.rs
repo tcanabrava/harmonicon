@@ -659,6 +659,55 @@ pub(super) fn build_tempo_map(tempo: &str, tempo_changes: &[(usize, f32)]) -> Ve
     map
 }
 
+/// The bpm in effect at `tick` per `tempo_map` (whichever point last took
+/// effect at or before it) — the starting point [`toggle_tempo_point`]
+/// steps a new point's bpm from, so a freshly-added point doesn't silently
+/// jump to some unrelated tempo.
+fn bpm_at(tempo_map: &[crate::song::chart::TempoPoint], tick: usize) -> f32 {
+    tempo_map
+        .iter()
+        .rev()
+        .find(|p| p.tick <= tick as u64)
+        .map(|p| p.bpm)
+        .unwrap_or(120.0)
+}
+
+/// How close (in ticks) a click has to land to an existing tempo-change
+/// point for [`toggle_tempo_point`] to treat it as "that point" (removing
+/// it) rather than adding a near-duplicate one right next to it.
+const TEMPO_POINT_SNAP_TICKS: usize = TICKS_PER_BEAT / 2;
+
+/// How much a freshly-added tempo point's bpm steps from whatever's
+/// already in effect at its tick — enough to be clearly audible/visible
+/// immediately, adjustable afterward the same way (click again nearby to
+/// remove, then re-add).
+const TEMPO_STEP_BPM: f32 = 10.0;
+
+/// The timeline's Tempo tool's click-to-toggle interaction
+/// (`timeline::on_timeline_click_tempo`): removes the closest existing
+/// tempo-change point within [`TEMPO_POINT_SNAP_TICKS`] of `tick`, or adds
+/// a new one at `tick` (bpm = [`bpm_at`] plus [`TEMPO_STEP_BPM`]) if none is
+/// that close. A tick at or near 0 — already controlled by the opening
+/// tempo's `Field::Tempo` box — is a no-op rather than adding a point
+/// [`build_tempo_map`] would just discard as a tick-0 collision.
+pub(super) fn toggle_tempo_point(state: &mut EditorState, tick: usize) {
+    if tick < TEMPO_POINT_SNAP_TICKS {
+        return;
+    }
+    let nearest = state
+        .tempo_changes
+        .iter()
+        .enumerate()
+        .filter(|&(_, &(t, _))| t.abs_diff(tick) <= TEMPO_POINT_SNAP_TICKS)
+        .min_by_key(|&(_, &(t, _))| t.abs_diff(tick));
+    if let Some((idx, _)) = nearest {
+        state.tempo_changes.remove(idx);
+        return;
+    }
+    let bpm = bpm_at(&state.tempo_map(), tick) + TEMPO_STEP_BPM;
+    state.tempo_changes.push((tick, bpm));
+}
+
 // ── Timeline erase/remove ────────────────────────────────────────────────────
 
 /// One past the last tick any note currently occupies — the right-hand

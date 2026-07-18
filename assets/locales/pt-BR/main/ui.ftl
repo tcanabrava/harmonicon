@@ -95,6 +95,7 @@ mod-delete = Apagar
 editor-tool-select = ✂ ⟕ Selecionar
 editor-tool-erase = ✂ Apagar Trecho
 editor-tool-remove = ✂ Remover Trecho
+editor-tool-tempo = ♩ Tempo
 
 # Editor de Músicas 2 — rótulos dos campos de metadados
 editor-field-tempo = Andamento da Música
@@ -160,6 +161,7 @@ mod-delete-tooltip = Apagar a nota selecionada
 editor-tool-select-tooltip = Click a point on the timeline then click a side (or click-drag a range)
 editor-tool-erase-tooltip = Clique num ponto da linha do tempo e depois num dos lados (ou clique e arraste um trecho) para apagar as notas dali, deixando um vazio
 editor-tool-remove-tooltip = Clique num ponto da linha do tempo e depois num dos lados (ou clique e arraste um trecho) para apagar as notas dali e deslocar tudo depois pra frente, fechando o vazio
+editor-tool-tempo-tooltip = Clique na régua para adicionar uma mudança de andamento ali, ou clique numa já existente para removê-la
 editor-harmonica-toggle-tooltip = Clique para alternar entre gaita Diatônica e Cromática
 editor-field-key-tooltip = Clique para alternar entre os tons da gaita
 editor-field-position-tooltip = Clique para alternar entre as posições de execução

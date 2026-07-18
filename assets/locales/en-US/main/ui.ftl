@@ -97,6 +97,7 @@ mod-delete = Delete
 editor-tool-select = ✂ ⟕ Select
 editor-tool-erase = ✂ Erase
 editor-tool-remove = ✂ Remove
+editor-tool-tempo = ♩ Tempo
 
 # Song Editor 2 — meta-form field labels
 editor-field-tempo = Music Tempo
@@ -162,6 +163,7 @@ mod-delete-tooltip = Delete the selected note
 editor-tool-select-tooltip = Click a point on the timeline then click a side (or click-drag a range)
 editor-tool-erase-tooltip = Remove all notes in the current selection.
 editor-tool-remove-tooltip = Erase the selection, and shift everything after it earlier, closing the gap
+editor-tool-tempo-tooltip = Click the ruler to add a tempo change there, or click an existing one to remove it
 editor-harmonica-toggle-tooltip = Click to switch between Diatonic and Chromatic harmonica layouts
 editor-field-key-tooltip = Click to cycle through harp keys
 editor-field-position-tooltip = Click to cycle through playing positions

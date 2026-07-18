@@ -12,7 +12,7 @@ use super::state::{
     Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
     apply_resize, build_tempo_map, can_place, enforce_direction, enforce_expr, erase_range,
     move_target, normalize_range, note_rect, remove_range, silence_gaps, song_end_tick,
-    split_side_range,
+    split_side_range, toggle_tempo_point,
 };
 use super::ui::ModButton;
 use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
@@ -1332,6 +1332,53 @@ fn tempo_map_keeps_the_opening_tempo_when_a_change_collides_with_tick_zero() {
     let map = build_tempo_map("120", &[(0, 200.0)]);
     assert_eq!(map.len(), 1);
     assert_eq!(map[0].bpm, 120.0);
+}
+
+// ── toggle_tempo_point ───────────────────────────────────────────────────────
+
+#[test]
+fn toggle_tempo_point_adds_a_point_at_the_clicked_tick() {
+    let mut s = EditorState {
+        tempo: "120".into(),
+        ..Default::default()
+    };
+    toggle_tempo_point(&mut s, 100);
+    assert_eq!(s.tempo_changes.len(), 1);
+    assert_eq!(s.tempo_changes[0].0, 100);
+    // Steps up from the 120 already in effect there.
+    assert_eq!(s.tempo_changes[0].1, 130.0);
+}
+
+#[test]
+fn toggle_tempo_point_removes_a_point_clicked_again_nearby() {
+    let mut s = EditorState {
+        tempo_changes: vec![(100, 150.0)],
+        ..Default::default()
+    };
+    toggle_tempo_point(&mut s, 101); // within snap distance, not exact
+    assert!(s.tempo_changes.is_empty());
+}
+
+#[test]
+fn toggle_tempo_point_ignores_a_click_too_close_to_tick_zero() {
+    let mut s = EditorState::default();
+    toggle_tempo_point(&mut s, 0);
+    assert!(s.tempo_changes.is_empty());
+}
+
+#[test]
+fn toggle_tempo_point_steps_from_whichever_tempo_is_already_in_effect() {
+    let mut s = EditorState {
+        tempo: "120".into(),
+        tempo_changes: vec![(100, 200.0)],
+        ..Default::default()
+    };
+    // Clicking well past the existing point should step from *its* tempo
+    // (200), not the opening one (120).
+    toggle_tempo_point(&mut s, 300);
+    assert_eq!(s.tempo_changes.len(), 2);
+    let added = s.tempo_changes.iter().find(|&&(t, _)| t == 300).unwrap();
+    assert_eq!(added.1, 210.0);
 }
 
 // ── Silence track ──────────────────────────────────────────────────────────

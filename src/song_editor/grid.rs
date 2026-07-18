@@ -55,6 +55,11 @@ pub(super) fn mix_srgba(base: Color, tint: Color, t: f32) -> Color {
 const OUT_OF_SCALE_MIX: f32 = 0.45;
 const OUT_OF_SCALE_TINT: Color = Color::srgb(0.95, 0.25, 0.20);
 
+/// A tempo-change point's marker line/label in the grid header — distinct
+/// from the waveform's own accent color and the beat/bar gridlines so it
+/// reads as its own kind of thing.
+const TEMPO_MARKER_COLOR: Color = Color::srgb(0.95, 0.55, 0.15);
+
 /// Whether `note`'s target pitch — its bent/overblown/overdrawn pitch, not
 /// just its natural one, since e.g. bending draw-3 down a step-and-a-half on a
 /// C harp is exactly how a blues player reaches the ♭7 — falls in `scale`.
@@ -284,10 +289,11 @@ pub(super) fn rebuild_grid(
         }
     }
 
-    // The Erase/Remove tool's click/drag catcher, spanning the header strip
-    // across every currently-rendered beat column — see `timeline`'s module
-    // docs. Always spawned (not gated on a tool being active); its own
-    // observers no-op when `state.timeline_tool` is `None`.
+    // The Erase/Remove/Tempo tools' click/drag catcher, spanning the header
+    // strip across every currently-rendered beat column — see `timeline`'s
+    // module docs. Always spawned (not gated on a tool being active); its
+    // own observers no-op when `state.timeline_tool` is `None` or a
+    // different tool than the one they handle.
     items.push(
         commands
             .spawn((
@@ -300,6 +306,7 @@ pub(super) fn rebuild_grid(
             .observe(super::timeline::on_timeline_drag_start)
             .observe(super::timeline::on_timeline_drag)
             .observe(super::timeline::on_timeline_drag_end)
+            .observe(super::timeline::on_timeline_click_tempo)
             .id(),
     );
 
@@ -353,6 +360,53 @@ pub(super) fn rebuild_grid(
                         ..default()
                     },
                     BackgroundColor(colors.accent.with_alpha(0.35)),
+                    Pickable::IGNORE,
+                ))
+                .id(),
+        );
+    }
+
+    // Tempo-change points (placed via the Tempo timeline tool — see
+    // `state::toggle_tempo_point`), windowed to the currently-visible ticks
+    // like everything else in this function.
+    for &(tick, bpm) in &state.tempo_changes {
+        if tick >= last_tick || tick < first_tick {
+            continue;
+        }
+        let x = tick as f32 * TICK_W;
+        items.push(
+            commands
+                .spawn((
+                    GridItem,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x),
+                        top: Val::Px(0.0),
+                        width: Val::Px(2.0),
+                        height: Val::Px(HEADER_H),
+                        ..default()
+                    },
+                    BackgroundColor(TEMPO_MARKER_COLOR),
+                    Pickable::IGNORE,
+                ))
+                .id(),
+        );
+        items.push(
+            commands
+                .spawn((
+                    GridItem,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x + 4.0),
+                        top: Val::Px(WAVEFORM_TOP - 14.0),
+                        ..default()
+                    },
+                    Text::new(format!("\u{2669}={}", bpm.round() as i32)),
+                    TextFont {
+                        font_size: FontSize::Px(11.0),
+                        ..default()
+                    },
+                    TextColor(TEMPO_MARKER_COLOR),
                     Pickable::IGNORE,
                 ))
                 .id(),
