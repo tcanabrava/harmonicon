@@ -366,6 +366,11 @@ pub(super) struct EditorState {
     pub(super) lesson_threshold: String,
     pub(super) lesson_technique: String,
     pub(super) lesson_progression: String,
+    /// Whether the lesson-fields panel's body (the two field columns) is
+    /// expanded — folded by default, since lesson metadata is filled in
+    /// occasionally, not every session, and shouldn't compete with the note
+    /// grid for screen space by default. See `lesson_form::spawn_lesson_form`.
+    pub(super) lesson_details_expanded: bool,
     /// User's own Lock toggle, independent of `mode`. See [`EditorState::locked`].
     pub(super) user_locked: bool,
     pub(super) harmonica_kind: HarmonicaKind,
@@ -428,6 +433,7 @@ impl Default for EditorState {
             lesson_threshold: "0.7".into(),
             lesson_technique: "normal".into(),
             lesson_progression: "none".into(),
+            lesson_details_expanded: false,
             user_locked: false,
             harmonica_kind: HarmonicaKind::default(),
             timeline_tool: TimelineTool::default(),

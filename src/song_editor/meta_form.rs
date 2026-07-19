@@ -123,8 +123,12 @@ pub(super) fn spawn_hole_column_rows(
 const FORM_LABEL_W: f32 = 110.0;
 
 /// A form column: one of the two side-by-side stacks [`spawn_meta_form`]
-/// splits its 8 rows across.
-fn spawn_form_column(root: &mut ChildSpawnerCommands, build: impl FnOnce(&mut ChildSpawnerCommands)) {
+/// splits its 8 rows across — also reused by `lesson_form::spawn_lesson_form`
+/// for the same reason (halving a long field list's height).
+pub(super) fn spawn_form_column(
+    root: &mut ChildSpawnerCommands,
+    build: impl FnOnce(&mut ChildSpawnerCommands),
+) {
     root.spawn(Node {
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(6.0),
@@ -238,13 +242,17 @@ fn spawn_harmonica_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, 
     );
 }
 
+/// Spawns one labelled field row and returns its own entity — so a caller
+/// with a row whose relevance depends on another field's value (e.g.
+/// `lesson_form`'s `LessonThreshold`/`LessonTechnique`) can tag it with a
+/// marker component afterward for a visibility system to key on.
 pub(super) fn spawn_field_row(
     col: &mut ChildSpawnerCommands,
     loc: &Localization,
     colors: SongEditorColors,
     field: Field,
     label: &str,
-) {
+) -> Entity {
     col.spawn(Node {
         width: Val::Percent(100.0),
         flex_direction: FlexDirection::Row,
@@ -375,7 +383,8 @@ pub(super) fn spawn_field_row(
                 ));
             });
         }
-    });
+    })
+    .id()
 }
 
 fn spawn_midi_track_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
