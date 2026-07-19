@@ -703,10 +703,13 @@ pub(super) fn overlaps(a: &GridNote, b: &GridNote) -> bool {
     a.tick < b.tick + b.len && b.tick < a.tick + a.len
 }
 
-pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
-    let Some(dir) = state.note_by_id(id).map(|n| n.dir) else {
-        return;
-    };
+/// Every note transitively overlapping `id` in time (including `id` itself):
+/// starting from `id`, repeatedly pulls in any note overlapping one already
+/// in the group until nothing new joins — the shared traversal
+/// `enforce_direction`/`enforce_expr` each build on, since a change to one
+/// note in a stack of simultaneous notes must propagate to every note that
+/// note's stack overlaps in turn, not just its immediate neighbors.
+fn overlapping_group(state: &EditorState, id: u32) -> Vec<u32> {
     let mut group = vec![id];
     let mut i = 0;
     while i < group.len() {
@@ -721,6 +724,14 @@ pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
         }
         i += 1;
     }
+    group
+}
+
+pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
+    let Some(dir) = state.note_by_id(id).map(|n| n.dir) else {
+        return;
+    };
+    let group = overlapping_group(state, id);
     for n in &mut state.notes {
         if group.contains(&n.id) {
             n.dir = dir;
@@ -737,20 +748,7 @@ pub(super) fn enforce_expr(state: &mut EditorState, id: u32) {
     let Some(expr) = state.note_by_id(id).map(|n| n.expr) else {
         return;
     };
-    let mut group = vec![id];
-    let mut i = 0;
-    while i < group.len() {
-        let Some(cur) = state.note_by_id(group[i]).copied() else {
-            i += 1;
-            continue;
-        };
-        for n in &state.notes {
-            if !group.contains(&n.id) && overlaps(&cur, n) {
-                group.push(n.id);
-            }
-        }
-        i += 1;
-    }
+    let group = overlapping_group(state, id);
     for n in &mut state.notes {
         if group.contains(&n.id) {
             n.expr = expr;

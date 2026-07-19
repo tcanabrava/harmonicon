@@ -19,16 +19,17 @@
 
 use std::collections::HashMap;
 
-use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
+use bevy::audio::AudioSource;
 use bevy::prelude::*;
 
 use crate::audio_system::pitch_detect::PitchEvent;
 use crate::settings::AudioSettings;
 use crate::song::harmonica::Harmonica;
 
+#[cfg(test)]
 use super::TICKS_PER_BEAT;
 use super::midi_import::map_pitch;
-use super::playback::{EditorAudio, Playhead, build_harp};
+use super::playback::{EditorAudio, Playhead, build_harp, secs_per_tick, spawn_background_music};
 use super::state::{EditorState, Expr, GridNote, HarmonicaKind};
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -86,32 +87,15 @@ pub(super) fn start_record(
     record.reset();
     record.active = true;
 
-    let bpm = state.tempo.trim().parse::<f32>().unwrap_or(120.0).max(1.0);
-    let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
     *playhead = Playhead {
         playing: true,
         paused: false,
         elapsed: 0.0,
         total: f32::MAX,
-        secs_per_tick,
+        secs_per_tick: secs_per_tick(state),
     };
 
-    let music = state.music.trim();
-    if !music.is_empty() {
-        match std::fs::read(music) {
-            Ok(bytes) => {
-                let handle = sources.add(AudioSource {
-                    bytes: bytes.into(),
-                });
-                commands.spawn((
-                    EditorAudio,
-                    AudioPlayer::<AudioSource>(handle),
-                    PlaybackSettings::DESPAWN.with_volume(Volume::Linear(settings.music_volume)),
-                ));
-            }
-            Err(e) => warn!("Song editor: couldn't read background music {music:?}: {e}"),
-        }
-    }
+    spawn_background_music(state, sources, settings, commands);
 }
 
 /// Stops recording: grows any still-sounding notes one last time to reflect

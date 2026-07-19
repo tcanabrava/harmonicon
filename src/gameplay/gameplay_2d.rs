@@ -784,30 +784,44 @@ fn spawn_harmonica_strip(
         }
     });
 
-    // Legend
-    col.spawn(Node {
-        flex_direction: FlexDirection::Row,
-        column_gap: Val::Px(20.0),
-        ..default()
-    })
-    .with_children(|leg| {
-        leg.spawn((
-            Text::new(String::from(loc.msg("gameplay-legend-blow"))),
-            TextFont {
-                font_size: FontSize::Px(15.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.50, 0.75, 1.00)),
-        ));
-        leg.spawn((
-            Text::new(String::from(loc.msg("gameplay-legend-draw"))),
-            TextFont {
-                font_size: FontSize::Px(15.0),
-                ..default()
-            },
-            TextColor(Color::srgb(1.00, 0.62, 0.35)),
-        ));
-    });
+    spawn_blow_draw_legend(col, loc, 20.0, 0.0);
+}
+
+/// The "Blow / Draw" colour-key legend — identical between the 2D harmonica
+/// strip and the 3D HUD overlay, differing only in the row's own spacing
+/// (`column_gap`/top `margin`, which each caller picks to match its
+/// surrounding layout).
+pub(super) fn spawn_blow_draw_legend(
+    parent: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    column_gap: f32,
+    margin_top: f32,
+) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(column_gap),
+            margin: UiRect::top(Val::Px(margin_top)),
+            ..default()
+        })
+        .with_children(|leg| {
+            leg.spawn((
+                Text::new(String::from(loc.msg("gameplay-legend-blow"))),
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.50, 0.75, 1.00)),
+            ));
+            leg.spawn((
+                Text::new(String::from(loc.msg("gameplay-legend-draw"))),
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(1.00, 0.62, 0.35)),
+            ));
+        });
 }
 
 // ── Per-frame systems ─────────────────────────────────────────────────────────
@@ -912,6 +926,63 @@ pub fn update_note_visuals(
     }
 }
 
+/// The set of currently-sounding MIDI pitches that are actually producible
+/// on this harp — shared `harp_pitches` builder `update_holes`/
+/// `update_holes_3d` each need before their per-cell glow loop.
+pub(super) fn harp_pitches(active: &ActivePitches, valid_notes: &ValidHarpNotes) -> HashSet<u8> {
+    active
+        .0
+        .iter()
+        .map(|p| p.midi)
+        .filter(|m| valid_notes.0.contains(m))
+        .collect()
+}
+
+/// One hole cell's brightness/hint glow step for one frame — the shared
+/// core of `update_holes`/`update_holes_3d`, which differ only in the final
+/// paint (`BackgroundColor` vs. `StandardMaterial` emissive/base color, done
+/// by each caller with the resulting `state.brightness`/`state.is_blow`).
+/// Matches `cell`'s blow/draw MIDI notes against `harp_pitches` (an actual
+/// played hit always wins), falls back to a dimmer "hint" floor from the
+/// scoring overlay's `ActiveTargets` if neither reed is sounding, and
+/// smooths `state.brightness` toward whichever target that resolved to —
+/// fast attack toward a brighter target, slower decay toward a dimmer one,
+/// so a hit flashes up instantly but fades out naturally.
+pub(super) fn step_hole_glow(
+    state: &mut HoleState,
+    blow: Option<u8>,
+    draw: Option<u8>,
+    hint: Option<bool>,
+    harp_pitches: &HashSet<u8>,
+    attack: f32,
+    decay: f32,
+) {
+    let blow_hit = blow.is_some_and(|m| harp_pitches.contains(&m));
+    let draw_hit = draw.is_some_and(|m| harp_pitches.contains(&m));
+    let hint_floor = if hint.is_some() { 0.18f32 } else { 0.0 };
+
+    let (target, is_blow) = if blow_hit {
+        (1.0f32, true)
+    } else if draw_hit {
+        (1.0f32, false)
+    } else if let Some(is_blow_hint) = hint {
+        (hint_floor, is_blow_hint)
+    } else {
+        (0.0f32, state.is_blow)
+    };
+
+    if blow_hit || draw_hit {
+        state.is_blow = is_blow;
+    }
+
+    let factor = if target > state.brightness {
+        attack
+    } else {
+        decay
+    };
+    state.brightness += (target - state.brightness) * factor;
+}
+
 pub fn update_holes(
     time: Res<Time>,
     active: Res<ActivePitches>,
@@ -929,48 +1000,18 @@ pub fn update_holes(
 
     let attack = 1.0 - (-dt * 25.0_f32).exp();
     let decay = 1.0 - (-dt * 4.0_f32).exp();
-
-    let harp_pitches: HashSet<u8> = active
-        .0
-        .iter()
-        .map(|p| p.midi)
-        .filter(|m| valid_notes.0.contains(m))
-        .collect();
+    let harp_pitches = harp_pitches(&active, &valid_notes);
 
     for (cell, mut bg, mut state) in &mut cells {
         let blow = chart.harmonica.wind_direction_midi(cell.0, &Action::Blow);
         let draw = chart.harmonica.wind_direction_midi(cell.0, &Action::Draw);
-
-        let blow_hit = blow.is_some_and(|m| harp_pitches.contains(&m));
-        let draw_hit = draw.is_some_and(|m| harp_pitches.contains(&m));
-
         let hint = targets
             .0
             .iter()
             .find(|(h, _)| *h == cell.0)
             .map(|(_, b)| *b);
-        let hint_floor = if hint.is_some() { 0.18f32 } else { 0.0 };
 
-        let (target, is_blow) = if blow_hit {
-            (1.0f32, true)
-        } else if draw_hit {
-            (1.0f32, false)
-        } else if let Some(is_blow_hint) = hint {
-            (hint_floor, is_blow_hint)
-        } else {
-            (0.0f32, state.is_blow)
-        };
-
-        if blow_hit || draw_hit {
-            state.is_blow = is_blow;
-        }
-
-        let factor = if target > state.brightness {
-            attack
-        } else {
-            decay
-        };
-        state.brightness += (target - state.brightness) * factor;
+        step_hole_glow(&mut state, blow, draw, hint, &harp_pitches, attack, decay);
         let b = state.brightness;
 
         let color = if state.is_blow {
@@ -1166,5 +1207,67 @@ mod tests {
     #[test]
     fn blow_and_draw_have_distinct_colors() {
         assert_ne!(note_rgb(true), note_rgb(false));
+    }
+
+    // ── harp_pitches / step_hole_glow ─────────────────────────────────────────
+
+    fn pitch_info(midi: u8) -> crate::audio_system::pitch_detect::PitchInfo {
+        crate::audio_system::pitch_detect::PitchInfo {
+            midi,
+            note: String::new(),
+            octave: 0,
+            frequency: 0.0,
+        }
+    }
+
+    #[test]
+    fn harp_pitches_keeps_only_sounding_pitches_the_harp_can_play() {
+        let active = ActivePitches(vec![pitch_info(60), pitch_info(61)]);
+        let valid = ValidHarpNotes(HashSet::from([60u8]));
+        assert_eq!(harp_pitches(&active, &valid), HashSet::from([60u8]));
+    }
+
+    #[test]
+    fn step_hole_glow_snaps_target_to_one_on_a_blow_hit() {
+        let mut state = HoleState::default();
+        let sounding = HashSet::from([60u8]);
+        step_hole_glow(&mut state, Some(60), Some(64), None, &sounding, 1.0, 0.1);
+        assert!(state.is_blow);
+        assert!((state.brightness - 1.0).abs() < 1e-6, "attack=1.0 should snap fully");
+    }
+
+    #[test]
+    fn step_hole_glow_prefers_an_actual_hit_over_a_hint() {
+        let mut state = HoleState::default();
+        let sounding = HashSet::from([64u8]);
+        // Draw (64) is actually sounding; the hint says blow — the real hit wins.
+        step_hole_glow(&mut state, Some(60), Some(64), Some(true), &sounding, 1.0, 0.1);
+        assert!(!state.is_blow, "the real draw hit should win over the blow hint");
+        assert!((state.brightness - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn step_hole_glow_uses_a_dim_floor_for_a_hint_with_nothing_sounding() {
+        let mut state = HoleState::default();
+        let sounding = HashSet::new();
+        step_hole_glow(&mut state, Some(60), Some(64), Some(true), &sounding, 1.0, 0.1);
+        // A hint alone (no actual hit) only nudges brightness toward the dim
+        // floor — `is_blow` is only ever written on a real hit, so it stays
+        // at its prior value (the `Default` false) regardless of the hint.
+        assert!(!state.is_blow);
+        assert!((state.brightness - 0.18).abs() < 1e-6);
+    }
+
+    #[test]
+    fn step_hole_glow_decays_toward_zero_with_nothing_sounding_or_hinted() {
+        let mut state = HoleState {
+            brightness: 1.0,
+            is_blow: true,
+        };
+        let sounding = HashSet::new();
+        step_hole_glow(&mut state, Some(60), Some(64), None, &sounding, 1.0, 0.5);
+        // decay=0.5 halves the distance to the 0.0 target each step.
+        assert!((state.brightness - 0.5).abs() < 1e-6);
+        assert!(state.is_blow, "direction is only updated on an actual hit");
     }
 }

@@ -5,6 +5,7 @@
 //! paired with in the setup layout (both are per-hole/per-chart "reference"
 //! panels, unlike the interactive note grid or mod panel).
 
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
@@ -133,12 +134,21 @@ fn spawn_form_column(root: &mut ChildSpawnerCommands, build: impl FnOnce(&mut Ch
     .with_children(build);
 }
 
-/// The "Record Song"/"Record Lesson" toggle — same click-to-cycle button
-/// shape as [`spawn_harmonica_kind_row`], but switching `content_kind` has
-/// no side effects to reconcile (unlike harmonica kind, which must sanitize
-/// existing notes), so the observer just flips it directly rather than
-/// calling a dedicated `EditorState` method.
-fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+/// A labelled click-to-cycle button row: `<label>:  [ current value ]` — the
+/// shared shape [`spawn_content_kind_row`]/[`spawn_harmonica_kind_row`] both
+/// build (the Key/Position/lesson pass-criteria/technique/progression
+/// cycle fields are a separate case — they already share their scaffold via
+/// [`spawn_field_row`], just branching on which `Field` they are). `marker`
+/// tags the value text so its own `update_*_text` system can find it.
+fn spawn_cycle_row<T: Component, M: 'static>(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+    label_key: &str,
+    tooltip_key: &str,
+    marker: T,
+    on_click: impl IntoObserverSystem<Pointer<Click>, (), M> + Clone + Sync + 'static,
+) {
     col.spawn(Node {
         width: Val::Percent(100.0),
         flex_direction: FlexDirection::Row,
@@ -152,7 +162,7 @@ fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, co
                 width: Val::Px(FORM_LABEL_W),
                 ..default()
             },
-            Text::new(format!("{}:", loc.msg("editor-field-content-kind"))),
+            Text::new(format!("{}:", loc.msg(label_key))),
             TextFont {
                 font_size: FontSize::Px(14.0),
                 ..default()
@@ -171,17 +181,12 @@ fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, co
             },
             BackgroundColor(colors.field_bg),
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            Tooltip(String::from(loc.msg("editor-content-kind-toggle-tooltip"))),
+            Tooltip(String::from(loc.msg(tooltip_key))),
         ))
-        .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-            state.content_kind = match state.content_kind {
-                ContentKind::Song => ContentKind::Lesson,
-                ContentKind::Lesson => ContentKind::Song,
-            };
-        })
+        .observe(on_click)
         .with_children(|b| {
             b.spawn((
-                ContentKindText,
+                marker,
                 Text::new(String::new()),
                 TextFont {
                     font_size: FontSize::Px(14.0),
@@ -194,61 +199,43 @@ fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, co
     });
 }
 
+/// The "Record Song"/"Record Lesson" toggle — switching `content_kind` has
+/// no side effects to reconcile (unlike harmonica kind, which must sanitize
+/// existing notes), so the observer just flips it directly rather than
+/// calling a dedicated `EditorState` method.
+fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    spawn_cycle_row(
+        col,
+        loc,
+        colors,
+        "editor-field-content-kind",
+        "editor-content-kind-toggle-tooltip",
+        ContentKindText,
+        |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+            state.content_kind = match state.content_kind {
+                ContentKind::Song => ContentKind::Lesson,
+                ContentKind::Lesson => ContentKind::Song,
+            };
+        },
+    );
+}
+
 fn spawn_harmonica_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
-    col.spawn(Node {
-        width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        column_gap: Val::Px(8.0),
-        ..default()
-    })
-    .with_children(|line| {
-        line.spawn((
-            Node {
-                width: Val::Px(FORM_LABEL_W),
-                ..default()
-            },
-            Text::new(format!("{}:", loc.msg("editor-field-harmonica"))),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
-            TextColor(colors.label),
-        ));
-        line.spawn((
-            Button,
-            Node {
-                width: Val::Px(240.0),
-                height: Val::Px(26.0),
-                align_items: AlignItems::Center,
-                padding: UiRect::horizontal(Val::Px(8.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(colors.field_bg),
-            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            Tooltip(String::from(loc.msg("editor-harmonica-toggle-tooltip"))),
-        ))
-        .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+    spawn_cycle_row(
+        col,
+        loc,
+        colors,
+        "editor-field-harmonica",
+        "editor-harmonica-toggle-tooltip",
+        HarmonicaKindText,
+        |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
             let next = match state.harmonica_kind {
                 HarmonicaKind::Diatonic => HarmonicaKind::Chromatic,
                 HarmonicaKind::Chromatic => HarmonicaKind::Diatonic,
             };
             state.set_harmonica_kind(next);
-        })
-        .with_children(|b| {
-            b.spawn((
-                HarmonicaKindText,
-                Text::new(String::new()),
-                TextFont {
-                    font_size: FontSize::Px(14.0),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Pickable::IGNORE,
-            ));
-        });
-    });
+        },
+    );
 }
 
 pub(super) fn spawn_field_row(

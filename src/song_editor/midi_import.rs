@@ -14,22 +14,17 @@
 //! (diatonic vs. chromatic) is left alone, since switching that is a much
 //! bigger, more disruptive change than a key (one more click to undo).
 //!
-//! Kept independent from `bin/midi_to_chart`'s own tempo/note-extraction
-//! code (a small amount of duplication) rather than sharing it, since the
-//! bin's pitch mapping is intentionally simpler (fixed C diatonic, no
-//! chromatic/slide support, no key suggestion) and already shipped/tested
-//! — reusing it here would mean either generalizing it (churn on a
-//! working tool for a feature that doesn't need it changed) or accepting
-//! its C-diatonic-only limitation inside the editor, which does need to
-//! support both harmonica kinds, any key, and now key suggestion too.
+//! The MIDI-file *parsing* itself (tempo map, note extraction, track
+//! names) is shared with `bin/midi_to_chart` via `crate::song::midi` — the
+//! two tools only differ in what they do with a parsed track afterward:
+//! the bin's pitch mapping is intentionally simpler (fixed C diatonic, no
+//! chromatic/slide support, no key suggestion), while this module supports
+//! both harmonica kinds, any key, and auto key suggestion.
 
 use bevy::prelude::*;
 use midly::Smf;
 
-use super::midi_parse::{
-    collect_tempo_map, editor_tempo_map, extract_notes, note_on_count, tick_to_seconds,
-    ticks_per_quarter, track_name_of,
-};
+use super::midi_parse::editor_tempo_map;
 use super::playback::build_harp;
 use super::state::{
     Dir, EditorState, Expr, GridNote, HARP_KEYS, HarmonicaKind, Pitch, max_bend, pitch_compatible,
@@ -43,6 +38,10 @@ use crate::dialogs::file_dialog::FileChosen;
 use crate::localization::LocalizationExt;
 use crate::song::chart::Action;
 use crate::song::harmonica::Harmonica;
+use crate::song::midi::{
+    collect_tempo_map, extract_notes, note_on_count, tick_to_seconds, ticks_per_quarter,
+    track_name_of,
+};
 use bevy_fluent::prelude::Localization;
 
 // ── Resource ──────────────────────────────────────────────────────────────────
@@ -479,7 +478,7 @@ fn on_midi_track_selected(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::midi_parse::{meta, note_on, note_off, smf_bytes};
+    use crate::song::midi::{meta, note_on, note_off, smf_bytes};
     use crate::song::harmonica::{chromatic_harp, richter_harp};
     use midly::num::u24;
     use midly::MetaMessage;

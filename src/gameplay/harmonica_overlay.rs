@@ -100,17 +100,25 @@ fn note_for(h: &HoleNotes, hole: u8, row: Row) -> Option<&str> {
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
-/// Spawn the harmonica diagram as a child of `parent`, built for `harp`.
-/// Diatonic harps get the full bend/overblow/overdraw diagram; chromatic
-/// harps (no bends, no overblow/overdraw — just a slide button) get a
-/// simpler diagram, see [`spawn_chromatic_overlay`].
-pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica, loc: &Localization) {
-    if matches!(harp, Harmonica::Chromatic { .. }) {
-        spawn_chromatic_overlay(parent, harp, loc);
-        return;
-    }
-    let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
-
+/// The shared shape of all three harmonica-diagram spawners below: a hint
+/// line, then a header row of hole numbers, then one row per `rows` entry —
+/// `spawn_harmonica_overlay`/`_selectable`/`spawn_chromatic_overlay` differ
+/// only in the technique vocabulary (`Row`/`ChromaticRow`), how a cell's
+/// note is looked up (`note_for`), and whether/how a cell becomes clickable
+/// (`spawn_cell`, called only for a hole/row combination that actually has a
+/// note — `None => spawn_empty` is the same for every caller). `note_for`
+/// and `spawn_cell` take `hole`/`kind` rather than closing purely over
+/// per-cell state so a caller (the selectable diagram) can still tag the
+/// spawned cell with which (hole, row) it is.
+fn spawn_diagram<RowKind: Copy>(
+    parent: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    hint_key: &str,
+    hole_count: u8,
+    rows: &[(&str, RowKind, Color)],
+    mut note_for: impl FnMut(u8, RowKind) -> Option<String>,
+    mut spawn_cell: impl FnMut(&mut ChildSpawnerCommands, &str, Color, u8, RowKind),
+) {
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Column,
@@ -121,7 +129,7 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
         })
         .with_children(|panel| {
             panel.spawn((
-                Text::new(String::from(loc.msg("harmonica-overlay-hint-view"))),
+                Text::new(String::from(loc.msg(hint_key))),
                 TextFont {
                     font_size: FontSize::Px(15.0),
                     ..default()
@@ -136,7 +144,7 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
                     ..default()
                 })
                 .with_children(|grid| {
-                    // Header: blank corner + hole numbers 1–10.
+                    // Header: blank corner + hole numbers.
                     grid.spawn(Node {
                         flex_direction: FlexDirection::Row,
                         column_gap: Val::Px(2.0),
@@ -144,13 +152,13 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
                     })
                     .with_children(|row| {
                         spawn_label(row, "");
-                        for hole in 1..=10u8 {
+                        for hole in 1..=hole_count {
                             spawn_text_cell(row, &hole.to_string(), Color::WHITE);
                         }
                     });
 
                     // One row per technique.
-                    for (label, kind, color) in ROWS {
+                    for &(label, kind, color) in rows {
                         grid.spawn(Node {
                             flex_direction: FlexDirection::Row,
                             column_gap: Val::Px(2.0),
@@ -158,11 +166,9 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
                         })
                         .with_children(|row| {
                             spawn_label(row, label);
-                            for (hole, h) in (1..=10u8).zip(&holes) {
-                                match note_for(h, hole, kind) {
-                                    Some(note) => {
-                                        spawn_note_cell(row, note, color);
-                                    }
+                            for hole in 1..=hole_count {
+                                match note_for(hole, kind) {
+                                    Some(note) => spawn_cell(row, &note, color, hole, kind),
                                     None => spawn_empty(row),
                                 }
                             }
@@ -170,6 +176,29 @@ pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmoni
                     }
                 });
         });
+}
+
+/// Spawn the harmonica diagram as a child of `parent`, built for `harp`.
+/// Diatonic harps get the full bend/overblow/overdraw diagram; chromatic
+/// harps (no bends, no overblow/overdraw — just a slide button) get a
+/// simpler diagram, see [`spawn_chromatic_overlay`].
+pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica, loc: &Localization) {
+    if matches!(harp, Harmonica::Chromatic { .. }) {
+        spawn_chromatic_overlay(parent, harp, loc);
+        return;
+    }
+    let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
+    spawn_diagram(
+        parent,
+        loc,
+        "harmonica-overlay-hint-view",
+        10,
+        &ROWS,
+        |hole, kind| note_for(&holes[(hole - 1) as usize], hole, kind).map(String::from),
+        |row, note, color, _hole, _kind| {
+            spawn_note_cell(row, note, color);
+        },
+    );
 }
 
 /// Tags a selectable diagram's note cell with which (hole, row) it is, so a
@@ -200,68 +229,19 @@ pub fn spawn_harmonica_overlay_selectable<M: 'static>(
         return;
     }
     let holes: Vec<HoleNotes> = (1..=10).map(|h| hole_notes(harp, h)).collect();
-
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            row_gap: Val::Px(4.0),
-            padding: UiRect::all(Val::Px(10.0)),
-            ..default()
-        })
-        .with_children(|panel| {
-            panel.spawn((
-                Text::new(String::from(loc.msg("harmonica-overlay-hint-select"))),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.70, 0.80)),
-            ));
-
-            panel
-                .spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(2.0),
-                    ..default()
-                })
-                .with_children(|grid| {
-                    // Header: blank corner + hole numbers 1–10.
-                    grid.spawn(Node {
-                        flex_direction: FlexDirection::Row,
-                        column_gap: Val::Px(2.0),
-                        ..default()
-                    })
-                    .with_children(|row| {
-                        spawn_label(row, "");
-                        for hole in 1..=10u8 {
-                            spawn_text_cell(row, &hole.to_string(), Color::WHITE);
-                        }
-                    });
-
-                    // One row per technique.
-                    for (label, kind, color) in ROWS {
-                        grid.spawn(Node {
-                            flex_direction: FlexDirection::Row,
-                            column_gap: Val::Px(2.0),
-                            ..default()
-                        })
-                        .with_children(|row| {
-                            spawn_label(row, label);
-                            for (hole, h) in (1..=10u8).zip(&holes) {
-                                match note_for(h, hole, kind) {
-                                    Some(note) => {
-                                        spawn_note_cell(row, note, color)
-                                            .insert(DiagramCellTarget { hole, row: kind })
-                                            .observe(on_click.clone());
-                                    }
-                                    None => spawn_empty(row),
-                                }
-                            }
-                        });
-                    }
-                });
-        });
+    spawn_diagram(
+        parent,
+        loc,
+        "harmonica-overlay-hint-select",
+        10,
+        &ROWS,
+        |hole, kind| note_for(&holes[(hole - 1) as usize], hole, kind).map(String::from),
+        |row, note, color, hole, kind| {
+            spawn_note_cell(row, note, color)
+                .insert(DiagramCellTarget { hole, row: kind })
+                .observe(on_click.clone());
+        },
+    );
 }
 
 /// Which row of the chromatic diagram a cell belongs to.
@@ -301,67 +281,17 @@ fn chromatic_note_for(harp: &Harmonica, hole: u8, row: ChromaticRow) -> Option<S
 /// bend/overblow/overdraw diagram in [`spawn_harmonica_overlay`] only applies
 /// to the fixed 10-hole diatonic layout).
 fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica, loc: &Localization) {
-    let hole_count = harp.hole_count();
-
-    parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            row_gap: Val::Px(4.0),
-            padding: UiRect::all(Val::Px(10.0)),
-            ..default()
-        })
-        .with_children(|panel| {
-            panel.spawn((
-                Text::new(String::from(loc.msg("harmonica-overlay-hint-view"))),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.70, 0.80)),
-            ));
-
-            panel
-                .spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(2.0),
-                    ..default()
-                })
-                .with_children(|grid| {
-                    // Header: blank corner + hole numbers.
-                    grid.spawn(Node {
-                        flex_direction: FlexDirection::Row,
-                        column_gap: Val::Px(2.0),
-                        ..default()
-                    })
-                    .with_children(|row| {
-                        spawn_label(row, "");
-                        for hole in 1..=hole_count {
-                            spawn_text_cell(row, &hole.to_string(), Color::WHITE);
-                        }
-                    });
-
-                    // One row per technique.
-                    for (label, kind, color) in CHROMATIC_ROWS {
-                        grid.spawn(Node {
-                            flex_direction: FlexDirection::Row,
-                            column_gap: Val::Px(2.0),
-                            ..default()
-                        })
-                        .with_children(|row| {
-                            spawn_label(row, label);
-                            for hole in 1..=hole_count {
-                                match chromatic_note_for(harp, hole, kind) {
-                                    Some(note) => {
-                                        spawn_note_cell(row, &note, color);
-                                    }
-                                    None => spawn_empty(row),
-                                }
-                            }
-                        });
-                    }
-                });
-        });
+    spawn_diagram(
+        parent,
+        loc,
+        "harmonica-overlay-hint-view",
+        harp.hole_count(),
+        &CHROMATIC_ROWS,
+        |hole, kind| chromatic_note_for(harp, hole, kind),
+        |row, note, color, _hole, _kind| {
+            spawn_note_cell(row, note, color);
+        },
+    );
 }
 
 /// A 44×28 cell shell. Returns its `EntityCommands` so callers add content.

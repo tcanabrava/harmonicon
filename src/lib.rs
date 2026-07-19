@@ -3,7 +3,7 @@
 //! Harmonicon library crate.
 //!
 //! Houses every subsystem so they can be shared between the game binary
-//! (`src/main.rs`) and the helper tools in `src/bin/` (e.g. `midi-to-chart`),
+//! (`src/main.rs`) and the helper tools in `src/bin/` (e.g. `hole-editor`),
 //! which are separate crates and can only reach this code through the library.
 
 // Bevy systems routinely take one parameter per resource/component/message

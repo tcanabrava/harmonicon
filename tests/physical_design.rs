@@ -38,7 +38,6 @@ const ALLOWLIST: &[&str] = &[
     "src/song_editor/state.rs",
     "src/gameplay/song_progress_overlay.rs",
     "src/song_editor/grid.rs",
-    "src/bin/midi_to_chart.rs",
     "src/jam/session.rs",
     "src/song/harmonica.rs",
     "src/bin/note_editor.rs",

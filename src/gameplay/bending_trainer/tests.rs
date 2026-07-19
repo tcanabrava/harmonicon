@@ -160,41 +160,11 @@ fn unparsable_profile_entries_are_dropped_not_fatal() {
 
 // `key_offset` is now `crate::song::harmonica::key_offset` — its
 // octave-folding behaviour is tested there, not duplicated here.
-
-#[test]
-fn c_harp_keeps_the_reference_layout() {
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = richter_harp("C")
-    else {
-        panic!("expected diatonic");
-    };
-    assert_eq!(l.blow.unwrap()[0], "C4");
-    assert_eq!(l.draw.unwrap()[0], "D4");
-}
-
-#[test]
-fn d_harp_hole_1_blow_is_d4() {
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = richter_harp("D")
-    else {
-        panic!("expected diatonic");
-    };
-    assert_eq!(l.blow.unwrap()[0], "D4");
-}
-
-#[test]
-fn g_harp_hole_1_blow_is_g3() {
-    // The G harp is a low harp — hole-1 blow sits below C4.
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = richter_harp("G")
-    else {
-        panic!("expected diatonic");
-    };
-    assert_eq!(l.blow.unwrap()[0], "G3");
-}
+// `richter_harp`'s own reference layout (C/D/G hole-1 pitches) is tested
+// once, centrally, in `song::harmonica::tests` — not duplicated here; this
+// module's own tests below only care that bending-trainer logic built atop
+// `richter_harp` (target resolution, valid targets, hints) behaves
+// correctly, not that `richter_harp` itself is correct.
 
 #[test]
 fn target_note_reads_the_right_technique_off_the_harp() {

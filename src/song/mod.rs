@@ -2,6 +2,7 @@
 
 pub mod chart;
 pub mod harmonica;
+pub mod midi;
 pub mod note_parser;
 
 mod loader;

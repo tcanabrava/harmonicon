@@ -56,10 +56,6 @@ dev = [
 name = "hole-editor"
 path = "src/bin/hole_editor.rs"
 
-[[bin]]
-name = "midi-to-chart"
-path = "src/bin/midi_to_chart.rs"
-
 [profile.dev]
 opt-level = 1
 

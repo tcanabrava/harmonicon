@@ -916,15 +916,11 @@ fn set_input_latency(ev: On<ValueChange<f32>>, mut settings: ResMut<AudioSetting
 /// a `bsn!` `Slider` whose value change is handled by the given dedicated `on`
 /// callback; the label/readout stay imperative (they carry the custom font,
 /// which `bsn!` can't set in 0.19).
-fn spawn_volume_slider<M: 'static>(
-    commands: &mut Commands,
-    parent: Entity,
-
-    label: &str,
-    kind: VolumeSlider,
-    value: f32,
-    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Sync + 'static,
-) {
+/// The shared row shell every Options slider builds on: a 420px row with a
+/// 110px label, already attached to `parent` — `spawn_volume_slider`/
+/// `spawn_latency_slider` differ only in the label text and, once this
+/// returns, which slider track/value-readout they add to the row.
+fn spawn_slider_row(commands: &mut Commands, parent: Entity, label: &str) -> Entity {
     let row = commands
         .spawn(Node {
             width: Val::Px(420.0),
@@ -934,7 +930,6 @@ fn spawn_volume_slider<M: 'static>(
             ..default()
         })
         .id();
-
     commands.entity(row).with_children(|r| {
         r.spawn((
             Node {
@@ -949,6 +944,42 @@ fn spawn_volume_slider<M: 'static>(
             TextColor(Color::WHITE),
         ));
     });
+    commands.entity(parent).add_child(row);
+    row
+}
+
+/// The shared trailing value-readout `spawn_volume_slider`/
+/// `spawn_latency_slider` both append after their track — a 50px right-hand
+/// label tagged with whichever marker component that caller's own sync
+/// system reads (`SliderValueLabel`/`LatencySliderLabel`).
+fn spawn_slider_value_label(commands: &mut Commands, row: Entity, text: String, marker: impl Component) {
+    commands.entity(row).with_children(|r| {
+        r.spawn((
+            Node {
+                width: Val::Px(50.0),
+                ..default()
+            },
+            Text::new(text),
+            TextFont {
+                font_size: FontSize::Px(18.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.6, 0.6, 0.7)),
+            marker,
+        ));
+    });
+}
+
+fn spawn_volume_slider<M: 'static>(
+    commands: &mut Commands,
+    parent: Entity,
+
+    label: &str,
+    kind: VolumeSlider,
+    value: f32,
+    on_change: impl IntoObserverSystem<ValueChange<f32>, (), M> + Clone + Sync + 'static,
+) {
+    let row = spawn_slider_row(commands, parent, label);
 
     // SliderRange/SliderStep have no Default, so they can't be bsn! patches —
     // insert them after the scene is spawned.
@@ -958,23 +989,7 @@ fn spawn_volume_slider<M: 'static>(
         .id();
     commands.entity(row).add_child(track);
 
-    commands.entity(row).with_children(|r| {
-        r.spawn((
-            Node {
-                width: Val::Px(50.0),
-                ..default()
-            },
-            Text::new(format!("{:.0}%", value * 100.0)),
-            TextFont {
-                font_size: FontSize::Px(18.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.6, 0.6, 0.7)),
-            SliderValueLabel(kind),
-        ));
-    });
-
-    commands.entity(parent).add_child(row);
+    spawn_slider_value_label(commands, row, format!("{:.0}%", value * 100.0), SliderValueLabel(kind));
 }
 
 /// The volume slider track itself: a `bsn!` `Slider` with its fill, wired to the
@@ -1015,31 +1030,8 @@ fn spawn_latency_slider(
     loc: &Localization,
 ) {
     let frac = (value_ms as f32 / LATENCY_MAX_MS as f32).clamp(0.0, 1.0);
-
-    let row = commands
-        .spawn(Node {
-            width: Val::Px(420.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(14.0),
-            ..default()
-        })
-        .id();
-
-    commands.entity(row).with_children(|r| {
-        r.spawn((
-            Node {
-                width: Val::Px(110.0),
-                ..default()
-            },
-            Text::new(String::from(loc.msg("options-input-lag"))),
-            TextFont {
-                font_size: FontSize::Px(20.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
-    });
+    let label = String::from(loc.msg("options-input-lag"));
+    let row = spawn_slider_row(commands, parent, &label);
 
     let track = commands
         .spawn_scene(latency_slider_scene(value_ms as f32, frac))
@@ -1050,23 +1042,7 @@ fn spawn_latency_slider(
         .id();
     commands.entity(row).add_child(track);
 
-    commands.entity(row).with_children(|r| {
-        r.spawn((
-            Node {
-                width: Val::Px(50.0),
-                ..default()
-            },
-            Text::new(format!("{}ms", value_ms)),
-            TextFont {
-                font_size: FontSize::Px(18.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.6, 0.6, 0.7)),
-            LatencySliderLabel,
-        ));
-    });
-
-    commands.entity(parent).add_child(row);
+    spawn_slider_value_label(commands, row, format!("{value_ms}ms"), LatencySliderLabel);
 }
 
 /// The latency slider track: a `bsn!` `Slider` + fill, wired to `set_input_latency`.

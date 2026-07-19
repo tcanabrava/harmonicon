@@ -363,6 +363,23 @@ fn populate_lesson_rows(
     }
 }
 
+/// One plain text line appended directly to `root` (no card/box around
+/// it) — the shared shape the lesson reader's goal-progress line and its
+/// "Passed" badge both use, differing only in text/color.
+fn spawn_reader_line(commands: &mut Commands, root: Entity, text: String, color: Color) {
+    let line = commands
+        .spawn((
+            Text::new(text),
+            TextFont {
+                font_size: FontSize::Px(16.0),
+                ..default()
+            },
+            TextColor(color),
+        ))
+        .id();
+    commands.entity(root).add_child(line);
+}
+
 fn spawn_back_to_play(
     commands: &mut Commands,
     root: Entity,
@@ -433,32 +450,17 @@ pub(crate) fn setup_lesson_reader(
     commands.entity(root).add_child(body);
 
     if let Some(goal) = goal_line(&loc, entry) {
-        let goal_row = commands
-            .spawn((
-                Text::new(goal),
-                TextFont {
-                    font_size: FontSize::Px(16.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.85, 0.72, 0.35)),
-            ))
-            .id();
-        commands.entity(root).add_child(goal_row);
+        spawn_reader_line(&mut commands, root, goal, Color::srgb(0.85, 0.72, 0.35));
     }
 
     let record = profile.lessons.get(&entry.manifest.id);
     if record.is_some_and(|r| r.passed) {
-        let done = commands
-            .spawn((
-                Text::new(format!("\u{2713} {}", loc.msg("lesson-passed"))),
-                TextFont {
-                    font_size: FontSize::Px(16.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.45, 0.95, 0.50)),
-            ))
-            .id();
-        commands.entity(root).add_child(done);
+        spawn_reader_line(
+            &mut commands,
+            root,
+            format!("\u{2713} {}", loc.msg("lesson-passed")),
+            Color::srgb(0.45, 0.95, 0.50),
+        );
     }
 
     match &entry.chart_asset_path {

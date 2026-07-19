@@ -49,11 +49,12 @@ spectrogram, and a small toolchain for turning MIDI files into playable charts.
   pitch-algorithm selection, latency calibration screen, and music/metronome
   volume sliders that affect playback live.
 - **Song editor** — author charts in-game (diatonic and chromatic), with
-  synthesized preview playback and a practice mode that scores your mic input
-  against the chart as you edit.
+  synthesized preview playback, a practice mode that scores your mic input
+  against the chart as you edit, and MIDI import (pick a track and drop its
+  notes straight onto the grid).
 - **Localization** — English, Portuguese (pt-BR), and Spanish (es-ES).
-- **Authoring tools** — `midi-to-chart` converts a MIDI track into a playable
-  chart; `hole-editor` positions the clickable holes on a 3D harmonica model.
+- **Authoring tools** — `hole-editor` positions the clickable holes on a 3D
+  harmonica model.
 
 ---
 
@@ -154,7 +155,6 @@ src/
   localization.rs      # Fluent localization plumbing
   theme.rs             # Visual theme config
   bin/
-    midi_to_chart.rs   # MIDI → chart converter
     hole_editor.rs     # 3D harmonica hole-layout editor
     note_editor.rs     # Visual editor for 2D note layouts
 
@@ -191,19 +191,14 @@ assets.
 ### Authoring tools
 
 ```bash
-# List the named tracks inside a MIDI file
-cargo run --bin midi-to-chart -- path/to/song.mid
-
-# Convert one track into a chart.hpchart (validated against the schema),
-# and write the MIDI back out with that track removed
-cargo run --bin midi-to-chart -- path/to/song.mid "Harmonica"
-
 # Edit the clickable hole positions for a 3D harmonica model
 cargo run --bin hole-editor
 ```
 
-`midi-to-chart` maps MIDI pitches onto a standard C richter diatonic harp,
-reaching unavailable notes with a draw/blow bend where possible and snapping to
+To turn a MIDI file into a chart, use the in-game Song Editor's own MIDI
+import instead: pick a `.mid`/`.midi` file, choose a track, and its notes
+drop straight onto the grid, auto-mapped onto the best-fitting harp key —
+reaching unavailable notes with a bend/slide where possible and snapping to
 the nearest playable note otherwise.
 
 The `scripts/` directory contains the Python helpers used to generate the 3D

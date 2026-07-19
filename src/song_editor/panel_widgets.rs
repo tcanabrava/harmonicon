@@ -22,6 +22,48 @@ use crate::localization::LocalizedStr;
 use crate::theme::SongEditorColors;
 use bevy_fluent::prelude::Localization;
 
+/// The shared button shell every panel button in this file builds on: a
+/// padded, bordered button with a tooltip and a single-line white label,
+/// observing one click handler. `mode_button`/`transport_button` are plain
+/// wrappers over this (the only two shapes here with no per-button extras).
+/// `mod_button`/`timeline_tool_button`/`spawn_record_button` need extra
+/// per-button children (`BendDot`, a swappable label, a `kind`-dependent
+/// observer body) that don't fit this shape cleanly, so they stay separate
+/// rather than forcing a less-readable shared abstraction onto them.
+fn spawn_button_shell<'a, M: 'static>(
+    panel: &'a mut ChildSpawnerCommands,
+    bg: Color,
+    label: LocalizedStr,
+    tooltip: LocalizedStr,
+    on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
+) -> EntityCommands<'a> {
+    let mut ec = panel.spawn((
+        Button,
+        Node {
+            padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            border: UiRect::all(Val::Px(1.0)),
+            ..default()
+        },
+        BackgroundColor(bg),
+        BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+        Tooltip(String::from(tooltip)),
+    ));
+    ec.observe(on_click).with_children(|b| {
+        b.spawn((
+            Text::new(String::from(label)),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Pickable::IGNORE,
+        ));
+    });
+    ec
+}
+
 pub(super) fn mode_button<M: 'static>(
     panel: &mut ChildSpawnerCommands,
     kind: ModeButton,
@@ -30,33 +72,7 @@ pub(super) fn mode_button<M: 'static>(
     colors: SongEditorColors,
     on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
 ) {
-    panel
-        .spawn((
-            Button,
-            kind,
-            Node {
-                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(colors.btn_bg),
-            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            Tooltip(String::from(tooltip)),
-        ))
-        .observe(on_click)
-        .with_children(|b| {
-            b.spawn((
-                Text::new(String::from(label)),
-                TextFont {
-                    font_size: FontSize::Px(14.0),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Pickable::IGNORE,
-            ));
-        });
+    spawn_button_shell(panel, colors.btn_bg, label, tooltip, on_click).insert(kind);
 }
 
 /// An Erase/Remove timeline-tool toggle button — see `TimelineToolButton`.
@@ -197,32 +213,7 @@ pub(super) fn transport_button<M: 'static>(
     bg: Color,
     on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
 ) {
-    panel
-        .spawn((
-            Button,
-            Node {
-                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(bg),
-            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            Tooltip(String::from(tooltip)),
-        ))
-        .observe(on_click)
-        .with_children(|b| {
-            b.spawn((
-                Text::new(String::from(label)),
-                TextFont {
-                    font_size: FontSize::Px(14.0),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Pickable::IGNORE,
-            ));
-        });
+    spawn_button_shell(panel, bg, label, tooltip, on_click);
 }
 
 /// Like [`transport_button`], except its label swaps between `idle_label`

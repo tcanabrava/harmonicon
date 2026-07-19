@@ -383,31 +383,7 @@ fn spawn_text_row(parent: &mut ChildSpawnerCommands, label: &str, value: &str, c
 }
 
 fn spawn_stat_row(parent: &mut ChildSpawnerCommands, label: &str, value: u32, color: Color) {
-    parent
-        .spawn(Node {
-            width: Val::Px(320.0),
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::SpaceBetween,
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn((
-                Text::new(label.to_string()),
-                TextFont {
-                    font_size: FontSize::Px(18.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.65, 0.68, 0.75)),
-            ));
-            row.spawn((
-                Text::new(format!("{value}")),
-                TextFont {
-                    font_size: FontSize::Px(18.0),
-                    ..default()
-                },
-                TextColor(color),
-            ));
-        });
+    spawn_text_row(parent, label, &format!("{value}"), color);
 }
 
 /// One "Bends  18/20  90%" row, color-coded by accuracy: green ≥ 80%,

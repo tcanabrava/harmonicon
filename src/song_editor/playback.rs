@@ -77,6 +77,70 @@ pub(super) fn note_freq(note: &GridNote, harp: &Harmonica) -> Option<f32> {
     Some(midi_to_freq_hz(note_to_midi(&label)? as f32))
 }
 
+/// Ticks-to-seconds for `state.tempo` — the flat nominal-BPM conversion
+/// every Play/Practice/Record start function needs before it can turn tick
+/// positions into real time. Deliberately not the real, possibly
+/// multi-point tempo map (`state::EditorState::tempo_map`/`song::chart::
+/// tick_to_seconds`) — audio synthesis stays on one constant tempo, the
+/// documented scope boundary of the tempo-map feature (see `CLAUDE.md`).
+pub(super) fn secs_per_tick(state: &super::state::EditorState) -> f32 {
+    let bpm = state.tempo.trim().parse::<f32>().unwrap_or(120.0).max(1.0);
+    60.0 / bpm / TICKS_PER_BEAT as f32
+}
+
+/// A fresh, playing [`Playhead`] running for `total_ticks` at `secs_per_tick`
+/// — the shape Play/Practice both construct once they know how long the
+/// take should run. Record needs an effectively unbounded `total` instead
+/// (a take has no natural end — see `record::start_record`'s own doc
+/// comment) and builds its `Playhead` directly rather than through this.
+pub(super) fn playhead_for(total_ticks: usize, secs_per_tick: f32) -> Playhead {
+    Playhead {
+        playing: true,
+        paused: false,
+        elapsed: 0.0,
+        total: total_ticks as f32 * secs_per_tick,
+        secs_per_tick,
+    }
+}
+
+/// Spawns `state.music` (if set) as a fire-and-forget background-music
+/// player at the configured music volume — the shared "play the chart's
+/// backing track" step Play/Practice/Record each need. Reads straight from
+/// disk rather than through the asset server, since the chart being edited
+/// may not be registered as an asset at all. Returns whether a player was
+/// actually spawned, so a caller needing an "nothing is playing" fallback
+/// (Practice's "no background music" hint) knows when to show one — true
+/// for an empty path *and* a read failure (already `warn!`-logged either
+/// way), since both leave nothing audible playing.
+pub(super) fn spawn_background_music(
+    state: &super::state::EditorState,
+    sources: &mut Assets<AudioSource>,
+    settings: &AudioSettings,
+    commands: &mut Commands,
+) -> bool {
+    let music = state.music.trim();
+    if music.is_empty() {
+        return false;
+    }
+    match std::fs::read(music) {
+        Ok(bytes) => {
+            let handle = sources.add(AudioSource {
+                bytes: bytes.into(),
+            });
+            commands.spawn((
+                EditorAudio,
+                AudioPlayer::<AudioSource>(handle),
+                PlaybackSettings::DESPAWN.with_volume(Volume::Linear(settings.music_volume)),
+            ));
+            true
+        }
+        Err(e) => {
+            warn!("Song editor: couldn't read background music {music:?}: {e}");
+            false
+        }
+    }
+}
+
 pub(super) fn start_playback(
     state: &super::state::EditorState,
     sources: &mut Assets<AudioSource>,
@@ -90,8 +154,7 @@ pub(super) fn start_playback(
     }
     *playhead = Playhead::default();
 
-    let bpm = state.tempo.trim().parse::<f32>().unwrap_or(120.0).max(1.0);
-    let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
+    let spt = secs_per_tick(state);
     if !state.notes.is_empty() {
         let harp = build_harp(&state.key, state.harmonica_kind);
         let phrase: Vec<PhraseNote> = state
@@ -104,10 +167,7 @@ pub(super) fn start_playback(
                 expr: n.expr,
             })
             .collect();
-        let wav = crate::audio_system::wav::encode_wav(
-            &render_pcm(&phrase, secs_per_tick),
-            SAMPLE_RATE,
-        );
+        let wav = crate::audio_system::wav::encode_wav(&render_pcm(&phrase, spt), SAMPLE_RATE);
         let handle = sources.add(AudioSource { bytes: wav.into() });
         commands.spawn((
             EditorAudio,
@@ -120,31 +180,10 @@ pub(super) fn start_playback(
             .map(|n| n.tick + n.len)
             .max()
             .unwrap_or(0);
-        *playhead = Playhead {
-            playing: true,
-            paused: false,
-            elapsed: 0.0,
-            total: end_tick as f32 * secs_per_tick,
-            secs_per_tick,
-        };
+        *playhead = playhead_for(end_tick, spt);
     }
 
-    let music = state.music.trim();
-    if !music.is_empty() {
-        match std::fs::read(music) {
-            Ok(bytes) => {
-                let handle = sources.add(AudioSource {
-                    bytes: bytes.into(),
-                });
-                commands.spawn((
-                    EditorAudio,
-                    AudioPlayer::<AudioSource>(handle),
-                    PlaybackSettings::DESPAWN.with_volume(Volume::Linear(settings.music_volume)),
-                ));
-            }
-            Err(e) => warn!("Song editor: couldn't read background music {music:?}: {e}"),
-        }
-    }
+    spawn_background_music(state, sources, settings, commands);
 }
 
 // ── Systems ──────────────────────────────────────────────────────────────────

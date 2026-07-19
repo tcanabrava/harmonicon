@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
+use bevy::audio::AudioSource;
 use bevy::prelude::*;
 use bevy_fluent::prelude::Localization;
 
@@ -12,8 +12,12 @@ use crate::scoring::{
 };
 use crate::settings::AudioSettings;
 
+#[cfg(test)]
 use super::TICKS_PER_BEAT;
-use super::playback::{EditorAudio, Playhead, build_harp, note_freq};
+use super::playback::{
+    EditorAudio, Playhead, build_harp, note_freq, playhead_for, secs_per_tick,
+    spawn_background_music,
+};
 use super::state::EditorState;
 
 // ── Timing windows ────────────────────────────────────────────────────────────
@@ -83,8 +87,7 @@ impl PracticeState {
 // ── Schedule builder ──────────────────────────────────────────────────────────
 
 fn build_schedule(state: &EditorState) -> Vec<PracticeNote> {
-    let bpm: f32 = state.tempo.parse::<f32>().unwrap_or(120.0).max(1.0);
-    let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
+    let secs_per_tick = secs_per_tick(state);
     let harp = build_harp(&state.key, state.harmonica_kind);
 
     let mut notes: Vec<PracticeNote> = state
@@ -137,39 +140,16 @@ pub(super) fn start_practice(
     practice.total = practice.notes.len() as u32;
     practice.active = true;
 
-    let bpm: f32 = state.tempo.parse::<f32>().unwrap_or(120.0).max(1.0);
-    let secs_per_tick = 60.0 / bpm / TICKS_PER_BEAT as f32;
+    let spt = secs_per_tick(state);
     let end_tick = state
         .notes
         .iter()
         .map(|n| n.tick + n.len)
         .max()
         .unwrap_or(0);
+    *playhead = playhead_for(end_tick, spt);
 
-    *playhead = Playhead {
-        playing: true,
-        paused: false,
-        elapsed: 0.0,
-        total: end_tick as f32 * secs_per_tick,
-        secs_per_tick,
-    };
-
-    let music = state.music.trim();
-    if !music.is_empty() {
-        match std::fs::read(music) {
-            Ok(bytes) => {
-                let handle = sources.add(AudioSource {
-                    bytes: bytes.into(),
-                });
-                commands.spawn((
-                    EditorAudio,
-                    AudioPlayer::<AudioSource>(handle),
-                    PlaybackSettings::DESPAWN.with_volume(Volume::Linear(settings.music_volume)),
-                ));
-            }
-            Err(e) => warn!("Practice: can't read background music {music:?}: {e}"),
-        }
-    } else {
+    if !spawn_background_music(state, sources, settings, commands) {
         practice.msg = loc.msg("practice-no-music");
     }
 }

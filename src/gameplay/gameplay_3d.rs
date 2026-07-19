@@ -851,30 +851,7 @@ fn spawn_hud_overlay(
             spawn_tab_ribbon(p);
 
             // Blow/draw legend
-            p.spawn(Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(12.0),
-                margin: UiRect::top(Val::Px(4.0)),
-                ..default()
-            })
-            .with_children(|leg| {
-                leg.spawn((
-                    Text::new(String::from(loc.msg("gameplay-legend-blow"))),
-                    TextFont {
-                        font_size: FontSize::Px(15.0),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.50, 0.75, 1.00)),
-                ));
-                leg.spawn((
-                    Text::new(String::from(loc.msg("gameplay-legend-draw"))),
-                    TextFont {
-                        font_size: FontSize::Px(15.0),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(1.00, 0.62, 0.35)),
-                ));
-            });
+            super::gameplay_2d::spawn_blow_draw_legend(p, loc, 12.0, 4.0);
 
             // Metronome
             p.spawn(Node {
@@ -1180,48 +1157,18 @@ pub fn update_holes_3d(
 
     let attack = 1.0 - (-dt * 25.0_f32).exp();
     let decay = 1.0 - (-dt * 4.0_f32).exp();
-
-    let harp_pitches: HashSet<u8> = active
-        .0
-        .iter()
-        .map(|p| p.midi)
-        .filter(|m| valid_notes.0.contains(m))
-        .collect();
+    let harp_pitches = super::gameplay_2d::harp_pitches(&active, &valid_notes);
 
     for (cell, hole_mat, mut state) in &mut cells {
         let blow = chart.harmonica.wind_direction_midi(cell.0, &Action::Blow);
         let draw = chart.harmonica.wind_direction_midi(cell.0, &Action::Draw);
-
-        let blow_hit = blow.is_some_and(|m| harp_pitches.contains(&m));
-        let draw_hit = draw.is_some_and(|m| harp_pitches.contains(&m));
-
         let hint = targets
             .0
             .iter()
             .find(|(h, _)| *h == cell.0)
             .map(|(_, b)| *b);
-        let hint_floor = if hint.is_some() { 0.18f32 } else { 0.0 };
 
-        let (target, is_blow) = if blow_hit {
-            (1.0f32, true)
-        } else if draw_hit {
-            (1.0f32, false)
-        } else if let Some(is_blow_hint) = hint {
-            (hint_floor, is_blow_hint)
-        } else {
-            (0.0f32, state.is_blow)
-        };
-
-        if blow_hit || draw_hit {
-            state.is_blow = is_blow;
-        }
-
-        let factor = if target > state.brightness {
-            attack
-        } else {
-            decay
-        };
-        state.brightness += (target - state.brightness) * factor;
+        super::gameplay_2d::step_hole_glow(&mut state, blow, draw, hint, &harp_pitches, attack, decay);
         let b = state.brightness;
 
         if let Some(mut mat) = materials.get_mut(&hole_mat.0) {

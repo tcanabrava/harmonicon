@@ -6,6 +6,7 @@
 //! alongside the "Jam Session" button's real-song flow.
 
 use bevy::audio::AudioSource;
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy_fluent::Localization;
@@ -58,6 +59,43 @@ pub(crate) struct ProgressionLabel;
 #[derive(Component)]
 pub(crate) struct PositionLabel;
 
+/// One `◂ value ▸` stepper row — the shared shape the key/tempo/
+/// progression/position rows below all use, differing only in which
+/// marker component tags the label (for `update_jam_generate_labels` to
+/// find it later) and what each arrow does to `JamGenerateConfig`.
+fn spawn_stepper_row<M1: 'static, M2: 'static>(
+    root: &mut ChildSpawnerCommands,
+    text: String,
+    marker: impl Component,
+    on_prev: impl IntoObserverSystem<Pointer<Click>, (), M1> + Clone + Sync + 'static,
+    on_next: impl IntoObserverSystem<Pointer<Click>, (), M2> + Clone + Sync + 'static,
+) {
+    root.spawn(Node {
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(10.0),
+        ..default()
+    })
+    .with_children(|row| {
+        row.spawn_empty().apply_scene(button::small("\u{25C2}", on_prev));
+        row.spawn((
+            Node {
+                width: Val::Px(150.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            Text::new(text),
+            TextFont {
+                font_size: FontSize::Px(20.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.95, 0.80, 0.35)),
+            marker,
+        ));
+        row.spawn_empty().apply_scene(button::small("\u{25B8}", on_next));
+    });
+}
+
 pub(crate) fn setup_jam_generate_menu(
     mut commands: Commands,
     config: Res<JamGenerateConfig>,
@@ -74,156 +112,61 @@ pub(crate) fn setup_jam_generate_menu(
     );
 
     commands.entity(root).with_children(|root| {
-        root.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25C2}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.key = prev_key(&cfg.key);
-                },
-            ));
-            row.spawn((
-                Node {
-                    width: Val::Px(150.0),
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                Text::new(String::from(
-                    loc.msg_args("jam-generate-key", &[("key", config.key.clone())]),
-                )),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.95, 0.80, 0.35)),
-                KeyLabel,
-            ));
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25B8}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.key = next_key(&cfg.key);
-                },
-            ));
-        });
+        spawn_stepper_row(
+            root,
+            String::from(loc.msg_args("jam-generate-key", &[("key", config.key.clone())])),
+            KeyLabel,
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.key = prev_key(&cfg.key);
+            },
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.key = next_key(&cfg.key);
+            },
+        );
 
-        root.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25C2}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.bpm = (cfg.bpm - BPM_STEP).max(MIN_BPM);
-                },
-            ));
-            row.spawn((
-                Node {
-                    width: Val::Px(150.0),
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                Text::new(String::from(loc.msg_args(
-                    "jam-generate-tempo",
-                    &[("bpm", format!("{:.0}", config.bpm))],
-                ))),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.95, 0.80, 0.35)),
-                BpmLabel,
-            ));
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25B8}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.bpm = (cfg.bpm + BPM_STEP).min(MAX_BPM);
-                },
-            ));
-        });
+        spawn_stepper_row(
+            root,
+            String::from(
+                loc.msg_args("jam-generate-tempo", &[("bpm", format!("{:.0}", config.bpm))]),
+            ),
+            BpmLabel,
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.bpm = (cfg.bpm - BPM_STEP).max(MIN_BPM);
+            },
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.bpm = (cfg.bpm + BPM_STEP).min(MAX_BPM);
+            },
+        );
 
-        root.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25C2}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.progression = cfg.progression.prev();
-                },
-            ));
-            row.spawn((
-                Node {
-                    width: Val::Px(150.0),
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                Text::new(String::from(loc.msg_args(
-                    "jam-generate-progression",
-                    &[("progression", config.progression.label().to_string())],
-                ))),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.95, 0.80, 0.35)),
-                ProgressionLabel,
-            ));
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25B8}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.progression = cfg.progression.next();
-                },
-            ));
-        });
+        spawn_stepper_row(
+            root,
+            String::from(loc.msg_args(
+                "jam-generate-progression",
+                &[("progression", config.progression.label().to_string())],
+            )),
+            ProgressionLabel,
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.progression = cfg.progression.prev();
+            },
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.progression = cfg.progression.next();
+            },
+        );
 
-        root.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
-            ..default()
-        })
-        .with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25C2}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.position = cfg.position.prev();
-                },
-            ));
-            row.spawn((
-                Node {
-                    width: Val::Px(150.0),
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                Text::new(String::from(loc.msg_args(
-                    "jam-generate-position",
-                    &[("position", config.position.label().to_string())],
-                ))),
-                TextFont {
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.95, 0.80, 0.35)),
-                PositionLabel,
-            ));
-            row.spawn_empty().apply_scene(button::small(
-                "\u{25B8}",
-                |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
-                    cfg.position = cfg.position.next();
-                },
-            ));
-        });
+        spawn_stepper_row(
+            root,
+            String::from(loc.msg_args(
+                "jam-generate-position",
+                &[("position", config.position.label().to_string())],
+            )),
+            PositionLabel,
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.position = cfg.position.prev();
+            },
+            |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
+                cfg.position = cfg.position.next();
+            },
+        );
     });
 
     spawn_button(

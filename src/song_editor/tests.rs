@@ -7,7 +7,7 @@ use super::harpchart::{
 use super::interaction::{apply_modifier, select_or_add};
 use super::lesson_form::{populate_from_lesson_manifest, serialize_lesson};
 use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
-use super::playback::{build_harp, note_freq};
+use super::playback::{build_harp, note_freq, playhead_for, secs_per_tick};
 use super::state::Scroll;
 use super::state::{
     ContentKind, Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
@@ -33,6 +33,40 @@ fn cycle_next_wraps_back_to_the_first_option() {
 fn cycle_next_treats_an_unknown_current_value_as_the_first_option() {
     let options = ["a", "b", "c"];
     assert_eq!(cycle_next(&options, "not-a-real-option"), "b");
+}
+
+// ── playback: secs_per_tick / playhead_for ───────────────────────────────
+
+#[test]
+fn secs_per_tick_reflects_the_songs_own_tempo() {
+    let s = EditorState {
+        tempo: "60".into(),
+        ..EditorState::default()
+    };
+    // 60 BPM: one beat per second, TICKS_PER_BEAT ticks per beat.
+    let spt = secs_per_tick(&s);
+    assert!((spt - 1.0 / TICKS_PER_BEAT as f32).abs() < 1e-6, "got {spt}");
+}
+
+#[test]
+fn secs_per_tick_falls_back_to_120_bpm_for_an_unparseable_tempo() {
+    let s = EditorState {
+        tempo: "not-a-number".into(),
+        ..EditorState::default()
+    };
+    let spt = secs_per_tick(&s);
+    let expected = 60.0 / 120.0 / TICKS_PER_BEAT as f32;
+    assert!((spt - expected).abs() < 1e-6, "got {spt}");
+}
+
+#[test]
+fn playhead_for_starts_playing_from_zero_with_the_right_total() {
+    let ph = playhead_for(8, 0.25);
+    assert!(ph.playing);
+    assert!(!ph.paused);
+    assert_eq!(ph.elapsed, 0.0);
+    assert_eq!(ph.secs_per_tick, 0.25);
+    assert_eq!(ph.total, 2.0);
 }
 
 // ── lesson_form ──────────────────────────────────────────────────────────
