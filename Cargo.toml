@@ -32,9 +32,9 @@ fluent_content = "0.0.5"
 unic-langid = "0.9"
 # Detect the OS UI language so the game starts in the player's locale.
 sys-locale = "0.3"
-regex = "1.13.0"
+regex = "1.13.1"
 rand = "0.10"
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.2", features = ["derive"] }
 # Watches ~/Harmonicon (songs/, themes/) so drop-in content is picked up
 # live instead of needing a manual refresh or restart. crossbeam-channel
 # feature: bridges the watcher's background thread into ECS the same way
