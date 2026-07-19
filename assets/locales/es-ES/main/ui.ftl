@@ -111,10 +111,26 @@ editor-field-author = Autor
 editor-field-midi-track = Pista MIDI
 editor-harmonica-diatonic = ‹ Diatónica (10 orificios) ›
 editor-harmonica-chromatic = ‹ Cromática (12 orificios) ›
+editor-field-content-kind = Grabación
+editor-content-kind-song = ‹ Grabar Canción ›
+editor-content-kind-lesson = ‹ Grabar Lección ›
+
+# Song Editor 2 — campos exclusivos de lección (mostrados mientras
+# "Grabar Lección" está activo)
+editor-field-lesson-id = ID de Lección
+editor-field-lesson-unit = Unidad
+editor-field-lesson-explanation = Explicación
+editor-field-lesson-prerequisites = Requisitos Previos
+editor-field-lesson-pass-criteria = Criterio de Aprobación
+editor-field-lesson-threshold = Umbral
+editor-field-lesson-technique = Técnica
+editor-field-lesson-progression = Progresión
 
 # Song Editor 2 — títulos de diálogos de archivo
 dialog-save-chart = Guardar partitura
 dialog-load-chart = Cargar partitura
+dialog-save-lesson = Guardar lección
+dialog-load-lesson = Cargar lección
 dialog-select-music = Seleccionar música de fondo
 dialog-select-midi = Seleccionar archivo MIDI
 dialog-file-name = Nombre de archivo:
@@ -166,6 +182,11 @@ editor-tool-erase-tooltip = Haz clic en un punto de la línea de tiempo y luego 
 editor-tool-remove-tooltip = Haz clic en un punto de la línea de tiempo y luego en un lado (o haz clic y arrastra un tramo) para borrar sus notas y desplazar todo lo siguiente hacia atrás, cerrando el hueco
 editor-tool-tempo-tooltip = Haz clic en la regla para añadir un cambio de tempo ahí, o haz clic en uno existente para quitarlo
 editor-harmonica-toggle-tooltip = Haz clic para alternar entre armónica Diatónica y Cromática
+editor-content-kind-toggle-tooltip = Haz clic para alternar entre grabar una canción normal y una lección del currículo
+editor-lesson-form-tooltip = Campos del currículo para lesson.json — solo se usan mientras "Grabar Lección" está activo
+editor-field-lesson-pass-criteria-tooltip = Haz clic para alternar cómo se evalúa esta lección — Ninguno, Precisión, Técnica, Adherencia a la Escala, Adherencia a Notas del Acorde, Disciplina de Frase
+editor-field-lesson-technique-tooltip = Haz clic para alternar qué técnica se evalúa — solo se usa cuando el Criterio de Aprobación es Técnica
+editor-field-lesson-progression-tooltip = Haz clic para alternar la progresión de acompañamiento de una lección basada en jam — Ninguna, Estándar, Quick-Change, Menor
 editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación
 editor-browse-tooltip = Elegir un archivo de audio de música de fondo para esta partitura

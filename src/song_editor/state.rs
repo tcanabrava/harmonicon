@@ -59,6 +59,24 @@ pub(super) enum Mode {
     Perform,
 }
 
+/// What kind of content the editor is authoring — toggled by the "Record
+/// Song"/"Record Lesson" button next to the harmonica-kind one. `Song`
+/// (the original, only behaviour) saves/loads a plain `.harpchart`, same as
+/// always. `Lesson` shows the extra `LESSON_FIELDS` panel
+/// (`lesson_form::spawn_lesson_form`) and saves/loads a `lesson.json`
+/// instead — see `lesson_form::serialize_lesson`. Doesn't affect anything
+/// about how notes are edited; the grid/mod-panel/playback all work exactly
+/// the same regardless, since a chart-backed lesson's chart *is* an ordinary
+/// `.harpchart` (written alongside the `lesson.json`, at `song/
+/// chart.harpchart` relative to it, exactly like a shipped lesson's own
+/// folder layout).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub(super) enum ContentKind {
+    #[default]
+    Song,
+    Lesson,
+}
+
 impl Dir {
     pub(super) fn arrow(self) -> &'static str {
         match self {
@@ -207,6 +225,35 @@ pub(super) enum Field {
     Music,
     Name,
     Author,
+    /// Stable lesson identifier — the profile key/prerequisite target. Never
+    /// rename one that's shipped; see `lesson_schema.dtd.json`.
+    LessonId,
+    /// Curriculum unit grouping this lesson in the menu (`lesson-unit-
+    /// <unit>` is its own separate Fluent key, not authored here).
+    LessonUnit,
+    /// Raw display text for the lesson's instructional body — `Name` above
+    /// doubles as the lesson's title text the same way. Neither is written
+    /// into `lesson.json` directly (which only stores Fluent *keys*, per
+    /// this codebase's localization convention); `lesson_form::
+    /// serialize_lesson` derives `title_key`/`body_key` from `LessonId` and
+    /// prints the key/text pairs an author still needs to add to the
+    /// locale files by hand — the same manual step authoring any bundled
+    /// lesson already requires.
+    LessonExplanation,
+    /// Comma-separated lesson ids that must be passed first.
+    LessonPrerequisites,
+    /// One of [`PASS_CRITERIA_KINDS`] — click-to-cycle, like `Key`/
+    /// `Position`, not a free-text field a player types into.
+    LessonPassCriteria,
+    /// The active pass criterion's threshold (0..1), as typed text —
+    /// ignored when `LessonPassCriteria` is `"none"`.
+    LessonThreshold,
+    /// One of [`TECHNIQUE_NAMES`] — only meaningful (and only written) when
+    /// `LessonPassCriteria` is `"technique"`; click-to-cycle like `Key`.
+    LessonTechnique,
+    /// One of [`PROGRESSIONS`] (`"none"` omits the field) — click-to-cycle
+    /// like `Key`.
+    LessonProgression,
 }
 
 /// Each entry pairs a [`Field`] with the localization key used for its label.
@@ -219,6 +266,22 @@ pub(super) const FIELDS: [(Field, &str); 6] = [
     (Field::Author, "editor-field-author"),
 ];
 
+/// The extra rows `lesson_form::spawn_lesson_form` shows only while
+/// [`ContentKind::Lesson`] is active — everything `lesson_schema.dtd.json`
+/// needs beyond what [`FIELDS`] already covers (title/tempo/key/... are
+/// shared with a plain song, since a chart-backed lesson's chart is an
+/// ordinary chart).
+pub(super) const LESSON_FIELDS: [(Field, &str); 8] = [
+    (Field::LessonId, "editor-field-lesson-id"),
+    (Field::LessonUnit, "editor-field-lesson-unit"),
+    (Field::LessonExplanation, "editor-field-lesson-explanation"),
+    (Field::LessonPrerequisites, "editor-field-lesson-prerequisites"),
+    (Field::LessonPassCriteria, "editor-field-lesson-pass-criteria"),
+    (Field::LessonThreshold, "editor-field-lesson-threshold"),
+    (Field::LessonTechnique, "editor-field-lesson-technique"),
+    (Field::LessonProgression, "editor-field-lesson-progression"),
+];
+
 /// All valid diatonic harp keys in chromatic order.
 pub(super) const HARP_KEYS: [&str; 12] = [
     "C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B",
@@ -228,6 +291,45 @@ pub(super) const HARP_KEYS: [&str; 12] = [
 /// 1st (straight), 2nd (cross harp, the blues staple), 3rd through 5th, and
 /// 12th, which jazz players use for its major-scale-friendly hole layout.
 pub(super) const POSITIONS: [&str; 6] = ["1st", "2nd", "3rd", "4th", "5th", "12th"];
+
+/// `Field::LessonPassCriteria`'s cycle — `"none"` (finishing counts as done)
+/// plus the five `pass_criteria.type` values `lesson_schema.dtd.json` allows.
+pub(super) const PASS_CRITERIA_KINDS: [&str; 6] = [
+    "none",
+    "accuracy",
+    "technique",
+    "scale-adherence",
+    "chord-tone-adherence",
+    "phrase-discipline",
+];
+
+/// `Field::LessonTechnique`'s cycle — the same technique-bucket vocabulary
+/// `SongStats`/`PlayerProfile::technique_best_accuracy` use, pinned by
+/// `lesson_schema.dtd.json`'s own enum.
+pub(super) const TECHNIQUE_NAMES: [&str; 8] = [
+    "normal",
+    "bend",
+    "vibrato",
+    "wah-wah",
+    "overblow",
+    "overdraw",
+    "slide",
+    "clean-attack",
+];
+
+/// `Field::LessonProgression`'s cycle — `"none"` omits the manifest field
+/// entirely (defaults to Standard in-game); the rest are
+/// `lesson_schema.dtd.json`'s own enum.
+pub(super) const PROGRESSIONS: [&str; 4] = ["none", "standard", "quick-change", "minor"];
+
+/// Advances `current` to the next entry in `options`, wrapping — every
+/// click-to-cycle metadata field (`Key`, `Position`, and the lesson-only
+/// pass-criteria kind/technique/progression fields) steps through its own
+/// fixed vocabulary this way rather than accepting free text.
+pub(super) fn cycle_next(options: &[&str], current: &str) -> String {
+    let idx = options.iter().position(|&o| o == current).unwrap_or(0);
+    options[(idx + 1) % options.len()].to_string()
+}
 
 // ── Resources ────────────────────────────────────────────────────────────────
 
@@ -253,6 +355,17 @@ pub(super) struct EditorState {
     pub(super) focus: Option<Field>,
     pub(super) drag_msg: crate::localization::LocalizedStr,
     pub(super) mode: Mode,
+    /// Whether this editing session is authoring a song or a lesson — see
+    /// [`ContentKind`].
+    pub(super) content_kind: ContentKind,
+    pub(super) lesson_id: String,
+    pub(super) lesson_unit: String,
+    pub(super) lesson_explanation: String,
+    pub(super) lesson_prerequisites: String,
+    pub(super) lesson_pass_criteria: String,
+    pub(super) lesson_threshold: String,
+    pub(super) lesson_technique: String,
+    pub(super) lesson_progression: String,
     /// User's own Lock toggle, independent of `mode`. See [`EditorState::locked`].
     pub(super) user_locked: bool,
     pub(super) harmonica_kind: HarmonicaKind,
@@ -306,6 +419,15 @@ impl Default for EditorState {
             focus: None,
             drag_msg: crate::localization::LocalizedStr::default(),
             mode: Mode::default(),
+            content_kind: ContentKind::default(),
+            lesson_id: String::new(),
+            lesson_unit: String::new(),
+            lesson_explanation: String::new(),
+            lesson_prerequisites: String::new(),
+            lesson_pass_criteria: "none".into(),
+            lesson_threshold: "0.7".into(),
+            lesson_technique: "normal".into(),
+            lesson_progression: "none".into(),
             user_locked: false,
             harmonica_kind: HarmonicaKind::default(),
             timeline_tool: TimelineTool::default(),
@@ -362,6 +484,14 @@ impl EditorState {
             Field::Music => &self.music,
             Field::Name => &self.name,
             Field::Author => &self.author,
+            Field::LessonId => &self.lesson_id,
+            Field::LessonUnit => &self.lesson_unit,
+            Field::LessonExplanation => &self.lesson_explanation,
+            Field::LessonPrerequisites => &self.lesson_prerequisites,
+            Field::LessonPassCriteria => &self.lesson_pass_criteria,
+            Field::LessonThreshold => &self.lesson_threshold,
+            Field::LessonTechnique => &self.lesson_technique,
+            Field::LessonProgression => &self.lesson_progression,
         }
     }
 
@@ -373,6 +503,14 @@ impl EditorState {
             Field::Music => &mut self.music,
             Field::Name => &mut self.name,
             Field::Author => &mut self.author,
+            Field::LessonId => &mut self.lesson_id,
+            Field::LessonUnit => &mut self.lesson_unit,
+            Field::LessonExplanation => &mut self.lesson_explanation,
+            Field::LessonPrerequisites => &mut self.lesson_prerequisites,
+            Field::LessonPassCriteria => &mut self.lesson_pass_criteria,
+            Field::LessonThreshold => &mut self.lesson_threshold,
+            Field::LessonTechnique => &mut self.lesson_technique,
+            Field::LessonProgression => &mut self.lesson_progression,
         }
     }
 

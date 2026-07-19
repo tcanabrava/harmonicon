@@ -22,6 +22,7 @@ use crate::theme::LoadedTheme;
 mod grid;
 mod harpchart;
 mod interaction;
+mod lesson_form;
 mod material;
 mod meta_form;
 mod midi_import;
@@ -166,6 +167,10 @@ impl Plugin for SongEditor2Plugin {
                     ),
                     panel::update_harmonica_kind_text
                         .run_if(resource_exists_and_changed::<state::EditorState>),
+                    panel::update_content_kind_text
+                        .run_if(resource_exists_and_changed::<state::EditorState>),
+                    lesson_form::update_lesson_form_visibility
+                        .run_if(resource_exists_and_changed::<state::EditorState>),
                     panel::update_status_bar.run_if(
                         resource_exists_and_changed::<state::EditorState>
                             .or_else(resource_changed::<practice::PracticeState>)
@@ -173,9 +178,13 @@ impl Plugin for SongEditor2Plugin {
                     ),
                     panel::update_record_button_label
                         .run_if(resource_changed::<record::RecordState>),
-                    harpchart::handle_save_chosen,
-                    harpchart::handle_load_chosen,
-                    harpchart::handle_music_chosen,
+                    (
+                        harpchart::handle_save_chosen,
+                        harpchart::handle_load_chosen,
+                        harpchart::handle_music_chosen,
+                        lesson_form::handle_save_lesson_chosen,
+                        lesson_form::handle_load_lesson_chosen,
+                    ),
                 )
                     .run_if(in_state(AppState::SongEditor2)),
             )

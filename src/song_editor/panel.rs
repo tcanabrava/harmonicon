@@ -4,10 +4,10 @@ use bevy::prelude::*;
 
 use super::practice::PracticeState;
 use super::record::RecordState;
-use super::state::{Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
+use super::state::{ContentKind, Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
 use super::ui::{
-    BendDot, EditModeGroup, HarmonicaKindText, MetaFieldBox, MetaFieldText, ModButton,
-    ModButtonLabel, ModeButton, PerformModeGroup, RecordButtonLabel, StatusMsg,
+    BendDot, ContentKindText, EditModeGroup, HarmonicaKindText, MetaFieldBox, MetaFieldText,
+    ModButton, ModButtonLabel, ModeButton, PerformModeGroup, RecordButtonLabel, StatusMsg,
     TimelineToolButton,
 };
 use crate::localization::LocalizationExt;
@@ -204,6 +204,22 @@ pub(super) fn update_harmonica_kind_text(
     let key = match state.harmonica_kind {
         HarmonicaKind::Diatonic => "editor-harmonica-diatonic",
         HarmonicaKind::Chromatic => "editor-harmonica-chromatic",
+    };
+    let label = String::from(loc.msg(key));
+    for mut text in &mut texts {
+        **text = label.clone();
+    }
+}
+
+/// Keeps the record-mode toggle's label in sync with `state.content_kind`.
+pub(super) fn update_content_kind_text(
+    state: Res<EditorState>,
+    loc: Res<Localization>,
+    mut texts: Query<&mut Text, With<ContentKindText>>,
+) {
+    let key = match state.content_kind {
+        ContentKind::Song => "editor-content-kind-song",
+        ContentKind::Lesson => "editor-content-kind-lesson",
     };
     let label = String::from(loc.msg(key));
     for mut text in &mut texts {

@@ -5,20 +5,146 @@ use super::harpchart::{
     load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart,
 };
 use super::interaction::{apply_modifier, select_or_add};
+use super::lesson_form::{populate_from_lesson_manifest, serialize_lesson};
 use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
 use super::playback::{build_harp, note_freq};
 use super::state::Scroll;
 use super::state::{
-    Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
-    apply_resize, build_tempo_map, can_place, enforce_direction, enforce_expr, erase_range,
-    move_target, normalize_range, note_rect, remove_range, silence_gaps, song_end_tick,
-    split_side_range, toggle_tempo_point,
+    ContentKind, Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
+    apply_resize, build_tempo_map, can_place, cycle_next, enforce_direction, enforce_expr,
+    erase_range, move_target, normalize_range, note_rect, remove_range, silence_gaps,
+    song_end_tick, split_side_range, toggle_tempo_point,
 };
 use super::ui::ModButton;
 use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::audio_system::synth::{PhraseNote, SAMPLE_RATE, envelope, render_pcm};
 use crate::audio_system::wav::encode_wav;
+use crate::lessons::{LessonManifest, PassCriteria};
 use crate::song::harmonica::blues_scale_classes;
+
+#[test]
+fn cycle_next_wraps_back_to_the_first_option() {
+    let options = ["a", "b", "c"];
+    assert_eq!(cycle_next(&options, "a"), "b");
+    assert_eq!(cycle_next(&options, "c"), "a");
+}
+
+#[test]
+fn cycle_next_treats_an_unknown_current_value_as_the_first_option() {
+    let options = ["a", "b", "c"];
+    assert_eq!(cycle_next(&options, "not-a-real-option"), "b");
+}
+
+// ── lesson_form ──────────────────────────────────────────────────────────
+
+#[test]
+fn serialize_lesson_omits_optional_fields_when_unset() {
+    let s = EditorState {
+        content_kind: ContentKind::Lesson,
+        lesson_id: "my-lesson".into(),
+        lesson_unit: "basics".into(),
+        ..EditorState::default()
+    };
+    let json = serialize_lesson(&s);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["id"], "my-lesson");
+    assert_eq!(v["unit"], "basics");
+    assert_eq!(v["title_key"], "lesson-my-lesson-title");
+    assert_eq!(v["body_key"], "lesson-my-lesson-body");
+    assert!(v.get("chart").is_none());
+    assert!(v.get("prerequisites").is_none());
+    assert!(v.get("pass_criteria").is_none());
+    assert!(v.get("progression").is_none());
+}
+
+#[test]
+fn serialize_lesson_includes_chart_only_when_notes_exist() {
+    let mut s = EditorState {
+        lesson_id: "with-notes".into(),
+        lesson_unit: "basics".into(),
+        ..EditorState::default()
+    };
+    select_or_add(&mut s, 4, 0);
+    let json = serialize_lesson(&s);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["chart"], "song/chart.harpchart");
+}
+
+#[test]
+fn serialize_lesson_writes_a_technique_pass_criterion() {
+    let s = EditorState {
+        lesson_id: "x".into(),
+        lesson_unit: "u".into(),
+        lesson_pass_criteria: "technique".into(),
+        lesson_technique: "bend".into(),
+        lesson_threshold: "0.6".into(),
+        ..EditorState::default()
+    };
+    let json = serialize_lesson(&s);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["pass_criteria"]["type"], "technique");
+    assert_eq!(v["pass_criteria"]["technique"], "bend");
+    assert_eq!(v["pass_criteria"]["threshold"].as_f64().unwrap(), 0.6_f32 as f64);
+}
+
+#[test]
+fn serialize_lesson_writes_prerequisites_and_progression() {
+    let s = EditorState {
+        lesson_id: "x".into(),
+        lesson_unit: "u".into(),
+        lesson_prerequisites: "a, b ,c".into(),
+        lesson_progression: "minor".into(),
+        ..EditorState::default()
+    };
+    let json = serialize_lesson(&s);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["prerequisites"], serde_json::json!(["a", "b", "c"]));
+    assert_eq!(v["progression"], "minor");
+}
+
+#[test]
+fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
+    let manifest = LessonManifest {
+        id: "hand-wah".into(),
+        unit: "blowing".into(),
+        title_key: "t".into(),
+        body_key: "b".into(),
+        chart: None,
+        prerequisites: vec!["single-note".into()],
+        pass_criteria: Some(PassCriteria::Technique {
+            technique: "wah-wah".into(),
+            threshold: 0.5,
+        }),
+        progression: None,
+    };
+    let mut s = EditorState::default();
+    populate_from_lesson_manifest(&manifest, &mut s);
+    assert_eq!(s.lesson_id, "hand-wah");
+    assert_eq!(s.lesson_unit, "blowing");
+    assert_eq!(s.lesson_prerequisites, "single-note");
+    assert_eq!(s.lesson_pass_criteria, "technique");
+    assert_eq!(s.lesson_technique, "wah-wah");
+    assert_eq!(s.lesson_threshold, "0.5");
+    assert_eq!(s.lesson_progression, "none");
+}
+
+#[test]
+fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
+    let manifest = LessonManifest {
+        id: "x".into(),
+        unit: "u".into(),
+        title_key: "t".into(),
+        body_key: "b".into(),
+        chart: None,
+        prerequisites: Vec::new(),
+        pass_criteria: None,
+        progression: Some("standard".into()),
+    };
+    let mut s = EditorState::default();
+    populate_from_lesson_manifest(&manifest, &mut s);
+    assert_eq!(s.lesson_pass_criteria, "none");
+    assert_eq!(s.lesson_progression, "standard");
+}
 
 #[test]
 fn click_adds_then_selects_without_duplicating() {

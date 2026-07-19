@@ -113,10 +113,26 @@ editor-field-author = Author
 editor-field-midi-track = MIDI Track
 editor-harmonica-diatonic = ‹ Diatonic (10 holes) ›
 editor-harmonica-chromatic = ‹ Chromatic (12 holes) ›
+editor-field-content-kind = Recording
+editor-content-kind-song = ‹ Record Song ›
+editor-content-kind-lesson = ‹ Record Lesson ›
+
+# Song Editor 2 — lesson-only meta-form fields (shown while "Record Lesson"
+# is active)
+editor-field-lesson-id = Lesson ID
+editor-field-lesson-unit = Unit
+editor-field-lesson-explanation = Explanation
+editor-field-lesson-prerequisites = Prerequisites
+editor-field-lesson-pass-criteria = Pass Criteria
+editor-field-lesson-threshold = Threshold
+editor-field-lesson-technique = Technique
+editor-field-lesson-progression = Progression
 
 # Song Editor 2 — file-dialog titles
 dialog-save-chart = Save chart
 dialog-load-chart = Load chart
+dialog-save-lesson = Save lesson
+dialog-load-lesson = Load lesson
 dialog-select-music = Select background music
 dialog-select-midi = Select MIDI file
 dialog-file-name = File name:
@@ -168,8 +184,13 @@ editor-tool-erase-tooltip = Remove all notes in the current selection.
 editor-tool-remove-tooltip = Erase the selection, and shift everything after it earlier, closing the gap
 editor-tool-tempo-tooltip = Click the ruler to add a tempo change there, or click an existing one to remove it
 editor-harmonica-toggle-tooltip = Click to switch between Diatonic and Chromatic harmonica layouts
+editor-content-kind-toggle-tooltip = Click to switch between authoring a plain song and a curriculum lesson
 editor-field-key-tooltip = Click to cycle through harp keys
 editor-field-position-tooltip = Click to cycle through playing positions
+editor-lesson-form-tooltip = Curriculum fields for lesson.json — only used while "Record Lesson" is active
+editor-field-lesson-pass-criteria-tooltip = Click to cycle how this lesson is judged — None, Accuracy, Technique, Scale Adherence, Chord-Tone Adherence, Phrase Discipline
+editor-field-lesson-technique-tooltip = Click to cycle which technique bucket is judged — only used when Pass Criteria is Technique
+editor-field-lesson-progression-tooltip = Click to cycle the backing progression seeded for a jam-based lesson — None, Standard, Quick-Change, Minor
 editor-browse-tooltip = Choose a background-music audio file for this chart
 editor-import-midi-tooltip = Load a MIDI file and pick a track to drop onto the note grid — Save then writes a backing track from its other tracks
 editor-silence-track-label = Silence

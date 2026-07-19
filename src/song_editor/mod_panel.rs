@@ -19,7 +19,7 @@ use super::panel_widgets::{
 use super::playback::{EditorAudio, Playhead, start_playback, toggle_pause};
 use super::practice::{PracticeState, start_practice, stop_practice};
 use super::record::{RecordState, start_record, stop_record};
-use super::state::{EditorState, Mode, TimelineTool};
+use super::state::{ContentKind, EditorState, Mode, TimelineTool};
 use super::ui::{EditModeGroup, ModButton, ModeButton, PerformModeGroup, TimelineToolButton};
 use super::{AppState, LOAD_PURPOSE, SAVE_PURPOSE};
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
@@ -271,7 +271,13 @@ pub(super) fn spawn_mod_panel(
     });
 }
 
-/// Chart file I/O — always visible, in both Edit and Perform mode.
+/// Chart file I/O — always visible, in both Edit and Perform mode. Save/Load
+/// both branch on `state.content_kind` for the dialog's title/extension/
+/// default name/start dir (`.harpchart` under `assets/songs`, vs. `.json`
+/// under `assets/lessons`) — which actual file gets written/read from the
+/// chosen path is decided separately, by whichever of `harpchart::
+/// handle_save_chosen`/`lesson_form::handle_save_lesson_chosen` (and their
+/// load siblings) matches that same `content_kind`.
 fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     transport_button(
         panel,
@@ -282,20 +288,33 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colo
          state: Res<EditorState>,
          loc: Res<Localization>,
          mut open: MessageWriter<OpenFileDialog>| {
-            let default_name = format!(
-                "{}.harpchart",
-                safe_path_segment(if state.name.is_empty() {
-                    "chart"
-                } else {
-                    &state.name
-                })
-            );
-            open.write(OpenFileDialog {
-                purpose: SAVE_PURPOSE,
-                title: String::from(loc.msg("dialog-save-chart")),
-                extensions: vec!["harpchart".into()],
-                start_dir: Some(std::path::PathBuf::from("assets/songs")),
-                mode: DialogMode::Save { default_name },
+            open.write(match state.content_kind {
+                ContentKind::Song => {
+                    let default_name = format!(
+                        "{}.harpchart",
+                        safe_path_segment(if state.name.is_empty() {
+                            "chart"
+                        } else {
+                            &state.name
+                        })
+                    );
+                    OpenFileDialog {
+                        purpose: SAVE_PURPOSE,
+                        title: String::from(loc.msg("dialog-save-chart")),
+                        extensions: vec!["harpchart".into()],
+                        start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                        mode: DialogMode::Save { default_name },
+                    }
+                }
+                ContentKind::Lesson => OpenFileDialog {
+                    purpose: SAVE_PURPOSE,
+                    title: String::from(loc.msg("dialog-save-lesson")),
+                    extensions: vec!["json".into()],
+                    start_dir: Some(std::path::PathBuf::from("assets/lessons")),
+                    mode: DialogMode::Save {
+                        default_name: "lesson.json".into(),
+                    },
+                },
             });
         },
     );
@@ -304,13 +323,25 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colo
         loc.msg("editor-load"),
         loc.msg("editor-load-tooltip"),
         colors.transport_load,
-        |_: On<Pointer<Click>>, loc: Res<Localization>, mut open: MessageWriter<OpenFileDialog>| {
-            open.write(OpenFileDialog {
-                purpose: LOAD_PURPOSE,
-                title: String::from(loc.msg("dialog-load-chart")),
-                extensions: vec!["harpchart".into()],
-                start_dir: Some(std::path::PathBuf::from("assets/songs")),
-                mode: DialogMode::Open,
+        |_: On<Pointer<Click>>,
+         state: Res<EditorState>,
+         loc: Res<Localization>,
+         mut open: MessageWriter<OpenFileDialog>| {
+            open.write(match state.content_kind {
+                ContentKind::Song => OpenFileDialog {
+                    purpose: LOAD_PURPOSE,
+                    title: String::from(loc.msg("dialog-load-chart")),
+                    extensions: vec!["harpchart".into()],
+                    start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                    mode: DialogMode::Open,
+                },
+                ContentKind::Lesson => OpenFileDialog {
+                    purpose: LOAD_PURPOSE,
+                    title: String::from(loc.msg("dialog-load-lesson")),
+                    extensions: vec!["json".into()],
+                    start_dir: Some(std::path::PathBuf::from("assets/lessons")),
+                    mode: DialogMode::Open,
+                },
             });
         },
     );

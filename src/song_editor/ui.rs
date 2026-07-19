@@ -6,6 +6,7 @@ use bevy::ui_widgets::ScrollArea;
 use bevy::window::WindowResized;
 
 use super::interaction::drag_grid_scrollbar;
+use super::lesson_form::spawn_lesson_form;
 use super::meta_form::{spawn_hole_column, spawn_hole_column_rows, spawn_meta_form};
 use super::mod_panel::spawn_mod_panel;
 use super::playback::{EditorAudio, EditorProgressFill, Playhead, PlayheadLine};
@@ -55,6 +56,18 @@ pub(super) struct HoleColumnContent;
 /// / "Chromatic") next to its toggle button.
 #[derive(Component)]
 pub(super) struct HarmonicaKindText;
+
+/// The label showing the current [`super::state::ContentKind`] ("Record
+/// Song" / "Record Lesson") next to its toggle button.
+#[derive(Component)]
+pub(super) struct ContentKindText;
+
+/// Wraps the lesson-only fields panel (`lesson_form::spawn_lesson_form`),
+/// shown only while [`super::state::ContentKind::Lesson`] is active — see
+/// `lesson_form::update_lesson_form_visibility`, which mirrors
+/// `update_mode_visibility`'s `Node::display` approach.
+#[derive(Component)]
+pub(super) struct LessonFormGroup;
 
 #[derive(Component)]
 pub(super) struct NoteView(pub(super) u32);
@@ -455,6 +468,7 @@ pub(super) fn setup(
 
                 spawn_mod_panel(scroll, &loc, colors, mode);
                 spawn_meta_form(scroll, &loc, colors);
+                spawn_lesson_form(scroll, &loc, colors);
 
                 scroll.spawn((
                     StatusMsg,

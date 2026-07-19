@@ -421,13 +421,18 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
 
 // ── Systems ───────────────────────────────────────────────────────────────────
 
+/// The `ContentKind::Song` half of loading — its `ContentKind::Lesson`
+/// sibling is `lesson_form::handle_load_lesson_chosen`; each skips the
+/// other's `ContentKind`, so exactly one acts on a given `FileChosen {
+/// purpose: LOAD_PURPOSE }` message.
 pub(super) fn handle_load_chosen(
     mut chosen: MessageReader<FileChosen>,
     mut state: ResMut<EditorState>,
     mut scroll: ResMut<Scroll>,
 ) {
+    use super::state::ContentKind;
     for ev in chosen.read() {
-        if ev.purpose != LOAD_PURPOSE {
+        if ev.purpose != LOAD_PURPOSE || state.content_kind != ContentKind::Song {
             continue;
         }
         let text = match std::fs::read_to_string(&ev.path) {
@@ -461,13 +466,21 @@ pub(super) fn handle_music_chosen(
     }
 }
 
+/// The `ContentKind::Song` half of saving — its `ContentKind::Lesson`
+/// sibling is `lesson_form::handle_save_lesson_chosen`; each skips the
+/// other's `ContentKind`, so exactly one acts on a given `FileChosen {
+/// purpose: SAVE_PURPOSE }` message. MIDI backing generation
+/// (`save_midi_backing`) is a `ContentKind::Song`-only convenience — see
+/// `lesson_form`'s module doc comment for why a lesson save doesn't do this
+/// too.
 pub(super) fn handle_save_chosen(
     mut chosen: MessageReader<FileChosen>,
     mut state: ResMut<EditorState>,
     midi: Option<Res<super::midi_import::MidiImport>>,
 ) {
+    use super::state::ContentKind;
     for ev in chosen.read() {
-        if ev.purpose != SAVE_PURPOSE {
+        if ev.purpose != SAVE_PURPOSE || state.content_kind != ContentKind::Song {
             continue;
         }
         if let Some(parent) = ev.path.parent()

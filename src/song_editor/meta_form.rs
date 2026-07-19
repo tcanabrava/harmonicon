@@ -9,8 +9,14 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use super::state::{EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, POSITIONS};
-use super::ui::{HarmonicaKindText, HoleColumnContent, MetaFieldBox, MetaFieldText, MidiTrackComboboxSlot};
+use super::state::{
+    ContentKind, EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, PASS_CRITERIA_KINDS,
+    POSITIONS, PROGRESSIONS, TECHNIQUE_NAMES, cycle_next,
+};
+use super::ui::{
+    ContentKindText, HarmonicaKindText, HoleColumnContent, MetaFieldBox, MetaFieldText,
+    MidiTrackComboboxSlot,
+};
 use super::{HEADER_H, MIDI_PURPOSE, MUSIC_PURPOSE, ROW_H, SILENCE_ROW_H, grid_height};
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::dialogs::tooltip::Tooltip;
@@ -127,6 +133,67 @@ fn spawn_form_column(root: &mut ChildSpawnerCommands, build: impl FnOnce(&mut Ch
     .with_children(build);
 }
 
+/// The "Record Song"/"Record Lesson" toggle — same click-to-cycle button
+/// shape as [`spawn_harmonica_kind_row`], but switching `content_kind` has
+/// no side effects to reconcile (unlike harmonica kind, which must sanitize
+/// existing notes), so the observer just flips it directly rather than
+/// calling a dedicated `EditorState` method.
+fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        ..default()
+    })
+    .with_children(|line| {
+        line.spawn((
+            Node {
+                width: Val::Px(FORM_LABEL_W),
+                ..default()
+            },
+            Text::new(format!("{}:", loc.msg("editor-field-content-kind"))),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(colors.label),
+        ));
+        line.spawn((
+            Button,
+            Node {
+                width: Val::Px(240.0),
+                height: Val::Px(26.0),
+                align_items: AlignItems::Center,
+                padding: UiRect::horizontal(Val::Px(8.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(colors.field_bg),
+            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+            Tooltip(String::from(loc.msg("editor-content-kind-toggle-tooltip"))),
+        ))
+        .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+            state.content_kind = match state.content_kind {
+                ContentKind::Song => ContentKind::Lesson,
+                ContentKind::Lesson => ContentKind::Song,
+            };
+        })
+        .with_children(|b| {
+            b.spawn((
+                ContentKindText,
+                Text::new(String::new()),
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Pickable::IGNORE,
+            ));
+        });
+    });
+}
+
 fn spawn_harmonica_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     col.spawn(Node {
         width: Val::Percent(100.0),
@@ -184,7 +251,7 @@ fn spawn_harmonica_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, 
     });
 }
 
-fn spawn_field_row(
+pub(super) fn spawn_field_row(
     col: &mut ChildSpawnerCommands,
     loc: &Localization,
     colors: SongEditorColors,
@@ -230,25 +297,37 @@ fn spawn_field_row(
         if field == Field::Key {
             btn.insert(Tooltip(String::from(loc.msg("editor-field-key-tooltip"))))
                 .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                    let idx = HARP_KEYS
-                        .iter()
-                        .position(|&k| k == state.key.as_str())
-                        .unwrap_or(0);
-                    state.key = HARP_KEYS[(idx + 1) % HARP_KEYS.len()].into();
+                    state.key = cycle_next(&HARP_KEYS, &state.key);
                 });
         } else if field == Field::Position {
             btn.insert(Tooltip(String::from(
                 loc.msg("editor-field-position-tooltip"),
             )))
-            .observe(
-                |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                    let idx = POSITIONS
-                        .iter()
-                        .position(|&p| p == state.position.as_str())
-                        .unwrap_or(0);
-                    state.position = POSITIONS[(idx + 1) % POSITIONS.len()].into();
-                },
-            );
+            .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.position = cycle_next(&POSITIONS, &state.position);
+            });
+        } else if field == Field::LessonPassCriteria {
+            btn.insert(Tooltip(String::from(
+                loc.msg("editor-field-lesson-pass-criteria-tooltip"),
+            )))
+            .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.lesson_pass_criteria =
+                    cycle_next(&PASS_CRITERIA_KINDS, &state.lesson_pass_criteria);
+            });
+        } else if field == Field::LessonTechnique {
+            btn.insert(Tooltip(String::from(
+                loc.msg("editor-field-lesson-technique-tooltip"),
+            )))
+            .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.lesson_technique = cycle_next(&TECHNIQUE_NAMES, &state.lesson_technique);
+            });
+        } else if field == Field::LessonProgression {
+            btn.insert(Tooltip(String::from(
+                loc.msg("editor-field-lesson-progression-tooltip"),
+            )))
+            .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.lesson_progression = cycle_next(&PROGRESSIONS, &state.lesson_progression);
+            });
         } else {
             btn.observe(
                 move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
@@ -399,6 +478,7 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
     })
     .with_children(|form| {
         spawn_form_column(form, |col| {
+            spawn_content_kind_row(col, loc, colors);
             spawn_harmonica_kind_row(col, loc, colors);
             for &(field, label) in &FIELDS[..MID] {
                 spawn_field_row(col, loc, colors, field, label);
