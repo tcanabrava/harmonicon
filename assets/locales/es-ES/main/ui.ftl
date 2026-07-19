@@ -117,6 +117,7 @@ editor-content-kind-lesson = ‹ Grabar Lección ›
 
 # Song Editor 2 — campos exclusivos de lección (mostrados mientras
 # "Grabar Lección" está activo)
+editor-lesson-details-header = Detalles de la Lección
 editor-field-lesson-id = ID de Lección
 editor-field-lesson-unit = Unidad
 editor-field-lesson-explanation = Explicación
@@ -184,6 +185,7 @@ editor-tool-tempo-tooltip = Haz clic en la regla para añadir un cambio de tempo
 editor-harmonica-toggle-tooltip = Haz clic para alternar entre armónica Diatónica y Cromática
 editor-content-kind-toggle-tooltip = Haz clic para alternar entre grabar una canción normal y una lección del currículo
 editor-lesson-form-tooltip = Campos del currículo para lesson.json — solo se usan mientras "Grabar Lección" está activo
+editor-lesson-details-toggle-tooltip = Haz clic para mostrar u ocultar los campos del currículo de la lección
 editor-field-lesson-pass-criteria-tooltip = Haz clic para alternar cómo se evalúa esta lección — Ninguno, Precisión, Técnica, Adherencia a la Escala, Adherencia a Notas del Acorde, Disciplina de Frase
 editor-field-lesson-technique-tooltip = Haz clic para alternar qué técnica se evalúa — solo se usa cuando el Criterio de Aprobación es Técnica
 editor-field-lesson-progression-tooltip = Haz clic para alternar la progresión de acompañamiento de una lección basada en jam — Ninguna, Estándar, Quick-Change, Menor

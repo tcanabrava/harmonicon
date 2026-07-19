@@ -117,6 +117,7 @@ editor-content-kind-lesson = ‹ Gravar Lição ›
 
 # Editor de Músicas 2 — campos exclusivos de lição (mostrados enquanto
 # "Gravar Lição" está ativo)
+editor-lesson-details-header = Detalhes da Lição
 editor-field-lesson-id = ID da Lição
 editor-field-lesson-unit = Unidade
 editor-field-lesson-explanation = Explicação
@@ -184,6 +185,7 @@ editor-tool-tempo-tooltip = Clique na régua para adicionar uma mudança de anda
 editor-harmonica-toggle-tooltip = Clique para alternar entre gaita Diatônica e Cromática
 editor-content-kind-toggle-tooltip = Clique para alternar entre gravar uma música comum e uma lição do currículo
 editor-lesson-form-tooltip = Campos do currículo para lesson.json — usados apenas enquanto "Gravar Lição" está ativo
+editor-lesson-details-toggle-tooltip = Clique para mostrar ou ocultar os campos do currículo da lição
 editor-field-lesson-pass-criteria-tooltip = Clique para alternar como esta lição é avaliada — Nenhum, Precisão, Técnica, Aderência à Escala, Aderência a Notas do Acorde, Disciplina de Frase
 editor-field-lesson-technique-tooltip = Clique para alternar qual técnica é avaliada — usado apenas quando o Critério de Aprovação é Técnica
 editor-field-lesson-progression-tooltip = Clique para alternar a progressão de acompanhamento de uma lição baseada em jam — Nenhuma, Padrão, Quick-Change, Menor

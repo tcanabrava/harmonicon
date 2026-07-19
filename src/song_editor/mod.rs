@@ -168,7 +168,11 @@ impl Plugin for SongEditor2Plugin {
                         .run_if(resource_exists_and_changed::<state::EditorState>),
                     panel::update_content_kind_text
                         .run_if(resource_exists_and_changed::<state::EditorState>),
-                    lesson_form::update_lesson_form_visibility
+                    (
+                        lesson_form::update_lesson_form_visibility,
+                        lesson_form::update_lesson_details_visibility,
+                        lesson_form::update_lesson_conditional_rows,
+                    )
                         .run_if(resource_exists_and_changed::<state::EditorState>),
                     panel::update_status_bar.run_if(
                         resource_exists_and_changed::<state::EditorState>

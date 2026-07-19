@@ -119,6 +119,7 @@ editor-content-kind-lesson = ‹ Record Lesson ›
 
 # Song Editor 2 — lesson-only meta-form fields (shown while "Record Lesson"
 # is active)
+editor-lesson-details-header = Lesson Details
 editor-field-lesson-id = Lesson ID
 editor-field-lesson-unit = Unit
 editor-field-lesson-explanation = Explanation
@@ -188,6 +189,7 @@ editor-content-kind-toggle-tooltip = Click to switch between authoring a plain s
 editor-field-key-tooltip = Click to cycle through harp keys
 editor-field-position-tooltip = Click to cycle through playing positions
 editor-lesson-form-tooltip = Curriculum fields for lesson.json — only used while "Record Lesson" is active
+editor-lesson-details-toggle-tooltip = Click to show or hide the lesson curriculum fields
 editor-field-lesson-pass-criteria-tooltip = Click to cycle how this lesson is judged — None, Accuracy, Technique, Scale Adherence, Chord-Tone Adherence, Phrase Discipline
 editor-field-lesson-technique-tooltip = Click to cycle which technique bucket is judged — only used when Pass Criteria is Technique
 editor-field-lesson-progression-tooltip = Click to cycle the backing progression seeded for a jam-based lesson — None, Standard, Quick-Change, Minor
