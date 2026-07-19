@@ -145,6 +145,7 @@ impl Plugin for AssetsManagementPlugin {
             .init_resource::<ShowNoteNumbers>()
             .init_resource::<AvailableThemes>()
             .init_resource::<SelectedTheme>()
+            .add_message::<watch::ExternalFolderChanged>()
             .add_message::<SongsRescanned>()
             .add_message::<ThemesRescanned>()
             .add_systems(
