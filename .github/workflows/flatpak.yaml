@@ -42,7 +42,11 @@ jobs:
       - name: Install flatpak and flatpak-builder
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder
+          # elfutils provides eu-strip, which flatpak-builder shells out to on
+          # the host after the build to split/strip debuginfo — apt only pulls
+          # it in as a Recommends of flatpak-builder, which
+          # --no-install-recommends skips, so it must be listed explicitly.
+          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder elfutils
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Install runtime, SDK, and Rust extension
