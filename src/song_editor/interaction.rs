@@ -4,6 +4,7 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
 use bevy::picking::events::{Drag, Pointer};
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use bevy::ui_render::prelude::MaterialNode;
@@ -15,7 +16,9 @@ use super::state::{
     VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction, enforce_expr,
     max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
 };
-use super::ui::{GridContent, GridScrollThumb, GridScrollTrack, ModButton, MoveGhost, NoteView};
+use super::ui::{
+    GridArea, GridContent, GridScrollThumb, GridScrollTrack, ModButton, MoveGhost, NoteView,
+};
 use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::dialogs::file_dialog::FileDialog;
 use crate::theme::LoadedTheme;
@@ -387,10 +390,19 @@ pub(super) fn pan_keys(
     }
 }
 
+/// Pans the grid horizontally on wheel input — but only while the pointer
+/// is actually over the grid ([`GridArea`]'s own [`Hovered`]). Without this
+/// gate, scrolling anywhere else in the editor (the meta/lesson form, say)
+/// would *also* pan the grid sideways at the same time the vertical
+/// `ScrollArea` scrolls the page — two unrelated scroll effects firing off
+/// one wheel gesture. Wheel events are still drained every frame regardless
+/// of hover, so an un-applied gesture can't linger and pan the grid a frame
+/// late once the pointer moves onto it.
 pub(super) fn pan_wheel(
     mut wheel: MessageReader<MouseWheel>,
     file_dialog: Res<FileDialog>,
     mut scroll: ResMut<Scroll>,
+    grid_hovered: Query<&Hovered, With<GridArea>>,
 ) {
     if file_dialog.open {
         wheel.clear();
@@ -400,7 +412,8 @@ pub(super) fn pan_wheel(
     for ev in wheel.read() {
         delta += if ev.y != 0.0 { ev.y } else { ev.x };
     }
-    if delta != 0.0 {
+    let hovered = grid_hovered.single().is_ok_and(Hovered::get);
+    if delta != 0.0 && hovered {
         scroll.px = (scroll.px - delta * BEAT_W).max(0.0);
     }
 }

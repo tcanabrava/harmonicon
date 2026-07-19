@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 
 use bevy::picking::Pickable;
+use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 use bevy::window::WindowResized;
 
 use super::interaction::drag_grid_scrollbar;
-use super::lesson_form::spawn_lesson_form;
-use super::meta_form::{spawn_hole_column, spawn_hole_column_rows, spawn_meta_form};
+use super::meta_form::{spawn_hole_column, spawn_hole_column_rows};
 use super::mod_panel::spawn_mod_panel;
 use super::playback::{EditorAudio, EditorProgressFill, Playhead, PlayheadLine};
-use super::state::{EditorState, Scroll, TimelineTool};
+use super::state::{EditorState, Mode, Scroll, TimelineTool};
 use super::{BEAT_W, HOLE_COL_W, NOTE_PAD, ROW_H, grid_height};
-use crate::theme::LoadedTheme;
+use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
 
 // ── Components ────────────────────────────────────────────────────────────────
@@ -298,191 +298,203 @@ pub(super) fn setup(
                 ));
             });
 
-            // Everything below the progress bar, in a scrollable column —
-            // total content height (grid + mod panel + meta form + status
-            // bar) routinely exceeds a laptop window's height, and without
-            // this whatever's last in the tree (the meta form's MIDI-track
-            // combobox) is simply pushed off-screen with no way to reach it.
-            // Same `Overflow::scroll_y()` + `ScrollArea` pattern
-            // `menu::pages::lessons`/`dialogs::file_dialog` already
-            // establish; `min_height: Val::Px(0.0)` lets this flex item
-            // actually shrink below its content size instead of refusing to
-            // clip (the standard flexbox "min-height: auto" gotcha).
-            root.spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    flex_grow: 1.0,
-                    min_height: Val::Px(0.0),
-                    overflow: Overflow::scroll_y(),
-                    ..default()
-                },
-                ScrollArea,
-            ))
-            .with_children(|scroll| {
-                scroll
+            // Fixed chrome: the grid row (own horizontal scroll) + mod
+            // panel — kept out of the form `ScrollArea` below, since sharing
+            // one scrollable area between the grid and the form fields let
+            // scrolling either one move both (a horizontal-scrollbar drag on
+            // the grid would also drag the page vertically on a small window).
+            spawn_fixed_chrome(root, &loc, colors, mode, hole_count);
+
+            // The form fields (meta form, lesson form, status bar), in their
+            // own scrollable column — a fully expanded lesson-details panel
+            // routinely exceeds a laptop window's height. Same
+            // `Overflow::scroll_y()` + `ScrollArea` pattern `menu::pages::
+            // lessons`/`dialogs::file_dialog` use; `min_height: Val::Px(0.0)`
+            // lets this flex item shrink below its content size (the
+            // flexbox "min-height: auto" gotcha). The sibling `Scrollbar`
+            // (`scroll::spawn_editor_scrollbar`) is what makes the fact that
+            // this scrolls at all visible to the player.
+            root.spawn(Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Row,
+                flex_grow: 1.0,
+                min_height: Val::Px(0.0),
+                ..default()
+            })
+            .with_children(|outer| {
+                let scroll_area = outer
                     .spawn((
-                        GridRowContainer,
                         Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Px(grid_height(hole_count)),
-                            flex_direction: FlexDirection::Row,
-                            flex_shrink: 0.0,
+                            flex_direction: FlexDirection::Column,
+                            flex_grow: 1.0,
+                            min_height: Val::Px(0.0),
+                            overflow: Overflow::scroll_y(),
                             ..default()
                         },
+                        ScrollArea,
                     ))
-                    .with_children(|row| {
-                        spawn_hole_column(row, colors, hole_count, &loc);
-                        row.spawn((
-                            GridArea,
-                            Node {
-                                flex_grow: 1.0,
-                                height: Val::Px(grid_height(hole_count)),
-                                overflow: Overflow::clip(),
-                                ..default()
-                            },
-                        ))
-                        .with_children(|ga| {
-                            ga.spawn((
-                                GridContent,
-                                Node {
-                                    position_type: PositionType::Absolute,
-                                    left: Val::Px(0.0),
-                                    top: Val::Px(0.0),
-                                    height: Val::Px(grid_height(hole_count)),
-                                    ..default()
-                                },
-                            ))
-                            .with_children(|content| {
-                                content.spawn((
-                                    MoveGhost,
-                                    ZIndex(2),
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        width: Val::Px(BEAT_W - 2.0),
-                                        height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
-                                        border: UiRect::all(Val::Px(2.0)),
-                                        ..default()
-                                    },
-                                    BackgroundColor(colors.ghost_ok.with_alpha(0.30)),
-                                    BorderColor::all(colors.ghost_ok),
-                                    Visibility::Hidden,
-                                    Pickable::IGNORE,
-                                ));
-                                content.spawn((
-                                    PlayheadLine,
-                                    ZIndex(3),
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        top: Val::Px(0.0),
-                                        width: Val::Px(2.0),
-                                        height: Val::Px(grid_height(hole_count)),
-                                        ..default()
-                                    },
-                                    BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
-                                    Visibility::Hidden,
-                                    Pickable::IGNORE,
-                                ));
-                                // Erase/Remove tool overlays — see `timeline`'s
-                                // module docs. Both hidden until a tool picks a
-                                // split point or drag span; `update_timeline_
-                                // overlays` (unconditional, like the playhead/move
-                                // ghost above) repositions and shows/hides them
-                                // every frame.
-                                content.spawn((
-                                    super::timeline::TimelineSplitLine,
-                                    ZIndex(3),
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        top: Val::Px(0.0),
-                                        width: Val::Px(2.0),
-                                        height: Val::Px(grid_height(hole_count)),
-                                        ..default()
-                                    },
-                                    BackgroundColor(Color::srgb(0.95, 0.75, 0.20)),
-                                    Visibility::Hidden,
-                                    Pickable::IGNORE,
-                                ));
-                                content.spawn((
-                                    super::timeline::TimelineHighlight,
-                                    ZIndex(1),
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        top: Val::Px(0.0),
-                                        height: Val::Px(grid_height(hole_count)),
-                                        ..default()
-                                    },
-                                    BackgroundColor(Color::srgba(0.95, 0.30, 0.20, 0.22)),
-                                    Visibility::Hidden,
-                                    Pickable::IGNORE,
-                                ));
-                            });
-                        });
-                    });
-
-                // Horizontal scrollbar for the grid, spanning only the grid
-                // area's own width (the empty leading spacer matches
-                // `HOLE_COL_W`) — hidden by `update_grid_scrollbar` whenever
-                // the song's notes all fit within the visible width.
-                scroll
-                    .spawn(Node {
-                        width: Val::Percent(100.0),
-                        flex_direction: FlexDirection::Row,
-                        flex_shrink: 0.0,
-                        ..default()
+                    .with_children(|scroll| {
+                        super::scroll::spawn_form_scroll_content(scroll, &loc, colors);
                     })
-                    .with_children(|row| {
-                        row.spawn(Node {
-                            width: Val::Px(HOLE_COL_W),
-                            flex_shrink: 0.0,
-                            ..default()
-                        });
-                        row.spawn((
-                            GridScrollTrack,
-                            Node {
-                                flex_grow: 1.0,
-                                height: Val::Px(8.0),
-                                margin: UiRect::top(Val::Px(4.0)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
-                            Visibility::Hidden,
-                        ))
-                        .with_children(|track| {
-                            track
-                                .spawn((
-                                    GridScrollThumb,
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        top: Val::Px(0.0),
-                                        left: Val::Px(0.0),
-                                        height: Val::Percent(100.0),
-                                        ..default()
-                                    },
-                                    BackgroundColor(colors.accent.with_alpha(0.65)),
-                                ))
-                                .observe(drag_grid_scrollbar);
-                        });
-                    });
-
-                spawn_mod_panel(scroll, &loc, colors, mode);
-                spawn_meta_form(scroll, &loc, colors);
-                spawn_lesson_form(scroll, &loc, colors);
-
-                scroll.spawn((
-                    StatusMsg,
-                    Text::new(""),
-                    TextFont {
-                        font_size: FontSize::Px(12.0),
-                        ..default()
-                    },
-                    TextColor(Color::srgb(1.0, 0.40, 0.15)),
-                    Node {
-                        width: Val::Percent(100.0),
-                        padding: UiRect::axes(Val::Px(10.0), Val::Px(4.0)),
-                        ..default()
-                    },
-                ));
+                    .id();
+                super::scroll::spawn_editor_scrollbar(outer, scroll_area, colors);
             });
         });
 }
+
+/// The editor's always-visible chrome, above the scrollable form area: the
+/// grid row (hole column + grid + its own horizontal scrollbar) and the mod
+/// panel. Kept out of the `ScrollArea` — see [`setup`]'s own comment for why.
+fn spawn_fixed_chrome(
+    root: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+    mode: Mode,
+    hole_count: u8,
+) {
+    root.spawn((
+        GridRowContainer,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(grid_height(hole_count)),
+            flex_direction: FlexDirection::Row,
+            flex_shrink: 0.0,
+            ..default()
+        },
+    ))
+    .with_children(|row| {
+        spawn_hole_column(row, colors, hole_count, loc);
+        row.spawn((
+            GridArea,
+            // So `interaction::pan_wheel` only pans horizontally
+            // while the pointer is actually over the grid.
+            Hovered::default(),
+            Node {
+                flex_grow: 1.0,
+                height: Val::Px(grid_height(hole_count)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+        ))
+        .with_children(|ga| {
+            ga.spawn((
+                GridContent,
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    height: Val::Px(grid_height(hole_count)),
+                    ..default()
+                },
+            ))
+            .with_children(|content| {
+                content.spawn((
+                    MoveGhost,
+                    ZIndex(2),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: Val::Px(BEAT_W - 2.0),
+                        height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(colors.ghost_ok.with_alpha(0.30)),
+                    BorderColor::all(colors.ghost_ok),
+                    Visibility::Hidden,
+                    Pickable::IGNORE,
+                ));
+                content.spawn((
+                    PlayheadLine,
+                    ZIndex(3),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        width: Val::Px(2.0),
+                        height: Val::Px(grid_height(hole_count)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.95, 0.30, 0.30)),
+                    Visibility::Hidden,
+                    Pickable::IGNORE,
+                ));
+                // Erase/Remove tool overlays — see `timeline`'s module
+                // docs. Hidden until a tool picks a split point or drag
+                // span; `update_timeline_overlays` repositions and shows/
+                // hides them every frame, like the playhead/move ghost above.
+                content.spawn((
+                    super::timeline::TimelineSplitLine,
+                    ZIndex(3),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        width: Val::Px(2.0),
+                        height: Val::Px(grid_height(hole_count)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.95, 0.75, 0.20)),
+                    Visibility::Hidden,
+                    Pickable::IGNORE,
+                ));
+                content.spawn((
+                    super::timeline::TimelineHighlight,
+                    ZIndex(1),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        height: Val::Px(grid_height(hole_count)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.95, 0.30, 0.20, 0.22)),
+                    Visibility::Hidden,
+                    Pickable::IGNORE,
+                ));
+            });
+        });
+    });
+
+    // Horizontal scrollbar for the grid, spanning only the grid area's own
+    // width (the leading spacer matches `HOLE_COL_W`) — hidden by
+    // `update_grid_scrollbar` whenever the song fits the visible width.
+    root.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        flex_shrink: 0.0,
+        ..default()
+    })
+    .with_children(|row| {
+        row.spawn(Node {
+            width: Val::Px(HOLE_COL_W),
+            flex_shrink: 0.0,
+            ..default()
+        });
+        row.spawn((
+            GridScrollTrack,
+            Node {
+                flex_grow: 1.0,
+                height: Val::Px(8.0),
+                margin: UiRect::top(Val::Px(4.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
+            Visibility::Hidden,
+        ))
+        .with_children(|track| {
+            track
+                .spawn((
+                    GridScrollThumb,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(0.0),
+                        left: Val::Px(0.0),
+                        height: Val::Percent(100.0),
+                        ..default()
+                    },
+                    BackgroundColor(colors.accent.with_alpha(0.65)),
+                ))
+                .observe(drag_grid_scrollbar);
+        });
+    });
+
+    spawn_mod_panel(root, loc, colors, mode);
+}
+
