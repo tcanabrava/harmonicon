@@ -3323,6 +3323,7 @@ dependencies = [
  "image",
  "jsonschema",
  "midly",
+ "notify-debouncer-full",
  "pulldown-cmark",
  "rand",
  "regex",
@@ -4260,6 +4261,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
 dependencies = [
  "bitflags 2.13.0",
+ "crossbeam-channel",
  "fsevent-sys",
  "inotify",
  "kqueue",
@@ -4277,6 +4279,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c02b49179cfebc9932238d04d6079912d26de0379328872846118a0fa0dbb302"
 dependencies = [
+ "crossbeam-channel",
  "file-id",
  "log",
  "notify",

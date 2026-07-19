@@ -18,7 +18,7 @@ use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 use bevy_fluent::Localization;
 
-use crate::assets_management::{AvailableThemes, SelectedTheme};
+use crate::assets_management::{AvailableThemes, SelectedTheme, ThemesRescanned};
 use crate::dialogs::button;
 use crate::dialogs::button_material::ButtonMaterials;
 use crate::localization::LocalizationExt;
@@ -40,7 +40,12 @@ impl Plugin for ThemePickerPlugin {
             // on(...) observers; these systems only react to the selection.
             .add_systems(
                 Update,
-                (update_button_visuals, update_preview).run_if(in_state(MenuPage::Theme)),
+                (
+                    update_button_visuals,
+                    update_preview,
+                    rebuild_on_themes_rescanned,
+                )
+                    .run_if(in_state(MenuPage::Theme)),
             );
     }
 }
@@ -248,6 +253,20 @@ fn update_button_visuals(
         } else {
             button::color_default()
         };
+    }
+}
+
+/// `assets_management::watch` rescans `AvailableThemes` live when
+/// `~/Harmonicon/themes` changes; if this page happens to be open when that
+/// happens, force a same-page rebuild the same way `artist_list::
+/// rebuild_on_songs_rescanned` does, and for the same message-driven reason
+/// (see that function's doc comment).
+fn rebuild_on_themes_rescanned(
+    mut rescanned: MessageReader<ThemesRescanned>,
+    mut page: ResMut<NextState<MenuPage>>,
+) {
+    if rescanned.read().next().is_some() {
+        page.set(MenuPage::Theme);
     }
 }
 

@@ -56,6 +56,11 @@ impl Plugin for MenuPlugin {
             )
             .add_systems(OnExit(MenuPage::ArtistList), scene::cleanup_menu)
             .add_systems(
+                Update,
+                pages::artist_list::rebuild_on_songs_rescanned
+                    .run_if(in_state(MenuPage::ArtistList)),
+            )
+            .add_systems(
                 OnEnter(MenuPage::SongList),
                 pages::song_list::setup_song_list,
             )

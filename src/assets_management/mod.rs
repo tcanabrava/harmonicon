@@ -3,6 +3,9 @@
 use bevy::prelude::*;
 use std::{collections::HashMap, fs::DirEntry};
 
+mod watch;
+pub use watch::{SongsRescanned, ThemesRescanned};
+
 pub struct AssetsManagementPlugin;
 
 #[derive(Debug, Clone)]
@@ -129,6 +132,8 @@ impl Plugin for AssetsManagementPlugin {
             .init_resource::<ShowNoteNumbers>()
             .init_resource::<AvailableThemes>()
             .init_resource::<SelectedTheme>()
+            .add_message::<SongsRescanned>()
+            .add_message::<ThemesRescanned>()
             .add_systems(
                 Startup,
                 (
@@ -137,8 +142,10 @@ impl Plugin for AssetsManagementPlugin {
                     scan_note_themes,
                     scan_ui_themes,
                     override_default_font,
+                    watch::start_watching_external_folder,
                 ),
-            );
+            )
+            .add_systems(Update, watch::process_external_folder_events);
     }
 }
 
@@ -392,6 +399,22 @@ mod tests {
             .values()
             .map(|v| v.len())
             .sum();
+
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn scan_ui_themes_does_not_duplicate_entries_when_run_again() {
+        let mut world = World::new();
+        world.init_resource::<AvailableThemes>();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(scan_ui_themes);
+
+        schedule.run(&mut world);
+        let first = world.resource::<AvailableThemes>().0.clone();
+
+        schedule.run(&mut world);
+        let second = world.resource::<AvailableThemes>().0.clone();
 
         assert_eq!(first, second);
     }

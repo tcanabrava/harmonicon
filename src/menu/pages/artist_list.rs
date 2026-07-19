@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy_fluent::Localization;
 
 use crate::app::{GameplayMode, SelectedArtist};
-use crate::assets_management::{self, AvailableSongs};
+use crate::assets_management::{AvailableSongs, SongsRescanned};
 use crate::dialogs::button_material::ButtonMaterials;
 use crate::localization::LocalizationExt;
 use crate::theme::LoadedTheme;
@@ -70,14 +70,6 @@ pub(crate) fn setup_artist_list(
     spawn_button(
         &mut commands,
         root,
-        &loc.msg("refresh-songs"),
-        &theme,
-        &btn_mats,
-        on_refresh_songs,
-    );
-    spawn_button(
-        &mut commands,
-        root,
         &loc.msg("back"),
         &theme,
         &btn_mats,
@@ -94,18 +86,24 @@ pub(crate) fn setup_artist_list(
     );
 }
 
-/// Re-scans the bundled + external (`~/Harmonicon/songs`) song folders and
-/// re-enters this same page to rebuild the list from the refreshed
-/// `AvailableSongs` — `NextState::set` re-fires `OnExit`/`OnEnter` even for a
-/// same-state transition (see `CLAUDE.md`), which is what makes a self-target
-/// transition rebuild the page at all. Lets a song dropped into
-/// `~/Harmonicon/songs` while the game is already running show up without a
-/// restart.
-fn on_refresh_songs(
-    _: On<Pointer<Click>>,
-    available: ResMut<AvailableSongs>,
+/// `assets_management::watch` rescans `AvailableSongs` live when
+/// `~/Harmonicon/songs` changes, but that alone doesn't touch this page's
+/// already-spawned button list. If the Artist List page happens to be open
+/// when that happens, force a rebuild the same way any other same-page
+/// transition does — `NextState::set` re-fires `OnExit`/`OnEnter` even for a
+/// same-state transition (see `CLAUDE.md`) — so a song dropped in while this
+/// page is on screen appears without the player needing to back out and back
+/// in. Driven by `SongsRescanned`, not `AvailableSongs::is_changed()`: this
+/// system only runs while the page is open, so its own change-detection tick
+/// goes stale every time the page is closed, and would otherwise read as
+/// "changed" the moment the page re-opens even when nothing outside this
+/// system's own dormant window actually happened — a message fired only from
+/// the watcher's own rescan call site has no such staleness problem.
+pub(crate) fn rebuild_on_songs_rescanned(
+    mut rescanned: MessageReader<SongsRescanned>,
     mut page: ResMut<NextState<MenuPage>>,
 ) {
-    assets_management::scan_all_songs(available);
-    page.set(MenuPage::ArtistList);
+    if rescanned.read().next().is_some() {
+        page.set(MenuPage::ArtistList);
+    }
 }
