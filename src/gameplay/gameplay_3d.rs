@@ -14,12 +14,12 @@ use crate::{
     app::SelectedSong,
     song::NoteCube3dConfig,
     song::SongManifest,
-    song::chart::{Action, HarpChart, Modifier},
+    song::chart::{Action, HarpChart},
     song::harmonica::twelve_bar,
     theme::{LoadedTheme, TwelveBarColors},
 };
 
-use super::adaptive_difficulty::{AdaptiveDifficulty, track_items, unlocked_flags};
+use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::countdown_overlay::spawn_countdown;
 use super::gameplay_2d::{note_anim_mode, note_techniques};
 use super::metronome_overlay::spawn_metronome;
@@ -277,79 +277,6 @@ fn create_hit_zone(commands: &mut Commands, center_x: f32, total_width: f32) {
     });
 }
 
-/// Builds every note's score state, filtered/tagged by adaptive
-/// difficulty's current unlock state — the note half of what
-/// `build_song_notes_3d` assembles, factored out so
-/// `resync_notes_on_adaptive_change` can rebuild just the notes later,
-/// mid-song, when the pause menu changes `learned`/`enabled` without a
-/// Restart (the render assets it's paired with there don't need rebuilding —
-/// only which notes exist changes).
-fn build_notes_3d(chart: &HarpChart, adaptive: &AdaptiveDifficulty) -> Vec<ScheduledNote> {
-    let items = track_items(&chart.track, &chart.timing);
-    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
-    let mut flags = flags.into_iter();
-    let mut notes: Vec<ScheduledNote> = Vec::new();
-    for item in &chart.track {
-        let t = super::resolve_item_time(item, &chart.timing);
-        // Each event's own modifiers/expected pitch, computed once up front
-        // so the chord-target set (below) doesn't need to redo it.
-        let event_data: Vec<(Vec<Modifier>, Option<u8>)> = item
-            .events
-            .iter()
-            .map(|event| {
-                let modifiers = event.modifiers.clone().unwrap_or_default();
-                let natural_pitch = event.note.clone().unwrap_or_else(|| {
-                    chart
-                        .harmonica
-                        .wind_direction_label(event.hole, &event.action)
-                });
-                // A bend targets the bent pitch, so the technique is scored not shown.
-                let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
-                (modifiers, expected_pitch)
-            })
-            .collect();
-        // A real chord/octave-split needs every sibling pitch sounding at
-        // once (see `ScheduledNote::chord_pitches`) — a `TrackItem` with
-        // only one event stays an ordinary single note, untouched by this.
-        let chord_pitches: Vec<u8> = if item.events.len() > 1 {
-            event_data.iter().filter_map(|(_, p)| *p).collect()
-        } else {
-            Vec::new()
-        };
-        for (event, (modifiers, expected_pitch)) in item.events.iter().zip(event_data) {
-            let (unlocked, section) = flags.next().unwrap_or((true, 0));
-            if !unlocked {
-                continue;
-            }
-            let is_blow = matches!(event.action, Action::Blow);
-            notes.push(ScheduledNote {
-                time: t,
-                duration: item.duration,
-                hole: event.hole,
-                is_blow,
-                expected_pitch,
-                hit: false,
-                missed: false,
-                held: 0.0,
-                sustain_scored: false,
-                modifiers,
-                pitch_samples: Vec::new(),
-                amp_samples: Vec::new(),
-                phrase_section: section,
-                chord_pitches: chord_pitches.clone(),
-                force_wait: item.call,
-            });
-        }
-    }
-    // `score_notes`/`spawn_visible_notes_3d` both rely on this being sorted.
-    notes.sort_by(|a, b| {
-        a.time
-            .partial_cmp(&b.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    notes
-}
-
 /// Spawns each note as a 3D comet: an elongated cube head (from the theme's glTF)
 /// tinted by blow/draw colour, trailing a flat ribbon that runs the technique's
 /// animation via [`NoteTail3dMaterial`] — the 3D twin of the 2D head+tail comet.
@@ -364,7 +291,7 @@ fn build_song_notes_3d(
     holes: Vec<HoleConfig>,
     adaptive: &AdaptiveDifficulty,
 ) -> (super::SongNotes, NoteRenderAssets3D) {
-    let notes = build_notes_3d(chart, adaptive);
+    let (notes, _) = super::build_scheduled_notes(chart, adaptive);
     let hole_count = chart.harmonica.hole_count();
     (
         super::SongNotes { notes, cursor: 0 },
@@ -408,10 +335,7 @@ pub(super) fn resync_notes_on_adaptive_change(
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
-    let mut new_notes = build_notes_3d(&manifest.chart, &adaptive);
-    super::adaptive_difficulty::carry_over_note_state(&song_notes.notes, &mut new_notes);
-    song_notes.cursor = super::adaptive_difficulty::first_unresolved_index(&new_notes);
-    song_notes.notes = new_notes;
+    super::adaptive_difficulty::rebuild_song_notes(&manifest.chart, &adaptive, &mut song_notes);
     for entity in &visuals {
         commands.entity(entity).despawn();
     }

@@ -10,7 +10,9 @@ use std::collections::HashSet;
 use bevy::prelude::*;
 
 use crate::audio_system::midi::note_to_midi;
-use crate::song::chart::Modifier;
+use crate::song::chart::{Action, HarpChart, Modifier, PlayMode};
+
+use super::adaptive_difficulty::{AdaptiveDifficulty, track_items, unlocked_flags};
 
 pub const LOOKAHEAD: f64 = 3.0;
 
@@ -241,4 +243,186 @@ pub fn target_pitch(natural: &str, modifiers: &[Modifier]) -> Option<u8> {
         .unwrap_or(0);
     let midi = note_to_midi(natural)? + bend;
     (0..=127).contains(&midi).then_some(midi as u8)
+}
+
+/// Label for the multi-note play modes; `single` (and absent) needs no badge.
+pub fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
+    match mode {
+        Some(PlayMode::Chord) => Some("chord"),
+        Some(PlayMode::Split) => Some("split"),
+        Some(PlayMode::Single) | None => None,
+    }
+}
+
+/// Builds every `ScheduledNote` a chart produces, gated by adaptive
+/// difficulty's current unlock state — the shared core of `gameplay_2d`'s
+/// and `gameplay_3d`'s own note-list builders (`build_combined_notes`/
+/// `build_notes_3d` before this was extracted), which differed only in
+/// whether they also collected each item's [`play_mode_label`] tag (2D's
+/// chord/split badge; 3D has no such badge and discards it). Sorted by
+/// `time` — `score_notes`/the spawn-window helpers above all rely on that.
+pub fn build_scheduled_notes(
+    chart: &HarpChart,
+    adaptive: &AdaptiveDifficulty,
+) -> (Vec<ScheduledNote>, Vec<Option<&'static str>>) {
+    let items = track_items(&chart.track, &chart.timing);
+    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
+    let mut flags = flags.into_iter();
+    let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
+    for item in &chart.track {
+        let t = resolve_item_time(item, &chart.timing);
+        let tag = play_mode_label(item.play_mode.as_ref());
+        // Each event's own modifiers/expected pitch, computed once up front
+        // so the chord-target set (below) doesn't need to redo it.
+        let event_data: Vec<(Vec<Modifier>, Option<u8>)> = item
+            .events
+            .iter()
+            .map(|event| {
+                let modifiers = event.modifiers.clone().unwrap_or_default();
+                let natural_pitch = event.note.clone().unwrap_or_else(|| {
+                    chart
+                        .harmonica
+                        .wind_direction_label(event.hole, &event.action)
+                });
+                let expected_pitch = target_pitch(&natural_pitch, &modifiers);
+                (modifiers, expected_pitch)
+            })
+            .collect();
+        // A real chord/octave-split needs every sibling pitch sounding at
+        // once (see `ScheduledNote::chord_pitches`) — a `TrackItem` with
+        // only one event stays an ordinary single note, untouched by this.
+        let chord_pitches: Vec<u8> = if item.events.len() > 1 {
+            event_data.iter().filter_map(|(_, p)| *p).collect()
+        } else {
+            Vec::new()
+        };
+        for (event, (modifiers, expected_pitch)) in item.events.iter().zip(event_data) {
+            let (unlocked, section) = flags.next().unwrap_or((true, 0));
+            if !unlocked {
+                continue;
+            }
+            let is_blow = matches!(event.action, Action::Blow);
+            combined.push((
+                ScheduledNote {
+                    time: t,
+                    duration: item.duration,
+                    hole: event.hole,
+                    is_blow,
+                    expected_pitch,
+                    hit: false,
+                    missed: false,
+                    held: 0.0,
+                    sustain_scored: false,
+                    modifiers,
+                    pitch_samples: Vec::new(),
+                    amp_samples: Vec::new(),
+                    phrase_section: section,
+                    chord_pitches: chord_pitches.clone(),
+                    force_wait: item.call,
+                },
+                tag,
+            ));
+        }
+    }
+    combined.sort_by(|a, b| {
+        a.0.time
+            .partial_cmp(&b.0.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    combined.into_iter().unzip()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── play_mode_label ───────────────────────────────────────────────────────
+
+    #[test]
+    fn play_mode_label_badges_only_multi_note_modes() {
+        assert_eq!(play_mode_label(Some(&PlayMode::Chord)), Some("chord"));
+        assert_eq!(play_mode_label(Some(&PlayMode::Split)), Some("split"));
+        assert_eq!(play_mode_label(Some(&PlayMode::Single)), None);
+        assert_eq!(play_mode_label(None), None);
+    }
+
+    // ── build_scheduled_notes ─────────────────────────────────────────────────
+
+    fn c_diatonic_chart(track_json: &str) -> HarpChart {
+        serde_json::from_str(&format!(
+            r#"{{
+                "song": {{"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"}},
+                "timing": {{"resolution":480,"tempo_map":[{{"tick":0,"bpm":120.0}}]}},
+                "harmonica": {{"type":"diatonic","holes":10,"bending_profile":"richter_standard",
+                    "layout": {{"blow":["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+                               "draw":["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]}}}},
+                "track": {track_json},
+                "scoring": {{"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}}
+            }}"#
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn builds_one_note_per_event_sorted_by_time() {
+        // Each item tags its own `phrase` so `unlocked_flags` treats them as
+        // separate sections (see its own doc comment) — with
+        // `AdaptiveDifficulty::default()`'s empty `sections`, two items
+        // sharing one *implicit* section would otherwise have their
+        // unlock-count math (ordinal vs. per-item `count`) collide, which
+        // isn't a realistic chart shape (`setup_adaptive_difficulty` always
+        // populates `sections` to match the chart's real phrase tags).
+        let chart = c_diatonic_chart(
+            r#"[
+                {"time":1.0,"duration":0.5,"call":false,"phrase":"p2",
+                 "events":[{"hole":2,"action":"blow"}]},
+                {"time":0.0,"duration":0.5,"call":false,"phrase":"p1",
+                 "events":[{"hole":1,"action":"blow"}]}
+            ]"#,
+        );
+        let (notes, tags) = build_scheduled_notes(&chart, &AdaptiveDifficulty::default());
+        assert_eq!(notes.len(), 2);
+        assert_eq!(tags.len(), 2);
+        // Sorted by time even though the track listed them out of order.
+        assert_eq!(notes[0].hole, 1);
+        assert_eq!(notes[0].time, 0.0);
+        assert_eq!(notes[1].hole, 2);
+        assert_eq!(notes[1].time, 1.0);
+        assert!(notes.iter().all(|n| n.chord_pitches.is_empty()));
+        assert!(tags.iter().all(|t| t.is_none()));
+    }
+
+    #[test]
+    fn a_multi_event_item_shares_one_chord_pitches_set_and_gets_tagged() {
+        let chart = c_diatonic_chart(
+            r#"[
+                {"time":0.0,"duration":0.5,"call":false,"play_mode":"chord",
+                 "events":[
+                    {"hole":1,"action":"blow"},
+                    {"hole":4,"action":"blow"}
+                 ]}
+            ]"#,
+        );
+        let (notes, tags) = build_scheduled_notes(&chart, &AdaptiveDifficulty::default());
+        assert_eq!(notes.len(), 2);
+        assert_eq!(tags, vec![Some("chord"), Some("chord")]);
+        // Both siblings carry the same chord_pitches set (both natural
+        // blow notes are known pitches here), regardless of which hole.
+        assert_eq!(notes[0].chord_pitches, notes[1].chord_pitches);
+        assert_eq!(notes[0].chord_pitches.len(), 2);
+    }
+
+    #[test]
+    fn a_single_event_item_never_gets_a_chord_pitches_set_even_if_call() {
+        let chart = c_diatonic_chart(
+            r#"[
+                {"time":0.0,"duration":0.5,"call":true,
+                 "events":[{"hole":1,"action":"blow"}]}
+            ]"#,
+        );
+        let (notes, _) = build_scheduled_notes(&chart, &AdaptiveDifficulty::default());
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].chord_pitches.is_empty());
+        assert!(notes[0].force_wait, "call: true carries through to force_wait");
+    }
 }

@@ -233,6 +233,27 @@ pub fn first_unresolved_index(notes: &[ScheduledNote]) -> usize {
         .unwrap_or(notes.len())
 }
 
+/// The shared core of `gameplay_2d`/`gameplay_3d`'s own
+/// `resync_notes_on_adaptive_change`: rebuilds `song_notes` for `chart`'s
+/// current unlock state, carries over already-resolved score state
+/// ([`carry_over_note_state`]), and resets the cursor
+/// ([`first_unresolved_index`]). Each mode keeps only its own
+/// visual-despawn (and, for 2D, `NoteRenderAssets::play_mode_tags`) lines —
+/// this is what both call sites had in common before extraction. Returns
+/// the chord/split-badge tags parallel to the rebuilt notes; 3D has no such
+/// badge and discards them.
+pub fn rebuild_song_notes(
+    chart: &crate::song::chart::HarpChart,
+    adaptive: &AdaptiveDifficulty,
+    song_notes: &mut super::SongNotes,
+) -> Vec<Option<&'static str>> {
+    let (mut new_notes, new_tags) = super::build_scheduled_notes(chart, adaptive);
+    carry_over_note_state(&song_notes.notes, &mut new_notes);
+    song_notes.cursor = first_unresolved_index(&new_notes);
+    song_notes.notes = new_notes;
+    new_tags
+}
+
 /// Live per-session cache of a song's phrase sections + adaptive-difficulty
 /// state — built once at song start (`setup_adaptive_difficulty`) from the
 /// chart, [`PlayerProfile`] (learned progress), and the global

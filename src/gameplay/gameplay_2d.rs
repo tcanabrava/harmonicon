@@ -7,7 +7,7 @@ use crate::{
     app::SelectedSong,
     song::NoteThemeConfig,
     song::SongManifest,
-    song::chart::{Action, Modifier, PlayMode},
+    song::chart::{Action, Modifier},
     song::harmonica::twelve_bar,
 };
 use bevy::asset::AssetPath;
@@ -20,7 +20,7 @@ use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_visual_2d::{NoteChildConfig, spawn_note_children};
-use super::adaptive_difficulty::{AdaptiveDifficulty, track_items, unlocked_flags};
+use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
 use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
@@ -92,7 +92,7 @@ pub fn setup(
     // *visuals* are spawned later, lazily, by `spawn_visible_notes` as each
     // one enters the `LOOKAHEAD` window — a long/dense chart no longer pays
     // for every note's UI subtree (and comet-tail material) at song load.
-    let (notes, play_mode_tags) = build_combined_notes(chart, &adaptive);
+    let (notes, play_mode_tags) = super::build_scheduled_notes(chart, &adaptive);
     *song_notes = SongNotes { notes, cursor: 0 };
     *render_assets = NoteRenderAssets {
         head_image: Some(head_image.clone()),
@@ -365,85 +365,6 @@ pub fn setup(
     spawn_countdown(&mut commands, &loc, Some(&harp_hint));
 }
 
-/// Builds every note's score state (see `setup`'s doc comment) plus the
-/// chord/split badge tag parallel to it, filtered/tagged by adaptive
-/// difficulty's current unlock state. Factored out of `setup` so
-/// `resync_notes_on_adaptive_change` can rebuild the same list later, mid-
-/// song, when the pause menu changes `learned`/`enabled` without a Restart.
-fn build_combined_notes(
-    chart: &crate::song::chart::HarpChart,
-    adaptive: &AdaptiveDifficulty,
-) -> (Vec<ScheduledNote>, Vec<Option<&'static str>>) {
-    let items = track_items(&chart.track, &chart.timing);
-    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
-    let mut flags = flags.into_iter();
-    let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
-    for item in &chart.track {
-        let t = super::resolve_item_time(item, &chart.timing);
-        let tag = play_mode_label(item.play_mode.as_ref());
-        // Each event's own modifiers/expected pitch, computed once up front
-        // so the chord-target set (below) doesn't need to redo it.
-        let event_data: Vec<(Vec<Modifier>, Option<u8>)> = item
-            .events
-            .iter()
-            .map(|event| {
-                let modifiers = event.modifiers.clone().unwrap_or_default();
-                let natural_pitch = event.note.clone().unwrap_or_else(|| {
-                    chart
-                        .harmonica
-                        .wind_direction_label(event.hole, &event.action)
-                });
-                let expected_pitch = super::target_pitch(&natural_pitch, &modifiers);
-                (modifiers, expected_pitch)
-            })
-            .collect();
-        // A real chord/octave-split needs every sibling pitch sounding at
-        // once (see `ScheduledNote::chord_pitches`) — a `TrackItem` with
-        // only one event stays an ordinary single note, untouched by this.
-        let chord_pitches: Vec<u8> = if item.events.len() > 1 {
-            event_data.iter().filter_map(|(_, p)| *p).collect()
-        } else {
-            Vec::new()
-        };
-        for (event, (modifiers, expected_pitch)) in item.events.iter().zip(event_data) {
-            let (unlocked, section) = flags.next().unwrap_or((true, 0));
-            if !unlocked {
-                continue;
-            }
-            let is_blow = matches!(event.action, Action::Blow);
-            combined.push((
-                ScheduledNote {
-                    time: t,
-                    duration: item.duration,
-                    hole: event.hole,
-                    is_blow,
-                    expected_pitch,
-                    hit: false,
-                    missed: false,
-                    held: 0.0,
-                    sustain_scored: false,
-                    modifiers,
-                    pitch_samples: Vec::new(),
-                    amp_samples: Vec::new(),
-                    phrase_section: section,
-                    chord_pitches: chord_pitches.clone(),
-                    force_wait: item.call,
-                },
-                tag,
-            ));
-        }
-    }
-    // `score_notes`/`spawn_visible_notes` both rely on this being sorted —
-    // charts are assumed authored in time order, but this makes that an
-    // actual guarantee instead of an assumption.
-    combined.sort_by(|a, b| {
-        a.0.time
-            .partial_cmp(&b.0.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    combined.into_iter().unzip()
-}
-
 /// Rebuilds `SongNotes`/`NoteRenderAssets::play_mode_tags` whenever
 /// `AdaptiveDifficulty` changes while a 2D song is loaded — e.g. the pause
 /// menu's manual phrase override — so unlocking/relocking notes takes
@@ -475,10 +396,8 @@ pub(super) fn resync_notes_on_adaptive_change(
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
     };
-    let (mut new_notes, new_tags) = build_combined_notes(&manifest.chart, &adaptive);
-    super::adaptive_difficulty::carry_over_note_state(&song_notes.notes, &mut new_notes);
-    song_notes.cursor = super::adaptive_difficulty::first_unresolved_index(&new_notes);
-    song_notes.notes = new_notes;
+    let new_tags =
+        super::adaptive_difficulty::rebuild_song_notes(&manifest.chart, &adaptive, &mut song_notes);
     render_assets.play_mode_tags = new_tags;
     for entity in &visuals {
         commands.entity(entity).despawn();
@@ -799,15 +718,6 @@ fn note_rgb(is_blow: bool) -> (f32, f32, f32) {
         (0.25, 0.55, 0.95)
     } else {
         (0.95, 0.38, 0.15)
-    }
-}
-
-/// Label for the multi-note play modes; `single` (and absent) needs no badge.
-fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
-    match mode {
-        Some(PlayMode::Chord) => Some("chord"),
-        Some(PlayMode::Split) => Some("split"),
-        Some(PlayMode::Single) | None => None,
     }
 }
 
@@ -1159,16 +1069,6 @@ mod tests {
         let (r, g, b) = note_rgb(false);
         assert_eq!(draw_head, Color::srgba(r, g, b, 1.0));
         assert_eq!(draw_tail, Color::srgba(r, g, b, 0.95));
-    }
-
-    // ── play_mode_label ───────────────────────────────────────────────────────
-
-    #[test]
-    fn play_mode_label_badges_only_multi_note_modes() {
-        assert_eq!(play_mode_label(Some(&PlayMode::Chord)), Some("chord"));
-        assert_eq!(play_mode_label(Some(&PlayMode::Split)), Some("split"));
-        assert_eq!(play_mode_label(Some(&PlayMode::Single)), None);
-        assert_eq!(play_mode_label(None), None);
     }
 
     // ── note_techniques ───────────────────────────────────────────────────────
