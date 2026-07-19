@@ -30,6 +30,45 @@ playing position, harmonica type (diatonic/chromatic, and hole layout),
 background music file, and song name/author — everything under `song` and
 `harmonica` in the `.harpchart` format.
 
+## Authoring a lesson
+
+The **Recording** field in the meta form cycles between **Record Song**
+and **Record Lesson**. Switching to Record Lesson doesn't change anything
+about editing notes, playing back, or practicing — it just adds a
+curriculum layer on top of the chart you're building, so a lesson's chart
+is really just an ordinary chart with some extra metadata attached.
+
+Click the **▸ Lesson Details** header to expand the curriculum fields
+(collapsed by default, so it stays out of the way while you're just
+placing notes):
+
+- **Lesson ID** and **Unit** — the lesson's identity and which curriculum
+  unit it's grouped under in the [Lessons](lessons.md) list.
+- **Explanation** — the instructional text shown on the lesson's reader
+  page.
+- **Prerequisites** — a comma-separated list of lesson IDs that must be
+  passed first, before this one unlocks.
+- **Pass Criteria** — how the lesson is judged: an accuracy threshold, a
+  specific technique's accuracy, or (for an open-jam lesson with no fixed
+  notes) scale adherence, chord-tone adherence, or phrase discipline.
+  **Threshold** and **Technique** only appear when the chosen criterion
+  actually needs them.
+- **Progression** — the backing chord progression an open-jam lesson
+  starts with (standard, quick-change, minor, or none).
+
+Saving writes a `lesson.json` file (validated against the lesson schema
+before writing) alongside the chart, if the grid has any notes on it.
+**One thing `lesson.json` can't do**: it stores the lesson's title and
+explanation as Fluent *keys*, never the actual display text you typed —
+Harmonicon's translated-text system needs real entries in each supported
+language's locale file, which this tool can't generate for you. After
+saving, check the game's log/console: it prints the exact key/text pairs
+to add by hand.
+
+A lesson save doesn't carry over a MIDI-imported backing track — author
+the chart as an ordinary song first if it needs one, then switch to
+Record Lesson to add the curriculum fields on top.
+
 ## Erasing and removing parts of a song
 
 The **Erase** and **Remove** buttons in the mod panel (next to Delete) turn
