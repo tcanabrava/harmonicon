@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy_fluent::Localization;
 
 use crate::app::{GameplayMode, SelectedArtist};
-use crate::assets_management::AvailableSongs;
+use crate::assets_management::{self, AvailableSongs};
 use crate::dialogs::button_material::ButtonMaterials;
 use crate::localization::LocalizationExt;
 use crate::theme::LoadedTheme;
@@ -70,6 +70,14 @@ pub(crate) fn setup_artist_list(
     spawn_button(
         &mut commands,
         root,
+        &loc.msg("refresh-songs"),
+        &theme,
+        &btn_mats,
+        on_refresh_songs,
+    );
+    spawn_button(
+        &mut commands,
+        root,
         &loc.msg("back"),
         &theme,
         &btn_mats,
@@ -84,4 +92,20 @@ pub(crate) fn setup_artist_list(
             });
         },
     );
+}
+
+/// Re-scans the bundled + external (`~/Harmonicon/songs`) song folders and
+/// re-enters this same page to rebuild the list from the refreshed
+/// `AvailableSongs` — `NextState::set` re-fires `OnExit`/`OnEnter` even for a
+/// same-state transition (see `CLAUDE.md`), which is what makes a self-target
+/// transition rebuild the page at all. Lets a song dropped into
+/// `~/Harmonicon/songs` while the game is already running show up without a
+/// restart.
+fn on_refresh_songs(
+    _: On<Pointer<Click>>,
+    available: ResMut<AvailableSongs>,
+    mut page: ResMut<NextState<MenuPage>>,
+) {
+    assets_management::scan_all_songs(available);
+    page.set(MenuPage::ArtistList);
 }

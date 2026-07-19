@@ -61,6 +61,7 @@ impl Plugin for OptionsPlugin {
                     sync_mic_combobox,
                     update_note_numbers_label,
                     update_adaptive_difficulty_label,
+                    update_fullscreen_label,
                 )
                     .run_if(in_state(MenuPage::Options)),
             );
@@ -124,6 +125,10 @@ struct NoteNumbersLabel;
 #[derive(Component)]
 struct AdaptiveDifficultyLabel;
 
+/// The "Fullscreen: on/off" readout beside its toggle.
+#[derive(Component)]
+struct FullscreenLabel;
+
 /// Current level for a given slider kind.
 fn audio_level(settings: &AudioSettings, kind: VolumeSlider) -> f32 {
     match kind {
@@ -147,6 +152,7 @@ fn setup_options_menu(
     btn_mats: Res<ButtonMaterials>,
     show_numbers: Res<ShowNoteNumbers>,
     adaptive_difficulty: Res<crate::settings::AdaptiveDifficultyEnabled>,
+    fullscreen: Res<crate::settings::FullscreenEnabled>,
 ) {
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"), &theme, "Options");
 
@@ -186,7 +192,7 @@ fn setup_options_menu(
     commands.entity(main_layout).add_child(left_layout);
     commands.entity(main_layout).add_child(right_layout);
 
-    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, &loc, selected_harmonica, asset_server, images, show_numbers, adaptive_difficulty);
+    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, &loc, selected_harmonica, asset_server, images, show_numbers, adaptive_difficulty, fullscreen);
     spawn_right_column(&mut commands, right_layout, theme, btn_mats, &loc);
 }
 
@@ -202,6 +208,7 @@ fn spawn_left_column(
     mut images: ResMut<Assets<Image>>,
     show_numbers: Res<ShowNoteNumbers>,
     adaptive_difficulty: Res<crate::settings::AdaptiveDifficultyEnabled>,
+    fullscreen: Res<crate::settings::FullscreenEnabled>,
 ) {
     spawn_mic_banner(commands, parent, &mic_status);
     spawn_volume_slider(
@@ -269,6 +276,7 @@ fn spawn_left_column(
 
     spawn_note_numbers_toggle(commands, parent, loc, show_numbers.0);
     spawn_adaptive_difficulty_toggle(commands, parent, adaptive_difficulty.0, loc);
+    spawn_fullscreen_toggle(commands, parent, fullscreen.0, loc);
 }
 
 fn spawn_right_column(
@@ -436,6 +444,63 @@ fn update_adaptive_difficulty_label(
     }
     for mut text in &mut labels {
         *text = Text::new(adaptive_difficulty_label_text(&loc, enabled.0));
+    }
+}
+
+/// Flips the fullscreen preference; `settings::apply_fullscreen` mirrors the
+/// resulting `FullscreenEnabled` onto the primary window's `WindowMode`.
+fn toggle_fullscreen(_: On<Pointer<Click>>, mut fullscreen: ResMut<crate::settings::FullscreenEnabled>) {
+    fullscreen.0 = !fullscreen.0;
+}
+
+fn fullscreen_label_text(loc: &Localization, enabled: bool) -> String {
+    if enabled {
+        loc.msg("options-fullscreen-on").into()
+    } else {
+        loc.msg("options-fullscreen-off").into()
+    }
+}
+
+/// A row with a pill button that flips the fullscreen setting plus a label
+/// reflecting the current choice — same shape as
+/// [`spawn_adaptive_difficulty_toggle`].
+fn spawn_fullscreen_toggle(commands: &mut Commands, parent: Entity, enabled: bool, loc: &Localization) {
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(8.0),
+            ..default()
+        })
+        .id();
+    commands.entity(row).with_children(|r| {
+        r.spawn_empty().apply_scene(button::small(
+            &loc.msg("options-fullscreen"),
+            toggle_fullscreen,
+        ));
+        r.spawn((
+            Text::new(fullscreen_label_text(loc, enabled)),
+            TextFont {
+                font_size: FontSize::Px(16.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            FullscreenLabel,
+        ));
+    });
+    commands.entity(parent).add_child(row);
+}
+
+fn update_fullscreen_label(
+    enabled: Res<crate::settings::FullscreenEnabled>,
+    loc: Res<Localization>,
+    mut labels: Query<&mut Text, With<FullscreenLabel>>,
+) {
+    if !enabled.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(fullscreen_label_text(&loc, enabled.0));
     }
 }
 
@@ -1087,5 +1152,12 @@ mod tests {
             adaptive_difficulty_label_text(&loc, false),
             "options-adaptive-difficulty-off"
         );
+    }
+
+    #[test]
+    fn fullscreen_label_picks_the_on_or_off_key() {
+        let loc = Localization::default();
+        assert_eq!(fullscreen_label_text(&loc, true), "options-fullscreen-on");
+        assert_eq!(fullscreen_label_text(&loc, false), "options-fullscreen-off");
     }
 }

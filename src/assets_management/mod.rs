@@ -341,7 +341,11 @@ fn scan_songs_root(
 // drop folder if present, for harmonica models and songs, per artist. The
 // external folder is optional — most players won't have one — so its absence
 // is not a warning, unlike the bundled directory always shipped with the game.
+// Clears `available` first, so this is safe to call again at runtime (e.g. a
+// menu "Refresh" button re-scanning after the player drops a song into
+// `~/Harmonicon/songs`), not just once at Startup.
 pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
+    available.0.clear();
     let bundled_root = std::path::Path::new("assets/songs");
     if bundled_root.is_dir() {
         scan_songs_root(bundled_root, "", &mut available);
@@ -359,4 +363,36 @@ pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
         total,
         available.0.len()
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::ecs::schedule::Schedule;
+
+    #[test]
+    fn scan_all_songs_does_not_duplicate_entries_when_run_again() {
+        let mut world = World::new();
+        world.init_resource::<AvailableSongs>();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(scan_all_songs);
+
+        schedule.run(&mut world);
+        let first: usize = world
+            .resource::<AvailableSongs>()
+            .0
+            .values()
+            .map(|v| v.len())
+            .sum();
+
+        schedule.run(&mut world);
+        let second: usize = world
+            .resource::<AvailableSongs>()
+            .0
+            .values()
+            .map(|v| v.len())
+            .sum();
+
+        assert_eq!(first, second);
+    }
 }

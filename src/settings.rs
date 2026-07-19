@@ -8,6 +8,7 @@
 //! `<config>/harmonicon/settings.json`.
 
 use bevy::prelude::*;
+use bevy::window::{MonitorSelection, PrimaryWindow, WindowMode};
 use figment::{
     Figment,
     providers::{Format, Json, Serialized},
@@ -66,6 +67,13 @@ impl Default for AudioSettings {
 #[derive(Resource, Default)]
 pub struct AdaptiveDifficultyEnabled(pub bool);
 
+/// Whether the game window runs borderless-fullscreen. Edited on the Options
+/// page; `apply_fullscreen` mirrors this onto the primary window's
+/// `WindowMode` whenever it changes (including once at startup, since the
+/// Startup load marks it changed).
+#[derive(Resource, Default)]
+pub struct FullscreenEnabled(pub bool);
+
 /// The on-disk shape of the settings. `#[serde(default)]` lets an older or
 /// hand-edited file omit fields and still load.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -82,6 +90,7 @@ struct Settings {
     input_device: String,
     show_note_numbers: bool,
     adaptive_difficulty_enabled: bool,
+    fullscreen: bool,
 }
 
 impl Default for Settings {
@@ -98,6 +107,7 @@ impl Default for Settings {
             input_device: String::new(),
             show_note_numbers: false,
             adaptive_difficulty_enabled: false,
+            fullscreen: false,
         }
     }
 }
@@ -156,6 +166,7 @@ impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AudioSettings>()
             .init_resource::<AdaptiveDifficultyEnabled>()
+            .init_resource::<FullscreenEnabled>()
             .init_resource::<PendingSave>()
             .add_systems(Startup, apply_loaded_settings)
             // Save whenever either settings resource changes. The Startup load
@@ -171,7 +182,8 @@ impl Plugin for SettingsPlugin {
                          model: Res<SelectedHarmonicaModel>,
                          ui_theme: Res<SelectedTheme>,
                          note_numbers: Res<ShowNoteNumbers>,
-                         adaptive_difficulty: Res<AdaptiveDifficultyEnabled>| {
+                         adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
+                         fullscreen: Res<FullscreenEnabled>| {
                             audio.is_changed()
                                 || theme_2d.is_changed()
                                 || theme_3d.is_changed()
@@ -179,9 +191,11 @@ impl Plugin for SettingsPlugin {
                                 || ui_theme.is_changed()
                                 || note_numbers.is_changed()
                                 || adaptive_difficulty.is_changed()
+                                || fullscreen.is_changed()
                         },
                     ),
                     tick_pending_save,
+                    apply_fullscreen,
                 )
                     .chain(),
             )
@@ -202,6 +216,7 @@ pub fn apply_loaded_settings(
     mut ui_theme: ResMut<SelectedTheme>,
     mut note_numbers: ResMut<ShowNoteNumbers>,
     mut adaptive_difficulty: ResMut<AdaptiveDifficultyEnabled>,
+    mut fullscreen: ResMut<FullscreenEnabled>,
 ) {
     let settings = load_settings();
     audio.music_volume = settings.music_volume;
@@ -215,8 +230,9 @@ pub fn apply_loaded_settings(
     ui_theme.0 = settings.ui_theme;
     note_numbers.0 = settings.show_note_numbers;
     adaptive_difficulty.0 = settings.adaptive_difficulty_enabled;
+    fullscreen.0 = settings.fullscreen;
     info!(
-        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={} note_numbers={} adaptive_difficulty={}",
+        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={} note_numbers={} adaptive_difficulty={} fullscreen={}",
         audio.music_volume,
         audio.metronome_volume,
         audio.input_latency_ms,
@@ -226,6 +242,7 @@ pub fn apply_loaded_settings(
         ui_theme.0,
         note_numbers.0,
         adaptive_difficulty.0,
+        fullscreen.0,
     );
 }
 
@@ -238,6 +255,7 @@ fn save_current(
     ui_theme: &SelectedTheme,
     note_numbers: &ShowNoteNumbers,
     adaptive_difficulty: &AdaptiveDifficultyEnabled,
+    fullscreen: &FullscreenEnabled,
 ) {
     save_settings(&Settings {
         music_volume: audio.music_volume,
@@ -251,6 +269,7 @@ fn save_current(
         ui_theme: ui_theme.0.clone(),
         show_note_numbers: note_numbers.0,
         adaptive_difficulty_enabled: adaptive_difficulty.0,
+        fullscreen: fullscreen.0,
     });
 }
 
@@ -287,6 +306,7 @@ fn tick_pending_save(
     ui_theme: Res<SelectedTheme>,
     note_numbers: Res<ShowNoteNumbers>,
     adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
+    fullscreen: Res<FullscreenEnabled>,
 ) {
     let (should_save, remaining) = tick_debounce(pending.0, time.delta_secs());
     pending.0 = remaining;
@@ -299,6 +319,7 @@ fn tick_pending_save(
             &ui_theme,
             &note_numbers,
             &adaptive_difficulty,
+            &fullscreen,
         );
     }
 }
@@ -315,6 +336,7 @@ fn flush_pending_save_on_exit(
     ui_theme: Res<SelectedTheme>,
     note_numbers: Res<ShowNoteNumbers>,
     adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
+    fullscreen: Res<FullscreenEnabled>,
 ) {
     if exit.read().next().is_none() || pending.0.is_none() {
         return;
@@ -328,7 +350,28 @@ fn flush_pending_save_on_exit(
         &ui_theme,
         &note_numbers,
         &adaptive_difficulty,
+        &fullscreen,
     );
+}
+
+/// Mirrors [`FullscreenEnabled`] onto the primary window's `WindowMode`.
+/// Borderless (not exclusive) fullscreen, so toggling doesn't require a
+/// video-mode change/re-negotiation with the display server.
+fn apply_fullscreen(
+    fullscreen: Res<FullscreenEnabled>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+) {
+    if !fullscreen.is_changed() {
+        return;
+    }
+    let Ok(mut window) = windows.single_mut() else {
+        return;
+    };
+    window.mode = if fullscreen.0 {
+        WindowMode::BorderlessFullscreen(MonitorSelection::Current)
+    } else {
+        WindowMode::Windowed
+    };
 }
 
 #[cfg(test)]
@@ -349,6 +392,20 @@ mod tests {
         // off, not silently on.
         let s: Settings = serde_json::from_str("{}").unwrap();
         assert!(!s.adaptive_difficulty_enabled);
+    }
+
+    // ── FullscreenEnabled ────────────────────────────────────────────────────
+
+    #[test]
+    fn fullscreen_is_off_by_default() {
+        assert!(!FullscreenEnabled::default().0);
+        assert!(!Settings::default().fullscreen);
+    }
+
+    #[test]
+    fn missing_fullscreen_field_defaults_off_via_serde_default() {
+        let s: Settings = serde_json::from_str("{}").unwrap();
+        assert!(!s.fullscreen);
     }
 
     // ── tick_debounce ────────────────────────────────────────────────────────
