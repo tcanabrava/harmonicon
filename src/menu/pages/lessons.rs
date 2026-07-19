@@ -13,7 +13,10 @@ use bevy_fluent::Localization;
 
 use crate::dialogs::button;
 use crate::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
-use crate::lessons::{AvailableLessons, LessonContext, LessonEntry, PassCriteria, group_by_unit, is_unlocked};
+use crate::lessons::{
+    AvailableLessons, LessonContext, LessonEntry, LessonsRescanned, PassCriteria, group_by_unit,
+    is_unlocked,
+};
 use crate::localization::LocalizationExt;
 use crate::profile::{PlayerProfile, record_lesson, save_profile};
 use crate::song::SongManifest;
@@ -246,6 +249,23 @@ pub(crate) fn repopulate_lesson_list(
     let ix = selected_unit.0.min(units.len() - 1);
     commands.entity(list).despawn_related::<Children>();
     populate_lesson_rows(&mut commands, list, units[ix].1.as_slice(), &profile, &loc);
+}
+
+/// `lessons::catalog` rescans `AvailableLessons` live when
+/// `~/Harmonicon/lessons` changes; if the Lessons list page happens to be
+/// open when that happens, force a same-page rebuild (`NextState::set`
+/// re-fires `OnExit`/`OnEnter` even for a same-state transition — see
+/// `CLAUDE.md`) — a full rebuild rather than just re-populating the current
+/// tab's rows, since a new/removed unit can change the tab bar itself, not
+/// just one unit's row list. Message-driven for the same staleness reason
+/// `artist_list::rebuild_on_songs_rescanned` documents.
+pub(crate) fn rebuild_on_lessons_rescanned(
+    mut rescanned: MessageReader<LessonsRescanned>,
+    mut page: ResMut<NextState<MenuPage>>,
+) {
+    if rescanned.read().next().is_some() {
+        page.set(MenuPage::Lessons);
+    }
 }
 
 /// Fixed width every lesson-list row (locked or not) is spawned at, so a

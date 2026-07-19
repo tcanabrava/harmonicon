@@ -8,6 +8,7 @@ use std::path::Path;
 use bevy::prelude::*;
 
 use super::manifest::{LessonManifest, parse_lesson};
+use crate::assets_management::ExternalFolderChanged;
 
 /// A discovered lesson: its manifest plus the asset path its chart loads
 /// from (`None` for instructional-only lessons).
@@ -38,12 +39,15 @@ pub fn group_by_unit(lessons: &[LessonEntry]) -> Vec<(&str, Vec<&LessonEntry>)> 
     units
 }
 
-/// Scans `root` (the bundled `assets/lessons` tree) for
-/// `<unit_dir>/<lesson_dir>/lesson.json`, sorted by directory name so the
-/// `01_`/`02_` prefixes give the curriculum order. `asset_prefix` is what
-/// the chart's engine-facing asset path starts with (`"lessons"` in the
-/// game; a temp dir in tests). Invalid manifests are logged and skipped —
-/// one bad lesson must not take down the whole menu.
+/// Scans `root` (the bundled `assets/lessons` tree, or the external
+/// `~/Harmonicon/lessons` drop folder) for `<unit_dir>/<lesson_dir>/
+/// lesson.json`, sorted by directory name so the `01_`/`02_` prefixes give
+/// the curriculum order. `asset_prefix` is what the chart's engine-facing
+/// asset path starts with (`"lessons"` for the bundled tree,
+/// `"external://lessons"` for the drop folder — same `AssetSource` scheme
+/// prefix `assets_management::scan_artist_song` uses for external songs; a
+/// temp dir in tests). Invalid manifests are logged and skipped — one bad
+/// lesson must not take down the whole menu.
 fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
     let mut entries = Vec::new();
     let mut unit_dirs: Vec<_> = match std::fs::read_dir(root) {
@@ -96,10 +100,52 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
     entries
 }
 
+/// Bundled `assets/lessons` plus, if present, an external
+/// `~/Harmonicon/lessons` drop folder — mirroring
+/// `assets_management::scan_all_songs`'s bundled+external pattern. Bundled
+/// entries come first, so curriculum ordering/prerequisites among the
+/// shipped lessons are unaffected by whatever a player drops in.
+fn scan_all_lessons() -> Vec<LessonEntry> {
+    let mut entries = scan_lessons_root(Path::new("assets/lessons"), "lessons");
+    if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/lessons")) {
+        entries.extend(scan_lessons_root(&external_root, "external://lessons"));
+    }
+    entries
+}
+
 fn scan_lessons(mut available: ResMut<AvailableLessons>) {
-    available.0 = scan_lessons_root(Path::new("assets/lessons"), "lessons");
+    available.0 = scan_all_lessons();
     let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
     info!("Found {} lesson(s): {:?}", ids.len(), ids);
+}
+
+/// Fired only when a *live* filesystem event under `~/Harmonicon/lessons`
+/// actually triggered a rescan — see `assets_management::watch::
+/// ExternalFolderChanged`'s doc comment for why this is a message rather
+/// than a bare `AvailableLessons::is_changed()` poll.
+#[derive(Message)]
+pub struct LessonsRescanned;
+
+/// This module's own consumer of the shared `~/Harmonicon` watcher's
+/// generic change signal — `assets_management` stays agnostic of what a
+/// lesson is (it's low-level shared vocabulary; lessons is a feature built
+/// on top, so the dependency points this way and not the reverse), while
+/// still reusing its one OS-level watch instead of starting a second one
+/// scoped to `lessons/` alone.
+fn rescan_lessons_on_external_change(
+    mut changed: MessageReader<ExternalFolderChanged>,
+    mut available: ResMut<AvailableLessons>,
+    mut rescanned: MessageWriter<LessonsRescanned>,
+) {
+    let dirty = changed
+        .read()
+        .any(|ev| ev.top_level_dirs.contains("lessons"));
+    if dirty {
+        available.0 = scan_all_lessons();
+        let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
+        info!("Re-scanned lessons: found {} lesson(s): {:?}", ids.len(), ids);
+        rescanned.write(LessonsRescanned);
+    }
 }
 
 pub struct LessonsPlugin;
@@ -107,13 +153,16 @@ pub struct LessonsPlugin;
 impl Plugin for LessonsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AvailableLessons>()
-            .add_systems(Startup, scan_lessons);
+            .add_message::<LessonsRescanned>()
+            .add_systems(Startup, scan_lessons)
+            .add_systems(Update, rescan_lessons_on_external_change);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::ecs::schedule::Schedule;
 
     fn entry(id: &str, unit: &str) -> LessonEntry {
         LessonEntry {
@@ -182,5 +231,48 @@ mod tests {
         assert_eq!(entries[1].chart_asset_path, None);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_external_asset_prefix_builds_an_external_source_chart_path() {
+        let dir = std::env::temp_dir().join(format!(
+            "harmonicon_lessons_ext_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let p = dir.join("01_basics/01_first/lesson.json");
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(
+            &p,
+            r#"{"id":"first","unit":"basics","title_key":"t","body_key":"b",
+                "chart":"song/chart.harpchart"}"#,
+        )
+        .unwrap();
+
+        let entries = scan_lessons_root(&dir, "external://lessons");
+        assert_eq!(
+            entries[0].chart_asset_path.as_deref(),
+            Some("external://lessons/01_basics/01_first/song/chart.harpchart")
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── scan_lessons (Startup system) ────────────────────────────────────────
+
+    #[test]
+    fn scan_lessons_does_not_duplicate_entries_when_run_again() {
+        let mut world = World::new();
+        world.init_resource::<AvailableLessons>();
+        let mut schedule = Schedule::default();
+        schedule.add_systems(scan_lessons);
+
+        schedule.run(&mut world);
+        let first = world.resource::<AvailableLessons>().0.len();
+
+        schedule.run(&mut world);
+        let second = world.resource::<AvailableLessons>().0.len();
+
+        assert_eq!(first, second);
     }
 }

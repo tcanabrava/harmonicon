@@ -76,6 +76,10 @@ impl Plugin for MenuPlugin {
             )
             .add_systems(OnExit(MenuPage::Lessons), scene::cleanup_menu)
             .add_systems(
+                Update,
+                pages::lessons::rebuild_on_lessons_rescanned.run_if(in_state(MenuPage::Lessons)),
+            )
+            .add_systems(
                 OnEnter(MenuPage::LessonReader),
                 pages::lessons::setup_lesson_reader,
             )

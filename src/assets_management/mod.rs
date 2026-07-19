@@ -4,9 +4,22 @@ use bevy::prelude::*;
 use std::{collections::HashMap, fs::DirEntry};
 
 mod watch;
-pub use watch::{SongsRescanned, ThemesRescanned};
+pub use watch::ExternalFolderChanged;
 
 pub struct AssetsManagementPlugin;
+
+/// Fired only when a *live* filesystem event actually triggered a rescan of
+/// `AvailableSongs` — distinct from that resource simply changing (which
+/// also happens once, uneventfully, from the ordinary Startup scan). A menu
+/// page that's already open needs exactly this distinction to tell "the
+/// watcher just found something new, rebuild me" from "this resource merely
+/// exists" (see `watch::ExternalFolderChanged`'s doc comment).
+#[derive(Message)]
+pub struct SongsRescanned;
+
+/// The `themes/` sibling of [`SongsRescanned`].
+#[derive(Message)]
+pub struct ThemesRescanned;
 
 #[derive(Debug, Clone)]
 // Struct representing a song entry in the menu
@@ -145,7 +158,38 @@ impl Plugin for AssetsManagementPlugin {
                     watch::start_watching_external_folder,
                 ),
             )
-            .add_systems(Update, watch::process_external_folder_events);
+            .add_systems(
+                Update,
+                (watch::process_external_folder_events, rescan_on_external_change).chain(),
+            );
+    }
+}
+
+/// Consumes `watch::ExternalFolderChanged` for the two kinds this module
+/// owns (`songs`/`themes`), re-scanning + firing the matching `*Rescanned`
+/// message for whichever actually changed. `lessons::catalog` has its own
+/// sibling consumer of the same message for `lessons`.
+fn rescan_on_external_change(
+    mut changed: MessageReader<ExternalFolderChanged>,
+    available_songs: ResMut<AvailableSongs>,
+    available_themes: ResMut<AvailableThemes>,
+    mut songs_rescanned: MessageWriter<SongsRescanned>,
+    mut themes_rescanned: MessageWriter<ThemesRescanned>,
+) {
+    let mut dirty_songs = false;
+    let mut dirty_themes = false;
+    for ev in changed.read() {
+        dirty_songs |= ev.top_level_dirs.contains("songs");
+        dirty_themes |= ev.top_level_dirs.contains("themes");
+    }
+
+    if dirty_songs {
+        scan_all_songs(available_songs);
+        songs_rescanned.write(SongsRescanned);
+    }
+    if dirty_themes {
+        scan_ui_themes(available_themes);
+        themes_rescanned.write(ThemesRescanned);
     }
 }
 
