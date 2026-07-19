@@ -21,10 +21,11 @@
 //! only runs for `ContentKind::Song`) — author the chart as a song first if
 //! it needs one, then switch to Lesson mode to add the curriculum fields.
 
+use bevy::picking::Pickable;
+use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
-use super::state::{ContentKind, EditorState, LESSON_FIELDS, Scroll};
-use super::ui::LessonFormGroup;
+use super::state::{ContentKind, EditorState, Field, LESSON_FIELDS, Scroll};
 use super::{LOAD_PURPOSE, SAVE_PURPOSE};
 use crate::dialogs::file_dialog::FileChosen;
 use crate::dialogs::tooltip::Tooltip;
@@ -33,9 +34,49 @@ use crate::localization::LocalizationExt;
 use crate::theme::SongEditorColors;
 use bevy_fluent::prelude::Localization;
 
-/// The lesson-only fields panel — one row per [`LESSON_FIELDS`] entry,
-/// reusing `meta_form::spawn_field_row` (the exact same click-to-cycle/
-/// type-to-edit machinery the song fields use). Hidden by default;
+// ── Components ────────────────────────────────────────────────────────────────
+// Owned by this module alone (nothing outside it queries these), same
+// "components live with their one feature" precedent `playback.rs`/
+// `timeline.rs` already set, rather than centralizing in `ui.rs`.
+
+/// Wraps the lesson-only fields panel, shown only while
+/// [`ContentKind::Lesson`] is active — see [`update_lesson_form_visibility`],
+/// which mirrors `panel::update_mode_visibility`'s `Node::display` approach.
+#[derive(Component)]
+pub(super) struct LessonFormGroup;
+
+/// The lesson-fields panel's collapsible body — folded by default, toggled
+/// by clicking [`spawn_lesson_details_header`]'s label. See
+/// [`update_lesson_details_visibility`].
+#[derive(Component)]
+pub(super) struct LessonDetailsBody;
+
+/// The lesson-details header's clickable label, ▸/▾ forms cached at spawn
+/// time like `panel::RecordButtonLabel`'s idle/active pair.
+#[derive(Component)]
+pub(super) struct LessonDetailsToggleLabel {
+    collapsed: String,
+    expanded: String,
+}
+
+/// Wraps a lesson field row whose visibility depends on another field's
+/// value rather than always applying (`LessonThreshold`/`LessonTechnique`
+/// today) — same one-component-per-variant shape as `ui::TimelineToolButton`.
+/// See [`update_lesson_conditional_rows`].
+#[derive(Component)]
+pub(super) struct LessonConditionalRow(Field);
+
+/// The lesson-only fields panel: a click-to-fold header (collapsed by
+/// default — see [`spawn_lesson_details_header`]) above a two-column body,
+/// the same left/right split `meta_form::spawn_meta_form` uses for the song
+/// fields (halving 8 rows' worth of height). [`LESSON_FIELDS`]'s own order
+/// puts the split to good use: the first half is curriculum identity
+/// (id/unit/explanation/prerequisites), the second is the pass-criteria
+/// cluster (kind/threshold/technique/progression) — so the two columns read
+/// as two related groups, not an arbitrary halving. `LessonThreshold`/
+/// `LessonTechnique` are further hidden unless the current
+/// `lesson_pass_criteria` actually needs them — see
+/// [`update_lesson_conditional_rows`]. Hidden entirely by default;
 /// [`update_lesson_form_visibility`] shows it once `ContentKind::Lesson` is
 /// active.
 pub(super) fn spawn_lesson_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
@@ -44,17 +85,97 @@ pub(super) fn spawn_lesson_form(root: &mut ChildSpawnerCommands, loc: &Localizat
         Node {
             width: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(6.0),
-            padding: UiRect::all(Val::Px(12.0)),
             display: Display::None,
             ..default()
         },
         Tooltip(String::from(loc.msg("editor-lesson-form-tooltip"))),
     ))
-    .with_children(|col| {
-        for &(field, label) in &LESSON_FIELDS {
-            super::meta_form::spawn_field_row(col, loc, colors, field, label);
-        }
+    .with_children(|group| {
+        spawn_lesson_details_header(group, loc, colors);
+
+        const MID: usize = LESSON_FIELDS.len() / 2;
+        group
+            .spawn((
+                LessonDetailsBody,
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(24.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    // Folded by default (`EditorState::lesson_details_expanded`
+                    // starts `false`) — set directly here rather than relying
+                    // on `update_lesson_details_visibility`'s first tick, same
+                    // as `LessonFormGroup` itself above.
+                    display: Display::None,
+                    ..default()
+                },
+            ))
+            .with_children(|form| {
+                super::meta_form::spawn_form_column(form, |col| {
+                    for &(field, label) in &LESSON_FIELDS[..MID] {
+                        spawn_conditional_field_row(col, loc, colors, field, label);
+                    }
+                });
+                super::meta_form::spawn_form_column(form, |col| {
+                    for &(field, label) in &LESSON_FIELDS[MID..] {
+                        spawn_conditional_field_row(col, loc, colors, field, label);
+                    }
+                });
+            });
+    });
+}
+
+/// [`super::meta_form::spawn_field_row`], tagging the row afterward if it's
+/// one of the two whose visibility [`update_lesson_conditional_rows`]
+/// controls — every other field is unconditional, same as before.
+fn spawn_conditional_field_row(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+    field: Field,
+    label: &str,
+) {
+    let row = super::meta_form::spawn_field_row(col, loc, colors, field, label);
+    if matches!(field, Field::LessonThreshold | Field::LessonTechnique) {
+        col.commands().entity(row).insert(LessonConditionalRow(field));
+    }
+}
+
+/// The clickable "▸ Lesson Details" / "▾ Lesson Details" header — toggles
+/// `EditorState::lesson_details_expanded` on click. Both label forms are
+/// cached at spawn time (one `loc.msg` call), same reasoning as
+/// `panel::spawn_record_button`'s `RecordButtonLabel` idle/active pair.
+fn spawn_lesson_details_header(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    let title = String::from(loc.msg("editor-lesson-details-header"));
+    let collapsed = format!("\u{25B8} {title}");
+    let expanded = format!("\u{25BE} {title}");
+
+    col.spawn((
+        Button,
+        Node {
+            width: Val::Percent(100.0),
+            align_items: AlignItems::Center,
+            padding: UiRect::all(Val::Px(8.0)),
+            ..default()
+        },
+        Tooltip(String::from(loc.msg("editor-lesson-details-toggle-tooltip"))),
+    ))
+    .observe(
+        |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+            state.lesson_details_expanded = !state.lesson_details_expanded;
+        },
+    )
+    .with_children(|b| {
+        b.spawn((
+            LessonDetailsToggleLabel { collapsed: collapsed.clone(), expanded },
+            Text::new(collapsed),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(colors.label),
+            Pickable::IGNORE,
+        ));
     });
 }
 
@@ -68,6 +189,48 @@ pub(super) fn update_lesson_form_visibility(
     let visible = state.content_kind == ContentKind::Lesson;
     for mut node in &mut groups {
         node.display = if visible { Display::Flex } else { Display::None };
+    }
+}
+
+/// Folds/unfolds the lesson-details body and swaps the header's label to
+/// match `EditorState::lesson_details_expanded`.
+pub(super) fn update_lesson_details_visibility(
+    state: Res<EditorState>,
+    mut bodies: Query<&mut Node, With<LessonDetailsBody>>,
+    mut labels: Query<(&mut Text, &LessonDetailsToggleLabel)>,
+) {
+    for mut node in &mut bodies {
+        node.display = if state.lesson_details_expanded {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+    for (mut text, label) in &mut labels {
+        **text = if state.lesson_details_expanded {
+            label.expanded.clone()
+        } else {
+            label.collapsed.clone()
+        };
+    }
+}
+
+/// Hides [`Field::LessonThreshold`]'s row when there's no pass criterion to
+/// threshold (`"none"`), and [`Field::LessonTechnique`]'s row unless the
+/// criterion is specifically `"technique"` — the only two [`LESSON_FIELDS`]
+/// rows whose relevance depends on another field's value rather than
+/// always applying.
+pub(super) fn update_lesson_conditional_rows(
+    state: Res<EditorState>,
+    mut rows: Query<(&mut Node, &LessonConditionalRow)>,
+) {
+    for (mut node, row) in &mut rows {
+        let show = match row.0 {
+            Field::LessonThreshold => state.lesson_pass_criteria != "none",
+            Field::LessonTechnique => state.lesson_pass_criteria == "technique",
+            _ => true,
+        };
+        node.display = if show { Display::Flex } else { Display::None };
     }
 }
 

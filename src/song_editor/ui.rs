@@ -62,12 +62,11 @@ pub(super) struct HarmonicaKindText;
 #[derive(Component)]
 pub(super) struct ContentKindText;
 
-/// Wraps the lesson-only fields panel (`lesson_form::spawn_lesson_form`),
-/// shown only while [`super::state::ContentKind::Lesson`] is active — see
-/// `lesson_form::update_lesson_form_visibility`, which mirrors
-/// `update_mode_visibility`'s `Node::display` approach.
-#[derive(Component)]
-pub(super) struct LessonFormGroup;
+// `LessonFormGroup`/`LessonDetailsBody`/`LessonDetailsToggleLabel`/
+// `LessonConditionalRow` — the lesson-fields panel's own components — live
+// in `lesson_form.rs` itself, not here, since nothing outside that module
+// uses them (same "components live with their one feature" precedent
+// `playback.rs`/`timeline.rs` already set).
 
 #[derive(Component)]
 pub(super) struct NoteView(pub(super) u32);
