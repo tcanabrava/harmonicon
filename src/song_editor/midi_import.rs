@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-//! Import a MIDI file's track into the note grid — the Song Editor's
-//! analogue of `bin/midi_to_chart`, but generalized to whatever harmonica
-//! key the editor session is currently set to (not a fixed C diatonic),
-//! and producing [`GridNote`]s in memory instead of writing a chart file,
-//! since here the destination is [`EditorState`], not disk. The *key*
+//! Import a MIDI file's track into the note grid, generalized to whatever
+//! harmonica key the editor session is currently set to (not a fixed C
+//! diatonic), producing [`GridNote`]s in memory rather than writing a chart
+//! file, since here the destination is [`EditorState`], not disk. The *key*
 //! isn't actually fixed to whatever was already selected, though: picking
 //! a track ([`on_midi_track_selected`]) auto-picks whichever [`HARP_KEYS`]
 //! entry needs the fewest bend/slide/nearest-note fallbacks to play the
@@ -15,16 +14,15 @@
 //! bigger, more disruptive change than a key (one more click to undo).
 //!
 //! The MIDI-file *parsing* itself (tempo map, note extraction, track
-//! names) is shared with `bin/midi_to_chart` via `crate::song::midi` — the
-//! two tools only differ in what they do with a parsed track afterward:
-//! the bin's pitch mapping is intentionally simpler (fixed C diatonic, no
-//! chromatic/slide support, no key suggestion), while this module supports
-//! both harmonica kinds, any key, and auto key suggestion.
+//! names) is shared, low-level code living in `crate::song::midi`; this
+//! module builds on it with the editor-specific pieces: pitch-to-harp
+//! resolution ([`map_pitch`]), key suggestion ([`suggest_key`]), and
+//! converting a MIDI tempo map into the editor's own tick/BPM units
+//! ([`editor_tempo_map`]).
 
 use bevy::prelude::*;
 use midly::Smf;
 
-use super::midi_parse::editor_tempo_map;
 use super::playback::build_harp;
 use super::state::{
     Dir, EditorState, Expr, GridNote, HARP_KEYS, HarmonicaKind, Pitch, max_bend, pitch_compatible,
@@ -33,10 +31,9 @@ use super::{MIDI_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::midi_to_freq_hz;
 use crate::audio_system::synth::{PhraseNote, render_pcm};
 use crate::dialogs::combobox::{ComboboxSelect, spawn_combobox};
-use crate::song::chart::seconds_to_tick;
 use crate::dialogs::file_dialog::FileChosen;
 use crate::localization::LocalizationExt;
-use crate::song::chart::Action;
+use crate::song::chart::{Action, TempoPoint, seconds_to_tick};
 use crate::song::harmonica::Harmonica;
 use crate::song::midi::{
     collect_tempo_map, extract_notes, note_on_count, tick_to_seconds, ticks_per_quarter,
@@ -237,6 +234,31 @@ pub(super) fn list_midi_tracks(bytes: &[u8]) -> Result<Vec<MidiTrackInfo>, Strin
         .collect())
 }
 
+/// Converts a MIDI tempo map (`(tick, microseconds_per_quarter)`, file `tpq`
+/// units) into the editor's own tempo map (`TICKS_PER_BEAT` ticks, `bpm`).
+/// Each point is placed by its *real time* position (`tick_to_seconds`/
+/// `seconds_to_tick` against the already-converted prefix), not its raw
+/// tick, since a MIDI file's `tpq` has no fixed ratio to the editor's
+/// resolution the way two `resolution: TICKS_PER_BEAT` charts do (see
+/// `harpchart::load_harpchart`'s simpler constant-ratio rescaling there).
+fn editor_tempo_map(midi_tempo: &[(u64, u32)], tpq: u32) -> Vec<TempoPoint> {
+    let mut editor_map: Vec<TempoPoint> = Vec::with_capacity(midi_tempo.len());
+    for &(tick, us) in midi_tempo {
+        let bpm = (60_000_000.0 / us as f64).clamp(20.0, 300.0) as f32;
+        let editor_tick = if editor_map.is_empty() {
+            0
+        } else {
+            let secs = tick_to_seconds(tick, tpq, midi_tempo);
+            seconds_to_tick(secs, TICKS_PER_BEAT as u32, &editor_map)
+        };
+        editor_map.push(TempoPoint {
+            tick: editor_tick,
+            bpm,
+        });
+    }
+    editor_map
+}
+
 pub(super) struct ImportedTrack {
     pub(super) initial_bpm: f32,
     /// Every tempo change after the opening one, already in the editor's
@@ -301,9 +323,8 @@ pub(super) fn import_track_notes(
     })
 }
 
-/// A copy of the MIDI file with `track_index` removed — the same
-/// "processed" copy `bin/midi_to_chart` writes, so the original file the
-/// user picked is never modified.
+/// A "processed" copy of the MIDI file with `track_index` removed, so the
+/// original file the user picked is never modified.
 pub(super) fn remove_track_bytes(bytes: &[u8], track_index: usize) -> Result<Vec<u8>, String> {
     let mut smf = Smf::parse(bytes).map_err(|e| e.to_string())?;
     if track_index >= smf.tracks.len() {
@@ -482,6 +503,32 @@ mod tests {
     use crate::song::harmonica::{chromatic_harp, richter_harp};
     use midly::num::u24;
     use midly::MetaMessage;
+
+    // ── editor_tempo_map ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn a_single_tempo_point_lands_at_tick_zero() {
+        let map = editor_tempo_map(&[(0, 500_000)], 480);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map[0].tick, 0);
+        assert!((map[0].bpm - 120.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn a_later_tempo_change_is_placed_by_real_time_not_raw_tick() {
+        // 480 tpq at 120 BPM: tick 480 is exactly one beat (0.5s) in, which
+        // is exactly TICKS_PER_BEAT in the editor's own resolution.
+        let map = editor_tempo_map(&[(0, 500_000), (480, 250_000)], 480);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map[1].tick, TICKS_PER_BEAT as u64);
+        assert!((map[1].bpm - 240.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn bpm_is_clamped_to_a_sane_range() {
+        let map = editor_tempo_map(&[(0, 20_000_000)], 480); // 3 BPM, absurdly slow
+        assert!((map[0].bpm - 20.0).abs() < 0.01);
+    }
 
     // ── map_pitch ─────────────────────────────────────────────────────────────────
 

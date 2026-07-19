@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-//! Pure MIDI-file parsing shared by every tool that reads a `.mid` file:
-//! `song_editor::midi_import`'s track listing/pitch mapping/note import, and
-//! `bin/midi_to_chart`'s standalone converter. Reading track names/note
-//! counts, tempo maps, and note on/off pairs out of a parsed `midly::Smf` —
-//! no pitch-to-harp resolution or chart-building happens here, that's each
-//! caller's own concern. Promoted out of `song_editor` (where both this and
-//! `bin/midi_to_chart` used to keep their own near-identical copies) since
-//! the crate is lib + bins precisely so tools can share code like this.
+//! Pure MIDI-file parsing used by `song_editor::midi_import`'s track
+//! listing/pitch mapping/note import: reading track names/note counts,
+//! tempo maps, and note on/off pairs out of a parsed `midly::Smf` — no
+//! pitch-to-harp resolution or chart-building happens here, that's the
+//! caller's own concern. Lives here rather than in `song_editor` (low-level
+//! shared vocabulary, not editor-specific) — it used to also be shared with
+//! `bin/midi_to_chart`, a standalone converter since removed once the
+//! editor's own MIDI import covered the same ground in-game.
 
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
 use std::collections::HashMap;
@@ -120,9 +120,9 @@ pub fn extract_notes(track: &[midly::TrackEvent]) -> Vec<RawNote> {
 
 // ── Shared test fixtures ─────────────────────────────────────────────────────
 //
-// Also used by `song_editor::midi_parse`/`midi_import`'s own tests
-// (constructing the same fake MIDI byte streams), hence `pub` and
-// module-level rather than nested in `mod tests` below.
+// Also used by `song_editor::midi_import`'s own tests (constructing the
+// same fake MIDI byte streams), hence `pub` and module-level rather than
+// nested in `mod tests` below.
 
 #[cfg(test)]
 pub fn meta(delta: u32, kind: MetaMessage<'static>) -> midly::TrackEvent<'static> {

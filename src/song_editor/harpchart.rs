@@ -510,9 +510,9 @@ pub(super) fn handle_save_chosen(
 }
 
 /// Writes the two extra files a MIDI-backed save produces alongside the
-/// chart itself: a copy of the original MIDI with the imported track
-/// removed (the same "processed" copy `bin/midi_to_chart` writes — the
-/// original the user picked is never modified), and a synthesized WAV
+/// chart itself: a "processed" copy of the original MIDI with the imported
+/// track removed (the original the user picked is never modified), and a
+/// synthesized WAV
 /// mixdown of every *other* track as the song's backing audio. The engine
 /// can't play a raw `.mid` file, so this is what "use the MIDI file as the
 /// background song" resolves to — see `song::loader`'s `song/music.wav`

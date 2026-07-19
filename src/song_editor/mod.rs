@@ -26,7 +26,6 @@ mod lesson_form;
 mod material;
 mod meta_form;
 mod midi_import;
-mod midi_parse;
 mod mod_panel;
 mod panel;
 mod panel_widgets;
