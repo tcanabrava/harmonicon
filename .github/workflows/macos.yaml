@@ -1,0 +1,72 @@
+name: macOS bundle
+
+# Verifies the macOS .app/.dmg packaging still builds — release.yaml has the
+# same bundling steps, but that workflow only runs on a tag push, so a
+# packaging regression there would otherwise go unnoticed until someone
+# actually cut a release (the same problem flatpak.yaml's own header comment
+# describes, and the same fix: check it on every push/PR too). Builds for
+# the runner's native arch only (Apple Silicon — GitHub's macOS runners are
+# ARM) since this is just confirming the bundle still assembles;
+# release.yaml is still what cross-builds both architectures for an actual
+# tagged release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/macos.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/macos.yaml'
+  workflow_dispatch:
+
+env:
+  binary: harmonicon
+
+jobs:
+  macos-bundle:
+    name: Build .app / .dmg
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-macos-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Build (release)
+        run: cargo build --release --bin ${{ env.binary }}
+
+      - name: Assemble .app bundle and create .dmg
+        run: |
+          mkdir -p ${{ env.binary }}.app/Contents/MacOS
+          cp target/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/
+          cp -r assets ${{ env.binary }}.app/Contents/MacOS/
+          hdiutil create -fs HFS+ -volname "${{ env.binary }}" -srcfolder ${{ env.binary }}.app ${{ env.binary }}.dmg
+
+      - name: Upload .dmg as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: ${{ env.binary }}.dmg
+          name: macos-dmg
+          retention-days: 7
