@@ -254,11 +254,25 @@ Manual testing needs a mic, audio out, and a display.
     stores the raw file bytes (not a parsed `midly::Smf`, which borrows
     them) and re-parses on demand, so switching the picked track needs no
     lifetime bookkeeping across frames.
-  - **The Song Editor can also record notes live** (`song_editor::record`,
-    a Perform-mode transport button next to Practice, its label swapping
-    to "Stop Recording" while active via `ui::RecordButtonLabel` +
-    `panel::update_record_button_label` — the same cached-base-text pattern
-    `ModButtonLabel` already uses for a mod button's rate suffix), sharing
+  - **The Song Editor can also record notes live** (`song_editor::record`;
+    `Mode::Record` is its own top-level mode alongside Edit and Play —
+    `state::Mode`, one visibility-toggled button group each, see
+    `panel::update_mode_visibility` — with its own Play/Pause/Stop/Finish
+    transport in `transport::spawn_record_buttons`: Play starts a take
+    *from the current playhead position* or resumes a paused one; Pause
+    freezes the take in place, closing any held note
+    (`record::pause_record`); Stop ends the take leaving the playhead
+    where it stopped; Finish ends it and rewinds to zero. While no take
+    runs, clicking the beat ruler parks the playhead at that tick as a
+    paused transport (`timeline::on_timeline_click_seek`) and the next
+    take records from there — the background music is sought to the same
+    offset via `playback::PendingMusicSeek`, a one-shot applied when the
+    freshly spawned sink appears, since `AudioSink` doesn't exist yet in
+    the system that spawns the `AudioPlayer`. Recording also *punches in*:
+    a recorded note removes any note overlapping its span that isn't part
+    of the current take (`RecordState::take_ids` — same-take chords must
+    coexist; `punch_out_overlaps`), so re-recording replaces instead of
+    layering impossible blow-and-draw-at-once combos.) Recording shares
     `pitch_map`'s resolution instead of reading file bytes — the
     microphone/pitch pipeline (`main.rs`'s `process_audio`) already runs
     continuously regardless of `AppState`, the same `PitchEvent` stream

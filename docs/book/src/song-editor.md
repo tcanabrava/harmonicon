@@ -13,13 +13,14 @@ without writing JSON directly.
   its body to move it. The **mod panel** on the side sets the selected
   note's technique: Blow/Draw direction, bend depth, overblow/overdraw,
   slide (chromatic only), wah/vibrato rate, or delete it outright.
-- **Perform mode** — plays the chart back (▶ Play / ⏸ Pause / ■ Stop), or
-  switches to **Practice** mode: play along on your actual harmonica and
-  get the same live pitch feedback a real song gives, against the chart
+- **Record mode** — play your harmonica and have it write notes onto the
+  grid for you, with its own Play/Pause/Stop/Finish transport (see
+  [Recording notes live](#recording-notes-live) below).
+- **Play mode** — plays the chart back (▶ Play / ⏸ Pause / ■ Stop), or
+  switches to **Practice**: play along on your actual harmonica and get
+  the same live pitch feedback a real song gives, against the chart
   you're currently editing — the fastest way to sanity-check a chart
-  actually feels right before saving it. **⏺ Record** goes the other
-  direction: play your harmonica and have it write notes onto the grid for
-  you (see [Recording notes live](#recording-notes-live) below).
+  actually feels right before saving it.
 - **Lock** — freezes the grid against accidental edits while you're just
   reviewing or practicing.
 
@@ -119,17 +120,39 @@ in place, during the real game.
 
 ## Recording notes live
 
-**⏺ Record** (Perform mode) writes a chart by ear: click it — the button
-changes to **⏹ Stop Recording** — then play your harmonica. Each note
-appears on the grid the instant you start playing it and keeps growing for
-as long as you hold it, so you watch it take shape in real time rather than
-only seeing it once you stop. Notes are mapped onto your currently selected
-harp key and type exactly the way MIDI import maps a file's notes (an exact
-note where one exists, a bend or slide where one doesn't) — a bend you
-actually play and hold is recorded as a bend, not snapped to the nearest
-natural note. The status bar shows a running count of notes captured while
-you play. Click Stop Recording, or Stop, to end the take — whatever note
-you're still holding at that instant stops growing right there.
+**Record mode** writes a chart by ear, with a transport of its own:
+
+- **▶ Play** starts a take from the current playhead position — the
+  beginning on a fresh take, wherever you clicked on the ruler, wherever
+  the last take stopped, or (resuming) wherever you paused. The chart's
+  background music plays from that same position.
+- **⏸ Pause** freezes the take in place — whatever note you're holding is
+  closed right there — and Play (or Pause again) resumes exactly where you
+  left off, as the same take.
+- **⏹ Stop** ends the take and leaves the playhead where it stopped, so
+  the next take can pick up from there.
+- **⏹ Finish** ends the take and rewinds to the beginning — you're done,
+  or ready to re-record the passage from the top.
+
+While no take is running, **clicking the ruler above the grid moves the
+red playhead line** to that spot; Play then records from there — the
+quickest way to punch in on a specific passage.
+
+Each note appears on the grid the instant you start playing it and keeps
+growing for as long as you hold it, so you watch it take shape in real
+time rather than only seeing it once you stop. Notes are mapped onto your
+currently selected harp key and type exactly the way MIDI import maps a
+file's notes (an exact note where one exists, a bend or slide where one
+doesn't) — a bend you actually play and hold is recorded as a bend, not
+snapped to the nearest natural note. The status bar shows a running count
+of notes captured while you play.
+
+Recording **punches in**: a note you play replaces whatever the grid
+already had at that moment — notes from an earlier take, imported or
+hand-placed ones — instead of stacking impossible blow-and-draw-at-once
+combinations on top of them. Notes played earlier in the *same* take
+(including the other notes of a chord) are never touched, and neither is
+anything at times you stay silent over.
 
 While recording, pitch detection is tuned to your selected harp: only
 sounds that harp can actually make are considered (a stray harmonic or
@@ -145,11 +168,11 @@ hears the music too and can record its notes as yours), and the **MPM**
 pitch algorithm on the Options page is a strong choice for single-note
 playing.
 
-Recording only ever *adds* notes; it never deletes or replaces what's
-already on the grid, so you can record several takes (or record over an
-imported/hand-placed part) without losing earlier work. If the chart has
-background music set, it plays automatically while you record, the same as
-Play and Practice, so you can play along to it.
+Outside the span you actually play over, recording never deletes or
+replaces what's already on the grid, so successive takes build up a chart
+incrementally. If the chart has background music set, it plays
+automatically while you record, the same as Play and Practice, so you can
+play along to it.
 
 ## Saving and loading
 

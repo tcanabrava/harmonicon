@@ -263,6 +263,20 @@ this file — prune it back to a one-line summary under "Shipped" below.
   `timeline.rs` split its overlay/rendering half into
   `timeline_overlay.rs` to stay under the file-size budget. See
   `CLAUDE.md`'s timeline-tools bullet.
+- **Song editor: Record as a first-class mode** — the editor's modes are
+  now Edit / Record / Play (`state::Mode`; Perform renamed to Play, the
+  record button moved out of it), each with its own button group. Record
+  mode has a Play/Pause/Stop/Finish transport
+  (`transport::spawn_record_buttons` — `mod_panel`'s transport clusters
+  split into `song_editor/transport.rs` for the file-size budget): pause
+  resumes in place as the same take, Stop keeps the playhead position for
+  the next take, Finish rewinds to zero; a take starts from the playhead
+  position (a Record-mode click on the beat ruler parks it —
+  `timeline::on_timeline_click_seek` — and the background music is sought
+  to match via `playback::PendingMusicSeek`). Recording now *punches in*
+  (`record::punch_out_overlaps`/`RecordState::take_ids`): a recorded note
+  replaces overlapping notes from outside the current take instead of
+  layering impossible simultaneous blow/draw combos on top of them.
 
 ## Current work
 
