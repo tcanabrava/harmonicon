@@ -41,8 +41,10 @@ use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy_fluent::prelude::Localization;
 
+use super::playback::{Playhead, secs_per_tick};
+use super::record::RecordState;
 use super::state::{
-    EditorState, Scroll, Side, TimelineDrag, TimelineSelection, TimelineTool, erase_range,
+    EditorState, Mode, Scroll, Side, TimelineDrag, TimelineSelection, TimelineTool, erase_range,
     normalize_range, remove_range, split_side_range, toggle_tempo_point,
 };
 use super::{BEATS_PER_BAR, BEAT_W, TICKS_PER_BEAT, TICK_W};
@@ -177,13 +179,42 @@ pub(super) fn on_timeline_click_tempo(
     rels: Query<&RelativeCursorPosition>,
     mut state: ResMut<EditorState>,
 ) {
-    if state.timeline_tool != TimelineTool::Tempo {
+    if state.mode != Mode::Edit || state.timeline_tool != TimelineTool::Tempo {
         return;
     }
     let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
         return;
     };
     toggle_tempo_point(&mut state, tick);
+}
+
+/// Record mode's own use of the ruler: a click parks the playhead (the red
+/// `PlayheadLine`) at the clicked tick, and the next take records from
+/// there — see `record::start_record`, which reads `Playhead::elapsed` as
+/// its start position. Armed as a *paused* transport (`playing` + `paused`)
+/// so the line is visible while parked; every route out of Record mode
+/// already stops the transport, so the armed state can't leak into
+/// Play/Edit. Ignored while a take is actually running — the playhead is
+/// the recording's own cursor then.
+pub(super) fn on_timeline_click_seek(
+    ev: On<Pointer<Click>>,
+    geoms: Query<&TimelineSurfaceGeometry>,
+    rels: Query<&RelativeCursorPosition>,
+    state: Res<EditorState>,
+    record: Res<RecordState>,
+    mut playhead: ResMut<Playhead>,
+) {
+    if state.mode != Mode::Record || record.active {
+        return;
+    }
+    let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
+        return;
+    };
+    let spt = secs_per_tick(&state);
+    playhead.secs_per_tick = spt;
+    playhead.elapsed = tick as f32 * spt;
+    playhead.playing = true;
+    playhead.paused = true;
 }
 
 pub(super) fn on_timeline_drag_start(
@@ -194,7 +225,10 @@ pub(super) fn on_timeline_drag_start(
     scroll: Res<Scroll>,
     mut sel: ResMut<TimelineSelection>,
 ) {
-    if state.timeline_tool != TimelineTool::Select {
+    // The timeline tools are Edit-mode concepts (their toggle buttons live
+    // in the Edit tool strip); a still-armed tool must not hijack ruler
+    // clicks in Record mode, whose own seek handler owns them there.
+    if state.mode != Mode::Edit || state.timeline_tool != TimelineTool::Select {
         return;
     }
 
