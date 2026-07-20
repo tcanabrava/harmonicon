@@ -21,7 +21,7 @@ use bevy::prelude::*;
 use bevy_fluent::Localization;
 
 use crate::audio_system::midi::{next_key, prev_key};
-use crate::audio_system::pitch_detect::PitchRange;
+use crate::audio_system::pitch_detect::{PITCH_RANGE_MARGIN_SEMITONES, PitchRange};
 use crate::audio_system::wav::encode_wav;
 use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_explanation};
 use crate::dialogs::button;
@@ -38,7 +38,7 @@ use super::harmonica_overlay::{
     CELL_DEFAULT, DiagramCellTarget, HarpOverlayCell, Row, spawn_harmonica_overlay_selectable,
 };
 use super::metronome_overlay::{MetronomeTempo, spawn_metronome};
-use super::{ActivePitches, GameplayClock, GameplayRoot, PITCH_RANGE_MARGIN_SEMITONES};
+use super::{ActivePitches, GameplayClock, GameplayRoot};
 
 const MIN_BPM: f32 = 40.0;
 const MAX_BPM: f32 = 220.0;

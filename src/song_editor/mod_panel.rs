@@ -22,6 +22,7 @@ use super::record::{RecordState, start_record, stop_record};
 use super::state::{ContentKind, EditorState, Mode, TimelineTool};
 use super::ui::{EditModeGroup, ModButton, ModeButton, PerformModeGroup, TimelineToolButton};
 use super::{AppState, LOAD_PURPOSE, SAVE_PURPOSE};
+use crate::audio_system::pitch_detect::PitchRange;
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::localization::LocalizationExt;
 use crate::settings::AudioSettings;
@@ -91,13 +92,14 @@ pub(super) fn spawn_mod_panel(
                      mut practice: ResMut<PracticeState>,
                      mut record: ResMut<RecordState>,
                      mut playhead: ResMut<Playhead>,
+                     mut pitch_range: ResMut<PitchRange>,
                      mut commands: Commands| {
                         state.mode = Mode::Edit;
                         // Leaving Perform mode hides Play/Pause/Stop/Practice/
                         // Record, so nothing would be left to stop anything
                         // that's running.
                         stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
-                        stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
+                        stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
                     },
                 );
                 mode_button(
@@ -364,6 +366,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
          mut practice: ResMut<PracticeState>,
          mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
+         mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands| {
             // Paused, not stopped: resume in place rather than restarting.
             if playhead.playing && playhead.paused {
@@ -375,7 +378,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
             // close it out (rather than letting `start_playback` below
             // silently repurpose it out from under `record.open`) before
             // taking over.
-            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
+            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
             start_playback(
                 &state,
                 &mut sources,
@@ -408,9 +411,10 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
          mut practice: ResMut<PracticeState>,
          mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
+         mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands| {
             stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
-            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
+            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
         },
     );
     transport_button(
@@ -426,6 +430,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
          mut practice: ResMut<PracticeState>,
          mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
+         mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands,
          loc: Res<Localization>,
          sinks: Query<&AudioSink, With<EditorAudio>>| {
@@ -439,7 +444,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
             } else {
                 // A recording in progress owns the shared `Playhead` clock —
                 // close it out before `start_practice` below repurposes it.
-                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
+                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
                 start_practice(
                     &state,
                     &mut sources,
@@ -467,9 +472,10 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
          mut practice: ResMut<PracticeState>,
          mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
+         mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands| {
             if record.active {
-                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut commands);
+                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
             } else {
                 practice.reset(); // exit practice mode before recording, same as Play does
                 start_record(
@@ -479,6 +485,7 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
                     &playing,
                     &mut record,
                     &mut playhead,
+                    &mut pitch_range,
                     &mut commands,
                 );
             }

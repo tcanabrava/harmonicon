@@ -29,6 +29,7 @@ mod midi_import;
 mod mod_panel;
 mod panel;
 mod panel_widgets;
+mod pitch_map;
 mod scroll;
 // `pub(crate)`, not private like its neighbours: `gameplay::call_response`
 // shares this module's synth (`PhraseNote`/`render_pcm`/`encode_wav`) for

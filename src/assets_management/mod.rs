@@ -301,7 +301,7 @@ fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
 fn clean_song_path(full_path: &std::path::Path) -> Option<String> {
     let mut ancestor = full_path;
     while let Some(parent) = ancestor.parent() {
-        if ancestor.file_name().map_or(false, |name| name == "songs") {
+        if ancestor.file_name().is_some_and(|name| name == "songs") {
             break;
         }
         ancestor = parent;
@@ -336,13 +336,13 @@ pub fn scan_artist_song(
             for song_file in std::fs::read_dir(song_dir.path().join("song")).ok()? {
                 let entry = song_file.ok()?;
                 let path = entry.path();
-                let is_music_file = path.extension().map_or(false, |ext| ext == "harpchart");
+                let is_music_file = path.extension().is_some_and(|ext| ext == "harpchart");
 
                 if is_music_file {
                     return Some(entry);
                 }
             }
-            return None;
+            None
         })();
 
         let Some(song_file) = song_file else {

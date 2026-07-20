@@ -8,7 +8,7 @@ use bevy::audio::Volume;
 use bevy::prelude::*;
 
 use crate::app::{AppState, GameplayMode, SelectedSong};
-use crate::audio_system::pitch_detect::PitchRange;
+use crate::audio_system::pitch_detect::{PITCH_RANGE_MARGIN_SEMITONES, PitchRange};
 use crate::song::SongManifest;
 
 use super::bars::parse_beats;
@@ -37,12 +37,6 @@ pub(crate) fn reset_score(
     *improv_gate = improv::ImprovGate::default();
     *improv_stats = improv::ImprovStats::default();
 }
-
-/// Semitone margin added on each side of the harmonica's natural range when
-/// sizing the pitch detector — covers bends/overblows landing just past a
-/// charted note plus a little slop before a clean attack. Also used by the
-/// bend trainer, which derives its own range from the current key.
-pub(crate) const PITCH_RANGE_MARGIN_SEMITONES: f32 = 1.0;
 
 /// Extra seconds after the last note before the results screen, so the final
 /// notes ring out.

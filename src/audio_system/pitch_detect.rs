@@ -28,6 +28,13 @@ impl Default for PitchRange {
     }
 }
 
+/// Semitone margin added on each side of a harmonica's natural range when
+/// sizing [`PitchRange`] from it — covers bends/overblows landing just past
+/// a charted note plus a little slop before a clean attack. Shared by
+/// gameplay's chart-driven range, the bend trainer's key-driven one, and
+/// the song editor's record mode.
+pub const PITCH_RANGE_MARGIN_SEMITONES: f32 = 1.0;
+
 impl PitchRange {
     /// Bounds spanning `freqs`, widened by `margin_semitones` on each side so
     /// a bend or attack landing just past a charted note still detects.
@@ -534,6 +541,14 @@ fn parabolic_vertex(c: &[f32], tau: usize) -> f32 {
 
 const MPM_CLARITY: f32 = 0.9;
 
+// A frame is only voiced when its best NSDF value reaches this. The 0.9
+// `MPM_CLARITY` above is *relative* (which key maximum to pick); without an
+// absolute floor too, an unpitched frame — breath noise loud enough to pass
+// the RMS silence gate — still reports whichever lag happens to score
+// highest, however weakly periodic. A cleanly played harmonica note scores
+// well above this; broadband noise well below.
+const MPM_MIN_CLARITY: f32 = 0.6;
+
 /// Estimate f0 with MPM, or `None` if the block is too short or no key maximum
 /// lands a clear pitch within `range`.
 fn mpm_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f32> {
@@ -580,9 +595,10 @@ fn mpm_pitch(samples: &[f32], sample_rate: u32, range: PitchRange) -> Option<f32
         }
     }
 
-    // Pick the first key maximum within MPM_CLARITY of the strongest one.
+    // Pick the first key maximum within MPM_CLARITY of the strongest one —
+    // but only if the frame is periodic enough to be voiced at all.
     let strongest = maxima.iter().map(|&t| nsdf[t]).fold(f32::MIN, f32::max);
-    if strongest <= 0.0 {
+    if strongest < MPM_MIN_CLARITY {
         return None;
     }
     let threshold = MPM_CLARITY * strongest;

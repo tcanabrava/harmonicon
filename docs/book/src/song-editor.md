@@ -127,6 +127,20 @@ natural note. The status bar shows a running count of notes captured while
 you play. Click Stop Recording, or Stop, to end the take — whatever note
 you're still holding at that instant stops growing right there.
 
+While recording, pitch detection is tuned to your selected harp: only
+sounds that harp can actually make are considered (a stray harmonic or
+room noise at an impossible pitch is ignored rather than snapped onto the
+grid), a note that flickers for only a single instant is treated as noise
+and removed again, and a brief detection dropout mid-note won't split a
+held note in two. Detected notes are also placed slightly earlier than the
+moment they're recognized, compensating for the analysis delay — plus
+whatever input latency you've calibrated on the Options page — so takes
+land on the beat you actually played. Two tips for cleaner takes: wear
+headphones if the chart has background music (otherwise the microphone
+hears the music too and can record its notes as yours), and the **MPM**
+pitch algorithm on the Options page is a strong choice for single-note
+playing.
+
 Recording only ever *adds* notes; it never deletes or replaces what's
 already on the grid, so you can record several takes (or record over an
 imported/hand-placed part) without losing earlier work. If the chart has

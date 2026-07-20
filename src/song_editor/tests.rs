@@ -797,7 +797,7 @@ fn note_freq_reads_the_chromatic_layout_and_slide_table() {
 
 #[test]
 fn render_and_wav_have_expected_size() {
-    let notes = vec![note(4, Dir::Draw, Pitch::Normal)];
+    let notes = [note(4, Dir::Draw, Pitch::Normal)];
     let harp = build_harp("C", HarmonicaKind::Diatonic);
     let phrase: Vec<PhraseNote> = notes
         .iter()

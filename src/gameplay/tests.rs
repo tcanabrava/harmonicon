@@ -12,6 +12,7 @@ use crate::settings::AudioSettings;
 use crate::song::chart::Modifier;
 
 use super::*;
+use super::lifecycle::cleanup_gameplay;
 
 // ── TechniqueStats / SongStats::record_technique ───────────────────────
 

@@ -122,6 +122,21 @@ fn mpm_rejects_silence() {
     );
 }
 
+#[test]
+fn mpm_rejects_unpitched_noise() {
+    // Deterministic white-ish noise (LCG), loud enough that only the
+    // absolute clarity floor — not the RMS silence gate — can reject it.
+    // Models breath noise into the mic, which must not read as a note.
+    let mut seed = 0x12345678u32;
+    let samples: Vec<f32> = (0..4096)
+        .map(|_| {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            (seed >> 8) as f32 / (1 << 24) as f32 - 0.5
+        })
+        .collect();
+    assert_eq!(mpm_pitch(&samples, 44100, PitchRange::default()), None);
+}
+
 // Render the FFT magnitude spectrum of a sum of sine tones, the way
 // `analyze` would, so the NMF detector can be tested directly.
 fn magnitudes_of(freqs: &[f32], sample_rate: u32, n: usize) -> Vec<f32> {

@@ -147,7 +147,7 @@ fn setup_options_menu(
     harmonicas: Res<AvailableHarmonicas>,
     selected_harmonica: Res<SelectedHarmonicaModel>,
     asset_server: Res<AssetServer>,
-    mut images: ResMut<Assets<Image>>,
+    images: ResMut<Assets<Image>>,
     theme: Res<LoadedTheme>,
     btn_mats: Res<ButtonMaterials>,
     show_numbers: Res<ShowNoteNumbers>,

@@ -41,7 +41,6 @@ pub use clock::*;
 pub use gameplay_2d::HIT_H_PCT;
 pub use hud::*;
 pub use judge::*;
-pub(crate) use lifecycle::*;
 pub use notes::*;
 pub use plugin::*;
 pub use state::*;
