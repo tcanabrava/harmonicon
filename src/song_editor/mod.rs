@@ -114,6 +114,7 @@ impl Plugin for SongEditor2Plugin {
             .init_resource::<practice::PracticeState>()
             .init_resource::<record::RecordState>()
             .init_resource::<state::TimelineSelection>()
+            .init_resource::<playback::PendingMusicSeek>()
             .init_resource::<waveform::MusicWaveform>()
             .add_systems(
                 Update,
@@ -142,6 +143,7 @@ impl Plugin for SongEditor2Plugin {
                             .run_if(resource_exists_and_changed::<state::EditorState>),
                     )
                         .chain(),
+                    playback::apply_pending_music_seek,
                     playback::update_playhead_view.after(playback::advance_playhead),
                     playback::update_progress_bar.after(playback::advance_playhead),
                     // Practice/record ticks run after the playhead advances so `elapsed` is current.

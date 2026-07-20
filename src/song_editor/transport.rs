@@ -12,9 +12,9 @@ use bevy::prelude::*;
 
 use super::harpchart::safe_path_segment;
 use super::panel_widgets::transport_button;
-use super::playback::{EditorAudio, Playhead, start_playback, toggle_pause};
+use super::playback::{EditorAudio, PendingMusicSeek, Playhead, start_playback, toggle_pause};
 use super::practice::{PracticeState, start_practice, stop_practice};
-use super::record::{RecordState, start_record, stop_record};
+use super::record::{RecordState, pause_record, start_record, stop_record};
 use super::state::{ContentKind, EditorState};
 use super::{LOAD_PURPOSE, SAVE_PURPOSE};
 use crate::audio_system::pitch_detect::PitchRange;
@@ -232,6 +232,7 @@ pub(super) fn spawn_record_buttons(panel: &mut ChildSpawnerCommands, loc: &Local
          mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
          mut pitch_range: ResMut<PitchRange>,
+         mut music_seek: ResMut<PendingMusicSeek>,
          mut commands: Commands| {
             if record.active {
                 // Paused, not stopped: resume in place rather than
@@ -250,6 +251,7 @@ pub(super) fn spawn_record_buttons(panel: &mut ChildSpawnerCommands, loc: &Local
                 &mut record,
                 &mut playhead,
                 &mut pitch_range,
+                &mut music_seek,
                 &mut commands,
             );
         },
@@ -260,11 +262,18 @@ pub(super) fn spawn_record_buttons(panel: &mut ChildSpawnerCommands, loc: &Local
         loc.msg("editor-pause-tooltip"),
         colors.transport_pause,
         |_: On<Pointer<Click>>,
-         record: Res<RecordState>,
+         mut state: ResMut<EditorState>,
+         mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
          sinks: Query<&AudioSink, With<EditorAudio>>| {
-            if record.active {
+            if !record.active {
+                return;
+            }
+            if playhead.paused {
+                // Toggle back out of pause — same resume the Play button does.
                 toggle_pause(&mut playhead, &sinks);
+            } else {
+                pause_record(&mut state, &mut record, &mut playhead, &sinks);
             }
         },
     );

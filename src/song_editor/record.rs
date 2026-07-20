@@ -47,7 +47,10 @@ use crate::song::harmonica::Harmonica;
 #[cfg(test)]
 use super::TICKS_PER_BEAT;
 use super::pitch_map::map_pitch_playable;
-use super::playback::{EditorAudio, Playhead, build_harp, secs_per_tick, spawn_background_music};
+use super::playback::{
+    EditorAudio, PendingMusicSeek, Playhead, build_harp, secs_per_tick, spawn_background_music,
+    toggle_pause,
+};
 use super::state::{Dir, EditorState, Expr, GridNote, HarmonicaKind, Pitch};
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
@@ -114,16 +117,20 @@ impl RecordState {
 
 // ── Public entry points ───────────────────────────────────────────────────────
 
-/// Starts recording: resets any prior take's state, precomputes the
-/// harp-derived pitch table and narrows [`PitchRange`] to the harp (see the
-/// module docs), and (re)starts the shared [`Playhead`] clock with an
-/// effectively unbounded `total` — unlike Play/Practice, which stop once
-/// the chart's own notes run out, a recording take has no natural end until
-/// the player stops it. Reusing `Playhead` this way also means
-/// `PlayheadLine`'s existing moving cursor gives live visual feedback of
-/// where new notes are landing, with no new plumbing. Also plays the
-/// chart's background music, if any, exactly as Play and Practice do, so
-/// there's something to record along to.
+/// Starts recording *from the playhead's current position* — zero on a
+/// fresh take or after Finish, wherever the last take stopped after Stop,
+/// or wherever a Record-mode timeline click parked it. Resets any prior
+/// take's state, precomputes the harp-derived pitch table and narrows
+/// [`PitchRange`] to the harp (see the module docs), and (re)starts the
+/// shared [`Playhead`] clock with an effectively unbounded `total` —
+/// unlike Play/Practice, which stop once the chart's own notes run out, a
+/// recording take has no natural end until the player stops it. Reusing
+/// `Playhead` this way also means `PlayheadLine`'s existing moving cursor
+/// gives live visual feedback of where new notes are landing, with no new
+/// plumbing. Also plays the chart's background music, if any, exactly as
+/// Play and Practice do — sought to the same start position (via
+/// [`PendingMusicSeek`]) so a mid-song take records against the right
+/// part of the song.
 pub(super) fn start_record(
     state: &EditorState,
     sources: &mut Assets<AudioSource>,
@@ -132,6 +139,7 @@ pub(super) fn start_record(
     record: &mut RecordState,
     playhead: &mut Playhead,
     pitch_range: &mut PitchRange,
+    music_seek: &mut PendingMusicSeek,
     commands: &mut Commands,
 ) {
     for e in playing {
@@ -150,15 +158,39 @@ pub(super) fn start_record(
         .map(|(lo, hi)| PitchRange::from_freqs([lo, hi], PITCH_RANGE_MARGIN_SEMITONES))
         .unwrap_or_default();
 
+    let from = playhead.elapsed.max(0.0);
     *playhead = Playhead {
         playing: true,
         paused: false,
-        elapsed: 0.0,
+        elapsed: from,
         total: f32::MAX,
         secs_per_tick: secs_per_tick(state),
     };
 
-    spawn_background_music(state, sources, settings, commands);
+    if spawn_background_music(state, sources, settings, commands) && from > 0.0 {
+        music_seek.0 = Some(from);
+    }
+}
+
+/// Pauses an in-flight take: closes out every currently-sounding note at
+/// the pause instant (the same close-out a release or Stop performs — a
+/// held note shouldn't stay open across a pause and absorb it), then
+/// freezes the shared clock and the music via the same
+/// [`toggle_pause`] Play mode uses. Resuming is just `toggle_pause` again
+/// (the Play/Pause buttons handle that side); the take stays active
+/// throughout, so `record_tick` merely idles while paused.
+pub(super) fn pause_record(
+    state: &mut EditorState,
+    record: &mut RecordState,
+    playhead: &mut Playhead,
+    sinks: &Query<&AudioSink, With<EditorAudio>>,
+) {
+    if !record.active || playhead.paused {
+        return;
+    }
+    let t = (playhead.elapsed - record.detect_delay).max(0.0);
+    finish_open_notes(record, &mut state.notes, t, playhead.secs_per_tick);
+    toggle_pause(playhead, sinks);
 }
 
 /// Stops recording: closes out every still-sounding note at the exact
@@ -206,8 +238,9 @@ pub(super) fn record_tick(
     mut record: ResMut<RecordState>,
     mut state: ResMut<EditorState>,
 ) {
-    if !record.active {
-        // Drain unread pitch events so they don't pile up while idle.
+    if !record.active || playhead.paused {
+        // Drain unread pitch events so they don't pile up while idle or
+        // paused — a pitch sounding during a pause is not part of the take.
         for _ in pitch_events.read() {}
         return;
     }

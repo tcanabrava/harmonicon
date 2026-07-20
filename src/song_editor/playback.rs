@@ -24,6 +24,33 @@ pub(super) struct PlayheadLine;
 #[derive(Component)]
 pub(super) struct EditorProgressFill;
 
+/// A one-shot seek to apply to the *next* editor audio sink that appears.
+/// `spawn_background_music` can only spawn an `AudioPlayer`; the `AudioSink`
+/// it needs to seek is inserted later by Bevy's audio systems, so a
+/// mid-song start (recording from a clicked/paused position) parks the
+/// offset here and [`apply_pending_music_seek`] delivers it once the sink
+/// exists.
+#[derive(Resource, Default)]
+pub(super) struct PendingMusicSeek(pub(super) Option<f32>);
+
+/// Seeks a freshly created editor music sink to the parked
+/// [`PendingMusicSeek`] offset, then clears it — see that type's docs.
+pub(super) fn apply_pending_music_seek(
+    mut pending: ResMut<PendingMusicSeek>,
+    sinks: Query<&AudioSink, (With<EditorAudio>, Added<AudioSink>)>,
+) {
+    let Some(offset) = pending.0 else {
+        return;
+    };
+    let Some(sink) = sinks.iter().next() else {
+        return;
+    };
+    if let Err(e) = sink.try_seek(std::time::Duration::from_secs_f32(offset.max(0.0))) {
+        warn!("Song editor: couldn't seek background music to {offset:.2}s: {e:?}");
+    }
+    pending.0 = None;
+}
+
 #[derive(Resource, Default)]
 pub(super) struct Playhead {
     pub(super) playing: bool,
