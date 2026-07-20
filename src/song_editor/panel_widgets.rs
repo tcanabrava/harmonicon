@@ -13,7 +13,7 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use super::interaction::apply_modifier;
-use super::state::{EditorState, TimelineDrag, TimelineTool, normalize_range};
+use super::state::{EditorState, TimelineDrag, TimelineSelection, TimelineTool, normalize_range};
 use super::timeline::request_confirm;
 use super::ui::{BendDot, ModButton, ModButtonLabel, ModeButton, TimelineToolButton, RecordButtonLabel};
 use crate::dialogs::confirm_dialog::OpenConfirmDialog;
@@ -102,8 +102,9 @@ pub(super) fn timeline_tool_button(
             move |_: On<Pointer<Click>>,
                 loc: Res<Localization>,
                 mut state: ResMut<EditorState>,
+                mut sel: ResMut<TimelineSelection>,
                 mut open: MessageWriter<OpenConfirmDialog>| {
-                if let Some(TimelineDrag { start, end }) = state.timeline_drag {
+                if let Some(TimelineDrag { start, end, .. }) = sel.drag {
                     let (s, e) = normalize_range(start, end);
                     if kind == TimelineToolButton(TimelineTool::Erase) {
                         state.timeline_tool = TimelineTool::Erase;
@@ -119,7 +120,7 @@ pub(super) fn timeline_tool_button(
                 } else {
                     kind.0
                 };
-                state.timeline_drag = None;
+                sel.drag = None;
                 state.timeline_split = None;
             },
         )

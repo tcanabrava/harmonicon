@@ -1658,14 +1658,14 @@ fn timeline_tool_is_active_is_false_only_for_none() {
 
 #[test]
 fn drag_end_tick_advances_by_whole_ticks_moved_right() {
-    assert_eq!(drag_end_tick(4, TICK_W, 1.0), 5);
-    assert_eq!(drag_end_tick(4, 3.0 * TICK_W, 1.0), 7);
+    assert_eq!(drag_end_tick(4, TICK_W, 1.0, 0.0), 5);
+    assert_eq!(drag_end_tick(4, 3.0 * TICK_W, 1.0, 0.0), 7);
 }
 
 #[test]
 fn drag_end_tick_moves_back_left_and_clamps_at_zero() {
-    assert_eq!(drag_end_tick(4, -TICK_W, 1.0), 3);
-    assert_eq!(drag_end_tick(4, -10.0 * TICK_W, 1.0), 0);
+    assert_eq!(drag_end_tick(4, -TICK_W, 1.0, 0.0), 3);
+    assert_eq!(drag_end_tick(4, -10.0 * TICK_W, 1.0, 0.0), 0);
 }
 
 #[test]
@@ -1674,7 +1674,21 @@ fn drag_end_tick_divides_out_the_ui_scale_before_converting() {
     // raw window pixels — dividing by `ui_scale` first is what keeps
     // the drag tracking the pointer 1:1 regardless of zoom level, the
     // same correction `grid.rs`'s note-move drag already applies.
-    assert_eq!(drag_end_tick(4, 2.0 * TICK_W, 2.0), 5);
+    assert_eq!(drag_end_tick(4, 2.0 * TICK_W, 2.0, 0.0), 5);
+}
+
+#[test]
+fn drag_end_tick_adds_the_grid_scroll_since_the_press() {
+    // A mid-drag wheel pan scrolls the content under a stationary
+    // pointer: the span's end must follow what's now under the pointer,
+    // so scroll delta counts like pointer motion.
+    assert_eq!(drag_end_tick(4, 0.0, 1.0, 2.0 * TICK_W), 6);
+    // Scroll delta is in logical px (like `Scroll::px` itself), so it is
+    // NOT divided by the UI scale the way raw pointer pixels are.
+    assert_eq!(drag_end_tick(4, 2.0 * TICK_W, 2.0, 2.0 * TICK_W), 7);
+    // Scrolling back before the press position clamps at zero like any
+    // other leftward motion.
+    assert_eq!(drag_end_tick(4, 0.0, 1.0, -10.0 * TICK_W), 0);
 }
 
 // ── TimelineSurfaceGeometry::tick_at ─────────────────────────────────────────
@@ -1685,7 +1699,7 @@ fn tick_at_recenters_the_minus_half_to_half_normalized_range() {
     // surface's own width, not 0..1 — a click at the surface's left
     // edge (-0.5) must resolve to tick 0, not get clamped away.
     let geom = TimelineSurfaceGeometry {
-        scroll_beat: 0,
+        scroll_px: 0.0,
         width_px: 20.0 * TICK_W,
     };
     assert_eq!(geom.tick_at(-0.5), 0);
@@ -1694,20 +1708,19 @@ fn tick_at_recenters_the_minus_half_to_half_normalized_range() {
 }
 
 #[test]
-fn tick_at_offsets_by_the_surfaces_own_scroll_beat() {
+fn tick_at_offsets_by_the_surfaces_own_scroll_position() {
     let geom = TimelineSurfaceGeometry {
-        scroll_beat: 4,
+        scroll_px: 16.0 * TICK_W,
         width_px: 20.0 * TICK_W,
     };
-    // scroll_beat=4 beats = 16 ticks (TICKS_PER_BEAT=4) added on top of
-    // the in-surface position.
+    // Scrolled 16 ticks in: the surface's left edge sits at tick 16.
     assert_eq!(geom.tick_at(-0.5), 16);
 }
 
 #[test]
 fn tick_at_clamps_outside_the_surfaces_own_bounds() {
     let geom = TimelineSurfaceGeometry {
-        scroll_beat: 0,
+        scroll_px: 0.0,
         width_px: 20.0 * TICK_W,
     };
     assert_eq!(geom.tick_at(-5.0), 0);

@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: MIT
 
-//! The timeline ruler's Erase/Remove editing tool. With a tool selected
+//! The timeline ruler's Select editing tool. With Select active
 //! (`EditorState::timeline_tool`), the header strip above the note grid
-//! becomes interactive two ways:
+//! builds a range selection ([`TimelineSelection`]) two ways:
 //!
 //! - **Click, hover, click**: a plain click drops a split point
 //!   (`EditorState::timeline_split`); hovering left or right of it previews
 //!   that whole side (song start..split, or split..song end); clicking
-//!   again on the highlighted side requests confirmation of the tool's
-//!   effect on that range.
+//!   again on the highlighted side selects it.
 //! - **Click, drag, release**: picks an explicit span instead, previewed
-//!   live as it's dragged, requesting confirmation on release.
+//!   live as it's dragged (and extendable mid-drag by wheel-scrolling the
+//!   grid — see `sync_selection_with_scroll` and `drag_end_tick`'s
+//!   `scroll_delta_px`), kept as the selection on release.
+//!
+//! The selection itself is non-destructive; the Erase/Remove buttons act on
+//! it (`panel_widgets::timeline_tool_button`), each opening the confirm
+//! dialog via [`request_confirm`].
 //!
 //! Both paths are driven entirely by `Pointer<DragStart>`/`Drag`/`DragEnd`
 //! — deliberately *not* `Pointer<Click>` at all, even for the "plain click"
@@ -31,17 +36,16 @@
 //! `state::erase_range`/`state::remove_range` pair; this module is just the
 //! interaction/UI wiring around them.
 
-use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Drag, DragEnd, DragStart, Pointer};
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy_fluent::prelude::Localization;
 
 use super::state::{
-    EditorState, Side, TimelineDrag, TimelineTool, erase_range, normalize_range, remove_range,
-    split_side_range, toggle_tempo_point,
+    EditorState, Scroll, Side, TimelineDrag, TimelineSelection, TimelineTool, erase_range,
+    normalize_range, remove_range, split_side_range, toggle_tempo_point,
 };
-use super::{BEATS_PER_BAR, BEAT_W, HEADER_H, TICKS_PER_BEAT, TICK_W};
+use super::{BEATS_PER_BAR, BEAT_W, TICKS_PER_BEAT, TICK_W};
 use crate::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use crate::localization::LocalizationExt;
 
@@ -49,21 +53,24 @@ pub(super) const TIMELINE_CONFIRM_PURPOSE: DialogId = DialogId("song_editor_2_ti
 
 // ── Components ────────────────────────────────────────────────────────────────
 
-/// The invisible, header-strip-sized click/drag catcher `grid::rebuild_grid`
-/// (re)spawns every rebuild — see [`TimelineSurfaceGeometry`] for how a
-/// click on it becomes an absolute tick.
+/// The invisible, header-strip-sized click/drag catcher. Spawned *once* in
+/// `ui::setup` (like `MoveGhost`/`PlayheadLine`) rather than respawned by
+/// `grid::rebuild_grid`: a rebuild mid-gesture would despawn the entity
+/// `bevy_picking` has captured the drag on, killing its `Drag`/`DragEnd`
+/// delivery — and rebuilds *do* now happen mid-gesture, since a wheel pan
+/// during a Select drag must spawn the notes it scrolls into view.
+/// [`sync_timeline_surface`] keeps it glued to the visible viewport.
 #[derive(Component)]
 pub(super) struct TimelineSurface;
 
-/// The pixel geometry a [`TimelineSurface`] was spawned with, needed to
-/// convert its own `RelativeCursorPosition` (0..1 across *its* box) into an
-/// absolute tick. Recorded at spawn time rather than re-derived from a
-/// window/`ComputedNode` query, since the surface's own position/size were
-/// computed from exactly these two numbers in the first place (see
-/// `grid::rebuild_grid`).
+/// The pixel geometry [`TimelineSurface`] currently covers, needed to
+/// convert its own `RelativeCursorPosition` into an absolute tick. Kept in
+/// lockstep with [`Scroll`] and the window width by
+/// [`sync_timeline_surface`], the same numbers its `Node` position/size are
+/// computed from.
 #[derive(Component, Clone, Copy)]
 pub(super) struct TimelineSurfaceGeometry {
-    pub(super) scroll_beat: usize,
+    pub(super) scroll_px: f32,
     pub(super) width_px: f32,
 }
 
@@ -76,40 +83,34 @@ impl TimelineSurfaceGeometry {
     /// surface's center down to its leftmost tick.
     pub(super) fn tick_at(&self, normalized_x: f32) -> usize {
         let frac = (normalized_x + 0.5).clamp(0.0, 1.0);
-        let abs_px = self.scroll_beat as f32 * BEAT_W + frac * self.width_px;
+        let abs_px = self.scroll_px + frac * self.width_px;
         (abs_px / TICK_W).round().max(0.0) as usize
     }
 }
 
-/// Persistent overlay entities (spawned once in `ui::setup`, like
-/// `MoveGhost`/`PlayheadLine` — never despawned/respawned by `grid::
-/// rebuild_grid`), updated every frame by [`update_timeline_overlays`].
-#[derive(Component)]
-pub(super) struct TimelineSplitLine;
-
-#[derive(Component)]
-pub(super) struct TimelineHighlight;
-
-/// Bundle for the (re)spawned interactive header surface — see
-/// `grid::rebuild_grid`'s single call site.
-pub(super) fn timeline_surface_bundle(scroll_beat: usize, width_px: f32) -> impl Bundle {
-    (
-        TimelineSurface,
-        TimelineSurfaceGeometry {
-            scroll_beat,
-            width_px,
-        },
-        RelativeCursorPosition::default(),
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(scroll_beat as f32 * BEAT_W),
-            top: Val::Px(0.0),
-            width: Val::Px(width_px),
-            height: Val::Px(HEADER_H),
-            ..default()
-        },
-        Pickable::default(),
-    )
+/// Keeps the persistent [`TimelineSurface`] covering exactly the visible
+/// slice of the header strip: its parent (`GridContent`) is translated left
+/// by [`Scroll::px`], so `left = scroll.px` pins it to the viewport origin,
+/// and its width tracks the window's visible beat span (same formula
+/// `grid::rebuild_grid` windows its columns with). Skips the writes when
+/// nothing changed so it doesn't dirty UI layout every frame.
+pub(super) fn sync_timeline_surface(
+    scroll: Res<Scroll>,
+    windows: Query<&Window>,
+    mut surfaces: Query<(&mut Node, &mut TimelineSurfaceGeometry), With<TimelineSurface>>,
+) {
+    let win_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0);
+    let width_px = (super::grid::visible_beats(win_w) + 1) as f32 * BEAT_W;
+    for (mut node, mut geom) in &mut surfaces {
+        if geom.scroll_px != scroll.px || geom.width_px != width_px {
+            *geom = TimelineSurfaceGeometry {
+                scroll_px: scroll.px,
+                width_px,
+            };
+            node.left = Val::Px(scroll.px);
+            node.width = Val::Px(width_px);
+        }
+    }
 }
 
 // ── Pure display helper ──────────────────────────────────────────────────────
@@ -189,12 +190,10 @@ pub(super) fn on_timeline_drag_start(
     ev: On<Pointer<DragStart>>,
     geoms: Query<&TimelineSurfaceGeometry>,
     rels: Query<&RelativeCursorPosition>,
-    mut state: ResMut<EditorState>,
+    state: Res<EditorState>,
+    scroll: Res<Scroll>,
+    mut sel: ResMut<TimelineSelection>,
 ) {
-    if !state.timeline_tool.is_active() {
-        return;
-    }
-
     if state.timeline_tool != TimelineTool::Select {
         return;
     }
@@ -202,62 +201,128 @@ pub(super) fn on_timeline_drag_start(
     let Some(tick) = hovered_tick(ev.entity, &geoms, &rels) else {
         return;
     };
-    state.timeline_drag = Some(TimelineDrag {
+    sel.drag = Some(TimelineDrag {
         start: tick,
         end: tick,
+        scroll_px: scroll.px,
+        pointer_px: 0.0,
+        live: true,
     });
 }
 
-/// The current end tick of a span drag, `distance_x` raw window pixels from
-/// its `start` tick — the same quantity/correction note-move dragging
-/// already uses in `grid.rs` (`ev.distance` divided by `UiScale`, the
-/// arrow-key UI zoom), deliberately reused here rather than re-deriving the
-/// current tick from `RelativeCursorPosition`: a drag routinely carries the
-/// pointer well outside the ruler's own thin `HEADER_H`-tall box (down over
-/// the note grid, since that's a natural drag motion), and `distance` keeps
-/// tracking correctly regardless of where the pointer physically ends up.
-pub(super) fn drag_end_tick(start: usize, distance_x: f32, ui_scale: f32) -> usize {
-    let delta_ticks = (distance_x / ui_scale.max(f32::EPSILON) / TICK_W).round() as i64;
+/// The current end tick of a span drag: `distance_x` raw window pixels of
+/// pointer motion from the press — the same quantity/correction note-move
+/// dragging already uses in `grid.rs` (`ev.distance` divided by `UiScale`,
+/// the arrow-key UI zoom), deliberately reused here rather than re-deriving
+/// the current tick from `RelativeCursorPosition`: a drag routinely carries
+/// the pointer well outside the ruler's own thin `HEADER_H`-tall box (down
+/// over the note grid, since that's a natural drag motion), and `distance`
+/// keeps tracking correctly regardless of where the pointer physically ends
+/// up — plus `scroll_delta_px`, how far the grid has scrolled *under* the
+/// pointer since the press (in the same logical px `Scroll` uses, so not
+/// scale-divided): a mid-drag wheel pan moves the content, not the pointer,
+/// and without this term the span end would stay pinned to wherever the
+/// content sat at press time instead of following what's now under the
+/// pointer.
+pub(super) fn drag_end_tick(
+    start: usize,
+    distance_x: f32,
+    ui_scale: f32,
+    scroll_delta_px: f32,
+) -> usize {
+    let motion_px = distance_x / ui_scale.max(f32::EPSILON) + scroll_delta_px;
+    let delta_ticks = (motion_px / TICK_W).round() as i64;
     (start as i64 + delta_ticks).max(0) as usize
 }
 
 pub(super) fn on_timeline_drag(
     ev: On<Pointer<Drag>>,
-    mut state: ResMut<EditorState>,
+    state: Res<EditorState>,
+    scroll: Res<Scroll>,
+    mut sel: ResMut<TimelineSelection>,
     ui_scale: Res<UiScale>,
 ) {
     if !state.timeline_tool.is_active() {
         return;
     }
-    let Some(TimelineDrag { start, .. }) = state.timeline_drag else {
+    let Some(TimelineDrag {
+        start, scroll_px, ..
+    }) = sel.drag
+    else {
         return;
     };
-    let end = drag_end_tick(start, ev.distance.x, ui_scale.0);
-    state.timeline_drag = Some(TimelineDrag { start, end });
+    let end = drag_end_tick(start, ev.distance.x, ui_scale.0, scroll.px - scroll_px);
+    sel.drag = Some(TimelineDrag {
+        start,
+        end,
+        scroll_px,
+        pointer_px: ev.distance.x / ui_scale.0.max(f32::EPSILON),
+        live: true,
+    });
 }
 
+/// Re-derives an in-progress drag's `end` whenever the grid scrolls —
+/// `Pointer<Drag>` only fires on pointer *motion*, so a wheel pan under a
+/// stationary held pointer (the natural "scroll to reach more of the song
+/// mid-selection" gesture) would otherwise leave the span's end stale until
+/// the mouse happens to move again — including at release, silently
+/// dropping the scrolled-to extent from the selection. Same math as
+/// [`on_timeline_drag`], fed the stored [`TimelineDrag::pointer_px`]
+/// (already scale-corrected, hence the `1.0`) instead of a fresh event.
+pub(super) fn sync_selection_with_scroll(
+    scroll: Res<Scroll>,
+    mut sel: ResMut<TimelineSelection>,
+) {
+    if !scroll.is_changed() {
+        return;
+    }
+    let Some(drag) = sel.drag else {
+        return;
+    };
+    if !drag.live {
+        return;
+    }
+    let end = drag_end_tick(drag.start, drag.pointer_px, 1.0, scroll.px - drag.scroll_px);
+    if end != drag.end {
+        sel.drag = Some(TimelineDrag { end, ..drag });
+    }
+}
+
+/// Only the Select tool ever has a drag in flight (see
+/// [`on_timeline_drag_start`]), so this is Select's release logic: a span
+/// that genuinely moved becomes the persisted selection; a same-tick
+/// "drag" is really a click, driving the two-click split flow — first
+/// click places the split point, second click turns the hovered side into
+/// the selection. Either way the result is a frozen [`TimelineSelection`]
+/// span for the Erase/Remove buttons to act on — nothing here opens the
+/// confirm dialog itself.
 pub(super) fn on_timeline_drag_end(
     _ev: On<Pointer<DragEnd>>,
     mut state: ResMut<EditorState>,
-    loc: Res<Localization>,
-    mut open: MessageWriter<OpenConfirmDialog>,
+    mut sel: ResMut<TimelineSelection>,
 ) {
-    if !state.timeline_tool.is_active() {
-        return;
-    }
-    let Some(TimelineDrag { start, end }) = state.timeline_drag else {
+    let Some(drag) = sel.drag else {
         return;
     };
-    let (s, e) = normalize_range(start, end);
+    let (s, e) = normalize_range(drag.start, drag.end);
     if e > s {
         // A real drag: an explicit span, superseding any stale split point
-        // from an earlier, abandoned click sequence.
+        // from an earlier, abandoned click sequence. It stays in
+        // `TimelineSelection` as the persisted selection, but frozen —
+        // released spans must not keep tracking the grid scrolling under
+        // them.
+        sel.drag = Some(TimelineDrag {
+            live: false,
+            ..drag
+        });
         state.timeline_split = None;
-        request_confirm(&mut state, &loc, &mut open, s, e);
         return;
     }
     // The span never moved a tick — an ordinary click (see the module docs
-    // for why this, not `Pointer<Click>`, is what decides that).
+    // for why this, not `Pointer<Click>`, is what decides that). Not yet a
+    // selection, so drop it rather than leaving a zero-width span shadowing
+    // the split-point overlay.
+    sel.drag = None;
     match state.timeline_split {
         None => state.timeline_split = Some(s),
         Some(split) => {
@@ -265,7 +330,13 @@ pub(super) fn on_timeline_drag_end(
             let (start, end) = split_side_range(split, side, &state.notes);
             state.timeline_split = None;
             if end > start {
-                request_confirm(&mut state, &loc, &mut open, start, end);
+                sel.drag = Some(TimelineDrag {
+                    start,
+                    end,
+                    scroll_px: 0.0,
+                    pointer_px: 0.0,
+                    live: false,
+                });
             }
         }
     }
@@ -297,76 +368,5 @@ pub(super) fn handle_timeline_confirm(
             TimelineTool::Tempo => continue,
         };
         state.selected = None;
-    }
-}
-
-// ── Per-frame overlay update ─────────────────────────────────────────────────
-
-/// Redraws the split-line/highlight overlay entities every frame —
-/// unconditional, like `playback::update_playhead_view`/`interaction::
-/// update_move_ghost`. Purely a rendering pass: the live hover-side preview
-/// reads `RelativeCursorPosition` fresh each frame as a local value rather
-/// than writing it back to `EditorState` (unlike the in-progress drag span,
-/// which genuinely is state), so this never marks `EditorState` "changed"
-/// and can't fight `grid::rebuild_grid`'s `timeline_drag`-only early-return
-/// guard.
-pub(super) fn update_timeline_overlays(
-    state: Res<EditorState>,
-    surfaces: Query<(&TimelineSurfaceGeometry, &RelativeCursorPosition), With<TimelineSurface>>,
-    mut split_lines: Query<
-        (&mut Node, &mut Visibility),
-        (With<TimelineSplitLine>, Without<TimelineHighlight>),
-    >,
-    mut highlights: Query<
-        (&mut Node, &mut Visibility),
-        (With<TimelineHighlight>, Without<TimelineSplitLine>),
-    >,
-) {
-    if let Some(TimelineDrag { start, end }) = state.timeline_drag {
-        hide(&mut split_lines);
-        let (s, e) = normalize_range(start, end);
-        set_highlight(&mut highlights, s, e.max(s + 1));
-        return;
-    }
-
-    let Some(split) = state.timeline_split else {
-        hide(&mut split_lines);
-        hide(&mut highlights);
-        return;
-    };
-    if let Ok((mut node, mut vis)) = split_lines.single_mut() {
-        node.left = Val::Px(split as f32 * TICK_W);
-        *vis = Visibility::Inherited;
-    }
-
-    let Some(hover) = surfaces.iter().find_map(|(geom, rel)| {
-        rel.normalized.map(|n| geom.tick_at(n.x))
-    }) else {
-        hide(&mut highlights);
-        return;
-    };
-    let side = if hover < split { Side::Left } else { Side::Right };
-    let (start, end) = split_side_range(split, side, &state.notes);
-    set_highlight(&mut highlights, start, end.max(start + 1));
-}
-
-fn hide<F: bevy::ecs::query::QueryFilter>(q: &mut Query<(&mut Node, &mut Visibility), F>) {
-    if let Ok((_, mut vis)) = q.single_mut() {
-        *vis = Visibility::Hidden;
-    }
-}
-
-fn set_highlight(
-    q: &mut Query<
-        (&mut Node, &mut Visibility),
-        (With<TimelineHighlight>, Without<TimelineSplitLine>),
-    >,
-    start: usize,
-    end: usize,
-) {
-    if let Ok((mut node, mut vis)) = q.single_mut() {
-        node.left = Val::Px(start as f32 * TICK_W);
-        node.width = Val::Px((end - start) as f32 * TICK_W);
-        *vis = Visibility::Inherited;
     }
 }

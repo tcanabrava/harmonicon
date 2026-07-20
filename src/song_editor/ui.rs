@@ -211,8 +211,8 @@ pub(super) fn sync_chrome_height(
             With<GridArea>,
             With<GridContent>,
             With<PlayheadLine>,
-            With<super::timeline::TimelineSplitLine>,
-            With<super::timeline::TimelineHighlight>,
+            With<super::timeline_overlay::TimelineSplitLine>,
+            With<super::timeline_overlay::TimelineHighlight>,
         )>,
     >,
 ) {
@@ -417,37 +417,7 @@ fn spawn_fixed_chrome(
                     Visibility::Hidden,
                     Pickable::IGNORE,
                 ));
-                // Erase/Remove tool overlays — see `timeline`'s module
-                // docs. Hidden until a tool picks a split point or drag
-                // span; `update_timeline_overlays` repositions and shows/
-                // hides them every frame, like the playhead/move ghost above.
-                content.spawn((
-                    super::timeline::TimelineSplitLine,
-                    ZIndex(3),
-                    Node {
-                        position_type: PositionType::Absolute,
-                        top: Val::Px(0.0),
-                        width: Val::Px(2.0),
-                        height: Val::Px(grid_height(hole_count)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgb(0.95, 0.75, 0.20)),
-                    Visibility::Hidden,
-                    Pickable::IGNORE,
-                ));
-                content.spawn((
-                    super::timeline::TimelineHighlight,
-                    ZIndex(1),
-                    Node {
-                        position_type: PositionType::Absolute,
-                        top: Val::Px(0.0),
-                        height: Val::Px(grid_height(hole_count)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.95, 0.30, 0.20, 0.22)),
-                    Visibility::Hidden,
-                    Pickable::IGNORE,
-                ));
+                super::timeline_overlay::spawn_persistent_entities(content, hole_count);
             });
         });
     });

@@ -133,9 +133,9 @@ pub(super) enum Side {
 /// fixed at the press position, `end` follows the pointer. Not normalized —
 /// `end` can be less than `start` — see [`normalize_range`]. Mirrors
 /// [`DragState`]'s role for note dragging: set by `Pointer<DragStart>`,
-/// live-updated by `Pointer<Drag>`, and always cleared by
-/// `Pointer<DragEnd>`, which then either confirms it as an explicit span
-/// (`end` genuinely moved past `start`) or, since `bevy_picking` fires
+/// live-updated by `Pointer<Drag>`; `Pointer<DragEnd>` then either keeps
+/// it as the Select tool's persisted selection (an `end` that genuinely
+/// moved past `start`) or, since `bevy_picking` fires
 /// `DragStart` on any nonzero pixel motion — meaning ordinary mouse jitter
 /// during a plain click routinely produces one of these — falls back to
 /// treating a same-tick `start`/`end` exactly like the click it was meant
@@ -149,6 +149,25 @@ pub(super) enum Side {
 pub(super) struct TimelineDrag {
     pub(super) start: usize,
     pub(super) end: usize,
+    /// [`Scroll::px`] at the moment the drag started. `Pointer<Drag>` only
+    /// reports pointer motion, but the grid can keep scrolling *under* a
+    /// held drag (wheel pan) — the span's moving end is pointer motion
+    /// *plus* however far the content scrolled since the press
+    /// (`timeline::drag_end_tick`), so scrolling mid-drag extends the
+    /// selection over the newly revealed area instead of silently pinning
+    /// it to wherever the content sat at press time.
+    pub(super) scroll_px: f32,
+    /// Accumulated pointer motion since the press, already divided by the
+    /// UI scale — the last `Pointer<Drag>::distance.x` seen. Kept so a
+    /// wheel-scroll frame with a *stationary* pointer (no `Drag` event
+    /// fires at all then) can still recompute `end` from the new scroll
+    /// position — see `timeline::sync_selection_with_scroll`.
+    pub(super) pointer_px: f32,
+    /// True while the button is still held (press → release). A released
+    /// Select span stays in [`TimelineSelection`] as the persisted
+    /// selection, but must stop tracking scroll — only a *live* gesture
+    /// follows the grid panning under it.
+    pub(super) live: bool,
 }
 
 /// One placed note: a hole (1..=10) starting at `tick` and lasting `len` ticks,
@@ -380,7 +399,6 @@ pub(super) struct EditorState {
     /// `timeline_drag`, which only lives for one gesture) until a second
     /// such click picks a side and consumes it, or the tool is switched.
     pub(super) timeline_split: Option<usize>,
-    pub(super) timeline_drag: Option<TimelineDrag>,
     /// A range the user has committed to (a placed split's side, or a
     /// released drag span) and is now waiting on the confirm dialog's
     /// answer for. Set right before opening the dialog; read and cleared
@@ -438,7 +456,6 @@ impl Default for EditorState {
             harmonica_kind: HarmonicaKind::default(),
             timeline_tool: TimelineTool::default(),
             timeline_split: None,
-            timeline_drag: None,
             pending_timeline_op: None,
             sticky_dir: Dir::Blow,
             sticky_pitch: Pitch::Normal,
@@ -570,6 +587,21 @@ impl EditorState {
 #[derive(Resource, Default)]
 pub(super) struct Scroll {
     pub(super) px: f32,
+}
+
+/// The timeline Select tool's span: the in-progress drag gesture while the
+/// button is held, and — once released with a real extent — the persisted
+/// selection the Erase/Remove buttons act on. Its own resource rather than
+/// an `EditorState` field for the same reason [`Scroll`] is: the span
+/// updates on every pointer move during a drag, and routing that through
+/// `EditorState` would either rebuild the whole grid every one of those
+/// frames or (the old guard against exactly that) suppress the
+/// scroll-driven rebuilds a mid-drag wheel pan needs — notes scrolled into
+/// view during a selection were never spawned, so only what was visible at
+/// press time could be selected.
+#[derive(Resource, Default)]
+pub(super) struct TimelineSelection {
+    pub(super) drag: Option<TimelineDrag>,
 }
 
 // ── Note model logic ─────────────────────────────────────────────────────────

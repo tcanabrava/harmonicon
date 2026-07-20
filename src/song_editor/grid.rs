@@ -87,7 +87,11 @@ pub(super) fn rebuild_grid(
     mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
     theme: Res<LoadedTheme>,
 ) {
-    if state.dragging.is_some() || state.timeline_drag.is_some() {
+    // A note drag owns picking-captured note entities a rebuild would
+    // despawn — but *only* a note drag: the timeline Select drag's surface
+    // is persistent (`ui::setup`), precisely so a mid-selection wheel pan
+    // can rebuild the grid and spawn the notes it scrolls into view.
+    if state.dragging.is_some() {
         return;
     }
     let colors = theme.song_editor_colors();
@@ -288,27 +292,6 @@ pub(super) fn rebuild_grid(
             );
         }
     }
-
-    // The Erase/Remove/Tempo tools' click/drag catcher, spanning the header
-    // strip across every currently-rendered beat column — see `timeline`'s
-    // module docs. Always spawned (not gated on a tool being active); its
-    // own observers no-op when `state.timeline_tool` is `None` or a
-    // different tool than the one they handle.
-    items.push(
-        commands
-            .spawn((
-                GridItem,
-                super::timeline::timeline_surface_bundle(
-                    state.scroll_beat,
-                    (cols + 1) as f32 * BEAT_W,
-                ),
-            ))
-            .observe(super::timeline::on_timeline_drag_start)
-            .observe(super::timeline::on_timeline_drag)
-            .observe(super::timeline::on_timeline_drag_end)
-            .observe(super::timeline::on_timeline_click_tempo)
-            .id(),
-    );
 
     let first_tick = state.scroll_beat * TICKS_PER_BEAT;
     let last_tick = (state.scroll_beat + cols + 1) * TICKS_PER_BEAT;

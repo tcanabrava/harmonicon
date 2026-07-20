@@ -39,6 +39,7 @@ mod practice;
 mod record;
 mod state;
 mod timeline;
+mod timeline_overlay;
 mod ui;
 mod waveform;
 
@@ -111,6 +112,7 @@ impl Plugin for SongEditor2Plugin {
             .init_resource::<state::Scroll>()
             .init_resource::<practice::PracticeState>()
             .init_resource::<record::RecordState>()
+            .init_resource::<state::TimelineSelection>()
             .init_resource::<waveform::MusicWaveform>()
             .add_systems(
                 Update,
@@ -202,7 +204,10 @@ impl Plugin for SongEditor2Plugin {
                         midi_import::rebuild_midi_track_combobox,
                     )
                         .chain(),
-                    timeline::update_timeline_overlays,
+                    timeline::sync_timeline_surface,
+                    timeline::sync_selection_with_scroll
+                        .before(timeline_overlay::update_timeline_overlays),
+                    timeline_overlay::update_timeline_overlays,
                     timeline::handle_timeline_confirm,
                     panel::update_timeline_tool_buttons
                         .run_if(resource_exists_and_changed::<state::EditorState>),

@@ -12,7 +12,8 @@ use bevy::ui_render::prelude::MaterialNode;
 use super::material::EditorNoteMaterial;
 use super::playback::Playhead;
 use super::state::{
-    Dir, DragKind, EditorState, Expr, GridNote, Pitch, Scroll, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN,
+    Dir, DragKind, EditorState, Expr, GridNote, Pitch, Scroll, TimelineSelection, VIBRATO_HZ_MAX,
+    VIBRATO_HZ_MIN,
     VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction, enforce_expr,
     max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
 };
@@ -318,6 +319,7 @@ fn cycle_sticky_vibrato(state: &mut EditorState) {
 pub(super) fn grid_keys(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<EditorState>,
+    mut sel: ResMut<TimelineSelection>,
     file_dialog: Res<FileDialog>,
     mut next_state: ResMut<NextState<AppState>>,
     mut ret_play: ResMut<crate::app::ReturnToPlay>,
@@ -329,8 +331,8 @@ pub(super) fn grid_keys(
         delete_selected(&mut state);
     }
     if keyboard.just_pressed(KeyCode::Escape) && !file_dialog.open {
-        if state.timeline_drag.is_some() || state.timeline_split.is_some() {
-            state.timeline_drag = None;
+        if sel.drag.is_some() || state.timeline_split.is_some() {
+            sel.drag = None;
             state.timeline_split = None;
         } else if state.selected.is_some() {
             state.selected = None;
