@@ -97,7 +97,8 @@ pub(super) enum ModButton {
 #[derive(Component, Clone, Copy, PartialEq)]
 pub(super) enum ModeButton {
     Edit,
-    Perform,
+    Record,
+    Play,
     Lock,
 }
 
@@ -114,9 +115,14 @@ pub(super) struct TimelineToolButton(pub(super) TimelineTool);
 pub(super) struct EditModeGroup;
 
 /// Wraps the playback/practice button cluster (Play, Pause, Stop, Practice),
-/// shown only in [`Mode::Perform`]. See `update_mode_visibility`.
+/// shown only in [`Mode::Play`]. See `update_mode_visibility`.
 #[derive(Component)]
-pub(super) struct PerformModeGroup;
+pub(super) struct PlayModeGroup;
+
+/// Wraps the recording transport cluster (Play, Pause, Stop, Finish),
+/// shown only in [`Mode::Record`]. See `update_mode_visibility`.
+#[derive(Component)]
+pub(super) struct RecordModeGroup;
 
 #[derive(Component)]
 pub(super) struct BendDot;
@@ -129,16 +135,6 @@ pub(super) struct BendDot;
 pub(super) struct ModButtonLabel {
     pub(super) kind: ModButton,
     pub(super) base: String,
-}
-
-/// Marks the Record button's label text so
-/// [`super::panel::update_record_button_label`] can swap it between its
-/// idle and actively-recording text — cached at spawn time, same reasoning
-/// as [`ModButtonLabel::base`].
-#[derive(Component)]
-pub(super) struct RecordButtonLabel {
-    pub(super) idle: String,
-    pub(super) active: String,
 }
 
 #[derive(Component)]

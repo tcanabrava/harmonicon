@@ -7,7 +7,7 @@ use super::record::RecordState;
 use super::state::{ContentKind, Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
 use super::ui::{
     BendDot, ContentKindText, EditModeGroup, HarmonicaKindText, MetaFieldBox, MetaFieldText,
-    ModButton, ModButtonLabel, ModeButton, PerformModeGroup, RecordButtonLabel, StatusMsg,
+    ModButton, ModButtonLabel, ModeButton, PlayModeGroup, RecordModeGroup, StatusMsg,
     TimelineToolButton,
 };
 use crate::localization::LocalizationExt;
@@ -110,9 +110,9 @@ pub(super) fn update_meta_fields(
     }
 }
 
-/// Highlights whichever of Edit/Perform is the current mode, and Lock when
-/// `state.locked()` — which includes the forced-lock that Perform mode always
-/// applies, not just the user's own toggle.
+/// Highlights whichever of Edit/Record/Play is the current mode, and Lock
+/// when `state.locked()` — which includes the forced-lock that the Record
+/// and Play modes always apply, not just the user's own toggle.
 pub(super) fn update_mode_buttons(
     state: Res<EditorState>,
     theme: Res<LoadedTheme>,
@@ -122,7 +122,8 @@ pub(super) fn update_mode_buttons(
     for (kind, mut bg) in &mut buttons {
         let active = match kind {
             ModeButton::Edit => state.mode == Mode::Edit,
-            ModeButton::Perform => state.mode == Mode::Perform,
+            ModeButton::Record => state.mode == Mode::Record,
+            ModeButton::Play => state.mode == Mode::Play,
             ModeButton::Lock => state.locked(),
         };
         bg.0 = if active {
@@ -148,29 +149,37 @@ pub(super) fn update_timeline_tool_buttons(
     }
 }
 
-/// Shows the note-editing button cluster in [`Mode::Edit`] and the
-/// playback/practice cluster in [`Mode::Perform`] — never both. Toggles
-/// `Node::display`, not `Visibility`: `Visibility::Hidden` only skips
-/// rendering and still reserves the hidden group's full layout width, which
-/// would push the visible group off to the side instead of freeing its place.
+/// Shows exactly the current mode's button cluster — note editing in
+/// [`Mode::Edit`], the recording transport in [`Mode::Record`], the
+/// playback/practice transport in [`Mode::Play`] — never more than one.
+/// Toggles `Node::display`, not `Visibility`: `Visibility::Hidden` only
+/// skips rendering and still reserves the hidden group's full layout width,
+/// which would push the visible group off to the side instead of freeing
+/// its place.
 pub(super) fn update_mode_visibility(
     state: Res<EditorState>,
-    mut edit_group: Query<&mut Node, (With<EditModeGroup>, Without<PerformModeGroup>)>,
-    mut perform_group: Query<&mut Node, (With<PerformModeGroup>, Without<EditModeGroup>)>,
+    mut edit_group: Query<
+        &mut Node,
+        (With<EditModeGroup>, Without<RecordModeGroup>, Without<PlayModeGroup>),
+    >,
+    mut record_group: Query<
+        &mut Node,
+        (With<RecordModeGroup>, Without<EditModeGroup>, Without<PlayModeGroup>),
+    >,
+    mut play_group: Query<
+        &mut Node,
+        (With<PlayModeGroup>, Without<EditModeGroup>, Without<RecordModeGroup>),
+    >,
 ) {
+    let display = |on: bool| if on { Display::Flex } else { Display::None };
     for mut node in &mut edit_group {
-        node.display = if state.mode == Mode::Edit {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        node.display = display(state.mode == Mode::Edit);
     }
-    for mut node in &mut perform_group {
-        node.display = if state.mode == Mode::Perform {
-            Display::Flex
-        } else {
-            Display::None
-        };
+    for mut node in &mut record_group {
+        node.display = display(state.mode == Mode::Record);
+    }
+    for mut node in &mut play_group {
+        node.display = display(state.mode == Mode::Play);
     }
 }
 
@@ -252,26 +261,6 @@ pub(super) fn update_status_bar(
     } else {
         practice.msg.to_string()
     };
-}
-
-/// Swaps the Record button's own label between its idle and
-/// actively-recording text (see [`RecordButtonLabel`]) — separate from
-/// `update_status_bar`'s message, which is transient per-note feedback;
-/// this is the button's persistent on/off state.
-pub(super) fn update_record_button_label(
-    record: Res<RecordState>,
-    mut labels: Query<(&RecordButtonLabel, &mut Text)>,
-) {
-    for (label, mut text) in &mut labels {
-        let want = if record.active {
-            &label.active
-        } else {
-            &label.idle
-        };
-        if text.0 != *want {
-            text.0 = want.clone();
-        }
-    }
 }
 
 #[cfg(test)]
@@ -493,7 +482,7 @@ mod tests {
     fn update_mode_buttons_highlights_the_active_mode_and_lock_state() {
         let mut world = World::new();
         let state = EditorState {
-            mode: Mode::Perform,
+            mode: Mode::Play,
             ..Default::default()
         };
         world.insert_resource(state);
@@ -503,10 +492,13 @@ mod tests {
         let edit = world
             .spawn((ModeButton::Edit, BackgroundColor(colors.btn_active)))
             .id();
-        let perform = world
-            .spawn((ModeButton::Perform, BackgroundColor(colors.btn_bg)))
+        let record = world
+            .spawn((ModeButton::Record, BackgroundColor(colors.btn_active)))
             .id();
-        // Perform mode is always locked, even without the user's own toggle.
+        let play = world
+            .spawn((ModeButton::Play, BackgroundColor(colors.btn_bg)))
+            .id();
+        // Play mode is always locked, even without the user's own toggle.
         let lock = world
             .spawn((ModeButton::Lock, BackgroundColor(colors.btn_bg)))
             .id();
@@ -516,14 +508,15 @@ mod tests {
         schedule.run(&mut world);
 
         assert_eq!(world.get::<BackgroundColor>(edit).unwrap().0, colors.btn_bg);
+        assert_eq!(world.get::<BackgroundColor>(record).unwrap().0, colors.btn_bg);
         assert_eq!(
-            world.get::<BackgroundColor>(perform).unwrap().0,
+            world.get::<BackgroundColor>(play).unwrap().0,
             colors.btn_active
         );
         assert_eq!(
             world.get::<BackgroundColor>(lock).unwrap().0,
             colors.btn_active,
-            "Perform mode forces Lock active regardless of user_locked"
+            "Play mode forces Lock active regardless of user_locked"
         );
     }
 
@@ -533,13 +526,14 @@ mod tests {
     fn update_mode_visibility_shows_only_the_current_modes_group() {
         let mut world = World::new();
         let state = EditorState {
-            mode: Mode::Perform,
+            mode: Mode::Play,
             ..Default::default()
         };
         world.insert_resource(state);
 
         let edit_group = world.spawn((EditModeGroup, Node::default())).id();
-        let perform_group = world.spawn((PerformModeGroup, Node::default())).id();
+        let record_group = world.spawn((RecordModeGroup, Node::default())).id();
+        let play_group = world.spawn((PlayModeGroup, Node::default())).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_mode_visibility);
@@ -547,7 +541,11 @@ mod tests {
 
         assert_eq!(world.get::<Node>(edit_group).unwrap().display, Display::None);
         assert_eq!(
-            world.get::<Node>(perform_group).unwrap().display,
+            world.get::<Node>(record_group).unwrap().display,
+            Display::None
+        );
+        assert_eq!(
+            world.get::<Node>(play_group).unwrap().display,
             Display::Flex
         );
     }

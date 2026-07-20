@@ -56,7 +56,11 @@ pub(super) enum Dir {
 pub(super) enum Mode {
     #[default]
     Edit,
-    Perform,
+    /// Live-recording transport (Play/Pause/Stop/Finish) — notes come from
+    /// the microphone, so the grid is locked like [`Mode::Play`].
+    Record,
+    /// Playback/practice transport.
+    Play,
 }
 
 /// What kind of content the editor is authoring — toggled by the "Record
@@ -541,7 +545,7 @@ impl EditorState {
     /// turned Lock on themselves, or `mode` is `Perform` (which is always
     /// locked, regardless of the user's own toggle).
     pub(super) fn locked(&self) -> bool {
-        self.user_locked || self.mode == Mode::Perform
+        self.user_locked || self.mode != Mode::Edit
     }
 
     /// The number of playable holes for the current [`HarmonicaKind`] — 10 for

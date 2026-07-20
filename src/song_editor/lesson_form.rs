@@ -52,7 +52,7 @@ pub(super) struct LessonFormGroup;
 pub(super) struct LessonDetailsBody;
 
 /// The lesson-details header's clickable label, ▸/▾ forms cached at spawn
-/// time like `panel::RecordButtonLabel`'s idle/active pair.
+/// time like `ui::ModButtonLabel`'s cached base text.
 #[derive(Component)]
 pub(super) struct LessonDetailsToggleLabel {
     collapsed: String,
@@ -144,7 +144,7 @@ fn spawn_conditional_field_row(
 /// The clickable "▸ Lesson Details" / "▾ Lesson Details" header — toggles
 /// `EditorState::lesson_details_expanded` on click. Both label forms are
 /// cached at spawn time (one `loc.msg` call), same reasoning as
-/// `panel::spawn_record_button`'s `RecordButtonLabel` idle/active pair.
+/// `ui::ModButtonLabel`'s cached-base-text pattern.
 fn spawn_lesson_details_header(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     let title = String::from(loc.msg("editor-lesson-details-header"));
     let collapsed = format!("\u{25B8} {title}");

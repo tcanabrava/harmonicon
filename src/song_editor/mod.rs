@@ -184,8 +184,6 @@ impl Plugin for SongEditor2Plugin {
                             .or_else(resource_changed::<practice::PracticeState>)
                             .or_else(resource_changed::<record::RecordState>),
                     ),
-                    panel::update_record_button_label
-                        .run_if(resource_changed::<record::RecordState>),
                     (
                         harpchart::handle_save_chosen,
                         harpchart::handle_load_chosen,

@@ -4,7 +4,7 @@
 //! "shape" (a themed toggle, a themed action button, a distinctly-colored
 //! transport button, ...), shared by `mod_panel`'s two-strip assembly.
 //! Component type declarations for the buttons these spawn (`ModButton`,
-//! `ModeButton`, `TimelineToolButton`, `ModButtonLabel`, `RecordButtonLabel`,
+//! `ModeButton`, `TimelineToolButton`, `ModButtonLabel`,
 //! `BendDot`) live in `super::ui`, alongside every other song-editor
 //! component type.
 
@@ -15,7 +15,7 @@ use bevy::prelude::*;
 use super::interaction::apply_modifier;
 use super::state::{EditorState, TimelineDrag, TimelineSelection, TimelineTool, normalize_range};
 use super::timeline::request_confirm;
-use super::ui::{BendDot, ModButton, ModButtonLabel, ModeButton, TimelineToolButton, RecordButtonLabel};
+use super::ui::{BendDot, ModButton, ModButtonLabel, ModeButton, TimelineToolButton};
 use crate::dialogs::confirm_dialog::OpenConfirmDialog;
 use crate::dialogs::tooltip::Tooltip;
 use crate::localization::LocalizedStr;
@@ -26,7 +26,7 @@ use bevy_fluent::prelude::Localization;
 /// padded, bordered button with a tooltip and a single-line white label,
 /// observing one click handler. `mode_button`/`transport_button` are plain
 /// wrappers over this (the only two shapes here with no per-button extras).
-/// `mod_button`/`timeline_tool_button`/`spawn_record_button` need extra
+/// `mod_button`/`timeline_tool_button` need extra
 /// per-button children (`BendDot`, a swappable label, a `kind`-dependent
 /// observer body) that don't fit this shape cleanly, so they stay separate
 /// rather than forcing a less-readable shared abstraction onto them.
@@ -217,47 +217,3 @@ pub(super) fn transport_button<M: 'static>(
     spawn_button_shell(panel, bg, label, tooltip, on_click);
 }
 
-/// Like [`transport_button`], except its label swaps between `idle_label`
-/// and `active_label` at runtime — `super::panel::update_record_button_label`
-/// picks one based on `RecordState::active`. Kept separate from
-/// `transport_button` rather than adding an optional param there, since
-/// every other transport button has a fixed label.
-pub(super) fn spawn_record_button<M: 'static>(
-    panel: &mut ChildSpawnerCommands,
-    idle_label: LocalizedStr,
-    active_label: LocalizedStr,
-    tooltip: LocalizedStr,
-    bg: Color,
-    on_click: impl bevy::ecs::system::IntoObserverSystem<Pointer<Click>, (), M>,
-) {
-    panel
-        .spawn((
-            Button,
-            Node {
-                padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(bg),
-            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            Tooltip(String::from(tooltip)),
-        ))
-        .observe(on_click)
-        .with_children(|b| {
-            b.spawn((
-                Text::new(String::from(idle_label.clone())),
-                TextFont {
-                    font_size: FontSize::Px(14.0),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Pickable::IGNORE,
-                RecordButtonLabel {
-                    idle: String::from(idle_label),
-                    active: String::from(active_label),
-                },
-            ));
-        });
-}

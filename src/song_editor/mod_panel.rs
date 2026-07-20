@@ -13,14 +13,13 @@ use bevy::prelude::*;
 
 use super::harpchart::safe_path_segment;
 use super::panel_widgets::{
-    mod_button, mode_button, panel_separator, spawn_record_button, timeline_tool_button,
-    transport_button,
+    mod_button, mode_button, panel_separator, timeline_tool_button, transport_button,
 };
 use super::playback::{EditorAudio, Playhead, start_playback, toggle_pause};
 use super::practice::{PracticeState, start_practice, stop_practice};
 use super::record::{RecordState, start_record, stop_record};
 use super::state::{ContentKind, EditorState, Mode, TimelineTool};
-use super::ui::{EditModeGroup, ModButton, ModeButton, PerformModeGroup, TimelineToolButton};
+use super::ui::{EditModeGroup, ModButton, ModeButton, PlayModeGroup, RecordModeGroup, TimelineToolButton};
 use super::{AppState, LOAD_PURPOSE, SAVE_PURPOSE};
 use crate::audio_system::pitch_detect::PitchRange;
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
@@ -78,8 +77,11 @@ pub(super) fn spawn_mod_panel(
                 );
                 panel_separator(transport);
 
-                // Edit/Perform/Lock: always visible, regardless of which
-                // mode-group below is currently shown.
+                // Edit/Record/Play/Lock: always visible, regardless of
+                // which mode-group below is currently shown. Every mode
+                // switch stops whatever the departed mode had running —
+                // its transport is about to disappear, so nothing would be
+                // left to stop it.
                 mode_button(
                     transport,
                     ModeButton::Edit,
@@ -95,21 +97,44 @@ pub(super) fn spawn_mod_panel(
                      mut pitch_range: ResMut<PitchRange>,
                      mut commands: Commands| {
                         state.mode = Mode::Edit;
-                        // Leaving Perform mode hides Play/Pause/Stop/Practice/
-                        // Record, so nothing would be left to stop anything
-                        // that's running.
                         stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
                         stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
                     },
                 );
                 mode_button(
                     transport,
-                    ModeButton::Perform,
-                    loc.msg("editor-mode-perform"),
-                    loc.msg("editor-mode-perform-tooltip"),
+                    ModeButton::Record,
+                    loc.msg("editor-mode-record"),
+                    loc.msg("editor-mode-record-tooltip"),
                     colors,
-                    |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                        state.mode = Mode::Perform;
+                    |_: On<Pointer<Click>>,
+                     mut state: ResMut<EditorState>,
+                     playing: Query<Entity, With<EditorAudio>>,
+                     mut practice: ResMut<PracticeState>,
+                     mut playhead: ResMut<Playhead>,
+                     mut commands: Commands| {
+                        state.mode = Mode::Record;
+                        // A recording can only have been started from this
+                        // mode itself, so only Play-mode playback/practice
+                        // needs stopping here.
+                        stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+                    },
+                );
+                mode_button(
+                    transport,
+                    ModeButton::Play,
+                    loc.msg("editor-mode-play"),
+                    loc.msg("editor-mode-play-tooltip"),
+                    colors,
+                    |_: On<Pointer<Click>>,
+                     mut state: ResMut<EditorState>,
+                     playing: Query<Entity, With<EditorAudio>>,
+                     mut record: ResMut<RecordState>,
+                     mut playhead: ResMut<Playhead>,
+                     mut pitch_range: ResMut<PitchRange>,
+                     mut commands: Commands| {
+                        state.mode = Mode::Play;
+                        stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
                     },
                 );
                 mode_button(
@@ -251,7 +276,7 @@ pub(super) fn spawn_mod_panel(
 
         panel
             .spawn((
-                PerformModeGroup,
+                RecordModeGroup,
                 Node {
                     width: Val::Percent(100.0),
                     flex_direction: FlexDirection::Row,
@@ -259,7 +284,29 @@ pub(super) fn spawn_mod_panel(
                     align_items: AlignItems::Center,
                     column_gap: Val::Px(8.0),
                     row_gap: Val::Px(6.0),
-                    display: if mode == Mode::Perform {
+                    display: if mode == Mode::Record {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
+                    ..default()
+                },
+            ))
+            .with_children(|g| {
+                spawn_record_buttons(g, loc, colors);
+            });
+
+        panel
+            .spawn((
+                PlayModeGroup,
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(8.0),
+                    row_gap: Val::Px(6.0),
+                    display: if mode == Mode::Play {
                         Display::Flex
                     } else {
                         Display::None
@@ -349,8 +396,8 @@ fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colo
     );
 }
 
-/// Play/Pause/Stop/Practice — only shown in [`Mode::Perform`] (wrapped in
-/// [`PerformModeGroup`] by the caller).
+/// Play/Pause/Stop/Practice — only shown in [`Mode::Play`] (wrapped in
+/// [`PlayModeGroup`] by the caller).
 fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     transport_button(
         panel,
@@ -458,37 +505,94 @@ fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, 
             }
         },
     );
-    spawn_record_button(
+}
+
+/// Play/Pause/Stop/Finish — the recording transport, only shown in
+/// [`Mode::Record`] (wrapped in [`RecordModeGroup`] by the caller). Play
+/// starts a take (or resumes a paused one); Pause freezes it in place;
+/// Stop ends the take leaving the playhead where it stopped; Finish ends
+/// it and rewinds to the beginning.
+fn spawn_record_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    transport_button(
         panel,
-        loc.msg("editor-record"),
-        loc.msg("editor-record-stop"),
-        loc.msg("editor-record-tooltip"),
+        loc.msg("editor-play"),
+        loc.msg("editor-record-play-tooltip"),
         colors.transport_record,
         |_: On<Pointer<Click>>,
          mut state: ResMut<EditorState>,
          mut sources: ResMut<Assets<AudioSource>>,
          settings: Res<AudioSettings>,
          playing: Query<Entity, With<EditorAudio>>,
+         sinks: Query<&AudioSink, With<EditorAudio>>,
          mut practice: ResMut<PracticeState>,
          mut record: ResMut<RecordState>,
          mut playhead: ResMut<Playhead>,
          mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands| {
             if record.active {
-                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
-            } else {
-                practice.reset(); // exit practice mode before recording, same as Play does
-                start_record(
-                    &state,
-                    &mut sources,
-                    &settings,
-                    &playing,
-                    &mut record,
-                    &mut playhead,
-                    &mut pitch_range,
-                    &mut commands,
-                );
+                // Paused, not stopped: resume in place rather than
+                // restarting the take.
+                if playhead.paused {
+                    toggle_pause(&mut playhead, &sinks);
+                }
+                return;
             }
+            practice.reset();
+            start_record(
+                &state,
+                &mut sources,
+                &settings,
+                &playing,
+                &mut record,
+                &mut playhead,
+                &mut pitch_range,
+                &mut commands,
+            );
+        },
+    );
+    transport_button(
+        panel,
+        loc.msg("editor-pause"),
+        loc.msg("editor-pause-tooltip"),
+        colors.transport_pause,
+        |_: On<Pointer<Click>>,
+         record: Res<RecordState>,
+         mut playhead: ResMut<Playhead>,
+         sinks: Query<&AudioSink, With<EditorAudio>>| {
+            if record.active {
+                toggle_pause(&mut playhead, &sinks);
+            }
+        },
+    );
+    transport_button(
+        panel,
+        loc.msg("editor-stop"),
+        loc.msg("editor-record-stop-tooltip"),
+        colors.transport_stop,
+        |_: On<Pointer<Click>>,
+         mut state: ResMut<EditorState>,
+         playing: Query<Entity, With<EditorAudio>>,
+         mut record: ResMut<RecordState>,
+         mut playhead: ResMut<Playhead>,
+         mut pitch_range: ResMut<PitchRange>,
+         mut commands: Commands| {
+            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+        },
+    );
+    transport_button(
+        panel,
+        loc.msg("editor-finish"),
+        loc.msg("editor-finish-tooltip"),
+        colors.transport_stop,
+        |_: On<Pointer<Click>>,
+         mut state: ResMut<EditorState>,
+         playing: Query<Entity, With<EditorAudio>>,
+         mut record: ResMut<RecordState>,
+         mut playhead: ResMut<Playhead>,
+         mut pitch_range: ResMut<PitchRange>,
+         mut commands: Commands| {
+            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+            playhead.elapsed = 0.0;
         },
     );
 }
