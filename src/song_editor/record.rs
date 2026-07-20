@@ -33,8 +33,16 @@
 //!   pitch events (a one-chunk blip is deleted again, so the live-growing
 //!   UX costs nothing), and releases get [`RELEASE_GRACE_EVENTS`] events of
 //!   grace (a one-chunk dropout doesn't split a held note in two).
+//!
+//! Recording also *punches in*: a note you play replaces whatever the grid
+//! already had at that time — any note overlapping a newly recorded note's
+//! span is removed, unless it was itself created during the current take
+//! ([`RecordState::take_ids`] — a chord's simultaneous notes are all part
+//! of the take and must coexist). So re-recording over a finished take (or
+//! over hand-placed/imported notes) replaces them instead of layering
+//! impossible blow-and-draw-at-once combinations on top.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::audio::AudioSource;
 use bevy::prelude::*;
@@ -101,6 +109,11 @@ pub(super) struct RecordState {
     /// per-event harp rebuild, and so non-producible detections are
     /// discarded as noise.
     table: Vec<Option<(u8, Dir, Pitch)>>,
+    /// Ids of every note created during the current take — the notes a
+    /// punch-in must *not* remove (see the module docs). Kept for the whole
+    /// take (not just while a note is open) so a chord or an earlier phrase
+    /// of the same take can't be eaten by a later overlapping note.
+    take_ids: HashSet<u32>,
     /// Seconds the detection pipeline lags behind the sound itself — half
     /// the analysis window plus the player's calibrated input latency —
     /// subtracted from the clock when placing onsets so recorded notes
@@ -266,7 +279,7 @@ pub(super) fn record_tick(
         apply_detected_pitches(&mut record, &mut state, &detected, t, secs_per_tick);
     }
 
-    grow_open_notes(&mut state.notes, &record.open, t, secs_per_tick);
+    grow_open_notes(&mut state.notes, &record.open, &record.take_ids, t, secs_per_tick);
 }
 
 // ── Pure-ish helpers ─────────────────────────────────────────────────────────
@@ -278,6 +291,20 @@ fn build_pitch_table(harp: &Harmonica, kind: HarmonicaKind) -> Vec<Option<(u8, D
     (0..=127u8)
         .map(|midi| map_pitch_playable(midi, harp, kind))
         .collect()
+}
+
+/// Removes every note overlapping `[start, end)` ticks that is *not* part
+/// of the current take — the punch-in rule (see the module docs). Interval
+/// overlap on time alone, regardless of hole: two overlapping notes from
+/// different takes are physically unplayable (one mouth), so whatever was
+/// there before yields to what's being played now.
+fn punch_out_overlaps(
+    notes: &mut Vec<GridNote>,
+    take_ids: &HashSet<u32>,
+    start: usize,
+    end: usize,
+) {
+    notes.retain(|n| take_ids.contains(&n.id) || n.tick + n.len <= start || n.tick >= end);
 }
 
 /// One pitch event's worth of onset/release bookkeeping — the debounced
@@ -327,7 +354,10 @@ fn apply_detected_pitches(
         };
         let id = state.next_id;
         state.next_id += 1;
-        state.notes.push(spawn_open_note(id, mapped, t, secs_per_tick));
+        let note = spawn_open_note(id, mapped, t, secs_per_tick);
+        punch_out_overlaps(&mut state.notes, &record.take_ids, note.tick, note.tick + note.len);
+        state.notes.push(note);
+        record.take_ids.insert(id);
         record.open.insert(
             midi,
             OpenNote {
@@ -350,13 +380,18 @@ fn finish_open_notes(
     t: f32,
     secs_per_tick: f32,
 ) {
+    let mut spans: Vec<(usize, usize)> = Vec::new();
     for (_, open) in record.open.drain() {
         if open.events_seen < CONFIRM_EVENTS {
             notes.retain(|n| n.id != open.id);
             record.note_count = record.note_count.saturating_sub(1);
         } else if let Some(n) = notes.iter_mut().find(|n| n.id == open.id) {
             n.len = note_len(open.start_secs, t, secs_per_tick);
+            spans.push((n.tick, n.tick + n.len));
         }
+    }
+    for (s, e) in spans {
+        punch_out_overlaps(notes, &record.take_ids, s, e);
     }
 }
 
@@ -390,18 +425,26 @@ fn spawn_open_note(
 /// doesn't, the note keeps the length it had when it actually stopped
 /// sounding rather than the grace window's extra chunks.
 fn grow_open_notes(
-    notes: &mut [GridNote],
+    notes: &mut Vec<GridNote>,
     open: &HashMap<u8, OpenNote>,
+    take_ids: &HashSet<u32>,
     t: f32,
     secs_per_tick: f32,
 ) {
+    let mut spans: Vec<(usize, usize)> = Vec::new();
     for o in open.values() {
         if o.missed_events > 0 {
             continue;
         }
         if let Some(n) = notes.iter_mut().find(|n| n.id == o.id) {
             n.len = note_len(o.start_secs, t, secs_per_tick);
+            spans.push((n.tick, n.tick + n.len));
         }
+    }
+    // A growing note keeps punching out what it extends over — see the
+    // module docs' punch-in rule.
+    for (s, e) in spans {
+        punch_out_overlaps(notes, take_ids, s, e);
     }
 }
 
@@ -442,7 +485,7 @@ mod tests {
         let mut notes = vec![note(0, 2, 1)];
         let open: HashMap<u8, OpenNote> = [(60, open(0, 0.25))].into();
         // 120 BPM -> secs_per_tick = 0.125s; held from 0.25s to 0.75s = 4 ticks.
-        grow_open_notes(&mut notes, &open, 0.75, 0.125);
+        grow_open_notes(&mut notes, &open, &HashSet::from([0]), 0.75, 0.125);
         assert_eq!(notes[0].len, 4);
     }
 
@@ -451,7 +494,7 @@ mod tests {
         let mut notes = vec![note(0, 2, 1)];
         let open: HashMap<u8, OpenNote> = [(60, open(0, 0.25))].into();
         // elapsed hasn't advanced past the onset yet — still a fresh blip.
-        grow_open_notes(&mut notes, &open, 0.25, 0.125);
+        grow_open_notes(&mut notes, &open, &HashSet::from([0]), 0.25, 0.125);
         assert_eq!(notes[0].len, 1);
     }
 
@@ -459,7 +502,7 @@ mod tests {
     fn grow_open_notes_leaves_notes_not_in_open_untouched() {
         let mut notes = vec![note(0, 2, 3)];
         let open: HashMap<u8, OpenNote> = HashMap::new();
-        grow_open_notes(&mut notes, &open, 5.0, 0.125);
+        grow_open_notes(&mut notes, &open, &HashSet::new(), 5.0, 0.125);
         assert_eq!(notes[0].len, 3);
     }
 
@@ -469,7 +512,7 @@ mod tests {
         let mut o = open(0, 0.25);
         o.missed_events = 1;
         let open: HashMap<u8, OpenNote> = [(60, o)].into();
-        grow_open_notes(&mut notes, &open, 5.0, 0.125);
+        grow_open_notes(&mut notes, &open, &HashSet::from([0]), 5.0, 0.125);
         assert_eq!(notes[0].len, 3);
     }
 
@@ -574,6 +617,55 @@ mod tests {
         apply_detected_pitches(&mut record, &mut state, &[c4], 0.15, 0.125);
         assert_eq!(state.notes.len(), 1, "dropout must not split the note");
         assert_eq!(record.note_count, 1);
+    }
+
+    // ── punch-in overwrite ───────────────────────────────────────────────────
+
+    #[test]
+    fn a_new_onset_removes_an_overlapping_note_from_outside_the_take() {
+        let (mut record, mut state, c4) = recording_setup();
+        // A pre-existing note (hand-placed, or an earlier finished take)
+        // sitting right where the player now plays.
+        state.notes.push(note(99, 0, 4));
+        state.next_id = 100;
+        apply_detected_pitches(&mut record, &mut state, &[c4], 0.0, 0.125);
+        assert!(
+            !state.notes.iter().any(|n| n.id == 99),
+            "the overlapped old note should be punched out"
+        );
+        assert_eq!(state.notes.len(), 1, "only the newly recorded note remains");
+    }
+
+    #[test]
+    fn a_growing_note_punches_out_what_it_extends_over() {
+        let (mut record, mut state, c4) = recording_setup();
+        // Old note starting later — not overlapped at onset, but in the
+        // path of the new note as it's held.
+        state.notes.push(note(99, 3, 2));
+        state.next_id = 100;
+        apply_detected_pitches(&mut record, &mut state, &[c4], 0.0, 0.125);
+        assert!(state.notes.iter().any(|n| n.id == 99), "not overlapped yet");
+        // Hold to 0.5s = 4 ticks: span [0,4) now overlaps [3,5).
+        apply_detected_pitches(&mut record, &mut state, &[c4], 0.5, 0.125);
+        grow_open_notes(&mut state.notes, &record.open, &record.take_ids, 0.5, 0.125);
+        assert!(
+            !state.notes.iter().any(|n| n.id == 99),
+            "the note grown over should be punched out"
+        );
+    }
+
+    #[test]
+    fn chord_notes_from_the_same_take_survive_each_other() {
+        let (mut record, mut state, c4) = recording_setup();
+        // E4 = hole 2 blow on a C harp — a real two-note chord with C4.
+        let e4 = crate::audio_system::midi::note_to_midi("E4").unwrap() as u8;
+        apply_detected_pitches(&mut record, &mut state, &[c4, e4], 0.0, 0.125);
+        grow_open_notes(&mut state.notes, &record.open, &record.take_ids, 0.5, 0.125);
+        assert_eq!(
+            state.notes.len(),
+            2,
+            "simultaneous notes of one take must coexist"
+        );
     }
 
     #[test]
