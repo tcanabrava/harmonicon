@@ -157,6 +157,19 @@
 
         "position": {
           "type": "string"
+        },
+
+        "scale": {
+          "type": "string",
+          "enum": [
+            "first_position",
+            "second_position",
+            "third_position",
+            "major",
+            "minor_pentatonic",
+            "country"
+          ],
+          "description": "Which scale the Song Editor colors notes against. first_position/second_position/third_position all use the blues scale, rooted at the harp's own key/a 5th up/a whole step up respectively; the others are the named scale rooted on the harp's own key. Optional, defaults to first_position."
         }
       },
 

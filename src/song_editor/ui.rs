@@ -160,6 +160,13 @@ pub(super) struct StatusMsg;
 #[derive(Component)]
 pub(super) struct MidiTrackComboboxSlot;
 
+/// Empty container [`super::meta_form::spawn_scale_combobox`] spawns the
+/// scale-picker combobox under, once — unlike [`MidiTrackComboboxSlot`],
+/// its option list is fixed at compile time, so this only ever spawns once
+/// rather than rebuilding on some external event.
+#[derive(Component)]
+pub(super) struct ScaleComboboxSlot;
+
 // ── Lifecycle systems ─────────────────────────────────────────────────────────
 
 pub(super) fn init_state(mut commands: Commands, existing: Option<Res<EditorState>>) {

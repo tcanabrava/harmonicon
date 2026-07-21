@@ -111,6 +111,7 @@ editor-field-music = Background Music
 editor-field-name = Name
 editor-field-author = Author
 editor-field-midi-track = MIDI Track
+editor-field-scale = Scale
 editor-harmonica-diatonic = ‹ Diatonic (10 holes) ›
 editor-harmonica-chromatic = ‹ Chromatic (12 holes) ›
 editor-field-content-kind = Recording

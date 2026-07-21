@@ -9,7 +9,7 @@ use super::state::{
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use crate::audio_system::midi::{midi_to_note, note_to_midi};
 use crate::dialogs::file_dialog::FileChosen;
-use crate::song::chart::{Action, TempoPoint, seconds_to_tick, tick_to_seconds};
+use crate::song::chart::{Action, Scale, TempoPoint, seconds_to_tick, tick_to_seconds};
 use crate::song::harmonica::{Harmonica, hole_notes};
 
 // ── Serialisation ────────────────────────────────────────────────────────────
@@ -154,6 +154,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
                 "type": "diatonic",
                 "holes": 10,
                 "position": state.position,
+                "scale": state.scale,
                 "bending_profile": "richter_standard",
                 "layout": { "blow": blow, "draw": draw }
             })
@@ -174,6 +175,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
                 "type": "chromatic",
                 "holes": 12,
                 "position": state.position,
+                "scale": state.scale,
                 "layout": {
                     "blow": blow,
                     "draw": draw,
@@ -294,6 +296,9 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         && POSITIONS.contains(&p)
     {
         state.position = p.to_string();
+    }
+    if let Ok(scale) = serde_json::from_value::<Scale>(v["harmonica"]["scale"].clone()) {
+        state.scale = scale;
     }
     // The editor only models a 10-hole diatonic or 12-hole chromatic harp
     // (`HarmonicaKind::hole_count`); a chart declaring a 16-hole chromatic

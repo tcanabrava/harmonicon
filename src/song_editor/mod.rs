@@ -207,6 +207,9 @@ impl Plugin for SongEditor2Plugin {
                         midi_import::rebuild_midi_track_combobox,
                     )
                         .chain(),
+                    meta_form::spawn_scale_combobox,
+                    meta_form::sync_scale_combobox_value
+                        .run_if(resource_exists_and_changed::<state::EditorState>),
                     timeline::sync_timeline_surface,
                     timeline::sync_selection_with_scroll
                         .before(timeline_overlay::update_timeline_overlays),

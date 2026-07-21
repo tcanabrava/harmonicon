@@ -22,7 +22,7 @@ use super::{
 use crate::audio_system::midi::{freq_to_midi, midi_to_note};
 use crate::gameplay::twelve_bar_blues_overlay::bar_bg;
 use crate::localization::LocalizationExt;
-use crate::song::harmonica::{Harmonica, blues_scale_classes};
+use crate::song::harmonica::Harmonica;
 use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
 use std::collections::HashSet;
@@ -96,7 +96,7 @@ pub(super) fn rebuild_grid(
     }
     let colors = theme.song_editor_colors();
     let bar_colors = theme.twelve_bar_colors();
-    let scale = blues_scale_classes(&state.key);
+    let scale = state.scale.classes(&state.key);
     let harp = build_harp(&state.key, state.harmonica_kind);
     let hole_count = state.hole_count();
     // Locked (user Lock toggle, or Perform mode): grid cells, notes, and

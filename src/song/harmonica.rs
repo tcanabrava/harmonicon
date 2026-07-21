@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::song::chart::{Action, BendingProfile};
+use crate::song::chart::{Action, BendingProfile, Scale};
 
 use crate::song::chart::{ChromaticLayout, DiatonicLayout};
 
@@ -69,6 +69,7 @@ pub fn richter_harp(key: &str) -> Harmonica {
         holes: 10,
         bending_profile: BendingProfile::RichterStandard,
         position: None,
+        scale: None,
         layout: Some(DiatonicLayout {
             blow: Some(transpose_table(&C_BLOW, off)),
             draw: Some(transpose_table(&C_DRAW, off)),
@@ -82,6 +83,7 @@ pub fn chromatic_harp(key: &str) -> Harmonica {
     Harmonica::Chromatic {
         holes: 12,
         position: None,
+        scale: None,
         layout: Some(ChromaticLayout {
             blow: Some(transpose_table(&C_BLOW_CHROMATIC, off)),
             draw: Some(transpose_table(&C_DRAW_CHROMATIC, off)),
@@ -164,11 +166,13 @@ pub enum Harmonica {
         holes: u8,
         bending_profile: BendingProfile,
         position: Option<String>,
+        scale: Option<Scale>,
         layout: Option<DiatonicLayout>,
     },
     Chromatic {
         holes: u8,
         position: Option<String>,
+        scale: Option<Scale>,
         layout: Option<ChromaticLayout>,
     },
 }
@@ -400,13 +404,104 @@ pub fn semitone(root: &str, n: i32) -> String {
 const BLUES_SCALE_INTERVALS: [i32; 6] = [0, 3, 5, 6, 7, 10];
 
 /// The six note classes of the blues scale rooted on `key` (1, b3, 4, b5, 5, b7).
-/// Shared by Jam Session's live hole-map feedback and the song editor's
-/// scale-aware note coloring, so both reflect the same blues-scale definition.
+/// Shared by Jam Session's live hole-map feedback and (via
+/// [`Scale::classes`]'s position variants) the song editor's scale-aware
+/// note coloring, so both reflect the same blues-scale definition.
 pub fn blues_scale_classes(key: &str) -> HashSet<String> {
     BLUES_SCALE_INTERVALS
         .iter()
         .map(|&n| semitone(key, n))
         .collect()
+}
+
+/// Semitone offsets of the major (Ionian) scale's seven degrees above the
+/// root — see [`Scale::Major`].
+const MAJOR_SCALE_INTERVALS: [i32; 7] = [0, 2, 4, 5, 7, 9, 11];
+/// Semitone offsets of the minor pentatonic scale's five degrees (1, ♭3, 4,
+/// 5, ♭7) above the root — see [`Scale::MinorPentatonic`].
+const MINOR_PENTATONIC_INTERVALS: [i32; 5] = [0, 3, 5, 7, 10];
+/// Semitone offsets of the major pentatonic scale's five degrees (1, 2, 3,
+/// 5, 6) above the root — commonly called "the Country scale" in
+/// harmonica pedagogy (the notes 2nd-position cross-harp playing reaches
+/// without bending) — see [`Scale::Country`].
+const COUNTRY_SCALE_INTERVALS: [i32; 5] = [0, 2, 4, 7, 9];
+
+impl Scale {
+    /// Every selectable scale, in the order the Song Editor's picker offers
+    /// them.
+    pub fn all() -> &'static [Scale] {
+        &[
+            Scale::FirstPosition,
+            Scale::SecondPosition,
+            Scale::ThirdPosition,
+            Scale::Major,
+            Scale::MinorPentatonic,
+            Scale::Country,
+        ]
+    }
+
+    /// Display label for the Song Editor's scale combobox.
+    pub fn label(self) -> &'static str {
+        match self {
+            Scale::FirstPosition => "1st Position",
+            Scale::SecondPosition => "2nd Position",
+            Scale::ThirdPosition => "3rd Position",
+            Scale::Major => "Major Scale",
+            Scale::MinorPentatonic => "Minor Pentatonic",
+            Scale::Country => "Country Scale",
+        }
+    }
+
+    /// Inverse of [`label`](Self::label) — for UI that deals in plain
+    /// strings (the combobox's own selection event) rather than the enum
+    /// itself. `None` for anything that isn't one of [`Self::all`]'s labels.
+    pub fn from_label(label: &str) -> Option<Self> {
+        Self::all().iter().copied().find(|s| s.label() == label)
+    }
+
+    /// Semitones this scale's root sits *above* the harp's own key —
+    /// `0` for a shape rooted directly on the harp key (`Major`/
+    /// `MinorPentatonic`/`Country`, and `FirstPosition` itself), or the 2nd/
+    /// 3rd-position offset otherwise. Numerically the same 0/7/2 that
+    /// `Position::interval_below_jam_key` uses, just applied upward from
+    /// the harp's own key instead of downward from a separate jam key —
+    /// a chart has no jam key distinct from its harp, so "position" here
+    /// means "which mode of this harp," not "which harp for this jam."
+    fn root_offset_semitones(self) -> i32 {
+        match self {
+            Scale::FirstPosition | Scale::Major | Scale::MinorPentatonic | Scale::Country => 0,
+            Scale::SecondPosition => 7,
+            Scale::ThirdPosition => 2,
+        }
+    }
+
+    /// This scale's degree intervals (semitones above its own root) — the
+    /// blues hexatonic for the three position variants (matching every
+    /// other blues-scale overlay in the game), or the named scale's own
+    /// intervals otherwise.
+    fn degree_intervals(self) -> &'static [i32] {
+        match self {
+            Scale::FirstPosition | Scale::SecondPosition | Scale::ThirdPosition => {
+                &BLUES_SCALE_INTERVALS
+            }
+            Scale::Major => &MAJOR_SCALE_INTERVALS,
+            Scale::MinorPentatonic => &MINOR_PENTATONIC_INTERVALS,
+            Scale::Country => &COUNTRY_SCALE_INTERVALS,
+        }
+    }
+
+    /// The note classes (no octave) of this scale, rooted relative to
+    /// `harp_key` — what the Song Editor's grid colors notes against
+    /// (`song_editor::grid::note_in_scale`), replacing what used to be an
+    /// unconditional [`blues_scale_classes`] call with an explicit,
+    /// chart-author-selectable scale.
+    pub fn classes(self, harp_key: &str) -> HashSet<String> {
+        let root = semitone(harp_key, self.root_offset_semitones());
+        self.degree_intervals()
+            .iter()
+            .map(|&n| semitone(&root, n))
+            .collect()
+    }
 }
 
 // Returns the blow label for the given hole, or a dash if not available.
@@ -501,6 +596,13 @@ impl Harmonica {
             Harmonica::Diatonic { position, .. } | Harmonica::Chromatic { position, .. } => {
                 position.as_deref()
             }
+        }
+    }
+
+    /// The chart-declared [`Scale`] to color notes against, if any.
+    pub fn scale(&self) -> Option<Scale> {
+        match self {
+            Harmonica::Diatonic { scale, .. } | Harmonica::Chromatic { scale, .. } => *scale,
         }
     }
 

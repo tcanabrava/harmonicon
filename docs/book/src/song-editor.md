@@ -36,6 +36,27 @@ playing position, harmonica type (diatonic/chromatic, and hole layout),
 background music file, and song name/author — everything under `song` and
 `harmonica` in the `.harpchart` format.
 
+### Scale and note colors
+
+Every note on the grid is tinted by the technique it's played with — plain
+blow/draw, bend, overblow, overdraw, or slide — and gets a warm red tint
+blended in if it falls outside a reference scale, as a gentle "you're
+reaching outside this scale" flag rather than an error. The third column
+next to the meta-form fields is a full legend for every color the editor
+uses, in case any of this is unclear at a glance.
+
+The **Scale** field picks that reference scale:
+
+- **1st/2nd/3rd Position** — the blues scale, rooted at the harp's own key,
+  a fifth above it, or a whole step above it respectively (matching the
+  three classic cross-harp playing positions).
+- **Major Scale** / **Minor Pentatonic** / **Country Scale** — rooted
+  directly on the harp's key, for melodies that aren't blues-flavored at
+  all.
+
+It defaults to 1st Position, and only affects this warning color — it
+never changes which notes you can actually place.
+
 ## Authoring a lesson
 
 The **Recording** field in the meta form cycles between **Record Song**

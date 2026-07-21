@@ -277,6 +277,18 @@ this file — prune it back to a one-line summary under "Shipped" below.
   (`record::punch_out_overlaps`/`RecordState::take_ids`): a recorded note
   replaces overlapping notes from outside the current take instead of
   layering impossible simultaneous blow/draw combos on top of them.
+- **Song editor: selectable scale** — a new `harmonica.scale` chart field
+  (`song::chart::Scale`, schema-`enum`-validated, format_version bumped to
+  1.2.0) replaces the grid's out-of-scale coloring's old hardcoded
+  "always blues, rooted at the harp key" assumption with six
+  player-selectable options (1st/2nd/3rd position — the blues hexatonic,
+  rooted at the harp key/a 5th up/a whole step up; Major/Minor
+  Pentatonic/Country — alternative shapes rooted at the harp key), picked
+  via a real combobox (`meta_form::spawn_scale_row`/`spawn_scale_combobox`)
+  rather than a click-to-cycle button, since six named options is a lot to
+  cycle through blindly. The default (1st position) reproduces the
+  pre-feature coloring exactly, so no existing bundled chart's appearance
+  changes. See `CLAUDE.md`'s song-editor-scale bullet.
 
 ## Current work
 

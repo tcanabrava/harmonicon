@@ -109,6 +109,7 @@ editor-field-music = Música de Fundo
 editor-field-name = Nome
 editor-field-author = Autor
 editor-field-midi-track = Faixa MIDI
+editor-field-scale = Escala
 editor-harmonica-diatonic = ‹ Diatônica (10 buracos) ›
 editor-harmonica-chromatic = ‹ Cromática (12 buracos) ›
 editor-field-content-kind = Gravação

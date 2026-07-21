@@ -18,13 +18,15 @@ use super::state::{
 };
 use super::timeline_overlay::{RANGE_HIGHLIGHT_COLOR, SPLIT_LINE_COLOR};
 use super::ui::{
-    ContentKindText, HarmonicaKindText, HoleColumnContent, MetaFieldBox, MetaFieldText,
-    MidiTrackComboboxSlot,
+    ContentKindText, EditorRoot, HarmonicaKindText, HoleColumnContent, MetaFieldBox, MetaFieldText,
+    MidiTrackComboboxSlot, ScaleComboboxSlot,
 };
 use super::{HEADER_H, MIDI_PURPOSE, MUSIC_PURPOSE, ROW_H, SILENCE_ROW_H, grid_height};
+use crate::dialogs::combobox::{ComboboxSelect, ComboboxValue, spawn_combobox};
 use crate::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 use crate::dialogs::tooltip::Tooltip;
 use crate::localization::LocalizationExt;
+use crate::song::chart::Scale;
 use crate::theme::SongEditorColors;
 use bevy_fluent::prelude::Localization;
 
@@ -458,6 +460,107 @@ fn spawn_midi_track_row(col: &mut ChildSpawnerCommands, loc: &Localization, colo
     });
 }
 
+/// The Scale field's label + empty [`ScaleComboboxSlot`] — [`spawn_scale_combobox`]
+/// fills the slot in once `EditorRoot` exists (this function only runs
+/// before it does, at initial `ui::setup`). Unlike [`spawn_midi_track_row`],
+/// there's no trigger button: the combobox's option list ([`Scale::all`])
+/// is fixed at compile time, so it can just always be there.
+fn spawn_scale_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        ..default()
+    })
+    .with_children(|line| {
+        line.spawn((
+            Node {
+                width: Val::Px(FORM_LABEL_W),
+                ..default()
+            },
+            Text::new(format!("{}:", loc.msg("editor-field-scale"))),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(colors.label),
+        ));
+        line.spawn((
+            ScaleComboboxSlot,
+            Node {
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+        ));
+    });
+}
+
+/// Fills in [`ScaleComboboxSlot`] the first time it's seen empty — a
+/// spawn-once gate (`Without<Children>`) rather than a rebuild-on-message
+/// system like [`rebuild_midi_track_combobox`](super::midi_import::
+/// rebuild_midi_track_combobox), since [`Scale::all`]'s option list never
+/// changes at runtime; there's nothing to rebuild for. Needs `EditorRoot`
+/// as the dropdown's backdrop parent (see `dialogs::combobox`'s own docs
+/// for why a combobox needs one), which doesn't exist yet the frame
+/// `spawn_scale_row` runs — hence deferring the actual combobox spawn to
+/// this system instead of doing it inline there.
+pub(super) fn spawn_scale_combobox(
+    mut commands: Commands,
+    state: Res<EditorState>,
+    loc: Res<Localization>,
+    slot: Query<Entity, (With<ScaleComboboxSlot>, Without<Children>)>,
+    editor_root: Query<Entity, With<EditorRoot>>,
+) {
+    let Ok(slot_entity) = slot.single() else {
+        return;
+    };
+    let Ok(backdrop) = editor_root.single() else {
+        return;
+    };
+    let options: Vec<String> = Scale::all().iter().map(|s| s.label().to_string()).collect();
+    spawn_combobox(
+        &mut commands,
+        slot_entity,
+        backdrop,
+        &loc.msg("editor-field-scale"),
+        &options,
+        state.scale.label(),
+        on_scale_selected,
+    );
+}
+
+fn on_scale_selected(ev: On<ComboboxSelect>, mut state: ResMut<EditorState>) {
+    if let Some(scale) = Scale::from_label(&ev.value) {
+        state.scale = scale;
+    }
+}
+
+/// Keeps the scale combobox's displayed value in step with
+/// `EditorState::scale` after it changes from outside the widget itself —
+/// namely, Load populating a different scale than whatever was previously
+/// selected. Writing to [`ComboboxValue`] directly is the widget's own
+/// documented escape hatch for exactly this; `dialogs::combobox`'s own
+/// `sync_combobox_visuals` (always running) then updates the visible
+/// toggle label text from it, same as a user pick would.
+pub(super) fn sync_scale_combobox_value(
+    state: Res<EditorState>,
+    slot: Query<&Children, With<ScaleComboboxSlot>>,
+    mut values: Query<&mut ComboboxValue>,
+) {
+    let Ok(children) = slot.single() else {
+        return;
+    };
+    for &child in children {
+        if let Ok(mut value) = values.get_mut(child) {
+            let want = state.scale.label();
+            if value.0 != want {
+                value.0 = want.to_string();
+            }
+        }
+    }
+}
+
 /// The chart metadata form: two side-by-side field columns plus a third,
 /// [`spawn_color_legend`], explaining what every color the grid/mod-panel/
 /// scrollbar uses actually means — with 8 field rows (harmonica kind,
@@ -488,6 +591,7 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
             for &(field, label) in &FIELDS[MID..] {
                 spawn_field_row(col, loc, colors, field, label);
             }
+            spawn_scale_row(col, loc, colors);
             spawn_midi_track_row(col, loc, colors);
         });
         spawn_form_column(form, |col| {

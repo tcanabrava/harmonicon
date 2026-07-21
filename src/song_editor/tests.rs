@@ -18,6 +18,7 @@ use super::state::{
 use super::ui::ModButton;
 use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::audio_system::synth::{PhraseNote, SAMPLE_RATE, envelope, render_pcm};
+use crate::song::chart::Scale;
 use crate::audio_system::wav::encode_wav;
 use crate::lessons::{LessonManifest, PassCriteria};
 use crate::song::harmonica::blues_scale_classes;
@@ -1010,6 +1011,42 @@ fn oscillation_hz_round_trips_through_save_and_load() {
     let mut scroll = Scroll::default();
     load_harpchart(&v, &mut loaded, &mut scroll);
     assert_eq!(loaded.notes[0].expr, Expr::Wah(3.0));
+}
+
+#[test]
+fn scale_round_trips_through_save_and_load() {
+    let s = EditorState {
+        scale: Scale::SecondPosition,
+        ..Default::default()
+    };
+
+    let json_str = serialize_harpchart(&s);
+    let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+    assert_eq!(v["harmonica"]["scale"], "second_position");
+
+    let mut loaded = EditorState::default();
+    let mut scroll = Scroll::default();
+    load_harpchart(&v, &mut loaded, &mut scroll);
+    assert_eq!(loaded.scale, Scale::SecondPosition);
+}
+
+#[test]
+fn loading_a_chart_without_a_scale_field_leaves_the_current_scale_untouched() {
+    // Matches `position`'s existing precedent: a missing field doesn't
+    // reset the editor's current selection, since `load_harpchart` never
+    // resets `EditorState` wholesale before applying fields piecemeal.
+    let s = EditorState::default();
+    let json_str = serialize_harpchart(&s);
+    let mut v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
+    v["harmonica"].as_object_mut().unwrap().remove("scale");
+
+    let mut loaded = EditorState {
+        scale: Scale::Country,
+        ..Default::default()
+    };
+    let mut scroll = Scroll::default();
+    load_harpchart(&v, &mut loaded, &mut scroll);
+    assert_eq!(loaded.scale, Scale::Country);
 }
 
 #[test]

@@ -2,6 +2,7 @@
 
 use bevy::prelude::*;
 
+use crate::song::chart::Scale;
 use super::{HEADER_H, NOTE_PAD, ROW_H, TICKS_PER_BEAT, TICK_W};
 
 // ── Note model types ─────────────────────────────────────────────────────────
@@ -372,6 +373,12 @@ pub(super) struct EditorState {
     pub(super) tempo_changes: Vec<(usize, f32)>,
     pub(super) key: String,
     pub(super) position: String,
+    /// Which scale the grid colors notes against — see [`Scale`]. A
+    /// picker-only field (the Scale combobox), unlike `key`/`position`,
+    /// which route through the generic [`Field`]/[`FIELDS`] click-to-cycle
+    /// machinery — six named options is a lot for a cycle button, and the
+    /// combobox shows all of them at once.
+    pub(super) scale: Scale,
     pub(super) music: String,
     pub(super) name: String,
     pub(super) author: String,
@@ -440,6 +447,7 @@ impl Default for EditorState {
             tempo_changes: Vec::new(),
             key: "C".into(),
             position: "2nd".into(),
+            scale: Scale::default(),
             music: String::new(),
             name: String::new(),
             author: String::new(),

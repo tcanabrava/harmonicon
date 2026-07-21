@@ -55,6 +55,69 @@ fn blues_scale_is_the_six_classes() {
     assert!(!s.contains("E"), "major 3rd is not in the blues scale");
 }
 
+// ── Scale ─────────────────────────────────────────────────────────────────────
+
+#[test]
+fn first_position_matches_blues_scale_classes_exactly() {
+    // The default/unset scale must reproduce the coloring behavior the
+    // editor always had before `Scale` existed — a chart with no `scale`
+    // field can't change appearance just because this feature landed.
+    assert_eq!(Scale::FirstPosition.classes("C"), blues_scale_classes("C"));
+}
+
+#[test]
+fn second_position_roots_the_blues_scale_a_fifth_up() {
+    // A C harp in 2nd position plays in G — same reasoning
+    // `Position::harp_key` uses, just inverted (up from the harp key).
+    assert_eq!(Scale::SecondPosition.classes("C"), blues_scale_classes("G"));
+}
+
+#[test]
+fn third_position_roots_the_blues_scale_a_whole_step_up() {
+    assert_eq!(Scale::ThirdPosition.classes("C"), blues_scale_classes("D"));
+}
+
+#[test]
+fn major_scale_is_seven_notes_rooted_on_the_harp_key() {
+    let s = Scale::Major.classes("C");
+    for c in ["C", "D", "E", "F", "G", "A", "B"] {
+        assert!(s.contains(c), "missing {c}");
+    }
+    assert_eq!(s.len(), 7);
+    assert!(!s.contains("D#"), "no ♭3 in a major scale");
+}
+
+#[test]
+fn minor_pentatonic_is_five_notes_rooted_on_the_harp_key() {
+    let s = Scale::MinorPentatonic.classes("C");
+    for c in ["C", "D#", "F", "G", "A#"] {
+        assert!(s.contains(c), "missing {c}");
+    }
+    assert_eq!(s.len(), 5);
+}
+
+#[test]
+fn country_scale_is_major_pentatonic_rooted_on_the_harp_key() {
+    let s = Scale::Country.classes("C");
+    for c in ["C", "D", "E", "G", "A"] {
+        assert!(s.contains(c), "missing {c}");
+    }
+    assert_eq!(s.len(), 5);
+    assert!(!s.contains("F"), "no 4th in a major pentatonic scale");
+}
+
+#[test]
+fn scale_label_round_trips_through_from_label() {
+    for &s in Scale::all() {
+        assert_eq!(Scale::from_label(s.label()), Some(s));
+    }
+}
+
+#[test]
+fn scale_from_label_rejects_unknown_text() {
+    assert_eq!(Scale::from_label("Dorian Mode"), None);
+}
+
 #[test]
 fn twelve_bar_c_major() {
     let bar = twelve_bar("C");
@@ -302,6 +365,7 @@ fn frequency_range_of_a_low_g_harp_dips_below_the_old_fixed_floor() {
         holes: 10,
         bending_profile: BendingProfile::RichterStandard,
         position: None,
+        scale: None,
         layout: Some(DiatonicLayout {
             blow: Some(vec!["G3".into(), "B3".into()]),
             draw: Some(vec!["A3".into(), "D4".into()]),
@@ -317,6 +381,7 @@ fn frequency_range_is_none_without_a_layout() {
         holes: 10,
         bending_profile: BendingProfile::RichterStandard,
         position: None,
+        scale: None,
         layout: None,
     };
     assert_eq!(harp.frequency_range(), None);
