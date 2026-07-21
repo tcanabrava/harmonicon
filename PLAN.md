@@ -293,7 +293,14 @@ this file — prune it back to a one-line summary under "Shipped" below.
   needs to be a literal child of its toggle, and Bevy's UI clipping follows
   that same ancestry, so a combobox nested in the form's `ScrollArea` gets
   its open dropdown clipped to that viewport regardless of `GlobalZIndex`,
-  rendering behind (and eating clicks meant for) the fixed mod panel. See
+  rendering behind (and eating clicks meant for) the fixed mod panel. That
+  fix then exposed a second, unrelated bug affecting every combobox in the
+  app (not just Scale's): `Pointer<Click>` auto-propagates up the entity
+  hierarchy, so picking a dropdown item also fired the toggle button's own
+  click handler on the same event, which saw the just-closed popup and
+  reopened it — picking an item never visually closed the dropdown. Fixed
+  in the shared widget (`dialogs::combobox`'s `toggle_click`/
+  `backdrop_click`/`item_click` all now call `ev.propagate(false)`). See
   `CLAUDE.md`'s song-editor-scale bullet.
 
 ## Current work

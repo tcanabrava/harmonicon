@@ -331,11 +331,17 @@ fn is_combobox_open(root: Entity, links: &Query<&ComboboxLinks>, nodes: &Query<&
 }
 
 fn toggle_click(
-    ev: On<Pointer<Click>>,
+    mut ev: On<Pointer<Click>>,
     toggles: Query<&ComboboxRoot>,
     links: Query<&ComboboxLinks>,
     mut nodes: Query<&mut Node>,
 ) {
+    // `Pointer<Click>` auto-propagates up the entity hierarchy (every
+    // `bevy_picking` pointer event does) — without this, a click on this
+    // combobox would also fire on whatever it's nested inside (e.g. a page
+    // that toggles something else on click of its own), letting the
+    // dropdown's own interactions leak out. A modal widget shouldn't leak.
+    ev.propagate(false);
     let Ok(&ComboboxRoot(root)) = toggles.get(ev.entity) else {
         return;
     };
@@ -346,11 +352,12 @@ fn toggle_click(
 /// Clicking the backdrop means clicking outside the dropdown — close it
 /// without touching `ComboboxValue`.
 fn backdrop_click(
-    ev: On<Pointer<Click>>,
+    mut ev: On<Pointer<Click>>,
     backdrops: Query<&ComboboxRoot>,
     links: Query<&ComboboxLinks>,
     mut nodes: Query<&mut Node>,
 ) {
+    ev.propagate(false);
     let Ok(&ComboboxRoot(root)) = backdrops.get(ev.entity) else {
         return;
     };
@@ -358,13 +365,18 @@ fn backdrop_click(
 }
 
 fn item_click(
-    ev: On<Pointer<Click>>,
+    mut ev: On<Pointer<Click>>,
     items: Query<&ComboboxItemButton>,
     links: Query<&ComboboxLinks>,
     mut nodes: Query<&mut Node>,
     mut values: Query<&mut ComboboxValue>,
     mut commands: Commands,
 ) {
+    // Without this, the click bubbles from this item up to the toggle
+    // button (its ancestor — `list` is a child of `toggle`), whose own
+    // `toggle_click` then sees the popup this observer just closed and
+    // immediately reopens it, on the very same click.
+    ev.propagate(false);
     let Ok(item) = items.get(ev.entity) else {
         return;
     };
