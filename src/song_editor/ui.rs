@@ -478,6 +478,39 @@ fn spawn_fixed_chrome(
         });
     });
 
+    // The Scale combobox's slot — deliberately part of the *fixed* chrome,
+    // not the scrollable meta form its other fields live in. See
+    // `meta_form::spawn_scale_combobox`'s doc comment: `bevy_ui_widgets::
+    // Popover`'s dropdown list must be a literal ECS child of its toggle to
+    // position itself, and Bevy's UI clipping follows that same ancestry —
+    // nested inside the form's `Overflow::scroll_y()` `ScrollArea`, the open
+    // dropdown would get clipped to that scrollable viewport regardless of
+    // `GlobalZIndex`, rendering behind (and stealing clicks from) whatever's
+    // fixed here instead. `ScaleComboboxSlot` fills in once, the same
+    // spawn-once gate the rest of that system's doc comment describes.
+    root.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        padding: UiRect::top(Val::Px(6.0)),
+        ..default()
+    })
+    .with_children(|row| {
+        row.spawn(Node {
+            width: Val::Px(HOLE_COL_W),
+            flex_shrink: 0.0,
+            ..default()
+        });
+        row.spawn((
+            ScaleComboboxSlot,
+            Node {
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+        ));
+    });
+
     spawn_mod_panel(root, loc, colors, mode);
 }
 

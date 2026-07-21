@@ -45,7 +45,7 @@ reaching outside this scale" flag rather than an error. The third column
 next to the meta-form fields is a full legend for every color the editor
 uses, in case any of this is unclear at a glance.
 
-The **Scale** field picks that reference scale:
+The **Scale** field, just above the mod panel, picks that reference scale:
 
 - **1st/2nd/3rd Position** — the blues scale, rooted at the harp's own key,
   a fifth above it, or a whole step above it respectively (matching the

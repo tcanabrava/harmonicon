@@ -460,42 +460,6 @@ fn spawn_midi_track_row(col: &mut ChildSpawnerCommands, loc: &Localization, colo
     });
 }
 
-/// The Scale field's label + empty [`ScaleComboboxSlot`] — [`spawn_scale_combobox`]
-/// fills the slot in once `EditorRoot` exists (this function only runs
-/// before it does, at initial `ui::setup`). Unlike [`spawn_midi_track_row`],
-/// there's no trigger button: the combobox's option list ([`Scale::all`])
-/// is fixed at compile time, so it can just always be there.
-fn spawn_scale_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
-    col.spawn(Node {
-        width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        column_gap: Val::Px(8.0),
-        ..default()
-    })
-    .with_children(|line| {
-        line.spawn((
-            Node {
-                width: Val::Px(FORM_LABEL_W),
-                ..default()
-            },
-            Text::new(format!("{}:", loc.msg("editor-field-scale"))),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
-            TextColor(colors.label),
-        ));
-        line.spawn((
-            ScaleComboboxSlot,
-            Node {
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-        ));
-    });
-}
-
 /// Fills in [`ScaleComboboxSlot`] the first time it's seen empty — a
 /// spawn-once gate (`Without<Children>`) rather than a rebuild-on-message
 /// system like [`rebuild_midi_track_combobox`](super::midi_import::
@@ -503,8 +467,22 @@ fn spawn_scale_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: S
 /// changes at runtime; there's nothing to rebuild for. Needs `EditorRoot`
 /// as the dropdown's backdrop parent (see `dialogs::combobox`'s own docs
 /// for why a combobox needs one), which doesn't exist yet the frame
-/// `spawn_scale_row` runs — hence deferring the actual combobox spawn to
-/// this system instead of doing it inline there.
+/// `ui::spawn_fixed_chrome` spawns the slot — hence deferring the actual
+/// combobox spawn to this system instead of doing it inline there.
+///
+/// The slot itself deliberately lives in the *fixed* chrome
+/// (`ui::spawn_fixed_chrome`), not the scrollable meta form alongside the
+/// other fields: `bevy_ui_widgets::Popover` (what makes the dropdown list
+/// float above everything, positioned relative to its toggle) requires the
+/// list to be a literal ECS child of that toggle, and Bevy's UI overflow
+/// clipping follows that same ancestry — not the popover's own computed
+/// screen position. A combobox nested inside the form's `Overflow::
+/// scroll_y()` `ScrollArea` gets its open dropdown clipped to that
+/// scrollable viewport no matter how high its `GlobalZIndex` is, which is
+/// exactly why it used to render behind the (unclipped) mod panel and eat
+/// clicks meant for it. Living in the fixed chrome instead sidesteps the
+/// clipping ancestor entirely, the only way to fix this given the widget's
+/// design.
 pub(super) fn spawn_scale_combobox(
     mut commands: Commands,
     state: Res<EditorState>,
@@ -591,7 +569,6 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
             for &(field, label) in &FIELDS[MID..] {
                 spawn_field_row(col, loc, colors, field, label);
             }
-            spawn_scale_row(col, loc, colors);
             spawn_midi_track_row(col, loc, colors);
         });
         spawn_form_column(form, |col| {

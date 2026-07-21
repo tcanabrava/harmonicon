@@ -284,11 +284,17 @@ this file — prune it back to a one-line summary under "Shipped" below.
   player-selectable options (1st/2nd/3rd position — the blues hexatonic,
   rooted at the harp key/a 5th up/a whole step up; Major/Minor
   Pentatonic/Country — alternative shapes rooted at the harp key), picked
-  via a real combobox (`meta_form::spawn_scale_row`/`spawn_scale_combobox`)
-  rather than a click-to-cycle button, since six named options is a lot to
-  cycle through blindly. The default (1st position) reproduces the
-  pre-feature coloring exactly, so no existing bundled chart's appearance
-  changes. See `CLAUDE.md`'s song-editor-scale bullet.
+  via a real combobox (`meta_form::spawn_scale_combobox`) rather than a
+  click-to-cycle button, since six named options is a lot to cycle through
+  blindly. The default (1st position) reproduces the pre-feature coloring
+  exactly, so no existing bundled chart's appearance changes. Its slot
+  lives in the fixed chrome above the mod panel, not the scrollable meta
+  form alongside the other fields — `bevy_ui_widgets::Popover`'s dropdown
+  needs to be a literal child of its toggle, and Bevy's UI clipping follows
+  that same ancestry, so a combobox nested in the form's `ScrollArea` gets
+  its open dropdown clipped to that viewport regardless of `GlobalZIndex`,
+  rendering behind (and eating clicks meant for) the fixed mod panel. See
+  `CLAUDE.md`'s song-editor-scale bullet.
 
 ## Current work
 
