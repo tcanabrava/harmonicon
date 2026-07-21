@@ -87,6 +87,43 @@ fn song_assets_are_complete() {
     assert!(report.is_empty(), "Incomplete song assets:\n{report}");
 }
 
+/// Every bundled song's chart must validate against the song schema — the
+/// same check the engine performs at load time (`song::loader`), moved up
+/// to CI so a hand-authored chart can't ship broken and only fail once a
+/// player picks it.
+#[test]
+fn song_charts_are_schema_valid() {
+    let root = Path::new("assets/songs");
+    let chart_validator = schema_validator("assets/song_schema.dtd.json");
+
+    let mut report = String::new();
+    for song in subdirs(root).iter().flat_map(|artist| subdirs(artist)) {
+        let Ok(entries) = std::fs::read_dir(song.join("song")) else {
+            continue; // missing song/ is `song_assets_are_complete`'s complaint
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("harpchart") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            match serde_json::from_str::<serde_json::Value>(&text) {
+                Err(e) => {
+                    report.push_str(&format!("  {}: JSON parse error: {e}\n", label(&path)));
+                }
+                Ok(value) => {
+                    let errors = validation_errors(&chart_validator, &value);
+                    if !errors.is_empty() {
+                        report.push_str(&format!("  {}:\n{errors}", label(&path)));
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(report.is_empty(), "Schema-invalid song charts:\n{report}");
+}
+
 #[test]
 fn harmonica_model_assets_are_complete() {
     let root = Path::new("assets/harmonicas/3d");

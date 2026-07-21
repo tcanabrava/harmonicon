@@ -1,0 +1,324 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "J.S. Bach (BWV 565)",
+    "source": "Toccata in D minor",
+    "license": "Public domain melody",
+    "description": "The organ toccata's opening statements on a C harp. The famous mordent figure at two octaves — the lower one needs real bending control: draw-3 down a whole step for A4, draw-2 down a whole step for F4, and the half-step draw bends on holes 1 and 4 for C#."
+  },
+  "song": {
+    "title": "Toccata in D minor",
+    "artist": "Johann Sebastian Bach",
+    "tempo_bpm": 60,
+    "key": "D",
+    "time_signature": "4/4",
+    "difficulty": "expert"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 60
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "note_001",
+      "time": 0.0,
+      "duration": 0.22,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "A5"
+        }
+      ],
+      "phrase": "flourish"
+    },
+    {
+      "id": "note_002",
+      "time": 0.22,
+      "duration": 0.22,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_003",
+      "time": 0.44,
+      "duration": 1.1,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "note_004",
+      "time": 2.04,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_005",
+      "time": 2.32,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "draw",
+          "note": "F5"
+        }
+      ]
+    },
+    {
+      "id": "note_006",
+      "time": 2.6,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_007",
+      "time": 2.88,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "note_008",
+      "time": 3.16,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_009",
+      "time": 3.44,
+      "duration": 1.4,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "note_010",
+      "time": 5.44,
+      "duration": 0.22,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -2
+            }
+          ]
+        }
+      ],
+      "phrase": "flourish, octave down"
+    },
+    {
+      "id": "note_011",
+      "time": 5.66,
+      "duration": 0.22,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "id": "note_012",
+      "time": 5.88,
+      "duration": 1.1,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 3,
+          "action": "draw",
+          "note": "B4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_013",
+      "time": 7.48,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "blow",
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "id": "note_014",
+      "time": 7.76,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 2,
+          "action": "draw",
+          "note": "G4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_015",
+      "time": 8.04,
+      "duration": 0.28,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_016",
+      "time": 8.32,
+      "duration": 1.4,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "id": "note_end",
+      "time": 10.32,
+      "duration": 2.2,
+      "phrase": "pedal octave",
+      "play_mode": "split",
+      "events": [
+        {
+          "hole": 1,
+          "action": "draw",
+          "note": "D4"
+        },
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 120,
+    "good_window_ms": 260,
+    "miss_window_ms": 500
+  }
+}

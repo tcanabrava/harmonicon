@@ -1,0 +1,989 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Traditional",
+    "source": "Greensleeves",
+    "license": "Public domain melody",
+    "description": "The classic English air in E minor, first position on a G harp — one bend, the draw-6 half-step, for the melody's raised leading tone."
+  },
+  "song": {
+    "title": "Greensleeves",
+    "artist": "Traditional",
+    "tempo_bpm": 85,
+    "key": "E",
+    "time_signature": "6/8",
+    "difficulty": "intermediate"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 85
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "G3",
+        "B3",
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "G5",
+        "B5",
+        "D6",
+        "G6"
+      ],
+      "draw": [
+        "A3",
+        "D4",
+        "F#4",
+        "A4",
+        "C5",
+        "E5",
+        "F#5",
+        "A5",
+        "C6",
+        "E6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "note_001",
+      "time": 0.0,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ],
+      "phrase": "verse"
+    },
+    {
+      "id": "note_002",
+      "time": 0.7,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_003",
+      "time": 1.4,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "note_004",
+      "time": 1.75,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "blow",
+          "note": "B5"
+        }
+      ]
+    },
+    {
+      "id": "note_005",
+      "time": 2.275,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "draw",
+          "note": "C6"
+        }
+      ]
+    },
+    {
+      "id": "note_006",
+      "time": 2.45,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "blow",
+          "note": "B5"
+        }
+      ]
+    },
+    {
+      "id": "note_007",
+      "time": 2.8,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "note_008",
+      "time": 3.5,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_009",
+      "time": 3.85,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "note_010",
+      "time": 4.375,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_011",
+      "time": 4.55,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_012",
+      "time": 4.9,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_013",
+      "time": 5.6,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_014",
+      "time": 5.95,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_015",
+      "time": 6.475,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_016",
+      "time": 6.65,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_017",
+      "time": 7.0,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_018",
+      "time": 7.7,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_019",
+      "time": 8.05,
+      "duration": 1.05,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "note_020",
+      "time": 9.1,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ],
+      "phrase": "verse, second ending"
+    },
+    {
+      "id": "note_021",
+      "time": 9.8,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_022",
+      "time": 10.5,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "note_023",
+      "time": 10.85,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "blow",
+          "note": "B5"
+        }
+      ]
+    },
+    {
+      "id": "note_024",
+      "time": 11.375,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "draw",
+          "note": "C6"
+        }
+      ]
+    },
+    {
+      "id": "note_025",
+      "time": 11.55,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "blow",
+          "note": "B5"
+        }
+      ]
+    },
+    {
+      "id": "note_026",
+      "time": 11.9,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "note_027",
+      "time": 12.6,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_028",
+      "time": 12.95,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "note_029",
+      "time": 13.475,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_030",
+      "time": 13.65,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_031",
+      "time": 14.0,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_032",
+      "time": 14.525,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_033",
+      "time": 14.7,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_034",
+      "time": 15.05,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_035",
+      "time": 15.575,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_036",
+      "time": 15.75,
+      "duration": 1.05,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_037",
+      "time": 16.8,
+      "duration": 1.05,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "blow",
+          "note": "D6"
+        }
+      ],
+      "phrase": "chorus"
+    },
+    {
+      "id": "note_038",
+      "time": 17.85,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "blow",
+          "note": "D6"
+        }
+      ]
+    },
+    {
+      "id": "note_039",
+      "time": 18.375,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "draw",
+          "note": "C6"
+        }
+      ]
+    },
+    {
+      "id": "note_040",
+      "time": 18.55,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "blow",
+          "note": "B5"
+        }
+      ]
+    },
+    {
+      "id": "note_041",
+      "time": 18.9,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "note_042",
+      "time": 19.6,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_043",
+      "time": 19.95,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "note_044",
+      "time": 20.475,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_045",
+      "time": 20.65,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_046",
+      "time": 21.0,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_047",
+      "time": 21.7,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_048",
+      "time": 22.05,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_049",
+      "time": 22.575,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_050",
+      "time": 22.75,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_051",
+      "time": 23.1,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_052",
+      "time": 23.8,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_053",
+      "time": 24.15,
+      "duration": 1.05,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "id": "note_054",
+      "time": 25.2,
+      "duration": 1.05,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "blow",
+          "note": "D6"
+        }
+      ],
+      "phrase": "chorus, second ending"
+    },
+    {
+      "id": "note_055",
+      "time": 26.25,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "blow",
+          "note": "D6"
+        }
+      ]
+    },
+    {
+      "id": "note_056",
+      "time": 26.775,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 9,
+          "action": "draw",
+          "note": "C6"
+        }
+      ]
+    },
+    {
+      "id": "note_057",
+      "time": 26.95,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "blow",
+          "note": "B5"
+        }
+      ]
+    },
+    {
+      "id": "note_058",
+      "time": 27.3,
+      "duration": 0.7,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 8,
+          "action": "draw",
+          "note": "A5"
+        }
+      ]
+    },
+    {
+      "id": "note_059",
+      "time": 28.0,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_060",
+      "time": 28.35,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "blow",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "note_061",
+      "time": 28.875,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_062",
+      "time": 29.05,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_063",
+      "time": 29.4,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "G5"
+        }
+      ]
+    },
+    {
+      "id": "note_064",
+      "time": 29.925,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "draw",
+          "note": "F#5"
+        }
+      ]
+    },
+    {
+      "id": "note_065",
+      "time": 30.1,
+      "duration": 0.35,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_066",
+      "time": 30.45,
+      "duration": 0.525,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_067",
+      "time": 30.975,
+      "duration": 0.175,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5",
+          "modifiers": [
+            {
+              "type": "bend",
+              "semitones": -1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note_068",
+      "time": 31.15,
+      "duration": 1.05,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 6,
+          "action": "draw",
+          "note": "E5"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 120,
+    "good_window_ms": 260,
+    "miss_window_ms": 500
+  }
+}
