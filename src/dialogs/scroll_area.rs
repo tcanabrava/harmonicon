@@ -38,6 +38,14 @@ pub fn spawn_scroll_area(
         .spawn(Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Stretch,
+            // Same "min-height: auto" flexbox gotcha as the `ScrollArea`
+            // column below, one level up: this row is itself a flex item of
+            // the menu's top-level column, and without this it refuses to
+            // shrink below its own content's natural height when the window
+            // gets smaller — so the `ScrollArea` inside it never actually
+            // receives less room than its content needs, and the overflow
+            // check in `update_scrollbar_visibility` never trips on resize.
+            min_height: Val::Px(0.0),
             ..default()
         })
         .with_children(|outer| {
