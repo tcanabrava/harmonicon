@@ -263,6 +263,7 @@ pub fn setup(
             item.events.iter().map(move |ev| NoteMarker {
                 time,
                 duration: item.duration,
+                hole: ev.hole,
                 is_blow: matches!(ev.action, Action::Blow),
             })
         })
@@ -274,6 +275,7 @@ pub fn setup(
         &manifest.waveform,
         manifest.music_duration_secs,
         &note_markers,
+        chart.harmonica.hole_count(),
         &[],
         &[],
     );

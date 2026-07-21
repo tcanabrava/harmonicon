@@ -6,11 +6,20 @@
 //! `SongManifest::waveform` — so a player picking a loop range can see where
 //! in the song they're aiming. A thin red playhead line (styled like the
 //! Song Editor's `PlayheadLine`) sweeps across it to mark the current
-//! position. A thin strip below the waveform marks every chart note as a
-//! small rectangle — left/width its time/duration, tinted by blow/draw —
-//! the same "note as a proportional rect" language the Song Editor's
-//! scrollbar minimap uses (`song_editor::interaction::scrollbar_marker`),
-//! on the same timescale as the waveform.
+//! position.
+//!
+//! Below the waveform, a note-lanes strip spans the harmonica's full hole
+//! range — the highest hole at the top, the lowest at the bottom (the
+//! *opposite* vertical order from the Song Editor's own scrollbar minimap,
+//! which the "note as a proportional rect" language here is otherwise
+//! modeled on: `song_editor::interaction::scrollbar_marker`). Each note is
+//! a small rectangle in its own hole's lane, sized to its actual duration
+//! (not a uniform sliver) and tinted by blow/draw, on the same timescale as
+//! the waveform. The per-phrase adaptive-difficulty rectangles (dim-gray to
+//! green by how much of that phrase has been learned) are painted as a
+//! translucent *overlay* on top of this same strip, not a separate row
+//! below it — spawned before the note markers so the notes stay legible on
+//! top of the tint.
 //!
 //! A song with no background music (`SongManifest::music: None`) has no
 //! waveform to draw and a `music_duration_secs` of `0.0` — but the chart
@@ -45,18 +54,18 @@ const WAVEFORM_FLOOR: f32 = 0.04;
 /// Height (px) of the waveform section.
 const WAVEFORM_HEIGHT: f32 = 26.0;
 
-/// Height (px) of the note-marker strip below the waveform.
-const NOTES_STRIP_HEIGHT: f32 = 10.0;
+/// Height (px) of the note-lanes strip below the waveform — tall enough
+/// that even a 12-hole chromatic's lanes stay individually legible (5px
+/// each; a 10-hole diatonic gets 6px). See [`note_lane_geometry`].
+const NOTE_LANES_HEIGHT: f32 = 60.0;
 
-/// Height (px) of the per-phrase adaptive-difficulty strip below the note
-/// markers — one rectangle per `adaptive_difficulty::PhraseSection`, filled
-/// (semi-transparently, so it reads as a fill rather than a solid block)
-/// dim-gray to green by how much of that phrase has been learned, with a
-/// fully opaque border so adjacent sections stay visually distinct even
-/// when their fill colors are close.
-const PHRASE_STRIP_HEIGHT: f32 = 18.0;
-
-/// Border thickness (px) on each phrase-section rectangle.
+/// One rectangle in the per-phrase adaptive-difficulty overlay, one per
+/// `adaptive_difficulty::PhraseSection`, filled (semi-transparently, so it
+/// reads as a fill rather than a solid block) dim-gray to green by how much
+/// of that phrase has been learned, with a fully opaque border so adjacent
+/// sections stay visually distinct even when their fill colors are close —
+/// see [`phrase_fill_color`]. Painted over the note-lanes strip, not its
+/// own row; spawned before the note markers so they stay legible on top.
 const PHRASE_RECT_BORDER: f32 = 1.5;
 
 /// Total height (px) of the bar, pinned across the full width at the very
@@ -64,7 +73,7 @@ const PHRASE_RECT_BORDER: f32 = 1.5;
 /// much space at the top of their own layout instead of placing content
 /// underneath it, where the bar — deliberately painted above them, see
 /// [`BAR_Z_INDEX`] — would cover it.
-pub const BAR_HEIGHT: f32 = WAVEFORM_HEIGHT + NOTES_STRIP_HEIGHT + PHRASE_STRIP_HEIGHT;
+pub const BAR_HEIGHT: f32 = WAVEFORM_HEIGHT + NOTE_LANES_HEIGHT;
 
 /// Narrowest a note's marker is ever drawn (fraction 0..1 of the bar),
 /// regardless of how short the note actually is — a proportionally-accurate
@@ -158,25 +167,28 @@ pub struct RequestLoopRange {
     pub end_time: f64,
 }
 
-/// One note's timing/direction, as much as the progress bar's note-marker
-/// strip needs — decoupled from any richer type a caller happens to have
-/// on hand, since callers differ: scored modes (2D/3D) have
-/// `gameplay::notes::ScheduledNote`, but Jam Session has no `SongNotes` at
-/// all (nothing is scored there) and builds these directly from the
-/// chart's own track events instead.
+/// One note's timing/direction/hole, as much as the progress bar's
+/// note-lanes strip needs — decoupled from any richer type a caller
+/// happens to have on hand, since callers differ: scored modes (2D/3D)
+/// have `gameplay::notes::ScheduledNote`, but Jam Session has no
+/// `SongNotes` at all (nothing is scored there) and builds these directly
+/// from the chart's own track events instead.
 #[derive(Clone, Copy)]
 pub struct NoteMarker {
     pub time: f64,
     pub duration: f64,
+    pub hole: u8,
     pub is_blow: bool,
 }
 
 /// Spawns the full-width progress bar at the very top of the screen: the
 /// song's waveform (from `waveform`, one entry per bar in 0..1, see
-/// `SongManifest::waveform`) on top, a strip of note-marker rectangles (from
-/// `notes`) below it, with the loop marker and playhead drawn over both.
-/// Tagged `GameplayRoot` so it is torn down with the rest of the scene.
-/// `duration_secs` is the audio's real length (`SongManifest::
+/// `SongManifest::waveform`) on top, the note-lanes strip below it — one
+/// rectangle per note, in its own hole's lane (`hole_count` total lanes,
+/// highest hole at the top) — with the phrase-section overlay painted over
+/// that same strip, then the loop marker and playhead drawn over
+/// everything. Tagged `GameplayRoot` so it is torn down with the rest of
+/// the scene. `duration_secs` is the audio's real length (`SongManifest::
 /// music_duration_secs`) — see [`AudioDuration`] — *if* there is one: a
 /// song with no background music has nothing to measure there, so this
 /// falls back to the furthest extent of `notes`/`sections` instead, so the
@@ -189,6 +201,7 @@ pub fn spawn_song_progress(
     waveform: &[f32],
     duration_secs: f64,
     notes: &[NoteMarker],
+    hole_count: u8,
     sections: &[PhraseSection],
     learned: &[f32],
 ) {
@@ -246,48 +259,17 @@ pub fn spawn_song_progress(
             bar.spawn((
                 Node {
                     width: Val::Percent(100.0),
-                    height: Val::Px(NOTES_STRIP_HEIGHT),
-                    ..default()
-                },
-                Pickable::IGNORE,
-            ))
-            .with_children(|strip| {
-                for note in notes {
-                    let Some((left, width)) =
-                        note_marker_geometry(note.time, note.duration, duration_secs)
-                    else {
-                        continue;
-                    };
-                    let color = if note.is_blow {
-                        NOTE_MARKER_BLOW_COLOR
-                    } else {
-                        NOTE_MARKER_DRAW_COLOR
-                    };
-                    strip.spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: Val::Percent(left * 100.0),
-                            top: Val::Px(0.0),
-                            width: Val::Percent(width * 100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(color),
-                        Pickable::IGNORE,
-                    ));
-                }
-            });
-
-            bar.spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Px(PHRASE_STRIP_HEIGHT),
+                    height: Val::Px(NOTE_LANES_HEIGHT),
                     position_type: PositionType::Relative,
                     ..default()
                 },
                 Pickable::IGNORE,
             ))
             .with_children(|strip| {
+                // Phrase-section overlay first, so the note markers below
+                // paint over it and stay legible rather than getting
+                // tinted by whatever learned-fraction color the section
+                // underneath happens to be.
                 if duration_secs > 0.0 {
                     for (i, section) in sections.iter().enumerate() {
                         let Some((left, width)) = phrase_rect_geometry(
@@ -302,12 +284,15 @@ pub fn spawn_song_progress(
                         // in this bar) — this is what "click a section to
                         // select it" clicks on; see `on_phrase_rect_click`.
                         // Its default `Pickable` (`should_block_lower:
-                        // true`) means a drag *starting* inside the phrase
-                        // strip's band no longer reaches
-                        // `ProgressBarDragSurface` underneath, so a loop-
-                        // range drag has to start in the waveform/notes
-                        // bands above it instead — an acceptable trade for
-                        // making the strip's own rectangles clickable.
+                        // true`) means a drag *starting* wherever a phrase
+                        // rect actually covers (typically the note-lanes
+                        // strip's entire width, for a fully phrase-tagged
+                        // chart) no longer reaches `ProgressBarDragSurface`
+                        // underneath, so a loop-range drag has to start in
+                        // the waveform band above instead — an acceptable
+                        // trade for making the overlay's own rectangles
+                        // clickable. Note markers spawned after this are
+                        // `Pickable::IGNORE`, so they don't also shadow it.
                         strip
                             .spawn((
                                 Node {
@@ -325,6 +310,34 @@ pub fn spawn_song_progress(
                             ))
                             .observe(on_phrase_rect_click);
                     }
+                }
+
+                for note in notes {
+                    let Some((left, width)) =
+                        note_marker_geometry(note.time, note.duration, duration_secs)
+                    else {
+                        continue;
+                    };
+                    let Some((top, height)) = note_lane_geometry(note.hole, hole_count) else {
+                        continue;
+                    };
+                    let color = if note.is_blow {
+                        NOTE_MARKER_BLOW_COLOR
+                    } else {
+                        NOTE_MARKER_DRAW_COLOR
+                    };
+                    strip.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Percent(left * 100.0),
+                            top: Val::Percent(top * 100.0),
+                            width: Val::Percent(width * 100.0),
+                            height: Val::Percent(height * 100.0),
+                            ..default()
+                        },
+                        BackgroundColor(color),
+                        Pickable::IGNORE,
+                    ));
                 }
             });
 
@@ -421,6 +434,23 @@ pub(super) fn drag_marker_geometry(
     let b = (current_time / duration_secs).clamp(0.0, 1.0) as f32;
     let left = a.min(b);
     Some((left, (a.max(b) - left).max(0.0)))
+}
+
+/// Top offset and height (fractions 0..1 of the note-lanes strip) for
+/// `hole`'s lane, out of `hole_count` total — the highest hole (`hole_count`
+/// itself) at the top, the lowest (hole 1) at the bottom, each getting an
+/// equal slice. `None` only when there are no holes to divide the strip
+/// into (a chart with a zero hole count, which shouldn't happen for a real
+/// harmonica but isn't this function's job to rule out). `hole` is clamped
+/// into range rather than rejected, so an out-of-range value degrades to
+/// the nearest real lane instead of silently dropping the note's marker.
+fn note_lane_geometry(hole: u8, hole_count: u8) -> Option<(f32, f32)> {
+    if hole_count == 0 {
+        return None;
+    }
+    let lanes = hole_count as f32;
+    let lane_from_top = (hole_count - hole.clamp(1, hole_count)) as f32;
+    Some((lane_from_top / lanes, 1.0 / lanes))
 }
 
 /// The timescale to lay the whole bar out on: `duration_secs` verbatim if
@@ -777,12 +807,59 @@ mod tests {
         assert!((width - 1.0).abs() < 1e-6);
     }
 
+    // ── note_lane_geometry ─────────────────────────────────────────────────────
+
+    #[test]
+    fn note_lane_hidden_with_a_zero_hole_count() {
+        assert_eq!(note_lane_geometry(1, 0), None);
+    }
+
+    #[test]
+    fn highest_hole_is_the_top_lane() {
+        let (top, height) = note_lane_geometry(10, 10).unwrap();
+        assert_eq!(top, 0.0);
+        assert!((height - 0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn lowest_hole_is_the_bottom_lane() {
+        // Hole 1 of 10 is the *last* lane (bottom), not the first —
+        // opposite the Song Editor's own scrollbar minimap ordering.
+        let (top, height) = note_lane_geometry(1, 10).unwrap();
+        assert!((top - 0.9).abs() < 1e-6);
+        assert!((height - 0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn middle_hole_lands_in_its_own_slice() {
+        // Hole 5 of 10: 5 lanes down from the highest (holes 10..6 above
+        // it), so lane_from_top = 10 - 5 = 5.
+        let (top, height) = note_lane_geometry(5, 10).unwrap();
+        assert!((top - 0.5).abs() < 1e-6);
+        assert!((height - 0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn lanes_are_narrower_on_a_chromatic_harp() {
+        let (_, height_10) = note_lane_geometry(1, 10).unwrap();
+        let (_, height_12) = note_lane_geometry(1, 12).unwrap();
+        assert!(height_12 < height_10);
+    }
+
+    #[test]
+    fn note_lane_geometry_clamps_an_out_of_range_hole() {
+        // Defensive: a hole past hole_count degrades to the top lane
+        // rather than vanishing the marker entirely.
+        assert_eq!(note_lane_geometry(99, 10), note_lane_geometry(10, 10));
+    }
+
     // ── effective_duration (the no-background-music fallback) ────────────────
 
     fn marker(time: f64, duration: f64) -> NoteMarker {
         NoteMarker {
             time,
             duration,
+            hole: 1,
             is_blow: true,
         }
     }

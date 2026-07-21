@@ -698,6 +698,7 @@ pub fn setup(
         .map(|n| NoteMarker {
             time: n.time,
             duration: n.duration,
+            hole: n.hole,
             is_blow: n.is_blow,
         })
         .collect();
@@ -706,6 +707,7 @@ pub fn setup(
         &manifest.waveform,
         manifest.music_duration_secs,
         &note_markers,
+        chart.harmonica.hole_count(),
         &note_build.adaptive.sections,
         &note_build.adaptive.learned,
     );
