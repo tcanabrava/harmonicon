@@ -126,6 +126,8 @@ impl Plugin for SongEditor2Plugin {
                         interaction::pan_wheel,
                         interaction::apply_scroll,
                         interaction::update_grid_scrollbar,
+                        interaction::update_scrollbar_markers
+                            .run_if(resource_exists_and_changed::<state::EditorState>),
                         scroll::update_editor_scrollbar_visibility,
                         ui::rebuild_grid_on_resize,
                         ui::sync_chrome_height

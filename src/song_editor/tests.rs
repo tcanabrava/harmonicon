@@ -1726,3 +1726,27 @@ fn tick_at_clamps_outside_the_surfaces_own_bounds() {
     assert_eq!(geom.tick_at(-5.0), 0);
     assert_eq!(geom.tick_at(5.0), 20);
 }
+
+// ── scrollbar_marker ─────────────────────────────────────────────────────
+
+#[test]
+fn scrollbar_marker_maps_ticks_onto_track_percentages() {
+    // A note from tick 25 to 50 of a 100-tick song: left 25%, width 25%.
+    let (left, width) = super::interaction::scrollbar_marker(25, 25, 100);
+    assert_eq!(left, 25.0);
+    assert_eq!(width, 25.0);
+}
+
+#[test]
+fn scrollbar_marker_floors_the_width_of_a_tiny_note() {
+    // One tick of a very long song would be invisibly thin without the floor.
+    let (_, width) = super::interaction::scrollbar_marker(0, 1, 10_000);
+    assert!(width >= 0.3);
+}
+
+#[test]
+fn scrollbar_marker_never_pokes_past_the_track_end() {
+    // A floored marker on the song's very last tick must stay inside 100%.
+    let (left, width) = super::interaction::scrollbar_marker(9_999, 1, 10_000);
+    assert!(left + width <= 100.0);
+}

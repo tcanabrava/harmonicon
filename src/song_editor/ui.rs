@@ -41,6 +41,13 @@ pub(super) struct GridRowContainer;
 #[derive(Component)]
 pub(super) struct GridScrollTrack;
 
+/// One note's tiny rectangle on the scrollbar track — together they sketch
+/// the whole song in miniature (horizontal = time, vertical = hole lane),
+/// so the scrollbar doubles as a minimap of where the notes are. Rebuilt by
+/// `interaction::update_scrollbar_markers` whenever the notes change.
+#[derive(Component)]
+pub(super) struct GridScrollMarker;
+
 /// The scrollbar's thumb, sized/positioned each frame from [`Scroll`] vs.
 /// the notes' total span vs. the track's own width.
 #[derive(Component)]
@@ -437,7 +444,7 @@ fn spawn_fixed_chrome(
             GridScrollTrack,
             Node {
                 flex_grow: 1.0,
-                height: Val::Px(8.0),
+                height: Val::Px(10.0),
                 margin: UiRect::top(Val::Px(4.0)),
                 ..default()
             },
@@ -445,9 +452,12 @@ fn spawn_fixed_chrome(
             Visibility::Hidden,
         ))
         .with_children(|track| {
+            // ZIndex above the note markers, which are spawned later (as
+            // fresh children) and would otherwise paint over the thumb.
             track
                 .spawn((
                     GridScrollThumb,
+                    ZIndex(1),
                     Node {
                         position_type: PositionType::Absolute,
                         top: Val::Px(0.0),

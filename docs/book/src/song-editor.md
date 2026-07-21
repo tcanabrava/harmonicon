@@ -24,6 +24,11 @@ without writing JSON directly.
 - **Lock** — freezes the grid against accidental edits while you're just
   reviewing or practicing.
 
+When a song runs wider than the window, a horizontal scrollbar appears
+under the grid — and it doubles as a **minimap**: every note shows as a
+tiny blow/draw-colored rectangle at its place in the full song, so you can
+see at a glance where the phrases are and drag straight to them.
+
 ## Chart metadata
 
 The meta-form covers a chart's song-level fields: music tempo, harp key,

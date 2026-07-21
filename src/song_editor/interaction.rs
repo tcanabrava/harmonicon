@@ -3,6 +3,7 @@
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseWheel;
+use bevy::picking::Pickable;
 use bevy::picking::events::{Drag, Pointer};
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
@@ -18,7 +19,8 @@ use super::state::{
     max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{
-    GridArea, GridContent, GridScrollThumb, GridScrollTrack, ModButton, MoveGhost, NoteView,
+    GridArea, GridContent, GridScrollMarker, GridScrollThumb, GridScrollTrack, ModButton,
+    MoveGhost, NoteView,
 };
 use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::dialogs::file_dialog::FileDialog;
@@ -521,6 +523,77 @@ pub(super) fn update_grid_scrollbar(
     let (width, left) = scrollbar_thumb(scroll.px, total_px, view_w, track_w);
     thumb.width = Val::Px(width);
     thumb.left = Val::Px(left);
+}
+
+/// One note's marker geometry on the scrollbar track, as percentages of
+/// the track's width: `(left, width)`. Pure tick math — the track's pixel
+/// width never enters, so markers need no re-layout on resize. Width is
+/// floored so a short note in a long song still shows up as at least a
+/// speck, and clamped so a floored marker near the end can't poke past the
+/// track.
+pub(super) fn scrollbar_marker(tick: usize, len: usize, end_tick: usize) -> (f32, f32) {
+    let end = end_tick.max(1) as f32;
+    let left = (tick as f32 / end * 100.0).min(100.0);
+    let width = (len as f32 / end * 100.0).max(0.3).min(100.0 - left);
+    (left, width)
+}
+
+/// Rebuilds the scrollbar's note markers (see [`GridScrollMarker`])
+/// whenever the notes change: one small rectangle per note, horizontal =
+/// its time span across the whole song, vertical = its hole lane — the
+/// scrollbar as a minimap. Blow/draw keep their usual colours. All
+/// percent-positioned (see [`scrollbar_marker`]) and `Pickable::IGNORE`,
+/// so they neither care about the track's pixel size nor steal drags from
+/// the thumb.
+pub(super) fn update_scrollbar_markers(
+    mut commands: Commands,
+    state: Res<EditorState>,
+    tracks: Query<Entity, With<GridScrollTrack>>,
+    markers: Query<Entity, With<GridScrollMarker>>,
+) {
+    let Ok(track) = tracks.single() else {
+        return;
+    };
+    for e in &markers {
+        commands.entity(e).despawn();
+    }
+    let end_tick = super::state::song_end_tick(&state.notes);
+    if end_tick == 0 {
+        return;
+    }
+    // Same blow/draw hues the gameplay legend and note comets use.
+    let blow = Color::srgba(0.50, 0.75, 1.00, 0.9);
+    let draw = Color::srgba(1.00, 0.62, 0.35, 0.9);
+    let lanes = state.hole_count().max(1) as f32;
+    let new: Vec<Entity> = state
+        .notes
+        .iter()
+        .map(|n| {
+            let (left, width) = scrollbar_marker(n.tick, n.len, end_tick);
+            // Each lane gets an equal slice of the track's height; the
+            // marker fills its lane's slice so adjacent lanes stay distinct.
+            let lane = (n.hole.saturating_sub(1)) as f32;
+            commands
+                .spawn((
+                    GridScrollMarker,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Percent(left),
+                        width: Val::Percent(width),
+                        top: Val::Percent(lane / lanes * 100.0),
+                        height: Val::Percent(100.0 / lanes),
+                        ..default()
+                    },
+                    BackgroundColor(match n.dir {
+                        Dir::Blow => blow,
+                        Dir::Draw => draw,
+                    }),
+                    Pickable::IGNORE,
+                ))
+                .id()
+        })
+        .collect();
+    commands.entity(track).add_children(&new);
 }
 
 /// Drags the thumb to scroll the grid — the drag delta (screen px) is
