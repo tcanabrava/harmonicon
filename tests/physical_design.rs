@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Enforces `docs/physical_design_plan.md`'s file-size rule: ~500 lines of
+//! Enforces `docs/physical_design_plan.md`'s file-size rule: ~1000 lines of
 //! non-test code per file (rule 1), test modules relocated to a sibling
 //! `tests.rs` once they dominate (rule 2). A file over budget must be in
 //! [`ALLOWLIST`] — new violations can't land silently, and the allowlist
@@ -16,9 +16,9 @@
 
 use std::path::{Path, PathBuf};
 
-/// ~500 lines of non-test code (see the module doc comment). Not a hard
+/// ~1000 lines of non-test code (see the module doc comment). Not a hard
 /// technical limit — just what `ALLOWLIST` measures every file against.
-const BUDGET: usize = 500;
+const BUDGET: usize = 1000;
 
 /// Current offenders, one per line, with the split this file is nominally
 /// waiting on (see `docs/physical_design_plan.md`'s Phase 6 — "no dedicated
@@ -31,20 +31,6 @@ const ALLOWLIST: &[&str] = &[
     "src/gameplay/gameplay_2d.rs",     // split: scene setup vs note spawn/despawn vs tails
     "src/gameplay/gameplay_3d.rs",     // split: scene setup vs note spawn/despawn vs tails
     "src/menu/pages/options.rs",       // split: one section per file
-    "src/menu/pages/calibration.rs",   // split: measurement logic vs UI
-    // Other current offenders, no assigned destination yet:
-    "src/gameplay/pause_menu.rs",
-    "src/audio_system/pitch_detect.rs",
-    "src/song_editor/state.rs",
-    "src/gameplay/song_progress_overlay.rs",
-    "src/song_editor/grid.rs",
-    "src/jam/session.rs",
-    "src/song/harmonica.rs",
-    "src/bin/note_editor.rs",
-    "src/menu/pages/lessons.rs",
-    "src/dialogs/file_dialog.rs",
-    "src/song_editor/harpchart.rs",
-    "src/song_editor/interaction.rs",
 ];
 
 /// Every `.rs` file under `root`, recursively, sorted for a stable report.

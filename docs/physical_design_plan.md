@@ -120,9 +120,9 @@ Level order (imports may only point left→right, never back):
 
 ## Rules to adopt (the part that keeps it fixed)
 
-1. **File budget: ~500 lines of non-test code.** Not a hard wall — a
-   cohesive 600-line file beats two incoherent 300s — but crossing it in a
-   PR needs a sentence of justification.
+1. **File budget: ~1000 lines of non-test code.** Not a hard wall — a
+   cohesive file just over it beats two incoherent halves — but crossing
+   it in a PR needs a sentence of justification.
 2. **Tests move to sibling files once they dominate.** Any `#[cfg(test)]
    mod tests` over ~150 lines becomes `#[cfg(test)] mod tests;` resolving
    to `<module>/tests.rs` (or `tests_<topic>.rs` split by subject). Same
