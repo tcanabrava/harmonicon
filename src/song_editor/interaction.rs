@@ -525,6 +525,12 @@ pub(super) fn update_grid_scrollbar(
     thumb.left = Val::Px(left);
 }
 
+// Same blow/draw hues the gameplay legend and note comets use — named so
+// `meta_form`'s color legend can show the same swatches rather than
+// duplicating the literals.
+pub(super) const SCROLLBAR_BLOW_COLOR: Color = Color::srgba(0.50, 0.75, 1.00, 0.9);
+pub(super) const SCROLLBAR_DRAW_COLOR: Color = Color::srgba(1.00, 0.62, 0.35, 0.9);
+
 /// One note's marker geometry on the scrollbar track, as percentages of
 /// the track's width: `(left, width)`. Pure tick math — the track's pixel
 /// width never enters, so markers need no re-layout on resize. Width is
@@ -561,9 +567,6 @@ pub(super) fn update_scrollbar_markers(
     if end_tick == 0 {
         return;
     }
-    // Same blow/draw hues the gameplay legend and note comets use.
-    let blow = Color::srgba(0.50, 0.75, 1.00, 0.9);
-    let draw = Color::srgba(1.00, 0.62, 0.35, 0.9);
     let lanes = state.hole_count().max(1) as f32;
     let new: Vec<Entity> = state
         .notes
@@ -585,8 +588,8 @@ pub(super) fn update_scrollbar_markers(
                         ..default()
                     },
                     BackgroundColor(match n.dir {
-                        Dir::Blow => blow,
-                        Dir::Draw => draw,
+                        Dir::Blow => SCROLLBAR_BLOW_COLOR,
+                        Dir::Draw => SCROLLBAR_DRAW_COLOR,
                     }),
                     Pickable::IGNORE,
                 ))

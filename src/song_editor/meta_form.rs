@@ -10,10 +10,13 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
+use super::grid::{OUT_OF_SCALE_MIX, OUT_OF_SCALE_TINT, TEMPO_MARKER_COLOR, mix_srgba};
+use super::interaction::{SCROLLBAR_BLOW_COLOR, SCROLLBAR_DRAW_COLOR};
 use super::state::{
-    ContentKind, EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, PASS_CRITERIA_KINDS,
-    POSITIONS, PROGRESSIONS, TECHNIQUE_NAMES, cycle_next,
+    ContentKind, Dir, EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, PASS_CRITERIA_KINDS,
+    POSITIONS, PROGRESSIONS, Pitch, TECHNIQUE_NAMES, cycle_next, pitch_color,
 };
+use super::timeline_overlay::{RANGE_HIGHLIGHT_COLOR, SPLIT_LINE_COLOR};
 use super::ui::{
     ContentKindText, HarmonicaKindText, HoleColumnContent, MetaFieldBox, MetaFieldText,
     MidiTrackComboboxSlot,
@@ -455,14 +458,15 @@ fn spawn_midi_track_row(col: &mut ChildSpawnerCommands, loc: &Localization, colo
     });
 }
 
-/// The chart metadata form: two side-by-side columns instead of one
-/// full-width row per field — with 8 rows (harmonica kind, [`FIELDS`]'s 6,
-/// and the MIDI-track row), stacking them all in one column routinely ran
-/// taller than a default-sized window. Split evenly (`FIELDS.len() / 2`, so
-/// each column gets at least 4 rows for today's 8): harmonica kind + the
-/// first half of `FIELDS` in the left column, the second half + the
-/// MIDI-track row in the right — halving the form's height for the same
-/// content.
+/// The chart metadata form: two side-by-side field columns plus a third,
+/// [`spawn_color_legend`], explaining what every color the grid/mod-panel/
+/// scrollbar uses actually means — with 8 field rows (harmonica kind,
+/// [`FIELDS`]'s 6, and the MIDI-track row), stacking them all in one column
+/// routinely ran taller than a default-sized window. Split evenly
+/// (`FIELDS.len() / 2`, so each field column gets at least 4 rows for
+/// today's 8): harmonica kind + the first half of `FIELDS` in the left
+/// column, the second half + the MIDI-track row in the middle — halving the
+/// form's height for the same content.
 pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
     const MID: usize = FIELDS.len() / 2;
     root.spawn(Node {
@@ -486,5 +490,178 @@ pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localizatio
             }
             spawn_midi_track_row(col, loc, colors);
         });
+        spawn_form_column(form, |col| {
+            spawn_color_legend(col, loc, colors);
+        });
     });
+}
+
+// ── Color legend ──────────────────────────────────────────────────────────────
+
+/// A legend swatch's fixed size — small enough to sit beside its label like
+/// a bullet, big enough that the color itself (not just its position) reads
+/// clearly.
+const SWATCH_SIZE: f32 = 16.0;
+
+/// One legend entry: a color swatch (a plain filled box, or — via
+/// `border_only` — an unfilled box with just a colored border, for the
+/// entries that are actually borders in the real UI, not fills) plus its
+/// explanation.
+fn spawn_legend_row(
+    col: &mut ChildSpawnerCommands,
+    colors: SongEditorColors,
+    swatch: Color,
+    border_only: bool,
+    text: String,
+) {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        ..default()
+    })
+    .with_children(|line| {
+        line.spawn((
+            Node {
+                width: Val::Px(SWATCH_SIZE),
+                height: Val::Px(SWATCH_SIZE),
+                flex_shrink: 0.0,
+                border: UiRect::all(Val::Px(if border_only { 2.0 } else { 1.0 })),
+                ..default()
+            },
+            BackgroundColor(if border_only { Color::NONE } else { swatch }),
+            BorderColor::all(if border_only {
+                swatch
+            } else {
+                Color::srgb(0.30, 0.30, 0.40)
+            }),
+        ));
+        line.spawn((
+            Text::new(text),
+            TextFont {
+                font_size: FontSize::Px(12.5),
+                ..default()
+            },
+            TextColor(colors.label),
+        ));
+    });
+}
+
+/// A small section heading within the legend column — same accent color
+/// the rest of the editor uses for anything meant to draw the eye.
+fn spawn_legend_heading(col: &mut ChildSpawnerCommands, colors: SongEditorColors, text: String) {
+    col.spawn((
+        Text::new(text),
+        TextFont {
+            font_size: FontSize::Px(13.0),
+            ..default()
+        },
+        TextColor(colors.accent),
+        Node {
+            margin: UiRect::top(Val::Px(4.0)),
+            ..default()
+        },
+    ));
+}
+
+/// Explains every color the song editor uses, grouped by where it shows up
+/// — written for exactly the confusion a first-time user hits: the grid
+/// note's *fill* color is its playing technique (blow vs. draw is instead
+/// the small ↑/↓ arrow drawn on the note, not a color at all), while the
+/// horizontal scrollbar's minimap markers use a *different* blue/orange
+/// pair that means blow/draw specifically — the same blue means two
+/// different things in two different places, which is exactly the kind of
+/// thing worth spelling out rather than leaving the player to reverse
+/// -engineer from `theme.json`.
+fn spawn_color_legend(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+    spawn_legend_heading(col, colors, loc.msg("editor-legend-notes").to_string());
+    spawn_legend_row(
+        col, colors, pitch_color(Pitch::Normal), false,
+        loc.msg("editor-legend-normal").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, pitch_color(Pitch::Bend(1.0)), false,
+        loc.msg("editor-legend-bend").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, pitch_color(Pitch::Overblow), false,
+        loc.msg("editor-legend-overblow").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, pitch_color(Pitch::Overdraw), false,
+        loc.msg("editor-legend-overdraw").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, pitch_color(Pitch::Slide), false,
+        loc.msg("editor-legend-slide").to_string(),
+    );
+    spawn_legend_row(
+        col, colors,
+        mix_srgba(pitch_color(Pitch::Normal), OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX),
+        false,
+        loc.msg("editor-legend-out-of-scale").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, colors.accent, true,
+        loc.msg("editor-legend-selected").to_string(),
+    );
+    col.spawn((
+        Text::new(format!(
+            "{}  {} / {}  {}",
+            Dir::Blow.arrow(),
+            loc.msg("editor-legend-blow"),
+            loc.msg("editor-legend-draw"),
+            Dir::Draw.arrow(),
+        )),
+        TextFont {
+            font_size: FontSize::Px(12.5),
+            ..default()
+        },
+        TextColor(colors.label),
+    ));
+
+    spawn_legend_heading(col, colors, loc.msg("editor-legend-dragging").to_string());
+    spawn_legend_row(
+        col, colors, colors.ghost_ok.with_alpha(0.30), false,
+        loc.msg("editor-legend-drag-ok").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, colors.ghost_bad.with_alpha(0.30), false,
+        loc.msg("editor-legend-drag-bad").to_string(),
+    );
+
+    spawn_legend_heading(col, colors, loc.msg("editor-legend-elsewhere").to_string());
+    spawn_legend_row(
+        col, colors, TEMPO_MARKER_COLOR, false,
+        loc.msg("editor-legend-tempo-marker").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, SPLIT_LINE_COLOR, false,
+        loc.msg("editor-legend-split-point").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, RANGE_HIGHLIGHT_COLOR, false,
+        loc.msg("editor-legend-range-preview").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, colors.btn_active, false,
+        loc.msg("editor-legend-active-button").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, SCROLLBAR_BLOW_COLOR, false,
+        loc.msg("editor-legend-scrollbar-blow").to_string(),
+    );
+    spawn_legend_row(
+        col, colors, SCROLLBAR_DRAW_COLOR, false,
+        loc.msg("editor-legend-scrollbar-draw").to_string(),
+    );
+    col.spawn((
+        Text::new(loc.msg("editor-legend-scrollbar-note").to_string()),
+        TextFont {
+            font_size: FontSize::Px(11.5),
+            ..default()
+        },
+        TextColor(colors.label.with_alpha(0.75)),
+    ));
 }

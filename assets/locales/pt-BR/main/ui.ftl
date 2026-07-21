@@ -115,6 +115,29 @@ editor-field-content-kind = Gravação
 editor-content-kind-song = ‹ Gravar Música ›
 editor-content-kind-lesson = ‹ Gravar Lição ›
 
+# Song Editor 2 — legenda de cores (terceira coluna do formulário)
+editor-legend-notes = Cores das notas (grade)
+editor-legend-normal = Nota sopro/aspiração normal
+editor-legend-bend = Bend (quanto mais fundo, mais vermelho)
+editor-legend-overblow = Overblow
+editor-legend-overdraw = Overdraw
+editor-legend-slide = Slide (só cromática)
+editor-legend-out-of-scale = Tom vermelho = fora da escala da música
+editor-legend-selected = Borda dourada = nota selecionada
+editor-legend-blow = Sopro
+editor-legend-draw = Aspiração
+editor-legend-dragging = Ao arrastar uma nota
+editor-legend-drag-ok = Posição de destino válida
+editor-legend-drag-bad = Inválida (sobreposição ou técnica incompatível)
+editor-legend-elsewhere = Em outras partes da tela
+editor-legend-tempo-marker = Marcador de mudança de andamento (cabeçalho da grade)
+editor-legend-split-point = Ferramenta Selecionar: ponto de divisão
+editor-legend-range-preview = Ferramenta Selecionar: prévia do intervalo
+editor-legend-active-button = Botão de modo/ferramenta atualmente ativo
+editor-legend-scrollbar-blow = Minimapa da barra de rolagem: nota de sopro
+editor-legend-scrollbar-draw = Minimapa da barra de rolagem: nota de aspiração
+editor-legend-scrollbar-note = Nota: aqui esse azul/laranja significa sopro/aspiração — um significado diferente das cores das notas acima, que representam a técnica.
+
 # Editor de Músicas 2 — campos exclusivos de lição (mostrados enquanto
 # "Gravar Lição" está ativo)
 editor-lesson-details-header = Detalhes da Lição

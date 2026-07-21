@@ -52,13 +52,13 @@ pub(super) fn mix_srgba(base: Color, tint: Color, t: f32) -> Color {
 /// How strongly the "outside the blues scale" warning tint shows through a
 /// note's own technique color. Subtle — this flags the exception (an outside
 /// note), not the common case, so in-scale notes are left untouched.
-const OUT_OF_SCALE_MIX: f32 = 0.45;
-const OUT_OF_SCALE_TINT: Color = Color::srgb(0.95, 0.25, 0.20);
+pub(super) const OUT_OF_SCALE_MIX: f32 = 0.45;
+pub(super) const OUT_OF_SCALE_TINT: Color = Color::srgb(0.95, 0.25, 0.20);
 
 /// A tempo-change point's marker line/label in the grid header — distinct
 /// from the waveform's own accent color and the beat/bar gridlines so it
 /// reads as its own kind of thing.
-const TEMPO_MARKER_COLOR: Color = Color::srgb(0.95, 0.55, 0.15);
+pub(super) const TEMPO_MARKER_COLOR: Color = Color::srgb(0.95, 0.55, 0.15);
 
 /// Whether `note`'s target pitch — its bent/overblown/overdrawn pitch, not
 /// just its natural one, since e.g. bending draw-3 down a step-and-a-half on a

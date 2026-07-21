@@ -117,6 +117,29 @@ editor-field-content-kind = Recording
 editor-content-kind-song = ‹ Record Song ›
 editor-content-kind-lesson = ‹ Record Lesson ›
 
+# Song Editor 2 — color legend (third meta-form column)
+editor-legend-notes = Note colors (grid)
+editor-legend-normal = Normal blow/draw note
+editor-legend-bend = Bend (deeper bend = redder)
+editor-legend-overblow = Overblow
+editor-legend-overdraw = Overdraw
+editor-legend-slide = Slide (chromatic only)
+editor-legend-out-of-scale = Red tint = outside the song's scale
+editor-legend-selected = Gold border = selected note
+editor-legend-blow = Blow
+editor-legend-draw = Draw
+editor-legend-dragging = While dragging a note
+editor-legend-drag-ok = Valid drop position
+editor-legend-drag-bad = Invalid (overlap or wrong technique)
+editor-legend-elsewhere = Elsewhere on screen
+editor-legend-tempo-marker = Tempo-change marker (grid header)
+editor-legend-split-point = Select tool: placed split point
+editor-legend-range-preview = Select tool: range preview
+editor-legend-active-button = Currently active mode/tool button
+editor-legend-scrollbar-blow = Scrollbar minimap: blow note
+editor-legend-scrollbar-draw = Scrollbar minimap: draw note
+editor-legend-scrollbar-note = Note: this blue/orange means blow/draw here — a different meaning than the note colors above, which encode technique instead.
+
 # Song Editor 2 — lesson-only meta-form fields (shown while "Record Lesson"
 # is active)
 editor-lesson-details-header = Lesson Details

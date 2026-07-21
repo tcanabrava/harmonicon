@@ -115,6 +115,29 @@ editor-field-content-kind = Grabación
 editor-content-kind-song = ‹ Grabar Canción ›
 editor-content-kind-lesson = ‹ Grabar Lección ›
 
+# Song Editor 2 — leyenda de colores (tercera columna del formulario)
+editor-legend-notes = Colores de las notas (cuadrícula)
+editor-legend-normal = Nota normal de soplo/aspiración
+editor-legend-bend = Bend (cuanto más profundo, más rojo)
+editor-legend-overblow = Overblow
+editor-legend-overdraw = Overdraw
+editor-legend-slide = Slide (solo cromática)
+editor-legend-out-of-scale = Tinte rojo = fuera de la escala de la canción
+editor-legend-selected = Borde dorado = nota seleccionada
+editor-legend-blow = Soplo
+editor-legend-draw = Aspiración
+editor-legend-dragging = Al arrastrar una nota
+editor-legend-drag-ok = Posición de destino válida
+editor-legend-drag-bad = Inválida (superposición o técnica incompatible)
+editor-legend-elsewhere = En otras partes de la pantalla
+editor-legend-tempo-marker = Marcador de cambio de tempo (encabezado de la cuadrícula)
+editor-legend-split-point = Herramienta Seleccionar: punto de división
+editor-legend-range-preview = Herramienta Seleccionar: vista previa del rango
+editor-legend-active-button = Botón de modo/herramienta actualmente activo
+editor-legend-scrollbar-blow = Minimapa de la barra de desplazamiento: nota de soplo
+editor-legend-scrollbar-draw = Minimapa de la barra de desplazamiento: nota de aspiración
+editor-legend-scrollbar-note = Nota: aquí ese azul/naranja significa soplo/aspiración — un significado distinto al de los colores de las notas anteriores, que representan la técnica.
+
 # Song Editor 2 — campos exclusivos de lección (mostrados mientras
 # "Grabar Lección" está activo)
 editor-lesson-details-header = Detalles de la Lección

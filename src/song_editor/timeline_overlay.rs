@@ -57,6 +57,11 @@ pub(super) fn timeline_surface_bundle() -> impl Bundle {
 /// catcher. The surface is deliberately persistent rather than respawned
 /// by `grid::rebuild_grid` — see its type docs — and always present: its
 /// observers no-op when no matching tool is active.
+// Named so `meta_form`'s color legend can show the same swatches instead
+// of duplicating the literals.
+pub(super) const SPLIT_LINE_COLOR: Color = Color::srgb(0.95, 0.75, 0.20);
+pub(super) const RANGE_HIGHLIGHT_COLOR: Color = Color::srgba(0.95, 0.30, 0.20, 0.22);
+
 pub(super) fn spawn_persistent_entities(
     content: &mut bevy::ecs::relationship::RelatedSpawnerCommands<ChildOf>,
     hole_count: u8,
@@ -72,7 +77,7 @@ pub(super) fn spawn_persistent_entities(
             height: Val::Px(grid_h),
             ..default()
         },
-        BackgroundColor(Color::srgb(0.95, 0.75, 0.20)),
+        BackgroundColor(SPLIT_LINE_COLOR),
         Visibility::Hidden,
         Pickable::IGNORE,
     ));
@@ -85,7 +90,7 @@ pub(super) fn spawn_persistent_entities(
             height: Val::Px(grid_h),
             ..default()
         },
-        BackgroundColor(Color::srgba(0.95, 0.30, 0.20, 0.22)),
+        BackgroundColor(RANGE_HIGHLIGHT_COLOR),
         Visibility::Hidden,
         Pickable::IGNORE,
     ));
