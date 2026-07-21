@@ -326,6 +326,17 @@ this file — prune it back to a one-line summary under "Shipped" below.
   whole bar reading as empty — only the waveform row stays blank, since
   there's genuinely no waveform without decoded audio. See `CLAUDE.md`'s
   song-progress-bar bullet.
+- **Menu pages auto-scroll instead of silently overflowing** — the Artist
+  List (and any other page whose content can outgrow the screen) used to
+  just grow past the top/bottom edges with no way to reach the rest.
+  `menu::scene::spawn_menu_root` now spawns a new, generic
+  `dialogs::scroll_area::spawn_scroll_area` widget (a `ScrollArea` paired
+  with a real `Scrollbar`/`ScrollbarThumb`, generalized out of the Song
+  Editor's own `song_editor::scroll`) and returns its entity instead of the
+  outer root's, so all 22 existing call sites gained scrolling with zero
+  changes. The scrollbar collapses via both `Visibility` and `Node::display`
+  when content already fits, so short menus stay exactly as centered as
+  before. See `CLAUDE.md`'s menu-scrolling bullet.
 
 ## Current work
 

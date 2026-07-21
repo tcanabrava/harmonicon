@@ -13,7 +13,14 @@ use crate::dialogs::button;
 use crate::dialogs::button_material::{
     ButtonMaterials, ButtonShaderLayer, ButtonVisual, ThemedButton, set_button_visual,
 };
+use crate::dialogs::scroll_area::spawn_scroll_area;
 use crate::theme::LoadedTheme;
+
+/// Scrollbar track/thumb colors for every menu page's content area — plain
+/// constants, not theme-driven, matching this file's existing
+/// `menu_bg()`-style "no per-theme menu chrome color" convention.
+const SCROLLBAR_TRACK_COLOR: Color = Color::srgba(0.0, 0.0, 0.0, 0.35);
+const SCROLLBAR_THUMB_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
 
 /// Marks every entity that belongs to a menu screen so `cleanup_menu` can
 /// remove it in one sweep when the page changes. Shared with the `options` page.
@@ -52,6 +59,19 @@ fn heading_scene(text: String, size: f32, color: Color) -> impl Scene {
     }
 }
 
+/// Spawns the full-screen root, its title/subtitle, and a scrollable
+/// content area beneath them — returning *that content area's* entity, not
+/// the outer root, so every caller's buttons/rows automatically scroll
+/// (with a real visible scrollbar, `dialogs::scroll_area::
+/// spawn_scroll_area`) instead of silently overflowing the screen once a
+/// page's content (a long artist/song/lesson/theme list, say) no longer
+/// fits — a page that previously just grew past the top/bottom edges with
+/// no way to reach the rest. The title/subtitle themselves stay outside
+/// the scrollable area, always visible. Short content (most menus) still
+/// looks exactly as before — vertically centered as a whole, since the
+/// content area sizes to its own content and only gets force-shrunk into
+/// scrolling once it doesn't fit (see `spawn_scroll_area`'s own comment on
+/// the `min_height: Val::Px(0.0)` flexbox trick this relies on).
 pub(crate) fn spawn_menu_root(
     commands: &mut Commands,
     title: &str,
@@ -100,7 +120,12 @@ pub(crate) fn spawn_menu_root(
             .id();
         commands.entity(root).insert_children(0, &[bg_layer]);
     }
-    root
+
+    let mut content = Entity::PLACEHOLDER;
+    commands.entity(root).with_children(|children| {
+        content = spawn_scroll_area(children, SCROLLBAR_THUMB_COLOR, SCROLLBAR_TRACK_COLOR);
+    });
+    content
 }
 
 /// Spawn a single button as a child of `parent`, in the normal flex flow —
