@@ -7,9 +7,10 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Drag, Pointer};
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
-use bevy::ui::ComputedNode;
+use bevy::ui::{ComputedNode, RelativeCursorPosition};
 use bevy::ui_render::prelude::MaterialNode;
 
+use super::clipboard::{NoteClipboard, copy_selected, paste_targets};
 use super::grid::group_move_targets;
 use super::material::EditorNoteMaterial;
 use super::playback::Playhead;
@@ -373,6 +374,51 @@ pub(super) fn grid_keys(
         } else {
             ret_play.0 = true;
             next_state.set(AppState::Menu);
+        }
+    }
+}
+
+/// Ctrl+C copies every selected note into [`NoteClipboard`] verbatim
+/// (nothing is deleted, unlike Delete); a copy with nothing selected
+/// leaves a previous clipboard untouched. Ctrl+V pastes it back at the
+/// tick under the mouse — read from [`GridArea`]'s own
+/// `RelativeCursorPosition` the same way a note-grid click resolves its
+/// tick, but without requiring a click, so any hover position counts.
+/// Does nothing if the pointer isn't over the grid at all (paste has no
+/// well-defined "current time" without it) or if nothing's ever been
+/// copied. See [`paste_targets`] for which pasted notes get silently
+/// skipped (out-of-range hole, or a spot already occupied); the notes that
+/// *did* land become the new selection, ready to be nudged into place.
+pub(super) fn handle_copy_paste(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<EditorState>,
+    mut clipboard: ResMut<NoteClipboard>,
+    scroll: Res<Scroll>,
+    grid_area: Query<(&RelativeCursorPosition, &ComputedNode), With<GridArea>>,
+) {
+    if state.focus.is_some() || !ctrl_held(&keyboard) {
+        return;
+    }
+    if keyboard.just_pressed(KeyCode::KeyC) && !state.selected.is_empty() {
+        clipboard.0 = copy_selected(&state.notes, &state.selected);
+    }
+    if keyboard.just_pressed(KeyCode::KeyV) && !clipboard.0.is_empty() {
+        let Ok((rel, computed)) = grid_area.single() else {
+            return;
+        };
+        let Some(normalized) = rel.normalized else {
+            return;
+        };
+        let width_px = computed.size().x * computed.inverse_scale_factor();
+        let frac = (normalized.x + 0.5).clamp(0.0, 1.0);
+        let tick = ((scroll.px + frac * width_px) / TICK_W).round().max(0.0) as usize;
+        let hole_count = state.hole_count();
+        let (pasted, next_id) =
+            paste_targets(&clipboard.0, tick, hole_count, &state.notes, state.next_id);
+        if !pasted.is_empty() {
+            state.next_id = next_id;
+            state.selected = pasted.iter().map(|n| n.id).collect();
+            state.notes.extend(pasted);
         }
     }
 }

@@ -19,6 +19,7 @@ use crate::app::AppState;
 use crate::menu::tutorial::tour_active;
 use crate::theme::LoadedTheme;
 
+mod clipboard;
 mod grid;
 mod harpchart;
 mod interaction;
@@ -117,6 +118,7 @@ impl Plugin for SongEditor2Plugin {
             .init_resource::<state::TimelineSelection>()
             .init_resource::<playback::PendingMusicSeek>()
             .init_resource::<waveform::MusicWaveform>()
+            .init_resource::<clipboard::NoteClipboard>()
             .add_systems(
                 Update,
                 (
@@ -153,9 +155,12 @@ impl Plugin for SongEditor2Plugin {
                     practice::practice_tick.after(playback::advance_playhead),
                     record::record_tick.after(playback::advance_playhead),
                     // Suspended while the guided tour is showing this
-                    // screen — Esc/Delete shouldn't act on it out from
-                    // under the tour (see `menu::tutorial`).
-                    interaction::grid_keys.run_if(not(tour_active)),
+                    // screen — Esc/Delete/Ctrl+C/Ctrl+V shouldn't act on it
+                    // out from under the tour (see `menu::tutorial`).
+                    (
+                        interaction::grid_keys.run_if(not(tour_active)),
+                        interaction::handle_copy_paste.run_if(not(tour_active)),
+                    ),
                     interaction::type_into_field,
                     (
                         interaction::live_resize,

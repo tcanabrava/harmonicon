@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use super::clipboard::{copy_selected, paste_targets};
 use super::grid::{group_move_targets, group_move_valid, mix_srgba, note_in_scale, visible_beats};
 use super::harpchart::{load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart};
 use super::interaction::{apply_modifier, select_or_add, select_or_add_ctrl};
@@ -332,6 +333,108 @@ fn group_move_valid_rejects_a_pitch_incompatible_with_its_target_hole() {
     // must fail even with nothing else in the way.
     let targets = vec![(1u32, 5, 0, 4, Pitch::Bend(1.5))];
     assert!(!group_move_valid(&[], &[1], &targets));
+}
+
+// ── Copy/paste ────────────────────────────────────────────────────────────
+
+#[test]
+fn copy_selected_returns_only_the_selected_notes_verbatim() {
+    let mut s = EditorState::default();
+    select_or_add(&mut s, 2, 0);
+    select_or_add(&mut s, 5, 4);
+    let copied = copy_selected(&s.notes, &[s.notes[0].id]);
+    assert_eq!(copied, vec![s.notes[0]]);
+}
+
+#[test]
+fn paste_targets_shifts_the_earliest_note_to_the_target_tick() {
+    let clipboard = vec![
+        GridNote {
+            id: 1,
+            hole: 2,
+            tick: 4,
+            len: 4,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        },
+        GridNote {
+            id: 2,
+            hole: 5,
+            tick: 8,
+            len: 4,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        },
+    ];
+    let (pasted, next_id) = paste_targets(&clipboard, 20, 10, &[], 100);
+    // The earliest note (tick 4) lands at 20; the other keeps its +4 offset.
+    assert_eq!(
+        pasted.iter().map(|n| (n.hole, n.tick)).collect::<Vec<_>>(),
+        vec![(2, 20), (5, 24)]
+    );
+    // Ids are freshly assigned starting at `next_id`, never reusing the
+    // clipboard's own copied ids.
+    assert_eq!(pasted.iter().map(|n| n.id).collect::<Vec<_>>(), vec![100, 101]);
+    assert_eq!(next_id, 102);
+}
+
+#[test]
+fn paste_targets_skips_a_note_landing_on_top_of_an_existing_one() {
+    let clipboard = vec![GridNote {
+        id: 1,
+        hole: 2,
+        tick: 0,
+        len: 4,
+        dir: Dir::Blow,
+        pitch: Pitch::Normal,
+        expr: Expr::None,
+    }];
+    let existing = vec![GridNote {
+        id: 99,
+        hole: 2,
+        tick: 10,
+        len: 4,
+        dir: Dir::Blow,
+        pitch: Pitch::Normal,
+        expr: Expr::None,
+    }];
+    // Pasting right on top of the existing note is skipped...
+    let (pasted, next_id) = paste_targets(&clipboard, 10, 10, &existing, 5);
+    assert!(pasted.is_empty());
+    assert_eq!(next_id, 5);
+    // ...but pasting clear of it lands normally.
+    let (pasted, next_id) = paste_targets(&clipboard, 20, 10, &existing, 5);
+    assert_eq!(pasted.len(), 1);
+    assert_eq!(next_id, 6);
+}
+
+#[test]
+fn paste_targets_skips_a_note_beyond_the_current_harps_hole_count() {
+    let clipboard = vec![GridNote {
+        id: 1,
+        hole: 11,
+        tick: 0,
+        len: 4,
+        dir: Dir::Blow,
+        pitch: Pitch::Normal,
+        expr: Expr::None,
+    }];
+    // Fits a 12-hole chromatic harp...
+    let (pasted, _) = paste_targets(&clipboard, 0, 12, &[], 0);
+    assert_eq!(pasted.len(), 1);
+    // ...but not a 10-hole diatonic one.
+    let (pasted, next_id) = paste_targets(&clipboard, 0, 10, &[], 0);
+    assert!(pasted.is_empty());
+    assert_eq!(next_id, 0);
+}
+
+#[test]
+fn paste_targets_of_an_empty_clipboard_is_a_no_op() {
+    let (pasted, next_id) = paste_targets(&[], 10, 10, &[], 7);
+    assert!(pasted.is_empty());
+    assert_eq!(next_id, 7);
 }
 
 #[test]

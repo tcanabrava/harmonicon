@@ -347,6 +347,12 @@ this file — prune it back to a one-line summary under "Shipped" below.
   (`song_end_tick`/`normalize_range`/`silence_gaps`/`split_side_range`/
   `erase_range`/`remove_range`) split out of `state.rs` to stay under the
   file-size budget. See `CLAUDE.md`'s multi-note-selection bullet.
+- **Song editor: Ctrl+C/Ctrl+V copy-paste** — new `song_editor::clipboard`
+  module (`NoteClipboard`, `copy_selected`, `paste_targets`); Ctrl+V pastes
+  at the tick under the mouse (`GridArea` gained its own
+  `RelativeCursorPosition` so this works from a hover, no click needed),
+  preserving the copied notes' relative shape and holes, silently skipping
+  any that don't fit. See `CLAUDE.md`'s copy-paste bullet.
 
 ## Current work
 

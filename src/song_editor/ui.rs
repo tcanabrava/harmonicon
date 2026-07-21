@@ -391,6 +391,9 @@ fn spawn_fixed_chrome(
             // So `interaction::pan_wheel` only pans horizontally
             // while the pointer is actually over the grid.
             Hovered::default(),
+            // Read by `interaction::handle_copy_paste` to resolve the tick
+            // under the mouse for Ctrl+V, without needing a click first.
+            bevy::ui::RelativeCursorPosition::default(),
             Node {
                 flex_grow: 1.0,
                 height: Val::Px(grid_height(hole_count)),
