@@ -212,7 +212,11 @@ fn spawn_cycle_row<T: Component, M: 'static>(
 /// no side effects to reconcile (unlike harmonica kind, which must sanitize
 /// existing notes), so the observer just flips it directly rather than
 /// calling a dedicated `EditorState` method.
-fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+fn spawn_content_kind_row(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     spawn_cycle_row(
         col,
         loc,
@@ -229,7 +233,11 @@ fn spawn_content_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, co
     );
 }
 
-fn spawn_harmonica_kind_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+fn spawn_harmonica_kind_row(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     spawn_cycle_row(
         col,
         loc,
@@ -392,7 +400,11 @@ pub(super) fn spawn_field_row(
     .id()
 }
 
-fn spawn_midi_track_row(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+fn spawn_midi_track_row(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     col.spawn(Node {
         width: Val::Percent(100.0),
         flex_direction: FlexDirection::Row,
@@ -548,7 +560,11 @@ pub(super) fn sync_scale_combobox_value(
 /// today's 8): harmonica kind + the first half of `FIELDS` in the left
 /// column, the second half + the MIDI-track row in the middle — halving the
 /// form's height for the same content.
-pub(super) fn spawn_meta_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+pub(super) fn spawn_meta_form(
+    root: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     const MID: usize = FIELDS.len() / 2;
     root.spawn(Node {
         width: Val::Percent(100.0),
@@ -655,36 +671,63 @@ fn spawn_legend_heading(col: &mut ChildSpawnerCommands, colors: SongEditorColors
 /// different things in two different places, which is exactly the kind of
 /// thing worth spelling out rather than leaving the player to reverse
 /// -engineer from `theme.json`.
-fn spawn_color_legend(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+fn spawn_color_legend(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     spawn_legend_heading(col, colors, loc.msg("editor-legend-notes").to_string());
     spawn_legend_row(
-        col, colors, pitch_color(Pitch::Normal), false,
+        col,
+        colors,
+        pitch_color(Pitch::Normal),
+        false,
         loc.msg("editor-legend-normal").to_string(),
     );
     spawn_legend_row(
-        col, colors, pitch_color(Pitch::Bend(1.0)), false,
+        col,
+        colors,
+        pitch_color(Pitch::Bend(1.0)),
+        false,
         loc.msg("editor-legend-bend").to_string(),
     );
     spawn_legend_row(
-        col, colors, pitch_color(Pitch::Overblow), false,
+        col,
+        colors,
+        pitch_color(Pitch::Overblow),
+        false,
         loc.msg("editor-legend-overblow").to_string(),
     );
     spawn_legend_row(
-        col, colors, pitch_color(Pitch::Overdraw), false,
+        col,
+        colors,
+        pitch_color(Pitch::Overdraw),
+        false,
         loc.msg("editor-legend-overdraw").to_string(),
     );
     spawn_legend_row(
-        col, colors, pitch_color(Pitch::Slide), false,
+        col,
+        colors,
+        pitch_color(Pitch::Slide),
+        false,
         loc.msg("editor-legend-slide").to_string(),
     );
     spawn_legend_row(
-        col, colors,
-        mix_srgba(pitch_color(Pitch::Normal), OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX),
+        col,
+        colors,
+        mix_srgba(
+            pitch_color(Pitch::Normal),
+            OUT_OF_SCALE_TINT,
+            OUT_OF_SCALE_MIX,
+        ),
         false,
         loc.msg("editor-legend-out-of-scale").to_string(),
     );
     spawn_legend_row(
-        col, colors, colors.accent, true,
+        col,
+        colors,
+        colors.accent,
+        true,
         loc.msg("editor-legend-selected").to_string(),
     );
     col.spawn((
@@ -704,37 +747,61 @@ fn spawn_color_legend(col: &mut ChildSpawnerCommands, loc: &Localization, colors
 
     spawn_legend_heading(col, colors, loc.msg("editor-legend-dragging").to_string());
     spawn_legend_row(
-        col, colors, colors.ghost_ok.with_alpha(0.30), false,
+        col,
+        colors,
+        colors.ghost_ok.with_alpha(0.30),
+        false,
         loc.msg("editor-legend-drag-ok").to_string(),
     );
     spawn_legend_row(
-        col, colors, colors.ghost_bad.with_alpha(0.30), false,
+        col,
+        colors,
+        colors.ghost_bad.with_alpha(0.30),
+        false,
         loc.msg("editor-legend-drag-bad").to_string(),
     );
 
     spawn_legend_heading(col, colors, loc.msg("editor-legend-elsewhere").to_string());
     spawn_legend_row(
-        col, colors, TEMPO_MARKER_COLOR, false,
+        col,
+        colors,
+        TEMPO_MARKER_COLOR,
+        false,
         loc.msg("editor-legend-tempo-marker").to_string(),
     );
     spawn_legend_row(
-        col, colors, SPLIT_LINE_COLOR, false,
+        col,
+        colors,
+        SPLIT_LINE_COLOR,
+        false,
         loc.msg("editor-legend-split-point").to_string(),
     );
     spawn_legend_row(
-        col, colors, RANGE_HIGHLIGHT_COLOR, false,
+        col,
+        colors,
+        RANGE_HIGHLIGHT_COLOR,
+        false,
         loc.msg("editor-legend-range-preview").to_string(),
     );
     spawn_legend_row(
-        col, colors, colors.btn_active, false,
+        col,
+        colors,
+        colors.btn_active,
+        false,
         loc.msg("editor-legend-active-button").to_string(),
     );
     spawn_legend_row(
-        col, colors, SCROLLBAR_BLOW_COLOR, false,
+        col,
+        colors,
+        SCROLLBAR_BLOW_COLOR,
+        false,
         loc.msg("editor-legend-scrollbar-blow").to_string(),
     );
     spawn_legend_row(
-        col, colors, SCROLLBAR_DRAW_COLOR, false,
+        col,
+        colors,
+        SCROLLBAR_DRAW_COLOR,
+        false,
         loc.msg("editor-legend-scrollbar-draw").to_string(),
     );
     col.spawn((

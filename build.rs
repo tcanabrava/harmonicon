@@ -63,7 +63,12 @@ fn main() {
 /// Sink constructors whose argument is a literal `Text`/`TextSpan` value —
 /// checked directly, and with a `format!(` wrapper (same line or the line
 /// immediately after, for a `format!(\n    "..."\n)` call).
-const TEXT_CTORS: &[&str] = &["Text::new(", "Text::from(", "TextSpan::new(", "TextSpan::from("];
+const TEXT_CTORS: &[&str] = &[
+    "Text::new(",
+    "Text::from(",
+    "TextSpan::new(",
+    "TextSpan::from(",
+];
 
 /// Shared spawn helpers whose first `&str`/`String` argument is a label/text
 /// that gets displayed as-is — so a literal passed here is exactly as
@@ -97,7 +102,12 @@ fn build() {
     collect_rs_files(dir, &mut rs_files);
     let sources: Vec<(String, String)> = rs_files
         .iter()
-        .map(|p| (p.display().to_string(), std::fs::read_to_string(p).unwrap_or_default()))
+        .map(|p| {
+            (
+                p.display().to_string(),
+                std::fs::read_to_string(p).unwrap_or_default(),
+            )
+        })
         .collect();
 
     let mut violations: Vec<String> = Vec::new();
@@ -184,7 +194,9 @@ fn check_source(source: &str, report: &mut dyn FnMut(usize, &str)) {
             {
                 report(
                     i,
-                    &format!("{ctor}\"...\") with a natural-language literal — use loc.msg(\"key\") instead"),
+                    &format!(
+                        "{ctor}\"...\") with a natural-language literal — use loc.msg(\"key\") instead"
+                    ),
                 );
             }
 
@@ -222,7 +234,9 @@ fn check_source(source: &str, report: &mut dyn FnMut(usize, &str)) {
                 if is_natural_language(&content) {
                     report(
                         i,
-                        &format!("{sink}\"...\") with a natural-language literal — use loc.msg(\"key\") instead"),
+                        &format!(
+                            "{sink}\"...\") with a natural-language literal — use loc.msg(\"key\") instead"
+                        ),
                     );
                 }
             } else if line.contains(sink) {
@@ -284,8 +298,13 @@ fn extract_type_name(line: &str) -> Option<String> {
             rest = after_paren[close + 1..].trim_start();
         }
     }
-    let rest = rest.strip_prefix("struct ").or_else(|| rest.strip_prefix("enum "))?;
-    let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+    let rest = rest
+        .strip_prefix("struct ")
+        .or_else(|| rest.strip_prefix("enum "))?;
+    let name: String = rest
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect();
     (!name.is_empty()).then_some(name)
 }
 
@@ -392,7 +411,8 @@ fn extract_quoted_after(line: &str, needle: &str) -> Option<String> {
 /// The two-feature fingerprint of natural-language text: at least one ASCII
 /// letter AND at least one ASCII whitespace character.
 fn is_natural_language(content: &str) -> bool {
-    content.chars().any(|c| c.is_ascii_alphabetic()) && content.chars().any(|c| c.is_ascii_whitespace())
+    content.chars().any(|c| c.is_ascii_alphabetic())
+        && content.chars().any(|c| c.is_ascii_whitespace())
 }
 
 #[cfg(target_os = "windows")]
@@ -420,12 +440,7 @@ fn generate_wix_assets() -> std::io::Result<()> {
 
     let mut component_refs = Vec::new();
 
-    visit_assets(
-        assets_dir,
-        assets_dir,
-        &mut out,
-        &mut component_refs,
-    )?;
+    visit_assets(assets_dir, assets_dir, &mut out, &mut component_refs)?;
 
     writeln!(
         out,
@@ -472,10 +487,7 @@ fn visit_assets(
             let dir_id = format!("A14e9533a2bd754b0bd9{}", dir_id);
             let dir_id = format!("Dir_{}", &dir_id[..12]);
 
-            writeln!(
-                out,
-                r#"<Directory Id="{dir_id}" Name="{name}">"#
-            )?;
+            writeln!(out, r#"<Directory Id="{dir_id}" Name="{name}">"#)?;
 
             visit_assets(root, &path, out, component_refs)?;
 
@@ -568,10 +580,7 @@ mod tests {
 
     #[test]
     fn flags_natural_language_inside_format() {
-        assert_eq!(
-            violations(r#"Text::new(format!("Key: {}", key))"#).len(),
-            1
-        );
+        assert_eq!(violations(r#"Text::new(format!("Key: {}", key))"#).len(), 1);
         assert_eq!(
             violations(r#"*text = Text::new(format!("Score: {}", score.points));"#).len(),
             1
@@ -580,16 +589,14 @@ mod tests {
 
     #[test]
     fn flags_natural_language_format_split_across_two_lines() {
-        let source = "*text = Text::new(format!(\n    \"Play it \u{2014} target {target_note}\"\n));";
+        let source =
+            "*text = Text::new(format!(\n    \"Play it \u{2014} target {target_note}\"\n));";
         assert_eq!(violations(source).len(), 1);
     }
 
     #[test]
     fn flags_natural_language_in_bsn_text_binding() {
-        assert_eq!(
-            violations(r#"Text({"Wait for Note: off"})"#).len(),
-            1
-        );
+        assert_eq!(violations(r#"Text({"Wait for Note: off"})"#).len(), 1);
         assert!(violations(r#"Text({"Retry".to_string()})"#).is_empty());
         assert!(violations(r#"Text({some_expr})"#).is_empty());
     }

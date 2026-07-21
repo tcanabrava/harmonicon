@@ -70,9 +70,7 @@ pub(crate) fn setup_play_menu(
         &loc.msg("menu-lessons"),
         &theme,
         &btn_mats,
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
-            page.set(MenuPage::Lessons)
-        },
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Lessons),
     );
     spawn_button(
         &mut commands,

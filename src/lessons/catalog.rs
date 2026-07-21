@@ -143,7 +143,11 @@ fn rescan_lessons_on_external_change(
     if dirty {
         available.0 = scan_all_lessons();
         let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
-        info!("Re-scanned lessons: found {} lesson(s): {:?}", ids.len(), ids);
+        info!(
+            "Re-scanned lessons: found {} lesson(s): {:?}",
+            ids.len(),
+            ids
+        );
         rescanned.write(LessonsRescanned);
     }
 }
@@ -193,7 +197,11 @@ mod tests {
         let grouped = group_by_unit(&lessons);
         assert_eq!(grouped.len(), 2);
         assert_eq!(grouped[0].0, "blowing");
-        let ids: Vec<&str> = grouped[0].1.iter().map(|l| l.manifest.id.as_str()).collect();
+        let ids: Vec<&str> = grouped[0]
+            .1
+            .iter()
+            .map(|l| l.manifest.id.as_str())
+            .collect();
         assert_eq!(ids, ["a1", "a2", "a3"]);
         assert_eq!(grouped[1].0, "rhythm");
     }
@@ -235,10 +243,8 @@ mod tests {
 
     #[test]
     fn an_external_asset_prefix_builds_an_external_source_chart_path() {
-        let dir = std::env::temp_dir().join(format!(
-            "harmonicon_lessons_ext_{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("harmonicon_lessons_ext_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let p = dir.join("01_basics/01_first/lesson.json");
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();

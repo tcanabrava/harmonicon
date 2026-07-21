@@ -29,9 +29,10 @@ struct DocsStatusLabel;
 /// neither exists; the docs aren't bundled into builds yet (see CLAUDE.md).
 fn locate_docs_index() -> Option<std::path::PathBuf> {
     let candidates = [
-        std::env::current_exe()
-            .ok()
-            .and_then(|exe| exe.parent().map(|dir| dir.join("docs/book/book/index.html"))),
+        std::env::current_exe().ok().and_then(|exe| {
+            exe.parent()
+                .map(|dir| dir.join("docs/book/book/index.html"))
+        }),
         Some(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/book/book/index.html")),
     ];
     candidates.into_iter().flatten().find(|p| p.exists())

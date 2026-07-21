@@ -31,7 +31,11 @@ use bevy_fluent::prelude::Localization;
 /// chosen path is decided separately, by whichever of `harpchart::
 /// handle_save_chosen`/`lesson_form::handle_save_lesson_chosen` (and their
 /// load siblings) matches that same `content_kind`.
-pub(super) fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+pub(super) fn spawn_file_buttons(
+    panel: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     transport_button(
         panel,
         loc.msg("editor-save"),
@@ -102,7 +106,11 @@ pub(super) fn spawn_file_buttons(panel: &mut ChildSpawnerCommands, loc: &Localiz
 
 /// Play/Pause/Stop/Practice — only shown in [`Mode::Play`] (wrapped in
 /// [`PlayModeGroup`] by the caller).
-pub(super) fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+pub(super) fn spawn_playback_buttons(
+    panel: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     transport_button(
         panel,
         loc.msg("editor-play"),
@@ -129,7 +137,14 @@ pub(super) fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Loc
             // close it out (rather than letting `start_playback` below
             // silently repurpose it out from under `record.open`) before
             // taking over.
-            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+            stop_record(
+                &mut state,
+                &playing,
+                &mut record,
+                &mut playhead,
+                &mut pitch_range,
+                &mut commands,
+            );
             start_playback(
                 &state,
                 &mut sources,
@@ -165,7 +180,14 @@ pub(super) fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Loc
          mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands| {
             stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
-            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+            stop_record(
+                &mut state,
+                &playing,
+                &mut record,
+                &mut playhead,
+                &mut pitch_range,
+                &mut commands,
+            );
         },
     );
     transport_button(
@@ -195,7 +217,14 @@ pub(super) fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Loc
             } else {
                 // A recording in progress owns the shared `Playhead` clock —
                 // close it out before `start_practice` below repurposes it.
-                stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+                stop_record(
+                    &mut state,
+                    &playing,
+                    &mut record,
+                    &mut playhead,
+                    &mut pitch_range,
+                    &mut commands,
+                );
                 start_practice(
                     &state,
                     &mut sources,
@@ -216,7 +245,11 @@ pub(super) fn spawn_playback_buttons(panel: &mut ChildSpawnerCommands, loc: &Loc
 /// starts a take (or resumes a paused one); Pause freezes it in place;
 /// Stop ends the take leaving the playhead where it stopped; Finish ends
 /// it and rewinds to the beginning.
-pub(super) fn spawn_record_buttons(panel: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+pub(super) fn spawn_record_buttons(
+    panel: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     transport_button(
         panel,
         loc.msg("editor-play"),
@@ -289,7 +322,14 @@ pub(super) fn spawn_record_buttons(panel: &mut ChildSpawnerCommands, loc: &Local
          mut playhead: ResMut<Playhead>,
          mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands| {
-            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+            stop_record(
+                &mut state,
+                &playing,
+                &mut record,
+                &mut playhead,
+                &mut pitch_range,
+                &mut commands,
+            );
         },
     );
     transport_button(
@@ -304,7 +344,14 @@ pub(super) fn spawn_record_buttons(panel: &mut ChildSpawnerCommands, loc: &Local
          mut playhead: ResMut<Playhead>,
          mut pitch_range: ResMut<PitchRange>,
          mut commands: Commands| {
-            stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+            stop_record(
+                &mut state,
+                &playing,
+                &mut record,
+                &mut playhead,
+                &mut pitch_range,
+                &mut commands,
+            );
             playhead.elapsed = 0.0;
         },
     );

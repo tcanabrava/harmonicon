@@ -182,7 +182,11 @@ fn spawn_diagram<RowKind: Copy>(
 /// Diatonic harps get the full bend/overblow/overdraw diagram; chromatic
 /// harps (no bends, no overblow/overdraw — just a slide button) get a
 /// simpler diagram, see [`spawn_chromatic_overlay`].
-pub fn spawn_harmonica_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica, loc: &Localization) {
+pub fn spawn_harmonica_overlay(
+    parent: &mut ChildSpawnerCommands,
+    harp: &Harmonica,
+    loc: &Localization,
+) {
     if matches!(harp, Harmonica::Chromatic { .. }) {
         spawn_chromatic_overlay(parent, harp, loc);
         return;
@@ -280,7 +284,11 @@ fn chromatic_note_for(harp: &Harmonica, hole: u8, row: ChromaticRow) -> Option<S
 /// pitch on each side, sized to `harp`'s actual hole count (12 or 16 — the
 /// bend/overblow/overdraw diagram in [`spawn_harmonica_overlay`] only applies
 /// to the fixed 10-hole diatonic layout).
-fn spawn_chromatic_overlay(parent: &mut ChildSpawnerCommands, harp: &Harmonica, loc: &Localization) {
+fn spawn_chromatic_overlay(
+    parent: &mut ChildSpawnerCommands,
+    harp: &Harmonica,
+    loc: &Localization,
+) {
     spawn_diagram(
         parent,
         loc,

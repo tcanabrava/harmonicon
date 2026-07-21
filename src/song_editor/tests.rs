@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use super::grid::{mix_srgba, note_in_scale, visible_beats};
-use super::harpchart::{
-    load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart,
-};
+use super::harpchart::{load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart};
 use super::interaction::{apply_modifier, select_or_add};
 use super::lesson_form::{populate_from_lesson_manifest, serialize_lesson};
-use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
 use super::playback::{build_harp, note_freq, playhead_for, secs_per_tick};
 use super::state::Scroll;
 use super::state::{
@@ -15,12 +12,13 @@ use super::state::{
     erase_range, move_target, normalize_range, note_rect, remove_range, silence_gaps,
     song_end_tick, split_side_range, toggle_tempo_point,
 };
+use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
 use super::ui::ModButton;
 use super::{BEAT_W, HEADER_H, HOLE_COL_W, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::audio_system::synth::{PhraseNote, SAMPLE_RATE, envelope, render_pcm};
-use crate::song::chart::Scale;
 use crate::audio_system::wav::encode_wav;
 use crate::lessons::{LessonManifest, PassCriteria};
+use crate::song::chart::Scale;
 use crate::song::harmonica::blues_scale_classes;
 
 #[test]
@@ -46,7 +44,10 @@ fn secs_per_tick_reflects_the_songs_own_tempo() {
     };
     // 60 BPM: one beat per second, TICKS_PER_BEAT ticks per beat.
     let spt = secs_per_tick(&s);
-    assert!((spt - 1.0 / TICKS_PER_BEAT as f32).abs() < 1e-6, "got {spt}");
+    assert!(
+        (spt - 1.0 / TICKS_PER_BEAT as f32).abs() < 1e-6,
+        "got {spt}"
+    );
 }
 
 #[test]
@@ -119,7 +120,10 @@ fn serialize_lesson_writes_a_technique_pass_criterion() {
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["pass_criteria"]["type"], "technique");
     assert_eq!(v["pass_criteria"]["technique"], "bend");
-    assert_eq!(v["pass_criteria"]["threshold"].as_f64().unwrap(), 0.6_f32 as f64);
+    assert_eq!(
+        v["pass_criteria"]["threshold"].as_f64().unwrap(),
+        0.6_f32 as f64
+    );
 }
 
 #[test]
@@ -292,7 +296,10 @@ fn armed_sticky_wah_propagates_to_a_simultaneous_chord_note() {
     select_or_add(&mut s, 2, 0);
     apply_modifier(&mut s, ModButton::Wah); // arms sticky Wah, applies to hole 2
     select_or_add(&mut s, 5, 0); // same tick, different hole — a chord
-    assert_eq!(s.notes.iter().find(|n| n.hole == 2).unwrap().expr, s.notes.iter().find(|n| n.hole == 5).unwrap().expr);
+    assert_eq!(
+        s.notes.iter().find(|n| n.hole == 2).unwrap().expr,
+        s.notes.iter().find(|n| n.hole == 5).unwrap().expr
+    );
     assert!(matches!(
         s.notes.iter().find(|n| n.hole == 5).unwrap().expr,
         Expr::Wah(_)
@@ -916,8 +923,7 @@ fn serialize_harpchart_omits_audio_file_when_no_music_is_picked() {
     };
     select_or_add(&mut s, 2, 0);
 
-    let v: serde_json::Value =
-        serde_json::from_str(&serialize_harpchart(&s)).expect("valid JSON");
+    let v: serde_json::Value = serde_json::from_str(&serialize_harpchart(&s)).expect("valid JSON");
     assert!(
         v["metadata"].get("audio_file").is_none(),
         "an empty/never-picked audio file shouldn't be written at all, \
@@ -935,8 +941,7 @@ fn serialize_harpchart_writes_audio_file_once_music_is_picked() {
     };
     select_or_add(&mut s, 2, 0);
 
-    let v: serde_json::Value =
-        serde_json::from_str(&serialize_harpchart(&s)).expect("valid JSON");
+    let v: serde_json::Value = serde_json::from_str(&serialize_harpchart(&s)).expect("valid JSON");
     assert_eq!(v["metadata"]["audio_file"], "music.ogg");
 }
 
@@ -1062,10 +1067,7 @@ fn chromatic_chart_round_trips_kind_hole_count_and_slide() {
     let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
     assert_eq!(v["harmonica"]["type"], "chromatic");
     assert_eq!(v["harmonica"]["holes"], 12);
-    assert_eq!(
-        v["track"][0]["events"][0]["modifiers"][0]["type"],
-        "slide"
-    );
+    assert_eq!(v["track"][0]["events"][0]["modifiers"][0]["type"], "slide");
 
     let mut loaded = EditorState::default();
     let mut scroll = Scroll::default();
@@ -1119,7 +1121,9 @@ fn serialize_harpchart_writes_every_tempo_change_point() {
     };
     let json_str = serialize_harpchart(&s);
     let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
-    let map = v["timing"]["tempo_map"].as_array().expect("tempo_map array");
+    let map = v["timing"]["tempo_map"]
+        .as_array()
+        .expect("tempo_map array");
     assert_eq!(map.len(), 2);
     assert_eq!(map[0]["tick"], 0);
     assert_eq!(map[0]["bpm"], 120.0);

@@ -226,8 +226,7 @@ mod tests {
         app.world_mut().get_mut::<TabBarSelected>(bar).unwrap().0 = 2;
         app.update();
 
-        let color_of =
-            |app: &App, e: Entity| app.world().get::<BackgroundColor>(e).unwrap().0;
+        let color_of = |app: &App, e: Entity| app.world().get::<BackgroundColor>(e).unwrap().0;
         assert_eq!(color_of(&app, tabs[0]), tab_color(false));
         assert_eq!(color_of(&app, tabs[1]), tab_color(false));
         assert_eq!(color_of(&app, tabs[2]), tab_color(true));

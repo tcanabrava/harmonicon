@@ -204,7 +204,11 @@ pub fn measured_relative_oscillation_hz(samples: &[(f64, f32)], min_frac: f32) -
 /// True when `measured_hz` is within `tolerance_frac` of `target_hz` (e.g.
 /// `0.4` = ±40%) — generous, since hand vibrato/wah speed varies naturally
 /// between players and even between notes.
-pub const fn oscillation_matches_rate(measured_hz: f32, target_hz: f32, tolerance_frac: f32) -> bool {
+pub const fn oscillation_matches_rate(
+    measured_hz: f32,
+    target_hz: f32,
+    tolerance_frac: f32,
+) -> bool {
     if target_hz <= 0.0 {
         return false;
     }

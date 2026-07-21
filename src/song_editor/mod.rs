@@ -39,8 +39,8 @@ mod practice;
 mod record;
 mod state;
 mod timeline;
-mod transport;
 mod timeline_overlay;
+mod transport;
 mod ui;
 mod waveform;
 

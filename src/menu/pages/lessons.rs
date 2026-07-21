@@ -92,16 +92,17 @@ fn goal_line(loc: &Localization, entry: &LessonEntry) -> Option<String> {
                 .into(),
         ),
         Some(PassCriteria::ChordToneAdherence { threshold }) => Some(
-            loc.msg_args("lesson-goal-chord-tone-adherence", &[("pct", pct(*threshold))])
-                .into(),
+            loc.msg_args(
+                "lesson-goal-chord-tone-adherence",
+                &[("pct", pct(*threshold))],
+            )
+            .into(),
         ),
         Some(PassCriteria::PhraseDiscipline { threshold }) => Some(
             loc.msg_args("lesson-goal-phrase-discipline", &[("pct", pct(*threshold))])
                 .into(),
         ),
-        None if entry.chart_asset_path.is_some() => {
-            Some(loc.msg("lesson-goal-finish").into())
-        }
+        None if entry.chart_asset_path.is_some() => Some(loc.msg("lesson-goal-finish").into()),
         None => None,
     }
 }
@@ -208,13 +209,7 @@ pub(crate) fn setup_lessons_menu(
         ))
         .id();
     commands.entity(root).add_child(list);
-    populate_lesson_rows(
-        &mut commands,
-        list,
-        units[ix].1.as_slice(),
-        &profile,
-        &loc,
-    );
+    populate_lesson_rows(&mut commands, list, units[ix].1.as_slice(), &profile, &loc);
 
     spawn_back_to_play(&mut commands, root, &theme, &btn_mats, &loc);
 }
@@ -546,9 +541,7 @@ fn spawn_back_to_lessons(
         &loc.msg("back"),
         theme,
         btn_mats,
-        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| {
-            page.set(MenuPage::Lessons)
-        },
+        |_: On<Pointer<Click>>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Lessons),
     );
 }
 

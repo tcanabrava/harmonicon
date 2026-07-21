@@ -80,7 +80,10 @@ fn song_assets_are_complete() {
     let mut report = String::new();
     for song in songs {
         if !has_harpchart(&song) {
-            report.push_str(&format!("  {}: no *.harpchart file under song/\n", label(&song)));
+            report.push_str(&format!(
+                "  {}: no *.harpchart file under song/\n",
+                label(&song)
+            ));
         }
     }
 
@@ -245,10 +248,8 @@ fn lesson_assets_are_complete_and_valid() {
                     Ok(chart) => {
                         let errors = validation_errors(&chart_validator, &chart);
                         if !errors.is_empty() {
-                            report.push_str(&format!(
-                                "  {} ({chart_rel}):\n{errors}\n",
-                                label(dir)
-                            ));
+                            report
+                                .push_str(&format!("  {} ({chart_rel}):\n{errors}\n", label(dir)));
                         }
                     }
                     Err(e) => report.push_str(&format!(

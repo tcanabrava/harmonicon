@@ -183,7 +183,8 @@ pub(crate) fn wait_freeze_index(
     clock_time: f64,
     wait_mode: bool,
 ) -> Option<usize> {
-    first_due_unresolved_note(notes, cursor, clock_time).filter(|&i| wait_mode || notes[i].force_wait)
+    first_due_unresolved_note(notes, cursor, clock_time)
+        .filter(|&i| wait_mode || notes[i].force_wait)
 }
 
 /// Index range (into `notes`, sorted by `time`) that a loop wrap must reset
@@ -266,7 +267,12 @@ pub fn build_scheduled_notes(
     adaptive: &AdaptiveDifficulty,
 ) -> (Vec<ScheduledNote>, Vec<Option<&'static str>>) {
     let items = track_items(&chart.track, &chart.timing);
-    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
+    let flags = unlocked_flags(
+        &items,
+        &adaptive.sections,
+        &adaptive.learned,
+        adaptive.enabled,
+    );
     let mut flags = flags.into_iter();
     let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
     for item in &chart.track {
@@ -423,6 +429,9 @@ mod tests {
         let (notes, _) = build_scheduled_notes(&chart, &AdaptiveDifficulty::default());
         assert_eq!(notes.len(), 1);
         assert!(notes[0].chord_pitches.is_empty());
-        assert!(notes[0].force_wait, "call: true carries through to force_wait");
+        assert!(
+            notes[0].force_wait,
+            "call: true carries through to force_wait"
+        );
     }
 }

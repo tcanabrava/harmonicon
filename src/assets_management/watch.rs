@@ -23,9 +23,9 @@
 
 use bevy::prelude::*;
 use crossbeam_channel::{Receiver, Sender};
-use notify_debouncer_full::{Debouncer, DebounceEventResult, RecommendedCache, new_debouncer};
 use notify_debouncer_full::notify::event::{EventKind, ModifyKind};
 use notify_debouncer_full::notify::{RecommendedWatcher, RecursiveMode};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::Duration;

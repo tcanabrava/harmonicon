@@ -490,7 +490,10 @@ mod tests {
     #[derive(Resource, Default)]
     struct PhraseChangeLog(u32);
 
-    fn log_phrase_changes(mut changed: MessageReader<PhraseChanged>, mut log: ResMut<PhraseChangeLog>) {
+    fn log_phrase_changes(
+        mut changed: MessageReader<PhraseChanged>,
+        mut log: ResMut<PhraseChangeLog>,
+    ) {
         log.0 += changed.read().count() as u32;
     }
 

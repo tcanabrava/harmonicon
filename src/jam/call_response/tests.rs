@@ -46,7 +46,10 @@ fn chord_tone_pitches_keeps_only_matching_note_classes_sorted() {
     note_to_holes.insert(62u8, vec![1]); // D4 — not a chord tone
     note_to_holes.insert(60u8, vec![1]); // C4 — chord tone
     let chord_tones: HashSet<String> = ["C".to_string(), "E".to_string()].into_iter().collect();
-    assert_eq!(chord_tone_pitches(&note_to_holes, &chord_tones), vec![60, 64]);
+    assert_eq!(
+        chord_tone_pitches(&note_to_holes, &chord_tones),
+        vec![60, 64]
+    );
 }
 
 #[test]

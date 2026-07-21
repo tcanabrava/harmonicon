@@ -7,8 +7,8 @@ use bevy::{
 use bevy_fluent::Localization;
 
 use crate::{
-    localization::LocalizationExt,
     app::{AppState, GameplayMode, SelectedSong},
+    localization::LocalizationExt,
     settings::AudioSettings,
     song::SongManifest,
 };

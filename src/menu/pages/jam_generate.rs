@@ -77,7 +77,8 @@ fn spawn_stepper_row<M1: 'static, M2: 'static>(
         ..default()
     })
     .with_children(|row| {
-        row.spawn_empty().apply_scene(button::small("\u{25C2}", on_prev));
+        row.spawn_empty()
+            .apply_scene(button::small("\u{25C2}", on_prev));
         row.spawn((
             Node {
                 width: Val::Px(150.0),
@@ -92,7 +93,8 @@ fn spawn_stepper_row<M1: 'static, M2: 'static>(
             TextColor(Color::srgb(0.95, 0.80, 0.35)),
             marker,
         ));
-        row.spawn_empty().apply_scene(button::small("\u{25B8}", on_next));
+        row.spawn_empty()
+            .apply_scene(button::small("\u{25B8}", on_next));
     });
 }
 
@@ -126,9 +128,10 @@ pub(crate) fn setup_jam_generate_menu(
 
         spawn_stepper_row(
             root,
-            String::from(
-                loc.msg_args("jam-generate-tempo", &[("bpm", format!("{:.0}", config.bpm))]),
-            ),
+            String::from(loc.msg_args(
+                "jam-generate-tempo",
+                &[("bpm", format!("{:.0}", config.bpm))],
+            )),
             BpmLabel,
             |_: On<Pointer<Click>>, mut cfg: ResMut<JamGenerateConfig>| {
                 cfg.bpm = (cfg.bpm - BPM_STEP).max(MIN_BPM);
@@ -227,22 +230,8 @@ pub(crate) fn setup_jam_generate_menu(
 pub(crate) fn update_jam_generate_labels(
     config: Res<JamGenerateConfig>,
     loc: Res<Localization>,
-    mut keys: Query<
-        &mut Text,
-        (
-            With<KeyLabel>,
-            Without<BpmLabel>,
-            Without<ProgressionLabel>,
-        ),
-    >,
-    mut bpms: Query<
-        &mut Text,
-        (
-            With<BpmLabel>,
-            Without<KeyLabel>,
-            Without<ProgressionLabel>,
-        ),
-    >,
+    mut keys: Query<&mut Text, (With<KeyLabel>, Without<BpmLabel>, Without<ProgressionLabel>)>,
+    mut bpms: Query<&mut Text, (With<BpmLabel>, Without<KeyLabel>, Without<ProgressionLabel>)>,
     mut progressions: Query<
         &mut Text,
         (

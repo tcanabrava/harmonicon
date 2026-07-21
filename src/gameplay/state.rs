@@ -270,7 +270,10 @@ pub fn loop_range_valid(start_time: f64, end_time: f64) -> bool {
     end_time > start_time
 }
 
-pub(super) fn collect_pitches(mut reader: MessageReader<PitchEvent>, mut active: ResMut<ActivePitches>) {
+pub(super) fn collect_pitches(
+    mut reader: MessageReader<PitchEvent>,
+    mut active: ResMut<ActivePitches>,
+) {
     for ev in reader.read() {
         active.0 = ev.0.clone();
     }

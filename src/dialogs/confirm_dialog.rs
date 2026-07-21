@@ -110,7 +110,14 @@ fn handle_open(
                                       roots: Query<Entity, With<ConfirmDialogRoot>>,
                                       mut chosen: MessageWriter<ConfirmChosen>,
                                       mut commands: Commands| {
-                                    respond(purpose, true, &mut open, &roots, &mut chosen, &mut commands);
+                                    respond(
+                                        purpose,
+                                        true,
+                                        &mut open,
+                                        &roots,
+                                        &mut chosen,
+                                        &mut commands,
+                                    );
                                 },
                             ));
                             row.spawn_empty().apply_scene(button::small(
@@ -120,7 +127,14 @@ fn handle_open(
                                       roots: Query<Entity, With<ConfirmDialogRoot>>,
                                       mut chosen: MessageWriter<ConfirmChosen>,
                                       mut commands: Commands| {
-                                    respond(purpose, false, &mut open, &roots, &mut chosen, &mut commands);
+                                    respond(
+                                        purpose,
+                                        false,
+                                        &mut open,
+                                        &roots,
+                                        &mut chosen,
+                                        &mut commands,
+                                    );
                                 },
                             ));
                         });
@@ -161,7 +175,14 @@ fn close_on_escape(
         return;
     }
     keyboard.clear_just_pressed(KeyCode::Escape);
-    respond(purpose, false, &mut open, &roots, &mut chosen, &mut commands);
+    respond(
+        purpose,
+        false,
+        &mut open,
+        &roots,
+        &mut chosen,
+        &mut commands,
+    );
 }
 
 pub struct ConfirmDialogPlugin;

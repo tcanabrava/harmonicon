@@ -157,42 +157,61 @@ fn setup_options_menu(
     let root = spawn_menu_root(&mut commands, "Options", Some("Audio"), &theme, "Options");
 
     // Parent container spanning the whole screen
-    let main_layout = commands.spawn(Node {
-        width: Val::Percent(80.0),
-        height: Val::Percent(100.0),
-        // Align children horizontally as columns
-        flex_direction: FlexDirection::Row,
-        // Optional spacing between the two columns
-        column_gap: Val::Px(20.0),
-        ..default()
-    }).id();
+    let main_layout = commands
+        .spawn(Node {
+            width: Val::Percent(80.0),
+            height: Val::Percent(100.0),
+            // Align children horizontally as columns
+            flex_direction: FlexDirection::Row,
+            // Optional spacing between the two columns
+            column_gap: Val::Px(20.0),
+            ..default()
+        })
+        .id();
 
-    let left_layout = commands.spawn(Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
-        // Align children horizontally as columns
-        flex_direction: FlexDirection::Column,
-        // Optional spacing between the two columns
-        column_gap: Val::Px(20.0),
-        ..default()
-    }).id();
+    let left_layout = commands
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            // Align children horizontally as columns
+            flex_direction: FlexDirection::Column,
+            // Optional spacing between the two columns
+            column_gap: Val::Px(20.0),
+            ..default()
+        })
+        .id();
 
-    let right_layout = commands.spawn(Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
-        // Align children horizontally as columns
-        flex_direction: FlexDirection::Column,
-        // Optional spacing between the two columns
-        column_gap: Val::Px(20.0),
-        row_gap: Val::Px(20.0),
-        ..default()
-    }).id();
+    let right_layout = commands
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            // Align children horizontally as columns
+            flex_direction: FlexDirection::Column,
+            // Optional spacing between the two columns
+            column_gap: Val::Px(20.0),
+            row_gap: Val::Px(20.0),
+            ..default()
+        })
+        .id();
 
     commands.entity(root).add_child(main_layout);
     commands.entity(main_layout).add_child(left_layout);
     commands.entity(main_layout).add_child(right_layout);
 
-    spawn_left_column(&mut commands, left_layout, mic_status, settings, harmonicas, &loc, selected_harmonica, asset_server, images, show_numbers, adaptive_difficulty, fullscreen);
+    spawn_left_column(
+        &mut commands,
+        left_layout,
+        mic_status,
+        settings,
+        harmonicas,
+        &loc,
+        selected_harmonica,
+        asset_server,
+        images,
+        show_numbers,
+        adaptive_difficulty,
+        fullscreen,
+    );
     spawn_right_column(&mut commands, right_layout, theme, btn_mats, &loc);
 }
 
@@ -256,12 +275,7 @@ fn spawn_left_column(
         })
         .collect();
 
-    spawn_harmonica_row(
-        commands,
-        parent,
-        &previews_harmonica,
-        &selected_harmonica.0,
-    );
+    spawn_harmonica_row(commands, parent, &previews_harmonica, &selected_harmonica.0);
 
     combobox::spawn_combobox(
         commands,
@@ -449,7 +463,10 @@ fn update_adaptive_difficulty_label(
 
 /// Flips the fullscreen preference; `settings::apply_fullscreen` mirrors the
 /// resulting `FullscreenEnabled` onto the primary window's `WindowMode`.
-fn toggle_fullscreen(_: On<Pointer<Click>>, mut fullscreen: ResMut<crate::settings::FullscreenEnabled>) {
+fn toggle_fullscreen(
+    _: On<Pointer<Click>>,
+    mut fullscreen: ResMut<crate::settings::FullscreenEnabled>,
+) {
     fullscreen.0 = !fullscreen.0;
 }
 
@@ -464,7 +481,12 @@ fn fullscreen_label_text(loc: &Localization, enabled: bool) -> String {
 /// A row with a pill button that flips the fullscreen setting plus a label
 /// reflecting the current choice — same shape as
 /// [`spawn_adaptive_difficulty_toggle`].
-fn spawn_fullscreen_toggle(commands: &mut Commands, parent: Entity, enabled: bool, loc: &Localization) {
+fn spawn_fullscreen_toggle(
+    commands: &mut Commands,
+    parent: Entity,
+    enabled: bool,
+    loc: &Localization,
+) {
     let row = commands
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -952,7 +974,12 @@ fn spawn_slider_row(commands: &mut Commands, parent: Entity, label: &str) -> Ent
 /// `spawn_latency_slider` both append after their track — a 50px right-hand
 /// label tagged with whichever marker component that caller's own sync
 /// system reads (`SliderValueLabel`/`LatencySliderLabel`).
-fn spawn_slider_value_label(commands: &mut Commands, row: Entity, text: String, marker: impl Component) {
+fn spawn_slider_value_label(
+    commands: &mut Commands,
+    row: Entity,
+    text: String,
+    marker: impl Component,
+) {
     commands.entity(row).with_children(|r| {
         r.spawn((
             Node {
@@ -989,7 +1016,12 @@ fn spawn_volume_slider<M: 'static>(
         .id();
     commands.entity(row).add_child(track);
 
-    spawn_slider_value_label(commands, row, format!("{:.0}%", value * 100.0), SliderValueLabel(kind));
+    spawn_slider_value_label(
+        commands,
+        row,
+        format!("{:.0}%", value * 100.0),
+        SliderValueLabel(kind),
+    );
 }
 
 /// The volume slider track itself: a `bsn!` `Slider` with its fill, wired to the

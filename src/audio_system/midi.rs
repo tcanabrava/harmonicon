@@ -195,7 +195,11 @@ mod tests {
     fn freq_to_midi_round_trips_through_midi_to_freq_hz() {
         for midi in 21i32..=108 {
             let freq = midi_to_freq_hz(midi as f32);
-            assert_eq!(freq_to_midi(freq), Some(midi), "round trip failed for {midi}");
+            assert_eq!(
+                freq_to_midi(freq),
+                Some(midi),
+                "round trip failed for {midi}"
+            );
         }
     }
 }

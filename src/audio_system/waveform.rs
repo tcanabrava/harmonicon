@@ -70,8 +70,7 @@ pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
 /// `Cargo.toml`'s comment on the `rodio` dependency) since the only WAV
 /// files this ever needs to read are ones this same codebase wrote.
 pub fn analyze_wav_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
-    let Some((samples, channels, sample_rate)) =
-        crate::audio_system::wav::decode_wav_pcm16(bytes)
+    let Some((samples, channels, sample_rate)) = crate::audio_system::wav::decode_wav_pcm16(bytes)
     else {
         return (vec![0.0; buckets], 0.0);
     };
@@ -140,7 +139,9 @@ mod tests {
 
     #[test]
     fn analyze_wav_waveform_reads_a_real_wav_and_its_duration() {
-        let samples: Vec<f32> = (0..44_100).map(|i| ((i % 100) as f32 / 50.0) - 1.0).collect();
+        let samples: Vec<f32> = (0..44_100)
+            .map(|i| ((i % 100) as f32 / 50.0) - 1.0)
+            .collect();
         let wav = crate::audio_system::wav::encode_wav(&samples, 44_100);
         let (waveform, duration) = analyze_wav_waveform(&wav, 8);
         assert_eq!(waveform.len(), 8);

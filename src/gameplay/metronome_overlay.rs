@@ -9,8 +9,8 @@ use bevy::{
 use bevy_fluent::Localization;
 
 use crate::{
-    localization::LocalizationExt,
     app::{AppState, SelectedSong},
+    localization::LocalizationExt,
     settings::AudioSettings,
     song::{SongManifest, chart::Feel},
 };
@@ -131,7 +131,11 @@ pub const fn tick_index(clock: f64, bpm: f64, feel: MetronomeFeel) -> Option<i64
 /// subdivision. In shuffle feel a beat is three triplet-eighths; we click the
 /// beat (sub 0, accented on the downbeat) and the swung "and" (sub 2, softer),
 /// and stay silent on the middle triplet — the classic long-short shuffle.
-pub const fn click_for_tick(tick: i64, beats_per_bar: f64, feel: MetronomeFeel) -> Option<(bool, f32)> {
+pub const fn click_for_tick(
+    tick: i64,
+    beats_per_bar: f64,
+    feel: MetronomeFeel,
+) -> Option<(bool, f32)> {
     match feel {
         MetronomeFeel::Straight => Some((is_downbeat(tick, beats_per_bar), 1.0)),
         MetronomeFeel::Shuffle => match tick.rem_euclid(3) {

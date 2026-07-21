@@ -765,7 +765,90 @@ Manual testing needs a mic, audio out, and a display.
 
 ## Known open items
 
-- Content gap: one bundled example artist (see `TODO.md`).
+- Content: besides the Example Artist gameplay demos, bundled songs now
+  include public-domain melodies (Greensleeves on a G harp, Jesu Joy and
+  the Toccata in D minor on C harps, Für Elise on a C chromatic,
+  "O Pulo da Gaita" transcribed from the Mr. Dirsom harmonica tab score,
+  Amazing Grace, the Hallelujah chorus from Handel's Messiah on a D harp,
+  and Mulher Rendeira). `tests/asset_layout.rs` schema-validates every
+  bundled song chart. Deliberately skipped as still under copyright:
+  Feira de Mangaio (Sivuca/Glorinha Gadelha) and Asa Branca (Luiz
+  Gonzaga/Humberto Teixeira) — chart those yourself via Record mode
+  instead of bundling a transcription.
+- **Song editor color legend**: a third meta-form column
+  (`meta_form::spawn_color_legend`) explains every color the editor uses,
+  grouped by where it appears — note technique colors in the grid
+  (`state::pitch_color`; direction is the ↑/↓ arrow glyph, not a color),
+  the out-of-scale red tint, the selected-note border, drag-ghost valid/
+  invalid, and the timeline/scrollbar colors — deliberately calling out
+  that the scrollbar minimap's blue/orange means blow/draw
+  (`interaction::SCROLLBAR_BLOW_COLOR`/`SCROLLBAR_DRAW_COLOR`), a
+  different meaning than the grid note's blue (which means the Normal
+  technique, regardless of blow/draw). Several colors that were private
+  `const`s or local `let` bindings (`grid::OUT_OF_SCALE_TINT`/
+  `TEMPO_MARKER_COLOR`, `timeline_overlay::SPLIT_LINE_COLOR`/
+  `RANGE_HIGHLIGHT_COLOR`) were widened to `pub(super)` so the legend
+  reuses the exact values instead of duplicating literals that could
+  drift out of sync.
+- **Song editor: selectable scale** (`song::chart::Scale`, a new chart
+  field): the grid's out-of-scale red tint used to always mean "outside
+  the blues scale rooted on the harp key" unconditionally
+  (`blues_scale_classes(&state.key)`); it's now `state.scale.classes(&state.
+  key)`, `state.scale` picked via a combobox (`meta_form::
+  spawn_scale_combobox`) — six options: 1st/2nd/3rd position (the blues
+  hexatonic, same shape as everywhere else, just rooted at the harp key
+  \+0/+7/+2 semitones — the same offsets `Position::interval_below_jam_key`
+  uses for Jam Session's harp-picking, just applied upward from the harp's
+  own key instead of downward from a separate jam key, since a chart has
+  no jam key distinct from its harp) and Major/Minor Pentatonic/Country
+  (alternative *shapes*, always rooted on the harp key — for melodies that
+  aren't blues-vocabulary at all; "Country" = major pentatonic, the
+  scale 2nd-position cross-harp playing reaches without bending, per
+  harmonica-pedagogy convention). `FirstPosition` (the default, used when
+  a chart doesn't set `scale` at all) reproduces the old unconditional-
+  blues behavior exactly — `first_position_matches_blues_scale_classes_
+  exactly` pins this down. `harmonica.scale` is a new, schema-`enum`-
+  validated field (unlike its free-string `position` sibling), added to
+  both `Harmonica::Diatonic`/`::Chromatic`; `CURRENT_FORMAT_VERSION`
+  bumped to 1.2.0 since an older build's stricter schema would otherwise
+  reject a chart that actually sets it with a confusing raw validation
+  error instead of the intended "needs a newer Harmonicon" message — a
+  chart that never sets `scale` needs no version bump, unaffected either
+  way. The combobox itself is spawned once into a reserved
+  `ScaleComboboxSlot` (`spawn_scale_combobox`, a `Without<Children>`
+  spawn-once gate, unlike the MIDI track combobox's rebuild-on-message
+  pattern, since `Scale::all()`'s option list never changes at runtime);
+  Load pushes a different value into the already-spawned combobox by
+  writing `ComboboxValue` directly (`sync_scale_combobox_value`) — the
+  widget's own documented escape hatch for exactly this, `dialogs::
+  combobox`'s always-on `sync_combobox_visuals` picks the change up from
+  there. No existing bundled chart sets `harmonica.scale` — all keep
+  reading as 1st position, i.e. unchanged from before this feature.
+  **`ScaleComboboxSlot` lives in the fixed chrome** (`ui::
+  spawn_fixed_chrome`, above the mod panel — not the scrollable meta form
+  the rest of the fields are in), a deliberate, load-bearing placement:
+  `bevy_ui_widgets::Popover`'s dropdown list must be a literal ECS child of
+  its toggle to compute its own position, and Bevy's UI overflow clipping
+  follows that same ancestry rather than the popover's computed screen
+  position — a combobox nested inside the form's `Overflow::scroll_y()`
+  `ScrollArea` gets its open dropdown clipped to that scroll viewport no
+  matter how high its `GlobalZIndex` is, rendering behind (and stealing
+  clicks from) whatever's in the unclipped fixed chrome instead. The MIDI
+  track combobox has this same latent constraint (it's also inside that
+  `ScrollArea`) but hasn't surfaced as a visible bug yet — if it ever does,
+  the fix is the same: move its slot out of the scrollable area too.
+  **Fixing the clipping surfaced a second, separate bug in `dialogs::
+  combobox` itself, affecting every combobox, not just Scale's**:
+  `Pointer<Click>` auto-propagates up the entity hierarchy (every
+  `bevy_picking` pointer event does, `#[entity_event(propagate =
+  PointerTraversal, auto_propagate)]`) — clicking a dropdown item bubbled
+  the same click up to the toggle button (`list`'s ancestor), whose own
+  `toggle_click` observer then saw the popup `item_click` had *just* closed
+  and immediately reopened it, so picking an item never visually closed
+  the dropdown. Fixed by calling `ev.propagate(false)` in all three of the
+  widget's own click observers (`toggle_click`/`backdrop_click`/
+  `item_click`) — a modal widget shouldn't leak its own clicks to whatever
+  it happens to be nested inside, regardless of this specific bug.
 - **Lessons**: engine, all five primitives, and the full wave 1 + wave 2
   content pass (Units 1–3, 19 lessons) are shipped — see
   `docs/lessons_plan.md`. Left: Unit 4 "jazz", explicitly gated on the 0.6

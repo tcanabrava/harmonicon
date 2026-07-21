@@ -14,9 +14,9 @@ use super::material::EditorNoteMaterial;
 use super::playback::Playhead;
 use super::state::{
     Dir, DragKind, EditorState, Expr, GridNote, Pitch, Scroll, TimelineSelection, VIBRATO_HZ_MAX,
-    VIBRATO_HZ_MIN,
-    VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction, enforce_expr,
-    max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
+    VIBRATO_HZ_MIN, VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, enforce_direction,
+    enforce_expr, max_bend, note_rect, overblow_ok, overdraw_ok, pitch_compatible,
+    pitch_forced_dir,
 };
 use super::ui::{
     GridArea, GridContent, GridScrollMarker, GridScrollThumb, GridScrollTrack, ModButton,

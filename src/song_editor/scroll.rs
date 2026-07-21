@@ -34,7 +34,11 @@ pub(super) fn update_editor_scrollbar_visibility(
         return;
     };
     let needed = area.content_size().y > area.size().y + 1.0;
-    *vis = if needed { Visibility::Visible } else { Visibility::Hidden };
+    *vis = if needed {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
 }
 
 /// A visible vertical scrollbar for `target` (the editor's [`ScrollArea`]),
@@ -74,7 +78,6 @@ pub(super) fn spawn_editor_scrollbar(
             ));
         });
 }
-
 
 /// The form fields the vertical `ScrollArea` scrolls: the meta form, the
 /// lesson form, and the status bar. The grid and mod panel are deliberately

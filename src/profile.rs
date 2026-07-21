@@ -122,7 +122,10 @@ pub fn record_play(
     record.best_score = record.best_score.max(score);
     record.best_accuracy = record.best_accuracy.max(accuracy);
     for &(name, acc) in technique_accuracy {
-        let best = record.technique_best_accuracy.entry(name.into()).or_default();
+        let best = record
+            .technique_best_accuracy
+            .entry(name.into())
+            .or_default();
         if acc > *best {
             *best = acc;
         }

@@ -69,7 +69,10 @@ fn tint_reddens_toward_zero_and_greens_toward_one() {
     let weak = progress_tint(Some(0.0)).to_srgba();
     let strong = progress_tint(Some(1.0)).to_srgba();
     assert!(weak.red > weak.green, "0% accuracy should read as red");
-    assert!(strong.green > strong.red, "100% accuracy should read as green");
+    assert!(
+        strong.green > strong.red,
+        "100% accuracy should read as green"
+    );
     // Never attempted stays visually distinct from a 0%-accuracy target.
     assert_ne!(progress_tint(Some(0.0)), progress_tint(None));
 }
@@ -120,7 +123,13 @@ fn stats_round_trip_through_the_profile_shape() {
 
     let profile = stats_to_profile(&stats);
     assert_eq!(profile.len(), 2);
-    assert_eq!(profile["2:bend1"], DrillRecord { attempts: 5, hits: 3 });
+    assert_eq!(
+        profile["2:bend1"],
+        DrillRecord {
+            attempts: 5,
+            hits: 3
+        }
+    );
 
     let restored = stats_from_profile(&profile);
     assert_eq!(restored.len(), 2);
@@ -154,7 +163,11 @@ fn unparsable_profile_entries_are_dropped_not_fatal() {
         },
     );
     let stats = stats_from_profile(&profile);
-    assert_eq!(stats.len(), 1, "only the one well-formed entry should survive");
+    assert_eq!(
+        stats.len(),
+        1,
+        "only the one well-formed entry should survive"
+    );
     assert!(stats.contains_key(&(2, Technique::Bend1)));
 }
 

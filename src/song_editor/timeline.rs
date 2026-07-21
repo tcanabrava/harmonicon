@@ -47,7 +47,7 @@ use super::state::{
     EditorState, Mode, Scroll, Side, TimelineDrag, TimelineSelection, TimelineTool, erase_range,
     normalize_range, remove_range, split_side_range, toggle_tempo_point,
 };
-use super::{BEATS_PER_BAR, BEAT_W, TICKS_PER_BEAT, TICK_W};
+use super::{BEAT_W, BEATS_PER_BAR, TICK_W, TICKS_PER_BEAT};
 use crate::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use crate::localization::LocalizationExt;
 
@@ -126,7 +126,7 @@ fn describe_tick(tick: usize) -> String {
     format!("{bar}.{beat_in_bar}")
 }
 
-pub (super) fn request_confirm(
+pub(super) fn request_confirm(
     state: &mut EditorState,
     loc: &Localization,
     open: &mut MessageWriter<OpenConfirmDialog>,
@@ -145,7 +145,10 @@ pub (super) fn request_confirm(
     };
     state.pending_timeline_op = Some((tool, start, end));
     let message = loc
-        .msg_args(key, &[("from", describe_tick(start)), ("to", describe_tick(end))])
+        .msg_args(
+            key,
+            &[("from", describe_tick(start)), ("to", describe_tick(end))],
+        )
         .to_string();
     open.write(OpenConfirmDialog {
         purpose: TIMELINE_CONFIRM_PURPOSE,
@@ -303,10 +306,7 @@ pub(super) fn on_timeline_drag(
 /// dropping the scrolled-to extent from the selection. Same math as
 /// [`on_timeline_drag`], fed the stored [`TimelineDrag::pointer_px`]
 /// (already scale-corrected, hence the `1.0`) instead of a fresh event.
-pub(super) fn sync_selection_with_scroll(
-    scroll: Res<Scroll>,
-    mut sel: ResMut<TimelineSelection>,
-) {
+pub(super) fn sync_selection_with_scroll(scroll: Res<Scroll>, mut sel: ResMut<TimelineSelection>) {
     if !scroll.is_changed() {
         return;
     }

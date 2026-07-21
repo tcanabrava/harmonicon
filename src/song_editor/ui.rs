@@ -513,4 +513,3 @@ fn spawn_fixed_chrome(
 
     spawn_mod_panel(root, loc, colors, mode);
 }
-

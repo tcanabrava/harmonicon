@@ -160,15 +160,27 @@ pub(super) fn update_mode_visibility(
     state: Res<EditorState>,
     mut edit_group: Query<
         &mut Node,
-        (With<EditModeGroup>, Without<RecordModeGroup>, Without<PlayModeGroup>),
+        (
+            With<EditModeGroup>,
+            Without<RecordModeGroup>,
+            Without<PlayModeGroup>,
+        ),
     >,
     mut record_group: Query<
         &mut Node,
-        (With<RecordModeGroup>, Without<EditModeGroup>, Without<PlayModeGroup>),
+        (
+            With<RecordModeGroup>,
+            Without<EditModeGroup>,
+            Without<PlayModeGroup>,
+        ),
     >,
     mut play_group: Query<
         &mut Node,
-        (With<PlayModeGroup>, Without<EditModeGroup>, Without<RecordModeGroup>),
+        (
+            With<PlayModeGroup>,
+            Without<EditModeGroup>,
+            Without<RecordModeGroup>,
+        ),
     >,
 ) {
     let display = |on: bool| if on { Display::Flex } else { Display::None };
@@ -190,17 +202,18 @@ pub(super) fn update_technique_button_visibility(
     state: Res<EditorState>,
     mut buttons: Query<(&ModButton, &mut Node)>,
 ) {
-    let diatonic_only = matches!(
-        state.harmonica_kind,
-        HarmonicaKind::Diatonic
-    );
+    let diatonic_only = matches!(state.harmonica_kind, HarmonicaKind::Diatonic);
     for (kind, mut node) in &mut buttons {
         let visible = match kind {
             ModButton::Bend | ModButton::Overblow | ModButton::Overdraw => diatonic_only,
             ModButton::Slide => !diatonic_only,
             _ => continue,
         };
-        node.display = if visible { Display::Flex } else { Display::None };
+        node.display = if visible {
+            Display::Flex
+        } else {
+            Display::None
+        };
     }
 }
 
@@ -265,8 +278,8 @@ pub(super) fn update_status_bar(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::state::GridNote;
+    use super::*;
 
     fn note(dir: Dir, pitch: Pitch, expr: Expr) -> GridNote {
         GridNote {
@@ -374,10 +387,16 @@ mod tests {
         schedule.add_systems(update_mod_panel);
         schedule.run(&mut world);
 
-        assert_eq!(world.get::<BackgroundColor>(blow).unwrap().0, colors.btn_active);
+        assert_eq!(
+            world.get::<BackgroundColor>(blow).unwrap().0,
+            colors.btn_active
+        );
         assert_eq!(world.get::<BackgroundColor>(draw).unwrap().0, colors.btn_bg);
         assert_eq!(world.get::<BackgroundColor>(bend).unwrap().0, colors.btn_bg);
-        assert_eq!(*world.get::<Visibility>(bend_dot).unwrap(), Visibility::Hidden);
+        assert_eq!(
+            *world.get::<Visibility>(bend_dot).unwrap(),
+            Visibility::Hidden
+        );
     }
 
     #[test]
@@ -416,9 +435,18 @@ mod tests {
         schedule.add_systems(update_mod_panel);
         schedule.run(&mut world);
 
-        assert_eq!(world.get::<BackgroundColor>(draw).unwrap().0, colors.btn_active);
-        assert_eq!(world.get::<BackgroundColor>(bend).unwrap().0, colors.btn_active);
-        assert_eq!(world.get::<BackgroundColor>(wah).unwrap().0, colors.btn_active);
+        assert_eq!(
+            world.get::<BackgroundColor>(draw).unwrap().0,
+            colors.btn_active
+        );
+        assert_eq!(
+            world.get::<BackgroundColor>(bend).unwrap().0,
+            colors.btn_active
+        );
+        assert_eq!(
+            world.get::<BackgroundColor>(wah).unwrap().0,
+            colors.btn_active
+        );
         assert_eq!(
             *world.get::<Visibility>(bend_dot).unwrap(),
             Visibility::Inherited
@@ -508,7 +536,10 @@ mod tests {
         schedule.run(&mut world);
 
         assert_eq!(world.get::<BackgroundColor>(edit).unwrap().0, colors.btn_bg);
-        assert_eq!(world.get::<BackgroundColor>(record).unwrap().0, colors.btn_bg);
+        assert_eq!(
+            world.get::<BackgroundColor>(record).unwrap().0,
+            colors.btn_bg
+        );
         assert_eq!(
             world.get::<BackgroundColor>(play).unwrap().0,
             colors.btn_active
@@ -539,7 +570,10 @@ mod tests {
         schedule.add_systems(update_mode_visibility);
         schedule.run(&mut world);
 
-        assert_eq!(world.get::<Node>(edit_group).unwrap().display, Display::None);
+        assert_eq!(
+            world.get::<Node>(edit_group).unwrap().display,
+            Display::None
+        );
         assert_eq!(
             world.get::<Node>(record_group).unwrap().display,
             Display::None
@@ -703,9 +737,6 @@ mod tests {
         // `Localization::default()` has no bundle loaded, so `loc.msg_args`
         // falls back to returning the key itself — just confirm it picked
         // the recording branch over the (also-set) practice message.
-        assert_eq!(
-            world.get::<Text>(status).unwrap().0,
-            "editor-record-status"
-        );
+        assert_eq!(world.get::<Text>(status).unwrap().0, "editor-record-status");
     }
 }

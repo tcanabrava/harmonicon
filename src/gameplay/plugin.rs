@@ -13,12 +13,6 @@ use crate::jam::{call_response as jam_call_response, improv, session as jam_sess
 use crate::menu::tutorial::tour_active;
 use crate::settings::AudioSettings;
 
-use super::{
-    adaptive_difficulty, bending_trainer, call_response, countdown_overlay, gameplay_2d,
-    gameplay_3d, harmonica_overlay, metronome_overlay, modifier_legend, note_tail_2d,
-    note_tail_3d, pause_menu, phrase_overlay, results, song_progress_overlay,
-    twelve_bar_blues_overlay, wait_freeze_overlay,
-};
 use super::bars::{self, AbsoluteBar, BarChanged, CurrentBar};
 use super::clock::{self, GameplayClock};
 use super::hud;
@@ -28,6 +22,12 @@ use super::notes::SongNotes;
 use super::state::{
     ActivePitches, ActiveTargets, HitFeedback, LoopConfig, MusicStarted, NoteScored, Paused,
     PitchGate, Score, ScoringConfig, SongEnd, SongStats, ValidHarpNotes, collect_pitches,
+};
+use super::{
+    adaptive_difficulty, bending_trainer, call_response, countdown_overlay, gameplay_2d,
+    gameplay_3d, harmonica_overlay, metronome_overlay, modifier_legend, note_tail_2d, note_tail_3d,
+    pause_menu, phrase_overlay, results, song_progress_overlay, twelve_bar_blues_overlay,
+    wait_freeze_overlay,
 };
 
 pub struct GameplayPlugin;
@@ -120,7 +120,10 @@ impl Plugin for GameplayPlugin {
         .add_systems(OnEnter(AppState::BendingTrainer), bending_trainer::setup)
         .add_systems(
             OnExit(AppState::BendingTrainer),
-            (lifecycle::cleanup_gameplay, bending_trainer::save_drill_progress),
+            (
+                lifecycle::cleanup_gameplay,
+                bending_trainer::save_drill_progress,
+            ),
         )
         .add_systems(
             Update,
@@ -207,13 +210,15 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             gameplay_2d::resync_notes_on_adaptive_change.run_if(
-                in_state(AppState::Playing).and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
+                in_state(AppState::Playing)
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
             ),
         )
         .add_systems(
             Update,
             gameplay_3d::resync_notes_on_adaptive_change.run_if(
-                in_state(AppState::Playing).and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
+                in_state(AppState::Playing)
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
             ),
         )
         // Gameplay-logic chains only run when not paused. This set ticks the

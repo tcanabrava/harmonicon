@@ -161,7 +161,11 @@ impl Plugin for AssetsManagementPlugin {
             )
             .add_systems(
                 Update,
-                (watch::process_external_folder_events, rescan_on_external_change).chain(),
+                (
+                    watch::process_external_folder_events,
+                    rescan_on_external_change,
+                )
+                    .chain(),
             );
     }
 }
@@ -332,7 +336,7 @@ pub fn scan_artist_song(
         }
 
         // The files for the music are inside of `song` subdirectory.
-        let song_file = (||{
+        let song_file = (|| {
             for song_file in std::fs::read_dir(song_dir.path().join("song")).ok()? {
                 let entry = song_file.ok()?;
                 let path = entry.path();

@@ -108,7 +108,12 @@ fn set_practice_speed(ev: On<ValueChange<f32>>, mut speed: ResMut<PracticeSpeed>
 /// [`PracticeSpeed`]. The track is a `bsn!` `Slider`; the label/readout stay
 /// imperative like every other pause-menu readout (custom font, which `bsn!`
 /// can't set in 0.19).
-fn spawn_practice_speed_row(commands: &mut Commands, parent: Entity, loc: &Localization, value: f32) {
+fn spawn_practice_speed_row(
+    commands: &mut Commands,
+    parent: Entity,
+    loc: &Localization,
+    value: f32,
+) {
     let row = commands
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -544,7 +549,10 @@ pub(super) fn setup_pause_menu(
         .unwrap_or(0.0);
     let phrase_text = phrase_selector_text(
         &loc,
-        adaptive.sections.get(selected_phrase.0).map(|s| s.name.as_str()),
+        adaptive
+            .sections
+            .get(selected_phrase.0)
+            .map(|s| s.name.as_str()),
         learned,
     );
 
@@ -587,8 +595,10 @@ pub(super) fn setup_pause_menu(
             },
             TextColor(Color::WHITE),
         ));
-        col.spawn_empty().apply_scene(button::default("Resume", on_resume));
-        col.spawn_empty().apply_scene(button::default("Restart", on_restart));
+        col.spawn_empty()
+            .apply_scene(button::default("Resume", on_resume));
+        col.spawn_empty()
+            .apply_scene(button::default("Restart", on_restart));
         col.spawn_empty()
             .apply_scene(button::default(&loc.msg("pause-quit-song"), on_quit));
         if is_lesson_jam {
@@ -894,7 +904,12 @@ mod tests {
 
     // ── jam_fraction_for ─────────────────────────────────────────────────────
 
-    fn stats(chord_tone: u32, in_scale: u32, out_of_scale: u32, rest_violations: u32) -> ImprovStats {
+    fn stats(
+        chord_tone: u32,
+        in_scale: u32,
+        out_of_scale: u32,
+        rest_violations: u32,
+    ) -> ImprovStats {
         ImprovStats {
             chord_tone,
             in_scale,
@@ -1022,7 +1037,10 @@ mod tests {
     #[test]
     fn loop_label_is_off_by_default() {
         let loc = Localization::default();
-        assert_eq!(loop_label_text(&loc, &LoopConfig::default()), "pause-loop-off");
+        assert_eq!(
+            loop_label_text(&loc, &LoopConfig::default()),
+            "pause-loop-off"
+        );
     }
 
     #[test]

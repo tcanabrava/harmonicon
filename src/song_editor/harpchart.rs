@@ -383,8 +383,11 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
                 &editor_tempo_map,
             ) - start_secs;
             let duration_secs = phrase["duration"].as_f64().unwrap_or(default_beat_secs);
-            let end_tick =
-                seconds_to_tick(start_secs + duration_secs, TICKS_PER_BEAT as u32, &editor_tempo_map);
+            let end_tick = seconds_to_tick(
+                start_secs + duration_secs,
+                TICKS_PER_BEAT as u32,
+                &editor_tempo_map,
+            );
             let len = (end_tick as usize).saturating_sub(start_tick).max(1);
 
             let events = phrase["events"].as_array().unwrap_or(&empty);
@@ -553,10 +556,8 @@ fn save_midi_backing(
 
     match super::midi_import::render_backing_pcm(&midi.bytes, track_index) {
         Ok((_bpm, pcm)) => {
-            let wav = crate::audio_system::wav::encode_wav(
-                &pcm,
-                crate::audio_system::synth::SAMPLE_RATE,
-            );
+            let wav =
+                crate::audio_system::wav::encode_wav(&pcm, crate::audio_system::synth::SAMPLE_RATE);
             let out = dir.join("music.wav");
             match std::fs::write(&out, &wav) {
                 Ok(()) => {

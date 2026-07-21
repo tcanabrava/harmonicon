@@ -11,7 +11,9 @@ use bevy::picking::Pickable;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
-use super::state::{EditorState, Side, TimelineDrag, TimelineSelection, normalize_range, split_side_range};
+use super::state::{
+    EditorState, Side, TimelineDrag, TimelineSelection, normalize_range, split_side_range,
+};
 use super::timeline::{
     TimelineSurface, TimelineSurfaceGeometry, on_timeline_click_seek, on_timeline_click_tempo,
     on_timeline_drag, on_timeline_drag_end, on_timeline_drag_start,
@@ -142,13 +144,18 @@ pub(super) fn update_timeline_overlays(
         *vis = Visibility::Inherited;
     }
 
-    let Some(hover) = surfaces.iter().find_map(|(geom, rel)| {
-        rel.normalized.map(|n| geom.tick_at(n.x))
-    }) else {
+    let Some(hover) = surfaces
+        .iter()
+        .find_map(|(geom, rel)| rel.normalized.map(|n| geom.tick_at(n.x)))
+    else {
         hide(&mut highlights);
         return;
     };
-    let side = if hover < split { Side::Left } else { Side::Right };
+    let side = if hover < split {
+        Side::Left
+    } else {
+        Side::Right
+    };
     let (start, end) = split_side_range(split, side, &state.notes);
     set_highlight(&mut highlights, start, end.max(start + 1));
 }

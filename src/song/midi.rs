@@ -186,7 +186,10 @@ mod tests {
 
     #[test]
     fn track_name_of_reads_the_first_track_name_event() {
-        let track = vec![meta(0, MetaMessage::TrackName(b"Bass")), note_on(0, 60, 100)];
+        let track = vec![
+            meta(0, MetaMessage::TrackName(b"Bass")),
+            note_on(0, 60, 100),
+        ];
         assert_eq!(track_name_of(&track).as_deref(), Some("Bass"));
     }
 
@@ -224,7 +227,10 @@ mod tests {
     #[test]
     fn collect_tempo_map_collects_and_sorts_changes_across_tracks() {
         let bytes = smf_bytes(vec![
-            vec![meta(100, MetaMessage::Tempo(midly::num::u24::from(300_000)))],
+            vec![meta(
+                100,
+                MetaMessage::Tempo(midly::num::u24::from(300_000)),
+            )],
             vec![meta(0, MetaMessage::Tempo(midly::num::u24::from(500_000)))],
         ]);
         let smf = Smf::parse(&bytes).unwrap();

@@ -20,6 +20,7 @@ use bevy::picking::events::{Click, Out, Over, Pointer};
 use bevy::prelude::*;
 use bevy_fluent::Localization;
 
+use crate::app::AppState;
 use crate::audio_system::midi::{next_key, prev_key};
 use crate::audio_system::pitch_detect::{PITCH_RANGE_MARGIN_SEMITONES, PitchRange};
 use crate::audio_system::wav::encode_wav;
@@ -27,7 +28,6 @@ use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_expl
 use crate::dialogs::button;
 use crate::dialogs::combobox;
 use crate::localization::LocalizationExt;
-use crate::app::AppState;
 use crate::profile::{DrillRecord, PlayerProfile};
 use crate::settings::AudioSettings;
 use crate::song::harmonica::{Harmonica, HoleNotes, hole_notes, richter_harp};
@@ -557,22 +557,25 @@ pub fn setup(
     // column itself so it sits in that column's normal vertical flow.
     let root_id = root_ec.id();
     root_ec.with_children(|root| {
-            // ── Left half: everything but the harmonica itself ───────────────
-            let mut left_ec = root.spawn(Node {
-                width: Val::Percent(50.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(18.0),
-                padding: UiRect::all(Val::Px(16.0)),
-                ..default()
-            });
-            let left_id = left_ec.id();
-            left_ec.with_children(|left| {
+        // ── Left half: everything but the harmonica itself ───────────────
+        let mut left_ec = root.spawn(Node {
+            width: Val::Percent(50.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            row_gap: Val::Px(18.0),
+            padding: UiRect::all(Val::Px(16.0)),
+            ..default()
+        });
+        let left_id = left_ec.id();
+        left_ec.with_children(|left| {
             left.spawn((
                 Text::new(String::from(loc.msg("bending-trainer"))),
-                TextFont { font_size: FontSize::Px(26.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(26.0),
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ));
 
@@ -586,24 +589,29 @@ pub fn setup(
             .with_children(|row| {
                 row.spawn_empty().apply_scene(button::small(
                     "\u{25C2}",
-                    |_: On<Pointer<Click>>,
-                     mut key: ResMut<TrainerKey>| {
+                    |_: On<Pointer<Click>>, mut key: ResMut<TrainerKey>| {
                         key.0 = prev_key(&key.0);
                     },
                 ));
                 row.spawn((
-                    Node { width: Val::Px(110.0), justify_content: JustifyContent::Center, ..default() },
+                    Node {
+                        width: Val::Px(110.0),
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
                     Text::new(String::from(
                         loc.msg_args("bending-key-label", &[("key", key.0.clone())]),
                     )),
-                    TextFont { font_size: FontSize::Px(20.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(20.0),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.95, 0.80, 0.35)),
                     KeyLabel,
                 ));
                 row.spawn_empty().apply_scene(button::small(
                     "\u{25B8}",
-                    |_: On<Pointer<Click>>,
-                     mut key: ResMut<TrainerKey>| {
+                    |_: On<Pointer<Click>>, mut key: ResMut<TrainerKey>| {
                         key.0 = next_key(&key.0);
                     },
                 ));
@@ -633,9 +641,16 @@ pub fn setup(
             })
             .with_children(|row| {
                 row.spawn((
-                    Node { width: Val::Px(220.0), justify_content: JustifyContent::Center, ..default() },
+                    Node {
+                        width: Val::Px(220.0),
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
                     Text::new(target_label_text(target.hole, target.technique)),
-                    TextFont { font_size: FontSize::Px(16.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(16.0),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.80, 0.90, 0.95)),
                     TargetLabel,
                 ));
@@ -647,8 +662,12 @@ pub fn setup(
                      mut sources: ResMut<Assets<AudioSource>>,
                      mut commands: Commands| {
                         let harp = richter_harp(&key.0);
-                        let Some(note) = target_note(&harp, *target) else { return };
-                        let Some(freq) = note_freq_hz(&note) else { return };
+                        let Some(note) = target_note(&harp, *target) else {
+                            return;
+                        };
+                        let Some(freq) = note_freq_hz(&note) else {
+                            return;
+                        };
                         let wav = synth_reference_tone(freq);
                         let handle = sources.add(AudioSource { bytes: wav.into() });
                         commands.spawn((
@@ -661,7 +680,10 @@ pub fn setup(
 
             left.spawn((
                 Text::new(""),
-                TextFont { font_size: FontSize::Px(15.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.55, 0.85, 0.60)),
                 TunerReadout,
             ));
@@ -686,7 +708,9 @@ pub fn setup(
                             drill.elapsed_secs = 0.0;
                             if drill.enabled {
                                 let harp = richter_harp(&key.0);
-                                if let Some(next) = pick_next_target(&harp, &drill.stats, Some(*target)) {
+                                if let Some(next) =
+                                    pick_next_target(&harp, &drill.stats, Some(*target))
+                                {
                                     *target = next;
                                 }
                             }
@@ -696,7 +720,10 @@ pub fn setup(
                     .observe(hide_drill_explanation);
                 row.spawn((
                     Text::new(String::from(loc.msg("bending-drill-off"))),
-                    TextFont { font_size: FontSize::Px(15.0), ..default() },
+                    TextFont {
+                        font_size: FontSize::Px(15.0),
+                        ..default()
+                    },
                     TextColor(Color::srgb(0.70, 0.70, 0.80)),
                     DrillLabel,
                 ));
@@ -712,8 +739,7 @@ pub fn setup(
             .with_children(|row| {
                 row.spawn_empty().apply_scene(button::small(
                     "\u{2212}",
-                    |_: On<Pointer<Click>>,
-                     mut tempo: ResMut<MetronomeTempo>| {
+                    |_: On<Pointer<Click>>, mut tempo: ResMut<MetronomeTempo>| {
                         tempo.bpm = (tempo.bpm - BPM_STEP).max(MIN_BPM);
                     },
                 ));
@@ -728,8 +754,7 @@ pub fn setup(
                 });
                 row.spawn_empty().apply_scene(button::small(
                     "+",
-                    |_: On<Pointer<Click>>,
-                     mut tempo: ResMut<MetronomeTempo>| {
+                    |_: On<Pointer<Click>>, mut tempo: ResMut<MetronomeTempo>| {
                         tempo.bpm = (tempo.bpm + BPM_STEP).min(MAX_BPM);
                     },
                 ));
@@ -737,7 +762,10 @@ pub fn setup(
 
             left.spawn((
                 Text::new(String::from(loc.msg("bending-hint"))),
-                TextFont { font_size: FontSize::Px(15.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.55, 0.55, 0.65)),
             ));
 
@@ -753,34 +781,36 @@ pub fn setup(
                     next_state.set(AppState::Menu);
                 },
             ));
-            });
+        });
 
-            // ── Right half: the harmonica — bend diagram + its explanatory
-            // text, the same grouping `jam::session::setup` uses for its own
-            // harmonica column.
-            root.spawn(Node {
-                width: Val::Percent(50.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(10.0),
-                padding: UiRect::all(Val::Px(16.0)),
-                ..default()
-            })
-            .with_children(|right| {
-                // The bend diagram (rebuilt on key change).
-                right.spawn((Node::default(), OverlayHost))
-                    .with_children(|host| {
-                        spawn_harmonica_overlay_selectable(
-                            host,
-                            &richter_harp(&key.0),
-                            on_diagram_cell_clicked,
-                            &loc,
-                        );
-                    });
+        // ── Right half: the harmonica — bend diagram + its explanatory
+        // text, the same grouping `jam::session::setup` uses for its own
+        // harmonica column.
+        root.spawn(Node {
+            width: Val::Percent(50.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            row_gap: Val::Px(10.0),
+            padding: UiRect::all(Val::Px(16.0)),
+            ..default()
+        })
+        .with_children(|right| {
+            // The bend diagram (rebuilt on key change).
+            right
+                .spawn((Node::default(), OverlayHost))
+                .with_children(|host| {
+                    spawn_harmonica_overlay_selectable(
+                        host,
+                        &richter_harp(&key.0),
+                        on_diagram_cell_clicked,
+                        &loc,
+                    );
+                });
 
-                right.spawn(Node {
+            right
+                .spawn(Node {
                     flex_direction: FlexDirection::Column,
                     width: Val::Px(280.0),
                     row_gap: Val::Px(8.0),
@@ -788,26 +818,35 @@ pub fn setup(
                 })
                 .with_children(|col| {
                     col.spawn((
-                        Node { padding: UiRect::all(Val::Px(8.0)), ..default() },
+                        Node {
+                            padding: UiRect::all(Val::Px(8.0)),
+                            ..default()
+                        },
                         BackgroundColor(Color::srgba(0.10, 0.10, 0.14, 0.85)),
                     ))
                     .with_children(|p| {
                         p.spawn((
                             Text::new(technique_hint(target.technique, target.hole)),
-                            TextFont { font_size: FontSize::Px(15.0), ..default() },
+                            TextFont {
+                                font_size: FontSize::Px(15.0),
+                                ..default()
+                            },
                             TextColor(Color::srgb(0.75, 0.75, 0.85)),
                             HintLabel,
                         ));
                     });
                     col.spawn((
                         Text::new(""),
-                        TextFont { font_size: FontSize::Px(15.0), ..default() },
+                        TextFont {
+                            font_size: FontSize::Px(15.0),
+                            ..default()
+                        },
                         TextColor(Color::srgb(0.60, 0.60, 0.70)),
                         DrillExplanation,
                     ));
                 });
-            });
         });
+    });
 }
 
 /// Advance the trainer's own clock (no song to drive it).

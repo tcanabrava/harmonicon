@@ -398,15 +398,13 @@ pub(super) fn rebuild_grid(
 
     for (start, end) in silence_gaps(&state.notes) {
         if start < last_tick && end > first_tick {
-            let duration_secs = crate::song::chart::tick_to_seconds(
-                end as u64,
-                TICKS_PER_BEAT as u32,
-                &tempo_map,
-            ) - crate::song::chart::tick_to_seconds(
-                start as u64,
-                TICKS_PER_BEAT as u32,
-                &tempo_map,
-            );
+            let duration_secs =
+                crate::song::chart::tick_to_seconds(end as u64, TICKS_PER_BEAT as u32, &tempo_map)
+                    - crate::song::chart::tick_to_seconds(
+                        start as u64,
+                        TICKS_PER_BEAT as u32,
+                        &tempo_map,
+                    );
             items.push(spawn_silence_gap(
                 &mut commands,
                 start,

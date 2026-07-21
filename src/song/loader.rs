@@ -269,7 +269,8 @@ fn generate_background_image(seed: &str) -> Image {
     let top = Color::hsl(hue, 0.35, 0.16).to_srgba();
     let bottom = Color::hsl((hue + 40.0) % 360.0, 0.35, 0.06).to_srgba();
 
-    let mut data = Vec::with_capacity((GENERATED_BACKGROUND_SIZE * GENERATED_BACKGROUND_SIZE * 4) as usize);
+    let mut data =
+        Vec::with_capacity((GENERATED_BACKGROUND_SIZE * GENERATED_BACKGROUND_SIZE * 4) as usize);
     for y in 0..GENERATED_BACKGROUND_SIZE {
         let t = y as f32 / (GENERATED_BACKGROUND_SIZE - 1) as f32;
         let pixel = [

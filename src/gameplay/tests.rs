@@ -11,8 +11,8 @@ use crate::scoring::{combo_label, compute_multiplier};
 use crate::settings::AudioSettings;
 use crate::song::chart::Modifier;
 
-use super::*;
 use super::lifecycle::cleanup_gameplay;
+use super::*;
 
 // ── TechniqueStats / SongStats::record_technique ───────────────────────
 
@@ -544,8 +544,7 @@ fn timestamped_sine(
     (0..n)
         .map(|i| {
             let t = i as f64 * dt;
-            let v =
-                offset + amplitude * (2.0 * std::f32::consts::PI * freq_hz * t as f32).sin();
+            let v = offset + amplitude * (2.0 * std::f32::consts::PI * freq_hz * t as f32).sin();
             (t, v)
         })
         .collect()
@@ -794,13 +793,15 @@ fn clean_attack_test_world(active: Vec<PitchInfo>) -> World {
 
 #[test]
 fn score_notes_counts_a_solo_pitch_as_a_clean_attack() {
-    let mut world =
-        clean_attack_test_world(vec![pitch_info(60, "C", 4, midi_to_freq_hz(60.0))]);
+    let mut world = clean_attack_test_world(vec![pitch_info(60, "C", 4, midi_to_freq_hz(60.0))]);
     let mut schedule = Schedule::default();
     schedule.add_systems(score_notes);
     schedule.run(&mut world);
 
-    assert!(world.resource::<SongNotes>().notes[0].hit, "should still hit");
+    assert!(
+        world.resource::<SongNotes>().notes[0].hit,
+        "should still hit"
+    );
     let stats = world.resource::<SongStats>();
     assert_eq!(stats.clean_attack.hits, 1);
     assert_eq!(stats.clean_attack.misses, 0);
@@ -885,10 +886,20 @@ fn score_notes_hits_both_chord_notes_when_both_pitches_sound_together() {
     schedule.run(&mut world);
 
     let notes = &world.resource::<SongNotes>().notes;
-    assert!(notes[0].hit, "60 should hit — both pitches sounded together");
-    assert!(notes[1].hit, "64 should hit — both pitches sounded together");
+    assert!(
+        notes[0].hit,
+        "60 should hit — both pitches sounded together"
+    );
+    assert!(
+        notes[1].hit,
+        "64 should hit — both pitches sounded together"
+    );
     let stats = world.resource::<SongStats>();
-    assert_eq!(stats.clean_attack.total(), 0, "chord notes aren't clean-attack notes");
+    assert_eq!(
+        stats.clean_attack.total(),
+        0,
+        "chord notes aren't clean-attack notes"
+    );
 }
 
 #[test]
@@ -973,7 +984,10 @@ fn update_score_display_only_writes_text_when_score_moved() {
     );
     assert_eq!(world.get::<Text>(feedback_entity).unwrap().0, "PERFECT!");
     let color = world.get::<TextColor>(feedback_entity).unwrap();
-    assert!(color.0.alpha() > 0.0, "the feedback flash should be visible right after a fresh hit");
+    assert!(
+        color.0.alpha() > 0.0,
+        "the feedback flash should be visible right after a fresh hit"
+    );
 }
 
 // ── notes_needing_spawn (windowed rendering) ─────────────────────────────

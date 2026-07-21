@@ -588,7 +588,10 @@ mod tests {
         for tick in [0u64, 240, 480, 960, 1200, 1440] {
             let secs = tick_to_seconds(tick, 480, &map);
             let round_tripped = seconds_to_tick(secs, 480, &map);
-            assert_eq!(round_tripped, tick, "tick {tick} -> {secs}s -> {round_tripped}");
+            assert_eq!(
+                round_tripped, tick,
+                "tick {tick} -> {secs}s -> {round_tripped}"
+            );
         }
     }
 

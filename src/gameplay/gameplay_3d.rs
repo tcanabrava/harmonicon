@@ -6,12 +6,12 @@ use bevy::prelude::*;
 use bevy_fluent::Localization;
 
 use crate::{
+    app::SelectedSong,
     assets_management::{
         HarmonicaModelConfig, HoleConfig, SelectedHarmonicaModel, SelectedNoteTheme3d,
         ShowNoteNumbers,
     },
     localization::LocalizationExt,
-    app::SelectedSong,
     song::NoteCube3dConfig,
     song::SongManifest,
     song::chart::{Action, HarpChart},
@@ -767,17 +767,24 @@ fn spawn_hud_overlay(
     loc: &Localization,
 ) {
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
-    let info = String::from(loc.msg_args(
-        "gameplay-chart-info",
-        &[
-            ("key", key.to_string()),
-            ("bpm", (chart.song.tempo_bpm as u32).to_string()),
-            (
-                "time_sig",
-                chart.song.time_signature.as_deref().unwrap_or("4/4").to_string(),
-            ),
-        ],
-    ));
+    let info = String::from(
+        loc.msg_args(
+            "gameplay-chart-info",
+            &[
+                ("key", key.to_string()),
+                ("bpm", (chart.song.tempo_bpm as u32).to_string()),
+                (
+                    "time_sig",
+                    chart
+                        .song
+                        .time_signature
+                        .as_deref()
+                        .unwrap_or("4/4")
+                        .to_string(),
+                ),
+            ],
+        ),
+    );
     let harp_info = chart.harmonica.display();
     let description = chart
         .metadata
@@ -1168,7 +1175,15 @@ pub fn update_holes_3d(
             .find(|(h, _)| *h == cell.0)
             .map(|(_, b)| *b);
 
-        super::gameplay_2d::step_hole_glow(&mut state, blow, draw, hint, &harp_pitches, attack, decay);
+        super::gameplay_2d::step_hole_glow(
+            &mut state,
+            blow,
+            draw,
+            hint,
+            &harp_pitches,
+            attack,
+            decay,
+        );
         let b = state.brightness;
 
         if let Some(mut mat) = materials.get_mut(&hole_mat.0) {

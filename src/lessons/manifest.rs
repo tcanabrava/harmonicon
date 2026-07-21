@@ -95,10 +95,9 @@ mod tests {
 
     #[test]
     fn parses_a_minimal_instructional_lesson() {
-        let m = parse_lesson(
-            br#"{"id":"twelve-bar","unit":"rhythm","title_key":"t","body_key":"b"}"#,
-        )
-        .unwrap();
+        let m =
+            parse_lesson(br#"{"id":"twelve-bar","unit":"rhythm","title_key":"t","body_key":"b"}"#)
+                .unwrap();
         assert_eq!(m.id, "twelve-bar");
         assert_eq!(m.chart, None);
         assert!(m.prerequisites.is_empty());
@@ -223,10 +222,9 @@ mod tests {
     fn rejects_an_unknown_field() {
         // additionalProperties: false — typos in hand-authored manifests must
         // fail loudly, not silently no-op.
-        let err = parse_lesson(
-            br#"{"id":"x","unit":"u","title_key":"t","body_key":"b","chrat":"oops"}"#,
-        )
-        .unwrap_err();
+        let err =
+            parse_lesson(br#"{"id":"x","unit":"u","title_key":"t","body_key":"b","chrat":"oops"}"#)
+                .unwrap_err();
         assert!(err.contains("chrat"), "unexpected error: {err}");
     }
 

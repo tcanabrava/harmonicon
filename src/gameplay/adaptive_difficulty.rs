@@ -146,7 +146,11 @@ pub const PHRASE_LEARN_STEP: f32 = 0.25;
 /// entries (new sections start at 0.0, same as a song's first-ever play).
 /// Sections with no notes seen this run (e.g. a partial/looped play that
 /// never reached them) are left untouched — nothing to judge a clear from.
-pub fn bump_learned_sections(notes: &[ScheduledNote], section_count: usize, learned: &mut Vec<f32>) {
+pub fn bump_learned_sections(
+    notes: &[ScheduledNote],
+    section_count: usize,
+    learned: &mut Vec<f32>,
+) {
     if learned.len() < section_count {
         learned.resize(section_count, 0.0);
     }
@@ -172,7 +176,10 @@ pub fn bump_learned_sections(notes: &[ScheduledNote], section_count: usize, lear
 /// `(time, phrase, event_count)` triples for every track item, in chart
 /// order — the shared shape `group_phrase_sections`/`unlocked_flags` and the
 /// note-building loops in `gameplay_2d`/`gameplay_3d` all key off.
-pub fn track_items<'a>(track: &'a [TrackItem], timing: &Timing) -> Vec<(f64, Option<&'a str>, usize)> {
+pub fn track_items<'a>(
+    track: &'a [TrackItem],
+    timing: &Timing,
+) -> Vec<(f64, Option<&'a str>, usize)> {
     track
         .iter()
         .map(|item| {
@@ -553,7 +560,10 @@ mod tests {
         let old_notes = vec![old];
         let mut new_notes = vec![note_at(1.0, 1, false), note_at(5.0, 3, true)];
         carry_over_note_state(&old_notes, &mut new_notes);
-        assert!(!new_notes[0].missed, "the newly-inserted note must not match");
+        assert!(
+            !new_notes[0].missed,
+            "the newly-inserted note must not match"
+        );
         assert!(new_notes[1].missed, "the pre-existing note keeps its state");
     }
 

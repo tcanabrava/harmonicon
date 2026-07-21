@@ -377,8 +377,8 @@ fn steady_loudness_is_not_relative_wobble() {
 fn measured_oscillation_hz_matches_a_clean_5hz_vibrato() {
     // 40 samples at a 60 Hz frame rate span ~0.65s — over 3 full cycles at 5 Hz.
     let samples = timestamped_sine(5.0, 25.0, 40, 1.0 / 60.0);
-    let hz = measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS)
-        .expect("should measure a rate");
+    let hz =
+        measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS).expect("should measure a rate");
     assert!((hz - 5.0).abs() < 0.5, "expected ~5 Hz, got {hz}");
 }
 

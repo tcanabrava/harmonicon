@@ -18,8 +18,8 @@ mod oscilloscope;
 use bevy::prelude::*;
 use bevy::ui_render::prelude::UiMaterialPlugin;
 
-use crate::audio_system::pitch_detect::AudioFrame;
 use crate::app::AppState;
+use crate::audio_system::pitch_detect::AudioFrame;
 
 pub use oscilloscope::OscMaterial;
 use oscilloscope::OscilloscopeMaterial;

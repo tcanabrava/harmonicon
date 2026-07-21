@@ -100,10 +100,10 @@ pub(super) fn timeline_tool_button(
         ))
         .observe(
             move |_: On<Pointer<Click>>,
-                loc: Res<Localization>,
-                mut state: ResMut<EditorState>,
-                mut sel: ResMut<TimelineSelection>,
-                mut open: MessageWriter<OpenConfirmDialog>| {
+                  loc: Res<Localization>,
+                  mut state: ResMut<EditorState>,
+                  mut sel: ResMut<TimelineSelection>,
+                  mut open: MessageWriter<OpenConfirmDialog>| {
                 if let Some(TimelineDrag { start, end, .. }) = sel.drag {
                     let (s, e) = normalize_range(start, end);
                     if kind == TimelineToolButton(TimelineTool::Erase) {
@@ -216,4 +216,3 @@ pub(super) fn transport_button<M: 'static>(
 ) {
     spawn_button_shell(panel, bg, label, tooltip, on_click);
 }
-

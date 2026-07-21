@@ -15,8 +15,8 @@
 
 use bevy::prelude::*;
 
-use super::state::EditorState;
 use super::TICKS_PER_BEAT;
+use super::state::EditorState;
 use crate::audio_system::waveform::{WAVEFORM_BUCKETS, analyze_ogg_waveform, analyze_wav_waveform};
 use crate::song::chart::{TempoPoint, seconds_to_tick, tick_to_seconds};
 
@@ -92,7 +92,11 @@ pub(super) fn waveform_bar_geometry(
     }
     let bucket_secs = duration_secs / bucket_count as f64;
     let start_tick = seconds_to_tick(i as f64 * bucket_secs, TICKS_PER_BEAT as u32, tempo_map);
-    let end_tick = seconds_to_tick((i + 1) as f64 * bucket_secs, TICKS_PER_BEAT as u32, tempo_map);
+    let end_tick = seconds_to_tick(
+        (i + 1) as f64 * bucket_secs,
+        TICKS_PER_BEAT as u32,
+        tempo_map,
+    );
     let x = start_tick as f32 * super::TICK_W;
     let w = end_tick.saturating_sub(start_tick) as f32 * super::TICK_W;
     (x, w)
@@ -117,8 +121,12 @@ pub(super) fn visible_waveform_buckets(
     let end_tick = ((scroll_beat + cols) * TICKS_PER_BEAT) as u64;
     let start_secs = tick_to_seconds(start_tick, TICKS_PER_BEAT as u32, tempo_map);
     let end_secs = tick_to_seconds(end_tick, TICKS_PER_BEAT as u32, tempo_map);
-    let start = (start_secs / bucket_secs).floor().clamp(0.0, bucket_count as f64) as usize;
-    let end = (end_secs / bucket_secs).ceil().clamp(0.0, bucket_count as f64) as usize;
+    let start = (start_secs / bucket_secs)
+        .floor()
+        .clamp(0.0, bucket_count as f64) as usize;
+    let end = (end_secs / bucket_secs)
+        .ceil()
+        .clamp(0.0, bucket_count as f64) as usize;
     start..end
 }
 
@@ -127,7 +135,10 @@ mod tests {
     use super::*;
 
     fn flat_120() -> Vec<TempoPoint> {
-        vec![TempoPoint { tick: 0, bpm: 120.0 }]
+        vec![TempoPoint {
+            tick: 0,
+            bpm: 120.0,
+        }]
     }
 
     // ── waveform_bar_geometry ────────────────────────────────────────────────
@@ -167,7 +178,10 @@ mod tests {
         // at the same spot.
         let flat = flat_120();
         let changed = vec![
-            TempoPoint { tick: 0, bpm: 120.0 },
+            TempoPoint {
+                tick: 0,
+                bpm: 120.0,
+            },
             TempoPoint {
                 tick: TICKS_PER_BEAT as u64,
                 bpm: 240.0,
@@ -175,7 +189,10 @@ mod tests {
         ];
         let (x_flat, _) = waveform_bar_geometry(5, 10, 20.0, &flat);
         let (x_changed, _) = waveform_bar_geometry(5, 10, 20.0, &changed);
-        assert!(x_changed > x_flat, "{x_changed} should be later than {x_flat}");
+        assert!(
+            x_changed > x_flat,
+            "{x_changed} should be later than {x_flat}"
+        );
     }
 
     // ── visible_waveform_buckets ─────────────────────────────────────────────

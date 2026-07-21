@@ -79,7 +79,11 @@ pub(super) struct LessonConditionalRow(Field);
 /// [`update_lesson_conditional_rows`]. Hidden entirely by default;
 /// [`update_lesson_form_visibility`] shows it once `ContentKind::Lesson` is
 /// active.
-pub(super) fn spawn_lesson_form(root: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+pub(super) fn spawn_lesson_form(
+    root: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     root.spawn((
         LessonFormGroup,
         Node {
@@ -137,7 +141,9 @@ fn spawn_conditional_field_row(
 ) {
     let row = super::meta_form::spawn_field_row(col, loc, colors, field, label);
     if matches!(field, Field::LessonThreshold | Field::LessonTechnique) {
-        col.commands().entity(row).insert(LessonConditionalRow(field));
+        col.commands()
+            .entity(row)
+            .insert(LessonConditionalRow(field));
     }
 }
 
@@ -145,7 +151,11 @@ fn spawn_conditional_field_row(
 /// `EditorState::lesson_details_expanded` on click. Both label forms are
 /// cached at spawn time (one `loc.msg` call), same reasoning as
 /// `ui::ModButtonLabel`'s cached-base-text pattern.
-fn spawn_lesson_details_header(col: &mut ChildSpawnerCommands, loc: &Localization, colors: SongEditorColors) {
+fn spawn_lesson_details_header(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+) {
     let title = String::from(loc.msg("editor-lesson-details-header"));
     let collapsed = format!("\u{25B8} {title}");
     let expanded = format!("\u{25BE} {title}");
@@ -158,16 +168,19 @@ fn spawn_lesson_details_header(col: &mut ChildSpawnerCommands, loc: &Localizatio
             padding: UiRect::all(Val::Px(8.0)),
             ..default()
         },
-        Tooltip(String::from(loc.msg("editor-lesson-details-toggle-tooltip"))),
+        Tooltip(String::from(
+            loc.msg("editor-lesson-details-toggle-tooltip"),
+        )),
     ))
-    .observe(
-        |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-            state.lesson_details_expanded = !state.lesson_details_expanded;
-        },
-    )
+    .observe(|_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+        state.lesson_details_expanded = !state.lesson_details_expanded;
+    })
     .with_children(|b| {
         b.spawn((
-            LessonDetailsToggleLabel { collapsed: collapsed.clone(), expanded },
+            LessonDetailsToggleLabel {
+                collapsed: collapsed.clone(),
+                expanded,
+            },
             Text::new(collapsed),
             TextFont {
                 font_size: FontSize::Px(14.0),
@@ -188,7 +201,11 @@ pub(super) fn update_lesson_form_visibility(
 ) {
     let visible = state.content_kind == ContentKind::Lesson;
     for mut node in &mut groups {
-        node.display = if visible { Display::Flex } else { Display::None };
+        node.display = if visible {
+            Display::Flex
+        } else {
+            Display::None
+        };
     }
 }
 
@@ -369,7 +386,10 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
             state.lesson_pass_criteria = "accuracy".into();
             state.lesson_threshold = threshold.to_string();
         }
-        Some(PassCriteria::Technique { technique, threshold }) => {
+        Some(PassCriteria::Technique {
+            technique,
+            threshold,
+        }) => {
             state.lesson_pass_criteria = "technique".into();
             state.lesson_technique = technique.clone();
             state.lesson_threshold = threshold.to_string();
@@ -387,7 +407,10 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
             state.lesson_threshold = threshold.to_string();
         }
     }
-    state.lesson_progression = manifest.progression.clone().unwrap_or_else(|| "none".into());
+    state.lesson_progression = manifest
+        .progression
+        .clone()
+        .unwrap_or_else(|| "none".into());
 }
 
 /// Reads and schema-validates `path` as a `lesson.json`, populates the

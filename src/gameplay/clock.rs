@@ -151,7 +151,12 @@ pub(crate) fn tick_clock(
     song_notes: Res<SongNotes>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    let due = wait_freeze_index(&song_notes.notes, song_notes.cursor, clock.get(), wait_mode.0);
+    let due = wait_freeze_index(
+        &song_notes.notes,
+        song_notes.cursor,
+        clock.get(),
+        wait_mode.0,
+    );
     // Gated so `ResMut`'s change detection (which `wait_freeze_overlay`'s
     // prompt reacts to) only fires on an actual transition, not every frame.
     if due != wait_freeze.0 {
@@ -198,7 +203,12 @@ pub(crate) fn tick_clock(
 /// so anchoring to it would make `advance_clock` repeatedly snap the clock
 /// back to that frozen point once real time drifts past
 /// `SNAP_THRESHOLD_SECS` — better to free-run past that point instead.
-pub(crate) fn should_anchor_to_sink(clock: f64, music_started: bool, mode: &GameplayMode, sink_empty: bool) -> bool {
+pub(crate) fn should_anchor_to_sink(
+    clock: f64,
+    music_started: bool,
+    mode: &GameplayMode,
+    sink_empty: bool,
+) -> bool {
     clock >= 0.0 && music_started && *mode != GameplayMode::JamSession && !sink_empty
 }
 

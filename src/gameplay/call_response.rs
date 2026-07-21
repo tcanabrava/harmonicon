@@ -78,10 +78,11 @@ pub(super) fn call_phrase_groups(track: &[TrackItem]) -> Vec<(usize, usize)> {
 /// `gameplay_2d::build_combined_notes`/`gameplay_3d::build_notes_3d` use: the
 /// event's own authored `note` if present, else the harmonica's layout.
 fn natural_pitch(chart: &HarpChart, event: &crate::song::chart::NoteEvent) -> String {
-    event
-        .note
-        .clone()
-        .unwrap_or_else(|| chart.harmonica.wind_direction_label(event.hole, &event.action))
+    event.note.clone().unwrap_or_else(|| {
+        chart
+            .harmonica
+            .wind_direction_label(event.hole, &event.action)
+    })
 }
 
 /// The expression LFO a call-phrase note's demo audio should carry, mapped
@@ -293,7 +294,10 @@ mod tests {
         let notes = build_phrase_notes(&chart, &group, 10.0, 120.0);
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].tick, 0);
-        assert!(notes[0].freq.is_some(), "hole 1 blow is a real C diatonic note");
+        assert!(
+            notes[0].freq.is_some(),
+            "hole 1 blow is a real C diatonic note"
+        );
     }
 
     #[test]

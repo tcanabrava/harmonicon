@@ -279,7 +279,13 @@ pub(super) fn record_tick(
         apply_detected_pitches(&mut record, &mut state, &detected, t, secs_per_tick);
     }
 
-    grow_open_notes(&mut state.notes, &record.open, &record.take_ids, t, secs_per_tick);
+    grow_open_notes(
+        &mut state.notes,
+        &record.open,
+        &record.take_ids,
+        t,
+        secs_per_tick,
+    );
 }
 
 // ── Pure-ish helpers ─────────────────────────────────────────────────────────
@@ -355,7 +361,12 @@ fn apply_detected_pitches(
         let id = state.next_id;
         state.next_id += 1;
         let note = spawn_open_note(id, mapped, t, secs_per_tick);
-        punch_out_overlaps(&mut state.notes, &record.take_ids, note.tick, note.tick + note.len);
+        punch_out_overlaps(
+            &mut state.notes,
+            &record.take_ids,
+            note.tick,
+            note.tick + note.len,
+        );
         state.notes.push(note);
         record.take_ids.insert(id);
         record.open.insert(
@@ -537,7 +548,9 @@ mod tests {
         // step) must resolve to a Bend, exactly like MIDI import already
         // does — recording a bent note shouldn't just snap to the nearest
         // natural note.
-        let draw2 = harp.wind_direction_midi(2, &crate::song::chart::Action::Draw).unwrap();
+        let draw2 = harp
+            .wind_direction_midi(2, &crate::song::chart::Action::Draw)
+            .unwrap();
         let table = build_pitch_table(&harp, HarmonicaKind::Diatonic);
         match table[(draw2 - 1) as usize] {
             Some((2, Dir::Draw, Pitch::Bend(_))) => {}

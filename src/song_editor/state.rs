@@ -2,8 +2,8 @@
 
 use bevy::prelude::*;
 
+use super::{HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::song::chart::Scale;
-use super::{HEADER_H, NOTE_PAD, ROW_H, TICKS_PER_BEAT, TICK_W};
 
 // ── Note model types ─────────────────────────────────────────────────────────
 
@@ -299,8 +299,14 @@ pub(super) const LESSON_FIELDS: [(Field, &str); 8] = [
     (Field::LessonId, "editor-field-lesson-id"),
     (Field::LessonUnit, "editor-field-lesson-unit"),
     (Field::LessonExplanation, "editor-field-lesson-explanation"),
-    (Field::LessonPrerequisites, "editor-field-lesson-prerequisites"),
-    (Field::LessonPassCriteria, "editor-field-lesson-pass-criteria"),
+    (
+        Field::LessonPrerequisites,
+        "editor-field-lesson-prerequisites",
+    ),
+    (
+        Field::LessonPassCriteria,
+        "editor-field-lesson-pass-criteria",
+    ),
     (Field::LessonThreshold, "editor-field-lesson-threshold"),
     (Field::LessonTechnique, "editor-field-lesson-technique"),
     (Field::LessonProgression, "editor-field-lesson-progression"),
@@ -831,15 +837,17 @@ pub(super) fn note_rect(note: &GridNote) -> (f32, f32, f32, f32) {
 /// applies) silently keeps the earlier-sorted entry rather than erroring —
 /// same "always resolves to something reasonable" spirit the rest of the
 /// editor's fallback chains follow.
-pub(super) fn build_tempo_map(tempo: &str, tempo_changes: &[(usize, f32)]) -> Vec<crate::song::chart::TempoPoint> {
+pub(super) fn build_tempo_map(
+    tempo: &str,
+    tempo_changes: &[(usize, f32)],
+) -> Vec<crate::song::chart::TempoPoint> {
     use crate::song::chart::TempoPoint;
     let bpm0: f32 = tempo.parse::<f32>().unwrap_or(120.0).max(1.0);
     let mut map = vec![TempoPoint { tick: 0, bpm: bpm0 }];
-    map.extend(
-        tempo_changes
-            .iter()
-            .map(|&(tick, bpm)| TempoPoint { tick: tick as u64, bpm: bpm.max(1.0) }),
-    );
+    map.extend(tempo_changes.iter().map(|&(tick, bpm)| TempoPoint {
+        tick: tick as u64,
+        bpm: bpm.max(1.0),
+    }));
     map.sort_by_key(|p| p.tick);
     map.dedup_by_key(|p| p.tick);
     map
@@ -919,7 +927,8 @@ pub(super) fn normalize_range(a: usize, b: usize) -> (usize, usize) {
 /// and trailing silence (after the last) are deliberately excluded — the
 /// silence track shows the space *between* notes, not lead-in/lead-out.
 pub(super) fn silence_gaps(notes: &[GridNote]) -> Vec<(usize, usize)> {
-    let mut intervals: Vec<(usize, usize)> = notes.iter().map(|n| (n.tick, n.tick + n.len)).collect();
+    let mut intervals: Vec<(usize, usize)> =
+        notes.iter().map(|n| (n.tick, n.tick + n.len)).collect();
     intervals.sort_by_key(|&(start, _)| start);
     let mut merged: Vec<(usize, usize)> = Vec::new();
     for (start, end) in intervals {

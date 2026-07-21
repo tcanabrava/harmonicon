@@ -440,7 +440,10 @@ mod tests {
         // `start_tutorial_tour` only handles a `Page` first step (it can
         // set `NextState<MenuPage>` directly, since it's already in
         // `AppState::Menu` — see its doc comment).
-        assert!(matches!(TOUR_STEPS.first(), Some((TourTarget::Page(_), ..))));
+        assert!(matches!(
+            TOUR_STEPS.first(),
+            Some((TourTarget::Page(_), ..))
+        ));
     }
 
     #[test]

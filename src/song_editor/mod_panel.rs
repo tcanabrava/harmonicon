@@ -10,16 +10,18 @@
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
+use super::AppState;
 use super::panel_widgets::{
     mod_button, mode_button, panel_separator, timeline_tool_button, transport_button,
 };
-use super::transport::{spawn_file_buttons, spawn_playback_buttons, spawn_record_buttons};
 use super::playback::{EditorAudio, Playhead};
 use super::practice::{PracticeState, stop_practice};
 use super::record::{RecordState, stop_record};
 use super::state::{EditorState, Mode, TimelineTool};
-use super::ui::{EditModeGroup, ModButton, ModeButton, PlayModeGroup, RecordModeGroup, TimelineToolButton};
-use super::AppState;
+use super::transport::{spawn_file_buttons, spawn_playback_buttons, spawn_record_buttons};
+use super::ui::{
+    EditModeGroup, ModButton, ModeButton, PlayModeGroup, RecordModeGroup, TimelineToolButton,
+};
 use crate::audio_system::pitch_detect::PitchRange;
 use crate::localization::LocalizationExt;
 use crate::theme::SongEditorColors;
@@ -95,7 +97,14 @@ pub(super) fn spawn_mod_panel(
                      mut commands: Commands| {
                         state.mode = Mode::Edit;
                         stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
-                        stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+                        stop_record(
+                            &mut state,
+                            &playing,
+                            &mut record,
+                            &mut playhead,
+                            &mut pitch_range,
+                            &mut commands,
+                        );
                     },
                 );
                 mode_button(
@@ -131,7 +140,14 @@ pub(super) fn spawn_mod_panel(
                      mut pitch_range: ResMut<PitchRange>,
                      mut commands: Commands| {
                         state.mode = Mode::Play;
-                        stop_record(&mut state, &playing, &mut record, &mut playhead, &mut pitch_range, &mut commands);
+                        stop_record(
+                            &mut state,
+                            &playing,
+                            &mut record,
+                            &mut playhead,
+                            &mut pitch_range,
+                            &mut commands,
+                        );
                     },
                 );
                 mode_button(

@@ -2,8 +2,8 @@
 
 use std::collections::HashSet;
 
-use super::*;
 use super::super::improv::{NoteFit, classify_note_fit};
+use super::*;
 
 // ── should_restart_jam_music ─────────────────────────────────────────────
 
@@ -165,7 +165,10 @@ fn classify_note_fit_prefers_chord_tone_over_plain_scale_membership() {
         classify_note_fit("C", &chord_tones, &scale),
         NoteFit::ChordTone
     );
-    assert_eq!(classify_note_fit("E", &chord_tones, &scale), NoteFit::InScale);
+    assert_eq!(
+        classify_note_fit("E", &chord_tones, &scale),
+        NoteFit::InScale
+    );
     assert_eq!(
         classify_note_fit("F", &chord_tones, &scale),
         NoteFit::OutOfScale

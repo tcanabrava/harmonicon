@@ -45,7 +45,8 @@ pub(super) fn map_pitch_playable(
                     && reed > target
                 {
                     let depth = (reed - target) as f32;
-                    if depth <= max_bend(hole) + f32::EPSILON && pitch_compatible(Pitch::Bend(depth), hole)
+                    if depth <= max_bend(hole) + f32::EPSILON
+                        && pitch_compatible(Pitch::Bend(depth), hole)
                     {
                         return Some((hole, Dir::Draw, Pitch::Bend(depth)));
                     }
@@ -56,7 +57,8 @@ pub(super) fn map_pitch_playable(
                     && reed > target
                 {
                     let depth = (reed - target) as f32;
-                    if depth <= max_bend(hole) + f32::EPSILON && pitch_compatible(Pitch::Bend(depth), hole)
+                    if depth <= max_bend(hole) + f32::EPSILON
+                        && pitch_compatible(Pitch::Bend(depth), hole)
                     {
                         return Some((hole, Dir::Blow, Pitch::Bend(depth)));
                     }

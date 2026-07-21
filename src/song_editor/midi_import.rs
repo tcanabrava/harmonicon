@@ -215,7 +215,10 @@ pub(super) fn remove_track_bytes(bytes: &[u8], track_index: usize) -> Result<Vec
 /// overlapping notes — the same machinery a chord preview uses) — a
 /// synthesized stand-in backing track, not a sampled/GM-accurate mix, since
 /// the editor has only ever had one instrument voice to render with.
-pub(super) fn render_backing_pcm(bytes: &[u8], skip_track: usize) -> Result<(f32, Vec<f32>), String> {
+pub(super) fn render_backing_pcm(
+    bytes: &[u8],
+    skip_track: usize,
+) -> Result<(f32, Vec<f32>), String> {
     let smf = Smf::parse(bytes).map_err(|e| e.to_string())?;
     let tpq = ticks_per_quarter(&smf)?;
     let tempo = collect_tempo_map(&smf);
@@ -310,7 +313,11 @@ pub(super) fn rebuild_midi_track_combobox(
             commands.entity(c).despawn();
         }
     }
-    let options: Vec<String> = midi.tracks.iter().map(MidiTrackInfo::option_label).collect();
+    let options: Vec<String> = midi
+        .tracks
+        .iter()
+        .map(MidiTrackInfo::option_label)
+        .collect();
     let Some(first) = options.first().cloned() else {
         return;
     };
@@ -372,11 +379,11 @@ fn on_midi_track_selected(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::state::{Dir, Pitch};
-    use crate::song::midi::{meta, note_on, note_off, smf_bytes};
-    use midly::num::u24;
+    use super::*;
+    use crate::song::midi::{meta, note_off, note_on, smf_bytes};
     use midly::MetaMessage;
+    use midly::num::u24;
 
     // ── editor_tempo_map ──────────────────────────────────────────────────────────
 
@@ -428,7 +435,11 @@ mod tests {
     #[test]
     fn list_midi_tracks_reports_name_and_note_count_per_track() {
         let bytes = smf_bytes(vec![
-            vec![meta(0, MetaMessage::TrackName(b"Bass")), note_on(0, 40, 100), note_off(10, 40)],
+            vec![
+                meta(0, MetaMessage::TrackName(b"Bass")),
+                note_on(0, 40, 100),
+                note_off(10, 40),
+            ],
             vec![meta(0, MetaMessage::TrackName(b"Lead"))],
         ]);
         let tracks = list_midi_tracks(&bytes).unwrap();
@@ -455,8 +466,8 @@ mod tests {
     fn import_track_notes_maps_pitches_and_quantizes_timing() {
         let bytes = smf_bytes(vec![vec![
             meta(0, MetaMessage::Tempo(u24::from(500_000))), // 120 BPM
-            note_on(0, 60, 100), // C4: hole 1 blow
-            note_off(480, 60),   // one beat (480 ticks at 480 tpq)
+            note_on(0, 60, 100),                             // C4: hole 1 blow
+            note_off(480, 60),                               // one beat (480 ticks at 480 tpq)
         ]]);
         let imported = import_track_notes(&bytes, 0, "C", HarmonicaKind::Diatonic).unwrap();
         assert_eq!(imported.initial_bpm.round(), 120.0);
@@ -475,7 +486,7 @@ mod tests {
         let bytes = smf_bytes(vec![vec![
             meta(0, MetaMessage::Tempo(u24::from(500_000))), // 120 BPM
             note_on(0, 60, 100),
-            note_off(480, 60), // one beat @ 120bpm
+            note_off(480, 60),                               // one beat @ 120bpm
             meta(0, MetaMessage::Tempo(u24::from(250_000))), // doubles to 240 BPM
             note_on(0, 62, 100),
             note_off(480, 62), // one more beat, now @ 240bpm
@@ -535,7 +546,10 @@ mod tests {
         let (bpm, pcm) = render_backing_pcm(&bytes, 0).unwrap();
         assert!(bpm > 0.0);
         assert!(!pcm.is_empty());
-        assert!(pcm.iter().any(|&s| s.abs() > 0.01), "backing track should be audible");
+        assert!(
+            pcm.iter().any(|&s| s.abs() > 0.01),
+            "backing track should be audible"
+        );
     }
 
     #[test]

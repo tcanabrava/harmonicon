@@ -246,9 +246,11 @@ pub fn spawn_song_progress(
             .with_children(|strip| {
                 if duration_secs > 0.0 {
                     for (i, section) in sections.iter().enumerate() {
-                        let Some((left, width)) =
-                            phrase_rect_geometry(section.start_time, section.end_time, duration_secs)
-                        else {
+                        let Some((left, width)) = phrase_rect_geometry(
+                            section.start_time,
+                            section.end_time,
+                            duration_secs,
+                        ) else {
                             continue;
                         };
                         let learned_frac = learned.get(i).copied().unwrap_or(0.0);

@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 
 use crate::{
-    localization::LocalizationExt,
     app::SelectedSong,
+    localization::LocalizationExt,
     song::NoteThemeConfig,
     song::SongManifest,
     song::chart::{Action, Modifier},
@@ -15,18 +15,18 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use bevy_fluent::Localization;
 
+use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::countdown_overlay::spawn_countdown;
 use super::metronome_overlay::spawn_metronome;
 use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_visual_2d::{NoteChildConfig, spawn_note_children};
-use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
 use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
-    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot,
-    HoleCell, HoleState, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote, ScoreText, SongNotes,
+    ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HoleCell,
+    HoleState, LOOKAHEAD, MusicStarted, NoteVisual, ScheduledNote, ScoreText, SongNotes,
     ValidHarpNotes,
 };
 
@@ -109,17 +109,24 @@ pub fn setup(
     let chords = twelve_bar(key);
 
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
-    let info = String::from(loc.msg_args(
-        "gameplay-chart-info",
-        &[
-            ("key", key.to_string()),
-            ("bpm", (bpm as u32).to_string()),
-            (
-                "time_sig",
-                chart.song.time_signature.as_deref().unwrap_or("4/4").to_string(),
-            ),
-        ],
-    ));
+    let info = String::from(
+        loc.msg_args(
+            "gameplay-chart-info",
+            &[
+                ("key", key.to_string()),
+                ("bpm", (bpm as u32).to_string()),
+                (
+                    "time_sig",
+                    chart
+                        .song
+                        .time_signature
+                        .as_deref()
+                        .unwrap_or("4/4")
+                        .to_string(),
+                ),
+            ],
+        ),
+    );
     let harp_info = chart.harmonica.display();
     let description = chart
         .metadata
@@ -1233,7 +1240,10 @@ mod tests {
         let sounding = HashSet::from([60u8]);
         step_hole_glow(&mut state, Some(60), Some(64), None, &sounding, 1.0, 0.1);
         assert!(state.is_blow);
-        assert!((state.brightness - 1.0).abs() < 1e-6, "attack=1.0 should snap fully");
+        assert!(
+            (state.brightness - 1.0).abs() < 1e-6,
+            "attack=1.0 should snap fully"
+        );
     }
 
     #[test]
@@ -1241,8 +1251,19 @@ mod tests {
         let mut state = HoleState::default();
         let sounding = HashSet::from([64u8]);
         // Draw (64) is actually sounding; the hint says blow — the real hit wins.
-        step_hole_glow(&mut state, Some(60), Some(64), Some(true), &sounding, 1.0, 0.1);
-        assert!(!state.is_blow, "the real draw hit should win over the blow hint");
+        step_hole_glow(
+            &mut state,
+            Some(60),
+            Some(64),
+            Some(true),
+            &sounding,
+            1.0,
+            0.1,
+        );
+        assert!(
+            !state.is_blow,
+            "the real draw hit should win over the blow hint"
+        );
         assert!((state.brightness - 1.0).abs() < 1e-6);
     }
 
@@ -1250,7 +1271,15 @@ mod tests {
     fn step_hole_glow_uses_a_dim_floor_for_a_hint_with_nothing_sounding() {
         let mut state = HoleState::default();
         let sounding = HashSet::new();
-        step_hole_glow(&mut state, Some(60), Some(64), Some(true), &sounding, 1.0, 0.1);
+        step_hole_glow(
+            &mut state,
+            Some(60),
+            Some(64),
+            Some(true),
+            &sounding,
+            1.0,
+            0.1,
+        );
         // A hint alone (no actual hit) only nudges brightness toward the dim
         // floor — `is_blow` is only ever written on a real hit, so it stays
         // at its prior value (the `Default` false) regardless of the hint.

@@ -6,10 +6,10 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 use bevy_fluent::Localization;
 
+use crate::app::{AppState, ReturnToSongList, SelectedSong};
 use crate::dialogs::button;
 use crate::lessons::{LessonContext, lesson_passed};
 use crate::localization::LocalizationExt;
-use crate::app::{AppState, ReturnToSongList, SelectedSong};
 use crate::profile::{PlayerProfile, record_lesson, record_play, save_profile};
 use crate::settings::AudioSettings;
 use crate::song::SongManifest;
@@ -302,9 +302,10 @@ pub(super) fn setup(
 
             // Final score.
             root.spawn((
-                Text::new(String::from(
-                    loc.msg_args("results-score", &[("points", score.points.to_string())]),
-                )),
+                Text::new(String::from(loc.msg_args(
+                    "results-score",
+                    &[("points", score.points.to_string())],
+                ))),
                 TextFont {
                     font_size: FontSize::Px(20.0),
                     ..default()

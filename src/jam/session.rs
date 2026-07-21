@@ -431,7 +431,11 @@ fn chord_tone_classes(chord_root: &str, quality: ChordQuality) -> HashSet<String
 /// Progression` — `Standard` for a real-song jam, player-selected for a
 /// generated one), and its tempo (needed to track which bar — and thus
 /// which chord — is currently sounding).
-pub(crate) fn build_hole_guide(harp: &Harmonica, key: &str, progression: Progression) -> (Vec<HoleInfo>, JamHoleGuide) {
+pub(crate) fn build_hole_guide(
+    harp: &Harmonica,
+    key: &str,
+    progression: Progression,
+) -> (Vec<HoleInfo>, JamHoleGuide) {
     let dash = "\u{2014}";
     let scale_classes = blues_scale_classes(key);
     let chord_tones_by_bar: [HashSet<String>; 12] = {
@@ -490,7 +494,10 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], loc: &L
         .with_children(|col| {
             col.spawn((
                 Text::new(String::from(loc.msg("jam-hole-map-hint"))),
-                TextFont { font_size: FontSize::Px(15.0), ..default() },
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
                 TextColor(Color::srgb(0.70, 0.70, 0.80)),
             ));
             col.spawn(Node {
@@ -516,18 +523,35 @@ fn spawn_hole_map(parent: &mut ChildSpawnerCommands, holes: &[HoleInfo], loc: &L
                     .with_children(|cell| {
                         cell.spawn((
                             Text::new(note_class(&h.blow).to_string()),
-                            TextFont { font_size: FontSize::Px(15.0), ..default() },
-                            TextColor(if h.blow_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
+                            TextFont {
+                                font_size: FontSize::Px(15.0),
+                                ..default()
+                            },
+                            TextColor(if h.blow_in_scale {
+                                LABEL_IN_SCALE
+                            } else {
+                                LABEL_OUT_SCALE
+                            }),
                         ));
                         cell.spawn((
                             Text::new(h.hole.to_string()),
-                            TextFont { font_size: FontSize::Px(16.0), ..default() },
+                            TextFont {
+                                font_size: FontSize::Px(16.0),
+                                ..default()
+                            },
                             TextColor(Color::WHITE),
                         ));
                         cell.spawn((
                             Text::new(note_class(&h.draw).to_string()),
-                            TextFont { font_size: FontSize::Px(15.0), ..default() },
-                            TextColor(if h.draw_in_scale { LABEL_IN_SCALE } else { LABEL_OUT_SCALE }),
+                            TextFont {
+                                font_size: FontSize::Px(15.0),
+                                ..default()
+                            },
+                            TextColor(if h.draw_in_scale {
+                                LABEL_IN_SCALE
+                            } else {
+                                LABEL_OUT_SCALE
+                            }),
                         ));
                     });
                 }

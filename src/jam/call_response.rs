@@ -97,7 +97,10 @@ fn pick_from_pool(pool: &[u8], roll: usize) -> u8 {
 
 /// Every harp-producible MIDI pitch that's a tone of `chord_tones`, sorted
 /// low to high — the pool one generated call lick draws from.
-fn chord_tone_pitches(note_to_holes: &HashMap<u8, Vec<u8>>, chord_tones: &HashSet<String>) -> Vec<u8> {
+fn chord_tone_pitches(
+    note_to_holes: &HashMap<u8, Vec<u8>>,
+    chord_tones: &HashSet<String>,
+) -> Vec<u8> {
     let mut pitches: Vec<u8> = note_to_holes
         .keys()
         .copied()

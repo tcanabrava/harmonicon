@@ -90,8 +90,7 @@ fn pyin_detects_440hz() {
     let samples: Vec<f32> = (0..n)
         .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
         .collect();
-    let f0 =
-        pyin_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
+    let f0 = pyin_pitch(&samples, sample_rate, PitchRange::default()).expect("expected a pitch");
     assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
 }
 
