@@ -9,7 +9,7 @@
   "song": {
     "title": "Greensleeves",
     "artist": "Traditional",
-    "tempo_bpm": 85,
+    "tempo_bpm": 180,
     "key": "E",
     "time_signature": "6/8",
     "difficulty": "intermediate"
@@ -19,7 +19,7 @@
     "tempo_map": [
       {
         "tick": 0,
-        "bpm": 85
+        "bpm": 180
       }
     ]
   },
@@ -58,8 +58,8 @@
   "track": [
     {
       "id": "note_001",
-      "time": 0.0,
-      "duration": 0.7,
+      "time": 1.3333,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -72,8 +72,8 @@
     },
     {
       "id": "note_002",
-      "time": 0.7,
-      "duration": 0.7,
+      "time": 2.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -85,8 +85,8 @@
     },
     {
       "id": "note_003",
-      "time": 1.4,
-      "duration": 0.35,
+      "time": 2.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -98,8 +98,8 @@
     },
     {
       "id": "note_004",
-      "time": 1.75,
-      "duration": 0.525,
+      "time": 3.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -111,8 +111,8 @@
     },
     {
       "id": "note_005",
-      "time": 2.275,
-      "duration": 0.175,
+      "time": 3.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -124,8 +124,8 @@
     },
     {
       "id": "note_006",
-      "time": 2.45,
-      "duration": 0.35,
+      "time": 3.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -137,8 +137,8 @@
     },
     {
       "id": "note_007",
-      "time": 2.8,
-      "duration": 0.7,
+      "time": 4.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -150,8 +150,8 @@
     },
     {
       "id": "note_008",
-      "time": 3.5,
-      "duration": 0.35,
+      "time": 4.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -163,8 +163,8 @@
     },
     {
       "id": "note_009",
-      "time": 3.85,
-      "duration": 0.525,
+      "time": 5.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -176,8 +176,8 @@
     },
     {
       "id": "note_010",
-      "time": 4.375,
-      "duration": 0.175,
+      "time": 5.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -189,8 +189,8 @@
     },
     {
       "id": "note_011",
-      "time": 4.55,
-      "duration": 0.35,
+      "time": 5.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -202,8 +202,8 @@
     },
     {
       "id": "note_012",
-      "time": 4.9,
-      "duration": 0.7,
+      "time": 6.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -215,8 +215,8 @@
     },
     {
       "id": "note_013",
-      "time": 5.6,
-      "duration": 0.35,
+      "time": 6.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -228,8 +228,8 @@
     },
     {
       "id": "note_014",
-      "time": 5.95,
-      "duration": 0.525,
+      "time": 7.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -241,8 +241,8 @@
     },
     {
       "id": "note_015",
-      "time": 6.475,
-      "duration": 0.175,
+      "time": 7.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -260,8 +260,8 @@
     },
     {
       "id": "note_016",
-      "time": 6.65,
-      "duration": 0.35,
+      "time": 7.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -273,8 +273,8 @@
     },
     {
       "id": "note_017",
-      "time": 7.0,
-      "duration": 0.7,
+      "time": 8.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -286,8 +286,8 @@
     },
     {
       "id": "note_018",
-      "time": 7.7,
-      "duration": 0.35,
+      "time": 8.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -305,8 +305,8 @@
     },
     {
       "id": "note_019",
-      "time": 8.05,
-      "duration": 1.05,
+      "time": 9.0,
+      "duration": 1.0,
       "play_mode": "single",
       "events": [
         {
@@ -318,8 +318,8 @@
     },
     {
       "id": "note_020",
-      "time": 9.1,
-      "duration": 0.7,
+      "time": 11.3333,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -332,8 +332,8 @@
     },
     {
       "id": "note_021",
-      "time": 9.8,
-      "duration": 0.7,
+      "time": 12.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -345,8 +345,8 @@
     },
     {
       "id": "note_022",
-      "time": 10.5,
-      "duration": 0.35,
+      "time": 12.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -358,8 +358,8 @@
     },
     {
       "id": "note_023",
-      "time": 10.85,
-      "duration": 0.525,
+      "time": 13.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -371,8 +371,8 @@
     },
     {
       "id": "note_024",
-      "time": 11.375,
-      "duration": 0.175,
+      "time": 13.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -384,8 +384,8 @@
     },
     {
       "id": "note_025",
-      "time": 11.55,
-      "duration": 0.35,
+      "time": 13.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -397,8 +397,8 @@
     },
     {
       "id": "note_026",
-      "time": 11.9,
-      "duration": 0.7,
+      "time": 14.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -410,8 +410,8 @@
     },
     {
       "id": "note_027",
-      "time": 12.6,
-      "duration": 0.35,
+      "time": 14.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -423,8 +423,8 @@
     },
     {
       "id": "note_028",
-      "time": 12.95,
-      "duration": 0.525,
+      "time": 15.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -436,8 +436,8 @@
     },
     {
       "id": "note_029",
-      "time": 13.475,
-      "duration": 0.175,
+      "time": 15.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -449,8 +449,8 @@
     },
     {
       "id": "note_030",
-      "time": 13.65,
-      "duration": 0.35,
+      "time": 15.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -462,8 +462,8 @@
     },
     {
       "id": "note_031",
-      "time": 14.0,
-      "duration": 0.525,
+      "time": 16.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -475,8 +475,8 @@
     },
     {
       "id": "note_032",
-      "time": 14.525,
-      "duration": 0.175,
+      "time": 16.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -488,8 +488,8 @@
     },
     {
       "id": "note_033",
-      "time": 14.7,
-      "duration": 0.35,
+      "time": 16.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -501,8 +501,8 @@
     },
     {
       "id": "note_034",
-      "time": 15.05,
-      "duration": 0.525,
+      "time": 17.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -514,8 +514,8 @@
     },
     {
       "id": "note_035",
-      "time": 15.575,
-      "duration": 0.175,
+      "time": 17.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -533,8 +533,8 @@
     },
     {
       "id": "note_036",
-      "time": 15.75,
-      "duration": 1.05,
+      "time": 17.6667,
+      "duration": 1.0,
       "play_mode": "single",
       "events": [
         {
@@ -546,8 +546,8 @@
     },
     {
       "id": "note_037",
-      "time": 16.8,
-      "duration": 1.05,
+      "time": 20.0,
+      "duration": 1.0,
       "play_mode": "single",
       "events": [
         {
@@ -560,8 +560,8 @@
     },
     {
       "id": "note_038",
-      "time": 17.85,
-      "duration": 0.525,
+      "time": 21.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -573,8 +573,8 @@
     },
     {
       "id": "note_039",
-      "time": 18.375,
-      "duration": 0.175,
+      "time": 21.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -586,8 +586,8 @@
     },
     {
       "id": "note_040",
-      "time": 18.55,
-      "duration": 0.35,
+      "time": 21.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -599,8 +599,8 @@
     },
     {
       "id": "note_041",
-      "time": 18.9,
-      "duration": 0.7,
+      "time": 22.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -612,8 +612,8 @@
     },
     {
       "id": "note_042",
-      "time": 19.6,
-      "duration": 0.35,
+      "time": 22.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -625,8 +625,8 @@
     },
     {
       "id": "note_043",
-      "time": 19.95,
-      "duration": 0.525,
+      "time": 23.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -638,8 +638,8 @@
     },
     {
       "id": "note_044",
-      "time": 20.475,
-      "duration": 0.175,
+      "time": 23.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -651,8 +651,8 @@
     },
     {
       "id": "note_045",
-      "time": 20.65,
-      "duration": 0.35,
+      "time": 23.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -664,8 +664,8 @@
     },
     {
       "id": "note_046",
-      "time": 21.0,
-      "duration": 0.7,
+      "time": 24.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -677,8 +677,8 @@
     },
     {
       "id": "note_047",
-      "time": 21.7,
-      "duration": 0.35,
+      "time": 24.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -690,8 +690,8 @@
     },
     {
       "id": "note_048",
-      "time": 22.05,
-      "duration": 0.525,
+      "time": 25.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -703,8 +703,8 @@
     },
     {
       "id": "note_049",
-      "time": 22.575,
-      "duration": 0.175,
+      "time": 25.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -722,8 +722,8 @@
     },
     {
       "id": "note_050",
-      "time": 22.75,
-      "duration": 0.35,
+      "time": 25.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -735,8 +735,8 @@
     },
     {
       "id": "note_051",
-      "time": 23.1,
-      "duration": 0.7,
+      "time": 26.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -748,8 +748,8 @@
     },
     {
       "id": "note_052",
-      "time": 23.8,
-      "duration": 0.35,
+      "time": 26.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -767,8 +767,8 @@
     },
     {
       "id": "note_053",
-      "time": 24.15,
-      "duration": 1.05,
+      "time": 27.0,
+      "duration": 1.0,
       "play_mode": "single",
       "events": [
         {
@@ -780,8 +780,8 @@
     },
     {
       "id": "note_054",
-      "time": 25.2,
-      "duration": 1.05,
+      "time": 28.0,
+      "duration": 1.0,
       "play_mode": "single",
       "events": [
         {
@@ -794,8 +794,8 @@
     },
     {
       "id": "note_055",
-      "time": 26.25,
-      "duration": 0.525,
+      "time": 29.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -807,8 +807,8 @@
     },
     {
       "id": "note_056",
-      "time": 26.775,
-      "duration": 0.175,
+      "time": 29.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -820,8 +820,8 @@
     },
     {
       "id": "note_057",
-      "time": 26.95,
-      "duration": 0.35,
+      "time": 29.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -833,8 +833,8 @@
     },
     {
       "id": "note_058",
-      "time": 27.3,
-      "duration": 0.7,
+      "time": 30.0,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -846,8 +846,8 @@
     },
     {
       "id": "note_059",
-      "time": 28.0,
-      "duration": 0.35,
+      "time": 30.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -859,8 +859,8 @@
     },
     {
       "id": "note_060",
-      "time": 28.35,
-      "duration": 0.525,
+      "time": 31.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -872,8 +872,8 @@
     },
     {
       "id": "note_061",
-      "time": 28.875,
-      "duration": 0.175,
+      "time": 31.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -885,8 +885,8 @@
     },
     {
       "id": "note_062",
-      "time": 29.05,
-      "duration": 0.35,
+      "time": 31.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -898,8 +898,8 @@
     },
     {
       "id": "note_063",
-      "time": 29.4,
-      "duration": 0.525,
+      "time": 32.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -911,8 +911,8 @@
     },
     {
       "id": "note_064",
-      "time": 29.925,
-      "duration": 0.175,
+      "time": 32.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -924,8 +924,8 @@
     },
     {
       "id": "note_065",
-      "time": 30.1,
-      "duration": 0.35,
+      "time": 32.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -937,8 +937,8 @@
     },
     {
       "id": "note_066",
-      "time": 30.45,
-      "duration": 0.525,
+      "time": 33.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -950,8 +950,8 @@
     },
     {
       "id": "note_067",
-      "time": 30.975,
-      "duration": 0.175,
+      "time": 33.5,
+      "duration": 0.1667,
       "play_mode": "single",
       "events": [
         {
@@ -969,8 +969,8 @@
     },
     {
       "id": "note_068",
-      "time": 31.15,
-      "duration": 1.05,
+      "time": 33.6667,
+      "duration": 1.0,
       "play_mode": "single",
       "events": [
         {

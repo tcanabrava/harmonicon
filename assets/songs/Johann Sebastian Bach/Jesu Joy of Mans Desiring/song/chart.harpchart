@@ -9,7 +9,7 @@
   "song": {
     "title": "Jesu, Joy of Man's Desiring",
     "artist": "Johann Sebastian Bach",
-    "tempo_bpm": 100,
+    "tempo_bpm": 60,
     "key": "C",
     "time_signature": "3/4",
     "difficulty": "easy"
@@ -19,7 +19,7 @@
     "tempo_map": [
       {
         "tick": 0,
-        "bpm": 100
+        "bpm": 60
       }
     ]
   },
@@ -59,7 +59,7 @@
     {
       "id": "note_001",
       "time": 0.0,
-      "duration": 0.32,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -68,12 +68,12 @@
           "note": "C5"
         }
       ],
-      "phrase": "triplet line"
+      "phrase": "bar 1"
     },
     {
       "id": "note_002",
-      "time": 0.32,
-      "duration": 0.32,
+      "time": 0.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -85,8 +85,8 @@
     },
     {
       "id": "note_003",
-      "time": 0.64,
-      "duration": 0.32,
+      "time": 0.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -98,8 +98,8 @@
     },
     {
       "id": "note_004",
-      "time": 0.96,
-      "duration": 0.32,
+      "time": 1.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -111,8 +111,8 @@
     },
     {
       "id": "note_005",
-      "time": 1.28,
-      "duration": 0.32,
+      "time": 1.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -124,8 +124,8 @@
     },
     {
       "id": "note_006",
-      "time": 1.6,
-      "duration": 0.32,
+      "time": 1.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -137,8 +137,8 @@
     },
     {
       "id": "note_007",
-      "time": 1.92,
-      "duration": 0.32,
+      "time": 2.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -150,8 +150,8 @@
     },
     {
       "id": "note_008",
-      "time": 2.24,
-      "duration": 0.32,
+      "time": 2.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -163,8 +163,8 @@
     },
     {
       "id": "note_009",
-      "time": 2.56,
-      "duration": 0.32,
+      "time": 2.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -176,8 +176,8 @@
     },
     {
       "id": "note_010",
-      "time": 2.88,
-      "duration": 0.32,
+      "time": 3.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -185,12 +185,13 @@
           "action": "blow",
           "note": "C6"
         }
-      ]
+      ],
+      "phrase": "bar 2"
     },
     {
       "id": "note_011",
-      "time": 3.2,
-      "duration": 0.32,
+      "time": 3.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -202,8 +203,8 @@
     },
     {
       "id": "note_012",
-      "time": 3.52,
-      "duration": 0.32,
+      "time": 3.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -215,8 +216,8 @@
     },
     {
       "id": "note_013",
-      "time": 3.84,
-      "duration": 0.32,
+      "time": 4.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -224,13 +225,12 @@
           "action": "blow",
           "note": "G5"
         }
-      ],
-      "phrase": "answer"
+      ]
     },
     {
       "id": "note_014",
-      "time": 4.16,
-      "duration": 0.32,
+      "time": 4.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -242,8 +242,8 @@
     },
     {
       "id": "note_015",
-      "time": 4.48,
-      "duration": 0.32,
+      "time": 4.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -255,8 +255,8 @@
     },
     {
       "id": "note_016",
-      "time": 4.8,
-      "duration": 0.32,
+      "time": 5.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -268,8 +268,8 @@
     },
     {
       "id": "note_017",
-      "time": 5.12,
-      "duration": 0.32,
+      "time": 5.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -281,8 +281,8 @@
     },
     {
       "id": "note_018",
-      "time": 5.44,
-      "duration": 0.32,
+      "time": 5.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -294,8 +294,8 @@
     },
     {
       "id": "note_019",
-      "time": 5.76,
-      "duration": 0.32,
+      "time": 6.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -303,12 +303,13 @@
           "action": "blow",
           "note": "G5"
         }
-      ]
+      ],
+      "phrase": "bar 3"
     },
     {
       "id": "note_020",
-      "time": 6.08,
-      "duration": 0.32,
+      "time": 6.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -320,8 +321,8 @@
     },
     {
       "id": "note_021",
-      "time": 6.4,
-      "duration": 0.32,
+      "time": 6.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -333,8 +334,8 @@
     },
     {
       "id": "note_022",
-      "time": 6.72,
-      "duration": 0.32,
+      "time": 7.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -346,8 +347,8 @@
     },
     {
       "id": "note_023",
-      "time": 7.04,
-      "duration": 0.32,
+      "time": 7.3333,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -359,8 +360,8 @@
     },
     {
       "id": "note_024",
-      "time": 7.36,
-      "duration": 0.32,
+      "time": 7.6667,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -372,8 +373,8 @@
     },
     {
       "id": "note_025",
-      "time": 7.68,
-      "duration": 0.32,
+      "time": 8.0,
+      "duration": 0.3333,
       "play_mode": "single",
       "events": [
         {
@@ -381,13 +382,12 @@
           "action": "blow",
           "note": "E5"
         }
-      ],
-      "phrase": "cadence"
+      ]
     },
     {
       "id": "note_026",
-      "time": 8.0,
-      "duration": 0.32,
+      "time": 8.3333,
+      "duration": 0.6667,
       "play_mode": "single",
       "events": [
         {
@@ -399,8 +399,8 @@
     },
     {
       "id": "note_027",
-      "time": 8.32,
-      "duration": 1.28,
+      "time": 9.0,
+      "duration": 3.0,
       "play_mode": "single",
       "events": [
         {
@@ -408,7 +408,8 @@
           "action": "blow",
           "note": "C5"
         }
-      ]
+      ],
+      "phrase": "cadence"
     }
   ],
   "scoring": {

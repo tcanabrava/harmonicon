@@ -59,7 +59,7 @@
     {
       "id": "note_001",
       "time": 0.0,
-      "duration": 0.22,
+      "duration": 0.25,
       "play_mode": "single",
       "events": [
         {
@@ -72,8 +72,8 @@
     },
     {
       "id": "note_002",
-      "time": 0.22,
-      "duration": 0.22,
+      "time": 0.25,
+      "duration": 0.25,
       "play_mode": "single",
       "events": [
         {
@@ -85,8 +85,8 @@
     },
     {
       "id": "note_003",
-      "time": 0.44,
-      "duration": 1.1,
+      "time": 0.5,
+      "duration": 2.0,
       "play_mode": "single",
       "events": [
         {
@@ -98,8 +98,8 @@
     },
     {
       "id": "note_004",
-      "time": 2.04,
-      "duration": 0.28,
+      "time": 4.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -111,8 +111,8 @@
     },
     {
       "id": "note_005",
-      "time": 2.32,
-      "duration": 0.28,
+      "time": 4.5,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -124,8 +124,8 @@
     },
     {
       "id": "note_006",
-      "time": 2.6,
-      "duration": 0.28,
+      "time": 5.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -137,8 +137,8 @@
     },
     {
       "id": "note_007",
-      "time": 2.88,
-      "duration": 0.28,
+      "time": 5.5,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -150,8 +150,8 @@
     },
     {
       "id": "note_008",
-      "time": 3.16,
-      "duration": 0.28,
+      "time": 6.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -169,8 +169,8 @@
     },
     {
       "id": "note_009",
-      "time": 3.44,
-      "duration": 1.4,
+      "time": 6.5,
+      "duration": 1.5,
       "play_mode": "single",
       "events": [
         {
@@ -182,8 +182,8 @@
     },
     {
       "id": "note_010",
-      "time": 5.44,
-      "duration": 0.22,
+      "time": 12.0,
+      "duration": 0.25,
       "play_mode": "single",
       "events": [
         {
@@ -202,8 +202,8 @@
     },
     {
       "id": "note_011",
-      "time": 5.66,
-      "duration": 0.22,
+      "time": 12.25,
+      "duration": 0.25,
       "play_mode": "single",
       "events": [
         {
@@ -215,8 +215,8 @@
     },
     {
       "id": "note_012",
-      "time": 5.88,
-      "duration": 1.1,
+      "time": 12.5,
+      "duration": 2.0,
       "play_mode": "single",
       "events": [
         {
@@ -234,8 +234,8 @@
     },
     {
       "id": "note_013",
-      "time": 7.48,
-      "duration": 0.28,
+      "time": 16.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -247,8 +247,8 @@
     },
     {
       "id": "note_014",
-      "time": 7.76,
-      "duration": 0.28,
+      "time": 16.5,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -266,8 +266,8 @@
     },
     {
       "id": "note_015",
-      "time": 8.04,
-      "duration": 0.28,
+      "time": 17.0,
+      "duration": 0.5,
       "play_mode": "single",
       "events": [
         {
@@ -285,8 +285,8 @@
     },
     {
       "id": "note_016",
-      "time": 8.32,
-      "duration": 1.4,
+      "time": 17.5,
+      "duration": 2.5,
       "play_mode": "single",
       "events": [
         {
@@ -298,8 +298,8 @@
     },
     {
       "id": "note_end",
-      "time": 10.32,
-      "duration": 2.2,
+      "time": 20.0,
+      "duration": 4.0,
       "phrase": "pedal octave",
       "play_mode": "split",
       "events": [

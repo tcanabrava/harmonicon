@@ -9,7 +9,7 @@
   "song": {
     "title": "Für Elise",
     "artist": "Ludwig van Beethoven",
-    "tempo_bpm": 72,
+    "tempo_bpm": 120,
     "key": "A",
     "time_signature": "3/8",
     "difficulty": "advanced"
@@ -19,7 +19,7 @@
     "tempo_map": [
       {
         "tick": 0,
-        "bpm": 72
+        "bpm": 120
       }
     ]
   },
@@ -88,7 +88,7 @@
   "track": [
     {
       "id": "note_001",
-      "time": 0.0,
+      "time": 1.0,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -102,7 +102,7 @@
     },
     {
       "id": "note_002",
-      "time": 0.25,
+      "time": 1.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -120,7 +120,7 @@
     },
     {
       "id": "note_003",
-      "time": 0.5,
+      "time": 1.5,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -133,7 +133,7 @@
     },
     {
       "id": "note_004",
-      "time": 0.75,
+      "time": 1.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -151,7 +151,7 @@
     },
     {
       "id": "note_005",
-      "time": 1.0,
+      "time": 2.0,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -164,7 +164,7 @@
     },
     {
       "id": "note_006",
-      "time": 1.25,
+      "time": 2.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -177,7 +177,7 @@
     },
     {
       "id": "note_007",
-      "time": 1.5,
+      "time": 2.5,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -190,7 +190,7 @@
     },
     {
       "id": "note_008",
-      "time": 1.75,
+      "time": 2.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -203,7 +203,7 @@
     },
     {
       "id": "note_009",
-      "time": 2.0,
+      "time": 3.0,
       "duration": 0.75,
       "play_mode": "single",
       "events": [
@@ -216,7 +216,7 @@
     },
     {
       "id": "note_010",
-      "time": 2.75,
+      "time": 3.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -229,7 +229,7 @@
     },
     {
       "id": "note_011",
-      "time": 3.0,
+      "time": 4.0,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -242,7 +242,7 @@
     },
     {
       "id": "note_012",
-      "time": 3.25,
+      "time": 4.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -255,7 +255,7 @@
     },
     {
       "id": "note_013",
-      "time": 3.5,
+      "time": 4.5,
       "duration": 0.75,
       "play_mode": "single",
       "events": [
@@ -268,7 +268,7 @@
     },
     {
       "id": "note_014",
-      "time": 4.25,
+      "time": 5.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -281,7 +281,7 @@
     },
     {
       "id": "note_015",
-      "time": 4.5,
+      "time": 5.5,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -299,7 +299,7 @@
     },
     {
       "id": "note_016",
-      "time": 4.75,
+      "time": 5.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -312,7 +312,7 @@
     },
     {
       "id": "note_017",
-      "time": 5.0,
+      "time": 6.0,
       "duration": 0.75,
       "play_mode": "single",
       "events": [
@@ -325,7 +325,7 @@
     },
     {
       "id": "note_018",
-      "time": 5.75,
+      "time": 6.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -334,12 +334,11 @@
           "action": "blow",
           "note": "E4"
         }
-      ],
-      "phrase": "theme again"
+      ]
     },
     {
       "id": "note_019",
-      "time": 6.0,
+      "time": 7.0,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -348,11 +347,12 @@
           "action": "blow",
           "note": "E5"
         }
-      ]
+      ],
+      "phrase": "theme again"
     },
     {
       "id": "note_020",
-      "time": 6.25,
+      "time": 7.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -370,7 +370,7 @@
     },
     {
       "id": "note_021",
-      "time": 6.5,
+      "time": 7.5,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -383,7 +383,7 @@
     },
     {
       "id": "note_022",
-      "time": 6.75,
+      "time": 7.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -401,7 +401,7 @@
     },
     {
       "id": "note_023",
-      "time": 7.0,
+      "time": 8.0,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -414,7 +414,7 @@
     },
     {
       "id": "note_024",
-      "time": 7.25,
+      "time": 8.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -427,7 +427,7 @@
     },
     {
       "id": "note_025",
-      "time": 7.5,
+      "time": 8.5,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -440,7 +440,7 @@
     },
     {
       "id": "note_026",
-      "time": 7.75,
+      "time": 8.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -453,7 +453,7 @@
     },
     {
       "id": "note_027",
-      "time": 8.0,
+      "time": 9.0,
       "duration": 0.75,
       "play_mode": "single",
       "events": [
@@ -466,7 +466,7 @@
     },
     {
       "id": "note_028",
-      "time": 8.75,
+      "time": 9.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -479,7 +479,7 @@
     },
     {
       "id": "note_029",
-      "time": 9.0,
+      "time": 10.0,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -492,7 +492,7 @@
     },
     {
       "id": "note_030",
-      "time": 9.25,
+      "time": 10.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -505,7 +505,7 @@
     },
     {
       "id": "note_031",
-      "time": 9.5,
+      "time": 10.5,
       "duration": 0.75,
       "play_mode": "single",
       "events": [
@@ -514,12 +514,11 @@
           "action": "blow",
           "note": "B4"
         }
-      ],
-      "phrase": "close"
+      ]
     },
     {
       "id": "note_032",
-      "time": 10.25,
+      "time": 11.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -528,11 +527,12 @@
           "action": "blow",
           "note": "E4"
         }
-      ]
+      ],
+      "phrase": "close"
     },
     {
       "id": "note_033",
-      "time": 10.5,
+      "time": 11.5,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -545,7 +545,7 @@
     },
     {
       "id": "note_034",
-      "time": 10.75,
+      "time": 11.75,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -558,7 +558,7 @@
     },
     {
       "id": "note_035",
-      "time": 11.0,
+      "time": 12.0,
       "duration": 1.5,
       "play_mode": "single",
       "events": [

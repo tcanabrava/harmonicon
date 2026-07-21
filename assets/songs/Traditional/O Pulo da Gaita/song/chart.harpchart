@@ -452,7 +452,7 @@
     {
       "id": "note_031",
       "time": 8.75,
-      "duration": 0.75,
+      "duration": 1.25,
       "play_mode": "single",
       "events": [
         {
@@ -464,7 +464,7 @@
     },
     {
       "id": "note_032",
-      "time": 9.5,
+      "time": 10.0,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -478,7 +478,7 @@
     },
     {
       "id": "note_033",
-      "time": 9.75,
+      "time": 10.25,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -491,7 +491,7 @@
     },
     {
       "id": "note_034",
-      "time": 10.0,
+      "time": 10.5,
       "duration": 0.25,
       "play_mode": "single",
       "events": [
@@ -504,32 +504,6 @@
     },
     {
       "id": "note_035",
-      "time": 10.25,
-      "duration": 0.25,
-      "play_mode": "single",
-      "events": [
-        {
-          "hole": 5,
-          "action": "blow",
-          "note": "E5"
-        }
-      ]
-    },
-    {
-      "id": "note_036",
-      "time": 10.5,
-      "duration": 0.25,
-      "play_mode": "single",
-      "events": [
-        {
-          "hole": 4,
-          "action": "draw",
-          "note": "D5"
-        }
-      ]
-    },
-    {
-      "id": "note_037",
       "time": 10.75,
       "duration": 0.25,
       "play_mode": "single",
@@ -542,7 +516,7 @@
       ]
     },
     {
-      "id": "note_038",
+      "id": "note_036",
       "time": 11.0,
       "duration": 0.25,
       "play_mode": "single",
@@ -555,9 +529,35 @@
       ]
     },
     {
-      "id": "note_039",
+      "id": "note_037",
       "time": 11.25,
-      "duration": 1.0,
+      "duration": 0.25,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 5,
+          "action": "blow",
+          "note": "E5"
+        }
+      ]
+    },
+    {
+      "id": "note_038",
+      "time": 11.5,
+      "duration": 0.25,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "draw",
+          "note": "D5"
+        }
+      ]
+    },
+    {
+      "id": "note_039",
+      "time": 11.75,
+      "duration": 1.25,
       "play_mode": "single",
       "events": [
         {
