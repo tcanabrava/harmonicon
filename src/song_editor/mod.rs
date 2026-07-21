@@ -30,6 +30,7 @@ mod mod_panel;
 mod panel;
 mod panel_widgets;
 mod pitch_map;
+mod ranges;
 mod scroll;
 // `pub(crate)`, not private like its neighbours: `gameplay::call_response`
 // shares this module's synth (`PhraseNote`/`render_pcm`/`encode_wav`) for
@@ -76,7 +77,7 @@ const HANDLE_W: f32 = 8.0;
 pub(crate) use crate::audio_system::synth::TICKS_PER_BEAT;
 const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
 // The silence track: a summary row below the hole lanes showing the gap, in
-// seconds, between consecutive notes — see `state::silence_gaps`. Shorter
+// seconds, between consecutive notes — see `ranges::silence_gaps`. Shorter
 // than an ordinary hole lane since it's read-only display, not an editable
 // row of its own.
 const SILENCE_ROW_H: f32 = 24.0;
@@ -156,8 +157,11 @@ impl Plugin for SongEditor2Plugin {
                     // under the tour (see `menu::tutorial`).
                     interaction::grid_keys.run_if(not(tour_active)),
                     interaction::type_into_field,
-                    interaction::live_resize,
-                    interaction::update_move_ghost,
+                    (
+                        interaction::live_resize,
+                        interaction::update_move_ghost,
+                        interaction::update_group_move_ghosts,
+                    ),
                     panel::update_mod_panel.run_if(
                         resource_exists_and_changed::<state::EditorState>
                             .or_else(resource_changed::<LoadedTheme>),

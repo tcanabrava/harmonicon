@@ -81,6 +81,18 @@ pub(super) struct NoteView(pub(super) u32);
 #[derive(Component)]
 pub(super) struct MoveGhost;
 
+/// One rectangle per *non-anchor* note being moved together in a
+/// multi-select group drag — [`MoveGhost`] alone only ever shows the
+/// anchor's own preview. Unlike `MoveGhost` (one persistent entity, just
+/// toggled visible/hidden), these are spawned and despawned fresh every
+/// frame a group drag is in progress (`interaction::
+/// update_group_move_ghosts`), the same "rebuild from scratch each frame"
+/// pattern `interaction::update_scrollbar_markers` already uses — there's
+/// no group to preview most of the time, so this is a no-op far more often
+/// than not.
+#[derive(Component)]
+pub(super) struct GroupMoveGhost;
+
 #[derive(Component, Clone, Copy, PartialEq)]
 pub(super) enum ModButton {
     Blow,

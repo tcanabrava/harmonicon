@@ -212,7 +212,7 @@ pub(super) enum DragKind {
     Resize(Edge),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(super) struct DragState {
     pub(super) id: u32,
     pub(super) kind: DragKind,
@@ -222,6 +222,15 @@ pub(super) struct DragState {
     pub(super) target_hole: u8,
     pub(super) target_tick: usize,
     pub(super) valid: bool,
+    /// Every *other* note moving together with the anchor (`id`) — its
+    /// original `(hole, tick)` at drag start, carried alongside so
+    /// `grid::group_move_targets` can shift the whole group by the same
+    /// delta the anchor moved by. Populated only when the dragged note was part
+    /// of a multi-selection (`EditorState::selected`) larger than one at
+    /// drag start; empty for an ordinary single-note move and always empty
+    /// for `DragKind::Resize` (resizing only ever affects the one handle
+    /// being dragged, group or no group).
+    pub(super) group: Vec<GridNote>,
 }
 
 impl DragState {
@@ -235,6 +244,17 @@ impl DragState {
             target_hole: note.hole,
             target_tick: note.tick,
             valid: true,
+            group: Vec::new(),
+        }
+    }
+
+    /// Like [`DragState::new`], but for a multi-note move: `group` is every
+    /// other selected note (the anchor `note` itself is excluded — it's
+    /// already tracked via `id`/`start_hole`/`start_tick`).
+    pub(super) fn new_group(id: u32, note: &GridNote, group: Vec<GridNote>) -> Self {
+        Self {
+            group,
+            ..Self::new(id, DragKind::Move, note)
         }
     }
 }
@@ -367,7 +387,19 @@ pub(super) fn cycle_next(options: &[&str], current: &str) -> String {
 pub(super) struct EditorState {
     pub(super) notes: Vec<GridNote>,
     pub(super) next_id: u32,
-    pub(super) selected: Option<u32>,
+    /// Every currently-selected note id, in the order each was added to the
+    /// selection — empty means nothing selected. A plain click replaces the
+    /// whole selection with one id ([`EditorState::select_only`]); a
+    /// Ctrl+click toggles one id in or out ([`EditorState::
+    /// toggle_selected`]) without disturbing the rest, which is what lets
+    /// multiple notes be selected at once. [`EditorState::selected_note`]/
+    /// [`EditorState::selected_note_mut`] — the mod panel's "the selected
+    /// note's own fields" source — read the *last* entry as the "primary"
+    /// note technique edits (Bend, Overblow, ...) apply to; Move and Delete
+    /// are the two operations that act on the whole set instead of just the
+    /// primary (see `interaction::delete_selected` and the note drag
+    /// observers in `grid.rs`).
+    pub(super) selected: Vec<u32>,
     pub(super) scroll_beat: usize,
     pub(super) dragging: Option<DragState>,
     pub(super) tempo: String,
@@ -446,7 +478,7 @@ impl Default for EditorState {
         Self {
             notes: Vec::new(),
             next_id: 0,
-            selected: None,
+            selected: Vec::new(),
             scroll_beat: 0,
             dragging: None,
             tempo: "120".into(),
@@ -499,13 +531,38 @@ impl EditorState {
             .map(|n| n.dir)
     }
 
+    /// The "primary" selected note — the most recently added to the
+    /// selection — whose own fields the mod panel reflects/edits. `None`
+    /// with nothing selected.
     pub(super) fn selected_note(&self) -> Option<&GridNote> {
-        self.selected.and_then(|id| self.note_by_id(id))
+        self.selected.last().and_then(|&id| self.note_by_id(id))
     }
 
     pub(super) fn selected_note_mut(&mut self) -> Option<&mut GridNote> {
-        let id = self.selected?;
+        let id = *self.selected.last()?;
         self.notes.iter_mut().find(|n| n.id == id)
+    }
+
+    pub(super) fn is_selected(&self, id: u32) -> bool {
+        self.selected.contains(&id)
+    }
+
+    /// Replaces the whole selection with just `id` — a plain (non-Ctrl)
+    /// click on a note.
+    pub(super) fn select_only(&mut self, id: u32) {
+        self.selected.clear();
+        self.selected.push(id);
+    }
+
+    /// Adds `id` to the selection, or removes it if already present —
+    /// a Ctrl+click on a note, which extends/shrinks the selection without
+    /// disturbing the rest of it.
+    pub(super) fn toggle_selected(&mut self, id: u32) {
+        if let Some(pos) = self.selected.iter().position(|&x| x == id) {
+            self.selected.remove(pos);
+        } else {
+            self.selected.push(id);
+        }
     }
 
     /// The full tempo map (sorted, always starting at tick 0), built from
@@ -592,11 +649,8 @@ impl EditorState {
             n.pitch = sanitize(kind, n.pitch);
         }
         self.sticky_pitch = sanitize(kind, self.sticky_pitch);
-        if let Some(id) = self.selected
-            && !self.notes.iter().any(|n| n.id == id)
-        {
-            self.selected = None;
-        }
+        let notes = &self.notes;
+        self.selected.retain(|id| notes.iter().any(|n| n.id == *id));
     }
 }
 
@@ -623,12 +677,6 @@ pub(super) struct TimelineSelection {
 }
 
 // ── Note model logic ─────────────────────────────────────────────────────────
-
-pub(super) fn can_place(notes: &[GridNote], id: u32, hole: u8, tick: usize, len: usize) -> bool {
-    !notes
-        .iter()
-        .any(|n| n.id != id && n.hole == hole && n.tick < tick + len && tick < n.tick + n.len)
-}
 
 pub(super) fn pitch_compatible(pitch: Pitch, hole: u8) -> bool {
     match pitch {
@@ -727,6 +775,10 @@ pub(super) fn move_target(
     let tick = (start_tick as i32 + steps_x).max(0) as usize;
     (hole, tick)
 }
+
+// `group_move_targets`/`group_move_valid` (the multi-select group-drag
+// pure functions) live in `grid.rs`, next to the note-drag observers that
+// are their only callers — split out to stay under the file-size budget.
 
 pub(super) fn apply_resize(
     tick: usize,
@@ -902,85 +954,7 @@ pub(super) fn toggle_tempo_point(state: &mut EditorState, tick: usize) {
     state.tempo_changes.push((tick, bpm));
 }
 
-// ── Timeline erase/remove ────────────────────────────────────────────────────
-
-/// One past the last tick any note currently occupies — the right-hand
-/// bound for a "from the split point to the end of the song" range. `0` for
-/// an empty song.
-pub(super) fn song_end_tick(notes: &[GridNote]) -> usize {
-    notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0)
-}
-
-/// Orders a possibly-backwards drag span into `(start, end)` with
-/// `start <= end`.
-pub(super) fn normalize_range(a: usize, b: usize) -> (usize, usize) {
-    if a <= b { (a, b) } else { (b, a) }
-}
-
-// ── Silence track ────────────────────────────────────────────────────────────
-
-/// The tick ranges strictly *between* two sounding notes — merging every
-/// note's `[tick, tick+len)` interval across all holes first, since silence
-/// means nothing at all is sounding, not just one particular hole (two holes
-/// overlapping as a chord, or one note's tail overlapping the next note's
-/// onset, must not read as a gap). Leading silence (before the first note)
-/// and trailing silence (after the last) are deliberately excluded — the
-/// silence track shows the space *between* notes, not lead-in/lead-out.
-pub(super) fn silence_gaps(notes: &[GridNote]) -> Vec<(usize, usize)> {
-    let mut intervals: Vec<(usize, usize)> =
-        notes.iter().map(|n| (n.tick, n.tick + n.len)).collect();
-    intervals.sort_by_key(|&(start, _)| start);
-    let mut merged: Vec<(usize, usize)> = Vec::new();
-    for (start, end) in intervals {
-        match merged.last_mut() {
-            Some(last) if start <= last.1 => last.1 = last.1.max(end),
-            _ => merged.push((start, end)),
-        }
-    }
-    merged.windows(2).map(|w| (w[0].1, w[1].0)).collect()
-}
-
-/// The whole-side range a split point resolves to once the user clicks the
-/// highlighted side: from the start of the song up to `split` (`Side::Left`,
-/// the pointer was hovering left of the split), or from `split` to the end
-/// of the song (`Side::Right`).
-pub(super) fn split_side_range(split: usize, side: Side, notes: &[GridNote]) -> (usize, usize) {
-    match side {
-        Side::Left => (0, split),
-        Side::Right => (split, song_end_tick(notes).max(split)),
-    }
-}
-
-/// Whether a note spanning `[tick, tick+len)` overlaps `[start, end)`.
-fn range_overlaps(tick: usize, len: usize, start: usize, end: usize) -> bool {
-    tick < end && start < tick + len
-}
-
-/// Deletes every note overlapping `[start, end)`, leaving every other note
-/// exactly where it is — the song's own length is unaffected, just a gap
-/// where those notes used to be. The **Erase** tool.
-pub(super) fn erase_range(notes: &[GridNote], start: usize, end: usize) -> Vec<GridNote> {
-    notes
-        .iter()
-        .copied()
-        .filter(|n| !range_overlaps(n.tick, n.len, start, end))
-        .collect()
-}
-
-/// Deletes every note overlapping `[start, end)`, *and* shifts every note
-/// that starts at or after `end` earlier by `end - start` ticks, closing the
-/// gap — the song gets shorter. The **Remove** tool.
-pub(super) fn remove_range(notes: &[GridNote], start: usize, end: usize) -> Vec<GridNote> {
-    let span = end.saturating_sub(start);
-    notes
-        .iter()
-        .copied()
-        .filter(|n| !range_overlaps(n.tick, n.len, start, end))
-        .map(|mut n| {
-            if n.tick >= end {
-                n.tick -= span;
-            }
-            n
-        })
-        .collect()
-}
+// Timeline erase/remove and silence-track range logic — `song_end_tick`,
+// `normalize_range`, `silence_gaps`, `split_side_range`, `erase_range`,
+// `remove_range` — live in `ranges.rs` (split out to stay under the
+// file-size budget; none of them touch `EditorState` itself).

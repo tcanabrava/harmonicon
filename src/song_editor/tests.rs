@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-use super::grid::{mix_srgba, note_in_scale, visible_beats};
+use super::grid::{group_move_targets, group_move_valid, mix_srgba, note_in_scale, visible_beats};
 use super::harpchart::{load_harpchart, parse_pitch_expr, safe_path_segment, serialize_harpchart};
-use super::interaction::{apply_modifier, select_or_add};
+use super::interaction::{apply_modifier, select_or_add, select_or_add_ctrl};
 use super::lesson_form::{populate_from_lesson_manifest, serialize_lesson};
 use super::playback::{build_harp, note_freq, playhead_for, secs_per_tick};
+use super::ranges::{
+    erase_range, normalize_range, remove_range, silence_gaps, song_end_tick, split_side_range,
+};
 use super::state::Scroll;
 use super::state::{
     ContentKind, Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
-    apply_resize, build_tempo_map, can_place, cycle_next, enforce_direction, enforce_expr,
-    erase_range, move_target, normalize_range, note_rect, remove_range, silence_gaps,
-    song_end_tick, split_side_range, toggle_tempo_point,
+    apply_resize, build_tempo_map, cycle_next, enforce_direction, enforce_expr,
+    move_target, note_rect, toggle_tempo_point,
 };
 use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
 use super::ui::ModButton;
@@ -191,11 +193,145 @@ fn click_adds_then_selects_without_duplicating() {
     select_or_add(&mut s, 4, 2);
     assert_eq!(s.notes.len(), 1);
     let added = s.notes[0];
-    assert_eq!(s.selected, Some(added.id));
+    assert_eq!(s.selected, vec![added.id]);
     assert_eq!((added.hole, added.tick, added.len), (4, 2, TICKS_PER_BEAT));
     select_or_add(&mut s, 4, 2);
     assert_eq!(s.notes.len(), 1);
-    assert_eq!(s.selected, Some(added.id));
+    assert_eq!(s.selected, vec![added.id]);
+}
+
+// ── Multi-select ──────────────────────────────────────────────────────────
+
+#[test]
+fn ctrl_click_toggles_notes_into_and_out_of_the_selection() {
+    let mut s = EditorState::default();
+    select_or_add(&mut s, 2, 0);
+    let a = s.notes[0].id;
+    select_or_add(&mut s, 5, 0);
+    let b = s.notes[1].id;
+    // A plain click on `b` above already replaced the selection with just
+    // it — Ctrl+click `a` to add it back in alongside `b`.
+    select_or_add_ctrl(&mut s, 2, 0);
+    assert_eq!(s.selected, vec![b, a]);
+    // Ctrl+click `b` again removes just it, leaving `a` selected.
+    select_or_add_ctrl(&mut s, 5, 0);
+    assert_eq!(s.selected, vec![a]);
+}
+
+#[test]
+fn ctrl_click_on_empty_space_still_creates_and_selects_a_note() {
+    let mut s = EditorState::default();
+    select_or_add(&mut s, 2, 0);
+    select_or_add_ctrl(&mut s, 5, 0);
+    assert_eq!(s.notes.len(), 2);
+    // Extending onto a freshly-created note behaves like a plain click,
+    // since there was nothing existing yet to add to the selection.
+    assert_eq!(s.selected, vec![s.notes[1].id]);
+}
+
+#[test]
+fn delete_selected_removes_every_note_in_a_multi_selection() {
+    let mut s = EditorState::default();
+    // Plain clicks to create three notes (each replaces the selection with
+    // just itself), then Ctrl+click the first two back in alongside the
+    // third to build a three-note multi-selection.
+    select_or_add(&mut s, 2, 0);
+    select_or_add(&mut s, 5, 0);
+    select_or_add(&mut s, 7, 0);
+    select_or_add_ctrl(&mut s, 2, 0);
+    select_or_add_ctrl(&mut s, 5, 0);
+    assert_eq!(s.notes.len(), 3);
+    assert_eq!(s.selected.len(), 3);
+    apply_modifier(&mut s, ModButton::Delete);
+    assert!(s.notes.is_empty());
+    assert!(s.selected.is_empty());
+}
+
+#[test]
+fn group_move_targets_shifts_every_member_by_the_same_delta() {
+    let make = |id: u32, hole: u8, tick: usize| GridNote {
+        id,
+        hole,
+        tick,
+        len: 4,
+        dir: Dir::Blow,
+        pitch: Pitch::Normal,
+        expr: Expr::None,
+    };
+    let others = vec![make(2, 3, 8), make(3, 5, 16)];
+    let targets = group_move_targets(&others, 1, TICKS_PER_BEAT as i32, 10);
+    assert_eq!(
+        targets,
+        vec![
+            (2, 4, 8 + TICKS_PER_BEAT, 4, Pitch::Normal),
+            (3, 6, 16 + TICKS_PER_BEAT, 4, Pitch::Normal),
+        ]
+    );
+}
+
+#[test]
+fn group_move_targets_clamps_each_member_to_the_hole_range() {
+    let note = GridNote {
+        id: 1,
+        hole: 9,
+        tick: 0,
+        len: 4,
+        dir: Dir::Blow,
+        pitch: Pitch::Normal,
+        expr: Expr::None,
+    };
+    let targets = group_move_targets(&[note], 5, 0, 10);
+    assert_eq!(targets[0].1, 10); // clamped at the top hole
+}
+
+#[test]
+fn group_move_valid_rejects_a_target_overlapping_a_note_outside_the_group() {
+    let mut s = EditorState::default();
+    select_or_add(&mut s, 3, 0); // an unrelated, unselected note
+    let targets = vec![(99u32, 3, 0, 4, Pitch::Normal)];
+    assert!(!group_move_valid(&s.notes, &[99], &targets));
+    // Moving out of the blocker's way is fine again.
+    let clear = vec![(99u32, 3, 8, 4, Pitch::Normal)];
+    assert!(group_move_valid(&s.notes, &[99], &clear));
+}
+
+#[test]
+fn group_move_valid_ignores_overlap_among_the_groups_own_members() {
+    // Two notes in the same group, already overlapping each other (e.g. a
+    // chord) — that must not block the move.
+    let notes = vec![
+        GridNote {
+            id: 1,
+            hole: 2,
+            tick: 0,
+            len: 4,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        },
+        GridNote {
+            id: 2,
+            hole: 5,
+            tick: 0,
+            len: 4,
+            dir: Dir::Blow,
+            pitch: Pitch::Normal,
+            expr: Expr::None,
+        },
+    ];
+    let targets = vec![
+        (1u32, 2, 4, 4, Pitch::Normal),
+        (2u32, 5, 4, 4, Pitch::Normal),
+    ];
+    assert!(group_move_valid(&notes, &[1, 2], &targets));
+}
+
+#[test]
+fn group_move_valid_rejects_a_pitch_incompatible_with_its_target_hole() {
+    // Bend(1.5) only fits holes 2/3/10 (see `max_bend`) — landing on hole 5
+    // must fail even with nothing else in the way.
+    let targets = vec![(1u32, 5, 0, 4, Pitch::Bend(1.5))];
+    assert!(!group_move_valid(&[], &[1], &targets));
 }
 
 #[test]
@@ -216,7 +352,7 @@ fn unbendable_hole_ignores_bend() {
     select_or_add(&mut s, 5, 0);
     let hole5 = s.notes[0].id;
     select_or_add(&mut s, 7, 0);
-    s.selected = Some(hole5);
+    s.selected = vec![hole5];
     apply_modifier(&mut s, ModButton::Bend);
     assert_eq!(
         s.notes.iter().find(|n| n.hole == 5).unwrap().pitch,
@@ -380,7 +516,7 @@ fn setting_overblow_on_a_selected_note_forces_its_direction_and_propagates() {
     select_or_add(&mut s, 3, 0);
     apply_modifier(&mut s, ModButton::Draw); // starts as Draw
     select_or_add(&mut s, 5, 0); // a simultaneous chord note, also Draw
-    s.selected = Some(s.note_at(3, 0).unwrap().id);
+    s.selected = vec![s.note_at(3, 0).unwrap().id];
     apply_modifier(&mut s, ModButton::Overblow);
     let hole3 = s.notes.iter().find(|n| n.hole == 3).unwrap();
     assert_eq!(hole3.pitch, Pitch::Overblow);
@@ -529,11 +665,11 @@ fn switching_kind_deselects_a_note_that_got_dropped() {
         ..Default::default()
     };
     select_or_add(&mut s, 11, 0);
-    assert!(s.selected.is_some());
+    assert!(!s.selected.is_empty());
 
     s.set_harmonica_kind(HarmonicaKind::Diatonic);
 
-    assert_eq!(s.selected, None);
+    assert!(s.selected.is_empty());
 }
 
 #[test]
@@ -555,7 +691,7 @@ fn delete_removes_selected() {
     select_or_add(&mut s, 2, 1);
     apply_modifier(&mut s, ModButton::Delete);
     assert!(s.notes.is_empty());
-    assert_eq!(s.selected, None);
+    assert!(s.selected.is_empty());
 }
 
 #[test]
@@ -566,7 +702,7 @@ fn clicking_a_covered_beat_selects_rather_than_stacks() {
     s.notes[0].len = 3;
     select_or_add(&mut s, 4, 2);
     assert_eq!(s.notes.len(), 1);
-    assert_eq!(s.selected, Some(id));
+    assert_eq!(s.selected, vec![id]);
 }
 
 #[test]
@@ -583,7 +719,7 @@ fn setting_direction_propagates_to_simultaneous_notes() {
     let mut s = EditorState::default();
     select_or_add(&mut s, 2, 0);
     select_or_add(&mut s, 5, 0);
-    s.selected = Some(s.note_at(2, 0).unwrap().id);
+    s.selected = vec![s.note_at(2, 0).unwrap().id];
     apply_modifier(&mut s, ModButton::Draw);
     assert_eq!(s.note_at(2, 0).unwrap().dir, Dir::Draw);
     assert_eq!(s.note_at(5, 0).unwrap().dir, Dir::Draw);
@@ -686,7 +822,7 @@ fn clicking_wah_propagates_to_overlapping_notes_via_apply_modifier() {
     select_or_add(&mut s, 2, 0);
     select_or_add(&mut s, 5, 2); // overlaps the first note (tick 0..4 vs 2..6)
     select_or_add(&mut s, 7, 10); // independent
-    s.selected = Some(s.note_at(2, 0).unwrap().id);
+    s.selected = vec![s.note_at(2, 0).unwrap().id];
     apply_modifier(&mut s, ModButton::Wah);
     assert_eq!(s.note_at(2, 0).unwrap().expr, Expr::Wah(2.0));
     assert_eq!(
@@ -706,7 +842,7 @@ fn separate_times_keep_independent_directions() {
     let mut s = EditorState::default();
     select_or_add(&mut s, 2, 0);
     select_or_add(&mut s, 2, 4);
-    s.selected = Some(s.note_at(2, 4).unwrap().id);
+    s.selected = vec![s.note_at(2, 4).unwrap().id];
     apply_modifier(&mut s, ModButton::Draw);
     assert_eq!(s.note_at(2, 0).unwrap().dir, Dir::Blow);
     assert_eq!(s.note_at(2, 4).unwrap().dir, Dir::Draw);
@@ -869,9 +1005,10 @@ fn move_is_blocked_where_a_note_already_sits() {
             expr: Expr::None,
         },
     ];
-    assert!(!can_place(&notes, 1, 3, 1, 1));
-    assert!(can_place(&notes, 1, 3, 2, 1));
-    assert!(can_place(&notes, 1, 4, 0, 1));
+    let target = |hole, tick| vec![(1u32, hole, tick, 1, Pitch::Normal)];
+    assert!(!group_move_valid(&notes, &[1], &target(3, 1)));
+    assert!(group_move_valid(&notes, &[1], &target(3, 2)));
+    assert!(group_move_valid(&notes, &[1], &target(4, 0)));
 }
 
 #[test]

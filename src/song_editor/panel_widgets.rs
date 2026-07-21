@@ -13,7 +13,8 @@ use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
 
 use super::interaction::apply_modifier;
-use super::state::{EditorState, TimelineDrag, TimelineSelection, TimelineTool, normalize_range};
+use super::ranges::normalize_range;
+use super::state::{EditorState, TimelineDrag, TimelineSelection, TimelineTool};
 use super::timeline::request_confirm;
 use super::ui::{BendDot, ModButton, ModButtonLabel, ModeButton, TimelineToolButton};
 use crate::dialogs::confirm_dialog::OpenConfirmDialog;

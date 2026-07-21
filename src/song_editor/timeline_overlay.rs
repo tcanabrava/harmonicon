@@ -11,9 +11,8 @@ use bevy::picking::Pickable;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
-use super::state::{
-    EditorState, Side, TimelineDrag, TimelineSelection, normalize_range, split_side_range,
-};
+use super::ranges::{normalize_range, split_side_range};
+use super::state::{EditorState, Side, TimelineDrag, TimelineSelection};
 use super::timeline::{
     TimelineSurface, TimelineSurfaceGeometry, on_timeline_click_seek, on_timeline_click_tempo,
     on_timeline_drag, on_timeline_drag_end, on_timeline_drag_start,

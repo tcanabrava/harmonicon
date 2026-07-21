@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use bevy::ui_render::prelude::MaterialNode;
 
+use super::grid::group_move_targets;
 use super::material::EditorNoteMaterial;
 use super::playback::Playhead;
 use super::state::{
@@ -19,8 +20,8 @@ use super::state::{
     pitch_forced_dir,
 };
 use super::ui::{
-    GridArea, GridContent, GridScrollMarker, GridScrollThumb, GridScrollTrack, ModButton,
-    MoveGhost, NoteView,
+    GridArea, GridContent, GridScrollMarker, GridScrollThumb, GridScrollTrack, GroupMoveGhost,
+    ModButton, MoveGhost, NoteView,
 };
 use super::{AppState, BEAT_W, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use crate::dialogs::file_dialog::FileDialog;
@@ -28,13 +29,20 @@ use crate::theme::LoadedTheme;
 
 // ── Note interaction ─────────────────────────────────────────────────────────
 
+/// Whether either Ctrl key is currently held — the modifier that turns a
+/// note click into a multi-selection toggle instead of an ordinary
+/// select/add (see [`select_or_add_ctrl`]).
+pub(super) fn ctrl_held(keyboard: &ButtonInput<KeyCode>) -> bool {
+    keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight)
+}
+
 pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     if let Some(existing) = state
         .notes
         .iter()
         .find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
     {
-        state.selected = Some(existing.id);
+        state.select_only(existing.id);
         return;
     }
 
@@ -84,7 +92,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         pitch,
         expr,
     });
-    state.selected = Some(id);
+    state.select_only(id);
     // A chord note whose direction was forced (above), or that's carrying
     // an armed sticky expr, must pull any simultaneous notes on other
     // holes into agreement too — direction and wah/vibrato are both
@@ -97,10 +105,34 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     }
 }
 
-pub(super) fn delete_selected(state: &mut EditorState) {
-    if let Some(id) = state.selected.take() {
-        state.notes.retain(|n| n.id != id);
+/// The Ctrl+click sibling of [`select_or_add`]: toggles an existing note at
+/// `hole`/`tick` in or out of the current multi-selection instead of
+/// replacing it outright — this is what lets more than one note be
+/// selected at once. Clicking empty space still behaves like a plain click
+/// (creates and exclusively selects a new note): extending a selection
+/// only makes sense against a note that already exists, there's nothing to
+/// "add" a freshly-placed one to.
+pub(super) fn select_or_add_ctrl(state: &mut EditorState, hole: u8, tick: usize) {
+    if let Some(existing) = state
+        .notes
+        .iter()
+        .find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
+    {
+        state.toggle_selected(existing.id);
+        return;
     }
+    select_or_add(state, hole, tick);
+}
+
+/// Deletes every currently-selected note (see `EditorState::selected`) —
+/// the Delete key/mod-panel button act on the whole multi-selection, not
+/// just one note.
+pub(super) fn delete_selected(state: &mut EditorState) {
+    if state.selected.is_empty() {
+        return;
+    }
+    let ids = core::mem::take(&mut state.selected);
+    state.notes.retain(|n| !ids.contains(&n.id));
 }
 
 pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
@@ -123,7 +155,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         if pitch_forced_dir(state.sticky_pitch).is_some_and(|d| d != dir) {
             state.sticky_pitch = Pitch::Normal;
         }
-        if let Some(id) = state.selected {
+        if let Some(&id) = state.selected.last() {
             if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                 n.dir = dir;
                 if pitch_forced_dir(n.pitch).is_some_and(|d| d != dir) {
@@ -135,7 +167,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         return;
     }
 
-    let Some(id) = state.selected else {
+    let Some(&id) = state.selected.last() else {
         // Nothing to edit, but every pitch/expr button still needs to
         // arm/cycle for notes not yet placed — cycles `sticky_pitch`/
         // `sticky_expr` directly instead of a selected note's own field.
@@ -336,8 +368,8 @@ pub(super) fn grid_keys(
         if sel.drag.is_some() || state.timeline_split.is_some() {
             sel.drag = None;
             state.timeline_split = None;
-        } else if state.selected.is_some() {
-            state.selected = None;
+        } else if !state.selected.is_empty() {
+            state.selected.clear();
         } else {
             ret_play.0 = true;
             next_state.set(AppState::Menu);
@@ -508,7 +540,7 @@ pub(super) fn update_grid_scrollbar(
         .map(|w| w.width() / ui_scale.0)
         .unwrap_or(1280.0)
         - super::HOLE_COL_W;
-    let total_px = super::state::song_end_tick(&state.notes) as f32 * TICK_W;
+    let total_px = super::ranges::song_end_tick(&state.notes) as f32 * TICK_W;
 
     if !scrollbar_needed(total_px, view_w) {
         if *vis != Visibility::Hidden {
@@ -563,7 +595,7 @@ pub(super) fn update_scrollbar_markers(
     for e in &markers {
         commands.entity(e).despawn();
     }
-    let end_tick = super::state::song_end_tick(&state.notes);
+    let end_tick = super::ranges::song_end_tick(&state.notes);
     if end_tick == 0 {
         return;
     }
@@ -614,7 +646,7 @@ pub(super) fn drag_grid_scrollbar(
         return;
     };
     let track_w = track.size().x * track.inverse_scale_factor();
-    let total_px = super::state::song_end_tick(&state.notes) as f32 * TICK_W;
+    let total_px = super::ranges::song_end_tick(&state.notes) as f32 * TICK_W;
     if track_w <= 0.0 {
         return;
     }
@@ -636,7 +668,9 @@ pub(super) fn live_resize(
     )>,
     mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
 ) {
-    let Some(drag) = state.dragging else { return };
+    let Some(drag) = state.dragging.as_ref() else {
+        return;
+    };
     if !matches!(drag.kind, DragKind::Resize(_)) {
         return;
     }
@@ -673,7 +707,7 @@ pub(super) fn update_move_ghost(
     let Ok((mut node, mut vis, mut bg, mut border)) = ghost.single_mut() else {
         return;
     };
-    match state.dragging {
+    match &state.dragging {
         Some(drag) if drag.kind == DragKind::Move => {
             let colors = theme.song_editor_colors();
             let left = drag.target_tick as f32 * TICK_W + 1.0;
@@ -692,6 +726,72 @@ pub(super) fn update_move_ghost(
         }
         _ => *vis = Visibility::Hidden,
     }
+}
+
+/// The multi-select sibling of [`update_move_ghost`]: one preview rectangle
+/// per *other* note in a group move (`DragState::group`), positioned by
+/// shifting each member's own original hole/tick by the exact delta the
+/// anchor moved by ([`group_move_targets`]) — the anchor's own preview is
+/// still [`MoveGhost`]. Rebuilt from scratch every frame, like
+/// `update_scrollbar_markers`, since there's no group to show most of the
+/// time (an ordinary single-note drag leaves `group` empty and this is a
+/// no-op after clearing any leftover ghosts from a previous drag).
+pub(super) fn update_group_move_ghosts(
+    mut commands: Commands,
+    state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
+    content: Query<Entity, With<GridContent>>,
+    old: Query<Entity, With<GroupMoveGhost>>,
+) {
+    for e in &old {
+        commands.entity(e).despawn();
+    }
+    let Some(drag) = state.dragging.as_ref() else {
+        return;
+    };
+    if drag.kind != DragKind::Move || drag.group.is_empty() {
+        return;
+    }
+    let Ok(content) = content.single() else {
+        return;
+    };
+    let colors = theme.song_editor_colors();
+    let color = if drag.valid {
+        colors.ghost_ok
+    } else {
+        colors.ghost_bad
+    };
+    let hole_delta = drag.target_hole as i32 - drag.start_hole as i32;
+    let tick_delta = drag.target_tick as i32 - drag.start_tick as i32;
+    let hole_count = state.hole_count();
+    let targets = group_move_targets(&drag.group, hole_delta, tick_delta, hole_count);
+    let new: Vec<Entity> = targets
+        .iter()
+        .map(|&(_, hole, tick, len, _)| {
+            let left = tick as f32 * TICK_W + 1.0;
+            let top = HEADER_H + (hole as f32 - 1.0) * ROW_H + NOTE_PAD;
+            let width = len as f32 * TICK_W - 2.0;
+            commands
+                .spawn((
+                    GroupMoveGhost,
+                    ZIndex(2),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(left),
+                        top: Val::Px(top),
+                        width: Val::Px(width),
+                        height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(color.with_alpha(0.30)),
+                    BorderColor::all(color),
+                    Pickable::IGNORE,
+                ))
+                .id()
+        })
+        .collect();
+    commands.entity(content).add_children(&new);
 }
 
 #[cfg(test)]

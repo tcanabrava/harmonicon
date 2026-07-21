@@ -33,8 +33,8 @@
 //! Either way nothing is deleted until the confirm dialog
 //! (`dialogs::confirm_dialog`) comes back `confirmed: true` — see
 //! [`handle_timeline_confirm`]. The actual note-list surgery is the pure
-//! `state::erase_range`/`state::remove_range` pair; this module is just the
-//! interaction/UI wiring around them.
+//! `ranges::erase_range`/`ranges::remove_range` pair; this module is just
+//! the interaction/UI wiring around them.
 
 use bevy::picking::events::{Click, Drag, DragEnd, DragStart, Pointer};
 use bevy::prelude::*;
@@ -42,10 +42,11 @@ use bevy::ui::RelativeCursorPosition;
 use bevy_fluent::prelude::Localization;
 
 use super::playback::{Playhead, secs_per_tick};
+use super::ranges::{erase_range, normalize_range, remove_range, split_side_range};
 use super::record::RecordState;
 use super::state::{
-    EditorState, Mode, Scroll, Side, TimelineDrag, TimelineSelection, TimelineTool, erase_range,
-    normalize_range, remove_range, split_side_range, toggle_tempo_point,
+    EditorState, Mode, Scroll, Side, TimelineDrag, TimelineSelection, TimelineTool,
+    toggle_tempo_point,
 };
 use super::{BEAT_W, BEATS_PER_BAR, TICK_W, TICKS_PER_BEAT};
 use crate::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
@@ -377,7 +378,7 @@ pub(super) fn on_timeline_drag_end(
 }
 
 /// Reacts to the confirm dialog's answer for [`TIMELINE_CONFIRM_PURPOSE`] —
-/// applies `state::erase_range`/`state::remove_range` on `confirmed: true`,
+/// applies `ranges::erase_range`/`ranges::remove_range` on `confirmed: true`,
 /// otherwise just drops the pending request. Ignores every other purpose,
 /// so this can share `ConfirmChosen` with any future confirm-dialog user.
 pub(super) fn handle_timeline_confirm(
@@ -401,6 +402,6 @@ pub(super) fn handle_timeline_confirm(
             TimelineTool::Select => continue,
             TimelineTool::Tempo => continue,
         };
-        state.selected = None;
+        state.selected.clear();
     }
 }

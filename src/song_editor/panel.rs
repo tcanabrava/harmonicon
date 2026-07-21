@@ -300,7 +300,7 @@ mod tests {
         let mut world = World::new();
         let state = EditorState {
             notes: vec![note(Dir::Blow, Pitch::Bend(0.5), Expr::Vibrato(5.0))],
-            selected: Some(1),
+            selected: vec![1],
             ..Default::default()
         };
         world.insert_resource(state);

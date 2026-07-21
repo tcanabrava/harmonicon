@@ -452,7 +452,7 @@ fn load_lesson(path: &std::path::Path, state: &mut EditorState, scroll: &mut Scr
         None => {
             state.notes.clear();
             state.next_id = 0;
-            state.selected = None;
+            state.selected.clear();
         }
     }
 

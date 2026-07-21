@@ -360,7 +360,7 @@ fn on_midi_track_selected(
         Ok(imported) => {
             state.next_id = imported.notes.len() as u32;
             state.notes = imported.notes;
-            state.selected = None;
+            state.selected.clear();
             state.dragging = None;
             state.tempo = format!("{}", imported.initial_bpm.round() as u32);
             state.tempo_changes = imported.tempo_changes;

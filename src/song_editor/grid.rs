@@ -6,13 +6,13 @@ use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy::ui_render::prelude::MaterialNode;
 
-use super::interaction::select_or_add;
+use super::interaction::{ctrl_held, select_or_add, select_or_add_ctrl};
 use super::material::EditorNoteMaterial;
 use super::playback::{build_harp, note_freq};
+use super::ranges::silence_gaps;
 use super::state::{
-    DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch, can_place, enforce_direction,
+    DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch, enforce_direction,
     enforce_expr, move_target, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
-    silence_gaps,
 };
 use super::ui::{GridContent, GridItem, NoteView};
 use super::{
@@ -204,7 +204,8 @@ pub(super) fn rebuild_grid(
             cell.observe(
                 move |ev: On<Pointer<Click>>,
                       rel: Query<&RelativeCursorPosition>,
-                      mut state: ResMut<EditorState>| {
+                      mut state: ResMut<EditorState>,
+                      keyboard: Res<ButtonInput<KeyCode>>| {
                     let frac = rel
                         .get(ev.entity)
                         .ok()
@@ -212,7 +213,12 @@ pub(super) fn rebuild_grid(
                         .map_or(0.0, |n| n.x)
                         .clamp(0.0, 0.999);
                     let sub = (frac * TICKS_PER_BEAT as f32).floor() as usize;
-                    select_or_add(&mut state, hole, beat * TICKS_PER_BEAT + sub);
+                    let tick = beat * TICKS_PER_BEAT + sub;
+                    if ctrl_held(&keyboard) {
+                        select_or_add_ctrl(&mut state, hole, tick);
+                    } else {
+                        select_or_add(&mut state, hole, tick);
+                    }
                 },
             );
             items.push(cell.id());
@@ -297,7 +303,7 @@ pub(super) fn rebuild_grid(
     let last_tick = (state.scroll_beat + cols + 1) * TICKS_PER_BEAT;
     for note in &state.notes {
         if note.tick < last_tick && note.tick + note.len > first_tick {
-            let selected = state.selected == Some(note.id);
+            let selected = state.is_selected(note.id);
             let in_scale = note_in_scale(note, &harp, &scale);
             items.push(spawn_note(
                 &mut commands,
@@ -463,6 +469,56 @@ fn spawn_silence_gap(
         .id()
 }
 
+/// Shifts every *other* selected note (`DragState::group`) by the exact
+/// hole/tick delta the anchor moved by (`anchor_target - anchor_start`),
+/// so a multi-note drag moves the whole group as one rigid shape — used
+/// alongside `state::move_target`, which already computes the anchor's own
+/// clamped target. Each member is independently clamped to the harp's hole
+/// range and non-negative ticks, the same rule `move_target` applies to
+/// the anchor; at the extreme edges of the grid this can compress the
+/// group's shape slightly (some members clamp, others don't) rather than
+/// blocking the whole move outright — an accepted, rare edge case, same
+/// spirit as a single note's own drag clamping instead of refusing to move.
+pub(super) fn group_move_targets(
+    others: &[GridNote],
+    hole_delta: i32,
+    tick_delta: i32,
+    hole_count: u8,
+) -> Vec<(u32, u8, usize, usize, Pitch)> {
+    others
+        .iter()
+        .map(|n| {
+            let hole = (n.hole as i32 + hole_delta).clamp(1, hole_count as i32) as u8;
+            let tick = (n.tick as i32 + tick_delta).max(0) as usize;
+            (n.id, hole, tick, n.len, n.pitch)
+        })
+        .collect()
+}
+
+/// Whether every note in a multi-note move — the anchor plus every other
+/// member of its group, each as `(id, hole, tick, len, pitch)` — can
+/// legally land at its computed target: its pitch technique still fits the
+/// hole it would land on (e.g. a note bent 1.5 semitones can't land on a
+/// hole whose own max bend is smaller), and it doesn't overlap any note
+/// that ISN'T part of the group (group members overlapping *each other* is
+/// fine — they keep their original relative positions, so if they didn't
+/// collide before the drag they won't after it either).
+pub(super) fn group_move_valid(
+    notes: &[GridNote],
+    moving_ids: &[u32],
+    targets: &[(u32, u8, usize, usize, Pitch)],
+) -> bool {
+    targets.iter().all(|&(_, hole, tick, len, pitch)| {
+        pitch_compatible(pitch, hole)
+            && !notes.iter().any(|n| {
+                !moving_ids.contains(&n.id)
+                    && n.hole == hole
+                    && n.tick < tick + len
+                    && tick < n.tick + n.len
+            })
+    })
+}
+
 pub(super) fn spawn_note(
     commands: &mut Commands,
     note: GridNote,
@@ -518,8 +574,14 @@ pub(super) fn spawn_note(
             pick,
         ))
         .observe(
-            move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                state.selected = Some(id);
+            move |_: On<Pointer<Click>>,
+                  mut state: ResMut<EditorState>,
+                  keyboard: Res<ButtonInput<KeyCode>>| {
+                if ctrl_held(&keyboard) {
+                    state.toggle_selected(id);
+                } else {
+                    state.select_only(id);
+                }
             },
         )
         .observe(
@@ -527,10 +589,25 @@ pub(super) fn spawn_note(
                 if state.dragging.is_some() {
                     return;
                 }
-                if let Some(n) = state.note_by_id(id).copied() {
-                    state.selected = Some(id);
-                    state.dragging = Some(DragState::new(id, DragKind::Move, &n));
-                }
+                let Some(anchor) = state.note_by_id(id).copied() else {
+                    return;
+                };
+                // Dragging a note that's part of the current multi-selection
+                // (more than one note selected, this one among them) moves
+                // the whole group together; otherwise a drag behaves like
+                // before — it exclusively selects just the note being
+                // dragged.
+                let group: Vec<GridNote> = if state.selected.len() > 1 && state.is_selected(id) {
+                    let ids = state.selected.clone();
+                    ids.iter()
+                        .filter(|&&gid| gid != id)
+                        .filter_map(|&gid| state.note_by_id(gid).copied())
+                        .collect()
+                } else {
+                    state.select_only(id);
+                    Vec::new()
+                };
+                state.dragging = Some(DragState::new_group(id, &anchor, group));
             },
         )
         .observe(
@@ -538,10 +615,13 @@ pub(super) fn spawn_note(
                   mut state: ResMut<EditorState>,
                   loc: Res<Localization>,
                   ui_scale: Res<UiScale>| {
-                let Some(drag) = state.dragging else { return };
+                let Some(drag) = state.dragging.clone() else {
+                    return;
+                };
                 if drag.id != id || drag.kind != DragKind::Move {
                     return;
                 }
+                let hole_count = state.hole_count();
                 // `Pointer<Drag>::distance` is raw window-pixel motion, but
                 // `TICK_W`/`ROW_H` are logical sizes that `UiScale` (the
                 // arrow-key UI zoom, `dialogs::ui_scale`) multiplies up for
@@ -554,7 +634,7 @@ pub(super) fn spawn_note(
                     drag.start_tick,
                     ev.distance.x / ui_scale.0,
                     ev.distance.y / ui_scale.0,
-                    state.hole_count(),
+                    hole_count,
                 );
                 let pitch = state
                     .notes
@@ -562,12 +642,32 @@ pub(super) fn spawn_note(
                     .find(|n| n.id == id)
                     .map(|n| n.pitch)
                     .unwrap_or(Pitch::Normal);
-                let place_ok = can_place(&state.notes, id, hole, tick, drag.start_len);
                 let pitch_ok = pitch_compatible(pitch, hole);
-                let valid = place_ok && pitch_ok;
+                // The anchor and the rest of the group (if any) are checked
+                // together, in one `group_move_valid` call, rather than the
+                // anchor via `can_place` and the group separately: since
+                // every member shifts by the same delta, a `can_place`-style
+                // check comparing the anchor's *new* spot against the other
+                // members' *stale, not-yet-moved* positions would wrongly
+                // flag a collision whenever the group's own shape has two
+                // members swap-adjacent (e.g. dragging two same-hole notes
+                // right by exactly one note's length) — they're moving out
+                // of each other's way together, not colliding.
+                let hole_delta = hole as i32 - drag.start_hole as i32;
+                let tick_delta = tick as i32 - drag.start_tick as i32;
+                let mut targets = vec![(id, hole, tick, drag.start_len, pitch)];
+                targets.extend(group_move_targets(
+                    &drag.group,
+                    hole_delta,
+                    tick_delta,
+                    hole_count,
+                ));
+                let mut moving_ids: Vec<u32> = vec![id];
+                moving_ids.extend(drag.group.iter().map(|n| n.id));
+                let valid = group_move_valid(&state.notes, &moving_ids, &targets);
                 state.drag_msg = if !pitch_ok {
                     loc.msg(pitch_deny_key(pitch, hole))
-                } else if !place_ok {
+                } else if !valid {
                     loc.msg("drag-denied-overlap")
                 } else {
                     crate::localization::LocalizedStr::default()
@@ -586,12 +686,27 @@ pub(super) fn spawn_note(
                 };
                 state.drag_msg = crate::localization::LocalizedStr::default();
                 if drag.kind == DragKind::Move && drag.valid {
+                    let hole_count = state.hole_count();
+                    let hole_delta = drag.target_hole as i32 - drag.start_hole as i32;
+                    let tick_delta = drag.target_tick as i32 - drag.start_tick as i32;
+                    let group_targets =
+                        group_move_targets(&drag.group, hole_delta, tick_delta, hole_count);
                     if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                         n.hole = drag.target_hole;
                         n.tick = drag.target_tick;
                     }
+                    for &(gid, gh, gt, _, _) in &group_targets {
+                        if let Some(n) = state.notes.iter_mut().find(|n| n.id == gid) {
+                            n.hole = gh;
+                            n.tick = gt;
+                        }
+                    }
                     enforce_direction(&mut state, id);
                     enforce_expr(&mut state, id);
+                    for &(gid, _, _, _, _) in &group_targets {
+                        enforce_direction(&mut state, gid);
+                        enforce_expr(&mut state, gid);
+                    }
                 }
             },
         )
@@ -656,12 +771,12 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge, l
         .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.25)), pick))
         .observe(move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
             if let Some(n) = state.note_by_id(id).copied() {
-                state.selected = Some(id);
+                state.select_only(id);
                 state.dragging = Some(DragState::new(id, DragKind::Resize(edge), &n));
             }
         })
         .observe(move |ev: On<Pointer<Drag>>, mut state: ResMut<EditorState>, ui_scale: Res<UiScale>| {
-            let Some(drag) = state.dragging else { return };
+            let Some(drag) = state.dragging.clone() else { return };
             if drag.id != id || drag.kind != DragKind::Resize(edge) { return; }
             let hole = drag.start_hole;
             let mut left_bound = 0usize;
@@ -686,7 +801,7 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge, l
             }
         })
         .observe(move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
-            if matches!(state.dragging, Some(d) if d.id == id && matches!(d.kind, DragKind::Resize(_))) {
+            if matches!(&state.dragging, Some(d) if d.id == id && matches!(d.kind, DragKind::Resize(_))) {
                 state.dragging = None;
                 enforce_direction(&mut state, id);
                 enforce_expr(&mut state, id);

@@ -337,6 +337,16 @@ this file — prune it back to a one-line summary under "Shipped" below.
   changes. The scrollbar collapses via both `Visibility` and `Node::display`
   when content already fits, so short menus stay exactly as centered as
   before. See `CLAUDE.md`'s menu-scrolling bullet.
+- **Song editor: multi-note selection** — Ctrl+click toggles notes into and
+  out of a multi-selection (`EditorState::selected` is now a `Vec<u32>`;
+  `interaction::select_or_add_ctrl`); Delete and dragging a note both act
+  on the whole selection instead of just one note, moving/deleting the
+  group together (`grid::group_move_targets`/`group_move_valid`,
+  `DragState::group`). Mod-panel technique edits still target one note
+  (the "primary"/most-recently-selected). New `song_editor::ranges` module
+  (`song_end_tick`/`normalize_range`/`silence_gaps`/`split_side_range`/
+  `erase_range`/`remove_range`) split out of `state.rs` to stay under the
+  file-size budget. See `CLAUDE.md`'s multi-note-selection bullet.
 
 ## Current work
 
