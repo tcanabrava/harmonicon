@@ -302,6 +302,22 @@ this file — prune it back to a one-line summary under "Shipped" below.
   in the shared widget (`dialogs::combobox`'s `toggle_click`/
   `backdrop_click`/`item_click` all now call `ev.propagate(false)`). See
   `CLAUDE.md`'s song-editor-scale bullet.
+- **Song-progress bar: survives no background music, notes as rects** —
+  `spawn_song_progress` falls back to the furthest extent of its notes/
+  phrase sections as the bar's timescale (`effective_duration`) when a
+  chart has no backing track (`music_duration_secs` reads `0.0` with
+  nothing to measure), so the playhead/phrase strip/note markers still
+  populate instead of the whole bar reading as empty — only the waveform
+  row stays blank, since there's genuinely no waveform without decoded
+  audio. Separately, each note marker is now a rectangle sized to its own
+  duration and tinted blue (blow) / orange (draw)
+  (`note_marker_geometry`/`NoteMarker`), replacing a fixed-width white
+  sliver with no duration or direction information — the same "note as a
+  colored rect" language the Song Editor's scrollbar minimap already used.
+  2D/3D build markers straight from `ScheduledNote`; Jam Session (no
+  `SongNotes`, nothing scored) flattens the chart's own track events
+  instead, one marker per event so a chord/split item's notes each get
+  their own marker. See `CLAUDE.md`'s song-progress-bar bullet.
 
 ## Current work
 

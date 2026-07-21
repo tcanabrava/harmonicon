@@ -32,7 +32,7 @@ use crate::{
 use crate::gameplay::countdown_overlay::spawn_countdown;
 use crate::gameplay::harmonica_overlay::spawn_harmonica_overlay;
 use crate::gameplay::metronome_overlay::spawn_metronome;
-use crate::gameplay::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
+use crate::gameplay::song_progress_overlay::{BAR_HEIGHT, NoteMarker, spawn_song_progress};
 use crate::gameplay::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use crate::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 
@@ -251,11 +251,21 @@ pub fn setup(
 
     // Song-progress bar, pinned across the top like the scored modes — Jam
     // Session has no `SongNotes` (nothing is scored), so note markers are
-    // taken directly from the chart's track items instead.
-    let note_times: Vec<f64> = chart
+    // built directly from the chart's own track events instead — one
+    // marker per event (not per item), matching the scored modes' own
+    // per-event `ScheduledNote` granularity, so a chord/split item's
+    // notes each get their own correctly-tinted marker.
+    let note_markers: Vec<NoteMarker> = chart
         .track
         .iter()
-        .map(|item| resolve_item_time(item, &chart.timing))
+        .flat_map(|item| {
+            let time = resolve_item_time(item, &chart.timing);
+            item.events.iter().map(move |ev| NoteMarker {
+                time,
+                duration: item.duration,
+                is_blow: matches!(ev.action, Action::Blow),
+            })
+        })
         .collect();
     // No phrase sections either — adaptive difficulty is a scored-mode
     // concept, so Jam Session's bar just shows no phrase strip rectangles.
@@ -263,7 +273,7 @@ pub fn setup(
         &mut commands,
         &manifest.waveform,
         manifest.music_duration_secs,
-        &note_times,
+        &note_markers,
         &[],
         &[],
     );

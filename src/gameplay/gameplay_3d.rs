@@ -27,7 +27,7 @@ use super::modifier_legend::{build_legend_materials, spawn_modifier_legend};
 use super::note_tail_2d::{NoteTail2dMaterial, tail_params};
 use super::note_tail_3d::NoteTail3dMaterial;
 use super::phrase_overlay::{spawn_phrase_banner, spawn_tab_ribbon};
-use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
+use super::song_progress_overlay::{BAR_HEIGHT, NoteMarker, spawn_song_progress};
 use super::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, ComboText, FeedbackText, GameplayRoot, HoleCell,
@@ -691,12 +691,21 @@ pub fn setup(
         theme.twelve_bar_colors(),
         &loc,
     );
-    let note_times: Vec<f64> = note_build.song_notes.notes.iter().map(|n| n.time).collect();
+    let note_markers: Vec<NoteMarker> = note_build
+        .song_notes
+        .notes
+        .iter()
+        .map(|n| NoteMarker {
+            time: n.time,
+            duration: n.duration,
+            is_blow: n.is_blow,
+        })
+        .collect();
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
         manifest.music_duration_secs,
-        &note_times,
+        &note_markers,
         &note_build.adaptive.sections,
         &note_build.adaptive.learned,
     );

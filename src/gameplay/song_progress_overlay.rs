@@ -6,8 +6,19 @@
 //! `SongManifest::waveform` — so a player picking a loop range can see where
 //! in the song they're aiming. A thin red playhead line (styled like the
 //! Song Editor's `PlayheadLine`) sweeps across it to mark the current
-//! position. A thin strip below the waveform marks every chart note's onset
-//! as a tiny white rectangle, on the same timescale.
+//! position. A thin strip below the waveform marks every chart note as a
+//! small rectangle — left/width its time/duration, tinted by blow/draw —
+//! the same "note as a proportional rect" language the Song Editor's
+//! scrollbar minimap uses (`song_editor::interaction::scrollbar_marker`),
+//! on the same timescale as the waveform.
+//!
+//! A song with no background music (`SongManifest::music: None`) has no
+//! waveform to draw and a `music_duration_secs` of `0.0` — but the chart
+//! itself still has a real length, so [`spawn_song_progress`] falls back to
+//! the notes'/phrase-sections' own extent as the bar's timescale rather
+//! than reading as empty just because there's no audio underneath it (see
+//! its own doc comment). Only the waveform row itself stays empty in that
+//! case — there's genuinely no waveform data to show.
 //!
 //! The bar has two [`ProgressBarMode`]s. While playing it's pure
 //! visualization. While paused it becomes editable: click-and-drag anywhere
@@ -55,8 +66,16 @@ const PHRASE_RECT_BORDER: f32 = 1.5;
 /// [`BAR_Z_INDEX`] — would cover it.
 pub const BAR_HEIGHT: f32 = WAVEFORM_HEIGHT + NOTES_STRIP_HEIGHT + PHRASE_STRIP_HEIGHT;
 
-/// Width (px) of a single note marker.
-const NOTE_MARKER_WIDTH: f32 = 2.0;
+/// Narrowest a note's marker is ever drawn (fraction 0..1 of the bar),
+/// regardless of how short the note actually is — a proportionally-accurate
+/// but sub-pixel-wide marker would be invisible. See [`note_marker_geometry`].
+const MIN_NOTE_MARKER_FRAC: f32 = 0.003;
+
+/// Blow/draw note-marker tints — the same hues the Song Editor's scrollbar
+/// minimap uses (`song_editor::interaction::SCROLLBAR_BLOW_COLOR`/
+/// `SCROLLBAR_DRAW_COLOR`), for the same "note as a colored rect" language.
+const NOTE_MARKER_BLOW_COLOR: Color = Color::srgba(0.50, 0.75, 1.00, 0.9);
+const NOTE_MARKER_DRAW_COLOR: Color = Color::srgba(1.00, 0.62, 0.35, 0.9);
 
 /// Above the pause overlay's own backdrop (`pause_menu::setup_pause_menu`,
 /// `GlobalZIndex(200)`) so the bar renders on top of — and, since bevy_ui's
@@ -139,23 +158,41 @@ pub struct RequestLoopRange {
     pub end_time: f64,
 }
 
+/// One note's timing/direction, as much as the progress bar's note-marker
+/// strip needs — decoupled from any richer type a caller happens to have
+/// on hand, since callers differ: scored modes (2D/3D) have
+/// `gameplay::notes::ScheduledNote`, but Jam Session has no `SongNotes` at
+/// all (nothing is scored there) and builds these directly from the
+/// chart's own track events instead.
+#[derive(Clone, Copy)]
+pub struct NoteMarker {
+    pub time: f64,
+    pub duration: f64,
+    pub is_blow: bool,
+}
+
 /// Spawns the full-width progress bar at the very top of the screen: the
 /// song's waveform (from `waveform`, one entry per bar in 0..1, see
-/// `SongManifest::waveform`) on top, a strip of tiny white note markers (from
-/// `note_times`, seconds from song start) below it, with the loop marker and
-/// playhead drawn over both. Tagged `GameplayRoot` so it is torn down with
-/// the rest of the scene. `duration_secs` is the audio's real length
-/// (`SongManifest::music_duration_secs`) — see [`AudioDuration`]; both the
-/// waveform and the note markers are laid out on this same timescale, so they
-/// stay aligned with each other and with the playhead.
+/// `SongManifest::waveform`) on top, a strip of note-marker rectangles (from
+/// `notes`) below it, with the loop marker and playhead drawn over both.
+/// Tagged `GameplayRoot` so it is torn down with the rest of the scene.
+/// `duration_secs` is the audio's real length (`SongManifest::
+/// music_duration_secs`) — see [`AudioDuration`] — *if* there is one: a
+/// song with no background music has nothing to measure there, so this
+/// falls back to the furthest extent of `notes`/`sections` instead, so the
+/// bar still has a real timescale to lay everything out on (and the
+/// playhead still has something to sweep across) rather than reading as
+/// empty. Only the waveform row itself stays empty in that case — there's
+/// genuinely no waveform data without decoded audio.
 pub fn spawn_song_progress(
     commands: &mut Commands,
     waveform: &[f32],
     duration_secs: f64,
-    note_times: &[f64],
+    notes: &[NoteMarker],
     sections: &[PhraseSection],
     learned: &[f32],
 ) {
+    let duration_secs = effective_duration(duration_secs, notes, sections);
     commands.insert_resource(AudioDuration(duration_secs));
     commands
         .spawn((
@@ -215,22 +252,29 @@ pub fn spawn_song_progress(
                 Pickable::IGNORE,
             ))
             .with_children(|strip| {
-                if duration_secs > 0.0 {
-                    for &time in note_times {
-                        let left = (time / duration_secs).clamp(0.0, 1.0) as f32 * 100.0;
-                        strip.spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Percent(left),
-                                top: Val::Px(0.0),
-                                width: Val::Px(NOTE_MARKER_WIDTH),
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::WHITE),
-                            Pickable::IGNORE,
-                        ));
-                    }
+                for note in notes {
+                    let Some((left, width)) =
+                        note_marker_geometry(note.time, note.duration, duration_secs)
+                    else {
+                        continue;
+                    };
+                    let color = if note.is_blow {
+                        NOTE_MARKER_BLOW_COLOR
+                    } else {
+                        NOTE_MARKER_DRAW_COLOR
+                    };
+                    strip.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Percent(left * 100.0),
+                            top: Val::Px(0.0),
+                            width: Val::Percent(width * 100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(color),
+                        Pickable::IGNORE,
+                    ));
                 }
             });
 
@@ -377,6 +421,43 @@ pub(super) fn drag_marker_geometry(
     let b = (current_time / duration_secs).clamp(0.0, 1.0) as f32;
     let left = a.min(b);
     Some((left, (a.max(b) - left).max(0.0)))
+}
+
+/// The timescale to lay the whole bar out on: `duration_secs` verbatim if
+/// there's real audio to measure, or — for a song with no background
+/// music (`SongManifest::music: None`, `duration_secs` reads `0.0` since
+/// there's nothing to decode) — the furthest extent of `notes`/`sections`
+/// instead, so the bar (playhead, phrase rects, note markers) still has a
+/// real length to draw against rather than reading as empty. `0.0` only
+/// when there's truly nothing to measure at all (an empty chart).
+fn effective_duration(duration_secs: f64, notes: &[NoteMarker], sections: &[PhraseSection]) -> f64 {
+    if duration_secs > 0.0 {
+        return duration_secs;
+    }
+    notes
+        .iter()
+        .map(|n| n.time + n.duration)
+        .chain(sections.iter().map(|s| s.end_time))
+        .fold(0.0_f64, f64::max)
+}
+
+/// Left offset and width (fractions 0..1) for one note's marker in the
+/// note-marker strip — mirrors [`phrase_rect_geometry`]'s shape, but width
+/// reflects the note's own duration instead of a fixed sliver: a note held
+/// longer visibly takes up more of the strip, matching the Song Editor
+/// scrollbar minimap's own "note as a proportional rect"
+/// (`song_editor::interaction::scrollbar_marker`). Floored to
+/// [`MIN_NOTE_MARKER_FRAC`] so a very short note still shows as at least a
+/// visible speck, and clamped so a floored marker near the end can't poke
+/// past the bar. `None` only when there's no known duration to lay it out
+/// against.
+fn note_marker_geometry(time: f64, duration: f64, total_duration: f64) -> Option<(f32, f32)> {
+    if total_duration <= 0.0 {
+        return None;
+    }
+    let left = (time / total_duration).clamp(0.0, 1.0) as f32;
+    let width = (duration / total_duration) as f32;
+    Some((left, width.max(MIN_NOTE_MARKER_FRAC).min(1.0 - left)))
 }
 
 /// Left offset and width (fractions 0..1) for a phrase section's rectangle,
@@ -654,6 +735,92 @@ impl Plugin for SongProgressPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── note_marker_geometry ───────────────────────────────────────────────────
+
+    #[test]
+    fn note_marker_hidden_without_a_known_duration() {
+        assert_eq!(note_marker_geometry(0.0, 1.0, 0.0), None);
+    }
+
+    #[test]
+    fn note_marker_geometry_is_a_fraction_of_the_total_duration() {
+        // A 4s note starting at 8s of a 64s song: left an eighth of the way
+        // in, a sixteenth wide.
+        let (left, width) = note_marker_geometry(8.0, 4.0, 64.0).unwrap();
+        assert!((left - 0.125).abs() < 1e-6);
+        assert!((width - 0.0625).abs() < 1e-6);
+    }
+
+    #[test]
+    fn note_marker_floors_the_width_of_a_very_short_note() {
+        // A near-instantaneous note in a long song would be invisibly thin
+        // without the floor.
+        let (_, width) = note_marker_geometry(0.0, 0.001, 10_000.0).unwrap();
+        assert!(width >= MIN_NOTE_MARKER_FRAC);
+    }
+
+    #[test]
+    fn note_marker_never_pokes_past_the_bars_end() {
+        // A floored marker on the song's very last instant must stay
+        // within the bar (left + width <= 1.0).
+        let (left, width) = note_marker_geometry(9_999.999, 0.0001, 10_000.0).unwrap();
+        assert!(left + width <= 1.0);
+    }
+
+    #[test]
+    fn note_marker_geometry_handles_a_note_spanning_the_whole_song() {
+        // A note whose own duration equals the whole song (a degenerate but
+        // possible input) shouldn't panic or invert.
+        let (left, width) = note_marker_geometry(0.0, 10.0, 10.0).unwrap();
+        assert_eq!(left, 0.0);
+        assert!((width - 1.0).abs() < 1e-6);
+    }
+
+    // ── effective_duration (the no-background-music fallback) ────────────────
+
+    fn marker(time: f64, duration: f64) -> NoteMarker {
+        NoteMarker {
+            time,
+            duration,
+            is_blow: true,
+        }
+    }
+
+    fn section(start_time: f64, end_time: f64) -> PhraseSection {
+        PhraseSection {
+            name: String::new(),
+            start_time,
+            end_time,
+            note_count: 0,
+        }
+    }
+
+    #[test]
+    fn effective_duration_prefers_real_audio_duration_when_present() {
+        let notes = [marker(0.0, 1.0), marker(50.0, 1.0)];
+        assert_eq!(effective_duration(64.0, &notes, &[]), 64.0);
+    }
+
+    #[test]
+    fn effective_duration_falls_back_to_the_furthest_note_end_without_music() {
+        let notes = [marker(0.0, 1.0), marker(20.0, 4.0), marker(5.0, 1.0)];
+        assert_eq!(effective_duration(0.0, &notes, &[]), 24.0);
+    }
+
+    #[test]
+    fn effective_duration_falls_back_to_the_furthest_phrase_section_too() {
+        // A phrase section can extend past every individual note (e.g. a
+        // trailing rest) — the fallback must cover it too, not just notes.
+        let notes = [marker(0.0, 1.0)];
+        let sections = [section(0.0, 30.0)];
+        assert_eq!(effective_duration(0.0, &notes, &sections), 30.0);
+    }
+
+    #[test]
+    fn effective_duration_is_zero_for_a_truly_empty_chart() {
+        assert_eq!(effective_duration(0.0, &[], &[]), 0.0);
+    }
 
     // ── phrase_rect_geometry / phrase_fill_color ──────────────────────────────
 
