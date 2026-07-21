@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use bevy::log::{error, info};
+use bevy::log::{error, info, info_span};
 use bevy::prelude::{Resource, World};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{SampleFormat, StreamConfig};
@@ -244,6 +244,12 @@ fn push_chunks(
     tx: &Sender<Vec<f32>>,
     free_rx: &Receiver<Vec<f32>>,
 ) {
+    // This runs on cpal's real-time callback thread, invisible to Bevy's own
+    // per-system spans (those only wrap systems the ECS schedule calls) — a
+    // manual span here is the only way Tracy shows this thread's activity at
+    // all, which matters since it's the one place an allocator stall would
+    // cause an audible dropout rather than just a dropped frame.
+    let _span = info_span!("push_chunks", frames = data.len()).entered();
     mono.clear();
     if channels == 1 {
         mono.extend_from_slice(data);

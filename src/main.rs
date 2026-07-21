@@ -53,9 +53,21 @@ fn main() {
                 }),
                 ..default()
             })
-            // bevy_render warns about its own internal shadow-view cameras in 0.19 RC
             .set(bevy::log::LogPlugin {
+                // bevy_render warns about its own internal shadow-view cameras
+                // in 0.19 RC. A plain `cargo run` keeps the console quiet
+                // below `warn`; a `trace_tracy` build needs the default
+                // filter level to stay at `info` instead — Bevy's ECS/render
+                // spans (and this crate's own manual ones, see
+                // `audio_system::audio_input`/`pitch_detect`) are emitted at
+                // `info`, and a span below the configured level is dropped
+                // before it reaches Tracy or any other backend at all
+                // (docs/profiling.md), no matter how the trace feature is
+                // wired up.
+                #[cfg(not(feature = "trace_tracy"))]
                 filter: "warn,bevy_render::camera=error".into(),
+                #[cfg(feature = "trace_tracy")]
+                filter: "bevy_render::camera=error,wgpu=error,naga=warn".into(),
                 ..default()
             })
             // Linear filtering on all three stages (mag, min, mipmap) so that

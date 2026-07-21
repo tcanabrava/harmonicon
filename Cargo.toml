@@ -34,7 +34,7 @@ unic-langid = "0.9"
 sys-locale = "0.3"
 regex = "1.13.1"
 rand = "0.10"
-clap = { version = "4.6.2", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"] }
 # Watches ~/Harmonicon (songs/, themes/) so drop-in content is picked up
 # live instead of needing a manual refresh or restart. crossbeam-channel
 # feature: bridges the watcher's background thread into ECS the same way
@@ -51,6 +51,15 @@ dev = [
     "bevy/dynamic_linking",
     "bevy/debug"
 ]
+# Streams Bevy's built-in ECS/render/asset spans plus this crate's own
+# manual spans (audio capture, pitch detection) to a running Tracy client
+# (https://github.com/wolfpld/tracy — match its version against
+# `cargo tree --features trace_tracy | grep tracy-client`, see
+# https://github.com/nagisa/rust_tracy_client#version-support-table).
+# `cargo run --release --features trace_tracy` with the Tracy UI already
+# listening; see main.rs for the accompanying LogPlugin filter change this
+# needs (spans below `info` are dropped before any backend sees them).
+trace_tracy = ["bevy/trace_tracy"]
 
 [[bin]]
 name = "hole-editor"

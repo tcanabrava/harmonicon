@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+use bevy::log::info_span;
 use bevy::prelude::{Message, Resource};
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
@@ -246,36 +247,56 @@ pub fn analyze(
         return silent;
     }
 
-    // Lazily create (or re-create on size change) the forward FFT plan.
-    if state.last_size != n {
-        state.plan = Some(state.planner.plan_fft_forward(n));
-        state.last_size = n;
-    }
-    let plan = state.plan.as_ref().unwrap();
+    let magnitudes = {
+        let _span = info_span!("fft_window_and_transform", n).entered();
+        // Lazily create (or re-create on size change) the forward FFT plan.
+        if state.last_size != n {
+            state.plan = Some(state.planner.plan_fft_forward(n));
+            state.last_size = n;
+        }
+        let plan = state.plan.as_ref().unwrap();
 
-    // Hanning window applied in-place before FFT.
-    let mut buffer: Vec<Complex<f32>> = samples
-        .iter()
-        .enumerate()
-        .map(|(i, &s)| {
-            let w = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (n - 1) as f32).cos());
-            Complex::new(s * w, 0.0)
-        })
-        .collect();
+        // Hanning window applied in-place before FFT.
+        let mut buffer: Vec<Complex<f32>> = samples
+            .iter()
+            .enumerate()
+            .map(|(i, &s)| {
+                let w =
+                    0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (n - 1) as f32).cos());
+                Complex::new(s * w, 0.0)
+            })
+            .collect();
 
-    plan.process(&mut buffer);
+        plan.process(&mut buffer);
 
-    let half = n / 2;
-    let magnitudes: Vec<f32> = buffer[..half].iter().map(|c| c.norm()).collect();
+        let half = n / 2;
+        buffer[..half].iter().map(|c| c.norm()).collect::<Vec<f32>>()
+    };
 
     // Pitches come from the selected algorithm; the magnitudes above are always
-    // produced so frequency-domain views (the spectrogram) keep working.
+    // produced so frequency-domain views (the spectrogram) keep working. The
+    // algorithms cost wildly different amounts (a plain FFT peak-pick vs.
+    // NMF's dictionary matching), hence one span per branch rather than a
+    // single span with an `algorithm` field.
     let pitches = match algorithm {
-        PitchAlgorithm::Fft => pitches_from_magnitudes(&magnitudes, freq_res, range),
-        PitchAlgorithm::Yin => mono_pitch(yin_pitch(samples, sample_rate, range)),
-        PitchAlgorithm::Pyin => mono_pitch(pyin_pitch(samples, sample_rate, range)),
-        PitchAlgorithm::Mcleod => mono_pitch(mpm_pitch(samples, sample_rate, range)),
+        PitchAlgorithm::Fft => {
+            let _span = info_span!("pitches_from_magnitudes").entered();
+            pitches_from_magnitudes(&magnitudes, freq_res, range)
+        }
+        PitchAlgorithm::Yin => {
+            let _span = info_span!("yin_pitch").entered();
+            mono_pitch(yin_pitch(samples, sample_rate, range))
+        }
+        PitchAlgorithm::Pyin => {
+            let _span = info_span!("pyin_pitch").entered();
+            mono_pitch(pyin_pitch(samples, sample_rate, range))
+        }
+        PitchAlgorithm::Mcleod => {
+            let _span = info_span!("mpm_pitch").entered();
+            mono_pitch(mpm_pitch(samples, sample_rate, range))
+        }
         PitchAlgorithm::Nmf => {
+            let _span = info_span!("nmf_pitches").entered();
             let n_bins = magnitudes.len();
             let stale = match &state.nmf_dict {
                 Some(d) => d.n_bins != n_bins || d.sample_rate != sample_rate || d.range != range,
@@ -650,6 +671,12 @@ struct NmfDict {
 /// Build the harmonic-template dictionary for a given spectrum size / rate /
 /// pitch range.
 fn build_nmf_dict(sample_rate: u32, n_bins: usize, range: PitchRange) -> NmfDict {
+    // Rebuilt only when the range/rate/bin-count actually goes stale (see the
+    // `Nmf` match arm above), but that can still land on a frame the player is
+    // actively playing through (e.g. a song-start range change) — worth its
+    // own span to distinguish a genuine hitch here from the steady-state
+    // per-chunk cost.
+    let _span = info_span!("build_nmf_dict", n_bins).entered();
     let nyquist = sample_rate as f32 / 2.0;
     // magnitudes span DC..Nyquist over n_bins, so each bin is this wide.
     let freq_res = nyquist / n_bins.max(1) as f32;

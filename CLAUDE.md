@@ -32,6 +32,9 @@ cargo run --features dev   # local iteration (dynamic linking + asset watcher)
 cargo run --release        # playable build; never ship the dev feature
 cargo test                 # ~590 pure-logic tests; safe headless
 cargo clippy               # keep clean
+# Profiling: start the Tracy UI (https://github.com/wolfpld/tracy), click
+# "Connect", then:
+cargo run --release --features trace_tracy
 ```
 
 Binaries: main game, plus `hole-editor`, `note_editor` (in `src/bin/`).
@@ -57,6 +60,29 @@ Manual testing needs a mic, audio out, and a display.
     resource (`Connected`/`Failed`); Options has a device picker and retry,
     persisted as `AudioSettings::input_device`. Startup capture is ordered
     `.after` settings load so the saved device preference wins.
+- **Profiling/tracing is Tracy-based** (`cargo run --release --features
+  trace_tracy`, per the Commands section above). `trace_tracy` (`Cargo.toml`)
+  just forwards to `bevy/trace_tracy`, which already wraps every ECS system
+  call in its own `info_span!("system", name = ..)` — most of what shows up
+  in Tracy needs no manual instrumentation at all. Two things this crate adds
+  on top:
+  - `main.rs`'s `LogPlugin` is feature-gated: the everyday filter
+    (`"warn,bevy_render::camera=error"`) sets the *default* level below
+    `info`, which silently drops every span (Bevy's own and ours) before any
+    backend — Tracy included — ever sees them (see
+    `docs/profiling.md`/`LogPlugin::build_filter_layer`, which folds
+    `filter`'s own bare directives over `level`). A `trace_tracy` build swaps
+    in a filter with no bare-level directive below `info`, so the configured
+    `Level::INFO` default actually holds.
+  - Manual spans cover the one path automatic per-system instrumentation
+    can't reach — the cpal capture callback (`audio_input::push_chunks`) runs
+    on its own real-time thread, entirely outside the ECS schedule — plus the
+    hot inner loop it feeds: `pipeline::process_audio`'s per-chunk work and
+    `pitch_detect::analyze`'s FFT transform, per-algorithm dispatch, and
+    `build_nmf_dict` (the priciest one-off, rebuilt only when the NMF
+    dictionary goes stale). Add spans the same way for any other code that
+    runs off the main schedule (audio decode threads, the asset watcher) or
+    burns real time inside a single system call.
 - **Detection range is chart-driven:** the `PitchRange` resource (defined in
   `pitch_detect.rs`, default 200–2500 Hz) is derived from
   `Harmonica::frequency_range()` at song start and from the selected key in
@@ -322,6 +348,56 @@ Manual testing needs a mic, audio out, and a display.
     Practice while a recording is in progress does the same, since both
     would otherwise silently repurpose the `Playhead` clock `RecordState::
     open`'s timings are still anchored to.
+  - **The Song Editor supports multi-note selection**: `EditorState::
+    selected` is a `Vec<u32>`, not a single `Option<u32>` — a plain click
+    replaces it wholesale (`select_only`), Ctrl+click toggles one note in
+    or out without disturbing the rest (`toggle_selected`,
+    `interaction::select_or_add_ctrl` — the Ctrl+click sibling of
+    `select_or_add`; Ctrl+clicking empty space still behaves like a plain
+    click, since there's nothing existing yet to extend onto). Mod-panel
+    technique edits (Bend, Overblow, ...) still act on one note — the
+    *primary* selection, `selected.last()` (`EditorState::selected_note`/
+    `_mut`) — since editing several notes' pitch technique at once has no
+    obviously-correct single meaning, but **Delete and Move act on the
+    whole selection**: `interaction::delete_selected` removes every
+    selected note, and dragging any note that's part of a multi-selection
+    (more than one selected, the dragged note among them) moves the whole
+    group together, preserving relative offsets — `DragState::group`
+    carries every *other* selected note's original position, and
+    `grid::group_move_targets`/`group_move_valid` shift/validate them by
+    the same delta the dragged anchor moved by. Deliberately one combined
+    validity check across the anchor *and* the group (not the anchor via
+    an overlap check against the group's stale positions, plus the group
+    checked separately) — two same-hole notes swapping past each other as
+    a rigid pair would otherwise falsely read as a collision, since each
+    one's *target* would land on the *other's* not-yet-moved spot. A
+    second, dynamically spawned/despawned ghost per non-anchor member
+    (`GroupMoveGhost`/`update_group_move_ghosts`, rebuilt every frame like
+    `update_scrollbar_markers`) previews the group during the drag, next
+    to the anchor's own persistent `MoveGhost`.
+  - **Ctrl+C/Ctrl+V copy and paste the current selection**
+    (`song_editor::clipboard`; wired in `interaction::handle_copy_paste`).
+    `NoteClipboard` holds the last Ctrl+C'd notes verbatim — copying with
+    nothing selected leaves a previous clipboard alone rather than
+    clearing it. Ctrl+V reads the tick under the *mouse*, not a click —
+    `GridArea` carries its own `RelativeCursorPosition` (added just for
+    this) so `handle_copy_paste` can resolve a live hover position the
+    same way a grid click already resolves its own tick, without needing
+    a click first — and does nothing if the pointer isn't over the grid
+    at all, or the clipboard is empty. `clipboard::paste_targets` (pure)
+    lands the clipboard's own *earliest* note at that tick and shifts
+    every other member by the same offset it had from that earliest one,
+    preserving the copied shape; holes never change, since paste is
+    keyed on "when", not "which hole". Each note is silently skipped
+    (not forced) if its hole doesn't exist on the current harp or its
+    computed target would collide with an existing note — pasting where
+    nothing fits is a no-op for that one note, same "silently skip" spirit
+    as `select_or_add`'s sticky-pitch fallback. Ids are always freshly
+    assigned (never the clipboard's own copied ids, which would collide
+    with the originals still sitting in `EditorState::notes`), and the
+    pasted notes become the new selection — ready to drag into place
+    immediately, the same way a fresh `select_or_add` selects what it
+    just placed.
   - **The Song Editor can author lessons, not just plain songs**
     (`song_editor::lesson_form`): a "Record Song"/"Record Lesson" toggle
     (`EditorState::content_kind: ContentKind`, its own click-to-cycle
@@ -544,6 +620,24 @@ Manual testing needs a mic, audio out, and a display.
     Song" back to the jam setup page instead of `MenuPage::SongList` (a
     generated jam never went through the song list) — same end-of-life
     pattern as `lessons::LessonContext`.
+  - **Every menu page's content area auto-scrolls once it overflows.**
+    `menu::scene::spawn_menu_root` no longer returns the outer root's own
+    entity for callers to add buttons/rows to — it spawns a
+    `dialogs::scroll_area::spawn_scroll_area` (a `bevy_ui_widgets::
+    ScrollArea` column paired with a real `Scrollbar`/`ScrollbarThumb`,
+    generalized out of the Song Editor's own `song_editor::scroll::
+    spawn_editor_scrollbar`) as a child of the root and returns *that*
+    entity instead, so all 22 existing `spawn_menu_root` call sites needed
+    zero changes to gain scrolling. The scrollbar
+    (`dialogs::scroll_area::update_scrollbar_visibility`, registered once
+    app-wide via `ScrollAreaPlugin`) toggles both `Visibility` and
+    `Node::display` together, collapsed to `Display::None` whenever content
+    already fits — `Visibility::Hidden` alone would still reserve the
+    track's width and nudge every short, perfectly-centered menu (Main,
+    Options, ...) slightly off-center even with nothing to scroll to. A
+    long list (Artist List, Lessons, Theme picker) that outgrows the screen
+    gets a visible, draggable scrollbar instead of silently overflowing
+    past the edges with no way to reach the rest.
 - **Settings:** figment-layered `<config>/harmonicon/settings.json`
   (`settings.rs`); saves are debounced (`PendingSave`, 0.5 s) with a flush
   on `AppExit` — route new persisted fields through that path.
@@ -579,6 +673,43 @@ Manual testing needs a mic, audio out, and a display.
   consumer, not a per-frame `format!` into `Text`. Follow this pattern for
   any future HUD element whose trigger is a discrete scoring event rather
   than a continuously-varying value.
+- **The song-progress bar is a per-hole note-lanes strip, with the phrase
+  overlay painted over it, and its timescale survives a music-less song**
+  (`gameplay::song_progress_overlay`, shared by Play 2D/3D and Jam
+  Session). The strip below the waveform spans the harmonica's whole hole
+  range as `hole_count` equal lanes — the highest hole at the *top*, the
+  lowest (hole 1) at the *bottom* (`note_lane_geometry`; the opposite
+  vertical order from the Song Editor's own scrollbar minimap, which the
+  rest of this design otherwise mirrors) — with one rectangle per note in
+  its own hole's lane: left/width from `note_marker_geometry` (proportional
+  to the note's own duration, floored so a very short note doesn't
+  vanish), tinted blue (blow) or orange (draw), the same "note as a
+  proportional colored rect" language `song_editor::interaction::
+  scrollbar_marker` established for the Song Editor's scrollbar minimap —
+  replacing what used to be a fixed-width white sliver with no duration,
+  hole, or direction information at all. The per-phrase adaptive-
+  difficulty rectangles are painted as a translucent *overlay* on that
+  same strip (spawned first, so the note markers stay legible on top),
+  not their own separate row below it as before — one load-bearing
+  consequence: a loop-range drag can now only start in the waveform band,
+  since a phrase rect covering part of the note-lanes strip intercepts
+  clicks there (see `spawn_song_progress`'s own comment on the trade-off).
+  Note markers are `NoteMarker{time, duration, hole, is_blow}` — a small
+  type decoupled from any richer one a caller has on hand, since callers
+  differ: 2D/3D map it straight from `ScheduledNote`, but Jam Session has
+  no `SongNotes` at all (nothing is scored there) and instead flattens the
+  chart's own `TrackItem`s to one marker per *event* (matching the scored
+  modes' own per-event granularity, so a chord/split item's notes each get
+  their own marker in their own lane). Separately, `spawn_song_progress`'s
+  `duration_secs` is normally `SongManifest::music_duration_secs`, but a
+  chart with no backing track (`SongManifest::music: None`) has nothing
+  decoded to measure there — `0.0` — even though the chart itself still
+  has a real length; `effective_duration` falls back to the furthest
+  extent of the passed-in note markers/phrase sections in that case, so
+  the bar (playhead sweep, phrase overlay, note lanes) still lays out
+  against something real instead of reading as empty. Only the waveform
+  row itself stays blank in that case — there's genuinely no waveform
+  data without decoded audio.
 - **Lessons** (`src/lessons/` — `manifest.rs`/`catalog.rs`/`progress.rs` —
   plus `src/menu/pages/lessons.rs`; design in `docs/lessons_plan.md`):
   `assets/lessons/<unit>/<lesson>/lesson.json` (schema

@@ -22,6 +22,11 @@ pub fn process_audio(
 ) {
     let Some(capture) = capture else { return };
     while let Ok(samples) = capture.receiver.try_recv() {
+        // Chunks arrive with 50% overlap (see `audio_input::push_chunks`), so
+        // more than one can land in a single frame — a span per chunk (rather
+        // than relying solely on the automatic per-system span this whole
+        // function already gets) shows how many ran and how long each took.
+        let _span = info_span!("process_audio_chunk", samples = samples.len()).entered();
         // One FFT per chunk for the spectrum; pitches use the chosen algorithm.
         let analysis = pitch_detect::analyze(
             &samples,
