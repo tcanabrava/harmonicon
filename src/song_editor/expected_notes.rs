@@ -49,14 +49,15 @@
 //! for arbitrarily long real songs.
 
 use bevy::picking::Pickable;
-use bevy::picking::events::{Click, Pointer};
+use bevy::picking::events::{Click, Drag, DragEnd, DragStart, Pointer};
 use bevy::prelude::*;
 
 use super::panel::mod_button_active;
 use super::state::{
-    Dir, EditorState, Expr, GridNote, HarmonicaKind, Mode, Pitch, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN,
-    VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, max_bend, note_rect, overblow_ok,
-    overdraw_ok, pitch_color, pitch_compatible, pitch_forced_dir,
+    Dir, DragKind, DragState, Edge, EditorState, Expr, GridNote, HarmonicaKind, Mode, Pitch,
+    VIBRATO_HZ_MAX, VIBRATO_HZ_MIN, VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP,
+    apply_resize, max_bend, move_target, note_rect, overblow_ok, overdraw_ok, pitch_color,
+    pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{ExpectedNotesGroup, GridContent, ModButton, ModeButton};
 use super::TICKS_PER_BEAT;
@@ -465,37 +466,56 @@ fn update_expected_mod_panel(
     }
 }
 
-// ── Rendering ─────────────────────────────────────────────────────────────────
+// ── Rendering + drag/resize ───────────────────────────────────────────────────
 
-/// One expected-note's overlay visual — see the module docs for why this is
-/// a separate, always-`Pickable::IGNORE` entity rather than reusing
-/// `grid::spawn_note`/`NoteView`.
+/// One expected-note's overlay visual, carrying its own id so the drag/
+/// resize observers below (and nothing else — this is *not* reused as a
+/// generic lookup key the way `grid::NoteView` is) can find their own
+/// entity again without needing to search by position.
 #[derive(Component)]
-struct ExpectedNoteVisual;
+struct ExpectedNoteVisual(u32);
 
 /// Rebuilds the whole overlay from scratch whenever `EditorState` changes —
 /// simple despawn-all/respawn-all rather than diffing, same trade-off
 /// `grid::rebuild_grid` itself makes, and cheap here since this is
 /// unwindowed (see the module docs) over what's meant to stay a short clip.
+/// Skips entirely while a drag/resize on this layer is in flight
+/// (`expected_dragging`), same reason `grid::rebuild_grid` skips during an
+/// ordinary note drag: rebuilding would despawn the very entity picking has
+/// captured the gesture on.
 fn rebuild_expected_notes_overlay(
     mut commands: Commands,
     state: Res<EditorState>,
     content: Query<Entity, With<GridContent>>,
     old: Query<Entity, With<ExpectedNoteVisual>>,
 ) {
+    if state.expected_dragging.is_some() {
+        return;
+    }
     for e in &old {
         commands.entity(e).despawn();
     }
     let Ok(content) = content.single() else {
         return;
     };
+    // Interactive (clickable/draggable) only in `Mode::ExpectedNotes` — in
+    // any other mode this is a pure review overlay, and must not steal
+    // clicks meant for the ordinary grid underneath it.
+    let interactive = state.mode == Mode::ExpectedNotes;
+    let pick = if interactive {
+        Pickable::default()
+    } else {
+        Pickable::IGNORE
+    };
     commands.entity(content).with_children(|c| {
         for note in &state.expected_notes {
             let (left, top, width, height) = note_rect(note);
             let selected = state.expected_selected == Some(note.id);
             let color = pitch_color(note.pitch);
-            c.spawn((
-                ExpectedNoteVisual,
+            let id = note.id;
+            let mut ec = c.spawn((
+                ExpectedNoteVisual(id),
+                Button,
                 ZIndex(4),
                 Node {
                     position_type: PositionType::Absolute,
@@ -510,9 +530,62 @@ fn rebuild_expected_notes_overlay(
                 },
                 BackgroundColor(Color::NONE),
                 BorderColor::all(color),
-                Pickable::IGNORE,
-            ))
-            .with_children(|n| {
+                pick,
+            ));
+            ec.observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                state.expected_selected = Some(id);
+            })
+            .observe(
+                move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
+                    if state.expected_dragging.is_some() {
+                        return;
+                    }
+                    let Some(note) = state.expected_note_by_id(id).copied() else {
+                        return;
+                    };
+                    state.expected_selected = Some(id);
+                    state.expected_dragging = Some(DragState::new(id, DragKind::Move, &note));
+                },
+            )
+            .observe(
+                move |ev: On<Pointer<Drag>>,
+                      mut state: ResMut<EditorState>,
+                      ui_scale: Res<UiScale>,
+                      mut nodes: Query<&mut Node, With<ExpectedNoteVisual>>| {
+                    let Some(drag) = state.expected_dragging.clone() else {
+                        return;
+                    };
+                    if drag.kind != DragKind::Move {
+                        return;
+                    }
+                    let hole_count = state.hole_count();
+                    let (hole, tick) = move_target(
+                        drag.start_hole,
+                        drag.start_tick,
+                        ev.distance.x / ui_scale.0,
+                        ev.distance.y / ui_scale.0,
+                        hole_count,
+                    );
+                    let Some(n) = state.expected_notes.iter_mut().find(|n| n.id == id) else {
+                        return;
+                    };
+                    n.hole = hole;
+                    n.tick = tick;
+                    let (left, top, _, _) = note_rect(n);
+                    if let Ok(mut node) = nodes.get_mut(ev.entity) {
+                        node.left = Val::Px(left);
+                        node.top = Val::Px(top);
+                    }
+                },
+            )
+            .observe(
+                move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
+                    if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Move) {
+                        state.expected_dragging = None;
+                    }
+                },
+            );
+            ec.with_children(|n| {
                 n.spawn((
                     Text::new(note.dir.arrow()),
                     TextFont {
@@ -522,9 +595,88 @@ fn rebuild_expected_notes_overlay(
                     TextColor(color),
                     Pickable::IGNORE,
                 ));
+                spawn_expected_resize_handle(n, id, Edge::Left, pick);
+                spawn_expected_resize_handle(n, id, Edge::Right, pick);
             });
         }
     });
+}
+
+/// The move-drag sibling for resizing — mirrors `grid::spawn_resize_handle`,
+/// but writes into `expected_notes`/`expected_dragging` and has no
+/// neighboring-note bound to respect (`apply_resize`'s `left_bound: 0,
+/// right_bound: None` — this layer never collision-checks, see the module
+/// docs), so unlike the ordinary grid's version it needs no per-hole scan
+/// of other notes before resizing.
+fn spawn_expected_resize_handle(
+    parent: &mut ChildSpawnerCommands,
+    id: u32,
+    edge: Edge,
+    pick: Pickable,
+) {
+    let mut node = Node {
+        position_type: PositionType::Absolute,
+        top: Val::Px(0.0),
+        bottom: Val::Px(0.0),
+        width: Val::Px(super::HANDLE_W),
+        ..default()
+    };
+    match edge {
+        Edge::Left => node.left = Val::Px(0.0),
+        Edge::Right => node.right = Val::Px(0.0),
+    }
+    parent
+        .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.35)), pick))
+        .observe(
+            move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
+                if state.expected_dragging.is_some() {
+                    return;
+                }
+                let Some(note) = state.expected_note_by_id(id).copied() else {
+                    return;
+                };
+                state.expected_selected = Some(id);
+                state.expected_dragging =
+                    Some(DragState::new(id, DragKind::Resize(edge), &note));
+            },
+        )
+        .observe(
+            move |ev: On<Pointer<Drag>>,
+                  mut state: ResMut<EditorState>,
+                  ui_scale: Res<UiScale>,
+                  mut boxes: Query<(&ExpectedNoteVisual, &mut Node)>| {
+                let Some(drag) = state.expected_dragging.clone() else {
+                    return;
+                };
+                if drag.kind != DragKind::Resize(edge) {
+                    return;
+                }
+                let steps = ((ev.distance.x / ui_scale.0) / super::TICK_W).round() as i32;
+                let (tick, len) =
+                    apply_resize(drag.start_tick, drag.start_len, edge, steps, 0, None);
+                let Some(n) = state.expected_notes.iter_mut().find(|n| n.id == id) else {
+                    return;
+                };
+                n.tick = tick;
+                n.len = len;
+                let (left, _, width, _) = note_rect(n);
+                // The handle is a child of the note box, so `ev.entity`
+                // (the handle) isn't what needs its `Node` updated — find
+                // the box by its own `ExpectedNoteVisual` id instead.
+                if let Some((_, mut node)) = boxes.iter_mut().find(|(v, _)| v.0 == id) {
+                    node.left = Val::Px(left);
+                    node.width = Val::Px(width);
+                }
+            },
+        )
+        .observe(
+            move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
+                if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Resize(edge))
+                {
+                    state.expected_dragging = None;
+                }
+            },
+        );
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────

@@ -62,11 +62,8 @@ pub(super) enum Mode {
     Record,
     /// Playback/practice transport.
     Play,
-    /// Dev-only ("--features dev") benchmark-authoring mode — see
-    /// `expected_notes`'s module docs. Grid clicks place/select notes on
-    /// `expected_notes` instead of `notes`; `grid::rebuild_grid`'s own
-    /// background-cell pickability carves out the one exception `locked()`
-    /// otherwise needs here (see its call site).
+    /// Dev-only benchmark-authoring mode — see `expected_notes`'s docs.
+    /// Grid clicks place/select notes on `expected_notes`, not `notes`.
     ExpectedNotes,
 }
 
@@ -393,20 +390,23 @@ pub(super) fn cycle_next(options: &[&str], current: &str) -> String {
 pub(super) struct EditorState {
     pub(super) notes: Vec<GridNote>,
     pub(super) next_id: u32,
-    /// Dev-only ("--features dev") benchmark ground truth — see
-    /// `expected_notes`'s module docs. Hand-placed, never collision-checked
-    /// against `notes` or itself. Always present (an empty `Vec` costs
-    /// nothing) rather than `#[cfg]`-gated, so the many `EditorState {
-    /// ..default() }` sites here and in tests don't need touching; the
-    /// `allow`s below cover the resulting plain-build dead code.
+    /// Dev-only benchmark ground truth — see `expected_notes`'s docs.
+    /// Hand-placed, never collision-checked. Always present (an empty `Vec`
+    /// costs nothing) rather than `#[cfg]`-gated, so the many `EditorState {
+    /// ..default() }` sites here and in tests don't need touching.
     #[cfg_attr(not(feature = "dev"), allow(dead_code))]
     pub(super) expected_notes: Vec<GridNote>,
     #[cfg_attr(not(feature = "dev"), allow(dead_code))]
     pub(super) expected_next_id: u32,
-    /// A single `Option`, not a `Vec` like `selected`: this layer only ever
-    /// needs one "primary" note for the mod-panel buttons to edit.
+    /// A single `Option`, not a `Vec`: this layer only ever needs one
+    /// "primary" note for the mod-panel buttons to edit.
     #[cfg_attr(not(feature = "dev"), allow(dead_code))]
     pub(super) expected_selected: Option<u32>,
+    /// Separate from `dragging`: `notes`/`expected_notes` are independent id
+    /// spaces, so reusing `dragging` (which `live_resize`/`update_move_ghost`
+    /// match purely by id) risks one layer's drag updating the other's note.
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
+    pub(super) expected_dragging: Option<DragState>,
     /// Every currently-selected note id, in the order each was added to the
     /// selection — empty means nothing selected. A plain click replaces the
     /// whole selection with one id ([`EditorState::select_only`]); a
@@ -501,6 +501,7 @@ impl Default for EditorState {
             expected_notes: Vec::new(),
             expected_next_id: 0,
             expected_selected: None,
+            expected_dragging: None,
             selected: Vec::new(),
             scroll_beat: 0,
             dragging: None,
