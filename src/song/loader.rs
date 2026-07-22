@@ -42,6 +42,28 @@ impl AssetLoader for SongChartLoader {
         _settings: &(),
         load_context: &mut LoadContext<'_>,
     ) -> Result<SongManifest, SongLoadError> {
+        // Bevy's asset loaders run as futures on the AssetServer's IO task
+        // pool, never through the ECS schedule — so unlike an ordinary
+        // system, this whole function is otherwise invisible to Tracy. The
+        // span has to wrap the future via `.instrument()` rather than a plain
+        // `.entered()` guard: it's held across several `.await` points below,
+        // and an `EnteredSpan` guard isn't `Send`, which `AssetLoader::load`'s
+        // returned future must be.
+        use bevy::log::tracing::Instrument;
+        let span = info_span!("SongChartLoader::load", path = %load_context.path());
+        Self::load_inner(reader, load_context).instrument(span).await
+    }
+
+    fn extensions(&self) -> &[&str] {
+        &["harpchart"]
+    }
+}
+
+impl SongChartLoader {
+    async fn load_inner(
+        reader: &mut dyn Reader,
+        load_context: &mut LoadContext<'_>,
+    ) -> Result<SongManifest, SongLoadError> {
         // Read chart.json bytes.
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
@@ -49,22 +71,27 @@ impl AssetLoader for SongChartLoader {
         // Parse to a generic JSON value first so we can validate before deserializing.
         let chart_value: serde_json::Value = serde_json::from_slice(&bytes)?;
 
-        // Validate against the embedded schema.
-        let schema_value: serde_json::Value = serde_json::from_str(SCHEMA)?;
-        let validator = jsonschema::validator_for(&schema_value)
-            .map_err(|e| SongLoadError::Schema(e.to_string()))?;
+        // Validate against the embedded schema — compiling the schema and
+        // walking the whole chart value against it is real work on a big
+        // chart, worth separating out from the rest of the load.
+        let chart: HarpChart = {
+            let _span = info_span!("validate_and_parse_chart").entered();
+            let schema_value: serde_json::Value = serde_json::from_str(SCHEMA)?;
+            let validator = jsonschema::validator_for(&schema_value)
+                .map_err(|e| SongLoadError::Schema(e.to_string()))?;
 
-        let errors: Vec<String> = validator
-            .iter_errors(&chart_value)
-            .map(|e| format!("  - {e} (at /{path})", path = e.instance_path))
-            .collect();
+            let errors: Vec<String> = validator
+                .iter_errors(&chart_value)
+                .map(|e| format!("  - {e} (at /{path})", path = e.instance_path))
+                .collect();
 
-        if !errors.is_empty() {
-            return Err(SongLoadError::Validation(errors.join("\n")));
-        }
+            if !errors.is_empty() {
+                return Err(SongLoadError::Validation(errors.join("\n")));
+            }
 
-        // Validation passed — deserialize into typed structs.
-        let chart: HarpChart = serde_json::from_value(chart_value)?;
+            // Validation passed — deserialize into typed structs.
+            serde_json::from_value(chart_value)?
+        };
 
         // Catch a chart authored for a newer spec than this build's loader
         // understands up front, with a clear message — rather than either
@@ -242,10 +269,6 @@ impl AssetLoader for SongChartLoader {
             assets_3d,
             assets_3d_config: serde_json::from_str(&note_3d_json).unwrap_or_default(),
         })
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["harpchart"]
     }
 }
 

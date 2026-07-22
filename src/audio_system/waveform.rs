@@ -7,6 +7,7 @@
 
 use std::io::Cursor;
 
+use bevy::log::info_span;
 use rodio::Source;
 
 /// How many bars the waveform is reduced to — independent of song length or
@@ -51,6 +52,13 @@ pub fn bucket_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
 /// over it should use this same duration. Returns an all-zero, zero-duration
 /// waveform on a decode failure rather than erroring.
 pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
+    // Two call sites, both invisible to Bevy's per-system spans: the async
+    // `SongChartLoader` (runs on the AssetServer's IO task pool, entirely
+    // outside the ECS schedule) and `song_editor::waveform`'s synchronous
+    // main-thread decode (inside a system, but a whole-file decode is exactly
+    // the kind of hot inner-loop work worth breaking out from that system's
+    // own total time).
+    let _span = info_span!("analyze_ogg_waveform", bytes = bytes.len()).entered();
     let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes.to_vec())) else {
         return (vec![0.0; buckets], 0.0);
     };
@@ -70,6 +78,8 @@ pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
 /// `Cargo.toml`'s comment on the `rodio` dependency) since the only WAV
 /// files this ever needs to read are ones this same codebase wrote.
 pub fn analyze_wav_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
+    // Same off-schedule/hot-loop reasoning as `analyze_ogg_waveform` above.
+    let _span = info_span!("analyze_wav_waveform", bytes = bytes.len()).entered();
     let Some((samples, channels, sample_rate)) = crate::audio_system::wav::decode_wav_pcm16(bytes)
     else {
         return (vec![0.0; buckets], 0.0);

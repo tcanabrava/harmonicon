@@ -74,15 +74,32 @@ Manual testing needs a mic, audio out, and a display.
     `filter`'s own bare directives over `level`). A `trace_tracy` build swaps
     in a filter with no bare-level directive below `info`, so the configured
     `Level::INFO` default actually holds.
-  - Manual spans cover the one path automatic per-system instrumentation
-    can't reach — the cpal capture callback (`audio_input::push_chunks`) runs
-    on its own real-time thread, entirely outside the ECS schedule — plus the
-    hot inner loop it feeds: `pipeline::process_audio`'s per-chunk work and
-    `pitch_detect::analyze`'s FFT transform, per-algorithm dispatch, and
-    `build_nmf_dict` (the priciest one-off, rebuilt only when the NMF
-    dictionary goes stale). Add spans the same way for any other code that
-    runs off the main schedule (audio decode threads, the asset watcher) or
-    burns real time inside a single system call.
+  - Manual spans cover the paths automatic per-system instrumentation can't
+    reach — anything that isn't itself a system call. Two categories so far:
+    - **Off the ECS schedule entirely:** the cpal capture callback
+      (`audio_input::push_chunks`) runs on its own real-time thread; the only
+      custom `AssetLoader` (`song::loader::SongChartLoader::load`) runs as a
+      future on the AssetServer's IO task pool. Both get a manual span for
+      the same reason — Bevy's per-system spans only wrap systems the
+      schedule itself calls, so anything running elsewhere (another thread,
+      another executor) is otherwise invisible no matter how expensive it
+      is. A span held across an `.await` needs `tracing::Instrument` (via
+      `bevy::log::tracing::Instrument`) rather than a plain `.entered()`
+      guard — an `EnteredSpan` isn't `Send`, which the loader's returned
+      future must be; `SongChartLoader::load` is a thin wrapper that
+      instruments a `load_inner` for exactly this reason.
+    - **A hot inner loop worth breaking out of its system's own total time:**
+      `pipeline::process_audio`'s per-chunk work; `pitch_detect::analyze`'s
+      FFT transform and per-algorithm dispatch; `build_nmf_dict` (the
+      priciest one-off, rebuilt only when the NMF dictionary goes stale);
+      `waveform::analyze_ogg_waveform`/`analyze_wav_waveform` (a whole-file
+      decode — also called from the off-schedule asset loader above, so it
+      carries both reasons at once).
+    Add spans the same way for any other code that runs off the main
+    schedule (more asset loaders, decode threads, the asset watcher — though
+    `assets_management::watch`'s debouncer thread runs only
+    `notify-debouncer-full`'s own code, nothing of ours, so there's nothing
+    to instrument there) or burns real time inside a single system call.
 - **Detection range is chart-driven:** the `PitchRange` resource (defined in
   `pitch_detect.rs`, default 200–2500 Hz) is derived from
   `Harmonica::frequency_range()` at song start and from the selected key in

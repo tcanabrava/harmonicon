@@ -196,6 +196,7 @@ editor-practice-tooltip = Modo prática — toque junto com sua gaita e receba f
 editor-record-play-tooltip = Começa a gravar da posição atual — ou retoma uma gravação pausada
 editor-record-stop-tooltip = Termina a gravação — o cursor fica onde parou
 editor-finish-tooltip = Conclui a gravação e volta ao início — gravar de novo substitui as notas sobre as quais você tocar
+editor-record-detect-label = Detectar
 mod-blow-tooltip = Definir a nota selecionada como sopro (expirar)
 mod-draw-tooltip = Definir a nota selecionada como puxada (inspirar)
 mod-bend-tooltip = Alternar a profundidade da dobra da nota selecionada: nenhuma → meio tom → tom inteiro → tom e meio

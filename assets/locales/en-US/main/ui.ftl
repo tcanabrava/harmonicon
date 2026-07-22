@@ -198,6 +198,7 @@ editor-practice-tooltip = Practice mode — play along on your harmonica with li
 editor-record-play-tooltip = Start recording from the current position — or resume a paused take
 editor-record-stop-tooltip = End the take — the playhead stays where it stopped
 editor-finish-tooltip = Finish the take and rewind to the beginning — recording again replaces notes you play over
+editor-record-detect-label = Detect
 mod-blow-tooltip = Set the selected note to a blow (exhale) note
 mod-draw-tooltip = Set the selected note to a draw (inhale) note
 mod-bend-tooltip = Cycle the selected note's bend depth: none → half step → whole step → step and a half

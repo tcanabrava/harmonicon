@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 //! Shared pitch-detection algorithm picker: a [`combobox`] plus a read-only
-//! explanation of whichever algorithm is selected. Used on the Options page
-//! and, so a player can quickly compare algorithms while actually bending
-//! notes, in the Bending Trainer — both drive the same global
-//! [`AudioSettings::pitch_algorithm`] via [`on_algo_selected`], so picking
-//! one anywhere takes effect everywhere immediately.
+//! explanation of whichever algorithm is selected. Used on the Options page;
+//! in the Bending Trainer, so a player can quickly compare algorithms while
+//! actually bending notes; and in the Song Editor's Record mode, since a
+//! take reads pitches off the same global detector. All three drive the same
+//! global [`AudioSettings::pitch_algorithm`] via [`on_algo_selected`], so
+//! picking one anywhere takes effect everywhere immediately.
 
 use bevy::prelude::*;
 

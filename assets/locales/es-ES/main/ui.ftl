@@ -196,6 +196,7 @@ editor-practice-tooltip = Modo práctica — toca junto con tu armónica y recib
 editor-record-play-tooltip = Empieza a grabar desde la posición actual — o reanuda una grabación en pausa
 editor-record-stop-tooltip = Termina la grabación — el cursor se queda donde paró
 editor-finish-tooltip = Finaliza la grabación y vuelve al inicio — grabar de nuevo reemplaza las notas sobre las que toques
+editor-record-detect-label = Detectar
 mod-blow-tooltip = Establecer la nota seleccionada como soplo (exhalar)
 mod-draw-tooltip = Establecer la nota seleccionada como aspiración (inhalar)
 mod-bend-tooltip = Alternar la profundidad de doblado de la nota seleccionada: ninguno → medio tono → tono completo → tono y medio

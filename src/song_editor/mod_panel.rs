@@ -22,7 +22,9 @@ use super::transport::{spawn_file_buttons, spawn_playback_buttons, spawn_record_
 use super::ui::{
     EditModeGroup, ModButton, ModeButton, PlayModeGroup, RecordModeGroup, TimelineToolButton,
 };
-use crate::audio_system::pitch_detect::PitchRange;
+use crate::audio_system::pitch_detect::{PitchAlgorithm, PitchRange};
+use crate::dialogs::algo_picker::{algo_labels, on_algo_selected, spawn_algo_explanation};
+use crate::dialogs::combobox;
 use crate::localization::LocalizationExt;
 use crate::theme::SongEditorColors;
 use bevy_fluent::prelude::Localization;
@@ -41,6 +43,8 @@ pub(super) fn spawn_mod_panel(
     loc: &Localization,
     colors: SongEditorColors,
     mode: Mode,
+    editor_root: Entity,
+    algorithm: PitchAlgorithm,
 ) {
     root.spawn((
         Node {
@@ -287,27 +291,48 @@ pub(super) fn spawn_mod_panel(
                 );
             });
 
-        panel
-            .spawn((
-                RecordModeGroup,
-                Node {
-                    width: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Row,
-                    flex_wrap: FlexWrap::Wrap,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(8.0),
-                    row_gap: Val::Px(6.0),
-                    display: if mode == Mode::Record {
-                        Display::Flex
-                    } else {
-                        Display::None
-                    },
-                    ..default()
+        let mut record_group_ec = panel.spawn((
+            RecordModeGroup,
+            Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(8.0),
+                row_gap: Val::Px(6.0),
+                display: if mode == Mode::Record {
+                    Display::Flex
+                } else {
+                    Display::None
                 },
-            ))
-            .with_children(|g| {
-                spawn_record_buttons(g, loc, colors);
-            });
+                ..default()
+            },
+        ));
+        // Captured so the combobox below can use it as its own trigger
+        // parent — `combobox::spawn_combobox` needs a concrete `Entity` up
+        // front, and this row (unlike `EditorRoot`) is spawned fresh right
+        // here, so there's nothing to query for.
+        let record_group_id = record_group_ec.id();
+        record_group_ec.with_children(|g| {
+            spawn_record_buttons(g, loc, colors);
+
+            // Detect algorithm: same shared combobox (and global
+            // `AudioSettings::pitch_algorithm`) as Options/Bending Trainer —
+            // picking one here takes effect immediately, including for a
+            // take already in progress, since recording reads pitches off
+            // the same continuously-running mic pipeline every other mode
+            // does (see `record.rs`'s module docs).
+            combobox::spawn_combobox(
+                g.commands_mut(),
+                record_group_id,
+                editor_root,
+                &loc.msg("editor-record-detect-label"),
+                &algo_labels(),
+                algorithm.label(),
+                on_algo_selected,
+            );
+            spawn_algo_explanation(g.commands_mut(), record_group_id, 380.0, algorithm);
+        });
 
         panel
             .spawn((

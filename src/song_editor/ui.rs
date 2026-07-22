@@ -12,6 +12,8 @@ use super::mod_panel::spawn_mod_panel;
 use super::playback::{EditorAudio, EditorProgressFill, Playhead, PlayheadLine};
 use super::state::{EditorState, Mode, Scroll, TimelineTool};
 use super::{BEAT_W, HOLE_COL_W, NOTE_PAD, ROW_H, grid_height};
+use crate::audio_system::pitch_detect::PitchAlgorithm;
+use crate::settings::AudioSettings;
 use crate::theme::{LoadedTheme, SongEditorColors};
 use bevy_fluent::prelude::Localization;
 
@@ -283,21 +285,27 @@ pub(super) fn setup(
     loc: Res<Localization>,
     theme: Res<LoadedTheme>,
     state: Res<EditorState>,
+    audio: Res<AudioSettings>,
 ) {
     let colors = theme.song_editor_colors();
     let mode = state.mode;
     let hole_count = state.hole_count();
-    commands
-        .spawn((
-            EditorRoot,
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-            BackgroundColor(colors.editor_bg),
-        ))
+    let mut root_ec = commands.spawn((
+        EditorRoot,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            ..default()
+        },
+        BackgroundColor(colors.editor_bg),
+    ));
+    // Captured up front (rather than queried later, like `ScaleComboboxSlot`
+    // needs to — see its own doc comment) so the Record mode's algorithm
+    // combobox, built inline below in this same system, can use it directly
+    // as its full-screen backdrop parent without waiting for a command flush.
+    let root_id = root_ec.id();
+    root_ec
         .with_children(|root| {
             root.spawn((
                 Node {
@@ -325,7 +333,15 @@ pub(super) fn setup(
             // one scrollable area between the grid and the form fields let
             // scrolling either one move both (a horizontal-scrollbar drag on
             // the grid would also drag the page vertically on a small window).
-            spawn_fixed_chrome(root, &loc, colors, mode, hole_count);
+            spawn_fixed_chrome(
+                root,
+                &loc,
+                colors,
+                mode,
+                hole_count,
+                root_id,
+                audio.pitch_algorithm,
+            );
 
             // The form fields (meta form, lesson form, status bar), in their
             // own scrollable column — a fully expanded lesson-details panel
@@ -373,6 +389,8 @@ fn spawn_fixed_chrome(
     colors: SongEditorColors,
     mode: Mode,
     hole_count: u8,
+    editor_root: Entity,
+    algorithm: PitchAlgorithm,
 ) {
     root.spawn((
         GridRowContainer,
@@ -526,5 +544,5 @@ fn spawn_fixed_chrome(
         ));
     });
 
-    spawn_mod_panel(root, loc, colors, mode);
+    spawn_mod_panel(root, loc, colors, mode, editor_root, algorithm);
 }
