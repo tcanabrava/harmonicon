@@ -26,10 +26,14 @@ finish-args:
   - --device=dri
   # Audio output and microphone input (pitch detection records from the mic).
   - --socket=pulseaudio
-  # Joystick/gamepad input (bevy_gilrs) — planned screen navigation. Without
-  # this, gilrs can't reach /dev/input to enumerate controllers and logs an
-  # error at startup (harmless today, but blocks the feature once it's built).
-  - --device=input
+  # Joystick/gamepad input (bevy_gilrs) — planned screen navigation, not
+  # implemented yet. `--device=input` isn't a real flatpak permission (the
+  # sandbox has no device category scoped to just /dev/input — CI's actual
+  # error spelled out the valid ones: dri, all, kvm, shm), and gilrs logging
+  # a startup error today with no way to reach the device anyway is harmless
+  # until the feature exists — so nothing is granted here for it yet. Once
+  # gamepad support actually lands, add `--device=all` (broader than ideal,
+  # but the closest real option) rather than retrying `input`.
   # User-added songs and themes: dropped into ~/Harmonicon, read as an extra
   # asset root alongside the bundled ones (see the "external" AssetSource in
   # main.rs). Scoped to this one subfolder, not the whole home directory.

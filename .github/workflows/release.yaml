@@ -18,55 +18,6 @@ env:
 
 jobs:
 
-  # Build for wasm
-  release-wasm:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: olegtarasov/get-tag@v2.1.2
-        id: get_version
-      - uses: actions/checkout@v4
-        with:
-          lfs: ${{ env.use_git_lfs }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - name: install wasm-bindgen-cli
-        run: |
-          version=`cargo metadata --format-version 1 | jq --raw-output '.packages[] | select(.name=="wasm-bindgen") | .version'`
-          cargo install -f wasm-bindgen-cli --version $version
-
-      - name: Build
-        run: |
-          cargo build --release --target wasm32-unknown-unknown
-
-      - name: Prepare package
-        run: |
-          wasm-bindgen --no-typescript --out-name bevy_game --out-dir wasm --target web target/wasm32-unknown-unknown/release/${{ env.binary }}.wasm
-          cp -r assets wasm/ || true # Try to copy, but ignore if it can't copy if source directory does not exist 
-
-      - name: Package as a zip
-        working-directory: ./wasm
-        run: |
-          zip --recurse-paths ../${{ env.binary }}.zip .
-
-      - name: Upload binaries to artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          path: ${{ env.binary }}.zip
-          name: wasm
-          retention-days: 1
-
-      - name: Upload binaries to release
-        if: ${{ env.add_binaries_to_github_release == 'true' }}
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ env.binary }}.zip
-          asset_name: ${{ env.binary }}-wasm-${{ steps.get_version.outputs.tag }}.zip
-          tag: ${{ github.ref }}
-          overwrite: true
-
   # Build for Linux
   release-linux:
     runs-on: ubuntu-latest
@@ -189,7 +140,19 @@ jobs:
           mkdir -p ${{ env.binary }}.app/Contents/MacOS
           cp target/x86_64-apple-darwin/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/
           cp -r assets ${{ env.binary }}.app/Contents/MacOS/ || true # Try to copy, but ignore if it can't copy if source directory does not exist
-          hdiutil create -fs HFS+ -volname "${{ env.binary }}" -srcfolder ${{ env.binary }}.app ${{ env.binary }}-macOS-intel.dmg
+
+      # Ad-hoc signing (no certificate needed): without this, the kernel
+      # refuses to launch the app on Apple Silicon at all (no dialog, no
+      # error — see `macos.yaml`'s own comment on this). This alone doesn't
+      # clear Gatekeeper's separate quarantine check on a real downloaded
+      # release (that needs paid-account notarization, which this project
+      # doesn't have) — a first-time user will likely still need to
+      # right-click → Open, or `xattr -cr` the .app.
+      - name: Ad-hoc code sign the app bundle
+        run: codesign --force --deep --sign - ${{ env.binary }}.app
+
+      - name: Create .dmg
+        run: hdiutil create -fs HFS+ -volname "${{ env.binary }}" -srcfolder ${{ env.binary }}.app ${{ env.binary }}-macOS-intel.dmg
 
       - name: Upload binaries to artifacts
         uses: actions/upload-artifact@v4
@@ -235,7 +198,14 @@ jobs:
           mkdir -p ${{ env.binary }}.app/Contents/MacOS
           cp target/aarch64-apple-darwin/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/
           cp -r assets ${{ env.binary }}.app/Contents/MacOS/ || true # Try to copy, but ignore if it can't copy if source directory does not exist
-          hdiutil create -fs HFS+ -volname "${{ env.binary }}-macOS-apple-silicon" -srcfolder ${{ env.binary }}.app ${{ env.binary }}-macOS-apple-silicon.dmg
+
+      # See the Intel job's own comment on why this matters most here:
+      # unsigned arm64 binaries are refused by the kernel outright.
+      - name: Ad-hoc code sign the app bundle
+        run: codesign --force --deep --sign - ${{ env.binary }}.app
+
+      - name: Create .dmg
+        run: hdiutil create -fs HFS+ -volname "${{ env.binary }}-macOS-apple-silicon" -srcfolder ${{ env.binary }}.app ${{ env.binary }}-macOS-apple-silicon.dmg
 
       - name: Upload binaries to artifacts
         uses: actions/upload-artifact@v4
@@ -251,6 +221,63 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ env.binary }}-macOS-apple-silicon.dmg
           asset_name: ${{ env.binary }}-macOS-apple-silicon-${{ steps.get_version.outputs.tag }}.dmg
+          tag: ${{ github.ref }}
+          overwrite: true
+
+  # Build a distributable single-file .flatpak bundle from the same manifest
+  # flatpak.yaml verifies on every push/PR (that workflow only builds, never
+  # exports/bundles — this is what actually produces something installable).
+  release-flatpak:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: olegtarasov/get-tag@v2.1.2
+        id: get_version
+      - uses: actions/checkout@v4
+        with:
+          lfs: ${{ env.use_git_lfs }}
+
+      - name: Install flatpak and flatpak-builder
+        run: |
+          sudo apt-get update
+          # elfutils provides eu-strip, which flatpak-builder shells out to on
+          # the host after the build to split/strip debuginfo — apt only pulls
+          # it in as a Recommends of flatpak-builder, which
+          # --no-install-recommends skips, so it must be listed explicitly.
+          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder elfutils
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install runtime, SDK, and Rust extension
+        run: |
+          sudo flatpak install -y --noninteractive flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//25.08
+
+      - name: Build and export to a local repo
+        run: |
+          flatpak-builder --force-clean --repo=flatpak-repo build-dir \
+            packaging/flatpak/io.github.tcanabrava.harmonicon.yaml
+
+      - name: Bundle into a single .flatpak file
+        run: |
+          flatpak build-bundle flatpak-repo ${{ env.binary }}.flatpak \
+            io.github.tcanabrava.harmonicon
+
+      - name: Upload binaries to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          path: ${{ env.binary }}.flatpak
+          name: flatpak
+          retention-days: 1
+
+      - name: Upload binaries to release
+        if: ${{ env.add_binaries_to_github_release == 'true' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ env.binary }}.flatpak
+          asset_name: ${{ env.binary }}-${{ steps.get_version.outputs.tag }}.flatpak
           tag: ${{ github.ref }}
           overwrite: true
 
@@ -271,11 +298,11 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - check-if-upload-to-itch-is-configured
-      - release-wasm
       - release-linux
       - release-windows
       - release-macOS-intel
       - release-macOS-apple-silicon
+      - release-flatpak
     if: ${{ needs.check-if-upload-to-itch-is-configured.outputs.should-upload == 'yes' }}
 
     steps:

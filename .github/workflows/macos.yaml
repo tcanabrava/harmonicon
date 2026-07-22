@@ -57,12 +57,29 @@ jobs:
       - name: Build (release)
         run: cargo build --release --bin ${{ env.binary }}
 
-      - name: Assemble .app bundle and create .dmg
+      - name: Assemble .app bundle
         run: |
           mkdir -p ${{ env.binary }}.app/Contents/MacOS
           cp target/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/
           cp -r assets ${{ env.binary }}.app/Contents/MacOS/
-          hdiutil create -fs HFS+ -volname "${{ env.binary }}" -srcfolder ${{ env.binary }}.app ${{ env.binary }}.dmg
+
+      # Without this, the app is unsigned — on Apple Silicon (GitHub's
+      # macos-latest runners are arm64), the kernel's code-signing
+      # enforcement refuses to even start an unsigned binary at all, with no
+      # dialog or error of any kind (Intel Macs instead show Gatekeeper's
+      # "unidentified developer" warning, which at least right-click → Open
+      # can bypass). Ad-hoc signing (no certificate, no paid Apple Developer
+      # account needed) satisfies that kernel check; it does *not* satisfy
+      # Gatekeeper's separate "downloaded from the internet" quarantine
+      # check for a real release download — that needs actual notarization
+      # with a paid account, which this project doesn't have. Someone
+      # grabbing this .dmg from an artifact/release will likely still need
+      # to right-click → Open (or `xattr -cr` the .app) the first time.
+      - name: Ad-hoc code sign the app bundle
+        run: codesign --force --deep --sign - ${{ env.binary }}.app
+
+      - name: Create .dmg
+        run: hdiutil create -fs HFS+ -volname "${{ env.binary }}" -srcfolder ${{ env.binary }}.app ${{ env.binary }}.dmg
 
       - name: Upload .dmg as a build artifact
         uses: actions/upload-artifact@v4
