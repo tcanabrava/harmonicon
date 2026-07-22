@@ -12,8 +12,8 @@ use super::ranges::{
 use super::state::Scroll;
 use super::state::{
     ContentKind, Dir, Edge, EditorState, Expr, GridNote, HarmonicaKind, Pitch, Side, TimelineTool,
-    apply_resize, build_tempo_map, cycle_next, enforce_direction, enforce_expr,
-    move_target, note_rect, toggle_tempo_point,
+    apply_resize, build_tempo_map, cycle_next, enforce_direction, enforce_expr, move_target,
+    note_rect, toggle_tempo_point,
 };
 use super::timeline::{TimelineSurfaceGeometry, drag_end_tick};
 use super::ui::ModButton;
@@ -376,7 +376,10 @@ fn paste_targets_shifts_the_earliest_note_to_the_target_tick() {
     );
     // Ids are freshly assigned starting at `next_id`, never reusing the
     // clipboard's own copied ids.
-    assert_eq!(pasted.iter().map(|n| n.id).collect::<Vec<_>>(), vec![100, 101]);
+    assert_eq!(
+        pasted.iter().map(|n| n.id).collect::<Vec<_>>(),
+        vec![100, 101]
+    );
     assert_eq!(next_id, 102);
 }
 

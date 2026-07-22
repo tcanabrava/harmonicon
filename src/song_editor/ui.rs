@@ -319,79 +319,78 @@ pub(super) fn setup(
     // combobox, built inline below in this same system, can use it directly
     // as its full-screen backdrop parent without waiting for a command flush.
     let root_id = root_ec.id();
-    root_ec
-        .with_children(|root| {
-            root.spawn((
+    root_ec.with_children(|root| {
+        root.spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(5.0),
+                flex_shrink: 0.0,
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+        ))
+        .with_children(|bar| {
+            bar.spawn((
+                EditorProgressFill,
                 Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Px(5.0),
-                    flex_shrink: 0.0,
+                    width: Val::Percent(0.0),
+                    height: Val::Percent(100.0),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
-            ))
-            .with_children(|bar| {
-                bar.spawn((
-                    EditorProgressFill,
+                BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
+            ));
+        });
+
+        // Fixed chrome: the grid row (own horizontal scroll) + mod
+        // panel — kept out of the form `ScrollArea` below, since sharing
+        // one scrollable area between the grid and the form fields let
+        // scrolling either one move both (a horizontal-scrollbar drag on
+        // the grid would also drag the page vertically on a small window).
+        spawn_fixed_chrome(
+            root,
+            &loc,
+            colors,
+            mode,
+            hole_count,
+            root_id,
+            audio.pitch_algorithm,
+        );
+
+        // The form fields (meta form, lesson form, status bar), in their
+        // own scrollable column — a fully expanded lesson-details panel
+        // routinely exceeds a laptop window's height. Same
+        // `Overflow::scroll_y()` + `ScrollArea` pattern `menu::pages::
+        // lessons`/`dialogs::file_dialog` use; `min_height: Val::Px(0.0)`
+        // lets this flex item shrink below its content size (the
+        // flexbox "min-height: auto" gotcha). The sibling `Scrollbar`
+        // (`scroll::spawn_editor_scrollbar`) is what makes the fact that
+        // this scrolls at all visible to the player.
+        root.spawn(Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            flex_grow: 1.0,
+            min_height: Val::Px(0.0),
+            ..default()
+        })
+        .with_children(|outer| {
+            let scroll_area = outer
+                .spawn((
                     Node {
-                        width: Val::Percent(0.0),
-                        height: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        flex_grow: 1.0,
+                        min_height: Val::Px(0.0),
+                        overflow: Overflow::scroll_y(),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.35, 0.75, 1.0)),
-                ));
-            });
-
-            // Fixed chrome: the grid row (own horizontal scroll) + mod
-            // panel — kept out of the form `ScrollArea` below, since sharing
-            // one scrollable area between the grid and the form fields let
-            // scrolling either one move both (a horizontal-scrollbar drag on
-            // the grid would also drag the page vertically on a small window).
-            spawn_fixed_chrome(
-                root,
-                &loc,
-                colors,
-                mode,
-                hole_count,
-                root_id,
-                audio.pitch_algorithm,
-            );
-
-            // The form fields (meta form, lesson form, status bar), in their
-            // own scrollable column — a fully expanded lesson-details panel
-            // routinely exceeds a laptop window's height. Same
-            // `Overflow::scroll_y()` + `ScrollArea` pattern `menu::pages::
-            // lessons`/`dialogs::file_dialog` use; `min_height: Val::Px(0.0)`
-            // lets this flex item shrink below its content size (the
-            // flexbox "min-height: auto" gotcha). The sibling `Scrollbar`
-            // (`scroll::spawn_editor_scrollbar`) is what makes the fact that
-            // this scrolls at all visible to the player.
-            root.spawn(Node {
-                width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Row,
-                flex_grow: 1.0,
-                min_height: Val::Px(0.0),
-                ..default()
-            })
-            .with_children(|outer| {
-                let scroll_area = outer
-                    .spawn((
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            flex_grow: 1.0,
-                            min_height: Val::Px(0.0),
-                            overflow: Overflow::scroll_y(),
-                            ..default()
-                        },
-                        ScrollArea,
-                    ))
-                    .with_children(|scroll| {
-                        super::scroll::spawn_form_scroll_content(scroll, &loc, colors);
-                    })
-                    .id();
-                super::scroll::spawn_editor_scrollbar(outer, scroll_area, colors);
-            });
+                    ScrollArea,
+                ))
+                .with_children(|scroll| {
+                    super::scroll::spawn_form_scroll_content(scroll, &loc, colors);
+                })
+                .id();
+            super::scroll::spawn_editor_scrollbar(outer, scroll_area, colors);
         });
+    });
 }
 
 /// The editor's always-visible chrome, above the scrollable form area: the

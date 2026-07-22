@@ -51,7 +51,9 @@ impl AssetLoader for SongChartLoader {
         // returned future must be.
         use bevy::log::tracing::Instrument;
         let span = info_span!("SongChartLoader::load", path = %load_context.path());
-        Self::load_inner(reader, load_context).instrument(span).await
+        Self::load_inner(reader, load_context)
+            .instrument(span)
+            .await
     }
 
     fn extensions(&self) -> &[&str] {

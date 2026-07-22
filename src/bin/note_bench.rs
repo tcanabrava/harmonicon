@@ -26,7 +26,9 @@
 //! take needs this at all: it's never going to line up sample-accurately,
 //! and this benchmark measures pitch detection, not rhythm).
 
-use harmonicon::audio_system::pitch_detect::{PITCH_RANGE_MARGIN_SEMITONES, PitchAlgorithm, PitchRange};
+use harmonicon::audio_system::pitch_detect::{
+    PITCH_RANGE_MARGIN_SEMITONES, PitchAlgorithm, PitchRange,
+};
 use harmonicon::audio_system::wav::decode_wav_pcm16;
 use harmonicon::note_bench::{
     DEFAULT_TIMING_TOLERANCE_SECS, compare, expected_notes_from_chart, run_algorithm,
@@ -91,10 +93,7 @@ fn main() {
 }
 
 fn run_one(song_dir: &Path, chart_path: &Path, wav_path: &Path, tolerance_secs: f64) {
-    let name = song_dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("?");
+    let name = song_dir.file_name().and_then(|n| n.to_str()).unwrap_or("?");
     println!("== {name} == (timing tolerance ±{tolerance_secs:.2}s)");
 
     let chart_json = match std::fs::read_to_string(chart_path) {

@@ -242,7 +242,10 @@ mod tests {
             },
             timing: Timing {
                 resolution: 480,
-                tempo_map: vec![TempoPoint { tick: 0, bpm: 120.0 }],
+                tempo_map: vec![TempoPoint {
+                    tick: 0,
+                    bpm: 120.0,
+                }],
                 time_signature_map: None,
             },
             harmonica: richter_harp("C"),
@@ -403,11 +406,7 @@ mod tests {
     #[test]
     fn confusion_pairs_are_sorted_most_frequent_first() {
         let expected = vec![expected(60)];
-        let frames = vec![
-            frame(0.1, &[60]),
-            frame(0.2, &[60]),
-            frame(0.3, &[62]),
-        ];
+        let frames = vec![frame(0.1, &[60]), frame(0.2, &[60]), frame(0.3, &[62])];
         let report = compare(&expected, &frames, 0.0);
         // (want=[60], got=[60]) occurred twice; (want=[60], got=[62]) once.
         assert_eq!(report.confusion[0], (vec![60], vec![60], 2));

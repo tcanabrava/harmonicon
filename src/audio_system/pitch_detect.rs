@@ -276,7 +276,10 @@ pub fn analyze(
         plan.process(&mut buffer);
 
         let half = n / 2;
-        buffer[..half].iter().map(|c| c.norm()).collect::<Vec<f32>>()
+        buffer[..half]
+            .iter()
+            .map(|c| c.norm())
+            .collect::<Vec<f32>>()
     };
 
     // Pitches come from the selected algorithm; the magnitudes above are always

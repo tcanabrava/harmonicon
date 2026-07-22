@@ -198,7 +198,10 @@ fn erase_debug_recording(_: On<Pointer<Click>>, mut raw: ResMut<RawCaptureBuffer
 /// aligned bars: this strip has no chart timeline to align against — it's
 /// just "what did the mic capture, squashed to fit" — so it doesn't need
 /// that geometry at all.
-pub(super) fn spawn_debug_waveform_strip(root: &mut ChildSpawnerCommands, colors: SongEditorColors) {
+pub(super) fn spawn_debug_waveform_strip(
+    root: &mut ChildSpawnerCommands,
+    colors: SongEditorColors,
+) {
     root.spawn((
         DebugWaveformRow,
         Node {
@@ -261,7 +264,11 @@ fn update_debug_waveform(
     let Ok(mut row_node) = row.single_mut() else {
         return;
     };
-    row_node.display = if checked { Display::Flex } else { Display::None };
+    row_node.display = if checked {
+        Display::Flex
+    } else {
+        Display::None
+    };
     if !checked || raw.samples.len() == *last_len {
         return;
     }

@@ -85,7 +85,8 @@ pub fn process_audio(
                 raw.samples.extend_from_slice(&samples);
             } else {
                 let hop = samples.len() / 2;
-                raw.samples.extend_from_slice(&samples[samples.len() - hop..]);
+                raw.samples
+                    .extend_from_slice(&samples[samples.len() - hop..]);
             }
             let elapsed = raw.samples.len() as f32 / raw.sample_rate.max(1) as f32;
             let current: Vec<String> = analysis

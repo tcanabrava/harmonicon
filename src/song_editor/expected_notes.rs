@@ -52,6 +52,7 @@ use bevy::picking::Pickable;
 use bevy::picking::events::{Click, Drag, DragEnd, DragStart, Pointer};
 use bevy::prelude::*;
 
+use super::TICKS_PER_BEAT;
 use super::panel::mod_button_active;
 use super::state::{
     Dir, DragKind, DragState, Edge, EditorState, Expr, GridNote, HarmonicaKind, Mode, Pitch,
@@ -60,7 +61,6 @@ use super::state::{
     pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{ExpectedNotesGroup, GridContent, ModButton, ModeButton};
-use super::TICKS_PER_BEAT;
 use crate::app::AppState;
 use crate::dialogs::tooltip::Tooltip;
 use crate::localization::LocalizationExt;
@@ -172,12 +172,8 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
     let Some(note) = state.expected_selected_note_mut() else {
         match kind {
             ModButton::Bend => super::interaction::cycle_sticky_bend(state),
-            ModButton::Overblow => {
-                super::interaction::cycle_sticky_pitch(state, Pitch::Overblow)
-            }
-            ModButton::Overdraw => {
-                super::interaction::cycle_sticky_pitch(state, Pitch::Overdraw)
-            }
+            ModButton::Overblow => super::interaction::cycle_sticky_pitch(state, Pitch::Overblow),
+            ModButton::Overdraw => super::interaction::cycle_sticky_pitch(state, Pitch::Overdraw),
             ModButton::Slide => super::interaction::cycle_sticky_pitch(state, Pitch::Slide),
             ModButton::Wah => super::interaction::cycle_sticky_wah(state),
             ModButton::Vibrato => super::interaction::cycle_sticky_vibrato(state),
@@ -328,9 +324,11 @@ fn spawn_expected_mod_button(
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
             Tooltip(String::from(tooltip)),
         ))
-        .observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-            apply_expected_modifier(&mut state, kind);
-        })
+        .observe(
+            move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                apply_expected_modifier(&mut state, kind);
+            },
+        )
         .with_children(|b| {
             b.spawn((
                 Text::new(String::from(label)),
@@ -532,9 +530,11 @@ fn rebuild_expected_notes_overlay(
                 BorderColor::all(color),
                 pick,
             ));
-            ec.observe(move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
-                state.expected_selected = Some(id);
-            })
+            ec.observe(
+                move |_: On<Pointer<Click>>, mut state: ResMut<EditorState>| {
+                    state.expected_selected = Some(id);
+                },
+            )
             .observe(
                 move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
                     if state.expected_dragging.is_some() {
@@ -626,7 +626,11 @@ fn spawn_expected_resize_handle(
         Edge::Right => node.right = Val::Px(0.0),
     }
     parent
-        .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.35)), pick))
+        .spawn((
+            node,
+            BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.35)),
+            pick,
+        ))
         .observe(
             move |_: On<Pointer<DragStart>>, mut state: ResMut<EditorState>| {
                 if state.expected_dragging.is_some() {
@@ -636,8 +640,7 @@ fn spawn_expected_resize_handle(
                     return;
                 };
                 state.expected_selected = Some(id);
-                state.expected_dragging =
-                    Some(DragState::new(id, DragKind::Resize(edge), &note));
+                state.expected_dragging = Some(DragState::new(id, DragKind::Resize(edge), &note));
             },
         )
         .observe(
@@ -671,8 +674,7 @@ fn spawn_expected_resize_handle(
         )
         .observe(
             move |_: On<Pointer<DragEnd>>, mut state: ResMut<EditorState>| {
-                if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Resize(edge))
-                {
+                if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Resize(edge)) {
                     state.expected_dragging = None;
                 }
             },
