@@ -1,19 +1,30 @@
 // SPDX-License-Identifier: MIT
 
 //! Dev-only ("--features dev") debugging aid — never wired up outside it,
-//! see `mod.rs`'s conditional `mod debug_record;`. Alongside the ordinary
-//! Record-mode note capture, a "Debug Recording" checkbox also dumps the
-//! *raw* microphone audio a take captured to a WAV file, written next to a
-//! copy of the chart in `assets/debug_songs/<song name>/` whenever the song
-//! is saved — so a pitch-detection miss can be diagnosed against exactly
-//! what the mic heard, not just what the detector reported for it.
+//! see `mod.rs`'s conditional `mod debug_record;`. A "Debug Recording"
+//! checkbox (always visible in the mod panel's top strip, regardless of
+//! mode — see `mod_panel.rs`'s own comment on why) dumps the *raw*
+//! microphone audio to a WAV file, written next to `recorded.harpchart`
+//! (what the live detector actually produced) and `expected.harpchart`
+//! (the hand-annotated ground truth, see `expected_notes`'s module docs)
+//! in `assets/debug_songs/<song name>/` whenever the song is saved — so a
+//! pitch-detection miss can be diagnosed against exactly what the mic
+//! heard, not just what the detector reported for it.
 //!
 //! The checkbox itself only *arms* this: checking it never starts capturing
-//! anything by itself, and never touches [`RecordState`] — the Play button
-//! remains the one thing that starts a take, recording notes as normal *or*
-//! also raw audio, depending on whether this checkbox happens to be on.
-//! [`sync_raw_capture`] is what actually gates [`RawCaptureBuffer::
-//! recording`] on both being true at once.
+//! anything by itself. [`sync_raw_capture`] gates the actual capture on
+//! *either* [`RecordState::active`] or [`PracticeState::active`] — Play (in
+//! either Record or Play/Practice mode) is what actually starts a take.
+//! Deliberately both, not just Record mode: Record mode's live note
+//! capture *punches in* over whatever notes already occupy the span it's
+//! recording over (see `record.rs`'s module docs), so recording there would
+//! silently overwrite hand-authored "ground truth" notes with whatever the
+//! live detector itself guessed — circular for benchmarking. Practice mode
+//! never touches `EditorState::notes` at all (`practice::practice_tick`
+//! takes no `EditorState` access), so playing along to an already-correct,
+//! by-hand-authored chart with Practice mode's Play button — while this
+//! checkbox is on — captures the mic audio without disturbing the ground
+//! truth `note_bench` will compare it against.
 //!
 //! The raw audio itself is tapped from `audio_system::pipeline`'s
 //! [`RawCaptureBuffer`] (a generic, also dev-only resource living there for
@@ -42,8 +53,9 @@ use bevy_fluent::prelude::Localization;
 
 use super::HOLE_COL_W;
 use super::SAVE_PURPOSE;
-use super::harpchart::{safe_path_segment, serialize_harpchart};
+use super::harpchart::{safe_path_segment, serialize_harpchart, serialize_harpchart_notes};
 use super::panel_widgets::transport_button;
+use super::practice::PracticeState;
 use super::record::RecordState;
 use super::state::{ContentKind, EditorState};
 
@@ -91,12 +103,14 @@ struct DebugWaveformBar(usize);
 
 // ── UI ────────────────────────────────────────────────────────────────────────
 
-/// Spawned once into the Record mode's mod-panel row (`mod_panel.rs`),
-/// alongside the pitch-algorithm combobox: a real checkbox (`bevy_ui_widgets
-/// ::Checkbox`, per this project's own preference for that crate's widgets
-/// over hand-rolled ones) plus an "Erase" button and a status label
-/// reflecting whether it's armed and, while a take is actually running, how
-/// much audio has been captured so far.
+/// Spawned once into the mod panel's always-visible top strip
+/// (`mod_panel.rs`, alongside Save/Load) — not a mode-specific group, since
+/// it needs to work from either Record or Play/Practice mode (see the
+/// module docs): a real checkbox (`bevy_ui_widgets::Checkbox`, per this
+/// project's own preference for that crate's widgets over hand-rolled ones)
+/// plus an "Erase" button and a status label reflecting whether it's armed
+/// and, while a take is actually running, how much audio has been captured
+/// so far.
 pub(super) fn spawn_debug_recording_controls(
     panel: &mut ChildSpawnerCommands,
     loc: &Localization,
@@ -287,6 +301,7 @@ fn update_checkbox_glyph(
 fn update_debug_record_status_label(
     checkbox: Query<Has<Checked>, With<DebugRecordCheckbox>>,
     record: Res<RecordState>,
+    practice: Res<PracticeState>,
     raw: Res<RawCaptureBuffer>,
     loc: Res<Localization>,
     mut labels: Query<&mut Text, With<DebugRecordStatusLabel>>,
@@ -296,7 +311,7 @@ fn update_debug_record_status_label(
     };
     let text = if !checked {
         loc.msg("editor-debug-recording-off")
-    } else if record.active {
+    } else if record.active || practice.active {
         let secs = raw.samples.len() as f32 / raw.sample_rate.max(1) as f32;
         loc.msg_args(
             "editor-debug-recording-status",
@@ -323,24 +338,29 @@ fn update_debug_record_status_label(
 fn sync_raw_capture(
     checkbox: Query<Has<Checked>, With<DebugRecordCheckbox>>,
     record: Res<RecordState>,
+    practice: Res<PracticeState>,
     mut raw: ResMut<RawCaptureBuffer>,
     mut was_active: Local<bool>,
 ) {
     let Ok(checked) = checkbox.single() else {
         return;
     };
-    let take_just_started = record.active && !*was_active;
-    *was_active = record.active;
+    // Either transport counts — see the module docs for why both, and why
+    // Practice (not Record) is the one to use when the chart's own notes
+    // must stay untouched.
+    let active_now = record.active || practice.active;
+    let take_just_started = active_now && !*was_active;
+    *was_active = active_now;
     if checked && take_just_started {
         raw.samples.clear();
         raw.detected_notes.clear();
     }
-    raw.recording = checked && record.active;
+    raw.recording = checked && active_now;
 }
 
-/// Writes a copy of the chart plus the take's raw WAV into
-/// `assets/debug_songs/<song name>/` whenever the song is saved — a
-/// separate `FileChosen{purpose: SAVE_PURPOSE}` consumer alongside
+/// Writes `recorded.harpchart` + `expected.harpchart` plus the take's raw
+/// WAV into `assets/debug_songs/<song name>/` whenever the song is saved —
+/// a separate `FileChosen{purpose: SAVE_PURPOSE}` consumer alongside
 /// `harpchart::handle_save_chosen` (same message, same purpose, different
 /// concern, same split-by-consumer pattern `harpchart`/`lesson_form`'s own
 /// save handlers already use). Skipped entirely if nothing was actually
@@ -369,10 +389,23 @@ fn write_debug_recording_on_save(
             continue;
         }
 
-        let chart_path = dir.join("chart.harpchart");
-        let json = serialize_harpchart(&state);
-        if let Err(e) = std::fs::write(&chart_path, json.as_bytes()) {
-            println!("Debug recording: chart write failed: {e}");
+        // Two charts, not one: `recorded.harpchart` is whatever the live
+        // detector actually produced (`state.notes`, mistakes and all —
+        // unchanged from what a plain chart save would write);
+        // `expected.harpchart` is the hand-annotated ground truth
+        // (`state.expected_notes`, see `expected_notes`'s module docs) —
+        // `note_bench` compares a detector's offline replay against the
+        // latter, never the former, so a detection miss can't accidentally
+        // get "confirmed" by comparing it against itself.
+        let recorded_path = dir.join("recorded.harpchart");
+        let recorded_json = serialize_harpchart(&state);
+        if let Err(e) = std::fs::write(&recorded_path, recorded_json.as_bytes()) {
+            println!("Debug recording: recorded-chart write failed: {e}");
+        }
+        let expected_path = dir.join("expected.harpchart");
+        let expected_json = serialize_harpchart_notes(&state, &state.expected_notes);
+        if let Err(e) = std::fs::write(&expected_path, expected_json.as_bytes()) {
+            println!("Debug recording: expected-chart write failed: {e}");
         }
 
         // Resampled to a fixed rate regardless of what the capture device
@@ -423,8 +456,9 @@ fn write_debug_recording_on_save(
         }
 
         println!(
-            "Debug recording written: {} + {} + {}",
-            chart_path.display(),
+            "Debug recording written: {} + {} + {} + {}",
+            recorded_path.display(),
+            expected_path.display(),
             wav_path.display(),
             meta_path.display()
         );

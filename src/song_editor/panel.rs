@@ -6,9 +6,9 @@ use super::practice::PracticeState;
 use super::record::RecordState;
 use super::state::{ContentKind, Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
 use super::ui::{
-    BendDot, ContentKindText, EditModeGroup, HarmonicaKindText, MetaFieldBox, MetaFieldText,
-    ModButton, ModButtonLabel, ModeButton, PlayModeGroup, RecordModeGroup, StatusMsg,
-    TimelineToolButton,
+    BendDot, ContentKindText, EditModeGroup, ExpectedNotesGroup, HarmonicaKindText, MetaFieldBox,
+    MetaFieldText, ModButton, ModButtonLabel, ModeButton, PlayModeGroup, RecordModeGroup,
+    StatusMsg, TimelineToolButton,
 };
 use crate::localization::LocalizationExt;
 use crate::theme::LoadedTheme;
@@ -19,7 +19,7 @@ use bevy_fluent::prelude::Localization;
 /// `GridNote`'s own fields) and the nothing-selected case (`EditorState`'s
 /// `sticky_dir`/`sticky_pitch`/`sticky_expr`, previewing what a *new* note
 /// would get), so the two can't drift out of sync with each other.
-fn mod_button_active(kind: ModButton, dir: Dir, pitch: Pitch, expr: Expr) -> bool {
+pub(super) fn mod_button_active(kind: ModButton, dir: Dir, pitch: Pitch, expr: Expr) -> bool {
     match kind {
         ModButton::Blow => dir == Dir::Blow,
         ModButton::Draw => dir == Dir::Draw,
@@ -125,6 +125,7 @@ pub(super) fn update_mode_buttons(
             ModeButton::Record => state.mode == Mode::Record,
             ModeButton::Play => state.mode == Mode::Play,
             ModeButton::Lock => state.locked(),
+            ModeButton::ExpectedNotes => state.mode == Mode::ExpectedNotes,
         };
         bg.0 = if active {
             colors.btn_active
@@ -164,6 +165,7 @@ pub(super) fn update_mode_visibility(
             With<EditModeGroup>,
             Without<RecordModeGroup>,
             Without<PlayModeGroup>,
+            Without<ExpectedNotesGroup>,
         ),
     >,
     mut record_group: Query<
@@ -172,6 +174,7 @@ pub(super) fn update_mode_visibility(
             With<RecordModeGroup>,
             Without<EditModeGroup>,
             Without<PlayModeGroup>,
+            Without<ExpectedNotesGroup>,
         ),
     >,
     mut play_group: Query<
@@ -180,6 +183,16 @@ pub(super) fn update_mode_visibility(
             With<PlayModeGroup>,
             Without<EditModeGroup>,
             Without<RecordModeGroup>,
+            Without<ExpectedNotesGroup>,
+        ),
+    >,
+    mut expected_notes_group: Query<
+        &mut Node,
+        (
+            With<ExpectedNotesGroup>,
+            Without<EditModeGroup>,
+            Without<RecordModeGroup>,
+            Without<PlayModeGroup>,
         ),
     >,
 ) {
@@ -192,6 +205,9 @@ pub(super) fn update_mode_visibility(
     }
     for mut node in &mut play_group {
         node.display = display(state.mode == Mode::Play);
+    }
+    for mut node in &mut expected_notes_group {
+        node.display = display(state.mode == Mode::ExpectedNotes);
     }
 }
 

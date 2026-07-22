@@ -48,6 +48,16 @@ fn note_name_for(n: &GridNote, harp: &Harmonica) -> String {
 }
 
 pub(super) fn serialize_harpchart(state: &EditorState) -> String {
+    serialize_harpchart_notes(state, &state.notes)
+}
+
+/// Same as [`serialize_harpchart`], but serializes `notes` instead of
+/// `state.notes` — everything else (key, tempo, harmonica, ...) still comes
+/// from the shared `state`. Used by `debug_record`'s benchmark-authoring
+/// workflow to write `expected.harpchart` from the second, hand-annotated
+/// [`EditorState::expected_notes`] vector without duplicating this whole
+/// function.
+pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote]) -> String {
     use serde_json::{Value, json};
     use std::collections::BTreeMap;
 
@@ -56,7 +66,7 @@ pub(super) fn serialize_harpchart(state: &EditorState) -> String {
     let harp = build_harp(&state.key, state.harmonica_kind);
 
     let mut by_tick: BTreeMap<usize, Vec<&GridNote>> = BTreeMap::new();
-    for n in &state.notes {
+    for n in notes {
         by_tick.entry(n.tick).or_default().push(n);
     }
 

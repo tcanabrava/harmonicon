@@ -289,7 +289,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
 /// (holes 2/3/10, see `max_bend`), so cycling here is never cut short by a
 /// hole that isn't even involved yet. `select_or_add` re-validates against
 /// the real hole once a note actually gets placed.
-fn cycle_sticky_bend(state: &mut EditorState) {
+pub(super) fn cycle_sticky_bend(state: &mut EditorState) {
     let current = match state.sticky_pitch {
         Pitch::Bend(depth) => depth,
         _ => 0.0,
@@ -306,7 +306,7 @@ fn cycle_sticky_bend(state: &mut EditorState) {
 /// hole-free sticky-only equivalent of the selected-note Overblow/
 /// Overdraw/Slide toggles below (which additionally gate on the selected
 /// note's own hole via `overblow_ok`/`overdraw_ok`).
-fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
+pub(super) fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
     state.sticky_pitch = if state.sticky_pitch == pitch {
         Pitch::Normal
     } else {
@@ -321,7 +321,7 @@ fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
     }
 }
 
-fn cycle_sticky_wah(state: &mut EditorState) {
+pub(super) fn cycle_sticky_wah(state: &mut EditorState) {
     let next = match state.sticky_expr {
         Expr::Wah(hz) => hz + WAH_HZ_STEP,
         _ => WAH_HZ_MIN,
@@ -333,7 +333,7 @@ fn cycle_sticky_wah(state: &mut EditorState) {
     };
 }
 
-fn cycle_sticky_vibrato(state: &mut EditorState) {
+pub(super) fn cycle_sticky_vibrato(state: &mut EditorState) {
     let next = match state.sticky_expr {
         Expr::Vibrato(hz) => hz + VIBRATO_HZ_STEP,
         _ => VIBRATO_HZ_MIN,

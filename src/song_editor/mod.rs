@@ -25,6 +25,10 @@ mod clipboard;
 // gates dynamic linking and asset hot-reload elsewhere in the app.
 #[cfg(feature = "dev")]
 mod debug_record;
+// Dev-only ("--features dev") benchmark-authoring workflow — see its own
+// module docs. Same gating as `debug_record` above.
+#[cfg(feature = "dev")]
+mod expected_notes;
 mod grid;
 mod harpchart;
 mod interaction;
@@ -112,7 +116,10 @@ pub struct SongEditor2Plugin;
 impl Plugin for SongEditor2Plugin {
     fn build(&self, app: &mut App) {
         #[cfg(feature = "dev")]
-        app.add_plugins(debug_record::DebugRecordPlugin);
+        app.add_plugins((
+            debug_record::DebugRecordPlugin,
+            expected_notes::ExpectedNotesPlugin,
+        ));
 
         app.add_plugins(material::EditorNoteMaterialPlugin)
             .add_systems(

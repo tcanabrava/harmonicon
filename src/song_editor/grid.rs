@@ -11,7 +11,7 @@ use super::material::EditorNoteMaterial;
 use super::playback::{build_harp, note_freq};
 use super::ranges::silence_gaps;
 use super::state::{
-    DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch, enforce_direction,
+    DragKind, DragState, Edge, EditorState, Expr, GridNote, Mode, Pitch, enforce_direction,
     enforce_expr, move_target, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
 };
 use super::ui::{GridContent, GridItem, NoteView};
@@ -104,6 +104,13 @@ pub(super) fn rebuild_grid(
     // so no click/drag observer below ever fires — a single gate at spawn
     // time rather than a check duplicated inside every observer.
     let locked = state.locked();
+    // `Mode::ExpectedNotes` is "locked" too (`EditorState::locked`, unchanged)
+    // — the *ordinary* notes layer shouldn't be editable there — but the
+    // background cell itself must stay clickable so its own click observer
+    // below can still reach `expected_notes::place_or_select_expected`.
+    // Only this one spot needs the split: note visuals (and everything
+    // else keyed off `locked`) stay exactly as locked as before.
+    let cell_locked = state.user_locked || matches!(state.mode, Mode::Record | Mode::Play);
     let pickable = |locked: bool| {
         if locked {
             Pickable::IGNORE
@@ -199,7 +206,7 @@ pub(super) fn rebuild_grid(
                     ..default()
                 },
                 BackgroundColor(lane),
-                pickable(locked),
+                pickable(cell_locked),
             ));
             cell.observe(
                 move |ev: On<Pointer<Click>>,
@@ -214,6 +221,16 @@ pub(super) fn rebuild_grid(
                         .clamp(0.0, 0.999);
                     let sub = (frac * TICKS_PER_BEAT as f32).floor() as usize;
                     let tick = beat * TICKS_PER_BEAT + sub;
+                    // Dev-only ("--features dev") benchmark-authoring mode —
+                    // see `expected_notes`'s module docs. `cell_locked`
+                    // (above) is what keeps this observer reachable at all
+                    // while in that mode, despite the grid otherwise being
+                    // `locked()` there like Record/Play.
+                    #[cfg(feature = "dev")]
+                    if state.mode == Mode::ExpectedNotes {
+                        super::expected_notes::place_or_select_expected(&mut state, hole, tick);
+                        return;
+                    }
                     if ctrl_held(&keyboard) {
                         select_or_add_ctrl(&mut state, hole, tick);
                     } else {

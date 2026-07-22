@@ -83,13 +83,27 @@ pub fn expected_notes_from_chart(chart: &HarpChart) -> Vec<ExpectedNote> {
     notes
 }
 
+/// Default slack applied on both ends of every [`ExpectedNote`]'s window
+/// before checking whether a detection instant falls inside it (see
+/// [`expected_at`]) — a played-along-with-the-chart take is never sample-
+/// accurate against the chart's own clock (nobody's timing is that tight,
+/// least of all against a screen, not a metronome click track), and this
+/// benchmark is measuring *pitch* detection, not rhythmic precision. Loose
+/// enough to absorb ordinary human timing drift, tight enough that it
+/// wouldn't paper over a genuinely different, adjacent note.
+pub const DEFAULT_TIMING_TOLERANCE_SECS: f64 = 0.25;
+
 /// The (deduplicated, sorted) MIDI pitches expected to be sounding at `t`
-/// seconds — every [`ExpectedNote`] whose `[start_secs, end_secs)` window
-/// contains it.
-pub fn expected_at(notes: &[ExpectedNote], t: f64) -> Vec<u8> {
+/// seconds — every [`ExpectedNote`] whose `[start_secs, end_secs)` window,
+/// widened by `tolerance_secs` on both ends, contains it. Widening (rather
+/// than requiring exact alignment) is what lets a take that nailed the
+/// pitch but drifted a little on tempo still score as correct — see
+/// [`DEFAULT_TIMING_TOLERANCE_SECS`]'s own doc comment for why that's the
+/// right call for this benchmark, not a fudge.
+pub fn expected_at(notes: &[ExpectedNote], t: f64, tolerance_secs: f64) -> Vec<u8> {
     let mut midis: Vec<u8> = notes
         .iter()
-        .filter(|n| t >= n.start_secs && t < n.end_secs)
+        .filter(|n| t >= n.start_secs - tolerance_secs && t < n.end_secs + tolerance_secs)
         .map(|n| n.midi)
         .collect();
     midis.sort_unstable();
@@ -162,14 +176,19 @@ pub struct AlgorithmReport {
 
 /// Builds an [`AlgorithmReport`] from `frames` (one algorithm's offline run,
 /// see [`run_algorithm`]) against `expected` (see
-/// [`expected_notes_from_chart`]) — pure, so it's directly testable without
-/// any real audio or chart file.
-pub fn compare(expected: &[ExpectedNote], frames: &[Frame]) -> AlgorithmReport {
+/// [`expected_notes_from_chart`]), with [`expected_at`]'s timing tolerance
+/// applied — pure, so it's directly testable without any real audio or
+/// chart file.
+pub fn compare(
+    expected: &[ExpectedNote],
+    frames: &[Frame],
+    tolerance_secs: f64,
+) -> AlgorithmReport {
     let mut report = AlgorithmReport::default();
     let mut confusion: HashMap<(Vec<u8>, Vec<u8>), u32> = HashMap::new();
 
     for frame in frames {
-        let want = expected_at(expected, frame.time_secs);
+        let want = expected_at(expected, frame.time_secs, tolerance_secs);
         *confusion
             .entry((want.clone(), frame.detected.clone()))
             .or_insert(0) += 1;
@@ -305,9 +324,21 @@ mod tests {
     fn expected_at_only_returns_notes_whose_window_contains_t() {
         let chart = flat_chart(vec![note_item(1.0, 0.5, 1, Action::Blow, "C4")]);
         let notes = expected_notes_from_chart(&chart);
-        assert!(expected_at(&notes, 0.5).is_empty());
-        assert_eq!(expected_at(&notes, 1.2), vec![60]); // C4 = MIDI 60
-        assert!(expected_at(&notes, 1.5).is_empty()); // end is exclusive
+        assert!(expected_at(&notes, 0.5, 0.0).is_empty());
+        assert_eq!(expected_at(&notes, 1.2, 0.0), vec![60]); // C4 = MIDI 60
+        assert!(expected_at(&notes, 1.5, 0.0).is_empty()); // end is exclusive
+    }
+
+    #[test]
+    fn tolerance_widens_the_window_on_both_ends() {
+        let chart = flat_chart(vec![note_item(1.0, 0.5, 1, Action::Blow, "C4")]);
+        let notes = expected_notes_from_chart(&chart);
+        // Exactly on the boundary is excluded with zero tolerance...
+        assert!(expected_at(&notes, 0.9, 0.0).is_empty());
+        assert!(expected_at(&notes, 1.6, 0.0).is_empty());
+        // ...but included once played a little early or a little late.
+        assert_eq!(expected_at(&notes, 0.9, 0.25), vec![60]);
+        assert_eq!(expected_at(&notes, 1.6, 0.25), vec![60]);
     }
 
     // ── compare ───────────────────────────────────────────────────────────────
@@ -332,7 +363,7 @@ mod tests {
     fn an_exact_match_counts_as_a_true_positive_with_no_confusion() {
         let expected = vec![expected(60)];
         let frames = vec![frame(0.5, &[60])];
-        let report = compare(&expected, &frames);
+        let report = compare(&expected, &frames, 0.0);
         assert_eq!(report.true_positive, 1);
         assert_eq!(report.false_negative, 0);
         assert_eq!(report.false_positive, 0);
@@ -342,7 +373,7 @@ mod tests {
     fn a_missed_note_is_a_false_negative() {
         let expected = vec![expected(60)];
         let frames = vec![frame(0.5, &[])];
-        let report = compare(&expected, &frames);
+        let report = compare(&expected, &frames, 0.0);
         assert_eq!(report.true_positive, 0);
         assert_eq!(report.false_negative, 1);
         assert_eq!(report.false_positive, 0);
@@ -352,7 +383,7 @@ mod tests {
     fn a_detection_with_nothing_expected_is_a_phantom_false_positive() {
         let expected: Vec<ExpectedNote> = vec![];
         let frames = vec![frame(0.5, &[60])];
-        let report = compare(&expected, &frames);
+        let report = compare(&expected, &frames, 0.0);
         assert_eq!(report.false_positive, 1);
         assert_eq!(report.true_positive, 0);
     }
@@ -363,7 +394,7 @@ mod tests {
         // "also active" for what's actually one clean note.
         let expected = vec![expected(60)];
         let frames = vec![frame(0.5, &[59, 60, 61])];
-        let report = compare(&expected, &frames);
+        let report = compare(&expected, &frames, 0.0);
         assert_eq!(report.true_positive, 1);
         assert_eq!(report.false_negative, 0);
         assert_eq!(report.false_positive, 2);
@@ -377,7 +408,7 @@ mod tests {
             frame(0.2, &[60]),
             frame(0.3, &[62]),
         ];
-        let report = compare(&expected, &frames);
+        let report = compare(&expected, &frames, 0.0);
         // (want=[60], got=[60]) occurred twice; (want=[60], got=[62]) once.
         assert_eq!(report.confusion[0], (vec![60], vec![60], 2));
         assert_eq!(report.confusion[1], (vec![60], vec![62], 1));

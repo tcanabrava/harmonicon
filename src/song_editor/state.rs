@@ -62,6 +62,12 @@ pub(super) enum Mode {
     Record,
     /// Playback/practice transport.
     Play,
+    /// Dev-only ("--features dev") benchmark-authoring mode — see
+    /// `expected_notes`'s module docs. Grid clicks place/select notes on
+    /// `expected_notes` instead of `notes`; `grid::rebuild_grid`'s own
+    /// background-cell pickability carves out the one exception `locked()`
+    /// otherwise needs here (see its call site).
+    ExpectedNotes,
 }
 
 /// What kind of content the editor is authoring — toggled by the "Record
@@ -387,6 +393,20 @@ pub(super) fn cycle_next(options: &[&str], current: &str) -> String {
 pub(super) struct EditorState {
     pub(super) notes: Vec<GridNote>,
     pub(super) next_id: u32,
+    /// Dev-only ("--features dev") benchmark ground truth — see
+    /// `expected_notes`'s module docs. Hand-placed, never collision-checked
+    /// against `notes` or itself. Always present (an empty `Vec` costs
+    /// nothing) rather than `#[cfg]`-gated, so the many `EditorState {
+    /// ..default() }` sites here and in tests don't need touching; the
+    /// `allow`s below cover the resulting plain-build dead code.
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
+    pub(super) expected_notes: Vec<GridNote>,
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
+    pub(super) expected_next_id: u32,
+    /// A single `Option`, not a `Vec` like `selected`: this layer only ever
+    /// needs one "primary" note for the mod-panel buttons to edit.
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
+    pub(super) expected_selected: Option<u32>,
     /// Every currently-selected note id, in the order each was added to the
     /// selection — empty means nothing selected. A plain click replaces the
     /// whole selection with one id ([`EditorState::select_only`]); a
@@ -478,6 +498,9 @@ impl Default for EditorState {
         Self {
             notes: Vec::new(),
             next_id: 0,
+            expected_notes: Vec::new(),
+            expected_next_id: 0,
+            expected_selected: None,
             selected: Vec::new(),
             scroll_beat: 0,
             dragging: None,
@@ -542,6 +565,14 @@ impl EditorState {
         let id = *self.selected.last()?;
         self.notes.iter_mut().find(|n| n.id == id)
     }
+
+    // `expected_note_by_id`/`expected_selected_note`/`expected_selected_note_mut`
+    // — the expected-notes layer's own siblings of the three methods above —
+    // live in `expected_notes.rs` (dev-only) instead of here, in their own
+    // `impl EditorState` block: purely a file-size trim (`docs/
+    // physical_design_plan.md`'s ~1000-line budget), not a meaningful
+    // separation — same struct, just declared in another file, which Rust
+    // allows freely for inherent impls.
 
     pub(super) fn is_selected(&self, id: u32) -> bool {
         self.selected.contains(&id)

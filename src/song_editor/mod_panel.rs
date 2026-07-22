@@ -164,9 +164,25 @@ pub(super) fn spawn_mod_panel(
                         state.user_locked = !state.user_locked;
                     },
                 );
+
+                // Dev-only ("--features dev") benchmark ground-truth mode —
+                // see `expected_notes`'s own module docs.
+                #[cfg(feature = "dev")]
+                super::expected_notes::spawn_expected_notes_mode_button(transport, loc, colors);
+
                 panel_separator(transport);
 
                 spawn_file_buttons(transport, loc, colors);
+
+                // Dev-only debugging aid — see `debug_record`'s own module
+                // docs. Deliberately in this always-visible strip, not a
+                // mode-specific group: it needs to stay checkable (and its
+                // one shared checkbox/status-label entity needs to exist
+                // exactly once) regardless of whether the mic tap it arms
+                // ends up gated on `RecordState::active` or
+                // `PracticeState::active` — see `sync_raw_capture`.
+                #[cfg(feature = "dev")]
+                super::debug_record::spawn_debug_recording_controls(transport, loc, colors);
             });
 
         panel
@@ -332,10 +348,6 @@ pub(super) fn spawn_mod_panel(
                 on_algo_selected,
             );
             spawn_algo_explanation(g.commands_mut(), record_group_id, 380.0, algorithm);
-
-            // Dev-only debugging aid — see `debug_record`'s own module docs.
-            #[cfg(feature = "dev")]
-            super::debug_record::spawn_debug_recording_controls(g, loc, colors);
         });
 
         panel
@@ -359,5 +371,10 @@ pub(super) fn spawn_mod_panel(
             .with_children(|g| {
                 spawn_playback_buttons(g, loc, colors);
             });
+
+        // Dev-only ("--features dev") benchmark ground-truth mode — see
+        // `expected_notes`'s own module docs.
+        #[cfg(feature = "dev")]
+        super::expected_notes::spawn_expected_notes_group(panel, loc, colors, mode);
     });
 }

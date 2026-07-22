@@ -121,6 +121,12 @@ pub(super) enum ModeButton {
     Record,
     Play,
     Lock,
+    /// Dev-only ("--features dev") — enters [`Mode::ExpectedNotes`]. See
+    /// `expected_notes`'s module docs. Only ever constructed there, hence
+    /// the `allow` for a plain (non-`dev`) build, where `panel.rs`'s own
+    /// exhaustive matches still need this variant to exist to compile.
+    #[cfg_attr(not(feature = "dev"), allow(dead_code))]
+    ExpectedNotes,
 }
 
 /// The Erase/Remove timeline-tool toggle buttons — see `timeline`'s module
@@ -144,6 +150,14 @@ pub(super) struct PlayModeGroup;
 /// shown only in [`Mode::Record`]. See `update_mode_visibility`.
 #[derive(Component)]
 pub(super) struct RecordModeGroup;
+
+/// Dev-only ("--features dev") — wraps the benchmark-ground-truth button
+/// cluster (Blow, Draw, Bend, ..., Delete, wired to `expected_notes::
+/// apply_expected_modifier` rather than `interaction::apply_modifier`),
+/// shown only in [`Mode::ExpectedNotes`]. See `update_mode_visibility` and
+/// `expected_notes`'s own module docs.
+#[derive(Component)]
+pub(super) struct ExpectedNotesGroup;
 
 #[derive(Component)]
 pub(super) struct BendDot;
