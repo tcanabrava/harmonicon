@@ -511,6 +511,11 @@ fn spawn_fixed_chrome(
         });
     });
 
+    // Dev-only debugging aid — see `debug_record`'s own module docs. Placed
+    // right below the grid's own scrollbar.
+    #[cfg(feature = "dev")]
+    super::debug_record::spawn_debug_waveform_strip(root, colors);
+
     // The Scale combobox's slot — deliberately part of the *fixed* chrome,
     // not the scrollable meta form its other fields live in. See
     // `meta_form::spawn_scale_combobox`'s doc comment: `bevy_ui_widgets::

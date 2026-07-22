@@ -12,6 +12,24 @@ use crate::settings::AudioSettings;
 use super::audio_input;
 use super::pitch_detect::{self, AudioFrame, PitchEvent, PitchRange};
 
+/// Dev-only ("--features dev") raw-audio tap for `song_editor`'s "Debug
+/// Recording" checkbox (`song_editor::debug_record`): accumulates the exact,
+/// non-overlapping mono audio the mic captured while `recording` is set, so
+/// a pitch-detection miss can be diagnosed against exactly what the mic
+/// heard rather than just what the detector reported for it. Lives here
+/// (not in `song_editor`) for the same reason `AudioFrame` does — a generic
+/// resource in the audio pipeline that a higher-level feature taps, rather
+/// than a second consumer of `AudioCapture::receiver` (each chunk only ever
+/// goes to *one* receiver, so a second reader would steal chunks from this
+/// one instead of seeing a copy).
+#[cfg(feature = "dev")]
+#[derive(Resource, Default)]
+pub struct RawCaptureBuffer {
+    pub recording: bool,
+    pub samples: Vec<f32>,
+    pub sample_rate: u32,
+}
+
 pub fn process_audio(
     capture: Option<Res<audio_input::AudioCapture>>,
     settings: Res<AudioSettings>,
@@ -19,6 +37,7 @@ pub fn process_audio(
     mut writer: MessageWriter<PitchEvent>,
     mut frame: ResMut<AudioFrame>,
     mut fft: Local<pitch_detect::FftState>,
+    #[cfg(feature = "dev")] mut raw_capture: Option<ResMut<RawCaptureBuffer>>,
 ) {
     let Some(capture) = capture else { return };
     while let Ok(samples) = capture.receiver.try_recv() {
@@ -40,6 +59,24 @@ pub fn process_audio(
         // waveform (time) without re-analysing.
         frame.magnitudes = analysis.magnitudes;
         frame.freq_res = analysis.freq_res;
+
+        // Only the newly-captured hop of each chunk (the first chunk in
+        // full, every later one just its second half) goes into the debug
+        // buffer — otherwise the 50% overlap above would duplicate half of
+        // every chunk into a stuttering recording.
+        #[cfg(feature = "dev")]
+        if let Some(raw) = raw_capture.as_deref_mut()
+            && raw.recording
+        {
+            raw.sample_rate = capture.sample_rate;
+            if raw.samples.is_empty() {
+                raw.samples.extend_from_slice(&samples);
+            } else {
+                let hop = samples.len() / 2;
+                raw.samples.extend_from_slice(&samples[samples.len() - hop..]);
+            }
+        }
+
         // Recycle the buffer we're about to overwrite back to the capture
         // callback's pool instead of letting it deallocate here — see
         // `audio_input::AudioCapture::free_sender`.

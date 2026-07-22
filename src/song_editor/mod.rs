@@ -20,6 +20,11 @@ use crate::menu::tutorial::tour_active;
 use crate::theme::LoadedTheme;
 
 mod clipboard;
+// Dev-only ("--features dev") debugging aid — see its own module docs.
+// Compiled only under that feature, same as `Cargo.toml`'s `dev` feature
+// gates dynamic linking and asset hot-reload elsewhere in the app.
+#[cfg(feature = "dev")]
+mod debug_record;
 mod grid;
 mod harpchart;
 mod interaction;
@@ -106,6 +111,9 @@ pub struct SongEditor2Plugin;
 
 impl Plugin for SongEditor2Plugin {
     fn build(&self, app: &mut App) {
+        #[cfg(feature = "dev")]
+        app.add_plugins(debug_record::DebugRecordPlugin);
+
         app.add_plugins(material::EditorNoteMaterialPlugin)
             .add_systems(
                 OnEnter(AppState::SongEditor2),

@@ -332,6 +332,10 @@ pub(super) fn spawn_mod_panel(
                 on_algo_selected,
             );
             spawn_algo_explanation(g.commands_mut(), record_group_id, 380.0, algorithm);
+
+            // Dev-only debugging aid — see `debug_record`'s own module docs.
+            #[cfg(feature = "dev")]
+            super::debug_record::spawn_debug_recording_controls(g, loc, colors);
         });
 
         panel

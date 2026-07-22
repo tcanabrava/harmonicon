@@ -20,3 +20,8 @@ scripts/.venv/
 # mdbook build output (the source lives in docs/book/src/)
 /docs/book/book/
 
+# Song Editor's dev-only "Debug Recording" checkbox (--features dev):
+# raw mic audio + chart copies dumped here for diagnosing pitch-detection
+# issues, never meant to be committed.
+/assets/debug_sounds/
+
