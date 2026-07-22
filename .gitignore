@@ -23,5 +23,5 @@ scripts/.venv/
 # Song Editor's dev-only "Debug Recording" checkbox (--features dev):
 # raw mic audio + chart copies dumped here for diagnosing pitch-detection
 # issues, never meant to be committed.
-/assets/debug_sounds/
+/assets/debug_songs/
 

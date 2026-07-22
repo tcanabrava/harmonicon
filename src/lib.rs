@@ -22,6 +22,7 @@ pub mod jam;
 pub mod lessons;
 pub mod localization;
 pub mod menu;
+pub mod note_bench;
 pub mod profile;
 pub mod scoring;
 pub mod settings;

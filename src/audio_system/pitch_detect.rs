@@ -143,6 +143,12 @@ impl PitchAlgorithm {
 // A peak must exceed this fraction of the strongest peak to be reported.
 const PEAK_THRESHOLD_RATIO: f32 = 0.08;
 
+/// The window function `analyze` applies before the FFT — a single named
+/// constant (rather than a magic string wherever this needs describing) so
+/// it can't drift out of sync with the actual formula below if that ever
+/// changes. Referenced by `song_editor::debug_record`'s recording metadata.
+pub const WINDOW_FUNCTION: &str = "Hann";
+
 // Signals below this RMS level are treated as silence.
 const SILENCE_THRESHOLD: f32 = 0.005;
 

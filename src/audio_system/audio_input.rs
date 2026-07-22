@@ -10,6 +10,10 @@ use crate::settings::AudioSettings;
 
 pub const CHUNK_SIZE: usize = 4096;
 
+/// Consecutive chunks overlap by this many samples (50%, see `push_chunks`)
+/// — the number of genuinely *new* samples each chunk contributes.
+pub const HOP_SIZE: usize = CHUNK_SIZE / 2;
+
 /// How many chunk buffers circulate between the real-time audio callback and
 /// the consumer (`process_audio`). Comfortably more than one in flight at a
 /// time — the consumer drains far faster than chunks arrive (one FFT per
@@ -270,7 +274,7 @@ fn push_chunks(
         chunk.clear();
         chunk.extend_from_slice(&buf[..CHUNK_SIZE]);
         let _ = tx.try_send(chunk);
-        buf.drain(..CHUNK_SIZE / 2);
+        buf.drain(..HOP_SIZE);
     }
 }
 

@@ -10,6 +10,8 @@ use bevy::prelude::*;
 use crate::settings::AudioSettings;
 
 use super::audio_input;
+#[cfg(feature = "dev")]
+use super::pitch_detect::PitchAlgorithm;
 use super::pitch_detect::{self, AudioFrame, PitchEvent, PitchRange};
 
 /// Dev-only ("--features dev") raw-audio tap for `song_editor`'s "Debug
@@ -28,6 +30,19 @@ pub struct RawCaptureBuffer {
     pub recording: bool,
     pub samples: Vec<f32>,
     pub sample_rate: u32,
+    /// Which algorithm `settings.pitch_algorithm` was set to while capturing
+    /// — refreshed every chunk like `sample_rate` above, so it reflects
+    /// whatever was active most recently if it was ever changed mid-take.
+    /// Written out alongside the WAV so a detection miss can be reproduced
+    /// against the exact algorithm that missed it, not just guessed at.
+    pub algorithm: PitchAlgorithm,
+    /// The detected-pitch log for this take: (seconds since the take's first
+    /// captured sample, the same formatted note labels `log_pitches` below
+    /// prints) — one entry per *change*, not per chunk, so a multi-minute
+    /// take doesn't produce one entry per ~46ms chunk. Cleared alongside
+    /// `samples` at the start of a fresh take (see `song_editor::
+    /// debug_record::sync_raw_capture`).
+    pub detected_notes: Vec<(f32, Vec<String>)>,
 }
 
 pub fn process_audio(
@@ -54,28 +69,40 @@ pub fn process_audio(
             settings.pitch_algorithm,
             *range,
         );
-        writer.write(PitchEvent(analysis.pitches));
-        // Publish the frame so visualizers reuse this FFT (freq) or the raw
-        // waveform (time) without re-analysing.
-        frame.magnitudes = analysis.magnitudes;
-        frame.freq_res = analysis.freq_res;
-
-        // Only the newly-captured hop of each chunk (the first chunk in
-        // full, every later one just its second half) goes into the debug
-        // buffer — otherwise the 50% overlap above would duplicate half of
-        // every chunk into a stuttering recording.
+        // Placed before `analysis.pitches` moves into the `PitchEvent` below
+        // — this needs to read it first.
         #[cfg(feature = "dev")]
         if let Some(raw) = raw_capture.as_deref_mut()
             && raw.recording
         {
             raw.sample_rate = capture.sample_rate;
+            raw.algorithm = settings.pitch_algorithm;
+            // Only the newly-captured hop of each chunk (the first chunk in
+            // full, every later one just its second half) goes into the
+            // debug buffer — otherwise the 50% overlap above would
+            // duplicate half of every chunk into a stuttering recording.
             if raw.samples.is_empty() {
                 raw.samples.extend_from_slice(&samples);
             } else {
                 let hop = samples.len() / 2;
                 raw.samples.extend_from_slice(&samples[samples.len() - hop..]);
             }
+            let elapsed = raw.samples.len() as f32 / raw.sample_rate.max(1) as f32;
+            let current: Vec<String> = analysis
+                .pitches
+                .iter()
+                .map(|p| format!("{}{} ({:.1}Hz)", p.note, p.octave, p.frequency))
+                .collect();
+            if raw.detected_notes.last().map(|(_, n)| n) != Some(&current) {
+                raw.detected_notes.push((elapsed, current));
+            }
         }
+
+        writer.write(PitchEvent(analysis.pitches));
+        // Publish the frame so visualizers reuse this FFT (freq) or the raw
+        // waveform (time) without re-analysing.
+        frame.magnitudes = analysis.magnitudes;
+        frame.freq_res = analysis.freq_res;
 
         // Recycle the buffer we're about to overwrite back to the capture
         // callback's pool instead of letting it deallocate here — see

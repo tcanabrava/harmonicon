@@ -85,6 +85,30 @@ pub fn decode_wav_pcm16(bytes: &[u8]) -> Option<(Vec<f32>, u16, u32)> {
     Some((samples, channels.max(1), sample_rate.max(1)))
 }
 
+/// Resamples mono `samples` from `from_rate` to `to_rate` by straight linear
+/// interpolation — deliberately simple (no anti-aliasing low-pass filter),
+/// so it's not broadcast-quality, but is plenty for tooling that just wants
+/// every output file at a fixed rate regardless of whatever a capture
+/// device happened to use (`song_editor::debug_record`'s WAV dump). A no-op
+/// copy when the rates already match, or when there's nothing to resample.
+pub fn resample_linear(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+    if samples.is_empty() || from_rate == 0 || from_rate == to_rate {
+        return samples.to_vec();
+    }
+    let ratio = to_rate as f64 / from_rate as f64;
+    let out_len = (samples.len() as f64 * ratio).round() as usize;
+    (0..out_len)
+        .map(|i| {
+            let src_pos = i as f64 / ratio;
+            let i0 = src_pos.floor() as usize;
+            let frac = (src_pos - i0 as f64) as f32;
+            let s0 = samples.get(i0).copied().unwrap_or(0.0);
+            let s1 = samples.get(i0 + 1).copied().unwrap_or(s0);
+            s0 + (s1 - s0) * frac
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,5 +152,39 @@ mod tests {
     #[test]
     fn decode_wav_pcm16_rejects_a_truncated_header() {
         assert!(decode_wav_pcm16(b"RIFF").is_none());
+    }
+
+    // ── resample_linear ──────────────────────────────────────────────────────
+
+    #[test]
+    fn matching_rates_are_a_no_op() {
+        let samples = vec![0.1, 0.2, -0.3];
+        assert_eq!(resample_linear(&samples, 44_100, 44_100), samples);
+    }
+
+    #[test]
+    fn upsampling_doubles_the_length_for_a_2x_ratio() {
+        let samples = vec![0.0; 100];
+        assert_eq!(resample_linear(&samples, 24_000, 48_000).len(), 200);
+    }
+
+    #[test]
+    fn downsampling_halves_the_length_for_a_half_ratio() {
+        let samples = vec![0.0; 100];
+        assert_eq!(resample_linear(&samples, 48_000, 24_000).len(), 50);
+    }
+
+    #[test]
+    fn interpolates_between_neighbouring_samples() {
+        // 0.0 -> 1.0 over 2 input samples at 2x: the midpoint output sample
+        // should land halfway between them.
+        let samples = vec![0.0, 1.0];
+        let out = resample_linear(&samples, 1, 2);
+        assert!((out[1] - 0.5).abs() < 1e-6, "{:?}", out);
+    }
+
+    #[test]
+    fn empty_input_stays_empty() {
+        assert!(resample_linear(&[], 44_100, 48_000).is_empty());
     }
 }

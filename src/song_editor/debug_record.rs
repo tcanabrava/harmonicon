@@ -4,7 +4,7 @@
 //! see `mod.rs`'s conditional `mod debug_record;`. Alongside the ordinary
 //! Record-mode note capture, a "Debug Recording" checkbox also dumps the
 //! *raw* microphone audio a take captured to a WAV file, written next to a
-//! copy of the chart in `assets/debug_sounds/<song name>/` whenever the song
+//! copy of the chart in `assets/debug_songs/<song name>/` whenever the song
 //! is saved — so a pitch-detection miss can be diagnosed against exactly
 //! what the mic heard, not just what the detector reported for it.
 //!
@@ -29,8 +29,10 @@ use bevy::ui::Checked;
 use bevy::ui_widgets::{Checkbox, checkbox_self_update};
 
 use crate::app::AppState;
+use crate::audio_system::audio_input::{CHUNK_SIZE, HOP_SIZE};
 use crate::audio_system::pipeline::RawCaptureBuffer;
-use crate::audio_system::wav::encode_wav;
+use crate::audio_system::pitch_detect::WINDOW_FUNCTION;
+use crate::audio_system::wav::{encode_wav, resample_linear};
 use crate::audio_system::waveform::{WAVEFORM_BUCKETS, bucket_peaks};
 use crate::dialogs::file_dialog::FileChosen;
 use crate::dialogs::tooltip::Tooltip;
@@ -49,6 +51,13 @@ use super::state::{ContentKind, EditorState};
 /// `WAVEFORM_H` (the header music waveform's own height), since this strip
 /// lives in a different part of the chrome with its own space budget.
 const DEBUG_WAVEFORM_H: f32 = 40.0;
+
+/// Every debug recording's WAV is written out at this rate regardless of
+/// what the capture device actually used — resampled via
+/// `audio_system::wav::resample_linear` — so recordings from different
+/// machines/devices are directly comparable rather than each carrying
+/// whatever rate happened to be plugged in that day.
+const DEBUG_RECORDING_SAMPLE_RATE: u32 = 48_000;
 
 // ── Markers ───────────────────────────────────────────────────────────────────
 
@@ -163,6 +172,7 @@ pub(super) fn spawn_debug_recording_controls(
 
 fn erase_debug_recording(_: On<Pointer<Click>>, mut raw: ResMut<RawCaptureBuffer>) {
     raw.samples.clear();
+    raw.detected_notes.clear();
 }
 
 /// Spawned once into the fixed chrome (`ui::spawn_fixed_chrome`), right
@@ -323,12 +333,13 @@ fn sync_raw_capture(
     *was_active = record.active;
     if checked && take_just_started {
         raw.samples.clear();
+        raw.detected_notes.clear();
     }
     raw.recording = checked && record.active;
 }
 
 /// Writes a copy of the chart plus the take's raw WAV into
-/// `assets/debug_sounds/<song name>/` whenever the song is saved — a
+/// `assets/debug_songs/<song name>/` whenever the song is saved — a
 /// separate `FileChosen{purpose: SAVE_PURPOSE}` consumer alongside
 /// `harpchart::handle_save_chosen` (same message, same purpose, different
 /// concern, same split-by-consumer pattern `harpchart`/`lesson_form`'s own
@@ -352,7 +363,7 @@ fn write_debug_recording_on_save(
         } else {
             &state.name
         });
-        let dir = std::path::Path::new("assets/debug_sounds").join(&song_name);
+        let dir = std::path::Path::new("assets/debug_songs").join(&song_name);
         if let Err(e) = std::fs::create_dir_all(&dir) {
             println!("Debug recording: mkdir failed: {e}");
             continue;
@@ -364,16 +375,59 @@ fn write_debug_recording_on_save(
             println!("Debug recording: chart write failed: {e}");
         }
 
-        let wav = encode_wav(&raw.samples, raw.sample_rate.max(1));
+        // Resampled to a fixed rate regardless of what the capture device
+        // actually used, so recordings from different machines line up.
+        let resampled = resample_linear(
+            &raw.samples,
+            raw.sample_rate.max(1),
+            DEBUG_RECORDING_SAMPLE_RATE,
+        );
+        let wav = encode_wav(&resampled, DEBUG_RECORDING_SAMPLE_RATE);
         let wav_path = dir.join("recording.wav");
-        match std::fs::write(&wav_path, &wav) {
-            Ok(()) => println!(
-                "Debug recording written: {} + {}",
-                chart_path.display(),
-                wav_path.display()
-            ),
-            Err(e) => println!("Debug recording: wav write failed: {e}"),
+        if let Err(e) = std::fs::write(&wav_path, &wav) {
+            println!("Debug recording: wav write failed: {e}");
+            continue;
         }
+
+        // Everything else needed to reproduce the original detection
+        // exactly, rather than guess at it later: which algorithm actually
+        // produced the pitches this take scored against, the fixed FFT/hop/
+        // window the pipeline always uses, when the take was recorded, and
+        // the detected-note log itself (time since the take's first sample,
+        // one entry per change — see `RawCaptureBuffer::detected_notes`).
+        let timestamp_unix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let detected_notes: Vec<serde_json::Value> = raw
+            .detected_notes
+            .iter()
+            .map(|(t, notes)| serde_json::json!({ "time": t, "notes": notes }))
+            .collect();
+        let metadata = serde_json::json!({
+            "timestamp_unix": timestamp_unix,
+            "sample_rate_hz": DEBUG_RECORDING_SAMPLE_RATE,
+            "original_sample_rate_hz": raw.sample_rate,
+            "algorithm": raw.algorithm.label(),
+            "fft_size": CHUNK_SIZE,
+            "hop_size": HOP_SIZE,
+            "window": WINDOW_FUNCTION,
+            "detected_notes": detected_notes,
+        });
+        let meta_path = dir.join("recording.json");
+        if let Err(e) = std::fs::write(
+            &meta_path,
+            serde_json::to_string_pretty(&metadata).unwrap_or_default(),
+        ) {
+            println!("Debug recording: metadata write failed: {e}");
+        }
+
+        println!(
+            "Debug recording written: {} + {} + {}",
+            chart_path.display(),
+            wav_path.display(),
+            meta_path.display()
+        );
     }
 }
 
