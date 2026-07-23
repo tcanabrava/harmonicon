@@ -379,10 +379,27 @@ fn write_debug_recording_on_save(
     raw: Res<RawCaptureBuffer>,
 ) {
     for ev in chosen.read() {
-        if ev.purpose != SAVE_PURPOSE
-            || state.content_kind != ContentKind::Song
-            || raw.samples.is_empty()
-        {
+        if ev.purpose != SAVE_PURPOSE {
+            continue;
+        }
+        // Both conditions below fail silently on purpose in the common case
+        // (an ordinary song save with the checkbox never touched shouldn't
+        // print anything) — but printed here, not just `continue`d past, so
+        // turning the checkbox on without ever actually taking anything
+        // doesn't look like Save quietly did nothing for no reason.
+        if state.content_kind != ContentKind::Song {
+            println!(
+                "Debug recording: skipped — only written for ContentKind::Song saves \
+                 (this save is a lesson)."
+            );
+            continue;
+        }
+        if raw.samples.is_empty() {
+            println!(
+                "Debug recording: skipped — nothing captured yet. Checking the box alone \
+                 doesn't record anything; press Play (Record mode) or Practice (Play mode) \
+                 while it's checked, then Save."
+            );
             continue;
         }
         let song_name = safe_path_segment(if state.name.is_empty() {

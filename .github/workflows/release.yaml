@@ -135,11 +135,19 @@ jobs:
         run: |
           cargo build --release --target x86_64-apple-darwin
 
+      # The real binary is installed as `harmonicon-bin`, not the bundle's
+      # `CFBundleExecutable` — see packaging/macos/harmonicon-launcher.sh's
+      # own comment for why a plain double-click needs this wrapper at all.
+      # The `|| true` that used to guard the assets copy is gone deliberately:
+      # it was silently masking a real copy failure into a bundle that
+      # "succeeded" with no assets in it at all.
       - name: Prepare Package
         run: |
           mkdir -p ${{ env.binary }}.app/Contents/MacOS
-          cp target/x86_64-apple-darwin/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/
-          cp -r assets ${{ env.binary }}.app/Contents/MacOS/ || true # Try to copy, but ignore if it can't copy if source directory does not exist
+          cp target/x86_64-apple-darwin/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/${{ env.binary }}-bin
+          install -m755 packaging/macos/harmonicon-launcher.sh ${{ env.binary }}.app/Contents/MacOS/${{ env.binary }}
+          sed 's/%%VERSION%%/${{ steps.get_version.outputs.tag }}/g' packaging/macos/Info.plist > ${{ env.binary }}.app/Contents/Info.plist
+          cp -r assets ${{ env.binary }}.app/Contents/MacOS/
 
       # Ad-hoc signing (no certificate needed): without this, the kernel
       # refuses to launch the app on Apple Silicon at all (no dialog, no
@@ -193,11 +201,14 @@ jobs:
         run: |
           cargo build --release --target aarch64-apple-darwin
 
+      # See the Intel job's own comment on the launcher/Info.plist/`|| true`.
       - name: Prepare Package
         run: |
           mkdir -p ${{ env.binary }}.app/Contents/MacOS
-          cp target/aarch64-apple-darwin/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/
-          cp -r assets ${{ env.binary }}.app/Contents/MacOS/ || true # Try to copy, but ignore if it can't copy if source directory does not exist
+          cp target/aarch64-apple-darwin/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/${{ env.binary }}-bin
+          install -m755 packaging/macos/harmonicon-launcher.sh ${{ env.binary }}.app/Contents/MacOS/${{ env.binary }}
+          sed 's/%%VERSION%%/${{ steps.get_version.outputs.tag }}/g' packaging/macos/Info.plist > ${{ env.binary }}.app/Contents/Info.plist
+          cp -r assets ${{ env.binary }}.app/Contents/MacOS/
 
       # See the Intel job's own comment on why this matters most here:
       # unsigned arm64 binaries are refused by the kernel outright.

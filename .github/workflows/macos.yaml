@@ -9,6 +9,15 @@ name: macOS bundle
 # ARM) since this is just confirming the bundle still assembles;
 # release.yaml is still what cross-builds both architectures for an actual
 # tagged release.
+#
+# The bundle's `CFBundleExecutable` is packaging/macos/harmonicon-launcher.sh
+# (installed as `Contents/MacOS/harmonicon`), not the real game binary
+# (`harmonicon-bin`, right next to it) — see that script's own comment: a
+# double-click launches with an arbitrary working directory, and several of
+# this project's own asset scans read `assets/...` relative to CWD, not
+# through Bevy. Without the launcher's `cd`, those scans (songs, themes,
+# lessons, ...) silently come up empty the moment the app is opened normally,
+# even though the identical bundle works fine run directly from a shell.
 
 on:
   push:
@@ -57,10 +66,15 @@ jobs:
       - name: Build (release)
         run: cargo build --release --bin ${{ env.binary }}
 
+      # The real binary is installed as `harmonicon-bin`, not the bundle's
+      # `CFBundleExecutable` — see packaging/macos/harmonicon-launcher.sh's
+      # own comment for why a plain double-click needs this wrapper at all.
       - name: Assemble .app bundle
         run: |
           mkdir -p ${{ env.binary }}.app/Contents/MacOS
-          cp target/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/
+          cp target/release/${{ env.binary }} ${{ env.binary }}.app/Contents/MacOS/${{ env.binary }}-bin
+          install -m755 packaging/macos/harmonicon-launcher.sh ${{ env.binary }}.app/Contents/MacOS/${{ env.binary }}
+          sed 's/%%VERSION%%/0.0.0-dev/g' packaging/macos/Info.plist > ${{ env.binary }}.app/Contents/Info.plist
           cp -r assets ${{ env.binary }}.app/Contents/MacOS/
 
       # Without this, the app is unsigned — on Apple Silicon (GitHub's
