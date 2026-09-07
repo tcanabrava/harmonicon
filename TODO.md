@@ -42,15 +42,30 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
   guided tour still force the chart's own harmonica — deliberate for now (a
   lesson prescribes its harp as part of the teaching), but a player who
   doesn't own that key can't take those lessons at all.
-- [ ] **No score format but `.harpchart` can be played.** Needs
-  `harmonicon-score` (Bevy-free, above core, below song) with one trait
-  over `.harpchart`, MIDI and Guitar Pro, plus track auto-selection by name
-  (`harmonica`/`gaita`/`mouth harp`/`blues harp`) and a picker when nothing
-  matches.
-- [ ] **Guitar Pro support rests on an unverified crate.** `guitarpro`
-  (MIT, v0.4.3) is a candidate; its gp3/gp4 API is unconfirmed and gpx is a
-  different container entirely (GP6 BCFS, GP7 zipped XML). Spike before
-  designing on it.
+- [ ] **Guitar Pro is the last format gap — the blocker is the dependency,
+  not the code.** MIDI now plays end to end and `harmonicon-score` was built
+  so a format is a module plus one arm in `parse_import`, reaching nothing
+  outside that crate. What stops Guitar Pro is what to parse it *with*.
+  Measured, not guessed:
+  - `guitarpro` (MIT, v0.4.3, codeberg.org/slundi/scorelib) does have the
+    API — `Song::read_gp3`/`read_gp4`/`read_gp5` — and it does cross-compile
+    to `wasm32-unknown-unknown`.
+  - It takes `harmonicon-score`'s dependency tree from **5 crates to 94**,
+    including `zstd-sys` and `bzip2` (C, built through `cc`). Those come
+    from `zip`, which the crate needs only for MuseScore and GPX; it exposes
+    no features to drop them, so the cost is not opt-out.
+  - `harmonicon-platform` depends on `harmonicon-score` **in its build
+    script** (to share `IMPORT_EXTENSIONS` with the bundled-asset manifest),
+    so that C would compile for the host on every single build — the exact
+    thing the recent build-size work was fighting.
+  - The published crate ships no fixtures: its own tests read `test/*.gp4`
+    files that aren't in the package. So an adapter can't be verified
+    without hand-authoring a binary `.gp5`, which is where the real work is.
+  Options, in rough order of appeal: put the reader behind a default-off
+  cargo feature so only desktop release builds pay for it; hand-author a
+  minimal `.gp4`/`.gp5` fixture and write a dependency-free reader for just
+  the fields we need (track names, fret+string pitches, timing); or wait for
+  a leaner crate. `score-tab` (same author, v0.2.0) is unevaluated.
 
 ## Mobile (post-1.0)
 
