@@ -207,6 +207,69 @@ pub fn choose_clef(notes: &[NotationNote]) -> Clef {
     }
 }
 
+/// Horizontal room one note needs: its notehead plus the accidental that
+/// may sit in front of it, plus a little air.
+///
+/// Reserved for *every* note, not only the ones that carry an accidental.
+/// Spacing derived from where accidentals actually fall would change with
+/// [`accidentals`]' own per-bar decisions, so the same passage would be
+/// spaced differently depending on what preceded it — the staff would
+/// breathe as it scrolled.
+pub const NOTE_ADVANCE_SP: f32 = 1.18 + 1.196 + 0.25;
+
+/// Fraction of a song's note gaps allowed to be tighter than the spacing
+/// derived for it.
+///
+/// Not the outright minimum: a single grace note or one flourish would
+/// otherwise stretch a whole song that is comfortable everywhere else. At
+/// the tenth percentile, spacing follows the density the song actually
+/// sustains, and the rare tighter moment is allowed to crowd.
+const DENSE_GAP_PERCENTILE: f32 = 0.1;
+
+/// The tightest gap, in beats, that a song sustains — see
+/// [`DENSE_GAP_PERCENTILE`]. `None` when there is nothing to measure.
+pub fn sustained_gap_beats(notes: &[NotationNote]) -> Option<f64> {
+    let mut onsets: Vec<f64> = notes.iter().map(|n| n.start_beat).collect();
+    onsets.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
+
+    // Chords share an onset and are already deduped; what is left is the
+    // rhythm the reader actually has to fit glyphs into.
+    let mut gaps: Vec<f64> = onsets.windows(2).map(|w| w[1] - w[0]).collect();
+    gaps.retain(|g| *g > 1e-6);
+    if gaps.is_empty() {
+        return None;
+    }
+    gaps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let index = ((gaps.len() - 1) as f32 * DENSE_GAP_PERCENTILE).round() as usize;
+    Some(gaps[index])
+}
+
+/// How wide a beat should be drawn for this song, in pixels.
+///
+/// The staff maps time to x linearly, and that is deliberate — horizontal
+/// distance is how a player reads how far away a note is, so the axis has to
+/// stay proportional to time. What can vary is the *scale*, once per song:
+/// a piece of sustained sixteenths gets a wider beat than a piece of
+/// quarters, and neither has to compromise for the other.
+///
+/// Widening costs lookahead — the panel is a fixed width, so more pixels per
+/// beat means fewer beats visible. `max_px` is where that trade is capped:
+/// past it, a very dense passage is left to crowd rather than shrinking the
+/// visible window to a bar and a half.
+pub fn pixels_per_beat(
+    notes: &[NotationNote],
+    staff_line_spacing: f32,
+    default_px: f32,
+    max_px: f32,
+) -> f32 {
+    let Some(gap) = sustained_gap_beats(notes) else {
+        return default_px;
+    };
+    let needed = NOTE_ADVANCE_SP * staff_line_spacing / gap as f32;
+    needed.clamp(default_px, max_px)
+}
+
 /// The accidental glyph drawn before a notehead, if any.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Accidental {
@@ -797,6 +860,115 @@ mod tests {
     fn beam_groups_returns_one_slot_per_note() {
         let ns = [eighth(64, 0.0), eighth(64, 0.5), note(1.0, 2.0)];
         assert_eq!(beam_groups(&ns, Clef::Treble).len(), ns.len());
+    }
+
+    // ── spacing ──────────────────────────────────────────────────────────
+
+    /// Notes every `gap` beats apart, at a pitch needing no accidental.
+    fn evenly(gap: f64, count: usize) -> Vec<NotationNote> {
+        (0..count)
+            .map(|i| NotationNote {
+                start_beat: i as f64 * gap,
+                duration_beats: gap,
+                midi: 64,
+                tied_from_previous: false,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_song_of_quarter_notes_keeps_the_default_width() {
+        // Quarters already clear each other at the default, so widening
+        // would cost lookahead for nothing.
+        assert_eq!(pixels_per_beat(&evenly(1.0, 16), 9.0, 34.0, 68.0), 34.0);
+    }
+
+    #[test]
+    fn a_song_of_sixteenths_is_given_more_room_than_one_of_eighths() {
+        let eighths = pixels_per_beat(&evenly(0.5, 16), 9.0, 34.0, 200.0);
+        let sixteenths = pixels_per_beat(&evenly(0.25, 16), 9.0, 34.0, 200.0);
+        assert!(
+            sixteenths > eighths && eighths > 34.0,
+            "eighths {eighths}, sixteenths {sixteenths}"
+        );
+    }
+
+    #[test]
+    fn a_sustained_gap_leaves_room_for_a_notehead_and_its_accidental() {
+        // The property the whole derivation exists for: at the returned
+        // scale, one gap is at least as wide as a note needs.
+        let notes = evenly(0.5, 16);
+        let scale = pixels_per_beat(&notes, 9.0, 34.0, 500.0);
+        assert!(0.5 * scale as f64 >= (NOTE_ADVANCE_SP * 9.0) as f64 - 0.01);
+    }
+
+    #[test]
+    fn widening_is_capped_so_lookahead_survives() {
+        // A very dense passage is left to crowd rather than shrinking the
+        // visible window to almost nothing.
+        assert_eq!(pixels_per_beat(&evenly(0.03125, 32), 9.0, 34.0, 68.0), 68.0);
+    }
+
+    #[test]
+    fn one_flourish_does_not_stretch_a_whole_song() {
+        // The reason this is a percentile and not a minimum: a song that is
+        // comfortable everywhere except two grace notes should stay
+        // comfortable.
+        let mut notes = evenly(1.0, 20);
+        notes.push(NotationNote {
+            start_beat: 20.01,
+            duration_beats: 0.01,
+            midi: 64,
+            tied_from_previous: false,
+        });
+        assert_eq!(pixels_per_beat(&notes, 9.0, 34.0, 200.0), 34.0);
+    }
+
+    #[test]
+    fn a_run_that_is_a_real_part_of_the_song_does_widen_it() {
+        // Half the song in sixteenths is not a flourish.
+        let mut notes = evenly(1.0, 8);
+        notes.extend((0..8).map(|i| NotationNote {
+            start_beat: 8.0 + i as f64 * 0.25,
+            duration_beats: 0.25,
+            midi: 64,
+            tied_from_previous: false,
+        }));
+        assert!(pixels_per_beat(&notes, 9.0, 34.0, 200.0) > 34.0);
+    }
+
+    #[test]
+    fn a_chord_is_not_mistaken_for_an_impossibly_tight_gap() {
+        // Notes sharing an onset are stacked, not sequential — counting a
+        // zero gap would peg every chorded song at the maximum width.
+        let notes = vec![
+            NotationNote {
+                start_beat: 0.0,
+                duration_beats: 1.0,
+                midi: 60,
+                tied_from_previous: false,
+            },
+            NotationNote {
+                start_beat: 0.0,
+                duration_beats: 1.0,
+                midi: 64,
+                tied_from_previous: false,
+            },
+            NotationNote {
+                start_beat: 1.0,
+                duration_beats: 1.0,
+                midi: 67,
+                tied_from_previous: false,
+            },
+        ];
+        assert_eq!(pixels_per_beat(&notes, 9.0, 34.0, 200.0), 34.0);
+    }
+
+    #[test]
+    fn an_empty_or_single_note_song_keeps_the_default() {
+        assert_eq!(pixels_per_beat(&[], 9.0, 34.0, 200.0), 34.0);
+        assert_eq!(pixels_per_beat(&evenly(1.0, 1), 9.0, 34.0, 200.0), 34.0);
+        assert_eq!(sustained_gap_beats(&[]), None);
     }
 
     // ── accidentals ──────────────────────────────────────────────────────

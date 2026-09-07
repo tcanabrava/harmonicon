@@ -159,7 +159,14 @@ const TIME_SIG_DENOMINATOR_STEP: i32 = 2;
 /// same "things move toward a fixed reference line" language the falling-
 /// note highway and song-progress playhead already use elsewhere.
 const PLAYHEAD_X: f32 = 56.0;
+/// How wide a beat is drawn when a song has no reason to need more — and
+/// the floor [`MusicScoreSpacing`] clamps to, so a sparse song is never
+/// squeezed *tighter* than this.
 const PIXELS_PER_BEAT: f32 = 34.0;
+/// The most a dense song may widen to. Past this the lookahead gets short
+/// enough to be its own problem: at 2x, a panel showing four bars ahead
+/// shows two. A passage tighter than this is left to crowd.
+const MAX_PIXELS_PER_BEAT: f32 = PIXELS_PER_BEAT * 2.0;
 /// Extra trailing margin (beats) behind the playhead, on top of what the
 /// panel's own on-screen space left of the reference line already fits —
 /// so a just-played note doesn't vanish the instant its onset crosses the
@@ -175,9 +182,10 @@ const VISIBLE_BEATS_GRACE: f64 = 1.0;
 /// the reference line, `panel_width_px - PLAYHEAD_X` to the right, and
 /// [`rebuild_score_notes`] re-derives this every time the panel's own
 /// rendered width changes (a resize), not just once.
-fn visible_beats(panel_width_px: f32) -> (f64, f64) {
-    let behind = (PLAYHEAD_X / PIXELS_PER_BEAT) as f64 + VISIBLE_BEATS_GRACE;
-    let ahead = ((panel_width_px - PLAYHEAD_X).max(0.0) / PIXELS_PER_BEAT) as f64;
+fn visible_beats(panel_width_px: f32, pixels_per_beat: f32) -> (f64, f64) {
+    let scale = pixels_per_beat.max(1.0);
+    let behind = (PLAYHEAD_X / scale) as f64 + VISIBLE_BEATS_GRACE;
+    let ahead = ((panel_width_px - PLAYHEAD_X).max(0.0) / scale) as f64;
     (behind, ahead)
 }
 
@@ -200,6 +208,40 @@ pub struct BravuraFont(pub Handle<Font>);
 /// here. Typically built once, at song/session setup, not every frame.
 #[derive(Resource, Default)]
 pub struct MusicScoreNotes(pub Vec<NotationNote>);
+
+/// How wide one beat is drawn, for the song currently loaded.
+///
+/// Derived once per song from its own note density rather than fixed,
+/// because the crowding a player sees is set by the shortest subdivision
+/// the music actually sustains — a piece of sixteenths needs more room per
+/// beat than a piece of quarters, and one constant cannot suit both. Kept
+/// in a resource, not recomputed inside the rebuild, because the rebuild
+/// runs on every playhead change (i.e. every frame) while this only moves
+/// when the notes do.
+#[derive(Resource)]
+pub struct MusicScoreSpacing(pub f32);
+
+impl Default for MusicScoreSpacing {
+    fn default() -> Self {
+        Self(PIXELS_PER_BEAT)
+    }
+}
+
+/// Recomputes [`MusicScoreSpacing`] when the notes change.
+fn derive_score_spacing(notes: Res<MusicScoreNotes>, mut spacing: ResMut<MusicScoreSpacing>) {
+    let derived = pixels_per_beat(
+        &notes.0,
+        STAFF_LINE_SPACING,
+        PIXELS_PER_BEAT,
+        MAX_PIXELS_PER_BEAT,
+    );
+    // Written through `set_if_neq` semantics by hand: this system runs on
+    // any note change, and a needless write would re-trigger the rebuild
+    // that reads it.
+    if spacing.0 != derived {
+        spacing.0 = derived;
+    }
+}
 
 /// The staff's meter: what the time signature at the head reads, and how
 /// often a bar line falls. Written by whichever bridge is driving the
@@ -296,15 +338,23 @@ impl Plugin for MusicScorePlugin {
             .init_resource::<MusicScoreNotes>()
             .init_resource::<MusicScorePlayhead>()
             .init_resource::<MusicScoreMeter>()
+            .init_resource::<MusicScoreSpacing>()
             .add_systems(Startup, load_bravura_font)
             .add_systems(
                 Update,
-                rebuild_score_notes.run_if(
-                    resource_changed::<MusicScoreNotes>
-                        .or_else(resource_changed::<MusicScoreMeter>)
-                        .or_else(resource_changed::<MusicScorePlayhead>)
-                        .or_else(panel_width_changed),
-                ),
+                derive_score_spacing.run_if(resource_changed::<MusicScoreNotes>),
+            )
+            .add_systems(
+                Update,
+                rebuild_score_notes
+                    .run_if(
+                        resource_changed::<MusicScoreNotes>
+                            .or_else(resource_changed::<MusicScoreMeter>)
+                            .or_else(resource_changed::<MusicScorePlayhead>)
+                            .or_else(resource_changed::<MusicScoreSpacing>)
+                            .or_else(panel_width_changed),
+                    )
+                    .after(derive_score_spacing),
             );
     }
 }
@@ -424,7 +474,7 @@ pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFon
         ));
         // Notes layer: positioned so its own local x=0 IS the playhead —
         // every note glyph spawned inside it is placed at
-        // `(note.start_beat - now) * PIXELS_PER_BEAT`, which can (and
+        // `(note.start_beat - now) * MusicScoreSpacing`, which can (and
         // routinely does) go negative for a note just behind the
         // playhead; `overflow: clip_x()` on the panel itself keeps that
         // from spilling past the panel's own left edge.
@@ -462,6 +512,7 @@ fn rebuild_score_notes(
     layers: Query<Entity, With<MusicScoreNotesLayer>>,
     existing: Query<Entity, With<MusicScoreNoteGlyph>>,
     meter: Res<MusicScoreMeter>,
+    spacing: Res<MusicScoreSpacing>,
     mut clefs: Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
     mut time_sigs: Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
 ) {
@@ -474,7 +525,7 @@ fn rebuild_score_notes(
     // window against yet, so skip this pass; `panel_width_changed` fires
     // again the moment layout catches up and gives it one. `ComputedNode`
     // sizes are physical px; every length in this module (`STAFF_LINE_
-    // SPACING`, `PIXELS_PER_BEAT`, ...) feeds `Val::Px`, which is logical
+    // SPACING`, `MusicScoreSpacing`, ...) feeds `Val::Px`, which is logical
     // px, so this needs `inverse_scale_factor()` to match — same
     // conversion `gameplay_2d::size_note_tails` already applies for the
     // same reason.
@@ -514,7 +565,8 @@ fn rebuild_score_notes(
     let beams = beam_groups(&notes.0, clef);
     let marks = accidentals(&notes.0, clef, meter.beats_per_bar());
 
-    let (beats_behind, beats_ahead) = visible_beats(panel_width);
+    let scale = spacing.0;
+    let (beats_behind, beats_ahead) = visible_beats(panel_width, scale);
     for glyph in &existing {
         commands.entity(glyph).despawn();
     }
@@ -532,7 +584,7 @@ fn rebuild_score_notes(
             // rather than under it.
             for beat in bar_line_beats(now - beats_behind, now + beats_ahead, meter.beats_per_bar())
             {
-                let x = ((beat - now) * PIXELS_PER_BEAT as f64) as f32;
+                let x = ((beat - now) * scale as f64) as f32;
                 parent.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -564,6 +616,7 @@ fn rebuild_score_notes(
                         clef,
                         beams[i],
                         marks[i],
+                        scale,
                     );
                 }
                 prev = Some(note);
@@ -582,8 +635,9 @@ fn spawn_note_glyphs(
     clef: Clef,
     beam: Option<BeamPlacement>,
     accidental: Accidental,
+    scale: f32,
 ) {
-    let x = ((note.start_beat - now) * PIXELS_PER_BEAT as f64) as f32;
+    let x = ((note.start_beat - now) * scale as f64) as f32;
     let step = staff_step(note.midi, clef);
     let rhythm = note_rhythm(note.duration_beats);
     let kind = rhythm.head;
@@ -641,7 +695,7 @@ fn spawn_note_glyphs(
     if note.tied_from_previous
         && let Some(prev) = prev
     {
-        let prev_x = ((prev.start_beat - now) * PIXELS_PER_BEAT as f64) as f32;
+        let prev_x = ((prev.start_beat - now) * scale as f64) as f32;
         let margin = TIE_END_MARGIN_SP * STAFF_LINE_SPACING;
         let left = prev_x + margin;
         let width = (x - margin - left).max(TIE_MIN_WIDTH_PX);
@@ -718,7 +772,7 @@ fn spawn_note_glyphs(
         // to the last stem in the group.
         if let Some(b) = beam.filter(|b| b.is_first) {
             let beam_y = y_for_step(b.beam_step);
-            let width = (b.span_beats * PIXELS_PER_BEAT as f64) as f32;
+            let width = (b.span_beats * scale as f64) as f32;
             // One beam per flag the group's notes would otherwise carry —
             // a second for sixteenths, stacked inward from the stem tip so
             // the outermost always sits at the tip itself.
@@ -839,8 +893,8 @@ mod tests {
     }
     #[test]
     fn visible_beats_ahead_scales_with_panel_width() {
-        let (_, narrow_ahead) = visible_beats(200.0);
-        let (_, wide_ahead) = visible_beats(2000.0);
+        let (_, narrow_ahead) = visible_beats(200.0, PIXELS_PER_BEAT);
+        let (_, wide_ahead) = visible_beats(2000.0, PIXELS_PER_BEAT);
         assert!(
             wide_ahead > narrow_ahead * 5.0,
             "a much wider panel should show proportionally more beats ahead"
@@ -848,15 +902,15 @@ mod tests {
     }
     #[test]
     fn visible_beats_ahead_never_goes_negative_for_a_panel_narrower_than_playhead_x() {
-        let (_, ahead) = visible_beats(10.0); // narrower than PLAYHEAD_X itself
+        let (_, ahead) = visible_beats(10.0, PIXELS_PER_BEAT); // narrower than PLAYHEAD_X itself
         assert!(ahead >= 0.0);
     }
     #[test]
     fn visible_beats_behind_is_independent_of_panel_width() {
         // The space behind the playhead is bounded by PLAYHEAD_X, which is
         // fixed — widening the panel only grows what's visible ahead.
-        let (behind_narrow, _) = visible_beats(200.0);
-        let (behind_wide, _) = visible_beats(2000.0);
+        let (behind_narrow, _) = visible_beats(200.0, PIXELS_PER_BEAT);
+        let (behind_wide, _) = visible_beats(2000.0, PIXELS_PER_BEAT);
         assert_eq!(behind_narrow, behind_wide);
     }
 }
