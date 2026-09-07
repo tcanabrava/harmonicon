@@ -42,30 +42,24 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
   guided tour still force the chart's own harmonica — deliberate for now (a
   lesson prescribes its harp as part of the teaching), but a player who
   doesn't own that key can't take those lessons at all.
-- [ ] **Guitar Pro is the last format gap — the blocker is the dependency,
-  not the code.** MIDI now plays end to end and `harmonicon-score` was built
-  so a format is a module plus one arm in `parse_import`, reaching nothing
-  outside that crate. What stops Guitar Pro is what to parse it *with*.
-  Measured, not guessed:
-  - `guitarpro` (MIT, v0.4.3, codeberg.org/slundi/scorelib) does have the
-    API — `Song::read_gp3`/`read_gp4`/`read_gp5` — and it does cross-compile
-    to `wasm32-unknown-unknown`.
-  - It takes `harmonicon-score`'s dependency tree from **5 crates to 94**,
-    including `zstd-sys` and `bzip2` (C, built through `cc`). Those come
-    from `zip`, which the crate needs only for MuseScore and GPX; it exposes
-    no features to drop them, so the cost is not opt-out.
-  - `harmonicon-platform` depends on `harmonicon-score` **in its build
-    script** (to share `IMPORT_EXTENSIONS` with the bundled-asset manifest),
-    so that C would compile for the host on every single build — the exact
-    thing the recent build-size work was fighting.
-  - The published crate ships no fixtures: its own tests read `test/*.gp4`
-    files that aren't in the package. So an adapter can't be verified
-    without hand-authoring a binary `.gp5`, which is where the real work is.
-  Options, in rough order of appeal: put the reader behind a default-off
-  cargo feature so only desktop release builds pay for it; hand-author a
-  minimal `.gp4`/`.gp5` fixture and write a dependency-free reader for just
-  the fields we need (track names, fret+string pitches, timing); or wait for
-  a leaner crate. `score-tab` (same author, v0.2.0) is unevaluated.
+- [ ] **`.mxl` (zipped MusicXML) and `.gp2` are still unread.** Everything
+  else a player is likely to own now loads — MIDI, Guitar Pro 3 through 7,
+  MuseScore, plain MusicXML. `.mxl` is just a zip around a `.musicxml`, and
+  `zip` is already in the tree; `.gp2` predates what the `guitarpro` crate
+  reads. Neither is urgent.
+- [ ] **`.xml` is claimed for MusicXML.** The extension is generic, and a
+  song folder holding some unrelated `.xml` would be offered as a chart and
+  then fail to parse. It is claimed anyway because a large share of real
+  MusicXML exports use it. Narrowing this would mean sniffing the root
+  element rather than trusting the extension — `parse_import` takes the
+  bytes already, so there is somewhere to put that.
+- [ ] **Tab timing is reconstructed, and only round-trip-tested.** The
+  `guitarpro` crate ships no fixtures, so `guitar_pro`'s measure/beat
+  placement is verified against songs this codebase writes itself plus an
+  in-memory model — not against a file Guitar Pro produced. Repeats
+  (`repeat_open`/`repeat_close`/`repeat_alternative`) are read but *not
+  honoured*: a tab that repeats a bar plays it once. Worth revisiting with a
+  real tab in hand.
 
 ## Mobile (post-1.0)
 
