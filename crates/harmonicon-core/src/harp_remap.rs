@@ -219,15 +219,16 @@ pub fn remap_event(
             // pitch and shuffles the tab even when the harps are identical:
             // hole 3 blow and hole 2 draw are both G4 on a C harp.
             //
-            // And re-resolving a *bent* note can fail outright, so a
-            // transposition onto the chart's own harmonica would report its
-            // own notes as unplayable. `map_pitch_playable` caps bends with
-            // `max_bend`, while `build_valid_notes` (and charts in the wild)
-            // treat the whole blow-to-draw gap as bendable — hole 3 draw
-            // bends a full three semitones there but only 1.5 by the cap.
-            // Those two disagree, which is its own bug (see `TODO.md`);
-            // this check means the disagreement cannot cost a player notes
-            // the chart already asked for.
+            // It also guards re-resolution generally: a note the chart
+            // already sounds correctly on this harp is kept as written,
+            // rather than being put back through the resolver and risking a
+            // different answer. That mattered acutely while `max_bend`
+            // disagreed with `build_valid_notes` about hole 3 (capping it
+            // at 1.5 semitones instead of three), which made a
+            // transposition onto the chart's *own* harmonica report its own
+            // notes unplayable; `max_bend` is now derived from the same
+            // blow-to-draw gap and the two agree, but keeping what already
+            // works is the cheaper and safer rule regardless.
             if source_pitch(hole, action, None, modifiers, target_harp) == Some(target) {
                 return RemappedEvent {
                     hole,

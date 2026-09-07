@@ -95,8 +95,15 @@ impl ScoreFile for MidiScore {
     }
 
     fn title(&self) -> Option<&str> {
-        // A MIDI file's title, by convention, is the first track's name.
-        self.tracks.first().and_then(|t| t.name.as_deref())
+        // Always `None`, deliberately. MIDI's convention is that the title
+        // is the *first track's* name — but a harmonica file's first track
+        // is named "Harmonica", which is an instrument, not a song. Passing
+        // that off as a title produced exactly that: a song called
+        // "Harmonica", observed in the running game. Reporting honestly
+        // that the format carries no title lets each caller fall back to
+        // something it actually knows (the folder name), instead of every
+        // caller having to un-do the same wrong answer.
+        None
     }
 
     fn tracks(&self) -> &[ScoreTrack] {

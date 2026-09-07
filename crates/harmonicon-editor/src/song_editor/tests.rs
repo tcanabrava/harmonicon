@@ -365,7 +365,8 @@ fn group_move_valid_ignores_overlap_among_the_groups_own_members() {
 
 #[test]
 fn group_move_valid_rejects_a_pitch_incompatible_with_its_target_hole() {
-    // Bend(1.5) only fits holes 2/3/10 (see `max_bend`) — landing on hole 5
+    // Bend(1.5) needs a hole with at least two semitones of bend, i.e.
+    // holes 2/3/10 (see `max_bend`) — landing on hole 5
     // must fail even with nothing else in the way.
     let targets = vec![(1u32, 5, 0, 4, Pitch::Bend(1.5))];
     assert!(!group_move_valid(&[], &[1], &targets));
@@ -490,21 +491,24 @@ fn bend_cycles_and_caps_at_hole_max() {
 
 #[test]
 fn unbendable_hole_ignores_bend() {
+    // Hole 5's two reeds are a semitone apart (E and F on a C harp), so
+    // there is no note in between for a bend to land on — `max_bend` is 0
+    // and the button does nothing, which is what this test's name has
+    // always said. It previously asserted one half-step was accepted,
+    // because `max_bend`'s table disagreed with the notes the hole
+    // actually has (see `pitch_map::max_bend`).
     let mut s = EditorState::default();
     select_or_add(&mut s, 5, 0);
     let hole5 = s.notes[0].id;
     select_or_add(&mut s, 7, 0);
     s.selected = vec![hole5];
-    apply_modifier(&mut s, ModButton::Bend);
-    assert_eq!(
-        s.notes.iter().find(|n| n.hole == 5).unwrap().pitch,
-        Pitch::Bend(0.5)
-    );
-    apply_modifier(&mut s, ModButton::Bend);
-    assert_eq!(
-        s.notes.iter().find(|n| n.hole == 5).unwrap().pitch,
-        Pitch::Normal
-    );
+    for _ in 0..2 {
+        apply_modifier(&mut s, ModButton::Bend);
+        assert_eq!(
+            s.notes.iter().find(|n| n.hole == 5).unwrap().pitch,
+            Pitch::Normal
+        );
+    }
 }
 
 // ── Sticky modifiers ──────────────────────────────────────────────────────
@@ -524,7 +528,7 @@ fn clicking_a_mod_button_with_nothing_selected_arms_it_for_new_notes() {
 fn sticky_bend_arms_without_a_selection_and_applies_to_a_compatible_hole() {
     let mut s = EditorState::default();
     apply_modifier(&mut s, ModButton::Bend); // -> 0.5
-    select_or_add(&mut s, 2, 0); // hole 2: max_bend 1.5, compatible
+    select_or_add(&mut s, 2, 0); // hole 2: max_bend 2.0, compatible
     assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
 }
 
@@ -545,11 +549,15 @@ fn sticky_pitch_falls_back_to_normal_on_an_incompatible_hole_but_stays_armed() {
 
 #[test]
 fn cycling_sticky_bend_past_the_richest_cap_turns_it_off() {
+    // Counted off `DEEPEST_BEND` rather than a literal, so this keeps
+    // testing the wrap and not a particular depth: the cap moved from 1.5
+    // to hole 3's real three semitones when `max_bend` was corrected.
+    let steps = (super::interaction::DEEPEST_BEND / 0.5).round() as usize;
     let mut s = EditorState::default();
-    for _ in 0..3 {
-        apply_modifier(&mut s, ModButton::Bend); // 0.5, 1.0, 1.5
+    for _ in 0..steps {
+        apply_modifier(&mut s, ModButton::Bend); // 0.5 .. DEEPEST_BEND
     }
-    apply_modifier(&mut s, ModButton::Bend); // past 1.5 -> Normal (off)
+    apply_modifier(&mut s, ModButton::Bend); // past the cap -> Normal (off)
     select_or_add(&mut s, 2, 0);
     assert_eq!(s.notes[0].pitch, Pitch::Normal);
 }
@@ -2399,4 +2407,16 @@ fn overflow_is_exactly_what_hangs_off_the_bottom() {
 #[test]
 fn an_empty_root_has_no_overflow() {
     assert_eq!(super::view_scroll::vertical_overflow_px(400.0, &[]), 0.0);
+}
+
+#[test]
+fn the_sticky_bend_cap_is_the_deepest_any_hole_allows() {
+    // Written as a constant next to the cycling code, so it can drift from
+    // `max_bend`. It used to say 1.5 while hole 3 genuinely bends three
+    // semitones, which capped the hole-free sticky cycle below what a real
+    // note could then be given.
+    let deepest = (1..=10u8)
+        .map(harmonicon_core::pitch_map::max_bend)
+        .fold(0.0f32, f32::max);
+    assert_eq!(super::interaction::DEEPEST_BEND, deepest);
 }

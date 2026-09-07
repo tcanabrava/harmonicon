@@ -408,29 +408,41 @@ pub fn scan_artist_song(
 
         // The files for the music are inside of `song` subdirectory.
         //
-        // A `.harpchart` always wins over a `.mid`, and the two are checked
-        // in separate passes rather than by first-match: `song/music.mid`
-        // is *backing audio* for a charted song, so a directory holding
-        // both would otherwise pick whichever `read_dir` happened to yield
-        // first and sometimes play the backing track as the chart. A MIDI
-        // is only the chart when nothing else is (see
-        // `harmonicon_song::song::midi_song`).
+        // A `.harpchart` always wins over an imported format, and the two
+        // are checked in separate passes rather than by first-match:
+        // `song/music.mid` is *backing audio* for a charted song, so a
+        // directory holding both would otherwise pick whichever `read_dir`
+        // happened to yield first and sometimes play the backing track as
+        // the chart. A score file is only the chart when nothing else is
+        // (see `harmonicon_song::song::score_song`).
+        //
+        // The importable extensions come from `harmonicon_score`, never a
+        // list written out here: a format this scan didn't know about
+        // would simply never appear in the song list, with nothing to
+        // explain why.
         let song_file = (|| {
             let entries: Vec<_> = std::fs::read_dir(song_dir.path().join("song"))
                 .ok()?
                 .flatten()
                 .collect();
+            // Case-insensitively, matching `harmonicon_score::parse_import`
+            // — a file saved as `.MID` is as common as `.mid`.
             let has_extension = |entry: &std::fs::DirEntry, want: &[&str]| {
                 entry
                     .path()
                     .extension()
                     .and_then(|e| e.to_str())
-                    .is_some_and(|e| want.contains(&e))
+                    .map(|e| e.to_ascii_lowercase())
+                    .is_some_and(|e| want.contains(&e.as_str()))
             };
             entries
                 .iter()
                 .find(|e| has_extension(e, &["harpchart"]))
-                .or_else(|| entries.iter().find(|e| has_extension(e, &["mid", "midi"])))
+                .or_else(|| {
+                    entries
+                        .iter()
+                        .find(|e| has_extension(e, harmonicon_score::IMPORT_EXTENSIONS))
+                })
                 .map(|e| e.path())
         })();
 

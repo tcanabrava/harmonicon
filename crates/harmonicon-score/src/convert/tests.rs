@@ -214,3 +214,166 @@ fn a_chart_converted_onto_its_own_harp_keeps_its_pitches() {
         .collect();
     assert_eq!(round_tripped, original);
 }
+
+// ── suggested_harp / choose_track ────────────────────────────────────────────
+
+/// A C-major run every C harp plays on plain blow reeds.
+fn easy_notes() -> Vec<u8> {
+    ["C4", "E4", "G4", "C5", "E5", "G5"]
+        .map(|n| note_to_midi(n).unwrap() as u8)
+        .to_vec()
+}
+
+#[test]
+fn the_harmonica_is_chosen_to_fit_the_music() {
+    // A tune in C should land on a C diatonic, not on whatever the default
+    // happens to be.
+    let harp = suggested_harp(&easy_notes());
+    assert_eq!(
+        harmonicon_core::harmonica::detected_harp_key(&harp).as_deref(),
+        Some("C")
+    );
+    assert!(matches!(harp, Harmonica::Diatonic { .. }));
+}
+
+#[test]
+fn a_diatonic_is_preferred_when_it_fits() {
+    // A chromatic plays everything, so scoring alone would always pick one.
+    // Handing a beginner a 12-hole chromatic for a tune a C diatonic plays
+    // cleanly is the wrong default.
+    let harp = suggested_harp(&easy_notes());
+    assert!(
+        matches!(harp, Harmonica::Diatonic { .. }),
+        "a plainly diatonic tune chose {harp:?}"
+    );
+}
+
+#[test]
+fn a_chromatic_run_still_fits_a_diatonic() {
+    // Not a typo for "prefers a chromatic": with its bends and overblows a
+    // diatonic *is* chromatic across its own range, so every semitone of an
+    // octave lands on a C harp. This test asserted the opposite while
+    // `max_bend` wrongly capped every hole at 1.5 semitones.
+    //
+    // Measured over C4..C7: a C diatonic reaches 100% of the semitones, a
+    // C chromatic 62% — so `suggested_harp`'s chromatic branch does not
+    // currently fire for any realistic input. That second number is a gap
+    // in how `chromatic_harp` is modelled (a real 12-hole chromatic reaches
+    // everything in its range), recorded in TODO.md; the branch stays
+    // because the rule it encodes is right, not because it is exercised.
+    let run: Vec<u8> =
+        (note_to_midi("C4").unwrap() as u8..=note_to_midi("C5").unwrap() as u8).collect();
+    let harp = suggested_harp(&run);
+    assert!(
+        matches!(harp, Harmonica::Diatonic { .. }),
+        "a diatonic covers a chromatic octave; chose {harp:?}"
+    );
+}
+
+/// A conversion result with only the fields `choose_track` reads.
+fn conversion(index: usize, name: Option<&str>, report: ConversionReport) -> TrackConversion {
+    TrackConversion {
+        track: ScoreTrack {
+            index,
+            name: name.map(str::to_string),
+            note_count: report.total,
+        },
+        // `choose_track` reads only the track and the report; the chart is
+        // carried along for the caller, so any valid one will do here.
+        chart: to_chart(&FakeScore::of(&[60]), 0, &richter_harp("C"), "A")
+            .unwrap()
+            .0,
+        report,
+    }
+}
+
+fn report(total: usize, unreachable: usize, bends: usize) -> ConversionReport {
+    ConversionReport {
+        total,
+        natural: total - unreachable - bends,
+        bends,
+        overblows: 0,
+        unreachable,
+    }
+}
+
+#[test]
+fn a_named_harmonica_track_wins_even_with_a_worse_score() {
+    // The file is telling us which part it is. A poor score there means the
+    // harp guess was bad, not that the part is wrong.
+    let tracks = [
+        conversion(0, Some("Guitar"), report(10, 0, 0)),
+        conversion(1, Some("Harmonica"), report(10, 1, 4)),
+    ];
+    assert_eq!(choose_track(&tracks), Some(1));
+}
+
+#[test]
+fn with_nothing_named_the_best_fitting_part_is_chosen() {
+    // Beats "the busiest track", which is routinely a guitar.
+    let tracks = [
+        conversion(0, None, report(100, 40, 0)),
+        conversion(1, None, report(10, 0, 0)),
+    ];
+    assert_eq!(choose_track(&tracks), Some(1));
+}
+
+#[test]
+fn a_tie_prefers_the_part_needing_fewer_bends() {
+    // Both fully reachable; one is playable by a beginner and one isn't.
+    let tracks = [
+        conversion(0, None, report(10, 0, 8)),
+        conversion(1, None, report(10, 0, 0)),
+    ];
+    assert_eq!(choose_track(&tracks), Some(1));
+}
+
+#[test]
+fn nothing_is_chosen_when_no_part_survives_the_harp() {
+    // The caller turns this into an error naming how close the best got.
+    let tracks = [
+        conversion(0, None, report(10, 9, 0)),
+        conversion(1, None, report(10, 8, 0)),
+    ];
+    assert_eq!(choose_track(&tracks), None);
+}
+
+#[test]
+fn a_named_track_does_not_win_when_none_of_it_is_playable() {
+    // Caught by a real test: a bass line named "Harmonica" converts to a
+    // chart with no notes at all, and opening a song on that is worse than
+    // opening on the part that actually works.
+    let tracks = [
+        conversion(0, Some("Harmonica"), report(12, 12, 0)),
+        conversion(1, Some("Lead"), report(10, 0, 0)),
+    ];
+    assert_eq!(choose_track(&tracks), Some(1));
+}
+
+#[test]
+fn a_file_whose_only_named_part_is_unplayable_yields_nothing() {
+    let tracks = [conversion(0, Some("Harmonica"), report(12, 12, 0))];
+    assert_eq!(choose_track(&tracks), None);
+}
+
+#[test]
+fn an_otherwise_tied_pair_prefers_the_longer_part() {
+    // Both fully playable with the same bends: the substantive part is the
+    // likelier lead, and a six-note comp is the likelier accompaniment.
+    let tracks = [
+        conversion(0, None, report(6, 0, 2)),
+        conversion(1, None, report(8, 0, 2)),
+    ];
+    assert_eq!(choose_track(&tracks), Some(1));
+}
+
+#[test]
+fn a_complete_tie_resolves_to_the_earlier_track() {
+    // `max_by` keeps the last maximum, so without the final comparison this
+    // would silently be "the last track" while the docs said otherwise.
+    let tracks = [
+        conversion(0, None, report(8, 0, 2)),
+        conversion(1, None, report(8, 0, 2)),
+    ];
+    assert_eq!(choose_track(&tracks), Some(0));
+}

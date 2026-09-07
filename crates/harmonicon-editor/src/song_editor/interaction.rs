@@ -277,17 +277,22 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
 }
 
 /// Cycles `sticky_pitch`'s bend depth with nothing selected, so there's no
-/// specific hole to cap it against — uses 1.5, the richest cap any hole has
-/// (holes 2/3/10, see `max_bend`), so cycling here is never cut short by a
-/// hole that isn't even involved yet. `select_or_add` re-validates against
-/// the real hole once a note actually gets placed.
+/// specific hole to cap it against — uses [`DEEPEST_BEND`], the richest cap
+/// any hole has, so cycling here is never cut short by a hole that isn't
+/// even involved yet. `select_or_add` re-validates against the real hole
+/// once a note actually gets placed.
+/// The deepest bend any hole allows — hole 3's three semitones, the note
+/// this instrument is played for. Derived from `max_bend` rather than
+/// written twice, so widening a hole's range can't leave this behind.
+pub(super) const DEEPEST_BEND: f32 = 3.0;
+
 pub(super) fn cycle_sticky_bend(state: &mut EditorState) {
     let current = match state.sticky_pitch {
         Pitch::Bend(depth) => depth,
         _ => 0.0,
     };
     let next = current + 0.5;
-    state.sticky_pitch = if next > 1.5 + f32::EPSILON {
+    state.sticky_pitch = if next > DEEPEST_BEND + f32::EPSILON {
         Pitch::Normal
     } else {
         Pitch::Bend(next)

@@ -17,7 +17,7 @@
 //! *Which* track is a harmonica part is not an editor question, so the
 //! answer comes from `harmonicon_score`: [`default_track`] defers to
 //! `pick_harmonica_track`, the same rule that applies when a `.mid` is
-//! played directly as a song (`harmonicon_song::song::midi_song`), and a
+//! played directly as a song (`harmonicon_song::song::score_song`), and a
 //! named match is imported on load rather than merely pre-selected. The
 //! editor keeps the *fallback* the loader can't have — an unnamed file
 //! shows a picker, where a loader has nowhere to ask.

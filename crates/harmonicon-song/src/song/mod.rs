@@ -12,10 +12,13 @@ use std::path::PathBuf;
 
 pub use harmonicon_core::chart::HarpChart;
 pub use harmonicon_core::harmonica::Harmonica;
-mod midi_song;
+mod score_song;
 
 pub use loader::SongChartLoader;
-pub use midi_song::MidiSongLoader;
+pub use score_song::ScoreSongLoader;
+
+pub use harmonicon_score::ScoreTrack;
+pub use harmonicon_score::convert::{ConversionReport, TrackConversion as TrackChart};
 
 use bevy::{asset::AssetPath, audio::AudioSource, image::Image, prelude::*};
 
@@ -79,6 +82,20 @@ pub struct SongManifest {
     /// by `gameplay_3d::setup` (with the `#Mesh0/Primitive0` label) the same way.
     pub assets_3d: Option<AssetPath<'static>>,
     pub assets_3d_config: NoteCube3dConfig,
+    /// Every playable part of the source file, each already converted onto
+    /// its own best-fitting harmonica — see [`TrackChart`].
+    ///
+    /// Empty for a `.harpchart`, which has exactly one part by
+    /// construction. Populated by `score_song`, because a file written for
+    /// a band names no harmonica part and the loader's own pick is then a
+    /// guess: the harp-check screen turns this into a track picker so the
+    /// player can correct it, and `source_track` says which one is
+    /// currently in [`chart`](Self::chart).
+    pub source_tracks: Vec<TrackChart>,
+    /// Index *into [`source_tracks`](Self::source_tracks)* — not the source
+    /// file's own track number, which `TrackChart::track.index` carries.
+    /// `None` when there was never a choice to make.
+    pub source_track: Option<usize>,
 }
 
 /// One MIDI track's own, independently-playable audio stem — see
@@ -164,9 +181,11 @@ impl Plugin for SongPlugin {
     fn build(&self, app: &mut App) {
         app.init_asset::<SongManifest>()
             .register_asset_loader(SongChartLoader)
-            // A `.mid` dropped in as a song's chart, converted at load time
-            // via `harmonicon-score`. Distinct from `song/music.mid`, which
-            // is backing audio for a `.harpchart` song — see `midi_song`.
-            .register_asset_loader(MidiSongLoader);
+            // A score file dropped in *as* a song's chart, converted at
+            // load time via `harmonicon-score`. Registers for every format
+            // that crate can read, so adding one needs no change here.
+            // Distinct from `song/music.mid`, which is backing audio for a
+            // `.harpchart` song — see `score_song`.
+            .register_asset_loader(ScoreSongLoader);
     }
 }

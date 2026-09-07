@@ -10,7 +10,7 @@ use bevy::{
 use thiserror::Error;
 
 use super::{
-    MidiTrackAudio, SongManifest,
+    MidiTrackAudio, SongManifest, TrackChart,
     chart::{CURRENT_FORMAT_VERSION, HarpChart, format_version_supported, migrate_chart_json},
 };
 use harmonicon_audio::waveform::{WAVEFORM_BUCKETS, bucket_peaks};
@@ -139,7 +139,7 @@ impl SongChartLoader {
             )));
         }
 
-        assemble_manifest(chart, load_context).await
+        assemble_manifest(chart, Vec::new(), None, load_context).await
     }
 }
 
@@ -152,6 +152,8 @@ impl SongChartLoader {
 /// generated background or its waveform.
 pub(super) async fn assemble_manifest(
     chart: HarpChart,
+    source_tracks: Vec<TrackChart>,
+    source_track: Option<usize>,
     load_context: &mut LoadContext<'_>,
 ) -> Result<SongManifest, SongLoadError> {
     // Materialise the parent path before calling load() to avoid holding
@@ -314,6 +316,8 @@ pub(super) async fn assemble_manifest(
         assets_2d_config: serde_json::from_str(&note_2d_json).unwrap_or_default(),
         assets_3d,
         assets_3d_config: serde_json::from_str(&note_3d_json).unwrap_or_default(),
+        source_tracks,
+        source_track,
     })
 }
 

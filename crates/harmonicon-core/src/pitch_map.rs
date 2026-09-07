@@ -73,11 +73,25 @@ pub fn harp_for_key(key: &str, kind: HarpKind) -> Harmonica {
 }
 
 /// How far a hole bends, in semitones. Zero means it doesn't.
+///
+/// A bend pulls a reed down toward *the other reed in the same hole*, so the
+/// depth available is however many semitones lie strictly between them —
+/// which is exactly what [`hole_notes`] already enumerates as `bends`. On a
+/// Richter harp that interval pattern is the same in every key, so it can be
+/// stated as a table; `max_bend_matches_the_notes_a_hole_actually_has` pins
+/// this against `hole_notes` for every hole of every key, because two
+/// descriptions of one physical fact are exactly the kind of thing that
+/// drifts.
+///
+/// Hole 3 bends a full three semitones — the blues note this instrument is
+/// played for. Holes 5 and 7 have adjacent reeds and so bend nothing at all
+/// (a player can bend hole 5 a fraction, but there is no semitone in
+/// between for it to land on).
 pub fn max_bend(hole: u8) -> f32 {
     match hole {
-        2 | 3 | 10 => 1.5,
-        1 | 6 | 8 | 9 => 1.0,
-        4 | 5 | 7 => 0.5,
+        3 => 3.0,
+        2 | 10 => 2.0,
+        1 | 4 | 6 | 8 | 9 => 1.0,
         _ => 0.0,
     }
 }

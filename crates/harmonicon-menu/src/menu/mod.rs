@@ -101,7 +101,11 @@ impl Plugin for MenuPlugin {
             // cost line is filled in on whichever frame it resolves.
             .add_systems(
                 Update,
-                pages::harp_check::refresh_harp_cost.run_if(in_state(MenuPage::HarpCheck)),
+                (
+                    pages::harp_check::spawn_track_picker,
+                    pages::harp_check::refresh_harp_cost,
+                )
+                    .run_if(in_state(MenuPage::HarpCheck)),
             )
             .add_systems(
                 OnEnter(MenuPage::ModeSelect),

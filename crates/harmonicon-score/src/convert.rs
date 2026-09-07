@@ -20,9 +20,11 @@ use harmonicon_core::chart::{
 };
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::midi::midi_to_note;
-use harmonicon_core::pitch_map::{Technique, map_pitch_playable};
+use harmonicon_core::pitch_map::{
+    HarpKind, Technique, harp_for_key, map_pitch_playable, suggest_key,
+};
 
-use crate::{ScoreError, ScoreFile};
+use crate::{ScoreError, ScoreFile, ScoreTrack};
 
 /// How well a track survived being put on a harmonica.
 ///
@@ -56,8 +58,132 @@ impl ConversionReport {
     /// reads as a broken chart rather than a hard one. A caller wanting a
     /// different line can use [`Self::reachable_fraction`] directly.
     pub fn is_worth_playing(&self) -> bool {
-        self.total > 0 && self.reachable_fraction() >= 0.8
+        self.total > 0 && self.reachable_fraction() >= MIN_REACHABLE
     }
+}
+
+/// Fraction of a part's notes that must land on the harp before it counts
+/// as playable at all.
+pub const MIN_REACHABLE: f32 = 0.8;
+
+/// One track of a source file, converted onto its own best-fitting harp.
+#[derive(Debug, Clone)]
+pub struct TrackConversion {
+    pub track: ScoreTrack,
+    pub chart: HarpChart,
+    pub report: ConversionReport,
+}
+
+/// Converts *every* playable track, each onto the harmonica that suits it.
+///
+/// Not just the one a caller expects to use: a file written for a band
+/// names no harmonica part, so whichever track gets chosen is a guess, and
+/// the alternatives are what let a player correct it without a reload.
+/// Conversion is arithmetic over notes already in memory — cheap next to
+/// the read that produced them.
+///
+/// Each part gets its own harp because the right key for a melody is rarely
+/// the right one for a bass line, and a shared harp would make every part
+/// but one look unplayable in the picker.
+pub fn convert_all_tracks(
+    score: &dyn ScoreFile,
+    artist: &str,
+) -> Result<Vec<TrackConversion>, ScoreError> {
+    let mut converted = Vec::new();
+    for track in score.tracks().iter().filter(|t| t.is_playable()) {
+        let notes = score.notes(track.index)?;
+        let harp = suggested_harp(&notes.iter().map(|n| n.midi).collect::<Vec<_>>());
+        let (chart, report) = to_chart(score, track.index, &harp, artist)?;
+        converted.push(TrackConversion {
+            track: track.clone(),
+            chart,
+            report,
+        });
+    }
+    Ok(converted)
+}
+
+/// Which converted track to open on, or `None` if none is playable.
+///
+/// A track the file *names* as the harmonica wins over a better-scoring
+/// one — the file is telling us, and a few extra bends there means the part
+/// is harder, not wrong. It does **not** win over being unplayable: a bass
+/// line named "Harmonica" converts to a chart with no notes in it at all,
+/// and opening a song on that is worse than opening on a part that works.
+///
+/// Failing a name, it's whichever part survives the harmonica best. That
+/// beats "the busiest track", which is routinely a guitar, and is only safe
+/// because it is a *default*: the picker makes it correctable, which is
+/// what allows offering an ambiguous file at all instead of refusing it.
+pub fn choose_track(tracks: &[TrackConversion]) -> Option<usize> {
+    let playable = || {
+        tracks
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.report.is_worth_playing())
+    };
+
+    let named = crate::pick_harmonica_track(
+        &tracks
+            .iter()
+            .map(|t| t.track.clone())
+            .collect::<Vec<ScoreTrack>>(),
+    );
+    if let Some(index) =
+        named.and_then(|i| playable().find(|(_, t)| t.track.index == i).map(|(n, _)| n))
+    {
+        return Some(index);
+    }
+    playable()
+        .max_by(|(ai, a), (bi, b)| {
+            a.report
+                .reachable_fraction()
+                .total_cmp(&b.report.reachable_fraction())
+                // Ties go to the part needing fewer bends (easier), then to
+                // the one with more notes (a lead part rather than a
+                // six-chord comp), then to the earlier track. Spelled out
+                // to the last step on purpose: `max_by` keeps the *last*
+                // maximum, so an unbroken tie would otherwise resolve by
+                // position with nothing saying so.
+                .then_with(|| b.report.bends.cmp(&a.report.bends))
+                .then_with(|| a.report.total.cmp(&b.report.total))
+                .then_with(|| bi.cmp(ai))
+        })
+        .map(|(index, _)| index)
+}
+
+/// The harmonica a set of pitches fits best.
+///
+/// Tries diatonic first and only prefers a chromatic when it genuinely fits
+/// better: a chromatic can play everything, so scoring alone would always
+/// choose one, and handing a beginner a 12-hole chromatic for a tune a C
+/// diatonic plays cleanly is the wrong default.
+pub fn suggested_harp(pitches: &[u8]) -> Harmonica {
+    let diatonic = harp_for_key(suggest_key(pitches, HarpKind::Diatonic), HarpKind::Diatonic);
+    if reachable(pitches, &diatonic) >= MIN_REACHABLE {
+        return diatonic;
+    }
+    let chromatic = harp_for_key(
+        suggest_key(pitches, HarpKind::Chromatic),
+        HarpKind::Chromatic,
+    );
+    if reachable(pitches, &chromatic) > reachable(pitches, &diatonic) {
+        chromatic
+    } else {
+        diatonic
+    }
+}
+
+/// Fraction of `pitches` this harp can actually produce.
+fn reachable(pitches: &[u8], harp: &Harmonica) -> f32 {
+    if pitches.is_empty() {
+        return 0.0;
+    }
+    let hit = pitches
+        .iter()
+        .filter(|&&p| map_pitch_playable(p, harp).is_some())
+        .count();
+    hit as f32 / pitches.len() as f32
 }
 
 /// Ticks per beat the generated chart uses.

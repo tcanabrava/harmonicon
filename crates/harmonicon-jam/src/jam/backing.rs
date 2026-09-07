@@ -396,6 +396,10 @@ pub fn build_generated_manifest(
         assets_2d_config: NoteThemeConfig::default(),
         assets_3d: None,
         assets_3d_config: NoteCube3dConfig::default(),
+        // A generated jam has no source file to have picked a track from,
+        // so there is nothing for the harp-check picker to offer.
+        source_tracks: Vec::new(),
+        source_track: None,
     }
 }
 

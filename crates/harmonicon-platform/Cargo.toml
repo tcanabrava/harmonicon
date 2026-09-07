@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
+harmonicon-score = { path = "../harmonicon-score", version = "*" }
 harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
 bevy = { workspace = true }
 bevy_fluent = { workspace = true }
@@ -21,6 +22,13 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 crossbeam-channel = { workspace = true }
 notify-debouncer-full = { workspace = true }
+
+# The build script generates the bundled-asset manifest, and has to mirror
+# `assets_management`'s discovery rules exactly — including *which* score
+# formats count as a song's chart. Depending on the same crate the runtime
+# scan reads `IMPORT_EXTENSIONS` from is what keeps the two from drifting.
+[build-dependencies]
+harmonicon-score = { path = "../harmonicon-score", version = "*" }
 
 [features]
 dev = ["bevy/dev", "bevy/debug", "harmonicon-audio/dev"]

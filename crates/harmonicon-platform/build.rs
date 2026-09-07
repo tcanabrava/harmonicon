@@ -105,18 +105,37 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String)> {
             if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                 continue;
             }
+            // Mirrors `assets_management::scan_artist_song` exactly,
+            // including its two passes and its use of
+            // `harmonicon_score::IMPORT_EXTENSIONS` — a bundled song whose
+            // chart is a score file would otherwise be visible on desktop
+            // and silently missing on wasm/Android.
             let chart = std::fs::read_dir(song_dir.path().join("song"))
                 .ok()
                 .and_then(|entries| {
+                    let entries: Vec<_> = entries.flatten().collect();
+                    let has_extension = |e: &std::fs::DirEntry, want: &[&str]| {
+                        e.path()
+                            .extension()
+                            .and_then(|x| x.to_str())
+                            .map(|x| x.to_ascii_lowercase())
+                            .is_some_and(|x| want.contains(&x.as_str()))
+                    };
                     entries
-                        .flatten()
-                        .find(|e| e.path().extension().is_some_and(|ext| ext == "harpchart"))
+                        .iter()
+                        .find(|e| has_extension(e, &["harpchart"]))
+                        .or_else(|| {
+                            entries
+                                .iter()
+                                .find(|e| has_extension(e, harmonicon_score::IMPORT_EXTENSIONS))
+                        })
+                        .map(|e| e.path())
                 });
             let Some(chart) = chart else {
                 continue;
             };
             let name = song_dir.file_name().to_string_lossy().into_owned();
-            let asset_path = asset_relative_path(&chart.path(), "../../assets");
+            let asset_path = asset_relative_path(&chart, "../../assets");
             out.push((artist.clone(), name, asset_path));
         }
     }

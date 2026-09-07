@@ -62,7 +62,7 @@ load-bearing about *this* crate.
   **Which track is the harmonica is not the editor's question to answer**:
   `default_track` defers to `harmonicon_score::pick_harmonica_track`, the
   same rule that applies when a `.mid` is played directly as a song
-  (`harmonicon_song::song::midi_song`), so the two can't disagree about
+  (`harmonicon_song::song::score_song`), so the two can't disagree about
   what a harmonica part is called. A *named* match is imported the moment
   the file loads rather than merely pre-selected — picking the value a
   combobox already displays fires no `ComboboxSelect`, so pre-selecting

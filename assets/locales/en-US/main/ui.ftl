@@ -856,3 +856,8 @@ harp-check-cost-unreachable = {$count} note(s) can't be played on this harmonica
 harp-check-chart-harp = Written for a {$key} {$kind} harmonica.
 harp-kind-diatonic = diatonic
 harp-kind-chromatic = chromatic
+# The track picker on the harp-check page, shown only for an imported score
+# file with more than one playable part.
+harp-check-track = Part to play
+harp-check-track-option = {$name} — {$notes} notes, {$percent}% playable
+harp-check-track-unnamed = Track {$index}

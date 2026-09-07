@@ -246,3 +246,59 @@ fn suggest_key_picks_the_harp_the_notes_are_natural_on() {
 fn suggest_key_breaks_ties_by_harp_keys_own_order() {
     assert_eq!(suggest_key(&[], HarpKind::Diatonic), HARP_KEYS[0]);
 }
+
+// ── max_bend ─────────────────────────────────────────────────────────────────
+
+#[test]
+fn max_bend_matches_the_notes_a_hole_actually_has() {
+    // Two descriptions of one physical fact: `max_bend`'s table and the
+    // bend notes `hole_notes` derives from the layout. They disagreed —
+    // the table capped every hole at 1.5 semitones, so a 2- or 3-semitone
+    // bend was unreachable and a plain C-major scale came back "needs a
+    // chromatic harmonica" because F and A were judged unplayable on a C
+    // diatonic. Key-independent, since Richter tuning repeats the same
+    // interval pattern, so every key must agree.
+    for key in HARP_KEYS {
+        let harp = richter_harp(key);
+        for hole in 1..=10u8 {
+            let derived = hole_notes(&harp, hole).bends.len() as f32;
+            assert_eq!(
+                max_bend(hole),
+                derived,
+                "hole {hole} on a {key} harp has {derived} bend note(s), \
+                 max_bend says {}",
+                max_bend(hole)
+            );
+        }
+    }
+}
+
+#[test]
+fn the_three_draw_bends_low_notes_are_reachable() {
+    // The specific notes the old cap made unplayable: hole 2 draw down two
+    // semitones, hole 3 draw down two and three.
+    let harp = richter_harp("C");
+    for (note, hole, depth) in [("F4", 2u8, 2.0), ("A4", 3, 2.0), ("Ab4", 3, 3.0)] {
+        let target = note_to_midi(note).unwrap() as u8;
+        let Some(assignment) = map_pitch_playable(target, &harp) else {
+            panic!("{note} is unreachable on a C harp");
+        };
+        assert_eq!(assignment.hole, hole, "{note} landed on the wrong hole");
+        assert_eq!(assignment.action, Action::Draw);
+        assert_eq!(assignment.technique, Technique::Bend(depth));
+    }
+}
+
+#[test]
+fn a_c_major_scale_fits_a_c_diatonic() {
+    // What the bug looked like from the outside: an imported MIDI of the
+    // plainest possible tune was offered a 12-hole chromatic.
+    let harp = richter_harp("C");
+    for note in ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"] {
+        let target = note_to_midi(note).unwrap() as u8;
+        assert!(
+            map_pitch_playable(target, &harp).is_some(),
+            "{note} judged unplayable on a C diatonic"
+        );
+    }
+}

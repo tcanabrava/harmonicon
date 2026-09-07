@@ -855,3 +855,8 @@ harp-check-cost-unreachable = {$count} nota(s) no se pueden tocar en esta armón
 harp-check-chart-harp = Escrita para una armónica {$kind} en {$key}.
 harp-kind-diatonic = diatónica
 harp-kind-chromatic = cromática
+# El selector de pista en la página de comprobación de la armónica, visible
+# solo para un archivo importado con más de una parte tocable.
+harp-check-track = Parte a tocar
+harp-check-track-option = {$name} — {$notes} notas, {$percent}% tocable
+harp-check-track-unnamed = Pista {$index}

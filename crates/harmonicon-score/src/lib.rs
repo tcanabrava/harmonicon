@@ -42,6 +42,34 @@ pub enum ScoreError {
     NoPlayableTracks,
     #[error("track {0} does not exist in this file")]
     NoSuchTrack(usize),
+    #[error("no reader for a .{0} file")]
+    UnsupportedFormat(String),
+}
+
+/// The file extensions [`parse_import`] understands — an asset loader's
+/// `extensions()` should be exactly this, so registering a format and
+/// advertising it can't drift apart.
+///
+/// **`harpchart` is deliberately absent.** It is already a chart: playing
+/// one goes through `harmonicon_song`'s own loader, which validates,
+/// migrates and version-checks it. [`harpchart::HarpChartScore`] exists so
+/// a chart can be a *source* — re-derived onto a different harmonica —
+/// not a second, weaker way to play one.
+pub const IMPORT_EXTENSIONS: &[&str] = &["mid", "midi"];
+
+/// Reads `bytes` as whatever `extension` says they are.
+///
+/// **This is the only place a concrete reader is named.** Everything above
+/// this crate works through [`ScoreFile`], so adding a format is a module,
+/// one arm here, and an entry in [`IMPORT_EXTENSIONS`] — no loader, no
+/// converter and no menu code learns that the format exists. A trait whose
+/// implementations are still selected by name at every call site would buy
+/// nothing, which is the mistake this function exists to prevent.
+pub fn parse_import(extension: &str, bytes: Vec<u8>) -> Result<Box<dyn ScoreFile>, ScoreError> {
+    match extension.to_ascii_lowercase().as_str() {
+        "mid" | "midi" => Ok(Box::new(midi::MidiScore::parse(bytes)?)),
+        other => Err(ScoreError::UnsupportedFormat(other.to_string())),
+    }
 }
 
 /// Which file format a score came from — for messages and for deciding
@@ -117,4 +145,40 @@ pub trait ScoreFile {
     fn tempo_bpm(&self) -> f32;
 
     fn time_signature(&self) -> (u8, u8);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_advertised_extension_has_a_reader() {
+        // The drift this catches: advertising an extension on a loader that
+        // then refuses every file with it, which reads to a player as "the
+        // game says it supports this and doesn't."
+        for extension in IMPORT_EXTENSIONS {
+            let err = parse_import(extension, b"not a real file".to_vec())
+                .err()
+                .expect("garbage bytes parsed as a valid score");
+            assert!(
+                !matches!(err, ScoreError::UnsupportedFormat(_)),
+                ".{extension} is advertised but has no reader"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unknown_extension_is_refused_by_name() {
+        let err = parse_import("gp5", Vec::new()).err().unwrap();
+        assert!(matches!(err, ScoreError::UnsupportedFormat(ext) if ext == "gp5"));
+    }
+
+    #[test]
+    fn an_extension_is_matched_case_insensitively() {
+        // Real files arrive as .MID as often as .mid.
+        let err = parse_import("MID", b"not a real file".to_vec())
+            .err()
+            .unwrap();
+        assert!(!matches!(err, ScoreError::UnsupportedFormat(_)));
+    }
 }

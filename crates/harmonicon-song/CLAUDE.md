@@ -97,37 +97,55 @@ load-bearing about *this* crate.
     instead of erroring — the game would just hang on the loading screen
     with no message, rather than "complain."
 
-- **A `.mid` can be a song's chart, not just its backing track**
-  (`song::midi_song`). Dropping a MIDI into
+- **A score file can be a song's chart, not just its backing track**
+  (`song::score_song`). Dropping a MIDI into
   `~/Harmonicon/songs/<artist>/<song>/song/` makes it playable: a second
-  `AssetLoader` (`MidiSongLoader`, registered for `mid`/`midi` alongside
-  `SongChartLoader`) converts it through `harmonicon-score` at load time.
-  Only the *chart* differs between the two loaders — background, backing
-  audio, waveform and note art are shared via `loader::assemble_manifest`,
-  split out of `SongChartLoader::load_inner` for exactly that reason.
+  `AssetLoader` (`ScoreSongLoader`, registered alongside `SongChartLoader`)
+  converts it through `harmonicon-score` at load time. Only the *chart*
+  differs between the two loaders — background, backing audio, waveform and
+  note art are shared via `loader::assemble_manifest`, split out of
+  `SongChartLoader::load_inner` for exactly that reason.
+  - **Nothing in this crate names a file format.** The extensions come from
+    `harmonicon_score::IMPORT_EXTENSIONS` (which is what `extensions()`
+    returns — never a hand-written list, or the loader could advertise a
+    format that then fails), the reader from
+    `harmonicon_score::parse_import`, and everything downstream works
+    through the `ScoreFile` trait. **A new format is a module in
+    `harmonicon-score` and changes nothing here**; a loader that said
+    `MidiScore::parse` would have made every future format a copy of
+    `score_song.rs`, which is the mistake the trait exists to prevent.
   - **`song/music.mid` already meant backing audio** for a charted song
     (`SongManifest::midi_tracks`). Both readings are legitimate, so
     `assets_management::scan_artist_song` looks for a `.harpchart` in one
-    pass and only falls back to `.mid`/`.midi` in a second — first-match
-    over one `read_dir` would sometimes have played a charted song's
-    backing track *as* its chart, nondeterministically.
-  - **The harmonica is chosen, not assumed.** A MIDI says nothing about
-    harmonicas, so `midi_song::suggested_harp` picks the key needing the
-    fewest bends via `pitch_map::suggest_key` — and prefers a diatonic
-    unless a chromatic genuinely fits better, since a chromatic reaches
-    every note and would otherwise always win. The player can change it on
-    the harp-check screen, whose cost readout is what says whether the
-    guess was good.
-  - **Title and artist come from the folder, not the file.** MIDI's
-    convention is that the title is the *first track's* name, which for a
-    harmonica file is usually "Harmonica" — observed in the game as a song
-    called exactly that before it was fixed.
-  - A track named harmonica/gaita/mouth harp/blues harp wins; failing
-    that, a lone playable track is used, and **several unnamed tracks are
-    refused** rather than guessed. Picking "the busiest" would routinely
-    choose a guitar, and an asset loader has nowhere to ask. A part where
-    under 80% of notes are reachable is likewise refused, with the counts
-    in the message.
+    pass and only falls back to an importable extension in a second —
+    first-match over one `read_dir` would sometimes have played a charted
+    song's backing track *as* its chart, nondeterministically.
+  - **Every playable track is converted, not just the chosen one**
+    (`SongManifest::source_tracks`, one `TrackChart` each). A file written
+    for a band names no harmonica part, so whichever track the loader picks
+    is a guess — carrying the alternatives is what lets the harp-check
+    screen offer a picker and swap the choice in place, with no reload and
+    with nothing downstream learning that a song can have alternates
+    (gameplay still just reads `manifest.chart`). Each part is fitted to
+    *its own* harmonica, since the right harp for a melody is rarely the
+    right one for a bass line.
+  - **The harmonica is chosen, not assumed** — `convert::suggested_harp`
+    picks the key needing the fewest bends via `pitch_map::suggest_key`,
+    and prefers a diatonic unless a chromatic genuinely fits better (a
+    chromatic reaches every note and would otherwise always win).
+  - **Title and artist come from the folder, not the file** — but as a
+    *fallback*, not an override: `MidiScore::title` reports `None` because
+    MIDI's "title" is the first track's name, which for a harmonica file is
+    the word "Harmonica" (observed in the game as a song called exactly
+    that). A format with a real title keeps it.
+  - A track named harmonica/gaita/mouth harp/blues harp wins over a
+    better-scoring one — the file is telling us, and extra bends mean
+    harder, not wrong. It does **not** win over being unplayable: a bass
+    line named "Harmonica" converts to a chart with no notes at all, which
+    a test caught. Failing a name, the best-surviving part wins, which beats
+    "the busiest track" (routinely a guitar) and is safe only because it's a
+    correctable default. A file where *no* part clears
+    `convert::MIN_REACHABLE` is refused, with how close the best one got.
 
 - **Lessons** (`harmonicon-song`'s `lessons/` — `manifest.rs`/`catalog.rs`/`progress.rs` —
   plus `harmonicon-menu`'s `menu/pages/lessons.rs`; design in `docs/lessons_plan.md`):

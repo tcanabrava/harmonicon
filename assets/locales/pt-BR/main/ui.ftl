@@ -853,3 +853,8 @@ harp-check-cost-unreachable = {$count} nota(s) não podem ser tocadas nesta gait
 harp-check-chart-harp = Escrita para uma gaita {$kind} em {$key}.
 harp-kind-diatonic = diatônica
 harp-kind-chromatic = cromática
+# O seletor de faixa na página de verificação da gaita, exibido apenas para
+# um arquivo importado com mais de uma parte tocável.
+harp-check-track = Parte a tocar
+harp-check-track-option = {$name} — {$notes} notas, {$percent}% tocável
+harp-check-track-unnamed = Faixa {$index}
