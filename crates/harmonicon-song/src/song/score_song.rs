@@ -2,8 +2,8 @@
 
 //! Playing a score file directly, without authoring a chart first.
 //!
-//! A player is far likelier to own a MIDI file or a Guitar Pro tab than a
-//! `.harpchart`. This makes one droppable into
+//! A player is far likelier to own a MIDI file, a Guitar Pro tab or a
+//! MuseScore score than a `.harpchart`. This makes one droppable into
 //! `~/Harmonicon/songs/<artist>/<song>/song/` and playable, by converting it
 //! to a chart at asset-load time through `harmonicon_score`.
 //!
@@ -92,8 +92,9 @@ pub struct ConvertedScore {
 /// Reads and converts a score file of any supported format.
 ///
 /// `fallback_title` is used only when the format carries no title of its
-/// own — MIDI doesn't (see `harmonicon_score::midi`'s `title`), Guitar Pro
-/// will — so a format that knows its own name keeps it.
+/// own — MIDI doesn't (see `harmonicon_score::midi`'s `title`), while Guitar
+/// Pro, MuseScore and MusicXML all do — so a format that knows its own name
+/// keeps it.
 pub fn convert_score(
     extension: &str,
     bytes: Vec<u8>,

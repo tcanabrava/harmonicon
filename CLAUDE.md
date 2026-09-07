@@ -152,7 +152,7 @@ Manual testing needs a mic, audio out, and a display.
   | Crate | Holds | Bevy? |
   |---|---|---|
   | `harmonicon-core` | music theory, chart types, scoring math, pitch/MIDI conversion, pitch→hole resolution (`pitch_map`), the harmonica synth, WAV, grid snapping | **no** |
-  | `harmonicon-score` | reading foreign score files (MIDI today, Guitar Pro next) behind one `ScoreFile` trait, and converting a track onto a harmonica | **no** |
+  | `harmonicon-score` | reading foreign score files (MIDI, Guitar Pro 3-7, MuseScore, MusicXML) behind one `ScoreFile` trait, and converting a track onto a harmonica | **no** |
   | `harmonicon-dsp` | the five pitch detectors (FFT/YIN/pYIN/MPM/NMF) and their windowing | **no** |
   | `harmonicon-audio` | cpal capture, the ECS wrapper over `harmonicon-dsp`, waveform analysis | yes |
   | `harmonicon-platform` | asset discovery, localization, settings, theme, responsive | yes |
@@ -270,7 +270,7 @@ Manual testing needs a mic, audio out, and a display.
   | Crate | Its `CLAUDE.md` covers |
   |---|---|
   | `harmonicon-core` | (no separate file — pure logic, documented at its `//!` headers) |
-  | `harmonicon-score` | (no separate file — the `ScoreFile` trait's contract is at `lib.rs`'s `//!` header; **adding a format means a module there and an arm in `parse_import`, nothing outside the crate**) |
+  | `harmonicon-score` | (no separate file — the `ScoreFile` trait's contract is at `lib.rs`'s `//!` header; **adding a format means a module there and an arm in `parse_import`, nothing outside the crate**. The `guitar_pro` module's own `//!` header is worth reading before touching tab timing) |
   | `harmonicon-audio` | the cpal→FFT input path, chart-driven detection range |
   | `harmonicon-platform` | asset sources + the `~/Harmonicon` watcher, settings, compact layout |
   | `harmonicon-song` | chart format, schema migration, optional sibling assets, lessons |

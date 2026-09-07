@@ -23,6 +23,7 @@
 //! of a format that knows nothing about harmonicas.
 
 pub mod convert;
+pub mod guitar_pro;
 pub mod harpchart;
 pub mod midi;
 pub mod track;
@@ -55,7 +56,13 @@ pub enum ScoreError {
 /// migrates and version-checks it. [`harpchart::HarpChartScore`] exists so
 /// a chart can be a *source* — re-derived onto a different harmonica —
 /// not a second, weaker way to play one.
-pub const IMPORT_EXTENSIONS: &[&str] = &["mid", "midi"];
+pub const IMPORT_EXTENSIONS: &[&str] = &[
+    "mid", "midi", // MIDI
+    "gp3", "gp4", "gp5", // Guitar Pro's binary formats
+    "gpx", "gp",   // Guitar Pro 6 and 7, both zipped containers
+    "mscz", // MuseScore
+    "musicxml", "xml", // MusicXML, the interchange format everything exports
+];
 
 /// Reads `bytes` as whatever `extension` says they are.
 ///
@@ -68,6 +75,9 @@ pub const IMPORT_EXTENSIONS: &[&str] = &["mid", "midi"];
 pub fn parse_import(extension: &str, bytes: Vec<u8>) -> Result<Box<dyn ScoreFile>, ScoreError> {
     match extension.to_ascii_lowercase().as_str() {
         "mid" | "midi" => Ok(Box::new(midi::MidiScore::parse(bytes)?)),
+        gp @ ("gp3" | "gp4" | "gp5" | "gpx" | "gp" | "mscz" | "musicxml" | "xml") => {
+            Ok(Box::new(guitar_pro::GpScore::parse(gp, bytes)?))
+        }
         other => Err(ScoreError::UnsupportedFormat(other.to_string())),
     }
 }
@@ -78,6 +88,9 @@ pub fn parse_import(extension: &str, bytes: Vec<u8>) -> Result<Box<dyn ScoreFile
 pub enum ScoreFormat {
     HarpChart,
     Midi,
+    GuitarPro,
+    MuseScore,
+    MusicXml,
 }
 
 impl ScoreFormat {
@@ -85,6 +98,9 @@ impl ScoreFormat {
         match self {
             ScoreFormat::HarpChart => "Harmonicon chart",
             ScoreFormat::Midi => "MIDI",
+            ScoreFormat::GuitarPro => "Guitar Pro",
+            ScoreFormat::MuseScore => "MuseScore",
+            ScoreFormat::MusicXml => "MusicXML",
         }
     }
 }
@@ -169,8 +185,9 @@ mod tests {
 
     #[test]
     fn an_unknown_extension_is_refused_by_name() {
-        let err = parse_import("gp5", Vec::new()).err().unwrap();
-        assert!(matches!(err, ScoreError::UnsupportedFormat(ext) if ext == "gp5"));
+        // Sibelius, which nothing here reads.
+        let err = parse_import("sib", Vec::new()).err().unwrap();
+        assert!(matches!(err, ScoreError::UnsupportedFormat(ext) if ext == "sib"));
     }
 
     #[test]

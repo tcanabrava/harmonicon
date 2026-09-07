@@ -13,8 +13,10 @@ publish = false
 # incompatible copies of the same crate in the tree surface as an unrelated
 # trait-bound error, not as a version complaint.
 [dependencies]
+guitarpro = "0.4.3"
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
 midly = { workspace = true }
+quick-xml = { version = "0.42.0", features = ["serialize"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 

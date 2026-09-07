@@ -16,6 +16,10 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "BSL-1.0",
+    # bzip2's own licence, on the pure-Rust libbz2-rs-sys. A permissive
+    # BSD-style licence in all but name; it reaches us through zip, which
+    # `guitarpro` uses for the zipped score containers (GPX, GP7, MuseScore).
+    "bzip2-1.0.6",
     "CC0-1.0",
     "ISC",
     "MIT",

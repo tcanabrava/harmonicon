@@ -98,7 +98,8 @@ load-bearing about *this* crate.
     with no message, rather than "complain."
 
 - **A score file can be a song's chart, not just its backing track**
-  (`song::score_song`). Dropping a MIDI into
+  (`song::score_song`). Dropping a MIDI, Guitar Pro tab (`.gp3`/`.gp4`/
+  `.gp5`/`.gpx`/`.gp`), MuseScore `.mscz` or MusicXML file into
   `~/Harmonicon/songs/<artist>/<song>/song/` makes it playable: a second
   `AssetLoader` (`ScoreSongLoader`, registered alongside `SongChartLoader`)
   converts it through `harmonicon-score` at load time. Only the *chart*
