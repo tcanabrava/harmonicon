@@ -155,9 +155,16 @@ pub fn choose_track(tracks: &[TrackConversion]) -> Option<usize> {
 /// The harmonica a set of pitches fits best.
 ///
 /// Tries diatonic first and only prefers a chromatic when it genuinely fits
-/// better: a chromatic can play everything, so scoring alone would always
-/// choose one, and handing a beginner a 12-hole chromatic for a tune a C
-/// diatonic plays cleanly is the wrong default.
+/// better, so a tune a C diatonic plays cleanly doesn't hand a beginner a
+/// 12-hole chromatic.
+///
+/// **In practice the second branch never fires today.** With its bends and
+/// overblows a diatonic is chromatic across its own range — measured over
+/// C4..C7 a C diatonic reaches 100% of the semitones and a C chromatic only
+/// 62%, because `chromatic_harp`'s slide is modelled as one semitone per
+/// hole with no bends. That is backwards for a real chromatic and is
+/// recorded in `TODO.md`; the rule below is kept because it is the right
+/// rule, not because anything currently reaches it.
 pub fn suggested_harp(pitches: &[u8]) -> Harmonica {
     let diatonic = harp_for_key(suggest_key(pitches, HarpKind::Diatonic), HarpKind::Diatonic);
     if reachable(pitches, &diatonic) >= MIN_REACHABLE {
