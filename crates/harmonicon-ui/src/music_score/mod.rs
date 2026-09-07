@@ -7,8 +7,10 @@
 //! drive it by writing [`MusicScoreNotes`]/[`MusicScorePlayhead`].
 //!
 //! Deliberately not full music engraving. It does draw: noteheads
-//! (whole/half/filled by duration), stems, ledger lines, sharp
-//! accidentals, ties across a bar line ([`split_at_bar_lines`]), bar lines
+//! (whole/half/filled by duration), stems, ledger lines, accidentals that
+//! follow the bar rather than the note ([`accidentals`] — a sharp holds
+//! for the rest of its bar, and a note cancelling one gets a natural),
+//! ties across a bar line ([`split_at_bar_lines`]), bar lines
 //! and a time signature ([`MusicScoreMeter`]), one of three clefs picked
 //! from the music's own range ([`choose_clef`]), and beams joining short
 //! notes within a beat ([`beam_groups`]).
@@ -138,6 +140,11 @@ const TIE_MIN_WIDTH_PX: f32 = 4.0;
 /// — `bBoxNE.x - bBoxSW.x` = `0.996 - 0.0`), plus a small fixed gap before
 /// the notehead it belongs to.
 const ACCIDENTAL_SHARP_WIDTH_SP: f32 = 0.996;
+/// Bravura's `accidentalNatural` is narrower than its sharp, so it is
+/// placed on its own width rather than the sharp's — otherwise it would
+/// float away from the notehead it belongs to. Transcribed from the font's
+/// `glyphBBoxes` like the sharp above; the metadata file isn't bundled.
+const ACCIDENTAL_NATURAL_WIDTH_SP: f32 = 0.664;
 const ACCIDENTAL_GAP_SP: f32 = 0.2;
 
 const CLEF_X: f32 = 8.0;
@@ -501,8 +508,11 @@ fn rebuild_score_notes(
     }
 
     // Over every note, not just the visible ones: a group that straddles
-    // the window edge must still agree on one direction and beam line.
+    // the window edge must still agree on one direction and beam line, and
+    // an accidental's effect on the rest of its bar has to be known even
+    // when the note that established it has already scrolled off.
     let beams = beam_groups(&notes.0, clef);
+    let marks = accidentals(&notes.0, clef, meter.beats_per_bar());
 
     let (beats_behind, beats_ahead) = visible_beats(panel_width);
     for glyph in &existing {
@@ -553,6 +563,7 @@ fn rebuild_score_notes(
                         now,
                         clef,
                         beams[i],
+                        marks[i],
                     );
                 }
                 prev = Some(note);
@@ -570,6 +581,7 @@ fn spawn_note_glyphs(
     now: f64,
     clef: Clef,
     beam: Option<BeamPlacement>,
+    accidental: Accidental,
 ) {
     let x = ((note.start_beat - now) * PIXELS_PER_BEAT as f64) as f32;
     let step = staff_step(note.midi, clef);
@@ -577,20 +589,22 @@ fn spawn_note_glyphs(
     let kind = rhythm.head;
     let notehead_y = y_for_step(step);
 
-    // A tied continuation is the same sounded pitch as the segment before
-    // it — standard engraving shows the accidental once, on the first
-    // segment, not restated on every tied-to note.
-    if needs_sharp(note.midi) && !note.tied_from_previous {
+    // Which accidental (if any) is decided over the whole song by
+    // `notation::accidentals`, since it depends on what the bar has already
+    // said — not on this note alone.
+    if let Some((mark, width_sp)) = match accidental {
+        Accidental::Sharp => Some((glyph::ACCIDENTAL_SHARP, ACCIDENTAL_SHARP_WIDTH_SP)),
+        Accidental::Natural => Some((glyph::ACCIDENTAL_NATURAL, ACCIDENTAL_NATURAL_WIDTH_SP)),
+        Accidental::None => None,
+    } {
         parent.spawn((
             Node {
                 position_type: PositionType::Absolute,
-                left: Val::Px(
-                    x - (ACCIDENTAL_SHARP_WIDTH_SP + ACCIDENTAL_GAP_SP) * STAFF_LINE_SPACING,
-                ),
+                left: Val::Px(x - (width_sp + ACCIDENTAL_GAP_SP) * STAFF_LINE_SPACING),
                 top: Val::Px(notehead_y - GLYPH_BASELINE_CORRECTION),
                 ..default()
             },
-            Text::new(glyph::ACCIDENTAL_SHARP),
+            Text::new(mark),
             TextFont {
                 font: FontSource::Handle(bravura.0.clone()),
                 font_size: FontSize::Px(GLYPH_FONT_PX),

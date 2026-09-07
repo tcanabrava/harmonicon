@@ -31,6 +31,7 @@ pub(super) mod glyph {
     pub const NOTEHEAD_HALF: &str = "\u{E0A3}";
     pub const NOTEHEAD_BLACK: &str = "\u{E0A4}";
     pub const ACCIDENTAL_SHARP: &str = "\u{E262}";
+    pub const ACCIDENTAL_NATURAL: &str = "\u{E261}";
     pub const FLAG_8TH_UP: &str = "\u{E240}";
     pub const FLAG_8TH_DOWN: &str = "\u{E241}";
     pub const FLAG_16TH_UP: &str = "\u{E242}";
@@ -204,6 +205,74 @@ pub fn choose_clef(notes: &[NotationNote]) -> Clef {
         m if m < 60 => Clef::Bass,
         _ => Clef::Treble,
     }
+}
+
+/// The accidental glyph drawn before a notehead, if any.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Accidental {
+    None,
+    Sharp,
+    Natural,
+}
+
+/// Which accidental each note needs, following the bar rather than the note.
+///
+/// An accidental holds for the rest of its bar, so a repeated F# is marked
+/// once and not on every note — which is both what a reader expects and, on
+/// a staff this cramped, a real amount of width back: a sharp is about as
+/// wide as a notehead and is drawn into the gap left by the previous note.
+///
+/// **The naturals are the reason this can't just be "skip the repeats".**
+/// Marking the first F# and nothing afterwards would leave a plain F later
+/// in the same bar reading as F# too, since the alteration is still in
+/// force. Every such note now gets an explicit natural. So this is a
+/// correctness fix that usually also saves width, not purely a saving — a
+/// bar alternating F# and F ends up with *more* glyphs than before, and
+/// says something true where it previously said something false.
+///
+/// Keyed on staff *position*, not pitch: [`staff_step`] puts F4 and F#4 on
+/// the same line, which is exactly what an accidental applies to. Expects
+/// `notes` in start order, and reads the whole song rather than the visible
+/// window so a note doesn't lose its accidental just because the note that
+/// established it has scrolled off.
+pub fn accidentals(notes: &[NotationNote], clef: Clef, beats_per_bar: f64) -> Vec<Accidental> {
+    let mut out = Vec::with_capacity(notes.len());
+    // Staff step -> is that position currently sharpened. Cleared at every
+    // bar line, which is what makes this "per bar" at all.
+    let mut altered: std::collections::HashMap<i32, bool> = std::collections::HashMap::new();
+    let mut current_bar: Option<i64> = None;
+
+    for note in notes {
+        let bar = if beats_per_bar > 0.0 {
+            (note.start_beat / beats_per_bar).floor() as i64
+        } else {
+            0
+        };
+        if current_bar != Some(bar) {
+            altered.clear();
+            current_bar = Some(bar);
+        }
+
+        let step = staff_step(note.midi, clef);
+        let sharp = needs_sharp(note.midi);
+        let was_sharp = altered.get(&step).copied().unwrap_or(false);
+        out.push(if note.tied_from_previous {
+            // The tie carries the alteration across the bar line; restating
+            // it on the continuation is what the tie is for.
+            Accidental::None
+        } else if sharp && !was_sharp {
+            Accidental::Sharp
+        } else if !sharp && was_sharp {
+            Accidental::Natural
+        } else {
+            Accidental::None
+        });
+        // Recorded even for a tied continuation, so a later note at this
+        // position in the new bar is judged against what is actually
+        // sounding.
+        altered.insert(step, sharp);
+    }
+    out
 }
 
 /// Whether `midi` needs a sharp accidental drawn before its notehead. This
@@ -728,6 +797,148 @@ mod tests {
     fn beam_groups_returns_one_slot_per_note() {
         let ns = [eighth(64, 0.0), eighth(64, 0.5), note(1.0, 2.0)];
         assert_eq!(beam_groups(&ns, Clef::Treble).len(), ns.len());
+    }
+
+    // ── accidentals ──────────────────────────────────────────────────────
+
+    /// Quarter notes, one per beat, at the given pitches.
+    fn run(midis: &[u8]) -> Vec<NotationNote> {
+        midis
+            .iter()
+            .enumerate()
+            .map(|(i, &midi)| NotationNote {
+                start_beat: i as f64,
+                duration_beats: 1.0,
+                midi,
+                tied_from_previous: false,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_repeated_sharp_is_marked_once_per_bar() {
+        // The width this buys back: a sharp is about as wide as a notehead
+        // and is drawn into the gap the previous note left.
+        let notes = run(&[66, 66, 66, 66]); // F#4 four times, one bar of 4/4
+        assert_eq!(
+            accidentals(&notes, Clef::Treble, 4.0),
+            vec![
+                Accidental::Sharp,
+                Accidental::None,
+                Accidental::None,
+                Accidental::None
+            ]
+        );
+    }
+
+    #[test]
+    fn the_next_bar_restates_it() {
+        let notes = run(&[66, 66, 66, 66, 66]); // the fifth note is bar two
+        let marks = accidentals(&notes, Clef::Treble, 4.0);
+        assert_eq!(marks[4], Accidental::Sharp);
+    }
+
+    #[test]
+    fn a_natural_after_a_sharp_in_the_same_bar_is_marked() {
+        // Without this the plain F would read as F#, since the alteration
+        // holds for the rest of the bar — the staff would be saying
+        // something false rather than merely something redundant.
+        let notes = run(&[66, 65]); // F#4 then F4
+        assert_eq!(
+            accidentals(&notes, Clef::Treble, 4.0),
+            vec![Accidental::Sharp, Accidental::Natural]
+        );
+    }
+
+    #[test]
+    fn a_natural_needs_no_mark_when_nothing_sharpened_it() {
+        let notes = run(&[65, 65]);
+        assert_eq!(
+            accidentals(&notes, Clef::Treble, 4.0),
+            vec![Accidental::None, Accidental::None]
+        );
+    }
+
+    #[test]
+    fn a_sharp_elsewhere_on_the_staff_does_not_cancel_this_one() {
+        // An accidental applies to its own line or space, not to the whole
+        // staff: C#4 has no bearing on F4.
+        let notes = run(&[61, 65]); // C#4 then F4
+        assert_eq!(
+            accidentals(&notes, Clef::Treble, 4.0),
+            vec![Accidental::Sharp, Accidental::None]
+        );
+    }
+
+    #[test]
+    fn a_sharp_carries_across_an_octave_boundary_no_further_than_its_own_step() {
+        // F#4 and F#5 sit on different lines, so each needs its own mark.
+        let notes = run(&[66, 78]);
+        assert_eq!(
+            accidentals(&notes, Clef::Treble, 4.0),
+            vec![Accidental::Sharp, Accidental::Sharp]
+        );
+    }
+
+    #[test]
+    fn a_tie_across_a_bar_line_is_not_restated() {
+        // `split_at_bar_lines` puts the continuation in the next bar, where
+        // the bar state has just been cleared — the tie is what carries the
+        // alteration over, so restating it would be wrong.
+        let notes = vec![
+            NotationNote {
+                start_beat: 3.0,
+                duration_beats: 1.0,
+                midi: 66,
+                tied_from_previous: false,
+            },
+            NotationNote {
+                start_beat: 4.0,
+                duration_beats: 1.0,
+                midi: 66,
+                tied_from_previous: true,
+            },
+        ];
+        assert_eq!(
+            accidentals(&notes, Clef::Treble, 4.0),
+            vec![Accidental::Sharp, Accidental::None]
+        );
+    }
+
+    #[test]
+    fn a_note_after_a_tied_continuation_is_judged_against_what_is_sounding() {
+        // The tied-in F# leaves that line sharpened, so the following plain
+        // F in the same bar still needs its natural.
+        let notes = vec![
+            NotationNote {
+                start_beat: 4.0,
+                duration_beats: 1.0,
+                midi: 66,
+                tied_from_previous: true,
+            },
+            NotationNote {
+                start_beat: 5.0,
+                duration_beats: 1.0,
+                midi: 65,
+                tied_from_previous: false,
+            },
+        ];
+        assert_eq!(
+            accidentals(&notes, Clef::Treble, 4.0),
+            vec![Accidental::None, Accidental::Natural]
+        );
+    }
+
+    #[test]
+    fn a_meaningless_bar_length_does_not_panic_or_divide_by_zero() {
+        let notes = run(&[66, 66]);
+        assert_eq!(accidentals(&notes, Clef::Treble, 0.0).len(), 2);
+    }
+
+    #[test]
+    fn there_is_exactly_one_decision_per_note() {
+        let notes = run(&[60, 61, 62, 63, 64, 65, 66]);
+        assert_eq!(accidentals(&notes, Clef::Treble, 4.0).len(), notes.len());
     }
 
     #[test]
