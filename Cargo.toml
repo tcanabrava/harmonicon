@@ -3,7 +3,7 @@
 # `cargo build --bin harmonicon` and packaging are unchanged.
 [package]
 name = "harmonicon"
-version = "0.0.10"
+version = "0.0.11"
 edition = "2024"
 license = "MIT"
 default-run = "harmonicon"

@@ -3445,7 +3445,7 @@ dependencies = [
 
 [[package]]
 name = "harmonicon"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "bevy",
  "bevy_fluent",
