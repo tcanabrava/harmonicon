@@ -168,6 +168,39 @@ load-bearing about *this* crate.
   unlocked for quick manual access while iterating; `is_unlocked` itself is
   untouched and still fully covered by its own prerequisite tests.
 
+- **The curriculum is a graph, and `lessons::graph` is what treats it as
+  one** (design: `docs/training_tree_plan.md`). `is_unlocked` answers "may
+  I start this one", which is all the flat list needs; the skill-tree view
+  needs rows, an order along each, and some assurance it can be drawn.
+  `LessonGraph::build` topologically sorts, assigns each lesson a `depth`
+  (**longest** path from a root — a lesson is only really available once
+  its *deepest* prerequisite is), and groups into `rows()`.
+  - **`track` is what a row is**, and it is optional in the schema,
+    falling back to `unit`: a lesson authored outside this repo and
+    dropped into `~/Harmonicon/lessons` has no reason to know the track
+    vocabulary but still has to land somewhere. Every *bundled* lesson
+    declares one, enforced by `tests/asset_layout.rs`, or the tree grows
+    a row named after a unit by accident.
+  - **A row is a family, not a chain.** Adjacent members needn't depend on
+    each other (`country-scale` doesn't lead to `blues-scale`), so a
+    renderer must draw the real `prerequisites` edges and never a link
+    between neighbours — unlike the skill-tree screenshots this is modelled
+    on, where each row is strictly sequential.
+  - **Cycle detection is the only real check here.** "Every edge points
+    forward" and "every lesson is reachable" are both vacuous given how
+    depth is defined; a prerequisite naming a lesson that doesn't exist is
+    its own error. A cycle is neither — it silently makes every lesson in
+    it unreachable forever and would hang a renderer walking the edges — so
+    `build` refuses to construct rather than returning something that looks
+    fine until walked.
+  - `min_choices` **reports** the fewest lessons ever offered at once,
+    rather than asserting a floor. The design wanted "always at least two
+    choices"; the shipped curriculum funnels to one at `deep-bends`,
+    `swing-eighths` and `blues-scale`, so a threshold would either fail or
+    have to be tuned until it only described today's data.
+  - The Song Editor's lesson form doesn't write `track` yet, so a lesson
+    authored there falls back to its unit until edited by hand.
+
 - **Lessons can also live in `~/Harmonicon/lessons`**, same
   bundled-plus-external pattern as songs/themes:
   `lessons::catalog::scan_all_lessons` scans `assets/lessons` then, if
