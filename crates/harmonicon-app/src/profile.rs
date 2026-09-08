@@ -110,6 +110,29 @@ pub struct LessonRecord {
     pub attempts: u32,
 }
 
+/// Cross-session result for one *training* — a lesson's generated drill at
+/// one tier — keyed `"<lesson id>:<tier>"` in [`PlayerProfile::trainings`]
+/// by [`training_key`].
+///
+/// Its own map rather than sharing [`PlayerProfile::lessons`]: a training
+/// must never satisfy a prerequisite. Passing tier 3 of the bend drill is
+/// practice, not evidence that the *lesson* was learned, and mixing the two
+/// would silently unlock everything downstream of it.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct TrainingRecord {
+    /// Once true it stays true, like [`LessonRecord::passed`] — a worse
+    /// retry must not take a tier away.
+    pub passed: bool,
+    pub best_accuracy: f32,
+    pub attempts: u32,
+}
+
+/// The [`PlayerProfile::trainings`] key for one tier of one lesson.
+pub fn training_key(lesson_id: &str, tier: u8) -> String {
+    format!("{lesson_id}:{tier}")
+}
+
 /// Cross-session player progress. Loaded once at startup and updated as the
 /// player finishes songs; see the module doc comment for the save policy.
 #[derive(Resource, Serialize, Deserialize, Clone, Debug, Default)]
@@ -119,9 +142,33 @@ pub struct PlayerProfile {
     pub total_play_secs: f64,
     pub drills: HashMap<String, DrillRecord>,
     pub lessons: HashMap<String, LessonRecord>,
+    pub trainings: HashMap<String, TrainingRecord>,
 }
 
 impl PlayerProfile {
+    /// How much of a lesson's training ladder is done, 0..1 — the mastery
+    /// meter. `tiers` is how many the ladder has
+    /// (`harmonicon_core::training::Tier::ALL.len()`), passed in rather than
+    /// imported so this module stays free of the lessons vocabulary, same
+    /// reasoning as the string keys above.
+    ///
+    /// A lesson with no trainings reports 0, not 1: nothing has been
+    /// mastered, and claiming otherwise would fill a meter the player can
+    /// never legitimately fill.
+    pub fn mastery(&self, lesson_id: &str, tiers: usize) -> f32 {
+        if tiers == 0 {
+            return 0.0;
+        }
+        let passed = (1..=tiers)
+            .filter(|t| {
+                self.trainings
+                    .get(&training_key(lesson_id, *t as u8))
+                    .is_some_and(|r| r.passed)
+            })
+            .count();
+        passed as f32 / tiers as f32
+    }
+
     /// Ids of every lesson whose pass criteria have been met — the shape
     /// `lessons::is_unlocked` takes for prerequisite gating.
     pub fn passed_lesson_ids(&self) -> Vec<&str> {
@@ -158,6 +205,14 @@ pub fn record_play(
         }
     }
     improved
+}
+
+/// Updates `record` with a just-finished training attempt. Same
+/// once-passed-always-passed rule as [`record_lesson`], for the same reason.
+pub fn record_training(record: &mut TrainingRecord, passed: bool, accuracy: f32) {
+    record.attempts += 1;
+    record.passed |= passed;
+    record.best_accuracy = record.best_accuracy.max(accuracy);
 }
 
 /// Updates `record` with a just-finished lesson attempt. Like
@@ -410,5 +465,69 @@ mod tests {
         record_play(&mut r, 50, 0.3, &[("bend", 0.3), ("overblow", 0.9)]);
         assert_eq!(r.technique_best_accuracy.get("bend"), Some(&0.5));
         assert_eq!(r.technique_best_accuracy.get("overblow"), Some(&0.9));
+    }
+}
+
+#[cfg(test)]
+mod training_tests {
+    use super::*;
+
+    #[test]
+    fn a_passed_training_stays_passed_after_a_failed_retry() {
+        // Same rule as a lesson: a worse retry must not take a tier away.
+        let mut r = TrainingRecord::default();
+        record_training(&mut r, true, 0.9);
+        record_training(&mut r, false, 0.1);
+        assert!(r.passed);
+        assert_eq!(r.attempts, 2);
+        assert_eq!(r.best_accuracy, 0.9);
+    }
+
+    #[test]
+    fn mastery_counts_only_the_tiers_actually_passed() {
+        let mut p = PlayerProfile::default();
+        assert_eq!(p.mastery("first-bend", 5), 0.0);
+        for tier in [1, 2] {
+            let r = p
+                .trainings
+                .entry(training_key("first-bend", tier))
+                .or_default();
+            record_training(r, true, 0.8);
+        }
+        assert_eq!(p.mastery("first-bend", 5), 0.4);
+    }
+
+    #[test]
+    fn an_attempted_but_failed_tier_does_not_count_toward_mastery() {
+        let mut p = PlayerProfile::default();
+        let r = p.trainings.entry(training_key("x", 1)).or_default();
+        record_training(r, false, 0.5);
+        assert_eq!(p.mastery("x", 5), 0.0);
+    }
+
+    #[test]
+    fn a_lesson_with_no_ladder_reports_no_mastery_rather_than_full() {
+        // Claiming 1.0 would fill a meter the player can never legitimately
+        // fill, and would read as "mastered" for a lesson with no drills.
+        assert_eq!(PlayerProfile::default().mastery("anything", 0), 0.0);
+    }
+
+    #[test]
+    fn a_training_never_lands_in_the_lessons_map() {
+        // The load-bearing separation: a passed tier must not satisfy a
+        // prerequisite, or finishing practice would unlock the curriculum.
+        let mut p = PlayerProfile::default();
+        let r = p
+            .trainings
+            .entry(training_key("first-bend", 5))
+            .or_default();
+        record_training(r, true, 1.0);
+        assert!(p.passed_lesson_ids().is_empty());
+    }
+
+    #[test]
+    fn training_keys_do_not_collide_between_lessons_or_tiers() {
+        assert_ne!(training_key("a", 1), training_key("a", 2));
+        assert_ne!(training_key("a", 1), training_key("b", 1));
     }
 }

@@ -860,3 +860,6 @@ harp-kind-chromatic = cromática
 harp-check-track = Parte a tocar
 harp-check-track-option = {$name} — {$notes} notas, {$percent}% tocable
 harp-check-track-unnamed = Pista {$index}
+# Encabezado sobre los cinco niveles de entrenamiento de una lección, con
+# cuánto de la escalera se ha completado (el medidor de dominio).
+lesson-training-heading = Entrenamiento — {$percent}% dominado

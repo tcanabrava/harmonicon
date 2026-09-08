@@ -756,17 +756,19 @@ fn on_restart(
     _: On<Activate>,
     mut paused: ResMut<Paused>,
     mut next_state: ResMut<NextState<AppState>>,
-    generated_jam: Option<Res<harmonicon_app::app::GeneratedJamSession>>,
+    generated: Option<Res<harmonicon_app::app::GeneratedSong>>,
 ) {
-    // A generated jam's `SelectedSong` was built by `Assets::add`, not
+    // A generated song's `SelectedSong` was built by `Assets::add`, not
     // `AssetServer::load` — it has no tracked `LoadState`, so routing
     // through `SongLoading` would hang there forever waiting on
     // `check_loading`'s `is_loaded_with_dependencies` (see
-    // `GeneratedJamSession`'s doc comment). Skip straight back to `Playing`
+    // `GeneratedSong`'s doc comment). Skip straight back to `Playing`
     // instead; `OnEnter(AppState::Playing)`'s own systems (`reset_score`,
     // `jam::session::setup`, ...) already do the "fresh restart" work that
     // `SongLoading` exists to wait for on the normal, asset-server path.
-    let target = if generated_jam.is_some() {
+    // Checked on `GeneratedSong` rather than `GeneratedJamSession` so a
+    // generated *training* restarts correctly too.
+    let target = if generated.is_some() {
         AppState::Playing
     } else {
         AppState::SongLoading

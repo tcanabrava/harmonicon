@@ -12,5 +12,13 @@
     "type": "technique",
     "technique": "bend",
     "threshold": 0.6
+  },
+  "training": {
+    "technique": "bend",
+    "holes": [
+      2,
+      3,
+      4
+    ]
   }
 }

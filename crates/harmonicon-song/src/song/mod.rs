@@ -98,6 +98,36 @@ pub struct SongManifest {
     pub source_track: Option<usize>,
 }
 
+/// Wraps a chart built in memory as a [`SongManifest`], for handing to
+/// `Assets::add` rather than the `AssetServer`.
+///
+/// A generated training has no folder and so no siblings: no backing track,
+/// no waveform, no art. Every one of those is already optional (see this
+/// module's own notes on `SongManifest`), so the drill plays against the
+/// metronome with a default background and nothing has to special-case it.
+///
+/// The caller must also insert `app::GeneratedSong`, or the route through
+/// `AppState::SongLoading` waits forever on a handle that has no
+/// `LoadState`.
+pub fn training_manifest(chart: HarpChart) -> SongManifest {
+    SongManifest {
+        path: PathBuf::from(format!("training/{}", chart.song.title)),
+        chart,
+        background: Handle::default(),
+        music: None,
+        midi_tracks: None,
+        waveform: Vec::new(),
+        music_duration_secs: 0.0,
+        elements: Handle::default(),
+        assets_2d: None,
+        assets_2d_config: NoteThemeConfig::default(),
+        assets_3d: None,
+        assets_3d_config: NoteCube3dConfig::default(),
+        source_tracks: Vec::new(),
+        source_track: None,
+    }
+}
+
 /// One MIDI track's own, independently-playable audio stem — see
 /// [`SongManifest::midi_tracks`].
 #[derive(Debug, Clone)]

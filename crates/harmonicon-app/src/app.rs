@@ -85,14 +85,32 @@ pub struct JamScale(pub Scale);
 #[derive(Resource, Default)]
 pub struct JamPositionCycle(pub bool);
 
+/// Present whenever the current `SelectedSong` was built in memory and
+/// handed to `Assets::add`, rather than loaded through the `AssetServer`.
+///
+/// Such a handle has **no tracked `LoadState`**, so routing through
+/// `AppState::SongLoading` would hang there forever waiting on
+/// `check_loading`'s `is_loaded_with_dependencies`. Every route that would
+/// otherwise pass through `SongLoading` checks this and goes straight to
+/// `Playing` instead — `gameplay::pause_menu::on_restart` today.
+///
+/// Separate from [`GeneratedJamSession`] on purpose. That one also means
+/// "this is a jam" — it picks the menu page to return to and gates the
+/// rhythm guide — whereas this one is only ever a statement about how the
+/// asset was made. A generated *training* is equally not-asset-loaded and
+/// emphatically not a jam, and conflating the two would have sent it back
+/// to the jam setup page.
+#[derive(Resource)]
+pub struct GeneratedSong;
+
 /// Present while a generated-backing jam is in flight (from the "Start Jam"
-/// button through `Playing`, including any Restart). Its presence — checked
-/// by both `menu::route_menu_entry` and `gameplay::pause_menu::on_restart`
-/// — tells those call sites this `SelectedSong` was built by
-/// [`build_generated_manifest`] via `Assets::add` rather than loaded through
-/// the `AssetServer`, so it has no tracked `LoadState`: both routes skip
-/// `AppState::SongLoading` and go straight to `Playing`. Removed on
-/// returning to the menu, same end-of-life point `LessonContext` uses.
+/// button through `Playing`, including any Restart). Means *this is a jam*:
+/// `menu::route_menu_entry` uses it to land back on the jam setup page, and
+/// `jam::session`/`jam::rhythm_guide` gate their own widgets on it.
+///
+/// For the "was built by `Assets::add`" half, see [`GeneratedSong`], which
+/// is inserted alongside it. Removed on returning to the menu, same
+/// end-of-life point `LessonContext` uses.
 #[derive(Resource)]
 pub struct GeneratedJamSession;
 

@@ -147,6 +147,12 @@ pub(crate) fn route_menu_entry(
         next_page.set(MenuPage::Welcome);
         return;
     }
+    // Cleared on every route back to the menu, whatever page we land on: it
+    // is a statement about the *current* `SelectedSong` and nothing else,
+    // and a stale one would send the next ordinary song straight past
+    // `SongLoading` without waiting for it to load.
+    commands.remove_resource::<harmonicon_app::app::GeneratedSong>();
+
     if lesson.is_some() {
         commands.remove_resource::<harmonicon_song::lessons::LessonContext>();
         // "Quit Song" sets this unconditionally; for a lesson run the lesson

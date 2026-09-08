@@ -10,16 +10,19 @@ use bevy::prelude::*;
 use bevy::ui_widgets::{Activate, ScrollArea};
 use bevy_fluent::Localization;
 
-use harmonicon_app::profile::{PlayerProfile, record_lesson, save_profile};
+use harmonicon_app::profile::{PlayerProfile, record_lesson, save_profile, training_key};
 use harmonicon_core::chart::Scale;
 use harmonicon_core::harmonica::{Position, Progression};
+use harmonicon_core::pitch_map::{HarpKind, harp_for_key};
+use harmonicon_core::training::{Tier, drill_chart};
 use harmonicon_platform::localization::LocalizationExt;
 use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_song::lessons::training_criteria;
 use harmonicon_song::lessons::{
     AvailableLessons, LessonContext, LessonEntry, LessonsRescanned, PassCriteria, group_by_unit,
     is_unlocked,
 };
-use harmonicon_song::song::SongManifest;
+use harmonicon_song::song::{SongManifest, training_manifest};
 use harmonicon_ui::dialogs::button;
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
 use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
@@ -27,7 +30,7 @@ use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 use crate::menu::routing::MenuPage;
 use crate::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root, spawn_menu_root_plain};
 use harmonicon_app::app::{
-    AppState, GameplayMode, JamPositionCycle, JamProgression, JamScale, SelectedSong,
+    AppState, GameplayMode, GeneratedSong, JamPositionCycle, JamProgression, JamScale, SelectedSong,
 };
 
 /// The lesson the reader page shows — set by the list page's buttons right
@@ -406,6 +409,96 @@ fn populate_lesson_rows(
 /// One plain text line appended directly to `root` (no card/box around
 /// it) — the shared shape the lesson reader's goal-progress line and its
 /// "Passed" badge both use, differing only in text/color.
+/// The lesson's five training tiers, as a row of buttons under Start.
+///
+/// A lesson with no `training` block gets nothing — that is the honest
+/// answer for anything instructional-only, where the microphone cannot
+/// verify the technique and five drills would only pretend to check it.
+///
+/// Tiers are **not gated on each other**. Practising tier 4 before tier 2
+/// is the player's business, and locking them would remove the one choice
+/// the ladder offers; the label carries the tick so progress is still
+/// visible.
+fn spawn_training_row(
+    commands: &mut Commands,
+    root: Entity,
+    entry: &LessonEntry,
+    profile: &PlayerProfile,
+    loc: &Localization,
+) {
+    if entry.manifest.training.is_none() {
+        return;
+    }
+    let lesson_id = entry.manifest.id.clone();
+    spawn_reader_line(
+        commands,
+        root,
+        String::from(loc.msg_args(
+            "lesson-training-heading",
+            &[(
+                "percent",
+                ((profile.mastery(&lesson_id, Tier::ALL.len()) * 100.0).round() as u32).to_string(),
+            )],
+        )),
+        Color::srgb(0.80, 0.82, 0.90),
+    );
+
+    let row = commands
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(8.0),
+            ..default()
+        })
+        .id();
+    commands.entity(root).add_child(row);
+
+    for tier in Tier::ALL {
+        let done = profile
+            .trainings
+            .get(&training_key(&lesson_id, tier.number()))
+            .is_some_and(|r| r.passed);
+        let label = if done {
+            format!("\u{2713} {}", tier.number())
+        } else {
+            tier.number().to_string()
+        };
+        let spec = entry.manifest.drill_spec(tier);
+        let criteria = entry.manifest.pass_criteria.clone();
+        let id = lesson_id.clone();
+        spawn_button(
+            commands,
+            row,
+            &label,
+            move |_: On<Activate>,
+                  mut manifests: ResMut<Assets<SongManifest>>,
+                  mut mode: ResMut<GameplayMode>,
+                  mut state: ResMut<NextState<AppState>>,
+                  mut commands: Commands| {
+                let Some(spec) = spec.clone() else { return };
+                let harp = harp_for_key("C", HarpKind::Diatonic);
+                let Some(chart) = drill_chart(&spec, &harp, &id, "") else {
+                    // No hole in the lesson can do the technique on this
+                    // harp. Nothing to play, so stay put rather than open a
+                    // drill of plain notes that trains nothing.
+                    return;
+                };
+                commands.insert_resource(SelectedSong(manifests.add(training_manifest(chart))));
+                commands.insert_resource(LessonContext {
+                    lesson_id: id.clone(),
+                    pass_criteria: Some(training_criteria(criteria.as_ref(), tier)),
+                    tier: Some(tier.number()),
+                });
+                // Built by `Assets::add`, so it has no `LoadState` and
+                // `SongLoading` would wait on it forever — see
+                // `app::GeneratedSong`.
+                commands.insert_resource(GeneratedSong);
+                *mode = GameplayMode::Play2D;
+                state.set(AppState::Playing);
+            },
+        );
+    }
+}
+
 fn spawn_reader_line(commands: &mut Commands, root: Entity, text: String, color: Color) {
     let line = commands
         .spawn((
@@ -537,6 +630,7 @@ pub(crate) fn setup_lesson_reader(
                     commands.insert_resource(LessonContext {
                         lesson_id: lesson_id.clone(),
                         pass_criteria: criteria.clone(),
+                        tier: None,
                     });
                     // A jam-based lesson (scale-adherence/chord-tone-
                     // adherence/phrase-discipline) is an open jam, not a
@@ -552,6 +646,7 @@ pub(crate) fn setup_lesson_reader(
                     state.set(AppState::SongLoading);
                 },
             );
+            spawn_training_row(&mut commands, root, entry, &profile, &loc);
         }
         // Instructional-only lesson: nothing to score — reading it and
         // saying "done" is the pass (see docs/lessons_plan.md on what's

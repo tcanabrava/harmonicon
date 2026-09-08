@@ -3,6 +3,7 @@
 //! `lesson.json` schema types and parsing: [`LessonManifest`] and its
 //! [`PassCriteria`], schema-validated against `assets/lesson_schema.dtd.json`.
 
+use harmonicon_core::training::{DrillSpec, DrillTechnique, Tier};
 use serde::Deserialize;
 
 const SCHEMA: &str = include_str!("../../../../assets/lesson_schema.dtd.json");
@@ -47,6 +48,19 @@ pub enum PassCriteria {
     PhraseDiscipline { threshold: f32 },
 }
 
+/// A lesson's generated drills, as authored. The tier ladder itself is
+/// fixed (`harmonicon_core::training::Tier`), so a lesson only says *what*
+/// to drill and *where* — never how hard, which is the ladder's job.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct TrainingBlock {
+    pub technique: String,
+    pub holes: Vec<u8>,
+    /// Fixes the generated order so a retry is the same exercise. Derived
+    /// from the lesson id when absent, so an author need not invent one.
+    #[serde(default)]
+    pub seed: Option<u64>,
+}
+
 /// One `lesson.json`, as authored. See `assets/lesson_schema.dtd.json` for
 /// field semantics.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -69,6 +83,14 @@ pub struct LessonManifest {
     pub prerequisites: Vec<String>,
     #[serde(default)]
     pub pass_criteria: Option<PassCriteria>,
+    /// Generated practice drills, or `None` for a lesson that has none.
+    ///
+    /// Absent is the right answer for anything instructional-only: where the
+    /// microphone cannot verify the technique, five exercises would only
+    /// pretend to check it. See `docs/lessons_plan.md` on what is honestly
+    /// scoreable.
+    #[serde(default)]
+    pub training: Option<TrainingBlock>,
     /// A jam-based lesson's backing progression (`"standard"`/
     /// `"quick-change"`/`"minor"`), seeded into `crate::app::JamProgression` when
     /// routing into `GameplayMode::JamSession` — see
@@ -137,6 +159,36 @@ impl LessonManifest {
     pub fn track(&self) -> &str {
         self.track.as_deref().unwrap_or(&self.unit)
     }
+
+    /// The drill this lesson's trainings are built from, at `tier`, or
+    /// `None` if it has no trainings.
+    pub fn drill_spec(&self, tier: Tier) -> Option<DrillSpec> {
+        let block = self.training.as_ref()?;
+        let technique = match block.technique.as_str() {
+            "bend" => DrillTechnique::Bend,
+            // Schema-enumerated, so this is unreachable from a validated
+            // manifest; refusing beats drilling the wrong thing.
+            _ => return None,
+        };
+        Some(DrillSpec {
+            technique,
+            holes: block.holes.clone(),
+            tier,
+            seed: block.seed.unwrap_or_else(|| seed_from_id(&self.id)),
+        })
+    }
+}
+
+/// A stable seed for a lesson that declares none — FNV-1a over the id, so
+/// the same lesson always generates the same exercises without an author
+/// having to pick a number, and two lessons don't collide.
+fn seed_from_id(id: &str) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in id.as_bytes() {
+        hash ^= u64::from(*b);
+        hash = hash.wrapping_mul(0x1000_0000_01b3);
+    }
+    hash
 }
 
 #[cfg(test)]

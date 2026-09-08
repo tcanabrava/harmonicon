@@ -5,6 +5,8 @@
 
 use bevy::prelude::*;
 
+use harmonicon_core::training::Tier;
+
 use super::manifest::{LessonManifest, PassCriteria};
 
 /// Present while a lesson run is in flight (from the reader's Start button,
@@ -17,6 +19,30 @@ use super::manifest::{LessonManifest, PassCriteria};
 pub struct LessonContext {
     pub lesson_id: String,
     pub pass_criteria: Option<PassCriteria>,
+    /// Set when this run is a *training* rather than the lesson itself, so
+    /// `gameplay::results` records it under
+    /// `PlayerProfile::trainings` instead of `lessons`. A training must
+    /// never satisfy a prerequisite — see `profile::TrainingRecord`.
+    #[allow(dead_code)]
+    pub tier: Option<u8>,
+}
+
+/// What a training at `tier` is judged against.
+///
+/// Keeps the *kind* of the lesson's own criterion — a bend lesson is still
+/// judged on bends — and replaces only the threshold, which the ladder owns.
+/// A lesson whose criterion is jam-based has no generated drill to judge, so
+/// it falls back to plain accuracy rather than asking a chart run for a
+/// scale-adherence figure it can never produce.
+pub fn training_criteria(lesson: Option<&PassCriteria>, tier: Tier) -> PassCriteria {
+    let threshold = tier.pass_threshold();
+    match lesson {
+        Some(PassCriteria::Technique { technique, .. }) => PassCriteria::Technique {
+            technique: technique.clone(),
+            threshold,
+        },
+        _ => PassCriteria::Accuracy { threshold },
+    }
 }
 
 /// Whether a lesson is playable yet: every prerequisite id has a passed
@@ -71,6 +97,7 @@ mod tests {
             id: id.into(),
             unit: "blowing".into(),
             track: None,
+            training: None,
             title_key: format!("lesson-{id}-title"),
             body_key: format!("lesson-{id}-body"),
             chart: None,
@@ -169,5 +196,65 @@ mod tests {
         ] {
             assert!(!lesson_passed(Some(&c), 1.0, &[], None));
         }
+    }
+}
+
+#[cfg(test)]
+mod training_criteria_tests {
+    use super::*;
+
+    #[test]
+    fn a_technique_lesson_keeps_being_judged_on_its_technique() {
+        // A bend lesson's drills are still about bends; only the bar moves.
+        let lesson = PassCriteria::Technique {
+            technique: "bend".into(),
+            threshold: 0.5,
+        };
+        let c = training_criteria(Some(&lesson), Tier::Interleave);
+        match c {
+            PassCriteria::Technique {
+                technique,
+                threshold,
+            } => {
+                assert_eq!(technique, "bend");
+                assert_eq!(threshold, Tier::Interleave.pass_threshold());
+            }
+            other => panic!("expected a technique criterion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_ladder_owns_the_threshold_not_the_lesson() {
+        let lesson = PassCriteria::Accuracy { threshold: 0.99 };
+        for tier in Tier::ALL {
+            let PassCriteria::Accuracy { threshold } = training_criteria(Some(&lesson), tier)
+            else {
+                panic!("expected accuracy");
+            };
+            assert_eq!(threshold, tier.pass_threshold());
+        }
+    }
+
+    #[test]
+    fn a_jam_criterion_falls_back_to_accuracy() {
+        // A generated drill is a chart run and never accumulates the jam
+        // stats a scale-adherence figure is read from, so inheriting that
+        // criterion would ask for a number the run cannot produce and fail
+        // every tier for a reason the player cannot see.
+        let lesson = PassCriteria::ScaleAdherence { threshold: 0.7 };
+        assert!(matches!(
+            training_criteria(Some(&lesson), Tier::Vary),
+            PassCriteria::Accuracy { .. }
+        ));
+    }
+
+    #[test]
+    fn a_lesson_with_no_criteria_still_gives_its_drills_a_bar() {
+        // Finishing is enough to pass the lesson; a drill you merely reached
+        // the end of has not been practised.
+        assert!(matches!(
+            training_criteria(None, Tier::Isolate),
+            PassCriteria::Accuracy { .. }
+        ));
     }
 }

@@ -343,7 +343,14 @@ without stranding the earlier ones.
 1. `training::drill_chart` + the tier ladder, for the `bend` track only.
    Play it. Decide whether generated drills are good enough before
    committing to the other thirteen tracks.
-2. `TrainingRecord` in the profile, and results routing for trainings.
+2. ~~`TrainingRecord` in the profile, and results routing for trainings.~~
+   **Done**, and playable: the lesson reader carries a row of five tier
+   buttons, so a training can be started before the tree exists. Records go
+   to `PlayerProfile::trainings`, never `lessons` — a passed tier must not
+   satisfy a prerequisite. `app::GeneratedSong` was split out of
+   `GeneratedJamSession`, which conflated "built by `Assets::add`, no
+   `LoadState`" with "this is a jam"; a training is the former and
+   emphatically not the latter.
 3. The tree view: pure layout first, then spawning. Largest single chunk,
    but no new scrolling machinery — it fits vertically.
 4. Gamification: the mastery meter, then the review queue, then the streak.

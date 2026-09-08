@@ -861,3 +861,6 @@ harp-kind-chromatic = chromatic
 harp-check-track = Part to play
 harp-check-track-option = {$name} — {$notes} notes, {$percent}% playable
 harp-check-track-unnamed = Track {$index}
+# Heading above a lesson's five training tiers, with how much of the ladder
+# is done (the mastery meter).
+lesson-training-heading = Training — {$percent}% mastered

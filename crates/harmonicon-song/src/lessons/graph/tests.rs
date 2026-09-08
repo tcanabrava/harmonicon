@@ -8,6 +8,7 @@ fn lesson(id: &str, track: &str, prerequisites: &[&str]) -> LessonManifest {
         id: id.to_string(),
         unit: "test".to_string(),
         track: Some(track.to_string()),
+        training: None,
         title_key: format!("lesson-{id}-title"),
         body_key: format!("lesson-{id}-body"),
         chart: None,

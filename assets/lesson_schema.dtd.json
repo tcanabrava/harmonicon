@@ -165,6 +165,39 @@
       ],
       "description": "How a chart-backed lesson is judged at the results screen (or, for a scale-adherence/chord-tone-adherence/phrase-discipline lesson, by its own \"Finish Lesson\" jam pause-menu button \u2014 see PassCriteria::ScaleAdherence). Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
     },
+    "training": {
+      "type": "object",
+      "description": "Generated practice drills for this lesson (docs/training_tree_plan.md). Absent means the lesson has no trainings, which is correct for anything instructional-only: where the microphone cannot verify the technique, five exercises would only pretend to check it.",
+      "properties": {
+        "technique": {
+          "type": "string",
+          "enum": [
+            "bend"
+          ],
+          "description": "What the drills train. Only techniques that change which pitch a hole produces; an expression technique shapes a note rather than choosing it and needs a different generator."
+        },
+        "holes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "minItems": 1,
+          "description": "Holes the lesson covers, in teaching order. The first is what the isolating tiers drill on its own."
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Fixes the generated order so a retry is the same exercise. Derived from the lesson id when absent."
+        }
+      },
+      "required": [
+        "technique",
+        "holes"
+      ],
+      "additionalProperties": false
+    },
     "progression": {
       "type": "string",
       "enum": [

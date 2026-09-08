@@ -106,6 +106,22 @@ impl Tier {
         self.bpm() / 60.0 * self.notes_per_beat() as f32
     }
 
+    /// Accuracy a tier must reach to count as passed.
+    ///
+    /// Rises gently rather than steeply: the exercise is already getting
+    /// harder on its own — faster, wider, less predictable — so demanding a
+    /// higher score *as well* would compound two difficulties and make the
+    /// top tiers unreachable for reasons the player cannot see.
+    pub fn pass_threshold(self) -> f32 {
+        match self {
+            Tier::Isolate => 0.60,
+            Tier::Consolidate => 0.65,
+            Tier::Vary => 0.70,
+            Tier::InContext => 0.75,
+            Tier::Interleave => 0.80,
+        }
+    }
+
     pub fn bars(self) -> usize {
         match self {
             Tier::Isolate | Tier::Consolidate | Tier::Vary => 4,

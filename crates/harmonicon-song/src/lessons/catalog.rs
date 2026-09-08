@@ -225,6 +225,7 @@ mod tests {
                 id: id.into(),
                 unit: unit.into(),
                 track: None,
+                training: None,
                 title_key: format!("lesson-{id}-title"),
                 body_key: format!("lesson-{id}-body"),
                 chart: None,

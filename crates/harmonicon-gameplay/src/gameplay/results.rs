@@ -7,7 +7,9 @@ use bevy::ui_widgets::Activate;
 use bevy_fluent::Localization;
 
 use harmonicon_app::app::{AppState, ReturnToSongList, SelectedSong};
-use harmonicon_app::profile::{PlayerProfile, record_lesson, record_play, save_profile};
+use harmonicon_app::profile::{
+    PlayerProfile, record_lesson, record_play, record_training, save_profile, training_key,
+};
 use harmonicon_audio::AudioSettings;
 use harmonicon_platform::localization::LocalizationExt;
 use harmonicon_song::lessons::{LessonContext, lesson_passed};
@@ -115,8 +117,20 @@ pub(super) fn setup(
         // data — only the jam pause menu's "Finish Lesson" button does
         // (see `PassCriteria::ScaleAdherence`).
         let passed = lesson_passed(ctx.pass_criteria.as_ref(), acc, &technique_accuracy, None);
-        let record = profile.lessons.entry(ctx.lesson_id.clone()).or_default();
-        record_lesson(record, passed, acc);
+        match ctx.tier {
+            // A training is practice, not evidence the lesson was learned:
+            // recording it under `lessons` would satisfy prerequisites and
+            // silently unlock everything downstream.
+            Some(tier) => {
+                let key = training_key(&ctx.lesson_id, tier);
+                let record = profile.trainings.entry(key).or_default();
+                record_training(record, passed, acc);
+            }
+            None => {
+                let record = profile.lessons.entry(ctx.lesson_id.clone()).or_default();
+                record_lesson(record, passed, acc);
+            }
+        }
         save_profile(&profile);
         passed
     });
