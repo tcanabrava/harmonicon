@@ -1,9 +1,15 @@
 {
   "id": "turnaround",
   "unit": "rhythm",
+  "track": "form",
   "title_key": "lesson-turnaround-title",
   "body_key": "lesson-turnaround-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["bar-counting"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+  "prerequisites": [
+    "bar-counting"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
 }

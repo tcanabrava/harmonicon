@@ -365,6 +365,62 @@ fn lesson_assets_are_complete_and_valid() {
 /// `lesson-unit-<unit>`) must exist in the en-US locale — the parity test in
 /// `localization.rs` then guarantees every other locale has it too. A missing
 /// key would render as the raw key name in the menu.
+/// The shipped curriculum must form a drawable graph, and every bundled
+/// lesson must say which row of the skill tree it belongs to.
+///
+/// `lesson_assets_are_complete_and_valid` already checks that a
+/// prerequisite names a lesson that exists. What it cannot see is a
+/// *cycle* — three lessons each waiting on the next are individually valid
+/// and collectively unreachable forever, and a renderer walking those
+/// edges would not terminate. `LessonGraph::build` refuses to construct
+/// one, so building it here is the check.
+///
+/// `track` is optional in the schema (an externally authored lesson falls
+/// back to its unit), but every lesson *shipped here* declares one, or the
+/// tree grows a row named after a unit by accident.
+#[test]
+fn the_bundled_curriculum_forms_a_drawable_graph() {
+    use harmonicon_song::lessons::graph::LessonGraph;
+    use harmonicon_song::lessons::parse_lesson;
+
+    let mut manifests = Vec::new();
+    let mut untracked = Vec::new();
+    for unit in subdirs(Path::new("assets/lessons")) {
+        for lesson in subdirs(&unit) {
+            let path = lesson.join("lesson.json");
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue; // `lesson_assets_are_complete_and_valid` reports this
+            };
+            let Ok(manifest) = parse_lesson(text.as_bytes()) else {
+                continue; // ditto
+            };
+            if manifest.track.is_none() {
+                untracked.push(manifest.id.clone());
+            }
+            manifests.push(manifest);
+        }
+    }
+
+    assert!(
+        !manifests.is_empty(),
+        "no bundled lessons found — has assets/lessons moved?"
+    );
+    assert!(
+        untracked.is_empty(),
+        "bundled lessons with no `track`, which would invent a row: {untracked:?}"
+    );
+
+    let graph = match LessonGraph::build(&manifests) {
+        Ok(g) => g,
+        Err(e) => panic!("the shipped curriculum is not a drawable graph: {e}"),
+    };
+    assert_eq!(
+        graph.nodes().len(),
+        manifests.len(),
+        "the graph lost lessons while placing them"
+    );
+}
+
 #[test]
 fn lesson_localization_keys_exist() {
     let ftl = std::fs::read_to_string("assets/locales/en-US/main/ui.ftl")

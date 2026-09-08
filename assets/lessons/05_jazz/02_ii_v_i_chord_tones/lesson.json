@@ -1,9 +1,16 @@
 {
   "id": "ii-v-i-chord-tones",
   "unit": "jazz",
+  "track": "harmony",
   "title_key": "lesson-ii-v-i-chord-tones-title",
   "body_key": "lesson-ii-v-i-chord-tones-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["swing-eighths", "deep-bends"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+  "prerequisites": [
+    "swing-eighths",
+    "deep-bends"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
 }

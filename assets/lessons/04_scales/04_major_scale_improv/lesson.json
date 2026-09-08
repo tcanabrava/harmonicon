@@ -1,10 +1,17 @@
 {
   "id": "major-scale-improv",
   "unit": "scales",
+  "track": "scales",
   "title_key": "lesson-major-scale-improv-title",
   "body_key": "lesson-major-scale-improv-body",
   "chart": "song/chart.harpchart",
   "scale": "major",
-  "prerequisites": ["major-scale", "improvisation"],
-  "pass_criteria": { "type": "scale-adherence", "threshold": 0.8 }
+  "prerequisites": [
+    "major-scale",
+    "improvisation"
+  ],
+  "pass_criteria": {
+    "type": "scale-adherence",
+    "threshold": 0.8
+  }
 }

@@ -178,6 +178,7 @@ fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
     let manifest = LessonManifest {
         id: "hand-wah".into(),
         unit: "blowing".into(),
+        track: None,
         title_key: "t".into(),
         body_key: "b".into(),
         chart: None,
@@ -207,6 +208,7 @@ fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
     let manifest = LessonManifest {
         id: "x".into(),
         unit: "u".into(),
+        track: None,
         title_key: "t".into(),
         body_key: "b".into(),
         chart: None,

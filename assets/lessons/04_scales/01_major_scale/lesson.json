@@ -1,9 +1,15 @@
 {
   "id": "major-scale",
   "unit": "scales",
+  "track": "scales",
   "title_key": "lesson-major-scale-title",
   "body_key": "lesson-major-scale-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["deep-bends"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+  "prerequisites": [
+    "deep-bends"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
 }

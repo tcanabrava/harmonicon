@@ -1,9 +1,15 @@
 {
   "id": "multiple-notes",
   "unit": "blowing",
+  "track": "tone",
   "title_key": "lesson-multiple-notes-title",
   "body_key": "lesson-multiple-notes-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["single-note"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.5 }
+  "prerequisites": [
+    "single-note"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.5
+  }
 }

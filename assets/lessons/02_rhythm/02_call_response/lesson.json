@@ -1,9 +1,15 @@
 {
   "id": "call-response",
   "unit": "rhythm",
+  "track": "improv",
   "title_key": "lesson-call-response-title",
   "body_key": "lesson-call-response-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["twelve-bar"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.7 }
+  "prerequisites": [
+    "twelve-bar"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.7
+  }
 }

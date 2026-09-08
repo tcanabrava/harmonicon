@@ -1,8 +1,13 @@
 {
   "id": "single-note",
   "unit": "blowing",
+  "track": "tone",
   "title_key": "lesson-single-note-title",
   "body_key": "lesson-single-note-body",
   "chart": "song/chart.harpchart",
-  "pass_criteria": { "type": "technique", "technique": "clean-attack", "threshold": 0.6 }
+  "pass_criteria": {
+    "type": "technique",
+    "technique": "clean-attack",
+    "threshold": 0.6
+  }
 }

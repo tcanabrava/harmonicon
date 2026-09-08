@@ -1,9 +1,15 @@
 {
   "id": "swing-eighths",
   "unit": "jazz",
+  "track": "time",
   "title_key": "lesson-swing-eighths-title",
   "body_key": "lesson-swing-eighths-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["shuffle-feel"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+  "prerequisites": [
+    "shuffle-feel"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
 }

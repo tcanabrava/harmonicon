@@ -19,6 +19,7 @@
 //! heading), never display strings.
 
 mod catalog;
+pub mod graph;
 mod manifest;
 mod progress;
 

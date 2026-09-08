@@ -53,6 +53,14 @@ pub enum PassCriteria {
 pub struct LessonManifest {
     pub id: String,
     pub unit: String,
+    /// Which row of the skill tree this lesson sits in — see
+    /// `docs/training_tree_plan.md`. Optional on purpose: a lesson authored
+    /// outside this repo and dropped into `~/Harmonicon/lessons` has no
+    /// reason to know the track vocabulary, and falling back to `unit`
+    /// still groups it somewhere sensible. Read it through
+    /// [`LessonManifest::track`], never directly.
+    #[serde(default)]
+    pub track: Option<String>,
     pub title_key: String,
     pub body_key: String,
     #[serde(default)]
@@ -121,6 +129,14 @@ pub fn parse_lesson(bytes: &[u8]) -> Result<LessonManifest, String> {
         return Err(errors.join("; "));
     }
     serde_json::from_value(value).map_err(|e| format!("deserialize error: {e}"))
+}
+
+impl LessonManifest {
+    /// The skill-tree row this lesson belongs to, falling back to its unit
+    /// when it declares no `track` of its own.
+    pub fn track(&self) -> &str {
+        self.track.as_deref().unwrap_or(&self.unit)
+    }
 }
 
 #[cfg(test)]

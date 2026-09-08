@@ -1,10 +1,17 @@
 {
   "id": "circle-of-fifths-jam",
   "unit": "scales",
+  "track": "theory",
   "title_key": "lesson-circle-of-fifths-jam-title",
   "body_key": "lesson-circle-of-fifths-jam-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["circle-of-fifths", "improvisation"],
-  "pass_criteria": { "type": "scale-adherence", "threshold": 0.65 },
+  "prerequisites": [
+    "circle-of-fifths",
+    "improvisation"
+  ],
+  "pass_criteria": {
+    "type": "scale-adherence",
+    "threshold": 0.65
+  },
   "position_cycle": true
 }

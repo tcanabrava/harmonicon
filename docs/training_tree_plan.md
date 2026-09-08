@@ -93,20 +93,40 @@ prerequisite edges and nothing else, and its left-to-right order is by
 graph depth. Inventing prerequisites to force every row into a chain would
 be lying about the curriculum to tidy the picture.
 
-**New validation, as tests** — the layout is only drawable if the graph
-behaves, and none of this is checked today:
+**Validation — built, and three of the four planned checks turned out not
+to exist.** `lessons::graph` (pure, Bevy-free) owns `depth`, topological
+order, `available`, `rows` and the checking. What survived contact:
 
-- **No cycles.** Nothing checks this now. A cycle would lock every lesson
-  in it forever and the renderer would not terminate.
-- **Every lesson reachable** from a no-prerequisite root.
-- **Cross-track edges point forward**, i.e. a prerequisite is never at a
-  greater depth than its dependent, so no edge is drawn backwards.
-- **At least two nodes available at every reachable progress state** — see
-  §4, autonomy. This one is a motivation constraint expressed as a graph
-  property, and it is checkable.
+- **No cycles — real, and genuinely unchecked before.** A lesson in a cycle
+  can never unlock, and a renderer walking those edges would not terminate.
+  `LessonGraph::build` refuses to construct rather than handing back
+  something that looks fine until someone walks it. Downstream lessons are
+  named in the same error, so fixing one cycle doesn't just reveal another.
+- *Every edge points forward* — **vacuous**. Depth is the longest path from
+  a root, so a prerequisite's depth is always below its dependent's by
+  construction. There was never anything to check.
+- *Every lesson reachable from a root* — **vacuous for the same reason**.
+  Any node of a finite DAG is reachable from some root; the only real
+  failure is a prerequisite naming a lesson that does not exist, which is
+  its own error (`UnknownPrerequisite`) because the fix is different.
+- *At least two lessons always available* — **false of the shipped
+  curriculum**, so it reports rather than asserts. Sampled over the 41,
+  the graph funnels to a single option at several points:
 
-A `lessons::graph` module (pure, Bevy-free, in `harmonicon-song`) owning
-`depth()`, `topological order`, `available(profile)` and the validators.
+  | Chokepoint | How often it is the only option |
+  |---|---|
+  | `deep-bends` | 135 |
+  | `swing-eighths` | 83 |
+  | `blues-scale` | 80 |
+  | `improvisation` | 64 |
+  | `call-response` | 45 |
+
+  (3000 seeded playthroughs, counting only states with ≥4 lessons still to
+  go.) `graph::min_choices` returns the number so it can be watched;
+  widening those gateways is curriculum work, not something a test can
+  force. Asserting a threshold would either fail today or have to be
+  weakened until it only described today's data.
+
 
 ## 2. Five trainings per lesson
 
@@ -316,8 +336,10 @@ that these do nothing — it is that they make playing feel like work.
 Each phase is independently shippable and the later ones can be dropped
 without stranding the earlier ones.
 
-0. `lessons::graph` — tracks, depth, validators, cycle test. Data only, no
-   UI. Cheap, and it unblocks everything else.
+0. ~~`lessons::graph` — tracks, depth, validators, cycle test.~~ **Done.**
+   `track` on all 41 lessons (optional in the schema, falling back to
+   `unit` so externally authored lessons still land somewhere), the graph
+   module, 17 tests, and an asset test that builds the shipped curriculum.
 1. `training::drill_chart` + the tier ladder, for the `bend` track only.
    Play it. Decide whether generated drills are good enough before
    committing to the other thirteen tracks.

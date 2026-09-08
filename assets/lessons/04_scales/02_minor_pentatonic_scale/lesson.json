@@ -1,9 +1,15 @@
 {
   "id": "minor-pentatonic-scale",
   "unit": "scales",
+  "track": "scales",
   "title_key": "lesson-minor-pentatonic-scale-title",
   "body_key": "lesson-minor-pentatonic-scale-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["blues-scale"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+  "prerequisites": [
+    "blues-scale"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
 }

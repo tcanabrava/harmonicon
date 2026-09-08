@@ -1,10 +1,17 @@
 {
   "id": "jazz-blues-form",
   "unit": "jazz",
+  "track": "form",
   "title_key": "lesson-jazz-blues-form-title",
   "body_key": "lesson-jazz-blues-form-body",
   "chart": "song/chart.harpchart",
   "progression": "jazz-blues",
-  "prerequisites": ["ii-v-i-chord-tones", "chord-tone-improv"],
-  "pass_criteria": { "type": "chord-tone-adherence", "threshold": 0.4 }
+  "prerequisites": [
+    "ii-v-i-chord-tones",
+    "chord-tone-improv"
+  ],
+  "pass_criteria": {
+    "type": "chord-tone-adherence",
+    "threshold": 0.4
+  }
 }

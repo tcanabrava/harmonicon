@@ -1,9 +1,15 @@
 {
   "id": "blues-scale",
   "unit": "blues",
+  "track": "scales",
   "title_key": "lesson-blues-scale-title",
   "body_key": "lesson-blues-scale-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["deep-bends"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+  "prerequisites": [
+    "deep-bends"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
 }

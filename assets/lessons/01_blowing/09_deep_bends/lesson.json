@@ -1,9 +1,16 @@
 {
   "id": "deep-bends",
   "unit": "blowing",
+  "track": "bend",
   "title_key": "lesson-deep-bends-title",
   "body_key": "lesson-deep-bends-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["first-bend"],
-  "pass_criteria": { "type": "technique", "technique": "bend", "threshold": 0.6 }
+  "prerequisites": [
+    "first-bend"
+  ],
+  "pass_criteria": {
+    "type": "technique",
+    "technique": "bend",
+    "threshold": 0.6
+  }
 }

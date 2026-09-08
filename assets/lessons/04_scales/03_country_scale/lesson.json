@@ -1,9 +1,15 @@
 {
   "id": "country-scale",
   "unit": "scales",
+  "track": "scales",
   "title_key": "lesson-country-scale-title",
   "body_key": "lesson-country-scale-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["multiple-notes"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+  "prerequisites": [
+    "multiple-notes"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
 }

@@ -4,18 +4,28 @@
   "title": "Harmonicon Lesson Manifest",
   "description": "One lesson in the curriculum: localized title/body keys, an optional playable chart, prerequisites, and pass criteria.",
   "type": "object",
-  "required": ["id", "unit", "title_key", "body_key"],
+  "required": [
+    "id",
+    "unit",
+    "title_key",
+    "body_key"
+  ],
   "additionalProperties": false,
   "properties": {
     "id": {
       "type": "string",
       "minLength": 1,
-      "description": "Stable identifier, unique across all lessons. Used as the profile key and in other lessons' prerequisites — never rename one that has shipped."
+      "description": "Stable identifier, unique across all lessons. Used as the profile key and in other lessons' prerequisites \u2014 never rename one that has shipped."
     },
     "unit": {
       "type": "string",
       "minLength": 1,
       "description": "Unit identifier grouping lessons in the menu. Localized via the Fluent key `lesson-unit-<unit>`."
+    },
+    "track": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Which row of the skill tree this lesson sits in (see docs/training_tree_plan.md). Optional: falls back to `unit`, so an externally authored lesson without one still groups sensibly. Localized via the Fluent key `lesson-track-<track>`."
     },
     "title_key": {
       "type": "string",
@@ -34,19 +44,29 @@
     },
     "prerequisites": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
       "uniqueItems": true,
       "description": "Lesson ids that must be passed before this one unlocks."
     },
     "pass_criteria": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "oneOf": [
         {
-          "required": ["type", "threshold"],
+          "required": [
+            "type",
+            "threshold"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "accuracy" },
+            "type": {
+              "const": "accuracy"
+            },
             "threshold": {
               "type": "number",
               "exclusiveMinimum": 0,
@@ -56,14 +76,29 @@
           }
         },
         {
-          "required": ["type", "technique", "threshold"],
+          "required": [
+            "type",
+            "technique",
+            "threshold"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "technique" },
+            "type": {
+              "const": "technique"
+            },
             "technique": {
               "type": "string",
-              "enum": ["normal", "bend", "vibrato", "wah-wah", "overblow", "overdraw", "slide", "clean-attack"],
-              "description": "Technique bucket name — the same vocabulary SongStats/profile use."
+              "enum": [
+                "normal",
+                "bend",
+                "vibrato",
+                "wah-wah",
+                "overblow",
+                "overdraw",
+                "slide",
+                "clean-attack"
+              ],
+              "description": "Technique bucket name \u2014 the same vocabulary SongStats/profile use."
             },
             "threshold": {
               "type": "number",
@@ -74,60 +109,89 @@
           }
         },
         {
-          "required": ["type", "threshold"],
+          "required": [
+            "type",
+            "threshold"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "scale-adherence" },
+            "type": {
+              "const": "scale-adherence"
+            },
             "threshold": {
               "type": "number",
               "exclusiveMinimum": 0,
               "maximum": 1,
-              "description": "Minimum fraction (0..1) of notes played during the jam that were at least in-scale. Routes the lesson into Jam Session instead of the normal chart pipeline — see PassCriteria::ScaleAdherence."
+              "description": "Minimum fraction (0..1) of notes played during the jam that were at least in-scale. Routes the lesson into Jam Session instead of the normal chart pipeline \u2014 see PassCriteria::ScaleAdherence."
             }
           }
         },
         {
-          "required": ["type", "threshold"],
+          "required": [
+            "type",
+            "threshold"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "chord-tone-adherence" },
+            "type": {
+              "const": "chord-tone-adherence"
+            },
             "threshold": {
               "type": "number",
               "exclusiveMinimum": 0,
               "maximum": 1,
-              "description": "Minimum fraction (0..1) of notes played during the jam that were specifically chord tones (stricter than scale-adherence). Routes into Jam Session like scale-adherence — see PassCriteria::ChordToneAdherence."
+              "description": "Minimum fraction (0..1) of notes played during the jam that were specifically chord tones (stricter than scale-adherence). Routes into Jam Session like scale-adherence \u2014 see PassCriteria::ChordToneAdherence."
             }
           }
         },
         {
-          "required": ["type", "threshold"],
+          "required": [
+            "type",
+            "threshold"
+          ],
           "additionalProperties": false,
           "properties": {
-            "type": { "const": "phrase-discipline" },
+            "type": {
+              "const": "phrase-discipline"
+            },
             "threshold": {
               "type": "number",
               "exclusiveMinimum": 0,
               "maximum": 1,
-              "description": "Minimum fraction (0..1) of notes played outside a rest window of the jam's play/rest bar pattern. Routes into Jam Session like scale-adherence — see PassCriteria::PhraseDiscipline."
+              "description": "Minimum fraction (0..1) of notes played outside a rest window of the jam's play/rest bar pattern. Routes into Jam Session like scale-adherence \u2014 see PassCriteria::PhraseDiscipline."
             }
           }
         }
       ],
-      "description": "How a chart-backed lesson is judged at the results screen (or, for a scale-adherence/chord-tone-adherence/phrase-discipline lesson, by its own \"Finish Lesson\" jam pause-menu button — see PassCriteria::ScaleAdherence). Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
+      "description": "How a chart-backed lesson is judged at the results screen (or, for a scale-adherence/chord-tone-adherence/phrase-discipline lesson, by its own \"Finish Lesson\" jam pause-menu button \u2014 see PassCriteria::ScaleAdherence). Absent = playing it through at all counts as done (or, for instructional-only lessons, the reader's Mark-as-Done button)."
     },
     "progression": {
       "type": "string",
-      "enum": ["standard", "quick-change", "minor", "jazz-blues"],
+      "enum": [
+        "standard",
+        "quick-change",
+        "minor",
+        "jazz-blues"
+      ],
       "description": "A jam-based lesson's backing progression, seeded into the jam when Start routes into it. Absent = Standard. See menu::lessons::parse_progression."
     },
     "scale": {
       "type": "string",
-      "enum": ["first-position", "second-position", "third-position", "major", "minor-pentatonic", "country"],
+      "enum": [
+        "first-position",
+        "second-position",
+        "third-position",
+        "major",
+        "minor-pentatonic",
+        "country"
+      ],
       "description": "A jam-based lesson's scale for live scale-adherence feedback, seeded into JamScale when Start routes into it. Absent = first-position (the blues hexatonic). See menu::lessons::parse_scale."
     },
     "diagram": {
       "type": "string",
-      "enum": ["circle-of-fifths"],
+      "enum": [
+        "circle-of-fifths"
+      ],
       "description": "An instructional lesson's embedded reference diagram, rendered by the lesson reader alongside the body text. Absent = no diagram. See dialogs::circle_of_fifths."
     },
     "position_cycle": {

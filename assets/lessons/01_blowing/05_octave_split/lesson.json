@@ -1,9 +1,15 @@
 {
   "id": "octave-split",
   "unit": "blowing",
+  "track": "tongue",
   "title_key": "lesson-octave-split-title",
   "body_key": "lesson-octave-split-body",
   "chart": "song/chart.harpchart",
-  "prerequisites": ["multiple-notes"],
-  "pass_criteria": { "type": "accuracy", "threshold": 0.5 }
+  "prerequisites": [
+    "multiple-notes"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.5
+  }
 }

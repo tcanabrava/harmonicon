@@ -224,6 +224,7 @@ mod tests {
             manifest: LessonManifest {
                 id: id.into(),
                 unit: unit.into(),
+                track: None,
                 title_key: format!("lesson-{id}-title"),
                 body_key: format!("lesson-{id}-body"),
                 chart: None,
