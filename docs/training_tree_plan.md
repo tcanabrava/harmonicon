@@ -52,27 +52,47 @@ The prerequisite edges exist; what's missing is a **spine** to lay them out
 along and the checks that keep the graph drawable.
 
 **Add `track` to the manifest** — the row a lesson belongs to, which is
-what the skill-tree view draws. Proposed tracks, derived from the lessons
-already written:
+what the skill-tree view draws.
 
-| Track | Lessons today |
-|---|---|
-| `tone` | single-note, breathing, articulation |
-| `hand` | hand-wah |
-| `tongue` | tongue-blocking, octave-split |
-| `bend` | first-bend, deep-bends |
-| `vibrato` | vibrato |
-| `slide` | chromatic-slide-basics |
-| `time` | counting-four, shuffle-feel, swing-eighths, using-your-feet |
-| `form` | twelve-bar, bar-counting, turnaround |
-| `train` | train-chug, train-rolling, train-whistle |
-| `scales` | blues-scale, major-scale, minor-pentatonic-scale, country-scale, circle-of-fifths |
-| `vocabulary` | first-licks, bent-licks, licks-over-changes |
-| `improv` | call-response, improvisation, question-answer, chord-tone-improv, minor-blues, quick-change, the -improv scale lessons, jazz-blues-form, ii-v-i |
+**An improvisation lesson belongs to the track of whatever it improvises
+over**, not to a general "improv" bucket. `major-scale-improv` sits in
+`scales` after `major-scale`; `quick-change-improv` sits in `form`, because
+the new thing it asks for is the form. This is what keeps the rows even —
+a bucket collected eleven lessons while nothing else had more than five —
+and it gives every track the same arc: **learn it, apply it, improvise with
+it**. It also leaves an obvious empty slot at the end of the technique
+tracks (an "improvise with bends" for `bend`, a "improvise the train" for
+`train`) which is where new lessons should go.
 
-Twelve tracks against the screenshot's nine — close enough that the layout
-reads the same. `unit` stays as it is (it groups for the list view and the
-locale keys); `track` is purely the drawing/progression spine.
+| Track | Lessons today | |
+|---|---|---|
+| `scales` | blues-scale, major-scale, major-scale-improv, minor-pentatonic-scale, minor-pentatonic-improv, country-scale | 6 |
+| `form` | twelve-bar, bar-counting, turnaround, quick-change-improv, jazz-blues-form | 5 |
+| `tone` | single-note, breathing, articulation, multiple-notes | 4 |
+| `time` | counting-four, shuffle-feel, swing-eighths, using-your-feet | 4 |
+| `train` | train-chug, train-rolling, train-whistle | 3 |
+| `harmony` | chord-tone-improv, minor-blues-improv, ii-v-i-chord-tones | 3 |
+| `vocabulary` | first-licks, bent-licks, licks-over-changes | 3 |
+| `improv` | call-response, improvisation, question-answer | 3 |
+| `tongue` | tongue-blocking, octave-split | 2 |
+| `bend` | first-bend, deep-bends | 2 |
+| `slide` | slides, chromatic-slide-basics | 2 |
+| `theory` | circle-of-fifths, circle-of-fifths-jam | 2 |
+| `hand` | hand-wah | 1 |
+| `vibrato` | vibrato | 1 |
+
+Fourteen tracks, all 41 lessons placed exactly once, longest track 6.
+`unit` stays as it is (it groups the list view and the locale keys);
+`track` is purely the drawing and progression spine.
+
+**A track is a family ordered by depth, not a dependency chain.** This is
+the one place the reference screenshot differs: there, each row is strictly
+sequential — buy node 1, then 2. Here `country-scale` does not lead to
+`blues-scale`; they merely belong together. So the row draws its real
+prerequisite edges and nothing else, and its left-to-right order is by
+graph depth. Inventing prerequisites to force every row into a chain would
+be lying about the curriculum to tidy the picture.
+
 
 **New validation, as tests** — the layout is only drawable if the graph
 behaves, and none of this is checked today:
@@ -155,17 +175,33 @@ times longer and remove the student's choice of what to work on.
 
 This is a real design fork and worth your call before anything is built.
 
-## 3. The horizontal graph view
+## 3. The skill-tree view
 
-Matching the reference: rows labelled at the left, nodes chained left to
-right with connectors, vertical connectors where one row branches from
-another, locked nodes desaturated with a padlock, a summary bar at the
-bottom.
+Flows **top-down**: tracks stack downward, each track reads left to right,
+the page scrolls vertically. That is the reference screenshot's layout and
+it needs no horizontal scrolling at all.
 
-Mapping onto the data: **row = track**, **first node = the lesson**,
-**following nodes = its five trainings**, **vertical connectors =
-prerequisite edges between tracks**. That is the same shape as the
-screenshot without forcing anything.
+An earlier draft of this plan claimed horizontal panning would be needed.
+That was wrong — it was written without measuring. With the redistribution
+above:
+
+| | |
+|---|---|
+| longest track | 6 nodes → **600 px** wide |
+| 14 tracks at 64 px | **896 px** tall |
+
+Wide enough to fit any window; tall enough to need vertical scrolling,
+which `dialogs::scroll_area` already does. Nothing new is required.
+
+Mapping onto the data: **row = track**, **node = lesson**, **vertical
+connectors = prerequisite edges between tracks**.
+
+**Trainings are not nodes.** Five extra nodes per lesson would put the
+longest track at 36 across and bring the panning problem straight back.
+Instead each lesson node carries a strip of five small pips — one per
+training tier, filled as each is passed. That strip *is* the mastery meter
+at node level, so points 2, 3 and 4 render as one control rather than
+three.
 
 Node states: `Locked` / `Available` / `Passed` / `Mastered` (all five
 trainings passed).
@@ -176,17 +212,14 @@ Implementation notes specific to this codebase:
   `layout(lessons, profile) -> Vec<PlacedNode>` returning row, column,
   state and edges, tested without Bevy. The spawn code is a translation of
   its output, as `music_score` does.
-- **Horizontal panning is new work.** `dialogs::scroll_area` is
-  `Overflow::scroll_y()` only. Either extend it to take an axis or add a
-  pan-and-scrollbar view; `song_editor::scroll` already solves the
-  horizontal case and is the thing to copy.
 - **Keyboard navigation is mandatory** (root `CLAUDE.md`): every node is a
   real `bevy_ui_widgets::Button` with `TabIndex(0)`, the graph root gets a
-  `TabGroup`, handlers are `On<Activate>`. Tab order follows reading order.
+  `TabGroup`, handlers are `On<Activate>`. Tab order follows reading order,
+  track by track.
 - **Keep the list view for compact layouts.** `responsive::is_compact`
-  exists; a twelve-row graph on a phone is unreadable. The graph is the
+  exists; fourteen rows of nodes on a phone is unreadable. The tree is the
   wide-screen presentation, not a replacement.
-- Row labels and node titles are Fluent keys, three locales, as ever.
+- Track labels and node titles are Fluent keys, three locales, as ever.
 
 ## 4. Gamification
 
@@ -226,8 +259,9 @@ bolt a currency onto playing music are the ones most likely to backfire.
 
 ### What to build
 
-1. **Mastery bars per track, not XP.** 0–100% from tier progress and recent
-   accuracy. Makes competence visible (SDT) without inventing a currency.
+1. **A mastery meter per track, not XP.** 0–100% from tier progress and
+   recent accuracy, and the per-node pip strip in §3 is its node-level
+   form. Makes competence visible (SDT) without inventing a currency.
 2. **A spaced review queue — "Warm-up".** Record when each technique was
    last passed; surface two or three due for review at the top of the tree.
    This is the highest-value item on the list and it is a *feature*, not a
@@ -265,14 +299,21 @@ without stranding the earlier ones.
 2. `TrainingRecord` in the profile, and results routing for trainings.
 3. The graph view: pure layout first, then spawning, then horizontal
    panning. Largest single chunk.
-4. Gamification: mastery bars, then the review queue, then the streak.
+4. Gamification: the mastery meter, then the review queue, then the streak.
 5. Roll trainings out across the remaining tracks.
+
+## Decided
+
+- **Trainings do not gate progression.** Passing the lesson unlocks what
+  follows, as today; trainings feed mastery and the review queue.
+- **Top-down, vertical scrolling only.**
+- **Improvisation lessons distribute into the track they improvise over**
+  rather than forming a bucket, which is what evened the rows out.
 
 ## Open questions
 
-- **Do trainings gate progression?** Recommendation above is no. Your call.
-- **Twelve tracks or fewer?** `scales` and `improv` are large enough to
-  split; `hand`, `vibrato` and `slide` are single-lesson rows today and
-  will look thin next to the others.
 - **Does the flat list survive** as the compact-layout view, or get
   replaced outright?
+- `hand` and `vibrato` are single-lesson rows and will look thin next to
+  `scales`. Fold them into `tone`, or leave the gap as somewhere the
+  curriculum visibly wants more lessons?
