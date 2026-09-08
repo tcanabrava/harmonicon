@@ -28,4 +28,5 @@ pub mod pitch_map;
 pub mod scoring;
 pub mod snap;
 pub mod synth;
+pub mod training;
 pub mod wav;

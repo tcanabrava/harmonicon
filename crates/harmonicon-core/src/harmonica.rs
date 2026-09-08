@@ -232,14 +232,20 @@ pub enum Harmonica {
     Diatonic {
         holes: u8,
         bending_profile: BendingProfile,
+        #[serde(skip_serializing_if = "Option::is_none")]
         position: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         scale: Option<Scale>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         layout: Option<DiatonicLayout>,
     },
     Chromatic {
         holes: u8,
+        #[serde(skip_serializing_if = "Option::is_none")]
         position: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         scale: Option<Scale>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         layout: Option<ChromaticLayout>,
     },
 }

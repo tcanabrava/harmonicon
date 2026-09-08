@@ -378,6 +378,41 @@ fn lesson_assets_are_complete_and_valid() {
 /// `track` is optional in the schema (an externally authored lesson falls
 /// back to its unit), but every lesson *shipped here* declares one, or the
 /// tree grows a row named after a unit by accident.
+/// A chart built in memory must serialize to something the loader would
+/// accept back.
+///
+/// `HarpChart` was deserialize-only in practice: nothing serialized one, so
+/// nobody noticed that `serde_json` writes `null` for every absent optional
+/// while the schema types those fields as strings and arrays. The Song
+/// Editor sidesteps it by hand-building its JSON with `json!` rather than
+/// serializing the struct, which is why saving from the editor has always
+/// worked. A generated training chart has no such hand-written path, so the
+/// round trip has to actually hold.
+#[test]
+fn a_generated_chart_serializes_to_something_the_schema_accepts() {
+    use harmonicon_core::harmonica::richter_harp;
+    use harmonicon_core::training::{DrillSpec, DrillTechnique, Tier, drill_chart};
+
+    let validator = schema_validator("assets/song_schema.dtd.json");
+    for tier in Tier::ALL {
+        let spec = DrillSpec {
+            technique: DrillTechnique::Bend,
+            holes: vec![2, 3, 4],
+            tier,
+            seed: 4242,
+        };
+        let chart = drill_chart(&spec, &richter_harp("C"), "Drill", "Trainer")
+            .expect("a C harp bends holes 2-4");
+        let value = serde_json::to_value(&chart).expect("a chart must serialize");
+        let errors = validation_errors(&validator, &value);
+        assert!(
+            errors.is_empty(),
+            "tier {} produced a schema-invalid chart:\n{errors}",
+            tier.number()
+        );
+    }
+}
+
 #[test]
 fn the_bundled_curriculum_forms_a_drawable_graph() {
     use harmonicon_song::lessons::graph::LessonGraph;

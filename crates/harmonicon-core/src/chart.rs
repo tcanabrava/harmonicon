@@ -6,22 +6,29 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HarpChart {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
     pub song: Song,
     pub timing: Timing,
     pub harmonica: Harmonica,
     pub track: Vec<TrackItem>,
     #[serde(rename = "loop")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub loop_section: Option<LoopSection>,
     pub scoring: Scoring,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub format_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub license: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
@@ -256,11 +263,13 @@ pub struct Song {
     pub artist: String,
     pub tempo_bpm: f32,
     pub key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub time_signature: Option<String>,
     pub difficulty: Difficulty,
     /// Metronome click subdivision this song is written for. `None` leaves
     /// the player's current metronome feel choice untouched — see
     /// `gameplay::metronome_overlay::set_tempo_from_song`.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub feel: Option<Feel>,
 }
 
@@ -284,6 +293,7 @@ pub enum Feel {
 pub struct Timing {
     pub resolution: u32,
     pub tempo_map: Vec<TempoPoint>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub time_signature_map: Option<Vec<TimeSigPoint>>,
 }
 
@@ -338,26 +348,38 @@ pub enum Scale {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiatonicLayout {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blow: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub draw: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChromaticLayout {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blow: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub draw: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blow_slide: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub draw_slide: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackItem {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub time: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tick: Option<u64>,
     pub duration: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub phrase: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub groove: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub play_mode: Option<PlayMode>,
     /// Marks this item as part of a call-and-response phrase: absent/`false`
     /// on every ordinary chart. A maximal run of consecutive `call: true`
@@ -385,7 +407,9 @@ pub enum PlayMode {
 pub struct NoteEvent {
     pub hole: u8,
     pub action: Action,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub modifiers: Option<Vec<Modifier>>,
 }
 
@@ -405,6 +429,7 @@ pub enum Modifier {
     #[serde(rename = "bend")]
     Bend {
         semitones: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
         intensity: Option<f32>,
     },
     #[serde(rename = "overblow")]
@@ -420,11 +445,13 @@ pub enum Modifier {
     #[serde(rename = "vibrato")]
     Vibrato {
         oscillation_hz: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
         intensity: Option<f32>,
     },
     #[serde(rename = "wah-wah")]
     WahWah {
         oscillation_hz: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
         intensity: Option<f32>,
     },
 }
@@ -434,7 +461,9 @@ pub struct LoopSection {
     pub start_index: usize,
     pub end_index: usize,
     #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub section_type: Option<LoopType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub repeat: Option<bool>,
 }
 
@@ -454,7 +483,9 @@ pub struct Scoring {
     pub perfect_window_ms: u32,
     pub good_window_ms: u32,
     pub miss_window_ms: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub combo: Option<Combo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub style_bonus: Option<HashMap<String, f32>>,
 }
 
@@ -464,6 +495,7 @@ pub struct Combo {
     pub base_multiplier: f32,
     pub step_multiplier: f32,
     pub max_multiplier: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub decay_ms: Option<u32>,
 }
 
