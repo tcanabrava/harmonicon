@@ -15,6 +15,9 @@ than accumulating history (git log/commit messages are the historical record):
 - `ROADMAP.md` — versioned feature direction (0.4 → 0.6+)
 - `PLAN.md` — execution order and implementation notes for what's in flight
 - `docs/lessons_plan.md` — curriculum design for the Lessons feature
+- `docs/training_tree_plan.md` — the technique DAG, per-lesson training
+  ladder, skill-tree view and practice-motivation design (planned, not
+  built)
 - `docs/gameplay_validation.md` — manual + automated validation checklist;
   update it when changing gameplay/timing behaviour
 - `docs/book/` — player-facing mdBook user guide (`mdbook build`/`mdbook

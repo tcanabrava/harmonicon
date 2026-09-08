@@ -5,6 +5,12 @@ shipped (wave 1, compactly), the scoring primitives lessons are built from,
 and the plan for the next batch of exercises (wave 2). Read this before
 writing any lesson code — `PLAN.md`'s Lessons entry just points here.
 
+**Structure, progression and motivation live in
+`docs/training_tree_plan.md`** — the technique DAG, the five-tier training
+ladder hung off each lesson, the horizontal skill-tree view, and what the
+evidence says about gamifying practice. This file stays curriculum: what
+each lesson teaches and what is honestly scoreable.
+
 A note on sourcing: this curriculum was drafted from general, widely-taught
 blues/jazz harmonica pedagogy (single note → tongue blocking → bending →
 12-bar form → positions → improvisation is the standard progression taught
