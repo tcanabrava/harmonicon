@@ -21,7 +21,7 @@ use harmonicon_core::chart::{
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::midi::midi_to_note;
 use harmonicon_core::pitch_map::{
-    HarpKind, Technique, harp_for_key, map_pitch_playable, suggest_key,
+    HarpKind, HoleAssignment, Technique, harp_for_key, map_pitch_playable, suggest_key,
 };
 
 use crate::{ScoreError, ScoreFile, ScoreTrack};
@@ -158,13 +158,12 @@ pub fn choose_track(tracks: &[TrackConversion]) -> Option<usize> {
 /// better, so a tune a C diatonic plays cleanly doesn't hand a beginner a
 /// 12-hole chromatic.
 ///
-/// **In practice the second branch never fires today.** With its bends and
-/// overblows a diatonic is chromatic across its own range — measured over
-/// C4..C7 a C diatonic reaches 100% of the semitones and a C chromatic only
-/// 62%, because `chromatic_harp`'s slide is modelled as one semitone per
-/// hole with no bends. That is backwards for a real chromatic and is
-/// recorded in `TODO.md`; the rule below is kept because it is the right
-/// rule, not because anything currently reaches it.
+/// **The second branch is rarely taken**, because both instruments are
+/// fully chromatic across their own range: a diatonic through its bends and
+/// overblows, a chromatic through its slide. So neither dominates on note
+/// coverage and the diatonic-first preference decides almost every time.
+/// What can still swing it is *range* — a part sitting outside the best
+/// diatonic's span but inside a chromatic's.
 pub fn suggested_harp(pitches: &[u8]) -> Harmonica {
     let diatonic = harp_for_key(suggest_key(pitches, HarpKind::Diatonic), HarpKind::Diatonic);
     if reachable(pitches, &diatonic) >= MIN_REACHABLE {
@@ -191,6 +190,25 @@ fn reachable(pitches: &[u8], harp: &Harmonica) -> f32 {
         .filter(|&&p| map_pitch_playable(p, harp).is_some())
         .count();
     hit as f32 / pitches.len() as f32
+}
+
+/// What a chart event's `note` field must say for this assignment.
+///
+/// **A bend is the exception, and getting it wrong is silent.** Everywhere
+/// else `note` is the pitch that sounds — including an overblow's or a
+/// slide's, neither of which a blow/draw lookup could reproduce. But both
+/// readers of the field, `gameplay::notes::target_pitch` and
+/// `harp_remap::source_pitch`, *add the bend modifier to it*, so a bent
+/// note must state the **unbent reed** and let the modifier do the moving.
+/// Every hand-authored chart in this repository already does (`note: "B4"`
+/// with `semitones: -1`); the converter wrote the sounding pitch instead,
+/// which made an imported song's bent notes judge a semitone or two below
+/// the music and asked the player to over-bend every one of them.
+fn chart_note(sounding: u8, assignment: &HoleAssignment, harp: &Harmonica) -> String {
+    match assignment.technique {
+        Technique::Bend(_) => harp.wind_direction_label(assignment.hole, &assignment.action),
+        _ => midi_to_note(sounding as i32),
+    }
 }
 
 /// Ticks per beat the generated chart uses.
@@ -266,10 +284,7 @@ pub fn to_chart(
             events: vec![NoteEvent {
                 hole: assignment.hole,
                 action: assignment.action,
-                // The resulting pitch, written out. An overblow's or a
-                // bend's sounding note is not derivable from its modifier
-                // alone — the chart format expects it stated here.
-                note: Some(midi_to_note(note.midi as i32)),
+                note: Some(chart_note(note.midi, &assignment, harp)),
                 modifiers: (!modifiers.is_empty()).then_some(modifiers),
             }],
         });

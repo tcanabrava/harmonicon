@@ -85,7 +85,16 @@ fn every_converted_note_sounds_the_pitch_it_came_from() {
     let source: Vec<u8> = (55u8..=100).collect();
     let score = FakeScore::of(&source);
     let (chart, _) = to_chart(&score, 0, &harp, "A").unwrap();
-    for item in &chart.track {
+
+    // The pitches that survived, in order — unreachable ones are dropped.
+    let kept: Vec<u8> = source
+        .iter()
+        .copied()
+        .filter(|&p| map_pitch_playable(p, &harp).is_some())
+        .collect();
+    assert_eq!(chart.track.len(), kept.len());
+
+    for (item, expected) in chart.track.iter().zip(&kept) {
         let event = &item.events[0];
         let sounded = source_pitch(
             event.hole,
@@ -94,9 +103,10 @@ fn every_converted_note_sounds_the_pitch_it_came_from() {
             event.modifiers.as_deref().unwrap_or(&[]),
             &harp,
         );
-        assert!(
-            sounded.is_some(),
-            "converted note has no resolvable pitch: {event:?}"
+        assert_eq!(
+            sounded,
+            Some(*expected),
+            "event {event:?} should sound MIDI {expected}"
         );
     }
 }
