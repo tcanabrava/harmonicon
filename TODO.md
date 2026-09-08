@@ -27,17 +27,6 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
 
 `ROADMAP.md` has the reasoning, `PLAN.md` the order. Phase 0 blocks both.
 
-- [ ] **A chromatic harmonica is modelled as reaching less than a diatonic.**
-  Measured over the semitones of C4..C7: a C *diatonic* reaches 100% of them
-  (bends and overblows make it chromatic across its range), a C *chromatic*
-  only 62% — the slide gives one semitone per hole and no bends are
-  modelled, so whole steps between holes fall through. A real 12-hole
-  chromatic reaches everything in its range, so this is backwards. It makes
-  `harmonicon_score::convert::suggested_harp`'s chromatic branch dead in
-  practice (it can never score better), and would mislead anyone reading the
-  harp-check cost line while holding a chromatic. Fixing it means teaching
-  `hole_notes`/`map_pitch_playable` that a chromatic's slide-plus-natural
-  reeds already tile every semitone.
 - [ ] **The harp picker is only on the song-list route.** Lessons and the
   guided tour still force the chart's own harmonica — deliberate for now (a
   lesson prescribes its harp as part of the teaching), but a player who
