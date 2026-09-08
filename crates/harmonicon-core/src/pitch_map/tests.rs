@@ -302,3 +302,71 @@ fn a_c_major_scale_fits_a_c_diatonic() {
         );
     }
 }
+
+// ── chromatic layout ─────────────────────────────────────────────────────────
+
+#[test]
+fn a_chromatic_reaches_every_semitone_across_its_three_octaves() {
+    // What a chromatic harmonica is *for*. This was false: the layout was a
+    // C major scale ascending one note per hole, which both mistuned the
+    // instrument and stopped it at A5 — so 14 of the 37 semitones from C4
+    // to C7 were unreachable, and a chromatic scored worse than a diatonic
+    // in `convert::suggested_harp`, which is backwards.
+    let harp = chromatic_harp("C");
+    let unreachable: Vec<i32> = (60..=96)
+        .filter(|&p| map_pitch_playable(p as u8, &harp).is_none())
+        .collect();
+    assert!(
+        unreachable.is_empty(),
+        "a C chromatic cannot play MIDI {unreachable:?}"
+    );
+}
+
+#[test]
+fn a_chromatic_is_solo_tuned_with_its_repeating_four_hole_group() {
+    // The property that makes one fingering work in every octave, and the
+    // reason hole 4 blow and hole 5 blow are both C.
+    let harp = chromatic_harp("C");
+    let blow: Vec<String> = (1..=12)
+        .map(|h| harp.wind_direction_label(h, &Action::Blow))
+        .collect();
+    assert_eq!(
+        blow,
+        [
+            "C4", "E4", "G4", "C5", "C5", "E5", "G5", "C6", "C6", "E6", "G6", "C7"
+        ]
+    );
+}
+
+#[test]
+fn the_slide_raises_every_reed_by_exactly_one_semitone() {
+    // `map_pitch_playable`'s chromatic arm assumes this — it looks for
+    // `target - 1` among the plain reeds rather than consulting the slide
+    // tables, so a table that disagreed would silently resolve to the
+    // wrong hole.
+    for key in HARP_KEYS {
+        let harp = chromatic_harp(key);
+        let (blow, draw, blow_slide, draw_slide) = match &harp {
+            Harmonica::Chromatic {
+                layout: Some(l), ..
+            } => (
+                l.blow.clone().unwrap(),
+                l.draw.clone().unwrap(),
+                l.blow_slide.clone().unwrap(),
+                l.draw_slide.clone().unwrap(),
+            ),
+            _ => panic!("{key} chromatic has no layout"),
+        };
+        for (plain, slid) in blow
+            .iter()
+            .zip(&blow_slide)
+            .chain(draw.iter().zip(&draw_slide))
+        {
+            assert_eq!(
+                note_to_midi(slid).unwrap(),
+                note_to_midi(plain).unwrap() + 1,
+                "{key}: slide on {plain} gave {slid}"
+            );
+        }
+    }
+}

@@ -29,59 +29,59 @@
     "layout": {
       "blow": [
         "C4",
-        "D4",
         "E4",
-        "F4",
         "G4",
-        "A4",
-        "B4",
         "C5",
-        "D5",
+        "C5",
         "E5",
-        "F5",
-        "G5"
+        "G5",
+        "C6",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
       ],
       "draw": [
         "D4",
-        "E4",
-        "F#4",
-        "G4",
+        "F4",
         "A4",
         "B4",
-        "C#5",
         "D5",
-        "E5",
-        "F#5",
-        "G5",
-        "A5"
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6",
+        "B6"
       ],
       "blow_slide": [
         "C#4",
-        "D#4",
         "F4",
-        "F#4",
         "G#4",
-        "A#4",
-        "C5",
         "C#5",
-        "D#5",
+        "C#5",
         "F5",
-        "F#5",
-        "G#5"
+        "G#5",
+        "C#6",
+        "C#6",
+        "F6",
+        "G#6",
+        "C#7"
       ],
       "draw_slide": [
         "D#4",
-        "F4",
-        "G4",
-        "G#4",
+        "F#4",
         "A#4",
         "C5",
-        "D5",
         "D#5",
-        "F5",
-        "G5",
-        "G#5",
-        "A#5"
+        "F#5",
+        "A#5",
+        "C6",
+        "D#6",
+        "F#6",
+        "A#6",
+        "C7"
       ]
     }
   },
@@ -157,7 +157,7 @@
       "events": [
         {
           "hole": 2,
-          "action": "draw",
+          "action": "blow",
           "note": "E4"
         }
       ]
@@ -171,12 +171,7 @@
         {
           "hole": 2,
           "action": "draw",
-          "note": "F4",
-          "modifiers": [
-            {
-              "type": "slide"
-            }
-          ]
+          "note": "F4"
         }
       ]
     },
@@ -187,9 +182,14 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 3,
+          "hole": 2,
           "action": "draw",
-          "note": "F#4"
+          "note": "F#4",
+          "modifiers": [
+            {
+              "type": "slide"
+            }
+          ]
         }
       ]
     },
@@ -201,13 +201,8 @@
       "events": [
         {
           "hole": 3,
-          "action": "draw",
-          "note": "G4",
-          "modifiers": [
-            {
-              "type": "slide"
-            }
-          ]
+          "action": "blow",
+          "note": "G4"
         }
       ]
     },
@@ -218,8 +213,8 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 4,
-          "action": "draw",
+          "hole": 3,
+          "action": "blow",
           "note": "G#4",
           "modifiers": [
             {
@@ -236,7 +231,7 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 5,
+          "hole": 3,
           "action": "draw",
           "note": "A4"
         }
@@ -249,7 +244,7 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 5,
+          "hole": 3,
           "action": "draw",
           "note": "A#4",
           "modifiers": [
@@ -267,7 +262,7 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 6,
+          "hole": 4,
           "action": "draw",
           "note": "B4"
         }
@@ -280,14 +275,9 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 6,
-          "action": "draw",
-          "note": "C5",
-          "modifiers": [
-            {
-              "type": "slide"
-            }
-          ]
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
         }
       ]
     },
@@ -298,14 +288,9 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 6,
-          "action": "draw",
-          "note": "C5",
-          "modifiers": [
-            {
-              "type": "slide"
-            }
-          ]
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
         }
       ],
       "phrase": "Descending"
@@ -317,7 +302,7 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 6,
+          "hole": 4,
           "action": "draw",
           "note": "B4"
         }
@@ -330,7 +315,7 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 5,
+          "hole": 3,
           "action": "draw",
           "note": "A#4",
           "modifiers": [
@@ -348,7 +333,7 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 5,
+          "hole": 3,
           "action": "draw",
           "note": "A4"
         }
@@ -361,8 +346,8 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 4,
-          "action": "draw",
+          "hole": 3,
+          "action": "blow",
           "note": "G#4",
           "modifiers": [
             {
@@ -380,13 +365,8 @@
       "events": [
         {
           "hole": 3,
-          "action": "draw",
-          "note": "G4",
-          "modifiers": [
-            {
-              "type": "slide"
-            }
-          ]
+          "action": "blow",
+          "note": "G4"
         }
       ]
     },
@@ -397,9 +377,14 @@
       "play_mode": "single",
       "events": [
         {
-          "hole": 3,
+          "hole": 2,
           "action": "draw",
-          "note": "F#4"
+          "note": "F#4",
+          "modifiers": [
+            {
+              "type": "slide"
+            }
+          ]
         }
       ]
     },
@@ -412,12 +397,7 @@
         {
           "hole": 2,
           "action": "draw",
-          "note": "F4",
-          "modifiers": [
-            {
-              "type": "slide"
-            }
-          ]
+          "note": "F4"
         }
       ]
     },
@@ -429,7 +409,7 @@
       "events": [
         {
           "hole": 2,
-          "action": "draw",
+          "action": "blow",
           "note": "E4"
         }
       ]

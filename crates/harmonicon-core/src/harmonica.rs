@@ -22,16 +22,24 @@ pub const C_BLOW: [&str; 10] = ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", 
 /// Standard Richter-tuned C-harp draw notes, holes 1–10.
 pub const C_DRAW: [&str; 10] = ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"];
 
-/// Standard 12-hole C chromatic blow notes: a straight C-major scale (unlike
-/// the diatonic layout above, blow and draw are each already a full scale —
-/// the slide button fills in the remaining chromatic steps, see
-/// [`C_BLOW_SLIDE_CHROMATIC`]/[`C_DRAW_SLIDE_CHROMATIC`]).
+/// Standard 12-hole C chromatic blow notes — solo tuning, the layout every
+/// 12-hole chromatic actually ships with: `C E G C` repeating up three
+/// octaves, so hole 4 blow and hole 5 blow are the same C. Together with
+/// [`C_DRAW_CHROMATIC`] and the slide (see
+/// [`C_BLOW_SLIDE_CHROMATIC`]/[`C_DRAW_SLIDE_CHROMATIC`]) this reaches every
+/// semitone from C4 to C7.
+///
+/// The duplicated C is not a typo, and neither is hole 4 draw sitting a
+/// semitone *below* hole 5 blow: solo tuning repeats a four-hole group so
+/// the same fingering works in every octave, which is the whole point of
+/// the instrument.
 pub const C_BLOW_CHROMATIC: [&str; 12] = [
-    "C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5", "D5", "E5", "F5", "G5",
+    "C4", "E4", "G4", "C5", "C5", "E5", "G5", "C6", "C6", "E6", "G6", "C7",
 ];
-/// Standard 12-hole C chromatic draw notes (the scale a whole step up).
+/// Standard 12-hole C chromatic draw notes — solo tuning's `D F A B`,
+/// repeating up three octaves alongside [`C_BLOW_CHROMATIC`].
 pub const C_DRAW_CHROMATIC: [&str; 12] = [
-    "D4", "E4", "F#4", "G4", "A4", "B4", "C#5", "D5", "E5", "F#5", "G5", "A5",
+    "D4", "F4", "A4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6", "B6",
 ];
 /// Paddy Richter-tuned C-harp blow notes: identical to [`C_BLOW`] except
 /// hole 3, raised a whole step (G4 → A4) — the tuning's one deliberate
@@ -60,12 +68,12 @@ pub const C_DRAW_NATURAL_MINOR: [&str; 10] = [
 /// Blow notes with the slide button pressed: each a half-step above the
 /// unslid blow note.
 pub const C_BLOW_SLIDE_CHROMATIC: [&str; 12] = [
-    "C#4", "D#4", "F4", "F#4", "G#4", "A#4", "C5", "C#5", "D#5", "F5", "F#5", "G#5",
+    "C#4", "F4", "G#4", "C#5", "C#5", "F5", "G#5", "C#6", "C#6", "F6", "G#6", "C#7",
 ];
 /// Draw notes with the slide button pressed: each a half-step above the
 /// unslid draw note.
 pub const C_DRAW_SLIDE_CHROMATIC: [&str; 12] = [
-    "D#4", "F4", "G4", "G#4", "A#4", "C5", "D5", "D#5", "F5", "G5", "G#5", "A#5",
+    "D#4", "F#4", "A#4", "C5", "D#5", "F#5", "A#5", "C6", "D#6", "F#6", "A#6", "C7",
 ];
 
 /// Semitone shift from a C harp to `key`, choosing the octave the real harp

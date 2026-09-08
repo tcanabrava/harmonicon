@@ -127,6 +127,89 @@ fn song_charts_are_schema_valid() {
     assert!(report.is_empty(), "Schema-invalid song charts:\n{report}");
 }
 
+/// Every bundled chart that declares a *chromatic* harmonica must declare
+/// one this codebase can actually build — see
+/// `harmonicon_core::harmonica::chromatic_harp`.
+///
+/// Both shipped chromatic charts once carried a layout that no real
+/// harmonica has: a C major scale ascending one note per hole, stopping at
+/// A5 instead of C7. The music was right and the charts were internally
+/// consistent, so nothing caught it — a player holding a real chromatic
+/// would simply have found the hole numbers wrong, and the lesson that
+/// teaches the slide was teaching it on a fictional instrument.
+///
+/// Deliberately only chromatics. A diatonic chart may legitimately use an
+/// alternate tuning (paddy Richter, natural minor), so "matches the standard
+/// table" is not a rule that holds there.
+#[test]
+fn bundled_chromatic_charts_use_a_real_instrument() {
+    use harmonicon_core::harmonica::{Harmonica, chromatic_harp};
+    use harmonicon_core::pitch_map::HARP_KEYS;
+
+    let mut report = String::new();
+    let mut checked = 0;
+    let mut charts: Vec<PathBuf> = Vec::new();
+    for root in ["assets/songs", "assets/lessons"] {
+        for group in subdirs(Path::new(root)) {
+            for item in subdirs(&group) {
+                charts.push(item.join("song"));
+            }
+        }
+    }
+
+    for dir in charts {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("harpchart") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            let Ok(chart) = serde_json::from_str::<harmonicon_core::chart::HarpChart>(&text) else {
+                continue; // `song_charts_are_schema_valid` reports this
+            };
+            let Harmonica::Chromatic { .. } = &chart.harmonica else {
+                continue;
+            };
+            checked += 1;
+            let matches_a_real_harp = HARP_KEYS
+                .iter()
+                .any(|key| layout_of(&chromatic_harp(key)) == layout_of(&chart.harmonica));
+            if !matches_a_real_harp {
+                report.push_str(&format!(
+                    "  {}: chromatic layout matches no key's standard tuning\n",
+                    label(&path)
+                ));
+            }
+        }
+    }
+    assert!(
+        checked > 0,
+        "no chromatic charts found — has the layout moved?"
+    );
+    assert!(
+        report.is_empty(),
+        "Charts declaring an impossible harmonica:\n{report}"
+    );
+}
+
+/// A chromatic's four note tables, for comparing two harmonicas by layout.
+fn layout_of(harp: &harmonicon_core::harmonica::Harmonica) -> Option<Vec<Vec<String>>> {
+    match harp {
+        harmonicon_core::harmonica::Harmonica::Chromatic {
+            layout: Some(l), ..
+        } => Some(vec![
+            l.blow.clone().unwrap_or_default(),
+            l.draw.clone().unwrap_or_default(),
+            l.blow_slide.clone().unwrap_or_default(),
+            l.draw_slide.clone().unwrap_or_default(),
+        ]),
+        _ => None,
+    }
+}
+
 #[test]
 fn harmonica_model_assets_are_complete() {
     let root = Path::new("assets/harmonicas/3d");
