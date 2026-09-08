@@ -195,15 +195,41 @@ which `dialogs::scroll_area` already does. Nothing new is required.
 Mapping onto the data: **row = track**, **node = lesson**, **vertical
 connectors = prerequisite edges between tracks**.
 
-**Trainings are not nodes.** Five extra nodes per lesson would put the
-longest track at 36 across and bring the panning problem straight back.
-Instead each lesson node carries a strip of five small pips — one per
-training tier, filled as each is passed. That strip *is* the mastery meter
-at node level, so points 2, 3 and 4 render as one control rather than
-three.
+### The node
 
-Node states: `Locked` / `Available` / `Passed` / `Mastered` (all five
-trainings passed).
+**A node is a circle carrying an image** — `BorderRadius::MAX` on a square
+node with the lesson's art inside, the same shape the reference screenshot
+uses for its skill icons.
+
+Art is a per-lesson `icon.png` beside the `lesson.json`, and it is
+**optional**: when absent the node falls back to
+`assets/icons/lesson_placeholder.png`, a neutral hatched disc that is
+deliberately obvious as placeholder art so it cannot be mistaken for
+finished work. That mirrors how a song's `background.png` already works —
+every sibling asset optional, with a fallback — so lessons can be given
+real icons one at a time as the art appears, rather than all 41 at once.
+
+**Trainings are not nodes — they are the ring.** Five extra nodes per
+lesson would put the longest track at 36 across and bring the width problem
+straight back. Instead the five training tiers are five segments around the
+circle's edge, filling as each tier is passed. Going circular makes this
+better than the strip an earlier draft proposed: the mastery meter becomes
+a literal progress ring around the lesson's own art, so points 2, 3 and 4
+of the brief render as one control rather than three.
+
+Segments are plain absolutely-positioned nodes with `BorderRadius::MAX`,
+not a shader — five pips around a circle needs no new material. A real arc
+shader is the fallback if that reads poorly at node size;
+`music_score::tie_material` is the precedent for adding one.
+
+Node states, and how each reads:
+
+| State | Treatment |
+|---|---|
+| `Locked` | desaturated art, padlock overlay, ring empty |
+| `Available` | full-colour art, highlighted ring outline |
+| `Passed` | full colour, lesson tick, ring shows the tiers earned so far |
+| `Mastered` | all five ring segments filled |
 
 Implementation notes specific to this codebase:
 
