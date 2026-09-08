@@ -1,7 +1,7 @@
 # Training tree: lessons, trainings, and a graph to walk them
 
 Design plan for turning the Lessons feature into a technique DAG with
-practice trainings hanging off each lesson, shown as a horizontal skill
+practice trainings hanging off each lesson, shown as a top-down skill
 tree. Curriculum content design stays in `docs/lessons_plan.md`; this
 covers structure, progression, UI and motivation.
 
@@ -93,7 +93,6 @@ prerequisite edges and nothing else, and its left-to-right order is by
 graph depth. Inventing prerequisites to force every row into a chain would
 be lying about the curriculum to tidy the picture.
 
-
 **New validation, as tests** — the layout is only drawable if the graph
 behaves, and none of this is checked today:
 
@@ -153,7 +152,7 @@ isn't good enough — the generator is the default, not the ceiling.
 
 **The main risk in this whole plan is that generated drills are musically
 dull.** Mitigation: build the generator for *one* track (`bend`) end to
-end and actually play it before rolling out the other eleven.
+end and actually play it before rolling out the other thirteen.
 
 ### Not every lesson gets trainings
 
@@ -295,10 +294,10 @@ without stranding the earlier ones.
    UI. Cheap, and it unblocks everything else.
 1. `training::drill_chart` + the tier ladder, for the `bend` track only.
    Play it. Decide whether generated drills are good enough before
-   committing to the other eleven tracks.
+   committing to the other thirteen tracks.
 2. `TrainingRecord` in the profile, and results routing for trainings.
-3. The graph view: pure layout first, then spawning, then horizontal
-   panning. Largest single chunk.
+3. The tree view: pure layout first, then spawning. Largest single chunk,
+   but no new scrolling machinery — it fits vertically.
 4. Gamification: the mastery meter, then the review queue, then the streak.
 5. Roll trainings out across the remaining tracks.
 
