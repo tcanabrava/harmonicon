@@ -52,39 +52,62 @@ pub fn decode_wav_pcm16(bytes: &[u8]) -> Option<(Vec<f32>, u16, u32)> {
     if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
         return None;
     }
-    let mut pos = 12;
-    let mut channels = 1u16;
-    let mut sample_rate = 44_100u32;
-    let mut bits_per_sample = 16u16;
-    let mut data: Option<&[u8]> = None;
-    while pos + 8 <= bytes.len() {
-        let id = &bytes[pos..pos + 4];
-        let size = u32::from_le_bytes(bytes[pos + 4..pos + 8].try_into().ok()?) as usize;
-        let body_start = pos + 8;
-        let body_end = (body_start + size).min(bytes.len());
-        let body = &bytes[body_start..body_end];
-        match id {
-            b"fmt " if body.len() >= 16 => {
-                channels = u16::from_le_bytes(body[2..4].try_into().ok()?);
-                sample_rate = u32::from_le_bytes(body[4..8].try_into().ok()?);
-                bits_per_sample = u16::from_le_bytes(body[14..16].try_into().ok()?);
+    let riff_size = u32::from_le_bytes(bytes[4..8].try_into().ok()?) as usize;
+    let end = 8usize.checked_add(riff_size)?;
+    let bytes = bytes.get(..end)?;
+    let mut pos = 12usize;
+    let mut format = None;
+    let mut data = None;
+    while pos < bytes.len() {
+        let header = bytes.get(pos..pos.checked_add(8)?)?;
+        let size = u32::from_le_bytes(header[4..8].try_into().ok()?) as usize;
+        let body_start = pos.checked_add(8)?;
+        let body_end = body_start.checked_add(size)?;
+        let body = bytes.get(body_start..body_end)?;
+        match &header[..4] {
+            b"fmt " => {
+                if body.len() < 16 || format.is_some() {
+                    return None;
+                }
+                let tag = u16::from_le_bytes(body[0..2].try_into().ok()?);
+                let channels = u16::from_le_bytes(body[2..4].try_into().ok()?);
+                let rate = u32::from_le_bytes(body[4..8].try_into().ok()?);
+                let byte_rate = u32::from_le_bytes(body[8..12].try_into().ok()?);
+                let align = u16::from_le_bytes(body[12..14].try_into().ok()?);
+                let bits = u16::from_le_bytes(body[14..16].try_into().ok()?);
+                if tag != 1
+                    || bits != 16
+                    || channels == 0
+                    || rate == 0
+                    || align != channels.checked_mul(2)?
+                    || byte_rate != rate.checked_mul(u32::from(align))?
+                {
+                    return None;
+                }
+                format = Some((channels, rate, align));
             }
+            // A second `data` chunk means a malformed file, not more audio.
+            b"data" if data.is_some() => return None,
             b"data" => data = Some(body),
             _ => {}
         }
-        // Chunks are word-aligned; an odd-sized chunk has one pad byte.
-        pos = body_start + size + (size % 2);
+        pos = body_end.checked_add(size % 2)?;
+        if pos > bytes.len() {
+            return None;
+        }
     }
-    if bits_per_sample != 16 {
+    let (channels, sample_rate, align) = format?;
+    let data = data?;
+    if !data.len().is_multiple_of(usize::from(align)) {
         return None;
     }
-    let samples = data?
+    let samples = data
         .as_chunks::<2>()
         .0
         .iter()
-        .map(|b| i16::from_le_bytes(*b) as f32 / i16::MAX as f32)
+        .map(|b| i16::from_le_bytes(*b) as f32 / 32768.0)
         .collect();
-    Some((samples, channels.max(1), sample_rate.max(1)))
+    Some((samples, channels, sample_rate))
 }
 
 /// Resamples mono `samples` from `from_rate` to `to_rate` by straight linear
@@ -188,5 +211,48 @@ mod tests {
     #[test]
     fn empty_input_stays_empty() {
         assert!(resample_linear(&[], 44_100, 48_000).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_non_pcm_and_invalid_format_fields() {
+        for (offset, value) in [(20, 6u16), (22, 0), (32, 4), (34, 24)] {
+            let mut bytes = encode_wav(&[0.5], 44100);
+            bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+            assert!(decode_wav_pcm16(&bytes).is_none(), "offset {offset}");
+        }
+        let mut bytes = encode_wav(&[0.5], 44100);
+        bytes[24..28].fill(0);
+        assert!(decode_wav_pcm16(&bytes).is_none());
+    }
+
+    #[test]
+    fn rejects_missing_format_truncation_and_overflowing_chunk_sizes() {
+        let bytes = encode_wav(&[0.5], 44100);
+        let mut missing = bytes[..12].to_vec();
+        missing.extend_from_slice(&bytes[36..]);
+        let size = (missing.len() - 8) as u32;
+        missing[4..8].copy_from_slice(&size.to_le_bytes());
+        assert!(decode_wav_pcm16(&missing).is_none());
+        for len in 0..bytes.len() {
+            assert!(decode_wav_pcm16(&bytes[..len]).is_none(), "length {len}");
+        }
+        let mut oversized = bytes;
+        oversized[40..44].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(decode_wav_pcm16(&oversized).is_none());
+    }
+
+    #[test]
+    fn accepts_padded_unknown_chunks_and_normalizes_negative_full_scale() {
+        let mut bytes = encode_wav(&[0.0], 44100);
+        bytes[44..46].copy_from_slice(&i16::MIN.to_le_bytes());
+        bytes.extend_from_slice(b"JUNK\x01\x00\x00\x00x\x00");
+        let len = (bytes.len() - 8) as u32;
+        bytes[4..8].copy_from_slice(&len.to_le_bytes());
+        assert_eq!(decode_wav_pcm16(&bytes).unwrap().0, vec![-1.0]);
     }
 }
