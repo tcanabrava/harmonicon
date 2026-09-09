@@ -121,7 +121,9 @@ pub fn process_audio(
         // callback's pool instead of letting it deallocate here — see
         // `audio_input::AudioCapture::free_sender`.
         let previous = std::mem::replace(&mut frame.samples, samples);
-        let _ = capture.free_sender.try_send(previous);
+        if previous.capacity() >= audio_input::CHUNK_SIZE {
+            let _ = capture.free_sender.try_send(previous);
+        }
     }
     if last_received.is_none_or(|last| time.elapsed().saturating_sub(last) >= CAPTURE_TIMEOUT) {
         clear_detection(&mut frame, &mut writer);

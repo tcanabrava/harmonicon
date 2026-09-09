@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use bevy::log::{error, info, info_span};
+use bevy::log::{error, info};
 use bevy::prelude::{Res, ResMut, Resource, World};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{SampleFormat, StreamConfig};
@@ -14,12 +14,8 @@ use crate::AudioSettings;
 // learn the numbers.
 pub use harmonicon_dsp::{CHUNK_SIZE, HOP_SIZE};
 
-/// How many chunk buffers circulate between the real-time audio callback and
-/// the consumer (`process_audio`). Comfortably more than one in flight at a
-/// time — the consumer drains far faster than chunks arrive (one FFT per
-/// ~46ms chunk) — so recycling normally never runs dry; if it ever does
-/// (startup, or the consumer briefly falling behind), `push_chunks` falls
-/// back to allocating a fresh buffer rather than dropping audio.
+/// Fixed buffer inventory shared by capture and its consumer. Exhaustion
+/// drops audio; callback code never grows the inventory.
 const POOL_SIZE: usize = 8;
 
 // NonSend resource — keeps the cpal stream alive for the duration of the app.
@@ -32,7 +28,7 @@ pub struct AudioCapture {
     /// Hand a chunk buffer back here once you're done with it (e.g. when
     /// overwriting `AudioFrame::samples` with a newer chunk) so the
     /// real-time callback can reuse it instead of allocating — see
-    /// `push_chunks`. Calling into the allocator from that callback risks
+    /// `ChunkWriter`. Calling into the allocator from that callback risks
     /// blocking on a lock held by a lower-priority thread, causing an
     /// audible dropout ("xrun") on weaker machines.
     pub free_sender: Sender<Vec<f32>>,
@@ -268,7 +264,7 @@ pub fn create_audio_capture(
     let (err_tx, err_rx) = bounded::<String>(4);
 
     // Pre-warm the recycling pool so even the first few chunks don't need to
-    // allocate — see `AudioCapture::free_sender` / `push_chunks`.
+    // allocate — see `AudioCapture::free_sender` / `ChunkWriter`.
     let (free_tx, free_rx) = bounded::<Vec<f32>>(POOL_SIZE);
     for _ in 0..POOL_SIZE {
         let _ = free_tx.try_send(Vec::with_capacity(CHUNK_SIZE));
@@ -276,13 +272,13 @@ pub fn create_audio_capture(
 
     let stream = match sample_format {
         SampleFormat::F32 => {
-            build_stream_f32(&device, &stream_config, channels, tx, free_rx, err_tx)?
+            build_stream::<f32>(&device, &stream_config, channels, tx, free_rx, err_tx)?
         }
         SampleFormat::I16 => {
-            build_stream_i16(&device, &stream_config, channels, tx, free_rx, err_tx)?
+            build_stream::<i16>(&device, &stream_config, channels, tx, free_rx, err_tx)?
         }
         SampleFormat::I32 => {
-            build_stream_i32(&device, &stream_config, channels, tx, free_rx, err_tx)?
+            build_stream::<i32>(&device, &stream_config, channels, tx, free_rx, err_tx)?
         }
         fmt => return Err(format!("unsupported sample format: {fmt:?}").into()),
     };
@@ -301,24 +297,22 @@ pub fn create_audio_capture(
     ))
 }
 
-// ---------------------------------------------------------------------------
-// Per-format stream builders — identical logic, only the sample type differs.
-// ---------------------------------------------------------------------------
-
-fn build_stream_f32(
+/// All formats share the same fixed-storage downmix and overlap handling.
+fn build_stream<T: cpal::SizedSample>(
     device: &cpal::Device,
     config: &StreamConfig,
     channels: usize,
     tx: Sender<Vec<f32>>,
     free_rx: Receiver<Vec<f32>>,
     errors: Sender<String>,
-) -> Result<cpal::Stream, cpal::BuildStreamError> {
-    let mut buf: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
-    let mut mono: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
+) -> Result<cpal::Stream, cpal::BuildStreamError>
+where
+    f32: cpal::FromSample<T>,
+{
+    let mut chunks = ChunkWriter::new();
     device.build_input_stream(
         config,
-        move |data: &[f32], _| push_chunks(&mut buf, &mut mono, data, channels, &tx, &free_rx),
-        // Runs on cpal's thread: `try_send` only, never a blocking send.
+        move |data: &[T], _| chunks.push(data, channels, &tx, &free_rx),
         move |e| {
             let _ = errors.try_send(e.to_string());
         },
@@ -326,100 +320,56 @@ fn build_stream_f32(
     )
 }
 
-fn build_stream_i16(
-    device: &cpal::Device,
-    config: &StreamConfig,
-    channels: usize,
-    tx: Sender<Vec<f32>>,
-    free_rx: Receiver<Vec<f32>>,
-    errors: Sender<String>,
-) -> Result<cpal::Stream, cpal::BuildStreamError> {
-    let mut buf: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
-    let mut mono: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
-    let mut converted: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
-    device.build_input_stream(
-        config,
-        move |data: &[i16], _| {
-            converted.clear();
-            converted.extend(data.iter().map(|&s| s as f32 / 32_768.0));
-            push_chunks(&mut buf, &mut mono, &converted, channels, &tx, &free_rx);
-        },
-        // Runs on cpal's thread: `try_send` only, never a blocking send.
-        move |e| {
-            let _ = errors.try_send(e.to_string());
-        },
-        None,
-    )
+/// Allocated before capture starts. A full channel retains its rejected
+/// buffer for the next hop; pool exhaustion drops a hop without allocating.
+/// Scratch storage is independent of the backend's callback block size.
+struct ChunkWriter {
+    samples: Box<[f32; CHUNK_SIZE]>,
+    len: usize,
+    pending: Option<Vec<f32>>,
 }
 
-fn build_stream_i32(
-    device: &cpal::Device,
-    config: &StreamConfig,
-    channels: usize,
-    tx: Sender<Vec<f32>>,
-    free_rx: Receiver<Vec<f32>>,
-    errors: Sender<String>,
-) -> Result<cpal::Stream, cpal::BuildStreamError> {
-    let mut buf: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
-    let mut mono: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
-    let mut converted: Vec<f32> = Vec::with_capacity(CHUNK_SIZE / 2);
-    device.build_input_stream(
-        config,
-        move |data: &[i32], _| {
-            converted.clear();
-            converted.extend(data.iter().map(|&s| s as f32 / 2_147_483_648.0));
-            push_chunks(&mut buf, &mut mono, &converted, channels, &tx, &free_rx);
-        },
-        // Runs on cpal's thread: `try_send` only, never a blocking send.
-        move |e| {
-            let _ = errors.try_send(e.to_string());
-        },
-        None,
-    )
-}
-
-/// Downmixes multichannel interleaved frames to mono into the reusable
-/// `mono` scratch buffer, accumulates into `buf`, and emits CHUNK_SIZE
-/// blocks with 50% overlap. Every buffer here (`buf`, `mono`, and the chunk
-/// handed to `tx`, drawn from `free_rx`) is reused across calls rather than
-/// freshly allocated, since this runs on the real-time audio callback
-/// thread — calling into the allocator there risks blocking on a lock held
-/// by a lower-priority thread and causing an audible dropout.
-fn push_chunks(
-    buf: &mut Vec<f32>,
-    mono: &mut Vec<f32>,
-    data: &[f32],
-    channels: usize,
-    tx: &Sender<Vec<f32>>,
-    free_rx: &Receiver<Vec<f32>>,
-) {
-    // This runs on cpal's real-time callback thread, invisible to Bevy's own
-    // per-system spans (those only wrap systems the ECS schedule calls) — a
-    // manual span here is the only way Tracy shows this thread's activity at
-    // all, which matters since it's the one place an allocator stall would
-    // cause an audible dropout rather than just a dropped frame.
-    let _span = info_span!("push_chunks", frames = data.len()).entered();
-    mono.clear();
-    if channels == 1 {
-        mono.extend_from_slice(data);
-    } else {
-        mono.extend(
-            data.chunks(channels)
-                .map(|frame| frame.iter().sum::<f32>() / channels as f32),
-        );
+impl ChunkWriter {
+    fn new() -> Self {
+        Self {
+            samples: Box::new([0.0; CHUNK_SIZE]),
+            len: 0,
+            pending: None,
+        }
     }
-    buf.extend_from_slice(mono);
-    while buf.len() >= CHUNK_SIZE {
-        // Reuse a buffer the consumer already handed back if one's
-        // available; only allocate as a last resort (pool momentarily
-        // empty), so steady-state operation never touches the allocator.
-        let mut chunk = free_rx
-            .try_recv()
-            .unwrap_or_else(|_| Vec::with_capacity(CHUNK_SIZE));
-        chunk.clear();
-        chunk.extend_from_slice(&buf[..CHUNK_SIZE]);
-        let _ = tx.try_send(chunk);
-        buf.drain(..HOP_SIZE);
+
+    fn push<T: cpal::Sample>(
+        &mut self,
+        data: &[T],
+        channels: usize,
+        tx: &Sender<Vec<f32>>,
+        free: &Receiver<Vec<f32>>,
+    ) where
+        f32: cpal::FromSample<T>,
+    {
+        if channels == 0 {
+            return;
+        }
+        for frame in data.chunks_exact(channels) {
+            self.samples[self.len] =
+                frame.iter().map(|&s| s.to_sample::<f32>()).sum::<f32>() / channels as f32;
+            self.len += 1;
+            if self.len != CHUNK_SIZE {
+                continue;
+            }
+            if let Some(mut chunk) = self.pending.take().or_else(|| free.try_recv().ok()) {
+                // Every production buffer comes from the preallocated pool;
+                // the consumer only recycles buffers with this capacity.
+                debug_assert!(chunk.capacity() >= CHUNK_SIZE);
+                chunk.clear();
+                chunk.extend_from_slice(&self.samples[..]);
+                if let Err(error) = tx.try_send(chunk) {
+                    self.pending = Some(error.into_inner());
+                }
+            }
+            self.samples.copy_within(HOP_SIZE.., 0);
+            self.len = CHUNK_SIZE - HOP_SIZE;
+        }
     }
 }
 
@@ -449,64 +399,136 @@ mod tests {
         assert_eq!(resolve_device_name(&available, "USB Mic (unplugged)"), None);
     }
 
-    // ── push_chunks ──────────────────────────────────────────────────────────
+    struct CountingAllocator;
+    thread_local! {
+        static ALLOCATIONS: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
+    }
+    // Only this crate's unit-test binary installs the wrapper. Production
+    // capture has no instrumentation or custom allocator.
+    #[global_allocator]
+    static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-    #[test]
-    fn emits_a_full_chunk_and_keeps_the_overlap_tail() {
-        let (tx, rx) = bounded::<Vec<f32>>(4);
-        let (_free_tx, free_rx) = bounded::<Vec<f32>>(4); // empty pool: falls back to alloc
-        let mut buf = Vec::new();
-        let mut mono = Vec::new();
-        let data: Vec<f32> = (0..CHUNK_SIZE).map(|i| i as f32).collect();
+    fn count_allocation(deallocation: bool) {
+        let _ = ALLOCATIONS.try_with(|counter| {
+            if let Some((alloc, free)) = counter.get() {
+                counter.set(Some((
+                    alloc + usize::from(!deallocation),
+                    free + usize::from(deallocation),
+                )));
+            }
+        });
+    }
 
-        push_chunks(&mut buf, &mut mono, &data, 1, &tx, &free_rx);
-
-        let chunk = rx.try_recv().expect("one chunk should have been emitted");
-        assert_eq!(chunk, data);
-        // 50% overlap: the back half stays buffered for the next call.
-        assert_eq!(buf, &data[CHUNK_SIZE / 2..]);
-        assert!(rx.try_recv().is_err(), "only one chunk should have emitted");
+    // SAFETY: every operation forwards the original pointer/layout unchanged
+    // to System; thread-local counters neither allocate nor access that memory.
+    unsafe impl std::alloc::GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
+            count_allocation(false);
+            unsafe { std::alloc::System.alloc(layout) }
+        }
+        unsafe fn alloc_zeroed(&self, layout: std::alloc::Layout) -> *mut u8 {
+            count_allocation(false);
+            unsafe { std::alloc::System.alloc_zeroed(layout) }
+        }
+        unsafe fn realloc(&self, ptr: *mut u8, layout: std::alloc::Layout, size: usize) -> *mut u8 {
+            count_allocation(false);
+            unsafe { std::alloc::System.realloc(ptr, layout, size) }
+        }
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
+            count_allocation(true);
+            unsafe { std::alloc::System.dealloc(ptr, layout) }
+        }
     }
 
     #[test]
-    fn downmixes_multichannel_frames_by_averaging() {
-        let (tx, rx) = bounded::<Vec<f32>>(4);
-        let (_free_tx, free_rx) = bounded::<Vec<f32>>(4);
-        let mut buf = Vec::new();
-        let mut mono = Vec::new();
-        // Two channels interleaved: (1,3) -> 2.0, (2,4) -> 3.0.
-        let data = vec![1.0, 3.0, 2.0, 4.0];
-
-        push_chunks(&mut buf, &mut mono, &data, 2, &tx, &free_rx);
-
-        assert_eq!(buf, vec![2.0, 3.0]);
-        assert!(
-            rx.try_recv().is_err(),
-            "not enough samples yet for a full chunk"
-        );
+    fn capture_sample_callback_neither_allocates_nor_frees_under_load() {
+        let (tx, _rx) = bounded(1);
+        let (free_tx, free_rx) = bounded(2);
+        for _ in 0..2 {
+            free_tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
+        }
+        let mut writer = ChunkWriter::new();
+        let data = vec![0i16; CHUNK_SIZE * 40];
+        ALLOCATIONS.with(|counter| counter.set(Some((0, 0))));
+        writer.push(&data, 2, &tx, &free_rx);
+        writer.push(&data, 2, &tx, &free_rx); // output full, reuse rejected buffer
+        let counts = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
+        assert_eq!(counts, (0, 0));
+        let (empty_tx, empty_rx) = bounded(1);
+        ALLOCATIONS.with(|counter| counter.set(Some((0, 0))));
+        // No pool buffers and no rejected buffer: exhaust the inventory.
+        writer.pending.as_mut().unwrap().clear();
+        // Keep pending owned until outside the measured interval.
+        let retained = writer.pending.take();
+        writer.push(&data, 2, &tx, &empty_rx);
+        let counts = ALLOCATIONS.with(|counter| counter.replace(None).unwrap());
+        assert_eq!(counts, (0, 0));
+        drop((retained, empty_tx));
     }
 
     #[test]
-    fn reuses_a_recycled_buffer_instead_of_allocating() {
-        let (tx, rx) = bounded::<Vec<f32>>(4);
-        let (free_tx, free_rx) = bounded::<Vec<f32>>(4);
-
-        let recycled: Vec<f32> = Vec::with_capacity(CHUNK_SIZE);
-        let recycled_ptr = recycled.as_ptr();
-        free_tx.try_send(recycled).unwrap();
-
-        let mut buf = Vec::new();
-        let mut mono = Vec::new();
-        let data = vec![0.0f32; CHUNK_SIZE];
-
-        push_chunks(&mut buf, &mut mono, &data, 1, &tx, &free_rx);
-
-        let chunk = rx.try_recv().expect("chunk emitted");
+    fn chunks_downmix_and_preserve_overlap_across_callback_sizes() {
+        let (tx, rx) = bounded(8);
+        let (free_tx, free_rx) = bounded(8);
+        for _ in 0..8 {
+            free_tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
+        }
+        let mut writer = ChunkWriter::new();
+        let data: Vec<f32> = (0..CHUNK_SIZE + HOP_SIZE)
+            .flat_map(|i| [i as f32, i as f32 + 2.0])
+            .collect();
+        for part in data.chunks(254) {
+            writer.push(part, 2, &tx, &free_rx);
+        }
+        let first = rx.try_recv().unwrap();
+        let second = rx.try_recv().unwrap();
         assert_eq!(
-            chunk.as_ptr(),
-            recycled_ptr,
-            "should reuse the pooled allocation instead of a fresh one"
+            first,
+            (0..CHUNK_SIZE).map(|i| i as f32 + 1.0).collect::<Vec<_>>()
         );
+        assert_eq!(
+            second,
+            (HOP_SIZE..CHUNK_SIZE + HOP_SIZE)
+                .map(|i| i as f32 + 1.0)
+                .collect::<Vec<_>>()
+        );
+        assert!(rx.is_empty());
+    }
+
+    #[test]
+    fn full_channel_retains_buffer_and_empty_pool_drops_without_allocation() {
+        let (tx, rx) = bounded(1);
+        let (free_tx, free_rx) = bounded(2);
+        let buffer = Vec::with_capacity(CHUNK_SIZE);
+        let pointer = buffer.as_ptr();
+        free_tx.send(buffer).unwrap();
+        tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
+        let mut writer = ChunkWriter::new();
+        let data = vec![0.5; CHUNK_SIZE * 8];
+        writer.push(&data, 1, &tx, &free_rx);
+        assert_eq!(writer.pending.as_ref().unwrap().as_ptr(), pointer);
+        rx.try_recv().unwrap();
+        writer.push(&data[..HOP_SIZE], 1, &tx, &free_rx);
+        let received = rx.try_recv().unwrap();
+        assert_eq!(received.as_ptr(), pointer);
+        assert!(writer.pending.is_none());
+        writer.push(&data, 1, &tx, &free_rx);
+        assert!(rx.is_empty()); // all buffers in flight: no fallback allocation
+        free_tx.send(received).unwrap();
+        writer.push(&data[..HOP_SIZE], 1, &tx, &free_rx);
+        assert_eq!(rx.try_recv().unwrap().as_ptr(), pointer);
+    }
+
+    #[test]
+    fn integer_capture_uses_the_same_normalized_pipeline() {
+        let (tx, rx) = bounded(1);
+        let (free_tx, free_rx) = bounded(1);
+        free_tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
+        ChunkWriter::new().push(&vec![i16::MIN; CHUNK_SIZE], 1, &tx, &free_rx);
+        assert_eq!(rx.try_recv().unwrap(), vec![-1.0; CHUNK_SIZE]);
+        free_tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
+        ChunkWriter::new().push(&vec![i32::MIN; CHUNK_SIZE], 1, &tx, &free_rx);
+        assert_eq!(rx.try_recv().unwrap(), vec![-1.0; CHUNK_SIZE]);
     }
 
     /// An `AudioCapture` whose only live wire is the error channel — the
