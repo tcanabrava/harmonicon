@@ -82,7 +82,7 @@ adaptive difficulty is forced off (a lesson's own pacing shouldn't be
 further modulated by a second, unrelated pacing system — see
 [Application States and Modes](app-states.md) for the general
 routing-flag pattern `LessonContext` follows for "where do I land when
-this run ends"), and the menu routes back to the lesson list rather than
+this run ends"), and the menu routes back to the skill tree rather than
 the song list on exit.
 
 **The one exception**: `PassCriteria::ScaleAdherence`/
@@ -100,13 +100,13 @@ automatically the way a scored song has.
 title Chart-backed vs. jam-based lesson — same LessonContext, different AppState/GameplayMode
 skinparam componentStyle rectangle
 
-rectangle "Lessons list -> lesson reader -> Start" as start
+rectangle "Skill tree -> lesson reader -> Start" as start
 rectangle "LessonContext (Resource)\nid, pass_criteria" as context
 rectangle "Chart-backed:\nPlay2D/Play3D, ordinary\nSongChartLoader + score_notes" as chart_lesson
 rectangle "Jam-based (ScaleAdherence /\nChordToneAdherence / PhraseDiscipline):\nJamSession + jam::improv::ImprovStats" as jam_lesson
 rectangle "Results screen judges\npass_criteria against\nnormal score/stats" as chart_judge
 rectangle "\"Finish Lesson\" pause-menu\nbutton judges pass_criteria\nagainst accumulated ImprovStats" as jam_judge
-rectangle "Progress written to\nPlayerProfile; menu routes\nback to the lesson list" as done
+rectangle "Progress written to\nPlayerProfile; menu routes\nback to the skill tree" as done
 
 start --> context
 context --> chart_lesson : manifest.chart is Some
@@ -130,7 +130,7 @@ deliberately: `lessons` depends on `assets_management` for the low-level
 watch machinery, never the other way around, since `assets_management`
 is generic shared vocabulary that has no business knowing what a
 "lesson" is. A live drop-in under `~/Harmonicon/lessons` fires a
-`LessonsRescanned` message the Lessons list page consumes to rebuild
+`LessonsRescanned` message the skill-tree page consumes to rebuild
 itself if it happens to already be open — no restart, no manual refresh
 button.
 

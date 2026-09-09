@@ -33,9 +33,7 @@ impl Plugin for MenuPlugin {
             .register_type::<bevy::state::state::NextState<MenuPage>>()
             .init_resource::<SelectedArtist>()
             .init_resource::<pages::harp_check::HarpChoice>()
-            .init_resource::<pages::lessons::SelectedLesson>()
-            .init_resource::<pages::lessons::SelectedUnitIx>()
-            .add_message::<pages::lessons::LessonUnitChanged>()
+            .init_resource::<pages::lesson_reader::SelectedLesson>()
             .init_resource::<pages::jam_generate::JamGenerateConfig>()
             .init_resource::<GameplayMode>()
             .init_resource::<JamProgression>()
@@ -113,22 +111,18 @@ impl Plugin for MenuPlugin {
             )
             .add_systems(OnExit(MenuPage::ModeSelect), scene::cleanup_menu)
             .add_systems(
-                OnEnter(MenuPage::Lessons),
-                pages::lessons::setup_lessons_menu,
-            )
-            .add_systems(OnExit(MenuPage::Lessons), scene::cleanup_menu)
-            .add_systems(
                 OnEnter(MenuPage::LessonTree),
                 pages::lesson_tree::setup_lesson_tree,
             )
             .add_systems(OnExit(MenuPage::LessonTree), scene::cleanup_menu)
             .add_systems(
                 Update,
-                pages::lessons::rebuild_on_lessons_rescanned.run_if(in_state(MenuPage::Lessons)),
+                pages::lesson_tree::rebuild_on_lessons_rescanned
+                    .run_if(in_state(MenuPage::LessonTree)),
             )
             .add_systems(
                 OnEnter(MenuPage::LessonReader),
-                pages::lessons::setup_lesson_reader,
+                pages::lesson_reader::setup_lesson_reader,
             )
             .add_systems(OnExit(MenuPage::LessonReader), scene::cleanup_menu)
             .add_systems(
@@ -154,14 +148,6 @@ impl Plugin for MenuPlugin {
             .add_systems(
                 Update,
                 routing::check_loading.run_if(in_state(AppState::SongLoading)),
-            )
-            // Tab switches on the Lessons page write `SelectedUnitIx` and
-            // fire `LessonUnitChanged`; this swaps the scrollbox rows in
-            // response (message-gated, not resource-change-gated — see the
-            // doc comment on `LessonUnitChanged`).
-            .add_systems(
-                Update,
-                pages::lessons::repopulate_lesson_list.run_if(in_state(MenuPage::Lessons)),
             )
             // The guided tour drives `NextState<AppState>`/`NextState<
             // MenuPage>` itself on a timer, and some steps leave

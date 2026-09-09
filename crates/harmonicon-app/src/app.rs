@@ -66,7 +66,7 @@ pub struct JamProgression(pub Progression);
 /// Defaults to `FirstPosition` (the blues hexatonic — unchanged Jam
 /// Session behavior before this resource existed). Set explicitly by
 /// "Generate Jam" (`menu::jam_generate`) and by a jam-based lesson's
-/// `scale` manifest field (`menu::pages::lessons::parse_scale`); the
+/// `scale` manifest field (`menu::pages::lesson_reader::parse_scale`); the
 /// real-song "Jam Session" button resets it to `FirstPosition`, mirroring
 /// `JamProgression`'s own reset — though a real song's own declared
 /// `Harmonica::scale()` (if it sets one) still wins over this resource,
@@ -78,7 +78,7 @@ pub struct JamScale(pub Scale);
 /// `JamScale` through First/Second/Third position) — see
 /// `jam::position_guide`. Only ever `true` for a jam-based lesson that opts
 /// in via its manifest's `position_cycle` field
-/// (`menu::pages::lessons::setup_lesson_reader`'s Start handler); the
+/// (`menu::pages::lesson_reader::setup_lesson_reader`'s Start handler); the
 /// real-song "Jam Session" button resets it to `false`, mirroring
 /// `JamProgression`/`JamScale`'s own reset, so a previous lesson's cycling
 /// can't leak into an ordinary jam.

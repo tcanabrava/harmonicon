@@ -33,7 +33,7 @@ load-bearing about *this* crate.
 - **One lesson type breaks the "ordinary pipeline" rule above:**
   `PassCriteria::ScaleAdherence` (the improvisation lesson) has no chart
   notes to score and no natural end — it's an open `GameplayMode::
-  JamSession`. `menu::pages::lessons::setup_lesson_reader`'s Start button
+  JamSession`. `menu::pages::lesson_reader::setup_lesson_reader`'s Start button
   routes it into `JamSession` instead of `Play2D`; `jam::improv::
   ImprovStats` (fresh-attack-gated, like `PitchGate`) accumulates
   scale/chord-tone adherence live via `classify_note_fit` — the same
@@ -43,7 +43,7 @@ load-bearing about *this* crate.
   `LessonContext` in flight) judges it and returns to the menu on
   demand, via the same `apply_quit` path the ordinary Quit button uses;
   `route_menu_entry` sees the still-present `LessonContext` and routes
-  to the lesson list, same as any other lesson. It never touches the
+  to the skill tree, same as any other lesson. It never touches the
   results screen at all.
 - **Two more jam-based criteria join `ScaleAdherence`:**
   `PassCriteria::ChordToneAdherence` (stricter — only counts chord tones,
@@ -55,13 +55,13 @@ load-bearing about *this* crate.
   pattern must repeat consistently across an open-ended jam rather than
   resetting every 12 bars). All three read different fields off the same
   always-accumulating `ImprovStats` (`chord_tone`/`in_scale`/
-  `out_of_scale`/`rest_violations`); `menu::pages::lessons::is_jam_criteria`
+  `out_of_scale`/`rest_violations`); `menu::pages::lesson_reader::is_jam_criteria`
   routes any of the three into `JamSession` the same way
   `ScaleAdherence` alone used to, and `gameplay::pause_menu::
   jam_fraction_for` picks the one relevant fraction for whichever
   criterion a given lesson declares before calling `lesson_passed`.
   Separately, `LessonManifest::progression` (an optional
-  `"standard"`/`"quick-change"`/`"minor"` string, `menu::pages::lessons::
+  `"standard"`/`"quick-change"`/`"minor"` string, `menu::pages::lesson_reader::
   parse_progression`) seeds `harmonicon_app::app::JamProgression` on Start for any
   jam-based lesson, defaulting to `Standard` — same "don't let a stale
   pick linger" reasoning the real-song Jam Session button already

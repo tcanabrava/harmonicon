@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 
-//! The Lessons menu: a tab bar of curriculum units over a vertical
-//! scrollbox of that unit's lessons, and the per-lesson reader page
-//! (instructional body + Start button for chart-backed lessons,
-//! Mark-as-Done for instructional-only ones). Discovery/unlock/pass logic
-//! lives in `harmonicon_song::lessons`; this module is only the menu surface.
+//! One lesson's page: the instructional body, a Start button for
+//! chart-backed lessons, Mark-as-Done for instructional-only ones, and the
+//! row of five training tiers under it. Reached from a node of
+//! `pages::lesson_tree`, which is the only way in — the curriculum used to
+//! have a flat list page here as well, and now has one home per lesson.
+//!
+//! Discovery/unlock/pass logic lives in `harmonicon_song::lessons`; this
+//! module is only the menu surface.
 
 use bevy::prelude::*;
-use bevy::ui_widgets::{Activate, ScrollArea};
+use bevy::ui_widgets::Activate;
 use bevy_fluent::Localization;
 
 use harmonicon_app::profile::{PlayerProfile, record_lesson, save_profile, training_key};
@@ -18,56 +21,24 @@ use harmonicon_core::training::{Tier, drill_chart};
 use harmonicon_platform::localization::LocalizationExt;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::lessons::training_criteria;
-use harmonicon_song::lessons::{
-    AvailableLessons, LessonContext, LessonEntry, LessonsRescanned, PassCriteria, group_by_unit,
-    is_unlocked,
-};
+use harmonicon_song::lessons::{AvailableLessons, LessonContext, LessonEntry, PassCriteria};
 use harmonicon_song::song::{SongManifest, training_manifest};
-use harmonicon_ui::dialogs::button;
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
-use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
 use crate::menu::routing::MenuPage;
-use crate::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root, spawn_menu_root_plain};
+use crate::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root};
 use harmonicon_app::app::{
     AppState, GameplayMode, GeneratedSong, JamPositionCycle, JamProgression, JamScale, SelectedSong,
 };
 
-/// The lesson the reader page shows — set by the list page's buttons right
-/// before switching to [`MenuPage::LessonReader`].
+/// The lesson this page shows — set by a skill-tree node right before it
+/// switches to [`MenuPage::LessonReader`].
 #[derive(Resource, Default)]
 pub(crate) struct SelectedLesson(pub Option<String>);
 
-/// The unit tab currently shown on the list page — an index into
-/// [`group_by_unit`]'s order. Persists across visits (returning from a
-/// lesson lands back on the same tab); clamped on read so a shrunk lesson
-/// set can't leave it dangling.
-#[derive(Resource, Default)]
-pub(crate) struct SelectedUnitIx(pub usize);
-
-/// Fired by the tab bar's `on_select` observer when the user actually
-/// switches units — [`repopulate_lesson_list`] reacts to this instead of
-/// `resource_changed::<SelectedUnitIx>`, which fires spuriously on the
-/// list page's very first frame (an initial value looks "changed" to a
-/// run condition that's never evaluated it before) and would otherwise
-/// re-populate the scrollbox the same frame `setup_lessons_menu` already
-/// did — despawning rows whose freshly inserted `Text` `dialogs::
-/// font_fallback::apply_font_fallback` may not have finished processing,
-/// which panics when its deferred command applies against the now-
-/// recycled entity index.
-#[derive(Message)]
-pub(crate) struct LessonUnitChanged;
-
-/// The scrollbox holding the selected unit's lesson rows, so
-/// [`repopulate_lesson_list`] can swap its children when the tab changes.
-/// `pub(crate)` only because it appears in that system's signature, which
-/// `menu::MenuPlugin` names when registering it.
-#[derive(Component)]
-pub(crate) struct LessonListBox;
-
-/// Looks a lesson up by id. The list page always sets [`SelectedLesson`]
-/// before opening the reader, so a miss only happens if something desyncs —
-/// the reader degrades to an empty page with a Back button rather than
+/// Looks a lesson up by id. The tree always sets [`SelectedLesson`] before
+/// opening this page, so a miss only happens if something desyncs — the
+/// reader degrades to an empty page with a Back button rather than
 /// panicking.
 fn find_lesson<'a>(lessons: &'a AvailableLessons, id: &str) -> Option<&'a LessonEntry> {
     lessons.0.iter().find(|l| l.manifest.id == id)
@@ -156,260 +127,6 @@ pub(crate) fn parse_scale(s: Option<&str>) -> Scale {
     }
 }
 
-// ── Lesson list page ──────────────────────────────────────────────────────────
-
-pub(crate) fn setup_lessons_menu(
-    mut commands: Commands,
-    lessons: Res<AvailableLessons>,
-    profile: Res<PlayerProfile>,
-    selected_unit: Res<SelectedUnitIx>,
-    theme: Res<LoadedTheme>,
-    loc: Res<Localization>,
-) {
-    // `spawn_menu_root_plain`, not `spawn_menu_root`: this page's own list
-    // box (below) needs to stretch to fill the body's full height and do
-    // its own scrolling — nesting it inside `spawn_menu_root`'s
-    // shrink-to-content, then-centered `ScrollArea` is what left it
-    // reading as a small floating box with dead space beneath it instead
-    // of a real full-height list panel.
-    let (root, header, _page_root) = spawn_menu_root_plain(
-        &mut commands,
-        &loc.msg("menu-lessons"),
-        None,
-        &theme,
-        "Lessons",
-    );
-    // Stretch to fill the body's remaining height below the header,
-    // instead of `spawn_menu_root_plain`'s default shrink-to-content
-    // sizing — see the comment above.
-    commands.entity(root).insert(Node {
-        flex_direction: FlexDirection::Column,
-        align_items: AlignItems::Center,
-        row_gap: Val::Px(16.0),
-        flex_grow: 1.0,
-        min_height: Val::Px(0.0),
-        ..default()
-    });
-
-    let units = group_by_unit(&lessons.0);
-    if units.is_empty() {
-        let msg = commands
-            .spawn((
-                Text::new(String::from(loc.msg("no-lessons-found"))),
-                TextFont {
-                    font_size: FontSize::Px(16.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.8, 0.4, 0.4)),
-            ))
-            .id();
-        commands.entity(root).add_child(msg);
-        spawn_back_to_play(&mut commands, header, &loc);
-        return;
-    }
-
-    // Unit tabs — switching one only updates `SelectedUnitIx`;
-    // `repopulate_lesson_list` reacts and swaps the scrollbox contents.
-    let unit_labels: Vec<String> = units
-        .iter()
-        .map(|(unit, _)| String::from(loc.msg(&format!("lesson-unit-{unit}"))))
-        .collect();
-    let ix = selected_unit.0.min(units.len() - 1);
-    spawn_tab_bar(
-        &mut commands,
-        root,
-        &unit_labels,
-        ix,
-        |ev: On<TabSelect>,
-         mut selected: ResMut<SelectedUnitIx>,
-         mut changed: MessageWriter<LessonUnitChanged>| {
-            selected.0 = ev.index;
-            changed.write(LessonUnitChanged);
-        },
-    );
-
-    // The selected unit's lessons, in a vertical scrollbox (`ScrollArea`
-    // gives wheel scrolling — same pattern as `dialogs::file_dialog`).
-    // `flex_grow: 1.0` + `min_height: Val::Px(0.0)` (the same "min-height:
-    // auto" shrink trick `dialogs::scroll_area::spawn_scroll_area` uses)
-    // makes this box fill the rest of `root`'s height below the tab bar —
-    // a real list panel down to the bottom of the screen — rather than a
-    // fixed `max_height: Percent(48.0)` that left it undersized with empty
-    // space below regardless of how much room was actually available;
-    // `overflow: scroll_y()` still only starts scrolling once the rows
-    // themselves outgrow that space.
-    let list = commands
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(8.0),
-                width: Val::Px(520.0),
-                flex_grow: 1.0,
-                min_height: Val::Px(0.0),
-                overflow: Overflow::scroll_y(),
-                padding: UiRect::all(Val::Px(10.0)),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.08, 0.08, 0.12, 0.85)),
-            LessonListBox,
-            ScrollArea,
-        ))
-        .id();
-    commands.entity(root).add_child(list);
-    populate_lesson_rows(&mut commands, list, units[ix].1.as_slice(), &profile, &loc);
-
-    spawn_tree_button(&mut commands, root, &loc);
-    spawn_back_to_play(&mut commands, header, &loc);
-}
-
-/// Swaps the scrollbox's rows for the newly selected unit's. Runs only
-/// while the list page is open and only when a [`LessonUnitChanged`]
-/// message says the tab actually changed (see the registration in
-/// `menu::MenuPlugin`) — not on resource change-detection, which can't
-/// distinguish "the user just switched tabs" from "this run condition has
-/// never observed this resource before" (see the doc comment on
-/// [`LessonUnitChanged`]).
-pub(crate) fn repopulate_lesson_list(
-    mut changed: MessageReader<LessonUnitChanged>,
-    lessons: Res<AvailableLessons>,
-    profile: Res<PlayerProfile>,
-    selected_unit: Res<SelectedUnitIx>,
-    loc: Res<Localization>,
-    list: Query<Entity, With<LessonListBox>>,
-    mut commands: Commands,
-) {
-    if changed.is_empty() {
-        return;
-    }
-    changed.clear();
-    let Ok(list) = list.single() else {
-        return;
-    };
-    let units = group_by_unit(&lessons.0);
-    if units.is_empty() {
-        return;
-    }
-    let ix = selected_unit.0.min(units.len() - 1);
-    commands.entity(list).despawn_related::<Children>();
-    populate_lesson_rows(&mut commands, list, units[ix].1.as_slice(), &profile, &loc);
-}
-
-/// `lessons::catalog` rescans `AvailableLessons` live when
-/// `~/Harmonicon/lessons` changes; if the Lessons list page happens to be
-/// open when that happens, force a same-page rebuild (`NextState::set`
-/// re-fires `OnExit`/`OnEnter` even for a same-state transition — see
-/// `CLAUDE.md`) — a full rebuild rather than just re-populating the current
-/// tab's rows, since a new/removed unit can change the tab bar itself, not
-/// just one unit's row list. Message-driven for the same staleness reason
-/// `artist_list::rebuild_on_songs_rescanned` documents.
-pub(crate) fn rebuild_on_lessons_rescanned(
-    mut rescanned: MessageReader<LessonsRescanned>,
-    mut page: ResMut<NextState<MenuPage>>,
-) {
-    if rescanned.read().next().is_some() {
-        page.set(MenuPage::Lessons);
-    }
-}
-
-/// Fixed width every lesson-list row (locked or not) is spawned at, so a
-/// long title never makes its row wider than a short one — matches the
-/// list container's own width (`setup_lessons_menu`) minus its padding.
-const LESSON_ROW_WIDTH: f32 = 500.0;
-
-/// Font size for a lesson-list row's label (already decorated with any
-/// 🔒/✓ prefix or " — locked" suffix — the caller passes the final display
-/// string). Bevy doesn't expose glyph metrics before layout, so this is a
-/// coarse character-count curve rather than a measured fit — chosen
-/// conservatively against the longest label any shipped locale actually
-/// produces (a long title plus the locked decoration, in the most verbose
-/// locale) so labels stay on one line at `LESSON_ROW_WIDTH` in practice.
-const fn lesson_button_font_size(char_count: usize) -> f32 {
-    match char_count {
-        0..=25 => 17.0,
-        26..=38 => 14.5,
-        39..=50 => 12.5,
-        _ => 11.0,
-    }
-}
-
-/// One row per lesson of the shown unit: a clickable button opening the
-/// reader (✓-prefixed once passed — a passed lesson stays replayable), or a
-/// dimmed 🔒 row while its prerequisites aren't met. Under `--features dev`
-/// every lesson is treated as unlocked regardless of prerequisites — a dev
-/// convenience for jumping straight to any lesson while iterating, not a
-/// change to `is_unlocked` itself (which stays a plain prerequisite check,
-/// still fully exercised by its own unit tests).
-fn populate_lesson_rows(
-    commands: &mut Commands,
-    list: Entity,
-    unit_lessons: &[&LessonEntry],
-    profile: &PlayerProfile,
-    loc: &Localization,
-) {
-    let passed = profile.passed_lesson_ids();
-    for entry in unit_lessons {
-        let unlocked = cfg!(feature = "dev") || is_unlocked(&entry.manifest, &passed);
-        let title = String::from(loc.msg(&entry.manifest.title_key));
-        let label = if !unlocked {
-            format!("\u{1F512} {} \u{2014} {}", title, loc.msg("lesson-locked"))
-        } else if passed.contains(&entry.manifest.id.as_str()) {
-            format!("\u{2713} {}", title)
-        } else {
-            title
-        };
-        let font_size = lesson_button_font_size(label.chars().count());
-        if unlocked {
-            let id = entry.manifest.id.clone();
-            commands.entity(list).with_children(|row| {
-                row.spawn_empty().apply_scene(button::sized(
-                    &label,
-                    LESSON_ROW_WIDTH,
-                    font_size,
-                    move |_: On<Activate>,
-                          mut selected: ResMut<SelectedLesson>,
-                          mut page: ResMut<NextState<MenuPage>>| {
-                        selected.0 = Some(id.clone());
-                        page.set(MenuPage::LessonReader);
-                    },
-                ));
-            });
-        } else {
-            let row = commands
-                .spawn((
-                    Node {
-                        width: Val::Px(LESSON_ROW_WIDTH),
-                        padding: UiRect::axes(Val::Px(16.0), Val::Px(12.0)),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        flex_shrink: 0.0,
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.08, 0.08, 0.11, 0.6)),
-                ))
-                .with_children(|cell| {
-                    cell.spawn((
-                        Text::new(&label),
-                        TextFont {
-                            font_size: FontSize::Px(font_size),
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.42, 0.44, 0.50)),
-                        TextLayout {
-                            justify: Justify::Center,
-                            ..default()
-                        },
-                    ));
-                })
-                .id();
-            commands.entity(list).add_child(row);
-        }
-    }
-}
-
-/// One plain text line appended directly to `root` (no card/box around
-/// it) — the shared shape the lesson reader's goal-progress line and its
-/// "Passed" badge both use, differing only in text/color.
 /// The lesson's five training tiers, as a row of buttons under Start.
 ///
 /// A lesson with no `training` block gets nothing — that is the honest
@@ -500,6 +217,9 @@ fn spawn_training_row(
     }
 }
 
+/// One plain text line appended directly to `root` (no card/box around
+/// it) — the shared shape the lesson reader's goal-progress line and its
+/// "Passed" badge both use, differing only in text/color.
 fn spawn_reader_line(commands: &mut Commands, root: Entity, text: String, color: Color) {
     let line = commands
         .spawn((
@@ -512,31 +232,6 @@ fn spawn_reader_line(commands: &mut Commands, root: Entity, text: String, color:
         ))
         .id();
     commands.entity(root).add_child(line);
-}
-
-/// Opens the skill-tree view of the same curriculum.
-///
-/// Offered rather than substituted: this list is what a compact layout gets
-/// (`responsive::is_compact` — fourteen rows of nodes is unreadable on a
-/// phone), so both views stay reachable.
-fn spawn_tree_button(commands: &mut Commands, root: Entity, loc: &Localization) {
-    spawn_button(
-        commands,
-        root,
-        &loc.msg("lesson-tree-open"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| {
-            page.set(MenuPage::LessonTree);
-        },
-    );
-}
-
-fn spawn_back_to_play(commands: &mut Commands, header: Entity, loc: &Localization) {
-    spawn_back_button(
-        commands,
-        header,
-        &loc.msg("back"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Play),
-    );
 }
 
 // ── Lesson reader page ────────────────────────────────────────────────────────
@@ -561,7 +256,7 @@ pub(crate) fn setup_lesson_reader(
         spawn_menu_root(&mut commands, &title, None, &theme, "Lessons");
 
     let Some(entry) = entry else {
-        spawn_back_to_lessons(&mut commands, header, &loc);
+        spawn_back_to_tree(&mut commands, header, &loc);
         return;
     };
 
@@ -680,24 +375,24 @@ pub(crate) fn setup_lesson_reader(
                     let record = profile.lessons.entry(lesson_id.clone()).or_default();
                     record_lesson(record, true, 0.0);
                     save_profile(&profile);
-                    // Back to the list, which re-spawns with the new ✓ (and
-                    // any newly unlocked lessons).
-                    page.set(MenuPage::Lessons);
+                    // Back to the tree, which re-spawns with this node
+                    // passed and anything it unlocked now lit.
+                    page.set(MenuPage::LessonTree);
                 },
             );
         }
         None => {}
     }
 
-    spawn_back_to_lessons(&mut commands, header, &loc);
+    spawn_back_to_tree(&mut commands, header, &loc);
 }
 
-fn spawn_back_to_lessons(commands: &mut Commands, header: Entity, loc: &Localization) {
+fn spawn_back_to_tree(commands: &mut Commands, header: Entity, loc: &Localization) {
     spawn_back_button(
         commands,
         header,
         &loc.msg("back"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Lessons),
+        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::LessonTree),
     );
 }
 
@@ -771,30 +466,5 @@ mod tests {
     fn parse_scale_defaults_to_first_position_when_absent_or_unknown() {
         assert_eq!(parse_scale(None), Scale::FirstPosition);
         assert_eq!(parse_scale(Some("dorian")), Scale::FirstPosition);
-    }
-
-    #[test]
-    fn short_titles_use_the_largest_size() {
-        assert_eq!(lesson_button_font_size(0), 17.0);
-        assert_eq!(lesson_button_font_size(25), 17.0);
-    }
-
-    #[test]
-    fn size_shrinks_in_steps_as_length_grows() {
-        assert_eq!(lesson_button_font_size(26), 14.5);
-        assert_eq!(lesson_button_font_size(38), 14.5);
-        assert_eq!(lesson_button_font_size(39), 12.5);
-        assert_eq!(lesson_button_font_size(50), 12.5);
-        assert_eq!(lesson_button_font_size(51), 11.0);
-    }
-
-    #[test]
-    fn the_longest_shipped_locked_label_still_fits_the_smallest_size() {
-        // "🔒 Leer la Rejilla del Blues de 12 Compases — bloqueada" (es-ES,
-        // the longest lesson title, decorated the way a locked row actually
-        // renders it) — the curve must not fall through to something even
-        // this doesn't have a tier for.
-        let longest = "\u{1F512} Leer la Rejilla del Blues de 12 Compases \u{2014} bloqueada";
-        assert!(lesson_button_font_size(longest.chars().count()) >= 11.0);
     }
 }

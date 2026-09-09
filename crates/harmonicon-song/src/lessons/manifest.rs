@@ -28,7 +28,7 @@ pub enum PassCriteria {
     /// from an *open* Jam Session, which has no chart notes to score and no
     /// natural end: the lesson reader's Start button routes a lesson with
     /// this criterion into `GameplayMode::JamSession` instead of `Play2D`
-    /// (see `menu::pages::lessons::setup_lesson_reader`), and a dedicated
+    /// (see `menu::pages::lesson_reader::setup_lesson_reader`), and a dedicated
     /// "Finish Lesson" pause-menu button (jam mode + a `LessonContext` in
     /// flight — see `gameplay::pause_menu`) judges it on demand and returns
     /// to the menu directly, bypassing the results screen entirely (there's
@@ -94,7 +94,7 @@ pub struct LessonManifest {
     /// A jam-based lesson's backing progression (`"standard"`/
     /// `"quick-change"`/`"minor"`), seeded into `crate::app::JamProgression` when
     /// routing into `GameplayMode::JamSession` — see
-    /// `menu::pages::lessons::parse_progression`. `None` resets to `Standard`,
+    /// `menu::pages::lesson_reader::parse_progression`. `None` resets to `Standard`,
     /// the same "don't let a stale pick from an earlier generated jam linger"
     /// reasoning the real-song Jam Session button already applies.
     #[serde(default)]
@@ -103,14 +103,14 @@ pub struct LessonManifest {
     /// (`"first-position"`/`"second-position"`/`"third-position"`/
     /// `"major"`/`"minor-pentatonic"`/`"country"`), seeded into
     /// `crate::app::JamScale` when routing into `GameplayMode::JamSession`
-    /// — see `menu::pages::lessons::parse_scale`. `None` resets to
+    /// — see `menu::pages::lesson_reader::parse_scale`. `None` resets to
     /// `first-position` (the blues hexatonic), the same "don't let a stale
     /// pick linger" reasoning `progression` above applies.
     #[serde(default)]
     pub scale: Option<String>,
     /// An instructional lesson's embedded reference diagram
     /// (`"circle-of-fifths"` — see `dialogs::circle_of_fifths`), rendered
-    /// by `menu::pages::lessons::setup_lesson_reader` alongside the body
+    /// by `menu::pages::lesson_reader::setup_lesson_reader` alongside the body
     /// text. `None` (the common case) renders no diagram. Schema-enforced
     /// to a fixed enum, like `progression`/`scale` above, so a second
     /// diagram type later just adds another accepted value here rather

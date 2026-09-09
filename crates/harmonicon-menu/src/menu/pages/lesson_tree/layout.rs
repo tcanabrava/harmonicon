@@ -7,40 +7,56 @@
 //! beside it turns that into nodes. Same split the notation staff uses:
 //! decisions here, translation there, so the decisions are testable.
 //!
-//! **A layered drawing, not a grid of tracks.** A node's column is its
-//! depth in the prerequisite graph, so it always sits right of everything
-//! it needs; its row is chosen to keep edges from crossing. Tracks stop
-//! being rows and become colour — the shape of the graph is what carries
-//! the meaning, the way a tech tree reads.
+//! **Two levels, not one.** Across the top runs a spine of *unit* nodes —
+//! Unit 1, Unit 2, … — each opening once enough of the one before it is
+//! passed ([`harmonicon_song::lessons::units`]). Under each hangs that
+//! unit's own lessons, laid out as their own small layered graph: column is
+//! depth *within the unit*, row is chosen to keep edges untangled, and
+//! track is colour rather than row.
+//!
+//! **That two-level shape is what makes the drawing readable**, and it is
+//! the whole reason for it. Laid out as one flat graph, the curriculum's
+//! eighteen cross-unit prerequisites became edges spanning four and five
+//! columns, drawn straight through whatever nodes and labels lay between —
+//! and no amount of crossing reduction helps, because the endpoints are
+//! genuinely that far apart. Grouping by unit turns those eighteen into
+//! four spine edges, and every remaining edge is local to one cluster.
+//!
+//! **A cross-unit prerequisite is therefore not drawn.** It is not lost:
+//! [`PlacedNode::unmet`] carries whatever a locked lesson is still waiting
+//! on, so the renderer can name it on the node itself rather than make the
+//! player trace a line across the screen.
 //!
 //! **Grid coordinates, not pixels.** Node size and spacing are the
 //! renderer's business and change with the theme; which node sits left of
 //! which does not.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use harmonicon_app::profile::PlayerProfile;
 use harmonicon_core::training::Tier;
 use harmonicon_song::lessons::LessonEntry;
 use harmonicon_song::lessons::graph::LessonGraph;
+use harmonicon_song::lessons::units::UnitChain;
 
 /// Crossing-reduction sweeps. Four down-and-up passes is well past the
 /// point this curriculum stops improving; it is cheap and runs once.
 const ORDERING_PASSES: usize = 4;
 
-/// How many nodes may share a column before the layout starts pushing some
-/// of them right.
-///
-/// Depth alone stacked nine lessons in one column, which reads as a wall
-/// rather than a tree. Spreading trades height for width — the shipped
-/// curriculum goes from 7 columns by 9 rows to 16 by 4 — and width is the
-/// axis that can afford it, since the page scrolls both ways.
-const MAX_PER_COLUMN: usize = 4;
+/// Blank columns between one unit's cluster and the next, so the units read
+/// as separate groups rather than one continuous field of nodes.
+const UNIT_GAP_COLUMNS: usize = 1;
+
+/// The row the spine runs along. Everything else hangs below it, which is
+/// what keeps the spine's own edges horizontal and crossing nothing.
+const SPINE_ROW: f32 = 0.0;
+/// The first row a lesson may occupy.
+const CLUSTER_TOP_ROW: f32 = 1.0;
 
 /// How a node reads at a glance.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NodeState {
-    /// A prerequisite is still unmet.
+    /// A prerequisite — or the whole unit — is still shut.
     Locked,
     /// Playable now, not yet passed.
     Available,
@@ -48,6 +64,23 @@ pub enum NodeState {
     Passed,
     /// Passed, and every training tier with it.
     Mastered,
+}
+
+/// One unit of the curriculum, drawn as a major node on the spine.
+#[derive(Clone, PartialEq, Debug)]
+pub struct PlacedUnit {
+    pub id: String,
+    /// Fluent key — `lesson-unit-<id>`, the key the curriculum already uses.
+    pub title_key: String,
+    pub column: usize,
+    pub row: f32,
+    /// Whether the player has reached this unit yet.
+    pub locked: bool,
+    /// Lessons passed inside it, and how many open the next unit. Shown as
+    /// a count on the node: a gate the player can't see the terms of is
+    /// just an obstacle.
+    pub completed: usize,
+    pub required: usize,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -59,11 +92,12 @@ pub struct PlacedNode {
     /// The track this lesson belongs to. Drawn as colour rather than as a
     /// row, so grouping survives without constraining position.
     pub track: String,
-    /// The lesson's depth in the prerequisite graph. A node always sits to
-    /// the right of everything it depends on.
+    /// Depth *within this lesson's unit*, offset by where that unit's
+    /// cluster starts. A node always sits right of everything it depends on
+    /// inside its own unit.
     pub column: usize,
-    /// Vertical position within the column, in node-heights. Fractional so
-    /// a short layer can be centred against a tall one.
+    /// Vertical position, in node-heights. Fractional so a short layer can
+    /// be centred against a tall one.
     pub row: f32,
     pub state: NodeState,
     /// 0..1, how much of the training ladder is passed.
@@ -72,25 +106,43 @@ pub struct PlacedNode {
     /// no ring — there is nothing to fill, and an empty ring would read as
     /// "you have done none of it" rather than "there is none".
     pub has_trainings: bool,
+    /// Title keys of the prerequisites still unpassed. Carries the
+    /// cross-unit ones no longer drawn as edges, so a locked node can say
+    /// what it wants instead of leaving the player to guess.
+    pub unmet: Vec<String>,
 }
 
-/// A prerequisite edge, in grid coordinates.
+/// What an edge means, which is also how it should be drawn.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EdgeKind {
+    /// Unit to unit, along the spine.
+    Spine,
+    /// A unit down into its own lessons, or one lesson to another inside a
+    /// unit.
+    Branch,
+}
+
+/// An edge, in grid coordinates.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Edge {
     pub from: (usize, f32),
     pub to: (usize, f32),
+    pub kind: EdgeKind,
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
 pub struct TreeLayout {
+    pub units: Vec<PlacedUnit>,
     pub nodes: Vec<PlacedNode>,
     pub edges: Vec<Edge>,
 }
 
 impl TreeLayout {
-    /// Columns the canvas needs — one past the deepest node.
+    /// Columns the canvas needs — one past the rightmost node.
     pub fn columns(&self) -> usize {
-        self.nodes.iter().map(|n| n.column + 1).max().unwrap_or(0)
+        let lessons = self.nodes.iter().map(|n| n.column + 1).max().unwrap_or(0);
+        let units = self.units.iter().map(|u| u.column + 1).max().unwrap_or(0);
+        lessons.max(units)
     }
 
     /// Rows the canvas needs, in node-heights.
@@ -98,6 +150,7 @@ impl TreeLayout {
         self.nodes
             .iter()
             .map(|n| n.row + 1.0)
+            .chain(self.units.iter().map(|u| u.row + 1.0))
             .fold(0.0_f32, f32::max)
     }
 
@@ -105,25 +158,39 @@ impl TreeLayout {
     pub fn node(&self, id: &str) -> Option<&PlacedNode> {
         self.nodes.iter().find(|n| n.id == id)
     }
+
+    #[cfg(test)]
+    pub fn unit(&self, id: &str) -> Option<&PlacedUnit> {
+        self.units.iter().find(|u| u.id == id)
+    }
 }
 
-/// Places every lesson, given what the player has done.
-pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProfile) -> TreeLayout {
+/// Places every unit and every lesson, given what the player has done.
+pub fn layout(
+    entries: &[LessonEntry],
+    graph: &LessonGraph,
+    chain: &UnitChain,
+    profile: &PlayerProfile,
+) -> TreeLayout {
     let passed: HashSet<&str> = profile.passed_lesson_ids().into_iter().collect();
     let tiers = Tier::ALL.len();
 
     // Only lessons the catalogue can label. One in the graph but not here
     // is skipped rather than drawn as a blank node.
     let mut nodes: Vec<PlacedNode> = Vec::new();
+    let mut unit_of_node: Vec<usize> = Vec::new();
     for entry in entries {
         let id = &entry.manifest.id;
-        let Some(graph_node) = graph.get(id) else {
+        let (Some(graph_node), Some(unit)) = (graph.get(id), chain.unit_of(id)) else {
             continue;
         };
-        let unlocked = graph_node
+        let unit_open = chain.is_unlocked(unit, &passed);
+        let unmet: Vec<&str> = graph_node
             .prerequisites
             .iter()
-            .all(|p| passed.contains(p.as_str()));
+            .map(String::as_str)
+            .filter(|p| !passed.contains(p))
+            .collect();
         let is_passed = passed.contains(id.as_str());
         let has_trainings = entry.manifest.training.is_some();
         let mastery = if has_trainings {
@@ -135,9 +202,11 @@ pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProf
             id: id.clone(),
             title_key: entry.manifest.title_key.clone(),
             track: graph_node.track.clone(),
-            column: graph_node.depth,
+            column: 0,
             row: 0.0,
-            state: match (unlocked, is_passed) {
+            // A lesson needs both gates open: its own prerequisites, and
+            // the unit holding it.
+            state: match (unit_open && unmet.is_empty(), is_passed) {
                 (false, false) => NodeState::Locked,
                 (_, true) if has_trainings && mastery >= 1.0 => NodeState::Mastered,
                 (_, true) => NodeState::Passed,
@@ -145,7 +214,12 @@ pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProf
             },
             mastery,
             has_trainings,
+            unmet: unmet
+                .iter()
+                .map(|p| title_key_of(entries, p).unwrap_or_else(|| (*p).to_string()))
+                .collect(),
         });
+        unit_of_node.push(unit);
     }
     if nodes.is_empty() {
         return TreeLayout::default();
@@ -157,16 +231,19 @@ pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProf
         .map(|(i, n)| (n.id.as_str(), i))
         .collect();
 
-    // Predecessors, by node index — only the ones actually placed.
+    // Adjacency, by node index, and **only within a unit** — a cross-unit
+    // prerequisite is represented by the spine, not by an edge.
     let predecessors: Vec<Vec<usize>> = nodes
         .iter()
-        .map(|n| {
+        .enumerate()
+        .map(|(i, n)| {
             graph
                 .get(&n.id)
                 .map(|g| {
                     g.prerequisites
                         .iter()
                         .filter_map(|p| index.get(p.as_str()).copied())
+                        .filter(|&p| unit_of_node[p] == unit_of_node[i])
                         .collect()
                 })
                 .unwrap_or_default()
@@ -179,44 +256,98 @@ pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProf
         }
     }
 
-    // Depth is only the *earliest* column a node may occupy. Spreading may
-    // push it further right so no column stacks too deep.
-    let mut columns: Vec<usize> = nodes.iter().map(|n| n.column).collect();
-    spread_columns(&mut columns, &predecessors, &successors);
-    for (node, column) in nodes.iter_mut().zip(&columns) {
-        node.column = *column;
-    }
-
-    let column_count = nodes.iter().map(|n| n.column + 1).max().unwrap_or(0);
-    let mut layers: Vec<Vec<usize>> = vec![Vec::new(); column_count];
-    for (i, n) in nodes.iter().enumerate() {
-        layers[n.column].push(i);
-    }
-    // Start from the catalogue's own order, so the result is deterministic
-    // and — before any crossing reduction — already roughly the order a
-    // reader met these lessons in.
-    for layer in &mut layers {
-        layer.sort_unstable();
-    }
-
-    order_layers(&mut layers, &predecessors, &successors);
-
-    // Centre every layer against the tallest, so the tree hangs balanced
-    // rather than pinned to the top with the root alone in the corner.
-    let tallest = layers.iter().map(Vec::len).max().unwrap_or(0) as f32;
-    for layer in &layers {
-        let offset = (tallest - layer.len() as f32) / 2.0;
-        for (row, &node) in layer.iter().enumerate() {
-            nodes[node].row = offset + row as f32;
+    let mut units: Vec<PlacedUnit> = Vec::new();
+    let mut cursor = 0usize;
+    for (ix, unit) in chain.units().iter().enumerate() {
+        let members: Vec<usize> = (0..nodes.len())
+            .filter(|&n| unit_of_node[n] == ix)
+            .collect();
+        if members.is_empty() {
+            continue;
         }
+
+        // Depth within the cluster. `graph.get(..).depth` is a valid
+        // topological order over the whole curriculum, so walking members
+        // in that order means every predecessor is resolved before its
+        // dependent — no second sort needed.
+        let mut by_depth = members.clone();
+        by_depth.sort_by_key(|&n| (graph.get(&nodes[n].id).map(|g| g.depth).unwrap_or(0), n));
+        let mut local: HashMap<usize, usize> = HashMap::new();
+        for &n in &by_depth {
+            let depth = predecessors[n]
+                .iter()
+                .filter_map(|p| local.get(p))
+                .map(|d| d + 1)
+                .max()
+                .unwrap_or(0);
+            local.insert(n, depth);
+        }
+
+        let width = local.values().map(|d| d + 1).max().unwrap_or(1);
+        let mut layers: Vec<Vec<usize>> = vec![Vec::new(); width];
+        for &n in &members {
+            layers[local[&n]].push(n);
+        }
+        // Start from the catalogue's own order, so the result is
+        // deterministic and — before any crossing reduction — already
+        // roughly the order a reader met these lessons in.
+        for layer in &mut layers {
+            layer.sort_unstable();
+        }
+        order_layers(&mut layers, &predecessors, &successors);
+
+        // Centre every layer against the tallest, so a cluster hangs
+        // balanced rather than pinned to the top.
+        let tallest = layers.iter().map(Vec::len).max().unwrap_or(0) as f32;
+        for (column, layer) in layers.iter().enumerate() {
+            let offset = (tallest - layer.len() as f32) / 2.0;
+            for (row, &n) in layer.iter().enumerate() {
+                nodes[n].column = cursor + column;
+                nodes[n].row = CLUSTER_TOP_ROW + offset + row as f32;
+            }
+        }
+
+        units.push(PlacedUnit {
+            id: unit.id.clone(),
+            title_key: unit.title_key.clone(),
+            column: cursor,
+            row: SPINE_ROW,
+            locked: !chain.is_unlocked(ix, &passed),
+            completed: chain.completed(ix, &passed),
+            required: chain.required(ix),
+        });
+        cursor += width + UNIT_GAP_COLUMNS;
     }
 
     let mut edges: Vec<Edge> = Vec::new();
+    for pair in units.windows(2) {
+        edges.push(Edge {
+            from: (pair[0].column, pair[0].row),
+            to: (pair[1].column, pair[1].row),
+            kind: EdgeKind::Spine,
+        });
+    }
     for (to, preds) in predecessors.iter().enumerate() {
+        if preds.is_empty() {
+            // A cluster root hangs off its unit node — otherwise the first
+            // column of every unit floats unattached to anything.
+            if let Some(unit) = units
+                .iter()
+                .find(|u| u.id == chain.units()[unit_of_node[to]].id)
+            {
+                edges.push(Edge {
+                    from: (unit.column, unit.row),
+                    to: (nodes[to].column, nodes[to].row),
+                    kind: EdgeKind::Branch,
+                });
+            }
+            continue;
+        }
         for &from in preds {
             edges.push(Edge {
                 from: (nodes[from].column, nodes[from].row),
                 to: (nodes[to].column, nodes[to].row),
+                kind: EdgeKind::Branch,
             });
         }
     }
@@ -226,67 +357,20 @@ pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProf
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    TreeLayout { nodes, edges }
+    TreeLayout {
+        units,
+        nodes,
+        edges,
+    }
 }
 
-/// Pushes nodes right until no column holds more than [`MAX_PER_COLUMN`].
-///
-/// A whole *sibling group* moves at once — the children of one parent stay
-/// together rather than being split across two columns, which is what keeps
-/// the result readable as "these came from there". Everything downstream of
-/// a moved node follows, so a node never lands level with or left of
-/// something it depends on.
-///
-/// This terminates because a column only ever increases, and it makes
-/// progress because no lesson has more than four children (a curriculum
-/// rule): a column holding more than four therefore holds at least two
-/// groups, so moving the largest always leaves someone behind.
-fn spread_columns(columns: &mut [usize], predecessors: &[Vec<usize>], successors: &[Vec<usize>]) {
-    /// Moves `node` to `to` and drags its dependents past it.
-    fn push(node: usize, to: usize, columns: &mut [usize], successors: &[Vec<usize>]) {
-        if columns[node] >= to {
-            return;
-        }
-        columns[node] = to;
-        for &next in &successors[node] {
-            push(next, to + 1, columns, successors);
-        }
-    }
-
-    // Bounded rather than `loop`: a bug in the progress argument above
-    // should slow the menu down, not hang the game.
-    for _ in 0..columns.len() * 4 {
-        let mut by_column: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-        for (node, &column) in columns.iter().enumerate() {
-            by_column.entry(column).or_default().push(node);
-        }
-        // Fullest first, earliest column breaking a tie, so the pass is
-        // deterministic rather than dependent on map iteration order.
-        let Some((&column, members)) = by_column
-            .iter()
-            .filter(|(_, members)| members.len() > MAX_PER_COLUMN)
-            .max_by_key(|(column, members)| (members.len(), std::cmp::Reverse(**column)))
-        else {
-            return;
-        };
-
-        let mut groups: BTreeMap<Option<usize>, Vec<usize>> = BTreeMap::new();
-        for &node in members {
-            groups
-                .entry(predecessors[node].first().copied())
-                .or_default()
-                .push(node);
-        }
-        let Some(group) = groups
-            .into_values()
-            .max_by_key(|group| (group.len(), std::cmp::Reverse(group[0])))
-        else {
-            return;
-        };
-        for node in group {
-            push(node, column + 1, columns, successors);
-        }
-    }
+/// A lesson's Fluent title key, for naming it somewhere other than its own
+/// node.
+fn title_key_of(entries: &[LessonEntry], id: &str) -> Option<String> {
+    entries
+        .iter()
+        .find(|e| e.manifest.id == id)
+        .map(|e| e.manifest.title_key.clone())
 }
 
 /// Reorders each layer so edges cross as little as possible.
@@ -309,14 +393,14 @@ fn order_layers(layers: &mut [Vec<usize>], predecessors: &[Vec<usize>], successo
     }
 
     let barycentre = |node: usize, neighbours: &[usize], row_of: &HashMap<usize, f32>| {
-        if neighbours.is_empty() {
-            return row_of.get(&node).copied().unwrap_or(0.0);
-        }
-        neighbours
+        let known: Vec<f32> = neighbours
             .iter()
             .filter_map(|n| row_of.get(n).copied())
-            .sum::<f32>()
-            / neighbours.len() as f32
+            .collect();
+        if known.is_empty() {
+            return row_of.get(&node).copied().unwrap_or(0.0);
+        }
+        known.iter().sum::<f32>() / known.len() as f32
     };
 
     let resort =

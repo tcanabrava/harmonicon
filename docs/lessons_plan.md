@@ -161,7 +161,7 @@ improvising over anything but the blues scale." Two parts:
    `blues_scale_classes` regardless of what a lesson or "Generate Jam"
    picked. Fixed by a new `JamScale` resource (`harmonicon-app`'s `app.rs`, mirrors the
    existing `JamProgression`) plus a `LessonManifest::scale` field
-   (mirrors `progression`, parsed by `menu::pages::lessons::parse_scale`)
+   (mirrors `progression`, parsed by `menu::pages::lesson_reader::parse_scale`)
    — `major-scale-improv` and `minor-pentatonic-improv` are the first
    lessons to actually exercise it, each pairing with its run-drill
    sibling (`song.key` matches, so the same notes taught in the drill are
@@ -208,7 +208,7 @@ Two new pieces, both generic (not lesson-specific):
 - **`LessonManifest::diagram`** — a new schema-enforced enum field
   (`"circle-of-fifths"`, room for more later), mirroring `progression`/
   `scale`'s own shape. The lesson reader page
-  (`menu::pages::lessons::setup_lesson_reader`) was text-only before this
+  (`menu::pages::lesson_reader::setup_lesson_reader`) was text-only before this
   — every prior instructional lesson is prose, some of it literally
   telling the player to go look at a live diagram elsewhere (`twelve-bar`'s
   own body text does exactly that) rather than embedding one. This is the
@@ -297,7 +297,7 @@ Cross-cutting authoring notes:
   existence — it will catch omissions).
 - Cross-unit prerequisites (`train-chug` ← `multiple-notes`,
   `blues-scale` ← `deep-bends`) are just ids — `is_unlocked` doesn't care
-  about units — but double-check the lesson list UI presents a locked
+  about units — but double-check the skill tree presents a locked
   lesson's prerequisite name legibly when it lives in another unit.
 - New charts using only existing schema features need no `format_version`
   bump; `train-rolling`'s tempo map and the multi-modifier charts all use

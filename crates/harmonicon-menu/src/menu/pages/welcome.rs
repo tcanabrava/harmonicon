@@ -93,7 +93,7 @@ pub(crate) fn setup_welcome_menu(
         &mut commands,
         root,
         &loc.msg("welcome-lessons"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Lessons),
+        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::LessonTree),
     );
     // No header Back button: there is nowhere "back" to on a first launch.
     // This is the deliberate way past the page, and Escape does the same via

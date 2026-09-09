@@ -481,8 +481,8 @@ fn extract_type_name(line: &str) -> Option<String> {
 }
 
 /// Every type named in an `add_message::<...>()` call in `source` — just the
-/// final path segment, so `add_message::<pages::lessons::LessonUnitChanged>()`
-/// registers as `LessonUnitChanged`, matching how [`collect_declared_messages`]
+/// final path segment, so `add_message::<lessons::LessonsRescanned>()`
+/// registers as `LessonsRescanned`, matching how [`collect_declared_messages`]
 /// names a type regardless of which module declares it.
 fn collect_registered_messages(source: &str) -> Vec<String> {
     let mut out = Vec::new();

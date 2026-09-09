@@ -149,7 +149,8 @@ load-bearing about *this* crate.
     `convert::MIN_REACHABLE` is refused, with how close the best one got.
 
 - **Lessons** (`harmonicon-song`'s `lessons/` — `manifest.rs`/`catalog.rs`/`progress.rs` —
-  plus `harmonicon-menu`'s `menu/pages/lessons.rs`; design in `docs/lessons_plan.md`):
+  plus `harmonicon-menu`'s `menu/pages/lesson_tree.rs` and
+  `lesson_reader.rs`; design in `docs/lessons_plan.md`):
   `assets/lessons/<unit>/<lesson>/lesson.json` (schema
   `assets/lesson_schema.dtd.json`, validated at startup scan; ids are
   stable — profile keys and prerequisites reference them). A chart-backed
@@ -157,21 +158,17 @@ load-bearing about *this* crate.
   lesson-specific scoring — with a `LessonContext` resource in flight:
   results judge `pass_criteria` against it instead of recording a song
   best, `setup_adaptive_difficulty` forces gating off, and
-  `route_menu_entry` returns to the lesson list and removes it (Menu entry
+  `route_menu_entry` returns to the skill tree and removes it (Menu entry
   is the context's end-of-life; Results→Retry never passes through Menu, so
   retries keep it). Manifest text fields are Fluent *keys*
   (`title_key`/`body_key`, `lesson-unit-<unit>`), never display strings;
   `tests/asset_layout.rs` validates every bundled lesson (schema, chart,
-  file completeness, prereq integrity, locale-key existence). Prerequisite
-  gating (`lessons::is_unlocked`) is bypassed in `menu::pages::lessons::
-  populate_lesson_rows` under `--features dev` — every lesson shows
-  unlocked for quick manual access while iterating; `is_unlocked` itself is
-  untouched and still fully covered by its own prerequisite tests.
+  file completeness, prereq integrity, locale-key existence).
 
 - **The curriculum is a graph, and `lessons::graph` is what treats it as
   one** (design: `docs/training_tree_plan.md`). `is_unlocked` answers "may
-  I start this one", which is all the flat list needs; the skill-tree view
-  needs rows, an order along each, and some assurance it can be drawn.
+  I start this one", which is the fine-grained gate; `lessons::units` is the
+  coarse one and the skill tree needs both.
   `LessonGraph::build` topologically sorts, assigns each lesson a `depth`
   (**longest** path from a root — a lesson is only really available once
   its *deepest* prerequisite is), and groups into `rows()`.
@@ -243,8 +240,9 @@ load-bearing about *this* crate.
   lesson is: `assets_management` is low-level shared vocabulary, `lessons`
   a feature built on it, so the dependency points that way and not the
   reverse (`docs/physical_design_plan.md`). A live rescan fires
-  `LessonsRescanned`; `menu::pages::lessons::rebuild_on_lessons_rescanned`
-  forces a same-page rebuild if the Lessons list happens to be open.
+  `LessonsRescanned`;
+  `menu::pages::lesson_tree::rebuild_on_lessons_rescanned` forces a
+  same-page rebuild if the skill tree happens to be open.
 
 - **Lesson discovery is `#[cfg]`-split, and this crate has its own
   `build.rs` because of it.** `scan_lessons_root` walks `assets/lessons`
@@ -264,4 +262,4 @@ load-bearing about *this* crate.
   - It has no external-folder half. There's no `~/Harmonicon` to drop a
     lesson into on either target, which is why it takes no root path.
   Until the Android port added this, the module had no manifest path at
-  all — so the Lessons menu was silently empty on wasm as well.
+  all — so the lesson menu was silently empty on wasm as well.

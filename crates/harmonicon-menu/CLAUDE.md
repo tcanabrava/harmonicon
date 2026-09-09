@@ -27,36 +27,49 @@ load-bearing about *this* crate.
   already fits — `Visibility::Hidden` alone would still reserve the
   track's width and nudge every short, perfectly-centered menu (Main,
   Options, ...) slightly off-center even with nothing to scroll to. A
-  long list (Artist List, Lessons, Theme picker) that outgrows the screen
+  long list (Artist List, Song List, Theme picker) that outgrows the screen
   gets a visible, draggable scrollbar instead of silently overflowing
   past the edges with no way to reach the rest.
 
-- **The skill tree is the one page that scrolls both ways.**
-  `menu/pages/lesson_tree.rs` builds its own
-  `dialogs::scroll_area::spawn_scroll_area_xy` on top of
-  `spawn_menu_root_plain` rather than taking `spawn_menu_root`'s vertical
-  `ScrollArea`, because its canvas is genuinely wider than any window: a
-  node's column is its depth in the prerequisite graph, and
-  `lesson_tree::layout::spread_columns` then pushes whole sibling groups
-  further right until no column stacks more than `MAX_PER_COLUMN` deep
-  (the shipped curriculum goes from 7 columns by 9 rows to 16 by 4).
-  Height is the axis a reader can't afford; width is the one that
-  scrolls. Two things this needs that an ordinary page doesn't: the
-  canvas carries `flex_shrink: 0.0` (every node inside is positioned
-  absolutely, so a collapsed box would keep its children's pixel offsets
-  while the scroll extent is computed from the collapsed size — the tree
-  spills past both ends with neither reachable), and the content column
-  `spawn_menu_root_plain` returns is reshaped with `min_height`/
-  `min_width: 0` so it can actually shrink under the canvas, the same
-  "min-height: auto" gotcha `scroll_area` documents one level further
-  out.
+- **The skill tree is the curriculum's only view, and the one page that
+  scrolls both ways.** `menu/pages/lesson_tree.rs` draws two levels: a
+  spine of *unit* nodes across the top (`harmonicon_song::lessons::units`),
+  each unit's own lessons hanging below it as a small layered graph. A flat
+  list page (`MenuPage::Lessons`) used to sit beside it and was deleted —
+  one home per lesson, and unit gating stated once.
+  - **Why two levels: edge length.** As one flat graph, the curriculum's
+    eighteen cross-unit prerequisites became edges four and five columns
+    long, drawn straight through whatever nodes and labels lay between.
+    Crossing reduction cannot help when the endpoints are genuinely that
+    far apart. Grouping by unit turns those eighteen into four spine edges
+    and leaves every other edge local to one cluster.
+  - **A cross-unit prerequisite is not drawn at all.** It is not lost:
+    `PlacedNode::unmet` carries what a locked lesson still wants and
+    `tooltip_for` names it on the node, which beats tracing a line across
+    the screen.
+  - It builds its own `dialogs::scroll_area::spawn_scroll_area_xy` on top
+    of `spawn_menu_root_plain` rather than taking `spawn_menu_root`'s
+    vertical `ScrollArea`, because the canvas outgrows any window in both
+    directions. Two things this needs that an ordinary page doesn't: the
+    canvas carries `flex_shrink: 0.0` (every node inside is positioned
+    absolutely, so a collapsed box would keep its children's pixel offsets
+    while the scroll extent is computed from the collapsed size — the tree
+    spills past both ends with neither reachable), and the content column
+    `spawn_menu_root_plain` returns is reshaped with `min_height`/
+    `min_width: 0` so it can actually shrink under the canvas, the same
+    "min-height: auto" gotcha `scroll_area` documents one level further
+    out.
+  - `node_centre` insets everything vertically by `SPINE_LABEL_PX`,
+    because a unit's title sits *above* its node on row 0 and would
+    otherwise be clipped by the top of the canvas. A lesson's title hangs
+    below it, so nothing else needs the room.
 
 - **Guided tutorial tour** (`harmonicon-menu`'s `menu/pages/tutorial.rs`): a "Tutorial" button on
   the Help/About menu drives a fixed sequence (`TOUR_STEPS`, each a
   `TourTarget`) on a timer, with a click-blocking overlay on top naming the
   current screen and briefly explaining it. Most steps are `TourTarget::
   Page` — the top-level, no-selection-required `MenuPage`s (Main, Play,
-  Mode Select, Jam Session Menu, Generate Jam, Lessons, Options, Theme,
+  Mode Select, Jam Session Menu, Generate Jam, Skill Tree, Options, Theme,
   Help/About; not `ArtistList`/`SongList`/`LessonReader`, which need an
   artist/song/lesson already picked) — but four steps actually enter live
   gameplay for a look:

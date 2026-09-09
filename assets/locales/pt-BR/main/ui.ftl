@@ -284,7 +284,6 @@ editor-silence-track-tooltip = O intervalo, em segundos, entre cada par de notas
 # Lições — menu, leitor, veredito nos resultados
 menu-lessons = Lições
 no-lessons-found = Nenhuma lição encontrada. Adicione pastas em assets/lessons/<unidade>/<lição>/
-lesson-locked = bloqueada
 lesson-passed = Concluída
 lesson-start = Começar a Lição
 lesson-mark-done = Marcar como Concluída
@@ -864,8 +863,9 @@ lesson-training-heading = Treino — {$percent}% dominado
 
 # The skill-tree view of the curriculum: one row per track.
 lesson-tree-title = Árvore de Habilidades
-lesson-tree-open = Ver como árvore
 lesson-tree-broken = Este currículo não pode ser desenhado: {$error}
+lesson-tree-unit-progress = {$done}/{$needed}
+lesson-tree-needs = Precisa de: {$lessons}
 lesson-track-tone = Tom
 lesson-track-hand = Wah de Mão
 lesson-track-tongue = Bloqueio de Língua

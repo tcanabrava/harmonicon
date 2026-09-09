@@ -1,17 +1,28 @@
 # Lessons
 
-**Play → Lessons** is a guided curriculum, grouped into units shown as
-tabs across the top, with a scrollable list of that unit's lessons below.
+**Play → Lessons** is a guided curriculum, drawn as a skill tree. Along the
+top runs a row of **unit** nodes — Unit 1, Unit 2, and so on — and each
+unit's lessons hang below it, connected by the order you take them in. The
+tree is wider and taller than the window: scroll in both directions to see
+the rest of it.
 
-![Lessons list](images/lessons-list.png)
+![The skill tree](images/skill-tree.png)
 
-Lessons **unlock in order**: each one lists its prerequisite(s), and shows
-locked (🔒, dimmed, not clickable) until you've passed them. A passed lesson
-gets a ✓ and stays replayable any time. Your progress is saved
-(`profile.json`) and survives restarting the game.
+There are **two locks**. A lesson shows dark until you've passed whatever it
+leads on from — hover it and the tooltip names what it's still waiting on. A
+whole unit stays shut until you've passed most of the one before it; the
+number on a unit node ("3/8") is how many of its lessons you've done and how
+many open the next unit. It's *most*, not all — one lesson you're stuck on
+shouldn't wall off the rest of the course.
 
-Clicking an unlocked lesson opens its **reader page**: instructional text
-explaining the technique, a goal line (e.g. "Goal: 70% overall accuracy"),
+Colour is the skill each lesson belongs to (bending, rhythm, tone…), and the
+ring of dots over a node is how much of that lesson's **training ladder**
+you've cleared — five drills of the same technique at rising speed, offered
+on the lesson's own page. A passed lesson stays replayable any time. Your
+progress is saved (`profile.json`) and survives restarting the game.
+
+Clicking a lesson — locked or not — opens its **reader page**: instructional
+text explaining the technique, a goal line (e.g. "Goal: 70% overall accuracy"),
 and a **Start Lesson** button (or **Mark as Done**, for the couple of
 lessons that are pure instruction with no drill — like tongue blocking,
 which the microphone genuinely can't tell apart from puckering, so it isn't

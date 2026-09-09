@@ -105,7 +105,7 @@ const TOUR_STEPS: &[(TourTarget, &str, &str, f32)] = &[
         LIVE_SCREEN_STEP_SECONDS,
     ),
     (
-        TourTarget::Page(MenuPage::Lessons),
+        TourTarget::Page(MenuPage::LessonTree),
         "tutorial-title-lessons",
         "tutorial-body-lessons",
         PAGE_STEP_SECONDS,
@@ -494,9 +494,9 @@ mod tests {
         let tour = TutorialTour {
             step,
             timer: Timer::from_seconds(1.0, TimerMode::Once),
-            return_to: MenuPage::Lessons,
+            return_to: MenuPage::LessonTree,
         };
-        assert_eq!(tour_menu_landing(&tour), MenuPage::Lessons);
+        assert_eq!(tour_menu_landing(&tour), MenuPage::LessonTree);
         assert!(!tour_finished(&tour));
     }
 }

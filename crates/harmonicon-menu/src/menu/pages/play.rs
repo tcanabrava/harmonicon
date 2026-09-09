@@ -52,7 +52,7 @@ pub(crate) fn setup_play_menu(
         &mut commands,
         root,
         &loc.msg("menu-lessons"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Lessons),
+        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::LessonTree),
     );
     spawn_back_button(
         &mut commands,

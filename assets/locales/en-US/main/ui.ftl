@@ -286,7 +286,6 @@ editor-silence-track-tooltip = The gap, in seconds, between each pair of consecu
 # Lessons — menu, reader, results verdict
 menu-lessons = Lessons
 no-lessons-found = No lessons found. Add folders under assets/lessons/<unit>/<lesson>/
-lesson-locked = locked
 lesson-passed = Passed
 lesson-start = Start Lesson
 lesson-mark-done = Mark as Done
@@ -867,8 +866,9 @@ lesson-training-heading = Training — {$percent}% mastered
 
 # The skill-tree view of the curriculum: one row per track.
 lesson-tree-title = Skill Tree
-lesson-tree-open = View as tree
 lesson-tree-broken = This curriculum cannot be drawn: {$error}
+lesson-tree-unit-progress = {$done}/{$needed}
+lesson-tree-needs = Needs: {$lessons}
 lesson-track-tone = Tone
 lesson-track-hand = Hand Wah
 lesson-track-tongue = Tongue Block

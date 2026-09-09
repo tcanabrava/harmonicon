@@ -37,14 +37,9 @@ pub(crate) enum MenuPage {
     ModeSelect,
     Options,
     Theme,
-    /// Curriculum list, grouped by unit (see `harmonicon_song::lessons`).
-    /// Kept as the compact-layout presentation of the curriculum — see
-    /// [`MenuPage::LessonTree`].
-    Lessons,
-    /// The curriculum as a skill tree: tracks stacked downward, each read
-    /// left to right, prerequisite edges drawn between them. The wide-screen
-    /// view of the same data `Lessons` lists; fourteen rows of nodes is
-    /// unreadable on a phone, so neither replaces the other.
+    /// The curriculum, and the only view of it: a spine of unit nodes with
+    /// each unit's own lessons hanging below it, prerequisite edges drawn
+    /// inside a unit (see `pages::lesson_tree`).
     LessonTree,
     /// One lesson's instructional page (+ Start for chart-backed lessons).
     LessonReader,
@@ -80,10 +75,7 @@ pub(crate) fn handle_menu_escape(
         // Escape is the keyboard equivalent of the page's own "Skip for now".
         MenuPage::Welcome => MenuPage::Main,
         MenuPage::Play | MenuPage::Options | MenuPage::HelpAbout => MenuPage::Main,
-        MenuPage::Lessons | MenuPage::JamSessionMenu => MenuPage::Play,
-        // Back to the list, matching the tree's own Back button — the tree
-        // is a view *of* the lesson list, not a sibling of it.
-        MenuPage::LessonTree => MenuPage::Lessons,
+        MenuPage::LessonTree | MenuPage::JamSessionMenu => MenuPage::Play,
         MenuPage::ModeSelect => MenuPage::Play,
         // Shared by two flows — Play Song (via ModeSelect) and Jam
         // Session's "Pick a Song" — see the Back button in
@@ -97,7 +89,7 @@ pub(crate) fn handle_menu_escape(
         MenuPage::SongList => MenuPage::ArtistList,
         MenuPage::HarpCheck => MenuPage::SongList,
         MenuPage::Theme => MenuPage::Options,
-        MenuPage::LessonReader => MenuPage::Lessons,
+        MenuPage::LessonReader => MenuPage::LessonTree,
         MenuPage::About => MenuPage::HelpAbout,
     };
     next_page.set(target);
@@ -165,10 +157,10 @@ pub(crate) fn route_menu_entry(
 
     if lesson.is_some() {
         commands.remove_resource::<harmonicon_song::lessons::LessonContext>();
-        // "Quit Song" sets this unconditionally; for a lesson run the lesson
-        // list is the right place to land, so the flag is consumed here.
+        // "Quit Song" sets this unconditionally; for a lesson run the tree
+        // is the right place to land, so the flag is consumed here.
         ret_song.0 = false;
-        next_page.set(MenuPage::Lessons);
+        next_page.set(MenuPage::LessonTree);
     } else if generated_jam.is_some() {
         commands.remove_resource::<harmonicon_app::app::GeneratedJamSession>();
         // Same reasoning as the lesson branch above: a generated jam never
