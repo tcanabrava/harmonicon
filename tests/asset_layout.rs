@@ -454,6 +454,17 @@ fn the_bundled_curriculum_forms_a_drawable_graph() {
         manifests.len(),
         "the graph lost lessons while placing them"
     );
+
+    // Unit gating (`lessons::units`) rests on the unit order being a valid
+    // layering of these same edges. A prerequisite pointing at a *later*
+    // unit could never be satisfied: that unit only opens once the
+    // depending lesson's own unit is done, and it can't be.
+    let backwards = harmonicon_song::lessons::units::crossing_prerequisites(&manifests);
+    assert!(
+        backwards.is_empty(),
+        "these prerequisites point at a later unit, which unit gating can never satisfy — \
+         move the lesson or the prerequisite: {backwards:?}"
+    );
 }
 
 #[test]

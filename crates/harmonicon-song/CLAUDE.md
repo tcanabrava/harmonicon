@@ -201,6 +201,33 @@ load-bearing about *this* crate.
   - The Song Editor's lesson form doesn't write `track` yet, so a lesson
     authored there falls back to its unit until edited by hand.
 
+- **Units are the curriculum's second, coarser level, and `lessons::units`
+  gates on them.** `graph` answers "may I start this lesson"; `UnitChain`
+  answers "is this whole unit open yet" — the five shipped units in
+  discovery order, each opening only once enough of the one before it is
+  passed. This is what the skill tree hangs off, and what keeps forty-one
+  loose lessons legible.
+  - **Nothing is authored for it.** A unit's identity is
+    `LessonManifest::unit`, its order is the `01_`/`02_` directory order
+    `catalog`'s scan already sorts by, and its name is the
+    `lesson-unit-<id>` Fluent key the unit tabs have always used. A
+    `unit.json` would mean a *second* build-script manifest for
+    wasm/Android to carry (see the discovery bullet below) — worth it only
+    once a unit needs something genuinely underivable.
+  - **The gate is a threshold, not "all of them"**
+    (`UNIT_UNLOCK_THRESHOLD`, 70% rounded up, never zero). Requiring every
+    lesson would put `deep-bends` — the hardest thing on a diatonic harp,
+    and a lesson a beginner can stall on for weeks — as a hard wall in
+    front of the rest of the course.
+  - **Gating on units is only safe because the unit order is a valid
+    layering of the prerequisite graph.** All eighteen cross-unit
+    prerequisites in the shipped curriculum point forward; one pointing
+    *backwards* would be unsatisfiable, since the prerequisite's unit only
+    opens once the depending lesson's unit is done.
+    `units::crossing_prerequisites` reports them and
+    `tests/asset_layout.rs::the_bundled_curriculum_forms_a_drawable_graph`
+    fails the build over one.
+
 - **Lessons can also live in `~/Harmonicon/lessons`**, same
   bundled-plus-external pattern as songs/themes:
   `lessons::catalog::scan_all_lessons` scans `assets/lessons` then, if

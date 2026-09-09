@@ -22,6 +22,7 @@ mod catalog;
 pub mod graph;
 mod manifest;
 mod progress;
+pub mod units;
 
 pub use catalog::*;
 pub use manifest::*;
