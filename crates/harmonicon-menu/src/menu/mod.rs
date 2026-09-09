@@ -118,6 +118,11 @@ impl Plugin for MenuPlugin {
             )
             .add_systems(OnExit(MenuPage::Lessons), scene::cleanup_menu)
             .add_systems(
+                OnEnter(MenuPage::LessonTree),
+                pages::lesson_tree::setup_lesson_tree,
+            )
+            .add_systems(OnExit(MenuPage::LessonTree), scene::cleanup_menu)
+            .add_systems(
                 Update,
                 pages::lessons::rebuild_on_lessons_rescanned.run_if(in_state(MenuPage::Lessons)),
             )

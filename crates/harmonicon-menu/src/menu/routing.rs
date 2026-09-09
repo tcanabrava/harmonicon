@@ -38,7 +38,14 @@ pub(crate) enum MenuPage {
     Options,
     Theme,
     /// Curriculum list, grouped by unit (see `harmonicon_song::lessons`).
+    /// Kept as the compact-layout presentation of the curriculum — see
+    /// [`MenuPage::LessonTree`].
     Lessons,
+    /// The curriculum as a skill tree: tracks stacked downward, each read
+    /// left to right, prerequisite edges drawn between them. The wide-screen
+    /// view of the same data `Lessons` lists; fourteen rows of nodes is
+    /// unreadable on a phone, so neither replaces the other.
+    LessonTree,
     /// One lesson's instructional page (+ Start for chart-backed lessons).
     LessonReader,
     /// The "Jam Session" choice on the Play menu lands here first: pick a
@@ -74,6 +81,9 @@ pub(crate) fn handle_menu_escape(
         MenuPage::Welcome => MenuPage::Main,
         MenuPage::Play | MenuPage::Options | MenuPage::HelpAbout => MenuPage::Main,
         MenuPage::Lessons | MenuPage::JamSessionMenu => MenuPage::Play,
+        // Back to the list, matching the tree's own Back button — the tree
+        // is a view *of* the lesson list, not a sibling of it.
+        MenuPage::LessonTree => MenuPage::Lessons,
         MenuPage::ModeSelect => MenuPage::Play,
         // Shared by two flows — Play Song (via ModeSelect) and Jam
         // Session's "Pick a Song" — see the Back button in

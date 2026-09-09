@@ -861,3 +861,22 @@ harp-check-track-unnamed = Faixa {$index}
 # Cabeçalho acima dos cinco níveis de treino de uma lição, com quanto da
 # escada foi concluído (o medidor de domínio).
 lesson-training-heading = Treino — {$percent}% dominado
+
+# The skill-tree view of the curriculum: one row per track.
+lesson-tree-title = Árvore de Habilidades
+lesson-tree-open = Ver como árvore
+lesson-tree-broken = Este currículo não pode ser desenhado: {$error}
+lesson-track-tone = Tom
+lesson-track-hand = Wah de Mão
+lesson-track-tongue = Bloqueio de Língua
+lesson-track-bend = Bends
+lesson-track-vibrato = Vibrato
+lesson-track-slide = Registro
+lesson-track-time = Tempo
+lesson-track-form = Forma
+lesson-track-train = Ritmo de Trem
+lesson-track-scales = Escalas
+lesson-track-theory = Teoria
+lesson-track-harmony = Harmonia
+lesson-track-vocabulary = Vocabulário
+lesson-track-improv = Improvisação

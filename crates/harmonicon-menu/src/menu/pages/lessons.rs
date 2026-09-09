@@ -259,6 +259,7 @@ pub(crate) fn setup_lessons_menu(
     commands.entity(root).add_child(list);
     populate_lesson_rows(&mut commands, list, units[ix].1.as_slice(), &profile, &loc);
 
+    spawn_tree_button(&mut commands, root, &loc);
     spawn_back_to_play(&mut commands, header, &loc);
 }
 
@@ -511,6 +512,22 @@ fn spawn_reader_line(commands: &mut Commands, root: Entity, text: String, color:
         ))
         .id();
     commands.entity(root).add_child(line);
+}
+
+/// Opens the skill-tree view of the same curriculum.
+///
+/// Offered rather than substituted: this list is what a compact layout gets
+/// (`responsive::is_compact` — fourteen rows of nodes is unreadable on a
+/// phone), so both views stay reachable.
+fn spawn_tree_button(commands: &mut Commands, root: Entity, loc: &Localization) {
+    spawn_button(
+        commands,
+        root,
+        &loc.msg("lesson-tree-open"),
+        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::LessonTree);
+        },
+    );
 }
 
 fn spawn_back_to_play(commands: &mut Commands, header: Entity, loc: &Localization) {

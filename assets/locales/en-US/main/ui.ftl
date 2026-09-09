@@ -864,3 +864,22 @@ harp-check-track-unnamed = Track {$index}
 # Heading above a lesson's five training tiers, with how much of the ladder
 # is done (the mastery meter).
 lesson-training-heading = Training — {$percent}% mastered
+
+# The skill-tree view of the curriculum: one row per track.
+lesson-tree-title = Skill Tree
+lesson-tree-open = View as tree
+lesson-tree-broken = This curriculum cannot be drawn: {$error}
+lesson-track-tone = Tone
+lesson-track-hand = Hand Wah
+lesson-track-tongue = Tongue Block
+lesson-track-bend = Bending
+lesson-track-vibrato = Vibrato
+lesson-track-slide = Slide
+lesson-track-time = Time
+lesson-track-form = Form
+lesson-track-train = Train Rhythm
+lesson-track-scales = Scales
+lesson-track-theory = Theory
+lesson-track-harmony = Harmony
+lesson-track-vocabulary = Vocabulary
+lesson-track-improv = Improvisation
