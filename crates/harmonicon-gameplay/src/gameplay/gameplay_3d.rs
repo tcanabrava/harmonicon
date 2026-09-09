@@ -55,7 +55,7 @@ pub(super) struct NoteVisual3D {
     /// `NoteVisual`, which this mirrors. `head_depth`/`tail_len` are cheap to
     /// recompute on demand from `NoteRenderAssets3D` + the note's own
     /// `hole`/`duration`, so there's nothing else this needs to carry.
-    note_id: usize,
+    pub(super) note_id: usize,
 }
 
 /// A hole-number label tracking a 3D note (`ShowNoteNumbers` on). 3D notes
@@ -299,48 +299,6 @@ fn build_song_notes_3d(
             hole_count,
         },
     )
-}
-
-/// Rebuilds `SongNotes` whenever `AdaptiveDifficulty` changes while a 3D
-/// song is loaded (e.g. the pause menu's manual phrase override), so
-/// unlocking/relocking takes effect immediately instead of only on the
-/// next Restart. Score state carries over for notes that still exist in
-/// the rebuilt list (matched by `(time, hole, is_blow)`, stable since both
-/// lists derive from the same chart); newly unlocked notes start fresh.
-/// `NoteRenderAssets3D` doesn't need touching — nothing about it depends
-/// on which notes are unlocked.
-///
-/// Every current `NoteVisual3D` is despawned unconditionally rather than
-/// reconciled in place: its `note_id` is a *positional* index into
-/// `SongNotes::notes`, and the rebuild can shift that position for every
-/// note after the edited phrase, so a surviving entity would otherwise
-/// render a different note's data under its old index.
-/// `spawn_visible_notes_3d` re-spawns everything within `LOOKAHEAD` fresh
-/// next frame, using the corrected indices.
-pub(super) fn resync_notes_on_adaptive_change(
-    effective: Res<EffectiveHarmonica>,
-    mut commands: Commands,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    adaptive: Res<AdaptiveDifficulty>,
-    mut song_notes: ResMut<super::SongNotes>,
-    visuals: Query<Entity, With<NoteVisual3D>>,
-) {
-    if !adaptive.is_changed() {
-        return;
-    }
-    let Some(manifest) = manifests.get(&selected.0) else {
-        return;
-    };
-    super::adaptive_difficulty::rebuild_song_notes(
-        &effective,
-        &manifest.chart,
-        &adaptive,
-        &mut song_notes,
-    );
-    for entity in &visuals {
-        commands.entity(entity).despawn();
-    }
 }
 
 /// Spawns 3D note visuals for any note newly within the `LOOKAHEAD` window.

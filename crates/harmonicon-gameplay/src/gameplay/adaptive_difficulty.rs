@@ -8,7 +8,7 @@
 //! unlocked (spawned/scored) at a time, and clearing a section cleanly
 //! bumps that fraction, unlocking more on the next attempt. A manual
 //! pause-menu override takes effect immediately mid-song —
-//! `gameplay_2d`/`gameplay_3d`'s `resync_notes_on_adaptive_change` rebuild
+//! [`resync_notes_on_adaptive_change`] rebuilds
 //! `SongNotes` the moment [`AdaptiveDifficulty`] changes, carrying over
 //! already-resolved score state via [`carry_over_note_state`] so a
 //! previously hit/missed note doesn't reset just because the list rebuilt.
@@ -309,6 +309,48 @@ pub fn rebuild_song_notes(
     song_notes.cursor = first_unresolved_index(&new_notes);
     song_notes.notes = new_notes;
     new_tags
+}
+
+/// Emitted only after the shared note array and its parallel tags are rebuilt.
+#[derive(Message)]
+pub(super) struct NotesRebuilt;
+
+pub(super) fn resync_notes_on_adaptive_change(
+    effective: Res<harmonicon_app::app::EffectiveHarmonica>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut notes: ResMut<super::SongNotes>,
+    mut assets: ResMut<super::gameplay_2d::NoteRenderAssets>,
+    mut rebuilt: MessageWriter<NotesRebuilt>,
+) {
+    if !adaptive.is_changed() {
+        return;
+    }
+    let Some(manifest) = manifests.get(&selected.0) else {
+        return;
+    };
+    assets.play_mode_tags = rebuild_song_notes(&effective, &manifest.chart, &adaptive, &mut notes);
+    rebuilt.write(NotesRebuilt);
+}
+
+pub(super) fn invalidate_note_visuals(
+    mut rebuilt: MessageReader<NotesRebuilt>,
+    mut commands: Commands,
+    visuals: Query<
+        Entity,
+        Or<(
+            With<super::NoteVisual>,
+            With<super::gameplay_3d::NoteVisual3D>,
+        )>,
+    >,
+) {
+    if rebuilt.read().count() == 0 {
+        return;
+    }
+    for entity in &visuals {
+        commands.entity(entity).despawn();
+    }
 }
 
 /// Live per-session cache of a song's phrase sections + adaptive-difficulty
@@ -713,5 +755,34 @@ mod tests {
     #[test]
     fn first_unresolved_index_is_zero_for_an_empty_list() {
         assert_eq!(first_unresolved_index(&[]), 0);
+    }
+}
+
+#[cfg(test)]
+mod invalidation_tests {
+    use super::*;
+
+    #[test]
+    fn both_presentations_invalidate_only_after_a_successful_rebuild() {
+        let mut app = App::new();
+        app.add_message::<NotesRebuilt>()
+            .add_systems(Update, invalidate_note_visuals);
+        let two = app
+            .world_mut()
+            .spawn(super::super::NoteVisual { note_id: 0 })
+            .id();
+        let three = app
+            .world_mut()
+            .spawn(super::super::gameplay_3d::NoteVisual3D { note_id: 0 })
+            .id();
+        let other = app.world_mut().spawn_empty().id();
+        app.update();
+        assert!(app.world().get_entity(two).is_ok());
+        assert!(app.world().get_entity(three).is_ok());
+        app.world_mut().write_message(NotesRebuilt);
+        app.update();
+        assert!(app.world().get_entity(two).is_err());
+        assert!(app.world().get_entity(three).is_err());
+        assert!(app.world().get_entity(other).is_ok());
     }
 }

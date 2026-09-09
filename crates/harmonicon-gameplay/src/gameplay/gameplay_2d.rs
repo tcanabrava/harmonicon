@@ -46,7 +46,7 @@ pub(super) struct NoteRenderAssets {
     /// Chord/split play-mode badge text, parallel to `SongNotes::notes`
     /// (same index = same note) — the one piece of per-note render data that
     /// doesn't already live on `ScheduledNote` itself.
-    play_mode_tags: Vec<Option<&'static str>>,
+    pub(super) play_mode_tags: Vec<Option<&'static str>>,
 }
 
 pub fn setup(
@@ -445,49 +445,6 @@ pub(super) fn spawn_gameplay_music_score(commands: &mut Commands, bravura: &Brav
         .with_children(|panel| {
             music_score::spawn_music_score(panel, bravura);
         });
-}
-
-/// Rebuilds `SongNotes`/`NoteRenderAssets::play_mode_tags` whenever
-/// `AdaptiveDifficulty` changes while a 2D song is loaded (e.g. the pause
-/// menu's manual phrase override), so unlocking/relocking takes effect
-/// immediately instead of only on the next Restart. Score state carries
-/// over for notes that still exist in the rebuilt list (matched by
-/// `(time, hole, is_blow)`, stable since both lists derive from the same
-/// chart); newly unlocked notes start fresh.
-///
-/// Every current `NoteVisual` is despawned unconditionally rather than
-/// reconciled in place: its `note_id` is a *positional* index into
-/// `SongNotes::notes`, and the rebuild can shift that position for every
-/// note after the edited phrase, so a surviving entity would otherwise
-/// render a different note's data under its old index.
-/// `spawn_visible_notes` re-spawns everything within `LOOKAHEAD` fresh next
-/// frame, using the corrected indices.
-pub(super) fn resync_notes_on_adaptive_change(
-    effective: Res<EffectiveHarmonica>,
-    mut commands: Commands,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    adaptive: Res<AdaptiveDifficulty>,
-    mut song_notes: ResMut<SongNotes>,
-    mut render_assets: ResMut<NoteRenderAssets>,
-    visuals: Query<Entity, With<NoteVisual>>,
-) {
-    if !adaptive.is_changed() {
-        return;
-    }
-    let Some(manifest) = manifests.get(&selected.0) else {
-        return;
-    };
-    let new_tags = super::adaptive_difficulty::rebuild_song_notes(
-        &effective,
-        &manifest.chart,
-        &adaptive,
-        &mut song_notes,
-    );
-    render_assets.play_mode_tags = new_tags;
-    for entity in &visuals {
-        commands.entity(entity).despawn();
-    }
 }
 
 fn note_height_pct(duration: f64) -> f32 {

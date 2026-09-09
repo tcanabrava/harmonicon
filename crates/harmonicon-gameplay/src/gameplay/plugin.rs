@@ -88,6 +88,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<AbsoluteBar>()
         .add_message::<BarChanged>()
         .add_message::<NoteScored>()
+        .add_message::<adaptive_difficulty::NotesRebuilt>()
         .add_message::<pause_menu::FinishLessonRequested>()
         .init_resource::<bending_trainer::TrainerKey>()
         .init_resource::<bending_trainer::TrainerTarget>()
@@ -217,17 +218,17 @@ impl Plugin for GameplayPlugin {
         // is only ever possible *while* paused (see `pause_menu`).
         .add_systems(
             Update,
-            gameplay_2d::resync_notes_on_adaptive_change.run_if(
-                in_state(AppState::Playing)
-                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
-            ),
-        )
-        .add_systems(
-            Update,
-            gameplay_3d::resync_notes_on_adaptive_change.run_if(
-                in_state(AppState::Playing)
-                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
-            ),
+            (
+                adaptive_difficulty::resync_notes_on_adaptive_change,
+                adaptive_difficulty::invalidate_note_visuals,
+            )
+                .chain()
+                .before(GameplayLogic)
+                .run_if(in_state(AppState::Playing).and_then(
+                    |m: Res<GameplayMode>| {
+                        matches!(*m, GameplayMode::Play2D | GameplayMode::Play3D)
+                    },
+                )),
         )
         // Gameplay-logic chains only run when not paused. This set ticks the
         // clock, so every clock reader below must run after it — otherwise the
