@@ -12,6 +12,7 @@
 //! shifts note ticks on save/load.
 
 use bevy::prelude::*;
+use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
 use super::TICKS_PER_BEAT;
 use super::state::EditorState;
@@ -26,6 +27,7 @@ use harmonicon_core::chart::{TempoPoint, seconds_to_tick, tick_to_seconds};
 #[derive(Resource, Default)]
 pub(super) struct MusicWaveform {
     path: String,
+    pending: Option<Task<(String, Vec<f32>, f64)>>,
     pub(super) buckets: Vec<f32>,
     pub(super) duration_secs: f64,
 }
@@ -51,24 +53,39 @@ fn decode_music_waveform(path: &std::path::Path) -> (Vec<f32>, f64) {
     }
 }
 
-/// Keeps [`MusicWaveform`] in step with `EditorState::music` — re-decodes
-/// only when the path actually changed since last frame. A synchronous
-/// decode on the main thread, same as `midi_import`'s own file-picker
-/// handling; a brief hitch on picking a long file is an accepted trade-off
-/// for not needing an async asset-loading path just for this preview.
+/// Start decoding on a worker and poll without blocking the ECS schedule.
 pub(super) fn sync_music_waveform(state: Res<EditorState>, mut waveform: ResMut<MusicWaveform>) {
-    if state.music == waveform.path {
-        return;
-    }
-    waveform.path = state.music.clone();
-    if state.music.trim().is_empty() {
-        waveform.buckets = Vec::new();
+    if state.music != waveform.path {
+        waveform.path = state.music.clone();
+        waveform.pending = None;
+        waveform.buckets.clear();
         waveform.duration_secs = 0.0;
-        return;
+        if !state.music.trim().is_empty() {
+            let path = state.music.clone();
+            waveform.pending = Some(AsyncComputeTaskPool::get().spawn(async move {
+                let (buckets, duration) = decode_music_waveform(std::path::Path::new(&path));
+                (path, buckets, duration)
+            }));
+        }
     }
-    let (buckets, duration_secs) = decode_music_waveform(std::path::Path::new(&state.music));
-    waveform.buckets = buckets;
-    waveform.duration_secs = duration_secs;
+    let result = waveform
+        .bypass_change_detection()
+        .pending
+        .as_mut()
+        .and_then(|task| future::block_on(future::poll_once(task)));
+    if let Some((path, buckets, duration)) = result {
+        waveform.pending = None;
+        waveform.apply_result(&path, buckets, duration);
+    }
+}
+
+impl MusicWaveform {
+    fn apply_result(&mut self, path: &str, buckets: Vec<f32>, duration: f64) {
+        if path == self.path {
+            self.buckets = buckets;
+            self.duration_secs = duration;
+        }
+    }
 }
 
 /// The grid-space pixel x/width for waveform bucket `i` of `bucket_count`
@@ -129,6 +146,19 @@ pub(super) fn visible_waveform_buckets(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stale_background_result_cannot_replace_new_selection() {
+        let mut waveform = MusicWaveform {
+            path: "new.wav".into(),
+            ..default()
+        };
+        waveform.apply_result("old.wav", vec![1.0], 60.0);
+        assert!(waveform.buckets.is_empty());
+        waveform.apply_result("new.wav", vec![0.5], 30.0);
+        assert_eq!(waveform.buckets, vec![0.5]);
+        assert_eq!(waveform.duration_secs, 30.0);
+    }
 
     fn flat_120() -> Vec<TempoPoint> {
         vec![TempoPoint {

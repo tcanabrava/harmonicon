@@ -5,7 +5,7 @@
 //! Runs once, at song-asset load time — see `song::loader` — so gameplay
 //! setup just reads the finished `Vec<f32>` off `SongManifest`.
 
-use std::io::Cursor;
+use std::{io::Cursor, sync::Arc};
 
 use bevy::log::info_span;
 use rodio::Source;
@@ -16,6 +16,7 @@ pub const WAVEFORM_BUCKETS: usize = 300;
 
 /// Downmixes interleaved multi-channel samples to mono by averaging each
 /// frame. `channels <= 1` returns the input unchanged (already mono).
+#[cfg(test)]
 fn downmix_to_mono(samples: &[f32], channels: usize) -> Vec<f32> {
     if channels <= 1 {
         return samples.to_vec();
@@ -59,14 +60,22 @@ pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
     // the kind of hot inner-loop work worth breaking out from that system's
     // own total time).
     let _span = info_span!("analyze_ogg_waveform", bytes = bytes.len()).entered();
-    let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes.to_vec())) else {
+    let bytes: Arc<[u8]> = bytes.into();
+    let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes.clone())) else {
         return (vec![0.0; buckets], 0.0);
     };
     let channels = decoder.channels().get() as usize;
     let sample_rate = decoder.sample_rate().get() as f64;
-    let mono = downmix_to_mono(&decoder.collect::<Vec<f32>>(), channels);
-    let duration_secs = mono.len() as f64 / sample_rate;
-    (bucket_peaks(&mono, buckets), duration_secs)
+    // Count first so buckets cover the exact duration, even when container
+    // metadata has no duration. Both passes retain only decoder working memory.
+    let frames = decoder.count() / channels;
+    let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes)) else {
+        return (vec![0.0; buckets], 0.0);
+    };
+    (
+        stream_peaks(decoder, channels, frames, buckets),
+        frames as f64 / sample_rate,
+    )
 }
 
 /// Same as [`analyze_ogg_waveform`], but for a `song/music.wav` backing
@@ -80,18 +89,80 @@ pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
 pub fn analyze_wav_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
     // Same off-schedule/hot-loop reasoning as `analyze_ogg_waveform` above.
     let _span = info_span!("analyze_wav_waveform", bytes = bytes.len()).entered();
-    let Some((samples, channels, sample_rate)) = harmonicon_core::wav::decode_wav_pcm16(bytes)
-    else {
+    let Some((data, channels, sample_rate)) = harmonicon_core::wav::wav_pcm16_data(bytes) else {
         return (vec![0.0; buckets], 0.0);
     };
-    let mono = downmix_to_mono(&samples, channels as usize);
-    let duration_secs = mono.len() as f64 / sample_rate as f64;
-    (bucket_peaks(&mono, buckets), duration_secs)
+    let frames = data.len() / (usize::from(channels) * 2);
+    let samples = data
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|b| i16::from_le_bytes(*b) as f32 / 32768.0);
+    (
+        stream_peaks(samples, usize::from(channels), frames, buckets),
+        frames as f64 / f64::from(sample_rate),
+    )
+}
+
+/// Reduce an interleaved stream with O(buckets + channels) working memory.
+fn stream_peaks(
+    mut samples: impl Iterator<Item = f32>,
+    channels: usize,
+    frames: usize,
+    buckets: usize,
+) -> Vec<f32> {
+    if frames == 0 || channels == 0 {
+        return vec![0.0; buckets];
+    }
+    let mut consumed = 0;
+    let mut last = 0.0f32;
+    (0..buckets)
+        .map(|i| {
+            let start = i * frames / buckets;
+            let end = ((i + 1) * frames / buckets).max(start + 1).min(frames);
+            // More buckets than frames repeats the corresponding sample, just
+            // like bucket_peaks, without buffering the whole decoded stream.
+            let mut peak = if start < consumed { last.abs() } else { 0.0 };
+            while consumed < end {
+                last = (0..channels)
+                    .map(|_| samples.next().unwrap_or(0.0))
+                    .sum::<f32>()
+                    / channels as f32;
+                peak = peak.max(last.abs());
+                consumed += 1;
+            }
+            peak.clamp(0.0, 1.0)
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn streaming_matches_reference_for_short_uneven_and_multichannel_input() {
+        for frames in [0, 1, 2, 7, 31, 1000] {
+            for channels in [1, 2, 6] {
+                let samples: Vec<f32> = (0..frames * channels)
+                    .map(|i| (i % 17) as f32 / 8.0 - 1.0)
+                    .collect();
+                for buckets in [0, 1, 3, 16, 300] {
+                    let expected = bucket_peaks(&downmix_to_mono(&samples, channels), buckets);
+                    assert_eq!(
+                        stream_peaks(samples.iter().copied(), channels, frames, buckets),
+                        expected
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn long_stream_needs_no_full_song_buffer() {
+        let peaks = stream_peaks(std::iter::repeat_n(0.5, 2_000_000), 2, 1_000_000, 300);
+        assert_eq!(peaks, vec![0.5; 300]);
+    }
 
     #[test]
     fn downmix_leaves_mono_untouched() {

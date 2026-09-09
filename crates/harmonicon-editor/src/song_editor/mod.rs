@@ -172,10 +172,11 @@ impl Plugin for SongEditor2Plugin {
                         // the meta form's Browse button) is decoded and
                         // ready the same frame the grid rebuilds around it,
                         // not one frame late.
-                        waveform::sync_music_waveform
-                            .run_if(resource_exists_and_changed::<state::EditorState>),
-                        grid::rebuild_grid
-                            .run_if(resource_exists_and_changed::<state::EditorState>),
+                        waveform::sync_music_waveform,
+                        grid::rebuild_grid.run_if(
+                            resource_exists_and_changed::<state::EditorState>
+                                .or_else(resource_changed::<waveform::MusicWaveform>),
+                        ),
                     )
                         .chain(),
                     playback::apply_pending_music_seek,
