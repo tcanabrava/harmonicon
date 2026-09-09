@@ -21,12 +21,9 @@ use bevy::prelude::*;
 use super::record::RecordState;
 use super::state::{EditorState, GridNote};
 
-/// How many edits back the history remembers. `GridNote` is `Copy` and
-/// `tempo_changes` entries are `(usize, f32)` pairs, so even a generous
-/// cap costs a trivial amount of memory — chosen to be deep enough that
-/// running out during ordinary editing would be surprising, not to bound
-/// anything performance-sensitive.
+/// History is limited by both edit count and retained allocation size.
 pub(super) const HISTORY_LIMIT: usize = 100;
+const HISTORY_BYTES: usize = 32 * 1024 * 1024;
 
 /// The editable content one undo/redo step restores — deliberately
 /// narrower than `EditorState` itself, see the module doc comment.
@@ -37,6 +34,15 @@ struct Snapshot {
 }
 
 impl Snapshot {
+    fn bytes(&self) -> usize {
+        self.notes.capacity() * std::mem::size_of::<GridNote>()
+            + self.tempo_changes.capacity() * std::mem::size_of::<(usize, f32)>()
+    }
+
+    fn matches(&self, state: &EditorState) -> bool {
+        self.notes == state.notes && self.tempo_changes == state.tempo_changes
+    }
+
     fn capture(state: &EditorState) -> Self {
         Self {
             notes: state.notes.clone(),
@@ -67,6 +73,32 @@ pub(super) struct UndoHistory {
 }
 
 impl UndoHistory {
+    fn trim(&mut self) {
+        self.trim_to(HISTORY_BYTES);
+    }
+
+    fn trim_to(&mut self, budget: usize) {
+        // The current snapshot is required for comparisons, even if a single
+        // document exceeds the budget. Drop old undo/redo entries first.
+        let mut bytes: usize = self
+            .past
+            .iter()
+            .chain(&self.future)
+            .map(Snapshot::bytes)
+            .sum();
+        bytes += self.last.as_ref().map_or(0, Snapshot::bytes);
+        while self.past.len() + self.future.len() > HISTORY_LIMIT || bytes > budget {
+            let removed = if !self.past.is_empty() {
+                self.past.remove(0)
+            } else if !self.future.is_empty() {
+                self.future.remove(0)
+            } else {
+                break;
+            };
+            bytes -= removed.bytes();
+        }
+    }
+
     pub(super) fn can_undo(&self) -> bool {
         !self.past.is_empty()
     }
@@ -86,6 +118,7 @@ impl UndoHistory {
             self.future.push(current);
         }
         prev.restore(state);
+        self.trim();
     }
 
     /// Steps `state` forward to the next snapshot, pushing the current one
@@ -99,6 +132,7 @@ impl UndoHistory {
             self.past.push(current);
         }
         next.restore(state);
+        self.trim();
     }
 
     /// Compares `state`'s current content against the last-seen snapshot;
@@ -107,18 +141,14 @@ impl UndoHistory {
     /// nothing content-shaped actually changed (e.g. `EditorState` changed
     /// for an unrelated reason — selection, scroll, a meta field edit).
     pub(super) fn record_if_changed(&mut self, state: &EditorState) {
-        let current = Snapshot::capture(state);
-        let Some(prev) = self.last.replace(current.clone()) else {
-            return;
-        };
-        if prev == current {
+        if self.last.as_ref().is_some_and(|last| last.matches(state)) {
             return;
         }
-        self.past.push(prev);
-        if self.past.len() > HISTORY_LIMIT {
-            self.past.remove(0);
+        if let Some(prev) = self.last.replace(Snapshot::capture(state)) {
+            self.past.push(prev);
         }
         self.future.clear();
+        self.trim();
     }
 }
 
@@ -136,4 +166,44 @@ pub(super) fn track_changes(
         return;
     }
     history.record_if_changed(&state);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn view_changes_preserve_snapshot_allocation_and_redo() {
+        let mut state = EditorState::default();
+        state.tempo_changes.push((0, 120.0));
+        let mut history = UndoHistory::default();
+        history.record_if_changed(&state);
+        state.tempo_changes.push((12, 90.0));
+        history.record_if_changed(&state);
+        history.undo(&mut state);
+        let ptr = history.last.as_ref().unwrap().tempo_changes.as_ptr();
+        state.scroll_beat += 1;
+        history.record_if_changed(&state);
+        assert_eq!(ptr, history.last.as_ref().unwrap().tempo_changes.as_ptr());
+        assert!(history.can_redo());
+        history.redo(&mut state);
+        assert_eq!(state.tempo_changes, vec![(0, 120.0), (12, 90.0)]);
+    }
+
+    #[test]
+    fn memory_budget_evicts_old_history_without_losing_current_content() {
+        let mut state = EditorState::default();
+        let mut history = UndoHistory::default();
+        for i in 0..5 {
+            state.tempo_changes.push((i, 120.0));
+            history.record_if_changed(&state);
+        }
+        let current_bytes = history.last.as_ref().unwrap().bytes();
+        history.trim_to(current_bytes);
+        assert!(!history.can_undo());
+        assert!(history.last.as_ref().unwrap().matches(&state));
+        state.tempo_changes.push((10, 90.0));
+        history.record_if_changed(&state);
+        assert!(history.can_undo());
+    }
 }
