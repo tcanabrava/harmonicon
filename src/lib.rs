@@ -211,14 +211,7 @@ pub fn run() {
                 .run_if(in_state(AppState::Startup))
                 .run_if(harmonicon_platform::localization::localization_ready),
         )
-        // Off Android this returns immediately and forever — capture never
-        // parks on a permission prompt there. See `audio_input::
-        // retry_capture_when_permission_granted`.
-        .add_systems(Update, audio_input::retry_capture_when_permission_granted)
-        // A device that dies *after* the stream opened — unplugged mid-song.
-        // Not gated to any state: Options needs to reflect it too.
-        .add_systems(Update, audio_input::detect_stream_failure)
-        .add_systems(Update, pipeline::process_audio)
+        .add_plugins(harmonicon_audio::AudioPipelinePlugin)
         .add_systems(
             Update,
             pipeline::log_pitches.run_if(in_state(AppState::Playing)),
