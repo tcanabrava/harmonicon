@@ -93,6 +93,106 @@ pub fn spawn_scroll_area(
     area
 }
 
+/// Like [`spawn_scroll_area`], but scrollable on *both* axes, with a
+/// scrollbar down the right and another along the bottom.
+///
+/// For content that is genuinely bigger than the window in both
+/// directions rather than merely long — the lesson skill tree, whose
+/// canvas is wider than any window once the curriculum is spread so no
+/// column stacks more than a few nodes deep. An ordinary page should still
+/// use [`spawn_scroll_area`]: a horizontal scrollbar under a page that
+/// never needs one is noise.
+///
+/// Returns the scroll area's entity, as its sibling does.
+pub fn spawn_scroll_area_xy(
+    parent: &mut ChildSpawnerCommands,
+    thumb_color: Color,
+    track_color: Color,
+) -> Entity {
+    let mut area = Entity::PLACEHOLDER;
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            // Same "min-height: auto" gotcha `spawn_scroll_area` documents:
+            // without this the column refuses to shrink below its content
+            // and the overflow check never trips.
+            min_height: Val::Px(0.0),
+            min_width: Val::Px(0.0),
+            flex_grow: 1.0,
+            width: Val::Percent(100.0),
+            ..default()
+        })
+        .with_children(|column| {
+            column
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Stretch,
+                    min_height: Val::Px(0.0),
+                    min_width: Val::Px(0.0),
+                    flex_grow: 1.0,
+                    ..default()
+                })
+                .with_children(|row| {
+                    area = row
+                        .spawn((
+                            Node {
+                                min_height: Val::Px(0.0),
+                                min_width: Val::Px(0.0),
+                                flex_grow: 1.0,
+                                overflow: Overflow::scroll(),
+                                ..default()
+                            },
+                            ScrollArea,
+                        ))
+                        .id();
+                    row.spawn((
+                        Scrollbar::new(area, ControlOrientation::Vertical, 24.0),
+                        Node {
+                            width: Val::Px(10.0),
+                            flex_shrink: 0.0,
+                            margin: UiRect::left(Val::Px(8.0)),
+                            display: Display::None,
+                            ..default()
+                        },
+                        BackgroundColor(track_color),
+                        Visibility::Hidden,
+                    ))
+                    .with_children(|track| {
+                        track.spawn((
+                            ScrollbarThumb {
+                                border_radius: BorderRadius::all(Val::Px(4.0)),
+                                border: UiRect::ZERO,
+                            },
+                            BackgroundColor(thumb_color),
+                        ));
+                    });
+                });
+            column
+                .spawn((
+                    Scrollbar::new(area, ControlOrientation::Horizontal, 24.0),
+                    Node {
+                        height: Val::Px(10.0),
+                        flex_shrink: 0.0,
+                        margin: UiRect::top(Val::Px(8.0)),
+                        display: Display::None,
+                        ..default()
+                    },
+                    BackgroundColor(track_color),
+                    Visibility::Hidden,
+                ))
+                .with_children(|track| {
+                    track.spawn((
+                        ScrollbarThumb {
+                            border_radius: BorderRadius::all(Val::Px(4.0)),
+                            border: UiRect::ZERO,
+                        },
+                        BackgroundColor(thumb_color),
+                    ));
+                });
+        });
+    area
+}
+
 /// Hides a scrollbar entirely once its paired [`ScrollArea`]'s content
 /// already fits without scrolling — same "don't show a scrollbar with
 /// nothing to scroll to" convention `song_editor::interaction::
@@ -100,6 +200,11 @@ pub fn spawn_scroll_area(
 /// [`Scrollbar`] to its own `ScrollArea` via [`Scrollbar::target`], so this
 /// is registered once for the whole app (see [`ScrollAreaPlugin`]) rather
 /// than per caller.
+///
+/// Each bar is judged on **its own axis**: a two-axis area
+/// ([`spawn_scroll_area_xy`]) routinely needs one bar and not the other,
+/// and measuring both against height would show a horizontal bar for
+/// content that is merely tall.
 pub fn update_scrollbar_visibility(
     mut bars: Query<(&Scrollbar, &mut Visibility, &mut Node)>,
     areas: Query<&ComputedNode, With<ScrollArea>>,
@@ -108,7 +213,10 @@ pub fn update_scrollbar_visibility(
         let Ok(area) = areas.get(bar.target) else {
             continue;
         };
-        let needed = area.content_size().y > area.size().y + 1.0;
+        let needed = match bar.orientation {
+            ControlOrientation::Vertical => area.content_size().y > area.size().y + 1.0,
+            ControlOrientation::Horizontal => area.content_size().x > area.size().x + 1.0,
+        };
         *vis = if needed {
             Visibility::Visible
         } else {

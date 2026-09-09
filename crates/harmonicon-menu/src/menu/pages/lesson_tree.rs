@@ -4,8 +4,15 @@
 //!
 //! One root (`single-note`) fanning right through the prerequisite graph,
 //! so a player sees the basics come first and the branches open out of
-//! them. Columns are depth, rows are chosen to keep edges untangled, and
-//! tracks are colour rather than rows — see [`layout`].
+//! them. A column is depth or later — deep enough to sit right of every
+//! prerequisite, and pushed further right when a column would otherwise
+//! stack too many nodes — rows are chosen to keep edges untangled, and
+//! tracks are colour rather than rows; see [`layout`].
+//!
+//! **The canvas is wider than the window on purpose**, which is why this
+//! page builds a two-axis `spawn_scroll_area_xy` instead of taking
+//! `spawn_menu_root`'s vertical one. Height is what a reader cannot
+//! afford; width scrolls.
 //!
 //! [`layout`] decides everything and is pure; this file only turns that
 //! into nodes, the same split `music_score` uses.
@@ -39,7 +46,8 @@ use harmonicon_ui::dialogs::tooltip::Tooltip;
 
 use crate::menu::pages::lessons::SelectedLesson;
 use crate::menu::routing::MenuPage;
-use crate::menu::scene::{spawn_back_button, spawn_menu_root};
+use crate::menu::scene::{spawn_back_button, spawn_menu_root_plain};
+use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
 use layout::{NodeState, PlacedNode, layout};
 
@@ -76,6 +84,10 @@ const LOCKED_TINT: Color = Color::srgba(0.35, 0.35, 0.42, 0.55);
 const PIP_FILLED: Color = Color::srgb(0.95, 0.80, 0.35);
 const PIP_EMPTY: Color = Color::srgba(0.40, 0.43, 0.52, 0.8);
 const EDGE_COLOR: Color = Color::srgba(0.62, 0.66, 0.78, 0.5);
+/// Matching `menu::scene`'s own scrollbar colours — this page builds its
+/// scroll area itself, so it can't inherit them.
+const SCROLLBAR_TRACK: Color = Color::srgba(0.0, 0.0, 0.0, 0.35);
+const SCROLLBAR_THUMB: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
 
 /// A track's colour. Grouping has to survive losing its row, and colour is
 /// what the skill trees this is modelled on use for the same job.
@@ -115,7 +127,11 @@ pub(crate) fn setup_lesson_tree(
     loc: Res<Localization>,
     asset_server: Res<AssetServer>,
 ) {
-    let (root, header, _page_root) = spawn_menu_root(
+    // `_plain` plus a two-axis scroll area of our own: the shared
+    // `spawn_menu_root` scrolls vertically only, and this canvas is wider
+    // than any window once the curriculum is spread so no column stacks
+    // more than four deep.
+    let (root, header, _page_root) = spawn_menu_root_plain(
         &mut commands,
         &loc.msg("lesson-tree-title"),
         None,
@@ -153,6 +169,28 @@ pub(crate) fn setup_lesson_tree(
     };
 
     let placeholder: Handle<Image> = asset_server.load("icons/lesson_placeholder.png");
+
+    // The plain root's content column sizes to its own content, so a canvas
+    // larger than the window would push it past both screen edges and the
+    // scroll area inside would never receive less room than the tree asks
+    // for — the "min-height: auto" gotcha `scroll_area` documents, one level
+    // further out. Nothing else shares this column, so reshape it here
+    // rather than change what every plain page gets.
+    commands.entity(root).insert(Node {
+        flex_direction: FlexDirection::Column,
+        align_items: AlignItems::Center,
+        width: Val::Percent(100.0),
+        min_height: Val::Px(0.0),
+        min_width: Val::Px(0.0),
+        flex_grow: 1.0,
+        ..default()
+    });
+
+    let mut scroller = Entity::PLACEHOLDER;
+    commands.entity(root).with_children(|parent| {
+        scroller = spawn_scroll_area_xy(parent, SCROLLBAR_THUMB, SCROLLBAR_TRACK);
+    });
+
     let canvas = commands
         .spawn(Node {
             position_type: PositionType::Relative,
@@ -168,7 +206,7 @@ pub(crate) fn setup_lesson_tree(
             ..default()
         })
         .id();
-    commands.entity(root).add_child(canvas);
+    commands.entity(scroller).add_child(canvas);
 
     // Edges first, so node art always sits on top of its connectors.
     commands.entity(canvas).with_children(|parent| {

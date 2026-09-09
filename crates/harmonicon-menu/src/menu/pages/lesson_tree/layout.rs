@@ -17,7 +17,7 @@
 //! renderer's business and change with the theme; which node sits left of
 //! which does not.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use harmonicon_app::profile::PlayerProfile;
 use harmonicon_core::training::Tier;
@@ -27,6 +27,15 @@ use harmonicon_song::lessons::graph::LessonGraph;
 /// Crossing-reduction sweeps. Four down-and-up passes is well past the
 /// point this curriculum stops improving; it is cheap and runs once.
 const ORDERING_PASSES: usize = 4;
+
+/// How many nodes may share a column before the layout starts pushing some
+/// of them right.
+///
+/// Depth alone stacked nine lessons in one column, which reads as a wall
+/// rather than a tree. Spreading trades height for width — the shipped
+/// curriculum goes from 7 columns by 9 rows to 16 by 4 — and width is the
+/// axis that can afford it, since the page scrolls both ways.
+const MAX_PER_COLUMN: usize = 4;
 
 /// How a node reads at a glance.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -170,6 +179,14 @@ pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProf
         }
     }
 
+    // Depth is only the *earliest* column a node may occupy. Spreading may
+    // push it further right so no column stacks too deep.
+    let mut columns: Vec<usize> = nodes.iter().map(|n| n.column).collect();
+    spread_columns(&mut columns, &predecessors, &successors);
+    for (node, column) in nodes.iter_mut().zip(&columns) {
+        node.column = *column;
+    }
+
     let column_count = nodes.iter().map(|n| n.column + 1).max().unwrap_or(0);
     let mut layers: Vec<Vec<usize>> = vec![Vec::new(); column_count];
     for (i, n) in nodes.iter().enumerate() {
@@ -210,6 +227,66 @@ pub fn layout(entries: &[LessonEntry], graph: &LessonGraph, profile: &PlayerProf
     });
 
     TreeLayout { nodes, edges }
+}
+
+/// Pushes nodes right until no column holds more than [`MAX_PER_COLUMN`].
+///
+/// A whole *sibling group* moves at once — the children of one parent stay
+/// together rather than being split across two columns, which is what keeps
+/// the result readable as "these came from there". Everything downstream of
+/// a moved node follows, so a node never lands level with or left of
+/// something it depends on.
+///
+/// This terminates because a column only ever increases, and it makes
+/// progress because no lesson has more than four children (a curriculum
+/// rule): a column holding more than four therefore holds at least two
+/// groups, so moving the largest always leaves someone behind.
+fn spread_columns(columns: &mut [usize], predecessors: &[Vec<usize>], successors: &[Vec<usize>]) {
+    /// Moves `node` to `to` and drags its dependents past it.
+    fn push(node: usize, to: usize, columns: &mut [usize], successors: &[Vec<usize>]) {
+        if columns[node] >= to {
+            return;
+        }
+        columns[node] = to;
+        for &next in &successors[node] {
+            push(next, to + 1, columns, successors);
+        }
+    }
+
+    // Bounded rather than `loop`: a bug in the progress argument above
+    // should slow the menu down, not hang the game.
+    for _ in 0..columns.len() * 4 {
+        let mut by_column: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for (node, &column) in columns.iter().enumerate() {
+            by_column.entry(column).or_default().push(node);
+        }
+        // Fullest first, earliest column breaking a tie, so the pass is
+        // deterministic rather than dependent on map iteration order.
+        let Some((&column, members)) = by_column
+            .iter()
+            .filter(|(_, members)| members.len() > MAX_PER_COLUMN)
+            .max_by_key(|(column, members)| (members.len(), std::cmp::Reverse(**column)))
+        else {
+            return;
+        };
+
+        let mut groups: BTreeMap<Option<usize>, Vec<usize>> = BTreeMap::new();
+        for &node in members {
+            groups
+                .entry(predecessors[node].first().copied())
+                .or_default()
+                .push(node);
+        }
+        let Some(group) = groups
+            .into_values()
+            .max_by_key(|group| (group.len(), std::cmp::Reverse(group[0])))
+        else {
+            return;
+        };
+        for node in group {
+            push(node, column + 1, columns, successors);
+        }
+    }
 }
 
 /// Reorders each layer so edges cross as little as possible.

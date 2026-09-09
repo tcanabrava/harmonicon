@@ -177,6 +177,53 @@ fn a_node_always_sits_right_of_everything_it_depends_on() {
 }
 
 #[test]
+fn a_crowded_column_spills_into_the_next_one() {
+    // Nine lessons all three steps in is a wall, not a tree. Depth is only
+    // the earliest column a node may take; the layout pushes whole sibling
+    // groups right until no column stacks deeper than `MAX_PER_COLUMN`.
+    let mut e = vec![entry("root", "t", &[], false)];
+    for parent in ["a", "b", "c"] {
+        e.push(entry(parent, "t", &["root"], false));
+        for child in 0..3 {
+            let id = format!("{parent}{child}");
+            e.push(entry(&id, "t", &[parent], false));
+        }
+    }
+    let l = build(&e, &PlayerProfile::default());
+
+    let mut per_column: HashMap<usize, usize> = HashMap::new();
+    for n in &l.nodes {
+        *per_column.entry(n.column).or_default() += 1;
+    }
+    for (column, count) in per_column {
+        assert!(
+            count <= MAX_PER_COLUMN,
+            "column {column} holds {count} nodes, more than {MAX_PER_COLUMN}"
+        );
+    }
+}
+
+#[test]
+fn a_node_pushed_right_drags_what_depends_on_it() {
+    // The whole point of spreading is readability; a node landing level
+    // with — or left of — its own prerequisite would trade one unreadable
+    // shape for a wrong one.
+    let mut e = vec![entry("root", "t", &[], false)];
+    for parent in ["a", "b", "c"] {
+        e.push(entry(parent, "t", &["root"], false));
+        for child in 0..3 {
+            let id = format!("{parent}{child}");
+            e.push(entry(&id, "t", &[parent], false));
+            e.push(entry(&format!("{id}x"), "t", &[id.as_str()], false));
+        }
+    }
+    let l = build(&e, &PlayerProfile::default());
+    for edge in &l.edges {
+        assert!(edge.from.0 < edge.to.0, "edge points backwards: {edge:?}");
+    }
+}
+
+#[test]
 fn a_single_root_sits_alone_in_the_first_column() {
     // The curriculum was given one root on purpose, so the tree opens from
     // one place instead of three unrelated starting points.

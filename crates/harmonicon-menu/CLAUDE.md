@@ -31,6 +31,26 @@ load-bearing about *this* crate.
   gets a visible, draggable scrollbar instead of silently overflowing
   past the edges with no way to reach the rest.
 
+- **The skill tree is the one page that scrolls both ways.**
+  `menu/pages/lesson_tree.rs` builds its own
+  `dialogs::scroll_area::spawn_scroll_area_xy` on top of
+  `spawn_menu_root_plain` rather than taking `spawn_menu_root`'s vertical
+  `ScrollArea`, because its canvas is genuinely wider than any window: a
+  node's column is its depth in the prerequisite graph, and
+  `lesson_tree::layout::spread_columns` then pushes whole sibling groups
+  further right until no column stacks more than `MAX_PER_COLUMN` deep
+  (the shipped curriculum goes from 7 columns by 9 rows to 16 by 4).
+  Height is the axis a reader can't afford; width is the one that
+  scrolls. Two things this needs that an ordinary page doesn't: the
+  canvas carries `flex_shrink: 0.0` (every node inside is positioned
+  absolutely, so a collapsed box would keep its children's pixel offsets
+  while the scroll extent is computed from the collapsed size — the tree
+  spills past both ends with neither reachable), and the content column
+  `spawn_menu_root_plain` returns is reshaped with `min_height`/
+  `min_width: 0` so it can actually shrink under the canvas, the same
+  "min-height: auto" gotcha `scroll_area` documents one level further
+  out.
+
 - **Guided tutorial tour** (`harmonicon-menu`'s `menu/pages/tutorial.rs`): a "Tutorial" button on
   the Help/About menu drives a fixed sequence (`TOUR_STEPS`, each a
   `TourTarget`) on a timer, with a click-blocking overlay on top naming the
