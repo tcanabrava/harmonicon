@@ -31,6 +31,7 @@ mod debug_record;
 #[cfg(feature = "dev")]
 mod expected_notes;
 mod grid;
+mod grid_cache;
 mod harpchart;
 mod interaction;
 mod lesson_form;
@@ -141,6 +142,7 @@ impl Plugin for SongEditor2Plugin {
             .init_resource::<state::TimelineSelection>()
             .init_resource::<playback::PendingMusicSeek>()
             .init_resource::<waveform::MusicWaveform>()
+            .init_resource::<grid_cache::GridCache>()
             .init_resource::<clipboard::NoteClipboard>()
             .init_resource::<metronome::CountIn>()
             .init_resource::<metronome::EditorLastClickedTick>()
@@ -175,11 +177,20 @@ impl Plugin for SongEditor2Plugin {
                         waveform::sync_music_waveform,
                         grid::rebuild_grid.run_if(
                             resource_exists_and_changed::<state::EditorState>
-                                .or_else(resource_changed::<waveform::MusicWaveform>),
+                                .or_else(resource_changed::<waveform::MusicWaveform>)
+                                .or_else(resource_changed::<LoadedTheme>)
+                                .or_else(resource_changed::<grid_cache::GridCache>),
                         ),
                     )
                         .chain(),
-                    playback::apply_pending_music_seek,
+                    (
+                        grid::update_selection.after(grid::rebuild_grid).run_if(
+                            resource_exists_and_changed::<state::EditorState>
+                                .or_else(resource_changed::<LoadedTheme>)
+                                .or_else(resource_changed::<grid_cache::GridCache>),
+                        ),
+                        playback::apply_pending_music_seek,
+                    ),
                     playback::update_playhead_view.after(playback::advance_playhead),
                     playback::update_progress_bar.after(playback::advance_playhead),
                     music_score_bridge::sync_music_score

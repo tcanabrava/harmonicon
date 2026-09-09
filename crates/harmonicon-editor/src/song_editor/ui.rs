@@ -269,8 +269,8 @@ pub(super) fn init_state(mut commands: Commands, existing: Option<Res<EditorStat
     commands.insert_resource(super::undo::UndoHistory::default());
 }
 
-pub(super) fn force_grid_rebuild(mut state: ResMut<EditorState>) {
-    state.set_changed();
+pub(super) fn force_grid_rebuild(mut cache: ResMut<super::grid_cache::GridCache>) {
+    cache.invalidate();
 }
 
 /// `rebuild_grid` only runs when `EditorState` changes, but the number of

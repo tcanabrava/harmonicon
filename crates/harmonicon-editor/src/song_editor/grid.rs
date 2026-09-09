@@ -82,6 +82,7 @@ pub(super) fn note_in_scale(note: &GridNote, harp: &Harmonica, scale: &HashSet<S
 
 pub(super) fn rebuild_grid(
     mut commands: Commands,
+    mut cache: ResMut<super::grid_cache::GridCache>,
     state: Res<EditorState>,
     waveform: Res<super::waveform::MusicWaveform>,
     content: Query<Entity, With<GridContent>>,
@@ -97,6 +98,16 @@ pub(super) fn rebuild_grid(
     if state.dragging.is_some() {
         return;
     }
+    let win_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0);
+    let cols = visible_beats(win_w);
+    if !cache.bypass_change_detection().update(
+        &state,
+        cols,
+        theme.is_changed() || waveform.is_changed(),
+    ) {
+        return;
+    }
+    cache.set_changed();
     let colors = theme.song_editor_colors();
     let bar_colors = theme.twelve_bar_colors();
     let scale = state.scale.classes(&state.key);
@@ -127,8 +138,6 @@ pub(super) fn rebuild_grid(
     let Ok(content) = content.single() else {
         return;
     };
-    let win_w = windows.iter().next().map(|w| w.width()).unwrap_or(1280.0);
-    let cols = visible_beats(win_w);
     let beats_per_bar = state.beats_per_bar();
     let mut items: Vec<Entity> = Vec::new();
 
@@ -862,4 +871,27 @@ fn spawn_resize_handle(parent: &mut ChildSpawnerCommands, id: u32, edge: Edge, l
                 enforce_expr(&mut state, id);
             }
         });
+}
+
+/// Selection only changes borders; keep note entities and observers alive.
+pub(super) fn update_selection(
+    state: Res<EditorState>,
+    theme: Res<LoadedTheme>,
+    mut notes: Query<(&NoteView, &mut Node, &mut BorderColor)>,
+) {
+    for (view, mut node, mut border) in &mut notes {
+        let selected = state.is_selected(view.0);
+        let width = UiRect::all(Val::Px(if selected { 2.0 } else { 0.0 }));
+        if node.border != width {
+            node.border = width;
+        }
+        let color = BorderColor::all(if selected {
+            theme.song_editor_colors().accent
+        } else {
+            Color::NONE
+        });
+        if *border != color {
+            *border = color;
+        }
+    }
 }
