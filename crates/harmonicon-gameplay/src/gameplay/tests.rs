@@ -671,7 +671,7 @@ fn cleanup_despawns_only_gameplay_entities() {
 
 // ── score_notes (same-pitch overlap ordering) ───────────────────────────
 
-fn overlap_test_note(time: f64) -> ScheduledNote {
+pub(super) fn overlap_test_note(time: f64) -> ScheduledNote {
     ScheduledNote {
         time,
         duration: 1.0,

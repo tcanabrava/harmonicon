@@ -648,6 +648,9 @@ pub fn spawn_visible_notes(
 
     commands.entity(highway_entity).with_children(|hw| {
         for i in to_spawn {
+            if note_has_left_view(&song_notes.notes[i], elapsed) {
+                continue;
+            }
             spawn_note_visual(
                 hw,
                 i,
@@ -916,6 +919,11 @@ pub(super) fn spawn_blow_draw_legend(
 
 // ── Per-frame systems ─────────────────────────────────────────────────────────
 
+fn note_has_left_view(note: &ScheduledNote, elapsed: f64) -> bool {
+    let tail_pct = SCROLL_SPAN * (note.duration / LOOKAHEAD) as f32;
+    note_head_bottom_pct(note.time, elapsed, LOOKAHEAD) < -(tail_pct + 15.0)
+}
+
 pub fn update_notes(
     clock: Res<super::GameplayClock>,
     song_notes: Res<SongNotes>,
@@ -928,7 +936,6 @@ pub fn update_notes(
             continue;
         };
         let bottom = note_head_bottom_pct(note.time, elapsed, LOOKAHEAD);
-        let duration_frac = (note.duration / LOOKAHEAD) as f32;
 
         // Recycle once the whole comet has fallen past the bottom. The tail
         // tip sits `SCROLL_SPAN * duration_frac` % above the head, so a long
@@ -936,8 +943,7 @@ pub fn update_notes(
         // independently in `SongNotes` now, so this despawns unconditionally
         // even while looping — `spawn_visible_notes` respawns it once the
         // (rewound) clock nears it again, with no state to lose.
-        let tail_pct = SCROLL_SPAN * duration_frac;
-        if bottom < -(tail_pct + 15.0) {
+        if note_has_left_view(note, elapsed) {
             commands.entity(entity).despawn();
             continue;
         }
@@ -1394,5 +1400,23 @@ mod tests {
         // decay=0.5 halves the distance to the 0.0 target each step.
         assert!((state.brightness - 0.5).abs() < 1e-6);
         assert!(state.is_blow, "direction is only updated on an actual hit");
+    }
+}
+
+#[cfg(test)]
+mod visibility_regression_tests {
+    use super::*;
+
+    #[test]
+    fn expired_notes_stay_expired_until_the_clock_rewinds() {
+        // The old spawn window remained open until t=3, even though the
+        // despawner had already removed this short note by t=1.
+        let mut note = super::super::tests::overlap_test_note(0.0);
+        note.duration = 0.1;
+        assert!(note_has_left_view(&note, 1.0));
+        assert!(note_has_left_view(&note, 2.0));
+        assert!(!note_has_left_view(&note, 0.0));
+        note.duration = 4.0;
+        assert!(!note_has_left_view(&note, 1.0));
     }
 }

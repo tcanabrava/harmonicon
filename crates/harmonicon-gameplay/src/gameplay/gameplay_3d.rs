@@ -367,6 +367,9 @@ pub fn spawn_visible_notes_3d(
     let elapsed = clock.get();
     let already_spawned: HashSet<usize> = existing.iter().map(|v| v.note_id).collect();
     for i in super::notes_needing_spawn(&song_notes.notes, &already_spawned, elapsed) {
+        if note_has_left_view(&render_assets, &song_notes.notes[i], elapsed) {
+            continue;
+        }
         spawn_note_visual_3d(
             &mut commands,
             &mut meshes,
@@ -1094,6 +1097,12 @@ pub fn groove_harmonica(
     }
 }
 
+fn note_has_left_view(assets: &NoteRenderAssets3D, note: &ScheduledNote, elapsed: f64) -> bool {
+    let (_, head_depth, tail_len) = note_dimensions(assets, note.hole, note.duration);
+    let distance = (elapsed - note.time) as f32 / LOOKAHEAD as f32 * LANE_DEPTH;
+    distance > head_depth + tail_len + 4.0
+}
+
 pub fn update_notes_3d(
     clock: Res<super::GameplayClock>,
     song_notes: Res<super::SongNotes>,
@@ -1106,7 +1115,7 @@ pub fn update_notes_3d(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let (_, head_depth, tail_len) = note_dimensions(&render_assets, note.hole, note.duration);
+        let (_, head_depth, _) = note_dimensions(&render_assets, note.hole, note.duration);
         let remaining = (note.time - elapsed) as f32;
         // The head's front face lands on the hit line at the note's time.
         let z = HIT_Z - remaining / LOOKAHEAD as f32 * LANE_DEPTH - head_depth * 0.5;
@@ -1115,7 +1124,7 @@ pub fn update_notes_3d(
         // this despawns unconditionally even while looping —
         // `spawn_visible_notes_3d` respawns it once the (rewound) clock
         // nears it again, with no state to lose.
-        if z > HIT_Z + head_depth * 0.5 + tail_len + 4.0 {
+        if note_has_left_view(&render_assets, note, elapsed) {
             commands.entity(entity).despawn();
             continue;
         }

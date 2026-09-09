@@ -108,3 +108,13 @@ fn leaving_3d_restores_the_2d_camera() {
     assert_eq!(camera.order, 0);
     assert!(matches!(camera.clear_color, ClearColorConfig::Default));
 }
+
+#[test]
+fn expired_note_cannot_respawn_until_rewind() {
+    let assets = NoteRenderAssets3D::default();
+    let mut note = super::super::tests::overlap_test_note(0.0);
+    note.duration = 0.1;
+    assert!(note_has_left_view(&assets, &note, 1.0));
+    assert!(note_has_left_view(&assets, &note, 2.0));
+    assert!(!note_has_left_view(&assets, &note, 0.0));
+}
