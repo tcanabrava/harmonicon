@@ -22,9 +22,17 @@ const POOL_SIZE: usize = 8;
 #[allow(dead_code)]
 pub struct AudioStream(pub cpal::Stream);
 
+/// Capture time and sample position travel with the samples so stalled
+/// consumers can reject stale analysis without compressing raw recordings.
+pub struct AudioChunk {
+    pub samples: Vec<f32>,
+    pub captured_at: std::time::Instant,
+    pub end_sample: u64,
+}
+
 #[derive(Resource)]
 pub struct AudioCapture {
-    pub receiver: Receiver<Vec<f32>>,
+    pub receiver: Receiver<AudioChunk>,
     /// Hand a chunk buffer back here once you're done with it (e.g. when
     /// overwriting `AudioFrame::samples` with a newer chunk) so the
     /// real-time callback can reuse it instead of allocating — see
@@ -256,7 +264,7 @@ pub fn create_audio_capture(
         sample_rate, channels, sample_format
     );
 
-    let (tx, rx) = bounded::<Vec<f32>>(64);
+    let (tx, rx) = bounded::<AudioChunk>(POOL_SIZE);
 
     // Small and bounded: only the first error actually matters (they arrive
     // in bursts once a device dies), and a full channel must never block
@@ -302,7 +310,7 @@ fn build_stream<T: cpal::SizedSample>(
     device: &cpal::Device,
     config: &StreamConfig,
     channels: usize,
-    tx: Sender<Vec<f32>>,
+    tx: Sender<AudioChunk>,
     free_rx: Receiver<Vec<f32>>,
     errors: Sender<String>,
 ) -> Result<cpal::Stream, cpal::BuildStreamError>
@@ -326,6 +334,7 @@ where
 struct ChunkWriter {
     samples: Box<[f32; CHUNK_SIZE]>,
     len: usize,
+    end_sample: u64,
     pending: Option<Vec<f32>>,
 }
 
@@ -334,6 +343,7 @@ impl ChunkWriter {
         Self {
             samples: Box::new([0.0; CHUNK_SIZE]),
             len: 0,
+            end_sample: 0,
             pending: None,
         }
     }
@@ -342,7 +352,7 @@ impl ChunkWriter {
         &mut self,
         data: &[T],
         channels: usize,
-        tx: &Sender<Vec<f32>>,
+        tx: &Sender<AudioChunk>,
         free: &Receiver<Vec<f32>>,
     ) where
         f32: cpal::FromSample<T>,
@@ -354,6 +364,7 @@ impl ChunkWriter {
             self.samples[self.len] =
                 frame.iter().map(|&s| s.to_sample::<f32>()).sum::<f32>() / channels as f32;
             self.len += 1;
+            self.end_sample += 1;
             if self.len != CHUNK_SIZE {
                 continue;
             }
@@ -363,8 +374,12 @@ impl ChunkWriter {
                 debug_assert!(chunk.capacity() >= CHUNK_SIZE);
                 chunk.clear();
                 chunk.extend_from_slice(&self.samples[..]);
-                if let Err(error) = tx.try_send(chunk) {
-                    self.pending = Some(error.into_inner());
+                if let Err(error) = tx.try_send(AudioChunk {
+                    samples: chunk,
+                    captured_at: std::time::Instant::now(),
+                    end_sample: self.end_sample,
+                }) {
+                    self.pending = Some(error.into_inner().samples);
                 }
             }
             self.samples.copy_within(HOP_SIZE.., 0);
@@ -480,8 +495,8 @@ mod tests {
         for part in data.chunks(254) {
             writer.push(part, 2, &tx, &free_rx);
         }
-        let first = rx.try_recv().unwrap();
-        let second = rx.try_recv().unwrap();
+        let first = rx.try_recv().unwrap().samples;
+        let second = rx.try_recv().unwrap().samples;
         assert_eq!(
             first,
             (0..CHUNK_SIZE).map(|i| i as f32 + 1.0).collect::<Vec<_>>()
@@ -502,21 +517,26 @@ mod tests {
         let buffer = Vec::with_capacity(CHUNK_SIZE);
         let pointer = buffer.as_ptr();
         free_tx.send(buffer).unwrap();
-        tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
+        tx.send(AudioChunk {
+            samples: Vec::with_capacity(CHUNK_SIZE),
+            captured_at: std::time::Instant::now(),
+            end_sample: 0,
+        })
+        .unwrap();
         let mut writer = ChunkWriter::new();
         let data = vec![0.5; CHUNK_SIZE * 8];
         writer.push(&data, 1, &tx, &free_rx);
         assert_eq!(writer.pending.as_ref().unwrap().as_ptr(), pointer);
         rx.try_recv().unwrap();
         writer.push(&data[..HOP_SIZE], 1, &tx, &free_rx);
-        let received = rx.try_recv().unwrap();
+        let received = rx.try_recv().unwrap().samples;
         assert_eq!(received.as_ptr(), pointer);
         assert!(writer.pending.is_none());
         writer.push(&data, 1, &tx, &free_rx);
         assert!(rx.is_empty()); // all buffers in flight: no fallback allocation
         free_tx.send(received).unwrap();
         writer.push(&data[..HOP_SIZE], 1, &tx, &free_rx);
-        assert_eq!(rx.try_recv().unwrap().as_ptr(), pointer);
+        assert_eq!(rx.try_recv().unwrap().samples.as_ptr(), pointer);
     }
 
     #[test]
@@ -525,17 +545,18 @@ mod tests {
         let (free_tx, free_rx) = bounded(1);
         free_tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
         ChunkWriter::new().push(&vec![i16::MIN; CHUNK_SIZE], 1, &tx, &free_rx);
-        assert_eq!(rx.try_recv().unwrap(), vec![-1.0; CHUNK_SIZE]);
+        assert_eq!(rx.try_recv().unwrap().samples, vec![-1.0; CHUNK_SIZE]);
         free_tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
         ChunkWriter::new().push(&vec![i32::MIN; CHUNK_SIZE], 1, &tx, &free_rx);
-        assert_eq!(rx.try_recv().unwrap(), vec![-1.0; CHUNK_SIZE]);
+        assert_eq!(rx.try_recv().unwrap().samples, vec![-1.0; CHUNK_SIZE]);
     }
 
     /// An `AudioCapture` whose only live wire is the error channel — the
     /// sample-path fields are real but unused here, since
     /// `detect_stream_failure` never touches them.
     fn capture_reporting(errors: Receiver<String>) -> AudioCapture {
-        let (tx, rx) = bounded::<Vec<f32>>(1);
+        let (_, rx) = bounded::<AudioChunk>(1);
+        let (tx, _) = bounded::<Vec<f32>>(1);
         AudioCapture {
             receiver: rx,
             free_sender: tx,

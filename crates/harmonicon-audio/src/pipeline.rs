@@ -40,6 +40,28 @@ pub struct RawCaptureBuffer {
     /// `samples` at the start of a fresh take (`song_editor::
     /// debug_record::sync_raw_capture`).
     pub detected_notes: Vec<(f32, Vec<String>)>,
+    last_sample_end: u64,
+}
+
+#[cfg(feature = "dev")]
+impl RawCaptureBuffer {
+    fn append(&mut self, chunk: &audio_input::AudioChunk, rate: u32, algorithm: PitchAlgorithm) {
+        self.sample_rate = rate;
+        self.algorithm = algorithm;
+        if self.samples.is_empty() || chunk.end_sample < self.last_sample_end {
+            self.samples.extend_from_slice(&chunk.samples);
+        } else {
+            let new_count = chunk.end_sample.saturating_sub(self.last_sample_end) as usize;
+            let available = new_count.min(chunk.samples.len());
+            // Missing capture hops remain silence in the recording rather
+            // than shifting every subsequent note earlier in time.
+            self.samples
+                .resize(self.samples.len() + new_count - available, 0.0);
+            self.samples
+                .extend_from_slice(&chunk.samples[chunk.samples.len() - available..]);
+        }
+        self.last_sample_end = chunk.end_sample;
+    }
 }
 
 pub fn process_audio(
@@ -57,8 +79,8 @@ pub fn process_audio(
     let connected = status.as_ref().is_none_or(|status| status.is_connected());
     if capture.is_none() || !connected {
         if let Some(capture) = capture.as_ref() {
-            for samples in capture.receiver.try_iter() {
-                let _ = capture.free_sender.try_send(samples);
+            for chunk in capture.receiver.try_iter() {
+                let _ = capture.free_sender.try_send(chunk.samples);
             }
         }
         *last_received = None;
@@ -66,12 +88,33 @@ pub fn process_audio(
         return;
     }
     let capture = capture.unwrap();
-    while let Ok(samples) = capture.receiver.try_recv() {
-        *last_received = Some(time.elapsed());
-        // Chunks arrive with 50% overlap (see `audio_input::push_chunks`), so
-        // more than one can land in a single frame — a span per chunk (rather
-        // than relying solely on the automatic per-system span this whole
-        // function already gets) shows how many ran and how long each took.
+    // Snapshot the bounded queue length: producers cannot extend this frame's
+    // work indefinitely. Raw recording keeps every delivered hop; live pitch
+    // feedback analyzes at most the newest fresh chunk.
+    let now = std::time::Instant::now();
+    let mut latest: Option<audio_input::AudioChunk> = None;
+    for _ in 0..capture.receiver.len() {
+        let Ok(chunk) = capture.receiver.try_recv() else {
+            break;
+        };
+        #[cfg(feature = "dev")]
+        if let Some(raw) = raw_capture.as_deref_mut()
+            && raw.recording
+        {
+            raw.append(&chunk, capture.sample_rate, settings.pitch_algorithm);
+        }
+        if now.saturating_duration_since(chunk.captured_at) >= CAPTURE_TIMEOUT {
+            let _ = capture.free_sender.try_send(chunk.samples);
+        } else if let Some(previous) = latest.replace(chunk) {
+            let _ = capture.free_sender.try_send(previous.samples);
+        }
+    }
+    if let Some(chunk) = latest {
+        *last_received = Some(
+            time.elapsed()
+                .saturating_sub(now.saturating_duration_since(chunk.captured_at)),
+        );
+        let samples = chunk.samples;
         let _span = info_span!("process_audio_chunk", samples = samples.len()).entered();
         // One FFT per chunk for the spectrum; pitches use the chosen algorithm.
         let analysis = pitch_detect::analyze(
@@ -87,19 +130,6 @@ pub fn process_audio(
         if let Some(raw) = raw_capture.as_deref_mut()
             && raw.recording
         {
-            raw.sample_rate = capture.sample_rate;
-            raw.algorithm = settings.pitch_algorithm;
-            // Only the newly-captured hop of each chunk (the first chunk in
-            // full, every later one just its second half) goes into the
-            // debug buffer — otherwise the 50% overlap above would
-            // duplicate half of every chunk into a stuttering recording.
-            if raw.samples.is_empty() {
-                raw.samples.extend_from_slice(&samples);
-            } else {
-                let hop = samples.len() / 2;
-                raw.samples
-                    .extend_from_slice(&samples[samples.len() - hop..]);
-            }
             let elapsed = raw.samples.len() as f32 / raw.sample_rate.max(1) as f32;
             let current: Vec<String> = analysis
                 .pitches
@@ -171,7 +201,15 @@ mod tests {
     use super::*;
     use crossbeam_channel::bounded;
 
-    fn app() -> (App, crossbeam_channel::Sender<Vec<f32>>) {
+    fn chunk(sample: f32) -> audio_input::AudioChunk {
+        audio_input::AudioChunk {
+            samples: vec![sample; 4096],
+            captured_at: std::time::Instant::now(),
+            end_sample: 4096,
+        }
+    }
+
+    fn app() -> (App, crossbeam_channel::Sender<audio_input::AudioChunk>) {
         let mut app = App::new();
         let (tx, receiver) = bounded(4);
         let (free_sender, _) = bounded(4);
@@ -210,7 +248,7 @@ mod tests {
     #[test]
     fn failed_capture_discards_queued_audio_and_publishes_silence() {
         let (mut app, tx) = app();
-        tx.send(vec![0.1; 4096]).unwrap();
+        tx.send(chunk(0.1)).unwrap();
         app.world_mut()
             .insert_resource(audio_input::MicStatus::Failed {
                 reason: "unplugged".into(),
@@ -223,7 +261,7 @@ mod tests {
     #[test]
     fn capture_timeout_clears_frame_and_recovers_on_new_audio() {
         let (mut app, tx) = app();
-        tx.send(vec![0.0; 4096]).unwrap();
+        tx.send(chunk(0.0)).unwrap();
         app.update();
         assert_eq!(app.world().resource::<AudioFrame>().samples.len(), 4096);
         app.world_mut()
@@ -231,7 +269,7 @@ mod tests {
             .advance_by(CAPTURE_TIMEOUT);
         app.update();
         assert_silent(&mut app);
-        tx.send(vec![0.0; 4096]).unwrap();
+        tx.send(chunk(0.0)).unwrap();
         app.update();
         assert_eq!(app.world().resource::<AudioFrame>().samples.len(), 4096);
     }
@@ -245,5 +283,48 @@ mod tests {
             app.update();
             assert_silent(&mut app);
         }
+    }
+    #[test]
+    fn backlog_analyzes_only_latest_and_rejects_stale_chunks() {
+        let (mut app, tx) = app();
+        tx.send(chunk(0.0)).unwrap();
+        tx.send(chunk(0.0001)).unwrap();
+        tx.send(chunk(0.0002)).unwrap();
+        app.update();
+        assert_eq!(
+            app.world().resource::<AudioFrame>().samples,
+            vec![0.0002; 4096]
+        );
+        assert_eq!(
+            app.world_mut()
+                .resource_mut::<Messages<PitchEvent>>()
+                .drain()
+                .count(),
+            1
+        );
+        app.world_mut()
+            .resource_mut::<Time<Real>>()
+            .advance_by(CAPTURE_TIMEOUT);
+        let mut old = chunk(0.1);
+        old.captured_at -= CAPTURE_TIMEOUT * 2;
+        tx.send(old).unwrap();
+        app.update();
+        assert_silent(&mut app);
+    }
+
+    #[cfg(feature = "dev")]
+    #[test]
+    fn raw_recording_preserves_overlap_and_missing_hop_timing() {
+        let mut raw = RawCaptureBuffer::default();
+        let first = chunk(0.25);
+        raw.append(&first, 44100, PitchAlgorithm::default());
+        let mut next = chunk(0.5);
+        next.end_sample += 2048;
+        raw.append(&next, 44100, PitchAlgorithm::default());
+        assert_eq!(raw.samples.len(), 6144);
+        next.end_sample += 8192;
+        raw.append(&next, 44100, PitchAlgorithm::default());
+        assert_eq!(raw.samples.len(), 14336);
+        assert!(raw.samples[6144..10240].iter().all(|&s| s == 0.0));
     }
 }
