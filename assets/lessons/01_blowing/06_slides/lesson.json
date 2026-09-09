@@ -6,7 +6,7 @@
   "body_key": "lesson-slides-body",
   "chart": "song/chart.harpchart",
   "prerequisites": [
-    "single-note"
+    "multiple-notes"
   ],
   "pass_criteria": {
     "type": "accuracy",

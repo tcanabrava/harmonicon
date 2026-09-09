@@ -6,7 +6,7 @@
   "body_key": "lesson-hand-wah-body",
   "chart": "song/chart.harpchart",
   "prerequisites": [
-    "single-note"
+    "breathing"
   ],
   "pass_criteria": {
     "type": "technique",

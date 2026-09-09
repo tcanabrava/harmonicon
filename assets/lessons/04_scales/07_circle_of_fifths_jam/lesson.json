@@ -7,7 +7,7 @@
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "circle-of-fifths",
-    "improvisation"
+    "major-scale-improv"
   ],
   "pass_criteria": {
     "type": "scale-adherence",

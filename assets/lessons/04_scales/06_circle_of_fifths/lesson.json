@@ -6,6 +6,6 @@
   "body_key": "lesson-circle-of-fifths-body",
   "diagram": "circle-of-fifths",
   "prerequisites": [
-    "single-note"
+    "twelve-bar"
   ]
 }

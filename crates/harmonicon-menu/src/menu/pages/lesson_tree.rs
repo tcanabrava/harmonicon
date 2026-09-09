@@ -48,14 +48,24 @@ const NODE_PX: f32 = 64.0;
 /// Column pitch — wide enough that a curve has room to bend before it
 /// arrives, which is what stops the edges reading as straight lines.
 const COL_PX: f32 = 150.0;
-/// Row pitch.
-const ROW_PX: f32 = 92.0;
+/// Row pitch. Tall enough for the node, its pips and two lines of title
+/// underneath without the next row's art crowding the text.
+const ROW_PX: f32 = 122.0;
 const MARGIN_PX: f32 = 24.0;
+/// Title width and size. Narrower than the column pitch so two neighbours'
+/// labels can't run together, and small enough that a long title wraps to
+/// two lines rather than three.
+const LABEL_PX: f32 = 132.0;
+const LABEL_FONT_PX: f32 = 11.0;
 
-/// Edge thickness, and how many straight pieces approximate each curve.
-/// Twenty is past the point more stops being visible at this scale.
+/// Edge thickness.
 const EDGE_PX: f32 = 3.5;
-const EDGE_SEGMENTS: usize = 20;
+/// Curve pixels per straight piece. **Resolution scales with length**, the
+/// way Bevy's own curve example does it — a fixed segment count made a long
+/// edge's pieces longer than they were thick, and with rounded caps that
+/// read as a string of beads rather than a line.
+const EDGE_PX_PER_SEGMENT: f32 = 4.0;
+const EDGE_MIN_SEGMENTS: usize = 24;
 /// How far the control points reach horizontally, as a fraction of the
 /// gap. Flat tangents at both ends are what make the curve leave and
 /// arrive horizontally rather than pointing corner to corner.
@@ -148,6 +158,13 @@ pub(crate) fn setup_lesson_tree(
             position_type: PositionType::Relative,
             width: Val::Px(MARGIN_PX * 2.0 + tree.columns() as f32 * COL_PX),
             height: Val::Px(MARGIN_PX * 2.0 + tree.rows() * ROW_PX),
+            // Every node is positioned absolutely inside this box, so it
+            // has to keep the height it asks for. Left to shrink — the
+            // flexbox default inside the scroll column — the box collapses
+            // to the viewport while its children keep their pixel offsets,
+            // and the scroll extent is computed from the collapsed box: the
+            // tree spills past both ends and neither can be scrolled to.
+            flex_shrink: 0.0,
             ..default()
         })
         .id();
@@ -199,7 +216,12 @@ fn spawn_edge(parent: &mut ChildSpawnerCommands, from: Vec2, to: Vec2) {
     .to_curve();
     let Ok(curve) = curve else { return };
 
-    let points: Vec<Vec2> = curve.iter_positions(EDGE_SEGMENTS).collect();
+    // Scale the sampling with how far the curve actually travels, so a long
+    // sweep is no coarser than a short hop.
+    let span = (end - start).length() + (end.y - start.y).abs();
+    let segments = ((span / EDGE_PX_PER_SEGMENT) as usize).max(EDGE_MIN_SEGMENTS);
+
+    let points: Vec<Vec2> = curve.iter_positions(segments).collect();
     for pair in points.windows(2) {
         let (a, b) = (pair[0], pair[1]);
         let delta = b - a;
@@ -207,6 +229,10 @@ fn spawn_edge(parent: &mut ChildSpawnerCommands, from: Vec2, to: Vec2) {
         if length < 0.01 {
             continue;
         }
+        // Overlap neighbours by a whole thickness: consecutive rotated
+        // rectangles leave a wedge at every joint where the angle changes,
+        // and overlapping is what closes it without a mitre calculation.
+        let drawn = length + EDGE_PX;
         let mid = (a + b) / 2.0;
         parent.spawn((
             Node {
@@ -214,11 +240,10 @@ fn spawn_edge(parent: &mut ChildSpawnerCommands, from: Vec2, to: Vec2) {
                 // Positioned by its own top-left, so shift back by half the
                 // segment to centre it on the midpoint before rotating —
                 // `UiTransform::rotation` turns a node about its centre.
-                left: Val::Px(mid.x - length / 2.0),
+                left: Val::Px(mid.x - drawn / 2.0),
                 top: Val::Px(mid.y - EDGE_PX / 2.0),
-                width: Val::Px(length),
+                width: Val::Px(drawn),
                 height: Val::Px(EDGE_PX),
-                border_radius: BorderRadius::MAX,
                 ..default()
             },
             UiTransform {
@@ -299,23 +324,52 @@ fn spawn_node(
         .id();
     commands.entity(canvas).add_child(button);
 
+    // The title, under the node. Small and wrapped to the column's own
+    // width — the art alone says nothing about which lesson this is, and a
+    // tooltip only helps a player already pointing at it.
+    let label = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(centre.x - LABEL_PX / 2.0),
+                top: Val::Px(centre.y + NODE_PX / 2.0 + 6.0),
+                width: Val::Px(LABEL_PX),
+                ..default()
+            },
+            Text::new(String::from(loc.msg(&node.title_key))),
+            TextFont {
+                font_size: FontSize::Px(LABEL_FONT_PX),
+                ..default()
+            },
+            TextLayout::justify(Justify::Center),
+            TextColor(if locked {
+                Color::srgba(0.62, 0.65, 0.74, 0.55)
+            } else {
+                Color::srgb(0.86, 0.89, 0.95)
+            }),
+        ))
+        .id();
+    commands.entity(canvas).add_child(label);
+
     if node.has_trainings {
         spawn_mastery_ring(commands, canvas, node, centre);
     }
 }
 
-/// The five training tiers, as pips tucked under the node — the mastery
+/// The five training tiers, as pips arced over the node — the mastery
 /// meter at node level.
+///
+/// Above rather than below, because the title now occupies the space under
+/// every node and pips sitting in it read as punctuation.
 fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode, centre: Vec2) {
     let tiers = harmonicon_core::training::Tier::ALL.len();
     let filled = (node.mastery * tiers as f32).round() as usize;
     let radius = NODE_PX / 2.0 + 1.0;
 
     for tier in 0..tiers {
-        // A tight arc across the bottom, where a pip can't be mistaken for
-        // part of the art.
         let t = tier as f32 / (tiers - 1) as f32;
-        let angle = (42.0 + t * 96.0_f32).to_radians();
+        // Negative sweeps the arc upward: screen y grows downward.
+        let angle = -(42.0 + t * 96.0_f32).to_radians();
         commands.entity(canvas).with_children(|parent| {
             parent.spawn((
                 Node {

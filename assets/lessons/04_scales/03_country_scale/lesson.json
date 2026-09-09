@@ -6,7 +6,7 @@
   "body_key": "lesson-country-scale-body",
   "chart": "song/chart.harpchart",
   "prerequisites": [
-    "multiple-notes"
+    "first-bend"
   ],
   "pass_criteria": {
     "type": "accuracy",

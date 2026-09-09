@@ -7,7 +7,7 @@
   "chart": "song/chart.harpchart",
   "progression": "quick-change",
   "prerequisites": [
-    "improvisation"
+    "question-answer"
   ],
   "pass_criteria": {
     "type": "scale-adherence",
