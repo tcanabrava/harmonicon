@@ -44,6 +44,9 @@ pub struct RawCaptureBuffer {
 
 pub fn process_audio(
     capture: Option<Res<audio_input::AudioCapture>>,
+    status: Option<Res<audio_input::MicStatus>>,
+    time: Res<Time<Real>>,
+    mut last_received: Local<Option<std::time::Duration>>,
     settings: Res<AudioSettings>,
     range: Res<PitchRange>,
     mut writer: MessageWriter<PitchEvent>,
@@ -51,8 +54,20 @@ pub fn process_audio(
     mut fft: Local<pitch_detect::FftState>,
     #[cfg(feature = "dev")] mut raw_capture: Option<ResMut<RawCaptureBuffer>>,
 ) {
-    let Some(capture) = capture else { return };
+    let connected = status.as_ref().is_none_or(|status| status.is_connected());
+    if capture.is_none() || !connected {
+        if let Some(capture) = capture.as_ref() {
+            for samples in capture.receiver.try_iter() {
+                let _ = capture.free_sender.try_send(samples);
+            }
+        }
+        *last_received = None;
+        clear_detection(&mut frame, &mut writer);
+        return;
+    }
+    let capture = capture.unwrap();
     while let Ok(samples) = capture.receiver.try_recv() {
+        *last_received = Some(time.elapsed());
         // Chunks arrive with 50% overlap (see `audio_input::push_chunks`), so
         // more than one can land in a single frame — a span per chunk (rather
         // than relying solely on the automatic per-system span this whole
@@ -108,6 +123,20 @@ pub fn process_audio(
         let previous = std::mem::replace(&mut frame.samples, samples);
         let _ = capture.free_sender.try_send(previous);
     }
+    if last_received.is_none_or(|last| time.elapsed().saturating_sub(last) >= CAPTURE_TIMEOUT) {
+        clear_detection(&mut frame, &mut writer);
+    }
+}
+
+const CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(250);
+
+fn clear_detection(frame: &mut AudioFrame, writer: &mut MessageWriter<PitchEvent>) {
+    frame.samples.clear();
+    frame.magnitudes.clear();
+    frame.freq_res = 0.0;
+    // Publish silence even while disconnected so a consumer resuming after
+    // a pause cannot retain an old pitch whose clear message has expired.
+    writer.write(PitchEvent(Vec::new()));
 }
 
 /// Logs the detected pitches whenever they change during Playing, at
@@ -132,5 +161,87 @@ pub fn log_pitches(mut reader: MessageReader<PitchEvent>, mut last: Local<Vec<St
             debug!("pitches: {}", current.join("  |  "));
         }
         *last = current;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossbeam_channel::bounded;
+
+    fn app() -> (App, crossbeam_channel::Sender<Vec<f32>>) {
+        let mut app = App::new();
+        let (tx, receiver) = bounded(4);
+        let (free_sender, _) = bounded(4);
+        let (_, errors) = bounded(4);
+        app.insert_resource(audio_input::AudioCapture {
+            receiver,
+            free_sender,
+            errors,
+            sample_rate: 44100,
+            device_name: "test".into(),
+        })
+        .insert_resource(audio_input::MicStatus::Connected {
+            device_name: "test".into(),
+        })
+        .init_resource::<Time<Real>>()
+        .init_resource::<AudioSettings>()
+        .init_resource::<PitchRange>()
+        .init_resource::<AudioFrame>()
+        .add_message::<PitchEvent>()
+        .add_systems(Update, process_audio);
+        (app, tx)
+    }
+
+    fn assert_silent(app: &mut App) {
+        let frame = app.world().resource::<AudioFrame>();
+        assert!(frame.samples.is_empty());
+        assert!(frame.magnitudes.is_empty());
+        let messages: Vec<_> = app
+            .world_mut()
+            .resource_mut::<Messages<PitchEvent>>()
+            .drain()
+            .collect();
+        assert!(messages.last().unwrap().0.is_empty());
+    }
+
+    #[test]
+    fn failed_capture_discards_queued_audio_and_publishes_silence() {
+        let (mut app, tx) = app();
+        tx.send(vec![0.1; 4096]).unwrap();
+        app.world_mut()
+            .insert_resource(audio_input::MicStatus::Failed {
+                reason: "unplugged".into(),
+            });
+        app.update();
+        assert_silent(&mut app);
+        assert!(tx.is_empty());
+    }
+
+    #[test]
+    fn capture_timeout_clears_frame_and_recovers_on_new_audio() {
+        let (mut app, tx) = app();
+        tx.send(vec![0.0; 4096]).unwrap();
+        app.update();
+        assert_eq!(app.world().resource::<AudioFrame>().samples.len(), 4096);
+        app.world_mut()
+            .resource_mut::<Time<Real>>()
+            .advance_by(CAPTURE_TIMEOUT);
+        app.update();
+        assert_silent(&mut app);
+        tx.send(vec![0.0; 4096]).unwrap();
+        app.update();
+        assert_eq!(app.world().resource::<AudioFrame>().samples.len(), 4096);
+    }
+
+    #[test]
+    fn missing_capture_repeatedly_publishes_silence_for_resuming_consumers() {
+        let (mut app, _) = app();
+        app.world_mut()
+            .remove_resource::<audio_input::AudioCapture>();
+        for _ in 0..4 {
+            app.update();
+            assert_silent(&mut app);
+        }
     }
 }
