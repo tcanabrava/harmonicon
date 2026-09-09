@@ -212,8 +212,25 @@ above:
 Wide enough to fit any window; tall enough to need vertical scrolling,
 which `dialogs::scroll_area` already does. Nothing new is required.
 
-Mapping onto the data: **row = track**, **node = lesson**, **vertical
-connectors = prerequisite edges between tracks**.
+**Superseded once it was built and looked at.** Track-as-row reads as a
+*grid*: every row starts at column 0 and marches right in lockstep, so a
+node's position says nothing about where it sits in the curriculum. What
+works is a **layered drawing**: a node's column is its depth in the
+prerequisite graph, its row is chosen to keep edges from crossing
+(barycentre sweeps), and tracks become **colour** rather than rows. The
+curriculum was also given a **single root** — `single-note` is now a
+prerequisite of `twelve-bar` and `counting-four` — so the tree opens from
+one place instead of three unrelated starts, which is the point: the basics
+come first and everything fans out of them.
+
+Measured on the real curriculum: 6 columns, widest layer 10, so about
+900 × 920 px. Still fits horizontally and scrolls vertically.
+
+Edges are real cubic Beziers. `bevy_ui` has no line primitive, but that is
+a fact about *drawing*, not about the engine: `bevy_math::CubicBezier`
+computes the curve, `iter_positions` samples it, and each sample pair
+becomes a short `Node` rotated by `UiTransform::rotation` (a first-class UI
+field in Bevy 0.19). No shader and no new dependency.
 
 ### The node
 

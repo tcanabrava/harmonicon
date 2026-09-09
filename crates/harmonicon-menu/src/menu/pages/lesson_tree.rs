@@ -1,24 +1,32 @@
 // SPDX-License-Identifier: MIT
 
-//! The skill tree: the curriculum drawn as a graph instead of a list.
+//! The skill tree: the curriculum drawn as a layered graph.
 //!
-//! Tracks stack downward and each reads left to right, so the page scrolls
-//! vertically and never sideways — see `docs/training_tree_plan.md` for why
-//! that shape was measured before it was chosen (600 px wide against 896
-//! tall, so nothing needs horizontal panning).
+//! One root (`single-note`) fanning right through the prerequisite graph,
+//! so a player sees the basics come first and the branches open out of
+//! them. Columns are depth, rows are chosen to keep edges untangled, and
+//! tracks are colour rather than rows — see [`layout`].
 //!
-//! [`layout`] decides everything — rows, columns, node state, edges — and
-//! is pure. This file only turns that into nodes, the same split
-//! `music_score` uses.
+//! [`layout`] decides everything and is pure; this file only turns that
+//! into nodes, the same split `music_score` uses.
+//!
+//! **Edges are real curves, and need no shader.** `bevy_math`'s
+//! [`CubicBezier`] gives the curve, `iter_positions` samples it, and each
+//! sample pair becomes a short `Node` rotated by `UiTransform::rotation` —
+//! a first-class UI field in Bevy 0.19. `bevy_ui` has no line primitive,
+//! which is a fact about *drawing*; it says nothing about whether the
+//! engine can compute a curve, and it can.
 //!
 //! **The list view is not replaced.** `responsive::is_compact` exists
-//! because a phone cannot show fourteen rows of anything; `MenuPage::
-//! Lessons` remains the compact presentation and this is the wide one.
+//! because a phone cannot show a graph this wide; `MenuPage::Lessons`
+//! remains the compact presentation and this is the wide one.
 
 pub(crate) mod layout;
 
 use bevy::input_focus::tab_navigation::TabIndex;
+use bevy::math::cubic_splines::CubicBezier;
 use bevy::prelude::*;
+use bevy::ui::UiTransform;
 use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use bevy_fluent::Localization;
 
@@ -27,6 +35,7 @@ use harmonicon_platform::localization::LocalizationExt;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::lessons::AvailableLessons;
 use harmonicon_song::lessons::graph::LessonGraph;
+use harmonicon_ui::dialogs::tooltip::Tooltip;
 
 use crate::menu::pages::lessons::SelectedLesson;
 use crate::menu::routing::MenuPage;
@@ -34,52 +43,58 @@ use crate::menu::scene::{spawn_back_button, spawn_menu_root};
 
 use layout::{NodeState, PlacedNode, layout};
 
-/// Node diameter. Big enough for art to read at a glance, small enough that
-/// the widest track (six nodes) still fits a narrow window.
-const NODE_PX: f32 = 72.0;
-/// Gap between nodes along a row, and between rows.
-const NODE_GAP_PX: f32 = 26.0;
-const ROW_GAP_PX: f32 = 18.0;
-/// Width reserved for the track label at the left of each row.
-const LABEL_PX: f32 = 96.0;
-/// Thickness of a prerequisite connector.
-const EDGE_PX: f32 = 2.0;
-/// The mastery ring: five pips spaced around the node's edge.
-const PIP_PX: f32 = 9.0;
+/// Node diameter.
+const NODE_PX: f32 = 64.0;
+/// Column pitch — wide enough that a curve has room to bend before it
+/// arrives, which is what stops the edges reading as straight lines.
+const COL_PX: f32 = 150.0;
+/// Row pitch.
+const ROW_PX: f32 = 92.0;
+const MARGIN_PX: f32 = 24.0;
 
+/// Edge thickness, and how many straight pieces approximate each curve.
+/// Twenty is past the point more stops being visible at this scale.
+const EDGE_PX: f32 = 3.5;
+const EDGE_SEGMENTS: usize = 20;
+/// How far the control points reach horizontally, as a fraction of the
+/// gap. Flat tangents at both ends are what make the curve leave and
+/// arrive horizontally rather than pointing corner to corner.
+const EDGE_TENSION: f32 = 0.55;
+
+const PIP_PX: f32 = 9.0;
 const LOCKED_TINT: Color = Color::srgba(0.35, 0.35, 0.42, 0.55);
-const AVAILABLE_RING: Color = Color::srgb(0.95, 0.80, 0.35);
-const PASSED_RING: Color = Color::srgb(0.45, 0.85, 0.50);
-const IDLE_RING: Color = Color::srgba(0.55, 0.58, 0.68, 0.7);
 const PIP_FILLED: Color = Color::srgb(0.95, 0.80, 0.35);
 const PIP_EMPTY: Color = Color::srgba(0.40, 0.43, 0.52, 0.8);
-const EDGE_COLOR: Color = Color::srgba(0.55, 0.58, 0.68, 0.45);
+const EDGE_COLOR: Color = Color::srgba(0.62, 0.66, 0.78, 0.5);
 
-/// Marks the tree's own scrolling canvas, so edges can be positioned
-/// against it rather than against whichever row they start in.
-#[derive(Component)]
-pub(crate) struct LessonTreeCanvas;
-
-/// Top-left corner of a node, in canvas pixels.
-fn node_origin(row: usize, column: usize) -> (f32, f32) {
-    (
-        LABEL_PX + column as f32 * (NODE_PX + NODE_GAP_PX),
-        row as f32 * (NODE_PX + ROW_GAP_PX),
-    )
-}
-
-fn node_centre(row: usize, column: usize) -> (f32, f32) {
-    let (x, y) = node_origin(row, column);
-    (x + NODE_PX / 2.0, y + NODE_PX / 2.0)
-}
-
-/// The ring colour a node's state calls for.
-fn ring_color(state: NodeState) -> Color {
-    match state {
-        NodeState::Locked => IDLE_RING,
-        NodeState::Available => AVAILABLE_RING,
-        NodeState::Passed | NodeState::Mastered => PASSED_RING,
+/// A track's colour. Grouping has to survive losing its row, and colour is
+/// what the skill trees this is modelled on use for the same job.
+fn track_color(track: &str) -> Color {
+    match track {
+        "tone" => Color::srgb(0.42, 0.78, 0.95),
+        "hand" => Color::srgb(0.95, 0.62, 0.42),
+        "tongue" => Color::srgb(0.72, 0.55, 0.95),
+        "bend" => Color::srgb(0.95, 0.45, 0.52),
+        "vibrato" => Color::srgb(0.95, 0.80, 0.42),
+        "slide" => Color::srgb(0.55, 0.88, 0.72),
+        "time" => Color::srgb(0.52, 0.70, 0.95),
+        "form" => Color::srgb(0.88, 0.72, 0.45),
+        "train" => Color::srgb(0.68, 0.78, 0.52),
+        "scales" => Color::srgb(0.45, 0.85, 0.62),
+        "theory" => Color::srgb(0.78, 0.68, 0.92),
+        "harmony" => Color::srgb(0.92, 0.58, 0.78),
+        "vocabulary" => Color::srgb(0.85, 0.65, 0.55),
+        "improv" => Color::srgb(0.58, 0.82, 0.88),
+        _ => Color::srgb(0.65, 0.68, 0.78),
     }
+}
+
+/// Centre of a node, in canvas pixels.
+fn node_centre(column: usize, row: f32) -> Vec2 {
+    Vec2::new(
+        MARGIN_PX + column as f32 * COL_PX + NODE_PX / 2.0,
+        MARGIN_PX + row * ROW_PX + NODE_PX / 2.0,
+    )
 }
 
 pub(crate) fn setup_lesson_tree(
@@ -105,11 +120,23 @@ pub(crate) fn setup_lesson_tree(
         // the build over either, so this only fires for a lesson dropped
         // into `~/Harmonicon/lessons` — say so rather than draw nothing.
         Err(e) => {
-            spawn_notice(
-                &mut commands,
-                root,
-                String::from(loc.msg_args("lesson-tree-broken", &[("error", e.to_string())])),
-            );
+            let line = commands
+                .spawn((
+                    Text::new(String::from(
+                        loc.msg_args("lesson-tree-broken", &[("error", e.to_string())]),
+                    )),
+                    TextFont {
+                        font_size: FontSize::Px(16.0),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.95, 0.65, 0.45)),
+                    Node {
+                        max_width: Val::Px(560.0),
+                        ..default()
+                    },
+                ))
+                .id();
+            commands.entity(root).add_child(line);
             spawn_back_button(&mut commands, header, &loc.msg("back"), back_to_lessons);
             return;
         }
@@ -117,52 +144,28 @@ pub(crate) fn setup_lesson_tree(
 
     let placeholder: Handle<Image> = asset_server.load("icons/lesson_placeholder.png");
     let canvas = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Relative,
-                width: Val::Px(LABEL_PX + tree.columns() as f32 * (NODE_PX + NODE_GAP_PX)),
-                height: Val::Px(tree.height() as f32 * (NODE_PX + ROW_GAP_PX)),
-                ..default()
-            },
-            LessonTreeCanvas,
-        ))
+        .spawn(Node {
+            position_type: PositionType::Relative,
+            width: Val::Px(MARGIN_PX * 2.0 + tree.columns() as f32 * COL_PX),
+            height: Val::Px(MARGIN_PX * 2.0 + tree.rows() * ROW_PX),
+            ..default()
+        })
         .id();
     commands.entity(root).add_child(canvas);
 
-    // Edges first, so a node's art always sits on top of its connectors.
+    // Edges first, so node art always sits on top of its connectors.
     commands.entity(canvas).with_children(|parent| {
         for edge in &tree.edges {
-            spawn_edge(parent, edge.from, edge.to);
+            spawn_edge(
+                parent,
+                node_centre(edge.from.0, edge.from.1),
+                node_centre(edge.to.0, edge.to.1),
+            );
         }
     });
 
-    for row in &tree.rows {
-        // Centred across however many sub-rows the track occupies.
-        let (_, top) = node_origin(row.first_row, 0);
-        let span = row.height as f32 * (NODE_PX + ROW_GAP_PX);
-        commands.entity(canvas).with_children(|parent| {
-            parent.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    top: Val::Px(top + span / 2.0 - 10.0),
-                    width: Val::Px(LABEL_PX - 12.0),
-                    ..default()
-                },
-                Text::new(String::from(
-                    loc.msg(&format!("lesson-track-{}", row.track)),
-                )),
-                TextFont {
-                    font_size: FontSize::Px(13.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.72, 0.75, 0.85)),
-            ));
-        });
-
-        for node in &row.nodes {
-            spawn_node(&mut commands, canvas, node, &placeholder, &loc);
-        }
+    for node in &tree.nodes {
+        spawn_node(&mut commands, canvas, node, &placeholder, &loc);
     }
 
     spawn_back_button(&mut commands, header, &loc.msg("back"), back_to_lessons);
@@ -172,56 +175,59 @@ fn back_to_lessons(_: On<Activate>, mut page: ResMut<NextState<MenuPage>>) {
     page.set(MenuPage::Lessons);
 }
 
-fn spawn_notice(commands: &mut Commands, root: Entity, text: String) {
-    let line = commands
-        .spawn((
-            Text::new(text),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.95, 0.65, 0.45)),
+/// One prerequisite edge, as a cubic Bezier.
+///
+/// The control points sit level with each end and reach toward the other,
+/// so the curve leaves its source horizontally and arrives horizontally —
+/// the shape that reads as flow rather than as a corner. Sampled with
+/// `bevy_math`'s own `iter_positions` and emitted as short rotated
+/// segments; `BorderRadius::MAX` rounds each one so the joins don't show.
+fn spawn_edge(parent: &mut ChildSpawnerCommands, from: Vec2, to: Vec2) {
+    // Start and end at the nodes' edges rather than their centres, so a
+    // curve doesn't run underneath the art it connects.
+    let radius = NODE_PX / 2.0;
+    let start = Vec2::new(from.x + radius, from.y);
+    let end = Vec2::new(to.x - radius, to.y);
+    let reach = ((end.x - start.x) * EDGE_TENSION).max(24.0);
+
+    let curve = CubicBezier::new([[
+        start,
+        Vec2::new(start.x + reach, start.y),
+        Vec2::new(end.x - reach, end.y),
+        end,
+    ]])
+    .to_curve();
+    let Ok(curve) = curve else { return };
+
+    let points: Vec<Vec2> = curve.iter_positions(EDGE_SEGMENTS).collect();
+    for pair in points.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        let delta = b - a;
+        let length = delta.length();
+        if length < 0.01 {
+            continue;
+        }
+        let mid = (a + b) / 2.0;
+        parent.spawn((
             Node {
-                max_width: Val::Px(560.0),
+                position_type: PositionType::Absolute,
+                // Positioned by its own top-left, so shift back by half the
+                // segment to centre it on the midpoint before rotating —
+                // `UiTransform::rotation` turns a node about its centre.
+                left: Val::Px(mid.x - length / 2.0),
+                top: Val::Px(mid.y - EDGE_PX / 2.0),
+                width: Val::Px(length),
+                height: Val::Px(EDGE_PX),
+                border_radius: BorderRadius::MAX,
                 ..default()
             },
-        ))
-        .id();
-    commands.entity(root).add_child(line);
-}
-
-/// A prerequisite connector, drawn as two rectangles rather than one
-/// diagonal: Bevy UI has no line primitive, and an orthogonal route is what
-/// the skill trees this is modelled on use anyway.
-fn spawn_edge(parent: &mut ChildSpawnerCommands, from: (usize, usize), to: (usize, usize)) {
-    let (fx, fy) = node_centre(from.0, from.1);
-    let (tx, ty) = node_centre(to.0, to.1);
-
-    // Vertical leg at the source's x, then a horizontal leg into the target.
-    let (top, height) = (fy.min(ty), (ty - fy).abs().max(EDGE_PX));
-    parent.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(fx - EDGE_PX / 2.0),
-            top: Val::Px(top),
-            width: Val::Px(EDGE_PX),
-            height: Val::Px(height),
-            ..default()
-        },
-        BackgroundColor(EDGE_COLOR),
-    ));
-    let (left, width) = (fx.min(tx), (tx - fx).abs().max(EDGE_PX));
-    parent.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(left),
-            top: Val::Px(ty - EDGE_PX / 2.0),
-            width: Val::Px(width),
-            height: Val::Px(EDGE_PX),
-            ..default()
-        },
-        BackgroundColor(EDGE_COLOR),
-    ));
+            UiTransform {
+                rotation: Rot2::radians(delta.y.atan2(delta.x)),
+                ..default()
+            },
+            BackgroundColor(EDGE_COLOR),
+        ));
+    }
 }
 
 fn spawn_node(
@@ -231,37 +237,54 @@ fn spawn_node(
     placeholder: &Handle<Image>,
     loc: &Localization,
 ) {
-    let (x, y) = node_origin(node.row, node.column);
+    let centre = node_centre(node.column, node.row);
     let locked = node.state == NodeState::Locked;
     let id = node.id.clone();
+
+    // The track's colour, dimmed while locked and brightened once passed,
+    // so state reads without giving up the grouping colour carries.
+    let base = track_color(&node.track);
+    let ring = match node.state {
+        NodeState::Locked => base.with_alpha(0.35),
+        NodeState::Available => base,
+        NodeState::Passed | NodeState::Mastered => base.lighter(0.15),
+    };
 
     let button = commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                left: Val::Px(x),
-                top: Val::Px(y),
+                left: Val::Px(centre.x - NODE_PX / 2.0),
+                top: Val::Px(centre.y - NODE_PX / 2.0),
                 width: Val::Px(NODE_PX),
                 height: Val::Px(NODE_PX),
-                border: UiRect::all(Val::Px(3.0)),
+                border: UiRect::all(Val::Px(if node.state == NodeState::Mastered {
+                    4.0
+                } else {
+                    3.0
+                })),
                 // A square node with a maximal radius is a circle.
                 border_radius: BorderRadius::MAX,
                 ..default()
             },
             ImageNode {
                 image: placeholder.clone(),
-                // Desaturation is not available on a UI image, so a locked
+                // Desaturation isn't available on a UI image, so a locked
                 // node is dimmed by tint instead — it still reads as "not
                 // yet" beside its lit neighbours.
                 color: if locked { LOCKED_TINT } else { Color::WHITE },
                 ..default()
             },
-            BorderColor::all(ring_color(node.state)),
+            BorderColor::all(ring),
             // A real widget button with a tab stop, never a bare `Node`
             // with a click observer — see the root `CLAUDE.md`.
             WidgetButton,
             TabIndex(0),
-            Tooltip(String::from(loc.msg(&node.title_key))),
+            Tooltip(format!(
+                "{} · {}",
+                loc.msg(&format!("lesson-track-{}", node.track)),
+                loc.msg(&node.title_key)
+            )),
         ))
         .observe(
             move |_: On<Activate>,
@@ -277,37 +300,28 @@ fn spawn_node(
     commands.entity(canvas).add_child(button);
 
     if node.has_trainings {
-        spawn_mastery_ring(commands, canvas, node);
+        spawn_mastery_ring(commands, canvas, node, centre);
     }
 }
 
-/// The five training tiers, as pips spaced around the node's edge — the
-/// mastery meter at node level.
-///
-/// Plain positioned squares with a maximal radius, not an arc shader: five
-/// dots around a circle need no new material, and `music_score::
-/// tie_material` is the precedent if this ever wants a real arc.
-fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode) {
+/// The five training tiers, as pips tucked under the node — the mastery
+/// meter at node level.
+fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode, centre: Vec2) {
     let tiers = harmonicon_core::training::Tier::ALL.len();
     let filled = (node.mastery * tiers as f32).round() as usize;
-    let (cx, cy) = node_centre(node.row, node.column);
     let radius = NODE_PX / 2.0 + 1.0;
 
     for tier in 0..tiers {
-        // A tight arc hugging the bottom of the node, where a pip can't be
-        // mistaken for part of the art. Deliberately narrow: a wider spread
-        // reached past the node's own width and ran into the next node's
-        // pips, which read as scattered dots rather than one meter.
+        // A tight arc across the bottom, where a pip can't be mistaken for
+        // part of the art.
         let t = tier as f32 / (tiers - 1) as f32;
         let angle = (42.0 + t * 96.0_f32).to_radians();
-        let px = cx + radius * angle.cos() - PIP_PX / 2.0;
-        let py = cy + radius * angle.sin() - PIP_PX / 2.0;
         commands.entity(canvas).with_children(|parent| {
             parent.spawn((
                 Node {
                     position_type: PositionType::Absolute,
-                    left: Val::Px(px),
-                    top: Val::Px(py),
+                    left: Val::Px(centre.x + radius * angle.cos() - PIP_PX / 2.0),
+                    top: Val::Px(centre.y + radius * angle.sin() - PIP_PX / 2.0),
                     width: Val::Px(PIP_PX),
                     height: Val::Px(PIP_PX),
                     border_radius: BorderRadius::MAX,
@@ -318,5 +332,3 @@ fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode
         });
     }
 }
-
-use harmonicon_ui::dialogs::tooltip::Tooltip;

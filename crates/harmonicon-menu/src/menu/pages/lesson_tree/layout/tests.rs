@@ -44,6 +44,24 @@ fn pass(profile: &mut PlayerProfile, id: &str) {
     record_lesson(r, true, 1.0);
 }
 
+/// How many pairs of edges cross — the thing the ordering pass exists to
+/// reduce. Two edges cross when one starts above the other and ends below.
+fn crossings(l: &TreeLayout) -> usize {
+    let mut n = 0;
+    for (i, a) in l.edges.iter().enumerate() {
+        for b in l.edges.iter().skip(i + 1) {
+            if a.from.0 == b.from.0 && a.to.0 == b.to.0 {
+                let starts_above = a.from.1 < b.from.1;
+                let ends_above = a.to.1 < b.to.1;
+                if starts_above != ends_above && a.from.1 != b.from.1 && a.to.1 != b.to.1 {
+                    n += 1;
+                }
+            }
+        }
+    }
+    n
+}
+
 // ── state ────────────────────────────────────────────────────────────────
 
 #[test]
@@ -81,9 +99,10 @@ fn a_passed_lesson_is_mastered_only_once_every_tier_is_too() {
         let r = p.trainings.entry(training_key("bend", tier)).or_default();
         record_training(r, true, 1.0);
     }
-    let l = build(&e, &p);
-    assert_eq!(l.node("bend").unwrap().state, NodeState::Mastered);
-    assert_eq!(l.node("bend").unwrap().mastery, 1.0);
+    assert_eq!(
+        build(&e, &p).node("bend").unwrap().state,
+        NodeState::Mastered
+    );
 }
 
 #[test]
@@ -93,8 +112,8 @@ fn a_lesson_with_no_trainings_never_claims_to_be_mastered() {
     let e = [entry("plain", "t", &[], false)];
     let mut p = PlayerProfile::default();
     pass(&mut p, "plain");
-    let node = build(&e, &p);
-    let node = node.node("plain").unwrap();
+    let l = build(&e, &p);
+    let node = l.node("plain").unwrap();
     assert_eq!(node.state, NodeState::Passed);
     assert!(!node.has_trainings);
     assert_eq!(node.mastery, 0.0);
@@ -114,7 +133,7 @@ fn mastery_is_the_fraction_of_tiers_passed() {
 #[test]
 fn a_locked_lesson_still_shows_what_it_has_practised() {
     // Trainings are not gated on the lesson, so a player can have earned
-    // ring segments on something whose prerequisites they later reset.
+    // ring segments on something still locked.
     let e = [
         entry("root", "t", &[], false),
         entry("bend", "t", &["root"], true),
@@ -123,45 +142,25 @@ fn a_locked_lesson_still_shows_what_it_has_practised() {
     let r = p.trainings.entry(training_key("bend", 1)).or_default();
     record_training(r, true, 1.0);
     let l = build(&e, &p);
-    let node = l.node("bend").unwrap();
-    assert_eq!(node.state, NodeState::Locked);
-    assert!(node.mastery > 0.0);
+    assert_eq!(l.node("bend").unwrap().state, NodeState::Locked);
+    assert!(l.node("bend").unwrap().mastery > 0.0);
 }
 
 // ── placement ────────────────────────────────────────────────────────────
 
 #[test]
-fn a_column_is_the_lessons_depth_not_its_place_in_the_track() {
-    // What makes this a tree rather than a grid. Placing by position within
-    // the track put every row in lockstep from column 0, so a node's
-    // horizontal position said nothing about where it sat in the
-    // curriculum.
+fn a_column_is_the_lessons_depth() {
+    // What makes this a tree rather than a grid: a node's horizontal
+    // position is where it sits in the curriculum, not its index in a row.
     let e = [
-        entry("late", "x", &["early"], false),
-        entry("early", "x", &[], false),
+        entry("root", "x", &[], false),
+        entry("mid", "x", &["root"], false),
+        entry("leaf", "x", &["mid"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    assert_eq!(l.node("early").unwrap().column, 0);
-    assert_eq!(l.node("late").unwrap().column, 1);
-}
-
-#[test]
-fn a_track_that_starts_late_starts_late_on_screen() {
-    // The gap is the point: `scales` has nothing before depth 2, and
-    // showing that is how the drawing communicates prerequisites at a
-    // glance rather than only through its edges.
-    let e = [
-        entry("a", "early", &[], false),
-        entry("b", "early", &["a"], false),
-        entry("c", "late", &["b"], false),
-    ];
-    let l = build(&e, &PlayerProfile::default());
-    assert_eq!(l.node("c").unwrap().column, 2);
-    assert_eq!(
-        l.rows.iter().find(|r| r.track == "late").unwrap().nodes[0].column,
-        2,
-        "a late track must not be packed back to column 0"
-    );
+    assert_eq!(l.node("root").unwrap().column, 0);
+    assert_eq!(l.node("mid").unwrap().column, 1);
+    assert_eq!(l.node("leaf").unwrap().column, 2);
 }
 
 #[test]
@@ -172,89 +171,146 @@ fn a_node_always_sits_right_of_everything_it_depends_on() {
         entry("c", "v", &["a", "b"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    for row in &l.rows {
-        for node in &row.nodes {
-            for edge in l.edges.iter().filter(|x| x.to == (node.row, node.column)) {
-                assert!(
-                    edge.from.1 < node.column,
-                    "{} is not right of its prerequisite",
-                    node.id
-                );
-            }
-        }
+    for edge in &l.edges {
+        assert!(edge.from.0 < edge.to.0, "edge points backwards: {edge:?}");
     }
 }
 
 #[test]
-fn same_depth_siblings_in_a_track_stack_into_sub_rows() {
-    // `tone` really has three lessons at depth 1; they cannot share a cell.
+fn a_single_root_sits_alone_in_the_first_column() {
+    // The curriculum was given one root on purpose, so the tree opens from
+    // one place instead of three unrelated starting points.
     let e = [
-        entry("root", "t", &[], false),
-        entry("x", "t", &["root"], false),
-        entry("y", "t", &["root"], false),
-        entry("z", "t", &["root"], false),
+        entry("start", "t", &[], false),
+        entry("a", "t", &["start"], false),
+        entry("b", "u", &["start"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    assert_eq!(
-        l.rows[0].height, 3,
-        "three at one depth need three sub-rows"
-    );
-    let rows: Vec<usize> = ["x", "y", "z"]
+    let first: Vec<&str> = l
+        .nodes
+        .iter()
+        .filter(|n| n.column == 0)
+        .map(|n| n.id.as_str())
+        .collect();
+    assert_eq!(first, vec!["start"]);
+}
+
+#[test]
+fn a_short_column_is_centred_against_a_tall_one() {
+    // Otherwise the root pins to the top corner and the tree hangs off it.
+    let e = [
+        entry("root", "t", &[], false),
+        entry("a", "t", &["root"], false),
+        entry("b", "t", &["root"], false),
+        entry("c", "t", &["root"], false),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    let root_row = l.node("root").unwrap().row;
+    let children: Vec<f32> = ["a", "b", "c"]
         .iter()
         .map(|id| l.node(id).unwrap().row)
         .collect();
-    let unique: std::collections::HashSet<usize> = rows.iter().copied().collect();
-    assert_eq!(unique.len(), 3, "siblings must not overlap: {rows:?}");
+    let mean = children.iter().sum::<f32>() / 3.0;
     assert!(
-        ["x", "y", "z"]
-            .iter()
-            .all(|id| l.node(id).unwrap().column == 1)
+        (root_row - mean).abs() < 0.01,
+        "root at {root_row} should sit level with its children's mean {mean}"
     );
 }
 
 #[test]
-fn a_tracks_rows_are_contiguous_and_do_not_overlap_the_next() {
+fn siblings_in_one_column_never_share_a_row() {
+    let e = [
+        entry("root", "t", &[], false),
+        entry("a", "t", &["root"], false),
+        entry("b", "t", &["root"], false),
+        entry("c", "t", &["root"], false),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    let mut rows: Vec<f32> = l
+        .nodes
+        .iter()
+        .filter(|n| n.column == 1)
+        .map(|n| n.row)
+        .collect();
+    rows.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    for w in rows.windows(2) {
+        assert!(w[1] - w[0] >= 1.0, "rows overlap: {rows:?}");
+    }
+}
+
+#[test]
+fn ordering_untangles_edges_that_would_otherwise_cross() {
+    // `x` depends on the second of the pair and `y` on the first, so the
+    // catalogue's own order draws them crossed. The barycentre sweep is
+    // what puts them back.
+    let e = [
+        entry("root", "t", &[], false),
+        entry("first", "t", &["root"], false),
+        entry("second", "t", &["root"], false),
+        entry("x", "t", &["second"], false),
+        entry("y", "t", &["first"], false),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    assert_eq!(crossings(&l), 0, "layout left crossings in a solvable case");
+}
+
+#[test]
+fn the_same_curriculum_always_lays_out_the_same_way() {
+    // The sweep is iterative; if it were order-dependent on a hash map the
+    // tree would reshuffle between runs.
+    let e = [
+        entry("root", "t", &[], false),
+        entry("a", "t", &["root"], false),
+        entry("b", "u", &["root"], false),
+        entry("c", "v", &["a", "b"], false),
+    ];
+    let once = build(&e, &PlayerProfile::default());
+    let twice = build(&e, &PlayerProfile::default());
+    assert_eq!(once, twice);
+}
+
+// ── shape ────────────────────────────────────────────────────────────────
+
+#[test]
+fn a_track_travels_with_its_node_for_colouring() {
+    // Tracks stopped being rows, so colour is the only thing left carrying
+    // the grouping.
+    let e = [entry("a", "bend", &[], false)];
+    assert_eq!(
+        build(&e, &PlayerProfile::default())
+            .node("a")
+            .unwrap()
+            .track,
+        "bend"
+    );
+}
+
+#[test]
+fn columns_and_rows_size_the_canvas() {
+    let e = [
+        entry("root", "t", &[], false),
+        entry("a", "t", &["root"], false),
+        entry("b", "t", &["root"], false),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    assert_eq!(l.columns(), 2);
+    assert_eq!(l.rows(), 2.0);
+}
+
+#[test]
+fn every_prerequisite_becomes_an_edge_between_placed_nodes() {
     let e = [
         entry("root", "a", &[], false),
-        entry("x", "a", &["root"], false),
-        entry("y", "a", &["root"], false),
-        entry("other", "b", &[], false),
+        entry("mid", "b", &["root"], false),
+        entry("leaf", "b", &["root", "mid"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let mut expected = 0;
-    for row in &l.rows {
-        assert_eq!(row.first_row, expected, "track {} starts wrong", row.track);
-        expected += row.height;
+    assert_eq!(l.edges.len(), 3);
+    let placed: Vec<(usize, f32)> = l.nodes.iter().map(|n| (n.column, n.row)).collect();
+    for edge in &l.edges {
+        assert!(placed.contains(&edge.from), "dangling edge start {edge:?}");
+        assert!(placed.contains(&edge.to), "dangling edge end {edge:?}");
     }
-    assert_eq!(l.height(), expected);
-}
-
-#[test]
-fn tracks_are_drawn_in_teaching_order_not_by_size() {
-    // The catalogue is ordered `01_blowing/01_single_note`, so its order is
-    // the curriculum's. Ordering by track length put a five-lesson `form`
-    // above `tone`, when `single-note` is where a player actually starts.
-    let e = [
-        entry("first-thing", "tone", &[], false),
-        entry("a", "form", &[], false),
-        entry("b", "form", &["a"], false),
-        entry("c", "form", &["b"], false),
-    ];
-    let l = build(&e, &PlayerProfile::default());
-    let tracks: Vec<&str> = l.rows.iter().map(|r| r.track.as_str()).collect();
-    assert_eq!(tracks, vec!["tone", "form"]);
-}
-
-#[test]
-fn columns_and_height_size_the_canvas() {
-    let e = [
-        entry("a", "one", &[], false),
-        entry("b", "one", &["a"], false),
-        entry("c", "two", &["b"], false),
-    ];
-    let l = build(&e, &PlayerProfile::default());
-    assert_eq!(l.columns(), 3);
-    assert_eq!(l.height(), 2);
 }
 
 #[test]
@@ -269,75 +325,20 @@ fn a_lesson_in_the_graph_but_not_the_catalogue_is_skipped() {
     ];
     let manifests: Vec<LessonManifest> = e.iter().map(|x| x.manifest.clone()).collect();
     let graph = LessonGraph::build(&manifests).unwrap();
-    let short = [e[0].clone(), e[2].clone()]; // 'b' missing from the catalogue
+    let short = [e[0].clone(), e[2].clone()];
     let l = layout(&short, &graph, &PlayerProfile::default());
     assert!(l.node("b").is_none());
     // 'c' keeps its own depth regardless of the hole above it.
     assert_eq!(l.node("c").unwrap().column, 2);
-}
-
-// ── edges ────────────────────────────────────────────────────────────────
-
-#[test]
-fn every_prerequisite_becomes_an_edge_between_placed_nodes() {
-    let e = [
-        entry("root", "a", &[], false),
-        entry("mid", "b", &["root"], false),
-        entry("leaf", "b", &["root", "mid"], false),
-    ];
-    let l = build(&e, &PlayerProfile::default());
-    assert_eq!(l.edges.len(), 3);
-    // Both ends are (absolute row, column) — grid coordinates, not indices
-    // into `rows`/`nodes` — so an edge is drawable without knowing which
-    // track either end sits in.
-    let placed: std::collections::HashSet<(usize, usize)> = l
-        .rows
-        .iter()
-        .flat_map(|r| &r.nodes)
-        .map(|n| (n.row, n.column))
-        .collect();
-    for edge in &l.edges {
-        assert!(placed.contains(&edge.from), "dangling edge start {edge:?}");
-        assert!(placed.contains(&edge.to), "dangling edge end {edge:?}");
-    }
-}
-
-#[test]
-fn an_edge_within_one_row_is_kept() {
-    // A row is a family, not a chain: neighbours are not implicitly
-    // connected, so a real prerequisite between two of them still has to be
-    // drawn or the reader cannot see it.
-    let e = [
-        entry("first", "t", &[], false),
-        entry("second", "t", &["first"], false),
-    ];
-    let l = build(&e, &PlayerProfile::default());
-    assert_eq!(
-        l.edges,
-        vec![Edge {
-            from: (0, 0),
-            to: (0, 1)
-        }]
-    );
-}
-
-#[test]
-fn edges_come_out_in_a_stable_order() {
-    let e = [
-        entry("root", "a", &[], false),
-        entry("x", "b", &["root"], false),
-        entry("y", "b", &["root"], false),
-    ];
-    let once = build(&e, &PlayerProfile::default()).edges;
-    let twice = build(&e, &PlayerProfile::default()).edges;
-    assert_eq!(once, twice);
+    // And the edge to the missing node is dropped rather than dangling.
+    assert!(l.edges.is_empty());
 }
 
 #[test]
 fn an_empty_curriculum_lays_out_to_nothing() {
     let l = build(&[], &PlayerProfile::default());
-    assert!(l.rows.is_empty());
+    assert!(l.nodes.is_empty());
     assert!(l.edges.is_empty());
     assert_eq!(l.columns(), 0);
-    assert_eq!(l.height(), 0);
+    assert_eq!(l.rows(), 0.0);
 }

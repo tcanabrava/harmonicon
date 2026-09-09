@@ -4,6 +4,7 @@
   "track": "time",
   "title_key": "lesson-counting-four-title",
   "body_key": "lesson-counting-four-body",
+  "prerequisites": ["single-note"],
   "chart": "song/chart.harpchart",
   "pass_criteria": {
     "type": "accuracy",
