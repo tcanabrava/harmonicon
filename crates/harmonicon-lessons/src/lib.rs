@@ -17,6 +17,8 @@ pub struct LessonsUiPlugin;
 impl Plugin for LessonsUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<lesson_reader::SelectedLesson>()
+            .init_resource::<lesson_tree::CollapsedUnits>()
+            .init_resource::<lesson_tree::UnitExpansions>()
             .add_systems(
                 OnEnter(MenuPage::LessonTree),
                 lesson_tree::setup_lesson_tree,
@@ -24,7 +26,11 @@ impl Plugin for LessonsUiPlugin {
             .add_systems(OnExit(MenuPage::LessonTree), scene::cleanup_menu)
             .add_systems(
                 Update,
-                lesson_tree::rebuild_on_lessons_rescanned.run_if(in_state(MenuPage::LessonTree)),
+                (
+                    lesson_tree::rebuild_on_lessons_rescanned,
+                    lesson_tree::animate_unit_expansion,
+                )
+                    .run_if(in_state(MenuPage::LessonTree)),
             )
             .add_systems(
                 OnEnter(MenuPage::LessonReader),

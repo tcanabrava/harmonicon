@@ -56,6 +56,8 @@ use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
 use layout::{EdgeKind, NodeState, PlacedNode, PlacedUnit, layout};
 
+use std::collections::{HashMap, HashSet};
+
 /// Node diameter.
 const NODE_PX: f32 = 64.0;
 /// Column pitch — wide enough that a curve has room to bend before it
@@ -112,6 +114,24 @@ const SPINE_COLOR: Color = Color::srgba(0.95, 0.82, 0.45, 0.65);
 /// scroll area itself, so it can't inherit them.
 const SCROLLBAR_TRACK: Color = Color::srgba(0.0, 0.0, 0.0, 0.35);
 const SCROLLBAR_THUMB: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
+
+const COLLAPSE_SECONDS: f32 = 0.22;
+
+/// Units the player explicitly collapsed. Kept across page visits so opening
+/// a lesson and returning does not discard the course-map view they chose.
+#[derive(Resource, Default)]
+pub(crate) struct CollapsedUnits(HashSet<String>);
+
+/// Current animation amount per unit: 0 is collapsed, 1 is expanded.
+#[derive(Resource, Default)]
+pub(crate) struct UnitExpansions(HashMap<String, f32>);
+
+/// Any lesson node, label, mastery pip, or branch edge owned by a unit.
+#[derive(Component)]
+pub(crate) struct ClusterMember(String);
+
+#[derive(Component)]
+pub(crate) struct UnitChevron(String);
 
 /// A track's colour. Grouping has to survive losing its row, and colour is
 /// what the skill trees this is modelled on use for the same job.
@@ -200,6 +220,21 @@ pub(crate) fn setup_lesson_tree(
 
     let placeholder: Handle<Image> = asset_server.load("icons/lesson_placeholder.png");
 
+    // A unit discovered while the app is running starts expanded. Existing
+    // animation values survive page rebuilds and visits to the reader.
+    let unit_ids: Vec<String> = tree.units.iter().map(|unit| unit.id.clone()).collect();
+    commands.queue(move |world: &mut World| {
+        let collapsed = world.resource::<CollapsedUnits>();
+        let initial: Vec<(String, f32)> = unit_ids
+            .iter()
+            .map(|id| (id.clone(), if collapsed.0.contains(id) { 0.0 } else { 1.0 }))
+            .collect();
+        let mut expansions = world.resource_mut::<UnitExpansions>();
+        for (id, value) in initial {
+            expansions.0.entry(id).or_insert(value);
+        }
+    });
+
     // The plain root's content column sizes to its own content, so a canvas
     // larger than the window would push it past both screen edges and the
     // scroll area inside would never receive less room than the tree asks
@@ -251,6 +286,7 @@ pub(crate) fn setup_lesson_tree(
                 node_centre(edge.to.0, edge.to.1),
                 thickness,
                 color,
+                edge.unit_id.as_deref(),
             );
         }
     });
@@ -297,6 +333,7 @@ fn spawn_edge(
     to: Vec2,
     thickness: f32,
     color: Color,
+    unit_id: Option<&str>,
 ) {
     // Start and end at the nodes' edges rather than their centres, so a
     // curve doesn't run underneath the art it connects.
@@ -332,7 +369,7 @@ fn spawn_edge(
         // and overlapping is what closes it without a mitre calculation.
         let drawn = length + thickness;
         let mid = (a + b) / 2.0;
-        parent.spawn((
+        let mut segment = parent.spawn((
             Node {
                 position_type: PositionType::Absolute,
                 // Positioned by its own top-left, so shift back by half the
@@ -350,17 +387,19 @@ fn spawn_edge(
             },
             BackgroundColor(color),
         ));
+        if let Some(unit_id) = unit_id {
+            segment.insert(ClusterMember(unit_id.to_string()));
+        }
     }
 }
 
 /// A unit: the major node the whole cluster below it hangs off.
 ///
-/// Not a button — there is nothing to open, since a unit *is* the lessons
-/// under it. It carries the gate's own terms instead ("3 / 8"), because a
-/// lock whose conditions a player can't read is just an obstacle.
+/// Activating it expands or collapses the lessons belonging to the unit.
 fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &Localization) {
     let centre = node_centre(unit.column, unit.row);
     let ring = if unit.locked { UNIT_SHUT } else { UNIT_OPEN };
+    let unit_id = unit.id.clone();
 
     // not-a-widget-button: a unit is a label and a gate, not an action.
     let node = commands
@@ -379,7 +418,16 @@ fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &
             },
             BorderColor::all(ring),
             BackgroundColor(Color::srgba(0.10, 0.11, 0.16, 0.85)),
+            WidgetButton,
+            TabIndex(0),
         ))
+        .observe(
+            move |_: On<Activate>, mut collapsed: ResMut<CollapsedUnits>| {
+                if !collapsed.0.remove(&unit_id) {
+                    collapsed.0.insert(unit_id.clone());
+                }
+            },
+        )
         .id();
     commands.entity(canvas).add_child(node);
 
@@ -400,6 +448,19 @@ fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &
         ))
         .id();
     commands.entity(node).add_child(progress);
+
+    let chevron = commands
+        .spawn((
+            Text::new("▼"),
+            TextFont {
+                font_size: FontSize::Px(13.0),
+                ..default()
+            },
+            TextColor(ring),
+            UnitChevron(unit.id.clone()),
+        ))
+        .id();
+    commands.entity(node).add_child(chevron);
 
     let label = commands
         .spawn((
@@ -512,6 +573,9 @@ fn spawn_node(
         )
         .id();
     commands.entity(canvas).add_child(button);
+    commands
+        .entity(button)
+        .insert(ClusterMember(node.unit_id.clone()));
 
     // The title, under the node. Small and wrapped to the column's own
     // width — the art alone says nothing about which lesson this is, and a
@@ -539,6 +603,9 @@ fn spawn_node(
         ))
         .id();
     commands.entity(canvas).add_child(label);
+    commands
+        .entity(label)
+        .insert(ClusterMember(node.unit_id.clone()));
 
     if node.has_trainings {
         spawn_mastery_ring(commands, canvas, node, centre);
@@ -571,8 +638,56 @@ fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode
                     ..default()
                 },
                 BackgroundColor(if tier < filled { PIP_FILLED } else { PIP_EMPTY }),
+                ClusterMember(node.unit_id.clone()),
             ));
         });
+    }
+}
+
+/// Advances all unit transitions and applies their eased scale/visibility to
+/// every entity in the corresponding cluster.
+pub(crate) fn animate_unit_expansion(
+    time: Res<Time>,
+    collapsed: Res<CollapsedUnits>,
+    mut expansions: ResMut<UnitExpansions>,
+    mut members: Query<(&ClusterMember, &mut UiTransform, &mut Visibility)>,
+    mut chevrons: Query<(&UnitChevron, &mut Text)>,
+) {
+    let step = time.delta_secs() / COLLAPSE_SECONDS;
+    for (id, amount) in &mut expansions.0 {
+        *amount = expansion_after(*amount, collapsed.0.contains(id), step);
+    }
+
+    for (member, mut transform, mut visibility) in &mut members {
+        let amount = expansions.0.get(&member.0).copied().unwrap_or(1.0);
+        // Smoothstep has zero velocity at both ends, so rapid toggles reverse
+        // without a visible snap.
+        let eased = amount * amount * (3.0 - 2.0 * amount);
+        transform.scale = Vec2::splat(eased.max(0.001));
+        *visibility = if amount <= 0.0 {
+            Visibility::Hidden
+        } else {
+            Visibility::Visible
+        };
+    }
+
+    for (chevron, mut text) in &mut chevrons {
+        **text = if collapsed.0.contains(&chevron.0) {
+            "▶".to_string()
+        } else {
+            "▼".to_string()
+        };
+    }
+}
+
+fn expansion_after(current: f32, collapsed: bool, step: f32) -> f32 {
+    let target = if collapsed { 0.0 } else { 1.0 };
+    if current < target {
+        (current + step).min(target)
+    } else if current > target {
+        (current - step).max(target)
+    } else {
+        current
     }
 }
 
@@ -600,5 +715,13 @@ mod tests {
         // Unit titles are the only labels drawn *above* their node.
         let spine = node_centre(0, 0.0);
         assert!(spine.y - UNIT_PX / 2.0 - UNIT_FONT_PX * 2.0 >= 0.0);
+    }
+
+    #[test]
+    fn expansion_moves_toward_the_requested_state_without_overshooting() {
+        assert_eq!(expansion_after(1.0, true, 0.25), 0.75);
+        assert_eq!(expansion_after(0.1, true, 0.25), 0.0);
+        assert_eq!(expansion_after(0.0, false, 0.25), 0.25);
+        assert_eq!(expansion_after(0.9, false, 0.25), 1.0);
     }
 }

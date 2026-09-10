@@ -86,6 +86,8 @@ pub struct PlacedUnit {
 #[derive(Clone, PartialEq, Debug)]
 pub struct PlacedNode {
     pub id: String,
+    /// Unit whose expand/collapse control owns this node.
+    pub unit_id: String,
     /// Fluent key — the tree never holds display text, same rule as the
     /// rest of the lesson UI.
     pub title_key: String,
@@ -123,11 +125,14 @@ pub enum EdgeKind {
 }
 
 /// An edge, in grid coordinates.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Edge {
     pub from: (usize, f32),
     pub to: (usize, f32),
     pub kind: EdgeKind,
+    /// Unit whose cluster owns this edge. Spine edges stay visible and have
+    /// no owner.
+    pub unit_id: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
@@ -200,6 +205,7 @@ pub fn layout(
         };
         nodes.push(PlacedNode {
             id: id.clone(),
+            unit_id: entry.manifest.unit.clone(),
             title_key: entry.manifest.title_key.clone(),
             track: graph_node.track.clone(),
             column: 0,
@@ -325,6 +331,7 @@ pub fn layout(
             from: (pair[0].column, pair[0].row),
             to: (pair[1].column, pair[1].row),
             kind: EdgeKind::Spine,
+            unit_id: None,
         });
     }
     for (to, preds) in predecessors.iter().enumerate() {
@@ -339,6 +346,7 @@ pub fn layout(
                     from: (unit.column, unit.row),
                     to: (nodes[to].column, nodes[to].row),
                     kind: EdgeKind::Branch,
+                    unit_id: Some(unit.id.clone()),
                 });
             }
             continue;
@@ -348,6 +356,7 @@ pub fn layout(
                 from: (nodes[from].column, nodes[from].row),
                 to: (nodes[to].column, nodes[to].row),
                 kind: EdgeKind::Branch,
+                unit_id: Some(nodes[to].unit_id.clone()),
             });
         }
     }
