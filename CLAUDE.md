@@ -20,6 +20,10 @@ than accumulating history (git log/commit messages are the historical record):
   built)
 - `docs/gameplay_validation.md` — manual + automated validation checklist;
   update it when changing gameplay/timing behaviour
+- `docs/pitch_detection_plan.md` — what the harmonica-aware detection
+  filtering does today, which of its constants were chosen from measurement
+  and which are placeholders, and what needs a recorded corpus before it can
+  be tuned rather than guessed at
 - `docs/book/` — player-facing mdBook user guide (`mdbook build`/`mdbook
   serve` from that directory); update it when a user-visible feature
   changes, not just internal ones. `docs/book/src/images/*.png` are real
