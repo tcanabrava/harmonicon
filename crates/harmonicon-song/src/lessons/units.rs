@@ -54,6 +54,9 @@ pub struct UnitNode {
     pub title_key: String,
     /// Member lesson ids, in discovery order.
     pub lessons: Vec<String>,
+    /// Required members only. This is the denominator for progress and unit
+    /// gates, so electives never become walls in front of the next unit.
+    pub core_lessons: Vec<String>,
 }
 
 /// Every unit, in curriculum order, each gating the next.
@@ -75,11 +78,21 @@ impl UnitChain {
         let mut units: Vec<UnitNode> = Vec::new();
         for m in manifests {
             match units.iter_mut().find(|u| u.id == m.unit) {
-                Some(unit) => unit.lessons.push(m.id.clone()),
+                Some(unit) => {
+                    unit.lessons.push(m.id.clone());
+                    if !m.optional {
+                        unit.core_lessons.push(m.id.clone());
+                    }
+                }
                 None => units.push(UnitNode {
                     id: m.unit.clone(),
                     title_key: format!("lesson-unit-{}", m.unit),
                     lessons: vec![m.id.clone()],
+                    core_lessons: if m.optional {
+                        Vec::new()
+                    } else {
+                        vec![m.id.clone()]
+                    },
                 }),
             }
         }
@@ -113,8 +126,11 @@ impl UnitChain {
         let Some(node) = self.units.get(unit) else {
             return 0;
         };
-        let total = node.lessons.len();
-        ((total as f32 * UNIT_UNLOCK_THRESHOLD).ceil() as usize).clamp(1, total.max(1))
+        let total = node.core_lessons.len();
+        if total == 0 {
+            return 0;
+        }
+        ((total as f32 * UNIT_UNLOCK_THRESHOLD).ceil() as usize).clamp(1, total)
     }
 
     /// How many of this unit's lessons are passed.
@@ -122,7 +138,7 @@ impl UnitChain {
         self.units
             .get(unit)
             .map(|u| {
-                u.lessons
+                u.core_lessons
                     .iter()
                     .filter(|l| passed.contains(l.as_str()))
                     .count()
@@ -174,6 +190,28 @@ pub fn crossing_prerequisites(manifests: &[LessonManifest]) -> Vec<(String, Stri
         }
     }
     backwards
+}
+
+/// Required lessons that depend on electives. Such an edge quietly turns an
+/// optional branch back into a mandatory gate, so curriculum validation must
+/// reject it. Electives may freely depend on core lessons or other electives.
+pub fn core_prerequisites_on_optional(manifests: &[LessonManifest]) -> Vec<(String, String)> {
+    let optional: HashSet<&str> = manifests
+        .iter()
+        .filter(|lesson| lesson.optional)
+        .map(|lesson| lesson.id.as_str())
+        .collect();
+    manifests
+        .iter()
+        .filter(|lesson| !lesson.optional)
+        .flat_map(|lesson| {
+            lesson
+                .prerequisites
+                .iter()
+                .filter(|id| optional.contains(id.as_str()))
+                .map(|id| (lesson.id.clone(), id.clone()))
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -94,6 +94,8 @@ pub struct PlacedNode {
     /// The track this lesson belongs to. Drawn as colour rather than as a
     /// row, so grouping survives without constraining position.
     pub track: String,
+    /// Elective branch: visible and playable, but excluded from unit gates.
+    pub optional: bool,
     /// Horizontal position. Fractional so a short prerequisite row can be
     /// centred over a wider row below it.
     pub column: f32,
@@ -139,6 +141,12 @@ pub struct Edge {
     /// Unit whose cluster owns this edge. Spine edges stay visible and have
     /// no owner.
     pub unit_id: Option<String>,
+    /// Whether this edge leads *into* an elective, which makes the whole
+    /// branch elective — the destination is what an edge is about, and a
+    /// core lesson may never depend on an optional one
+    /// ([`harmonicon_song::lessons::units::core_prerequisites_on_optional`]
+    /// rejects it), so anything hanging off an elective is elective too.
+    pub optional: bool,
 }
 
 #[derive(Clone, PartialEq, Debug, Default)]
@@ -231,6 +239,7 @@ pub fn layout_with_collapsed(
             unit_id: entry.manifest.unit.clone(),
             title_key: entry.manifest.title_key.clone(),
             track: graph_node.track.clone(),
+            optional: entry.manifest.optional,
             column: 0.0,
             row: 0.0,
             // A lesson needs both gates open: its own prerequisites, and
@@ -371,6 +380,9 @@ pub fn layout_with_collapsed(
             to: (pair[1].column, pair[1].row),
             kind: EdgeKind::Spine,
             unit_id: None,
+            // The spine is the mandatory path through the course by
+            // definition: a unit gate counts core lessons only.
+            optional: false,
         });
     }
     for (to, preds) in predecessors.iter().enumerate() {
@@ -386,6 +398,7 @@ pub fn layout_with_collapsed(
                     to: (nodes[to].column, nodes[to].row),
                     kind: EdgeKind::UnitBranch,
                     unit_id: Some(unit.id.clone()),
+                    optional: nodes[to].optional,
                 });
             }
             continue;
@@ -396,6 +409,7 @@ pub fn layout_with_collapsed(
                 to: (nodes[to].column, nodes[to].row),
                 kind: EdgeKind::Branch,
                 unit_id: Some(nodes[to].unit_id.clone()),
+                optional: nodes[to].optional,
             });
         }
     }

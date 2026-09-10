@@ -67,6 +67,10 @@ pub struct TrainingBlock {
 pub struct LessonManifest {
     pub id: String,
     pub unit: String,
+    /// An elective branch. Optional lessons can depend on the core, but unit
+    /// completion and later-unit gates never require them.
+    #[serde(default)]
+    pub optional: bool,
     /// Which row of the skill tree this lesson sits in — see
     /// `docs/training_tree_plan.md`. Optional on purpose: a lesson authored
     /// outside this repo and dropped into `~/Harmonicon/lessons` has no
@@ -202,8 +206,18 @@ mod tests {
                 .unwrap();
         assert_eq!(m.id, "twelve-bar");
         assert_eq!(m.chart, None);
+        assert!(!m.optional);
         assert!(m.prerequisites.is_empty());
         assert_eq!(m.pass_criteria, None);
+    }
+
+    #[test]
+    fn parses_an_optional_lesson() {
+        let m = parse_lesson(
+            br#"{"id":"overblows","unit":"advanced","optional":true,"title_key":"t","body_key":"b"}"#,
+        )
+        .unwrap();
+        assert!(m.optional);
     }
 
     #[test]

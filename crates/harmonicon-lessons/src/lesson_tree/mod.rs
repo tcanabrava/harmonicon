@@ -94,11 +94,22 @@ const EDGE_PX: f32 = 3.5;
 /// Clearance two node boundaries need before an edge between them is worth
 /// drawing at all.
 const EDGE_MIN_LENGTH_PX: f32 = 1.0;
+/// Gap between the dots of an elective branch. A dot is the edge's own
+/// thickness across, so a dotted line carries the same weight as a solid
+/// one and only the continuity differs.
+const EDGE_DOT_GAP_PX: f32 = 7.0;
 
 const PIP_PX: f32 = 9.0;
 const LOCKED_TINT: Color = Color::srgba(0.35, 0.35, 0.42, 0.55);
 const PIP_FILLED: Color = Color::srgb(0.95, 0.80, 0.35);
 const PIP_EMPTY: Color = Color::srgba(0.40, 0.43, 0.52, 0.8);
+const OPTIONAL_COLOR: Color = Color::srgb(0.62, 0.88, 0.82);
+/// The elective badge drawn beside a node, and its clearance from the ring.
+const BADGE_PX: f32 = 20.0;
+const BADGE_GAP_PX: f32 = 2.0;
+/// The badge has to stay inside its own column, or it collides with the
+/// next node's title.
+const _: () = assert!(NODE_PX / 2.0 + BADGE_GAP_PX + BADGE_PX < COL_PX - LABEL_PX / 2.0);
 const EDGE_COLOR: Color = Color::srgba(0.62, 0.66, 0.78, 0.5);
 
 /// A unit node, drawn larger than a lesson because it is the level a player
@@ -349,6 +360,19 @@ pub(crate) fn setup_lesson_tree(
                 EdgeKind::UnitBranch => (UNIT_PX / 2.0, NODE_PX / 2.0, EDGE_PX, EDGE_COLOR),
                 EdgeKind::Branch => (NODE_PX / 2.0, NODE_PX / 2.0, EDGE_PX, EDGE_COLOR),
             };
+            // An elective branch is dotted and takes the badge's own
+            // colour, so the line peeling off and the node it arrives at
+            // say the same thing. Hue rather than dimming: dim already
+            // means locked, and an elective is perfectly playable.
+            let style = EdgeStyle {
+                thickness,
+                color: if edge.optional {
+                    OPTIONAL_COLOR.with_alpha(EDGE_COLOR.alpha())
+                } else {
+                    color
+                },
+                dotted: edge.optional,
+            };
             let owners = match edge.kind {
                 EdgeKind::Spine => tree
                     .units
@@ -374,8 +398,7 @@ pub(crate) fn setup_lesson_tree(
                     centre: node_centre(edge.to.0, edge.to.1),
                     radius: to_radius,
                 },
-                thickness,
-                color,
+                style,
                 edge.unit_id.as_deref(),
                 owners,
             );
@@ -471,6 +494,77 @@ fn set_edge_geometry(
     true
 }
 
+/// How an edge is drawn, as opposed to where it runs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct EdgeStyle {
+    thickness: f32,
+    color: Color,
+    /// Elective branches are dotted: the conventional way a dependency
+    /// diagram says "you may skip this" without spending a second meaning
+    /// on brightness, which here already distinguishes locked from open.
+    dotted: bool,
+}
+
+/// Centres of the dots making up an elective branch, evenly spread so one
+/// sits against each node's boundary and the spacing comes out equal.
+///
+/// Spacing is derived from the span rather than fixed, which is what stops
+/// a short edge ending in a ragged half-gap. `diameter` is the dot size, so
+/// the first and last centres are inset by half of it.
+fn dot_centres(start: Vec2, end: Vec2, diameter: f32, gap: f32) -> Vec<Vec2> {
+    let delta = end - start;
+    let length = delta.length();
+    // Centre-to-centre distance available once both end dots are inset.
+    let travel = length - diameter;
+    if travel <= 0.0 {
+        return vec![(start + end) / 2.0];
+    }
+    let direction = delta / length;
+    let count = ((travel / (diameter + gap)).round() as usize + 1).max(2);
+    let spacing = travel / (count - 1) as f32;
+    (0..count)
+        .map(|i| start + direction * (diameter / 2.0 + spacing * i as f32))
+        .collect()
+}
+
+/// An elective branch, as a run of round dots.
+///
+/// Each dot is its own entity carrying [`LayoutOwner`], not one
+/// [`MovingEdge`]: a dotted edge is always inside a single cluster (the
+/// spine is never elective), so both its endpoints take the same slide
+/// offset and the whole run translates rigidly. `animate_unit_slides`
+/// writes only `translation`, so each dot keeps the rotation set here.
+fn spawn_dotted_edge(
+    parent: &mut ChildSpawnerCommands,
+    start: Vec2,
+    end: Vec2,
+    style: EdgeStyle,
+    unit_id: Option<&str>,
+) {
+    let diameter = style.thickness;
+    for centre in dot_centres(start, end, diameter, EDGE_DOT_GAP_PX) {
+        let mut dot = parent.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(centre.x - diameter / 2.0),
+                top: Val::Px(centre.y - diameter / 2.0),
+                width: Val::Px(diameter),
+                height: Val::Px(diameter),
+                // A square with a maximal radius is a circle.
+                border_radius: BorderRadius::MAX,
+                ..default()
+            },
+            BackgroundColor(style.color),
+        ));
+        if let Some(unit_id) = unit_id {
+            dot.insert((
+                ClusterMember(unit_id.to_string()),
+                LayoutOwner(unit_id.to_string()),
+            ));
+        }
+    }
+}
+
 /// One edge, as a single rotated rectangle.
 ///
 /// A straight run needs no sampling and no joins, so there is exactly one
@@ -479,14 +573,20 @@ fn spawn_edge(
     parent: &mut ChildSpawnerCommands,
     from: Endpoint,
     to: Endpoint,
-    thickness: f32,
-    color: Color,
+    style: EdgeStyle,
     unit_id: Option<&str>,
     owners: Option<(&str, &str)>,
 ) {
     let Some((start, end)) = edge_span(from, to) else {
         return;
     };
+    let EdgeStyle {
+        thickness, color, ..
+    } = style;
+    if style.dotted {
+        spawn_dotted_edge(parent, start, end, style, unit_id);
+        return;
+    }
     let delta = end - start;
     let length = delta.length();
     let mid = (start + end) / 2.0;
@@ -651,11 +751,14 @@ fn spawn_unit(
 /// player finds out why a node is dark. Naming them beats a line across
 /// the screen even when there *is* one to follow.
 fn tooltip_for(node: &PlacedNode, loc: &Localization) -> String {
-    let head = format!(
+    let mut head = format!(
         "{} · {}",
         loc.msg(&format!("lesson-track-{}", node.track)),
         loc.msg(&node.title_key)
     );
+    if node.optional {
+        head = format!("{} · {head}", loc.msg("lesson-tree-optional"));
+    }
     if node.state != NodeState::Locked || node.unmet.is_empty() {
         return head;
     }
@@ -769,6 +872,32 @@ fn spawn_node(
         ClusterMember(node.unit_id.clone()),
         LayoutOwner(node.unit_id.clone()),
     ));
+
+    if node.optional {
+        // Beside the node at mid-height, not over its top-right shoulder:
+        // the mastery pips arc from 42° to 138°, so the whole upper corner
+        // belongs to them, and the title owns everything below. Clearing
+        // the button's own bounds also keeps it off the click target.
+        let badge = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(centre.x + NODE_PX / 2.0 + BADGE_GAP_PX),
+                    top: Val::Px(centre.y - BADGE_PX / 2.0),
+                    ..default()
+                },
+                Text::new("◇"),
+                TextFont {
+                    font_size: FontSize::Px(BADGE_PX),
+                    ..default()
+                },
+                TextColor(OPTIONAL_COLOR),
+                ClusterMember(node.unit_id.clone()),
+                LayoutOwner(node.unit_id.clone()),
+            ))
+            .id();
+        commands.entity(canvas).add_child(badge);
+    }
 
     if node.has_trainings {
         spawn_mastery_ring(commands, canvas, node, centre);
@@ -903,6 +1032,56 @@ mod tests {
             edge_span(unit(2.5, 0.0), lesson(2.5, 1.0)).expect("a unit above its root lesson");
         assert_eq!(branch_start.y - node_centre(2.5, 0.0).y, UNIT_PX / 2.0);
         assert_eq!(node_centre(2.5, 1.0).y - branch_end.y, NODE_PX / 2.0);
+    }
+
+    #[test]
+    fn a_dotted_edge_starts_and_ends_against_the_nodes_it_joins() {
+        // A dot sits against each boundary, so a dotted branch reaches its
+        // node exactly as far as a solid one does.
+        let (start, end) = (Vec2::new(100.0, 100.0), Vec2::new(100.0, 240.0));
+        let dots = dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX);
+        assert!(dots.len() > 2, "expected a run of dots, got {}", dots.len());
+        assert!((dots[0].distance(start) - EDGE_PX / 2.0).abs() < 1.0e-4);
+        assert!((dots[dots.len() - 1].distance(end) - EDGE_PX / 2.0).abs() < 1.0e-4);
+    }
+
+    #[test]
+    fn dots_are_evenly_spaced_however_long_the_edge() {
+        // Spacing is derived from the span rather than fixed, which is what
+        // stops a short edge finishing on a ragged half-gap.
+        for length in [20.0_f32, 58.0, 137.0, 394.0] {
+            let (start, end) = (Vec2::ZERO, Vec2::new(length, 0.0));
+            let dots = dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX);
+            let gaps: Vec<f32> = dots.windows(2).map(|w| w[0].distance(w[1])).collect();
+            let first = gaps[0];
+            assert!(
+                gaps.iter().all(|g| (g - first).abs() < 1.0e-3),
+                "uneven spacing over {length}px: {gaps:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn dots_follow_a_diagonal_edge() {
+        // Every dot has to land *on* the line, not on a bounding box of it.
+        let (start, end) = (Vec2::new(40.0, 40.0), Vec2::new(200.0, 160.0));
+        let direction = (end - start).normalize();
+        for dot in dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX) {
+            let along = (dot - start).dot(direction);
+            assert!(
+                (start + direction * along).distance(dot) < 1.0e-3,
+                "dot {dot} sits off the line"
+            );
+        }
+    }
+
+    #[test]
+    fn a_span_too_short_for_two_dots_draws_one() {
+        let (start, end) = (Vec2::new(0.0, 0.0), Vec2::new(2.0, 0.0));
+        assert_eq!(
+            dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX),
+            vec![Vec2::new(1.0, 0.0)]
+        );
     }
 
     #[test]

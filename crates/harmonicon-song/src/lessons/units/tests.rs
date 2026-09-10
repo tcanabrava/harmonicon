@@ -7,6 +7,7 @@ fn lesson(id: &str, unit: &str, prerequisites: &[&str]) -> LessonManifest {
     LessonManifest {
         id: id.to_string(),
         unit: unit.to_string(),
+        optional: false,
         track: None,
         training: None,
         title_key: format!("lesson-{id}-title"),
@@ -37,6 +38,11 @@ fn two_units() -> Vec<LessonManifest> {
     m
 }
 
+fn optional(mut lesson: LessonManifest) -> LessonManifest {
+    lesson.optional = true;
+    lesson
+}
+
 // ── build ────────────────────────────────────────────────────────────────
 
 #[test]
@@ -51,6 +57,45 @@ fn units_keep_the_order_they_were_discovered_in() {
     let ids: Vec<&str> = chain.units().iter().map(|u| u.id.as_str()).collect();
     assert_eq!(ids, ["alpha", "beta"]);
     assert_eq!(chain.units()[0].lessons, ["a1", "a2"]);
+}
+
+#[test]
+fn electives_do_not_raise_a_units_gate() {
+    let lessons = [
+        lesson("core", "alpha", &[]),
+        optional(lesson("elective-a", "alpha", &["core"])),
+        optional(lesson("elective-b", "alpha", &["core"])),
+    ];
+    let chain = UnitChain::build(&lessons);
+    assert_eq!(chain.required(0), 1);
+    assert_eq!(
+        chain.completed(0, &passed(&["elective-a", "elective-b"])),
+        0
+    );
+    assert_eq!(chain.completed(0, &passed(&["core"])), 1);
+}
+
+#[test]
+fn an_elective_only_unit_never_blocks_the_required_course() {
+    let lessons = [
+        optional(lesson("advanced", "electives", &[])),
+        lesson("next-core", "next", &[]),
+    ];
+    let chain = UnitChain::build(&lessons);
+    assert_eq!(chain.required(0), 0);
+    assert!(chain.is_unlocked(1, &HashSet::new()));
+}
+
+#[test]
+fn a_core_lesson_cannot_hide_an_elective_in_its_prerequisites() {
+    let lessons = [
+        optional(lesson("overblow", "advanced", &[])),
+        lesson("graduation", "advanced", &["overblow"]),
+    ];
+    assert_eq!(
+        core_prerequisites_on_optional(&lessons),
+        [("graduation".to_string(), "overblow".to_string())]
+    );
 }
 
 #[test]

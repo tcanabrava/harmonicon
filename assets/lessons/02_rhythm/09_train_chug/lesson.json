@@ -1,6 +1,7 @@
 {
   "id": "train-chug",
   "unit": "rhythm",
+  "optional": true,
   "track": "train",
   "title_key": "lesson-train-chug-title",
   "body_key": "lesson-train-chug-body",

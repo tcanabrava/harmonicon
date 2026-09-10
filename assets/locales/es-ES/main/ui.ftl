@@ -186,6 +186,7 @@ editor-field-lesson-pass-criteria = Criterio de Aprobación
 editor-field-lesson-threshold = Umbral
 editor-field-lesson-technique = Técnica
 editor-field-lesson-progression = Progresión
+editor-field-lesson-path = Ruta del curso
 
 # Song Editor 2 — títulos de diálogos de archivo
 dialog-save-chart = Guardar partitura
@@ -274,6 +275,7 @@ editor-lesson-details-toggle-tooltip = Haz clic para mostrar u ocultar los campo
 editor-field-lesson-pass-criteria-tooltip = Haz clic para alternar cómo se evalúa esta lección — Ninguno, Precisión, Técnica, Adherencia a la Escala, Adherencia a Notas del Acorde, Disciplina de Frase
 editor-field-lesson-technique-tooltip = Haz clic para alternar qué técnica se evalúa — solo se usa cuando el Criterio de Aprobación es Técnica
 editor-field-lesson-progression-tooltip = Haz clic para alternar la progresión de acompañamiento de una lección basada en jam — Ninguna, Estándar, Quick-Change, Menor
+editor-field-lesson-path-tooltip = Haz clic para elegir si esta lección es obligatoria o una rama optativa
 editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación
 editor-browse-tooltip = Elegir un archivo de audio de música de fondo para esta partitura
@@ -868,6 +870,7 @@ lesson-tree-title = Árbol de Habilidades
 lesson-tree-broken = Este plan de estudios no se puede dibujar: {$error}
 lesson-tree-unit-progress = {$done}/{$needed}
 lesson-tree-needs = Necesita: {$lessons}
+lesson-tree-optional = Optativa
 lesson-track-tone = Tono
 lesson-track-hand = Wah de Mano
 lesson-track-tongue = Bloqueo de Lengua

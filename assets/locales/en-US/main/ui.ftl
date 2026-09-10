@@ -188,6 +188,7 @@ editor-field-lesson-pass-criteria = Pass Criteria
 editor-field-lesson-threshold = Threshold
 editor-field-lesson-technique = Technique
 editor-field-lesson-progression = Progression
+editor-field-lesson-path = Course path
 
 # Song Editor 2 — file-dialog titles
 dialog-save-chart = Save chart
@@ -278,6 +279,7 @@ editor-lesson-details-toggle-tooltip = Click to show or hide the lesson curricul
 editor-field-lesson-pass-criteria-tooltip = Click to cycle how this lesson is judged — None, Accuracy, Technique, Scale Adherence, Chord-Tone Adherence, Phrase Discipline
 editor-field-lesson-technique-tooltip = Click to cycle which technique bucket is judged — only used when Pass Criteria is Technique
 editor-field-lesson-progression-tooltip = Click to cycle the backing progression seeded for a jam-based lesson — None, Standard, Quick-Change, Minor
+editor-field-lesson-path-tooltip = Click to choose whether this lesson is required Core work or an Elective branch
 editor-browse-tooltip = Choose a background-music audio file for this chart
 editor-import-midi-tooltip = Load a MIDI file and pick a track to drop onto the note grid — Save then writes a backing track from its other tracks
 editor-silence-track-label = Silence
@@ -869,6 +871,7 @@ lesson-tree-title = Skill Tree
 lesson-tree-broken = This curriculum cannot be drawn: {$error}
 lesson-tree-unit-progress = {$done}/{$needed}
 lesson-tree-needs = Needs: {$lessons}
+lesson-tree-optional = Elective
 lesson-track-tone = Tone
 lesson-track-hand = Hand Wah
 lesson-track-tongue = Tongue Block

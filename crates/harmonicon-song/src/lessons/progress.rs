@@ -96,6 +96,7 @@ mod tests {
         LessonManifest {
             id: id.into(),
             unit: "blowing".into(),
+            optional: false,
             track: None,
             training: None,
             title_key: format!("lesson-{id}-title"),

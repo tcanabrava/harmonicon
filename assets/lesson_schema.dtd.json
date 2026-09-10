@@ -22,6 +22,10 @@
       "minLength": 1,
       "description": "Unit identifier grouping lessons in the menu. Localized via the Fluent key `lesson-unit-<unit>`."
     },
+    "optional": {
+      "type": "boolean",
+      "description": "Marks an elective lesson. Electives keep their own prerequisites but never count toward unit gates or block the required course. Absent/false = core curriculum."
+    },
     "track": {
       "type": "string",
       "minLength": 1,

@@ -174,10 +174,31 @@ fn serialize_lesson_writes_prerequisites_and_progression() {
 }
 
 #[test]
+fn serialize_lesson_writes_elective_only_when_selected() {
+    let core = EditorState {
+        lesson_id: "core".into(),
+        lesson_unit: "u".into(),
+        ..EditorState::default()
+    };
+    let (json, _) = serialize_lesson(&core);
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert!(value.get("optional").is_none());
+
+    let elective = EditorState {
+        lesson_path: "elective".into(),
+        ..core
+    };
+    let (json, _) = serialize_lesson(&elective);
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(value["optional"], true);
+}
+
+#[test]
 fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
     let manifest = LessonManifest {
         id: "hand-wah".into(),
         unit: "blowing".into(),
+        optional: false,
         track: None,
         training: None,
         title_key: "t".into(),
@@ -197,6 +218,7 @@ fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
     populate_from_lesson_manifest(&manifest, &mut s);
     assert_eq!(s.lesson_id, "hand-wah");
     assert_eq!(s.lesson_unit, "blowing");
+    assert_eq!(s.lesson_path, "core");
     assert_eq!(s.lesson_prerequisites, "single-note");
     assert_eq!(s.lesson_pass_criteria, "technique");
     assert_eq!(s.lesson_technique, "wah-wah");
@@ -209,6 +231,7 @@ fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
     let manifest = LessonManifest {
         id: "x".into(),
         unit: "u".into(),
+        optional: false,
         track: None,
         training: None,
         title_key: "t".into(),

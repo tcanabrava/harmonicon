@@ -283,6 +283,9 @@ pub(super) fn serialize_lesson(state: &EditorState) -> (String, Vec<String>) {
         "title_key": title_key,
         "body_key": body_key,
     });
+    if state.lesson_path == "elective" {
+        manifest["optional"] = json!(true);
+    }
 
     if !state.notes.is_empty() {
         manifest["chart"] = json!("song/chart.harpchart");
@@ -405,6 +408,11 @@ pub(super) fn save_lesson(
 pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &mut EditorState) {
     state.lesson_id = manifest.id.clone();
     state.lesson_unit = manifest.unit.clone();
+    state.lesson_path = if manifest.optional {
+        "elective".into()
+    } else {
+        "core".into()
+    };
     state.lesson_prerequisites = manifest.prerequisites.join(", ");
     match &manifest.pass_criteria {
         None => state.lesson_pass_criteria = "none".into(),

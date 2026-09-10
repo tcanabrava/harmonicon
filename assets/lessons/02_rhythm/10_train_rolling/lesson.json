@@ -1,6 +1,7 @@
 {
   "id": "train-rolling",
   "unit": "rhythm",
+  "optional": true,
   "track": "train",
   "title_key": "lesson-train-rolling-title",
   "body_key": "lesson-train-rolling-body",

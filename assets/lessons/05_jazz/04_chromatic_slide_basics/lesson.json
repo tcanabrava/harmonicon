@@ -1,6 +1,7 @@
 {
   "id": "chromatic-slide-basics",
   "unit": "jazz",
+  "optional": true,
   "track": "slide",
   "title_key": "lesson-chromatic-slide-basics-title",
   "body_key": "lesson-chromatic-slide-basics-body",

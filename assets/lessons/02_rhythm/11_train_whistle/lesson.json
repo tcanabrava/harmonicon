@@ -1,6 +1,7 @@
 {
   "id": "train-whistle",
   "unit": "rhythm",
+  "optional": true,
   "track": "train",
   "title_key": "lesson-train-whistle-title",
   "body_key": "lesson-train-whistle-body",

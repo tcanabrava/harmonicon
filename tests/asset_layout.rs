@@ -465,6 +465,13 @@ fn the_bundled_curriculum_forms_a_drawable_graph() {
         "these prerequisites point at a later unit, which unit gating can never satisfy — \
          move the lesson or the prerequisite: {backwards:?}"
     );
+    let elective_gates =
+        harmonicon_song::lessons::units::core_prerequisites_on_optional(&manifests);
+    assert!(
+        elective_gates.is_empty(),
+        "required lessons depend on electives, making optional branches mandatory: \
+         {elective_gates:?}"
+    );
 }
 
 #[test]

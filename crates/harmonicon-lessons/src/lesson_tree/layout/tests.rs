@@ -14,6 +14,7 @@ fn manifest(
     LessonManifest {
         id: id.to_string(),
         unit: unit.to_string(),
+        optional: false,
         track: Some(track.to_string()),
         title_key: format!("lesson-{id}-title"),
         body_key: format!("lesson-{id}-body"),
@@ -549,6 +550,93 @@ fn a_track_travels_with_its_node_for_colouring() {
             .track,
         "bend"
     );
+}
+
+#[test]
+fn an_elective_marker_travels_with_its_node() {
+    let mut e = entry("advanced", "bend", &[], false);
+    e.manifest.optional = true;
+    assert!(
+        build(&[e], &PlayerProfile::default())
+            .node("advanced")
+            .unwrap()
+            .optional
+    );
+}
+
+/// An elective: visible and playable, but outside its unit's gate.
+fn elective(mut e: LessonEntry) -> LessonEntry {
+    e.manifest.optional = true;
+    e
+}
+
+/// The edge arriving at `id`, whatever it hangs off.
+fn edge_into<'a>(l: &'a TreeLayout, id: &str) -> &'a Edge {
+    let node = l.node(id).expect("a placed node");
+    l.edges
+        .iter()
+        .find(|x| x.to == (node.column, node.row))
+        .expect("an edge arriving at it")
+}
+
+#[test]
+fn a_branch_is_elective_when_the_lesson_it_arrives_at_is() {
+    // What makes the drawing say "you may skip this": the *destination*
+    // decides, because that is what the edge is about.
+    let e = [
+        entry("core", "t", &[], false),
+        entry("also-core", "t", &["core"], false),
+        elective(entry("overblows", "bend", &["core"], false)),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    assert!(edge_into(&l, "overblows").optional);
+    assert!(!edge_into(&l, "also-core").optional);
+}
+
+#[test]
+fn an_elective_hanging_off_an_elective_stays_elective() {
+    // Core may never depend on an elective, so once a branch leaves the
+    // required path everything further down it is optional too.
+    let e = [
+        entry("core", "t", &[], false),
+        elective(entry("overblows", "bend", &["core"], false)),
+        elective(entry("overblow-licks", "bend", &["overblows"], false)),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    assert!(edge_into(&l, "overblow-licks").optional);
+}
+
+#[test]
+fn a_unit_branch_into_an_elective_root_is_elective() {
+    // An elective needing no prerequisites hangs straight off its unit, so
+    // that edge is the only one carrying the distinction.
+    let e = [
+        entry("core", "t", &[], false),
+        elective(entry("standalone", "bend", &[], false)),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    let edge = edge_into(&l, "standalone");
+    assert_eq!(edge.kind, EdgeKind::UnitBranch);
+    assert!(edge.optional);
+}
+
+#[test]
+fn the_spine_is_never_elective() {
+    // A unit gate counts core lessons only, so the path from unit to unit
+    // is mandatory by construction — even a unit made entirely of
+    // electives is still on it.
+    let e = [
+        entry_in("alpha", "a1", "t", &[], false),
+        elective(entry_in("beta", "b1", "t", &[], false)),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    let spine: Vec<&Edge> = l
+        .edges
+        .iter()
+        .filter(|x| x.kind == EdgeKind::Spine)
+        .collect();
+    assert!(!spine.is_empty(), "no spine to check");
+    assert!(spine.iter().all(|x| !x.optional));
 }
 
 #[test]

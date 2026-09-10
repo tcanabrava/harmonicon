@@ -37,6 +37,8 @@ pub(super) enum Field {
     /// Curriculum unit grouping this lesson in the menu (`lesson-unit-
     /// <unit>` is its own separate Fluent key, not authored here).
     LessonUnit,
+    /// Whether this lesson belongs to the required core or an elective branch.
+    LessonPath,
     /// Raw display text for the lesson's instructional body — `Name` above
     /// doubles as the lesson's title text the same way. Neither is written
     /// into `lesson.json` directly (which only stores Fluent *keys*, per
@@ -76,6 +78,7 @@ impl Field {
                 | Field::LessonPassCriteria
                 | Field::LessonTechnique
                 | Field::LessonProgression
+                | Field::LessonPath
         )
     }
 }
@@ -96,9 +99,10 @@ pub(super) const FIELDS: [(Field, &str); 7] = [
 /// needs beyond what [`FIELDS`] already covers (title/tempo/key/... are
 /// shared with a plain song, since a chart-backed lesson's chart is an
 /// ordinary chart).
-pub(super) const LESSON_FIELDS: [(Field, &str); 8] = [
+pub(super) const LESSON_FIELDS: [(Field, &str); 9] = [
     (Field::LessonId, "editor-field-lesson-id"),
     (Field::LessonUnit, "editor-field-lesson-unit"),
+    (Field::LessonPath, "editor-field-lesson-path"),
     (Field::LessonExplanation, "editor-field-lesson-explanation"),
     (
         Field::LessonPrerequisites,
@@ -151,6 +155,7 @@ pub(super) const TECHNIQUE_NAMES: [&str; 8] = [
 /// `lesson_schema.dtd.json`'s own enum.
 pub(super) const PROGRESSIONS: [&str; 5] =
     ["none", "standard", "quick-change", "minor", "jazz-blues"];
+pub(super) const LESSON_PATHS: [&str; 2] = ["core", "elective"];
 
 /// Advances `current` to the next entry in `options`, wrapping — every
 /// click-to-cycle metadata field (`Key`, `Position`, and the lesson-only
@@ -225,6 +230,7 @@ pub(super) struct EditorState {
     pub(super) content_kind: ContentKind,
     pub(super) lesson_id: String,
     pub(super) lesson_unit: String,
+    pub(super) lesson_path: String,
     pub(super) lesson_explanation: String,
     pub(super) lesson_prerequisites: String,
     pub(super) lesson_pass_criteria: String,
@@ -298,6 +304,7 @@ impl Default for EditorState {
             content_kind: ContentKind::default(),
             lesson_id: String::new(),
             lesson_unit: String::new(),
+            lesson_path: "core".into(),
             lesson_explanation: String::new(),
             lesson_prerequisites: String::new(),
             lesson_pass_criteria: "none".into(),
@@ -408,6 +415,7 @@ impl EditorState {
             Field::Author => &self.author,
             Field::LessonId => &self.lesson_id,
             Field::LessonUnit => &self.lesson_unit,
+            Field::LessonPath => &self.lesson_path,
             Field::LessonExplanation => &self.lesson_explanation,
             Field::LessonPrerequisites => &self.lesson_prerequisites,
             Field::LessonPassCriteria => &self.lesson_pass_criteria,
@@ -428,6 +436,7 @@ impl EditorState {
             Field::Author => &mut self.author,
             Field::LessonId => &mut self.lesson_id,
             Field::LessonUnit => &mut self.lesson_unit,
+            Field::LessonPath => &mut self.lesson_path,
             Field::LessonExplanation => &mut self.lesson_explanation,
             Field::LessonPrerequisites => &mut self.lesson_prerequisites,
             Field::LessonPassCriteria => &mut self.lesson_pass_criteria,

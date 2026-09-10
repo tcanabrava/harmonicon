@@ -186,6 +186,7 @@ editor-field-lesson-pass-criteria = Critério de Aprovação
 editor-field-lesson-threshold = Limite
 editor-field-lesson-technique = Técnica
 editor-field-lesson-progression = Progressão
+editor-field-lesson-path = Percurso
 
 # Editor de Músicas 2 — títulos dos diálogos de arquivo
 dialog-save-chart = Salvar partitura
@@ -274,6 +275,7 @@ editor-lesson-details-toggle-tooltip = Clique para mostrar ou ocultar os campos 
 editor-field-lesson-pass-criteria-tooltip = Clique para alternar como esta lição é avaliada — Nenhum, Precisão, Técnica, Aderência à Escala, Aderência a Notas do Acorde, Disciplina de Frase
 editor-field-lesson-technique-tooltip = Clique para alternar qual técnica é avaliada — usado apenas quando o Critério de Aprovação é Técnica
 editor-field-lesson-progression-tooltip = Clique para alternar a progressão de acompanhamento de uma lição baseada em jam — Nenhuma, Padrão, Quick-Change, Menor
+editor-field-lesson-path-tooltip = Clique para escolher se esta lição é obrigatória ou uma ramificação eletiva
 editor-field-key-tooltip = Clique para alternar entre os tons da gaita
 editor-field-position-tooltip = Clique para alternar entre as posições de execução
 editor-browse-tooltip = Escolher um arquivo de áudio de música de fundo para esta partitura
@@ -866,6 +868,7 @@ lesson-tree-title = Árvore de Habilidades
 lesson-tree-broken = Este currículo não pode ser desenhado: {$error}
 lesson-tree-unit-progress = {$done}/{$needed}
 lesson-tree-needs = Precisa de: {$lessons}
+lesson-tree-optional = Eletiva
 lesson-track-tone = Tom
 lesson-track-hand = Wah de Mão
 lesson-track-tongue = Bloqueio de Língua
