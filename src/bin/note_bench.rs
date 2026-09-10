@@ -149,12 +149,11 @@ fn run_one(song_dir: &Path, chart_path: &Path, wav_path: &Path, tolerance_secs: 
             println!("        {count:>4}x  played {want:?} -> detected {got:?}");
         }
 
-        // Same frames, re-filtered through the harmonica constraint solver
-        // (`song::harmonica_constraints::plausible_notes` — rejects any
-        // simultaneous blow+draw mix, which no single breath can produce)
-        // — printed alongside the raw algorithm so its effect is visible
-        // directly, before deciding whether it's worth wiring into the
-        // live pipeline.
+        // Same frames, re-filtered through exactly the policy live gameplay
+        // applies (`harmonicon_core::harmonica_constraints`'s
+        // `HarmonicaNoteTracker`: one wind direction at a time, plus onset
+        // confirmation and release) — printed alongside the raw algorithm so
+        // the cost and benefit of that stage are visible side by side.
         let constrained = apply_live_constraints(&chart.harmonica, &frames);
         let constrained_report = compare(&expected, &constrained, tolerance_secs);
         println!(

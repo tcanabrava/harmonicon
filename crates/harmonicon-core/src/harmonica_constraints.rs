@@ -227,7 +227,8 @@ pub struct TrackedNotes {
 /// Pure harmonica-state tracker shared by gameplay, recording, and benchmarks.
 pub struct HarmonicaNoteTracker {
     harp: Harmonica,
-    config: NoteTrackerConfig,
+    onset_frames: u8,
+    release_frames: u8,
     direction: BreathDirectionTracker,
     pending: HashMap<u8, u8>,
     active: HashMap<u8, u8>,
@@ -237,11 +238,13 @@ impl HarmonicaNoteTracker {
     pub fn new(harp: Harmonica, config: NoteTrackerConfig) -> Self {
         Self {
             harp,
-            config: NoteTrackerConfig {
-                onset_frames: config.onset_frames.max(1),
-                release_frames: config.release_frames.max(1),
-                direction_change_frames: config.direction_change_frames.max(1),
-            },
+            // Every threshold is a count of frames to wait, so zero would
+            // mean "decide before observing anything" — floor them all at
+            // one. `direction_change_frames` is floored by
+            // `with_change_frames` rather than here, so each knob has exactly
+            // one owner applying its floor and one place storing it.
+            onset_frames: config.onset_frames.max(1),
+            release_frames: config.release_frames.max(1),
             direction: BreathDirectionTracker::with_change_frames(config.direction_change_frames),
             pending: HashMap::new(),
             active: HashMap::new(),
@@ -259,12 +262,12 @@ impl HarmonicaNoteTracker {
     /// real time — it depends on their own hop size, which is not this
     /// crate's business.
     pub fn onset_frames(&self) -> u8 {
-        self.config.onset_frames
+        self.onset_frames
     }
 
     pub fn update(&mut self, candidates: &[u8]) -> TrackedNotes {
-        // Keep the direction tracker's public two-frame default compatible,
-        // while permitting consumers to request a different transition count.
+        // One wind direction first: a pitch the current breath cannot produce
+        // is not a candidate for onset counting at all.
         let allowed = self.direction.filter(&self.harp, candidates);
         let allowed_set: HashSet<u8> = allowed.iter().copied().collect();
         self.pending.retain(|midi, _| allowed_set.contains(midi));
@@ -277,7 +280,7 @@ impl HarmonicaNoteTracker {
             }
             let seen = self.pending.entry(midi).or_default();
             *seen += 1;
-            if *seen >= self.config.onset_frames {
+            if *seen >= self.onset_frames {
                 confirmed.push(midi);
                 self.active.insert(midi, 0);
             }
@@ -289,7 +292,7 @@ impl HarmonicaNoteTracker {
                 true
             } else {
                 *missed += 1;
-                *missed < self.config.release_frames
+                *missed < self.release_frames
             }
         });
 
@@ -490,6 +493,28 @@ mod tests {
             vec![60],
             "the re-attack must confirm again"
         );
+    }
+
+    #[test]
+    fn a_zero_frame_threshold_is_floored_to_one() {
+        // Zero would mean deciding before observing anything. Each threshold
+        // is floored by whichever type owns it, so no caller has to know.
+        let harp = richter_harp("C");
+        let mut tracker = HarmonicaNoteTracker::new(
+            harp.clone(),
+            NoteTrackerConfig {
+                onset_frames: 0,
+                release_frames: 0,
+                direction_change_frames: 0,
+            },
+        );
+        assert_eq!(tracker.onset_frames(), 1);
+        assert_eq!(tracker.update(&[60]).confirmed, vec![60]);
+        assert!(tracker.update(&[]).active.is_empty());
+
+        let mut direction = BreathDirectionTracker::with_change_frames(0);
+        direction.filter(&harp, &[60]);
+        assert_eq!(direction.filter(&harp, &[62]), vec![62]);
     }
 
     #[test]
