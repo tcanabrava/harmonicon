@@ -1,5 +1,12 @@
 # Lesson tree layout and curriculum plan
 
+**Implementation status: complete.** The extraction, collapsible major nodes,
+downward dependency layout, continuous edge geometry, compacting canvas,
+neighbor motion, viewport anchoring, accessibility state, and live-rescan
+handling have shipped. The full workspace suite validates the bundled
+curriculum graph and assets. The curriculum additions below remain the content
+roadmap rather than prerequisites for the layout implementation.
+
 This plan treats the lesson screen as a course dependency map: units are
 course modules, lessons are classes, and prerequisite edges explain the order
 in which skills become useful. The screen should answer three questions at a
@@ -128,11 +135,19 @@ bounds, ports, control points, and tessellation segments.
    anchoring. Live lesson rescans also remove transition state for units that
    disappeared. Neighboring units and their edge endpoints animate into the
    new layout. Add reduced-motion behavior once that setting exists.
-4. **Done:** replace sampled curves with continuous straight paths. Compare
-   captures at 1×, 1.25×, 1.5×, and 2× scale; consider a mesh only if those
-   captures demonstrate a need for curved routing.
-5. Add an overview/minimap or “show available” action only if usability tests
-   still show players losing their place after collapse ships.
+4. **Done:** replace sampled curves with continuous straight paths. Each edge
+   is one UI rectangle, so there are no tessellation joins whose appearance
+   changes with scale. Keep multi-scale captures and a mesh renderer as
+   regression tools only if a curved route is introduced later.
+5. **Not activated:** add an overview/minimap or “show available” action only
+   if usability tests show players losing their place. Viewport anchoring and
+   compact units address the original navigation problem without another
+   control, and there is currently no evidence that one is needed.
+
+Reduced-motion behavior remains a shared-settings follow-up. The repository
+does not currently expose such a preference; when it does, both cluster and
+neighbor transitions should use it rather than introducing a lesson-only
+setting.
 
 ## Curriculum gaps
 
