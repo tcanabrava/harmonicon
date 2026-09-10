@@ -179,11 +179,26 @@ impl TreeLayout {
 }
 
 /// Places every unit and every lesson, given what the player has done.
+#[cfg(test)]
 pub fn layout(
     entries: &[LessonEntry],
     graph: &LessonGraph,
     chain: &UnitChain,
     profile: &PlayerProfile,
+) -> TreeLayout {
+    layout_with_collapsed(entries, graph, chain, profile, &HashSet::new())
+}
+
+/// Places the tree while allowing selected unit clusters to consume only one
+/// spine column. Their lesson entities remain in the result at the unit's
+/// position so the renderer can keep stable ownership, but they do not enlarge
+/// the canvas while hidden.
+pub fn layout_with_collapsed(
+    entries: &[LessonEntry],
+    graph: &LessonGraph,
+    chain: &UnitChain,
+    profile: &PlayerProfile,
+    collapsed: &HashSet<String>,
 ) -> TreeLayout {
     let passed: HashSet<&str> = profile.passed_lesson_ids().into_iter().collect();
     let tiers = Tier::ALL.len();
@@ -310,6 +325,8 @@ pub fn layout(
         }
         order_layers(&mut layers, &predecessors, &successors);
 
+        let is_collapsed = collapsed.contains(&unit.id);
+
         // Each layer is a prerequisite depth row. Centre shorter rows
         // against the widest so the unit can sit over the cluster's true
         // midpoint instead of over its first lesson.
@@ -317,21 +334,34 @@ pub fn layout(
         for (depth, layer) in layers.iter().enumerate() {
             let offset = (tallest - layer.len() as f32) / 2.0;
             for (column, &n) in layer.iter().enumerate() {
-                nodes[n].column = cursor + offset + column as f32;
-                nodes[n].row = CLUSTER_TOP_ROW + depth as f32;
+                if is_collapsed {
+                    nodes[n].column = cursor;
+                    nodes[n].row = SPINE_ROW;
+                } else {
+                    nodes[n].column = cursor + offset + column as f32;
+                    nodes[n].row = CLUSTER_TOP_ROW + depth as f32;
+                }
             }
         }
 
         units.push(PlacedUnit {
             id: unit.id.clone(),
             title_key: unit.title_key.clone(),
-            column: cursor + (tallest - 1.0) / 2.0,
+            column: if is_collapsed {
+                cursor
+            } else {
+                cursor + (tallest - 1.0) / 2.0
+            },
             row: SPINE_ROW,
             locked: !chain.is_unlocked(ix, &passed),
             completed: chain.completed(ix, &passed),
             required: chain.required(ix),
         });
-        cursor += tallest.max(1.0) + UNIT_GAP_COLUMNS;
+        cursor += if is_collapsed {
+            1.0 + UNIT_GAP_COLUMNS
+        } else {
+            tallest.max(1.0) + UNIT_GAP_COLUMNS
+        };
     }
 
     let mut edges: Vec<Edge> = Vec::new();

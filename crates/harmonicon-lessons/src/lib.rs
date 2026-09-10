@@ -19,6 +19,7 @@ impl Plugin for LessonsUiPlugin {
         app.init_resource::<lesson_reader::SelectedLesson>()
             .init_resource::<lesson_tree::CollapsedUnits>()
             .init_resource::<lesson_tree::UnitExpansions>()
+            .init_resource::<lesson_tree::PendingCompaction>()
             .add_systems(
                 OnEnter(MenuPage::LessonTree),
                 lesson_tree::setup_lesson_tree,
@@ -29,7 +30,9 @@ impl Plugin for LessonsUiPlugin {
                 (
                     lesson_tree::rebuild_on_lessons_rescanned,
                     lesson_tree::animate_unit_expansion,
+                    lesson_tree::compact_finished_units,
                 )
+                    .chain()
                     .run_if(in_state(MenuPage::LessonTree)),
             )
             .add_systems(

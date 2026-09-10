@@ -57,7 +57,7 @@ use harmonicon_menu::menu::MenuPage;
 use harmonicon_menu::menu::scene::{spawn_back_button, spawn_menu_root_plain};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
-use layout::{EdgeKind, NodeState, PlacedNode, PlacedUnit, layout};
+use layout::{EdgeKind, NodeState, PlacedNode, PlacedUnit, layout_with_collapsed};
 
 use std::collections::{HashMap, HashSet};
 
@@ -127,6 +127,11 @@ pub(crate) struct CollapsedUnits(HashSet<String>);
 #[derive(Resource, Default)]
 pub(crate) struct UnitExpansions(HashMap<String, f32>);
 
+/// Units whose close animation must finish before the layout reclaims their
+/// columns. Tracking ids keeps rapid toggles independent.
+#[derive(Resource, Default)]
+pub(crate) struct PendingCompaction(HashSet<String>);
+
 /// Any lesson node, label, mastery pip, or branch edge owned by a unit.
 #[derive(Component)]
 pub(crate) struct ClusterMember(String);
@@ -173,6 +178,7 @@ pub(crate) fn setup_lesson_tree(
     mut commands: Commands,
     lessons: Res<AvailableLessons>,
     profile: Res<PlayerProfile>,
+    collapsed: Res<CollapsedUnits>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     asset_server: Res<AssetServer>,
@@ -192,7 +198,7 @@ pub(crate) fn setup_lesson_tree(
     let manifests: Vec<_> = lessons.0.iter().map(|e| e.manifest.clone()).collect();
     let chain = UnitChain::build(&manifests);
     let tree = match LessonGraph::build(&manifests) {
-        Ok(graph) => layout(&lessons.0, &graph, &chain, &profile),
+        Ok(graph) => layout_with_collapsed(&lessons.0, &graph, &chain, &profile, &collapsed.0),
         // A cycle or a dangling prerequisite. `tests/asset_layout.rs` fails
         // the build over either, so this only fires for a lesson dropped
         // into `~/Harmonicon/lessons` — say so rather than draw nothing.
@@ -438,9 +444,18 @@ fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &
             TabIndex(0),
         ))
         .observe(
-            move |_: On<Activate>, mut collapsed: ResMut<CollapsedUnits>| {
-                if !collapsed.0.remove(&unit_id) {
+            move |_: On<Activate>,
+                  mut collapsed: ResMut<CollapsedUnits>,
+                  mut pending: ResMut<PendingCompaction>,
+                  mut page: ResMut<NextState<MenuPage>>| {
+                if collapsed.0.remove(&unit_id) {
+                    pending.0.remove(&unit_id);
+                    // Expand from the compact layout first; the existing zero
+                    // expansion amount then animates the newly placed cluster.
+                    page.set(MenuPage::LessonTree);
+                } else {
                     collapsed.0.insert(unit_id.clone());
+                    pending.0.insert(unit_id.clone());
                 }
             },
         )
@@ -693,6 +708,27 @@ pub(crate) fn animate_unit_expansion(
         } else {
             "▼".to_string()
         };
+    }
+}
+
+/// Rebuilds once every closing unit has finished. Waiting for zero preserves
+/// the close animation; the next layout then removes the hidden width from the
+/// canvas and moves later units left.
+pub(crate) fn compact_finished_units(
+    expansions: Res<UnitExpansions>,
+    mut pending: ResMut<PendingCompaction>,
+    mut page: ResMut<NextState<MenuPage>>,
+) {
+    if pending.0.is_empty() {
+        return;
+    }
+    let all_closed = pending
+        .0
+        .iter()
+        .all(|id| expansions.0.get(id).is_none_or(|amount| *amount <= 0.0));
+    if all_closed {
+        pending.0.clear();
+        page.set(MenuPage::LessonTree);
     }
 }
 

@@ -58,6 +58,18 @@ fn build(entries: &[LessonEntry], profile: &PlayerProfile) -> TreeLayout {
     layout(entries, &graph, &chain, profile)
 }
 
+fn build_collapsed(
+    entries: &[LessonEntry],
+    profile: &PlayerProfile,
+    collapsed: &[&str],
+) -> TreeLayout {
+    let manifests: Vec<LessonManifest> = entries.iter().map(|e| e.manifest.clone()).collect();
+    let graph = LessonGraph::build(&manifests).expect("a valid graph");
+    let chain = UnitChain::build(&manifests);
+    let collapsed = collapsed.iter().map(|id| (*id).to_string()).collect();
+    layout_with_collapsed(entries, &graph, &chain, profile, &collapsed)
+}
+
 fn pass(profile: &mut PlayerProfile, id: &str) {
     let r = profile.lessons.entry(id.to_string()).or_default();
     record_lesson(r, true, 1.0);
@@ -550,6 +562,44 @@ fn columns_and_rows_size_the_canvas() {
     assert_eq!(l.columns(), 2.0);
     // One spine row plus two dependency-depth rows.
     assert_eq!(l.rows(), 3.0);
+}
+
+#[test]
+fn a_collapsed_unit_reclaims_its_cluster_width() {
+    let e = [
+        entry_in("alpha", "root", "t", &[], false),
+        entry_in("alpha", "a", "t", &["root"], false),
+        entry_in("alpha", "b", "t", &["root"], false),
+        entry_in("beta", "next", "t", &[], false),
+    ];
+    let expanded = build(&e, &PlayerProfile::default());
+    let collapsed = build_collapsed(&e, &PlayerProfile::default(), &["alpha"]);
+
+    assert!(collapsed.columns() < expanded.columns());
+    assert!(collapsed.unit("beta").unwrap().column < expanded.unit("beta").unwrap().column);
+    let alpha = collapsed.unit("alpha").unwrap();
+    assert!(
+        collapsed
+            .nodes
+            .iter()
+            .filter(|node| node.unit_id == "alpha")
+            .all(|node| node.column == alpha.column && node.row == alpha.row)
+    );
+}
+
+#[test]
+fn collapsing_one_unit_does_not_move_earlier_units() {
+    let e = [
+        entry_in("alpha", "first", "t", &[], false),
+        entry_in("beta", "root", "t", &[], false),
+        entry_in("beta", "a", "t", &["root"], false),
+        entry_in("beta", "b", "t", &["root"], false),
+    ];
+    let expanded = build(&e, &PlayerProfile::default());
+    let collapsed = build_collapsed(&e, &PlayerProfile::default(), &["beta"]);
+
+    assert_eq!(collapsed.unit("alpha"), expanded.unit("alpha"));
+    assert_eq!(collapsed.node("first"), expanded.node("first"));
 }
 
 #[test]

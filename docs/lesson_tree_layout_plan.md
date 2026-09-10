@@ -38,11 +38,12 @@ remaining visual problems come from the rendering contract around that layout.
 
 ### 1. Collapsible units
 
-**Initial implementation shipped in `0be52cc`.** Unit nodes are focusable
-buttons, explicit choices persist across lesson-reader visits, the chevron
-shows the current state, and all lesson art and local edges animate over 220
-ms. Compacting the canvas, sliding neighboring units, viewport anchoring, and
-reduced-motion behavior remain open.
+**Initial interaction shipped in `0be52cc`; compact layout is now implemented.**
+Unit nodes are focusable buttons, explicit choices persist across lesson-reader
+visits, the chevron shows the current state, and all lesson art and local edges
+animate over 220 ms. Once a close animation finishes, the pure layout reclaims
+that cluster's columns and recomputes the canvas. Smooth neighboring-unit
+motion, viewport anchoring, and reduced-motion behavior remain open.
 
 Make every unit node an accessible button with expanded/collapsed state. Keep
 the current unit, the first available unit, and units containing available
@@ -117,9 +118,11 @@ bounds, ports, control points, and tessellation segments.
    endpoint kinds, and test the geometry invariants.
 2. **Done:** add unit-button state, keyboard focus, session persistence, and
    animated visibility for each cluster.
-3. Compact collapsed clusters, animate neighboring unit positions, and anchor
-   the viewport. Validate compact windows, rapid toggles, and lesson rescans
-   during animation; add reduced-motion behavior once that setting exists.
+3. **In progress:** collapsed clusters now compact after their close animation,
+   including safe rapid toggles and recomputed canvas bounds. Animate
+   neighboring unit positions and anchor the viewport next. Validate compact
+   windows and lesson rescans during animation; add reduced-motion behavior
+   once that setting exists.
 4. **Done:** replace sampled curves with continuous straight paths. Compare
    captures at 1×, 1.25×, 1.5×, and 2× scale; consider a mesh only if those
    captures demonstrate a need for curved routing.
