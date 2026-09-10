@@ -320,6 +320,21 @@ requirement, and every lesson here declares `optional: true`.
 |---|---|---|---|---|
 | **High blow bends** (`high-blow-bends`, `01_high_blow_bends`) — half-step bends on 8/9/10, the whole-step 10 bend, and a descending application | **Scored** | Existing bend detection and generated bend ladder over holes 8/9/10 | `deep-bends`, `high-register` | technique `bend` ≥ 0.55 |
 
+### Unit 8 — rhythm lab (`08_rhythm_lab/`) — 5 lessons shipped
+
+The second rhythm module moves from recognizing the blues pulse to controlling
+subdivisions, silence, articulation, and changing tempos. Every chart is an
+original rhythm exercise. Tick-based placement keeps triplets and sixteenths
+exact, and the final drill exercises multiple tempo-map boundaries.
+
+| Lesson | Scoreable? | Mechanism | Prereq | Pass |
+|---|---|---|---|---|
+| **Eighth-note triplets** (`eighth-note-triplets`) | **Scored** | Tick-aligned three-part subdivisions | `shuffle-feel` | accuracy ≥ 0.65 |
+| **Straight versus shuffle** (`straight-vs-shuffle`) | **Scored** | Equal eighths followed by long-short pairs | `eighth-note-triplets` | accuracy ≥ 0.7 |
+| **Syncopation and rests** (`syncopation-and-rests`) | **Scored** | Offbeat onsets with explicit empty beats | `straight-vs-shuffle` | accuracy ≥ 0.7 |
+| **Sixteenth-note articulation** (`sixteenth-articulation`) | **Scored via proxy** | Fresh-attack detection on four-note cells | `syncopation-and-rests`, `articulation` | clean attacks ≥ 0.65 |
+| **Tempo stability** (`tempo-stability`) | **Scored** | Tight timing across 64, 72, 80, and 68 BPM map segments | `sixteenth-articulation` | accuracy ≥ 0.75 |
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"

@@ -1,0 +1,21 @@
+{
+  "metadata":{"format_version":"1.0.0","author":"Harmonicon","source":"Original exercise","license":"MIT","description":"Even eighth-note triplets."},
+  "song":{"title":"Eighth-note Triplets","artist":"Harmonicon Lessons","tempo_bpm":60,"key":"C","time_signature":"4/4","difficulty":"intermediate"},
+  "timing":{"resolution":480,"tempo_map":[{"tick":0,"bpm":60}]},
+  "harmonica":{"type":"diatonic","holes":10,"position":"1st","bending_profile":"richter_standard","layout":{"blow":["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],"draw":["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]}},
+  "track":[
+    {"id":"t01","tick":0,"duration":0.5,"play_mode":"single","events":[{"hole":4,"action":"blow","note":"C5"}],"phrase":"Count one-trip-let"},
+    {"id":"t02","tick":320,"duration":0.5,"play_mode":"single","events":[{"hole":4,"action":"draw","note":"D5"}]},
+    {"id":"t03","tick":640,"duration":0.5,"play_mode":"single","events":[{"hole":4,"action":"blow","note":"C5"}]},
+    {"id":"t04","tick":960,"duration":0.5,"play_mode":"single","events":[{"hole":5,"action":"blow","note":"E5"}]},
+    {"id":"t05","tick":1280,"duration":0.5,"play_mode":"single","events":[{"hole":5,"action":"draw","note":"F5"}]},
+    {"id":"t06","tick":1600,"duration":0.5,"play_mode":"single","events":[{"hole":5,"action":"blow","note":"E5"}]},
+    {"id":"t07","tick":1920,"duration":0.5,"play_mode":"single","events":[{"hole":4,"action":"blow","note":"C5"}]},
+    {"id":"t08","tick":2240,"duration":0.5,"play_mode":"single","events":[{"hole":4,"action":"draw","note":"D5"}]},
+    {"id":"t09","tick":2560,"duration":0.5,"play_mode":"single","events":[{"hole":5,"action":"blow","note":"E5"}]},
+    {"id":"t10","tick":2880,"duration":0.5,"play_mode":"single","events":[{"hole":5,"action":"draw","note":"F5"}]},
+    {"id":"t11","tick":3200,"duration":0.5,"play_mode":"single","events":[{"hole":6,"action":"blow","note":"G5"}]},
+    {"id":"t12","tick":3520,"duration":0.5,"play_mode":"single","events":[{"hole":5,"action":"draw","note":"F5"}]}
+  ],
+  "scoring":{"perfect_window_ms":130,"good_window_ms":260,"miss_window_ms":450}
+}

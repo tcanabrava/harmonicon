@@ -1,0 +1,6 @@
+{
+  "id": "sixteenth-articulation", "unit": "rhythm-lab", "track": "time",
+  "title_key": "lesson-sixteenth-articulation-title", "body_key": "lesson-sixteenth-articulation-body",
+  "chart": "song/chart.harpchart", "prerequisites": ["syncopation-and-rests", "articulation"],
+  "pass_criteria": {"type": "technique", "technique": "clean-attack", "threshold": 0.65}
+}

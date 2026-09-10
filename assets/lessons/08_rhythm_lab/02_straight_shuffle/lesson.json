@@ -1,0 +1,6 @@
+{
+  "id": "straight-vs-shuffle", "unit": "rhythm-lab", "track": "time",
+  "title_key": "lesson-straight-vs-shuffle-title", "body_key": "lesson-straight-vs-shuffle-body",
+  "chart": "song/chart.harpchart", "prerequisites": ["eighth-note-triplets"],
+  "pass_criteria": {"type": "accuracy", "threshold": 0.7}
+}

@@ -944,6 +944,17 @@ lesson-track-vocabulary = Vocabulário
 lesson-track-improv = Improvisação
 lesson-track-navigation = Navegação
 lesson-unit-advanced = Eletivas avançadas
+lesson-unit-rhythm-lab = Laboratório de ritmo
+lesson-eighth-note-triplets-title = Tercinas de colcheia
+lesson-eighth-note-triplets-body = Divida cada pulso em três partes iguais. Conte “um-tri-pla” e mantenha os ataques igualmente espaçados antes de acelerar.
+lesson-straight-vs-shuffle-title = Reto e shuffle
+lesson-straight-vs-shuffle-body = Colcheias retas dividem o pulso igualmente. O shuffle usa a primeira e a terceira parte de uma tercina. Ouça a mudança e coloque a nota curta tarde o bastante para criar o swing.
+lesson-syncopation-rests-title = Síncopes e pausas
+lesson-syncopation-rests-body = Comece no “e” entre os tempos numerados. Continue contando em cada intervalo: uma pausa tem duração exata e dá forma ao próximo contratempo.
+lesson-sixteenth-articulation-title = Articulação de semicolcheias
+lesson-sixteenth-articulation-body = Encaixe quatro ataques limpos em um pulso. Use a língua leve e o ar constante para iniciar cada nota com clareza sem tensionar a mandíbula.
+lesson-tempo-stability-title = Estabilidade do andamento
+lesson-tempo-stability-body = Acompanhe o metrônomo enquanto ele acelera e desacelera. Ouça o próximo pulso antes de tocar e ajuste-se imediatamente em vez de manter o andamento anterior.
 lesson-high-blow-bends-title = Bends soprados agudos: furos 8–10
 lesson-high-blow-bends-body =
     O bend muda de direção no registro agudo: os furos 8, 9 e 10 fazem bend na nota soprada. Comece no 8. Sustente o 8 soprado, diminua o espaço dentro da boca e eleve o meio da língua até a altura cair meio tom. Mantenha o ar uniforme; soprar com mais força dificulta o controle.

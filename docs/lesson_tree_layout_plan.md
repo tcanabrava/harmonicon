@@ -158,9 +158,6 @@ required by `docs/lessons_plan.md`.
 
 ### Highest priority
 
-- **Rhythm progression:** eighth-note triplets, straight versus shuffle,
-  syncopation, rests, sixteenth-note articulation, and tempo stability. Reuse
-  timing windows, tempo maps, and fresh-attack scoring.
 - **Ear training:** match a heard note, repeat a hidden short phrase, identify
   up/down/same motion, and find a tonic or chord root. Start from the existing
   call-and-response path and progressively remove visual hints.

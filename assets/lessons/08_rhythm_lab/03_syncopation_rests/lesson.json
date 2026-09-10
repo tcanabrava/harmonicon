@@ -1,0 +1,6 @@
+{
+  "id": "syncopation-and-rests", "unit": "rhythm-lab", "track": "time",
+  "title_key": "lesson-syncopation-rests-title", "body_key": "lesson-syncopation-rests-body",
+  "chart": "song/chart.harpchart", "prerequisites": ["straight-vs-shuffle"],
+  "pass_criteria": {"type": "accuracy", "threshold": 0.7}
+}

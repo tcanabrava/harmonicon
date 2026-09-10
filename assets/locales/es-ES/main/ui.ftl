@@ -946,6 +946,17 @@ lesson-track-vocabulary = Vocabulario
 lesson-track-improv = Improvisación
 lesson-track-navigation = Navegación
 lesson-unit-advanced = Optativas avanzadas
+lesson-unit-rhythm-lab = Laboratorio de ritmo
+lesson-eighth-note-triplets-title = Tresillos de corchea
+lesson-eighth-note-triplets-body = Divide cada pulso en tres partes iguales. Cuenta «un-tre-si» y mantén cada ataque a la misma distancia antes de acelerar.
+lesson-straight-vs-shuffle-title = Recto frente a shuffle
+lesson-straight-vs-shuffle-body = Las corcheas rectas dividen el pulso por igual. El shuffle usa la primera y la tercera parte de un tresillo. Escucha el cambio y coloca la nota corta lo bastante tarde para crear el swing.
+lesson-syncopation-rests-title = Síncopas y silencios
+lesson-syncopation-rests-body = Empieza en el «y» entre los pulsos numerados. Sigue contando durante cada pausa: un silencio tiene una duración exacta y da forma al siguiente contratiempo.
+lesson-sixteenth-articulation-title = Articulación de semicorcheas
+lesson-sixteenth-articulation-body = Coloca cuatro ataques limpios dentro de un pulso. Usa una lengua ligera y aire constante para iniciar cada nota con claridad sin tensar la mandíbula.
+lesson-tempo-stability-title = Estabilidad del tempo
+lesson-tempo-stability-body = Sigue el metrónomo cuando acelera y desacelera. Escucha el siguiente pulso antes de tocar y ajústate de inmediato en vez de conservar el tempo anterior.
 lesson-high-blow-bends-title = Bends soplados agudos: agujeros 8–10
 lesson-high-blow-bends-body =
     El bend cambia de dirección en el registro agudo: los agujeros 8, 9 y 10 se doblan al soplar. Empieza con el 8. Mantén un 8 soplado estable, reduce el espacio dentro de la boca y eleva el centro de la lengua hasta bajar medio tono. Mantén el aire uniforme; soplar con más fuerza dificulta el control.

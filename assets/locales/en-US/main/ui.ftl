@@ -947,6 +947,17 @@ lesson-track-vocabulary = Vocabulary
 lesson-track-improv = Improvisation
 lesson-track-navigation = Navigation
 lesson-unit-advanced = Advanced electives
+lesson-unit-rhythm-lab = Rhythm lab
+lesson-eighth-note-triplets-title = Eighth-note triplets
+lesson-eighth-note-triplets-body = Divide every beat into three equal parts. Count “one-trip-let” and keep each attack evenly spaced before you speed up.
+lesson-straight-vs-shuffle-title = Straight versus shuffle
+lesson-straight-vs-shuffle-body = Straight eighths split the beat equally. Shuffle eighths use the first and third parts of a triplet. Listen for the change, then place each short note late enough to swing.
+lesson-syncopation-rests-title = Syncopation and rests
+lesson-syncopation-rests-body = Start on the “and” between numbered beats. Keep counting through every gap: a rest has an exact length and gives the next offbeat its shape.
+lesson-sixteenth-articulation-title = Sixteenth-note articulation
+lesson-sixteenth-articulation-body = Fit four clean attacks inside one beat. Use a light tongue and steady air so each note begins clearly without tightening your jaw.
+lesson-tempo-stability-title = Tempo stability
+lesson-tempo-stability-body = Stay with the metronome as it speeds up and slows down. Hear the next beat before you play and adjust immediately instead of carrying the old tempo forward.
 lesson-high-blow-bends-title = High Blow Bends: Holes 8–10
 lesson-high-blow-bends-body =
     The bend changes direction in the high register: holes 8, 9, and 10 bend on the blow note. Begin with hole 8. Hold a steady 8 blow, then make the space in your mouth smaller and raise the middle of your tongue until the pitch drops one semitone. Keep the air even; extra force makes control harder.
