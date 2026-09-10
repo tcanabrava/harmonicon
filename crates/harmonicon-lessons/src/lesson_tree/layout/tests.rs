@@ -79,10 +79,10 @@ fn crossings(l: &TreeLayout) -> usize {
     let mut n = 0;
     for (i, a) in l.edges.iter().enumerate() {
         for b in l.edges.iter().skip(i + 1) {
-            if a.from.0 == b.from.0 && a.to.0 == b.to.0 {
-                let starts_above = a.from.1 < b.from.1;
-                let ends_above = a.to.1 < b.to.1;
-                if starts_above != ends_above && a.from.1 != b.from.1 && a.to.1 != b.to.1 {
+            if a.from.1 == b.from.1 && a.to.1 == b.to.1 {
+                let starts_left = a.from.0 < b.from.0;
+                let ends_left = a.to.0 < b.to.0;
+                if starts_left != ends_left && a.from.0 != b.from.0 && a.to.0 != b.to.0 {
                     n += 1;
                 }
             }
@@ -290,7 +290,7 @@ fn a_cluster_root_hangs_off_its_own_unit_node() {
     let a1 = l.node("a1").unwrap();
     assert!(
         l.edges.iter().any(|x| {
-            x.kind == EdgeKind::Branch
+            x.kind == EdgeKind::UnitBranch
                 && x.from == (unit.column, unit.row)
                 && x.to == (a1.column, a1.row)
         }),
@@ -356,18 +356,18 @@ fn a_unit_the_player_has_not_reached_is_locked() {
 // ── placement inside a cluster ───────────────────────────────────────────
 
 #[test]
-fn a_column_is_the_lessons_depth_within_its_unit() {
-    // What makes this a tree rather than a grid: a node's horizontal
-    // position is where it sits in the curriculum, not its index in a row.
+fn a_row_is_the_lessons_depth_within_its_unit() {
+    // What makes this a course tree rather than a grid: vertical position
+    // records how many prerequisite steps came before a lesson.
     let e = [
         entry("root", "x", &[], false),
         entry("mid", "x", &["root"], false),
         entry("leaf", "x", &["mid"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    assert_eq!(l.node("root").unwrap().column, 0);
-    assert_eq!(l.node("mid").unwrap().column, 1);
-    assert_eq!(l.node("leaf").unwrap().column, 2);
+    assert_eq!(l.node("root").unwrap().row, CLUSTER_TOP_ROW);
+    assert_eq!(l.node("mid").unwrap().row, CLUSTER_TOP_ROW + 1.0);
+    assert_eq!(l.node("leaf").unwrap().row, CLUSTER_TOP_ROW + 2.0);
 }
 
 #[test]
@@ -381,16 +381,17 @@ fn depth_restarts_in_each_unit() {
         entry_in("beta", "b1", "t", &["a3"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let beta = l.unit("beta").unwrap().column;
+    let beta = l.unit("beta").unwrap();
     assert_eq!(
-        l.node("b1").unwrap().column,
-        beta,
-        "the first lesson of a unit starts that unit's own first column"
+        l.node("b1").unwrap().row,
+        CLUSTER_TOP_ROW,
+        "the first lesson of a unit starts at that unit's first depth"
     );
+    assert_eq!(l.node("b1").unwrap().column, beta.column);
 }
 
 #[test]
-fn a_node_always_sits_right_of_everything_it_depends_on_in_its_unit() {
+fn a_node_always_sits_below_everything_it_depends_on_in_its_unit() {
     let e = [
         entry("a", "t", &[], false),
         entry("b", "u", &["a"], false),
@@ -398,12 +399,12 @@ fn a_node_always_sits_right_of_everything_it_depends_on_in_its_unit() {
     ];
     let l = build(&e, &PlayerProfile::default());
     for edge in l.edges.iter().filter(|x| x.from.1 >= CLUSTER_TOP_ROW) {
-        assert!(edge.from.0 < edge.to.0, "edge points backwards: {edge:?}");
+        assert!(edge.from.1 < edge.to.1, "edge points upwards: {edge:?}");
     }
 }
 
 #[test]
-fn a_single_root_sits_alone_in_the_first_column() {
+fn a_single_root_sits_alone_in_the_first_lesson_row() {
     let e = [
         entry("start", "t", &[], false),
         entry("a", "t", &["start"], false),
@@ -413,15 +414,15 @@ fn a_single_root_sits_alone_in_the_first_column() {
     let first: Vec<&str> = l
         .nodes
         .iter()
-        .filter(|n| n.column == 0)
+        .filter(|n| n.row == CLUSTER_TOP_ROW)
         .map(|n| n.id.as_str())
         .collect();
     assert_eq!(first, vec!["start"]);
 }
 
 #[test]
-fn a_short_column_is_centred_against_a_tall_one() {
-    // Otherwise the root pins to the top corner and the cluster hangs off it.
+fn a_short_row_is_centred_against_a_wide_one() {
+    // Otherwise the root pins to the left corner and the cluster hangs off it.
     let e = [
         entry("root", "t", &[], false),
         entry("a", "t", &["root"], false),
@@ -429,16 +430,35 @@ fn a_short_column_is_centred_against_a_tall_one() {
         entry("c", "t", &["root"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let root_row = l.node("root").unwrap().row;
+    let root_column = l.node("root").unwrap().column;
     let children: Vec<f32> = ["a", "b", "c"]
         .iter()
-        .map(|id| l.node(id).unwrap().row)
+        .map(|id| l.node(id).unwrap().column)
         .collect();
     let mean = children.iter().sum::<f32>() / 3.0;
     assert!(
-        (root_row - mean).abs() < 0.01,
-        "root at {root_row} should sit level with its children's mean {mean}"
+        (root_column - mean).abs() < 0.01,
+        "root at {root_column} should be centred over its children's mean {mean}"
     );
+}
+
+#[test]
+fn a_unit_is_centred_over_its_widest_lesson_row() {
+    let e = [
+        entry("root", "t", &[], false),
+        entry("a", "t", &["root"], false),
+        entry("b", "t", &["root"], false),
+        entry("c", "t", &["root"], false),
+        entry("d", "t", &["root"], false),
+    ];
+    let l = build(&e, &PlayerProfile::default());
+    let children: Vec<f32> = ["a", "b", "c", "d"]
+        .iter()
+        .map(|id| l.node(id).unwrap().column)
+        .collect();
+    let midpoint = (children[0] + children[3]) / 2.0;
+    assert_eq!(l.unit("u").unwrap().column, midpoint);
+    assert_eq!(l.node("root").unwrap().column, midpoint);
 }
 
 #[test]
@@ -452,7 +472,7 @@ fn no_lesson_is_ever_level_with_the_spine() {
 }
 
 #[test]
-fn siblings_in_one_column_never_share_a_row() {
+fn siblings_in_one_depth_row_never_share_a_column() {
     let e = [
         entry("root", "t", &[], false),
         entry("a", "t", &["root"], false),
@@ -460,15 +480,15 @@ fn siblings_in_one_column_never_share_a_row() {
         entry("c", "t", &["root"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let mut rows: Vec<f32> = l
+    let mut columns: Vec<f32> = l
         .nodes
         .iter()
-        .filter(|n| n.column == 1)
-        .map(|n| n.row)
+        .filter(|n| n.row == CLUSTER_TOP_ROW + 1.0)
+        .map(|n| n.column)
         .collect();
-    rows.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    for w in rows.windows(2) {
-        assert!(w[1] - w[0] >= 1.0, "rows overlap: {rows:?}");
+    columns.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    for w in columns.windows(2) {
+        assert!(w[1] - w[0] >= 1.0, "columns overlap: {columns:?}");
     }
 }
 
@@ -527,8 +547,8 @@ fn columns_and_rows_size_the_canvas() {
         entry("b", "t", &["root"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    assert_eq!(l.columns(), 2);
-    // One spine row plus two rows of lessons.
+    assert_eq!(l.columns(), 2.0);
+    // One spine row plus two dependency-depth rows.
     assert_eq!(l.rows(), 3.0);
 }
 
@@ -538,7 +558,12 @@ fn the_canvas_is_sized_for_the_spine_even_with_no_lessons_under_it() {
     // the canvas too narrow for its own spine.
     let e = [entry("a", "t", &[], false)];
     let l = build(&e, &PlayerProfile::default());
-    assert!(l.columns() >= l.units.iter().map(|u| u.column + 1).max().unwrap());
+    let spine_width = l
+        .units
+        .iter()
+        .map(|u| u.column + 1.0)
+        .fold(0.0_f32, f32::max);
+    assert!(l.columns() >= spine_width);
 }
 
 #[test]
@@ -551,7 +576,7 @@ fn every_prerequisite_becomes_an_edge_between_placed_positions() {
     let l = build(&e, &PlayerProfile::default());
     // root→mid, root→leaf, mid→leaf, plus the unit hanging onto root.
     assert_eq!(l.edges.len(), 4);
-    let placed: Vec<(usize, f32)> = l
+    let placed: Vec<(f32, f32)> = l
         .nodes
         .iter()
         .map(|n| (n.column, n.row))
@@ -581,13 +606,13 @@ fn a_lesson_in_the_graph_but_not_the_catalogue_is_skipped() {
     assert!(l.node("b").is_none());
     // With nothing left to depend on, 'c' becomes a root of its cluster
     // rather than keeping a column it can no longer be connected to.
-    assert_eq!(l.node("c").unwrap().column, 0);
+    assert_eq!(l.node("c").unwrap().row, CLUSTER_TOP_ROW);
     // 'c' is still locked, and still says what it wants — the reasoning
     // survives the hole in the drawing.
     assert_eq!(l.node("c").unwrap().state, NodeState::Locked);
     assert_eq!(l.node("c").unwrap().unmet, ["b"]);
     // Both are cluster roots, so both hang off the unit and nothing dangles.
-    assert!(l.edges.iter().all(|x| x.kind == EdgeKind::Branch));
+    assert!(l.edges.iter().all(|x| x.kind == EdgeKind::UnitBranch));
     assert_eq!(l.edges.len(), 2);
 }
 
@@ -597,6 +622,6 @@ fn an_empty_curriculum_lays_out_to_nothing() {
     assert!(l.nodes.is_empty());
     assert!(l.units.is_empty());
     assert!(l.edges.is_empty());
-    assert_eq!(l.columns(), 0);
+    assert_eq!(l.columns(), 0.0);
     assert_eq!(l.rows(), 0.0);
 }

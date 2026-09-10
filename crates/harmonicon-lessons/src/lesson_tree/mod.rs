@@ -20,12 +20,16 @@
 //! page builds a two-axis `spawn_scroll_area_xy` instead of taking
 //! `spawn_menu_root`'s vertical one.
 //!
-//! **Edges are real curves, and need no shader.** `bevy_math`'s
-//! [`CubicBezier`] gives the curve, `iter_positions` samples it, and each
-//! sample pair becomes a short `Node` rotated by `UiTransform::rotation` —
-//! a first-class UI field in Bevy 0.19. `bevy_ui` has no line primitive,
-//! which is a fact about *drawing*; it says nothing about whether the
-//! engine can compute a curve, and it can.
+//! **An edge runs straight from one node's boundary to the other's**, along
+//! the line joining their centres, and each end is clipped by the radius of
+//! the node it actually touches — see [`edge_span`]. Units and lessons are
+//! different sizes, so a single shared radius would leave a spine edge
+//! starting inside a unit's ring and a branch edge stopping short of the
+//! lesson it points at.
+//!
+//! **That takes no shader and no mesh.** A straight run is one `Node`
+//! rotated by `UiTransform::rotation`, a first-class UI field in Bevy 0.19.
+//! `bevy_ui` has no line primitive, but a rotated rectangle is one.
 //!
 //! **There is no list view any more.** This replaced it rather than sitting
 //! beside it, so a lesson has one home and unit gating is stated in one
@@ -35,7 +39,6 @@
 mod layout;
 
 use bevy::input_focus::tab_navigation::TabIndex;
-use bevy::math::cubic_splines::CubicBezier;
 use bevy::prelude::*;
 use bevy::ui::UiTransform;
 use bevy::ui_widgets::{Activate, Button as WidgetButton};
@@ -60,8 +63,9 @@ use std::collections::{HashMap, HashSet};
 
 /// Node diameter.
 const NODE_PX: f32 = 64.0;
-/// Column pitch — wide enough that a curve has room to bend before it
-/// arrives, which is what stops the edges reading as straight lines.
+/// Column pitch. Must stay wider than `LABEL_PX`, or two neighbours in the
+/// same row have their titles run together — the pitch is what separates
+/// the *labels*, the nodes themselves being far narrower.
 const COL_PX: f32 = 150.0;
 /// Row pitch. Tall enough for the node, its pips and two lines of title
 /// underneath without the next row's art crowding the text.
@@ -75,20 +79,17 @@ const MARGIN_PX: f32 = 90.0;
 /// labels can't run together, and small enough that a long title wraps to
 /// two lines rather than three.
 const LABEL_PX: f32 = 132.0;
+/// Two neighbours in one depth row sit exactly a column apart and each
+/// label is centred on its node, so the pitch is the only thing keeping
+/// their titles from running together.
+const _: () = assert!(COL_PX > LABEL_PX);
 const LABEL_FONT_PX: f32 = 11.0;
 
 /// Edge thickness.
 const EDGE_PX: f32 = 3.5;
-/// Curve pixels per straight piece. **Resolution scales with length**, the
-/// way Bevy's own curve example does it — a fixed segment count made a long
-/// edge's pieces longer than they were thick, and with rounded caps that
-/// read as a string of beads rather than a line.
-const EDGE_PX_PER_SEGMENT: f32 = 4.0;
-const EDGE_MIN_SEGMENTS: usize = 24;
-/// How far the control points reach horizontally, as a fraction of the
-/// gap. Flat tangents at both ends are what make the curve leave and
-/// arrive horizontally rather than pointing corner to corner.
-const EDGE_TENSION: f32 = 0.55;
+/// Clearance two node boundaries need before an edge between them is worth
+/// drawing at all.
+const EDGE_MIN_LENGTH_PX: f32 = 1.0;
 
 const PIP_PX: f32 = 9.0;
 const LOCKED_TINT: Color = Color::srgba(0.35, 0.35, 0.42, 0.55);
@@ -161,9 +162,9 @@ fn track_color(track: &str) -> Color {
 /// *above* their nodes on row 0 and would otherwise be cut off by the top
 /// of the canvas — a lesson's title hangs below it, so nothing else needs
 /// the space.
-fn node_centre(column: usize, row: f32) -> Vec2 {
+fn node_centre(column: f32, row: f32) -> Vec2 {
     Vec2::new(
-        MARGIN_PX + column as f32 * COL_PX + NODE_PX / 2.0,
+        MARGIN_PX + column * COL_PX + NODE_PX / 2.0,
         MARGIN_PX + SPINE_LABEL_PX + row * ROW_PX + NODE_PX / 2.0,
     )
 }
@@ -259,7 +260,7 @@ pub(crate) fn setup_lesson_tree(
     let canvas = commands
         .spawn(Node {
             position_type: PositionType::Relative,
-            width: Val::Px(MARGIN_PX * 2.0 + tree.columns() as f32 * COL_PX),
+            width: Val::Px(MARGIN_PX * 2.0 + tree.columns() * COL_PX),
             height: Val::Px(MARGIN_PX * 2.0 + SPINE_LABEL_PX + tree.rows() * ROW_PX),
             // Every node is positioned absolutely inside this box, so it
             // has to keep the height it asks for. Left to shrink — the
@@ -276,14 +277,24 @@ pub(crate) fn setup_lesson_tree(
     // Edges first, so node art always sits on top of its connectors.
     commands.entity(canvas).with_children(|parent| {
         for edge in &tree.edges {
-            let (thickness, color) = match edge.kind {
-                EdgeKind::Spine => (UNIT_EDGE_PX, SPINE_COLOR),
-                EdgeKind::Branch => (EDGE_PX, EDGE_COLOR),
+            // `EdgeKind` names which sort of node sits at each end, which is
+            // what decides where the line has to stop — a unit's ring is
+            // `UNIT_PX` across, a lesson's `NODE_PX`.
+            let (from_radius, to_radius, thickness, color) = match edge.kind {
+                EdgeKind::Spine => (UNIT_PX / 2.0, UNIT_PX / 2.0, UNIT_EDGE_PX, SPINE_COLOR),
+                EdgeKind::UnitBranch => (UNIT_PX / 2.0, NODE_PX / 2.0, EDGE_PX, EDGE_COLOR),
+                EdgeKind::Branch => (NODE_PX / 2.0, NODE_PX / 2.0, EDGE_PX, EDGE_COLOR),
             };
             spawn_edge(
                 parent,
-                node_centre(edge.from.0, edge.from.1),
-                node_centre(edge.to.0, edge.to.1),
+                Endpoint {
+                    centre: node_centre(edge.from.0, edge.from.1),
+                    radius: from_radius,
+                },
+                Endpoint {
+                    centre: node_centre(edge.to.0, edge.to.1),
+                    radius: to_radius,
+                },
                 thickness,
                 color,
                 edge.unit_id.as_deref(),
@@ -320,76 +331,81 @@ pub(crate) fn rebuild_on_lessons_rescanned(
     }
 }
 
-/// One prerequisite edge, as a cubic Bezier.
+/// One end of an edge: where a node sits, and how far its art reaches from
+/// that centre.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Endpoint {
+    centre: Vec2,
+    radius: f32,
+}
+
+/// The visible run of an edge: the segment of the line joining two centres
+/// that lies *between* the two nodes' boundaries.
 ///
-/// The control points sit level with each end and reach toward the other,
-/// so the curve leaves its source horizontally and arrives horizontally —
-/// the shape that reads as flow rather than as a corner. Sampled with
-/// `bevy_math`'s own `iter_positions` and emitted as short rotated
-/// segments; `BorderRadius::MAX` rounds each one so the joins don't show.
+/// Both ends are pulled back along that same line, each by its own radius,
+/// so the edge points at what it connects from wherever that happens to be
+/// — below, above, or off to one side. `None` when the boundaries already
+/// meet and there is nothing left to draw.
+fn edge_span(from: Endpoint, to: Endpoint) -> Option<(Vec2, Vec2)> {
+    let offset = to.centre - from.centre;
+    let gap = offset.length();
+    // Tested against the gap rather than the resulting segment's length:
+    // two nodes nearer than their combined radii would pull each end past
+    // the other, and a backwards segment has a perfectly respectable
+    // positive length while running through both nodes it claims to join.
+    // This also covers two centres landing on the same point.
+    if gap < from.radius + to.radius + EDGE_MIN_LENGTH_PX {
+        return None;
+    }
+    let direction = offset / gap;
+    Some((
+        from.centre + direction * from.radius,
+        to.centre - direction * to.radius,
+    ))
+}
+
+/// One edge, as a single rotated rectangle.
+///
+/// A straight run needs no sampling and no joins, so there is exactly one
+/// node per edge and no seam anywhere along it.
 fn spawn_edge(
     parent: &mut ChildSpawnerCommands,
-    from: Vec2,
-    to: Vec2,
+    from: Endpoint,
+    to: Endpoint,
     thickness: f32,
     color: Color,
     unit_id: Option<&str>,
 ) {
-    // Start and end at the nodes' edges rather than their centres, so a
-    // curve doesn't run underneath the art it connects.
-    let radius = NODE_PX / 2.0;
-    let start = Vec2::new(from.x + radius, from.y);
-    let end = Vec2::new(to.x - radius, to.y);
-    let reach = ((end.x - start.x) * EDGE_TENSION).max(24.0);
+    let Some((start, end)) = edge_span(from, to) else {
+        return;
+    };
+    let delta = end - start;
+    let length = delta.length();
+    let mid = (start + end) / 2.0;
 
-    let curve = CubicBezier::new([[
-        start,
-        Vec2::new(start.x + reach, start.y),
-        Vec2::new(end.x - reach, end.y),
-        end,
-    ]])
-    .to_curve();
-    let Ok(curve) = curve else { return };
-
-    // Scale the sampling with how far the curve actually travels, so a long
-    // sweep is no coarser than a short hop.
-    let span = (end - start).length() + (end.y - start.y).abs();
-    let segments = ((span / EDGE_PX_PER_SEGMENT) as usize).max(EDGE_MIN_SEGMENTS);
-
-    let points: Vec<Vec2> = curve.iter_positions(segments).collect();
-    for pair in points.windows(2) {
-        let (a, b) = (pair[0], pair[1]);
-        let delta = b - a;
-        let length = delta.length();
-        if length < 0.01 {
-            continue;
-        }
-        // Overlap neighbours by a whole thickness: consecutive rotated
-        // rectangles leave a wedge at every joint where the angle changes,
-        // and overlapping is what closes it without a mitre calculation.
-        let drawn = length + thickness;
-        let mid = (a + b) / 2.0;
-        let mut segment = parent.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                // Positioned by its own top-left, so shift back by half the
-                // segment to centre it on the midpoint before rotating —
-                // `UiTransform::rotation` turns a node about its centre.
-                left: Val::Px(mid.x - drawn / 2.0),
-                top: Val::Px(mid.y - thickness / 2.0),
-                width: Val::Px(drawn),
-                height: Val::Px(thickness),
-                ..default()
-            },
-            UiTransform {
-                rotation: Rot2::radians(delta.y.atan2(delta.x)),
-                ..default()
-            },
-            BackgroundColor(color),
-        ));
-        if let Some(unit_id) = unit_id {
-            segment.insert(ClusterMember(unit_id.to_string()));
-        }
+    let mut segment = parent.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            // Positioned by its own top-left, so shift back by half its
+            // extent to centre it on the midpoint before rotating —
+            // `UiTransform::rotation` turns a node about its centre.
+            left: Val::Px(mid.x - length / 2.0),
+            top: Val::Px(mid.y - thickness / 2.0),
+            width: Val::Px(length),
+            height: Val::Px(thickness),
+            // Rounds the two ends, which softens where a thick spine edge
+            // meets a ring.
+            border_radius: BorderRadius::MAX,
+            ..default()
+        },
+        UiTransform {
+            rotation: Rot2::radians(delta.y.atan2(delta.x)),
+            ..default()
+        },
+        BackgroundColor(color),
+    ));
+    if let Some(unit_id) = unit_id {
+        segment.insert(ClusterMember(unit_id.to_string()));
     }
 }
 
@@ -701,7 +717,7 @@ mod tests {
         // one has to fit between the node's centre and the canvas edge —
         // otherwise Unit 1's title is clipped, which is exactly what a
         // narrower margin did.
-        let first = node_centre(0, 0.0);
+        let first = node_centre(0.0, 0.0);
         assert!(
             first.x - UNIT_LABEL_PX / 2.0 >= 0.0,
             "a unit title would start at {} px, off the canvas",
@@ -711,10 +727,97 @@ mod tests {
     }
 
     #[test]
+    fn a_fractional_column_lands_between_two_whole_ones() {
+        // A unit centres over its cluster, so its column is a half-step
+        // whenever the widest lesson row holds an even number of nodes.
+        // `node_centre` therefore has to interpolate across the grid rather
+        // than index into it.
+        let left = node_centre(0.0, 0.0);
+        let right = node_centre(1.0, 0.0);
+        let middle = node_centre(0.5, 0.0);
+        assert_eq!(middle.x, (left.x + right.x) / 2.0);
+        assert_eq!(middle.y, left.y);
+    }
+
+    #[test]
     fn the_top_inset_leaves_room_for_a_unit_title_above_the_spine() {
         // Unit titles are the only labels drawn *above* their node.
-        let spine = node_centre(0, 0.0);
+        let spine = node_centre(0.0, 0.0);
         assert!(spine.y - UNIT_PX / 2.0 - UNIT_FONT_PX * 2.0 >= 0.0);
+    }
+
+    fn lesson(column: f32, row: f32) -> Endpoint {
+        Endpoint {
+            centre: node_centre(column, row),
+            radius: NODE_PX / 2.0,
+        }
+    }
+
+    fn unit(column: f32, row: f32) -> Endpoint {
+        Endpoint {
+            centre: node_centre(column, row),
+            radius: UNIT_PX / 2.0,
+        }
+    }
+
+    #[test]
+    fn an_edge_leaves_the_bottom_of_a_parent_and_arrives_at_the_top_of_its_child() {
+        // The tree flows downward, so a child directly below its parent is
+        // the ordinary case: the line has to run down the gap between them
+        // rather than out of either one's flank.
+        let (from, to) = (lesson(2.5, 1.0), lesson(2.5, 2.0));
+        let (start, end) = edge_span(from, to).expect("nodes a whole row apart");
+        assert_eq!(start, from.centre + Vec2::Y * NODE_PX / 2.0);
+        assert_eq!(end, to.centre - Vec2::Y * NODE_PX / 2.0);
+    }
+
+    #[test]
+    fn an_edge_points_the_way_its_centres_do() {
+        // The invariant that keeps a line off the art it connects: whatever
+        // direction the child lies in, both ends move along *that* line. A
+        // child down and to the left is left by the parent's lower-left.
+        let (from, to) = (lesson(2.5, 2.0), lesson(0.0, 3.0));
+        let (start, end) = edge_span(from, to).expect("nodes a whole row apart");
+        let along = (end - start).normalize();
+        let centres = (to.centre - from.centre).normalize();
+        assert!(
+            along.distance(centres) < 1.0e-5,
+            "edge runs {along} but its nodes lie {centres} apart",
+        );
+        assert!(start.x < from.centre.x, "the edge left the wrong side");
+        assert!(start.y > from.centre.y, "the edge left the wrong side");
+    }
+
+    #[test]
+    fn each_end_is_clipped_by_the_radius_of_the_node_it_touches() {
+        // A spine edge meets two unit rings; a unit branch meets a ring at
+        // the top and a lesson at the bottom. One shared radius would leave
+        // the wider node's end buried inside its own art.
+        let (spine_start, spine_end) =
+            edge_span(unit(0.0, 0.0), unit(7.0, 0.0)).expect("two units apart on the spine");
+        assert_eq!(spine_start.x - node_centre(0.0, 0.0).x, UNIT_PX / 2.0);
+        assert_eq!(node_centre(7.0, 0.0).x - spine_end.x, UNIT_PX / 2.0);
+
+        let (branch_start, branch_end) =
+            edge_span(unit(2.5, 0.0), lesson(2.5, 1.0)).expect("a unit above its root lesson");
+        assert_eq!(branch_start.y - node_centre(2.5, 0.0).y, UNIT_PX / 2.0);
+        assert_eq!(node_centre(2.5, 1.0).y - branch_end.y, NODE_PX / 2.0);
+    }
+
+    #[test]
+    fn nodes_too_close_to_separate_draw_no_edge() {
+        // Nearer than their combined radii, the pull-backs would cross and
+        // the segment would run backwards through both nodes.
+        let touching = Endpoint {
+            centre: Vec2::new(100.0, 100.0),
+            radius: 40.0,
+        };
+        let overlapping = Endpoint {
+            centre: Vec2::new(110.0, 100.0),
+            radius: 40.0,
+        };
+        assert_eq!(edge_span(touching, overlapping), None);
+        assert_eq!(edge_span(touching, touching), None);
     }
 
     #[test]

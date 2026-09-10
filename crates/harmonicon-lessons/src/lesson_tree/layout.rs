@@ -10,8 +10,8 @@
 //! **Two levels, not one.** Across the top runs a spine of *unit* nodes —
 //! Unit 1, Unit 2, … — each opening once enough of the one before it is
 //! passed ([`harmonicon_song::lessons::units`]). Under each hangs that
-//! unit's own lessons, laid out as their own small layered graph: column is
-//! depth *within the unit*, row is chosen to keep edges untangled, and
+//! unit's own lessons, laid out as their own small layered graph: row is
+//! depth *within the unit*, column is chosen to keep edges untangled, and
 //! track is colour rather than row.
 //!
 //! **That two-level shape is what makes the drawing readable**, and it is
@@ -45,7 +45,7 @@ const ORDERING_PASSES: usize = 4;
 
 /// Blank columns between one unit's cluster and the next, so the units read
 /// as separate groups rather than one continuous field of nodes.
-const UNIT_GAP_COLUMNS: usize = 1;
+const UNIT_GAP_COLUMNS: f32 = 1.0;
 
 /// The row the spine runs along. Everything else hangs below it, which is
 /// what keeps the spine's own edges horizontal and crossing nothing.
@@ -72,7 +72,7 @@ pub struct PlacedUnit {
     pub id: String,
     /// Fluent key — `lesson-unit-<id>`, the key the curriculum already uses.
     pub title_key: String,
-    pub column: usize,
+    pub column: f32,
     pub row: f32,
     /// Whether the player has reached this unit yet.
     pub locked: bool,
@@ -94,12 +94,11 @@ pub struct PlacedNode {
     /// The track this lesson belongs to. Drawn as colour rather than as a
     /// row, so grouping survives without constraining position.
     pub track: String,
-    /// Depth *within this lesson's unit*, offset by where that unit's
-    /// cluster starts. A node always sits right of everything it depends on
-    /// inside its own unit.
-    pub column: usize,
-    /// Vertical position, in node-heights. Fractional so a short layer can
-    /// be centred against a tall one.
+    /// Horizontal position. Fractional so a short prerequisite row can be
+    /// centred over a wider row below it.
+    pub column: f32,
+    /// Dependency depth within this lesson's unit. A node always sits below
+    /// everything it depends on inside its own unit.
     pub row: f32,
     pub state: NodeState,
     /// 0..1, how much of the training ladder is passed.
@@ -115,20 +114,27 @@ pub struct PlacedNode {
 }
 
 /// What an edge means, which is also how it should be drawn.
+///
+/// The three cases are the three combinations of endpoint a drawn edge can
+/// meet, which is the part the renderer cannot work out for itself: a unit
+/// node and a lesson node are different sizes, so an edge has to know which
+/// one it touches at each end to stop at the right boundary.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EdgeKind {
-    /// Unit to unit, along the spine.
+    /// Unit to unit, along the spine. A unit node at both ends.
     Spine,
-    /// A unit down into its own lessons, or one lesson to another inside a
-    /// unit.
+    /// A unit down into one of its own cluster's roots. A unit node at the
+    /// top, a lesson at the bottom.
+    UnitBranch,
+    /// One lesson to another inside a unit. A lesson node at both ends.
     Branch,
 }
 
 /// An edge, in grid coordinates.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Edge {
-    pub from: (usize, f32),
-    pub to: (usize, f32),
+    pub from: (f32, f32),
+    pub to: (f32, f32),
     pub kind: EdgeKind,
     /// Unit whose cluster owns this edge. Spine edges stay visible and have
     /// no owner.
@@ -144,10 +150,12 @@ pub struct TreeLayout {
 
 impl TreeLayout {
     /// Columns the canvas needs — one past the rightmost node.
-    pub fn columns(&self) -> usize {
-        let lessons = self.nodes.iter().map(|n| n.column + 1).max().unwrap_or(0);
-        let units = self.units.iter().map(|u| u.column + 1).max().unwrap_or(0);
-        lessons.max(units)
+    pub fn columns(&self) -> f32 {
+        self.nodes
+            .iter()
+            .map(|n| n.column + 1.0)
+            .chain(self.units.iter().map(|u| u.column + 1.0))
+            .fold(0.0_f32, f32::max)
     }
 
     /// Rows the canvas needs, in node-heights.
@@ -208,7 +216,7 @@ pub fn layout(
             unit_id: entry.manifest.unit.clone(),
             title_key: entry.manifest.title_key.clone(),
             track: graph_node.track.clone(),
-            column: 0,
+            column: 0.0,
             row: 0.0,
             // A lesson needs both gates open: its own prerequisites, and
             // the unit holding it.
@@ -263,7 +271,7 @@ pub fn layout(
     }
 
     let mut units: Vec<PlacedUnit> = Vec::new();
-    let mut cursor = 0usize;
+    let mut cursor = 0.0_f32;
     for (ix, unit) in chain.units().iter().enumerate() {
         let members: Vec<usize> = (0..nodes.len())
             .filter(|&n| unit_of_node[n] == ix)
@@ -289,8 +297,8 @@ pub fn layout(
             local.insert(n, depth);
         }
 
-        let width = local.values().map(|d| d + 1).max().unwrap_or(1);
-        let mut layers: Vec<Vec<usize>> = vec![Vec::new(); width];
+        let depth_count = local.values().map(|d| d + 1).max().unwrap_or(1);
+        let mut layers: Vec<Vec<usize>> = vec![Vec::new(); depth_count];
         for &n in &members {
             layers[local[&n]].push(n);
         }
@@ -302,27 +310,28 @@ pub fn layout(
         }
         order_layers(&mut layers, &predecessors, &successors);
 
-        // Centre every layer against the tallest, so a cluster hangs
-        // balanced rather than pinned to the top.
+        // Each layer is a prerequisite depth row. Centre shorter rows
+        // against the widest so the unit can sit over the cluster's true
+        // midpoint instead of over its first lesson.
         let tallest = layers.iter().map(Vec::len).max().unwrap_or(0) as f32;
-        for (column, layer) in layers.iter().enumerate() {
+        for (depth, layer) in layers.iter().enumerate() {
             let offset = (tallest - layer.len() as f32) / 2.0;
-            for (row, &n) in layer.iter().enumerate() {
-                nodes[n].column = cursor + column;
-                nodes[n].row = CLUSTER_TOP_ROW + offset + row as f32;
+            for (column, &n) in layer.iter().enumerate() {
+                nodes[n].column = cursor + offset + column as f32;
+                nodes[n].row = CLUSTER_TOP_ROW + depth as f32;
             }
         }
 
         units.push(PlacedUnit {
             id: unit.id.clone(),
             title_key: unit.title_key.clone(),
-            column: cursor,
+            column: cursor + (tallest - 1.0) / 2.0,
             row: SPINE_ROW,
             locked: !chain.is_unlocked(ix, &passed),
             completed: chain.completed(ix, &passed),
             required: chain.required(ix),
         });
-        cursor += width + UNIT_GAP_COLUMNS;
+        cursor += tallest.max(1.0) + UNIT_GAP_COLUMNS;
     }
 
     let mut edges: Vec<Edge> = Vec::new();
@@ -345,7 +354,7 @@ pub fn layout(
                 edges.push(Edge {
                     from: (unit.column, unit.row),
                     to: (nodes[to].column, nodes[to].row),
-                    kind: EdgeKind::Branch,
+                    kind: EdgeKind::UnitBranch,
                     unit_id: Some(unit.id.clone()),
                 });
             }
