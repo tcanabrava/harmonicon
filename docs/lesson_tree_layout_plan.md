@@ -45,7 +45,9 @@ visits, the chevron shows the current state, and all lesson art and local edges
 animate over 220 ms. Once a close animation finishes, the pure layout reclaims
 that cluster's columns and recomputes the canvas. The toggled unit keeps its
 horizontal screen position across that rebuild, clamped at the new scroll
-bounds. Smooth neighboring-unit motion and reduced-motion behavior remain open.
+bounds. Lesson buttons leave pointer and keyboard interaction as soon as their
+unit starts closing. Smooth neighboring-unit motion and reduced-motion behavior
+remain open.
 
 Make every unit node an accessible button with expanded/collapsed state. Keep
 the current unit, the first available unit, and units containing available

@@ -42,7 +42,7 @@ use accesskit::{Node as AccessibilityKitNode, Role};
 use bevy::a11y::AccessibilityNode;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
-use bevy::ui::{ComputedNode, ScrollPosition, UiTransform};
+use bevy::ui::{ComputedNode, InteractionDisabled, ScrollPosition, UiTransform};
 use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use bevy_fluent::Localization;
 
@@ -769,12 +769,22 @@ fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode
 /// Advances all unit transitions and applies their eased scale/visibility to
 /// every entity in the corresponding cluster.
 pub(crate) fn animate_unit_expansion(
+    mut commands: Commands,
     time: Res<Time>,
     collapsed: Res<CollapsedUnits>,
     mut expansions: ResMut<UnitExpansions>,
     mut members: Query<(&ClusterMember, &mut UiTransform, &mut Visibility)>,
     mut chevrons: Query<(&UnitChevron, &mut Text)>,
     mut unit_buttons: Query<(&UnitButton, &mut AccessibilityNode)>,
+    mut lesson_buttons: Query<
+        (
+            Entity,
+            &ClusterMember,
+            &mut TabIndex,
+            Has<InteractionDisabled>,
+        ),
+        With<WidgetButton>,
+    >,
 ) {
     let step = time.delta_secs() / COLLAPSE_SECONDS;
     for (id, amount) in &mut expansions.0 {
@@ -804,6 +814,20 @@ pub(crate) fn animate_unit_expansion(
 
     for (button, mut accessibility) in &mut unit_buttons {
         accessibility.set_expanded(!collapsed.0.contains(&button.0));
+    }
+
+    for (entity, member, mut tab_index, disabled) in &mut lesson_buttons {
+        let closing = collapsed.0.contains(&member.0);
+        tab_index.0 = if closing { -1 } else { 0 };
+        match (closing, disabled) {
+            (true, false) => {
+                commands.entity(entity).insert(InteractionDisabled);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<InteractionDisabled>();
+            }
+            _ => {}
+        }
     }
 }
 
