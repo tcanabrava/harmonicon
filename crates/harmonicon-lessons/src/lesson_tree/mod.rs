@@ -40,7 +40,7 @@ mod layout;
 
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
-use bevy::ui::UiTransform;
+use bevy::ui::{ComputedNode, ScrollPosition, UiTransform};
 use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use bevy_fluent::Localization;
 
@@ -132,6 +132,18 @@ pub(crate) struct UnitExpansions(HashMap<String, f32>);
 #[derive(Resource, Default)]
 pub(crate) struct PendingCompaction(HashSet<String>);
 
+/// Keeps the unit that triggered a same-page rebuild at the same horizontal
+/// screen coordinate once the new canvas has been measured.
+#[derive(Resource, Default)]
+pub(crate) struct PendingViewportAnchor {
+    unit_id: Option<String>,
+    screen_x: f32,
+    canvas_x: Option<f32>,
+}
+
+#[derive(Component)]
+pub(crate) struct LessonTreeScroller;
+
 /// Any lesson node, label, mastery pip, or branch edge owned by a unit.
 #[derive(Component)]
 pub(crate) struct ClusterMember(String);
@@ -179,6 +191,7 @@ pub(crate) fn setup_lesson_tree(
     lessons: Res<AvailableLessons>,
     profile: Res<PlayerProfile>,
     collapsed: Res<CollapsedUnits>,
+    mut anchor: ResMut<PendingViewportAnchor>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     asset_server: Res<AssetServer>,
@@ -225,6 +238,14 @@ pub(crate) fn setup_lesson_tree(
         }
     };
 
+    if let Some(unit_id) = anchor.unit_id.as_deref() {
+        anchor.canvas_x = tree
+            .units
+            .iter()
+            .find(|unit| unit.id == unit_id)
+            .map(|unit| node_centre(unit.column, unit.row).x);
+    }
+
     let placeholder: Handle<Image> = asset_server.load("icons/lesson_placeholder.png");
 
     // A unit discovered while the app is running starts expanded. Existing
@@ -262,6 +283,7 @@ pub(crate) fn setup_lesson_tree(
     commands.entity(root).with_children(|parent| {
         scroller = spawn_scroll_area_xy(parent, SCROLLBAR_THUMB, SCROLLBAR_TRACK);
     });
+    commands.entity(scroller).insert(LessonTreeScroller);
 
     let canvas = commands
         .spawn(Node {
@@ -447,7 +469,13 @@ fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &
             move |_: On<Activate>,
                   mut collapsed: ResMut<CollapsedUnits>,
                   mut pending: ResMut<PendingCompaction>,
+                  mut anchor: ResMut<PendingViewportAnchor>,
+                  scroller: Query<&ScrollPosition, With<LessonTreeScroller>>,
                   mut page: ResMut<NextState<MenuPage>>| {
+                let scroll_x = scroller.iter().next().map_or(0.0, |position| position.x);
+                anchor.unit_id = Some(unit_id.clone());
+                anchor.screen_x = centre.x - scroll_x;
+                anchor.canvas_x = None;
                 if collapsed.0.remove(&unit_id) {
                     pending.0.remove(&unit_id);
                     // Expand from the compact layout first; the existing zero
@@ -512,6 +540,38 @@ fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &
         ))
         .id();
     commands.entity(canvas).add_child(label);
+}
+
+/// Applies a pending anchor after Bevy has measured the replacement scroll
+/// area, clamping it when the compact canvas no longer has enough overflow to
+/// keep the unit at its previous screen coordinate.
+pub(crate) fn restore_viewport_anchor(
+    mut anchor: ResMut<PendingViewportAnchor>,
+    mut scroller: Query<(&mut ScrollPosition, &ComputedNode), With<LessonTreeScroller>>,
+) {
+    let Some(canvas_x) = anchor.canvas_x else {
+        return;
+    };
+    let Some((mut position, computed)) = scroller.iter_mut().next() else {
+        return;
+    };
+    if computed.size().x <= 0.0 || computed.content_size().x <= 0.0 {
+        return;
+    }
+
+    position.x = anchored_scroll(
+        canvas_x,
+        anchor.screen_x,
+        computed.size().x,
+        computed.content_size().x,
+    );
+    anchor.unit_id = None;
+    anchor.canvas_x = None;
+}
+
+fn anchored_scroll(canvas_x: f32, screen_x: f32, viewport_width: f32, content_width: f32) -> f32 {
+    let max_scroll = (content_width - viewport_width).max(0.0);
+    (canvas_x - screen_x).clamp(0.0, max_scroll)
 }
 
 /// Track, title, and — for a locked lesson — what it is still waiting on.
@@ -862,5 +922,17 @@ mod tests {
         assert_eq!(expansion_after(0.1, true, 0.25), 0.0);
         assert_eq!(expansion_after(0.0, false, 0.25), 0.25);
         assert_eq!(expansion_after(0.9, false, 0.25), 1.0);
+    }
+
+    #[test]
+    fn viewport_anchor_preserves_the_units_screen_coordinate() {
+        assert_eq!(anchored_scroll(700.0, 250.0, 600.0, 1_400.0), 450.0);
+    }
+
+    #[test]
+    fn viewport_anchor_respects_both_scroll_bounds() {
+        assert_eq!(anchored_scroll(100.0, 250.0, 600.0, 1_400.0), 0.0);
+        assert_eq!(anchored_scroll(1_300.0, 250.0, 600.0, 1_400.0), 800.0);
+        assert_eq!(anchored_scroll(700.0, 250.0, 900.0, 600.0), 0.0);
     }
 }
