@@ -354,13 +354,43 @@ mod pitch_filter_tests {
     }
 
     #[test]
-    fn confirms_onsets_and_bridges_one_dropout() {
+    fn confirms_an_onset_over_two_frames_and_releases_on_the_first_silent_one() {
         let mut filter = HarmonicaPitchFilter::default();
         filter.configure(richter_harp("C"));
         assert!(filter.update(&[pitch(60)]).is_empty());
         assert_eq!(filter.update(&[pitch(60)])[0].midi, 60);
-        assert_eq!(filter.update(&[])[0].midi, 60);
         assert!(filter.update(&[]).is_empty());
+    }
+
+    #[test]
+    fn a_re_articulated_pitch_leaves_active_so_the_gate_re_arms() {
+        // `score_notes` re-arms `PitchGate` from `ActivePitches` alone
+        // (`gate.release_absent`), so a pitch that never leaves this list
+        // can only ever satisfy one note however many times it is played.
+        let mut filter = HarmonicaPitchFilter::default();
+        filter.configure(richter_harp("C"));
+        filter.update(&[pitch(60)]);
+        filter.update(&[pitch(60)]);
+        assert!(filter.update(&[]).is_empty());
+        filter.update(&[pitch(60)]);
+        assert_eq!(filter.update(&[pitch(60)])[0].midi, 60);
+    }
+
+    #[test]
+    fn onset_confirmation_costs_one_hop_of_latency() {
+        // What waiting for a second frame actually costs, in milliseconds at
+        // the shipped hop size — so changing `onset_frames` or `HOP_SIZE`
+        // fails here with the real number, rather than registering only as a
+        // vague sense that the game got less responsive.
+        let mut filter = HarmonicaPitchFilter::default();
+        filter.configure(richter_harp("C"));
+        filter.update(&[pitch(60)]);
+        filter.update(&[pitch(60)]);
+        let delay_ms = filter.confirmation_delay(60, 44_100) * 1000.0;
+        assert!(
+            (delay_ms - 46.4).abs() < 0.1,
+            "onset confirmation costs {delay_ms:.1} ms per note"
+        );
     }
 
     #[test]

@@ -177,7 +177,12 @@ impl BreathDirectionTracker {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NoteTrackerConfig {
+    /// Consecutive frames a pitch must appear in before it counts. Costs
+    /// exactly `onset_frames - 1` hops of latency on every note, which
+    /// gameplay compensates for out of the judged clock.
     pub onset_frames: u8,
+    /// Frames a confirmed pitch survives without being detected. `1` is no
+    /// grace at all — the pitch is released the first frame it is missing.
     pub release_frames: u8,
     pub direction_change_frames: u8,
 }
@@ -185,8 +190,21 @@ pub struct NoteTrackerConfig {
 impl Default for NoteTrackerConfig {
     fn default() -> Self {
         Self {
+            // Two frames is what rejects a one-frame phantom; see
+            // `tracker_resists_a_one_frame_direction_flip`.
             onset_frames: 2,
-            release_frames: 2,
+            // **No release grace.** A grace frame bridges a detector that
+            // drops a frame mid-sustain, which stops one held breath from
+            // re-arming `AttackGate` and satisfying a second note. It cannot
+            // be told apart from a real re-articulation, though — both look
+            // like one silent frame — and at the shipped hop size a frame is
+            // ~46 ms, so a grace of 2 swallows the gap between chugged
+            // eighth notes on one hole. That figure is the backbone of blues
+            // harmonica; a detector dropping frames mid-sustain is so far
+            // only hypothetical. Prefer the measured cost over the assumed
+            // one, and revisit against the recorded corpus
+            // (`docs/pitch_detection_plan.md`) rather than by taste.
+            release_frames: 1,
             direction_change_frames: 2,
         }
     }
@@ -404,6 +422,50 @@ mod tests {
         );
         // G4: hole 2 draw and hole 3 blow.
         assert_eq!(tracker.update(&[67]).active, vec![67]);
+    }
+
+    #[test]
+    fn a_re_articulation_after_one_silent_frame_is_a_second_attack() {
+        // Repeated notes on one hole are the basic rhythmic figure of blues
+        // harmonica, and the gap between two of them is short: at the
+        // shipped hop size a detector frame is ~46 ms, so chugged eighths
+        // leave one, sometimes two, silent frames. The tracker has to
+        // report the pitch as gone in that gap — `AttackGate` re-arms on
+        // absence, so a pitch that never goes absent can only ever satisfy
+        // one note, and the second chug scores nothing.
+        let harp = richter_harp("C");
+        let mut tracker = HarmonicaNoteTracker::new(harp, NoteTrackerConfig::default());
+        tracker.update(&[60]);
+        assert_eq!(tracker.update(&[60]).confirmed, vec![(60, 1)]);
+        assert!(
+            tracker.update(&[]).active.is_empty(),
+            "one silent frame must read as a release, or two chugged notes \
+             merge into a single sustain"
+        );
+        tracker.update(&[60]);
+        assert_eq!(
+            tracker.update(&[60]).confirmed,
+            vec![(60, 1)],
+            "the re-attack must confirm again"
+        );
+    }
+
+    #[test]
+    fn a_longer_release_grace_bridges_a_dropout_when_asked_for() {
+        // The knob still works, and is what a detector measured to drop
+        // frames mid-sustain would want — see `docs/pitch_detection_plan.md`.
+        let harp = richter_harp("C");
+        let mut tracker = HarmonicaNoteTracker::new(
+            harp,
+            NoteTrackerConfig {
+                release_frames: 2,
+                ..NoteTrackerConfig::default()
+            },
+        );
+        tracker.update(&[60]);
+        tracker.update(&[60]);
+        assert_eq!(tracker.update(&[]).active, vec![60]);
+        assert!(tracker.update(&[]).active.is_empty());
     }
 
     #[test]

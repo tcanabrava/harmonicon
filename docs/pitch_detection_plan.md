@@ -8,10 +8,19 @@
   changing direction.
 - Share one pure `HarmonicaNoteTracker` across gameplay, Song Editor recording,
   and the offline benchmark.
-- In gameplay, confirm new pitches over two detector frames and tolerate one
-  missing frame before release.
+- In gameplay, confirm new pitches over two detector frames (~46 ms at the
+  shipped hop size, compensated out of the judged clock) and release them on
+  the first frame they go missing.
 - Keep deterministic synthetic tests for legal chords, impossible mixed-wind
-  sets, direction transitions, onset confirmation, and release grace.
+  sets, direction transitions, onset confirmation, and re-articulation.
+
+The release grace is deliberately off (`release_frames: 1`). It would bridge a
+detector that drops a frame mid-sustain — which stops one held breath from
+re-arming `AttackGate` and satisfying a second note — but a dropped frame is
+indistinguishable from a real re-articulation, and at ~46 ms per frame a grace
+of 2 swallows the gap between chugged eighth notes on one hole. Whether
+mid-sustain dropouts happen often enough to be worth that is a question for
+the corpus below, not for taste.
 
 ## Ready for recordings
 

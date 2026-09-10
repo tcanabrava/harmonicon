@@ -303,19 +303,23 @@ mod tests {
     }
 
     #[test]
-    fn live_constraints_confirm_and_release_over_two_frames() {
+    fn live_constraints_confirm_over_two_frames_and_release_on_the_first_silent_one() {
         let harp = richter_harp("C");
         let frames = vec![
             frame(0.1, &[60]),
             frame(0.2, &[60]),
             frame(0.3, &[]),
-            frame(0.4, &[]),
+            frame(0.4, &[60]),
+            frame(0.5, &[60]),
         ];
         let constrained = apply_live_constraints(&harp, &frames);
         assert!(constrained[0].detected.is_empty());
         assert_eq!(constrained[1].detected, vec![60]);
-        assert_eq!(constrained[2].detected, vec![60]);
+        assert!(constrained[2].detected.is_empty());
+        // The re-attack pays the confirmation cost again, rather than being
+        // swallowed by a release grace still holding the first note open.
         assert!(constrained[3].detected.is_empty());
+        assert_eq!(constrained[4].detected, vec![60]);
     }
 
     fn flat_chart(track: Vec<TrackItem>) -> HarpChart {
