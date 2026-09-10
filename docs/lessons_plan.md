@@ -274,6 +274,42 @@ changes, only content:
 | **Chromatic slide basics** (`chromatic-slide-basics`, `04_chromatic_slide_basics`) — a full ascending/descending chromatic scale on a 12-hole chromatic harp, computed directly from the chromatic layout tables (not transcribed) | **Scored** | `Modifier::Slide` onset scoring, already built; first bundled chromatic lesson content | `swing-eighths` | technique `slide` ≥ 0.5 |
 | **Jazz heads** — actual repertoire | **Scored** | Ordinary charts | Rights-sensitive: public-domain only, human judgment required (`TODO.md`) — **deliberately not built**; needs specific pieces confirmed public domain before charting |
 
+### Unit 6 — navigation (`06_navigation/`) — 8 of 8 lessons shipped
+
+Hole navigation and register changes, from the "highest priority"
+curriculum gap in `docs/lesson_tree_layout_plan.md`. Needed no engine work
+at all: finding a hole *is* producing its pitch, so every drill is judged
+by the ordinary `accuracy` criterion against a plain chart.
+
+Appended as the last unit rather than inserted after `blowing`, which is
+where it belongs pedagogically — inserting would have re-locked every
+later unit for anyone mid-course, since `is_unlocked` requires *all*
+earlier units satisfied. Revisit if the chain is ever renumbered.
+
+All eight use `track: "navigation"` and a C diatonic. The unit leans on
+one fact about Richter tuning: blow 1, 4, 7 and 10 are all C, an octave
+apart, which is what makes them usable as landmarks.
+
+| Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
+|---|---|---|---|---|
+| **Landmarks** (`landmarks`, `01_landmarks`) — blow 1/4/7/10, up and back | **Scored** | Plain chart; the four octave C's | `single-note` (Unit 1) | accuracy ≥ 0.6 |
+| **The middle register** (`middle-register`, `02_middle_register`) — holes 4–6 blow/draw, spelling C D E F G A | **Scored** | Plain chart | `landmarks` | accuracy ≥ 0.6 |
+| **Jumping between holes** (`hole-jumps`, `03_hole_jumps`) — octave leaps between landmarks, landing without sliding | **Scored** | Plain chart; all targets are C, so a wrong landing is audible | `landmarks` | accuracy ≥ 0.55 |
+| **Crossing 3–4** (`crossing-three-four`, `04_crossing_three_four`) — G B C D across the low/middle seam | **Scored** | Plain chart | `middle-register` | accuracy ≥ 0.6 |
+| **Crossing 6–7** (`crossing-six-seven`, `05_crossing_six_seven`) — G A B C across the blow/draw inversion | **Scored** | Plain chart | `middle-register` | accuracy ≥ 0.6 |
+| **The low register** (`low-register`, `06_low_register`) — holes 1–3, slower warmer air | **Scored** | Plain chart. Takes G from draw 2, **not** blow 3 — see the duplicate-pitch note below | `crossing-three-four` | accuracy ≥ 0.55 |
+| **The high register** (`high-register`, `07_high_register`) — holes 7–10, draw below blow throughout | **Scored** | Plain chart | `crossing-six-seven` | accuracy ≥ 0.55 |
+| **Register leaps** (`register-leaps`, `08_register_leaps`) — capstone, full range | **Scored** | Plain chart | `low-register`, `high-register` | accuracy ≥ 0.5 |
+
+**The one honesty caveat.** The engine judges pitch, not which hole
+produced it. On a C diatonic that is a distinction without a difference
+everywhere except **G4, which is both blow 3 and draw 2** — the only
+duplicated pitch on the instrument. No drill here is allowed to depend on
+telling those two apart: `low-register` deliberately takes its G from
+draw 2 so every note of that exercise is a distinct pitch. Any future
+navigation lesson must respect the same constraint, or it will score a
+player correct for landing on the wrong hole.
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"
@@ -305,7 +341,7 @@ Cross-cutting authoring notes:
 
 ### Suggested build order (what's left)
 
-Units 3 and 4 (scales) are fully shipped. Unit 5 (jazz) is 4/5 lessons
-shipped — all that's left of the lessons curriculum is **jazz heads**,
-blocked on picking specific repertoire someone has actually confirmed is
-public domain (not just "probably fine"); see that row above.
+Units 3, 4 (scales) and 6 (navigation) are fully shipped. Unit 5 (jazz) is
+4/5 lessons shipped — all that's left of the lessons curriculum is **jazz
+heads**, blocked on picking specific repertoire someone has actually
+confirmed is public domain (not just "probably fine"); see that row above.

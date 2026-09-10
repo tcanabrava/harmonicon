@@ -1,0 +1,252 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "Lesson drill: the four landmark holes of a C diatonic, played blow. All four sound a C, an octave apart each time."
+  },
+  "song": {
+    "title": "Landmark Holes",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 70,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "easy"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 70
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": [
+        "C4",
+        "E4",
+        "G4",
+        "C5",
+        "E5",
+        "G5",
+        "C6",
+        "E6",
+        "G6",
+        "C7"
+      ],
+      "draw": [
+        "D4",
+        "G4",
+        "B4",
+        "D5",
+        "F5",
+        "A5",
+        "B5",
+        "D6",
+        "F6",
+        "A6"
+      ]
+    }
+  },
+  "track": [
+    {
+      "id": "n01",
+      "time": 0.0,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        }
+      ],
+      "phrase": "Hole 1 \u2014 the low anchor"
+    },
+    {
+      "id": "n02",
+      "time": 1.714,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ],
+      "phrase": "Hole 4 \u2014 home"
+    },
+    {
+      "id": "n03",
+      "time": 3.429,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "C6"
+        }
+      ],
+      "phrase": "Hole 7 \u2014 the flip"
+    },
+    {
+      "id": "n04",
+      "time": 5.143,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 10,
+          "action": "blow",
+          "note": "C7"
+        }
+      ],
+      "phrase": "Hole 10 \u2014 the top"
+    },
+    {
+      "id": "n05",
+      "time": 6.857,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "C6"
+        }
+      ]
+    },
+    {
+      "id": "n06",
+      "time": 8.571,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n07",
+      "time": 10.286,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        }
+      ]
+    },
+    {
+      "id": "n08",
+      "time": 12.0,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        }
+      ],
+      "phrase": "Again, without looking"
+    },
+    {
+      "id": "n09",
+      "time": 13.714,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n10",
+      "time": 15.429,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "C6"
+        }
+      ]
+    },
+    {
+      "id": "n11",
+      "time": 17.143,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 10,
+          "action": "blow",
+          "note": "C7"
+        }
+      ]
+    },
+    {
+      "id": "n12",
+      "time": 18.857,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 7,
+          "action": "blow",
+          "note": "C6"
+        }
+      ]
+    },
+    {
+      "id": "n13",
+      "time": 20.571,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 4,
+          "action": "blow",
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "id": "n14",
+      "time": 22.286,
+      "duration": 1.371,
+      "play_mode": "single",
+      "events": [
+        {
+          "hole": 1,
+          "action": "blow",
+          "note": "C4"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 150,
+    "good_window_ms": 350,
+    "miss_window_ms": 550
+  }
+}

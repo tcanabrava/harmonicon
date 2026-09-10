@@ -1,0 +1,15 @@
+{
+  "id": "crossing-three-four",
+  "unit": "navigation",
+  "track": "navigation",
+  "title_key": "lesson-crossing-three-four-title",
+  "body_key": "lesson-crossing-three-four-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": [
+    "middle-register"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
+}

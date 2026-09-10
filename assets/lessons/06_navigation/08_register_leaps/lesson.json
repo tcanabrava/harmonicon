@@ -1,0 +1,16 @@
+{
+  "id": "register-leaps",
+  "unit": "navigation",
+  "track": "navigation",
+  "title_key": "lesson-register-leaps-title",
+  "body_key": "lesson-register-leaps-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": [
+    "low-register",
+    "high-register"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.5
+  }
+}

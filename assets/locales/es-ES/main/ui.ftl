@@ -304,6 +304,7 @@ lesson-unit-rhythm = Unidad 2 · Contar el Blues
 lesson-unit-blues = Unidad 3 · Vocabulario del Blues
 lesson-unit-scales = Unidad 4 · Escalas e Improvisación
 lesson-unit-jazz = Unidad 5 · Jazz
+lesson-unit-navigation = Unidad 6 · Encontrar el Camino
 
 # Lección: nota única
 lesson-single-note-title = Tocar una Sola Nota
@@ -675,6 +676,64 @@ lesson-chromatic-slide-basics-body =
     Cerca de la mitad de este recorrido necesita el slide pulsado — fíjate en cómo siempre se usa para alcanzar la nota específica un semitono por encima de lo que ese agujero ya da sin pulsar nada.
     Esta escala es a propósito solo técnica, no melodía — en cuanto pulsar el slide justo en la nota correcta te resulte automático, estarás listo para usarlo musicalmente, no solo mecánicamente.
     Tómate tu tiempo para encajar el momento del slide con el inicio de la nota — un slide pulsado un poco tarde todavía se registra como la nota equivocada, sin el slide.
+# Unit 6 — hole navigation and register changes
+
+lesson-landmarks-title = Puntos de Referencia: Agujeros 1, 4, 7 y 10
+lesson-landmarks-body =
+    La armónica no tiene trastes y no puedes verla mientras tocas, así que te orientas por el tacto y por el oído.
+    En una armónica en do, soplar en los agujeros 1, 4, 7 y 10 da siempre un do — la misma nota, una octava más arriba cada vez. Domina esos cuatro y siempre sabrás dónde estás.
+    Desliza a lo largo de la armónica en lugar de separarla: las comisuras de los labios siguen en contacto y así cuentas los agujeros al tacto.
+    Este ejercicio sube por los cuatro puntos de referencia y vuelve. Sin prisa — compara cada nota con la anterior y escucha la octava.
+
+lesson-middle-register-title = El Registro Medio: Agujeros 4 a 6
+lesson-middle-register-body =
+    Los agujeros 4 a 6 son donde vive la mayoría de las melodías, y donde la armónica se comporta de forma más sencilla: soplar y aspirar se alternan formando do re mi fa sol la.
+    Es el registro que conviene automatizar primero — todo lo demás se mide a partir de él.
+    Mantén el aire suave y constante. Una nota del registro medio necesita mucho menos aire del que suele darle un principiante.
+    Tócalo subiendo y bajando. El giro de arriba es donde se pierde el hilo, así que ve despacio.
+
+lesson-hole-jumps-title = Saltar Entre Agujeros
+lesson-hole-jumps-body =
+    Moverse dos o tres agujeros no es lo mismo que ir al de al lado: hay que cortar el aire, moverse y volver a empezar.
+    Deslizarse hace sonar todos los agujeros intermedios, y un salto limpio se convierte en un borrón. Corta el aire un instante mientras te mueves — un hueco mínimo se nota mucho menos que un borrón.
+    Este ejercicio salta entre los agujeros de referencia, todos do, así que un aterrizaje erróneo se oye al momento.
+    Si caes en el agujero contiguo, no lo corrijas deslizando. Para y coloca la nota otra vez.
+
+lesson-crossing-three-four-title = Cruzar los Agujeros 3 y 4
+lesson-crossing-three-four-body =
+    Del agujero 3 al 4 está la costura entre el registro grave y el medio, y es el primer punto en el que la armónica deja de parecer regular.
+    Subiendo tocas sol, si, do, re — pero el salto de sol a si es mayor que los pasos de alrededor, lo que hace que el movimiento parezca más largo de lo que es.
+    Mantén la posición de la boca idéntica y deja que se mueva la armónica. La mayoría se pasa aquí y aterriza en el agujero 5.
+    Tócalo subiendo y bajando hasta que el tamaño del movimiento deje de sorprenderte.
+
+lesson-crossing-six-seven-title = Cruzar los Agujeros 6 y 7
+lesson-crossing-six-seven-body =
+    Este es el que pilla a todo el mundo. Hasta el agujero 6, aspirar es más agudo que soplar. Del 7 hacia arriba se invierte: soplar es más agudo que aspirar.
+    Cruza la costura y tus instintos quedan de pronto al revés.
+    Subiendo por sol, la, si, do tocas soplar 6, aspirar 6, luego aspirar 7 y soplar 7 — el aspirar y el soplar intercambian el orden justo en el cruce.
+    No hay más truco que saber que llega y practicarlo hasta que la inversión sea lo que tus manos esperan. Ve despacio y dite los números de los agujeros.
+
+lesson-low-register-title = El Registro Grave: Agujeros 1 a 3
+lesson-low-register-body =
+    El grave es más oscuro y lleno, y menos indulgente: las lengüetas son más largas, así que piden aire más lento y cálido y tardan un instante más en sonar.
+    Apurarlas da una nota ahogada, o nada. Baja la mandíbula y piensa "o" en lugar de "i".
+    Este ejercicio sube do re mi sol si do. El sol sale de aspirar 2 y no de soplar 3 — ambos dan la misma altura en una armónica en do, y elegir uno mantiene distinta cada nota del ejercicio.
+    Mantén el aire lento. Si una nota se atasca, afloja en vez de apretar.
+
+lesson-high-register-title = El Registro Agudo: Agujeros 7 a 10
+lesson-high-register-body =
+    Los cuatro agujeros de arriba quieren lo contrario que los cuatro de abajo: las lengüetas son cortas, así que necesitan menos aire y una boca algo más cerrada.
+    Soplar fuerte aquí arriba suena estridente y puede atascar una lengüeta.
+    Recuerda la inversión — del agujero 7 hacia arriba, aspirar queda por debajo de soplar, así que esta serie alterna aspirar-soplar todo el rato, y no soplar-aspirar.
+    Afloja según subes. Si una nota aguda chilla, es exceso de aire, no falta.
+
+lesson-register-leaps-title = Saltar Entre los Registros
+lesson-register-leaps-body =
+    El cierre de la unidad: los tres registros en un solo ejercicio, saltando entre ellos como hace un solo de verdad.
+    Cada registro quiere un aire distinto — lento y cálido abajo, suave arriba — así que un salto es también un cambio de respiración, no solo de posición.
+    Los do de referencia son tu red de seguridad. Si pierdes el sitio, busca el más cercano y vuelve a empezar desde ahí.
+    Haz la primera pasada lo bastante despacio como para colocar cada nota con intención. La velocidad viene después de la precisión, nunca antes.
+
 
 # Juego — cuenta atrás, leyenda, pistas del diagrama de armónica
 gameplay-get-ready = PREPÁRATE
@@ -885,3 +944,4 @@ lesson-track-theory = Teoría
 lesson-track-harmony = Armonía
 lesson-track-vocabulary = Vocabulario
 lesson-track-improv = Improvisación
+lesson-track-navigation = Navegación

@@ -306,6 +306,7 @@ lesson-unit-rhythm = Unit 2 · Counting the Blues
 lesson-unit-blues = Unit 3 · Blues Vocabulary
 lesson-unit-scales = Unit 4 · Scales and Improvisation
 lesson-unit-jazz = Unit 5 · Jazz
+lesson-unit-navigation = Unit 6 · Finding Your Way Around
 
 # Lesson: single note
 lesson-single-note-title = Playing a Single Note
@@ -678,6 +679,64 @@ lesson-chromatic-slide-basics-body =
     This scale is deliberately just technique, not melody — once pressing the slide at exactly the right note feels automatic, you're ready to use it musically instead of just mechanically.
     Take your time matching the slide's timing to the note's onset — a slide pressed a little late still registers as the wrong, unslid pitch.
 
+# Unit 6 — hole navigation and register changes
+
+lesson-landmarks-title = Landmarks: Holes 1, 4, 7 and 10
+lesson-landmarks-body =
+    The harmonica has no frets and you can't see it while you play, so you navigate by feel and by sound.
+    On a C harp, blow 1, 4, 7 and 10 are all C — the same note, an octave apart each time. Learn those four and you always know where you are.
+    Slide along the harmonica rather than lifting it away: the corners of your mouth stay in contact, so you can count holes by touch.
+    This drill walks up the four landmarks and back down. Don't hurry — check each note against the one before it and listen for the octave.
+
+lesson-middle-register-title = The Middle Register: Holes 4 to 6
+lesson-middle-register-body =
+    Holes 4 to 6 are where most melodies live, and where the harmonica behaves most simply: blow and draw alternate to spell C D E F G A.
+    This is the register to make automatic first — everything else gets measured against it.
+    Keep the air gentle and even. A middle-register note needs far less breath than most beginners give it.
+    Play up and back down. The turn at the top is where players lose the thread, so take it slowly.
+
+lesson-hole-jumps-title = Jumping Between Holes
+lesson-hole-jumps-body =
+    Moving two or three holes is not the same as moving to the next one: you have to lift the airflow, move, and set it down again.
+    Sliding sounds every hole in between, which turns a clean leap into a smear. Stop the air for an instant while you move — a tiny gap is far less noticeable than a smear.
+    This drill leaps between the landmark holes, which are all C, so a wrong landing is obvious the moment you hear it.
+    If you land next door, don't correct by sliding. Stop, and place the note again.
+
+lesson-crossing-three-four-title = Crossing Holes 3 and 4
+lesson-crossing-three-four-body =
+    Hole 3 to hole 4 is the seam between the low and middle registers, and the first place the harmonica stops feeling regular.
+    Going up you play G, B, C, D — but the gap from G to B is wider than the steps around it, which makes the move feel further than it is.
+    Keep your mouth position identical and let the harmonica do the moving. Most players over-travel here and land on hole 5.
+    Play it up and down until the size of the move stops surprising you.
+
+lesson-crossing-six-seven-title = Crossing Holes 6 and 7
+lesson-crossing-six-seven-body =
+    This is the one that catches everybody. Up to hole 6, draw is higher than blow. From hole 7 up, that flips: blow is higher than draw.
+    Cross the seam and your instincts are suddenly backwards.
+    Climbing through G, A, B, C you play blow 6, draw 6, then draw 7, then blow 7 — the draw and blow swap order exactly at the crossing.
+    There is no trick beyond knowing it's coming and drilling it until the flip is what your hands expect. Go slowly and say the hole numbers to yourself.
+
+lesson-low-register-title = The Low Register: Holes 1 to 3
+lesson-low-register-body =
+    The low end is darker and fuller, and less forgiving: the reeds are longer, so they want slower, warmer air and take a moment longer to speak.
+    Rushing them gives you a choked note, or nothing at all. Drop your jaw and think "oh" rather than "ee".
+    This drill climbs C D E G B C. It takes the G from draw 2 rather than blow 3 — both give the same pitch on a C harp, and picking one keeps every note of the drill distinct.
+    Keep the air slow. If a note stalls, back off rather than pushing harder.
+
+lesson-high-register-title = The High Register: Holes 7 to 10
+lesson-high-register-body =
+    The top four holes want the opposite of the bottom four: the reeds are short, so they need less air and a slightly tighter mouth.
+    Blowing hard up here sounds shrill and can jam a reed.
+    Remember the flip — from hole 7 up, draw sits below blow, so this run alternates draw-blow all the way rather than blow-draw.
+    Ease off as you climb. If a high note squeals, you are using too much air, not too little.
+
+lesson-register-leaps-title = Leaping Across the Registers
+lesson-register-leaps-body =
+    The capstone: all three registers in one exercise, leaping between them the way a real solo does.
+    Each register wants different air — slow and warm at the bottom, gentle at the top — so a leap is a change of breath as well as a change of position.
+    The landmark C's are your safety net. If you lose your place, find the nearest one and start again from there.
+    Take the first pass slowly enough to place every note deliberately. Speed comes after accuracy, never before it.
+
 # Gameplay — countdown, legend, harmonica overlay hints
 gameplay-get-ready = GET READY
 gameplay-legend-blow = ■ BLOW
@@ -886,3 +945,4 @@ lesson-track-theory = Theory
 lesson-track-harmony = Harmony
 lesson-track-vocabulary = Vocabulary
 lesson-track-improv = Improvisation
+lesson-track-navigation = Navigation

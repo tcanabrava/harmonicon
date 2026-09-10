@@ -1,0 +1,15 @@
+{
+  "id": "hole-jumps",
+  "unit": "navigation",
+  "track": "navigation",
+  "title_key": "lesson-hole-jumps-title",
+  "body_key": "lesson-hole-jumps-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": [
+    "landmarks"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.55
+  }
+}

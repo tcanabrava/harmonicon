@@ -1,0 +1,15 @@
+{
+  "id": "middle-register",
+  "unit": "navigation",
+  "track": "navigation",
+  "title_key": "lesson-middle-register-title",
+  "body_key": "lesson-middle-register-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": [
+    "landmarks"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
+}

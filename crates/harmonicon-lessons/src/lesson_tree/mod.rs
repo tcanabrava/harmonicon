@@ -174,6 +174,7 @@ fn track_color(track: &str) -> Color {
         "harmony" => Color::srgb(0.92, 0.58, 0.78),
         "vocabulary" => Color::srgb(0.85, 0.65, 0.55),
         "improv" => Color::srgb(0.58, 0.82, 0.88),
+        "navigation" => Color::srgb(0.82, 0.78, 0.58),
         _ => Color::srgb(0.65, 0.68, 0.78),
     }
 }

@@ -304,6 +304,7 @@ lesson-unit-rhythm = Unidade 2 · Contando o Blues
 lesson-unit-blues = Unidade 3 · Vocabulário do Blues
 lesson-unit-scales = Unidade 4 · Escalas e Improvisação
 lesson-unit-jazz = Unidade 5 · Jazz
+lesson-unit-navigation = Unidade 6 · Encontrando o Caminho
 
 # Lição: nota única
 lesson-single-note-title = Tocando uma Nota Só
@@ -675,6 +676,64 @@ lesson-chromatic-slide-basics-body =
     Cerca de metade desse trecho precisa do slide apertado — repare como ele sempre é usado pra alcançar a nota específica um semitom acima do que aquele furo já dá sem apertar nada.
     Essa escala é de propósito só técnica, não melodia — assim que apertar o slide bem na nota certa parecer automático, você está pronto pra usá-lo musicalmente, não só mecanicamente.
     Tome seu tempo pra encaixar o momento do slide com o início da nota — um slide apertado um pouco tarde ainda registra como a nota errada, sem o slide.
+# Unit 6 — hole navigation and register changes
+
+lesson-landmarks-title = Pontos de Referência: Furos 1, 4, 7 e 10
+lesson-landmarks-body =
+    A gaita não tem trastes e você não consegue vê-la enquanto toca, então a navegação é pelo tato e pelo ouvido.
+    Numa gaita em C, soprar nos furos 1, 4, 7 e 10 dá sempre um dó — a mesma nota, uma oitava acima a cada vez. Domine esses quatro e você sempre sabe onde está.
+    Deslize ao longo da gaita em vez de afastá-la: os cantos da boca continuam encostados, e assim você conta os furos pelo tato.
+    Este exercício sobe os quatro pontos de referência e volta. Sem pressa — compare cada nota com a anterior e escute a oitava.
+
+lesson-middle-register-title = O Registro Médio: Furos 4 a 6
+lesson-middle-register-body =
+    Os furos 4 a 6 são onde vive a maioria das melodias, e onde a gaita se comporta de forma mais simples: soprar e aspirar se alternam formando dó ré mi fá sol lá.
+    Este é o registro a automatizar primeiro — todo o resto é medido a partir dele.
+    Mantenha o ar suave e constante. Uma nota do registro médio precisa de muito menos ar do que a maioria dos iniciantes usa.
+    Toque subindo e descendo. A virada no topo é onde se perde o fio, então vá devagar.
+
+lesson-hole-jumps-title = Saltando Entre Furos
+lesson-hole-jumps-body =
+    Mover dois ou três furos não é o mesmo que ir ao furo vizinho: é preciso interromper o fluxo de ar, mover e recomeçar.
+    Deslizar faz soar todos os furos do caminho, e um salto limpo vira um borrão. Pare o ar por um instante enquanto se move — uma pausa mínima incomoda muito menos que um borrão.
+    Este exercício salta entre os furos de referência, todos dó, então um pouso errado fica evidente assim que você o ouve.
+    Se cair no furo vizinho, não corrija deslizando. Pare e coloque a nota de novo.
+
+lesson-crossing-three-four-title = Cruzando os Furos 3 e 4
+lesson-crossing-three-four-body =
+    Do furo 3 para o 4 está a emenda entre o registro grave e o médio, e é o primeiro ponto em que a gaita deixa de parecer regular.
+    Subindo você toca sol, si, dó, ré — mas o salto de sol para si é maior que os passos ao redor, o que faz o movimento parecer mais longo do que é.
+    Mantenha a posição da boca idêntica e deixe a gaita se mover. A maioria exagera aqui e cai no furo 5.
+    Toque subindo e descendo até o tamanho do movimento deixar de surpreender.
+
+lesson-crossing-six-seven-title = Cruzando os Furos 6 e 7
+lesson-crossing-six-seven-body =
+    Esta é a que pega todo mundo. Até o furo 6, aspirar é mais agudo que soprar. Do furo 7 para cima isso se inverte: soprar é mais agudo que aspirar.
+    Cruze a emenda e seus instintos ficam de repente ao contrário.
+    Subindo por sol, lá, si, dó você toca soprar 6, aspirar 6, depois aspirar 7 e soprar 7 — o aspirar e o soprar trocam de ordem exatamente na travessia.
+    Não há truque além de saber que vem aí e treinar até a inversão ser o que suas mãos esperam. Vá devagar e diga os números dos furos para si mesmo.
+
+lesson-low-register-title = O Registro Grave: Furos 1 a 3
+lesson-low-register-body =
+    O grave é mais escuro e encorpado, e menos tolerante: as palhetas são mais longas, então pedem ar mais lento e quente e demoram um instante a mais para falar.
+    Apressá-las dá uma nota abafada, ou nada. Baixe o queixo e pense "ó" em vez de "i".
+    Este exercício sobe dó ré mi sol si dó. O sol vem do aspirar 2 e não do soprar 3 — os dois dão a mesma altura numa gaita em C, e escolher um mantém cada nota do exercício distinta.
+    Mantenha o ar lento. Se uma nota travar, alivie em vez de forçar.
+
+lesson-high-register-title = O Registro Agudo: Furos 7 a 10
+lesson-high-register-body =
+    Os quatro furos do topo querem o oposto dos quatro de baixo: as palhetas são curtas, então precisam de menos ar e de uma boca um pouco mais fechada.
+    Soprar forte aqui em cima soa estridente e pode travar uma palheta.
+    Lembre da inversão — do furo 7 para cima, aspirar fica abaixo de soprar, então esta sequência alterna aspirar-soprar o tempo todo, e não soprar-aspirar.
+    Alivie conforme sobe. Se uma nota aguda apitar, é ar demais, não ar de menos.
+
+lesson-register-leaps-title = Saltando Entre os Registros
+lesson-register-leaps-body =
+    O fecho da unidade: os três registros num só exercício, saltando entre eles como faz um solo de verdade.
+    Cada registro quer um ar diferente — lento e quente embaixo, suave em cima — então um salto é também uma mudança de respiração, não só de posição.
+    Os dós de referência são sua rede de segurança. Se perder o lugar, ache o mais próximo e recomece dali.
+    Faça a primeira passada devagar o bastante para colocar cada nota com intenção. A velocidade vem depois da precisão, nunca antes.
+
 
 # Jogo — contagem regressiva, legenda, dicas do diagrama da harmônica
 gameplay-get-ready = PREPARE-SE
@@ -883,3 +942,4 @@ lesson-track-theory = Teoria
 lesson-track-harmony = Harmonia
 lesson-track-vocabulary = Vocabulário
 lesson-track-improv = Improvisação
+lesson-track-navigation = Navegação

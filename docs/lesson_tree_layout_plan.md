@@ -158,8 +158,6 @@ required by `docs/lessons_plan.md`.
 
 ### Highest priority
 
-- **Hole navigation and register changes:** landmarks, low/middle/high-register
-  jumps, and patterns crossing holes 3–4 and 6–7. Use pitch/timing accuracy.
 - **High-register blow bends:** controlled 8/9/10 blow bends followed by short
   melodic applications. Existing bend scoring should work after validating
   the relevant harmonica maps.

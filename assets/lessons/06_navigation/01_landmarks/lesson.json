@@ -1,0 +1,15 @@
+{
+  "id": "landmarks",
+  "unit": "navigation",
+  "track": "navigation",
+  "title_key": "lesson-landmarks-title",
+  "body_key": "lesson-landmarks-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": [
+    "single-note"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.6
+  }
+}

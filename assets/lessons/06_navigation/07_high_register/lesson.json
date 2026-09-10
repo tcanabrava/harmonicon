@@ -1,0 +1,15 @@
+{
+  "id": "high-register",
+  "unit": "navigation",
+  "track": "navigation",
+  "title_key": "lesson-high-register-title",
+  "body_key": "lesson-high-register-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": [
+    "crossing-six-seven"
+  ],
+  "pass_criteria": {
+    "type": "accuracy",
+    "threshold": 0.55
+  }
+}
