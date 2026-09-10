@@ -3628,6 +3628,7 @@ dependencies = [
 name = "harmonicon-lessons"
 version = "0.1.0"
 dependencies = [
+ "accesskit",
  "bevy",
  "bevy_fluent",
  "harmonicon-app",

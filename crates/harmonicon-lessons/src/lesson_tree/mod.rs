@@ -38,6 +38,8 @@
 
 mod layout;
 
+use accesskit::{Node as AccessibilityKitNode, Role};
+use bevy::a11y::AccessibilityNode;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, ScrollPosition, UiTransform};
@@ -150,6 +152,9 @@ pub(crate) struct ClusterMember(String);
 
 #[derive(Component)]
 pub(crate) struct UnitChevron(String);
+
+#[derive(Component)]
+pub(crate) struct UnitButton(String);
 
 /// A track's colour. Grouping has to survive losing its row, and colour is
 /// what the skill trees this is modelled on use for the same job.
@@ -331,7 +336,13 @@ pub(crate) fn setup_lesson_tree(
     });
 
     for unit in &tree.units {
-        spawn_unit(&mut commands, canvas, unit, &loc);
+        spawn_unit(
+            &mut commands,
+            canvas,
+            unit,
+            !collapsed.0.contains(&unit.id),
+            &loc,
+        );
     }
     for node in &tree.nodes {
         spawn_node(&mut commands, canvas, node, &placeholder, &loc);
@@ -440,10 +451,19 @@ fn spawn_edge(
 /// A unit: the major node the whole cluster below it hangs off.
 ///
 /// Activating it expands or collapses the lessons belonging to the unit.
-fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &Localization) {
+fn spawn_unit(
+    commands: &mut Commands,
+    canvas: Entity,
+    unit: &PlacedUnit,
+    expanded: bool,
+    loc: &Localization,
+) {
     let centre = node_centre(unit.column, unit.row);
     let ring = if unit.locked { UNIT_SHUT } else { UNIT_OPEN };
     let unit_id = unit.id.clone();
+    let mut accessibility = AccessibilityKitNode::new(Role::Button);
+    accessibility.set_label(String::from(loc.msg(&unit.title_key)));
+    accessibility.set_expanded(expanded);
 
     // not-a-widget-button: a unit is a label and a gate, not an action.
     let node = commands
@@ -464,6 +484,8 @@ fn spawn_unit(commands: &mut Commands, canvas: Entity, unit: &PlacedUnit, loc: &
             BackgroundColor(Color::srgba(0.10, 0.11, 0.16, 0.85)),
             WidgetButton,
             TabIndex(0),
+            AccessibilityNode(accessibility),
+            UnitButton(unit.id.clone()),
         ))
         .observe(
             move |_: On<Activate>,
@@ -743,6 +765,7 @@ pub(crate) fn animate_unit_expansion(
     mut expansions: ResMut<UnitExpansions>,
     mut members: Query<(&ClusterMember, &mut UiTransform, &mut Visibility)>,
     mut chevrons: Query<(&UnitChevron, &mut Text)>,
+    mut unit_buttons: Query<(&UnitButton, &mut AccessibilityNode)>,
 ) {
     let step = time.delta_secs() / COLLAPSE_SECONDS;
     for (id, amount) in &mut expansions.0 {
@@ -768,6 +791,10 @@ pub(crate) fn animate_unit_expansion(
         } else {
             "▼".to_string()
         };
+    }
+
+    for (button, mut accessibility) in &mut unit_buttons {
+        accessibility.set_expanded(!collapsed.0.contains(&button.0));
     }
 }
 

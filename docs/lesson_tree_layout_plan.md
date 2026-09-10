@@ -39,7 +39,8 @@ remaining visual problems come from the rendering contract around that layout.
 ### 1. Collapsible units
 
 **Initial interaction shipped in `0be52cc`; compact layout is now implemented.**
-Unit nodes are focusable buttons, explicit choices persist across lesson-reader
+Unit nodes are focusable buttons whose accessibility state reports whether
+their cluster is expanded, explicit choices persist across lesson-reader
 visits, the chevron shows the current state, and all lesson art and local edges
 animate over 220 ms. Once a close animation finishes, the pure layout reclaims
 that cluster's columns and recomputes the canvas. The toggled unit keeps its

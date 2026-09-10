@@ -6,6 +6,7 @@ license = "MIT"
 publish = false
 
 [dependencies]
+accesskit = { workspace = true }
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
 harmonicon-platform = { path = "../harmonicon-platform", version = "*" }
 harmonicon-song = { path = "../harmonicon-song", version = "*" }
