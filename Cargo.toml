@@ -63,6 +63,7 @@ harmonicon-gameplay = { path = "crates/harmonicon-gameplay", version = "*" }
 harmonicon-jam = { path = "crates/harmonicon-jam", version = "*" }
 harmonicon-editor = { path = "crates/harmonicon-editor", version = "*" }
 harmonicon-menu = { path = "crates/harmonicon-menu", version = "*" }
+harmonicon-lessons = { path = "crates/harmonicon-lessons", version = "*" }
 harmonicon-bench = { path = "crates/harmonicon-bench", version = "*" }
 # `wav` lets bevy_audio decode the in-memory WAV the song editor synthesises for
 # its Play button (and user-supplied .wav background tracks).
@@ -129,6 +130,7 @@ dev = [
     "harmonicon-jam/dev",
     "harmonicon-editor/dev",
     "harmonicon-menu/dev",
+    "harmonicon-lessons/dev",
 ]
 # Dynamic-links Bevy for faster local link times. Opt in on top of `dev`
 # when iterating on the game itself (`cargo run --features dev,dynamic_linking`);
@@ -146,6 +148,7 @@ dynamic_linking = [
     "harmonicon-jam/dynamic_linking",
     "harmonicon-editor/dynamic_linking",
     "harmonicon-menu/dynamic_linking",
+    "harmonicon-lessons/dynamic_linking",
 ]
 # Streams Bevy's built-in ECS/render/asset spans plus this crate's own
 # manual spans (audio capture, pitch detection) to a running Tracy client
@@ -155,7 +158,7 @@ dynamic_linking = [
 # `cargo run --release --features trace_tracy` with the Tracy UI already
 # listening; see main.rs for the accompanying LogPlugin filter change this
 # needs (spans below `info` are dropped before any backend sees them).
-trace_tracy = ["bevy/trace_tracy", "harmonicon-audio/trace_tracy", "harmonicon-platform/trace_tracy", "harmonicon-song/trace_tracy", "harmonicon-app/trace_tracy", "harmonicon-ui/trace_tracy", "harmonicon-gameplay/trace_tracy", "harmonicon-jam/trace_tracy", "harmonicon-editor/trace_tracy", "harmonicon-menu/trace_tracy"]
+trace_tracy = ["bevy/trace_tracy", "harmonicon-audio/trace_tracy", "harmonicon-platform/trace_tracy", "harmonicon-song/trace_tracy", "harmonicon-app/trace_tracy", "harmonicon-ui/trace_tracy", "harmonicon-gameplay/trace_tracy", "harmonicon-jam/trace_tracy", "harmonicon-editor/trace_tracy", "harmonicon-menu/trace_tracy", "harmonicon-lessons/trace_tracy"]
 
 [lints]
 workspace = true

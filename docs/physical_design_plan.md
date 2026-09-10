@@ -126,7 +126,8 @@ harmonicon-ui         dialogs, music_score, spectrogram
 harmonicon-gameplay   clock, judging, highways, overlays, bend trainer
 harmonicon-jam        \ both build on gameplay
 harmonicon-editor     /
-harmonicon-menu       pages + routing; registers the editor, reaches jam
+harmonicon-menu       navigation shell + general pages; registers editor/jam
+harmonicon-lessons    lesson tree/reader UI; depends on the menu shell
 harmonicon (bin)      main.rs + src/bin/*; assets/, build.rs, tests/
 ```
 

@@ -36,7 +36,7 @@ use harmonicon_ui::dialogs::page_chrome::{header_scene, heading_scene, title_col
 // page chrome; the definitions live in `dialogs` because non-menu screens
 // need them too (see `dialogs::page_chrome`).
 use harmonicon_platform::theme::LoadedTheme;
-pub(crate) use harmonicon_ui::dialogs::page_chrome::spawn_back_button;
+pub use harmonicon_ui::dialogs::page_chrome::spawn_back_button;
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area;
 
 /// Scrollbar track/thumb colors for every menu page's content area — plain
@@ -48,7 +48,7 @@ const SCROLLBAR_THUMB_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
 /// Marks every entity that belongs to a menu screen so `cleanup_menu` can
 /// remove it in one sweep when the page changes. Shared with the `options` page.
 #[derive(Component, Default, Clone)]
-pub(crate) struct MenuRoot;
+pub struct MenuRoot;
 
 fn menu_bg() -> Color {
     Color::srgb(0.05, 0.05, 0.08)
@@ -182,7 +182,7 @@ fn spawn_menu_chrome(
 /// page whose content happens to be shorter than the window gets its
 /// dropdown cut off with nothing to scroll to — not a hypothetical, this is
 /// exactly the bug `jam_generate`'s Genre combobox hit.
-pub(crate) fn spawn_menu_root(
+pub fn spawn_menu_root(
     commands: &mut Commands,
     title: &str,
     subtitle: Option<&str>,
@@ -209,7 +209,7 @@ pub(crate) fn spawn_menu_root(
 /// own doc comment for why). Not a drop-in general replacement: a page
 /// whose content genuinely can overflow (a long list) still needs
 /// `spawn_menu_root`'s real scrolling.
-pub(crate) fn spawn_menu_root_plain(
+pub fn spawn_menu_root_plain(
     commands: &mut Commands,
     title: &str,
     subtitle: Option<&str>,
@@ -241,7 +241,7 @@ pub(crate) fn spawn_menu_root_plain(
 /// shaders the button also gets a smoke background layer, an optional
 /// icon, and audio on hover/click. `on_click` is wired inline as the
 /// `on(...)` callback (plain buttons) or via `observe` (themed buttons).
-pub(crate) fn spawn_button<M: 'static>(
+pub fn spawn_button<M: 'static>(
     commands: &mut Commands,
     parent: Entity,
     label: &str,
@@ -265,7 +265,7 @@ pub(crate) fn spawn_button<M: 'static>(
     e
 }
 
-pub(crate) fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<MenuRoot>>) {
+pub fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<MenuRoot>>) {
     for entity in &roots {
         commands.entity(entity).despawn();
     }

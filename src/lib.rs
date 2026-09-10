@@ -29,6 +29,7 @@ use harmonicon_audio::pitch_detect::{AudioFrame, PitchEvent, PitchRange};
 use harmonicon_audio::{audio_input, pipeline};
 use harmonicon_gameplay::gameplay::GameplayPlugin;
 use harmonicon_jam::jam::JamPlugin;
+use harmonicon_lessons::LessonsUiPlugin;
 use harmonicon_menu::menu::MenuPlugin;
 use harmonicon_platform::assets_management::AssetsManagementPlugin;
 use harmonicon_platform::localization::LocalizationPlugin;
@@ -163,6 +164,7 @@ pub fn run() {
         LocalizationPlugin,
         SongPlugin,
         MenuPlugin,
+        LessonsUiPlugin,
         GameplayPlugin,
         JamPlugin,
         SpectrogramPlugin,

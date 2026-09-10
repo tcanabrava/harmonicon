@@ -148,7 +148,7 @@ wrappers around one shared `run()`. Everything *else* still lives in
 Manual testing needs a mic, audio out, and a display.
 
 ## Architecture (load-bearing facts)
-- **Cargo workspace — thirteen library crates plus a root package holding the
+- **Cargo workspace — fourteen library crates plus a root package holding the
   binaries and the composition root.** A crate may depend only on ones
   *earlier* in this list, and **peers may not depend on each other**:
 
@@ -164,7 +164,8 @@ Manual testing needs a mic, audio out, and a display.
   | `harmonicon-ui` | `dialogs`, `music_score`, `spectrogram` | yes |
   | `harmonicon-gameplay` | clock, judging, 2D/3D highways, overlays, bend trainer | yes |
   | `harmonicon-jam` / `harmonicon-editor` | Jam Session / Song Editor — **siblings**, neither imports the other | yes |
-  | `harmonicon-menu` | page state machine, routing, one file per screen | yes |
+  | `harmonicon-menu` | page state machine, routing, and shared menu chrome | yes |
+  | `harmonicon-lessons` | lesson tree/reader UI and pure tree layout | yes |
   | `harmonicon-bench` | pitch-detection benchmark + dataset generator (dev tooling) | yes |
   | `harmonicon` (root) | `lib.rs` (composition root) + `main.rs` + `src/bin/*`; owns `assets/`, `build.rs`, `tests/` | yes |
   | `harmonicon-android` | `android_main` only — the one crate *above* the root, and the only cdylib | yes |

@@ -19,7 +19,7 @@ use super::pages::tutorial;
 /// `Reflect` for the same reason as [`AppState`] — see its doc comment.
 #[derive(SubStates, Default, Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[source(AppState = AppState::Menu)]
-pub(crate) enum MenuPage {
+pub enum MenuPage {
     #[default]
     Main,
     /// First-launch greeting: point the player at microphone setup, the
@@ -39,7 +39,7 @@ pub(crate) enum MenuPage {
     Theme,
     /// The curriculum, and the only view of it: a spine of unit nodes with
     /// each unit's own lessons hanging below it, prerequisite edges drawn
-    /// inside a unit (see `pages::lesson_tree`).
+    /// inside a unit (see `harmonicon-lessons`).
     LessonTree,
     /// One lesson's instructional page (+ Start for chart-backed lessons).
     LessonReader,

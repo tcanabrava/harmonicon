@@ -3,7 +3,7 @@
 //! One lesson's page: the instructional body, a Start button for
 //! chart-backed lessons, Mark-as-Done for instructional-only ones, and the
 //! row of five training tiers under it. Reached from a node of
-//! `pages::lesson_tree`, which is the only way in — the curriculum used to
+//! `lesson_tree`, which is the only way in — the curriculum used to
 //! have a flat list page here as well, and now has one home per lesson.
 //!
 //! Discovery/unlock/pass logic lives in `harmonicon_song::lessons`; this
@@ -25,11 +25,11 @@ use harmonicon_song::lessons::{AvailableLessons, LessonContext, LessonEntry, Pas
 use harmonicon_song::song::{SongManifest, training_manifest};
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
 
-use crate::menu::routing::MenuPage;
-use crate::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root};
 use harmonicon_app::app::{
     AppState, GameplayMode, GeneratedSong, JamPositionCycle, JamProgression, JamScale, SelectedSong,
 };
+use harmonicon_menu::menu::MenuPage;
+use harmonicon_menu::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root};
 
 /// The lesson this page shows — set by a skill-tree node right before it
 /// switches to [`MenuPage::LessonReader`].

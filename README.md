@@ -210,7 +210,8 @@ crates/
   harmonicon-jam/      # Jam Session: free play, generated 12-bar backing, improv
                        #   scoring, call-and-response      (sibling of the editor)
   harmonicon-editor/   # The Song Editor: record/edit/play, MIDI import, undo/redo
-  harmonicon-menu/     # Page state machine, routing, one file per screen
+  harmonicon-menu/     # Page state machine, routing, shared chrome, general pages
+  harmonicon-lessons/  # Lesson tree/reader UI and tree layout
   harmonicon-bench/    # Developer tooling: pitch-detection benchmark + synthetic
                        #   dataset generator (not shipped game code)
   harmonicon-android/  # `android_main` only — the one crate *above* the root, and

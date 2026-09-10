@@ -1,5 +1,8 @@
 # Training tree: lessons, trainings, and a graph to walk them
 
+The next layout iteration, including collapsible units, edge rendering, and
+the curriculum gap analysis, is in `docs/lesson_tree_layout_plan.md`.
+
 Design plan for turning the Lessons feature into a technique DAG with
 practice trainings hanging off each lesson, shown as a top-down skill
 tree. Curriculum content design stays in `docs/lessons_plan.md`; this

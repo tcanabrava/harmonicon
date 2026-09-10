@@ -14,11 +14,11 @@ use harmonicon_editor::song_editor;
 use harmonicon_jam::jam::backing::JamGenre;
 
 mod pages;
-pub(crate) mod routing;
-pub(crate) mod scene;
+mod routing;
+pub mod scene;
 
 pub(crate) use pages::tutorial;
-pub(crate) use routing::MenuPage;
+pub use routing::MenuPage;
 
 pub struct MenuPlugin;
 
@@ -33,7 +33,6 @@ impl Plugin for MenuPlugin {
             .register_type::<bevy::state::state::NextState<MenuPage>>()
             .init_resource::<SelectedArtist>()
             .init_resource::<pages::harp_check::HarpChoice>()
-            .init_resource::<pages::lesson_reader::SelectedLesson>()
             .init_resource::<pages::jam_generate::JamGenerateConfig>()
             .init_resource::<GameplayMode>()
             .init_resource::<JamProgression>()
@@ -110,21 +109,6 @@ impl Plugin for MenuPlugin {
                 pages::mode_select::setup_mode_select,
             )
             .add_systems(OnExit(MenuPage::ModeSelect), scene::cleanup_menu)
-            .add_systems(
-                OnEnter(MenuPage::LessonTree),
-                pages::lesson_tree::setup_lesson_tree,
-            )
-            .add_systems(OnExit(MenuPage::LessonTree), scene::cleanup_menu)
-            .add_systems(
-                Update,
-                pages::lesson_tree::rebuild_on_lessons_rescanned
-                    .run_if(in_state(MenuPage::LessonTree)),
-            )
-            .add_systems(
-                OnEnter(MenuPage::LessonReader),
-                pages::lesson_reader::setup_lesson_reader,
-            )
-            .add_systems(OnExit(MenuPage::LessonReader), scene::cleanup_menu)
             .add_systems(
                 OnEnter(MenuPage::JamSessionMenu),
                 pages::jam_session::setup_jam_session_menu,

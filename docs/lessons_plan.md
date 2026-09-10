@@ -161,7 +161,7 @@ improvising over anything but the blues scale." Two parts:
    `blues_scale_classes` regardless of what a lesson or "Generate Jam"
    picked. Fixed by a new `JamScale` resource (`harmonicon-app`'s `app.rs`, mirrors the
    existing `JamProgression`) plus a `LessonManifest::scale` field
-   (mirrors `progression`, parsed by `menu::pages::lesson_reader::parse_scale`)
+   (mirrors `progression`, parsed by `harmonicon-lessons::lesson_reader`)
    — `major-scale-improv` and `minor-pentatonic-improv` are the first
    lessons to actually exercise it, each pairing with its run-drill
    sibling (`song.key` matches, so the same notes taught in the drill are
@@ -208,7 +208,7 @@ Two new pieces, both generic (not lesson-specific):
 - **`LessonManifest::diagram`** — a new schema-enforced enum field
   (`"circle-of-fifths"`, room for more later), mirroring `progression`/
   `scale`'s own shape. The lesson reader page
-  (`menu::pages::lesson_reader::setup_lesson_reader`) was text-only before this
+  (`harmonicon-lessons::lesson_reader::setup_lesson_reader`) was text-only before this
   — every prior instructional lesson is prose, some of it literally
   telling the player to go look at a live diagram elsewhere (`twelve-bar`'s
   own body text does exactly that) rather than embedding one. This is the
@@ -280,7 +280,7 @@ All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"
 above): `PassCriteria::ChordToneAdherence`/`PhraseDiscipline`, the lesson
 manifest's `progression` field, and `jam_session::in_rest_window` +
 `ImprovStats::rest_violations`/`chord_tone_adherence`/`phrase_discipline`.
-`menu::lessons::is_jam_criteria` routes all three jam-based criteria (plus
+`harmonicon-lessons::lesson_reader::is_jam_criteria` routes all three jam-based criteria (plus
 `ScaleAdherence`) into `GameplayMode::JamSession`;
 `gameplay::pause_menu::jam_fraction_for` picks the right `ImprovStats`
 fraction for whichever criterion a given lesson declares. Unit 3 (above)

@@ -32,7 +32,7 @@
 //! place. The tree is wide, and a small screen reaches the rest of it by
 //! scrolling; `responsive::is_compact` no longer routes anywhere.
 
-pub(crate) mod layout;
+mod layout;
 
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::math::cubic_splines::CubicBezier;
@@ -49,9 +49,9 @@ use harmonicon_song::lessons::units::UnitChain;
 use harmonicon_song::lessons::{AvailableLessons, LessonsRescanned};
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 
-use crate::menu::pages::lesson_reader::SelectedLesson;
-use crate::menu::routing::MenuPage;
-use crate::menu::scene::{spawn_back_button, spawn_menu_root_plain};
+use crate::lesson_reader::SelectedLesson;
+use harmonicon_menu::menu::MenuPage;
+use harmonicon_menu::menu::scene::{spawn_back_button, spawn_menu_root_plain};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
 use layout::{EdgeKind, NodeState, PlacedNode, PlacedUnit, layout};

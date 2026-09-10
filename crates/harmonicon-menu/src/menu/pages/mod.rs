@@ -12,8 +12,6 @@ pub(crate) mod harp_check;
 pub(crate) mod help_about;
 pub(crate) mod jam_generate;
 pub(crate) mod jam_session;
-pub(crate) mod lesson_reader;
-pub(crate) mod lesson_tree;
 pub(crate) mod main_menu;
 pub(crate) mod mode_select;
 pub(crate) mod options;

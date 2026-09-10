@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: MIT
+
+//! Lesson-facing UI: the curriculum tree, its pure layout engine, and the
+//! lesson reader. Lesson manifests, discovery, and progress remain in
+//! `harmonicon-song`; this crate owns how that domain is presented.
+
+use bevy::prelude::*;
+
+use harmonicon_menu::menu::{MenuPage, scene};
+
+mod lesson_reader;
+mod lesson_tree;
+
+/// Registers the two lesson pages and their page-local state.
+pub struct LessonsUiPlugin;
+
+impl Plugin for LessonsUiPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<lesson_reader::SelectedLesson>()
+            .add_systems(
+                OnEnter(MenuPage::LessonTree),
+                lesson_tree::setup_lesson_tree,
+            )
+            .add_systems(OnExit(MenuPage::LessonTree), scene::cleanup_menu)
+            .add_systems(
+                Update,
+                lesson_tree::rebuild_on_lessons_rescanned.run_if(in_state(MenuPage::LessonTree)),
+            )
+            .add_systems(
+                OnEnter(MenuPage::LessonReader),
+                lesson_reader::setup_lesson_reader,
+            )
+            .add_systems(OnExit(MenuPage::LessonReader), scene::cleanup_menu);
+    }
+}

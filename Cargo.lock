@@ -3478,6 +3478,7 @@ dependencies = [
  "harmonicon-editor",
  "harmonicon-gameplay",
  "harmonicon-jam",
+ "harmonicon-lessons",
  "harmonicon-menu",
  "harmonicon-platform",
  "harmonicon-song",
@@ -3621,6 +3622,20 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "harmonicon-lessons"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_fluent",
+ "harmonicon-app",
+ "harmonicon-core",
+ "harmonicon-menu",
+ "harmonicon-platform",
+ "harmonicon-song",
+ "harmonicon-ui",
 ]
 
 [[package]]

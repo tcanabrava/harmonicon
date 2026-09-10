@@ -1,10 +1,11 @@
 # harmonicon-menu
 
-Every screen outside gameplay: the page state machine, routing, the
-shared page scaffolding, and one file per page.
+The page state machine, routing, shared page scaffolding, and general menu
+pages. The lesson tree and reader are in `harmonicon-lessons`.
 
-The top of the library stack — it registers the editor and reaches jam,
-so nothing may depend on it but the binary.
+Near the top of the library stack — it registers the editor and reaches jam.
+`harmonicon-lessons` depends on its public navigation and page-chrome API;
+otherwise only the binary depends on it.
 
 Project-wide rules (workspace layering, localization, testing style,
 commit conventions) are in the root `CLAUDE.md` — this file is only what's
@@ -32,7 +33,7 @@ load-bearing about *this* crate.
   past the edges with no way to reach the rest.
 
 - **The skill tree is the curriculum's only view, and the one page that
-  scrolls both ways.** `menu/pages/lesson_tree.rs` draws two levels: a
+  scrolls both ways.** `harmonicon-lessons/src/lesson_tree` draws two levels: a
   spine of *unit* nodes across the top (`harmonicon_song::lessons::units`),
   each unit's own lessons hanging below it as a small layered graph. A flat
   list page (`MenuPage::Lessons`) used to sit beside it and was deleted —
@@ -59,6 +60,9 @@ load-bearing about *this* crate.
     `min_width: 0` so it can actually shrink under the canvas, the same
     "min-height: auto" gotcha `scroll_area` documents one level further
     out.
+  - `LessonsUiPlugin` registers the tree and reader lifecycles separately
+    from `MenuPlugin`; this crate supplies their navigation state and shared
+    page chrome.
   - `node_centre` insets everything vertically by `SPINE_LABEL_PX`,
     because a unit's title sits *above* its node on row 0 and would
     otherwise be clipped by the top of the canvas. A lesson's title hangs
