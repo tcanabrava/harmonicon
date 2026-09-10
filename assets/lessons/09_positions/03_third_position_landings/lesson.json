@@ -1,0 +1,1 @@
+{"id":"third-position-landings","unit":"positions","track":"positions","title_key":"lesson-third-position-landings-title","body_key":"lesson-third-position-landings-body","chart":"song/chart.harpchart","prerequisites":["second-position-landings","minor-pentatonic-scale"],"pass_criteria":{"type":"accuracy","threshold":0.65}}

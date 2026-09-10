@@ -335,6 +335,19 @@ exact, and the final drill exercises multiple tempo-map boundaries.
 | **Sixteenth-note articulation** (`sixteenth-articulation`) | **Scored via proxy** | Fresh-attack detection on four-note cells | `syncopation-and-rests`, `articulation` | clean attacks ≥ 0.65 |
 | **Tempo stability** (`tempo-stability`) | **Scored** | Tight timing across 64, 72, 80, and 68 BPM map segments | `sixteenth-articulation` | accuracy ≥ 0.75 |
 
+### Unit 9 — applied positions (`09_positions/`) — 3 lessons shipped
+
+The circle and position-cycle lessons explain and demonstrate position
+changes. These drills give first, second, and third position a playable home:
+each uses the same C diatonic but changes the song key, tonic landmarks, and
+chord-tone destinations. Pitch accuracy can score every landing directly.
+
+| Lesson | Position and key | Prereq | Pass |
+|---|---|---|---|
+| **First-position landings** (`first-position-landings`) | 1st, C; resolves on 4/7 blow | `major-scale` | accuracy ≥ 0.65 |
+| **Second-position landings** (`second-position-landings`) | 2nd, G; resolves on 2 draw | `first-position-landings`, `blues-scale` | accuracy ≥ 0.65 |
+| **Third-position landings** (`third-position-landings`) | 3rd, D minor color; resolves on 4/8 draw | `second-position-landings`, `minor-pentatonic-scale` | accuracy ≥ 0.65 |
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"
