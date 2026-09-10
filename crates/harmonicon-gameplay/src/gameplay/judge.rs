@@ -11,7 +11,6 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 
 use harmonicon_audio::AudioSettings;
-use harmonicon_audio::audio_input::AudioCapture;
 use harmonicon_audio::pitch_detect::{AudioFrame, PitchInfo};
 use harmonicon_core::chart::Modifier;
 use harmonicon_core::midi::midi_to_freq_hz;
@@ -143,7 +142,6 @@ pub(crate) fn score_notes(
     valid_notes: Res<ValidHarpNotes>,
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
-    capture: Option<Res<AudioCapture>>,
     pitch_filter: Option<Res<HarmonicaPitchFilter>>,
     mut song_notes: ResMut<SongNotes>,
     mut score: ResMut<Score>,
@@ -158,19 +156,17 @@ pub(crate) fn score_notes(
     let dt = time.delta_secs_f64();
     // Compensate for microphone pipeline latency: a pitch detected at clock T
     // was actually played at T - latency. Shift the judgment window accordingly.
-    let judged = clock.get() - audio.input_latency_ms as f64 / 1000.0;
-    let judged_pitch = |midi: Option<u8>| {
-        let confirmation_delay = midi
-            .and_then(|midi| {
-                capture.as_ref().and_then(|capture| {
-                    pitch_filter
-                        .as_ref()
-                        .map(|filter| filter.confirmation_delay(midi, capture.sample_rate))
-                })
-            })
-            .unwrap_or(0.0);
-        judged - confirmation_delay
-    };
+    //
+    // Onset confirmation in `HarmonicaPitchFilter` is part of that same
+    // pipeline and delays every pitch by the same fixed amount, so it belongs
+    // in the same scalar rather than being applied per note. The scan below
+    // stops early on the first note past the window and relies on `judged`
+    // being one instant for the whole frame to do that: a per-note judgment
+    // time makes `offset` non-monotonic over notes sorted by `time`, and the
+    // scan can then break before a later note that was still in range.
+    let judged = clock.get()
+        - audio.input_latency_ms as f64 / 1000.0
+        - pitch_filter.map_or(0.0, |filter| filter.onset_lag_secs(audio.pitch_algorithm));
 
     if config.combo_enabled
         && should_decay_combo(
@@ -286,7 +282,7 @@ pub(crate) fn score_notes(
         // this far out, every note after it is too — stop scanning outright
         // instead of just skipping the push, so a long chart's untouched
         // future notes cost nothing per frame, not even a visit.
-        let offset = judged_pitch(note.expected_pitch) - note.time;
+        let offset = judged - note.time;
         if offset < -config.good_window {
             break;
         }
@@ -294,10 +290,8 @@ pub(crate) fn score_notes(
     }
 
     pending.sort_by(|&a, &b| {
-        let offset_a =
-            (judged_pitch(song_notes.notes[a].expected_pitch) - song_notes.notes[a].time).abs();
-        let offset_b =
-            (judged_pitch(song_notes.notes[b].expected_pitch) - song_notes.notes[b].time).abs();
+        let offset_a = (judged - song_notes.notes[a].time).abs();
+        let offset_b = (judged - song_notes.notes[b].time).abs();
         offset_a
             .partial_cmp(&offset_b)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -312,7 +306,7 @@ pub(crate) fn score_notes(
         if !note.playable {
             continue;
         }
-        let offset = judged_pitch(note.expected_pitch) - note.time;
+        let offset = judged - note.time;
         // A note counts as "playing" only on a fresh attack: the pitch must be
         // sounding and not already consumed by an earlier note in this sustain.
         // A note with no valid `expected_pitch` (the harp can't produce it) can

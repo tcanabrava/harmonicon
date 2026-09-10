@@ -213,9 +213,15 @@ impl Default for NoteTrackerConfig {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TrackedNotes {
     pub active: Vec<u8>,
-    /// Newly confirmed pitches and the number of detector hops since their
-    /// first observation. Consumers can credit an attack to that earlier time.
-    pub confirmed: Vec<(u8, u8)>,
+    /// Pitches confirmed on *this* frame — the tracker's onset events.
+    ///
+    /// Every one of them is exactly [`NoteTrackerConfig::onset_frames`]` - 1`
+    /// hops later than the sound that produced it, because a pitch is
+    /// confirmed the instant its run of consecutive frames reaches that
+    /// threshold and never after. So the lag a consumer has to correct for is
+    /// one constant for the whole stream, not a per-pitch quantity — see
+    /// `a_confirmation_is_always_the_same_number_of_frames_late`.
+    pub confirmed: Vec<u8>,
 }
 
 /// Pure harmonica-state tracker shared by gameplay, recording, and benchmarks.
@@ -248,6 +254,14 @@ impl HarmonicaNoteTracker {
         self.active.clear();
     }
 
+    /// Consecutive frames a pitch must be seen in before it is reported.
+    /// Consumers need this to convert the tracker's fixed onset lag into
+    /// real time — it depends on their own hop size, which is not this
+    /// crate's business.
+    pub fn onset_frames(&self) -> u8 {
+        self.config.onset_frames
+    }
+
     pub fn update(&mut self, candidates: &[u8]) -> TrackedNotes {
         // Keep the direction tracker's public two-frame default compatible,
         // while permitting consumers to request a different transition count.
@@ -264,7 +278,7 @@ impl HarmonicaNoteTracker {
             let seen = self.pending.entry(midi).or_default();
             *seen += 1;
             if *seen >= self.config.onset_frames {
-                confirmed.push((midi, (*seen).saturating_sub(1)));
+                confirmed.push(midi);
                 self.active.insert(midi, 0);
             }
         }
@@ -436,7 +450,7 @@ mod tests {
         let harp = richter_harp("C");
         let mut tracker = HarmonicaNoteTracker::new(harp, NoteTrackerConfig::default());
         tracker.update(&[60]);
-        assert_eq!(tracker.update(&[60]).confirmed, vec![(60, 1)]);
+        assert_eq!(tracker.update(&[60]).confirmed, vec![60]);
         assert!(
             tracker.update(&[]).active.is_empty(),
             "one silent frame must read as a release, or two chugged notes \
@@ -445,7 +459,7 @@ mod tests {
         tracker.update(&[60]);
         assert_eq!(
             tracker.update(&[60]).confirmed,
-            vec![(60, 1)],
+            vec![60],
             "the re-attack must confirm again"
         );
     }
@@ -469,10 +483,32 @@ mod tests {
     }
 
     #[test]
-    fn note_tracker_reports_confirmation_age() {
+    fn a_confirmation_is_always_the_same_number_of_frames_late() {
+        // The property the whole latency correction rests on: whatever the
+        // onset threshold, a pitch is confirmed on exactly the frame its run
+        // reaches it — never earlier, never later, however long it goes on
+        // sounding afterwards. So the lag is one constant for the stream, and
+        // a consumer can subtract it from its clock once rather than tracking
+        // a per-pitch age.
         let harp = richter_harp("C");
-        let mut tracker = HarmonicaNoteTracker::new(harp, NoteTrackerConfig::default());
-        assert!(tracker.update(&[60]).confirmed.is_empty());
-        assert_eq!(tracker.update(&[60]).confirmed, vec![(60, 1)]);
+        for onset_frames in 1..=4u8 {
+            let mut tracker = HarmonicaNoteTracker::new(
+                harp.clone(),
+                NoteTrackerConfig {
+                    onset_frames,
+                    ..NoteTrackerConfig::default()
+                },
+            );
+            let confirmed_on: Vec<usize> = (0..8)
+                .filter(|_| !tracker.update(&[60]).confirmed.is_empty())
+                .collect();
+            assert_eq!(
+                confirmed_on,
+                vec![onset_frames as usize - 1],
+                "onset_frames = {onset_frames} should confirm once, on frame \
+                 {}, and never again while the pitch keeps sounding",
+                onset_frames - 1
+            );
+        }
     }
 }

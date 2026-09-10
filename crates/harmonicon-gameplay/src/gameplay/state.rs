@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use bevy::prelude::*;
 
 use harmonicon_audio::AudioSettings;
-use harmonicon_audio::pitch_detect::{PitchEvent, PitchInfo};
+use harmonicon_audio::pitch_detect::{PitchAlgorithm, PitchEvent, PitchInfo};
 use harmonicon_core::chart::Modifier;
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
@@ -26,18 +26,51 @@ pub struct ActivePitches(pub Vec<PitchInfo>);
 pub struct HarmonicaPitchFilter {
     tracker: Option<HarmonicaNoteTracker>,
     pitches: HashMap<u8, PitchInfo>,
-    confirmed_ages: HashMap<u8, u8>,
+    /// Seconds of latency onset confirmation adds, fixed for the whole song:
+    /// the sample rate comes from the capture stream and the number of hops
+    /// is a constant of the tracker (see `TrackedNotes::confirmed`), so
+    /// there's nothing per-pitch or per-frame to recompute.
+    lag_secs: f64,
 }
 
 impl HarmonicaPitchFilter {
-    pub fn configure(&mut self, harp: Harmonica) {
+    /// `sample_rate` is `None` when no microphone is open — there are no
+    /// detections to filter in that case, and no latency to correct for.
+    pub fn configure(&mut self, harp: Harmonica, sample_rate: Option<u32>) {
+        let tracker = HarmonicaNoteTracker::new(harp, NoteTrackerConfig::default());
+        let hops = tracker.onset_frames().saturating_sub(1) as f64;
         *self = Self {
-            tracker: Some(HarmonicaNoteTracker::new(
-                harp,
-                NoteTrackerConfig::default(),
-            )),
-            ..default()
+            lag_secs: sample_rate.map_or(0.0, |rate| {
+                hops * harmonicon_audio::audio_input::HOP_SIZE as f64 / rate.max(1) as f64
+            }),
+            tracker: Some(tracker),
+            pitches: HashMap::new(),
         };
+    }
+
+    /// Whether this filter is actually post-processing the detector's output.
+    /// It needs both a configured harp and a detector that reports more than
+    /// one pitch at a time — a monophonic one has no impossible chord to
+    /// reject, so its output is passed through untouched.
+    ///
+    /// The one place that rule lives: `collect_pitches` decides whether to
+    /// filter by it, and `judge::score_notes` decides whether to correct for
+    /// the resulting latency by it, so the two can't disagree about what the
+    /// pitches in `ActivePitches` have been through.
+    pub fn engaged(&self, algorithm: PitchAlgorithm) -> bool {
+        self.tracker.is_some() && algorithm.is_polyphonic()
+    }
+
+    /// How far behind the sound `ActivePitches` runs because of onset
+    /// confirmation — zero unless the filter is actually [`engaged`].
+    ///
+    /// [`engaged`]: Self::engaged
+    pub(crate) fn onset_lag_secs(&self, algorithm: PitchAlgorithm) -> f64 {
+        if self.engaged(algorithm) {
+            self.lag_secs
+        } else {
+            0.0
+        }
     }
 
     fn update(&mut self, raw: &[PitchInfo]) -> Vec<PitchInfo> {
@@ -49,18 +82,12 @@ impl HarmonicaPitchFilter {
         }
         let midis: Vec<u8> = raw.iter().map(|pitch| pitch.midi).collect();
         let tracked = tracker.update(&midis);
-        self.confirmed_ages = tracked.confirmed.iter().copied().collect();
         self.pitches.retain(|midi, _| tracked.active.contains(midi));
         tracked
             .active
             .iter()
             .filter_map(|midi| self.pitches.get(midi).cloned())
             .collect()
-    }
-
-    pub(crate) fn confirmation_delay(&self, midi: u8, sample_rate: u32) -> f64 {
-        let hops = self.confirmed_ages.get(&midi).copied().unwrap_or(0) as f64;
-        hops * harmonicon_audio::audio_input::HOP_SIZE as f64 / sample_rate.max(1) as f64
     }
 }
 
@@ -329,8 +356,9 @@ pub(super) fn collect_pitches(
     mut filter: ResMut<HarmonicaPitchFilter>,
     settings: Res<AudioSettings>,
 ) {
+    let engaged = filter.engaged(settings.pitch_algorithm);
     for ev in reader.read() {
-        active.0 = if settings.pitch_algorithm.is_polyphonic() {
+        active.0 = if engaged {
             filter.update(&ev.0)
         } else {
             ev.0.clone()
@@ -356,7 +384,7 @@ mod pitch_filter_tests {
     #[test]
     fn confirms_an_onset_over_two_frames_and_releases_on_the_first_silent_one() {
         let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"));
+        filter.configure(richter_harp("C"), Some(44_100));
         assert!(filter.update(&[pitch(60)]).is_empty());
         assert_eq!(filter.update(&[pitch(60)])[0].midi, 60);
         assert!(filter.update(&[]).is_empty());
@@ -368,7 +396,7 @@ mod pitch_filter_tests {
         // (`gate.release_absent`), so a pitch that never leaves this list
         // can only ever satisfy one note however many times it is played.
         let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"));
+        filter.configure(richter_harp("C"), Some(44_100));
         filter.update(&[pitch(60)]);
         filter.update(&[pitch(60)]);
         assert!(filter.update(&[]).is_empty());
@@ -383,10 +411,8 @@ mod pitch_filter_tests {
         // fails here with the real number, rather than registering only as a
         // vague sense that the game got less responsive.
         let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"));
-        filter.update(&[pitch(60)]);
-        filter.update(&[pitch(60)]);
-        let delay_ms = filter.confirmation_delay(60, 44_100) * 1000.0;
+        filter.configure(richter_harp("C"), Some(44_100));
+        let delay_ms = filter.onset_lag_secs(PitchAlgorithm::Nmf) * 1000.0;
         assert!(
             (delay_ms - 46.4).abs() < 0.1,
             "onset confirmation costs {delay_ms:.1} ms per note"
@@ -394,9 +420,48 @@ mod pitch_filter_tests {
     }
 
     #[test]
+    fn the_lag_is_one_constant_and_not_a_per_pitch_or_per_frame_quantity() {
+        // What lets `score_notes` keep a single `judged` instant for the
+        // whole frame, which its early break over time-sorted notes needs to
+        // stay correct. Whatever has been detected, however long ago, the
+        // correction is the same number.
+        let mut filter = HarmonicaPitchFilter::default();
+        filter.configure(richter_harp("C"), Some(44_100));
+        let quiet = filter.onset_lag_secs(PitchAlgorithm::Nmf);
+        filter.update(&[pitch(60)]);
+        filter.update(&[pitch(60)]);
+        assert_eq!(filter.onset_lag_secs(PitchAlgorithm::Nmf), quiet);
+        for _ in 0..5 {
+            filter.update(&[pitch(60), pitch(64)]);
+            assert_eq!(filter.onset_lag_secs(PitchAlgorithm::Nmf), quiet);
+        }
+    }
+
+    #[test]
+    fn a_monophonic_detector_is_neither_filtered_nor_compensated() {
+        // The two must agree: correcting for a latency the pitches never
+        // actually incurred would judge every note early.
+        let mut filter = HarmonicaPitchFilter::default();
+        filter.configure(richter_harp("C"), Some(44_100));
+        assert!(!filter.engaged(PitchAlgorithm::Yin));
+        assert_eq!(filter.onset_lag_secs(PitchAlgorithm::Yin), 0.0);
+        assert!(filter.engaged(PitchAlgorithm::Nmf));
+        assert!(filter.onset_lag_secs(PitchAlgorithm::Nmf) > 0.0);
+    }
+
+    #[test]
+    fn an_unconfigured_filter_compensates_for_nothing() {
+        // Jam Session and the Bending Trainer share `collect_pitches` but
+        // never configure a harp, so nothing there is filtered or shifted.
+        let filter = HarmonicaPitchFilter::default();
+        assert!(!filter.engaged(PitchAlgorithm::Nmf));
+        assert_eq!(filter.onset_lag_secs(PitchAlgorithm::Nmf), 0.0);
+    }
+
+    #[test]
     fn rejects_opposite_wind_phantoms() {
         let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"));
+        filter.configure(richter_harp("C"), Some(44_100));
         filter.update(&[pitch(60), pitch(64), pitch(62)]);
         let stable = filter.update(&[pitch(60), pitch(64), pitch(62)]);
         let midis: Vec<u8> = stable.iter().map(|pitch| pitch.midi).collect();

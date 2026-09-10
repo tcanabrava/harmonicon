@@ -8,6 +8,7 @@ use bevy::audio::Volume;
 use bevy::prelude::*;
 
 use harmonicon_app::app::{AppState, EffectiveHarmonica, GameplayMode, SelectedSong};
+use harmonicon_audio::audio_input::AudioCapture;
 use harmonicon_audio::pitch_detect::{PITCH_RANGE_MARGIN_SEMITONES, PitchRange};
 use harmonicon_song::song::SongManifest;
 
@@ -19,14 +20,21 @@ use super::state::{
     PitchGate, Score, ScoringConfig, SongEnd, SongStats,
 };
 
+/// The capture stream's sample rate is fixed for as long as it is open, so
+/// the filter's onset lag is resolved once here rather than recomputed per
+/// frame in the judge.
 pub(crate) fn configure_pitch_filter(
     selected: Res<SelectedSong>,
     effective: Res<EffectiveHarmonica>,
     manifests: Res<Assets<SongManifest>>,
+    capture: Option<Res<AudioCapture>>,
     mut filter: ResMut<HarmonicaPitchFilter>,
 ) {
     if let Some(manifest) = manifests.get(&selected.0) {
-        filter.configure(effective.harp_for(&manifest.chart).clone());
+        filter.configure(
+            effective.harp_for(&manifest.chart).clone(),
+            capture.map(|capture| capture.sample_rate),
+        );
     }
 }
 

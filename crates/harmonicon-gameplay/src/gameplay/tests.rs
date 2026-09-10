@@ -6,7 +6,7 @@ use bevy::prelude::*;
 
 use harmonicon_app::app::GameplayMode;
 use harmonicon_audio::AudioSettings;
-use harmonicon_audio::pitch_detect::{AudioFrame, PitchInfo, PitchRange};
+use harmonicon_audio::pitch_detect::{AudioFrame, PitchAlgorithm, PitchInfo, PitchRange};
 use harmonicon_core::chart::Modifier;
 use harmonicon_core::midi::{midi_to_freq_hz, note_to_midi};
 use harmonicon_core::scoring::{combo_label, compute_multiplier};
@@ -907,6 +907,56 @@ fn score_notes_hits_both_chord_notes_when_both_pitches_sound_together() {
         stats.clean_attack.total(),
         0,
         "chord notes aren't clean-attack notes"
+    );
+}
+
+#[test]
+fn score_notes_judges_every_note_of_a_frame_at_one_instant() {
+    // `score_notes` stops scanning at the first note past the good window,
+    // which is only sound while `judged` is a single instant: notes are
+    // sorted by `time`, so a judgment time that varies per note makes the
+    // offsets non-monotonic and the scan can break before a later note that
+    // was still in range. A chord is where that shows: its two notes share a
+    // `time`, so they must always resolve together, at every distance from
+    // the window's edge.
+    let mut chord_hit = |chord_time: f64| {
+        let mut world = chord_test_world(vec![
+            pitch_info(60, "C", 4, midi_to_freq_hz(60.0)),
+            pitch_info(64, "E", 4, midi_to_freq_hz(64.0)),
+        ]);
+        let mut filter = HarmonicaPitchFilter::default();
+        filter.configure(harmonicon_core::harmonica::richter_harp("C"), Some(44_100));
+        world.insert_resource(filter);
+        world.resource_mut::<AudioSettings>().pitch_algorithm = PitchAlgorithm::Nmf;
+        for note in &mut world.resource_mut::<SongNotes>().notes {
+            note.time = chord_time;
+        }
+        let mut schedule = Schedule::default();
+        schedule.add_systems(score_notes);
+        schedule.run(&mut world);
+        let notes = &world.resource::<SongNotes>().notes;
+        (notes[0].hit, notes[1].hit)
+    };
+
+    // Sweep the chord across the good-window edge. Whatever the verdict at
+    // each step, both halves must reach the same one.
+    let window = ScoringConfig::default().good_window;
+    let mut verdicts = Vec::new();
+    for step in 0..24 {
+        let chord_time = 0.5 + window - 0.012 * step as f64;
+        let (first, second) = chord_hit(chord_time);
+        assert_eq!(
+            first, second,
+            "chord at {chord_time} judged inconsistently: 60 hit = {first}, \
+             64 hit = {second}"
+        );
+        verdicts.push(first);
+    }
+    // The sweep has to actually straddle the edge, or it agrees with itself
+    // for the uninteresting reason that nothing was ever in range.
+    assert!(
+        verdicts.contains(&true) && verdicts.contains(&false),
+        "the sweep never crossed the good-window edge: {verdicts:?}"
     );
 }
 
