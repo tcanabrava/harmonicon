@@ -37,12 +37,13 @@
 //! scrolling; `responsive::is_compact` no longer routes anywhere.
 
 mod layout;
+mod transition;
 
 use accesskit::{Node as AccessibilityKitNode, Role};
 use bevy::a11y::AccessibilityNode;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
-use bevy::ui::{ComputedNode, InteractionDisabled, ScrollPosition, UiTransform, Val2};
+use bevy::ui::{ScrollPosition, UiTransform};
 use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use bevy_fluent::Localization;
 
@@ -60,6 +61,7 @@ use harmonicon_menu::menu::scene::{spawn_back_button, spawn_menu_root_plain};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
 use layout::{EdgeKind, NodeState, PlacedNode, PlacedUnit, layout_with_collapsed};
+pub(crate) use transition::*;
 
 use std::collections::{HashMap, HashSet};
 
@@ -117,47 +119,6 @@ const SPINE_COLOR: Color = Color::srgba(0.95, 0.82, 0.45, 0.65);
 /// scroll area itself, so it can't inherit them.
 const SCROLLBAR_TRACK: Color = Color::srgba(0.0, 0.0, 0.0, 0.35);
 const SCROLLBAR_THUMB: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
-
-const COLLAPSE_SECONDS: f32 = 0.22;
-const SLIDE_SECONDS: f32 = 0.22;
-
-/// Units the player explicitly collapsed. Kept across page visits so opening
-/// a lesson and returning does not discard the course-map view they chose.
-#[derive(Resource, Default)]
-pub(crate) struct CollapsedUnits(HashSet<String>);
-
-/// Current animation amount per unit: 0 is collapsed, 1 is expanded.
-#[derive(Resource, Default)]
-pub(crate) struct UnitExpansions(HashMap<String, f32>);
-
-/// Units whose close animation must finish before the layout reclaims their
-/// columns. Tracking ids keeps rapid toggles independent.
-#[derive(Resource, Default)]
-pub(crate) struct PendingCompaction(HashSet<String>);
-
-/// Keeps the unit that triggered a same-page rebuild at the same horizontal
-/// screen coordinate once the new canvas has been measured.
-#[derive(Resource, Default)]
-pub(crate) struct PendingViewportAnchor {
-    unit_id: Option<String>,
-    screen_x: f32,
-    canvas_x: Option<f32>,
-}
-
-#[derive(Resource, Default)]
-pub(crate) struct PreviousUnitPositions(HashMap<String, f32>);
-
-#[derive(Clone, Copy, Debug)]
-struct UnitSlide {
-    from_px: f32,
-    amount: f32,
-}
-
-#[derive(Resource, Default)]
-pub(crate) struct UnitSlides(HashMap<String, UnitSlide>);
-
-#[derive(Component)]
-pub(crate) struct LessonTreeScroller;
 
 /// Any lesson node, label, mastery pip, or branch edge owned by a unit.
 #[derive(Component)]
@@ -683,38 +644,6 @@ fn spawn_unit(
     commands.entity(canvas).add_child(label);
 }
 
-/// Applies a pending anchor after Bevy has measured the replacement scroll
-/// area, clamping it when the compact canvas no longer has enough overflow to
-/// keep the unit at its previous screen coordinate.
-pub(crate) fn restore_viewport_anchor(
-    mut anchor: ResMut<PendingViewportAnchor>,
-    mut scroller: Query<(&mut ScrollPosition, &ComputedNode), With<LessonTreeScroller>>,
-) {
-    let Some(canvas_x) = anchor.canvas_x else {
-        return;
-    };
-    let Some((mut position, computed)) = scroller.iter_mut().next() else {
-        return;
-    };
-    if computed.size().x <= 0.0 || computed.content_size().x <= 0.0 {
-        return;
-    }
-
-    position.x = anchored_scroll(
-        canvas_x,
-        anchor.screen_x,
-        computed.size().x,
-        computed.content_size().x,
-    );
-    anchor.unit_id = None;
-    anchor.canvas_x = None;
-}
-
-fn anchored_scroll(canvas_x: f32, screen_x: f32, viewport_width: f32, content_width: f32) -> f32 {
-    let max_scroll = (content_width - viewport_width).max(0.0);
-    (canvas_x - screen_x).clamp(0.0, max_scroll)
-}
-
 /// Track, title, and — for a locked lesson — what it is still waiting on.
 ///
 /// That last part is load-bearing: a prerequisite in another unit is no
@@ -876,144 +805,6 @@ fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode
                 LayoutOwner(node.unit_id.clone()),
             ));
         });
-    }
-}
-
-/// Advances all unit transitions and applies their eased scale/visibility to
-/// every entity in the corresponding cluster.
-pub(crate) fn animate_unit_expansion(
-    mut commands: Commands,
-    time: Res<Time>,
-    collapsed: Res<CollapsedUnits>,
-    mut expansions: ResMut<UnitExpansions>,
-    mut members: Query<(&ClusterMember, &mut UiTransform, &mut Visibility)>,
-    mut chevrons: Query<(&UnitChevron, &mut Text)>,
-    mut unit_buttons: Query<(&UnitButton, &mut AccessibilityNode)>,
-    mut lesson_buttons: Query<
-        (
-            Entity,
-            &ClusterMember,
-            &mut TabIndex,
-            Has<InteractionDisabled>,
-        ),
-        With<WidgetButton>,
-    >,
-) {
-    let step = time.delta_secs() / COLLAPSE_SECONDS;
-    for (id, amount) in &mut expansions.0 {
-        *amount = expansion_after(*amount, collapsed.0.contains(id), step);
-    }
-
-    for (member, mut transform, mut visibility) in &mut members {
-        let amount = expansions.0.get(&member.0).copied().unwrap_or(1.0);
-        // Smoothstep has zero velocity at both ends, so rapid toggles reverse
-        // without a visible snap.
-        let eased = amount * amount * (3.0 - 2.0 * amount);
-        transform.scale = Vec2::splat(eased.max(0.001));
-        *visibility = if amount <= 0.0 {
-            Visibility::Hidden
-        } else {
-            Visibility::Visible
-        };
-    }
-
-    for (chevron, mut text) in &mut chevrons {
-        **text = if collapsed.0.contains(&chevron.0) {
-            "▶".to_string()
-        } else {
-            "▼".to_string()
-        };
-    }
-
-    for (button, mut accessibility) in &mut unit_buttons {
-        accessibility.set_expanded(!collapsed.0.contains(&button.0));
-    }
-
-    for (entity, member, mut tab_index, disabled) in &mut lesson_buttons {
-        let closing = collapsed.0.contains(&member.0);
-        tab_index.0 = if closing { -1 } else { 0 };
-        match (closing, disabled) {
-            (true, false) => {
-                commands.entity(entity).insert(InteractionDisabled);
-            }
-            (false, true) => {
-                commands.entity(entity).remove::<InteractionDisabled>();
-            }
-            _ => {}
-        }
-    }
-}
-
-fn slide_offset(slide: &UnitSlide) -> f32 {
-    let eased = slide.amount * slide.amount * (3.0 - 2.0 * slide.amount);
-    slide.from_px * (1.0 - eased)
-}
-
-/// Slides every visual from its previous unit column to its new layout
-/// column. Edges are recomputed from both moving endpoints, preserving the
-/// renderer's single straight segment instead of translating a detached line.
-pub(crate) fn animate_unit_slides(
-    time: Res<Time>,
-    mut slides: ResMut<UnitSlides>,
-    mut owned: Query<(&LayoutOwner, &mut UiTransform), Without<MovingEdge>>,
-    mut edges: Query<(&MovingEdge, &mut Node, &mut UiTransform)>,
-) {
-    let step = time.delta_secs() / SLIDE_SECONDS;
-    for slide in slides.0.values_mut() {
-        slide.amount = (slide.amount + step).min(1.0);
-    }
-
-    for (owner, mut transform) in &mut owned {
-        let offset = slides.0.get(&owner.0).map_or(0.0, slide_offset);
-        transform.translation = Val2::px(offset, 0.0);
-    }
-
-    for (edge, mut node, mut transform) in &mut edges {
-        let from_offset = slides.0.get(&edge.from_unit).map_or(0.0, slide_offset);
-        let to_offset = slides.0.get(&edge.to_unit).map_or(0.0, slide_offset);
-        let from = Endpoint {
-            centre: edge.from.centre + Vec2::X * from_offset,
-            ..edge.from
-        };
-        let to = Endpoint {
-            centre: edge.to.centre + Vec2::X * to_offset,
-            ..edge.to
-        };
-        set_edge_geometry(&mut node, &mut transform, from, to, edge.thickness);
-    }
-
-    slides.0.retain(|_, slide| slide.amount < 1.0);
-}
-
-/// Rebuilds once every closing unit has finished. Waiting for zero preserves
-/// the close animation; the next layout then removes the hidden width from the
-/// canvas and moves later units left.
-pub(crate) fn compact_finished_units(
-    expansions: Res<UnitExpansions>,
-    mut pending: ResMut<PendingCompaction>,
-    mut page: ResMut<NextState<MenuPage>>,
-) {
-    if pending.0.is_empty() {
-        return;
-    }
-    let all_closed = pending
-        .0
-        .iter()
-        .all(|id| expansions.0.get(id).is_none_or(|amount| *amount <= 0.0));
-    if all_closed {
-        pending.0.clear();
-        page.set(MenuPage::LessonTree);
-    }
-}
-
-fn expansion_after(current: f32, collapsed: bool, step: f32) -> f32 {
-    let target = if collapsed { 0.0 } else { 1.0 };
-    if current < target {
-        (current + step).min(target)
-    } else if current > target {
-        (current - step).max(target)
-    } else {
-        current
     }
 }
 
