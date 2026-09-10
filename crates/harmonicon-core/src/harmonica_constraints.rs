@@ -416,6 +416,34 @@ mod tests {
     }
 
     #[test]
+    fn a_phantom_that_keeps_leading_holds_the_wrong_direction_indefinitely() {
+        // Characterisation of a known weakness, not an endorsement of it.
+        //
+        // Direction is inferred from the first candidate the harp can only
+        // sound one way, on the assumption that detectors return
+        // strongest-first. So a blow-only phantom ranked above a real draw
+        // chord suppresses the entire chord — and goes on suppressing it for
+        // as long as it keeps leading, because it supplies the same evidence
+        // every frame and the hysteresis below only resists evidence that
+        // *changes*. The two-frame rule defends against a phantom that
+        // flickers, not one that persists.
+        //
+        // Replacing this with summed detector strength needs `PitchInfo` to
+        // carry a strength at all, and needs recordings to tune against —
+        // see `docs/pitch_detection_plan.md`.
+        let harp = richter_harp("C");
+        let mut tracker = BreathDirectionTracker::default();
+        // C4 is blow-only; D4 and B4 are draw-only. All three "sound" at once.
+        for _ in 0..10 {
+            assert_eq!(tracker.filter(&harp, &[60, 62, 71]), vec![60]);
+        }
+        // Recovery takes the ordinary two frames once the phantom stops
+        // outranking the real notes.
+        assert!(tracker.filter(&harp, &[62, 71]).is_empty());
+        assert_eq!(tracker.filter(&harp, &[62, 71]), vec![62, 71]);
+    }
+
+    #[test]
     fn tracker_changes_direction_after_two_frames() {
         let harp = richter_harp("C");
         let mut tracker = BreathDirectionTracker::default();
