@@ -919,7 +919,7 @@ fn score_notes_judges_every_note_of_a_frame_at_one_instant() {
     // was still in range. A chord is where that shows: its two notes share a
     // `time`, so they must always resolve together, at every distance from
     // the window's edge.
-    let mut chord_hit = |chord_time: f64| {
+    let chord_hit = |chord_time: f64| {
         let mut world = chord_test_world(vec![
             pitch_info(60, "C", 4, midi_to_freq_hz(60.0)),
             pitch_info(64, "E", 4, midi_to_freq_hz(64.0)),

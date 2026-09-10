@@ -86,12 +86,7 @@ pub fn setup(
 
     clock.set_free(-COUNTDOWN);
     music_started.0 = false;
-    // The harp actually being played, not the one the chart names — this is
-    // the set `judge::score_notes` filters every detected pitch through, so
-    // leaving it on the chart's harp would discard everything the player
-    // sounds on a substituted one.
-    let played_harp = effective.harp_for(&manifest.chart);
-    valid_notes.0 = played_harp.build_valid_notes();
+    *valid_notes = ValidHarpNotes::for_played_harp(&effective, &manifest.chart);
 
     let chart = &manifest.chart;
 

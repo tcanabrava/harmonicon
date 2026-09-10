@@ -9,9 +9,10 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 
+use harmonicon_app::app::EffectiveHarmonica;
 use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::{PitchAlgorithm, PitchEvent, PitchInfo};
-use harmonicon_core::chart::Modifier;
+use harmonicon_core::chart::{HarpChart, Modifier};
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
 use harmonicon_core::scoring::{AttackGate, HitQuality};
@@ -123,6 +124,20 @@ pub struct MusicStarted(pub bool);
 /// enharmonic spelling mismatch (`"A#4"` vs `"Bb4"`) silently failing to match.
 #[derive(Resource, Default)]
 pub struct ValidHarpNotes(pub HashSet<u8>);
+
+impl ValidHarpNotes {
+    /// The pitches gameplay will accept, taken from the harp the player is
+    /// actually *holding* — [`EffectiveHarmonica`], not `chart.harmonica`.
+    ///
+    /// The two differ whenever a harp has been substituted, and this is the
+    /// set `judge::score_notes` filters every detected pitch through, so
+    /// building it from the chart's harp instead discards everything the
+    /// player sounds. Shared by the 2D and 3D setups so they cannot drift
+    /// apart on which harp they mean.
+    pub(super) fn for_played_harp(effective: &EffectiveHarmonica, chart: &HarpChart) -> Self {
+        Self(effective.harp_for(chart).build_valid_notes())
+    }
+}
 
 #[derive(Resource, Default)]
 pub struct Score {
@@ -363,6 +378,68 @@ pub(super) fn collect_pitches(
         } else {
             ev.0.clone()
         };
+    }
+}
+
+#[cfg(test)]
+mod valid_harp_notes_tests {
+    use super::*;
+    use harmonicon_core::harmonica::richter_harp;
+
+    /// A chart in C. Only its `harmonica` matters here.
+    fn chart_in_c() -> HarpChart {
+        serde_json::from_str(
+            r#"{
+            "song": { "title": "T", "artist": "A", "tempo_bpm": 120.0,
+                      "key": "C", "difficulty": "easy" },
+            "timing": { "resolution": 480, "tempo_map": [{"tick": 0, "bpm": 120.0}] },
+            "harmonica": {
+                "type": "diatonic", "holes": 10,
+                "bending_profile": "richter_standard",
+                "layout": {
+                    "blow": ["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
+                    "draw": ["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]
+                }
+            },
+            "track": [],
+            "scoring": { "perfect_window_ms": 50, "good_window_ms": 100,
+                         "miss_window_ms": 130 }
+        }"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_substituted_harp_decides_which_pitches_count() {
+        // Judging an A harp's pitches against the chart's C harp rejects
+        // essentially everything the player can physically sound, so the song
+        // becomes unplayable rather than merely transposed. Both the 2D and
+        // 3D setups go through here for exactly that reason.
+        let chart = chart_in_c();
+        let substitute = richter_harp("A");
+        let effective = EffectiveHarmonica {
+            harp: Some(substitute.clone()),
+            ..default()
+        };
+        assert_eq!(
+            ValidHarpNotes::for_played_harp(&effective, &chart).0,
+            substitute.build_valid_notes()
+        );
+        assert_ne!(
+            ValidHarpNotes::for_played_harp(&effective, &chart).0,
+            chart.harmonica.build_valid_notes(),
+            "an A harp and a C harp must not agree on which pitches are valid"
+        );
+    }
+
+    #[test]
+    fn without_a_substitution_the_charts_own_harp_decides() {
+        let chart = chart_in_c();
+        let effective = EffectiveHarmonica::default();
+        assert_eq!(
+            ValidHarpNotes::for_played_harp(&effective, &chart).0,
+            chart.harmonica.build_valid_notes()
+        );
     }
 }
 

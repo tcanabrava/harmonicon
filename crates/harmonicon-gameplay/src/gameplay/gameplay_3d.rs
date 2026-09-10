@@ -590,8 +590,7 @@ pub fn setup(
     };
     clock.set_free(-COUNTDOWN);
     music_started.0 = false;
-    let played_harp = effective.harp_for(&manifest.chart);
-    note_build.valid_notes.0 = played_harp.build_valid_notes();
+    *note_build.valid_notes = ValidHarpNotes::for_played_harp(&effective, &manifest.chart);
 
     for (mut cam, _) in &mut cameras {
         cam.order = 1;
