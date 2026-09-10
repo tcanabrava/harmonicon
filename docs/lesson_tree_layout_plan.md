@@ -7,6 +7,10 @@ glance: where am I, what can I study next, and why is something locked?
 
 ## Current layout findings
 
+The findings below describe the renderer before the first implementation pass.
+The downward course-map layout and single-segment edges shipped in `e58e620`;
+they are retained here as the rationale for that change.
+
 The pure layout engine in `harmonicon-lessons/src/lesson_tree/layout.rs`
 already topologically layers lessons inside each unit, reduces crossings with
 barycentre sweeps, and hides cross-unit edges behind the unit spine. The
@@ -34,6 +38,12 @@ remaining visual problems come from the rendering contract around that layout.
 
 ### 1. Collapsible units
 
+**Initial implementation shipped in `0be52cc`.** Unit nodes are focusable
+buttons, explicit choices persist across lesson-reader visits, the chevron
+shows the current state, and all lesson art and local edges animate over 220
+ms. Compacting the canvas, sliding neighboring units, viewport anchoring, and
+reduced-motion behavior remain open.
+
 Make every unit node an accessible button with expanded/collapsed state. Keep
 the current unit, the first available unit, and units containing available
 lessons expanded on first visit; persist explicit choices for the session. A
@@ -52,6 +62,13 @@ keyboard tab order, and edge routes from visible clusters. Preserve context by
 keeping the toggled unit's screen-space center fixed while neighbors move.
 
 ### 2. Course-map layout
+
+**Core layout shipped in `e58e620`.** Prerequisite depth now increases
+downward, siblings spread horizontally, and each unit is centered over its
+widest lesson row. Deterministic tests cover direction, centering, spacing,
+crossing reduction, and canvas bounds. Explicit named ports are no longer
+needed by the current straight-edge renderer; endpoint kinds carry the node
+sizes it needs.
 
 Give units and lessons distinct layout roles. Lay the unit spine left to right.
 For each expanded unit, compute its lesson DAG independently, measure its
@@ -75,6 +92,13 @@ intersections, stable ordering, collapsed widths, and canvas bounds.
 
 ### 3. Continuous edge rendering
 
+**Resolved in `e58e620` with a simpler renderer.** Each relationship is one
+straight, rotated UI rectangle with rounded ends. It is clipped along the line
+between centers using the true radius of each endpoint; `UnitBranch` records
+the mixed unit-to-lesson case. This removes every sampled join and its stacked
+alpha while keeping UI scrolling and clipping. Keep the mesh approach below as
+a fallback only if visual testing shows straight relationships need curves.
+
 Replace the chain of UI rectangles with one continuous geometry path per edge.
 The preferred implementation is a small UI mesh builder that emits a triangle
 strip with bevel joins and round caps from an adaptive polyline. It preserves
@@ -89,15 +113,16 @@ bounds, ports, control points, and tessellation segments.
 
 ## Delivery sequence
 
-1. Extend the pure layout model with node bounds, cluster bounds, ports, and a
-   set of expanded unit ids. Change the local DAG to flow downward and test the
-   geometry invariants.
-2. Add unit-button state, keyboard/focus behavior, session persistence, and an
-   immediate collapse path. Verify scroll extents and focus order first.
-3. Add expansion animation and viewport anchoring. Validate compact windows,
-   DPI scaling, rapid toggles, and lesson rescans during animation.
-4. Replace segmented edges with cached mesh paths. Compare captures at 1×,
-   1.25×, 1.5×, and 2× scale, then remove the rectangle renderer.
+1. **Done:** flow the local DAG downward, center clusters, distinguish edge
+   endpoint kinds, and test the geometry invariants.
+2. **Done:** add unit-button state, keyboard focus, session persistence, and
+   animated visibility for each cluster.
+3. Compact collapsed clusters, animate neighboring unit positions, and anchor
+   the viewport. Validate compact windows, rapid toggles, and lesson rescans
+   during animation; add reduced-motion behavior once that setting exists.
+4. **Done:** replace sampled curves with continuous straight paths. Compare
+   captures at 1×, 1.25×, 1.5×, and 2× scale; consider a mesh only if those
+   captures demonstrate a need for curved routing.
 5. Add an overview/minimap or “show available” action only if usability tests
    still show players losing their place after collapse ships.
 
