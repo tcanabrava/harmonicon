@@ -122,9 +122,9 @@ bounds, ports, control points, and tessellation segments.
    animated visibility for each cluster.
 3. **In progress:** collapsed clusters now compact after their close animation,
    including safe rapid toggles, recomputed canvas bounds, and viewport
-   anchoring. Animate neighboring unit positions next. Validate compact windows
-   and lesson rescans during animation; add reduced-motion behavior once that
-   setting exists.
+   anchoring. Live lesson rescans also remove transition state for units that
+   disappeared. Animate neighboring unit positions next and validate compact
+   windows; add reduced-motion behavior once that setting exists.
 4. **Done:** replace sampled curves with continuous straight paths. Compare
    captures at 1×, 1.25×, 1.5×, and 2× scale; consider a mesh only if those
    captures demonstrate a need for curved routing.

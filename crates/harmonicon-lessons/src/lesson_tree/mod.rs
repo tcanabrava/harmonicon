@@ -195,7 +195,9 @@ pub(crate) fn setup_lesson_tree(
     mut commands: Commands,
     lessons: Res<AvailableLessons>,
     profile: Res<PlayerProfile>,
-    collapsed: Res<CollapsedUnits>,
+    mut collapsed: ResMut<CollapsedUnits>,
+    mut expansions: ResMut<UnitExpansions>,
+    mut pending: ResMut<PendingCompaction>,
     mut anchor: ResMut<PendingViewportAnchor>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
@@ -243,6 +245,20 @@ pub(crate) fn setup_lesson_tree(
         }
     };
 
+    let live_units: HashSet<&str> = tree.units.iter().map(|unit| unit.id.as_str()).collect();
+    collapsed.0.retain(|id| live_units.contains(id.as_str()));
+    expansions
+        .0
+        .retain(|id, _| live_units.contains(id.as_str()));
+    pending.0.retain(|id| live_units.contains(id.as_str()));
+    if anchor
+        .unit_id
+        .as_deref()
+        .is_some_and(|id| !live_units.contains(id))
+    {
+        *anchor = PendingViewportAnchor::default();
+    }
+
     if let Some(unit_id) = anchor.unit_id.as_deref() {
         anchor.canvas_x = tree
             .units
@@ -256,17 +272,10 @@ pub(crate) fn setup_lesson_tree(
     // A unit discovered while the app is running starts expanded. Existing
     // animation values survive page rebuilds and visits to the reader.
     let unit_ids: Vec<String> = tree.units.iter().map(|unit| unit.id.clone()).collect();
-    commands.queue(move |world: &mut World| {
-        let collapsed = world.resource::<CollapsedUnits>();
-        let initial: Vec<(String, f32)> = unit_ids
-            .iter()
-            .map(|id| (id.clone(), if collapsed.0.contains(id) { 0.0 } else { 1.0 }))
-            .collect();
-        let mut expansions = world.resource_mut::<UnitExpansions>();
-        for (id, value) in initial {
-            expansions.0.entry(id).or_insert(value);
-        }
-    });
+    for id in unit_ids {
+        let initial = if collapsed.0.contains(&id) { 0.0 } else { 1.0 };
+        expansions.0.entry(id).or_insert(initial);
+    }
 
     // The plain root's content column sizes to its own content, so a canvas
     // larger than the window would push it past both screen edges and the
