@@ -46,8 +46,9 @@ animate over 220 ms. Once a close animation finishes, the pure layout reclaims
 that cluster's columns and recomputes the canvas. The toggled unit keeps its
 horizontal screen position across that rebuild, clamped at the new scroll
 bounds. Lesson buttons leave pointer and keyboard interaction as soon as their
-unit starts closing. Smooth neighboring-unit motion and reduced-motion behavior
-remain open.
+unit starts closing. Neighboring units slide to their recomputed columns over
+220 ms, with each straight edge recalculated from its moving endpoints.
+Reduced-motion behavior remains open until that application setting exists.
 
 Make every unit node an accessible button with expanded/collapsed state. Keep
 the current unit, the first available unit, and units containing available
@@ -122,11 +123,11 @@ bounds, ports, control points, and tessellation segments.
    endpoint kinds, and test the geometry invariants.
 2. **Done:** add unit-button state, keyboard focus, session persistence, and
    animated visibility for each cluster.
-3. **In progress:** collapsed clusters now compact after their close animation,
+3. **Done:** collapsed clusters compact after their close animation,
    including safe rapid toggles, recomputed canvas bounds, and viewport
    anchoring. Live lesson rescans also remove transition state for units that
-   disappeared. Animate neighboring unit positions next and validate compact
-   windows; add reduced-motion behavior once that setting exists.
+   disappeared. Neighboring units and their edge endpoints animate into the
+   new layout. Add reduced-motion behavior once that setting exists.
 4. **Done:** replace sampled curves with continuous straight paths. Compare
    captures at 1×, 1.25×, 1.5×, and 2× scale; consider a mesh only if those
    captures demonstrate a need for curved routing.

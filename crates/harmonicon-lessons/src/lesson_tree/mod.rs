@@ -42,7 +42,7 @@ use accesskit::{Node as AccessibilityKitNode, Role};
 use bevy::a11y::AccessibilityNode;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
-use bevy::ui::{ComputedNode, InteractionDisabled, ScrollPosition, UiTransform};
+use bevy::ui::{ComputedNode, InteractionDisabled, ScrollPosition, UiTransform, Val2};
 use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use bevy_fluent::Localization;
 
@@ -119,6 +119,7 @@ const SCROLLBAR_TRACK: Color = Color::srgba(0.0, 0.0, 0.0, 0.35);
 const SCROLLBAR_THUMB: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
 
 const COLLAPSE_SECONDS: f32 = 0.22;
+const SLIDE_SECONDS: f32 = 0.22;
 
 /// Units the player explicitly collapsed. Kept across page visits so opening
 /// a lesson and returning does not discard the course-map view they chose.
@@ -143,6 +144,18 @@ pub(crate) struct PendingViewportAnchor {
     canvas_x: Option<f32>,
 }
 
+#[derive(Resource, Default)]
+pub(crate) struct PreviousUnitPositions(HashMap<String, f32>);
+
+#[derive(Clone, Copy, Debug)]
+struct UnitSlide {
+    from_px: f32,
+    amount: f32,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct UnitSlides(HashMap<String, UnitSlide>);
+
 #[derive(Component)]
 pub(crate) struct LessonTreeScroller;
 
@@ -155,6 +168,21 @@ pub(crate) struct UnitChevron(String);
 
 #[derive(Component)]
 pub(crate) struct UnitButton(String);
+
+/// Any visual whose horizontal position follows one unit's layout column.
+#[derive(Component)]
+pub(crate) struct LayoutOwner(String);
+
+/// Endpoints retained in layout coordinates so a moving relationship remains
+/// one continuous straight segment throughout a neighboring-unit slide.
+#[derive(Component)]
+pub(crate) struct MovingEdge {
+    from: Endpoint,
+    to: Endpoint,
+    from_unit: String,
+    to_unit: String,
+    thickness: f32,
+}
 
 /// A track's colour. Grouping has to survive losing its row, and colour is
 /// what the skill trees this is modelled on use for the same job.
@@ -199,6 +227,8 @@ pub(crate) fn setup_lesson_tree(
     mut expansions: ResMut<UnitExpansions>,
     mut pending: ResMut<PendingCompaction>,
     mut anchor: ResMut<PendingViewportAnchor>,
+    mut previous_positions: ResMut<PreviousUnitPositions>,
+    mut slides: ResMut<UnitSlides>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     asset_server: Res<AssetServer>,
@@ -251,6 +281,7 @@ pub(crate) fn setup_lesson_tree(
         .0
         .retain(|id, _| live_units.contains(id.as_str()));
     pending.0.retain(|id| live_units.contains(id.as_str()));
+    slides.0.retain(|id, _| live_units.contains(id.as_str()));
     if anchor
         .unit_id
         .as_deref()
@@ -266,6 +297,36 @@ pub(crate) fn setup_lesson_tree(
             .find(|unit| unit.id == unit_id)
             .map(|unit| node_centre(unit.column, unit.row).x);
     }
+
+    let anchor_id = anchor.unit_id.as_deref();
+    let current_positions: HashMap<String, f32> = tree
+        .units
+        .iter()
+        .map(|unit| (unit.id.clone(), node_centre(unit.column, unit.row).x))
+        .collect();
+    let mut next_slides = HashMap::new();
+    for (id, &new_x) in &current_positions {
+        let Some(&old_x) = previous_positions.0.get(id) else {
+            continue;
+        };
+        let old_offset = slides.0.get(id).map_or(0.0, slide_offset);
+        let from_px = if anchor_id == Some(id.as_str()) {
+            0.0
+        } else {
+            old_x + old_offset - new_x
+        };
+        if from_px.abs() > 0.5 {
+            next_slides.insert(
+                id.clone(),
+                UnitSlide {
+                    from_px,
+                    amount: 0.0,
+                },
+            );
+        }
+    }
+    previous_positions.0 = current_positions;
+    slides.0 = next_slides;
 
     let placeholder: Handle<Image> = asset_server.load("icons/lesson_placeholder.png");
 
@@ -327,6 +388,21 @@ pub(crate) fn setup_lesson_tree(
                 EdgeKind::UnitBranch => (UNIT_PX / 2.0, NODE_PX / 2.0, EDGE_PX, EDGE_COLOR),
                 EdgeKind::Branch => (NODE_PX / 2.0, NODE_PX / 2.0, EDGE_PX, EDGE_COLOR),
             };
+            let owners = match edge.kind {
+                EdgeKind::Spine => tree
+                    .units
+                    .iter()
+                    .find(|unit| (unit.column, unit.row) == edge.from)
+                    .zip(
+                        tree.units
+                            .iter()
+                            .find(|unit| (unit.column, unit.row) == edge.to),
+                    )
+                    .map(|(from, to)| (from.id.as_str(), to.id.as_str())),
+                EdgeKind::UnitBranch | EdgeKind::Branch => {
+                    edge.unit_id.as_deref().map(|unit| (unit, unit))
+                }
+            };
             spawn_edge(
                 parent,
                 Endpoint {
@@ -340,6 +416,7 @@ pub(crate) fn setup_lesson_tree(
                 thickness,
                 color,
                 edge.unit_id.as_deref(),
+                owners,
             );
         }
     });
@@ -412,6 +489,27 @@ fn edge_span(from: Endpoint, to: Endpoint) -> Option<(Vec2, Vec2)> {
     ))
 }
 
+fn set_edge_geometry(
+    node: &mut Node,
+    transform: &mut UiTransform,
+    from: Endpoint,
+    to: Endpoint,
+    thickness: f32,
+) -> bool {
+    let Some((start, end)) = edge_span(from, to) else {
+        return false;
+    };
+    let delta = end - start;
+    let length = delta.length();
+    let mid = (start + end) / 2.0;
+    node.left = Val::Px(mid.x - length / 2.0);
+    node.top = Val::Px(mid.y - thickness / 2.0);
+    node.width = Val::Px(length);
+    node.height = Val::Px(thickness);
+    transform.rotation = Rot2::radians(delta.y.atan2(delta.x));
+    true
+}
+
 /// One edge, as a single rotated rectangle.
 ///
 /// A straight run needs no sampling and no joins, so there is exactly one
@@ -423,6 +521,7 @@ fn spawn_edge(
     thickness: f32,
     color: Color,
     unit_id: Option<&str>,
+    owners: Option<(&str, &str)>,
 ) {
     let Some((start, end)) = edge_span(from, to) else {
         return;
@@ -452,6 +551,15 @@ fn spawn_edge(
         },
         BackgroundColor(color),
     ));
+    if let Some((from_unit, to_unit)) = owners {
+        segment.insert(MovingEdge {
+            from,
+            to,
+            from_unit: from_unit.to_string(),
+            to_unit: to_unit.to_string(),
+            thickness,
+        });
+    }
     if let Some(unit_id) = unit_id {
         segment.insert(ClusterMember(unit_id.to_string()));
     }
@@ -495,6 +603,7 @@ fn spawn_unit(
             TabIndex(0),
             AccessibilityNode(accessibility),
             UnitButton(unit.id.clone()),
+            LayoutOwner(unit.id.clone()),
         ))
         .observe(
             move |_: On<Activate>,
@@ -568,6 +677,7 @@ fn spawn_unit(
             },
             TextLayout::justify(Justify::Center),
             TextColor(ring),
+            LayoutOwner(unit.id.clone()),
         ))
         .id();
     commands.entity(canvas).add_child(label);
@@ -695,9 +805,10 @@ fn spawn_node(
         )
         .id();
     commands.entity(canvas).add_child(button);
-    commands
-        .entity(button)
-        .insert(ClusterMember(node.unit_id.clone()));
+    commands.entity(button).insert((
+        ClusterMember(node.unit_id.clone()),
+        LayoutOwner(node.unit_id.clone()),
+    ));
 
     // The title, under the node. Small and wrapped to the column's own
     // width — the art alone says nothing about which lesson this is, and a
@@ -725,9 +836,10 @@ fn spawn_node(
         ))
         .id();
     commands.entity(canvas).add_child(label);
-    commands
-        .entity(label)
-        .insert(ClusterMember(node.unit_id.clone()));
+    commands.entity(label).insert((
+        ClusterMember(node.unit_id.clone()),
+        LayoutOwner(node.unit_id.clone()),
+    ));
 
     if node.has_trainings {
         spawn_mastery_ring(commands, canvas, node, centre);
@@ -761,6 +873,7 @@ fn spawn_mastery_ring(commands: &mut Commands, canvas: Entity, node: &PlacedNode
                 },
                 BackgroundColor(if tier < filled { PIP_FILLED } else { PIP_EMPTY }),
                 ClusterMember(node.unit_id.clone()),
+                LayoutOwner(node.unit_id.clone()),
             ));
         });
     }
@@ -829,6 +942,47 @@ pub(crate) fn animate_unit_expansion(
             _ => {}
         }
     }
+}
+
+fn slide_offset(slide: &UnitSlide) -> f32 {
+    let eased = slide.amount * slide.amount * (3.0 - 2.0 * slide.amount);
+    slide.from_px * (1.0 - eased)
+}
+
+/// Slides every visual from its previous unit column to its new layout
+/// column. Edges are recomputed from both moving endpoints, preserving the
+/// renderer's single straight segment instead of translating a detached line.
+pub(crate) fn animate_unit_slides(
+    time: Res<Time>,
+    mut slides: ResMut<UnitSlides>,
+    mut owned: Query<(&LayoutOwner, &mut UiTransform), Without<MovingEdge>>,
+    mut edges: Query<(&MovingEdge, &mut Node, &mut UiTransform)>,
+) {
+    let step = time.delta_secs() / SLIDE_SECONDS;
+    for slide in slides.0.values_mut() {
+        slide.amount = (slide.amount + step).min(1.0);
+    }
+
+    for (owner, mut transform) in &mut owned {
+        let offset = slides.0.get(&owner.0).map_or(0.0, slide_offset);
+        transform.translation = Val2::px(offset, 0.0);
+    }
+
+    for (edge, mut node, mut transform) in &mut edges {
+        let from_offset = slides.0.get(&edge.from_unit).map_or(0.0, slide_offset);
+        let to_offset = slides.0.get(&edge.to_unit).map_or(0.0, slide_offset);
+        let from = Endpoint {
+            centre: edge.from.centre + Vec2::X * from_offset,
+            ..edge.from
+        };
+        let to = Endpoint {
+            centre: edge.to.centre + Vec2::X * to_offset,
+            ..edge.to
+        };
+        set_edge_geometry(&mut node, &mut transform, from, to, edge.thickness);
+    }
+
+    slides.0.retain(|_, slide| slide.amount < 1.0);
 }
 
 /// Rebuilds once every closing unit has finished. Waiting for zero preserves
@@ -994,5 +1148,24 @@ mod tests {
         assert_eq!(anchored_scroll(100.0, 250.0, 600.0, 1_400.0), 0.0);
         assert_eq!(anchored_scroll(1_300.0, 250.0, 600.0, 1_400.0), 800.0);
         assert_eq!(anchored_scroll(700.0, 250.0, 900.0, 600.0), 0.0);
+    }
+
+    #[test]
+    fn neighboring_unit_slide_uses_a_smooth_complete_transition() {
+        let start = UnitSlide {
+            from_px: 300.0,
+            amount: 0.0,
+        };
+        let middle = UnitSlide {
+            amount: 0.5,
+            ..start
+        };
+        let end = UnitSlide {
+            amount: 1.0,
+            ..start
+        };
+        assert_eq!(slide_offset(&start), 300.0);
+        assert_eq!(slide_offset(&middle), 150.0);
+        assert_eq!(slide_offset(&end), 0.0);
     }
 }
