@@ -27,7 +27,7 @@
 //! and this benchmark measures pitch detection, not rhythm).
 
 use harmonicon_bench::note_bench::{
-    DEFAULT_TIMING_TOLERANCE_SECS, apply_constraints, compare, expected_notes_from_chart,
+    DEFAULT_TIMING_TOLERANCE_SECS, apply_live_constraints, compare, expected_notes_from_chart,
     run_algorithm,
 };
 use harmonicon_core::wav::decode_wav_pcm16;
@@ -155,7 +155,7 @@ fn run_one(song_dir: &Path, chart_path: &Path, wav_path: &Path, tolerance_secs: 
         // — printed alongside the raw algorithm so its effect is visible
         // directly, before deciding whether it's worth wiring into the
         // live pipeline.
-        let constrained = apply_constraints(&chart.harmonica, &frames);
+        let constrained = apply_live_constraints(&chart.harmonica, &frames);
         let constrained_report = compare(&expected, &constrained, tolerance_secs);
         println!(
             "  {:>5}+HC: hit {:>5}  miss {:>5}  phantom {:>5}",

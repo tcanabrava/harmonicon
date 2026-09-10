@@ -17,7 +17,9 @@ use std::collections::HashMap;
 
 use harmonicon_core::chart::{Action, HarpChart, tick_to_seconds};
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::harmonica_constraints::plausible_notes;
+use harmonicon_core::harmonica_constraints::{
+    HarmonicaNoteTracker, NoteTrackerConfig, plausible_notes,
+};
 use harmonicon_core::midi::note_to_midi;
 use harmonicon_dsp::{
     self as pitch_detect, CHUNK_SIZE, FftState, HOP_SIZE, PitchAlgorithm, PitchRange,
@@ -175,6 +177,20 @@ pub fn apply_constraints(harp: &Harmonica, frames: &[Frame]) -> Vec<Frame> {
         .collect()
 }
 
+/// Applies the same stateful direction/onset/release policy used by gameplay.
+/// This is the constrained row to use when judging real recordings; the older
+/// stateless helper remains useful for isolating the direction rule itself.
+pub fn apply_live_constraints(harp: &Harmonica, frames: &[Frame]) -> Vec<Frame> {
+    let mut tracker = HarmonicaNoteTracker::new(harp.clone(), NoteTrackerConfig::default());
+    frames
+        .iter()
+        .map(|frame| Frame {
+            time_secs: frame.time_secs,
+            detected: tracker.update(&frame.detected).active,
+        })
+        .collect()
+}
+
 // ── Comparison / confusion matrix ────────────────────────────────────────────
 
 /// One algorithm's aggregate performance against a chart's expected notes:
@@ -284,6 +300,22 @@ mod tests {
         let frames = vec![frame(0.1, &[60, 64, 67])];
         let constrained = apply_constraints(&harp, &frames);
         assert_eq!(constrained[0].detected, vec![60, 64, 67]);
+    }
+
+    #[test]
+    fn live_constraints_confirm_and_release_over_two_frames() {
+        let harp = richter_harp("C");
+        let frames = vec![
+            frame(0.1, &[60]),
+            frame(0.2, &[60]),
+            frame(0.3, &[]),
+            frame(0.4, &[]),
+        ];
+        let constrained = apply_live_constraints(&harp, &frames);
+        assert!(constrained[0].detected.is_empty());
+        assert_eq!(constrained[1].detected, vec![60]);
+        assert_eq!(constrained[2].detected, vec![60]);
+        assert!(constrained[3].detected.is_empty());
     }
 
     fn flat_chart(track: Vec<TrackItem>) -> HarpChart {

@@ -90,7 +90,8 @@ pub fn setup(
     // the set `judge::score_notes` filters every detected pitch through, so
     // leaving it on the chart's harp would discard everything the player
     // sounds on a substituted one.
-    valid_notes.0 = effective.harp_for(&manifest.chart).build_valid_notes();
+    let played_harp = effective.harp_for(&manifest.chart);
+    valid_notes.0 = played_harp.build_valid_notes();
 
     let chart = &manifest.chart;
 

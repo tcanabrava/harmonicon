@@ -9,12 +9,60 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 
+use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::{PitchEvent, PitchInfo};
 use harmonicon_core::chart::Modifier;
+use harmonicon_core::harmonica::Harmonica;
+use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
 use harmonicon_core::scoring::{AttackGate, HitQuality};
 
 #[derive(Resource, Default)]
 pub struct ActivePitches(pub Vec<PitchInfo>);
+
+/// Harmonica-aware post-processing for polyphonic detector output. The raw
+/// `PitchEvent` remains available to diagnostics; gameplay receives only notes
+/// compatible with one wind direction and stable for two audio frames.
+#[derive(Resource, Default)]
+pub struct HarmonicaPitchFilter {
+    tracker: Option<HarmonicaNoteTracker>,
+    pitches: HashMap<u8, PitchInfo>,
+    confirmed_ages: HashMap<u8, u8>,
+}
+
+impl HarmonicaPitchFilter {
+    pub fn configure(&mut self, harp: Harmonica) {
+        *self = Self {
+            tracker: Some(HarmonicaNoteTracker::new(
+                harp,
+                NoteTrackerConfig::default(),
+            )),
+            ..default()
+        };
+    }
+
+    fn update(&mut self, raw: &[PitchInfo]) -> Vec<PitchInfo> {
+        let Some(tracker) = self.tracker.as_mut() else {
+            return raw.to_vec();
+        };
+        for pitch in raw {
+            self.pitches.insert(pitch.midi, pitch.clone());
+        }
+        let midis: Vec<u8> = raw.iter().map(|pitch| pitch.midi).collect();
+        let tracked = tracker.update(&midis);
+        self.confirmed_ages = tracked.confirmed.iter().copied().collect();
+        self.pitches.retain(|midi, _| tracked.active.contains(midi));
+        tracked
+            .active
+            .iter()
+            .filter_map(|midi| self.pitches.get(midi).cloned())
+            .collect()
+    }
+
+    pub(crate) fn confirmation_delay(&self, midi: u8, sample_rate: u32) -> f64 {
+        let hops = self.confirmed_ages.get(&midi).copied().unwrap_or(0) as f64;
+        hops * harmonicon_audio::audio_input::HOP_SIZE as f64 / sample_rate.max(1) as f64
+    }
+}
 
 /// Enforces a fresh attack per note. A sustained pitch may satisfy only **one**
 /// note: once it scores, the pitch is "consumed" and cannot score again until it
@@ -278,8 +326,50 @@ pub fn loop_range_valid(start_time: f64, end_time: f64) -> bool {
 pub(super) fn collect_pitches(
     mut reader: MessageReader<PitchEvent>,
     mut active: ResMut<ActivePitches>,
+    mut filter: ResMut<HarmonicaPitchFilter>,
+    settings: Res<AudioSettings>,
 ) {
     for ev in reader.read() {
-        active.0 = ev.0.clone();
+        active.0 = if settings.pitch_algorithm.is_polyphonic() {
+            filter.update(&ev.0)
+        } else {
+            ev.0.clone()
+        };
+    }
+}
+
+#[cfg(test)]
+mod pitch_filter_tests {
+    use super::*;
+    use harmonicon_core::harmonica::richter_harp;
+    use harmonicon_core::midi::midi_to_freq_hz;
+
+    fn pitch(midi: u8) -> PitchInfo {
+        PitchInfo {
+            midi,
+            note: String::new(),
+            octave: 0,
+            frequency: midi_to_freq_hz(midi as f32),
+        }
+    }
+
+    #[test]
+    fn confirms_onsets_and_bridges_one_dropout() {
+        let mut filter = HarmonicaPitchFilter::default();
+        filter.configure(richter_harp("C"));
+        assert!(filter.update(&[pitch(60)]).is_empty());
+        assert_eq!(filter.update(&[pitch(60)])[0].midi, 60);
+        assert_eq!(filter.update(&[])[0].midi, 60);
+        assert!(filter.update(&[]).is_empty());
+    }
+
+    #[test]
+    fn rejects_opposite_wind_phantoms() {
+        let mut filter = HarmonicaPitchFilter::default();
+        filter.configure(richter_harp("C"));
+        filter.update(&[pitch(60), pitch(64), pitch(62)]);
+        let stable = filter.update(&[pitch(60), pitch(64), pitch(62)]);
+        let midis: Vec<u8> = stable.iter().map(|pitch| pitch.midi).collect();
+        assert_eq!(midis, vec![60, 64]);
     }
 }

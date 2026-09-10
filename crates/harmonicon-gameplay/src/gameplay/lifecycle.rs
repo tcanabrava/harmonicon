@@ -15,9 +15,24 @@ use super::bars::parse_beats;
 use super::clock::GameplayClock;
 use super::notes::{last_note_end, resolve_item_time};
 use super::state::{
-    GameplayRoot, HitFeedback, LoopConfig, MusicPlayer, MusicStarted, Paused, PitchGate, Score,
-    ScoringConfig, SongEnd, SongStats,
+    GameplayRoot, HarmonicaPitchFilter, HitFeedback, LoopConfig, MusicPlayer, MusicStarted, Paused,
+    PitchGate, Score, ScoringConfig, SongEnd, SongStats,
 };
+
+pub(crate) fn configure_pitch_filter(
+    selected: Res<SelectedSong>,
+    effective: Res<EffectiveHarmonica>,
+    manifests: Res<Assets<SongManifest>>,
+    mut filter: ResMut<HarmonicaPitchFilter>,
+) {
+    if let Some(manifest) = manifests.get(&selected.0) {
+        filter.configure(effective.harp_for(&manifest.chart).clone());
+    }
+}
+
+pub(crate) fn reset_pitch_filter(mut filter: ResMut<HarmonicaPitchFilter>) {
+    *filter = HarmonicaPitchFilter::default();
+}
 
 pub(crate) fn reset_score(
     mut score: ResMut<Score>,

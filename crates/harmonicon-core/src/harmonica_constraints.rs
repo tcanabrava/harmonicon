@@ -12,14 +12,12 @@
 //! which detector produced the candidates, so it composes with any of
 //! them (most usefully the polyphonic ones).
 //!
-//! Deliberately lives under `song::`, not `audio_system::`: `Harmonica` is
-//! a `song` type, and `song` already depends on `audio_system` (never the
-//! other way — see `docs/physical_design_plan.md`'s "dependencies point
-//! downward"), so a detector-output filter that needs the harmonica model
-//! can't live inside `audio_system::pitch_detect` itself without inverting
-//! that. Callers that have both a detector's raw output and the active
-//! chart's `Harmonica` (`note_bench`, and eventually the live gameplay
-//! pitch-gate path) apply this as a separate step instead.
+//! This stays in the Bevy-free core beside [`Harmonica`]. The DSP and audio
+//! crates remain instrument-agnostic and publish raw candidates; gameplay,
+//! Song Editor recording, and the offline benchmark supply the selected harp
+//! and share the state tracker below.
+
+use std::collections::{HashMap, HashSet};
 
 use crate::harmonica::{Harmonica, hole_notes};
 use crate::midi::note_to_midi;
@@ -41,7 +39,7 @@ fn to_midi_u8(note: &str) -> Option<u8> {
 /// (blow-family, even though its pitch sits a semitone above the draw
 /// reed); on holes 7-10 a bend pushes the *blow* reed down (blow-family)
 /// and an overdraw is produced by drawing (draw-family).
-fn reachable(harp: &Harmonica, midi: u8) -> (bool, bool) {
+pub fn reachable_directions(harp: &Harmonica, midi: u8) -> (bool, bool) {
     let mut blow = false;
     let mut draw = false;
     for hole in 1..=harp.hole_count() {
@@ -70,6 +68,206 @@ fn reachable(harp: &Harmonica, midi: u8) -> (bool, bool) {
     (blow, draw)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BreathDirection {
+    Blow,
+    Draw,
+}
+
+/// Stateful breath-direction inference for successive detector frames.
+///
+/// Candidate order is significant: the pitch detectors return strongest-first,
+/// so it is a useful confidence proxy until `PitchInfo` carries an explicit
+/// strength. By default, a direction change needs two consecutive frames of opposing
+/// evidence; this prevents one noisy FFT frame from turning a held blow chord
+/// into an impossible draw/blow flicker.
+#[derive(Debug)]
+pub struct BreathDirectionTracker {
+    current: Option<BreathDirection>,
+    pending: Option<BreathDirection>,
+    pending_frames: u8,
+    silent_frames: u8,
+    change_frames: u8,
+}
+
+impl Default for BreathDirectionTracker {
+    fn default() -> Self {
+        Self {
+            current: None,
+            pending: None,
+            pending_frames: 0,
+            silent_frames: 0,
+            change_frames: 2,
+        }
+    }
+}
+
+impl BreathDirectionTracker {
+    pub fn with_change_frames(change_frames: u8) -> Self {
+        Self {
+            change_frames: change_frames.max(1),
+            ..Self::default()
+        }
+    }
+
+    pub fn reset(&mut self) {
+        let change_frames = self.change_frames;
+        *self = Self::with_change_frames(change_frames);
+    }
+
+    pub fn filter(&mut self, harp: &Harmonica, candidates: &[u8]) -> Vec<u8> {
+        if candidates.is_empty() {
+            self.silent_frames += 1;
+            self.pending = None;
+            self.pending_frames = 0;
+            if self.silent_frames >= 2 {
+                self.reset();
+            }
+            return Vec::new();
+        }
+        self.silent_frames = 0;
+
+        let evidence = candidates
+            .iter()
+            .find_map(|&midi| match reachable_directions(harp, midi) {
+                (true, false) => Some(BreathDirection::Blow),
+                (false, true) => Some(BreathDirection::Draw),
+                _ => None,
+            });
+
+        match (self.current, evidence) {
+            (None, Some(direction)) => self.current = Some(direction),
+            (Some(current), Some(direction)) if current != direction => {
+                if self.pending == Some(direction) {
+                    self.pending_frames += 1;
+                } else {
+                    self.pending = Some(direction);
+                    self.pending_frames = 1;
+                }
+                if self.pending_frames >= self.change_frames {
+                    self.current = Some(direction);
+                    self.pending = None;
+                    self.pending_frames = 0;
+                }
+            }
+            (_, Some(_)) => {
+                self.pending = None;
+                self.pending_frames = 0;
+            }
+            _ => {}
+        }
+
+        let mut kept: Vec<u8> = candidates
+            .iter()
+            .copied()
+            .filter(|&midi| {
+                let (blow, draw) = reachable_directions(harp, midi);
+                match self.current {
+                    Some(BreathDirection::Blow) => blow,
+                    Some(BreathDirection::Draw) => draw,
+                    None => blow || draw,
+                }
+            })
+            .collect();
+        kept.sort_unstable();
+        kept.dedup();
+        kept
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NoteTrackerConfig {
+    pub onset_frames: u8,
+    pub release_frames: u8,
+    pub direction_change_frames: u8,
+}
+
+impl Default for NoteTrackerConfig {
+    fn default() -> Self {
+        Self {
+            onset_frames: 2,
+            release_frames: 2,
+            direction_change_frames: 2,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TrackedNotes {
+    pub active: Vec<u8>,
+    /// Newly confirmed pitches and the number of detector hops since their
+    /// first observation. Consumers can credit an attack to that earlier time.
+    pub confirmed: Vec<(u8, u8)>,
+}
+
+/// Pure harmonica-state tracker shared by gameplay, recording, and benchmarks.
+pub struct HarmonicaNoteTracker {
+    harp: Harmonica,
+    config: NoteTrackerConfig,
+    direction: BreathDirectionTracker,
+    pending: HashMap<u8, u8>,
+    active: HashMap<u8, u8>,
+}
+
+impl HarmonicaNoteTracker {
+    pub fn new(harp: Harmonica, config: NoteTrackerConfig) -> Self {
+        Self {
+            harp,
+            config: NoteTrackerConfig {
+                onset_frames: config.onset_frames.max(1),
+                release_frames: config.release_frames.max(1),
+                direction_change_frames: config.direction_change_frames.max(1),
+            },
+            direction: BreathDirectionTracker::with_change_frames(config.direction_change_frames),
+            pending: HashMap::new(),
+            active: HashMap::new(),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.direction.reset();
+        self.pending.clear();
+        self.active.clear();
+    }
+
+    pub fn update(&mut self, candidates: &[u8]) -> TrackedNotes {
+        // Keep the direction tracker's public two-frame default compatible,
+        // while permitting consumers to request a different transition count.
+        let allowed = self.direction.filter(&self.harp, candidates);
+        let allowed_set: HashSet<u8> = allowed.iter().copied().collect();
+        self.pending.retain(|midi, _| allowed_set.contains(midi));
+
+        let mut confirmed = Vec::new();
+        for midi in allowed {
+            if let Some(missed) = self.active.get_mut(&midi) {
+                *missed = 0;
+                continue;
+            }
+            let seen = self.pending.entry(midi).or_default();
+            *seen += 1;
+            if *seen >= self.config.onset_frames {
+                confirmed.push((midi, (*seen).saturating_sub(1)));
+                self.active.insert(midi, 0);
+            }
+        }
+        self.pending
+            .retain(|midi, _| !self.active.contains_key(midi));
+        self.active.retain(|midi, missed| {
+            if allowed_set.contains(midi) {
+                true
+            } else {
+                *missed += 1;
+                *missed < self.config.release_frames
+            }
+        });
+
+        let mut active: Vec<u8> = self.active.keys().copied().collect();
+        active.sort_unstable();
+        confirmed.sort_unstable();
+        TrackedNotes { active, confirmed }
+    }
+}
+
 /// Filters `candidates` (a raw detector's simultaneous MIDI pitch guesses)
 /// down to a physically plausible subset for `harp`:
 ///
@@ -89,7 +287,7 @@ pub fn plausible_notes(harp: &Harmonica, candidates: &[u8]) -> Vec<u8> {
     let reach: Vec<(u8, bool, bool)> = candidates
         .iter()
         .map(|&midi| {
-            let (blow, draw) = reachable(harp, midi);
+            let (blow, draw) = reachable_directions(harp, midi);
             (midi, blow, draw)
         })
         .filter(|&(_, blow, draw)| blow || draw)
@@ -174,5 +372,45 @@ mod tests {
     fn empty_candidates_yield_empty_output() {
         let harp = richter_harp("C");
         assert!(plausible_notes(&harp, &[]).is_empty());
+    }
+
+    #[test]
+    fn tracker_resists_a_one_frame_direction_flip() {
+        let harp = richter_harp("C");
+        let mut tracker = BreathDirectionTracker::default();
+        assert_eq!(tracker.filter(&harp, &[60, 64]), vec![60, 64]);
+        assert!(tracker.filter(&harp, &[62]).is_empty());
+        assert_eq!(tracker.filter(&harp, &[60, 64]), vec![60, 64]);
+    }
+
+    #[test]
+    fn tracker_changes_direction_after_two_frames() {
+        let harp = richter_harp("C");
+        let mut tracker = BreathDirectionTracker::default();
+        tracker.filter(&harp, &[60]);
+        assert!(tracker.filter(&harp, &[62]).is_empty());
+        assert_eq!(tracker.filter(&harp, &[62]), vec![62]);
+    }
+
+    #[test]
+    fn note_tracker_preserves_a_pitch_reachable_in_both_directions() {
+        let harp = richter_harp("C");
+        let mut tracker = HarmonicaNoteTracker::new(
+            harp,
+            NoteTrackerConfig {
+                onset_frames: 1,
+                ..NoteTrackerConfig::default()
+            },
+        );
+        // G4: hole 2 draw and hole 3 blow.
+        assert_eq!(tracker.update(&[67]).active, vec![67]);
+    }
+
+    #[test]
+    fn note_tracker_reports_confirmation_age() {
+        let harp = richter_harp("C");
+        let mut tracker = HarmonicaNoteTracker::new(harp, NoteTrackerConfig::default());
+        assert!(tracker.update(&[60]).confirmed.is_empty());
+        assert_eq!(tracker.update(&[60]).confirmed, vec![(60, 1)]);
     }
 }

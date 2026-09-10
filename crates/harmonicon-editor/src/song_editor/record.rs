@@ -47,6 +47,7 @@ use harmonicon_audio::AudioSettings;
 use harmonicon_audio::audio_input::{AudioCapture, CHUNK_SIZE};
 use harmonicon_audio::pitch_detect::{PITCH_RANGE_MARGIN_SEMITONES, PitchEvent, PitchRange};
 use harmonicon_core::harmonica::Harmonica;
+use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
 
 #[cfg(test)]
 use super::TICKS_PER_BEAT;
@@ -103,6 +104,10 @@ pub(super) struct RecordState {
     /// per-event harp rebuild, and so non-producible detections are
     /// discarded as noise.
     table: Vec<Option<(u8, Dir, Pitch)>>,
+    /// The selected instrument and its current wind-direction estimate. Pitch
+    /// reachability alone is insufficient for chords: one breath cannot sound
+    /// a blow-only and draw-only reed simultaneously.
+    tracker: Option<HarmonicaNoteTracker>,
     /// Ids of every note created during the current take — the notes a
     /// punch-in must *not* remove (see the module docs). Kept for the whole
     /// take so a chord or earlier phrase of the same take can't be eaten by
@@ -155,6 +160,14 @@ pub(super) fn start_record(
 
     let harp = build_harp(&state.key, state.harmonica_kind);
     record.table = build_pitch_table(&harp, state.harmonica_kind);
+    record.tracker = Some(HarmonicaNoteTracker::new(
+        harp.clone(),
+        NoteTrackerConfig {
+            onset_frames: 1,
+            release_frames: 1,
+            direction_change_frames: 2,
+        },
+    ));
     // Same harp-sized narrowing gameplay applies from a loaded chart
     // (`gameplay::lifecycle::setup_scoring_config`) — fewer candidates for
     // every detection algorithm. Restored to the default by `stop_record`.
@@ -268,7 +281,11 @@ pub(super) fn record_tick(
     // the frame rate — each one is a real detector verdict, so each drives
     // the onset/release debounce counters.
     for ev in pitch_events.read() {
-        let detected: Vec<u8> = ev.0.iter().map(|p| p.midi).collect();
+        let raw: Vec<u8> = ev.0.iter().map(|p| p.midi).collect();
+        let detected = match record.tracker.as_mut() {
+            Some(tracker) => tracker.update(&raw).active,
+            None => raw,
+        };
         apply_detected_pitches(&mut record, &mut state, &detected, t, secs_per_tick);
     }
 

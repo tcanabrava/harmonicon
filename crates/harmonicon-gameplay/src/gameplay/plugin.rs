@@ -19,8 +19,9 @@ use super::judge;
 use super::lifecycle;
 use super::notes::SongNotes;
 use super::state::{
-    ActivePitches, ActiveTargets, HitFeedback, LoopConfig, MusicStarted, NoteScored, Paused,
-    PitchGate, Score, ScoringConfig, SongEnd, SongStats, ValidHarpNotes, collect_pitches,
+    ActivePitches, ActiveTargets, HarmonicaPitchFilter, HitFeedback, LoopConfig, MusicStarted,
+    NoteScored, Paused, PitchGate, Score, ScoringConfig, SongEnd, SongStats, ValidHarpNotes,
+    collect_pitches,
 };
 use super::{
     adaptive_difficulty, bending_trainer, call_response, countdown_overlay, gameplay_2d,
@@ -68,6 +69,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<GameplayClock>()
         .init_resource::<PitchRange>()
         .init_resource::<ActivePitches>()
+        .init_resource::<HarmonicaPitchFilter>()
         .init_resource::<PitchGate>()
         .init_resource::<MusicStarted>()
         .init_resource::<ValidHarpNotes>()
@@ -103,6 +105,7 @@ impl Plugin for GameplayPlugin {
             (
                 lifecycle::reset_score,
                 lifecycle::setup_scoring_config,
+                lifecycle::configure_pitch_filter,
                 adaptive_difficulty::setup_adaptive_difficulty,
                 pause_menu::setup_pause_menu,
                 // Every mode, unlike the 2D/3D-only overlays below.
@@ -176,6 +179,7 @@ impl Plugin for GameplayPlugin {
         )
         // Cleanup: shared entity despawn + restore camera on 3D exit
         .add_systems(OnExit(AppState::Playing), lifecycle::cleanup_gameplay)
+        .add_systems(OnExit(AppState::Playing), lifecycle::reset_pitch_filter)
         .add_systems(
             OnExit(AppState::Playing),
             gameplay_3d::restore_camera.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
