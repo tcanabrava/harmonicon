@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "format_version": "1.0.0",
+    "author": "Harmonicon",
+    "source": "Original exercise",
+    "license": "MIT",
+    "description": "High-register blow-bend exercise on holes 8, 9 and 10, followed by an original descending application."
+  },
+  "song": {
+    "title": "High Blow Bends",
+    "artist": "Harmonicon Lessons",
+    "tempo_bpm": 66,
+    "key": "C",
+    "time_signature": "4/4",
+    "difficulty": "advanced"
+  },
+  "timing": {
+    "resolution": 480,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 66
+      }
+    ]
+  },
+  "harmonica": {
+    "type": "diatonic",
+    "holes": 10,
+    "position": "1st",
+    "bending_profile": "richter_standard",
+    "layout": {
+      "blow": ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"],
+      "draw": ["D4", "G4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6"]
+    }
+  },
+  "track": [
+    {"id":"n01","time":0.0,"duration":1.5,"play_mode":"single","events":[{"hole":8,"action":"blow","note":"E6"}],"phrase":"8 blow"},
+    {"id":"n02","time":2.0,"duration":1.5,"play_mode":"single","events":[{"hole":8,"action":"blow","note":"E6","modifiers":[{"type":"bend","semitones":-1}]}],"phrase":"8 blow bend"},
+    {"id":"n03","time":4.0,"duration":1.5,"play_mode":"single","events":[{"hole":9,"action":"blow","note":"G6"}],"phrase":"9 blow"},
+    {"id":"n04","time":6.0,"duration":1.5,"play_mode":"single","events":[{"hole":9,"action":"blow","note":"G6","modifiers":[{"type":"bend","semitones":-1}]}],"phrase":"9 blow bend"},
+    {"id":"n05","time":8.0,"duration":1.5,"play_mode":"single","events":[{"hole":10,"action":"blow","note":"C7"}],"phrase":"10 blow"},
+    {"id":"n06","time":10.0,"duration":1.5,"play_mode":"single","events":[{"hole":10,"action":"blow","note":"C7","modifiers":[{"type":"bend","semitones":-1}]}],"phrase":"10 blow bend"},
+    {"id":"n07","time":12.0,"duration":1.5,"play_mode":"single","events":[{"hole":10,"action":"blow","note":"C7","modifiers":[{"type":"bend","semitones":-2}]}],"phrase":"10 blow whole-step bend"},
+    {"id":"n08","time":16.0,"duration":0.75,"play_mode":"single","events":[{"hole":10,"action":"blow","note":"C7"}],"phrase":"Descending bend line"},
+    {"id":"n09","time":17.0,"duration":0.75,"play_mode":"single","events":[{"hole":10,"action":"blow","note":"C7","modifiers":[{"type":"bend","semitones":-1}]}]},
+    {"id":"n10","time":18.0,"duration":0.75,"play_mode":"single","events":[{"hole":9,"action":"blow","note":"G6"}]},
+    {"id":"n11","time":19.0,"duration":0.75,"play_mode":"single","events":[{"hole":9,"action":"blow","note":"G6","modifiers":[{"type":"bend","semitones":-1}]}]},
+    {"id":"n12","time":20.0,"duration":0.75,"play_mode":"single","events":[{"hole":8,"action":"blow","note":"E6"}]},
+    {"id":"n13","time":21.0,"duration":1.5,"play_mode":"single","events":[{"hole":8,"action":"blow","note":"E6","modifiers":[{"type":"bend","semitones":-1}]}]}
+  ],
+  "scoring": {
+    "perfect_window_ms": 170,
+    "good_window_ms": 360,
+    "miss_window_ms": 600
+  }
+}

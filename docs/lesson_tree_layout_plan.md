@@ -158,9 +158,6 @@ required by `docs/lessons_plan.md`.
 
 ### Highest priority
 
-- **High-register blow bends:** controlled 8/9/10 blow bends followed by short
-  melodic applications. Existing bend scoring should work after validating
-  the relevant harmonica maps.
 - **Rhythm progression:** eighth-note triplets, straight versus shuffle,
   syncopation, rests, sixteenth-note articulation, and tempo stability. Reuse
   timing windows, tempo maps, and fresh-attack scoring.

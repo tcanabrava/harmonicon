@@ -1,0 +1,26 @@
+{
+  "id": "high-blow-bends",
+  "unit": "advanced",
+  "track": "bend",
+  "optional": true,
+  "title_key": "lesson-high-blow-bends-title",
+  "body_key": "lesson-high-blow-bends-body",
+  "chart": "song/chart.harpchart",
+  "prerequisites": [
+    "deep-bends",
+    "high-register"
+  ],
+  "pass_criteria": {
+    "type": "technique",
+    "technique": "bend",
+    "threshold": 0.55
+  },
+  "training": {
+    "technique": "bend",
+    "holes": [
+      8,
+      9,
+      10
+    ]
+  }
+}

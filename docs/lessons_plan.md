@@ -310,6 +310,16 @@ draw 2 so every note of that exercise is a distinct pitch. Any future
 navigation lesson must respect the same constraint, or it will score a
 player correct for landing on the wrong hole.
 
+### Unit 7 — advanced (`07_advanced/`) — 1 lesson shipped
+
+An elective-only unit for techniques that add range and expression without
+blocking the main course. A unit with no core lessons has a zero unlock
+requirement, and every lesson here declares `optional: true`.
+
+| Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
+|---|---|---|---|---|
+| **High blow bends** (`high-blow-bends`, `01_high_blow_bends`) — half-step bends on 8/9/10, the whole-step 10 bend, and a descending application | **Scored** | Existing bend detection and generated bend ladder over holes 8/9/10 | `deep-bends`, `high-register` | technique `bend` ≥ 0.55 |
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"

@@ -104,6 +104,34 @@ fn no_drill_asks_for_a_bend_deeper_than_the_hole_allows() {
 }
 
 #[test]
+fn high_register_training_generates_real_blow_bends() {
+    let harp = richter_harp("C");
+    let chart = drill(Tier::Vary, &[8, 9, 10]);
+    let mut saw_whole_step_ten = false;
+    for item in &chart.track {
+        let event = &item.events[0];
+        let bend = event
+            .modifiers
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .find_map(|m| {
+                if let Modifier::Bend { semitones, .. } = m {
+                    Some(*semitones)
+                } else {
+                    None
+                }
+            });
+        if let Some(semitones) = bend {
+            assert_eq!(event.action, Action::Blow);
+            assert!(sounded_pitch(event, &harp).is_some());
+            saw_whole_step_ten |= event.hole == 10 && semitones == -2.0;
+        }
+    }
+    assert!(saw_whole_step_ten, "hole 10's deeper blow bend was omitted");
+}
+
+#[test]
 fn a_hole_that_cannot_bend_yields_no_drill() {
     // Hole 5's reeds are a semitone apart, so there is no bend note to
     // reach. Returning `None` beats generating a drill of plain notes that
