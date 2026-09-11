@@ -151,7 +151,7 @@ pub(crate) fn animate_unit_slides(
     time: Res<Time>,
     mut slides: ResMut<UnitSlides>,
     mut owned: Query<(&LayoutOwner, &mut UiTransform), Without<MovingEdge>>,
-    mut edges: Query<(&MovingEdge, &mut Node, &mut UiTransform)>,
+    mut edges: Query<(&MovingEdge, &mut Node)>,
 ) {
     let step = time.delta_secs() / TRANSITION_SECONDS;
     for slide in slides.0.values_mut() {
@@ -162,7 +162,7 @@ pub(crate) fn animate_unit_slides(
         let offset = slides.0.get(&owner.0).map_or(0.0, slide_offset);
         transform.translation = Val2::px(offset, 0.0);
     }
-    for (edge, mut node, mut transform) in &mut edges {
+    for (edge, mut node) in &mut edges {
         let from_offset = slides.0.get(&edge.from_unit).map_or(0.0, slide_offset);
         let to_offset = slides.0.get(&edge.to_unit).map_or(0.0, slide_offset);
         let from = Endpoint {
@@ -173,7 +173,7 @@ pub(crate) fn animate_unit_slides(
             centre: edge.to.centre + Vec2::X * to_offset,
             ..edge.to
         };
-        set_edge_geometry(&mut node, &mut transform, from, to, edge.thickness);
+        set_edge_geometry(&mut node, from, to, edge.thickness);
     }
     slides.0.retain(|_, slide| slide.amount < 1.0);
 }

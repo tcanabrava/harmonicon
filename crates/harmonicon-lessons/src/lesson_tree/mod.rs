@@ -27,15 +27,22 @@
 //! starting inside a unit's ring and a branch edge stopping short of the
 //! lesson it points at.
 //!
-//! **That takes no shader and no mesh.** A straight run is one `Node`
-//! rotated by `UiTransform::rotation`, a first-class UI field in Bevy 0.19.
-//! `bevy_ui` has no line primitive, but a rotated rectangle is one.
+//! **The node holding an edge is axis-aligned, and a shader draws the line
+//! inside it** ([`edge_material`]). `bevy_ui` has no line primitive, and a
+//! rotated rectangle looks like the obvious substitute — but `bevy_ui`
+//! clips by pushing a node's four transformed corners inside the clip rect,
+//! which shears a rotated quad instead of cutting it. This page lives in a
+//! scroll area, so every edge leaving the viewport came out skewed.
+//!
+//! An elective branch is dotted instead, and its dots *are* plain nodes:
+//! they are axis-aligned already, so they clip correctly with no shader.
 //!
 //! **There is no list view any more.** This replaced it rather than sitting
 //! beside it, so a lesson has one home and unit gating is stated in one
 //! place. The tree is wide, and a small screen reaches the rest of it by
 //! scrolling; `responsive::is_compact` no longer routes anywhere.
 
+mod edge_material;
 mod layout;
 mod transition;
 
@@ -43,7 +50,7 @@ use accesskit::{Node as AccessibilityKitNode, Role};
 use bevy::a11y::AccessibilityNode;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
-use bevy::ui::{ScrollPosition, UiTransform};
+use bevy::ui::ScrollPosition;
 use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use bevy_fluent::Localization;
 
@@ -60,6 +67,9 @@ use harmonicon_menu::menu::MenuPage;
 use harmonicon_menu::menu::scene::{spawn_back_button, spawn_menu_root_plain};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
+use bevy::ui_render::prelude::MaterialNode;
+pub(crate) use edge_material::LessonEdgeMaterialPlugin;
+use edge_material::{LessonEdgeMaterial, edge_box, edge_diagonal};
 use layout::{EdgeKind, NodeState, PlacedNode, PlacedUnit, layout_with_collapsed};
 pub(crate) use transition::*;
 
@@ -230,6 +240,7 @@ pub(crate) fn setup_lesson_tree(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<LessonEdgeMaterial>>,
 ) {
     // `_plain` plus a two-axis scroll area of our own: the shared
     // `spawn_menu_root` scrolls vertically only, and this canvas outgrows
@@ -427,6 +438,7 @@ pub(crate) fn setup_lesson_tree(
                 style,
                 edge.unit_id.as_deref(),
                 owners,
+                &mut materials,
             );
         }
     });
@@ -499,24 +511,22 @@ fn edge_span(from: Endpoint, to: Endpoint) -> Option<(Vec2, Vec2)> {
     ))
 }
 
-fn set_edge_geometry(
-    node: &mut Node,
-    transform: &mut UiTransform,
-    from: Endpoint,
-    to: Endpoint,
-    thickness: f32,
-) -> bool {
+/// Repositions a moving edge's node.
+///
+/// Only the box moves: the shader rebuilds the line from the node's own
+/// size, so a translating or stretching edge needs no material update. The
+/// diagonal *is* baked into the material at spawn, which holds because an
+/// edge either slides rigidly (both ends belong to one unit) or stretches
+/// along the horizontal spine — neither flips which way it runs.
+fn set_edge_geometry(node: &mut Node, from: Endpoint, to: Endpoint, thickness: f32) -> bool {
     let Some((start, end)) = edge_span(from, to) else {
         return false;
     };
-    let delta = end - start;
-    let length = delta.length();
-    let mid = (start + end) / 2.0;
-    node.left = Val::Px(mid.x - length / 2.0);
-    node.top = Val::Px(mid.y - thickness / 2.0);
-    node.width = Val::Px(length);
-    node.height = Val::Px(thickness);
-    transform.rotation = Rot2::radians(delta.y.atan2(delta.x));
+    let (top_left, size) = edge_box(start, end, thickness / 2.0);
+    node.left = Val::Px(top_left.x);
+    node.top = Val::Px(top_left.y);
+    node.width = Val::Px(size.x);
+    node.height = Val::Px(size.y);
     true
 }
 
@@ -602,6 +612,7 @@ fn spawn_edge(
     style: EdgeStyle,
     unit_id: Option<&str>,
     owners: Option<(&str, &str)>,
+    materials: &mut Assets<LessonEdgeMaterial>,
 ) {
     let Some((start, end)) = edge_span(from, to) else {
         return;
@@ -613,30 +624,24 @@ fn spawn_edge(
         spawn_dotted_edge(parent, start, end, style, unit_id);
         return;
     }
-    let delta = end - start;
-    let length = delta.length();
-    let mid = (start + end) / 2.0;
+    let (top_left, size) = edge_box(start, end, thickness / 2.0);
 
     let mut segment = parent.spawn((
         Node {
             position_type: PositionType::Absolute,
-            // Positioned by its own top-left, so shift back by half its
-            // extent to centre it on the midpoint before rotating —
-            // `UiTransform::rotation` turns a node about its centre.
-            left: Val::Px(mid.x - length / 2.0),
-            top: Val::Px(mid.y - thickness / 2.0),
-            width: Val::Px(length),
-            height: Val::Px(thickness),
-            // Rounds the two ends, which softens where a thick spine edge
-            // meets a ring.
-            border_radius: BorderRadius::MAX,
+            left: Val::Px(top_left.x),
+            top: Val::Px(top_left.y),
+            width: Val::Px(size.x),
+            height: Val::Px(size.y),
             ..default()
         },
-        UiTransform {
-            rotation: Rot2::radians(delta.y.atan2(delta.x)),
-            ..default()
-        },
-        BackgroundColor(color),
+        // The node stays axis-aligned and the shader draws the line inside
+        // it — see `edge_material`. A rotated node would be sheared rather
+        // than clipped wherever it left the scroll viewport.
+        MaterialNode(materials.add(LessonEdgeMaterial {
+            color: color.into(),
+            params: Vec4::new(thickness / 2.0, edge_diagonal(start, end), 0.0, 0.0),
+        })),
     ));
     if let Some((from_unit, to_unit)) = owners {
         segment.insert(MovingEdge {

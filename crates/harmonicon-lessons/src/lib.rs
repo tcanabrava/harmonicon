@@ -16,7 +16,8 @@ pub struct LessonsUiPlugin;
 
 impl Plugin for LessonsUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<lesson_reader::SelectedLesson>()
+        app.add_plugins(lesson_tree::LessonEdgeMaterialPlugin)
+            .init_resource::<lesson_reader::SelectedLesson>()
             .init_resource::<lesson_tree::CollapsedUnits>()
             .init_resource::<lesson_tree::UnitExpansions>()
             .init_resource::<lesson_tree::PendingCompaction>()
