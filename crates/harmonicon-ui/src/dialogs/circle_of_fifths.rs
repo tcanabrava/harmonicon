@@ -60,7 +60,7 @@ pub fn spawn_circle_of_fifths(
     harp_key: &str,
     positions: &[Position],
     colors: CircleOfFifthsColors,
-) {
+) -> Entity {
     // Circle-of-fifths order starting at `harp_key`: index i is i fifths
     // (7 semitones) clockwise from it (C, G, D, A, E, B, F#, C#, G#, D#,
     // A#, F, back to C).
@@ -145,7 +145,8 @@ pub fn spawn_circle_of_fifths(
                         }
                     });
             }
-        });
+        })
+        .id()
 }
 
 #[cfg(test)]

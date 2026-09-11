@@ -51,7 +51,7 @@ pub enum PassCriteria {
 /// A lesson's generated drills, as authored. The tier ladder itself is
 /// fixed (`harmonicon_core::training::Tier`), so a lesson only says *what*
 /// to drill and *where* — never how hard, which is the ladder's job.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct TrainingBlock {
     pub technique: String,
     pub holes: Vec<u8>,
@@ -64,7 +64,7 @@ pub struct TrainingBlock {
 /// A reusable teaching aid embedded in a lesson reader page. This is a tagged
 /// enum so unsupported widget kinds fail while loading the manifest rather
 /// than silently rendering an incomplete lesson.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum LessonWidget {
     CircleOfFifths {
@@ -73,10 +73,41 @@ pub enum LessonWidget {
         #[serde(default)]
         positions: Vec<String>,
     },
+    TwelveBarGrid {
+        #[serde(default = "default_harp_key")]
+        key: String,
+        #[serde(default = "default_progression")]
+        progression: String,
+        #[serde(default)]
+        sync_group: Option<String>,
+    },
+    Metronome {
+        #[serde(default = "default_bpm")]
+        bpm: f32,
+        #[serde(default = "default_beats_per_bar")]
+        beats_per_bar: usize,
+        #[serde(default = "default_feel")]
+        feel: String,
+        #[serde(default)]
+        sync_group: Option<String>,
+    },
 }
 
 fn default_harp_key() -> String {
     "C".into()
+}
+
+fn default_progression() -> String {
+    "standard".into()
+}
+fn default_bpm() -> f32 {
+    90.0
+}
+fn default_beats_per_bar() -> usize {
+    4
+}
+fn default_feel() -> String {
+    "straight".into()
 }
 
 /// One `lesson.json`, as authored. See `assets/lesson_schema.dtd.json` for
@@ -262,6 +293,34 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("piano"), "{error}");
+    }
+
+    #[test]
+    fn parses_synchronized_grid_and_metronome_widgets() {
+        let m = parse_lesson(
+            br#"{"id":"form","unit":"rhythm","title_key":"t","body_key":"b","widgets":[
+                {"type":"twelve-bar-grid","key":"G","progression":"quick-change","sync_group":"form"},
+                {"type":"metronome","bpm":72,"beats_per_bar":4,"feel":"shuffle","sync_group":"form"}
+            ]}"#,
+        )
+        .unwrap();
+        assert_eq!(m.widgets.len(), 2);
+        assert!(
+            matches!(m.widgets[0], LessonWidget::TwelveBarGrid { ref key, ref sync_group, .. } if key == "G" && sync_group.as_deref() == Some("form"))
+        );
+        assert!(
+            matches!(m.widgets[1], LessonWidget::Metronome { bpm, beats_per_bar: 4, ref sync_group, .. } if bpm == 72.0 && sync_group.as_deref() == Some("form"))
+        );
+    }
+
+    #[test]
+    fn rejects_metronome_tempo_outside_the_supported_range() {
+        let error = parse_lesson(
+            br#"{"id":"x","unit":"u","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"metronome","bpm":301}]}"#,
+        )
+        .unwrap_err();
+        assert!(error.contains("301"), "{error}");
     }
 
     #[test]

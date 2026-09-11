@@ -60,7 +60,8 @@ pub fn spawn_12_bar_grid(
     progression: Progression,
     cfg: &GridConfig,
     colors: TwelveBarColors,
-) {
+) -> Vec<Entity> {
+    let mut cells = Vec::with_capacity(12);
     for row in 0..3usize {
         parent
             .spawn(Node {
@@ -71,7 +72,7 @@ pub fn spawn_12_bar_grid(
             .with_children(|row_node| {
                 for col in 0..4usize {
                     let idx = row * 4 + col;
-                    row_node
+                    let cell_entity = row_node
                         .spawn((
                             Node {
                                 width: cfg.cell_width,
@@ -103,10 +104,13 @@ pub fn spawn_12_bar_grid(
                                 },
                                 TextColor(Color::srgb(0.45, 0.45, 0.55)),
                             ));
-                        });
+                        })
+                        .id();
+                    cells.push(cell_entity);
                 }
             });
     }
+    cells
 }
 
 #[cfg(test)]

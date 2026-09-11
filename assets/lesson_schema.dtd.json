@@ -253,6 +253,25 @@
                 "uniqueItems": true
               }
             }
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "type": { "const": "twelve-bar-grid" },
+              "key": { "type": "string", "minLength": 1 },
+              "progression": { "type": "string", "enum": ["standard", "quick-change", "minor", "jazz-blues"] },
+              "sync_group": { "type": "string", "minLength": 1 }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "type": { "const": "metronome" },
+              "bpm": { "type": "number", "minimum": 30, "maximum": 300 },
+              "beats_per_bar": { "type": "integer", "minimum": 1, "maximum": 12 },
+              "feel": { "type": "string", "enum": ["straight", "shuffle"] },
+              "sync_group": { "type": "string", "minLength": 1 }
+            }
           }
         ]
       }

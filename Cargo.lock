@@ -3632,6 +3632,7 @@ dependencies = [
  "bevy",
  "bevy_fluent",
  "harmonicon-app",
+ "harmonicon-audio",
  "harmonicon-core",
  "harmonicon-menu",
  "harmonicon-platform",

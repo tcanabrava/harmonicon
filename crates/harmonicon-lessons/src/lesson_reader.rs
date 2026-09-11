@@ -9,13 +9,14 @@
 //! Discovery/unlock/pass logic lives in `harmonicon_song::lessons`; this
 //! module is only the menu surface.
 
-use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
+use bevy::{audio::Volume, prelude::*};
 use bevy_fluent::Localization;
 
 use harmonicon_app::profile::{PlayerProfile, record_lesson, save_profile, training_key};
+use harmonicon_audio::AudioSettings;
 use harmonicon_core::chart::Scale;
-use harmonicon_core::harmonica::{Position, Progression};
+use harmonicon_core::harmonica::{Position, Progression, progression_bars, semitone};
 use harmonicon_core::pitch_map::{HarpKind, harp_for_key};
 use harmonicon_core::training::{Tier, drill_chart};
 use harmonicon_platform::localization::LocalizationExt;
@@ -26,6 +27,8 @@ use harmonicon_song::lessons::{
 };
 use harmonicon_song::song::{SongManifest, training_manifest};
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
+use harmonicon_ui::dialogs::metronome::{MetronomeClock, MetronomeFeel, click_for_tick};
+use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, bar_bg, spawn_12_bar_grid};
 
 use harmonicon_app::app::{
     AppState, GameplayMode, GeneratedSong, JamPositionCycle, JamProgression, JamScale, SelectedSong,
@@ -37,6 +40,94 @@ use harmonicon_menu::menu::scene::{spawn_back_button, spawn_button, spawn_menu_r
 /// switches to [`MenuPage::LessonReader`].
 #[derive(Resource, Default)]
 pub(crate) struct SelectedLesson(pub Option<String>);
+
+#[derive(Component)]
+pub(crate) struct LessonMetronome {
+    clock: MetronomeClock,
+    bpm: f32,
+    feel: MetronomeFeel,
+    beats_per_bar: usize,
+    muted: bool,
+    sync_group: Option<String>,
+    label: Entity,
+}
+
+#[derive(Component)]
+pub(crate) struct LessonGrid {
+    cells: Vec<Entity>,
+    key: String,
+    progression: Progression,
+    sync_group: Option<String>,
+}
+
+#[derive(Component)]
+struct LessonCircle {
+    diagram: Entity,
+    host: Entity,
+    harp_key: String,
+    positions: Vec<Position>,
+}
+
+pub(crate) fn update_lesson_metronomes(
+    time: Res<Time>,
+    mut metronomes: Query<&mut LessonMetronome>,
+    grids: Query<&LessonGrid>,
+    mut labels: Query<&mut Text>,
+    mut backgrounds: Query<&mut BackgroundColor>,
+    asset_server: Res<AssetServer>,
+    audio: Res<AudioSettings>,
+    theme: Res<LoadedTheme>,
+    mut commands: Commands,
+) {
+    for mut metronome in &mut metronomes {
+        let bpm = metronome.bpm;
+        let feel = metronome.feel;
+        let tick = metronome
+            .clock
+            .advance(time.delta_secs_f64(), f64::from(bpm), feel);
+        if let Ok(mut text) = labels.get_mut(metronome.label) {
+            *text = Text::new(format!("\u{2669} = {}", bpm as u32));
+        }
+        let Some(tick) = tick else { continue };
+        if !metronome.muted
+            && let Some((accent, gain)) = click_for_tick(tick, metronome.beats_per_bar as f64, feel)
+        {
+            let sample = if accent {
+                "sounds/metronome_high.ogg"
+            } else {
+                "sounds/metronome_low.ogg"
+            };
+            commands.spawn((
+                AudioPlayer::<AudioSource>(asset_server.load(sample)),
+                PlaybackSettings::DESPAWN
+                    .with_volume(Volume::Linear(audio.metronome_volume * gain)),
+            ));
+        }
+        let beat = match feel {
+            MetronomeFeel::Straight => tick,
+            MetronomeFeel::Shuffle => tick.div_euclid(3),
+        };
+        if tick == 0 || (feel == MetronomeFeel::Shuffle && tick.rem_euclid(3) != 0) {
+            continue;
+        }
+        let bar = (beat.div_euclid(metronome.beats_per_bar as i64) as usize) % 12;
+        for grid in &grids {
+            if grid.sync_group.is_none() || grid.sync_group != metronome.sync_group {
+                continue;
+            }
+            let colors = theme.twelve_bar_colors();
+            for (index, entity) in grid.cells.iter().enumerate() {
+                if let Ok(mut bg) = backgrounds.get_mut(*entity) {
+                    *bg = if index == bar {
+                        BackgroundColor(Color::srgba(0.75, 0.55, 0.08, 0.95))
+                    } else {
+                        BackgroundColor(bar_bg(index, &grid.key, grid.progression, colors))
+                    };
+                }
+            }
+        }
+    }
+}
 
 /// Looks a lesson up by id. The tree always sets [`SelectedLesson`] before
 /// opening this page, so a miss only happens if something desyncs — the
@@ -293,29 +384,231 @@ pub(crate) fn setup_lesson_reader(
     // An empty position list means "show every position", which preserves
     // the original diagram's useful overview without verbose manifest data.
     for widget in &entry.manifest.widgets {
-        let LessonWidget::CircleOfFifths {
-            harp_key,
-            positions,
-        } = widget;
-        let selected: Vec<Position> = if positions.is_empty() {
-            Position::all().to_vec()
-        } else {
-            positions
-                .iter()
-                .filter_map(|name| match name.as_str() {
-                    "first" => Some(Position::First),
-                    "second" => Some(Position::Second),
-                    "third" => Some(Position::Third),
-                    "fourth" => Some(Position::Fourth),
-                    "fifth" => Some(Position::Fifth),
-                    "twelfth" => Some(Position::Twelfth),
-                    _ => None,
-                })
-                .collect()
-        };
-        commands.entity(root).with_children(|parent| {
-            spawn_circle_of_fifths(parent, harp_key, &selected, theme.circle_of_fifths_colors());
-        });
+        match widget {
+            LessonWidget::CircleOfFifths {
+                harp_key,
+                positions,
+            } => {
+                let selected: Vec<Position> = if positions.is_empty() {
+                    Position::all().to_vec()
+                } else {
+                    positions
+                        .iter()
+                        .filter_map(|name| match name.as_str() {
+                            "first" => Some(Position::First),
+                            "second" => Some(Position::Second),
+                            "third" => Some(Position::Third),
+                            "fourth" => Some(Position::Fourth),
+                            "fifth" => Some(Position::Fifth),
+                            "twelfth" => Some(Position::Twelfth),
+                            _ => None,
+                        })
+                        .collect()
+                };
+                let mut diagram = Entity::PLACEHOLDER;
+                commands.entity(root).with_children(|parent| {
+                    diagram = spawn_circle_of_fifths(
+                        parent,
+                        harp_key,
+                        &selected,
+                        theme.circle_of_fifths_colors(),
+                    );
+                });
+                let state = commands
+                    .spawn(LessonCircle {
+                        diagram,
+                        host: root,
+                        harp_key: harp_key.clone(),
+                        positions: selected,
+                    })
+                    .id();
+                commands.entity(root).add_child(state);
+                let target = state;
+                spawn_button(
+                    &mut commands,
+                    root,
+                    &loc.msg("lesson-widget-key-previous"),
+                    move |_: On<Activate>,
+                          mut commands: Commands,
+                          theme: Res<LoadedTheme>,
+                          mut q: Query<&mut LessonCircle>| {
+                        let Ok(mut circle) = q.get_mut(target) else {
+                            return;
+                        };
+                        commands.entity(circle.diagram).despawn();
+                        circle.harp_key = semitone(&circle.harp_key, -1);
+                        let mut diagram = Entity::PLACEHOLDER;
+                        commands.entity(circle.host).with_children(|parent| {
+                            diagram = spawn_circle_of_fifths(
+                                parent,
+                                &circle.harp_key,
+                                &circle.positions,
+                                theme.circle_of_fifths_colors(),
+                            );
+                        });
+                        circle.diagram = diagram;
+                    },
+                );
+                let target = state;
+                spawn_button(
+                    &mut commands,
+                    root,
+                    &loc.msg("lesson-widget-key-next"),
+                    move |_: On<Activate>,
+                          mut commands: Commands,
+                          theme: Res<LoadedTheme>,
+                          mut q: Query<&mut LessonCircle>| {
+                        let Ok(mut circle) = q.get_mut(target) else {
+                            return;
+                        };
+                        commands.entity(circle.diagram).despawn();
+                        circle.harp_key = semitone(&circle.harp_key, 1);
+                        let mut diagram = Entity::PLACEHOLDER;
+                        commands.entity(circle.host).with_children(|parent| {
+                            diagram = spawn_circle_of_fifths(
+                                parent,
+                                &circle.harp_key,
+                                &circle.positions,
+                                theme.circle_of_fifths_colors(),
+                            );
+                        });
+                        circle.diagram = diagram;
+                    },
+                );
+            }
+            LessonWidget::TwelveBarGrid {
+                key,
+                progression,
+                sync_group,
+            } => {
+                let progression = parse_progression(Some(progression));
+                let chords: Vec<String> = progression_bars(key, progression)
+                    .into_iter()
+                    .map(|(root, _)| root)
+                    .collect();
+                let mut cells = Vec::new();
+                commands.entity(root).with_children(|parent| {
+                    cells = spawn_12_bar_grid(
+                        parent,
+                        &chords,
+                        key,
+                        progression,
+                        &GridConfig::for_3d(),
+                        theme.twelve_bar_colors(),
+                    );
+                });
+                let marker = commands
+                    .spawn(LessonGrid {
+                        cells,
+                        key: key.clone(),
+                        progression,
+                        sync_group: sync_group.clone(),
+                    })
+                    .id();
+                commands.entity(root).add_child(marker);
+            }
+            LessonWidget::Metronome {
+                bpm,
+                beats_per_bar,
+                feel,
+                sync_group,
+            } => {
+                let label = commands
+                    .spawn((
+                        Text::new(format!("\u{2669} = {}", *bpm as u32)),
+                        TextFont {
+                            font_size: FontSize::Px(22.0),
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                    ))
+                    .id();
+                let metronome = commands
+                    .spawn((
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            align_items: AlignItems::Center,
+                            row_gap: Val::Px(8.0),
+                            ..default()
+                        },
+                        LessonMetronome {
+                            clock: MetronomeClock::default(),
+                            bpm: *bpm,
+                            feel: if feel == "shuffle" {
+                                MetronomeFeel::Shuffle
+                            } else {
+                                MetronomeFeel::Straight
+                            },
+                            beats_per_bar: *beats_per_bar,
+                            muted: false,
+                            sync_group: sync_group.clone(),
+                            label,
+                        },
+                    ))
+                    .add_child(label)
+                    .id();
+                commands.entity(root).add_child(metronome);
+                let target = metronome;
+                spawn_button(
+                    &mut commands,
+                    metronome,
+                    &loc.msg("lesson-widget-metronome-toggle"),
+                    move |_: On<Activate>, mut q: Query<&mut LessonMetronome>| {
+                        if let Ok(mut metronome) = q.get_mut(target) {
+                            metronome.clock.running = !metronome.clock.running;
+                        }
+                    },
+                );
+                let target = metronome;
+                spawn_button(
+                    &mut commands,
+                    metronome,
+                    &loc.msg("lesson-widget-tempo-decrease"),
+                    move |_: On<Activate>, mut q: Query<&mut LessonMetronome>| {
+                        if let Ok(mut metronome) = q.get_mut(target) {
+                            metronome.bpm = (metronome.bpm - 5.0).max(30.0);
+                        }
+                    },
+                );
+                let target = metronome;
+                spawn_button(
+                    &mut commands,
+                    metronome,
+                    &loc.msg("lesson-widget-tempo-increase"),
+                    move |_: On<Activate>, mut q: Query<&mut LessonMetronome>| {
+                        if let Ok(mut metronome) = q.get_mut(target) {
+                            metronome.bpm = (metronome.bpm + 5.0).min(300.0);
+                        }
+                    },
+                );
+                let target = metronome;
+                spawn_button(
+                    &mut commands,
+                    metronome,
+                    &loc.msg("lesson-widget-feel-toggle"),
+                    move |_: On<Activate>, mut q: Query<&mut LessonMetronome>| {
+                        if let Ok(mut metronome) = q.get_mut(target) {
+                            metronome.feel = match metronome.feel {
+                                MetronomeFeel::Straight => MetronomeFeel::Shuffle,
+                                MetronomeFeel::Shuffle => MetronomeFeel::Straight,
+                            };
+                            metronome.clock.reset();
+                        }
+                    },
+                );
+                let target = metronome;
+                spawn_button(
+                    &mut commands,
+                    metronome,
+                    &loc.msg("lesson-widget-sound-toggle"),
+                    move |_: On<Activate>, mut q: Query<&mut LessonMetronome>| {
+                        if let Ok(mut metronome) = q.get_mut(target) {
+                            metronome.muted = !metronome.muted;
+                        }
+                    },
+                );
+            }
+        }
     }
 
     // Compatibility for externally-authored lessons using the original
@@ -324,7 +617,7 @@ pub(crate) fn setup_lesson_reader(
         && entry.manifest.diagram.as_deref() == Some("circle-of-fifths")
     {
         commands.entity(root).with_children(|parent| {
-            spawn_circle_of_fifths(
+            let _ = spawn_circle_of_fifths(
                 parent,
                 "C",
                 Position::all(),

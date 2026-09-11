@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 accesskit = { workspace = true }
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
+harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
 harmonicon-platform = { path = "../harmonicon-platform", version = "*" }
 harmonicon-song = { path = "../harmonicon-song", version = "*" }
 harmonicon-app = { path = "../harmonicon-app", version = "*" }
@@ -17,9 +18,9 @@ bevy = { workspace = true }
 bevy_fluent = { workspace = true }
 
 [features]
-dev = ["bevy/dev", "bevy/debug", "harmonicon-menu/dev"]
-dynamic_linking = ["bevy/dynamic_linking", "harmonicon-menu/dynamic_linking"]
-trace_tracy = ["bevy/trace_tracy", "harmonicon-menu/trace_tracy"]
+dev = ["bevy/dev", "bevy/debug", "harmonicon-audio/dev", "harmonicon-menu/dev"]
+dynamic_linking = ["bevy/dynamic_linking", "harmonicon-audio/dynamic_linking", "harmonicon-menu/dynamic_linking"]
+trace_tracy = ["bevy/trace_tracy", "harmonicon-audio/trace_tracy", "harmonicon-menu/trace_tracy"]
 
 [lints]
 workspace = true

@@ -49,6 +49,10 @@ impl Plugin for LessonsUiPlugin {
                 OnEnter(MenuPage::LessonReader),
                 lesson_reader::setup_lesson_reader,
             )
+            .add_systems(
+                Update,
+                lesson_reader::update_lesson_metronomes.run_if(in_state(MenuPage::LessonReader)),
+            )
             .add_systems(OnExit(MenuPage::LessonReader), scene::cleanup_menu);
     }
 }
