@@ -1,0 +1,1 @@
+{"id":"long-tone-control","unit":"expression","optional":true,"track":"vibrato","title_key":"lesson-long-tone-control-title","body_key":"lesson-long-tone-control-body","chart":"song/chart.harpchart","prerequisites":["dynamic-shaping","vibrato-control"],"pass_criteria":{"type":"accuracy","threshold":0.75}}

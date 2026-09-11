@@ -1,0 +1,1 @@
+{"id":"vibrato-control","unit":"expression","optional":true,"track":"vibrato","title_key":"lesson-vibrato-control-title","body_key":"lesson-vibrato-control-body","chart":"song/chart.harpchart","prerequisites":["hand-vibrato","throat-vibrato","diaphragm-vibrato"],"pass_criteria":{"type":"technique","technique":"vibrato","threshold":0.6}}

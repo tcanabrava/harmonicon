@@ -394,6 +394,23 @@ shake and trill cells; glissandi finish with measured multi-hole sweeps.
 | **Trill cells** (`trill-cells`) | Timed neighbor-note cells | `fast-shake` | accuracy ≥ 0.7 |
 | **Glissandi** (`glissandi`) | Ordered sweep and destination | `trill-cells`, `slides` | accuracy ≥ 0.65 |
 
+### Unit 13 — expression (`13_expression/`) — 6 lessons shipped
+
+Hand, throat, and diaphragm vibrato are separate instructional approaches;
+the microphone cannot attribute the motion that produced a modulation.
+`vibrato-control` scores the pitch-oscillation rate the existing analyzer can
+measure. Crescendo/diminuendo remains instructional because no envelope
+criterion exists. The long-tone capstone scores sustained pitch and duration.
+
+| Lesson | Classification | Prereq |
+|---|---|---|
+| **Hand vibrato** (`hand-vibrato`) | Instructional | `hand-wah`, `vibrato` |
+| **Throat vibrato** (`throat-vibrato`) | Instructional | `vibrato` |
+| **Diaphragm vibrato** (`diaphragm-vibrato`) | Instructional | `breathing`, `vibrato` |
+| **Vibrato rate control** (`vibrato-control`) | Measured 3 Hz and 5 Hz oscillation, technique ≥ 0.6 | all three families |
+| **Crescendo and diminuendo** (`dynamic-shaping`) | Instructional | `breathing` |
+| **Long-tone control** (`long-tone-control`) | Sustained pitch/duration, accuracy ≥ 0.75 | `dynamic-shaping`, `vibrato-control` |
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"

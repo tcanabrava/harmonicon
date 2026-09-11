@@ -161,9 +161,6 @@ required by `docs/lessons_plan.md`.
 
 ### Technique expansion
 
-- **Vibrato families and dynamics:** distinguish hand, throat, and diaphragm
-  approaches instructionally; score outcomes such as oscillation rate/depth,
-  crescendos, diminuendos, and long-tone stability.
 - **Accompaniment:** chord rhythm, train accompaniment behind a singer, fills
   between vocal phrases, and trading fours. Reuse form and rest discipline.
 
