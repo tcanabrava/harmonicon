@@ -19,6 +19,7 @@ fn lesson(id: &str, unit: &str, prerequisites: &[&str]) -> LessonManifest {
         progression: None,
         scale: None,
         diagram: None,
+        widgets: Vec::new(),
         position_cycle: false,
     }
 }

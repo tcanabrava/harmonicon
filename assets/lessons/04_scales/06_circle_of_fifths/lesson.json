@@ -4,7 +4,7 @@
   "track": "theory",
   "title_key": "lesson-circle-of-fifths-title",
   "body_key": "lesson-circle-of-fifths-body",
-  "diagram": "circle-of-fifths",
+  "widgets": [{ "type": "circle-of-fifths" }],
   "prerequisites": [
     "twelve-bar"
   ]

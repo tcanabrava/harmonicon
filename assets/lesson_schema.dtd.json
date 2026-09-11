@@ -235,6 +235,28 @@
       ],
       "description": "An instructional lesson's embedded reference diagram, rendered by the lesson reader alongside the body text. Absent = no diagram. See dialogs::circle_of_fifths."
     },
+    "widgets": {
+      "type": "array",
+      "description": "Reusable teaching aids rendered below the lesson body. Absent means the lesson has no embedded tools.",
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "type": { "const": "circle-of-fifths" },
+              "harp_key": { "type": "string", "minLength": 1 },
+              "positions": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["first", "second", "third", "fourth", "fifth", "twelfth"] },
+                "uniqueItems": true
+              }
+            }
+          }
+        ]
+      }
+    },
     "position_cycle": {
       "type": "boolean",
       "description": "A jam-based lesson that periodically calls a new position (cycling JamScale through First/Second/Third position every few bars), seeded into JamPositionCycle when Start routes into it. Absent/false = the jam's scale field stays fixed for the whole session. See jam::position_guide."

@@ -61,6 +61,24 @@ pub struct TrainingBlock {
     pub seed: Option<u64>,
 }
 
+/// A reusable teaching aid embedded in a lesson reader page. This is a tagged
+/// enum so unsupported widget kinds fail while loading the manifest rather
+/// than silently rendering an incomplete lesson.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum LessonWidget {
+    CircleOfFifths {
+        #[serde(default = "default_harp_key")]
+        harp_key: String,
+        #[serde(default)]
+        positions: Vec<String>,
+    },
+}
+
+fn default_harp_key() -> String {
+    "C".into()
+}
+
 /// One `lesson.json`, as authored. See `assets/lesson_schema.dtd.json` for
 /// field semantics.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -125,6 +143,10 @@ pub struct LessonManifest {
     /// than a new field.
     #[serde(default)]
     pub diagram: Option<String>,
+    /// Reusable teaching aids rendered below the lesson body. New lesson
+    /// content should use this field; `diagram` remains a compatibility input.
+    #[serde(default)]
+    pub widgets: Vec<LessonWidget>,
     /// A jam-based lesson that periodically calls a new position (cycling
     /// `crate::app::JamScale` through First/Second/Third position every few
     /// bars — see `jam::position_guide`), seeded into
@@ -213,6 +235,33 @@ mod tests {
         assert!(!m.optional);
         assert!(m.prerequisites.is_empty());
         assert_eq!(m.pass_criteria, None);
+        assert!(m.widgets.is_empty());
+    }
+
+    #[test]
+    fn parses_circle_of_fifths_widget_with_defaults() {
+        let m = parse_lesson(
+            br#"{"id":"circle","unit":"theory","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"circle-of-fifths"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            m.widgets,
+            vec![LessonWidget::CircleOfFifths {
+                harp_key: "C".into(),
+                positions: Vec::new(),
+            }]
+        );
+    }
+
+    #[test]
+    fn rejects_an_unknown_widget_kind() {
+        let error = parse_lesson(
+            br#"{"id":"x","unit":"u","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"piano"}]}"#,
+        )
+        .unwrap_err();
+        assert!(error.contains("piano"), "{error}");
     }
 
     #[test]

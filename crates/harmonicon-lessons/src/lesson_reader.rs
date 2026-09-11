@@ -21,7 +21,9 @@ use harmonicon_core::training::{Tier, drill_chart};
 use harmonicon_platform::localization::LocalizationExt;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::lessons::training_criteria;
-use harmonicon_song::lessons::{AvailableLessons, LessonContext, LessonEntry, PassCriteria};
+use harmonicon_song::lessons::{
+    AvailableLessons, LessonContext, LessonEntry, LessonWidget, PassCriteria,
+};
 use harmonicon_song::song::{SongManifest, training_manifest};
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
 
@@ -287,9 +289,40 @@ pub(crate) fn setup_lesson_reader(
         .id();
     commands.entity(root).add_child(body);
 
-    // Embedded reference diagram, if this lesson declares one — spawned
-    // right under the body text, above the goal/pass lines.
-    if entry.manifest.diagram.as_deref() == Some("circle-of-fifths") {
+    // Reusable teaching aids sit below the body and above goal/pass lines.
+    // An empty position list means "show every position", which preserves
+    // the original diagram's useful overview without verbose manifest data.
+    for widget in &entry.manifest.widgets {
+        let LessonWidget::CircleOfFifths {
+            harp_key,
+            positions,
+        } = widget;
+        let selected: Vec<Position> = if positions.is_empty() {
+            Position::all().to_vec()
+        } else {
+            positions
+                .iter()
+                .filter_map(|name| match name.as_str() {
+                    "first" => Some(Position::First),
+                    "second" => Some(Position::Second),
+                    "third" => Some(Position::Third),
+                    "fourth" => Some(Position::Fourth),
+                    "fifth" => Some(Position::Fifth),
+                    "twelfth" => Some(Position::Twelfth),
+                    _ => None,
+                })
+                .collect()
+        };
+        commands.entity(root).with_children(|parent| {
+            spawn_circle_of_fifths(parent, harp_key, &selected, theme.circle_of_fifths_colors());
+        });
+    }
+
+    // Compatibility for externally-authored lessons using the original
+    // single-purpose field. Bundled lessons use `widgets`.
+    if entry.manifest.widgets.is_empty()
+        && entry.manifest.diagram.as_deref() == Some("circle-of-fifths")
+    {
         commands.entity(root).with_children(|parent| {
             spawn_circle_of_fifths(
                 parent,

@@ -215,6 +215,7 @@ fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
         progression: None,
         scale: None,
         diagram: None,
+        widgets: Vec::new(),
         position_cycle: false,
     };
     let mut s = EditorState::default();
@@ -247,6 +248,7 @@ fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
         progression: Some("standard".into()),
         scale: Some("major".into()),
         diagram: None,
+        widgets: Vec::new(),
         position_cycle: false,
     };
     let mut s = EditorState::default();

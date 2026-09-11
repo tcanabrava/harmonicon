@@ -236,6 +236,7 @@ mod tests {
                 progression: None,
                 scale: None,
                 diagram: None,
+                widgets: Vec::new(),
                 position_cycle: false,
             },
             chart_asset_path: None,
