@@ -165,8 +165,6 @@ required by `docs/lessons_plan.md`.
 
 ### Chromatic and musicianship branches
 
-- Add intervals, chord construction, guide tones, arpeggio-to-scale connection,
-  transposition, and song-form listening as short theory-plus-play units.
 - Teach practice skills: slow practice, loop isolation, spaced review,
   self-recording, and mixed review lessons that sample earlier dependencies.
   Guide use of existing tools instead of pretending the microphone can judge

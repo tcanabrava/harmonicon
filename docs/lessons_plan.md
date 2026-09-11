@@ -446,7 +446,7 @@ Cross-cutting authoring notes:
 
 ### Suggested build order (what's left)
 
-The remaining curriculum work is musicianship and guided practice skills.
+The remaining curriculum work is guided practice skills.
 The chromatic branch now ends in an original jazz study, avoiding the earlier
 repertoire-rights blocker. Reduced motion belongs to shared application
 settings; a lesson-map minimap remains conditional on usability evidence.

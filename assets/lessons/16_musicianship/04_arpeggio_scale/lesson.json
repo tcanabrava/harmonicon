@@ -1,0 +1,1 @@
+{"id":"arpeggio-to-scale","unit":"musicianship","optional":true,"track":"harmony","title_key":"lesson-arpeggio-scale-title","body_key":"lesson-arpeggio-scale-body","chart":"song/chart.harpchart","prerequisites":["guide-tones","major-scale"],"pass_criteria":{"type":"accuracy","threshold":0.7}}

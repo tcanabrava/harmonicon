@@ -1,0 +1,1 @@
+{"id":"guide-tones","unit":"musicianship","optional":true,"track":"harmony","title_key":"lesson-guide-tones-title","body_key":"lesson-guide-tones-body","chart":"song/chart.harpchart","prerequisites":["chord-construction","ii-v-i-chord-tones"],"pass_criteria":{"type":"accuracy","threshold":0.65}}
