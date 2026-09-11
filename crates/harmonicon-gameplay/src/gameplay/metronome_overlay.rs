@@ -15,6 +15,9 @@ use harmonicon_app::app::{AppState, SelectedSong};
 use harmonicon_audio::AudioSettings;
 use harmonicon_platform::localization::LocalizationExt;
 use harmonicon_song::song::{SongManifest, chart::Feel};
+pub use harmonicon_ui::dialogs::metronome::{
+    MetronomeFeel, click_for_tick, is_downbeat, tick_index,
+};
 
 use super::{GameplayClock, GameplayLogic, Paused};
 
@@ -82,13 +85,6 @@ const PILL_BORDER: Color = Color::srgb(0.35, 0.35, 0.50);
 /// Click subdivision. `Straight` clicks plain quarters; `Shuffle` splits each
 /// beat into triplets and clicks the beat + the swung "and" (the long-short
 /// "loping" blues groove). Defaults to shuffle since the songs are blues.
-#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
-pub enum MetronomeFeel {
-    Straight,
-    #[default]
-    Shuffle,
-}
-
 /// Click samples, loaded once at startup. The downbeat carries the accent.
 #[derive(Resource)]
 pub struct MetronomeSounds {
@@ -108,45 +104,6 @@ pub struct LastClickedTick(pub Option<i64>);
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
 /// True when a beat is the first beat of its bar.
-pub const fn is_downbeat(beat: i64, beats_per_bar: f64) -> bool {
-    let beats = (beats_per_bar.max(1.0)) as i64;
-    beat.rem_euclid(beats) == 0
-}
-
-/// Index of the current click subdivision ("tick"), or `None` before the song
-/// starts. A tick is a whole beat in `Straight` feel, or a triplet-eighth (three
-/// per beat) in `Shuffle` feel.
-pub const fn tick_index(clock: f64, bpm: f64, feel: MetronomeFeel) -> Option<i64> {
-    if clock < 0.0 || bpm <= 0.0 {
-        return None;
-    }
-    let beat_dur = 60.0 / bpm;
-    let div = match feel {
-        MetronomeFeel::Straight => beat_dur,
-        MetronomeFeel::Shuffle => beat_dur / 3.0,
-    };
-    Some((clock / div).floor() as i64)
-}
-
-/// What to play for a given tick: `Some((accent, gain))` or `None` for a silent
-/// subdivision. In shuffle feel a beat is three triplet-eighths; we click the
-/// beat (sub 0, accented on the downbeat) and the swung "and" (sub 2, softer),
-/// and stay silent on the middle triplet — the classic long-short shuffle.
-pub const fn click_for_tick(
-    tick: i64,
-    beats_per_bar: f64,
-    feel: MetronomeFeel,
-) -> Option<(bool, f32)> {
-    match feel {
-        MetronomeFeel::Straight => Some((is_downbeat(tick, beats_per_bar), 1.0)),
-        MetronomeFeel::Shuffle => match tick.rem_euclid(3) {
-            0 => Some((is_downbeat(tick.div_euclid(3), beats_per_bar), 1.0)),
-            2 => Some((false, 0.55)),
-            _ => None,
-        },
-    }
-}
-
 // ── UI ────────────────────────────────────────────────────────────────────────
 
 pub fn spawn_metronome(

@@ -7,6 +7,7 @@ pub mod confirm_dialog;
 pub mod file_dialog;
 pub mod font_fallback;
 pub mod keyboard_nav;
+pub mod metronome;
 pub mod page_chrome;
 pub mod scroll_area;
 pub mod tab_bar;
