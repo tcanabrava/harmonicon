@@ -310,7 +310,7 @@ draw 2 so every note of that exercise is a distinct pitch. Any future
 navigation lesson must respect the same constraint, or it will score a
 player correct for landing on the wrong hole.
 
-### Unit 7 — advanced (`07_advanced/`) — 1 lesson shipped
+### Unit 7 — advanced (`07_advanced/`) — 3 lessons shipped
 
 An elective-only unit for techniques that add range and expression without
 blocking the main course. A unit with no core lessons has a zero unlock
@@ -319,6 +319,8 @@ requirement, and every lesson here declares `optional: true`.
 | Lesson (id, folder) | Scoreable? | Mechanism | Prereq | Pass |
 |---|---|---|---|---|
 | **High blow bends** (`high-blow-bends`, `01_high_blow_bends`) — half-step bends on 8/9/10, the whole-step 10 bend, and a descending application | **Scored** | Existing bend detection and generated bend ladder over holes 8/9/10 | `deep-bends`, `high-register` | technique `bend` ≥ 0.55 |
+| **Overblows** (`overblows`, `02_overblows`) — isolate holes 4/5/6 and release to their natural reeds | **Scored** | Existing overblow pitch and technique bucket | `deep-bends`, `high-blow-bends` | technique `overblow` ≥ 0.5 |
+| **Overdraws** (`overdraws`, `03_overdraws`) — isolate holes 7–10 against adjacent natural notes | **Scored** | Existing overdraw pitch and technique bucket | `overblows`, `high-register` | technique `overdraw` ≥ 0.5 |
 
 ### Unit 8 — rhythm lab (`08_rhythm_lab/`) — 5 lessons shipped
 

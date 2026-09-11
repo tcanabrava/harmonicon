@@ -1,0 +1,1 @@
+{"id":"overblows","unit":"advanced","optional":true,"track":"bend","title_key":"lesson-overblows-title","body_key":"lesson-overblows-body","chart":"song/chart.harpchart","prerequisites":["deep-bends","high-blow-bends"],"pass_criteria":{"type":"technique","technique":"overblow","threshold":0.5}}

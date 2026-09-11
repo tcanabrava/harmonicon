@@ -1,0 +1,1 @@
+{"id":"overdraws","unit":"advanced","optional":true,"track":"bend","title_key":"lesson-overdraws-title","body_key":"lesson-overdraws-body","chart":"song/chart.harpchart","prerequisites":["overblows","high-register"],"pass_criteria":{"type":"technique","technique":"overdraw","threshold":0.5}}

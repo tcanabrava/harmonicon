@@ -976,3 +976,7 @@ lesson-high-blow-bends-body =
     O bend muda de direção no registro agudo: os furos 8, 9 e 10 fazem bend na nota soprada. Comece no 8. Sustente o 8 soprado, diminua o espaço dentro da boca e eleve o meio da língua até a altura cair meio tom. Mantenha o ar uniforme; soprar com mais força dificulta o controle.
 
     Repita o mesmo movimento de meio tom nos furos 9 e 10. O furo 10 também pode descer um tom inteiro, por isso o exercício dá mais tempo a esse alvo. Ouça primeiro a nota natural, vá deliberadamente até a nota com bend e volte sem um novo ataque. A frase final conecta os três furos de forma musical.
+lesson-overblows-title = Oversopros
+lesson-overblows-body = Oversopros fecham a palheta normal de sopro para que a palheta aspirada soe acima da altura habitual. Comece suavemente nos orifícios 4, 5 e 6 e volte à palheta natural sem forçar o ar.
+lesson-overdraws-title = Overpuxadas
+lesson-overdraws-body = Overpuxadas aplicam o mesmo controle de palheta à aspiração no registro agudo. Trabalhe suavemente nos orifícios 7–10 e compare cada nota com a natural vizinha antes de ligá-las.

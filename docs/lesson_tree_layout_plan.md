@@ -170,9 +170,6 @@ required by `docs/lessons_plan.md`.
 - **Vibrato families and dynamics:** distinguish hand, throat, and diaphragm
   approaches instructionally; score outcomes such as oscillation rate/depth,
   crescendos, diminuendos, and long-tone stability.
-- **Overblows and overdraws:** the engine and bend trainer recognize them, but
-  the curriculum never teaches them. Put them in an optional advanced diatonic
-  branch so they do not block the core course.
 - **Accompaniment:** chord rhythm, train accompaniment behind a singer, fills
   between vocal phrases, and trading fours. Reuse form and rest discipline.
 
