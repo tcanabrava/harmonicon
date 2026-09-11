@@ -1,0 +1,1 @@
+{"id":"chromatic-jazz-study","unit":"chromatic","optional":true,"track":"vocabulary","title_key":"lesson-chromatic-jazz-study-title","body_key":"lesson-chromatic-jazz-study-body","chart":"song/chart.harpchart","prerequisites":["legato-slide-phrasing","swing-eighths"],"pass_criteria":{"type":"accuracy","threshold":0.7}}

@@ -446,8 +446,7 @@ Cross-cutting authoring notes:
 
 ### Suggested build order (what's left)
 
-The remaining curriculum work, in order, is accompaniment, expanded chromatic
-technique, musicianship, and guided practice skills. Unit 5's jazz head also
-remains blocked on choosing repertoire whose public-domain status has been
-verified. Reduced motion belongs to shared application settings; a lesson-map
-minimap remains conditional on usability evidence.
+The remaining curriculum work is musicianship and guided practice skills.
+The chromatic branch now ends in an original jazz study, avoiding the earlier
+repertoire-rights blocker. Reduced motion belongs to shared application
+settings; a lesson-map minimap remains conditional on usability evidence.

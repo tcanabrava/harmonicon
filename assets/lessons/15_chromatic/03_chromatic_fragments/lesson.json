@@ -1,0 +1,1 @@
+{"id":"chromatic-fragments","unit":"chromatic","optional":true,"track":"slide","title_key":"lesson-chromatic-fragments-title","body_key":"lesson-chromatic-fragments-body","chart":"song/chart.harpchart","prerequisites":["enharmonic-slide-choices"],"pass_criteria":{"type":"accuracy","threshold":0.7}}

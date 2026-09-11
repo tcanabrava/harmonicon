@@ -1,0 +1,1 @@
+{"id":"legato-slide-phrasing","unit":"chromatic","optional":true,"track":"slide","title_key":"lesson-legato-slide-phrasing-title","body_key":"lesson-legato-slide-phrasing-body","chart":"song/chart.harpchart","prerequisites":["chromatic-fragments"],"pass_criteria":{"type":"technique","technique":"slide","threshold":0.65}}

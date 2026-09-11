@@ -165,9 +165,6 @@ required by `docs/lessons_plan.md`.
 
 ### Chromatic and musicianship branches
 
-- Grow chromatic harmonica beyond one slide-scale lesson: button coordination,
-  enharmonic slide choices, chromatic fragments, legato slide phrasing, and an
-  original or verified-public-domain jazz study.
 - Add intervals, chord construction, guide tones, arpeggio-to-scale connection,
   transposition, and song-form listening as short theory-plus-play units.
 - Teach practice skills: slow practice, loop isolation, spaced review,
