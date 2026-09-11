@@ -442,7 +442,8 @@ Cross-cutting authoring notes:
 
 ### Suggested build order (what's left)
 
-Units 3, 4 (scales) and 6 (navigation) are fully shipped. Unit 5 (jazz) is
-4/5 lessons shipped — all that's left of the lessons curriculum is **jazz
-heads**, blocked on picking specific repertoire someone has actually
-confirmed is public domain (not just "probably fine"); see that row above.
+The remaining curriculum work, in order, is accompaniment, expanded chromatic
+technique, musicianship, and guided practice skills. Unit 5's jazz head also
+remains blocked on choosing repertoire whose public-domain status has been
+verified. Reduced motion belongs to shared application settings; a lesson-map
+minimap remains conditional on usability evidence.

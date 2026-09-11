@@ -151,9 +151,10 @@ setting.
 
 ## Curriculum gaps
 
-The current 41 lessons form a strong blues-oriented beginner course and a
-small jazz/chromatic bridge. New content should deepen playable technique
-before adding more theory. Every item needs the honest scoring classification
+The current 80 lessons form a broad blues-oriented course with rhythm,
+navigation, ear-training, position, expression, and advanced elective
+branches. Remaining content should deepen applied musicianship and chromatic
+playing. Every item needs the honest scoring classification
 required by `docs/lessons_plan.md`.
 
 ### Highest priority
