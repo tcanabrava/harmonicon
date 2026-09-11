@@ -49,6 +49,13 @@ pub(super) struct NoteRenderAssets {
     pub(super) play_mode_tags: Vec<Option<&'static str>>,
 }
 
+#[derive(bevy::ecs::system::SystemParam)]
+pub(super) struct LessonDisplayContext<'w> {
+    compact: Res<'w, harmonicon_platform::responsive::CompactLayout>,
+    bravura: Option<Res<'w, BravuraFont>>,
+    lesson: Option<Res<'w, harmonicon_song::lessons::LessonContext>>,
+}
+
 pub fn setup(
     mut commands: Commands,
     selected: Res<SelectedSong>,
@@ -64,8 +71,7 @@ pub fn setup(
     theme: Res<harmonicon_platform::theme::LoadedTheme>,
     adaptive: Res<AdaptiveDifficulty>,
     loc: Res<Localization>,
-    bravura: Option<Res<BravuraFont>>,
-    compact: Res<harmonicon_platform::responsive::CompactLayout>,
+    display: LessonDisplayContext,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         error!("SongManifest not ready when entering Playing state");
@@ -146,7 +152,7 @@ pub fn setup(
             .unwrap_or(4)
     };
 
-    let compact = compact.0;
+    let compact = display.compact.0;
     commands
         .spawn((
             Node {
@@ -383,16 +389,21 @@ pub fn setup(
                     });
             });
         });
-    let note_markers: Vec<NoteMarker> = song_notes
-        .notes
-        .iter()
-        .map(|n| NoteMarker {
-            time: n.time,
-            duration: n.duration,
-            hole: n.hole,
-            is_blow: n.is_blow,
-        })
-        .collect();
+    let aural = display.lesson.is_some_and(|lesson| lesson.aural);
+    let note_markers: Vec<NoteMarker> = if aural {
+        Vec::new()
+    } else {
+        song_notes
+            .notes
+            .iter()
+            .map(|n| NoteMarker {
+                time: n.time,
+                duration: n.duration,
+                hole: n.hole,
+                is_blow: n.is_blow,
+            })
+            .collect()
+    };
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
@@ -402,7 +413,10 @@ pub fn setup(
         &adaptive.sections,
         &adaptive.learned,
     );
-    if !compact && let Some(bravura) = &bravura {
+    if !aural
+        && !compact
+        && let Some(bravura) = &display.bravura
+    {
         spawn_gameplay_music_score(&mut commands, bravura);
     }
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
@@ -578,7 +592,11 @@ pub fn spawn_visible_notes(
     show_numbers: Res<harmonicon_platform::assets_management::ShowNoteNumbers>,
     theme: Res<LoadedTheme>,
     colorblind: Res<harmonicon_platform::settings::ColorblindPalette>,
+    lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
 ) {
+    if lesson.is_some_and(|lesson| lesson.aural) {
+        return;
+    }
     let (Some(manifest), Ok(highway_entity), Some(head_image), Some(tail_cfg)) = (
         manifests.get(&selected.0),
         highway.single(),
@@ -1041,6 +1059,7 @@ pub fn update_holes(
     targets: Res<ActiveTargets>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
+    lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
     mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState)>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
@@ -1056,11 +1075,15 @@ pub fn update_holes(
     for (cell, mut bg, mut state) in &mut cells {
         let blow = chart.harmonica.wind_direction_midi(cell.0, &Action::Blow);
         let draw = chart.harmonica.wind_direction_midi(cell.0, &Action::Draw);
-        let hint = targets
-            .0
-            .iter()
-            .find(|(h, _)| *h == cell.0)
-            .map(|(_, b)| *b);
+        let hint = if lesson.as_ref().is_some_and(|lesson| lesson.aural) {
+            None
+        } else {
+            targets
+                .0
+                .iter()
+                .find(|(h, _)| *h == cell.0)
+                .map(|(_, b)| *b)
+        };
 
         step_hole_glow(&mut state, blow, draw, hint, &harp_pitches, attack, decay);
         let b = state.brightness;

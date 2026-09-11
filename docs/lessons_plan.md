@@ -348,6 +348,20 @@ chord-tone destinations. Pitch accuracy can score every landing directly.
 | **Second-position landings** (`second-position-landings`) | 2nd, G; resolves on 2 draw | `first-position-landings`, `blues-scale` | accuracy ≥ 0.65 |
 | **Third-position landings** (`third-position-landings`) | 3rd, D minor color; resolves on 4/8 draw | `second-position-landings`, `minor-pentatonic-scale` | accuracy ≥ 0.65 |
 
+### Unit 10 — ear training (`10_ear_training/`) — 4 lessons shipped
+
+These drills reuse synthesized call-and-response, but declare `aural: true`.
+That manifest flag withholds scrolling note prompts while leaving the call,
+forced response wait, pitch scoring, and feedback intact. The sequence moves
+from one-note matching through contour and phrase memory to tonic resolution.
+
+| Lesson | Listening task | Prereq | Pass |
+|---|---|---|---|
+| **Match a heard note** (`match-heard-note`) | Find middle-register pitches from sound | `middle-register`, `call-response` | accuracy ≥ 0.65 |
+| **Up, down, or same** (`melodic-motion`) | Recognize and reproduce melodic direction | `match-heard-note` | accuracy ≥ 0.7 |
+| **Repeat a hidden phrase** (`hidden-short-phrase`) | Retain contour and rhythm without prompts | `melodic-motion` | accuracy ≥ 0.7 |
+| **Find the tonic** (`find-the-tonic`) | Resolve heard phrases to C by ear | `hidden-short-phrase`, `first-position-landings` | accuracy ≥ 0.75 |
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"

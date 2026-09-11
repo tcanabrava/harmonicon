@@ -204,6 +204,7 @@ fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
         title_key: "t".into(),
         body_key: "b".into(),
         chart: None,
+        aural: false,
         prerequisites: vec!["single-note".into()],
         pass_criteria: Some(PassCriteria::Technique {
             technique: "wah-wah".into(),
@@ -237,6 +238,7 @@ fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
         title_key: "t".into(),
         body_key: "b".into(),
         chart: None,
+        aural: false,
         prerequisites: Vec::new(),
         pass_criteria: None,
         progression: Some("standard".into()),

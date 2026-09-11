@@ -83,6 +83,10 @@ pub struct LessonManifest {
     pub body_key: String,
     #[serde(default)]
     pub chart: Option<String>,
+    /// Hides scrolling note prompts for an ear-training run while retaining
+    /// synthesized call cues and ordinary microphone scoring.
+    #[serde(default)]
+    pub aural: bool,
     #[serde(default)]
     pub prerequisites: Vec<String>,
     #[serde(default)]
@@ -218,6 +222,19 @@ mod tests {
         )
         .unwrap();
         assert!(m.optional);
+    }
+
+    #[test]
+    fn parses_an_aural_lesson_and_defaults_ordinary_lessons_to_visual() {
+        let aural = parse_lesson(
+            br#"{"id":"echo","unit":"ear","title_key":"t","body_key":"b","aural":true}"#,
+        )
+        .unwrap();
+        assert!(aural.aural);
+
+        let ordinary =
+            parse_lesson(br#"{"id":"x","unit":"u","title_key":"t","body_key":"b"}"#).unwrap();
+        assert!(!ordinary.aural);
     }
 
     #[test]

@@ -1,0 +1,1 @@
+{"id":"hidden-short-phrase","unit":"ear-training","track":"ear","title_key":"lesson-hidden-short-phrase-title","body_key":"lesson-hidden-short-phrase-body","chart":"song/chart.harpchart","aural":true,"prerequisites":["melodic-motion"],"pass_criteria":{"type":"accuracy","threshold":0.7}}

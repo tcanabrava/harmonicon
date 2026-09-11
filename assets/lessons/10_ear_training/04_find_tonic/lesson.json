@@ -1,0 +1,1 @@
+{"id":"find-the-tonic","unit":"ear-training","track":"ear","title_key":"lesson-find-tonic-title","body_key":"lesson-find-tonic-body","chart":"song/chart.harpchart","aural":true,"prerequisites":["hidden-short-phrase","first-position-landings"],"pass_criteria":{"type":"accuracy","threshold":0.75}}

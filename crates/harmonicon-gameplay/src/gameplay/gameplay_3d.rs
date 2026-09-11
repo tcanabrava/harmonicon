@@ -317,7 +317,11 @@ pub fn spawn_visible_notes_3d(
     show_numbers: Res<ShowNoteNumbers>,
     theme: Res<LoadedTheme>,
     colorblind: Res<harmonicon_platform::settings::ColorblindPalette>,
+    lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
 ) {
+    if lesson.is_some_and(|lesson| lesson.aural) {
+        return;
+    }
     if render_assets.head_mesh.is_none() {
         return;
     }
@@ -582,6 +586,7 @@ pub fn setup(
     note_theme: Res<SelectedNoteTheme3d>,
     mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
     hud: HudContext,
+    lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
 ) {
     let compact = hud.compact.0;
     let Some(manifest): Option<&SongManifest> = manifests.get(&selected.0) else {
@@ -678,17 +683,22 @@ pub fn setup(
         &hud.loc,
         compact,
     );
-    let note_markers: Vec<NoteMarker> = note_build
-        .song_notes
-        .notes
-        .iter()
-        .map(|n| NoteMarker {
-            time: n.time,
-            duration: n.duration,
-            hole: n.hole,
-            is_blow: n.is_blow,
-        })
-        .collect();
+    let aural = lesson.is_some_and(|lesson| lesson.aural);
+    let note_markers: Vec<NoteMarker> = if aural {
+        Vec::new()
+    } else {
+        note_build
+            .song_notes
+            .notes
+            .iter()
+            .map(|n| NoteMarker {
+                time: n.time,
+                duration: n.duration,
+                hole: n.hole,
+                is_blow: n.is_blow,
+            })
+            .collect()
+    };
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
@@ -698,7 +708,10 @@ pub fn setup(
         &note_build.adaptive.sections,
         &note_build.adaptive.learned,
     );
-    if !compact && let Some(bravura) = &hud.bravura {
+    if !aural
+        && !compact
+        && let Some(bravura) = &hud.bravura
+    {
         super::gameplay_2d::spawn_gameplay_music_score(&mut commands, bravura);
     }
     super::wait_freeze_overlay::spawn_wait_freeze_prompt(&mut commands);
@@ -1182,6 +1195,7 @@ pub fn update_holes_3d(
     targets: Res<ActiveTargets>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
+    lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut cells: Query<(&HoleCell, &HoleMesh3D, &mut HoleState)>,
 ) {
@@ -1198,11 +1212,15 @@ pub fn update_holes_3d(
     for (cell, hole_mat, mut state) in &mut cells {
         let blow = chart.harmonica.wind_direction_midi(cell.0, &Action::Blow);
         let draw = chart.harmonica.wind_direction_midi(cell.0, &Action::Draw);
-        let hint = targets
-            .0
-            .iter()
-            .find(|(h, _)| *h == cell.0)
-            .map(|(_, b)| *b);
+        let hint = if lesson.as_ref().is_some_and(|lesson| lesson.aural) {
+            None
+        } else {
+            targets
+                .0
+                .iter()
+                .find(|(h, _)| *h == cell.0)
+                .map(|(_, b)| *b)
+        };
 
         super::gameplay_2d::step_hole_glow(
             &mut state,

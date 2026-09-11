@@ -1,0 +1,1 @@
+{"id":"match-heard-note","unit":"ear-training","track":"ear","title_key":"lesson-match-heard-note-title","body_key":"lesson-match-heard-note-body","chart":"song/chart.harpchart","aural":true,"prerequisites":["middle-register","call-response"],"pass_criteria":{"type":"accuracy","threshold":0.65}}

@@ -230,6 +230,7 @@ mod tests {
                 title_key: format!("lesson-{id}-title"),
                 body_key: format!("lesson-{id}-body"),
                 chart: None,
+                aural: false,
                 prerequisites: Vec::new(),
                 pass_criteria: None,
                 progression: None,

@@ -204,6 +204,7 @@ fn spawn_training_row(
                 commands.insert_resource(LessonContext {
                     lesson_id: id.clone(),
                     pass_criteria: Some(training_criteria(criteria.as_ref(), tier)),
+                    aural: false,
                     tier: Some(tier.number()),
                 });
                 // Built by `Assets::add`, so it has no `LoadState` and
@@ -324,6 +325,7 @@ pub(crate) fn setup_lesson_reader(
             let progression = entry.manifest.progression.clone();
             let scale = entry.manifest.scale.clone();
             let position_cycle = entry.manifest.position_cycle;
+            let aural = entry.manifest.aural;
             spawn_button(
                 &mut commands,
                 root,
@@ -342,6 +344,7 @@ pub(crate) fn setup_lesson_reader(
                     commands.insert_resource(LessonContext {
                         lesson_id: lesson_id.clone(),
                         pass_criteria: criteria.clone(),
+                        aural,
                         tier: None,
                     });
                     // A jam-based lesson (scale-adherence/chord-tone-

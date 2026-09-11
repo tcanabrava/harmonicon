@@ -19,6 +19,9 @@ use super::manifest::{LessonManifest, PassCriteria};
 pub struct LessonContext {
     pub lesson_id: String,
     pub pass_criteria: Option<PassCriteria>,
+    /// Whether gameplay should withhold the scrolling note prompts so the
+    /// response must be recalled by ear.
+    pub aural: bool,
     /// Set when this run is a *training* rather than the lesson itself, so
     /// `gameplay::results` records it under
     /// `PlayerProfile::trainings` instead of `lessons`. A training must
@@ -102,6 +105,7 @@ mod tests {
             title_key: format!("lesson-{id}-title"),
             body_key: format!("lesson-{id}-body"),
             chart: None,
+            aural: false,
             prerequisites: prereqs.iter().map(|s| s.to_string()).collect(),
             pass_criteria: None,
             progression: None,

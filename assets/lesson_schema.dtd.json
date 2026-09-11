@@ -46,6 +46,10 @@
       "minLength": 1,
       "description": "Path to a .harpchart, relative to the lesson's own directory. Absent = instructional-only lesson (no playable drill)."
     },
+    "aural": {
+      "type": "boolean",
+      "description": "Hide the scrolling note prompts during a chart-backed ear-training lesson. The synthesized call still plays and scoring still waits for the response. Absent/false keeps ordinary visual prompts."
+    },
     "prerequisites": {
       "type": "array",
       "items": {

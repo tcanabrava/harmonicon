@@ -1,0 +1,1 @@
+{"id":"melodic-motion","unit":"ear-training","track":"ear","title_key":"lesson-melodic-motion-title","body_key":"lesson-melodic-motion-body","chart":"song/chart.harpchart","aural":true,"prerequisites":["match-heard-note"],"pass_criteria":{"type":"accuracy","threshold":0.7}}
