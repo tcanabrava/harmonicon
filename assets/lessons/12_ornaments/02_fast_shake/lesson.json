@@ -1,0 +1,1 @@
+{"id":"fast-shake","unit":"ornaments","optional":true,"track":"ornaments","title_key":"lesson-fast-shake-title","body_key":"lesson-fast-shake-body","chart":"song/chart.harpchart","prerequisites":["slow-warble","sixteenth-articulation"],"pass_criteria":{"type":"accuracy","threshold":0.7}}

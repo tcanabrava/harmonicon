@@ -161,9 +161,6 @@ required by `docs/lessons_plan.md`.
 
 ### Technique expansion
 
-- **Warbles, shakes, trills, and glissandi:** move from slow adjacent-hole
-  alternation to ornaments. A reusable alternation detector could honestly
-  score event rate and pitch pattern later.
 - **Vibrato families and dynamics:** distinguish hand, throat, and diaphragm
   approaches instructionally; score outcomes such as oscillation rate/depth,
   crescendos, diminuendos, and long-tone stability.

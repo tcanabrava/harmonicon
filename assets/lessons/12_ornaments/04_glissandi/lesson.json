@@ -1,0 +1,1 @@
+{"id":"glissandi","unit":"ornaments","optional":true,"track":"ornaments","title_key":"lesson-glissandi-title","body_key":"lesson-glissandi-body","chart":"song/chart.harpchart","prerequisites":["trill-cells","slides"],"pass_criteria":{"type":"accuracy","threshold":0.65}}

@@ -380,6 +380,20 @@ pair of blow notes exactly one octave apart, which chord scoring can verify.
 | **Tongue flutter** (`tongue-flutter`) | Instructional | `tongue-rake` |
 | **Moving octaves** (`moving-octaves`) | Scored through simultaneous octave pitches, accuracy ≥ 0.6 | `octave-split`, `side-pull` |
 
+### Unit 12 — ornaments (`12_ornaments/`) — 4 lessons shipped
+
+This elective sequence scores only the produced pitch order and timing. It
+does not claim to distinguish whether the player moved their head, hands,
+tongue, or instrument. Slow alternation establishes control before the faster
+shake and trill cells; glissandi finish with measured multi-hole sweeps.
+
+| Lesson | Observable outcome | Prereq | Pass |
+|---|---|---|---|
+| **Slow warble** (`slow-warble`) | Clear adjacent-hole alternation | `middle-register` | accuracy ≥ 0.65 |
+| **Fast shake** (`fast-shake`) | Even sixteenth-note alternation | `slow-warble`, `sixteenth-articulation` | accuracy ≥ 0.7 |
+| **Trill cells** (`trill-cells`) | Timed neighbor-note cells | `fast-shake` | accuracy ≥ 0.7 |
+| **Glissandi** (`glissandi`) | Ordered sweep and destination | `trill-cells`, `slides` | accuracy ≥ 0.65 |
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"

@@ -1,0 +1,1 @@
+{"id":"slow-warble","unit":"ornaments","optional":true,"track":"ornaments","title_key":"lesson-slow-warble-title","body_key":"lesson-slow-warble-body","chart":"song/chart.harpchart","prerequisites":["middle-register"],"pass_criteria":{"type":"accuracy","threshold":0.65}}
