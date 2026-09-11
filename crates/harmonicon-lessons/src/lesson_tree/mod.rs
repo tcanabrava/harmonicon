@@ -42,7 +42,7 @@
 //! place. The tree is wide, and a small screen reaches the rest of it by
 //! scrolling; `responsive::is_compact` no longer routes anywhere.
 
-mod edge_material;
+mod edges;
 mod layout;
 mod transition;
 
@@ -67,9 +67,9 @@ use harmonicon_menu::menu::MenuPage;
 use harmonicon_menu::menu::scene::{spawn_back_button, spawn_menu_root_plain};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
-use bevy::ui_render::prelude::MaterialNode;
-pub(crate) use edge_material::LessonEdgeMaterialPlugin;
-use edge_material::{LessonEdgeMaterial, edge_box, edge_diagonal};
+pub(crate) use edges::LessonEdgeMaterialPlugin;
+pub(crate) use edges::set_edge_geometry;
+use edges::{EdgeStyle, Endpoint, LessonEdgeMaterial, spawn_edge};
 use layout::{EdgeKind, NodeState, PlacedNode, PlacedUnit, layout_with_collapsed};
 pub(crate) use transition::*;
 
@@ -98,16 +98,20 @@ const LABEL_PX: f32 = 132.0;
 /// their titles from running together.
 const _: () = assert!(COL_PX > LABEL_PX);
 const LABEL_FONT_PX: f32 = 11.0;
+/// Inset between a title's backdrop and the words inside it.
+const LABEL_PAD_X: f32 = 6.0;
+const LABEL_PAD_Y: f32 = 2.0;
+/// Widest the words themselves may run. Deliberately `LABEL_PX` less the
+/// padding, so a backdrop is never wider than the label allowance it was
+/// sized against and `COL_PX > LABEL_PX` keeps meaning what it says.
+const LABEL_TEXT_PX: f32 = LABEL_PX - LABEL_PAD_X * 2.0;
+/// Sits behind a lesson title. Edges run underneath the labels, and text
+/// drawn straight over a line is hard to read; this is dark and mostly
+/// opaque so the words win, without becoming a solid card.
+const LABEL_BACKDROP: Color = Color::srgba(0.07, 0.08, 0.12, 0.82);
 
 /// Edge thickness.
 const EDGE_PX: f32 = 3.5;
-/// Clearance two node boundaries need before an edge between them is worth
-/// drawing at all.
-const EDGE_MIN_LENGTH_PX: f32 = 1.0;
-/// Gap between the dots of an elective branch. A dot is the edge's own
-/// thickness across, so a dotted line carries the same weight as a solid
-/// one and only the continuity differs.
-const EDGE_DOT_GAP_PX: f32 = 7.0;
 
 const PIP_PX: f32 = 9.0;
 const LOCKED_TINT: Color = Color::srgba(0.35, 0.35, 0.42, 0.55);
@@ -478,185 +482,6 @@ pub(crate) fn rebuild_on_lessons_rescanned(
     }
 }
 
-/// One end of an edge: where a node sits, and how far its art reaches from
-/// that centre.
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct Endpoint {
-    centre: Vec2,
-    radius: f32,
-}
-
-/// The visible run of an edge: the segment of the line joining two centres
-/// that lies *between* the two nodes' boundaries.
-///
-/// Both ends are pulled back along that same line, each by its own radius,
-/// so the edge points at what it connects from wherever that happens to be
-/// — below, above, or off to one side. `None` when the boundaries already
-/// meet and there is nothing left to draw.
-fn edge_span(from: Endpoint, to: Endpoint) -> Option<(Vec2, Vec2)> {
-    let offset = to.centre - from.centre;
-    let gap = offset.length();
-    // Tested against the gap rather than the resulting segment's length:
-    // two nodes nearer than their combined radii would pull each end past
-    // the other, and a backwards segment has a perfectly respectable
-    // positive length while running through both nodes it claims to join.
-    // This also covers two centres landing on the same point.
-    if gap < from.radius + to.radius + EDGE_MIN_LENGTH_PX {
-        return None;
-    }
-    let direction = offset / gap;
-    Some((
-        from.centre + direction * from.radius,
-        to.centre - direction * to.radius,
-    ))
-}
-
-/// Repositions a moving edge's node.
-///
-/// Only the box moves: the shader rebuilds the line from the node's own
-/// size, so a translating or stretching edge needs no material update. The
-/// diagonal *is* baked into the material at spawn, which holds because an
-/// edge either slides rigidly (both ends belong to one unit) or stretches
-/// along the horizontal spine — neither flips which way it runs.
-fn set_edge_geometry(node: &mut Node, from: Endpoint, to: Endpoint, thickness: f32) -> bool {
-    let Some((start, end)) = edge_span(from, to) else {
-        return false;
-    };
-    let (top_left, size) = edge_box(start, end, thickness / 2.0);
-    node.left = Val::Px(top_left.x);
-    node.top = Val::Px(top_left.y);
-    node.width = Val::Px(size.x);
-    node.height = Val::Px(size.y);
-    true
-}
-
-/// How an edge is drawn, as opposed to where it runs.
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct EdgeStyle {
-    thickness: f32,
-    color: Color,
-    /// Elective branches are dotted: the conventional way a dependency
-    /// diagram says "you may skip this" without spending a second meaning
-    /// on brightness, which here already distinguishes locked from open.
-    dotted: bool,
-}
-
-/// Centres of the dots making up an elective branch, evenly spread so one
-/// sits against each node's boundary and the spacing comes out equal.
-///
-/// Spacing is derived from the span rather than fixed, which is what stops
-/// a short edge ending in a ragged half-gap. `diameter` is the dot size, so
-/// the first and last centres are inset by half of it.
-fn dot_centres(start: Vec2, end: Vec2, diameter: f32, gap: f32) -> Vec<Vec2> {
-    let delta = end - start;
-    let length = delta.length();
-    // Centre-to-centre distance available once both end dots are inset.
-    let travel = length - diameter;
-    if travel <= 0.0 {
-        return vec![(start + end) / 2.0];
-    }
-    let direction = delta / length;
-    let count = ((travel / (diameter + gap)).round() as usize + 1).max(2);
-    let spacing = travel / (count - 1) as f32;
-    (0..count)
-        .map(|i| start + direction * (diameter / 2.0 + spacing * i as f32))
-        .collect()
-}
-
-/// An elective branch, as a run of round dots.
-///
-/// Each dot is its own entity carrying [`LayoutOwner`], not one
-/// [`MovingEdge`]: a dotted edge is always inside a single cluster (the
-/// spine is never elective), so both its endpoints take the same slide
-/// offset and the whole run translates rigidly. `animate_unit_slides`
-/// writes only `translation`, so each dot keeps the rotation set here.
-fn spawn_dotted_edge(
-    parent: &mut ChildSpawnerCommands,
-    start: Vec2,
-    end: Vec2,
-    style: EdgeStyle,
-    unit_id: Option<&str>,
-) {
-    let diameter = style.thickness;
-    for centre in dot_centres(start, end, diameter, EDGE_DOT_GAP_PX) {
-        let mut dot = parent.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(centre.x - diameter / 2.0),
-                top: Val::Px(centre.y - diameter / 2.0),
-                width: Val::Px(diameter),
-                height: Val::Px(diameter),
-                // A square with a maximal radius is a circle.
-                border_radius: BorderRadius::MAX,
-                ..default()
-            },
-            BackgroundColor(style.color),
-        ));
-        if let Some(unit_id) = unit_id {
-            dot.insert((
-                ClusterMember(unit_id.to_string()),
-                LayoutOwner(unit_id.to_string()),
-            ));
-        }
-    }
-}
-
-/// One edge, as a single rotated rectangle.
-///
-/// A straight run needs no sampling and no joins, so there is exactly one
-/// node per edge and no seam anywhere along it.
-fn spawn_edge(
-    parent: &mut ChildSpawnerCommands,
-    from: Endpoint,
-    to: Endpoint,
-    style: EdgeStyle,
-    unit_id: Option<&str>,
-    owners: Option<(&str, &str)>,
-    materials: &mut Assets<LessonEdgeMaterial>,
-) {
-    let Some((start, end)) = edge_span(from, to) else {
-        return;
-    };
-    let EdgeStyle {
-        thickness, color, ..
-    } = style;
-    if style.dotted {
-        spawn_dotted_edge(parent, start, end, style, unit_id);
-        return;
-    }
-    let (top_left, size) = edge_box(start, end, thickness / 2.0);
-
-    let mut segment = parent.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(top_left.x),
-            top: Val::Px(top_left.y),
-            width: Val::Px(size.x),
-            height: Val::Px(size.y),
-            ..default()
-        },
-        // The node stays axis-aligned and the shader draws the line inside
-        // it — see `edge_material`. A rotated node would be sheared rather
-        // than clipped wherever it left the scroll viewport.
-        MaterialNode(materials.add(LessonEdgeMaterial {
-            color: color.into(),
-            params: Vec4::new(thickness / 2.0, edge_diagonal(start, end), 0.0, 0.0),
-        })),
-    ));
-    if let Some((from_unit, to_unit)) = owners {
-        segment.insert(MovingEdge {
-            from,
-            to,
-            from_unit: from_unit.to_string(),
-            to_unit: to_unit.to_string(),
-            thickness,
-        });
-    }
-    if let Some(unit_id) = unit_id {
-        segment.insert(ClusterMember(unit_id.to_string()));
-    }
-}
-
 /// A unit: the major node the whole cluster below it hangs off.
 ///
 /// Activating it expands or collapses the lessons belonging to the unit.
@@ -882,6 +707,11 @@ fn spawn_node(
     // The title, under the node. Small and wrapped to the column's own
     // width — the art alone says nothing about which lesson this is, and a
     // tooltip only helps a player already pointing at it.
+    //
+    // Two nodes, not one: the outer holds the column's full width so the
+    // title stays centred under its lesson, while the inner shrinks to the
+    // text so the backdrop hugs the words. One node carrying both would
+    // paint a full-width slab behind every title, however short.
     let label = commands
         .spawn((
             Node {
@@ -889,8 +719,30 @@ fn spawn_node(
                 left: Val::Px(centre.x - LABEL_PX / 2.0),
                 top: Val::Px(centre.y + NODE_PX / 2.0 + 6.0),
                 width: Val::Px(LABEL_PX),
+                justify_content: JustifyContent::Center,
                 ..default()
             },
+            ClusterMember(node.unit_id.clone()),
+            LayoutOwner(node.unit_id.clone()),
+        ))
+        .id();
+    commands.entity(canvas).add_child(label);
+
+    let title = commands
+        .spawn((
+            Node {
+                // Padding plus this width comes to exactly `LABEL_PX`, so
+                // the backdrop still can't reach a neighbouring column —
+                // which is what `COL_PX > LABEL_PX` is there to promise.
+                max_width: Val::Px(LABEL_TEXT_PX),
+                padding: UiRect::axes(Val::Px(LABEL_PAD_X), Val::Px(LABEL_PAD_Y)),
+                border_radius: BorderRadius::all(Val::Px(4.0)),
+                ..default()
+            },
+            // Edges pass behind the titles, and glyphs drawn straight over
+            // a line are hard to read. The backdrop is what separates the
+            // text from whatever runs under it.
+            BackgroundColor(LABEL_BACKDROP),
             Text::new(String::from(loc.msg(&node.title_key))),
             TextFont {
                 font_size: FontSize::Px(LABEL_FONT_PX),
@@ -904,11 +756,7 @@ fn spawn_node(
             }),
         ))
         .id();
-    commands.entity(canvas).add_child(label);
-    commands.entity(label).insert((
-        ClusterMember(node.unit_id.clone()),
-        LayoutOwner(node.unit_id.clone()),
-    ));
+    commands.entity(label).add_child(title);
 
     if node.optional {
         // Beside the node at mid-height, not over its top-right shoulder:
@@ -1064,130 +912,6 @@ mod tests {
             "bundled tracks with no colour of their own, so they all draw \
              the same grey: {uncoloured:?}"
         );
-    }
-
-    fn lesson(column: f32, row: f32) -> Endpoint {
-        Endpoint {
-            centre: node_centre(column, row),
-            radius: NODE_PX / 2.0,
-        }
-    }
-
-    fn unit(column: f32, row: f32) -> Endpoint {
-        Endpoint {
-            centre: node_centre(column, row),
-            radius: UNIT_PX / 2.0,
-        }
-    }
-
-    #[test]
-    fn an_edge_leaves_the_bottom_of_a_parent_and_arrives_at_the_top_of_its_child() {
-        // The tree flows downward, so a child directly below its parent is
-        // the ordinary case: the line has to run down the gap between them
-        // rather than out of either one's flank.
-        let (from, to) = (lesson(2.5, 1.0), lesson(2.5, 2.0));
-        let (start, end) = edge_span(from, to).expect("nodes a whole row apart");
-        assert_eq!(start, from.centre + Vec2::Y * NODE_PX / 2.0);
-        assert_eq!(end, to.centre - Vec2::Y * NODE_PX / 2.0);
-    }
-
-    #[test]
-    fn an_edge_points_the_way_its_centres_do() {
-        // The invariant that keeps a line off the art it connects: whatever
-        // direction the child lies in, both ends move along *that* line. A
-        // child down and to the left is left by the parent's lower-left.
-        let (from, to) = (lesson(2.5, 2.0), lesson(0.0, 3.0));
-        let (start, end) = edge_span(from, to).expect("nodes a whole row apart");
-        let along = (end - start).normalize();
-        let centres = (to.centre - from.centre).normalize();
-        assert!(
-            along.distance(centres) < 1.0e-5,
-            "edge runs {along} but its nodes lie {centres} apart",
-        );
-        assert!(start.x < from.centre.x, "the edge left the wrong side");
-        assert!(start.y > from.centre.y, "the edge left the wrong side");
-    }
-
-    #[test]
-    fn each_end_is_clipped_by_the_radius_of_the_node_it_touches() {
-        // A spine edge meets two unit rings; a unit branch meets a ring at
-        // the top and a lesson at the bottom. One shared radius would leave
-        // the wider node's end buried inside its own art.
-        let (spine_start, spine_end) =
-            edge_span(unit(0.0, 0.0), unit(7.0, 0.0)).expect("two units apart on the spine");
-        assert_eq!(spine_start.x - node_centre(0.0, 0.0).x, UNIT_PX / 2.0);
-        assert_eq!(node_centre(7.0, 0.0).x - spine_end.x, UNIT_PX / 2.0);
-
-        let (branch_start, branch_end) =
-            edge_span(unit(2.5, 0.0), lesson(2.5, 1.0)).expect("a unit above its root lesson");
-        assert_eq!(branch_start.y - node_centre(2.5, 0.0).y, UNIT_PX / 2.0);
-        assert_eq!(node_centre(2.5, 1.0).y - branch_end.y, NODE_PX / 2.0);
-    }
-
-    #[test]
-    fn a_dotted_edge_starts_and_ends_against_the_nodes_it_joins() {
-        // A dot sits against each boundary, so a dotted branch reaches its
-        // node exactly as far as a solid one does.
-        let (start, end) = (Vec2::new(100.0, 100.0), Vec2::new(100.0, 240.0));
-        let dots = dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX);
-        assert!(dots.len() > 2, "expected a run of dots, got {}", dots.len());
-        assert!((dots[0].distance(start) - EDGE_PX / 2.0).abs() < 1.0e-4);
-        assert!((dots[dots.len() - 1].distance(end) - EDGE_PX / 2.0).abs() < 1.0e-4);
-    }
-
-    #[test]
-    fn dots_are_evenly_spaced_however_long_the_edge() {
-        // Spacing is derived from the span rather than fixed, which is what
-        // stops a short edge finishing on a ragged half-gap.
-        for length in [20.0_f32, 58.0, 137.0, 394.0] {
-            let (start, end) = (Vec2::ZERO, Vec2::new(length, 0.0));
-            let dots = dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX);
-            let gaps: Vec<f32> = dots.windows(2).map(|w| w[0].distance(w[1])).collect();
-            let first = gaps[0];
-            assert!(
-                gaps.iter().all(|g| (g - first).abs() < 1.0e-3),
-                "uneven spacing over {length}px: {gaps:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn dots_follow_a_diagonal_edge() {
-        // Every dot has to land *on* the line, not on a bounding box of it.
-        let (start, end) = (Vec2::new(40.0, 40.0), Vec2::new(200.0, 160.0));
-        let direction = (end - start).normalize();
-        for dot in dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX) {
-            let along = (dot - start).dot(direction);
-            assert!(
-                (start + direction * along).distance(dot) < 1.0e-3,
-                "dot {dot} sits off the line"
-            );
-        }
-    }
-
-    #[test]
-    fn a_span_too_short_for_two_dots_draws_one() {
-        let (start, end) = (Vec2::new(0.0, 0.0), Vec2::new(2.0, 0.0));
-        assert_eq!(
-            dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX),
-            vec![Vec2::new(1.0, 0.0)]
-        );
-    }
-
-    #[test]
-    fn nodes_too_close_to_separate_draw_no_edge() {
-        // Nearer than their combined radii, the pull-backs would cross and
-        // the segment would run backwards through both nodes.
-        let touching = Endpoint {
-            centre: Vec2::new(100.0, 100.0),
-            radius: 40.0,
-        };
-        let overlapping = Endpoint {
-            centre: Vec2::new(110.0, 100.0),
-            radius: 40.0,
-        };
-        assert_eq!(edge_span(touching, overlapping), None);
-        assert_eq!(edge_span(touching, touching), None);
     }
 
     #[test]
