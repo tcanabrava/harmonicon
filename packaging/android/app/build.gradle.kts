@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.zip.ZipFile
 
 plugins {
     id("com.android.application")
@@ -139,3 +140,49 @@ val cargoNdkBuild = tasks.register<Exec>("cargoNdkBuild") {
 // installDebug all rebuild the Rust side first.
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("JniLibFolders") }
     .configureEach { dependsOn(cargoNdkBuild) }
+
+/**
+ * Confirms that runtime-only source assets reached the release APK unchanged.
+ *
+ * Android lesson manifests are also embedded in the Rust library, but Fluent
+ * bundles and WGSL shaders are read from the APK at runtime. A mixed-revision
+ * package can therefore compile and launch while showing raw localization
+ * keys or failing to create a material. Comparing the source bytes catches
+ * both missing files and stale Gradle merge output.
+ */
+val verifyReleaseRuntimeAssets = tasks.register("verifyReleaseRuntimeAssets") {
+    group = "verification"
+    description = "Verify locales and shaders packaged in the release APK"
+    dependsOn("packageRelease")
+
+    doLast {
+        val apk = layout.buildDirectory
+            .file("outputs/apk/release/app-release.apk")
+            .get()
+            .asFile
+        check(apk.isFile) { "Release APK was not produced at ${apk.absolutePath}" }
+
+        ZipFile(apk).use { archive ->
+            listOf("locales", "shaders").forEach { directory ->
+                File(repoRoot, "assets/$directory")
+                    .walkTopDown()
+                    .filter(File::isFile)
+                    .forEach { source ->
+                        val relative = source.relativeTo(File(repoRoot, "assets"))
+                            .invariantSeparatorsPath
+                        val entryName = "assets/$relative"
+                        val entry = checkNotNull(archive.getEntry(entryName)) {
+                            "$entryName is missing from ${apk.name}"
+                        }
+                        val packaged = archive.getInputStream(entry).use { it.readBytes() }
+                        check(source.readBytes().contentEquals(packaged)) {
+                            "$entryName in ${apk.name} is stale"
+                        }
+                    }
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" }
+    .configureEach { dependsOn(verifyReleaseRuntimeAssets) }
