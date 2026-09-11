@@ -11,9 +11,58 @@
 //! `menu::scene::spawn_menu_root` (any page whose content can outgrow the
 //! screen — a long artist/song/lesson/theme list) and the Song Editor.
 
+use bevy::picking::events::{Drag, DragStart, Pointer};
 use bevy::prelude::*;
-use bevy::ui::ComputedNode;
+use bevy::ui::{ComputedNode, ScrollPosition};
 use bevy::ui_widgets::{ControlOrientation, ScrollArea, Scrollbar, ScrollbarThumb};
+
+/// Scroll offset captured when a pointer drag begins.
+#[derive(Component, Default)]
+struct DragScrollStart(Vec2);
+
+fn begin_drag_scroll(
+    drag: On<Pointer<DragStart>>,
+    mut areas: Query<(&ComputedNode, &mut DragScrollStart), With<ScrollArea>>,
+) {
+    let Ok((computed, mut start)) = areas.get_mut(drag.entity) else {
+        return;
+    };
+    start.0 = computed.scroll_position * computed.inverse_scale_factor;
+}
+
+fn drag_scroll(
+    drag: On<Pointer<Drag>>,
+    ui_scale: Res<UiScale>,
+    mut areas: Query<
+        (&Node, &ComputedNode, &DragScrollStart, &mut ScrollPosition),
+        With<ScrollArea>,
+    >,
+) {
+    let Ok((node, computed, start, mut position)) = areas.get_mut(drag.entity) else {
+        return;
+    };
+
+    let visible_size = computed.size() * computed.inverse_scale_factor;
+    let content_size = computed.content_size() * computed.inverse_scale_factor;
+    let requested = start.0 - drag.distance / ui_scale.0;
+    position.0 = bounded_scroll_position(node.overflow, requested, content_size - visible_size);
+}
+
+fn bounded_scroll_position(overflow: Overflow, requested: Vec2, available_range: Vec2) -> Vec2 {
+    let max = available_range.max(Vec2::ZERO);
+    Vec2::new(
+        if overflow.x == OverflowAxis::Scroll {
+            requested.x.clamp(0.0, max.x)
+        } else {
+            0.0
+        },
+        if overflow.y == OverflowAxis::Scroll {
+            requested.y.clamp(0.0, max.y)
+        } else {
+            0.0
+        },
+    )
+}
 
 /// Spawns a full "scrollable content area + visible scrollbar" unit as a
 /// child of `parent`: an outer row holding the scrollable column (sized to
@@ -143,7 +192,10 @@ pub fn spawn_scroll_area_xy(
                                 ..default()
                             },
                             ScrollArea,
+                            DragScrollStart::default(),
                         ))
+                        .observe(begin_drag_scroll)
+                        .observe(drag_scroll)
                         .id();
                     row.spawn((
                         Scrollbar::new(area, ControlOrientation::Vertical, 24.0),
@@ -232,5 +284,36 @@ pub struct ScrollAreaPlugin;
 impl Plugin for ScrollAreaPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, update_scrollbar_visibility);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn drag_scroll_is_bounded_on_both_axes() {
+        let overflow = Overflow::scroll();
+
+        assert_eq!(
+            bounded_scroll_position(overflow, Vec2::new(240.0, -20.0), Vec2::new(200.0, 300.0),),
+            Vec2::new(200.0, 0.0),
+        );
+        assert_eq!(
+            bounded_scroll_position(overflow, Vec2::new(80.0, 120.0), Vec2::new(200.0, 300.0),),
+            Vec2::new(80.0, 120.0),
+        );
+    }
+
+    #[test]
+    fn drag_scroll_leaves_disabled_axes_at_origin() {
+        assert_eq!(
+            bounded_scroll_position(
+                Overflow::scroll_y(),
+                Vec2::new(80.0, 120.0),
+                Vec2::new(200.0, 300.0),
+            ),
+            Vec2::new(0.0, 120.0),
+        );
     }
 }

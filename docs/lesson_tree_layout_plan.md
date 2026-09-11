@@ -139,10 +139,11 @@ bounds, ports, control points, and tessellation segments.
    is one UI rectangle, so there are no tessellation joins whose appearance
    changes with scale. Keep multi-scale captures and a mesh renderer as
    regression tools only if a curved route is introduced later.
-5. **Not activated:** add an overview/minimap or “show available” action only
-   if usability tests show players losing their place. Viewport anchoring and
-   compact units address the original navigation problem without another
-   control, and there is currently no evidence that one is needed.
+5. **Done:** Android use showed that the map could not be navigated by touch.
+   The two-axis viewport now follows pointer drags and clamps both axes to its
+   measured content bounds. Keep a minimap or “show available” action as a
+   further option only if touch panning still leaves players losing their
+   place.
 
 Reduced-motion behavior remains a shared-settings follow-up. The repository
 does not currently expose such a preference; when it does, both cluster and
