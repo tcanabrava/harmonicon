@@ -65,6 +65,7 @@ use harmonicon_ui::dialogs::tooltip::Tooltip;
 use crate::lesson_reader::SelectedLesson;
 use harmonicon_menu::menu::MenuPage;
 use harmonicon_menu::menu::scene::{spawn_back_button, spawn_menu_root_plain};
+use harmonicon_ui::dialogs::button;
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy;
 
 pub(crate) use edges::LessonEdgeMaterialPlugin;
@@ -241,6 +242,7 @@ pub(crate) fn setup_lesson_tree(
     mut anchor: ResMut<PendingViewportAnchor>,
     mut previous_positions: ResMut<PreviousUnitPositions>,
     mut slides: ResMut<UnitSlides>,
+    mut lesson_focus: ResMut<PendingLessonFocus>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     asset_server: Res<AssetServer>,
@@ -288,6 +290,17 @@ pub(crate) fn setup_lesson_tree(
             return;
         }
     };
+
+    if let Some(id) = lesson_focus.lesson_id.as_deref() {
+        lesson_focus.canvas_position = tree
+            .nodes
+            .iter()
+            .find(|node| node.id == id)
+            .map(|node| node_centre(node.column, node.row));
+        if lesson_focus.canvas_position.is_none() {
+            lesson_focus.lesson_id = None;
+        }
+    }
 
     let live_units: HashSet<&str> = tree.units.iter().map(|unit| unit.id.as_str()).collect();
     collapsed.0.retain(|id| live_units.contains(id.as_str()));
@@ -463,7 +476,39 @@ pub(crate) fn setup_lesson_tree(
         spawn_node(&mut commands, canvas, node, &placeholder, &loc);
     }
 
+    if let Some(next) = next_available_lesson(&tree.nodes) {
+        let lesson_id = next.id.clone();
+        let unit_id = next.unit_id.clone();
+        let centre = node_centre(next.column, next.row);
+        let locator = commands
+            .spawn_scene(button::icon(
+                "⌖",
+                move |_: On<Activate>,
+                      mut collapsed: ResMut<CollapsedUnits>,
+                      mut focus: ResMut<PendingLessonFocus>,
+                      mut page: ResMut<NextState<MenuPage>>| {
+                    focus.lesson_id = Some(lesson_id.clone());
+                    focus.canvas_position = Some(centre);
+                    if collapsed.0.remove(&unit_id) {
+                        // Rebuild first because expansion changes this lesson's
+                        // canvas position when compacted units make room again.
+                        focus.canvas_position = None;
+                        page.set(MenuPage::LessonTree);
+                    }
+                },
+            ))
+            .insert(Tooltip(String::from(loc.msg("lesson-tree-find-next"))))
+            .id();
+        commands.entity(header).add_child(locator);
+    }
     spawn_back_button(&mut commands, header, &loc.msg("back"), back_to_play);
+}
+
+fn next_available_lesson(nodes: &[PlacedNode]) -> Option<&PlacedNode> {
+    nodes
+        .iter()
+        .find(|node| node.state == NodeState::Available && !node.optional)
+        .or_else(|| nodes.iter().find(|node| node.state == NodeState::Available))
 }
 
 fn back_to_play(_: On<Activate>, mut page: ResMut<NextState<MenuPage>>) {

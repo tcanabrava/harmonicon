@@ -54,6 +54,41 @@ pub(crate) struct LessonTreeScroller;
 #[derive(Resource, Default)]
 pub(crate) struct LessonTreeViewport(pub(super) Vec2);
 
+/// A lesson requested by the header locator. Its canvas position is filled
+/// during tree construction, after a collapsed unit has been expanded and
+/// the compact layout has consequently changed.
+#[derive(Resource, Default)]
+pub(crate) struct PendingLessonFocus {
+    pub(super) lesson_id: Option<String>,
+    pub(super) canvas_position: Option<Vec2>,
+}
+
+pub(crate) fn focus_pending_lesson(
+    mut pending: ResMut<PendingLessonFocus>,
+    mut scroller: Query<(&mut ScrollPosition, &ComputedNode), With<LessonTreeScroller>>,
+) {
+    let Some(target) = pending.canvas_position else {
+        return;
+    };
+    let Some((mut position, computed)) = scroller.iter_mut().next() else {
+        return;
+    };
+    let scale = computed.inverse_scale_factor;
+    let viewport = computed.size() * scale;
+    let content = computed.content_size() * scale;
+    if viewport.min_element() <= 0.0 || content.min_element() <= 0.0 {
+        return;
+    }
+
+    position.0 = centred_scroll(target, viewport, content);
+    pending.lesson_id = None;
+    pending.canvas_position = None;
+}
+
+pub(super) fn centred_scroll(target: Vec2, viewport: Vec2, content: Vec2) -> Vec2 {
+    (target - viewport / 2.0).clamp(Vec2::ZERO, (content - viewport).max(Vec2::ZERO))
+}
+
 pub(crate) fn remember_viewport(
     scroller: Query<&ScrollPosition, With<LessonTreeScroller>>,
     mut saved: ResMut<LessonTreeViewport>,
@@ -243,6 +278,21 @@ mod viewport_tests {
         assert_eq!(
             app.world().resource::<LessonTreeViewport>().0,
             Vec2::new(420.0, 180.0),
+        );
+    }
+
+    #[test]
+    fn lesson_focus_centres_and_clamps_to_the_scrollable_range() {
+        let viewport = Vec2::new(300.0, 200.0);
+        let content = Vec2::new(1_000.0, 600.0);
+
+        assert_eq!(
+            centred_scroll(Vec2::new(500.0, 300.0), viewport, content),
+            Vec2::new(350.0, 200.0),
+        );
+        assert_eq!(
+            centred_scroll(Vec2::new(20.0, 590.0), viewport, content),
+            Vec2::new(0.0, 400.0),
         );
     }
 }

@@ -928,6 +928,7 @@ lesson-training-heading = Entrenamiento — {$percent}% dominado
 
 # The skill-tree view of the curriculum: one row per track.
 lesson-tree-title = Árbol de Habilidades
+lesson-tree-find-next = Buscar la siguiente lección
 lesson-tree-broken = Este plan de estudios no se puede dibujar: {$error}
 lesson-tree-unit-progress = {$done}/{$needed}
 lesson-tree-needs = Necesita: {$lessons}

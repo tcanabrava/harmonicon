@@ -929,6 +929,7 @@ lesson-training-heading = Training — {$percent}% mastered
 
 # The skill-tree view of the curriculum: one row per track.
 lesson-tree-title = Skill Tree
+lesson-tree-find-next = Find next lesson
 lesson-tree-broken = This curriculum cannot be drawn: {$error}
 lesson-tree-unit-progress = {$done}/{$needed}
 lesson-tree-needs = Needs: {$lessons}
