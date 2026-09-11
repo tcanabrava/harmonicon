@@ -25,9 +25,9 @@ use super::{
 use bevy_fluent::prelude::Localization;
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::midi::{freq_to_midi, midi_to_note};
-use harmonicon_gameplay::gameplay::twelve_bar_blues_overlay::bar_bg;
 use harmonicon_platform::localization::LocalizationExt;
 use harmonicon_platform::theme::{LoadedTheme, SongEditorColors};
+use harmonicon_ui::dialogs::twelve_bar_grid::bar_bg;
 use std::collections::HashSet;
 
 pub(super) fn visible_beats(win_w: f32) -> usize {

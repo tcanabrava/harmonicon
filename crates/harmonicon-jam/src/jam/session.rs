@@ -34,7 +34,7 @@ use harmonicon_gameplay::gameplay::metronome_overlay::spawn_metronome;
 use harmonicon_gameplay::gameplay::song_progress_overlay::{
     BAR_HEIGHT, NoteMarker, spawn_song_progress,
 };
-use harmonicon_gameplay::gameplay::twelve_bar_blues_overlay::{GridConfig, spawn_12_bar_grid};
+use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, spawn_12_bar_grid};
 use harmonicon_ui::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
 
 use super::backing::JamGenre;

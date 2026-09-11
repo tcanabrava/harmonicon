@@ -12,4 +12,5 @@ pub mod scroll_area;
 pub mod tab_bar;
 pub mod text_input;
 pub mod tooltip;
+pub mod twelve_bar_grid;
 pub mod ui_scale;
