@@ -49,6 +49,21 @@ pub(crate) struct UnitSlides(pub(super) HashMap<String, UnitSlide>);
 #[derive(Component)]
 pub(crate) struct LessonTreeScroller;
 
+/// Last viewport position, retained while the reader or gameplay page owns
+/// the screen. The tree itself is despawned on every page change.
+#[derive(Resource, Default)]
+pub(crate) struct LessonTreeViewport(pub(super) Vec2);
+
+pub(crate) fn remember_viewport(
+    scroller: Query<&ScrollPosition, With<LessonTreeScroller>>,
+    mut saved: ResMut<LessonTreeViewport>,
+) {
+    let Some(position) = scroller.iter().next() else {
+        return;
+    };
+    saved.0 = position.0;
+}
+
 pub(crate) fn restore_viewport_anchor(
     mut anchor: ResMut<PendingViewportAnchor>,
     mut scroller: Query<(&mut ScrollPosition, &ComputedNode), With<LessonTreeScroller>>,
@@ -204,5 +219,30 @@ pub(super) fn expansion_after(current: f32, collapsed: bool, step: f32) -> f32 {
         (current - step).max(target)
     } else {
         current
+    }
+}
+
+#[cfg(test)]
+mod viewport_tests {
+    use super::*;
+
+    #[test]
+    fn viewport_position_survives_after_the_scroller_is_gone() {
+        let mut app = App::new();
+        app.init_resource::<LessonTreeViewport>()
+            .add_systems(Update, remember_viewport);
+        let scroller = app
+            .world_mut()
+            .spawn((LessonTreeScroller, ScrollPosition(Vec2::new(420.0, 180.0))))
+            .id();
+
+        app.update();
+        app.world_mut().despawn(scroller);
+        app.update();
+
+        assert_eq!(
+            app.world().resource::<LessonTreeViewport>().0,
+            Vec2::new(420.0, 180.0),
+        );
     }
 }

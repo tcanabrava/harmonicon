@@ -245,6 +245,7 @@ pub(crate) fn setup_lesson_tree(
     loc: Res<Localization>,
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<LessonEdgeMaterial>>,
+    viewport: Res<LessonTreeViewport>,
 ) {
     // `_plain` plus a two-axis scroll area of our own: the shared
     // `spawn_menu_root` scrolls vertically only, and this canvas outgrows
@@ -371,7 +372,9 @@ pub(crate) fn setup_lesson_tree(
     commands.entity(root).with_children(|parent| {
         scroller = spawn_scroll_area_xy(parent, SCROLLBAR_THUMB, SCROLLBAR_TRACK);
     });
-    commands.entity(scroller).insert(LessonTreeScroller);
+    commands
+        .entity(scroller)
+        .insert((LessonTreeScroller, ScrollPosition(viewport.0)));
 
     let canvas = commands
         .spawn(Node {
