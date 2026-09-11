@@ -60,6 +60,40 @@ pub(crate) struct LessonGrid {
     key: String,
     progression: Progression,
     sync_group: Option<String>,
+    current_bar: usize,
+}
+
+#[derive(Component)]
+pub(crate) struct LessonMetronomeAudio;
+
+pub(crate) fn cleanup_lesson_audio(
+    mut commands: Commands,
+    audio: Query<Entity, With<LessonMetronomeAudio>>,
+) {
+    for entity in &audio {
+        commands.entity(entity).despawn();
+    }
+}
+
+fn highlight_lesson_grid(
+    grid: &LessonGrid,
+    bar: usize,
+    colors: harmonicon_platform::theme::TwelveBarColors,
+    backgrounds: &mut Query<&mut BackgroundColor>,
+) {
+    for (index, entity) in grid.cells.iter().enumerate() {
+        if let Ok(mut bg) = backgrounds.get_mut(*entity) {
+            *bg = if index == bar {
+                BackgroundColor(Color::srgba(0.75, 0.55, 0.08, 0.95))
+            } else {
+                BackgroundColor(bar_bg(index, &grid.key, grid.progression, colors))
+            };
+        }
+    }
+}
+
+const fn stepped_bar(current: usize, delta: i32) -> usize {
+    (current as i32 + delta).rem_euclid(12) as usize
 }
 
 #[derive(Component)]
@@ -103,6 +137,7 @@ pub(crate) fn update_lesson_metronomes(
                 AudioPlayer::<AudioSource>(asset_server.load(sample)),
                 PlaybackSettings::DESPAWN
                     .with_volume(Volume::Linear(audio.metronome_volume * gain)),
+                LessonMetronomeAudio,
             ));
         }
         if tick == 0 || (feel == MetronomeFeel::Shuffle && tick.rem_euclid(3) != 0) {
@@ -113,16 +148,7 @@ pub(crate) fn update_lesson_metronomes(
             if grid.sync_group.is_none() || grid.sync_group != metronome.sync_group {
                 continue;
             }
-            let colors = theme.twelve_bar_colors();
-            for (index, entity) in grid.cells.iter().enumerate() {
-                if let Ok(mut bg) = backgrounds.get_mut(*entity) {
-                    *bg = if index == bar {
-                        BackgroundColor(Color::srgba(0.75, 0.55, 0.08, 0.95))
-                    } else {
-                        BackgroundColor(bar_bg(index, &grid.key, grid.progression, colors))
-                    };
-                }
-            }
+            highlight_lesson_grid(grid, bar, theme.twelve_bar_colors(), &mut backgrounds);
         }
     }
 }
@@ -501,9 +527,73 @@ pub(crate) fn setup_lesson_reader(
                         key: key.clone(),
                         progression,
                         sync_group: sync_group.clone(),
+                        current_bar: 0,
                     })
                     .id();
                 commands.entity(root).add_child(marker);
+                let target = marker;
+                spawn_button(
+                    &mut commands,
+                    root,
+                    &loc.msg("lesson-widget-bar-previous"),
+                    move |_: On<Activate>,
+                          theme: Res<LoadedTheme>,
+                          mut grids: Query<&mut LessonGrid>,
+                          mut backgrounds: Query<&mut BackgroundColor>| {
+                        let Ok(mut grid) = grids.get_mut(target) else {
+                            return;
+                        };
+                        grid.current_bar = stepped_bar(grid.current_bar, -1);
+                        highlight_lesson_grid(
+                            &grid,
+                            grid.current_bar,
+                            theme.twelve_bar_colors(),
+                            &mut backgrounds,
+                        );
+                    },
+                );
+                let target = marker;
+                spawn_button(
+                    &mut commands,
+                    root,
+                    &loc.msg("lesson-widget-bar-next"),
+                    move |_: On<Activate>,
+                          theme: Res<LoadedTheme>,
+                          mut grids: Query<&mut LessonGrid>,
+                          mut backgrounds: Query<&mut BackgroundColor>| {
+                        let Ok(mut grid) = grids.get_mut(target) else {
+                            return;
+                        };
+                        grid.current_bar = stepped_bar(grid.current_bar, 1);
+                        highlight_lesson_grid(
+                            &grid,
+                            grid.current_bar,
+                            theme.twelve_bar_colors(),
+                            &mut backgrounds,
+                        );
+                    },
+                );
+                let target = marker;
+                spawn_button(
+                    &mut commands,
+                    root,
+                    &loc.msg("lesson-widget-bar-reset"),
+                    move |_: On<Activate>,
+                          theme: Res<LoadedTheme>,
+                          mut grids: Query<&mut LessonGrid>,
+                          mut backgrounds: Query<&mut BackgroundColor>| {
+                        let Ok(mut grid) = grids.get_mut(target) else {
+                            return;
+                        };
+                        grid.current_bar = 0;
+                        highlight_lesson_grid(
+                            &grid,
+                            0,
+                            theme.twelve_bar_colors(),
+                            &mut backgrounds,
+                        );
+                    },
+                );
             }
             LessonWidget::Metronome {
                 bpm,
@@ -726,6 +816,24 @@ fn spawn_back_to_tree(commands: &mut Commands, header: Entity, loc: &Localizatio
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lesson_grid_steps_and_wraps_in_both_directions() {
+        assert_eq!(stepped_bar(0, -1), 11);
+        assert_eq!(stepped_bar(11, 1), 0);
+        assert_eq!(stepped_bar(5, 1), 6);
+    }
+
+    #[test]
+    fn lesson_audio_cleanup_despawns_every_active_click() {
+        let mut app = App::new();
+        app.add_systems(Update, cleanup_lesson_audio);
+        let first = app.world_mut().spawn(LessonMetronomeAudio).id();
+        let second = app.world_mut().spawn(LessonMetronomeAudio).id();
+        app.update();
+        assert!(app.world().get_entity(first).is_err());
+        assert!(app.world().get_entity(second).is_err());
+    }
 
     // ── is_jam_criteria ───────────────────────────────────────────────────────
 
