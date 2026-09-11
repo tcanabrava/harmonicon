@@ -151,21 +151,12 @@ setting.
 
 ## Curriculum gaps
 
-The current 80 lessons form a broad blues-oriented course with rhythm,
+The current 100 lessons form a broad blues-oriented course with rhythm,
 navigation, ear-training, position, expression, and advanced elective
-branches. Remaining content should deepen applied musicianship and chromatic
-playing. Every item needs the honest scoring classification
+branches. Future content should follow learner feedback. Every item needs the
+honest scoring classification
 required by `docs/lessons_plan.md`.
 
-### Highest priority
-
-
-### Technique expansion
-
-
-### Chromatic and musicianship branches
-
-
-Before authoring these, split the graph into a required core and optional
-branches. Advanced techniques and repertoire should add depth without becoming
-gates in front of rhythm, blues, or basic improvisation.
+The planned gaps are now represented. The graph distinguishes required core
+lessons from elective branches, so advanced technique and repertoire do not
+gate rhythm, blues, or basic improvisation.

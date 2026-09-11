@@ -181,10 +181,8 @@ improvising over anything but the blues scale." Two parts:
 `quick-change-improv` (content-only, no new scale) is the 6th lesson of
 this wave but lives in `03_blues/` — see its row in Unit 3's table above.
 
-**Known gap, not built in this wave:** the Song Editor's lesson-authoring
-form (`song_editor::lesson_form`) still only round-trips `progression`,
-not the new `scale` field — authoring a scale-based jam lesson through
-the editor UI means hand-editing `lesson.json`'s `"scale"` key afterward.
+The Song Editor's lesson form round-trips both `progression` and `scale`, so
+scale-based jam lessons no longer require a manual manifest edit.
 
 ## Wave 4 — Circle of fifths — shipped
 
@@ -224,8 +222,7 @@ functions in `harmonica.rs` (`all()`, `interval_below_jam_key()`) plus
 `label()` — nothing outside that file matches over `Position`
 exhaustively, so the Generate Jam Position combobox and this lesson's own
 diagram picked the new positions up automatically, no other file touched.
-Small, bounded follow-up if the editor UI is ever extended (mirror
-`progression`'s existing click-to-cycle field).
+The editor's existing position cycle includes these variants as well.
 
 ## Wave 5 — Circle of fifths, live in Jam Session — shipped
 
@@ -259,7 +256,7 @@ it.
   `scale-adherence` at a 0.65 threshold (looser than the fixed-scale improv
   lessons' 0.8, since chasing a moving target is harder).
 
-### Unit 5 — jazz (`05_jazz/`) — 4 of 5 lessons shipped
+### Unit 5 — jazz (`05_jazz/`) — 4 lessons shipped
 
 Its own engine work (jazz chord-tone tables, a jazz-blues `Progression`
 variant) was already done before this unit's content — see "Engine work
@@ -272,7 +269,10 @@ changes, only content:
 | **ii-V-I chord tones** (`ii-v-i-chord-tones`, `02_ii_v_i_chord_tones`) — the Dm7-G7-Cmaj7 turnaround in C, each chord arpeggiated low to high | **Scored** | Plain chart, notes computed from `song::harmonica::ii_v_i_chords("C", false)`; reuses `deep-bends`'s whole-step draw bends for F/A | `swing-eighths`, `deep-bends` (Unit 1) | accuracy ≥ 0.6 |
 | **The jazz blues form** (`jazz-blues-form`, `03_jazz_blues_form`) — open jam over the full jazz-blues progression (a real ii-V-I turnaround in the last few bars) | **Scored via proxy** | `PassCriteria::ChordToneAdherence` + existing `progression: "jazz-blues"` field — the same mechanism `minor-blues-improv`/`quick-change-improv` already use, just a different `Progression` value | `ii-v-i-chord-tones`, `chord-tone-improv` (Unit 3) | chord-tone fraction ≥ 0.4 |
 | **Chromatic slide basics** (`chromatic-slide-basics`, `04_chromatic_slide_basics`) — a full ascending/descending chromatic scale on a 12-hole chromatic harp, computed directly from the chromatic layout tables (not transcribed) | **Scored** | `Modifier::Slide` onset scoring, already built; first bundled chromatic lesson content | `swing-eighths` | technique `slide` ≥ 0.5 |
-| **Jazz heads** — actual repertoire | **Scored** | Ordinary charts | Rights-sensitive: public-domain only, human judgment required (`TODO.md`) — **deliberately not built**; needs specific pieces confirmed public domain before charting |
+
+The repertoire objective is completed by the original `Crossing Lights`
+chromatic jazz study in Unit 15. It uses no borrowed melody and therefore does
+not depend on uncertain public-domain status.
 
 ### Unit 6 — navigation (`06_navigation/`) — 8 of 8 lessons shipped
 
@@ -428,8 +428,8 @@ fraction for whichever criterion a given lesson declares. Unit 3 (above)
 used every one of these with no further engine changes. Wave 3's `JamScale`
 resource + `LessonManifest::scale` field (see above) is the other piece of
 engine work landed so far. Unit 5 (jazz) below needed none of its own —
-every mechanism its four shipped lessons use already existed; only "jazz
-heads" (rights-blocked content, not an engine gap) remains.
+every mechanism its four shipped lessons use already existed. The later
+original chromatic study supplies the planned jazz repertoire capstone.
 
 Cross-cutting authoring notes:
 
@@ -444,7 +444,7 @@ Cross-cutting authoring notes:
   bump; `train-rolling`'s tempo map and the multi-modifier charts all use
   long-supported fields.
 
-### Suggested build order (what's left)
+### Completion status
 
 All planned curriculum branches are now represented. Future lesson additions
 should follow learner feedback rather than extending the graph by default.
