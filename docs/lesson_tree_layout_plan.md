@@ -165,10 +165,6 @@ required by `docs/lessons_plan.md`.
 
 ### Chromatic and musicianship branches
 
-- Teach practice skills: slow practice, loop isolation, spaced review,
-  self-recording, and mixed review lessons that sample earlier dependencies.
-  Guide use of existing tools instead of pretending the microphone can judge
-  posture or practice quality.
 
 Before authoring these, split the graph into a required core and optional
 branches. Advanced techniques and repertoire should add depth without becoming
