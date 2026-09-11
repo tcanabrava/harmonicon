@@ -141,9 +141,11 @@ bounds, ports, control points, and tessellation segments.
    regression tools only if a curved route is introduced later.
 5. **Done:** Android use showed that the map could not be navigated by touch.
    The two-axis viewport now follows pointer drags and clamps both axes to its
-   measured content bounds. Keep a minimap or “show available” action as a
-   further option only if touch panning still leaves players losing their
-   place.
+   measured content bounds. It remembers its position across lesson visits,
+   and the header locator expands the relevant unit and centres the next
+   available required lesson. Once required work is complete it locates an
+   available elective instead. A minimap remains conditional on further
+   usability evidence.
 
 Reduced-motion behavior remains a shared-settings follow-up. The repository
 does not currently expose such a preference; when it does, both cluster and
