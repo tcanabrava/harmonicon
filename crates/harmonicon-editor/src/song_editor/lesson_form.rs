@@ -317,6 +317,9 @@ pub(super) fn serialize_lesson(state: &EditorState) -> (String, Vec<String>) {
     if state.lesson_progression != "none" {
         manifest["progression"] = json!(state.lesson_progression);
     }
+    if state.lesson_scale != "none" {
+        manifest["scale"] = json!(state.lesson_scale);
+    }
 
     let json_text = serde_json::to_string_pretty(&manifest).unwrap_or_default();
     if let Err(err) = parse_lesson(json_text.as_bytes()) {
@@ -445,6 +448,7 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
         .progression
         .clone()
         .unwrap_or_else(|| "none".into());
+    state.lesson_scale = manifest.scale.clone().unwrap_or_else(|| "none".into());
 }
 
 /// Reads and schema-validates `path` as a `lesson.json`, populates the

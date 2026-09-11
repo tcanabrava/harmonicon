@@ -165,12 +165,14 @@ fn serialize_lesson_writes_prerequisites_and_progression() {
         lesson_unit: "u".into(),
         lesson_prerequisites: "a, b ,c".into(),
         lesson_progression: "minor".into(),
+        lesson_scale: "minor-pentatonic".into(),
         ..EditorState::default()
     };
     let (json, _warnings) = serialize_lesson(&s);
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["prerequisites"], serde_json::json!(["a", "b", "c"]));
     assert_eq!(v["progression"], "minor");
+    assert_eq!(v["scale"], "minor-pentatonic");
 }
 
 #[test]
@@ -225,6 +227,7 @@ fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
     assert_eq!(s.lesson_technique, "wah-wah");
     assert_eq!(s.lesson_threshold, "0.5");
     assert_eq!(s.lesson_progression, "none");
+    assert_eq!(s.lesson_scale, "none");
 }
 
 #[test]
@@ -242,7 +245,7 @@ fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
         prerequisites: Vec::new(),
         pass_criteria: None,
         progression: Some("standard".into()),
-        scale: None,
+        scale: Some("major".into()),
         diagram: None,
         position_cycle: false,
     };
@@ -250,6 +253,7 @@ fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
     populate_from_lesson_manifest(&manifest, &mut s);
     assert_eq!(s.lesson_pass_criteria, "none");
     assert_eq!(s.lesson_progression, "standard");
+    assert_eq!(s.lesson_scale, "major");
 }
 
 #[test]

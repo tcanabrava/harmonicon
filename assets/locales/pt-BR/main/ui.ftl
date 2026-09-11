@@ -186,6 +186,7 @@ editor-field-lesson-pass-criteria = Critério de Aprovação
 editor-field-lesson-threshold = Limite
 editor-field-lesson-technique = Técnica
 editor-field-lesson-progression = Progressão
+editor-field-lesson-scale = Escala da lição
 editor-field-lesson-path = Percurso
 
 # Editor de Músicas 2 — títulos dos diálogos de arquivo
@@ -275,6 +276,7 @@ editor-lesson-details-toggle-tooltip = Clique para mostrar ou ocultar os campos 
 editor-field-lesson-pass-criteria-tooltip = Clique para alternar como esta lição é avaliada — Nenhum, Precisão, Técnica, Aderência à Escala, Aderência a Notas do Acorde, Disciplina de Frase
 editor-field-lesson-technique-tooltip = Clique para alternar qual técnica é avaliada — usado apenas quando o Critério de Aprovação é Técnica
 editor-field-lesson-progression-tooltip = Clique para alternar a progressão de acompanhamento de uma lição baseada em jam — Nenhuma, Padrão, Quick-Change, Menor
+editor-field-lesson-scale-tooltip = Clique para alternar a escala usada para avaliar uma lição de jam
 editor-field-lesson-path-tooltip = Clique para escolher se esta lição é obrigatória ou uma ramificação eletiva
 editor-field-key-tooltip = Clique para alternar entre os tons da gaita
 editor-field-position-tooltip = Clique para alternar entre as posições de execução

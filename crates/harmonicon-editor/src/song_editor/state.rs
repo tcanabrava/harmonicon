@@ -62,6 +62,8 @@ pub(super) enum Field {
     /// One of [`PROGRESSIONS`] (`"none"` omits the field) — click-to-cycle
     /// like `Key`.
     LessonProgression,
+    /// Jam scale written to the lesson manifest; `"none"` omits it.
+    LessonScale,
 }
 
 impl Field {
@@ -78,6 +80,7 @@ impl Field {
                 | Field::LessonPassCriteria
                 | Field::LessonTechnique
                 | Field::LessonProgression
+                | Field::LessonScale
                 | Field::LessonPath
         )
     }
@@ -99,7 +102,7 @@ pub(super) const FIELDS: [(Field, &str); 7] = [
 /// needs beyond what [`FIELDS`] already covers (title/tempo/key/... are
 /// shared with a plain song, since a chart-backed lesson's chart is an
 /// ordinary chart).
-pub(super) const LESSON_FIELDS: [(Field, &str); 9] = [
+pub(super) const LESSON_FIELDS: [(Field, &str); 10] = [
     (Field::LessonId, "editor-field-lesson-id"),
     (Field::LessonUnit, "editor-field-lesson-unit"),
     (Field::LessonPath, "editor-field-lesson-path"),
@@ -115,6 +118,7 @@ pub(super) const LESSON_FIELDS: [(Field, &str); 9] = [
     (Field::LessonThreshold, "editor-field-lesson-threshold"),
     (Field::LessonTechnique, "editor-field-lesson-technique"),
     (Field::LessonProgression, "editor-field-lesson-progression"),
+    (Field::LessonScale, "editor-field-lesson-scale"),
 ];
 
 /// All valid diatonic harp keys in chromatic order.
@@ -155,6 +159,15 @@ pub(super) const TECHNIQUE_NAMES: [&str; 8] = [
 /// `lesson_schema.dtd.json`'s own enum.
 pub(super) const PROGRESSIONS: [&str; 5] =
     ["none", "standard", "quick-change", "minor", "jazz-blues"];
+pub(super) const LESSON_SCALES: [&str; 7] = [
+    "none",
+    "first-position",
+    "second-position",
+    "third-position",
+    "major",
+    "minor-pentatonic",
+    "country",
+];
 pub(super) const LESSON_PATHS: [&str; 2] = ["core", "elective"];
 
 /// Advances `current` to the next entry in `options`, wrapping — every
@@ -237,6 +250,7 @@ pub(super) struct EditorState {
     pub(super) lesson_threshold: String,
     pub(super) lesson_technique: String,
     pub(super) lesson_progression: String,
+    pub(super) lesson_scale: String,
     /// Whether the lesson-fields panel's body is expanded — folded by
     /// default so it doesn't compete with the note grid for screen space.
     /// See `lesson_form::spawn_lesson_form`.
@@ -311,6 +325,7 @@ impl Default for EditorState {
             lesson_threshold: "0.7".into(),
             lesson_technique: "normal".into(),
             lesson_progression: "none".into(),
+            lesson_scale: "none".into(),
             lesson_details_expanded: false,
             legend_visible: true,
             user_locked: false,
@@ -422,6 +437,7 @@ impl EditorState {
             Field::LessonThreshold => &self.lesson_threshold,
             Field::LessonTechnique => &self.lesson_technique,
             Field::LessonProgression => &self.lesson_progression,
+            Field::LessonScale => &self.lesson_scale,
         }
     }
 
@@ -443,6 +459,7 @@ impl EditorState {
             Field::LessonThreshold => &mut self.lesson_threshold,
             Field::LessonTechnique => &mut self.lesson_technique,
             Field::LessonProgression => &mut self.lesson_progression,
+            Field::LessonScale => &mut self.lesson_scale,
         }
     }
 

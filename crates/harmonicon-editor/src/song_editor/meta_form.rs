@@ -15,7 +15,8 @@ use bevy::ui_widgets::Button as WidgetButton;
 use super::grid::{OUT_OF_SCALE_MIX, OUT_OF_SCALE_TINT, TEMPO_MARKER_COLOR, mix_srgba};
 use super::state::{
     ContentKind, Dir, EditorState, FIELDS, Field, HARP_KEYS, HarmonicaKind, LESSON_PATHS,
-    PASS_CRITERIA_KINDS, POSITIONS, PROGRESSIONS, Pitch, TECHNIQUE_NAMES, cycle_next, pitch_color,
+    LESSON_SCALES, PASS_CRITERIA_KINDS, POSITIONS, PROGRESSIONS, Pitch, TECHNIQUE_NAMES,
+    cycle_next, pitch_color,
 };
 use super::timeline_overlay::{RANGE_HIGHLIGHT_COLOR, SPLIT_LINE_COLOR};
 use super::ui::{
@@ -374,6 +375,13 @@ pub(super) fn spawn_field_row(
                 )))
                 .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
                     state.lesson_progression = cycle_next(&PROGRESSIONS, &state.lesson_progression);
+                });
+            } else if field == Field::LessonScale {
+                btn.insert(Tooltip(String::from(
+                    loc.msg("editor-field-lesson-scale-tooltip"),
+                )))
+                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
+                    state.lesson_scale = cycle_next(&LESSON_SCALES, &state.lesson_scale);
                 });
             } else {
                 btn.insert(Tooltip(String::from(

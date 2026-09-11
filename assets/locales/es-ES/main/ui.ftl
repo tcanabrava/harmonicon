@@ -186,6 +186,7 @@ editor-field-lesson-pass-criteria = Criterio de Aprobación
 editor-field-lesson-threshold = Umbral
 editor-field-lesson-technique = Técnica
 editor-field-lesson-progression = Progresión
+editor-field-lesson-scale = Escala de la lección
 editor-field-lesson-path = Ruta del curso
 
 # Song Editor 2 — títulos de diálogos de archivo
@@ -275,6 +276,7 @@ editor-lesson-details-toggle-tooltip = Haz clic para mostrar u ocultar los campo
 editor-field-lesson-pass-criteria-tooltip = Haz clic para alternar cómo se evalúa esta lección — Ninguno, Precisión, Técnica, Adherencia a la Escala, Adherencia a Notas del Acorde, Disciplina de Frase
 editor-field-lesson-technique-tooltip = Haz clic para alternar qué técnica se evalúa — solo se usa cuando el Criterio de Aprobación es Técnica
 editor-field-lesson-progression-tooltip = Haz clic para alternar la progresión de acompañamiento de una lección basada en jam — Ninguna, Estándar, Quick-Change, Menor
+editor-field-lesson-scale-tooltip = Haz clic para alternar la escala usada para evaluar una lección de jam
 editor-field-lesson-path-tooltip = Haz clic para elegir si esta lección es obligatoria o una rama optativa
 editor-field-key-tooltip = Haz clic para recorrer los tonos de la armónica
 editor-field-position-tooltip = Haz clic para recorrer las posiciones de interpretación
