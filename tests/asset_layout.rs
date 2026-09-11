@@ -362,7 +362,7 @@ fn lesson_assets_are_complete_and_valid() {
 }
 
 /// Every Fluent key a lesson manifest declares (`title_key`, `body_key`,
-/// `lesson-unit-<unit>`) must exist in the en-US locale — the parity test in
+/// `lesson-unit-<unit>`, `lesson-track-<track>`) must exist in the en-US locale — the parity test in
 /// `localization.rs` then guarantees every other locale has it too. A missing
 /// key would render as the raw key name in the menu.
 /// The shipped curriculum must form a drawable graph, and every bundled
@@ -502,6 +502,9 @@ fn lesson_localization_keys_exist() {
         }
         if let Some(unit) = manifest["unit"].as_str() {
             needed.push(format!("lesson-unit-{unit}"));
+        }
+        if let Some(track) = manifest["track"].as_str() {
+            needed.push(format!("lesson-track-{track}"));
         }
         for key in needed {
             if !defined.contains(&key.as_str()) {
