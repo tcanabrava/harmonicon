@@ -20,6 +20,24 @@ use bevy::ui_widgets::{ControlOrientation, ScrollArea, Scrollbar, ScrollbarThumb
 #[derive(Component, Default)]
 struct DragScrollStart(Vec2);
 
+/// Makes a freshly spawned scroll area pannable by dragging its content,
+/// and returns its entity.
+///
+/// **Every scroll area goes through here**, which is the point: touch has
+/// no wheel, so an area without this can only be scrolled by dragging a
+/// 10px scrollbar thumb. Wiring it at each spawn site instead let the two
+/// of them disagree, and for a while only the lesson tree could be panned.
+///
+/// Both axes are handled by one implementation because
+/// [`bounded_scroll_position`] reads the area's own [`Overflow`]: a
+/// vertical-only area stays pinned at x with nothing extra said here.
+fn drag_to_pan(mut area: EntityCommands) -> Entity {
+    area.insert(DragScrollStart::default())
+        .observe(begin_drag_scroll)
+        .observe(drag_scroll)
+        .id()
+}
+
 fn begin_drag_scroll(
     drag: On<Pointer<DragStart>>,
     mut areas: Query<(&ComputedNode, &mut DragScrollStart), With<ScrollArea>>,
@@ -91,24 +109,22 @@ pub fn spawn_scroll_area(
             ..default()
         })
         .with_children(|outer| {
-            area = outer
-                .spawn((
-                    Node {
-                        flex_direction: FlexDirection::Column,
-                        align_items: AlignItems::Center,
-                        row_gap: Val::Px(16.0),
-                        // Same "min-height: auto" gotcha: zeroing it lets
-                        // this column force-shrink to whatever room is left
-                        // under the title once content no longer fits,
-                        // handing the rest to scrolling via `overflow`
-                        // below instead of running past the edges.
-                        min_height: Val::Px(0.0),
-                        overflow: Overflow::scroll_y(),
-                        ..default()
-                    },
-                    ScrollArea,
-                ))
-                .id();
+            area = drag_to_pan(outer.spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    row_gap: Val::Px(16.0),
+                    // Same "min-height: auto" gotcha: zeroing it lets
+                    // this column force-shrink to whatever room is left
+                    // under the title once content no longer fits,
+                    // handing the rest to scrolling via `overflow`
+                    // below instead of running past the edges.
+                    min_height: Val::Px(0.0),
+                    overflow: Overflow::scroll_y(),
+                    ..default()
+                },
+                ScrollArea,
+            )));
             outer
                 .spawn((
                     Scrollbar::new(area, ControlOrientation::Vertical, 24.0),
@@ -182,21 +198,16 @@ pub fn spawn_scroll_area_xy(
                     ..default()
                 })
                 .with_children(|row| {
-                    area = row
-                        .spawn((
-                            Node {
-                                min_height: Val::Px(0.0),
-                                min_width: Val::Px(0.0),
-                                flex_grow: 1.0,
-                                overflow: Overflow::scroll(),
-                                ..default()
-                            },
-                            ScrollArea,
-                            DragScrollStart::default(),
-                        ))
-                        .observe(begin_drag_scroll)
-                        .observe(drag_scroll)
-                        .id();
+                    area = drag_to_pan(row.spawn((
+                        Node {
+                            min_height: Val::Px(0.0),
+                            min_width: Val::Px(0.0),
+                            flex_grow: 1.0,
+                            overflow: Overflow::scroll(),
+                            ..default()
+                        },
+                        ScrollArea,
+                    )));
                     row.spawn((
                         Scrollbar::new(area, ControlOrientation::Vertical, 24.0),
                         Node {
@@ -290,6 +301,39 @@ impl Plugin for ScrollAreaPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_spawner_wires_up_drag_panning() {
+        // The one invariant `drag_to_pan` exists to hold. Touch has no
+        // wheel, so a scroll area without it can only be moved by dragging
+        // a 10px scrollbar thumb — and an area missing it looks perfectly
+        // fine on a desktop, where the wheel hides the omission entirely.
+        // `DragScrollStart` stands in for the observers here: it is
+        // inserted in the same place they are attached, and nothing else
+        // inserts it.
+        let mut world = World::new();
+        let mut areas = Vec::new();
+        {
+            let mut commands = world.commands();
+            commands.spawn_empty().with_children(|parent| {
+                areas.push(spawn_scroll_area(parent, Color::WHITE, Color::BLACK));
+                areas.push(spawn_scroll_area_xy(parent, Color::WHITE, Color::BLACK));
+            });
+        }
+        world.flush();
+
+        assert_eq!(areas.len(), 2, "a spawner was added without a case here");
+        for area in areas {
+            assert!(
+                world.get::<ScrollArea>(area).is_some(),
+                "{area} is not the scroll area itself"
+            );
+            assert!(
+                world.get::<DragScrollStart>(area).is_some(),
+                "{area} cannot be panned by dragging"
+            );
+        }
+    }
 
     #[test]
     fn drag_scroll_is_bounded_on_both_axes() {
