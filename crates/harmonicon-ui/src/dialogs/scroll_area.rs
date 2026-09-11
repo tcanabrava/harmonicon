@@ -18,9 +18,16 @@ use bevy::ui_widgets::{
     Button as WidgetButton, ControlOrientation, ScrollArea, Scrollbar, ScrollbarThumb,
 };
 
-/// Scroll offset captured when a pointer drag begins.
+/// Screen-space movement tolerated before a touch becomes a pan. Bevy emits
+/// `DragStart` on the first nonzero movement, including ordinary finger jitter.
+const PAN_SLOP_PX: f32 = 8.0;
+
+/// Scroll state captured when a pointer drag begins.
 #[derive(Component, Default)]
-struct DragScrollStart(Vec2);
+struct DragScrollStart {
+    position: Vec2,
+    active: bool,
+}
 
 /// Makes a freshly spawned scroll area pannable by dragging its content,
 /// and returns its entity.
@@ -42,42 +49,59 @@ fn drag_to_pan(mut area: EntityCommands) -> Entity {
 
 fn begin_drag_scroll(
     drag: On<Pointer<DragStart>>,
-    mut commands: Commands,
     mut areas: Query<(&ComputedNode, &mut DragScrollStart), With<ScrollArea>>,
-    buttons: Query<(), With<WidgetButton>>,
 ) {
     let Ok((computed, mut start)) = areas.get_mut(drag.entity) else {
         return;
     };
-    start.0 = computed.scroll_position * computed.inverse_scale_factor;
-
-    // Bevy dispatches Click before DragEnd on release, and Button activates
-    // that click while Pressed is still present. Without cancelling it here,
-    // a swipe that begins and ends over the same lesson opens the lesson after
-    // moving the map. Controls such as sliders consume DragStart themselves,
-    // so their gesture never bubbles here and their pressed state is untouched.
-    let origin = drag.original_event_target();
-    if buttons.contains(origin) {
-        commands.entity(origin).remove::<Pressed>();
-    }
+    start.position = computed.scroll_position * computed.inverse_scale_factor;
+    start.active = false;
 }
 
 fn drag_scroll(
     drag: On<Pointer<Drag>>,
+    mut commands: Commands,
     ui_scale: Res<UiScale>,
     mut areas: Query<
-        (&Node, &ComputedNode, &DragScrollStart, &mut ScrollPosition),
+        (
+            &Node,
+            &ComputedNode,
+            &mut DragScrollStart,
+            &mut ScrollPosition,
+        ),
         With<ScrollArea>,
     >,
+    buttons: Query<(), With<WidgetButton>>,
 ) {
-    let Ok((node, computed, start, mut position)) = areas.get_mut(drag.entity) else {
+    let Ok((node, computed, mut start, mut position)) = areas.get_mut(drag.entity) else {
         return;
     };
+    if !start.active {
+        if !is_pan_gesture(drag.distance) {
+            return;
+        }
+        start.active = true;
+
+        // Bevy dispatches Click before DragEnd on release, and Button
+        // activates that click while Pressed is still present. Cancel only
+        // after crossing the pan threshold: finger jitter keeps a tap alive,
+        // while a real swipe cannot open the button it began over.
+        // Sliders consume DragStart themselves, so their gestures never reach
+        // this observer and their pressed state is untouched.
+        let origin = drag.original_event_target();
+        if buttons.contains(origin) {
+            commands.entity(origin).remove::<Pressed>();
+        }
+    }
 
     let visible_size = computed.size() * computed.inverse_scale_factor;
     let content_size = computed.content_size() * computed.inverse_scale_factor;
-    let requested = start.0 - drag.distance / ui_scale.0;
+    let requested = start.position - drag.distance / ui_scale.0;
     position.0 = bounded_scroll_position(node.overflow, requested, content_size - visible_size);
+}
+
+fn is_pan_gesture(distance: Vec2) -> bool {
+    distance.length_squared() >= PAN_SLOP_PX * PAN_SLOP_PX
 }
 
 fn bounded_scroll_position(overflow: Overflow, requested: Vec2, available_range: Vec2) -> Vec2 {
@@ -361,6 +385,14 @@ mod tests {
             bounded_scroll_position(overflow, Vec2::new(80.0, 120.0), Vec2::new(200.0, 300.0),),
             Vec2::new(80.0, 120.0),
         );
+    }
+
+    #[test]
+    fn finger_jitter_does_not_become_a_pan() {
+        assert!(!is_pan_gesture(Vec2::ZERO));
+        assert!(!is_pan_gesture(Vec2::new(5.0, 5.0)));
+        assert!(is_pan_gesture(Vec2::new(PAN_SLOP_PX, 0.0)));
+        assert!(is_pan_gesture(Vec2::new(6.0, 6.0)));
     }
 
     #[test]
