@@ -413,6 +413,10 @@ criterion exists. The long-tone capstone scores sustained pitch and duration.
 
 ### Engine work (done)
 
+Unit 14 (`14_accompaniment/`) adds four elective accompaniment lessons:
+scored chord rhythm, instructional singer support, timed vocal-gap fills, and
+trading fours judged with the existing phrase-discipline criterion.
+
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"
 above): `PassCriteria::ChordToneAdherence`/`PhraseDiscipline`, the lesson
 manifest's `progression` field, and `jam_session::in_rest_window` +

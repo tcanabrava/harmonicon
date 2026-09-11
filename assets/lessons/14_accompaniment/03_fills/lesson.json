@@ -1,0 +1,1 @@
+{"id":"vocal-fills","unit":"accompaniment","optional":true,"track":"accompaniment","title_key":"lesson-vocal-fills-title","body_key":"lesson-vocal-fills-body","chart":"song/chart.harpchart","prerequisites":["behind-a-singer","first-licks"],"pass_criteria":{"type":"accuracy","threshold":0.65}}

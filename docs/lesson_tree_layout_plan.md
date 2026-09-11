@@ -162,8 +162,6 @@ required by `docs/lessons_plan.md`.
 
 ### Technique expansion
 
-- **Accompaniment:** chord rhythm, train accompaniment behind a singer, fills
-  between vocal phrases, and trading fours. Reuse form and rest discipline.
 
 ### Chromatic and musicianship branches
 

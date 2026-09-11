@@ -1,0 +1,1 @@
+{"id":"chord-rhythm","unit":"accompaniment","optional":true,"track":"accompaniment","title_key":"lesson-chord-rhythm-title","body_key":"lesson-chord-rhythm-body","chart":"song/chart.harpchart","prerequisites":["multiple-notes","tempo-stability"],"pass_criteria":{"type":"accuracy","threshold":0.6}}
