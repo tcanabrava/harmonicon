@@ -104,6 +104,9 @@ const LOCKED_TINT: Color = Color::srgba(0.35, 0.35, 0.42, 0.55);
 const PIP_FILLED: Color = Color::srgb(0.95, 0.80, 0.35);
 const PIP_EMPTY: Color = Color::srgba(0.40, 0.43, 0.52, 0.8);
 const OPTIONAL_COLOR: Color = Color::srgb(0.62, 0.88, 0.82);
+/// A track this build has no colour for. Only reachable from an externally
+/// authored lesson — see [`declared_track_color`].
+const UNKNOWN_TRACK_COLOR: Color = Color::srgb(0.65, 0.68, 0.78);
 /// The elective badge drawn beside a node, and its clearance from the ring.
 const BADGE_PX: f32 = 20.0;
 const BADGE_GAP_PX: f32 = 2.0;
@@ -159,7 +162,24 @@ pub(crate) struct MovingEdge {
 /// A track's colour. Grouping has to survive losing its row, and colour is
 /// what the skill trees this is modelled on use for the same job.
 fn track_color(track: &str) -> Color {
-    match track {
+    declared_track_color(track).unwrap_or(UNKNOWN_TRACK_COLOR)
+}
+
+/// The colour this build gives `track`, or `None` if it has none of its own.
+///
+/// Separate from [`track_color`] so the fallback is *detectable*. Every
+/// bundled track must have its own entry — `every_bundled_track_has_its_own_colour`
+/// fails the build otherwise — while an externally authored lesson dropped
+/// into `~/Harmonicon/lessons` may still name any track at all and gets
+/// [`UNKNOWN_TRACK_COLOR`].
+///
+/// Hues are spread around the wheel rather than picked to taste: with
+/// twenty tracks, two that sit close together are two groups a player
+/// cannot tell apart. Saturation and value stay inside the range the
+/// original palette established, so a new track doesn't read as louder
+/// than the rest.
+fn declared_track_color(track: &str) -> Option<Color> {
+    Some(match track {
         "tone" => Color::srgb(0.42, 0.78, 0.95),
         "hand" => Color::srgb(0.95, 0.62, 0.42),
         "tongue" => Color::srgb(0.72, 0.55, 0.95),
@@ -175,8 +195,13 @@ fn track_color(track: &str) -> Color {
         "vocabulary" => Color::srgb(0.85, 0.65, 0.55),
         "improv" => Color::srgb(0.58, 0.82, 0.88),
         "navigation" => Color::srgb(0.82, 0.78, 0.58),
-        _ => Color::srgb(0.65, 0.68, 0.78),
-    }
+        "positions" => Color::srgb(0.51, 0.86, 0.47),
+        "ornaments" => Color::srgb(0.90, 0.56, 0.93),
+        "ear" => Color::srgb(0.55, 0.55, 0.94),
+        "accompaniment" => Color::srgb(0.46, 0.86, 0.80),
+        "practice" => Color::srgb(0.89, 0.95, 0.47),
+        _ => return None,
+    })
 }
 
 /// Centre of a node, in canvas pixels.
@@ -975,6 +1000,59 @@ mod tests {
         // Unit titles are the only labels drawn *above* their node.
         let spine = node_centre(0.0, 0.0);
         assert!(spine.y - UNIT_PX / 2.0 - UNIT_FONT_PX * 2.0 >= 0.0);
+    }
+
+    #[test]
+    fn every_bundled_track_has_its_own_colour() {
+        // Colour is the only thing carrying track grouping, now that the
+        // tree places nodes by prerequisite depth rather than by track. A
+        // bundled lesson falling through to `UNKNOWN_TRACK_COLOR` doesn't
+        // fail anything — it just joins an undifferentiated grey pile, and
+        // five tracks once did exactly that. The fallback itself stays:
+        // an externally authored lesson may name any track at all.
+        //
+        // Built from `CARGO_MANIFEST_DIR`, not the working directory —
+        // `assets/` is two levels up from a crate, and a wrong runtime
+        // path is not a compile error.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/lessons");
+        let units =
+            std::fs::read_dir(&root).unwrap_or_else(|e| panic!("reading {}: {e}", root.display()));
+
+        let mut seen = 0usize;
+        let mut uncoloured: Vec<String> = Vec::new();
+        for unit in units.flatten() {
+            for lesson in std::fs::read_dir(unit.path())
+                .into_iter()
+                .flatten()
+                .flatten()
+            {
+                let path = lesson.path().join("lesson.json");
+                let Ok(bytes) = std::fs::read(&path) else {
+                    continue;
+                };
+                let manifest = harmonicon_song::lessons::parse_lesson(&bytes)
+                    .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+                seen += 1;
+                if let Some(track) = manifest.track.as_deref()
+                    && declared_track_color(track).is_none()
+                {
+                    uncoloured.push(track.to_string());
+                }
+            }
+        }
+
+        assert!(
+            seen > 0,
+            "no bundled lessons found under {}",
+            root.display()
+        );
+        uncoloured.sort();
+        uncoloured.dedup();
+        assert!(
+            uncoloured.is_empty(),
+            "bundled tracks with no colour of their own, so they all draw \
+             the same grey: {uncoloured:?}"
+        );
     }
 
     fn lesson(column: f32, row: f32) -> Endpoint {
