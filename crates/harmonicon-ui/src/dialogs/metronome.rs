@@ -81,6 +81,16 @@ pub const fn click_for_tick(
     }
 }
 
+/// Zero-based 12-bar position for a metronome subdivision tick.
+pub const fn twelve_bar_for_tick(tick: i64, beats_per_bar: usize, feel: MetronomeFeel) -> usize {
+    let beat = match feel {
+        MetronomeFeel::Straight => tick,
+        MetronomeFeel::Shuffle => tick.div_euclid(3),
+    };
+    let beats_per_bar = if beats_per_bar == 0 { 1 } else { beats_per_bar };
+    beat.div_euclid(beats_per_bar as i64).rem_euclid(12) as usize
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,5 +120,14 @@ mod tests {
             click_for_tick(2, 4.0, MetronomeFeel::Shuffle),
             Some((false, 0.55))
         );
+    }
+
+    #[test]
+    fn twelve_bar_position_advances_and_wraps() {
+        assert_eq!(twelve_bar_for_tick(0, 4, MetronomeFeel::Straight), 0);
+        assert_eq!(twelve_bar_for_tick(4, 4, MetronomeFeel::Straight), 1);
+        assert_eq!(twelve_bar_for_tick(47, 4, MetronomeFeel::Straight), 11);
+        assert_eq!(twelve_bar_for_tick(48, 4, MetronomeFeel::Straight), 0);
+        assert_eq!(twelve_bar_for_tick(12, 4, MetronomeFeel::Shuffle), 1);
     }
 }

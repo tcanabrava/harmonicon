@@ -247,7 +247,7 @@ pub fn setup(
                             ..default()
                         })
                         .with_children(|grid| {
-                            spawn_12_bar_grid(
+                            let _ = spawn_12_bar_grid(
                                 grid,
                                 &chords,
                                 key,

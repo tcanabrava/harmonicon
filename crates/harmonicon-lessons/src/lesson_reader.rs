@@ -27,7 +27,9 @@ use harmonicon_song::lessons::{
 };
 use harmonicon_song::song::{SongManifest, training_manifest};
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
-use harmonicon_ui::dialogs::metronome::{MetronomeClock, MetronomeFeel, click_for_tick};
+use harmonicon_ui::dialogs::metronome::{
+    MetronomeClock, MetronomeFeel, click_for_tick, twelve_bar_for_tick,
+};
 use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, bar_bg, spawn_12_bar_grid};
 
 use harmonicon_app::app::{
@@ -103,14 +105,10 @@ pub(crate) fn update_lesson_metronomes(
                     .with_volume(Volume::Linear(audio.metronome_volume * gain)),
             ));
         }
-        let beat = match feel {
-            MetronomeFeel::Straight => tick,
-            MetronomeFeel::Shuffle => tick.div_euclid(3),
-        };
         if tick == 0 || (feel == MetronomeFeel::Shuffle && tick.rem_euclid(3) != 0) {
             continue;
         }
-        let bar = (beat.div_euclid(metronome.beats_per_bar as i64) as usize) % 12;
+        let bar = twelve_bar_for_tick(tick, metronome.beats_per_bar, feel);
         for grid in &grids {
             if grid.sync_group.is_none() || grid.sync_group != metronome.sync_group {
                 continue;

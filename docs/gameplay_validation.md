@@ -20,6 +20,15 @@ Navigation to gameplay: **Play → Play Song → (2D | 3D) → artist → song**
 **Play → Jam Session → Pick a Song → artist → song**. In-game keys: **Esc**
 pause/resume, **M** metronome mute, **V** cycle spectrogram.
 
+### Lesson widgets
+
+- [ ] Open the circle-of-fifths lesson and use Previous/Next key. The whole
+  circle should rotate while the highlighted positions remain correct.
+- [ ] Open Counting Four, start its metronome, change tempo and feel, mute and
+  unmute it, then leave the reader. Clicks must stop immediately on exit.
+- [ ] Open Bar Counting and start its metronome. The 12-bar highlight should
+  advance every four beats and wrap from bar 12 to bar 1.
+
 ## Automated coverage (`cargo test`)
 
 | Behavior | Test |

@@ -28,6 +28,13 @@ lessons that are pure instruction with no drill — like tongue blocking,
 which the microphone genuinely can't tell apart from puckering, so it isn't
 scored).
 
+Some reader pages include practice tools beside the explanation. The circle of
+fifths can rotate to another harp key; rhythm lessons may include a 12-bar grid
+or a metronome with tempo, feel, and sound controls. When a lesson shows both,
+starting the metronome advances the highlighted bar through the form. These
+tools help you prepare for the drill; lesson completion still comes from Start
+Lesson or Mark as Done.
+
 ## Unit 1 — Blowing the Harmonica
 
 Single clean notes, chords, tongue blocking, octave splits, slides, and

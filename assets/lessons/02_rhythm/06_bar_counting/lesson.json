@@ -4,6 +4,10 @@
   "track": "form",
   "title_key": "lesson-bar-counting-title",
   "body_key": "lesson-bar-counting-body",
+  "widgets": [
+    { "type": "twelve-bar-grid", "key": "C", "sync_group": "form" },
+    { "type": "metronome", "bpm": 72, "beats_per_bar": 4, "feel": "straight", "sync_group": "form" }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "counting-four",
