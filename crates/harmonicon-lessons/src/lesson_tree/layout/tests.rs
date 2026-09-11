@@ -581,6 +581,46 @@ fn edge_into<'a>(l: &'a TreeLayout, id: &str) -> &'a Edge {
 }
 
 #[test]
+fn an_elective_only_unit_counts_its_own_lessons_instead_of_a_gate() {
+    // Counting core lessons would put `0/0` on a unit holding three real
+    // ones — a progress badge that is not only useless but reads as a bug.
+    let e = [
+        elective(entry_in("electives", "e1", "t", &[], false)),
+        elective(entry_in("electives", "e2", "t", &[], false)),
+        elective(entry_in("electives", "e3", "t", &[], false)),
+    ];
+    let mut p = PlayerProfile::default();
+    pass(&mut p, "e1");
+    pass(&mut p, "e2");
+
+    let unit = build(&e, &p).unit("electives").unwrap().clone();
+    assert!(unit.elective_only);
+    assert_eq!(
+        (unit.completed, unit.required),
+        (2, 3),
+        "an all-elective unit reports passed-of-all, not passed-of-gate"
+    );
+}
+
+#[test]
+fn a_unit_with_any_core_lesson_still_reports_its_gate() {
+    // The mixed case must not drift onto the elective path: electives
+    // neither raise the threshold nor count toward it.
+    let e = [
+        entry_in("mixed", "core-a", "t", &[], false),
+        entry_in("mixed", "core-b", "t", &[], false),
+        elective(entry_in("mixed", "extra", "t", &[], false)),
+    ];
+    let mut p = PlayerProfile::default();
+    pass(&mut p, "extra");
+
+    let unit = build(&e, &p).unit("mixed").unwrap().clone();
+    assert!(!unit.elective_only);
+    assert_eq!(unit.completed, 0, "an elective doesn't count toward a gate");
+    assert_eq!(unit.required, 2);
+}
+
+#[test]
 fn a_branch_is_elective_when_the_lesson_it_arrives_at_is() {
     // What makes the drawing say "you may skip this": the *destination*
     // decides, because that is what the edge is about.

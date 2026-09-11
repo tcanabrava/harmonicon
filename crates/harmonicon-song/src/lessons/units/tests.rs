@@ -88,6 +88,30 @@ fn an_elective_only_unit_never_blocks_the_required_course() {
 }
 
 #[test]
+fn a_unit_is_elective_only_when_nothing_in_it_counts_toward_a_gate() {
+    // The drawing needs this as its own question. `required(..) == 0` is
+    // also what an out-of-range index answers, and "there is no such unit"
+    // and "this unit gates nothing" want opposite treatment on screen.
+    let lessons = [
+        optional(lesson("elective-a", "electives", &[])),
+        optional(lesson("elective-b", "electives", &[])),
+        lesson("core", "mixed", &[]),
+        optional(lesson("elective-c", "mixed", &[])),
+    ];
+    let chain = UnitChain::build(&lessons);
+    assert!(chain.is_elective_only(0));
+    assert!(!chain.is_elective_only(1), "a mixed unit still has a gate");
+    assert!(
+        !chain.is_elective_only(9),
+        "no such unit is not elective-only"
+    );
+
+    assert_eq!(chain.total(0), 2);
+    assert_eq!(chain.total(1), 2, "total counts electives alongside core");
+    assert_eq!(chain.total(9), 0);
+}
+
+#[test]
 fn a_core_lesson_cannot_hide_an_elective_in_its_prerequisites() {
     let lessons = [
         optional(lesson("overblow", "advanced", &[])),

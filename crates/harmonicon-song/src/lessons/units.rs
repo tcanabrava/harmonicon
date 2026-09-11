@@ -119,9 +119,20 @@ impl UnitChain {
             .position(|u| u.lessons.iter().any(|l| l == lesson))
     }
 
-    /// How many of this unit's lessons must be passed for the next one to
-    /// open — [`UNIT_UNLOCK_THRESHOLD`] of its size, rounded up, and never
-    /// zero (an empty unit would otherwise open the next one for free).
+    /// How many of this unit's *core* lessons must be passed for the next
+    /// one to open — [`UNIT_UNLOCK_THRESHOLD`] of their number, rounded up.
+    ///
+    /// Never zero while the unit has any core lesson at all, so a unit
+    /// can't open the next one for free just by being small.
+    ///
+    /// **Zero when every lesson in the unit is elective**, which is a real
+    /// case (`07_advanced`, `11_tongue_block` and five others are entirely
+    /// optional) and deliberate: such a unit is trivially satisfied and
+    /// gates nothing. Requiring optional work before the course may
+    /// continue is precisely what marking it optional rules out. See
+    /// `an_elective_only_unit_never_blocks_the_required_course`. The
+    /// drawing has to say so rather than render a bare `0/0` — see
+    /// [`UnitChain::is_elective_only`].
     pub fn required(&self, unit: usize) -> usize {
         let Some(node) = self.units.get(unit) else {
             return 0;
@@ -131,6 +142,22 @@ impl UnitChain {
             return 0;
         }
         ((total as f32 * UNIT_UNLOCK_THRESHOLD).ceil() as usize).clamp(1, total)
+    }
+
+    /// Whether every lesson here is elective, so the unit gates nothing.
+    ///
+    /// Distinct from `required(unit) == 0`, which is also what an
+    /// out-of-range index answers — the drawing needs "this unit is
+    /// genuinely all-elective", not "there was nothing to ask about".
+    pub fn is_elective_only(&self, unit: usize) -> bool {
+        self.units
+            .get(unit)
+            .is_some_and(|u| u.core_lessons.is_empty() && !u.lessons.is_empty())
+    }
+
+    /// How many lessons the unit holds, core and elective together.
+    pub fn total(&self, unit: usize) -> usize {
+        self.units.get(unit).map_or(0, |u| u.lessons.len())
     }
 
     /// How many of this unit's lessons are passed.

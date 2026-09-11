@@ -663,7 +663,13 @@ fn spawn_unit(
     loc: &Localization,
 ) {
     let centre = node_centre(unit.column, unit.row);
-    let ring = if unit.locked { UNIT_SHUT } else { UNIT_OPEN };
+    // Locked still wins: an all-elective unit sits behind the units before
+    // it like any other, and has to read that way while it does.
+    let ring = match (unit.locked, unit.elective_only) {
+        (true, _) => UNIT_SHUT,
+        (false, true) => OPTIONAL_COLOR,
+        (false, false) => UNIT_OPEN,
+    };
     let unit_id = unit.id.clone();
     let mut accessibility = AccessibilityKitNode::new(Role::Button);
     accessibility.set_label(String::from(loc.msg(&unit.title_key)));

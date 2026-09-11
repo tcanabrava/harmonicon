@@ -79,8 +79,16 @@ pub struct PlacedUnit {
     /// Lessons passed inside it, and how many open the next unit. Shown as
     /// a count on the node: a gate the player can't see the terms of is
     /// just an obstacle.
+    ///
+    /// **When [`Self::elective_only`] these are passed-of-all instead**, and
+    /// describe no gate — there isn't one to describe. Counting core
+    /// lessons would report `0/0` on a unit holding six real lessons.
     pub completed: usize,
     pub required: usize,
+    /// Whether every lesson here is elective, so the unit gates nothing.
+    /// Drawn in the elective colour rather than the open/shut one, because
+    /// a progress count that opens nothing has to say so.
+    pub elective_only: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -353,6 +361,7 @@ pub fn layout_with_collapsed(
             }
         }
 
+        let elective_only = chain.is_elective_only(ix);
         units.push(PlacedUnit {
             id: unit.id.clone(),
             title_key: unit.title_key.clone(),
@@ -363,8 +372,24 @@ pub fn layout_with_collapsed(
             },
             row: SPINE_ROW,
             locked: !chain.is_unlocked(ix, &passed),
-            completed: chain.completed(ix, &passed),
-            required: chain.required(ix),
+            // An all-elective unit has no gate, so it reports progress
+            // through its own lessons instead of through a threshold none
+            // of them count toward.
+            completed: if elective_only {
+                chain.units()[ix]
+                    .lessons
+                    .iter()
+                    .filter(|lesson| passed.contains(lesson.as_str()))
+                    .count()
+            } else {
+                chain.completed(ix, &passed)
+            },
+            required: if elective_only {
+                chain.total(ix)
+            } else {
+                chain.required(ix)
+            },
+            elective_only,
         });
         cursor += if is_collapsed {
             1.0 + UNIT_GAP_COLUMNS
