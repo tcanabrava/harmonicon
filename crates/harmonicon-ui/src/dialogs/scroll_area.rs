@@ -13,8 +13,10 @@
 
 use bevy::picking::events::{Drag, DragStart, Pointer};
 use bevy::prelude::*;
-use bevy::ui::{ComputedNode, ScrollPosition};
-use bevy::ui_widgets::{ControlOrientation, ScrollArea, Scrollbar, ScrollbarThumb};
+use bevy::ui::{ComputedNode, Pressed, ScrollPosition};
+use bevy::ui_widgets::{
+    Button as WidgetButton, ControlOrientation, ScrollArea, Scrollbar, ScrollbarThumb,
+};
 
 /// Scroll offset captured when a pointer drag begins.
 #[derive(Component, Default)]
@@ -40,12 +42,24 @@ fn drag_to_pan(mut area: EntityCommands) -> Entity {
 
 fn begin_drag_scroll(
     drag: On<Pointer<DragStart>>,
+    mut commands: Commands,
     mut areas: Query<(&ComputedNode, &mut DragScrollStart), With<ScrollArea>>,
+    buttons: Query<(), With<WidgetButton>>,
 ) {
     let Ok((computed, mut start)) = areas.get_mut(drag.entity) else {
         return;
     };
     start.0 = computed.scroll_position * computed.inverse_scale_factor;
+
+    // Bevy dispatches Click before DragEnd on release, and Button activates
+    // that click while Pressed is still present. Without cancelling it here,
+    // a swipe that begins and ends over the same lesson opens the lesson after
+    // moving the map. Controls such as sliders consume DragStart themselves,
+    // so their gesture never bubbles here and their pressed state is untouched.
+    let origin = drag.original_event_target();
+    if buttons.contains(origin) {
+        commands.entity(origin).remove::<Pressed>();
+    }
 }
 
 fn drag_scroll(
