@@ -135,8 +135,9 @@ cd packaging/android && ./gradlew assembleRelease
 
 Both build and run. The web build plays but cannot hear you: cpal has no
 browser microphone backend yet. The Android APK runs on an emulator and has
-never been tried on real hardware — in particular nobody has confirmed a
-phone microphone captures usably, which for this game is the whole product.
+now been exercised on real hardware for menu and lesson-tree navigation. Phone
+microphone latency, gain, and pitch detection under device audio processing
+still need a recorded real-device result.
 
 ---
 

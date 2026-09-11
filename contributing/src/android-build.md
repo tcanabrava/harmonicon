@@ -4,7 +4,7 @@ The operational half of the Android port — how to build it, how to run it on
 an emulator, and exactly how far it has actually been taken. For the *shape*
 the port forced on the codebase, see [Android](android.md).
 
-## Status: runs on an emulator; never run on real hardware
+## Status: runs on an emulator and real hardware
 
 **Verified, by actually running it** on an Android 15 (API 35) x86_64
 emulator:
@@ -25,12 +25,12 @@ emulator:
 
 CI's `android_check` job type-checks the target on every push.
 
-**Not verified.** No real device, so: **nobody has played a harmonica into
-it.** An emulator opening a capture stream says the plumbing is connected; it
-says nothing about latency, gain, or whether pitch detection works against a
-phone mic's AGC and noise suppression — which for this game is the whole
-product. Also unknown: touch target sizes, whether landscape-only is right,
-real frame rates, and whether the Song Editor is usable on a phone at all.
+Real-device use found that scroll areas accepted wheel input but did not pan
+from a touch drag. Shared scroll areas now implement drag panning, including
+both axes of the lesson tree. The remaining device questions are microphone
+latency and gain under a phone's AGC/noise suppression, sustained frame rate,
+whether landscape-only is right, and whether the Song Editor is usable on a
+phone.
 
 Two bugs were found *only* by running it, both since fixed — see
 "Two runtime-only failures" below. Neither was visible at build time.
@@ -74,6 +74,14 @@ fixed it in your shell. `./gradlew --stop` and build again. If your SDK isn't at
 
 The Gradle build invokes `cargo ndk` itself — there is no separate Rust step
 to remember. Expect ~6 minutes for a cold Rust release build.
+
+Always install the APK produced by that Gradle invocation. Lesson manifests
+are embedded into the Rust library on Android, while Fluent translations and
+WGSL shaders remain APK assets. Replacing only `libharmonicon_android.so`, or
+installing an APK left from an earlier build, can therefore expose new lessons
+through an old locale bundle. Warnings for keys that exist under
+`assets/locales/` are a strong sign of this mixed-revision state. Re-run
+`assembleRelease` or `installRelease` and install the newly produced APK.
 
 ### Other ABIs, and the emulator
 
