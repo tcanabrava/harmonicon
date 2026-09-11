@@ -364,6 +364,22 @@ from one-note matching through contour and phrase memory to tonic resolution.
 | **Repeat a hidden phrase** (`hidden-short-phrase`) | Retain contour and rhythm without prompts | `melodic-motion` | accuracy ≥ 0.7 |
 | **Find the tonic** (`find-the-tonic`) | Resolve heard phrases to C by ear | `hidden-short-phrase`, `first-position-landings` | accuracy ≥ 0.75 |
 
+### Unit 11 — tongue-block electives (`11_tongue_block/`) — 6 lessons shipped
+
+Slap, pull, side-pull, rake, and flutter remain instructional because a
+microphone cannot identify the player's embouchure from the resulting sound.
+Moving octaves provides the scored capstone: every target is a simultaneous
+pair of blow notes exactly one octave apart, which chord scoring can verify.
+
+| Lesson | Classification | Prereq |
+|---|---|---|
+| **Tongue slap** (`tongue-slap`) | Instructional | `tongue-blocking` |
+| **Tongue pull** (`tongue-pull`) | Instructional | `tongue-slap` |
+| **Side pull** (`side-pull`) | Instructional | `tongue-pull` |
+| **Tongue rake** (`tongue-rake`) | Instructional | `tongue-pull` |
+| **Tongue flutter** (`tongue-flutter`) | Instructional | `tongue-rake` |
+| **Moving octaves** (`moving-octaves`) | Scored through simultaneous octave pitches, accuracy ≥ 0.6 | `octave-split`, `side-pull` |
+
 ### Engine work (done)
 
 All three wave-2 engine items are built (see "Wave 2, part 1 — shipped"

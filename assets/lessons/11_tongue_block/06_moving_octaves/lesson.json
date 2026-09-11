@@ -1,0 +1,1 @@
+{"id":"moving-octaves","unit":"tongue-block","optional":true,"track":"tongue","title_key":"lesson-moving-octaves-title","body_key":"lesson-moving-octaves-body","chart":"song/chart.harpchart","prerequisites":["octave-split","side-pull"],"pass_criteria":{"type":"accuracy","threshold":0.6}}

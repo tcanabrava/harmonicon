@@ -161,9 +161,6 @@ required by `docs/lessons_plan.md`.
 
 ### Technique expansion
 
-- **Tongue-block articulation:** slap, pull, side-pull, rake, flutter, and
-  moving octaves after tongue blocking and octave splits. Most are
-  instructional or scored through chord, pitch, and rhythm outcomes.
 - **Warbles, shakes, trills, and glissandi:** move from slow adjacent-hole
   alternation to ornaments. A reusable alternation detector could honestly
   score event rate and pitch pattern later.
