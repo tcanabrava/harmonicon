@@ -4,6 +4,9 @@
   "track": "theory",
   "title_key": "lesson-circle-of-fifths-jam-title",
   "body_key": "lesson-circle-of-fifths-jam-body",
+  "widgets": [
+    { "type": "circle-of-fifths", "harp_key": "C", "positions": ["first", "second", "third"] }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "circle-of-fifths",
