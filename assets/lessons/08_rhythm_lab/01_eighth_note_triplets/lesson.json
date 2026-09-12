@@ -1,6 +1,7 @@
 {
   "id": "eighth-note-triplets", "unit": "rhythm-lab", "track": "time",
   "title_key": "lesson-eighth-note-triplets-title", "body_key": "lesson-eighth-note-triplets-body",
+  "widgets": [{"type": "metronome", "bpm": 60, "beats_per_bar": 4, "feel": "triplet"}],
   "chart": "song/chart.harpchart", "prerequisites": ["shuffle-feel"],
   "pass_criteria": {"type": "accuracy", "threshold": 0.65}
 }
