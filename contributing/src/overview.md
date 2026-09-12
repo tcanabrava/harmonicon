@@ -8,167 +8,168 @@ against a scrolling chart — the same core loop as any note-highway rhythm
 game (Guitar Hero, Clone Hero, osu!), except the "controller" is an
 acoustic instrument and a live audio pipeline instead of a button press.
 
-## The single-crate-with-many-modules shape
+## The workspace shape
 
-Harmonicon is one Cargo package (`harmonicon`, `edition = "2024"`)
-structured as a **library plus several binaries**, not a Cargo workspace
-of many crates. `src/lib.rs` is the library root; `src/main.rs` (the game
-itself) and everything in `src/bin/` (`hole-editor`, `note-editor`,
-`note-bench` — small developer tools, described in
+Harmonicon is a **Cargo workspace** (`edition = "2024"`): fourteen
+library crates under `crates/`, a root package holding the binaries and
+the composition root, and one crate *above* the root for Android. The
+layering is not a convention — it is the dependency graph, and Cargo
+refuses to express a cycle, so **an illegal import doesn't compile**.
+That is the whole point of the split, and what
+[Module Boundaries and Dependency Rules](module-dependency-rules.md)
+covers in depth.
+
+`src/lib.rs` is the composition root: its `run()` assembles every plugin
+and nothing else. It exists because Android never calls a `main` — it
+loads a shared object and calls `android_main` (see
+[Android](android.md)) — so both entry points had to become thin
+wrappers around one shared function. `src/main.rs` (the game itself) and
+everything in `src/bin/` (`hole-editor`, `note-editor`, `note-bench`,
+`gen_synthetic_dataset` — small developer tools, described in
 [Testing Strategy](testing-strategy.md) and the [Song Editor](
-song-editor-architecture.md) chapter) are separate binary crates that
-depend on that library and share every subsystem through it. This is a
-deliberate, low-ceremony choice: a full Cargo workspace with separate
-crates per subsystem would enforce dependency direction at the compiler
-level (a real advantage — see [Module Boundaries and Dependency Rules](
-module-dependency-rules.md) for how those rules are enforced *without*
-that today), but at this project's size the extra `Cargo.toml`
-boilerplate, the friction of moving code between crates while a module's
-boundaries are still being found, and the loss of being able to freely
-`pub(crate)` things across what would become crate boundaries outweigh
-that benefit. The module tree inside the one library crate mirrors what
-separate crates would look like closely enough that splitting it later,
-if the project ever grows to need that, is a mechanical refactor rather
-than a redesign.
+song-editor-architecture.md) chapter) go through it. Assembly only, never
+logic.
 
 ```plantuml
 @startuml
-title Crate shape
+title Workspace shape
 skinparam componentStyle rectangle
 
-package "harmonicon (library crate)" as lib {
+package "crates/ (fourteen library crates)" as crates {
 }
 
-component "harmonicon (game binary)\nsrc/main.rs" as main
-component "hole-editor\nsrc/bin/hole_editor.rs" as hole_editor
-component "note-editor\nsrc/bin/note_editor.rs" as note_editor
-component "note-bench\nsrc/bin/note_bench.rs" as note_bench
+component "harmonicon (root package)\nsrc/lib.rs — composition root\nsrc/main.rs + src/bin/*" as root
+component "harmonicon-android\n(cdylib, android_main)" as android
 
-main --> lib
-hole_editor --> lib
-note_editor --> lib
-note_bench --> lib
+root --> crates
+android --> root
 @enduml
 ```
 
-## The top-level modules
+## The crates
 
-`src/lib.rs` re-exports every subsystem as a `pub mod`. Roughly grouped
-by what they're *for* (this grouping is informal — Rust doesn't nest
-these into sub-namespaces beyond the module tree itself, and the
-["Module Boundaries" chapter](module-dependency-rules.md) covers the
-actual, enforced dependency rules between them):
+A crate may depend only on ones *earlier* in this list, and **peers may
+not depend on each other**.
 
-**Low-level, widely shared vocabulary** — depended on by almost
-everything else, and deliberately kept ignorant of the features built on
-top of them:
+**Bevy-free layers.** Their whole dependency tree is
+`serde`/`serde_json`/`midly`, which is why their tests run in seconds
+rather than after an engine link. Keeping `harmonicon-core` free of Bevy
+is the single most valuable property of the split; anything needing
+`Resource`/`Component`/`App` belongs a level up.
 
-- [`song`](chart-and-assets.md) — the chart file format (`HarpChart`),
-  harmonica layouts and tunings, MIDI-file parsing, and the custom
-  [`AssetLoader`](chart-and-assets.md) that turns a chart folder on disk
-  into a loaded `SongManifest`.
-- [`audio_system`](audio-pipeline.md) — microphone capture (`cpal`), the
-  five pitch-detection algorithms, the additive harmonica-voice
-  synthesizer used for playback previews and generated backing, and WAV
-  encode/decode helpers.
-- `theme`, `localization` — see [Localization and Theming](
-  localization-and-theming.md).
-- `settings`, `profile` — see [Persistence](persistence.md).
-- `dialogs` — shared, generic UI widgets (buttons, comboboxes, file
-  dialogs, tooltips, scroll areas) used by every screen in the game;
-  intentionally has no idea what a "song" or a "harmonica" is.
-- `assets_management` — non-chart asset discovery (which songs, themes,
-  harmonica 3D models, and note-head themes exist) and the live
-  filesystem watcher for the `~/Harmonicon` external content folder.
-- `scoring` — the *pure*, timing-window/combo-multiplier math shared by
-  real gameplay and the Song Editor's own practice mode. Deliberately
-  just functions operating on plain data, no ECS types at all — see
-  [The Scoring System](scoring-system.md).
+- [`harmonicon-core`](scoring-system.md) — music theory, chart types,
+  [scoring math](scoring-system.md), pitch/MIDI conversion, pitch→hole
+  resolution, the harmonica synth, WAV, grid snapping, and the generated
+  training drills.
+- [`harmonicon-score`](chart-and-assets.md) — reading foreign score files
+  (MIDI, Guitar Pro 3–7, MuseScore, MusicXML) behind one `ScoreFile`
+  trait, and converting a track onto a harmonica.
+- [`harmonicon-dsp`](audio-pipeline.md) — the five pitch detectors
+  (FFT/YIN/pYIN/MPM/NMF) and their windowing.
 
-**Features built on that vocabulary:**
+**Shared vocabulary**, Bevy-aware but feature-agnostic:
 
-- [`gameplay`](gameplay-clock.md) — the scored Play 2D/3D modes, the
-  gameplay clock, the Bending Trainer, and every in-song HUD overlay.
-  Also where `AppState::Playing`'s system schedule is assembled for
-  *every* `GameplayMode` (2D, 3D, and Jam Session) — see the
-  composition-root discussion in [Module Boundaries](
+- [`harmonicon-audio`](audio-pipeline.md) — `cpal` capture, the ECS
+  wrapper over `harmonicon-dsp`, waveform analysis.
+- [`harmonicon-platform`](localization-and-theming.md) — asset discovery
+  and the `~/Harmonicon` watcher, [settings](persistence.md),
+  localization, theme, responsive layout.
+- [`harmonicon-song`](chart-and-assets.md) — chart/manifest loading,
+  MIDI-backed songs, and the [lessons](lessons-engine.md) data layer
+  (manifests, prerequisite graph, unit gates, progress).
+- [`harmonicon-app`](app-states.md) — the `AppState`/`MenuPage` state
+  machine, routing flags, [player profile](persistence.md).
+- `harmonicon-ui` — `dialogs` (buttons, comboboxes, file dialogs,
+  tooltips, scroll areas, the circle-of-fifths and 12-bar-grid teaching
+  widgets), the Bravura notation staff, the spectrogram. Intentionally
+  has no idea what a "song" or a "lesson" is.
+
+**Features:**
+
+- [`harmonicon-gameplay`](gameplay-clock.md) — the [clock](
+  gameplay-clock.md), judging, 2D/3D highways, HUD overlays, adaptive
+  difficulty, the Bending Trainer, call-and-response. Also where
+  `AppState::Playing`'s schedule is assembled for *every* `GameplayMode`
+  — see the composition-root discussion in [Module Boundaries](
   module-dependency-rules.md).
-- [`jam`](jam-session-architecture.md) — free-play Jam Session, the
-  generated 12-bar backing track, MIDI multi-track backing, and the
-  improv/call-and-response practice modes.
-- [`lessons`](lessons-engine.md) — the guided curriculum: lesson
-  manifests, catalog discovery, prerequisite gating, and per-player
-  progress.
-- [`song_editor`](song-editor-architecture.md) — the in-game chart
-  authoring tool.
-- `spectrogram` — the live audio visualizer (bar spectrum and
-  oscilloscope styles), reusing the same `AudioFrame` the pitch pipeline
-  already publishes rather than re-analyzing audio itself.
-- `menu` — every menu screen, app-level state routing, and the guided
-  tutorial tour.
-- `app` — pure, feature-agnostic vocabulary shared *across* features:
-  `AppState`, `GameplayMode`, the currently-selected song, and a handful
-  of "which menu page to land on when this state exits" routing flags.
-  See [Application States and Modes](app-states.md).
-- `note_bench` — pure comparison logic for the pitch-detection benchmark
-  tool (`note-bench`); see [Testing Strategy](testing-strategy.md).
+- [`harmonicon-jam`](jam-session-architecture.md) /
+  [`harmonicon-editor`](song-editor-architecture.md) — Jam Session and
+  the Song Editor. **Siblings**: neither imports the other.
+- `harmonicon-menu` — the page state machine, routing, shared menu
+  chrome, and the guided tutorial tour.
+- [`harmonicon-lessons`](lessons-engine.md) — the lesson tree/reader UI
+  and the pure tree layout.
+- [`harmonicon-bench`](testing-strategy.md) — the pitch-detection
+  benchmark and dataset generator (dev tooling).
 
 ```plantuml
 @startuml
-title Top-level module map (informal grouping, not enforced namespacing)
+title Crate dependency layers (Cargo-enforced — a cycle is not expressible)
 skinparam componentStyle rectangle
 left to right direction
 
-package "Low-level shared vocabulary" {
-  [song] as song
-  [audio_system] as audio_system
-  [theme] as theme
-  [localization] as localization
-  [settings] as settings
-  [profile] as profile
-  [dialogs] as dialogs
-  [assets_management] as assets_management
-  [scoring] as scoring
+package "Bevy-free" {
+  [harmonicon-core] as core
+  [harmonicon-score] as score
+  [harmonicon-dsp] as dsp
+}
+
+package "Shared vocabulary" {
+  [harmonicon-audio] as audio
+  [harmonicon-platform] as platform
+  [harmonicon-song] as song
+  [harmonicon-app] as app
+  [harmonicon-ui] as ui
 }
 
 package "Features" {
-  [gameplay] as gameplay
-  [jam] as jam
-  [lessons] as lessons
-  [song_editor] as song_editor
-  [spectrogram] as spectrogram
+  [harmonicon-gameplay] as gameplay
+  [harmonicon-jam] as jam
+  [harmonicon-editor] as editor
+  [harmonicon-menu] as menu
+  [harmonicon-lessons] as lessons
 }
 
-package "App shell" {
-  [menu] as menu
-  [app] as app
+package "Composition root" {
+  [harmonicon (src/lib.rs)] as root
 }
 
-gameplay ..> song
-gameplay ..> audio_system
-gameplay ..> scoring
-gameplay ..> theme
-gameplay ..> app
+note as N1
+  Representative edges, not the full set —
+  every crate also depends on the Bevy-free
+  layer. What matters is that no arrow
+  points upward and no two peers
+  point at each other.
+end note
+
+score ..> core
+audio ..> dsp
+platform ..> audio
+platform ..> score
+song ..> platform
+app ..> song
+ui ..> app
+ui ..> platform
+gameplay ..> ui
 jam ..> gameplay
-jam ..> song
-jam ..> audio_system
-song_editor ..> song
-song_editor ..> audio_system
-song_editor ..> scoring
-song_editor ..> dialogs
-song_editor ..> theme
-lessons ..> song
-lessons ..> assets_management
+editor ..> gameplay
 menu ..> gameplay
 menu ..> jam
-menu ..> lessons
-menu ..> song_editor
-menu ..> assets_management
-menu ..> dialogs
-menu ..> app
-spectrogram ..> audio_system
+menu ..> editor
+lessons ..> menu
+root ..> lessons
 @enduml
 ```
+
+**No re-export facades.** A call site names the crate it depends on
+(`harmonicon_core::chart`, `harmonicon_gameplay::gameplay::…`), so every
+dependency is visible where it's taken. Re-exporting a moved module under
+its old path was tried and deliberately removed: it hid which crate code
+came from and let modules reach for things casually.
+
+Per-crate architecture notes live in `crates/<name>/CLAUDE.md` — the
+load-bearing facts for one subsystem, alongside its code rather than all
+in one place.
 
 ## The engine and its major dependencies
 

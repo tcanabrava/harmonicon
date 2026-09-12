@@ -109,7 +109,7 @@ discarding already-captured audio for no reason.
 
 ### Analysis: `pitch_detect::analyze`
 
-`analyze` (`audio_system/pitch_detect.rs`) takes one chunk, the sample
+`analyze` (`harmonicon-audio`'s `pitch_detect.rs`) takes one chunk, the sample
 rate, the selected `PitchAlgorithm`, and the current `PitchRange`, and
 returns an `Analysis`: the detected `Vec<PitchInfo>` plus the FFT
 magnitude spectrum and its bin width (`freq_res`) — the same spectrum

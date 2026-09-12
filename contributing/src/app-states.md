@@ -120,7 +120,7 @@ matters.
 
 ## `MenuPage`: a sub-state scoped to `Menu`
 
-`MenuPage` (`src/menu/routing.rs`) is a Bevy `SubStates`, declared with
+`MenuPage` (`harmonicon-menu`'s `menu/routing.rs`) is a Bevy `SubStates`, declared with
 `#[source(AppState = AppState::Menu)]` — it only exists, and only
 resets to its default (`Main`), while `AppState` is `Menu`. Every menu
 screen (`Play`, `ArtistList`, `SongList`, `ModeSelect`, `Options`,

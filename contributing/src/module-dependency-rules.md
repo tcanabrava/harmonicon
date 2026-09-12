@@ -1,13 +1,17 @@
 # Module Boundaries and Dependency Rules
 
-Harmonicon has no Cargo-workspace boundaries between its subsystems (see
-[System Overview](overview.md) for why it's one library crate) — which
-means nothing at the compiler level stops any module from importing any
-other. The structure this chapter describes is enforced by a mix of one
-automated test, and — for everything the test can't check — reviewer
-discipline against a written-down rule. This chapter states the rules,
-the one place they're mechanically checked, and a documented exception
-worth understanding rather than working around.
+Harmonicon's subsystems are **separate crates in a Cargo workspace** (see
+[System Overview](overview.md) for the layering), which means the most
+important rule here needs no policing at all: a crate may depend only on
+ones below it, peers may not depend on each other, and **Cargo cannot
+express a cycle** — an import pointing the wrong way is a compile error,
+not a review comment.
+
+That covers direction *between* crates. Two things it doesn't cover get
+their own automated tests: how big a single file may grow, and cycles
+between *modules inside* one crate, which Rust still permits. This
+chapter states the rules, where each is mechanically checked, and a
+documented exception worth understanding rather than working around.
 
 ## Rule 1: unrelated things do not share a file
 
@@ -61,102 +65,123 @@ cleanup, it's an ongoing discipline applied as code is written.
 
 ## Rule 2: folders match modules, and dependencies point downward
 
-A module's physical location should reflect its level: low-level shared
-vocabulary at the bottom, features in the middle, app-wiring at the top
-— and nothing should import *upward*. [System Overview](overview.md)'s
-package diagram shows the intended shape; this section covers what
-"pointing the wrong way" actually looked like before it was fixed, as a
-concrete illustration of the rule rather than an abstract statement of
-it.
+Code's physical location reflects its level: low-level shared vocabulary
+at the bottom, features in the middle, wiring at the top — and nothing
+imports *upward*. [System Overview](overview.md)'s layer diagram shows
+the shape. The crate split makes this the compiler's problem, but the
+judgment call it encodes is still yours to make: **which crate does this
+new thing belong in?** Two shapes of wrong answer are worth recognizing,
+because both compiled fine when the whole game was one crate.
 
-**`AppState` used to live inside `menu`.** Conceptually, an app-wide
-state machine is vocabulary every feature shares, not a menu concern —
-but historically it lived in `menu/mod.rs`, so `gameplay` (seven
-files), `song_editor`, `spectrogram`, and `profile` all had to
-`use crate::menu::...` to reach it, even though ten of the eleven things
-they were actually importing from there (`AppState`, `GameplayMode`,
-`SelectedSong`, `ReturnToSongList`) had nothing to do with menus at all.
-Anyone asking "what depends on the menu?" got a misleading answer, and
-any review of menu code pulled in readers who only ever wanted the
-state enum. The fix was mechanical once diagnosed: this vocabulary now
-lives in `app.rs` at the crate's top level (see
+**Shared vocabulary hiding inside a feature.** An app-wide state machine
+is vocabulary every feature needs, not a menu concern — but `AppState`
+and friends once lived in `menu`, so gameplay, the editor, the
+spectrogram and the profile all reached into `menu` for something that
+had nothing to do with menus. Anyone asking "what depends on the menu?"
+got a misleading answer. That vocabulary is now `harmonicon-app` (see
 [Application States and Modes](app-states.md)), which every feature —
-`menu` included — depends on downward, and nothing depends on upward.
+`harmonicon-menu` included — sits above.
 
-**`gameplay::call_response` used to import `song_editor::playback`**
-directly for its synth — two peer features welded sideways, when the
-synth (`audio_system::synth`, see
-[The Audio Input Pipeline](audio-pipeline.md)) is shared audio
-infrastructure with no real business living inside an editor tool.
-Moving the synth down to `audio_system` — vocabulary both `gameplay`
-and `song_editor` can depend on independently — removed the sideways
-edge entirely, rather than leaving one feature depending on the other's
-internals.
+**Two peers welded sideways.** Call-and-response once imported the Song
+Editor's playback module directly for its synth, when the synth is
+shared audio infrastructure with no business living inside an editor
+tool. It now lives in `harmonicon-core`, which both depend on
+independently. Today `harmonicon-gameplay` and `harmonicon-editor` are
+peers and that import wouldn't build — but the diagnosis is what
+generalizes: when two features want the same thing, the thing goes
+*down*, not sideways.
 
-## The documented exception: composition roots
+The same reasoning drove the lessons split. The manifest schema,
+prerequisite graph and progress judgment are data and rules, so they
+live in `harmonicon-song`; the skill tree and reader are UI, so they
+live in `harmonicon-lessons` above the menu crate (see
+[The Lessons Engine](lessons-engine.md)). Pushed together into one
+crate, the pure layout algorithm would have had an engine in its test
+dependency tree for no reason.
 
-One place in the codebase looks, at first glance, like it violates
-"dependencies point downward" — and is worth naming explicitly as a
-deliberate, understood exception rather than either hiding it or
-mistaking it for a bug to fix:
+## The composition root
+
+Something has to depend on everything, or nothing would ever be wired
+together. That job belongs to exactly one place: `src/lib.rs`'s `run()`,
+in the root package, which sits above every library crate and adds each
+feature's plugin to one `App`.
 
 ```plantuml
 @startuml
 title Composition root vs. ordinary feature dependency
 skinparam componentStyle rectangle
 
-rectangle "gameplay::plugin\n(composition root — assembles the\nENTIRE AppState::Playing schedule,\nfor every GameplayMode)" as root
-rectangle "gameplay (core primitives)\nGameplayClock, MusicPlayer, ..." as core
-rectangle "jam (a peer feature)" as jam
-rectangle "song_editor (a peer feature)" as editor
+rectangle "src/lib.rs run()\n(root package — adds every\nfeature plugin to one App)" as root
+rectangle "harmonicon-gameplay\nGameplayClock, MusicPlayer,\nthe Playing schedule" as gameplay
+rectangle "harmonicon-jam\n(a peer feature)" as jam
+rectangle "harmonicon-editor\n(a peer feature)" as editor
 
-root -down-> jam : registers jam's systems\ninto the shared schedule
-root -down-> editor : (song_editor is its own\nAppState, not part of\nPlaying — a different case,\nshown for contrast)
-jam -down-> core : ordinary "feature depends\non shared vocabulary" edge
+root -down-> jam : adds JamPlugin
+root -down-> editor : adds the editor's plugin
+root -down-> gameplay : adds GameplayPlugin
+jam -down-> gameplay : ordinary "feature depends\non shared vocabulary" edge
+editor -down-> gameplay
 note right of root
   A composition root is EXPECTED to
   depend on everything it wires
   together — that is its whole job.
-  What it must never do is let one
-  peer feature's own logic depend on
-  another peer feature's own logic.
+  It is also the ONLY place allowed to,
+  which is why it holds no logic of
+  its own.
 end note
 @enduml
 ```
 
-`gameplay::plugin` — the one file responsible for assembling the entire
-`AppState::Playing` system schedule, across all three `GameplayMode`
-values — imports from `jam` to register Jam-Session-specific systems
-into that shared schedule. Read naively, that's `gameplay` depending on
-`jam`, while [Jam Session](jam-session-architecture.md) also describes
-`jam`'s own feature code depending on `gameplay`'s core primitives
-(`GameplayClock`, `MusicPlayer`) — which would be a real circular
-dependency, and a real problem, if both directions were the *same kind*
-of dependency. They aren't: `gameplay::plugin` is acting as a
-**composition root** — the one place in the codebase whose entire job
-is wiring separately-developed pieces together — and a composition root
-being coupled to everything it composes is not the same failure mode as
-two peer features being coupled to each other's internals. The rule
-this exception doesn't violate: **`jam`'s own feature logic never
-reaches into `gameplay`'s feature logic** (2D/3D rendering, scoring) —
-only into the shared low-level vocabulary `gameplay::state` exists
-specifically to expose, the same primitives any other feature is free
-to depend on too.
+A composition root being coupled to everything it composes is not the
+same failure mode as two peer features being coupled to each other's
+internals — so the rule is not "nothing may depend on everything", it's
+**"only assembly code may, and assembly code may contain nothing else"**.
+`src/lib.rs` is assembly only: plugin registration, the `DefaultPlugins`
+configuration, and the handful of startup systems that belong to no
+feature. The moment real logic lands there, the exception stops being one.
 
-The practical test for "is this a legitimate composition-root edge, or
-an actual layering inversion sneaking in": does the dependency go from
-*assembly/wiring code* down into a *feature's own systems/resources* (fine — that's what a composition root does), or does it go from one
-*feature's own business logic* sideways into *another feature's own
-business logic* (the `call_response`/`song_editor::playback` case above
-— not fine, and the kind of thing worth flagging in review the same way
-the historical `AppState`-in-`menu` case would be today).
+`harmonicon-jam` and `harmonicon-editor` both depend on
+`harmonicon-gameplay` for the shared primitives it exposes —
+`GameplayClock`, `MusicPlayer`, the `AppState::Playing` schedule — and
+neither can reach the other. When Jam Session needs an ordering
+guarantee against a gameplay system, it takes it through a published
+`SystemSet`, not a system name.
 
-## What isn't enforced mechanically
+The practical test for "is this a legitimate composition-root edge, or a
+layering inversion sneaking in": is the code doing the depending pure
+*wiring* (fine — that's what a composition root does), or is it one
+feature's own business logic reaching into another's? The second case
+no longer compiles between crates, but it very much still compiles
+between *modules* of one crate, which is the shape to watch for now.
 
-The file-size budget is the one rule with a real, running test behind
-it. Dependency *direction* itself has no equivalent automated check
-today — a Cargo workspace with real crate boundaries would get one for
-free (an illegal `use` simply wouldn't compile), which is the main
-thing a future workspace split, if the project ever grows to warrant
-one, would buy back over the current single-crate structure. Until
-then, this chapter — and a reviewer who's read it — are the mechanism.
+## Rule 3: no module cycles inside a crate either
+
+Cargo rules out a cycle *between* crates. It has nothing to say about
+one *within* a crate — Rust is perfectly happy for `a.rs` to name `b`
+while `b.rs` names `a` — so the workspace split, valuable as it is,
+buys nothing here. `tests/physical_design.rs::no_module_dependency_
+cycles` closes that gap: it walks every `.rs` file under `src/` **and**
+every `crates/*/src/`, builds the graph of `crate::`-qualified
+references between top-level modules, and fails on any cycle. Each edge
+remembers one witness line, so a failure names the `use` to go delete
+rather than just announcing that a cycle exists somewhere.
+
+**This one has no allowlist.** The file-size budget is a burndown chart
+because a large file is debt to be paid down on a schedule; a module
+cycle is a design error with no "pay it later" story, and every one
+found while introducing the check was fixed rather than recorded.
+
+## Two ordering rules that follow from the split
+
+**Cross-crate ordering goes through a `SystemSet`, never a system
+name.** `.after(some_private_fn)` forces the owning crate to make the
+system *and every one of its parameter types* public, which turns an
+implementation detail into permanent API for the sake of one ordering
+edge. `dialogs::combobox::ComboboxEscapeSet` and
+`gameplay::plugin::MusicVolumeSet` exist for exactly this: publish an
+ordering point, keep the implementation private.
+
+**A new crate must forward the `dev`/`trace_tracy` features** to its own
+`bevy` dependency (`"harmonicon-x/dev"`). Miss it and Cargo's feature
+unification breaks: the build ends up with two differently-configured
+Bevy builds, which fails in ways that look nothing like the cause.

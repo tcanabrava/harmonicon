@@ -1,7 +1,7 @@
 # The Song Editor
 
-The Song Editor (`src/song_editor/`, ~15,000 lines across roughly thirty
-files) is Harmonicon's largest single feature: a full in-game chart
+The Song Editor (`harmonicon-editor`'s `song_editor/`, ~16,500 lines
+across thirty-five files) is Harmonicon's largest single feature: a full in-game chart
 authoring tool built around one central document resource, a piano-roll
 grid, and enough surrounding tooling (live recording, MIDI import,
 undo/redo, a real tempo map, lesson authoring) that it functions as a

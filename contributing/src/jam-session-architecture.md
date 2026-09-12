@@ -1,6 +1,6 @@
 # Jam Session
 
-Jam Session (`src/jam/`) is Harmonicon's free-play mode: a rolling
+Jam Session (`harmonicon-jam`) is Harmonicon's free-play mode: a rolling
 12-bar backing, a live hole-map guide, and — deliberately — nothing
 scored. This chapter covers how it shares `gameplay`'s core
 infrastructure without being a `gameplay` submodule itself, the two ways

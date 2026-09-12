@@ -122,7 +122,7 @@ own unit tests:
 
 ## Developer tools as their own kind of testing infrastructure
 
-`src/bin/` holds three small binaries, sharing the library crate (see
+`src/bin/` holds four small binaries in the root package (see
 [System Overview](overview.md)), each existing specifically to make some
 kind of manual verification faster than it would be through the full
 game:
@@ -140,8 +140,8 @@ game:
   metadata, dumped by the Song Editor's own `--features dev` "Debug
   Recording" checkbox) through each of the five selectable algorithms
   (see [The Audio Input Pipeline](audio-pipeline.md)) and reports a hit/
-  miss/phantom summary. Its comparison logic lives in the library
-  (`note_bench.rs`), not the binary, specifically so it's directly unit-
+  miss/phantom summary. Its comparison logic lives in
+  `harmonicon-bench`, not the binary, specifically so it's directly unit-
   testable against synthetic inputs without needing a real recorded WAV
   file — the same "pure logic first" split this whole chapter describes,
   applied to a benchmarking tool rather than a gameplay feature. This
@@ -149,3 +149,11 @@ game:
   ever touching the detection algorithms themselves: don't change
   detection logic on a hunch, measure it against a reproducible dataset
   first.
+- **`gen_synthetic_dataset`** — writes a synthesized dataset under
+  `assets/debug_songs/` so `note-bench` has something to run against
+  without a real harmonica, a microphone and a quiet room. A stand-in,
+  explicitly *not* a replacement for recorded takes: synthetic audio
+  can't reproduce breath noise, reed overtones or room tone, which is
+  exactly where the detectors actually disagree. Its generator lives in
+  `harmonicon-bench` alongside `note-bench`'s comparison logic; the
+  binary is argument parsing and nothing else.
