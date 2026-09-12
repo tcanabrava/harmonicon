@@ -6,6 +6,10 @@
   "body_key": "lesson-quick-change-improv-body",
   "chart": "song/chart.harpchart",
   "progression": "quick-change",
+  "widgets": [
+    { "type": "twelve-bar-grid", "key": "G", "progression": "quick-change", "sync_group": "form" },
+    { "type": "metronome", "bpm": 80, "beats_per_bar": 4, "feel": "straight", "sync_group": "form" }
+  ],
   "prerequisites": [
     "question-answer"
   ],
