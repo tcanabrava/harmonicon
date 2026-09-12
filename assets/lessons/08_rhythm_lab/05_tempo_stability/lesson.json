@@ -1,6 +1,7 @@
 {
   "id": "tempo-stability", "unit": "rhythm-lab", "track": "time",
   "title_key": "lesson-tempo-stability-title", "body_key": "lesson-tempo-stability-body",
+  "widgets": [{"type": "metronome", "bpm": 64, "beats_per_bar": 4, "feel": "straight"}],
   "chart": "song/chart.harpchart", "prerequisites": ["sixteenth-articulation"],
   "pass_criteria": {"type": "accuracy", "threshold": 0.75}
 }
