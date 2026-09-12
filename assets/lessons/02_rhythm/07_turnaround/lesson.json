@@ -4,6 +4,10 @@
   "track": "form",
   "title_key": "lesson-turnaround-title",
   "body_key": "lesson-turnaround-body",
+  "widgets": [
+    { "type": "twelve-bar-grid", "key": "G", "sync_group": "form" },
+    { "type": "metronome", "bpm": 80, "beats_per_bar": 4, "feel": "straight", "sync_group": "form" }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "bar-counting"
