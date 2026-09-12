@@ -1,1 +1,1 @@
-{"id":"slow-practice","unit":"practice","optional":true,"track":"practice","title_key":"lesson-slow-practice-title","body_key":"lesson-slow-practice-body","prerequisites":["tempo-stability"]}
+{"id":"slow-practice","unit":"practice","optional":true,"track":"practice","title_key":"lesson-slow-practice-title","body_key":"lesson-slow-practice-body","widgets":[{"type":"metronome","bpm":60,"beats_per_bar":4,"feel":"straight"}],"prerequisites":["tempo-stability"]}
