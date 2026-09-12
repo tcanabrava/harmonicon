@@ -4,6 +4,9 @@
   "track": "time",
   "title_key": "lesson-shuffle-feel-title",
   "body_key": "lesson-shuffle-feel-body",
+  "widgets": [
+    { "type": "metronome", "bpm": 90, "beats_per_bar": 4, "feel": "shuffle" }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "counting-four"
