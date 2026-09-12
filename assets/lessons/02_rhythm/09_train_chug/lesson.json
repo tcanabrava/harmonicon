@@ -5,6 +5,9 @@
   "track": "train",
   "title_key": "lesson-train-chug-title",
   "body_key": "lesson-train-chug-body",
+  "widgets": [
+    { "type": "metronome", "bpm": 70, "beats_per_bar": 4, "feel": "straight" }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "multiple-notes"
