@@ -4,6 +4,9 @@
   "track": "tone",
   "title_key": "lesson-articulation-title",
   "body_key": "lesson-articulation-body",
+  "widgets": [
+    { "type": "metronome", "bpm": 100, "beats_per_bar": 4, "feel": "straight" }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "single-note"
