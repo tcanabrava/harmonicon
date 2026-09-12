@@ -27,6 +27,7 @@ use harmonicon_song::lessons::{
 };
 use harmonicon_song::song::{SongManifest, training_manifest};
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
+use harmonicon_ui::dialogs::form_map::{section_bg, spawn_form_map};
 use harmonicon_ui::dialogs::metronome::{
     MetronomeClock, MetronomeFeel, click_for_tick, is_downbeat, twelve_bar_for_tick,
 };
@@ -125,6 +126,13 @@ pub(crate) struct LessonGrid {
 }
 
 #[derive(Component)]
+struct LessonFormMap {
+    cells: Vec<Entity>,
+    sections: Vec<String>,
+    current_section: usize,
+}
+
+#[derive(Component)]
 pub(crate) struct LessonMetronomeAudio;
 
 pub(crate) fn cleanup_lesson_audio(
@@ -155,6 +163,29 @@ fn highlight_lesson_grid(
 
 const fn stepped_bar(current: usize, delta: i32) -> usize {
     (current as i32 + delta).rem_euclid(12) as usize
+}
+
+fn stepped_section(current: usize, delta: i32, count: usize) -> usize {
+    if count == 0 {
+        return 0;
+    }
+    (current as i32 + delta).rem_euclid(count as i32) as usize
+}
+
+fn highlight_form_section(
+    map: &LessonFormMap,
+    section: usize,
+    backgrounds: &mut Query<&mut BackgroundColor>,
+) {
+    for (index, entity) in map.cells.iter().enumerate() {
+        if let Ok(mut bg) = backgrounds.get_mut(*entity) {
+            *bg = if index == section {
+                BackgroundColor(Color::srgba(0.82, 0.62, 0.10, 1.0))
+            } else {
+                BackgroundColor(section_bg(&map.sections[index]))
+            };
+        }
+    }
 }
 
 #[derive(Component)]
@@ -671,6 +702,50 @@ pub(crate) fn setup_lesson_reader(
                     },
                 );
             }
+            LessonWidget::FormMap { sections } => {
+                let mut cells = Vec::new();
+                commands.entity(root).with_children(|parent| {
+                    cells = spawn_form_map(parent, sections);
+                });
+                let marker = commands
+                    .spawn(LessonFormMap {
+                        cells,
+                        sections: sections.clone(),
+                        current_section: 0,
+                    })
+                    .id();
+                commands.entity(root).add_child(marker);
+
+                for (message, delta) in [
+                    ("lesson-widget-section-previous", -1),
+                    ("lesson-widget-section-next", 1),
+                    ("lesson-widget-section-reset", 0),
+                ] {
+                    let target = marker;
+                    spawn_button(
+                        &mut commands,
+                        root,
+                        &loc.msg(message),
+                        move |_: On<Activate>,
+                              mut maps: Query<&mut LessonFormMap>,
+                              mut backgrounds: Query<&mut BackgroundColor>| {
+                            let Ok(mut map) = maps.get_mut(target) else {
+                                return;
+                            };
+                            map.current_section = if delta == 0 {
+                                0
+                            } else {
+                                stepped_section(map.current_section, delta, map.sections.len())
+                            };
+                            highlight_form_section(
+                                &map,
+                                map.current_section,
+                                &mut backgrounds,
+                            );
+                        },
+                    );
+                }
+            }
             LessonWidget::Metronome {
                 bpm,
                 tempo_steps,
@@ -903,6 +978,14 @@ mod tests {
         assert_eq!(stepped_bar(0, -1), 11);
         assert_eq!(stepped_bar(11, 1), 0);
         assert_eq!(stepped_bar(5, 1), 6);
+    }
+
+    #[test]
+    fn form_sections_step_and_wrap_for_any_form_length() {
+        assert_eq!(stepped_section(0, -1, 4), 3);
+        assert_eq!(stepped_section(3, 1, 4), 0);
+        assert_eq!(stepped_section(1, 1, 3), 2);
+        assert_eq!(stepped_section(0, 1, 0), 0);
     }
 
     #[test]

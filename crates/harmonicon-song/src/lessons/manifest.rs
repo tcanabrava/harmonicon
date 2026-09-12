@@ -81,6 +81,9 @@ pub enum LessonWidget {
         #[serde(default)]
         sync_group: Option<String>,
     },
+    FormMap {
+        sections: Vec<String>,
+    },
     Metronome {
         #[serde(default = "default_bpm")]
         bpm: f32,
@@ -300,6 +303,20 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("piano"), "{error}");
+    }
+
+    #[test]
+    fn parses_a_repeating_section_form_map() {
+        let manifest = parse_lesson(
+            br#"{"id":"form","unit":"theory","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"form-map","sections":["A","A","B","A"]}]}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            &manifest.widgets[0],
+            LessonWidget::FormMap { sections }
+                if sections == &["A", "A", "B", "A"]
+        ));
     }
 
     #[test]

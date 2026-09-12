@@ -6,6 +6,7 @@ pub mod combobox;
 pub mod confirm_dialog;
 pub mod file_dialog;
 pub mod font_fallback;
+pub mod form_map;
 pub mod keyboard_nav;
 pub mod metronome;
 pub mod page_chrome;
