@@ -101,9 +101,6 @@ pub struct MetronomeMuted(pub bool);
 #[derive(Resource, Default)]
 pub struct LastClickedTick(pub Option<i64>);
 
-// ── Pure helpers ──────────────────────────────────────────────────────────────
-
-/// True when a beat is the first beat of its bar.
 // ── UI ────────────────────────────────────────────────────────────────────────
 
 pub fn spawn_metronome(
