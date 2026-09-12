@@ -5,6 +5,14 @@
   "track": "train",
   "title_key": "lesson-train-whistle-title",
   "body_key": "lesson-train-whistle-body",
+  "widgets": [
+    {
+      "type": "metronome",
+      "bpm": 90,
+      "beats_per_bar": 4,
+      "feel": "straight"
+    }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "train-rolling",
