@@ -28,7 +28,7 @@ use harmonicon_song::lessons::{
 use harmonicon_song::song::{SongManifest, training_manifest};
 use harmonicon_ui::dialogs::circle_of_fifths::spawn_circle_of_fifths;
 use harmonicon_ui::dialogs::metronome::{
-    MetronomeClock, MetronomeFeel, click_for_tick, twelve_bar_for_tick,
+    MetronomeClock, MetronomeFeel, click_for_tick, is_downbeat, twelve_bar_for_tick,
 };
 use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, bar_bg, spawn_12_bar_grid};
 
@@ -47,11 +47,46 @@ pub(crate) struct SelectedLesson(pub Option<String>);
 pub(crate) struct LessonMetronome {
     clock: MetronomeClock,
     bpm: f32,
-    feel: MetronomeFeel,
+    pattern: LessonMetronomePattern,
     beats_per_bar: usize,
     muted: bool,
     sync_group: Option<String>,
     label: Entity,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LessonMetronomePattern {
+    Straight,
+    Shuffle,
+    Triplet,
+}
+
+impl LessonMetronomePattern {
+    const fn clock_feel(self) -> MetronomeFeel {
+        match self {
+            Self::Straight => MetronomeFeel::Straight,
+            Self::Shuffle | Self::Triplet => MetronomeFeel::Shuffle,
+        }
+    }
+
+    const fn click(self, tick: i64, beats_per_bar: f64) -> Option<(bool, f32)> {
+        match self {
+            Self::Straight => click_for_tick(tick, beats_per_bar, MetronomeFeel::Straight),
+            Self::Shuffle => click_for_tick(tick, beats_per_bar, MetronomeFeel::Shuffle),
+            Self::Triplet => Some((
+                is_downbeat(tick.div_euclid(3), beats_per_bar) && tick.rem_euclid(3) == 0,
+                if tick.rem_euclid(3) == 0 { 1.0 } else { 0.55 },
+            )),
+        }
+    }
+
+    const fn next(self) -> Self {
+        match self {
+            Self::Straight => Self::Shuffle,
+            Self::Shuffle => Self::Triplet,
+            Self::Triplet => Self::Straight,
+        }
+    }
 }
 
 #[derive(Component)]
@@ -117,7 +152,8 @@ pub(crate) fn update_lesson_metronomes(
 ) {
     for mut metronome in &mut metronomes {
         let bpm = metronome.bpm;
-        let feel = metronome.feel;
+        let pattern = metronome.pattern;
+        let feel = pattern.clock_feel();
         let tick = metronome
             .clock
             .advance(time.delta_secs_f64(), f64::from(bpm), feel);
@@ -126,7 +162,7 @@ pub(crate) fn update_lesson_metronomes(
         }
         let Some(tick) = tick else { continue };
         if !metronome.muted
-            && let Some((accent, gain)) = click_for_tick(tick, metronome.beats_per_bar as f64, feel)
+            && let Some((accent, gain)) = pattern.click(tick, metronome.beats_per_bar as f64)
         {
             let sample = if accent {
                 "sounds/metronome_high.ogg"
@@ -623,10 +659,10 @@ pub(crate) fn setup_lesson_reader(
                         LessonMetronome {
                             clock: MetronomeClock::default(),
                             bpm: *bpm,
-                            feel: if feel == "shuffle" {
-                                MetronomeFeel::Shuffle
-                            } else {
-                                MetronomeFeel::Straight
+                            pattern: match feel.as_str() {
+                                "shuffle" => LessonMetronomePattern::Shuffle,
+                                "triplet" => LessonMetronomePattern::Triplet,
+                                _ => LessonMetronomePattern::Straight,
                             },
                             beats_per_bar: *beats_per_bar,
                             muted: false,
@@ -677,10 +713,7 @@ pub(crate) fn setup_lesson_reader(
                     &loc.msg("lesson-widget-feel-toggle"),
                     move |_: On<Activate>, mut q: Query<&mut LessonMetronome>| {
                         if let Ok(mut metronome) = q.get_mut(target) {
-                            metronome.feel = match metronome.feel {
-                                MetronomeFeel::Straight => MetronomeFeel::Shuffle,
-                                MetronomeFeel::Shuffle => MetronomeFeel::Straight,
-                            };
+                            metronome.pattern = metronome.pattern.next();
                             metronome.clock.reset();
                         }
                     },
@@ -823,6 +856,31 @@ mod tests {
         assert_eq!(stepped_bar(0, -1), 11);
         assert_eq!(stepped_bar(11, 1), 0);
         assert_eq!(stepped_bar(5, 1), 6);
+    }
+
+    #[test]
+    fn triplet_pattern_clicks_three_equal_subdivisions() {
+        let pattern = LessonMetronomePattern::Triplet;
+        assert_eq!(pattern.click(0, 4.0), Some((true, 1.0)));
+        assert_eq!(pattern.click(1, 4.0), Some((false, 0.55)));
+        assert_eq!(pattern.click(2, 4.0), Some((false, 0.55)));
+        assert_eq!(pattern.click(3, 4.0), Some((false, 1.0)));
+    }
+
+    #[test]
+    fn lesson_metronome_pattern_cycles_through_every_mode() {
+        assert!(matches!(
+            LessonMetronomePattern::Straight.next(),
+            LessonMetronomePattern::Shuffle
+        ));
+        assert!(matches!(
+            LessonMetronomePattern::Shuffle.next(),
+            LessonMetronomePattern::Triplet
+        ));
+        assert!(matches!(
+            LessonMetronomePattern::Triplet.next(),
+            LessonMetronomePattern::Straight
+        ));
     }
 
     #[test]
