@@ -38,8 +38,41 @@ multi-selection, the metronome/count-in, and more.
 
 | Key | Action |
 |---|---|
-| `↑` / `↓` (Arrow Up/Down) | Adjust the UI's overall zoom/scale. |
+| `Tab` / `Shift+Tab` | Move keyboard focus to the next / previous control. |
+| `Enter` or `Space` | Activate whatever has focus. |
+| Arrow keys | Move between the options of a focused tab bar or radio group; nudge a focused slider (`←` / `→`). |
+| `Home` / `End` | Send a focused slider to its minimum / maximum. |
 | `Esc` | Close an open dropdown, cancel a file dialog, or back out one menu level — whichever applies where you are. |
+
+The UI's overall zoom is the **Zoom** slider in [Options](options.md),
+not a keybinding — focus it and `←`/`→` step it, or drag it with the
+mouse.
+
+**Every screen can be driven from the keyboard alone.** The control with
+focus is outlined by a focus ring, and `Tab` stays inside whatever modal
+is open — a confirmation dialog, a file picker, an open dropdown — so it
+can't wander onto something you can't see. A focused button responds to
+`Enter` and `Space` exactly as it does to a click.
+
+## Scrolling and touch
+
+Any screen with more content than fits scrolls, and there are three ways
+to move it:
+
+- the **mouse wheel** over the content,
+- the **scrollbar** down its right-hand side (which hides itself entirely
+  when everything already fits), or
+- **dragging the content itself**, anywhere on it.
+
+Dragging matters most on a touchscreen, where there's no wheel and the
+scrollbar is a thin target. It works everywhere a page scrolls — song and
+artist lists, the options pages, the lesson tree. Starting a drag on a
+button doesn't press it: a short movement is still treated as a tap, and
+once you've moved far enough to be clearly swiping, the button under your
+finger is let go rather than activated.
+
+The [Lessons](lessons.md) skill tree scrolls in **both** directions, so
+dragging it pans diagonally as well.
 
 ## Pause menu (mouse-driven)
 
