@@ -6,6 +6,10 @@
   "body_key": "lesson-jazz-blues-form-body",
   "chart": "song/chart.harpchart",
   "progression": "jazz-blues",
+  "widgets": [
+    { "type": "twelve-bar-grid", "key": "G", "progression": "jazz-blues", "sync_group": "form" },
+    { "type": "metronome", "bpm": 90, "beats_per_bar": 4, "feel": "shuffle", "sync_group": "form" }
+  ],
   "prerequisites": [
     "ii-v-i-chord-tones",
     "chord-tone-improv"
