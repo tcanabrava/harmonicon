@@ -320,6 +320,16 @@ mod tests {
     }
 
     #[test]
+    fn rejects_a_form_map_with_only_one_section() {
+        let error = parse_lesson(
+            br#"{"id":"form","unit":"theory","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"form-map","sections":["A"]}]}"#,
+        )
+        .unwrap_err();
+        assert!(error.contains("sections"), "{error}");
+    }
+
+    #[test]
     fn parses_synchronized_grid_and_metronome_widgets() {
         let m = parse_lesson(
             br#"{"id":"form","unit":"rhythm","title_key":"t","body_key":"b","widgets":[
@@ -342,6 +352,28 @@ mod tests {
         let error = parse_lesson(
             br#"{"id":"x","unit":"u","title_key":"t","body_key":"b",
                  "widgets":[{"type":"metronome","bpm":301}]}"#,
+        )
+        .unwrap_err();
+        assert!(error.contains("301"), "{error}");
+    }
+
+    #[test]
+    fn parses_and_validates_a_metronome_tempo_schedule() {
+        let manifest = parse_lesson(
+            br#"{"id":"train","unit":"rhythm","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"metronome","bpm":70,
+                 "tempo_steps":[75,80],"bars_per_step":2,"feel":"triplet"}]}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            &manifest.widgets[0],
+            LessonWidget::Metronome { tempo_steps, bars_per_step: 2, feel, .. }
+                if tempo_steps == &[75.0, 80.0] && feel == "triplet"
+        ));
+
+        let error = parse_lesson(
+            br#"{"id":"train","unit":"rhythm","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"metronome","tempo_steps":[301]}]}"#,
         )
         .unwrap_err();
         assert!(error.contains("301"), "{error}");
