@@ -1,1 +1,1 @@
-{"id":"transposition","unit":"musicianship","optional":true,"track":"theory","title_key":"lesson-transposition-title","body_key":"lesson-transposition-body","prerequisites":["circle-of-fifths","arpeggio-to-scale"]}
+{"id":"transposition","unit":"musicianship","optional":true,"track":"theory","title_key":"lesson-transposition-title","body_key":"lesson-transposition-body","widgets":[{"type":"circle-of-fifths","harp_key":"C"}],"prerequisites":["circle-of-fifths","arpeggio-to-scale"]}
