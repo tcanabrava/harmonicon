@@ -5,6 +5,16 @@
   "track": "train",
   "title_key": "lesson-train-rolling-title",
   "body_key": "lesson-train-rolling-body",
+  "widgets": [
+    {
+      "type": "metronome",
+      "bpm": 70,
+      "tempo_steps": [75, 80, 85, 90, 95, 100, 105, 110],
+      "bars_per_step": 1,
+      "beats_per_bar": 4,
+      "feel": "straight"
+    }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "train-chug"
