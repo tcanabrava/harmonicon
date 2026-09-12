@@ -107,7 +107,7 @@ struct LessonCircle {
 pub(crate) fn update_lesson_metronomes(
     time: Res<Time>,
     mut metronomes: Query<&mut LessonMetronome>,
-    grids: Query<&LessonGrid>,
+    mut grids: Query<&mut LessonGrid>,
     mut labels: Query<&mut Text>,
     mut backgrounds: Query<&mut BackgroundColor>,
     asset_server: Res<AssetServer>,
@@ -144,11 +144,12 @@ pub(crate) fn update_lesson_metronomes(
             continue;
         }
         let bar = twelve_bar_for_tick(tick, metronome.beats_per_bar, feel);
-        for grid in &grids {
+        for mut grid in &mut grids {
             if grid.sync_group.is_none() || grid.sync_group != metronome.sync_group {
                 continue;
             }
-            highlight_lesson_grid(grid, bar, theme.twelve_bar_colors(), &mut backgrounds);
+            grid.current_bar = bar;
+            highlight_lesson_grid(&grid, bar, theme.twelve_bar_colors(), &mut backgrounds);
         }
     }
 }
