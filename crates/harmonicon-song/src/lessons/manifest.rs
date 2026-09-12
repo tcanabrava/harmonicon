@@ -84,6 +84,10 @@ pub enum LessonWidget {
     Metronome {
         #[serde(default = "default_bpm")]
         bpm: f32,
+        #[serde(default)]
+        tempo_steps: Vec<f32>,
+        #[serde(default = "default_bars_per_step")]
+        bars_per_step: usize,
         #[serde(default = "default_beats_per_bar")]
         beats_per_bar: usize,
         #[serde(default = "default_feel")]
@@ -102,6 +106,9 @@ fn default_progression() -> String {
 }
 fn default_bpm() -> f32 {
     90.0
+}
+fn default_bars_per_step() -> usize {
+    1
 }
 fn default_beats_per_bar() -> usize {
     4

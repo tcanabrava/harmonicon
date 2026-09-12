@@ -47,6 +47,10 @@ pub(crate) struct SelectedLesson(pub Option<String>);
 pub(crate) struct LessonMetronome {
     clock: MetronomeClock,
     bpm: f32,
+    initial_bpm: f32,
+    tempo_steps: Vec<f32>,
+    tempo_step: usize,
+    bars_per_step: usize,
     pattern: LessonMetronomePattern,
     beats_per_bar: usize,
     muted: bool,
@@ -87,6 +91,28 @@ impl LessonMetronomePattern {
             Self::Triplet => Self::Straight,
         }
     }
+
+    const fn ticks_per_beat(self) -> i64 {
+        match self {
+            Self::Straight => 1,
+            Self::Shuffle | Self::Triplet => 3,
+        }
+    }
+}
+
+fn scheduled_tempo(
+    tick: i64,
+    beats_per_bar: usize,
+    bars_per_step: usize,
+    pattern: LessonMetronomePattern,
+    step: usize,
+    tempo_steps: &[f32],
+) -> Option<f32> {
+    let ticks_per_step =
+        beats_per_bar.max(1) as i64 * bars_per_step.max(1) as i64 * pattern.ticks_per_beat();
+    (tick > 0 && tick.rem_euclid(ticks_per_step) == 0)
+        .then(|| tempo_steps.get(step).copied())
+        .flatten()
 }
 
 #[derive(Component)]
@@ -186,6 +212,19 @@ pub(crate) fn update_lesson_metronomes(
             }
             grid.current_bar = bar;
             highlight_lesson_grid(&grid, bar, theme.twelve_bar_colors(), &mut backgrounds);
+        }
+        if let Some(next_bpm) = scheduled_tempo(
+            tick,
+            metronome.beats_per_bar,
+            metronome.bars_per_step,
+            pattern,
+            metronome.tempo_step,
+            &metronome.tempo_steps,
+        ) {
+            metronome.bpm = next_bpm;
+            metronome.tempo_step += 1;
+            metronome.clock.reset();
+            metronome.clock.running = true;
         }
     }
 }
@@ -634,6 +673,8 @@ pub(crate) fn setup_lesson_reader(
             }
             LessonWidget::Metronome {
                 bpm,
+                tempo_steps,
+                bars_per_step,
                 beats_per_bar,
                 feel,
                 sync_group,
@@ -659,6 +700,10 @@ pub(crate) fn setup_lesson_reader(
                         LessonMetronome {
                             clock: MetronomeClock::default(),
                             bpm: *bpm,
+                            initial_bpm: *bpm,
+                            tempo_steps: tempo_steps.clone(),
+                            tempo_step: 0,
+                            bars_per_step: *bars_per_step,
                             pattern: match feel.as_str() {
                                 "shuffle" => LessonMetronomePattern::Shuffle,
                                 "triplet" => LessonMetronomePattern::Triplet,
@@ -714,6 +759,8 @@ pub(crate) fn setup_lesson_reader(
                     move |_: On<Activate>, mut q: Query<&mut LessonMetronome>| {
                         if let Ok(mut metronome) = q.get_mut(target) {
                             metronome.pattern = metronome.pattern.next();
+                            metronome.bpm = metronome.initial_bpm;
+                            metronome.tempo_step = 0;
                             metronome.clock.reset();
                         }
                     },
@@ -881,6 +928,27 @@ mod tests {
             LessonMetronomePattern::Triplet.next(),
             LessonMetronomePattern::Straight
         ));
+    }
+
+    #[test]
+    fn tempo_schedule_advances_on_configured_bar_boundaries() {
+        let steps = [75.0, 80.0];
+        assert_eq!(
+            scheduled_tempo(3, 4, 1, LessonMetronomePattern::Straight, 0, &steps),
+            None
+        );
+        assert_eq!(
+            scheduled_tempo(4, 4, 1, LessonMetronomePattern::Straight, 0, &steps),
+            Some(75.0)
+        );
+        assert_eq!(
+            scheduled_tempo(12, 4, 1, LessonMetronomePattern::Triplet, 1, &steps),
+            Some(80.0)
+        );
+        assert_eq!(
+            scheduled_tempo(4, 4, 1, LessonMetronomePattern::Straight, 2, &steps),
+            None
+        );
     }
 
     #[test]
