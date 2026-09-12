@@ -164,6 +164,12 @@ load-bearing about *this* crate.
   (`title_key`/`body_key`, `lesson-unit-<unit>`), never display strings;
   `tests/asset_layout.rs` validates every bundled lesson (schema, chart,
   file completeness, prereq integrity, locale-key existence).
+  Reader-page teaching aids are declared in `widgets`: `circle-of-fifths`,
+  `twelve-bar-grid`, `metronome`, or `form-map`. Metronomes accept
+  `straight`, `shuffle`, and `triplet` feel; `tempo_steps` plus
+  `bars_per_step` describes a bar-aligned tempo sequence after the initial
+  `bpm`. A grid and metronome with the same non-empty `sync_group` advance
+  together. Form maps require two or more labels in `sections`.
 
 - **The curriculum is a graph, and `lessons::graph` is what treats it as
   one** (design: `docs/training_tree_plan.md`). `is_unlocked` answers "may

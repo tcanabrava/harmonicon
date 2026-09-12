@@ -52,8 +52,11 @@ completion still comes from **Start Lesson** or **Mark as Done**.
   chords shown follow whichever progression the lesson is about: the
   standard blues, a quick change, a minor blues, or the jazz blues.
 - **Metronome** — start and stop it, nudge the tempo by 5 BPM either way,
-  switch between straight and shuffle feel, and mute the click if you'd
-  rather watch than listen.
+  switch between straight, shuffle, and equal-triplet pulses, and mute the
+  click if you'd rather watch than listen. Some lessons change tempo after a
+  configured number of bars to demonstrate an accelerando.
+- **Form map** — a row of named sections such as A–A–B–A. Repeated sections
+  share a colour, and Previous/Next lets you follow the form as you listen.
 
 **When a page shows a metronome and a grid together, starting the
 metronome walks the highlight through the form** — one bar per bar, in

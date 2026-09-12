@@ -28,6 +28,14 @@ pause/resume, **M** metronome mute, **V** cycle spectrogram.
   unmute it, then leave the reader. Clicks must stop immediately on exit.
 - [ ] Open Bar Counting and start its metronome. The 12-bar highlight should
   advance every four beats and wrap from bar 12 to bar 1.
+- [ ] Open Eighth-note Triplets and start its metronome. It should click three
+  evenly spaced pulses per beat; cycling the pattern should still offer the
+  original straight and shuffle patterns.
+- [ ] Open Train Rolling and start its metronome. Its readout should rise from
+  70 through 110 BPM in 5 BPM steps, changing after each four-beat bar without
+  a doubled or missing boundary click.
+- [ ] Open Listening for Form. Its A–A–B–A sections should give both A returns
+  the same colour, and Previous/Next/Reset should move and wrap the highlight.
 
 ## Automated coverage (`cargo test`)
 
