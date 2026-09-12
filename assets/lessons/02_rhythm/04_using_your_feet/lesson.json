@@ -4,6 +4,9 @@
   "track": "time",
   "title_key": "lesson-using-your-feet-title",
   "body_key": "lesson-using-your-feet-body",
+  "widgets": [
+    { "type": "metronome", "bpm": 90, "beats_per_bar": 4, "feel": "straight" }
+  ],
   "chart": "song/chart.harpchart",
   "prerequisites": [
     "twelve-bar"
