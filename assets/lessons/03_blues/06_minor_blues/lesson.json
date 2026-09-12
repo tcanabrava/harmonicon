@@ -6,6 +6,10 @@
   "body_key": "lesson-minor-blues-improv-body",
   "chart": "song/chart.harpchart",
   "progression": "minor",
+  "widgets": [
+    { "type": "twelve-bar-grid", "key": "G", "progression": "minor", "sync_group": "form" },
+    { "type": "metronome", "bpm": 80, "beats_per_bar": 4, "feel": "straight", "sync_group": "form" }
+  ],
   "prerequisites": [
     "chord-tone-improv"
   ],
