@@ -4,9 +4,9 @@
 //!
 //! [`graph`](super::graph) treats the prerequisite edges as a graph, which
 //! is the fine structure — "may I start *this* lesson". This module is the
-//! coarse one: the five shipped units in order, each opening only once
+//! coarse one: the seventeen shipped units in order, each opening only once
 //! enough of the one before it is done. Drawn, they are the spine a skill
-//! tree hangs off; read, they are what turns forty-one loose lessons into
+//! tree hangs off; read, they are what turns a hundred loose lessons into
 //! "Unit 1, then Unit 2".
 //!
 //! **Nothing new is authored for this.** A unit's identity is
@@ -19,7 +19,7 @@
 //!
 //! **The unit order is a valid layering of the prerequisite graph**, which
 //! is what makes gating on it safe: measured over the shipped curriculum,
-//! all eighteen cross-unit prerequisites point forward (`blowing` →
+//! every cross-unit prerequisite points forward (`blowing` →
 //! `rhythm` → `blues` → …), so a unit gate can never contradict a lesson's
 //! own prerequisites or deadlock the player.
 //! [`crossing_prerequisites`] reports any that don't, and
@@ -126,7 +126,7 @@ impl UnitChain {
     /// can't open the next one for free just by being small.
     ///
     /// **Zero when every lesson in the unit is elective**, which is a real
-    /// case (`07_advanced`, `11_tongue_block` and five others are entirely
+    /// case (`07_advanced`, `11_tongue_block` and six others are entirely
     /// optional) and deliberate: such a unit is trivially satisfied and
     /// gates nothing. Requiring optional work before the course may
     /// continue is precisely what marking it optional rules out. See

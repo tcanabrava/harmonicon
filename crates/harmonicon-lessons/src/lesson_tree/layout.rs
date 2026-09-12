@@ -16,11 +16,12 @@
 //!
 //! **That two-level shape is what makes the drawing readable**, and it is
 //! the whole reason for it. Laid out as one flat graph, the curriculum's
-//! eighteen cross-unit prerequisites became edges spanning four and five
+//! dozens of cross-unit prerequisites became edges spanning four and five
 //! columns, drawn straight through whatever nodes and labels lay between —
 //! and no amount of crossing reduction helps, because the endpoints are
-//! genuinely that far apart. Grouping by unit turns those eighteen into
-//! four spine edges, and every remaining edge is local to one cluster.
+//! genuinely that far apart. Grouping by unit turns all of them into one
+//! spine edge per adjacent pair, and every remaining edge is local to one
+//! cluster.
 //!
 //! **A cross-unit prerequisite is therefore not drawn.** It is not lost:
 //! [`PlacedNode::unmet`] carries whatever a locked lesson is still waiting

@@ -3,8 +3,8 @@
 //! Generated practice drills — the *training* half of a lesson.
 //!
 //! A lesson teaches; a training presents the same material again, harder,
-//! with no explanation. Five tiers per lesson, and 41 lessons, is over two
-//! hundred charts — far too many to author by hand — so a training is a
+//! with no explanation. Five tiers per lesson, across a hundred lessons, is
+//! far too many charts to author by hand — so a training is a
 //! [`DrillSpec`] rendered on demand rather than a file. See
 //! `docs/training_tree_plan.md`.
 //!

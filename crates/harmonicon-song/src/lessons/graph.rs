@@ -26,7 +26,7 @@
 //!
 //! A fourth was planned and turned out to be **false of the real
 //! curriculum**: "at least two lessons are always available, so the player
-//! always has a choice". Sampled over the shipped 41, the graph funnels to a
+//! always has a choice". Sampled over the shipped curriculum, the graph funnels to a
 //! single option at several points — `deep-bends` most often, then
 //! `swing-eighths` and `blues-scale`. So [`min_choices`] reports the number
 //! instead of asserting it, and widening those chokepoints is curriculum
