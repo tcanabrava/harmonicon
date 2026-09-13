@@ -1,7 +1,10 @@
 {
   "id": "straight-vs-shuffle", "unit": "rhythm-lab", "track": "time",
   "title_key": "lesson-straight-vs-shuffle-title", "body_key": "lesson-straight-vs-shuffle-body",
-  "widgets": [{"type": "metronome", "bpm": 72, "beats_per_bar": 4, "feel": "shuffle"}],
+  "widgets": [
+    {"type":"rhythm-pattern","steps":[{"label":"Straight 1","accent":true},{"label":"Straight &"},{"label":"Shuffle 1","accent":true},{"label":"trip","rest":true},{"label":"let"}]},
+    {"type": "metronome", "bpm": 72, "beats_per_bar": 4, "feel": "shuffle"}
+  ],
   "chart": "song/chart.harpchart", "prerequisites": ["eighth-note-triplets"],
   "pass_criteria": {"type": "accuracy", "threshold": 0.7}
 }

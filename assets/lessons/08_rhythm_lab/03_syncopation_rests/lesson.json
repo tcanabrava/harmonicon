@@ -1,7 +1,10 @@
 {
   "id": "syncopation-and-rests", "unit": "rhythm-lab", "track": "time",
   "title_key": "lesson-syncopation-rests-title", "body_key": "lesson-syncopation-rests-body",
-  "widgets": [{"type": "metronome", "bpm": 76, "beats_per_bar": 4, "feel": "straight"}],
+  "widgets": [
+    {"type":"rhythm-pattern","steps":[{"label":"1","rest":true},{"label":"&","accent":true},{"label":"2","rest":true},{"label":"&","accent":true},{"label":"3","rest":true},{"label":"&","accent":true},{"label":"4","rest":true},{"label":"&","accent":true}]},
+    {"type": "metronome", "bpm": 76, "beats_per_bar": 4, "feel": "straight"}
+  ],
   "chart": "song/chart.harpchart", "prerequisites": ["straight-vs-shuffle"],
   "pass_criteria": {"type": "accuracy", "threshold": 0.7}
 }
