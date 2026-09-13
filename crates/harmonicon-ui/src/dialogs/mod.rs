@@ -10,6 +10,7 @@ pub mod form_map;
 pub mod keyboard_nav;
 pub mod metronome;
 pub mod page_chrome;
+pub mod rhythm_pattern;
 pub mod scroll_area;
 pub mod tab_bar;
 pub mod text_input;
