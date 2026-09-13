@@ -61,6 +61,15 @@ pub struct TrainingBlock {
     pub seed: Option<u64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct RhythmPatternStep {
+    pub label: String,
+    #[serde(default)]
+    pub rest: bool,
+    #[serde(default)]
+    pub accent: bool,
+}
+
 /// A reusable teaching aid embedded in a lesson reader page. This is a tagged
 /// enum so unsupported widget kinds fail while loading the manifest rather
 /// than silently rendering an incomplete lesson.
@@ -83,6 +92,9 @@ pub enum LessonWidget {
     },
     FormMap {
         sections: Vec<String>,
+    },
+    RhythmPattern {
+        steps: Vec<RhythmPatternStep>,
     },
     Metronome {
         #[serde(default = "default_bpm")]
@@ -327,6 +339,31 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("sections"), "{error}");
+    }
+
+    #[test]
+    fn parses_a_rhythm_pattern_with_rests_and_accents() {
+        let manifest = parse_lesson(
+            br#"{"id":"sync","unit":"rhythm","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"rhythm-pattern","steps":[
+                 {"label":"1","accent":true},{"label":"&","rest":true}]}]}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            &manifest.widgets[0],
+            LessonWidget::RhythmPattern { steps }
+                if steps.len() == 2 && steps[0].accent && steps[1].rest
+        ));
+    }
+
+    #[test]
+    fn rejects_a_single_step_rhythm_pattern() {
+        let error = parse_lesson(
+            br#"{"id":"sync","unit":"rhythm","title_key":"t","body_key":"b",
+                 "widgets":[{"type":"rhythm-pattern","steps":[{"label":"1"}]}]}"#,
+        )
+        .unwrap_err();
+        assert!(error.contains("steps"), "{error}");
     }
 
     #[test]

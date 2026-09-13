@@ -9,7 +9,7 @@ timing/layout models live in `harmonicon-ui`; manifests live in
 
 - [x] Add a reusable subdivision-strip widget with authored beat labels,
   rests, accents, and active-step highlighting.
-- [ ] Add a schema-validated `rhythm-pattern` lesson widget and reader
+- [x] Add a schema-validated `rhythm-pattern` lesson widget and reader
   controls for previous, next, and reset.
 - [ ] Add it to rhythm lessons where seeing the subdivision or silence is
   part of the instruction.

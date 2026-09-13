@@ -279,6 +279,28 @@
           {
             "additionalProperties": false,
             "properties": {
+              "type": { "const": "rhythm-pattern" },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["label"],
+                  "properties": {
+                    "label": { "type": "string", "minLength": 1, "maxLength": 12 },
+                    "rest": { "type": "boolean" },
+                    "accent": { "type": "boolean" }
+                  }
+                },
+                "minItems": 2,
+                "maxItems": 32
+              }
+            },
+            "required": ["steps"]
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
               "type": { "const": "metronome" },
               "bpm": { "type": "number", "minimum": 30, "maximum": 300 },
               "tempo_steps": {

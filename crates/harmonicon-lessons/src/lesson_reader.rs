@@ -31,6 +31,9 @@ use harmonicon_ui::dialogs::form_map::{section_bg, spawn_form_map};
 use harmonicon_ui::dialogs::metronome::{
     MetronomeClock, MetronomeFeel, click_for_tick, is_downbeat, twelve_bar_for_tick,
 };
+use harmonicon_ui::dialogs::rhythm_pattern::{
+    ACTIVE_BG as RHYTHM_ACTIVE_BG, RhythmStep, spawn_rhythm_pattern, step_bg,
+};
 use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, bar_bg, spawn_12_bar_grid};
 
 use harmonicon_app::app::{
@@ -133,6 +136,13 @@ struct LessonFormMap {
 }
 
 #[derive(Component)]
+struct LessonRhythmPattern {
+    cells: Vec<Entity>,
+    steps: Vec<RhythmStep>,
+    current_step: usize,
+}
+
+#[derive(Component)]
 pub(crate) struct LessonMetronomeAudio;
 
 pub(crate) fn cleanup_lesson_audio(
@@ -184,6 +194,22 @@ fn highlight_form_section(
             } else {
                 BackgroundColor(section_bg(&map.sections[index]))
             };
+        }
+    }
+}
+
+fn highlight_rhythm_step(
+    pattern: &LessonRhythmPattern,
+    selected: usize,
+    backgrounds: &mut Query<&mut BackgroundColor>,
+) {
+    for (index, entity) in pattern.cells.iter().enumerate() {
+        if let Ok(mut bg) = backgrounds.get_mut(*entity) {
+            *bg = BackgroundColor(if index == selected {
+                RHYTHM_ACTIVE_BG
+            } else {
+                step_bg(&pattern.steps[index])
+            });
         }
     }
 }
@@ -740,6 +766,58 @@ pub(crate) fn setup_lesson_reader(
                             highlight_form_section(
                                 &map,
                                 map.current_section,
+                                &mut backgrounds,
+                            );
+                        },
+                    );
+                }
+            }
+            LessonWidget::RhythmPattern { steps } => {
+                let steps: Vec<RhythmStep> = steps
+                    .iter()
+                    .map(|step| RhythmStep {
+                        label: step.label.clone(),
+                        rest: step.rest,
+                        accent: step.accent,
+                    })
+                    .collect();
+                let mut cells = Vec::new();
+                commands.entity(root).with_children(|parent| {
+                    cells = spawn_rhythm_pattern(parent, &steps);
+                });
+                let marker = commands
+                    .spawn(LessonRhythmPattern {
+                        cells,
+                        steps,
+                        current_step: 0,
+                    })
+                    .id();
+                commands.entity(root).add_child(marker);
+
+                for (message, delta) in [
+                    ("lesson-widget-step-previous", -1),
+                    ("lesson-widget-step-next", 1),
+                    ("lesson-widget-step-reset", 0),
+                ] {
+                    let target = marker;
+                    spawn_button(
+                        &mut commands,
+                        root,
+                        &loc.msg(message),
+                        move |_: On<Activate>,
+                              mut patterns: Query<&mut LessonRhythmPattern>,
+                              mut backgrounds: Query<&mut BackgroundColor>| {
+                            let Ok(mut pattern) = patterns.get_mut(target) else {
+                                return;
+                            };
+                            pattern.current_step = if delta == 0 {
+                                0
+                            } else {
+                                stepped_section(pattern.current_step, delta, pattern.steps.len())
+                            };
+                            highlight_rhythm_step(
+                                &pattern,
+                                pattern.current_step,
                                 &mut backgrounds,
                             );
                         },
