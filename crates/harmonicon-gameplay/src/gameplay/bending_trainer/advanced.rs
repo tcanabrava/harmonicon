@@ -231,15 +231,14 @@ pub(super) fn spawn_advanced_drawer(
             TextColor({Color::srgb(0.62, 0.66, 0.74)})
         });
         for readout in READOUTS {
-            drawer.spawn((
-                Text::new(String::new()),
-                TextFont {
-                    font_size: FontSize::Px(13.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.74, 0.78, 0.86)),
-                readout,
-            ));
+            drawer
+                .spawn_empty()
+                .apply_scene(bsn! {
+                    Text("")
+                    TextFont { font_size: {FontSize::Px(13.0)} }
+                    TextColor({Color::srgb(0.74, 0.78, 0.86)})
+                })
+                .insert(readout);
         }
         drawer
             .spawn(Node {
