@@ -341,15 +341,14 @@ fn spawn_credit_line(parent: &mut ChildSpawnerCommands, item: CreditLine) {
         CreditLine::Heading(text) => (text, 20.0, Color::srgb(0.85, 0.72, 0.35), 8.0),
         CreditLine::Body(text) => (text, 17.0, Color::srgb(0.78, 0.80, 0.88), 4.0),
         CreditLine::Divider => {
-            parent.spawn((
+            parent.spawn_empty().apply_scene(bsn! {
                 Node {
-                    width: Val::Px(320.0),
-                    height: Val::Px(1.0),
-                    margin: UiRect::axes(Val::ZERO, Val::Px(2.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.55, 0.58, 0.72, 0.40)),
-            ));
+                    width: {Val::Px(320.0)},
+                    height: {Val::Px(1.0)},
+                    margin: {UiRect::axes(Val::ZERO, Val::Px(2.0))},
+                }
+                BackgroundColor({Color::srgba(0.55, 0.58, 0.72, 0.40)})
+            });
             return;
         }
         CreditLine::Gap(px) => {
