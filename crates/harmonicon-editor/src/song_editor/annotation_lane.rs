@@ -76,28 +76,25 @@ pub(super) fn spawn(
         // following drag or Delete acts on the whole phrase.
         items.push(
             commands
-                .spawn((
-                    GridItem,
-                    WidgetButton,
+                .spawn_empty()
+                .apply_scene(bsn! {
+                    WidgetButton
                     Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(x),
-                        top: Val::Px(ANNOTATION_TOP),
-                        width: Val::Px(width(tick, next_tick)),
-                        height: Val::Px(ANNOTATION_H),
-                        padding: UiRect::horizontal(Val::Px(3.0)),
-                        overflow: Overflow::clip(),
-                        ..default()
-                    },
-                    BackgroundColor(colors.accent.with_alpha(0.18)),
-                    Text::new(text),
-                    TextFont {
-                        font_size: FontSize::Px(11.0),
-                        ..default()
-                    },
-                    TextColor(colors.label),
-                    Tooltip(String::from(tooltip)),
-                ))
+                        position_type: {PositionType::Absolute},
+                        left: {Val::Px(x)},
+                        top: {Val::Px(ANNOTATION_TOP)},
+                        width: {Val::Px(width(tick, next_tick))},
+                        height: {Val::Px(ANNOTATION_H)},
+                        padding: {UiRect::horizontal(Val::Px(3.0))},
+                        overflow: {Overflow::clip()},
+                    }
+                    BackgroundColor({colors.accent.with_alpha(0.18)})
+                    Text({text})
+                    TextFont { font_size: {FontSize::Px(11.0)} }
+                    TextColor({colors.label})
+                    Tooltip({String::from(tooltip)})
+                })
+                .insert(GridItem)
                 .observe(move |_: On<Activate>, mut state: ResMut<EditorState>| {
                     state.open_phrase_editor(tick);
                 })
