@@ -532,36 +532,32 @@ fn spawn_note_visual(
 
         // What the technique asks for, in the lane beside the cap.
         if let Some(cue) = cue {
-            note_e.spawn((
+            note_e.spawn_empty().apply_scene(bsn! {
                 Node {
-                    position_type: PositionType::Absolute,
-                    bottom: Val::Px(2.0),
-                    left: if cue.on_right {
+                    position_type: {PositionType::Absolute},
+                    bottom: {Val::Px(2.0)},
+                    left: {if cue.on_right {
                         Val::Percent(100.0)
                     } else {
                         Val::Auto
-                    },
-                    right: if cue.on_right {
+                    }},
+                    right: {if cue.on_right {
                         Val::Auto
                     } else {
                         Val::Percent(100.0)
-                    },
-                    margin: UiRect::horizontal(Val::Px(4.0)),
-                    padding: UiRect::axes(Val::Px(4.0), Val::Px(1.0)),
-                    border_radius: BorderRadius::all(Val::Px(4.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.04, 0.05, 0.1, 0.72)),
-                children![(
-                    Text::new(cue.text),
-                    TextFont {
-                        font_size: FontSize::Px(18.0),
-                        ..default()
-                    },
-                    TextLayout::no_wrap(),
-                    TextColor(Color::srgba(0.95, 0.95, 1.0, 0.95)),
-                )],
-            ));
+                    }},
+                    margin: {UiRect::horizontal(Val::Px(4.0))},
+                    padding: {UiRect::axes(Val::Px(4.0), Val::Px(1.0))},
+                    border_radius: {BorderRadius::all(Val::Px(4.0))},
+                }
+                BackgroundColor({Color::srgba(0.04, 0.05, 0.1, 0.72)})
+                Children [
+                    Text({cue.text})
+                    TextFont { font_size: {FontSize::Px(18.0)} }
+                    ~{TextLayout::no_wrap()}
+                    TextColor({Color::srgba(0.95, 0.95, 1.0, 0.95)})
+                ]
+            });
         }
 
         // Chord / split play-mode badge, in the cap's corner.
