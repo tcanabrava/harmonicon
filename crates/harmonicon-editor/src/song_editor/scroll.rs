@@ -91,18 +91,16 @@ pub(super) fn spawn_form_scroll_content(
     spawn_meta_form(scroll, loc, colors, state, compact, legend_visible);
     spawn_lesson_form(scroll, loc, colors, state);
 
-    scroll.spawn((
-        StatusMsg,
-        Text::new(""),
-        TextFont {
-            font_size: FontSize::Px(12.0),
-            ..default()
-        },
-        TextColor(Color::srgb(1.0, 0.40, 0.15)),
-        Node {
-            width: Val::Percent(100.0),
-            padding: UiRect::axes(Val::Px(10.0), Val::Px(4.0)),
-            ..default()
-        },
-    ));
+    scroll
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text("")
+            TextFont { font_size: {FontSize::Px(12.0)} }
+            TextColor({Color::srgb(1.0, 0.40, 0.15)})
+            Node {
+                width: {Val::Percent(100.0)},
+                padding: {UiRect::axes(Val::Px(10.0), Val::Px(4.0))},
+            }
+        })
+        .insert(StatusMsg);
 }
