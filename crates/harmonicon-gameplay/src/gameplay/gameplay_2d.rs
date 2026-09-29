@@ -125,23 +125,22 @@ pub fn setup(
     // Filled in below; the shared score readout hangs off the highway so it
     // can sit a fixed distance above that node's own hit line.
     let mut highway = Entity::PLACEHOLDER;
+    // Background painted first (this node itself), Main Layout second
+    // — everything else here is a child, so it always paints above
+    // the background. The song-progress bar (`BAR_Z_INDEX`) still
+    // paints above this whole layout; panels below reserve
+    // `BAR_HEIGHT` of top space so it doesn't cover their text.
     commands
-        .spawn((
+        .spawn_empty()
+        .apply_scene(bsn! {
             Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Row,
-                ..default()
-            },
-            ImageNode::new(manifest.background.clone()),
-            // Background painted first (this node itself), Main Layout second
-            // — everything else here is a child, so it always paints above
-            // the background. The song-progress bar (`BAR_Z_INDEX`) still
-            // paints above this whole layout; panels below reserve
-            // `BAR_HEIGHT` of top space so it doesn't cover their text.
-            GlobalZIndex(1),
-            GameplayRoot,
-        ))
+                width: {Val::Percent(100.0)},
+                height: {Val::Percent(100.0)},
+                flex_direction: {FlexDirection::Row},
+            }
+            GlobalZIndex(1)
+        })
+        .insert((ImageNode::new(manifest.background.clone()), GameplayRoot))
         .with_children(|root| {
             // Dark overlay
             root.spawn((
