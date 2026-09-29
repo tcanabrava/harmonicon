@@ -156,15 +156,12 @@ pub(super) fn populate_phrase_editor(
                 state.phrase_editor = None;
             })
             .with_children(|b| {
-                b.spawn((
-                    Text::new("\u{2717}"),
-                    TextFont {
-                        font_size: FontSize::Px(13.0),
-                        ..default()
-                    },
-                    TextColor(colors.label),
-                    Pickable::IGNORE,
-                ));
+                b.spawn_empty().apply_scene(bsn! {
+                    Text("\u{2717}")
+                    TextFont { font_size: {FontSize::Px(13.0)} }
+                    TextColor({colors.label})
+                    ~{Pickable::IGNORE}
+                });
             });
     });
     commands.entity(root).add_child(header);
