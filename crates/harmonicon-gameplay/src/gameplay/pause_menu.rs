@@ -777,16 +777,15 @@ pub(super) fn setup_pause_menu(
     // it) and the pause overlay's `GlobalZIndex(200)` (so pausing still
     // visually and click-wise covers it, per the paragraph above).
     commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                right: Val::Px(20.0),
-                bottom: Val::Px(20.0),
-                ..default()
-            },
-            GlobalZIndex(100),
-            GameplayRoot,
-        ))
+                position_type: {PositionType::Absolute},
+                right: {Val::Px(20.0)},
+                bottom: {Val::Px(20.0)},
+            }
+            GlobalZIndex(100)
+        })
+        .insert(GameplayRoot)
         .with_children(|parent| {
             parent
                 .spawn_empty()
