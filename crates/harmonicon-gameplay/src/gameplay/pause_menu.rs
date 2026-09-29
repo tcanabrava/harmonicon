@@ -578,29 +578,23 @@ pub(super) fn setup_pause_menu(
         learned,
     );
 
+    // The song-progress bar paints above this overlay (`BAR_Z_INDEX`), so
+    // reserve its height with the card padding just as `gameplay_2d` does.
     let backdrop = commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                // The song-progress bar paints *above* this overlay
-                // (`BAR_Z_INDEX`), on purpose — a loop range is dragged on it
-                // while paused. So reserve its height here the same way
-                // `gameplay_2d`'s own panels do, or the top card slides
-                // under it and "Resume" ends up behind the waveform.
-                padding: UiRect::all(Val::Px(16.0)).with_top(Val::Px(8.0 + BAR_HEIGHT)),
-                ..default()
-            },
-            BackgroundColor(MODAL_BACKDROP_BG),
-            GlobalZIndex(200),
-            GameplayRoot,
-            PauseMenuRoot,
-            Visibility::Hidden,
-        ))
+                position_type: {PositionType::Absolute},
+                width: {Val::Percent(100.0)},
+                height: {Val::Percent(100.0)},
+                flex_direction: {FlexDirection::Column},
+                justify_content: {JustifyContent::Center},
+                align_items: {AlignItems::Center},
+                padding: {UiRect::all(Val::Px(16.0)).with_top(Val::Px(8.0 + BAR_HEIGHT))},
+            }
+            BackgroundColor({MODAL_BACKDROP_BG})
+            GlobalZIndex(200)
+        })
+        .insert((GameplayRoot, PauseMenuRoot, Visibility::Hidden))
         .id();
 
     let root = commands
