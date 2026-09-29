@@ -143,15 +143,14 @@ pub fn setup(
         .insert((ImageNode::new(manifest.background.clone()), GameplayRoot))
         .with_children(|root| {
             // Dark overlay
-            root.spawn((
+            root.spawn_empty().apply_scene(bsn! {
                 Node {
-                    position_type: PositionType::Absolute,
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.04, 0.04, 0.06, 0.70)),
-            ));
+                    position_type: {PositionType::Absolute},
+                    width: {Val::Percent(100.0)},
+                    height: {Val::Percent(100.0)},
+                }
+                BackgroundColor({Color::srgba(0.04, 0.04, 0.06, 0.70)})
+            });
 
             // ── Left panel: note highway + harmonica ─────────────────────────
             let left_top_padding = if compact {
