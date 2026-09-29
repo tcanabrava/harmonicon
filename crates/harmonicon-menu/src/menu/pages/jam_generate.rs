@@ -293,16 +293,14 @@ pub(crate) fn setup_jam_generate_menu(
     );
 
     commands.entity(root).with_children(|page| {
-        page.spawn((
-            PreparingLabel,
-            Text::new(String::from(loc.msg("jam-generate-preparing"))),
-            TextFont {
-                font_size: FontSize::Px(20.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-            Visibility::Hidden,
-        ));
+        page.spawn_empty()
+            .apply_scene(bsn! {
+                Text({String::from(loc.msg("jam-generate-preparing"))})
+                TextFont { font_size: {FontSize::Px(20.0)} }
+                TextColor({Color::WHITE})
+                ~{Visibility::Hidden}
+            })
+            .insert(PreparingLabel);
     });
 
     spawn_back_button(
