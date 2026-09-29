@@ -221,15 +221,13 @@ pub fn spawn_style_toggle(
                 &loc.msg("jam-spectrogram-style-button"),
                 cycle_style_button,
             ));
-            row.spawn((
-                Text::new(style_label_text(loc, style)),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.70, 0.80)),
-                StyleLabel,
-            ));
+            row.spawn_empty()
+                .apply_scene(bsn! {
+                    Text({style_label_text(loc, style)})
+                    TextFont { font_size: {FontSize::Px(15.0)} }
+                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                })
+                .insert(StyleLabel);
         });
 }
 
