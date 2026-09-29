@@ -175,19 +175,18 @@ fn spawn_lesson_details_header(
         state.lesson_details_expanded = !state.lesson_details_expanded;
     })
     .with_children(|b| {
-        b.spawn((
-            LessonDetailsToggleLabel {
-                collapsed: collapsed.clone(),
-                expanded,
-            },
-            Text::new(collapsed),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
-            TextColor(colors.label),
-            Pickable::IGNORE,
-        ));
+        let marker = LessonDetailsToggleLabel {
+            collapsed: collapsed.clone(),
+            expanded,
+        };
+        b.spawn_empty()
+            .apply_scene(bsn! {
+                Text({collapsed})
+                TextFont { font_size: {FontSize::Px(14.0)} }
+                TextColor({colors.label})
+                ~{Pickable::IGNORE}
+            })
+            .insert(marker);
     });
 }
 
