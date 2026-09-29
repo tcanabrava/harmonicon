@@ -135,15 +135,13 @@ pub(crate) fn setup_help_about_menu(
         |_: On<Activate>, mut state: ResMut<NextState<AppState>>| state.set(AppState::Credits),
     );
     let status = commands
-        .spawn((
-            Text::new(""),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.8, 0.4, 0.4)),
-            DocsStatusLabel,
-        ))
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text("")
+            TextFont { font_size: {FontSize::Px(16.0)} }
+            TextColor({Color::srgb(0.8, 0.4, 0.4)})
+        })
+        .insert(DocsStatusLabel)
         .id();
     commands.entity(root).add_child(status);
     spawn_back_button(
