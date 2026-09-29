@@ -183,16 +183,14 @@ fn spawn_cycle_row<T: Component, M: 'static>(
         ));
         make_interactive(&mut btn, colors.field_bg);
         btn.observe(on_click).with_children(|b| {
-            b.spawn((
-                marker,
-                Text::new(String::new()),
-                TextFont {
-                    font_size: FontSize::Px(14.0),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Pickable::IGNORE,
-            ));
+            b.spawn_empty()
+                .apply_scene(bsn! {
+                    Text("")
+                    TextFont { font_size: {FontSize::Px(14.0)} }
+                    TextColor({Color::WHITE})
+                    ~{Pickable::IGNORE}
+                })
+                .insert(marker);
         });
     });
 }
