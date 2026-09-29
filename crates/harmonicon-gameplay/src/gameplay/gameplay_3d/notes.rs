@@ -220,15 +220,13 @@ pub(super) fn spawn_note_visual_3d(
                 GameplayRoot,
             ))
             .with_children(|l| {
-                l.spawn((
-                    Text::new(tab),
-                    TextFont {
-                        font_size: FontSize::Px(22.0),
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                    NoteHoleLabelText3D,
-                ));
+                l.spawn_empty()
+                    .apply_scene(bsn! {
+                        Text({tab})
+                        TextFont { font_size: {FontSize::Px(22.0)} }
+                        TextColor({Color::WHITE})
+                    })
+                    .insert(NoteHoleLabelText3D);
                 if let Some(cue) = cue {
                     l.spawn_empty().apply_scene(bsn! {
                         Text({cue})
