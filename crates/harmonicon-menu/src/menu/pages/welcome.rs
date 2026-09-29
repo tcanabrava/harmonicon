@@ -43,14 +43,12 @@ pub(crate) fn setup_welcome_menu(
         ))
         .id();
     let body = commands
-        .spawn((
-            Text::new(loc.msg("welcome-body")),
-            TextFont {
-                font_size: FontSize::Px(18.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.88, 0.88, 0.93)),
-        ))
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text({String::from(loc.msg("welcome-body"))})
+            TextFont { font_size: {FontSize::Px(18.0)} }
+            TextColor({Color::srgb(0.88, 0.88, 0.93)})
+        })
         .id();
     commands.entity(scrim).add_child(body);
     commands.entity(root).add_child(scrim);
