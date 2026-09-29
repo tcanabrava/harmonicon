@@ -291,18 +291,14 @@ fn spawn_knob_row(
                     knob.nudge(&mut settings, 1.0);
                 },
             ));
-            row.spawn((
+            row.spawn_empty().apply_scene(bsn! {
                 Node {
-                    flex_grow: 1.0,
-                    ..default()
-                },
-                Text::new(String::from(loc.msg(knob.label_key()))),
-                TextFont {
-                    font_size: FontSize::Px(13.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.74, 0.82)),
-            ));
+                    flex_grow: {1.0_f32},
+                }
+                Text({String::from(loc.msg(knob.label_key()))})
+                TextFont { font_size: {FontSize::Px(13.0)} }
+                TextColor({Color::srgb(0.70, 0.74, 0.82)})
+            });
             row.spawn((
                 Text::new(knob.value_text(settings)),
                 TextFont {
