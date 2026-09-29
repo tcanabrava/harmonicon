@@ -198,16 +198,13 @@ pub fn spawn_call_response_banner(parent: &mut ChildSpawnerCommands) {
             ..default()
         })
         .with_children(|row| {
-            row.spawn((
-                Text::new(""),
-                TextFont {
-                    font_size: FontSize::Px(28.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(1.0, 0.85, 0.35)),
-                Visibility::Hidden,
-                CallResponseBanner,
-            ));
+            row.spawn_empty().apply_scene(bsn! {
+                Text("")
+                TextFont { font_size: {FontSize::Px(28.0)} }
+                TextColor({Color::srgb(1.0, 0.85, 0.35)})
+                ~{Visibility::Hidden}
+                CallResponseBanner
+            });
         });
 }
 
