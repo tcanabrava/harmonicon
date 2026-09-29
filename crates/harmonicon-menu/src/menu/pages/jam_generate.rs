@@ -242,14 +242,11 @@ pub(crate) fn setup_jam_generate_menu(
         .id();
     commands.entity(root).add_child(tempo_row);
     commands.entity(tempo_row).with_children(|row| {
-        row.spawn((
-            Text::new(String::from(loc.msg("jam-generate-tempo"))),
-            TextFont {
-                font_size: FontSize::Px(20.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
+        row.spawn_empty().apply_scene(bsn! {
+            Text({String::from(loc.msg("jam-generate-tempo"))})
+            TextFont { font_size: {FontSize::Px(20.0)} }
+            TextColor({Color::WHITE})
+        });
     });
     spawn_numeric_input(
         &mut commands,
