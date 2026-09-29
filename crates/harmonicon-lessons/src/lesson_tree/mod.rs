@@ -800,20 +800,19 @@ fn spawn_node(
         // the button's own bounds also keeps it off the click target.
         let badge_at = PartKind::Badge.top_left(centre);
         let badge = commands
-            .spawn((
+            .spawn_empty()
+            .apply_scene(bsn! {
                 Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(badge_at.x),
-                    top: Val::Px(badge_at.y),
-                    ..default()
-                },
+                    position_type: {PositionType::Absolute},
+                    left: {Val::Px(badge_at.x)},
+                    top: {Val::Px(badge_at.y)},
+                }
+                Text("◇")
+                TextFont { font_size: {FontSize::Px(BADGE_PX)} }
+                TextColor({OPTIONAL_COLOR})
+            })
+            .insert((
                 PartKind::Badge.part(&node.id),
-                Text::new("◇"),
-                TextFont {
-                    font_size: FontSize::Px(BADGE_PX),
-                    ..default()
-                },
-                TextColor(OPTIONAL_COLOR),
                 ClusterMember(node.unit_id.clone()),
                 LayoutOwner(node.unit_id.clone()),
             ))
