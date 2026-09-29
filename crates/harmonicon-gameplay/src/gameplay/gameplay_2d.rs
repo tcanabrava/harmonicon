@@ -562,20 +562,16 @@ fn spawn_note_visual(
 
         // Chord / split play-mode badge, in the cap's corner.
         if let Some(tag) = play_mode_tag {
-            note_e.spawn((
+            note_e.spawn_empty().apply_scene(bsn! {
                 Node {
-                    position_type: PositionType::Absolute,
-                    bottom: Val::Px(1.0),
-                    right: Val::Px(3.0),
-                    ..default()
-                },
-                Text::new(tag),
-                TextFont {
-                    font_size: FontSize::Px(9.0),
-                    ..default()
-                },
-                TextColor(Color::srgba(0.05, 0.05, 0.08, 0.8)),
-            ));
+                    position_type: {PositionType::Absolute},
+                    bottom: {Val::Px(1.0)},
+                    right: {Val::Px(3.0)},
+                }
+                Text({tag})
+                TextFont { font_size: {FontSize::Px(9.0)} }
+                TextColor({Color::srgba(0.05, 0.05, 0.08, 0.8)})
+            });
         }
     });
 }
