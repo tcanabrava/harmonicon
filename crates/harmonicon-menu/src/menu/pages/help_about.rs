@@ -167,18 +167,13 @@ pub(crate) fn setup_about_page(
         "About",
     );
     let body = commands
-        .spawn((
-            Text::new(loc.msg("about-body")),
-            TextFont {
-                font_size: FontSize::Px(18.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.85, 0.85, 0.9)),
-            Node {
-                max_width: Val::Px(560.0),
-                ..default()
-            },
-        ))
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text({String::from(loc.msg("about-body"))})
+            TextFont { font_size: {FontSize::Px(18.0)} }
+            TextColor({Color::srgb(0.85, 0.85, 0.9)})
+            Node { max_width: {Val::Px(560.0)} }
+        })
         .id();
     commands.entity(root).add_child(body);
     let version = commands
