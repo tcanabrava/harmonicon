@@ -182,17 +182,15 @@ pub(crate) fn setup_about_page(
         .id();
     commands.entity(root).add_child(body);
     let version = commands
-        .spawn((
-            Text::new(String::from(loc.msg_args(
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text({String::from(loc.msg_args(
                 "about-version",
                 &[("version", String::from(env!("CARGO_PKG_VERSION")))],
-            ))),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.6, 0.6, 0.7)),
-        ))
+            ))})
+            TextFont { font_size: {FontSize::Px(14.0)} }
+            TextColor({Color::srgb(0.6, 0.6, 0.7)})
+        })
         .id();
     commands.entity(root).add_child(version);
     spawn_back_button(
