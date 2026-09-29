@@ -176,19 +176,15 @@ pub(super) fn populate_phrase_editor(
             })
             .id();
         commands.entity(row).with_children(|r| {
-            r.spawn((
+            r.spawn_empty().apply_scene(bsn! {
                 Node {
-                    width: Val::Px(LABEL_W),
-                    ..default()
-                },
-                Text::new(format!("{}:", loc.msg(label_key))),
-                TextFont {
-                    font_size: FontSize::Px(13.0),
-                    ..default()
-                },
-                TextColor(colors.label),
-                Pickable::IGNORE,
-            ));
+                    width: {Val::Px(LABEL_W)},
+                }
+                Text({format!("{}:", loc.msg(label_key))})
+                TextFont { font_size: {FontSize::Px(13.0)} }
+                TextColor({colors.label})
+                ~{Pickable::IGNORE}
+            });
         });
         let input = spawn_text_input(
             &mut commands,
