@@ -200,19 +200,18 @@ pub(crate) fn spawn_dotted_edge(
 ) {
     let diameter = style.thickness;
     for centre in dot_centres(start, end, diameter, EDGE_DOT_GAP_PX) {
-        let mut dot = parent.spawn((
+        let mut dot = parent.spawn_empty();
+        dot.apply_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(centre.x - diameter / 2.0),
-                top: Val::Px(centre.y - diameter / 2.0),
-                width: Val::Px(diameter),
-                height: Val::Px(diameter),
+                position_type: {PositionType::Absolute},
+                left: {Val::Px(centre.x - diameter / 2.0)},
+                top: {Val::Px(centre.y - diameter / 2.0)},
+                width: {Val::Px(diameter)}, height: {Val::Px(diameter)},
                 // A square with a maximal radius is a circle.
-                border_radius: BorderRadius::MAX,
-                ..default()
-            },
-            BackgroundColor(style.color),
-        ));
+                border_radius: {BorderRadius::MAX},
+            }
+            BackgroundColor({style.color})
+        });
         if let Some(unit_id) = unit_id {
             dot.insert((
                 ClusterMember(unit_id.to_string()),
