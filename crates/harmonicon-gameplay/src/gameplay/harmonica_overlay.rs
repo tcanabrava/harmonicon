@@ -147,14 +147,11 @@ fn spawn_diagram<RowKind: Copy>(
             ..default()
         })
         .with_children(|panel| {
-            panel.spawn((
-                Text::new(String::from(loc.msg(hint_key))),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.70, 0.80)),
-            ));
+            panel.spawn_empty().apply_scene(bsn! {
+                Text({String::from(loc.msg(hint_key))})
+                TextFont { font_size: {FontSize::Px(15.0)} }
+                TextColor({Color::srgb(0.70, 0.70, 0.80)})
+            });
 
             panel
                 .spawn(Node {
