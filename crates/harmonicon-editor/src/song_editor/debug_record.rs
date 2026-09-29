@@ -140,17 +140,15 @@ pub(super) fn spawn_debug_recording_controls(
             ))
             .observe(checkbox_self_update)
             .with_children(|cb| {
-                cb.spawn((
-                    Text::new("\u{2713}"),
-                    TextFont {
-                        font_size: FontSize::Px(14.0),
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                    Visibility::Hidden,
-                    DebugCheckmarkGlyph,
-                    Pickable::IGNORE,
-                ));
+                cb.spawn_empty()
+                    .apply_scene(bsn! {
+                        Text("\u{2713}")
+                        TextFont { font_size: {FontSize::Px(14.0)} }
+                        TextColor({Color::WHITE})
+                        ~{Visibility::Hidden}
+                        ~{Pickable::IGNORE}
+                    })
+                    .insert(DebugCheckmarkGlyph);
             });
 
             row.spawn_empty().apply_scene(bsn! {
