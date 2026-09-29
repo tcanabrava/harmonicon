@@ -232,31 +232,24 @@ pub(crate) fn setup_harp_check(
     );
 
     let intro = commands
-        .spawn((
-            Text::new(loc.msg("harp-check-intro")),
-            TextFont {
-                font_size: FontSize::Px(17.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.82, 0.82, 0.88)),
-            Node {
-                max_width: Val::Px(560.0),
-                ..default()
-            },
-        ))
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text({String::from(loc.msg("harp-check-intro"))})
+            TextFont { font_size: {FontSize::Px(17.0)} }
+            TextColor({Color::srgb(0.82, 0.82, 0.88)})
+            Node { max_width: {Val::Px(560.0)} }
+        })
         .id();
     commands.entity(root).add_child(intro);
 
     let written_for = commands
-        .spawn((
-            Text::new(""),
-            TextFont {
-                font_size: FontSize::Px(18.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.95, 0.95, 1.0)),
-            ChartHarpLabel,
-        ))
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text("")
+            TextFont { font_size: {FontSize::Px(18.0)} }
+            TextColor({Color::srgb(0.95, 0.95, 1.0)})
+        })
+        .insert(ChartHarpLabel)
         .id();
     commands.entity(root).add_child(written_for);
 
@@ -316,19 +309,14 @@ pub(crate) fn setup_harp_check(
     commands.entity(root).add_child(track_slot);
 
     let cost = commands
-        .spawn((
-            Text::new(""),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.95, 0.8, 0.45)),
-            Node {
-                max_width: Val::Px(560.0),
-                ..default()
-            },
-            HarpCostLabel,
-        ))
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text("")
+            TextFont { font_size: {FontSize::Px(16.0)} }
+            TextColor({Color::srgb(0.95, 0.8, 0.45)})
+            Node { max_width: {Val::Px(560.0)} }
+        })
+        .insert(HarpCostLabel)
         .id();
     commands.entity(root).add_child(cost);
 
