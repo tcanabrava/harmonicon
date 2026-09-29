@@ -54,35 +54,34 @@ const DOWNBEAT_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.16);
 pub(super) fn spawn_beat_guides(commands: &mut Commands, highway: Entity) {
     commands.entity(highway).with_children(|hw| {
         for _ in 0..POOL {
-            hw.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Percent(0.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Px(1.0),
-                    ..default()
-                },
-                BackgroundColor(BEAT_COLOR),
-                // **No `GlobalZIndex`.** `GlobalZIndex(0)` would seem to say
-                // "behind the notes", but it is global: it drops these below
-                // the gameplay root's own `GlobalZIndex(1)` background, which
-                // then paints straight over them (the same trap
-                // `gameplay_2d::spawn_gameplay_music_score` documents).
-                // Ordinary child order already puts them behind the notes,
-                // which are added to the highway later.
-                Visibility::Hidden,
-                Pickable::IGNORE,
-                BeatGuide,
-                // **No `GameplayRoot`.** That marker means "a top-level
-                // entity `cleanup_gameplay` sweeps on exit"; these are
-                // children of the highway, which is itself a descendant of
-                // the `GameplayRoot` node `gameplay_2d::setup` spawns, so
-                // that sweep already takes them via its recursive despawn.
-                // Tagging them too put them in the sweep's own query as
-                // well, and the second despawn then hit an entity its own
-                // ancestor had just removed — one `Entity despawned`
-                // warning per guide, every time you left Play 2D.
-            ));
+            // **No `GlobalZIndex`.** `GlobalZIndex(0)` would seem to say
+            // "behind the notes", but it is global: it drops these below
+            // the gameplay root's own `GlobalZIndex(1)` background, which
+            // then paints straight over them (the same trap
+            // `gameplay_2d::spawn_gameplay_music_score` documents).
+            // Ordinary child order already puts them behind the notes,
+            // which are added to the highway later.
+            // **No `GameplayRoot`.** That marker means "a top-level
+            // entity `cleanup_gameplay` sweeps on exit"; these are
+            // children of the highway, which is itself a descendant of
+            // the `GameplayRoot` node `gameplay_2d::setup` spawns, so
+            // that sweep already takes them via its recursive despawn.
+            // Tagging them too put them in the sweep's own query as
+            // well, and the second despawn then hit an entity its own
+            // ancestor had just removed — one `Entity despawned`
+            // warning per guide, every time you left Play 2D.
+            hw.spawn_empty()
+                .apply_scene(bsn! {
+                    Node {
+                        position_type: {PositionType::Absolute},
+                        left: {Val::Percent(0.0)},
+                        width: {Val::Percent(100.0)}, height: {Val::Px(1.0)},
+                    }
+                    BackgroundColor({BEAT_COLOR})
+                    ~{Visibility::Hidden}
+                    ~{Pickable::IGNORE}
+                })
+                .insert(BeatGuide);
         }
     });
 }
