@@ -462,19 +462,15 @@ pub fn setup(
         orientation,
     );
     commands.entity(root_id).with_children(|root| {
-        root.spawn((
+        root.spawn_empty().apply_scene(bsn! {
             Node {
-                align_self: AlignSelf::Center,
-                padding: UiRect::bottom(Val::Px(10.0)),
-                ..default()
-            },
-            Text::new(String::from(loc.msg("bending-hint"))),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.55, 0.55, 0.65)),
-        ));
+                align_self: {AlignSelf::Center},
+                padding: {UiRect::bottom(Val::Px(10.0))},
+            }
+            Text({String::from(loc.msg("bending-hint"))})
+            TextFont { font_size: {FontSize::Px(14.0)} }
+            TextColor({Color::srgb(0.55, 0.55, 0.65)})
+        });
     });
 }
 
