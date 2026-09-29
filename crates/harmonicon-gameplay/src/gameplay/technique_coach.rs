@@ -104,19 +104,18 @@ pub(super) fn spawn_technique_coach(parent: &mut ChildSpawnerCommands) {
             .id()
     }
 
-    let mut row = parent.spawn((
+    let mut row = parent.spawn_empty();
+    row.apply_scene(bsn! {
         Node {
-            width: Val::Percent(100.0),
-            height: Val::Px(ROW_PX),
-            flex_shrink: 0.0,
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(12.0),
-            padding: UiRect::horizontal(Val::Px(12.0)),
-            ..default()
-        },
-        BackgroundColor(ROW_BG),
-    ));
+            width: {Val::Percent(100.0)}, height: {Val::Px(ROW_PX)},
+            flex_shrink: {0.0_f32},
+            flex_direction: {FlexDirection::Row},
+            align_items: {AlignItems::Center},
+            column_gap: {Val::Px(12.0)},
+            padding: {UiRect::horizontal(Val::Px(12.0))},
+        }
+        BackgroundColor({ROW_BG})
+    });
     let mut coach = None;
     row.with_children(|row| {
         let start_label = label(row, 140.0);
