@@ -199,19 +199,17 @@ pub fn spawn_combobox<M: 'static>(
         .id();
     commands.entity(row).add_child(toggle);
     commands.entity(toggle).with_children(|t| {
-        t.spawn((
-            Text::new(toggle_label(current)),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-            Pickable {
-                should_block_lower: false,
-                is_hoverable: false,
-            },
-            ComboboxToggleLabel(root),
-        ));
+        t.spawn_empty()
+            .apply_scene(bsn! {
+                Text({toggle_label(current)})
+                TextFont { font_size: {FontSize::Px(16.0)} }
+                TextColor({Color::WHITE})
+                ~{Pickable {
+                    should_block_lower: false,
+                    is_hoverable: false,
+                }}
+            })
+            .insert(ComboboxToggleLabel(root));
     });
 
     // Absolutely positioned (out of flow) so opening it overlays the rest of
