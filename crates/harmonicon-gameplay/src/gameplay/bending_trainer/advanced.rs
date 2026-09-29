@@ -299,15 +299,13 @@ fn spawn_knob_row(
                 TextFont { font_size: {FontSize::Px(13.0)} }
                 TextColor({Color::srgb(0.70, 0.74, 0.82)})
             });
-            row.spawn((
-                Text::new(knob.value_text(settings)),
-                TextFont {
-                    font_size: FontSize::Px(13.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.88, 0.90, 0.96)),
-                knob,
-            ));
+            row.spawn_empty()
+                .apply_scene(bsn! {
+                    Text({knob.value_text(settings)})
+                    TextFont { font_size: {FontSize::Px(13.0)} }
+                    TextColor({Color::srgb(0.88, 0.90, 0.96)})
+                })
+                .insert(knob);
         });
 }
 
