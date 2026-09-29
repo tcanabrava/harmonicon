@@ -341,19 +341,18 @@ pub fn spawn_combobox<M: 'static>(
     // against the page's own full-screen box rather than this widget's
     // small one — same technique as `dialogs::file_dialog`'s overlay.
     let backdrop = commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(0.0),
-                top: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                display: Display::None,
-                ..default()
-            },
-            GlobalZIndex(240),
-            ComboboxRoot(root),
-        ))
+                position_type: {PositionType::Absolute},
+                left: {Val::Px(0.0)},
+                top: {Val::Px(0.0)},
+                width: {Val::Percent(100.0)},
+                height: {Val::Percent(100.0)},
+                display: {Display::None},
+            }
+            GlobalZIndex(240)
+        })
+        .insert(ComboboxRoot(root))
         .observe(backdrop_click)
         .id();
     commands.entity(backdrop_parent).add_child(backdrop);
