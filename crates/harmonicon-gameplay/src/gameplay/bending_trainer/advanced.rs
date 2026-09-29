@@ -222,18 +222,14 @@ pub(super) fn spawn_advanced_drawer(
         for knob in KNOBS {
             spawn_knob_row(drawer, loc, knob, settings);
         }
-        drawer.spawn((
+        drawer.spawn_empty().apply_scene(bsn! {
             Node {
-                margin: UiRect::top(Val::Px(6.0)),
-                ..default()
-            },
-            Text::new(String::from(loc.msg("bending-adv-stability-heading"))),
-            TextFont {
-                font_size: FontSize::Px(13.0),
-                ..default()
-            },
-            TextColor(Color::srgb(0.62, 0.66, 0.74)),
-        ));
+                margin: {UiRect::top(Val::Px(6.0))},
+            }
+            Text({String::from(loc.msg("bending-adv-stability-heading"))})
+            TextFont { font_size: {FontSize::Px(13.0)} }
+            TextColor({Color::srgb(0.62, 0.66, 0.74)})
+        });
         for readout in READOUTS {
             drawer.spawn((
                 Text::new(String::new()),
