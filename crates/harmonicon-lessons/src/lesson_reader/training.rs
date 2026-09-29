@@ -86,15 +86,13 @@ fn tier_lines(loc: &Localization, entry: &LessonEntry, tier: Tier) -> (String, S
 
 fn spawn_line(commands: &mut Commands, root: Entity, text: String, marker: impl Component) {
     let line = commands
-        .spawn((
-            Text::new(text),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
-            TextColor(LINE_COLOR),
-            marker,
-        ))
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text({text})
+            TextFont { font_size: {FontSize::Px(16.0)} }
+            TextColor({LINE_COLOR})
+        })
+        .insert(marker)
         .id();
     commands.entity(root).add_child(line);
 }
