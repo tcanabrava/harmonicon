@@ -153,14 +153,11 @@ pub(super) fn spawn_debug_recording_controls(
                 ));
             });
 
-            row.spawn((
-                Text::new(String::from(loc.msg("editor-debug-recording-button"))),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
+            row.spawn_empty().apply_scene(bsn! {
+                Text({String::from(loc.msg("editor-debug-recording-button"))})
+                TextFont { font_size: {FontSize::Px(15.0)} }
+                TextColor({Color::WHITE})
+            });
         });
 
     transport_button(
