@@ -90,18 +90,17 @@ pub(super) fn spawn_technique_coach(parent: &mut ChildSpawnerCommands) {
     /// A tick (or, once sized by the update, a band) on the track.
     fn tick(track: &mut ChildSpawnerCommands, color: Color, height: f32) -> Entity {
         track
-            .spawn((
+            .spawn_empty()
+            .apply_scene(bsn! {
                 Node {
-                    position_type: PositionType::Absolute,
-                    width: Val::Px(TICK_PX),
-                    height: Val::Px(height),
-                    top: Val::Px((TRACK_PX - height) * 0.5),
-                    margin: UiRect::left(Val::Px(-TICK_PX * 0.5)),
-                    display: Display::None,
-                    ..default()
-                },
-                BackgroundColor(color),
-            ))
+                    position_type: {PositionType::Absolute},
+                    width: {Val::Px(TICK_PX)}, height: {Val::Px(height)},
+                    top: {Val::Px((TRACK_PX - height) * 0.5)},
+                    margin: {UiRect::left(Val::Px(-TICK_PX * 0.5))},
+                    display: {Display::None},
+                }
+                BackgroundColor({color})
+            })
             .id()
     }
 
