@@ -424,16 +424,14 @@ pub(super) fn spawn_field_row(
             }
 
             btn.with_children(|b| {
-                b.spawn((
-                    MetaFieldText(field),
-                    Text::new(String::new()),
-                    TextFont {
-                        font_size: FontSize::Px(14.0),
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                    Pickable::IGNORE,
-                ));
+                b.spawn_empty()
+                    .apply_scene(bsn! {
+                        Text("")
+                        TextFont { font_size: {FontSize::Px(14.0)} }
+                        TextColor({Color::WHITE})
+                        ~{Pickable::IGNORE}
+                    })
+                    .insert(MetaFieldText(field));
             });
         } else {
             let on_commit = move |ev: On<TextInputCommitted>, mut state: ResMut<EditorState>| {
