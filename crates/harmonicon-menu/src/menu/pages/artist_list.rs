@@ -32,14 +32,12 @@ pub(crate) fn setup_artist_list(
 
     if songs.0.is_empty() {
         let msg = commands
-            .spawn((
-                Text::new(loc.msg("no-songs-found")),
-                TextFont {
-                    font_size: FontSize::Px(16.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.8, 0.4, 0.4)),
-            ))
+            .spawn_empty()
+            .apply_scene(bsn! {
+                Text({String::from(loc.msg("no-songs-found"))})
+                TextFont { font_size: {FontSize::Px(16.0)} }
+                TextColor({Color::srgb(0.8, 0.4, 0.4)})
+            })
             .id();
         commands.entity(root).add_child(msg);
     } else {
