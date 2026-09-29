@@ -222,25 +222,22 @@ pub(super) fn spawn(
     let mut label = |text: String, left: f32| {
         items.push(
             commands
-                .spawn((
-                    GridItem,
+                .spawn_empty()
+                .apply_scene(bsn! {
                     Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(left),
-                        top: Val::Px(WAVEFORM_TOP + 3.0),
-                        ..default()
-                    },
-                    Text::new(text),
+                        position_type: {PositionType::Absolute},
+                        left: {Val::Px(left)},
+                        top: {Val::Px(WAVEFORM_TOP + 3.0)},
+                    }
+                    Text({text})
                     // An absolute node shrinks to its left offset's room,
                     // which wrapped ":‖ ×2" onto two lines.
-                    TextLayout::no_wrap(),
-                    TextFont {
-                        font_size: FontSize::Px(11.0),
-                        ..default()
-                    },
-                    TextColor(REPEAT_COLOR),
-                    Pickable::IGNORE,
-                ))
+                    ~{TextLayout::no_wrap()}
+                    TextFont { font_size: {FontSize::Px(11.0)} }
+                    TextColor({REPEAT_COLOR})
+                    ~{Pickable::IGNORE}
+                })
+                .insert(GridItem)
                 .id(),
         );
     };
