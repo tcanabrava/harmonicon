@@ -83,14 +83,11 @@ pub fn spawn_checkbox<M: 'static>(
             box_ec.insert(Checked);
         }
         box_ec.observe(on_change);
-        r.spawn((
-            Text::new(label.to_string()),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
+        r.spawn_empty().apply_scene(bsn! {
+            Text({label.to_string()})
+            TextFont { font_size: {FontSize::Px(16.0)} }
+            TextColor({Color::WHITE})
+        });
     });
     commands.entity(parent).add_child(row);
     row
