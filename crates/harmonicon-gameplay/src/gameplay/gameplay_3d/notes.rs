@@ -230,15 +230,12 @@ pub(super) fn spawn_note_visual_3d(
                     NoteHoleLabelText3D,
                 ));
                 if let Some(cue) = cue {
-                    l.spawn((
-                        Text::new(cue),
-                        TextFont {
-                            font_size: FontSize::Px(18.0),
-                            ..default()
-                        },
-                        TextColor(Color::srgb(1.0, 0.92, 0.6)),
-                        TextLayout::no_wrap(),
-                    ));
+                    l.spawn_empty().apply_scene(bsn! {
+                        Text({cue})
+                        TextFont { font_size: {FontSize::Px(18.0)} }
+                        TextColor({Color::srgb(1.0, 0.92, 0.6)})
+                        ~{TextLayout::no_wrap()}
+                    });
                 }
             });
     }
