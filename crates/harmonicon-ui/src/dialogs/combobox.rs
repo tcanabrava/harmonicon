@@ -242,34 +242,33 @@ pub fn spawn_combobox<M: 'static>(
     // inside (see `dialogs::scroll_area`/`menu::scene::spawn_menu_root`) —
     // only one of the two scrolls, ever.
     let list = commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(6.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                display: Display::None,
-                ..default()
-            },
-            BackgroundColor(PANEL_BG),
-            BorderColor::all(PANEL_BORDER),
-            GlobalZIndex(250),
-            Popover {
-                positions: vec![
-                    PopoverPlacement {
-                        side: PopoverSide::Bottom,
-                        align: PopoverAlign::Start,
-                        gap: 4.0,
-                    },
-                    PopoverPlacement {
-                        side: PopoverSide::Top,
-                        align: PopoverAlign::Start,
-                        gap: 4.0,
-                    },
-                ],
-                window_margin: 8.0,
-            },
-        ))
+                position_type: {PositionType::Absolute},
+                flex_direction: {FlexDirection::Column},
+                padding: {UiRect::all(Val::Px(6.0))},
+                border: {UiRect::all(Val::Px(1.0))},
+                display: {Display::None},
+            }
+            BackgroundColor({PANEL_BG})
+            ~{BorderColor::all(PANEL_BORDER)}
+            GlobalZIndex(250)
+        })
+        .insert(Popover {
+            positions: vec![
+                PopoverPlacement {
+                    side: PopoverSide::Bottom,
+                    align: PopoverAlign::Start,
+                    gap: 4.0,
+                },
+                PopoverPlacement {
+                    side: PopoverSide::Top,
+                    align: PopoverAlign::Start,
+                    gap: 4.0,
+                },
+            ],
+            window_margin: 8.0,
+        })
         .id();
     let mut items_area = Entity::PLACEHOLDER;
     commands.entity(list).with_children(|l| {
