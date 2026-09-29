@@ -219,19 +219,18 @@ fn spawn_ui(commands: &mut Commands, loc: &Localization) {
     // a bare, untagged button here, which `cleanup` (only sweeping
     // `CreditsRoot`) never despawned, leaking it across screens.
     let back_anchor = commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                position_type: PositionType::Absolute,
-                top: Val::Px(20.0),
-                right: Val::Px(20.0),
-                ..default()
-            },
-            GlobalZIndex(20),
+                position_type: {PositionType::Absolute},
+                top: {Val::Px(20.0)},
+                right: {Val::Px(20.0)},
+            }
+            GlobalZIndex(20)
             // The screen's only focusable element hangs off this anchor, so
             // this is what Tab has to scope to.
-            TabGroup::default(),
-            CreditsRoot,
-        ))
+            TabGroup
+            CreditsRoot
+        })
         .id();
     spawn_back_button(
         commands,
