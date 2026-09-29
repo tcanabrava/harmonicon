@@ -76,16 +76,15 @@ pub fn spawn_tab_bar<M: 'static>(
     on_select: impl IntoObserverSystem<TabSelect, M>,
 ) -> Entity {
     let bar = commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(4.0),
-                ..default()
-            },
-            RadioGroup,
-            TabIndex(0),
-            TabBarSelected(selected),
-        ))
+                flex_direction: {FlexDirection::Row},
+                column_gap: {Val::Px(4.0)},
+            }
+            RadioGroup
+            TabIndex(0)
+            TabBarSelected({selected})
+        })
         .id();
     commands.entity(bar).observe(on_select);
 
