@@ -170,15 +170,14 @@ pub(super) fn spawn_debug_recording_controls(
         erase_debug_recording,
     );
 
-    panel.spawn((
-        Text::new(""),
-        TextFont {
-            font_size: FontSize::Px(15.0),
-            ..default()
-        },
-        TextColor(Color::srgb(0.75, 0.78, 0.88)),
-        DebugRecordStatusLabel,
-    ));
+    panel
+        .spawn_empty()
+        .apply_scene(bsn! {
+            Text("")
+            TextFont { font_size: {FontSize::Px(15.0)} }
+            TextColor({Color::srgb(0.75, 0.78, 0.88)})
+        })
+        .insert(DebugRecordStatusLabel);
 }
 
 fn erase_debug_recording(_: On<Activate>, mut raw: ResMut<RawCaptureBuffer>) {
