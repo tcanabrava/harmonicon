@@ -348,17 +348,14 @@ fn spawn_expected_mod_button(
         apply_expected_modifier(&mut state, kind);
     })
     .with_children(|b| {
-        b.spawn((
-            Text::new(super::panel_widgets::button_content_text(
+        b.spawn_empty().apply_scene(bsn! {
+            Text({super::panel_widgets::button_content_text(
                 style, icon, &label,
-            )),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-            Pickable::IGNORE,
-        ));
+            )})
+            TextFont { font_size: {FontSize::Px(14.0)} }
+            TextColor({Color::WHITE})
+            ~{Pickable::IGNORE}
+        });
     });
 }
 
