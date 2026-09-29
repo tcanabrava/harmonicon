@@ -622,15 +622,12 @@ fn rebuild_expected_notes_overlay(
                 },
             );
             ec.with_children(|n| {
-                n.spawn((
-                    Text::new(note.dir.arrow()),
-                    TextFont {
-                        font_size: FontSize::Px(15.0),
-                        ..default()
-                    },
-                    TextColor(color),
-                    Pickable::IGNORE,
-                ));
+                n.spawn_empty().apply_scene(bsn! {
+                    Text({note.dir.arrow()})
+                    TextFont { font_size: {FontSize::Px(15.0)} }
+                    TextColor({color})
+                    ~{Pickable::IGNORE}
+                });
                 spawn_expected_resize_handle(n, id, Edge::Left, pick);
                 spawn_expected_resize_handle(n, id, Edge::Right, pick);
             });
