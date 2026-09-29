@@ -289,15 +289,14 @@ pub(super) fn spawn_bend_rail(card: &mut ChildSpawnerCommands, loc: &Localizatio
             BendMetric::Stability,
             BendMetric::Hold,
         ] {
-            metrics.spawn((
-                Text::new(""),
-                TextFont {
-                    font_size: FontSize::Px(14.0),
-                    ..default()
-                },
-                TextColor(Color::srgb(0.68, 0.72, 0.78)),
-                metric,
-            ));
+            metrics
+                .spawn_empty()
+                .apply_scene(bsn! {
+                    Text("")
+                    TextFont { font_size: {FontSize::Px(14.0)} }
+                    TextColor({Color::srgb(0.68, 0.72, 0.78)})
+                })
+                .insert(metric);
         }
     });
 }
