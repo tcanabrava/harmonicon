@@ -148,14 +148,13 @@ pub fn spawn_combobox<M: 'static>(
     on_select: impl IntoObserverSystem<ComboboxSelect, M>,
 ) -> Entity {
     let root = commands
-        .spawn((
+        .spawn_scene(bsn! {
             Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(6.0),
-                ..default()
-            },
-            ComboboxValue(current.to_string()),
-        ))
+                flex_direction: {FlexDirection::Column},
+                row_gap: {Val::Px(6.0)},
+            }
+        })
+        .insert(ComboboxValue(current.to_string()))
         .id();
     commands.entity(root).observe(on_select);
 
