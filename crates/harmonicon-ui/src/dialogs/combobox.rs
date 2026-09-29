@@ -170,18 +170,15 @@ pub fn spawn_combobox<M: 'static>(
     commands.entity(root).add_child(row);
 
     let label_entity = commands
-        .spawn((
+        .spawn_empty()
+        .apply_scene(bsn! {
             Node {
-                width: Val::Px(LABEL_WIDTH),
-                ..default()
-            },
-            Text::new(label.to_string()),
-            TextFont {
-                font_size: FontSize::Px(20.0),
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ))
+                width: {Val::Px(LABEL_WIDTH)},
+            }
+            Text({label.to_string()})
+            TextFont { font_size: {FontSize::Px(20.0)} }
+            TextColor({Color::WHITE})
+        })
         .id();
     commands.entity(row).add_child(label_entity);
 
