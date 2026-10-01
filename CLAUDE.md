@@ -169,7 +169,7 @@ wrappers around one shared `run()`. Everything *else* still lives in
 Manual testing needs a mic, audio out, and a display.
 
 ## Architecture (load-bearing facts)
-- **Cargo workspace — fourteen library crates plus a root package holding the
+- **Cargo workspace — fifteen library crates plus a root package holding the
   binaries and the composition root.** A crate may depend only on ones
   *earlier* in this list, and **peers may not depend on each other**:
 
@@ -178,6 +178,7 @@ Manual testing needs a mic, audio out, and a display.
   | `harmonicon-core` | music theory, chart types, scoring math, pitch/MIDI conversion, pitch→hole resolution (`pitch_map`), the harmonica synth, WAV, grid snapping | **no** |
   | `harmonicon-score` | reading foreign score files (MIDI, Guitar Pro 3-7, MuseScore, MusicXML) behind one `ScoreFile` trait, and converting a track onto a harmonica | **no** |
   | `harmonicon-dsp` | the five pitch detectors (FFT/YIN/pYIN/MPM/NMF) and their windowing | **no** |
+  | `harmonicon-packs` | lessons/songs as git repositories: `pack.json` and its compatibility rules, configured/installed repos, the depth-1 `gix` clone | **no** |
   | `harmonicon-audio` | cpal capture, the ECS wrapper over `harmonicon-dsp`, waveform analysis | yes |
   | `harmonicon-platform` | asset discovery, localization, settings, theme, responsive | yes |
   | `harmonicon-song` | chart/manifest loading, MIDI-backed songs, lessons | yes |
@@ -295,6 +296,7 @@ Manual testing needs a mic, audio out, and a display.
   | Crate | Its `CLAUDE.md` covers |
   |---|---|
   | `harmonicon-core` | (no separate file — pure logic, documented at its `//!` headers) |
+  | `harmonicon-packs` | (no separate file — `docs/content_packs_plan.md` has the design; `git.rs`'s `//!` header has why updates re-clone instead of fetching, and its `Cargo.toml` why rustls uses `ring`) |
   | `harmonicon-score` | (no separate file — the `ScoreFile` trait's contract is at `lib.rs`'s `//!` header; **adding a format means a module there and an arm in `parse_import`, nothing outside the crate**. The `guitar_pro` module's own `//!` header is worth reading before touching tab timing) |
   | `harmonicon-audio` | the cpal→FFT input path, chart-driven detection range |
   | `harmonicon-platform` | asset sources + the `~/Harmonicon` watcher, settings, compact layout |

@@ -59,6 +59,12 @@ Nothing below can be approved by a test.
 - **The single-lesson `hand` track**: fold it into `tone`, or leave the gap
   visible as a place the curriculum wants more lessons.
 
+## Content packs
+
+`docs/content_packs_plan.md` has the design and phase list. Open: phases 2–7
+(engine integration, bundled localization, startup sync, Options UI,
+extraction into the two repositories, docs).
+
 ## Deferred until a condition is met
 
 - **A graded `Sustain` outcome**: only as a deliberate scoring change,

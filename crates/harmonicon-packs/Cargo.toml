@@ -1,0 +1,35 @@
+[package]
+name = "harmonicon-packs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+# Deliberately no Bevy: pack manifests, compatibility rules and the git
+# transport are plain logic, so they test in seconds against local
+# repositories. The ECS side (sync state, settings, UI) lives a level up.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+semver = { version = "1", features = ["serde"] }
+thiserror = { workspace = true }
+gix = { version = "0.87", default-features = false, features = [
+    "blocking-network-client",
+    "blocking-http-transport-reqwest",
+    "worktree-mutation",
+    "revision",
+    "sha1",
+] }
+
+# TLS for gix's https transport. reqwest's plain `rustls` feature picks the
+# aws-lc crypto provider, whose C build needs cmake on every target,
+# including the Android cross-compile. `ring` builds with just a C compiler;
+# `git::ensure_crypto_provider` installs it before the first connection.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
