@@ -7,9 +7,9 @@
 //!
 //! The pack comes from the directory `HARMONICON_LESSONS_DIR` names (a
 //! relative path is taken from the workspace root) — a checkout of
-//! `harmonicon-lessons`, fetched by whatever builds the web
-//! bundle, which must also serve that pack under `assets/lessons/` so the
-//! charts load. Unset, the wasm build has no lessons and says so.
+//! `harmonicon-lessons`, fetched by `scripts/build_web.sh`, whose Trunk hook
+//! also serves that pack under `assets/lessons/` so the charts load. Unset,
+//! the wasm build has no lessons and says so.
 //!
 //! It can't live in `harmonicon-platform`'s build script:
 //! `include!(concat!(env!("OUT_DIR"), ...))` reads the *including* crate's

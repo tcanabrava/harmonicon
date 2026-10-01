@@ -70,11 +70,9 @@ locales/<lang>.ftl             unit-* and track-* names
 5. ~~**Options UI**~~ — landed: Options → Lessons & songs
    (`pages::content_sources`). Not built: following a branch or tag other
    than the default from the UI (settings.json's `ref` already does it).
-6. **Extraction** — lessons done: they live in `harmonicon-lessons` with
-   their translations, `validate-pack` checks them (and runs in that repo's
-   CI), and this repo tests the validator on `tests/fixtures/lesson-pack`.
-   Open: songs, the same way; a web build that sets
-   `HARMONICON_LESSONS_DIR` and serves the pack under `assets/lessons/`
-   (there is no web deploy yet, only CI's `cargo check`).
+6. ~~**Extraction**~~ — landed: lessons and songs live in their own
+   repositories, `validate-pack` checks them in their CI, this repo tests
+   the validator on `tests/fixtures/`, and `scripts/build_web.sh` bundles
+   both packs into the web build.
 7. ~~**Docs**~~ — landed: `contributing/src/content-packs.md` and the
    player chapter `docs/book/src/content-sources.md`.

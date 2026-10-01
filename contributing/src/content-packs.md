@@ -87,9 +87,16 @@ Scans skip hidden directories, since a checkout keeps its `.git`. For each
 language the game's own strings are consulted before a pack's, so a pack can
 add strings but never replace one of the game's.
 
-wasm can neither clone nor list a directory. Its lessons are bundled at build
-time from the directory `HARMONICON_LESSONS_DIR` names (see
-`harmonicon-song`'s `build.rs`).
+wasm can neither clone nor list a directory, so the web build bundles its
+packs instead: `scripts/build_web.sh` fetches the latest commit of each
+official pack (or takes `HARMONICON_LESSONS_DIR`/`HARMONICON_SONGS_DIR`
+pointing at checkouts of your own) and runs Trunk with both variables set.
+The build scripts embed the packs' manifests (`harmonicon-song`'s and
+`harmonicon-platform`'s `build.rs`), and a Trunk `post_build` hook
+(`scripts/web_copy_packs.sh`) copies their files into the bundle under
+`assets/lessons/` and `assets/songs/`, where those manifests point. A web
+build therefore has the packs as they were when it was built; a player
+updates them by getting a newer build.
 
 ## Authoring and validating
 

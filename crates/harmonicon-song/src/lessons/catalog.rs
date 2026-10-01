@@ -18,7 +18,8 @@ use harmonicon_platform::content_packs::{ContentPacks, ContentPacksChanged, Cont
 /// are a pack bundled at build time: `build.rs` embeds each `lesson.json`
 /// from the directory `HARMONICON_LESSONS_DIR` names, with `include_str!`,
 /// and this `include!()`s the result. The web bundle must serve that same
-/// pack under `assets/lessons/` for the charts to load. Every other target
+/// pack under `assets/lessons/` for the charts to load, which
+/// `scripts/build_web.sh` arranges. Every other target
 /// reads its packs from disk.
 #[cfg(target_arch = "wasm32")]
 mod bundled {

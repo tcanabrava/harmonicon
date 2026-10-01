@@ -1,14 +1,23 @@
-# WASM build pipeline (`ROADMAP.md`'s 0.7+ "web build" item). Invoke from
-# the repo root: `trunk build` / `trunk serve` (add `--release` for a real
-# build — debug wasm is enormous and slow). `getrandom`'s wasm32 backend
-# needs a compile-time cfg Trunk can't express itself (see the comment on
-# the `[target.'cfg(target_arch = "wasm32")']` block in `Cargo.toml`), so
-# always run with:
+# WASM build pipeline (`ROADMAP.md`'s 0.7+ "web build" item). Build through
+# `scripts/build_web.sh` (`build_web.sh serve` for `trunk serve`), which
+# fetches the lesson and song packs and sets the variables the build needs.
+# Plain `trunk build` still works, but the result has no lessons or songs.
+#
+# `getrandom`'s wasm32 backend needs a compile-time cfg Trunk can't express
+# itself (see the comment on the `[target.'cfg(target_arch = "wasm32")']`
+# block in `Cargo.toml`), so a direct run needs:
 #   RUSTFLAGS='--cfg getrandom_backend="wasm_js"' trunk build
 
 [build]
 target = "index.html"
 dist = "dist"
+
+# Lessons and songs are packs, not part of `assets/`: copy the ones the build
+# embedded (HARMONICON_LESSONS_DIR / HARMONICON_SONGS_DIR) into the bundle.
+[[hooks]]
+stage = "post_build"
+command = "sh"
+command_arguments = ["scripts/web_copy_packs.sh"]
 
 [serve]
 # Without this, `trunk serve` renders a blank canvas while `trunk build` +

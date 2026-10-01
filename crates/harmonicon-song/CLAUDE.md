@@ -287,7 +287,9 @@ load-bearing about *this* crate.
   `build.rs`'s generated `BUNDLED_LESSONS`: the pack in the directory
   `HARMONICON_LESSONS_DIR` names at build time (unset: no lessons, and a
   cargo warning). The web bundle must serve that same pack under
-  `assets/lessons/`, which is where those charts' asset paths point.
+  `assets/lessons/`, which is where those charts' asset paths point;
+  `scripts/build_web.sh` sets the variable and Trunk's `post_build` hook
+  copies the pack there.
   - It embeds the **JSON text** via `include_str!`, unlike
     `harmonicon-platform`'s manifests which carry only names — because of
     that direct-bytes read above.

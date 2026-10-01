@@ -36,7 +36,11 @@ trunk --> dist
 `Trunk` (a Rust/Bevy-ecosystem-standard wasm bundler) drives the wasm
 build from `index.html` and `Trunk.toml` at the repository root — it
 compiles the crate for `wasm32-unknown-unknown`, runs `wasm-bindgen` to
-generate the JS glue, and copies `assets/` alongside the output. The
+generate the JS glue, and copies `assets/` alongside the output.
+Lessons and songs are not in `assets/`: build through
+`scripts/build_web.sh`, which fetches the lesson and song packs and has a
+`post_build` hook copy them into the bundle (see
+[Content Packs](content-packs.md)). The
 `<canvas id="bevy-canvas">` element `index.html` declares is wired up in
 `lib.rs`'s `WindowPlugin` (`canvas: Some("#bevy-canvas".into())`,
 `fit_canvas_to_parent: true`, `prevent_default_event_handling: true`) —

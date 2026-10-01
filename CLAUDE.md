@@ -23,8 +23,8 @@ than accumulating history (git log/commit messages are the historical record):
 - `PLAN.md` — every open item, in order, gathered from the plans below;
   delete a line when it lands
 - `docs/lessons_plan.md` — curriculum design for the Lessons feature
-- `docs/content_packs_plan.md` — lessons and songs as downloadable git
-  repositories (packs): what has landed and what's open
+- `docs/content_packs_plan.md` — the design of lessons and songs as
+  downloadable git repositories (packs) and the decisions behind it
 - `docs/training_tree_plan.md` — the technique DAG, per-lesson training
   ladder, skill-tree view and practice-motivation design. The graph,
   training records, tree view, per-lesson mastery ring, the spaced
@@ -236,7 +236,7 @@ Manual testing needs a mic, audio out, and a display.
   and offers updates without applying them. Each pack carries its own
   `pack.json` (with the engine version and `LESSON_FORMAT_VERSION` it
   needs) and its own translations. `contributing/src/content-packs.md` is
-  the architecture; `docs/content_packs_plan.md` has what's still open.
+  the architecture; `docs/content_packs_plan.md` the decisions behind it.
   Consequences that bite:
   - **A lesson's text is not in `ui.ftl`**: it is in the pack's
     `locales/`. `ui.ftl` is the game's own UI only.
