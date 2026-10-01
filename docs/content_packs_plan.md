@@ -62,8 +62,11 @@ locales/<lang>.ftl             unit-* and track-* names
 3. ~~**Bundled localization**~~ — landed: `localization::packs`. The audit of
    which `lesson-*` keys in `ui.ftl` are engine chrome and which are lesson
    content moves to phase 6, where the content keys leave `ui.ftl`.
-4. **Startup sync**: `AppState::Syncing` and its dialog, background clone on
-   `IoTaskPool` with a Tracy span, background update check.
+4. ~~**Startup sync**~~ — landed: `content_sync` and the
+   `AppState::Syncing` screen. **Until the two official repositories have a
+   commit, a fresh install cannot get past that screen** (it shows "the
+   repository has no commits yet" with Retry and Quit) — phase 6 has to
+   populate them before this ships.
 5. **Options UI**: repository list per kind (version, short SHA, status),
    check/update/remove/add, confirmations through `dialogs::confirm_dialog`,
    a text-input widget in `dialogs/` if none exists, three locales.

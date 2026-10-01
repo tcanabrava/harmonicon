@@ -31,6 +31,8 @@ pub enum SyncError {
     Fetch(String),
     #[error("the remote has no branch or tag named {0:?}")]
     NoSuchRef(String),
+    #[error("the repository has no commits yet")]
+    EmptyRepository,
     #[error("the repository has no pack.json at its root")]
     NoManifest,
     #[error(transparent)]
@@ -165,9 +167,20 @@ fn clone_shallow(
     }
     let (mut checkout, _) = prepare
         .fetch_then_checkout(Discard, should_interrupt)
-        .map_err(|e| match git_ref {
-            // gix reports a missing ref as a fetch failure; say which.
-            Some(name) if e.to_string().contains(name) => SyncError::NoSuchRef(name.into()),
+        .map_err(|e| match (&e, git_ref) {
+            // Nothing on the remote matched what we asked for: the named
+            // branch or tag doesn't exist, or, following the default branch,
+            // the repository has none yet. gix's own wording for both lists
+            // refspecs, which says nothing to a player.
+            (
+                gix::clone::fetch::Error::RefNameMissing { .. }
+                | gix::clone::fetch::Error::Fetch(gix::remote::fetch::Error::NoMapping { .. }),
+                Some(name),
+            ) => SyncError::NoSuchRef(name.into()),
+            (
+                gix::clone::fetch::Error::Fetch(gix::remote::fetch::Error::NoMapping { .. }),
+                None,
+            ) => SyncError::EmptyRepository,
             _ => fetch_err(e),
         })?;
     let (repo, _) = checkout
@@ -474,10 +487,17 @@ mod tests {
         let up = upstream(1);
         let root = tempfile::tempdir().unwrap();
         let err = install_into(&spec_for(up.path(), Some("nope")), root.path()).unwrap_err();
-        assert!(
-            matches!(err, SyncError::NoSuchRef(_) | SyncError::Fetch(_)),
-            "{err}"
-        );
+        assert!(matches!(err, SyncError::NoSuchRef(_)), "{err}");
+    }
+
+    /// What a freshly created GitHub repository looks like.
+    #[test]
+    fn an_empty_repository_is_reported_as_such() {
+        let up = tempfile::tempdir().unwrap();
+        git(up.path(), &["init", "-q"]);
+        let root = tempfile::tempdir().unwrap();
+        let err = install_into(&spec_for(up.path(), None), root.path()).unwrap_err();
+        assert!(matches!(err, SyncError::EmptyRepository), "{err}");
     }
 
     /// The https transport end to end, TLS included. Needs the network, so

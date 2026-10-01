@@ -4786,6 +4786,7 @@ dependencies = [
  "harmonicon-editor",
  "harmonicon-gameplay",
  "harmonicon-jam",
+ "harmonicon-packs",
  "harmonicon-platform",
  "harmonicon-song",
  "harmonicon-ui",

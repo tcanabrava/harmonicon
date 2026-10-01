@@ -13,6 +13,8 @@
 pub mod assets_management;
 pub mod calendar;
 pub mod content_packs;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod content_sync;
 pub mod localization;
 pub mod paths;
 pub mod responsive;

@@ -7,6 +7,8 @@
 
 pub(crate) mod artist_list;
 pub(crate) mod calibration;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) mod content_sync;
 pub(crate) mod credits;
 pub(crate) mod harp_check;
 pub(crate) mod help_about;

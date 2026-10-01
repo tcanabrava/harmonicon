@@ -26,6 +26,9 @@ use harmonicon_song::song::SongManifest;
 pub enum AppState {
     #[default]
     Startup,
+    /// Downloading lesson or song packs that have never been installed;
+    /// the menu opens once they are (`menu::pages::content_sync`).
+    Syncing,
     Menu,
     SongLoading,
     Playing,

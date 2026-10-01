@@ -33,7 +33,7 @@ use harmonicon_lessons::LessonsUiPlugin;
 use harmonicon_menu::menu::MenuPlugin;
 use harmonicon_packs::pack::EngineSupport;
 use harmonicon_platform::assets_management::AssetsManagementPlugin;
-use harmonicon_platform::content_packs::{ContentPacksPlugin, PackEngine};
+use harmonicon_platform::content_packs::{ContentPacks, ContentPacksPlugin, PackEngine};
 use harmonicon_platform::localization::LocalizationPlugin;
 use harmonicon_platform::responsive::ResponsivePlugin;
 use harmonicon_platform::settings::SettingsPlugin;
@@ -220,10 +220,10 @@ pub fn run() {
             ),
         )
         // Hold on the Startup state until the locale folder has loaded, so the
-        // menu's first frame shows translated labels rather than raw Fluent keys.
+        // first screen shows translated labels rather than raw Fluent keys.
         .add_systems(
             Update,
-            enter_menu_when_localized
+            leave_startup_when_localized
                 .run_if(in_state(AppState::Startup))
                 .run_if(harmonicon_platform::localization::localization_ready),
         )
@@ -239,6 +239,13 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn((Camera2d, Name::new("Camera2d (main)")));
 }
 
-fn enter_menu_when_localized(mut next: ResMut<NextState<AppState>>) {
-    next.set(AppState::Menu);
+/// To the download screen if a configured lesson or song pack has never been
+/// downloaded — the game has nothing to teach or play without them — and
+/// otherwise straight to the menu.
+fn leave_startup_when_localized(packs: Res<ContentPacks>, mut next: ResMut<NextState<AppState>>) {
+    next.set(if packs.any_missing() {
+        AppState::Syncing
+    } else {
+        AppState::Menu
+    });
 }

@@ -61,8 +61,10 @@ Nothing below can be approved by a test.
 
 ## Content packs
 
-`docs/content_packs_plan.md` has the design and phase list. Open: phases 4–7
-(startup sync, Options UI, extraction into the two repositories, docs).
+`docs/content_packs_plan.md` has the design and phase list. Open: phases 5–7
+(Options UI, extraction into the two repositories, docs). Until phase 6
+populates the official repositories, a fresh install stops at the download
+screen.
 
 ## Deferred until a condition is met
 

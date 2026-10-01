@@ -24,6 +24,9 @@ pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
+        // The first-run pack download screen. wasm bundles its packs.
+        #[cfg(not(target_arch = "wasm32"))]
+        app.add_plugins(pages::content_sync::ContentSyncPlugin);
         app.init_state::<AppState>()
             .add_sub_state::<MenuPage>()
             // So the Bevy Remote Protocol can move between screens from

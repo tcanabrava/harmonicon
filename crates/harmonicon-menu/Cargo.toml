@@ -9,6 +9,7 @@ publish = false
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
 harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
 harmonicon-platform = { path = "../harmonicon-platform", version = "*" }
+harmonicon-packs = { path = "../harmonicon-packs", version = "*" }
 harmonicon-song = { path = "../harmonicon-song", version = "*" }
 harmonicon-app = { path = "../harmonicon-app", version = "*" }
 harmonicon-ui = { path = "../harmonicon-ui", version = "*" }

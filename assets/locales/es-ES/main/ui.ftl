@@ -72,6 +72,14 @@ band-energy-low = Baja
 band-energy-medium = Media
 band-energy-high = Alta
 
+# Descarga inicial de los paquetes de lecciones y canciones
+sync-title = Obteniendo lecciones y canciones
+sync-in-progress = Harmonicon está descargando sus lecciones y canciones. El juego empezará en cuanto estén listas.
+sync-repo-downloading = Descargando {$name}
+sync-repo-failed = No se pudo descargar {$name}: {$error}
+sync-retry = Reintentar
+sync-quit = Salir
+
 # Créditos
 credits-back-to-menu = Volver al Menú
 

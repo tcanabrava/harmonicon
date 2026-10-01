@@ -311,6 +311,12 @@ fn refresh(
     roots: Option<&PackRoots>,
     packs: &mut ContentPacks,
 ) {
+    // wasm's content is bundled at build time; it has no configured packs
+    // to wait for.
+    if cfg!(target_arch = "wasm32") {
+        packs.0.clear();
+        return;
+    }
     let Some(packs_dir) = crate::paths::packs_dir() else {
         warn!("No writable data directory; lesson and song packs are unavailable");
         packs.0.clear();
@@ -374,6 +380,7 @@ fn refresh_on_request(
 
 /// Needs [`PackEngine`] inserted first, and `SettingsPlugin` for
 /// [`ContentSources`] to hold the player's list rather than the defaults.
+/// Also runs the downloads (`content_sync`) on every target that can.
 pub struct ContentPacksPlugin;
 
 impl Plugin for ContentPacksPlugin {
@@ -389,6 +396,8 @@ impl Plugin for ContentPacksPlugin {
                     .after(crate::settings::apply_loaded_settings),
             )
             .add_systems(Update, refresh_on_request.in_set(ContentPacksSet));
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::content_sync::build(app);
     }
 }
 

@@ -67,6 +67,14 @@ load-bearing about *this* crate.
   - **What a pack may require is decided by the composition root**
     (`PackEngine`), the only place that knows both the game's version and
     `harmonicon-song`'s `LESSON_FORMAT_VERSION`.
+  - **Downloads run on their own named threads** (`content_sync`), not a
+    Bevy task pool: a clone is a long blocking network call, and parked on
+    the IO pool it would stall asset loading. Results return over a channel
+    and only the main thread writes `installed.json`. At `Startup` a remote
+    never downloaded is installed (the game holds on `AppState::Syncing`
+    until it is), while an installed one is only *checked* — the answer
+    lands in `PackSync::updates` and nothing updates without the player
+    asking (`InstallPack`).
   - **Scans skip hidden directories** (`assets_management::is_visible_dir`):
     a pack's checkout keeps its `.git`, which would otherwise read as an
     artist or a unit.
