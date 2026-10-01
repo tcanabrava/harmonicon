@@ -82,6 +82,36 @@ sync-repo-failed = Could not download {$name}: {$error}
 sync-retry = Retry
 sync-quit = Quit
 
+# Options → Lessons & songs (content repositories)
+content-title = Lessons & songs
+content-subtitle = Lessons and songs come from git repositories, which Harmonicon keeps up to date when you ask it to.
+content-back-tooltip = Back to Options
+content-check-updates = Check for updates
+content-songs = Songs
+content-lessons = Lessons
+content-empty = No repositories.
+content-add = Add
+content-add-hint = Repository address or folder:
+content-add-invalid = "{$input}" is neither a git repository address (https or ssh) nor a folder on this computer.
+content-add-duplicate = That repository is already in the list.
+content-trust-note = Lessons and songs are only data, never programs, but add only repositories you trust.
+content-update = Update
+content-download = Download
+content-remove = Remove
+content-confirm-update = Update {$name} to its latest version?
+content-confirm-remove = Remove {$name}? Its downloaded files are deleted; your progress is kept.
+content-status-downloading = Downloading
+content-status-download-failed = Could not download: {$error}
+content-status-not-installed = Not downloaded
+content-status-unusable = Can't be used: {$reason}
+content-status-local = Version {$version}, a folder on this computer
+content-status-checking = Version {$version}, checking for updates
+content-status-up-to-date = Version {$version}, up to date
+content-status-update-available = Version {$version}, an update is available
+content-status-check-failed = Version {$version}, could not check for updates: {$error}
+content-status-installed = Version {$version}
+sync-failed = Harmonicon could not download its lessons and songs.
+
 # Credits
 credits-back-to-menu = Back to Menu
 
@@ -123,6 +153,8 @@ options-harmonica-tooltip = Which harmonica model appears in 3D gameplay.
 options-music-volume-tooltip = Backing-track volume.
 options-metronome-volume-tooltip = Metronome click volume.
 options-theme-tooltip = Change the menu's visual theme.
+options-content = Lessons & songs
+options-content-tooltip = Where lessons and songs come from, and their updates.
 options-calibrate-input-lag = Calibrate input lag
 options-calibrate-input-lag-tooltip = Measure your setup's audio latency and apply it automatically.
 options-back-tooltip = Return to the main menu.

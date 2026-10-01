@@ -80,6 +80,36 @@ sync-repo-failed = No se pudo descargar {$name}: {$error}
 sync-retry = Reintentar
 sync-quit = Salir
 
+# Opciones → Lecciones y canciones (repositorios de contenido)
+content-title = Lecciones y canciones
+content-subtitle = Las lecciones y canciones vienen de repositorios git, que Harmonicon actualiza cuando se lo pides.
+content-back-tooltip = Volver a Opciones
+content-check-updates = Buscar actualizaciones
+content-songs = Canciones
+content-lessons = Lecciones
+content-empty = Ningún repositorio.
+content-add = Añadir
+content-add-hint = Dirección del repositorio o carpeta:
+content-add-invalid = "{$input}" no es una dirección de repositorio git (https o ssh) ni una carpeta de este ordenador.
+content-add-duplicate = Ese repositorio ya está en la lista.
+content-trust-note = Las lecciones y canciones son solo datos, nunca programas, pero añade solo repositorios de confianza.
+content-update = Actualizar
+content-download = Descargar
+content-remove = Quitar
+content-confirm-update = ¿Actualizar {$name} a su última versión?
+content-confirm-remove = ¿Quitar {$name}? Se borran sus archivos descargados; tu progreso se conserva.
+content-status-downloading = Descargando
+content-status-download-failed = No se pudo descargar: {$error}
+content-status-not-installed = No descargado
+content-status-unusable = No se puede usar: {$reason}
+content-status-local = Versión {$version}, una carpeta de este ordenador
+content-status-checking = Versión {$version}, buscando actualizaciones
+content-status-up-to-date = Versión {$version}, al día
+content-status-update-available = Versión {$version}, hay una actualización disponible
+content-status-check-failed = Versión {$version}, no se pudieron buscar actualizaciones: {$error}
+content-status-installed = Versión {$version}
+sync-failed = Harmonicon no pudo descargar sus lecciones y canciones.
+
 # Créditos
 credits-back-to-menu = Volver al Menú
 
@@ -121,6 +151,8 @@ options-harmonica-tooltip = Qué modelo de armónica aparece en el juego en 3D.
 options-music-volume-tooltip = Volumen de la pista de acompañamiento.
 options-metronome-volume-tooltip = Volumen del clic del metrónomo.
 options-theme-tooltip = Cambia el tema visual de los menús.
+options-content = Lecciones y canciones
+options-content-tooltip = De dónde vienen las lecciones y canciones, y sus actualizaciones.
 options-calibrate-input-lag = Calibrar la latencia de entrada
 options-calibrate-input-lag-tooltip = Mide la latencia de audio de tu equipo y la aplica automáticamente.
 options-back-tooltip = Vuelve al menú principal.

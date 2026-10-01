@@ -37,6 +37,9 @@ pub enum MenuPage {
     ModeSelect,
     Options,
     Theme,
+    /// Options → Lessons & songs: the lesson and song repositories, their
+    /// updates, adding and removing them (`pages::content_sources`).
+    ContentSources,
     /// The curriculum, and the only view of it: a spine of unit nodes with
     /// each unit's own lessons hanging below it, prerequisite edges drawn
     /// inside a unit (see `harmonicon-lessons`).
@@ -97,7 +100,7 @@ pub(crate) fn handle_menu_escape(
         MenuPage::JamGenerate => MenuPage::JamSessionMenu,
         MenuPage::SongList => MenuPage::ArtistList,
         MenuPage::HarpCheck => MenuPage::SongList,
-        MenuPage::Theme => MenuPage::Options,
+        MenuPage::Theme | MenuPage::ContentSources => MenuPage::Options,
         MenuPage::LessonReader => MenuPage::LessonTree,
         MenuPage::About => MenuPage::HelpAbout,
     };

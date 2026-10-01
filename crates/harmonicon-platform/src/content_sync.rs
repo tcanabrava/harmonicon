@@ -64,6 +64,8 @@ type InstallResult = Result<(InstalledRepo, PackManifest), String>;
 struct Job {
     slug: String,
     rx: Receiver<InstallResult>,
+    /// Finished with nothing sent means the thread panicked.
+    thread: std::thread::JoinHandle<()>,
     cancel: Arc<AtomicBool>,
 }
 
@@ -71,6 +73,7 @@ struct Check {
     slug: String,
     installed_commit: Option<String>,
     rx: Receiver<Result<String, String>>,
+    thread: std::thread::JoinHandle<()>,
 }
 
 /// Every download and check in flight, and what the finished ones found.
@@ -120,10 +123,15 @@ fn spawn_install(sync: &mut PackSync, kind: PackKind, spec: RepoSpec, engine: &P
             let _ = tx.send(result);
         });
     match spawned {
-        Ok(_) => {
+        Ok(thread) => {
             info!("Downloading {kind} pack {slug}");
             sync.failures.remove(&slug);
-            sync.jobs.push(Job { slug, rx, cancel });
+            sync.jobs.push(Job {
+                slug,
+                rx,
+                thread,
+                cancel,
+            });
         }
         Err(e) => {
             sync.failures.insert(slug, e.to_string());
@@ -151,13 +159,14 @@ fn spawn_check(
             let _span = info_span!("pack_check", slug).entered();
             let _ = tx.send(git::remote_head(&root, &spec).map_err(|e| e.to_string()));
         });
-    if spawned.is_ok() {
+    if let Ok(thread) = spawned {
         sync.updates
             .insert(entry_slug.to_string(), UpdateState::Checking);
         sync.checks.push(Check {
             slug: entry_slug.to_string(),
             installed_commit,
             rx,
+            thread,
         });
     }
 }
@@ -214,11 +223,24 @@ fn handle_requests(
 /// in `installed.json` here, on the main thread, and triggers one
 /// [`RefreshContentPacks`] for however many finished this frame.
 fn collect_results(
-    mut sync: ResMut<PackSync>,
+    mut sync_res: ResMut<PackSync>,
     mut finished: MessageWriter<PackSyncFinished>,
     mut refresh: MessageWriter<RefreshContentPacks>,
 ) {
-    let sync = &mut *sync;
+    // Polled every frame, so it must not mark the resource changed unless
+    // something actually finished: the Options page rebuilds on a change.
+    let anything_done = sync_res
+        .jobs
+        .iter()
+        .any(|j| !j.rx.is_empty() || j.thread.is_finished())
+        || sync_res
+            .checks
+            .iter()
+            .any(|c| !c.rx.is_empty() || c.thread.is_finished());
+    if !anything_done {
+        return;
+    }
+    let sync = &mut *sync_res;
     let mut any_finished = false;
     let mut still_running = Vec::new();
     for job in sync.jobs.drain(..) {
@@ -281,6 +303,28 @@ fn collect_results(
     if any_finished {
         refresh.write(RefreshContentPacks);
     }
+}
+
+/// Deletes a downloaded pack's checkout and its `installed.json` entry. Only
+/// ever touches `packs_dir/<slug>`, which is why it takes a [`RepoSpec`]
+/// rather than a path: a local folder is the author's own and is never
+/// deleted, only dropped from the list by the caller.
+pub fn uninstall(spec: &RepoSpec) -> Result<(), String> {
+    if !matches!(spec, RepoSpec::Remote { .. }) {
+        return Ok(());
+    }
+    let packs_dir = crate::paths::packs_dir().ok_or("no writable data directory")?;
+    let slug = spec.slug();
+    match std::fs::remove_dir_all(packs_dir.join(&slug)) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.to_string()),
+        _ => {}
+    }
+    let path = packs_dir.join("installed.json");
+    let mut installed = Installed::load(&path);
+    if installed.repos.remove(&slug).is_some() {
+        installed.save(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 fn record_install(slug: &str, repo: InstalledRepo) -> Result<(), String> {

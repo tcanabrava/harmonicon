@@ -61,10 +61,9 @@ Nothing below can be approved by a test.
 
 ## Content packs
 
-`docs/content_packs_plan.md` has the design and phase list. Open: phases 5–7
-(Options UI, extraction into the two repositories, docs). Until phase 6
-populates the official repositories, a fresh install stops at the download
-screen.
+`docs/content_packs_plan.md` has the design and phase list. Open: a web
+build that bundles the packs, and the player guide's "Content sources"
+chapter.
 
 ## Deferred until a condition is met
 

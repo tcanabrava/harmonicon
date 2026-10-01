@@ -95,7 +95,8 @@ load-bearing about *this* crate.
   artist/song/lesson already picked) — but four steps actually enter live
   gameplay for a look:
   `TourTarget::Playing(GameplayMode::Play2D)` and `::JamSession` (both
-  load the bundled `DEMO_SONG_PATH`, long enough that no step could ever
+  load the `DEMO_SONG`, looked up by artist and title among installed
+  songs, long enough that no step could ever
   run it to completion and trigger a real `AppState::Results`),
   `TourTarget::BendingTrainer`, and `TourTarget::SongEditor` — the exact
   same `AppState` transitions those screens' normal entry points use, so

@@ -366,6 +366,23 @@ fn spawn_right_column(commands: &mut Commands, parent: Entity, loc: &Localizatio
         .entity(theme_btn)
         .insert(Tooltip(String::from(loc.msg("options-theme-tooltip"))));
 
+    // Downloaded content: wasm's is bundled at build time, so it has no
+    // repositories to manage.
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let content_btn = spawn_button(
+            commands,
+            parent,
+            &loc.msg("options-content"),
+            |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| {
+                page.set(MenuPage::ContentSources)
+            },
+        );
+        commands
+            .entity(content_btn)
+            .insert(Tooltip(String::from(loc.msg("options-content-tooltip"))));
+    }
+
     let calibrate_btn = spawn_button(
         commands,
         parent,

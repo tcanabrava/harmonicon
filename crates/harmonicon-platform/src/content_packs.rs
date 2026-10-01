@@ -65,6 +65,21 @@ impl Default for ContentSources {
 }
 
 impl ContentSources {
+    /// The list of `kind`.
+    pub fn of(&self, kind: PackKind) -> &Vec<RepoSpec> {
+        match kind {
+            PackKind::Songs => &self.songs,
+            PackKind::Lessons => &self.lessons,
+        }
+    }
+
+    pub fn of_mut(&mut self, kind: PackKind) -> &mut Vec<RepoSpec> {
+        match kind {
+            PackKind::Songs => &mut self.songs,
+            PackKind::Lessons => &mut self.lessons,
+        }
+    }
+
     /// Every configured repository with its kind, songs first.
     pub fn all(&self) -> impl Iterator<Item = (PackKind, &RepoSpec)> {
         self.songs
@@ -72,6 +87,52 @@ impl ContentSources {
             .map(|spec| (PackKind::Songs, spec))
             .chain(self.lessons.iter().map(|spec| (PackKind::Lessons, spec)))
     }
+}
+
+/// Why what the player typed into "add a repository" can't be added.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepoInputError {
+    Empty,
+    /// Neither a git address this game can fetch nor an existing folder.
+    NotARepository,
+    AlreadyListed,
+}
+
+/// Reads what the player typed as a repository to add: a git address (a
+/// URL with a scheme, or `user@host:path`) becomes a remote, anything else
+/// must be an existing folder, used in place. `~/` expands to the home
+/// directory, since that's how people write paths.
+pub fn parse_repo_input(input: &str, already: &[RepoSpec]) -> Result<RepoSpec, RepoInputError> {
+    let input = input.trim();
+    if input.is_empty() {
+        return Err(RepoInputError::Empty);
+    }
+    let looks_remote = input.contains("://")
+        || (input.contains('@') && input.contains(':') && !input.starts_with('/'));
+    let spec = if looks_remote {
+        let spec = RepoSpec::Remote {
+            url: input.to_string(),
+            git_ref: None,
+        };
+        spec.validate()
+            .map_err(|_| RepoInputError::NotARepository)?;
+        spec
+    } else {
+        let path = match input.strip_prefix("~/") {
+            Some(rest) => dirs::home_dir()
+                .ok_or(RepoInputError::NotARepository)?
+                .join(rest),
+            None => PathBuf::from(input),
+        };
+        if !path.is_dir() {
+            return Err(RepoInputError::NotARepository);
+        }
+        RepoSpec::Local { path }
+    };
+    if already.iter().any(|s| s.slug() == spec.slug()) {
+        return Err(RepoInputError::AlreadyListed);
+    }
+    Ok(spec)
 }
 
 /// What this build can read. Built by the composition root, which is the
@@ -363,6 +424,23 @@ fn refresh_at_startup(
     refresh(&sources, &engine.0, roots.as_deref(), &mut packs);
 }
 
+/// Editing [`ContentSources`] (the Options page adding or removing a
+/// repository) re-reads every pack. Skips the first run, where the change
+/// is just the settings loading and `Startup` already read them.
+fn refresh_when_sources_change(
+    sources: Res<ContentSources>,
+    mut seen_first: Local<bool>,
+    mut refresh: MessageWriter<RefreshContentPacks>,
+) {
+    if !*seen_first {
+        *seen_first = true;
+        return;
+    }
+    if sources.is_changed() {
+        refresh.write(RefreshContentPacks);
+    }
+}
+
 fn refresh_on_request(
     mut requests: MessageReader<RefreshContentPacks>,
     sources: Res<ContentSources>,
@@ -395,7 +473,12 @@ impl Plugin for ContentPacksPlugin {
                     .in_set(ContentPacksSet)
                     .after(crate::settings::apply_loaded_settings),
             )
-            .add_systems(Update, refresh_on_request.in_set(ContentPacksSet));
+            .add_systems(
+                Update,
+                (refresh_when_sources_change, refresh_on_request)
+                    .chain()
+                    .in_set(ContentPacksSet),
+            );
         #[cfg(not(target_arch = "wasm32"))]
         crate::content_sync::build(app);
     }
@@ -556,6 +639,38 @@ mod tests {
         assert_eq!(roots.resolve(Path::new("p/../q/secret")), None);
         assert_eq!(roots.resolve(Path::new("unknown/file")), None);
         assert_eq!(roots.resolve(Path::new("/etc/passwd")), None);
+    }
+
+    #[test]
+    fn typed_repositories_are_read_as_remotes_or_folders() {
+        let folder = tempfile::tempdir().unwrap();
+        assert_eq!(
+            parse_repo_input("  https://gitlab.com/me/blues-licks  ", &[]),
+            Ok(remote("https://gitlab.com/me/blues-licks"))
+        );
+        assert_eq!(
+            parse_repo_input("git@github.com:me/licks.git", &[]),
+            Ok(remote("git@github.com:me/licks.git"))
+        );
+        assert_eq!(
+            parse_repo_input(&folder.path().display().to_string(), &[]),
+            Ok(RepoSpec::Local {
+                path: folder.path().into()
+            })
+        );
+        assert_eq!(parse_repo_input("", &[]), Err(RepoInputError::Empty));
+        assert_eq!(
+            parse_repo_input("http://insecure/x", &[]),
+            Err(RepoInputError::NotARepository)
+        );
+        assert_eq!(
+            parse_repo_input("/no/such/folder", &[]),
+            Err(RepoInputError::NotARepository)
+        );
+        assert_eq!(
+            parse_repo_input("https://h/a/b", &[remote("https://h/a/b.git")]),
+            Err(RepoInputError::AlreadyListed)
+        );
     }
 
     #[test]

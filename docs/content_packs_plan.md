@@ -67,9 +67,9 @@ locales/<lang>.ftl             unit-* and track-* names
    commit, a fresh install cannot get past that screen** (it shows "the
    repository has no commits yet" with Retry and Quit) — phase 6 has to
    populate them before this ships.
-5. **Options UI**: repository list per kind (version, short SHA, status),
-   check/update/remove/add, confirmations through `dialogs::confirm_dialog`,
-   a text-input widget in `dialogs/` if none exists, three locales.
+5. ~~**Options UI**~~ — landed: Options → Lessons & songs
+   (`pages::content_sources`). Not built: following a branch or tag other
+   than the default from the UI (settings.json's `ref` already does it).
 6. **Extraction** — lessons done: they live in `harmonicon-lessons` with
    their translations, `validate-pack` checks them (and runs in that repo's
    CI), and this repo tests the validator on `tests/fixtures/lesson-pack`.

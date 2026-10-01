@@ -23,6 +23,11 @@ struct SyncRoot;
 #[derive(Component, Default, Clone)]
 struct SyncStatusText;
 
+/// The line under the title: "downloading", or "could not download" once
+/// every attempt has failed.
+#[derive(Component, Default, Clone)]
+struct SyncIntroText;
+
 /// Holds Retry/Quit while a download has failed; empty otherwise, so no
 /// hidden button is ever a Tab stop.
 #[derive(Component, Default, Clone)]
@@ -96,6 +101,7 @@ fn setup(mut commands: Commands, loc: Res<Localization>) {
             TextFont { font_size: {FontSize::Px(38.0)} }
             TextColor({Color::WHITE})
             --
+            SyncIntroText
             Text({String::from(loc.msg("sync-in-progress"))})
             TextFont { font_size: {FontSize::Px(18.0)} }
             TextColor({Color::srgb(0.62, 0.65, 0.80)})
@@ -128,12 +134,24 @@ fn update_status(
     packs: Res<ContentPacks>,
     sync: Res<PackSync>,
     loc: Res<Localization>,
-    mut texts: Query<&mut Text, With<SyncStatusText>>,
+    mut status: Query<&mut Text, (With<SyncStatusText>, Without<SyncIntroText>)>,
+    mut intro: Query<&mut Text, With<SyncIntroText>>,
 ) {
     let lines = status_lines(&packs, &sync, &loc);
-    for mut text in &mut texts {
+    for mut text in &mut status {
         if text.0 != lines {
             text.0.clone_from(&lines);
+        }
+    }
+    let key = if failed(&packs, &sync) {
+        "sync-failed"
+    } else {
+        "sync-in-progress"
+    };
+    let line = String::from(loc.msg(key));
+    for mut text in &mut intro {
+        if text.0 != line {
+            text.0 = line.clone();
         }
     }
 }
