@@ -40,3 +40,24 @@ pub fn config_dir() -> Option<PathBuf> {
 pub fn config_file(name: &str) -> Option<PathBuf> {
     config_dir().map(|dir| dir.join(name))
 }
+
+/// Where downloaded content (lesson and song packs) lives: `<data>/harmonicon`
+/// on desktop, separate from the config directory because it is large,
+/// re-downloadable and nothing a player would back up or edit.
+///
+/// Android has one private directory for everything, so it is the same as
+/// [`config_dir`] there.
+#[cfg(not(target_os = "android"))]
+pub fn data_dir() -> Option<PathBuf> {
+    dirs::data_dir().map(|dir| dir.join("harmonicon"))
+}
+
+#[cfg(target_os = "android")]
+pub fn data_dir() -> Option<PathBuf> {
+    config_dir()
+}
+
+/// The directory installed packs are cloned into, one subdirectory each.
+pub fn packs_dir() -> Option<PathBuf> {
+    data_dir().map(|dir| dir.join("packs"))
+}

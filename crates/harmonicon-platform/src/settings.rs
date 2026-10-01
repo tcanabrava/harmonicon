@@ -20,6 +20,7 @@ use crate::assets_management::{
     SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d, SelectedTheme,
     ShowNoteNumbers,
 };
+use crate::content_packs::ContentSources;
 use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::PitchAlgorithm;
 
@@ -249,6 +250,7 @@ struct Settings {
     reduced_motion: bool,
     action_button_style: ActionButtonStyle,
     bending_trainer: BendingTrainerSettings,
+    content_sources: ContentSources,
 }
 
 impl Default for Settings {
@@ -270,6 +272,7 @@ impl Default for Settings {
             reduced_motion: false,
             action_button_style: ActionButtonStyle::default(),
             bending_trainer: BendingTrainerSettings::default(),
+            content_sources: ContentSources::default(),
         }
     }
 }
@@ -333,6 +336,7 @@ impl Plugin for SettingsPlugin {
             .init_resource::<ReducedMotion>()
             .init_resource::<ActionButtonStyle>()
             .init_resource::<BendingTrainerSettings>()
+            .init_resource::<ContentSources>()
             .init_resource::<PendingSave>()
             .add_systems(Startup, apply_loaded_settings)
             // Save whenever either settings resource changes. The Startup load
@@ -353,7 +357,8 @@ impl Plugin for SettingsPlugin {
                          colorblind_palette: Res<ColorblindPalette>,
                          reduced_motion: Res<ReducedMotion>,
                          action_button_style: Res<ActionButtonStyle>,
-                         bending_trainer: Res<BendingTrainerSettings>| {
+                         bending_trainer: Res<BendingTrainerSettings>,
+                         content_sources: Res<ContentSources>| {
                             audio.is_changed()
                                 || theme_2d.is_changed()
                                 || theme_3d.is_changed()
@@ -366,6 +371,7 @@ impl Plugin for SettingsPlugin {
                                 || reduced_motion.is_changed()
                                 || action_button_style.is_changed()
                                 || bending_trainer.is_changed()
+                                || content_sources.is_changed()
                         },
                     ),
                     tick_pending_save,
@@ -395,6 +401,7 @@ pub fn apply_loaded_settings(
     mut reduced_motion: ResMut<ReducedMotion>,
     mut action_button_style: ResMut<ActionButtonStyle>,
     mut bending_trainer: ResMut<BendingTrainerSettings>,
+    mut content_sources: ResMut<ContentSources>,
 ) {
     let settings = load_settings();
     audio.music_volume = settings.music_volume;
@@ -416,6 +423,7 @@ pub fn apply_loaded_settings(
     // plain file, and an out-of-range value would otherwise reach the
     // trainer's maths before the player ever opens the drawer.
     *bending_trainer = settings.bending_trainer.clamped();
+    *content_sources = settings.content_sources;
     info!(
         "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={} note_numbers={} adaptive_difficulty={} fullscreen={} colorblind_palette={} reduced_motion={} action_button_style={:?}",
         audio.music_volume,
@@ -448,6 +456,7 @@ fn save_current(
     reduced_motion: &ReducedMotion,
     action_button_style: &ActionButtonStyle,
     bending_trainer: &BendingTrainerSettings,
+    content_sources: &ContentSources,
 ) {
     save_settings(&Settings {
         music_volume: audio.music_volume,
@@ -466,6 +475,7 @@ fn save_current(
         reduced_motion: reduced_motion.0,
         action_button_style: *action_button_style,
         bending_trainer: bending_trainer.clone(),
+        content_sources: content_sources.clone(),
     });
 }
 
@@ -507,6 +517,7 @@ fn tick_pending_save(
     reduced_motion: Res<ReducedMotion>,
     action_button_style: Res<ActionButtonStyle>,
     bending_trainer: Res<BendingTrainerSettings>,
+    content_sources: Res<ContentSources>,
 ) {
     // Nothing pending is the usual state; don't rewrite it every frame.
     if pending.0.is_none() {
@@ -528,6 +539,7 @@ fn tick_pending_save(
             &reduced_motion,
             &action_button_style,
             &bending_trainer,
+            &content_sources,
         );
     }
 }
@@ -549,6 +561,7 @@ fn flush_pending_save_on_exit(
     reduced_motion: Res<ReducedMotion>,
     action_button_style: Res<ActionButtonStyle>,
     bending_trainer: Res<BendingTrainerSettings>,
+    content_sources: Res<ContentSources>,
 ) {
     if exit.read().next().is_none() || pending.0.is_none() {
         return;
@@ -567,6 +580,7 @@ fn flush_pending_save_on_exit(
         &reduced_motion,
         &action_button_style,
         &bending_trainer,
+        &content_sources,
     );
 }
 
@@ -671,6 +685,36 @@ mod tests {
         // off, not silently on.
         let s: Settings = serde_json::from_str("{}").unwrap();
         assert!(!s.adaptive_difficulty_enabled);
+    }
+
+    // ── ContentSources ───────────────────────────────────────────────────────
+
+    /// Through figment, as `load_settings` reads it: the file's list must
+    /// *replace* the default one, or a removed official repository would
+    /// come back on every start.
+    fn layered(file: &str) -> Settings {
+        Figment::from(Serialized::defaults(Settings::default()))
+            .merge(Json::string(file))
+            .extract()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_settings_file_without_sources_gets_the_official_repositories() {
+        assert_eq!(layered("{}").content_sources, ContentSources::default());
+    }
+
+    #[test]
+    fn a_players_repository_list_replaces_the_defaults() {
+        let s =
+            layered(r#"{"content_sources":{"lessons":[],"songs":[{"path":"/home/me/songs"}]}}"#);
+        assert!(s.content_sources.lessons.is_empty());
+        assert_eq!(
+            s.content_sources.songs,
+            [harmonicon_packs::repo::RepoSpec::Local {
+                path: "/home/me/songs".into()
+            }]
+        );
     }
 
     // ── FullscreenEnabled ────────────────────────────────────────────────────

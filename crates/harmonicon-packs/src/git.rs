@@ -184,6 +184,17 @@ pub fn validate_checkout(
     engine: &EngineSupport,
 ) -> Result<PackManifest, SyncError> {
     check_tree(dir)?;
+    read_manifest(dir, kind, engine)
+}
+
+/// Reads `dir/pack.json` and checks it against `engine`, without walking the
+/// tree: for a pack already validated when it was installed, or a local
+/// folder its author is editing.
+pub fn read_manifest(
+    dir: &Path,
+    kind: PackKind,
+    engine: &EngineSupport,
+) -> Result<PackManifest, SyncError> {
     let bytes = match std::fs::read(dir.join("pack.json")) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(SyncError::NoManifest),

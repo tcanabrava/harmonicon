@@ -67,6 +67,7 @@ type_complexity = "allow"
 [dependencies]
 harmonicon-core = { path = "crates/harmonicon-core", version = "*"}
 harmonicon-dsp = { path = "crates/harmonicon-dsp" }
+harmonicon-packs = { path = "crates/harmonicon-packs", version = "*" }
 harmonicon-audio = { path = "crates/harmonicon-audio", version = "*" }
 harmonicon-platform = { path = "crates/harmonicon-platform", version = "*" }
 harmonicon-song = { path = "crates/harmonicon-song", version = "*" }

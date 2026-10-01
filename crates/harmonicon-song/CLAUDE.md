@@ -251,6 +251,15 @@ load-bearing about *this* crate.
     `tests/asset_layout.rs::the_bundled_curriculum_forms_a_drawable_graph`
     fails the build over one.
 
+- **Lessons also come from lesson packs** (`docs/content_packs_plan.md`):
+  `scan_all_lessons` reads bundled lessons, then every usable pack from
+  `ContentPacks` in configured order (chart paths `packs://<slug>/...`),
+  then `~/Harmonicon/lessons`, and keeps only the **first** lesson with each
+  id, since an id is both a profile key and a prerequisite target.
+  `LESSON_FORMAT_VERSION` (`manifest.rs`) is what a pack's
+  `requires.lesson_format` is checked against — bump it in the same change
+  that adds a widget or pass-criteria type an older build can't parse.
+
 - **Lessons can also live in `~/Harmonicon/lessons`**, same
   bundled-plus-external pattern as songs/themes:
   `lessons::catalog::scan_all_lessons` scans `assets/lessons` then, if

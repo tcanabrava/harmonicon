@@ -10,6 +10,7 @@ harmonicon-core = { path = "../harmonicon-core", version = "*" }
 harmonicon-score = { path = "../harmonicon-score", version = "*" }
 harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
 harmonicon-platform = { path = "../harmonicon-platform", version = "*" }
+harmonicon-packs = { path = "../harmonicon-packs", version = "*" }
 bevy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

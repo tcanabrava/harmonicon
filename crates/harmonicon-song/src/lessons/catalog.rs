@@ -3,13 +3,14 @@
 //! Startup discovery of every bundled lesson (`assets/lessons/<unit>/
 //! <lesson>/lesson.json`) and unit grouping for the menu.
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 use bevy::prelude::*;
 
 use super::manifest::{LessonManifest, parse_lesson};
 use harmonicon_platform::assets_management::ExternalFolderChanged;
+use harmonicon_platform::content_packs::{ContentPacks, ContentPacksChanged, ContentPacksSet};
 
 /// Build-time-generated stand-in for the `assets/lessons` directory walk, on
 /// targets where that tree isn't a readable local directory: wasm has no
@@ -56,22 +57,26 @@ pub fn group_by_unit(lessons: &[LessonEntry]) -> Vec<(&str, Vec<&LessonEntry>)> 
     units
 }
 
-/// Scans `root` (the bundled `assets/lessons` tree, or the external
-/// `~/Harmonicon/lessons` drop folder) for `<unit_dir>/<lesson_dir>/
-/// lesson.json`, sorted by directory name so the `01_`/`02_` prefixes give
-/// the curriculum order. `asset_prefix` is what the chart's engine-facing
-/// asset path starts with (`"lessons"` for the bundled tree,
-/// `"external://lessons"` for the drop folder — same `AssetSource` scheme
-/// prefix `assets_management::scan_artist_song` uses for external songs; a
-/// temp dir in tests). Invalid manifests are logged and skipped — one bad
-/// lesson must not take down the whole menu.
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+/// Scans `root` (the bundled `assets/lessons` tree, the external
+/// `~/Harmonicon/lessons` drop folder, or a lesson pack's checkout) for
+/// `<unit_dir>/<lesson_dir>/lesson.json`, sorted by directory name so the
+/// `01_`/`02_` prefixes give the curriculum order. `asset_prefix` is what
+/// the chart's engine-facing asset path starts with (`"lessons"` for the
+/// bundled tree, `"external://lessons"` for the drop folder, a pack's
+/// `"packs://<slug>"` — the same `AssetSource` scheme prefixes
+/// `assets_management::scan_artist_song` uses for songs; a temp dir in
+/// tests). Invalid manifests are logged and skipped — one bad lesson must
+/// not take down the whole menu. Hidden directories (a pack's `.git`) are
+/// not units.
+#[cfg(not(target_arch = "wasm32"))]
 fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
+    use harmonicon_platform::assets_management::is_visible_dir;
+
     let mut entries = Vec::new();
     let mut unit_dirs: Vec<_> = match std::fs::read_dir(root) {
         Ok(rd) => rd
             .flatten()
-            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .filter(is_visible_dir)
             .map(|e| e.path())
             .collect(),
         Err(_) => return entries,
@@ -84,7 +89,7 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
         };
         let mut lesson_dirs: Vec<_> = rd
             .flatten()
-            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .filter(is_visible_dir)
             .map(|e| e.path())
             .collect();
         lesson_dirs.sort();
@@ -118,18 +123,54 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
     entries
 }
 
-/// Bundled `assets/lessons` plus, if present, an external
-/// `~/Harmonicon/lessons` drop folder — mirroring
-/// `assets_management::scan_all_songs`'s bundled+external pattern. Bundled
-/// entries come first, so curriculum ordering/prerequisites among the
-/// shipped lessons are unaffected by whatever a player drops in.
+/// Bundled `assets/lessons`, then every usable lesson pack in configured
+/// order, then, if present, an external `~/Harmonicon/lessons` drop folder —
+/// mirroring `assets_management::scan_all_songs_into`. Bundled entries come
+/// first, so curriculum ordering/prerequisites among the shipped lessons are
+/// unaffected by whatever a pack or a player adds.
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-fn scan_all_lessons() -> Vec<LessonEntry> {
+fn scan_all_lessons(packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
     let mut entries = scan_lessons_root(Path::new("assets/lessons"), "lessons");
+    entries.extend(scan_lesson_packs(packs));
     if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/lessons")) {
         entries.extend(scan_lessons_root(&external_root, "external://lessons"));
     }
+    dedupe_by_id(entries)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn scan_lesson_packs(packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
+    packs
+        .into_iter()
+        .flat_map(|p| p.usable(harmonicon_packs::pack::PackKind::Lessons))
+        .flat_map(|pack| scan_lessons_root(&pack.root, &pack.asset_prefix()))
+        .collect()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn scan_lesson_packs(_packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
+    Vec::new()
+}
+
+/// Keeps the first lesson with each id. An id is a profile key and a
+/// prerequisite target, so two lessons sharing one would make progress and
+/// unlocking ambiguous; the earlier source (bundled before packs before the
+/// drop folder) wins.
+fn dedupe_by_id(entries: Vec<LessonEntry>) -> Vec<LessonEntry> {
+    let mut seen = std::collections::HashSet::new();
     entries
+        .into_iter()
+        .filter(|entry| {
+            let fresh = seen.insert(entry.manifest.id.clone());
+            if !fresh {
+                warn!(
+                    "Skipping lesson {:?} from {:?}: an earlier lesson already uses that id",
+                    entry.manifest.id, entry.chart_asset_path
+                );
+            }
+            fresh
+        })
+        .collect()
 }
 
 /// Bundled lessons only, parsed from the build-time manifest (see the
@@ -141,8 +182,8 @@ fn scan_all_lessons() -> Vec<LessonEntry> {
 /// manifest is logged and skipped, never fatal — even though a bad lesson
 /// here would have failed the build's own asset-layout test first.
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
-fn scan_all_lessons() -> Vec<LessonEntry> {
-    bundled::BUNDLED_LESSONS
+fn scan_all_lessons(packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
+    let bundled = bundled::BUNDLED_LESSONS
         .iter()
         .filter_map(|(unit, lesson, json)| {
             let manifest = match parse_lesson(json.as_bytes()) {
@@ -160,12 +201,12 @@ fn scan_all_lessons() -> Vec<LessonEntry> {
                 manifest,
                 chart_asset_path,
             })
-        })
-        .collect()
+        });
+    dedupe_by_id(bundled.chain(scan_lesson_packs(packs)).collect())
 }
 
-fn scan_lessons(mut available: ResMut<AvailableLessons>) {
-    available.0 = scan_all_lessons();
+fn scan_lessons(mut available: ResMut<AvailableLessons>, packs: Option<Res<ContentPacks>>) {
+    available.0 = scan_all_lessons(packs.as_deref());
     let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
     info!("Found {} lesson(s): {:?}", ids.len(), ids);
 }
@@ -183,16 +224,22 @@ pub struct LessonsRescanned;
 /// on top, so the dependency points this way and not the reverse), while
 /// still reusing its one OS-level watch instead of starting a second one
 /// scoped to `lessons/` alone.
+///
+/// A pack being installed, updated or removed (`ContentPacksChanged`)
+/// rescans too.
 fn rescan_lessons_on_external_change(
     mut changed: MessageReader<ExternalFolderChanged>,
+    mut packs_changed: MessageReader<ContentPacksChanged>,
     mut available: ResMut<AvailableLessons>,
+    packs: Option<Res<ContentPacks>>,
     mut rescanned: MessageWriter<LessonsRescanned>,
 ) {
-    let dirty = changed
+    let external = changed
         .read()
         .any(|ev| ev.top_level_dirs.contains("lessons"));
+    let dirty = packs_changed.read().count() > 0 || external;
     if dirty {
-        available.0 = scan_all_lessons();
+        available.0 = scan_all_lessons(packs.as_deref());
         let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
         info!(
             "Re-scanned lessons: found {} lesson(s): {:?}",
@@ -209,8 +256,14 @@ impl Plugin for LessonsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AvailableLessons>()
             .add_message::<LessonsRescanned>()
-            .add_systems(Startup, scan_lessons)
-            .add_systems(Update, rescan_lessons_on_external_change);
+            // Read by the rescan below; registered here too so an app
+            // without `ContentPacksPlugin` (tests, tools) still runs.
+            .add_message::<ContentPacksChanged>()
+            .add_systems(Startup, scan_lessons.after(ContentPacksSet))
+            .add_systems(
+                Update,
+                rescan_lessons_on_external_change.after(ContentPacksSet),
+            );
     }
 }
 
@@ -218,6 +271,7 @@ impl Plugin for LessonsPlugin {
 mod tests {
     use super::*;
     use bevy::ecs::schedule::Schedule;
+    use harmonicon_packs::pack::PackKind;
 
     fn entry(id: &str, unit: &str) -> LessonEntry {
         LessonEntry {
@@ -321,6 +375,60 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_lesson_pack_builds_packs_source_chart_paths_and_skips_git() {
+        use harmonicon_packs::pack::PackManifest;
+        use harmonicon_packs::repo::RepoSpec;
+        use harmonicon_platform::content_packs::{PackEntry, PackStatus};
+
+        let dir =
+            std::env::temp_dir().join(format!("harmonicon_lessons_pack_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for rel in ["01_basics/01_first/lesson.json", ".git/01_x/lesson.json"] {
+            let p = dir.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(
+                &p,
+                r#"{"id":"first","unit":"basics","title_key":"t","body_key":"b",
+                    "chart":"song/chart.harpchart"}"#,
+            )
+            .unwrap();
+        }
+        let manifest = PackManifest::parse(
+            br#"{"schema":1,"kind":"lessons","id":"p","name":"P","version":"1.0.0"}"#,
+        )
+        .unwrap()
+        .unwrap();
+        let packs = ContentPacks(vec![PackEntry {
+            kind: PackKind::Lessons,
+            spec: RepoSpec::Local { path: dir.clone() },
+            slug: "core".into(),
+            root: dir.clone(),
+            status: PackStatus::Ready {
+                manifest,
+                commit: None,
+            },
+        }]);
+
+        let entries = scan_lesson_packs(Some(&packs));
+        assert_eq!(entries.len(), 1, "the .git copy must not be scanned");
+        assert_eq!(
+            entries[0].chart_asset_path.as_deref(),
+            Some("packs://core/01_basics/01_first/song/chart.harpchart")
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_first_lesson_with_an_id_wins() {
+        let mut later = entry("a", "second-source");
+        later.chart_asset_path = Some("packs://p/x".into());
+        let kept = dedupe_by_id(vec![entry("a", "first-source"), entry("b", "u"), later]);
+        let units: Vec<&str> = kept.iter().map(|l| l.manifest.unit.as_str()).collect();
+        assert_eq!(units, ["first-source", "u"]);
     }
 
     // ── scan_lessons (Startup system) ────────────────────────────────────────

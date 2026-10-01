@@ -8,6 +8,16 @@ use serde::Deserialize;
 
 const SCHEMA: &str = include_str!("../../../../assets/lesson_schema.dtd.json");
 
+/// The newest lesson format this build reads. A lesson pack declaring a
+/// higher `requires.lesson_format` in its `pack.json` is refused as a whole
+/// with a "needs a newer Harmonicon" message, rather than having its lessons
+/// fail one by one on a widget or pass criterion this build doesn't know.
+///
+/// Bump it whenever `lesson.json` gains something an older build cannot
+/// parse — a new `widgets` or `pass_criteria` type, a new required field —
+/// in the same change that adds it.
+pub const LESSON_FORMAT_VERSION: u32 = 1;
+
 /// How a lesson is judged. `Accuracy`/`Technique` are judged when a
 /// chart-backed run reaches the results screen; `None` on [`LessonManifest`]
 /// means finishing at all counts. `ScaleAdherence` is judged differently —

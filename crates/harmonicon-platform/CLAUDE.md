@@ -50,6 +50,30 @@ load-bearing about *this* crate.
     shipped builds, which is exactly the `--features dev`-only behavior
     this file's Commands section says never to ship.
 
+- **Lesson and song packs** (`content_packs.rs`; design in
+  `docs/content_packs_plan.md`). `ContentSources` is the configured
+  repository list, persisted in `settings.json` (a player's list *replaces*
+  the default official pair — figment replaces arrays, tested). `ContentPacks`
+  is each one's state on disk, read at `Startup` in `ContentPacksSet` and
+  again on a `RefreshContentPacks` message, which then fires
+  `ContentPacksChanged` so the song and lesson scans rerun.
+  - **`packs://` is one source with a custom reader**, not a
+    `FileAssetReader` per pack: sources are fixed once `AssetPlugin` is built,
+    while packs appear at runtime, and a local author's pack can be anywhere
+    on disk. The first path segment is the pack's slug, routed through the
+    shared `PackRoots` table; a path that tries to leave its pack (`..`) is
+    `NotFound`. It reads with `std::fs`, which is what makes it work on
+    Android, where the default reader is the APK's.
+  - **What a pack may require is decided by the composition root**
+    (`PackEngine`), the only place that knows both the game's version and
+    `harmonicon-song`'s `LESSON_FORMAT_VERSION`.
+  - **Scans skip hidden directories** (`assets_management::is_visible_dir`):
+    a pack's checkout keeps its `.git`, which would otherwise read as an
+    artist or a unit.
+  - **Song asset paths are relative to the scanned root**, with the root's
+    prefix (`songs/`, `external://songs/`, `packs://<slug>/`) prepended — a
+    pack checkout has no `songs` folder above its content to anchor on.
+
 - **This crate owns the whole Fluent stack**, down to the asset loaders.
   `localization::ftl` holds the `.ftl`/`.ftl.ron` `AssetLoader`s and the
   `LocaleBundle` asset; `localization::Locale` does the language

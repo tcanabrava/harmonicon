@@ -55,10 +55,10 @@ locales/<lang>.ftl             unit-* and track-* names
    no backend trait (tests drive gix against real `file://` repositories,
    which proved simpler than a fake), and no download progress yet (phase 4
    shows an indeterminate spinner until it needs more).
-2. **Engine integration**: `packs://` asset source under the data dir, one
-   scan per compatible installed pack in the song and lesson scans,
-   `ContentSources` in settings (defaults to the two official repos), rescan
-   messages after a sync.
+2. ~~**Engine integration**~~ — landed: `packs://`, `ContentSources` in
+   settings, `ContentPacks`, pack scans for songs and lessons, rescans on
+   `ContentPacksChanged`. Nothing downloads yet, so with the default
+   settings both official packs read as not installed until phase 4.
 3. **Bundled localization**: load pack `.ftl` files, rebuild `Localization`
    on rescan, audit which `lesson-*` keys are engine chrome and which are
    content.

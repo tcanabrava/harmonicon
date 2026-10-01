@@ -3,14 +3,16 @@
 //! Everything the game needs from the machine it runs on, below any
 //! gameplay concept: asset discovery ([`assets_management`]), translated
 //! strings ([`localization`]), persisted preferences ([`settings`]), the
-//! visual theme ([`theme`]) and the narrow-window breakpoint
-//! ([`responsive`]).
+//! visual theme ([`theme`]), the narrow-window breakpoint ([`responsive`])
+//! and which lesson/song packs are installed ([`content_packs`]).
 //!
-//! Depends only on `harmonicon-core` and `harmonicon-audio`. Nothing here
-//! knows what a song, a note or a screen is.
+//! Depends only on `harmonicon-core`, `harmonicon-audio` and
+//! `harmonicon-packs`. Nothing here knows what a song, a note or a screen
+//! is.
 
 pub mod assets_management;
 pub mod calendar;
+pub mod content_packs;
 pub mod localization;
 pub mod paths;
 pub mod responsive;

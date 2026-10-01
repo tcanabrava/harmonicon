@@ -2,8 +2,10 @@
 
 use bevy::prelude::*;
 use std::collections::HashMap;
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs::DirEntry;
+
+use crate::content_packs::{ContentPacks, ContentPacksChanged, ContentPacksSet};
 
 mod watch;
 pub use watch::ExternalFolderChanged;
@@ -162,10 +164,13 @@ impl Plugin for AssetsManagementPlugin {
             .add_message::<watch::ExternalFolderChanged>()
             .add_message::<SongsRescanned>()
             .add_message::<ThemesRescanned>()
+            // Read by `rescan_on_external_change`; registered here too so an
+            // app without `ContentPacksPlugin` (tests, tools) still runs.
+            .add_message::<ContentPacksChanged>()
             .add_systems(
                 Startup,
                 (
-                    scan_all_songs,
+                    scan_all_songs.after(ContentPacksSet),
                     scan_harmonica_models,
                     scan_note_themes,
                     scan_ui_themes,
@@ -179,7 +184,8 @@ impl Plugin for AssetsManagementPlugin {
                     watch::process_external_folder_events,
                     rescan_on_external_change,
                 )
-                    .chain(),
+                    .chain()
+                    .after(ContentPacksSet),
             );
     }
 }
@@ -187,15 +193,18 @@ impl Plugin for AssetsManagementPlugin {
 /// Consumes `watch::ExternalFolderChanged` for the two kinds this module
 /// owns (`songs`/`themes`), re-scanning + firing the matching `*Rescanned`
 /// message for whichever actually changed. `lessons::catalog` has its own
-/// sibling consumer of the same message for `lessons`.
+/// sibling consumer of the same message for `lessons`. A pack being
+/// installed, updated or removed (`ContentPacksChanged`) rescans songs too.
 fn rescan_on_external_change(
     mut changed: MessageReader<ExternalFolderChanged>,
-    available_songs: ResMut<AvailableSongs>,
+    mut packs_changed: MessageReader<ContentPacksChanged>,
+    mut available_songs: ResMut<AvailableSongs>,
     available_themes: ResMut<AvailableThemes>,
+    packs: Option<Res<ContentPacks>>,
     mut songs_rescanned: MessageWriter<SongsRescanned>,
     mut themes_rescanned: MessageWriter<ThemesRescanned>,
 ) {
-    let mut dirty_songs = false;
+    let mut dirty_songs = packs_changed.read().count() > 0;
     let mut dirty_themes = false;
     for ev in changed.read() {
         dirty_songs |= ev.top_level_dirs.contains("songs");
@@ -203,7 +212,7 @@ fn rescan_on_external_change(
     }
 
     if dirty_songs {
-        scan_all_songs(available_songs);
+        scan_all_songs_into(&mut available_songs, packs.as_deref());
         songs_rescanned.write(SongsRescanned);
     }
     if dirty_themes {
@@ -371,38 +380,25 @@ fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
     );
 }
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-fn clean_song_path(full_path: &std::path::Path) -> Option<String> {
-    let mut ancestor = full_path;
-    while let Some(parent) = ancestor.parent() {
-        if ancestor.file_name().is_some_and(|name| name == "songs") {
-            break;
-        }
-        ancestor = parent;
-    }
-
-    let relative_path = full_path.strip_prefix(ancestor.parent()?).ok()?;
-    Some(relative_path.to_string_lossy().into_owned())
-}
-
-/// `source_prefix` is prepended to the built `SongEntry::asset_path` so it
-/// loads from the right [`AssetSource`](bevy::asset::io::AssetSource): empty
-/// for the bundled `assets/` root, or `"external://"` for the `~/Harmonicon`
-/// drop folder registered under that source name in `main.rs`.
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+/// `songs_root` is the folder holding artist folders, and `source_prefix`
+/// is what each built `SongEntry::asset_path` starts with, so it loads from
+/// the right [`AssetSource`](bevy::asset::io::AssetSource): `songs/` for the
+/// bundled `assets/` root, `external://songs/` for the `~/Harmonicon` drop
+/// folder, or a pack's `packs://<slug>/`.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn scan_artist_song(
     artist_dir: &DirEntry,
-    available: &mut ResMut<AvailableSongs>,
+    songs_root: &std::path::Path,
+    available: &mut AvailableSongs,
     source_prefix: &str,
 ) {
-    println!("Looking for artist songs inside of {:?}", artist_dir);
     let Ok(song_dirs) = std::fs::read_dir(artist_dir.path()) else {
         return;
     };
 
     let artist = artist_dir.file_name().to_string_lossy().into_owned();
     for song_dir in song_dirs.flatten() {
-        if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+        if !is_visible_dir(&song_dir) {
             continue;
         }
 
@@ -451,68 +447,78 @@ pub fn scan_artist_song(
             continue;
         };
 
-        let Some(cleaned_path) = clean_song_path(&song_file) else {
+        let Some(relative) = asset_relative_path(&song_file, songs_root) else {
             continue;
         };
 
         let name = song_dir.file_name().to_string_lossy().into_owned();
-        let full_path = format!("{source_prefix}{cleaned_path}");
-
         available
             .0
             .entry(artist.clone())
             .or_default()
             .push(SongEntry {
-                asset_path: full_path,
+                asset_path: format!("{source_prefix}{relative}"),
                 artist: artist.clone(),
                 name,
             });
     }
 }
 
-/// Walks `songs_root` (bundled `assets/songs` or the external
-/// `~/Harmonicon/songs` drop folder) and scans each artist subfolder into
-/// `available`, tagging entries with `source_prefix` so they load from the
-/// matching [`AssetSource`](bevy::asset::io::AssetSource).
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+/// `path` below `root`, `/`-separated whatever the platform, since asset
+/// paths are.
+#[cfg(not(target_arch = "wasm32"))]
+fn asset_relative_path(path: &std::path::Path, root: &std::path::Path) -> Option<String> {
+    let relative = path.strip_prefix(root).ok()?;
+    let parts: Option<Vec<&str>> = relative.iter().map(|c| c.to_str()).collect();
+    Some(parts?.join("/"))
+}
+
+/// A directory a scan should look into. Hidden ones are skipped: a pack's
+/// checkout carries its own `.git`, which is not content.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn is_visible_dir(entry: &DirEntry) -> bool {
+    entry.file_type().is_ok_and(|t| t.is_dir())
+        && !entry.file_name().to_string_lossy().starts_with('.')
+}
+
+/// Walks `songs_root` (bundled `assets/songs`, the external
+/// `~/Harmonicon/songs` drop folder, or a pack's checkout) and scans each
+/// artist subfolder into `available`, tagging entries with `source_prefix`
+/// so they load from the matching
+/// [`AssetSource`](bevy::asset::io::AssetSource).
+#[cfg(not(target_arch = "wasm32"))]
 fn scan_songs_root(
     songs_root: &std::path::Path,
     source_prefix: &str,
-    available: &mut ResMut<AvailableSongs>,
+    available: &mut AvailableSongs,
 ) {
     let Ok(artists) = std::fs::read_dir(songs_root) else {
         return;
     };
 
     for artist_dir in artists.flatten() {
-        if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+        if !is_visible_dir(&artist_dir) {
             continue;
         }
-        scan_artist_song(&artist_dir, available, source_prefix);
+        scan_artist_song(&artist_dir, songs_root, available, source_prefix);
     }
 }
 
-// Scans the bundled songs directory, plus the external `~/Harmonicon/songs`
-// drop folder if present, for harmonica models and songs, per artist. The
-// external folder is optional — most players won't have one — so its absence
-// is not a warning, unlike the bundled directory always shipped with the game.
-// Clears `available` first, so this is safe to call again at runtime (e.g. a
-// menu "Refresh" button re-scanning after the player drops a song into
-// `~/Harmonicon/songs`), not just once at Startup.
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
-pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
-    available.0.clear();
-    let bundled_root = std::path::Path::new("assets/songs");
-    if bundled_root.is_dir() {
-        scan_songs_root(bundled_root, "", &mut available);
-    } else {
-        warn!("No songs directory found at assets/songs/");
+/// Every usable song pack, after whatever else is already in `available`.
+#[cfg(not(target_arch = "wasm32"))]
+fn scan_song_packs(packs: Option<&ContentPacks>, available: &mut AvailableSongs) {
+    for pack in packs
+        .into_iter()
+        .flat_map(|p| p.usable(harmonicon_packs::pack::PackKind::Songs))
+    {
+        scan_songs_root(&pack.root, &format!("{}/", pack.asset_prefix()), available);
     }
+}
 
-    if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/songs")) {
-        scan_songs_root(&external_root, "external://", &mut available);
-    }
+#[cfg(target_arch = "wasm32")]
+fn scan_song_packs(_packs: Option<&ContentPacks>, _available: &mut AvailableSongs) {}
 
+fn log_song_count(available: &AvailableSongs) {
     let total: usize = available.0.values().map(|v| v.len()).sum();
     info!(
         "Found {} song(s) across {} artist(s)",
@@ -521,12 +527,42 @@ pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
     );
 }
 
-/// wasm sibling of the native `scan_all_songs` above: reads the build-time
-/// manifest instead of scanning `assets/songs/`, and skips the
+pub fn scan_all_songs(mut available: ResMut<AvailableSongs>, packs: Option<Res<ContentPacks>>) {
+    scan_all_songs_into(&mut available, packs.as_deref());
+}
+
+// Scans the bundled songs directory, plus the external `~/Harmonicon/songs`
+// drop folder if present, plus every usable song pack, per artist. The
+// external folder is optional — most players won't have one — so its absence
+// is not a warning, unlike the bundled directory always shipped with the game.
+// Clears `available` first, so this is safe to call again at runtime (e.g.
+// after the player drops a song into `~/Harmonicon/songs`, or a pack
+// updates), not just once at Startup.
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
+    available.0.clear();
+    let bundled_root = std::path::Path::new("assets/songs");
+    if bundled_root.is_dir() {
+        scan_songs_root(bundled_root, "songs/", available);
+    } else {
+        warn!("No songs directory found at assets/songs/");
+    }
+
+    if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/songs")) {
+        scan_songs_root(&external_root, "external://songs/", available);
+    }
+
+    scan_song_packs(packs, available);
+    log_song_count(available);
+}
+
+/// wasm/Android sibling of the native `scan_all_songs_into` above: reads the
+/// build-time manifest instead of scanning `assets/songs/`, and skips the
 /// `~/Harmonicon/songs` external drop folder entirely — there's no home
-/// directory concept in a browser.
+/// directory concept in a browser. Android still scans downloaded packs,
+/// which live in its private data directory.
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
-pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
+pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
     available.0.clear();
     for (artist, name, asset_path) in manifest::SONGS {
         available
@@ -539,19 +575,15 @@ pub fn scan_all_songs(mut available: ResMut<AvailableSongs>) {
                 asset_path: (*asset_path).to_string(),
             });
     }
-
-    let total: usize = available.0.values().map(|v| v.len()).sum();
-    info!(
-        "Found {} song(s) across {} artist(s)",
-        total,
-        available.0.len()
-    );
+    scan_song_packs(packs, available);
+    log_song_count(available);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use bevy::ecs::schedule::Schedule;
+    use harmonicon_packs::pack::PackKind;
 
     #[test]
     fn scan_all_songs_does_not_duplicate_entries_when_run_again() {
@@ -577,6 +609,80 @@ mod tests {
             .sum();
 
         assert_eq!(first, second);
+    }
+
+    fn song_tree(files: &[&str]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        for rel in files {
+            let p = dir.path().join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, "{}").unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn song_paths_are_relative_to_the_scanned_root() {
+        let root = song_tree(&["Bach/Minuet/song/chart.harpchart"]);
+        let mut available = AvailableSongs::default();
+        scan_songs_root(root.path(), "packs://some-pack/", &mut available);
+        assert_eq!(
+            available.0["Bach"][0].asset_path,
+            "packs://some-pack/Bach/Minuet/song/chart.harpchart"
+        );
+    }
+
+    #[test]
+    fn hidden_folders_are_not_artists_or_songs() {
+        let root = song_tree(&[
+            ".git/objects/song/chart.harpchart",
+            "Bach/.draft/song/chart.harpchart",
+            "Bach/Minuet/song/chart.harpchart",
+        ]);
+        let mut available = AvailableSongs::default();
+        scan_songs_root(root.path(), "", &mut available);
+        assert_eq!(available.0.len(), 1);
+        assert_eq!(available.0["Bach"].len(), 1);
+    }
+
+    #[test]
+    fn usable_song_packs_are_scanned_after_everything_else() {
+        use crate::content_packs::{PackEntry, PackStatus};
+        use harmonicon_packs::pack::PackManifest;
+        use harmonicon_packs::repo::RepoSpec;
+
+        let root = song_tree(&["Bach/Minuet/song/chart.harpchart"]);
+        let manifest = PackManifest::parse(
+            br#"{"schema":1,"kind":"songs","id":"p","name":"P","version":"1.0.0"}"#,
+        )
+        .unwrap()
+        .unwrap();
+        let entry = |slug: &str, status| PackEntry {
+            kind: PackKind::Songs,
+            spec: RepoSpec::Local {
+                path: root.path().into(),
+            },
+            slug: slug.into(),
+            root: root.path().into(),
+            status,
+        };
+        let packs = ContentPacks(vec![
+            entry(
+                "ready",
+                PackStatus::Ready {
+                    manifest,
+                    commit: None,
+                },
+            ),
+            entry("broken", PackStatus::Unusable("no".into())),
+        ]);
+        let mut available = AvailableSongs::default();
+        scan_song_packs(Some(&packs), &mut available);
+        let paths: Vec<_> = available.0["Bach"]
+            .iter()
+            .map(|s| s.asset_path.as_str())
+            .collect();
+        assert_eq!(paths, ["packs://ready/Bach/Minuet/song/chart.harpchart"]);
     }
 
     #[test]

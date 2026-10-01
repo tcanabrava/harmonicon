@@ -31,11 +31,14 @@ use harmonicon_gameplay::gameplay::GameplayPlugin;
 use harmonicon_jam::jam::JamPlugin;
 use harmonicon_lessons::LessonsUiPlugin;
 use harmonicon_menu::menu::MenuPlugin;
+use harmonicon_packs::pack::EngineSupport;
 use harmonicon_platform::assets_management::AssetsManagementPlugin;
+use harmonicon_platform::content_packs::{ContentPacksPlugin, PackEngine};
 use harmonicon_platform::localization::LocalizationPlugin;
 use harmonicon_platform::responsive::ResponsivePlugin;
 use harmonicon_platform::settings::SettingsPlugin;
 use harmonicon_platform::theme::ThemePlugin;
+use harmonicon_song::lessons::LESSON_FORMAT_VERSION;
 use harmonicon_song::lessons::LessonsPlugin;
 use harmonicon_song::song::SongPlugin;
 use harmonicon_ui::music_score::MusicScorePlugin;
@@ -115,6 +118,9 @@ pub fn run() {
     let mut app = App::new();
 
     register_external_asset_source(&mut app);
+    // wasm has no packs to read: its content is bundled at build time.
+    #[cfg(not(target_arch = "wasm32"))]
+    harmonicon_platform::content_packs::register_pack_asset_source(&mut app);
 
     app.add_plugins(
         DefaultPlugins
@@ -187,6 +193,14 @@ pub fn run() {
         harmonicon_ui::dialogs::text_input::TextInputPlugin,
         harmonicon_ui::dialogs::tooltip::TooltipPlugin,
     ));
+
+    // The game's version and the lesson format meet only here, which is why
+    // the composition root says what packs this build can read.
+    app.insert_resource(PackEngine(EngineSupport::new(
+        env!("CARGO_PKG_VERSION"),
+        LESSON_FORMAT_VERSION,
+    )))
+    .add_plugins(ContentPacksPlugin);
 
     #[cfg(feature = "dev")]
     app.add_plugins(dev_capture::DevCapturePlugin);

@@ -7,6 +7,7 @@
 //! No Bevy here, so all of it tests in seconds; see
 //! `docs/content_packs_plan.md` for how the engine uses it.
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod git;
 pub mod pack;
 pub mod repo;

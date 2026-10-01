@@ -9,6 +9,7 @@ publish = false
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
 harmonicon-score = { path = "../harmonicon-score", version = "*" }
 harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
+harmonicon-packs = { path = "../harmonicon-packs", version = "*" }
 bevy = { workspace = true }
 # The Fluent stack, used directly: `localization::ftl` owns the `.ftl`/
 # `.ftl.ron` asset loaders and `localization::Locale` the negotiation, so
@@ -36,6 +37,10 @@ web-time = { workspace = true }
 # scan reads `IMPORT_EXTENSIONS` from is what keeps the two from drifting.
 [build-dependencies]
 harmonicon-score = { path = "../harmonicon-score", version = "*" }
+
+[dev-dependencies]
+semver = "1"
+tempfile = "3"
 
 [features]
 dev = ["bevy/dev", "bevy/debug", "harmonicon-audio/dev"]

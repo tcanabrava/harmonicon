@@ -64,6 +64,18 @@ pub struct EngineSupport {
     pub lesson_format: u32,
 }
 
+impl EngineSupport {
+    /// From the game's `CARGO_PKG_VERSION`, which Cargo has already required
+    /// to be valid semver, hence the panic rather than a `Result`.
+    pub fn new(harmonicon: &str, lesson_format: u32) -> Self {
+        Self {
+            harmonicon: Version::parse(harmonicon)
+                .unwrap_or_else(|e| panic!("game version {harmonicon:?} is not semver: {e}")),
+            lesson_format,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum PackError {
     #[error("pack.json is not valid: {0}")]

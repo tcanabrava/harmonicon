@@ -13,6 +13,12 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 semver = { version = "1", features = ["serde"] }
 thiserror = { workspace = true }
+
+# The transport only exists where a clone can: wasm has no filesystem and no
+# sockets, and gets its packs bundled at build time instead. `pack` and
+# `repo` stay available there so settings and the Options page compile
+# unchanged.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 gix = { version = "0.87", default-features = false, features = [
     "blocking-network-client",
     "blocking-http-transport-reqwest",
