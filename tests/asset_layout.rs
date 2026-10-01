@@ -2,35 +2,19 @@
 
 //! Smoke test for the asset tree's minimum structure.
 //!
-//! Each song and each 3D harmonica model needs a fixed set of files for menu
+//! Each 3D harmonica model and theme needs a fixed set of files for menu
 //! discovery, loading, and 3D behavior. A file missing here breaks the game far
 //! from where the symptom shows up, so this fails fast with a report listing
-//! every missing file, grouped by song or by model, for quick local diagnosis.
+//! every missing file, grouped by model or theme, for quick local diagnosis.
+//!
+//! Songs and lessons are not here: they are content packs, checked by
+//! `validate-pack` in their own repositories (`tests/validate_pack.rs`).
 //!
 //! Paths checked (per the design docs / asset conventions):
-//!   assets/songs/<artist>/<song>/song/*.harpchart
 //!   assets/harmonicas/3d/<model>/{harmonica.glb, holes.json}
 //!   assets/themes/<name>/{theme.json (valid against schema), preview.png, + all files listed in theme.json}
 
 use std::path::{Path, PathBuf};
-
-/// Whether `dir/song/` contains at least one `.harpchart` file (any name —
-/// `song::loader::SongChartLoader` is registered for the extension, not a
-/// fixed filename) — the only asset a song strictly needs.
-/// `background.png`/`elements.png`/`song/*.ogg` and the `2d/`/`3d/` note
-/// asset folders are all optional: the loader falls back to a generated
-/// background, silent (no) music, and the selected note theme's defaults
-/// respectively when they're missing, rather than hanging `SongLoading`
-/// waiting on a dependency that will never resolve. See `Example Song 3`
-/// for a deliberately minimal example exercising every one of those
-/// fallbacks at once.
-fn has_harpchart(dir: &Path) -> bool {
-    std::fs::read_dir(dir.join("song"))
-        .into_iter()
-        .flatten()
-        .flatten()
-        .any(|entry| entry.path().extension().and_then(|e| e.to_str()) == Some("harpchart"))
-}
 
 /// Files every `assets/harmonicas/3d/<model>/` directory must contain.
 const MODEL_FILES: [&str; 2] = ["harmonica.glb", "holes.json"];
@@ -63,151 +47,6 @@ fn label(path: &Path) -> String {
         .unwrap_or(path)
         .display()
         .to_string()
-}
-
-#[test]
-fn song_assets_are_complete() {
-    let root = Path::new("assets/songs");
-    assert!(root.is_dir(), "missing asset directory: {}", root.display());
-
-    // songs/<artist>/<song>/
-    let songs: Vec<PathBuf> = subdirs(root)
-        .iter()
-        .flat_map(|artist| subdirs(artist))
-        .collect();
-    assert!(!songs.is_empty(), "no songs found under {}", root.display());
-
-    let mut report = String::new();
-    for song in songs {
-        if !has_harpchart(&song) {
-            report.push_str(&format!(
-                "  {}: no *.harpchart file under song/\n",
-                label(&song)
-            ));
-        }
-    }
-
-    assert!(report.is_empty(), "Incomplete song assets:\n{report}");
-}
-
-/// Every bundled song's chart must validate against the song schema — the
-/// same check the engine performs at load time (`song::loader`), moved up
-/// to CI so a hand-authored chart can't ship broken and only fail once a
-/// player picks it.
-#[test]
-fn song_charts_are_schema_valid() {
-    let root = Path::new("assets/songs");
-    let chart_validator = schema_validator("assets/song_schema.dtd.json");
-
-    let mut report = String::new();
-    for song in subdirs(root).iter().flat_map(|artist| subdirs(artist)) {
-        let Ok(entries) = std::fs::read_dir(song.join("song")) else {
-            continue; // missing song/ is `song_assets_are_complete`'s complaint
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("harpchart") {
-                continue;
-            }
-            let text = std::fs::read_to_string(&path).unwrap();
-            match serde_json::from_str::<serde_json::Value>(&text) {
-                Err(e) => {
-                    report.push_str(&format!("  {}: JSON parse error: {e}\n", label(&path)));
-                }
-                Ok(value) => {
-                    let errors = validation_errors(&chart_validator, &value);
-                    if !errors.is_empty() {
-                        report.push_str(&format!("  {}:\n{errors}", label(&path)));
-                    }
-                }
-            }
-        }
-    }
-
-    assert!(report.is_empty(), "Schema-invalid song charts:\n{report}");
-}
-
-/// Every bundled chart that declares a *chromatic* harmonica must declare
-/// one this codebase can actually build — see
-/// `harmonicon_core::harmonica::chromatic_harp`.
-///
-/// Both shipped chromatic charts once carried a layout that no real
-/// harmonica has: a C major scale ascending one note per hole, stopping at
-/// A5 instead of C7. The music was right and the charts were internally
-/// consistent, so nothing caught it — a player holding a real chromatic
-/// would simply have found the hole numbers wrong, and the lesson that
-/// teaches the slide was teaching it on a fictional instrument.
-///
-/// Deliberately only chromatics. A diatonic chart may legitimately use an
-/// alternate tuning (paddy Richter, natural minor), so "matches the standard
-/// table" is not a rule that holds there.
-#[test]
-fn bundled_chromatic_charts_use_a_real_instrument() {
-    use harmonicon_core::harmonica::{Harmonica, chromatic_harp};
-    use harmonicon_core::pitch_map::HARP_KEYS;
-
-    let mut report = String::new();
-    let mut checked = 0;
-    let mut charts: Vec<PathBuf> = Vec::new();
-    for root in ["assets/songs"] {
-        for group in subdirs(Path::new(root)) {
-            for item in subdirs(&group) {
-                charts.push(item.join("song"));
-            }
-        }
-    }
-
-    for dir in charts {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("harpchart") {
-                continue;
-            }
-            let text = std::fs::read_to_string(&path).unwrap();
-            let Ok(chart) = serde_json::from_str::<harmonicon_core::chart::HarpChart>(&text) else {
-                continue; // `song_charts_are_schema_valid` reports this
-            };
-            let Harmonica::Chromatic { .. } = &chart.harmonica else {
-                continue;
-            };
-            checked += 1;
-            let matches_a_real_harp = HARP_KEYS
-                .iter()
-                .any(|key| layout_of(&chromatic_harp(key)) == layout_of(&chart.harmonica));
-            if !matches_a_real_harp {
-                report.push_str(&format!(
-                    "  {}: chromatic layout matches no key's standard tuning\n",
-                    label(&path)
-                ));
-            }
-        }
-    }
-    assert!(
-        checked > 0,
-        "no chromatic charts found — has the layout moved?"
-    );
-    assert!(
-        report.is_empty(),
-        "Charts declaring an impossible harmonica:\n{report}"
-    );
-}
-
-/// A chromatic's four note tables, for comparing two harmonicas by layout.
-fn layout_of(harp: &harmonicon_core::harmonica::Harmonica) -> Option<Vec<Vec<String>>> {
-    match harp {
-        harmonicon_core::harmonica::Harmonica::Chromatic {
-            layout: Some(l), ..
-        } => Some(vec![
-            l.blow.clone().unwrap_or_default(),
-            l.draw.clone().unwrap_or_default(),
-            l.blow_slide.clone().unwrap_or_default(),
-            l.draw_slide.clone().unwrap_or_default(),
-        ]),
-        _ => None,
-    }
 }
 
 #[test]

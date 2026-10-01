@@ -184,10 +184,10 @@ pointing at a file that doesn't exist never resolves, so
 `check_loading` polls) would wait on it forever. Without the
 existence check first, a song shipping only a chart wouldn't fail
 loudly — it would just hang on the loading screen indefinitely, with no
-error message pointing at why. `Example Song 3` in the bundled assets
-exists specifically to exercise this path: it ships *only* a chart, on
-purpose, so this fallback behavior stays covered by
-`tests/asset_layout.rs` rather than silently regressing.
+error message pointing at why. `Example Song 3` in the `harmonicon-songs`
+pack exists specifically to exercise this path: it ships *only* a chart,
+on purpose, so this fallback behavior has a real song to check it with
+(`docs/gameplay_validation.md`).
 
 **2D/3D note assets are noted, not loaded, here.** `assets_2d`/
 `assets_3d` are stored as an `AssetPath`, not a `Handle` — loading them

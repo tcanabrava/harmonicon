@@ -191,6 +191,44 @@ mod tests {
         );
     }
 
+    fn fixture() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/song-pack")
+    }
+
+    #[test]
+    fn the_fixture_pack_is_valid() {
+        let report = validate_song_pack(&fixture());
+        assert!(report.errors.is_empty(), "{:#?}", report.errors);
+    }
+
+    /// A chart can be schema-valid and still describe a chromatic no one
+    /// makes: a C major scale one note per hole, stopping at A5. The
+    /// schema can't see that; this check does.
+    #[test]
+    fn a_chromatic_with_an_impossible_layout_is_reported() {
+        let source = fixture().join("Ludwig van Beethoven/Fur Elise/song/chart.harpchart");
+        let mut chart: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&source).unwrap()).unwrap();
+        assert_eq!(
+            chart["harmonica"]["type"], "chromatic",
+            "the fixture must be a chromatic"
+        );
+        let blow = chart["harmonica"]["layout"]["blow"].as_array_mut().unwrap();
+        blow.swap(0, 1);
+
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "Beethoven/Fur Elise/song/chart.harpchart",
+            &chart.to_string(),
+        );
+        let errors = validate_song_pack(dir.path()).errors;
+        assert!(
+            errors.iter().any(|e| e.contains("no real harmonica")),
+            "{errors:#?}"
+        );
+    }
+
     #[test]
     fn an_empty_pack_is_reported() {
         let dir = tempfile::tempdir().unwrap();

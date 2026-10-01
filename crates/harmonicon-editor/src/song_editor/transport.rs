@@ -21,10 +21,11 @@ use harmonicon_platform::settings::ActionButtonStyle;
 use harmonicon_platform::theme::SongEditorColors;
 use harmonicon_ui::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 
-/// Where a file dialog for authored `kind` content (`"lessons"`) opens:
-/// the `~/Harmonicon/<kind>` drop folder, which the game watches live, so
-/// a lesson saved there is playable at once. The home directory when that
-/// folder doesn't exist; the game ships no lessons of its own to start from.
+/// Where a file dialog for authored `kind` content (`"songs"`, `"lessons"`)
+/// opens: the `~/Harmonicon/<kind>` drop folder, which the game watches
+/// live, so a chart saved there is playable at once. The home directory when
+/// that folder doesn't exist; the game ships no songs or lessons of its own
+/// to start from.
 fn drop_folder(kind: &str) -> Option<std::path::PathBuf> {
     let home = dirs::home_dir()?;
     let folder = home.join("Harmonicon").join(kind);
@@ -33,8 +34,8 @@ fn drop_folder(kind: &str) -> Option<std::path::PathBuf> {
 
 /// Chart file I/O — always visible, in both Edit and Perform mode. Save/Load
 /// both branch on `state.content_kind` for the dialog's title/extension/
-/// default name/start dir (`.harpchart` under `assets/songs`, vs. `.json`
-/// under `~/Harmonicon/lessons`) — which actual file gets written/read from the
+/// default name/start dir (`.harpchart` under `~/Harmonicon/songs`, vs.
+/// `.json` under `~/Harmonicon/lessons`) — which actual file gets written/read from the
 /// chosen path is decided separately, by whichever of `harpchart::
 /// handle_save_chosen`/`lesson_form::handle_save_lesson_chosen` (and their
 /// load siblings) matches that same `content_kind`.
@@ -69,7 +70,7 @@ pub(super) fn spawn_file_buttons(
                         purpose: SAVE_PURPOSE,
                         title: String::from(loc.msg("dialog-save-chart")),
                         extensions: vec!["harpchart".into()],
-                        start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                        start_dir: drop_folder("songs"),
                         mode: DialogMode::Save { default_name },
                     }
                 }
@@ -101,7 +102,7 @@ pub(super) fn spawn_file_buttons(
                     purpose: LOAD_PURPOSE,
                     title: String::from(loc.msg("dialog-load-chart")),
                     extensions: vec!["harpchart".into()],
-                    start_dir: Some(std::path::PathBuf::from("assets/songs")),
+                    start_dir: drop_folder("songs"),
                     mode: DialogMode::Open,
                 },
                 ContentKind::Lesson => OpenFileDialog {

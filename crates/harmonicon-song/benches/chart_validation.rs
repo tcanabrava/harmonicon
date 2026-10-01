@@ -12,10 +12,12 @@ use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_ma
 use harmonicon_song::song::validate_and_migrate_chart;
 use serde_json::Value;
 
-const SHORT: &[u8] =
-    include_bytes!("../../../assets/songs/Traditional/Amazing Grace/song/chart.harpchart");
-const LONG: &[u8] =
-    include_bytes!("../../../assets/songs/Traditional/O Pulo da Gaita/song/chart.harpchart");
+const SHORT: &[u8] = include_bytes!(
+    "../../../tests/fixtures/song-pack/Traditional/Amazing Grace/song/chart.harpchart"
+);
+const LONG: &[u8] = include_bytes!(
+    "../../../tests/fixtures/song-pack/Traditional/O Pulo da Gaita/song/chart.harpchart"
+);
 
 fn chart_validation(c: &mut Criterion) {
     let mut group = c.benchmark_group("chart_validation");

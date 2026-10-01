@@ -30,6 +30,14 @@ music through your speakers/headphones.
 
 ## The first launch
 
+Harmonicon's lessons and songs are not part of the download: they live in
+their own online repositories, so they can grow without waiting for a new
+version of the game. The first time it starts, Harmonicon fetches them —
+only their latest version, so it stays small — and shows **Getting lessons
+and songs** until they arrive. This needs an internet connection once; if it
+fails, the screen says why and offers **Retry**. After that the game starts
+straight away, and never updates them without asking you.
+
 The first time Harmonicon starts — before it has saved a profile — it opens
 on a welcome page instead of the main menu, with the three things worth
 doing before anything else: **Set up your microphone** (the Options page,
@@ -62,8 +70,8 @@ accurate.
 ## Adding your own content
 
 Harmonicon also reads from `~/Harmonicon` (a folder in your home
-directory) as a second source of songs and themes, alongside what ships
-with the game — drop a song folder or a theme folder in there and it shows
+directory) as another source of songs, lessons and themes, alongside the
+ones it downloads — drop a song folder or a theme folder in there and it shows
 up in the song list / theme picker without needing to reinstall anything.
 See [Song Editor](song-editor.md) for how to author a chart of your own.
 

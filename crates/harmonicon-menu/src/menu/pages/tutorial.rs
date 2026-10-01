@@ -7,6 +7,7 @@ use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
+use harmonicon_platform::assets_management::AvailableSongs;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
@@ -14,11 +15,33 @@ use harmonicon_ui::dialogs::button;
 use crate::menu::routing::MenuPage;
 use harmonicon_app::app::{AppState, GameplayMode, SelectedSong};
 
-/// The bundled song a live-gameplay tour step plays a few seconds of. Long
-/// enough (well over two minutes) that no tour step could ever run it to
-/// completion and trigger a real `AppState::Results` — the tour always cuts
-/// away first.
-const DEMO_SONG_PATH: &str = "songs/Example Artist/Example Song/song/chart.harpchart";
+/// The song a live-gameplay tour step plays a few seconds of, as `(artist,
+/// title)` in the official songs pack. Long enough (well over two minutes)
+/// that no tour step could ever run it to completion and trigger a real
+/// `AppState::Results` — the tour always cuts away first.
+const DEMO_SONG: (&str, &str) = ("Example Artist", "Example Song");
+
+/// Where to load the tour's demo song from. Songs come from packs, so the
+/// path depends on which pack holds it, and a player may have configured
+/// packs without it: then any song will do (the first by artist and
+/// title, so the tour is the same every time), and with no songs at all,
+/// `None`.
+fn demo_song_path(songs: &AvailableSongs) -> Option<String> {
+    let (artist, title) = DEMO_SONG;
+    if let Some(song) = songs
+        .0
+        .get(artist)
+        .and_then(|list| list.iter().find(|s| s.name == title))
+    {
+        return Some(song.asset_path.clone());
+    }
+    songs
+        .0
+        .values()
+        .flatten()
+        .min_by(|a, b| (&a.artist, &a.name).cmp(&(&b.artist, &b.name)))
+        .map(|s| s.asset_path.clone())
+}
 
 /// How long a plain menu-page step stays on screen before auto-advancing.
 const PAGE_STEP_SECONDS: f32 = 3.5;
@@ -35,7 +58,7 @@ enum TourTarget {
     /// Show a `MenuPage`, no `AppState` change (or a `Menu`-page landing
     /// after leaving a non-`Menu` step — see [`enter_tour_target`]).
     Page(MenuPage),
-    /// Load [`DEMO_SONG_PATH`] and play it in the given mode for a look.
+    /// Load the [`DEMO_SONG`] and play it in the given mode for a look.
     Playing(GameplayMode),
     BendingTrainer,
     SongEditor,
@@ -225,24 +248,27 @@ fn step_seconds(step: usize) -> f32 {
 /// first) — the same reason `ReturnToSongList`/`GeneratedJamSession`/
 /// `LessonContext` exist as flags `route_menu_entry` reads instead. For the
 /// live-screen targets, this is exactly what each screen's own normal
-/// entry point does (loading `DEMO_SONG_PATH` for `Playing`, the same way
-/// picking a song from the song list does).
+/// entry point does (loading the demo song for `Playing`, the same way
+/// picking a song from the song list does). With no songs installed a
+/// `Playing` step shows the menu instead.
 fn enter_tour_target(
     target: &TourTarget,
     commands: &mut Commands,
     next_app_state: &mut NextState<AppState>,
     mode: &mut GameplayMode,
     asset_server: &AssetServer,
+    songs: &AvailableSongs,
 ) {
     match target {
         TourTarget::Page(_) => next_app_state.set(AppState::Menu),
-        TourTarget::Playing(gameplay_mode) => {
-            *mode = gameplay_mode.clone();
-            commands.insert_resource(SelectedSong(
-                asset_server.load::<SongManifest>(DEMO_SONG_PATH),
-            ));
-            next_app_state.set(AppState::SongLoading);
-        }
+        TourTarget::Playing(gameplay_mode) => match demo_song_path(songs) {
+            Some(path) => {
+                *mode = gameplay_mode.clone();
+                commands.insert_resource(SelectedSong(asset_server.load::<SongManifest>(path)));
+                next_app_state.set(AppState::SongLoading);
+            }
+            None => next_app_state.set(AppState::Menu),
+        },
         TourTarget::BendingTrainer => next_app_state.set(AppState::BendingTrainer),
         TourTarget::SongEditor => next_app_state.set(AppState::SongEditor2),
     }
@@ -278,6 +304,7 @@ pub(crate) fn advance_tutorial_tour(
     mut mode: ResMut<GameplayMode>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    songs: Res<AvailableSongs>,
 ) {
     let Some(mut tour) = tour else { return };
     // Once the tour has ended (the sentinel step), stop ticking — the
@@ -301,6 +328,7 @@ pub(crate) fn advance_tutorial_tour(
                 &mut next_app_state,
                 &mut mode,
                 &asset_server,
+                &songs,
             );
         }
         None => end_tutorial_tour(&mut tour, &mut next_app_state),
@@ -402,6 +430,42 @@ pub(crate) fn sync_tutorial_overlay(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harmonicon_platform::assets_management::SongEntry;
+
+    fn songs(entries: &[(&str, &str)]) -> AvailableSongs {
+        let mut songs = AvailableSongs::default();
+        for (artist, name) in entries {
+            songs
+                .0
+                .entry(artist.to_string())
+                .or_default()
+                .push(SongEntry {
+                    artist: artist.to_string(),
+                    name: name.to_string(),
+                    asset_path: format!("packs://p/{artist}/{name}/song/chart.harpchart"),
+                });
+        }
+        songs
+    }
+
+    #[test]
+    fn the_demo_song_is_found_in_whichever_pack_holds_it() {
+        let available = songs(&[("Bach", "Minuet"), ("Example Artist", "Example Song")]);
+        assert_eq!(
+            demo_song_path(&available).as_deref(),
+            Some("packs://p/Example Artist/Example Song/song/chart.harpchart")
+        );
+    }
+
+    #[test]
+    fn without_the_demo_song_the_tour_plays_the_first_song() {
+        let available = songs(&[("Traditional", "Greensleeves"), ("Bach", "Minuet")]);
+        assert_eq!(
+            demo_song_path(&available).as_deref(),
+            Some("packs://p/Bach/Minuet/song/chart.harpchart")
+        );
+        assert_eq!(demo_song_path(&AvailableSongs::default()), None);
+    }
 
     #[test]
     fn tour_has_at_least_one_step() {

@@ -90,12 +90,14 @@ Three top-level suites under `tests/` check properties that span *many*
 files at once, which don't naturally belong inside any single module's
 own unit tests:
 
-- **`tests/asset_layout.rs`** — schema-validates every bundled song
-  chart, theme, and lesson against their respective JSON schemas, and
-  checks completeness (a lesson's referenced chart file actually exists,
-  a lesson's prerequisite ids actually resolve to other real lessons,
-  a lesson's Fluent keys actually exist in every locale). This is what
-  keeps bundled *content* — not code — from silently rotting as the
+- **`tests/asset_layout.rs`** — schema-validates every bundled theme and
+  checks that harmonica models and shaders are complete. Songs and lessons
+  are content packs in their own repositories, checked there by
+  `validate-pack` (`tests/validate_pack.rs` and `harmonicon-song`'s
+  `lessons::validate`/`song::validate` test it against `tests/fixtures`):
+  a lesson's referenced chart actually exists, its prerequisite ids
+  resolve, its Fluent keys exist in every language its pack ships. This is
+  what keeps *content* — not code — from silently rotting as the
   schemas or the content itself evolve independently.
 - **`tests/physical_design.rs`** — the file-size budget enforcement
   described in [Module Boundaries and Dependency Rules](

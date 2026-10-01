@@ -141,10 +141,10 @@ fn score_frame(c: &mut Criterion) {
 
 fn fixture_chart() -> HarpChart {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../assets/songs/Traditional/O Pulo da Gaita/song/chart.harpchart");
+        .join("../../tests/fixtures/song-pack/Traditional/O Pulo da Gaita/song/chart.harpchart");
     let text = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
-    serde_json::from_str(&text).expect("bundled chart parses")
+    serde_json::from_str(&text).expect("fixture chart parses")
 }
 
 /// The chart played `times` times back to back.

@@ -53,7 +53,8 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
 
 ## Content
 
-- [ ] **Only one bundled example artist** (`assets/songs/Example Artist`,
+- [ ] **Only one example artist** (`Example Artist` in the
+  `harmonicon-songs` pack,
   three example songs used for 2D/3D/fallback testing). Ship a starter
   pack of public-domain blues heads/riffs across difficulties before wider
   release. **Deliberately not attempted unsupervised**: authoring
@@ -79,8 +80,8 @@ architecture, so they belong with the rest of the planning docs.
   the Toccata in D minor on C harps, Für Elise on a C chromatic,
   "O Pulo da Gaita" transcribed from the Mr. Dirsom harmonica tab score,
   Amazing Grace, the Hallelujah chorus from Handel's Messiah on a D harp,
-  and Mulher Rendeira). `tests/asset_layout.rs` schema-validates every
-  bundled song chart. Deliberately skipped as still under copyright:
+  and Mulher Rendeira), now in the `harmonicon-songs` pack, whose CI runs
+  `validate-pack` over every chart. Deliberately skipped as still under copyright:
   Feira de Mangaio (Sivuca/Glorinha Gadelha) and Asa Branca (Luiz
   Gonzaga/Humberto Teixeira) — chart those yourself via Record mode
   instead of bundling a transcription.

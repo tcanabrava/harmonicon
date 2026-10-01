@@ -195,7 +195,7 @@ remains:
   bundled songs, note themes, harmonica models, and UI themes now actually
   load: `assets_management`'s directory-scanning discovery is `#[cfg(not(
   target_arch = "wasm32"))]` on native (unchanged — a player can still drop
-  a new song into `assets/songs/` or `~/Harmonicon/songs/` with no rebuild)
+  a new song into `~/Harmonicon/songs/` with no rebuild)
   and reads a `build.rs`-generated manifest on wasm instead
   (`generate_wasm_asset_manifest`, `$OUT_DIR/asset_manifest.rs` — safe
   because a build script always runs on the native host regardless of

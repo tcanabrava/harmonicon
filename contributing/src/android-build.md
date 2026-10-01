@@ -222,8 +222,9 @@ went this way.
 ### Asset discovery goes through the build-time manifest
 
 An APK's assets live inside the archive, reachable only through the JNI
-`AssetManager` — `std::fs::read_dir("assets/songs")` returns `Err`, and the
-runtime scans would find nothing at all.
+`AssetManager` — `std::fs::read_dir("assets/themes")` returns `Err`, and the
+runtime scans would find nothing at all. Songs and lessons are downloaded
+packs in the app's private data directory, which reads normally.
 
 This is the same constraint wasm already had, so Android reuses the same
 solution: `#[cfg]`-split scan functions backed by a `build.rs`-generated

@@ -67,10 +67,10 @@
 // compiles for and runs on the *host* (native) machine regardless of the
 // crate's own `--target`, so `std::fs::read_dir` here works exactly the same
 // whether the crate itself is being built for `wasm32-unknown-unknown` or
-// not. Native builds are unaffected: they keep scanning `assets/` for real
-// at runtime (`assets_management`'s `#[cfg(not(target_arch = "wasm32"))]`
-// functions), which is required so a player can drop a new song into
-// `assets/songs/` or `~/Harmonicon/songs/` without a rebuild.
+// not. Native builds are unaffected: they keep scanning for real at runtime
+// (`assets_management`'s `#[cfg(not(target_arch = "wasm32"))]` functions),
+// which is required so a player can drop a new song into
+// `~/Harmonicon/songs/` without a rebuild.
 
 use std::path::Path;
 

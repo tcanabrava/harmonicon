@@ -98,7 +98,8 @@ load-bearing about *this* crate.
     anchoring to a sink, see `should_anchor_to_sink`) — and the `2d/`/`3d/`
     note asset folders (already-established fallback to the selected note
     theme).
-    `Example Song 3` ships only a chart, deliberately, to exercise all of
+    `Example Song 3` (in the `harmonicon-songs` pack) ships only a chart,
+    deliberately, to exercise all of
     these at once. The load-order subtlety: every sibling is checked with
     `read_asset_bytes` *before* being handed to `load_context.load()` —
     `load()` registers the path as a hard dependency of the `SongManifest`

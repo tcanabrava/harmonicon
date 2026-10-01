@@ -500,8 +500,8 @@ skills in `.claude/skills/`, loaded on demand rather than living here:
   `std::fs::read_dir`-based body, unchanged, behind
   `#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]` (this is
   what keeps native dynamic:
-  a player can still drop a new song into `assets/songs/` or
-  `~/Harmonicon/songs/` with no rebuild — a fixed manifest like
+  a player can still drop a new song into `~/Harmonicon/songs/` with no
+  rebuild — a fixed manifest like
   localization's `LOCALES` isn't an option here, unlike the fixed set of
   three shipped locales), and a
   `#[cfg(any(target_arch = "wasm32", target_os = "android"))]` sibling

@@ -801,7 +801,7 @@ load-bearing about *this* crate.
   cannot be reproduced by the synth, so load validation rejects each category
   with its phrase and event location.
 - **Every real lesson/song chart must survive the editor.** The integration
-  tests walk every `.harpchart` in `tests/fixtures`, `assets/songs` and — when
+  tests walk every `.harpchart` in `tests/fixtures` and — when
   checked out beside this repo — `../harmonicon-lessons` and
   `../harmonicon-songs` (`content_charts`), validate each source, load
   and serialize it, validate the saved result, and compare events, annotations,

@@ -6,7 +6,8 @@
    highway) or [Play 3D](play-3d.md) (the same notes on a lane in
    perspective). Both modes share the same scoring, timing, and pause menu — it's
    purely a visual choice.
-2. **Select Artist**, then **Select Song** — browse the bundled songs (and
+2. **Select Artist**, then **Select Song** — browse the songs Harmonicon
+   downloaded on its first start (and
    anything you've dropped into `~/Harmonicon/songs/`, see
    [Getting Started](getting-started.md#adding-your-own-content)).
 3. A **3-2-1 countdown** plays, showing the song title, key, and which

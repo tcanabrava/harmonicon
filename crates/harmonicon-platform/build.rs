@@ -7,6 +7,12 @@
 //! of these; an app bundle's Resources directory reads like any other, so it
 //! keeps the runtime scan.
 //!
+//! Songs are a downloaded pack, not part of `assets/`. Android downloads
+//! them at runtime like desktop, so its manifest lists none; wasm can't, so
+//! it lists the songs of the pack in the directory `HARMONICON_SONGS_DIR`
+//! names (relative paths from the workspace root), which the web bundle
+//! must serve under `assets/songs/`.
+//!
 //! Lives here rather than in the workspace root's build.rs because
 //! `include!(concat!(env!("OUT_DIR"), ...))` reads the *including* crate's
 //! own OUT_DIR, and OUT_DIR is per-package. Paths reach back to the
@@ -34,7 +40,7 @@ fn generate_bundled_asset_manifest() {
         return;
     }
 
-    println!("cargo:rerun-if-changed=../../assets/songs");
+    println!("cargo:rerun-if-env-changed=HARMONICON_SONGS_DIR");
     println!("cargo:rerun-if-changed=../../assets/themes");
     println!("cargo:rerun-if-changed=../../assets/notes");
     println!("cargo:rerun-if-changed=../../assets/harmonicas");
@@ -42,7 +48,23 @@ fn generate_bundled_asset_manifest() {
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set by cargo");
     let dest = Path::new(&out_dir).join("asset_manifest.rs");
 
-    let songs = scan_songs_for_manifest(Path::new("../../assets/songs"));
+    let songs = if arch.as_deref() == Ok("wasm32") {
+        match std::env::var("HARMONICON_SONGS_DIR") {
+            Ok(dir) => {
+                let root = Path::new("../..").join(&dir);
+                println!("cargo:rerun-if-changed={}", root.display());
+                scan_songs_for_manifest(&root)
+            }
+            Err(_) => {
+                println!(
+                    "cargo:warning=HARMONICON_SONGS_DIR is not set; this wasm build has no songs"
+                );
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
     let themes = scan_theme_dir_names(Path::new("../../assets/themes"));
     let notes_2d = scan_ext_stems(Path::new("../../assets/notes/2d"), "png");
     let notes_3d = scan_ext_stems(Path::new("../../assets/notes/3d"), "glb");
@@ -74,7 +96,7 @@ fn write_str_slice(out: &mut String, name: &str, values: &[String]) {
 
 /// A forward-slash-joined asset path — Bevy asset paths always use `/`
 /// regardless of host OS, unlike `Path::to_string_lossy()` on Windows.
-fn asset_relative_path(path: &Path, strip: &str) -> String {
+fn asset_relative_path(path: &Path, strip: &Path) -> String {
     path.strip_prefix(strip)
         .unwrap_or(path)
         .components()
@@ -94,7 +116,9 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String)> {
         return out;
     };
     for artist_dir in artists.flatten() {
-        if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+        if !artist_dir.file_type().map(|t| t.is_dir()).unwrap_or(false)
+            || artist_dir.file_name().to_string_lossy().starts_with('.')
+        {
             continue;
         }
         let artist = artist_dir.file_name().to_string_lossy().into_owned();
@@ -135,7 +159,8 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String)> {
                 continue;
             };
             let name = song_dir.file_name().to_string_lossy().into_owned();
-            let asset_path = asset_relative_path(&chart, "../../assets");
+            // Served under `assets/songs/` by the web bundle.
+            let asset_path = format!("songs/{}", asset_relative_path(&chart, root));
             out.push((artist.clone(), name, asset_path));
         }
     }

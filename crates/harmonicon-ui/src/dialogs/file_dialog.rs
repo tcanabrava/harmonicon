@@ -531,8 +531,10 @@ mod tests {
 
     #[test]
     fn list_dir_splits_and_filters() {
-        let (dirs, files) = list_dir(&asset_root("assets/songs"), &["ogg".into()]);
-        assert!(!dirs.is_empty(), "expected artist subfolders");
+        let (dirs, _) = list_dir(&asset_root("assets"), &["ogg".into()]);
+        assert!(!dirs.is_empty(), "expected asset subfolders");
+        let (_, files) = list_dir(&asset_root("assets/sounds"), &["ogg".into()]);
+        assert!(!files.is_empty(), "expected the metronome clicks");
         assert!(
             files
                 .iter()

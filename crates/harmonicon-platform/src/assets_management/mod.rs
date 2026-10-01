@@ -481,8 +481,8 @@ pub fn is_visible_dir(entry: &DirEntry) -> bool {
         && !entry.file_name().to_string_lossy().starts_with('.')
 }
 
-/// Walks `songs_root` (bundled `assets/songs`, the external
-/// `~/Harmonicon/songs` drop folder, or a pack's checkout) and scans each
+/// Walks `songs_root` (a pack's checkout or the external
+/// `~/Harmonicon/songs` drop folder) and scans each
 /// artist subfolder into `available`, tagging entries with `source_prefix`
 /// so they load from the matching
 /// [`AssetSource`](bevy::asset::io::AssetSource).
@@ -531,23 +531,14 @@ pub fn scan_all_songs(mut available: ResMut<AvailableSongs>, packs: Option<Res<C
     scan_all_songs_into(&mut available, packs.as_deref());
 }
 
-// Scans the bundled songs directory, plus the external `~/Harmonicon/songs`
-// drop folder if present, plus every usable song pack, per artist. The
-// external folder is optional — most players won't have one — so its absence
-// is not a warning, unlike the bundled directory always shipped with the game.
-// Clears `available` first, so this is safe to call again at runtime (e.g.
-// after the player drops a song into `~/Harmonicon/songs`, or a pack
-// updates), not just once at Startup.
+// Scans the external `~/Harmonicon/songs` drop folder if present, plus every
+// usable song pack, per artist. The game ships no songs of its own; they come
+// from the packs. Clears `available` first, so this is safe to call again at
+// runtime (e.g. after the player drops a song into `~/Harmonicon/songs`, or a
+// pack updates), not just once at Startup.
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
     available.0.clear();
-    let bundled_root = std::path::Path::new("assets/songs");
-    if bundled_root.is_dir() {
-        scan_songs_root(bundled_root, "songs/", available);
-    } else {
-        warn!("No songs directory found at assets/songs/");
-    }
-
     if let Some(external_root) = dirs::home_dir().map(|h| h.join("Harmonicon/songs")) {
         scan_songs_root(&external_root, "external://songs/", available);
     }
@@ -556,11 +547,11 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
     log_song_count(available);
 }
 
-/// wasm/Android sibling of the native `scan_all_songs_into` above: reads the
-/// build-time manifest instead of scanning `assets/songs/`, and skips the
-/// `~/Harmonicon/songs` external drop folder entirely — there's no home
-/// directory concept in a browser. Android still scans downloaded packs,
-/// which live in its private data directory.
+/// wasm/Android sibling of the native `scan_all_songs_into` above, with no
+/// `~/Harmonicon/songs` drop folder (there's no home directory concept in a
+/// browser, and an Android app can only reach its own sandbox). wasm's songs
+/// are the pack bundled into the build-time manifest; Android's manifest
+/// lists none and it scans its downloaded packs instead.
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
     available.0.clear();

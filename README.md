@@ -251,8 +251,11 @@ assets/
 
 ## Songs & charts
 
-Each song lives under `assets/songs/<artist>/<song>/` and is loaded as a single
-`SongManifest` made of:
+Songs are not in this repository: they are a pack the game downloads from
+[harmonicon-songs](https://github.com/tcanabrava/harmonicon-songs) (see
+`contributing/src/content-packs.md`). Each song lives under
+`<artist>/<song>/` in a pack, or in `~/Harmonicon/songs/`, and is loaded as a
+single `SongManifest` made of:
 
 - `song/<name>.harpchart` — a JSON chart describing tempo, the harmonica
   layout, and the timed track of notes (validated against

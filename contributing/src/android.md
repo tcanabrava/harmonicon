@@ -44,8 +44,10 @@ package in the layering, and the only cdylib.
 ## Assets live inside the APK
 
 An APK's assets are inside the archive, reachable only through the JNI
-`AssetManager`. `std::fs::read_dir("assets/songs")` returns `Err`, so the
-runtime scans find nothing at all.
+`AssetManager`. `std::fs::read_dir("assets/themes")` returns `Err`, so the
+runtime scans find nothing at all. (Songs and lessons are not affected:
+they are packs downloaded into the app's private data directory, which is
+an ordinary filesystem — see [Content Packs](content-packs.md).)
 
 This is the same constraint wasm already had, so Android reuses the same
 solution — the `#[cfg]`-split scan functions backed by a

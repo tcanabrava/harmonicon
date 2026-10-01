@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "kind": "songs",
+  "id": "fixture-songs",
+  "name": "Fixture songs",
+  "version": "1.0.0"
+}

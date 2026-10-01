@@ -1604,8 +1604,8 @@ fn editor_load_validation_accepts_its_own_expression_intensity() {
         .expect("the editor must accept a chart it wrote itself");
 }
 
-/// Every real chart within reach: the fixture packs, the songs still in
-/// `assets/`, and — when they are checked out beside this repository, as
+/// Every real chart within reach: the fixture packs and — when they are
+/// checked out beside this repository, as
 /// `../harmonicon-lessons` and `../harmonicon-songs` — the official packs.
 /// CI checks out only this repository and so covers the fixtures; a local
 /// run with the packs beside it covers every chart a player can get.
@@ -1631,7 +1631,6 @@ fn content_charts() -> Vec<std::path::PathBuf> {
     let mut paths = Vec::new();
     for dir in [
         repo.join("tests/fixtures"),
-        repo.join("assets/songs"),
         repo.join("../harmonicon-lessons"),
         repo.join("../harmonicon-songs"),
     ] {
