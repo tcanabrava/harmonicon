@@ -91,6 +91,17 @@ load-bearing about *this* crate.
     explicit per-locale handles instead, because this module never
     enumerates a directory (see its own doc comment for why).
 
+- **Packs carry their own translations** (`localization::packs`): every
+  `locales/<lang>.ftl` anywhere in a usable pack, merged into one bundle per
+  language in configured pack order (an earlier pack keeps a key both
+  define). These are built from source text with `std::fs`, not through the
+  asset server, the same way pack lessons are read. `build_from_bundles`
+  puts each language's *game* bundle before its pack bundle, so a pack can
+  add strings but never replace one of the game's, and negotiates over the
+  union of languages, so a pack translated into a language the game lacks
+  still shows its own text in it. `Localization` rebuilds when
+  `PackTranslations` changes (on `ContentPacksChanged`).
+
 - **Settings:** figment-layered `<config>/harmonicon/settings.json`
   (`settings.rs`); saves are debounced (`PendingSave`, 0.5 s) with a flush
   on `AppExit` — route new persisted fields through that path.

@@ -59,9 +59,9 @@ locales/<lang>.ftl             unit-* and track-* names
    settings, `ContentPacks`, pack scans for songs and lessons, rescans on
    `ContentPacksChanged`. Nothing downloads yet, so with the default
    settings both official packs read as not installed until phase 4.
-3. **Bundled localization**: load pack `.ftl` files, rebuild `Localization`
-   on rescan, audit which `lesson-*` keys are engine chrome and which are
-   content.
+3. ~~**Bundled localization**~~ — landed: `localization::packs`. The audit of
+   which `lesson-*` keys in `ui.ftl` are engine chrome and which are lesson
+   content moves to phase 6, where the content keys leave `ui.ftl`.
 4. **Startup sync**: `AppState::Syncing` and its dialog, background clone on
    `IoTaskPool` with a Tracy span, background update check.
 5. **Options UI**: repository list per kind (version, short SHA, status),

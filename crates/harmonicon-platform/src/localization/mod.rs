@@ -15,7 +15,9 @@
 //! The language is not persisted — to change it, change the system locale.
 //!
 //! The asset layer underneath — the `.ftl` and `.ftl.ron` [`AssetLoader`]s
-//! and the [`LocaleBundle`] they produce — lives in [`ftl`].
+//! and the [`LocaleBundle`] they produce — lives in [`ftl`]. Lesson and song
+//! packs bring their own translations ([`packs`]), consulted after the
+//! game's own for each language.
 //!
 //! Call sites fetch strings through [`LocalizationExt::msg`]:
 //!
@@ -30,6 +32,7 @@
 //! [`AssetLoader`]: bevy::asset::AssetLoader
 
 pub mod ftl;
+pub mod packs;
 
 use std::borrow::Borrow;
 use std::fmt;
@@ -41,6 +44,8 @@ use fluent_langneg::{NegotiationStrategy, negotiate_languages};
 use unic_langid::LanguageIdentifier;
 
 use self::ftl::{FtlResource, FtlResourceLoader, LocaleBundle, LocaleBundleLoader};
+use self::packs::PackTranslations;
+use crate::content_packs::{ContentPacksChanged, ContentPacksSet};
 
 /// Every shipped locale, matched 1:1 with a folder under `assets/locales/`
 /// — a fixed list rather than a directory scan (see the module doc
@@ -117,8 +122,23 @@ impl Plugin for LocalizationPlugin {
             // always take `Res<Localization>` without ordering against the load.
             .init_resource::<Localization>()
             .insert_resource(default_locale())
-            .add_systems(Startup, load_locales)
-            .add_systems(Update, (sync_locale, build_localization).chain());
+            .init_resource::<PackTranslations>()
+            // Read by `packs::reload_on_packs_changed`; registered here too
+            // so an app without `ContentPacksPlugin` (tests, tools) runs.
+            .add_message::<ContentPacksChanged>()
+            .add_systems(
+                Startup,
+                (load_locales, packs::load_at_startup.after(ContentPacksSet)),
+            )
+            .add_systems(
+                Update,
+                (
+                    sync_locale,
+                    packs::reload_on_packs_changed.after(ContentPacksSet),
+                    build_localization,
+                )
+                    .chain(),
+            );
     }
 }
 
@@ -164,18 +184,20 @@ fn sync_locale(selected: Res<SelectedLanguage>, mut locale: ResMut<Locale>) {
 }
 
 /// Build [`Localization`] once every bundle has finished loading, and
-/// rebuild it whenever the requested [`Locale`] changes.
+/// rebuild it whenever the requested [`Locale`] or the packs' translations
+/// change.
 fn build_localization(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     bundles: Res<Assets<LocaleBundle>>,
     locale: Res<Locale>,
     handles: Option<Res<LocaleBundles>>,
+    pack_translations: Res<PackTranslations>,
     mut ready: ResMut<LocalizationReady>,
 ) {
-    // Built and nothing asked for a different locale: the common case every
-    // frame after startup, so answer it before asking the asset server.
-    if ready.0 && !locale.is_changed() {
+    // Built and nothing changed: the common case every frame after startup,
+    // so answer it before asking the asset server.
+    if ready.0 && !locale.is_changed() && !pack_translations.is_changed() {
         return;
     }
     let Some(handles) = handles else { return };
@@ -188,7 +210,12 @@ fn build_localization(
         return;
     }
     ready.0 = true;
-    commands.insert_resource(build_from_bundles(&handles.0, &bundles, &locale));
+    commands.insert_resource(build_from_bundles(
+        &handles.0,
+        &bundles,
+        &pack_translations.0,
+        &locale,
+    ));
 }
 
 /// Assembles [`Localization`] from every loaded locale bundle, inserted in
@@ -197,12 +224,18 @@ fn build_localization(
 /// matching key, so insertion order is what makes the fallback actually
 /// take effect).
 ///
+/// For each language the game's bundle goes before the packs', so a pack
+/// can add strings but not replace the game's. The languages negotiated
+/// over include the packs' own: a pack translated into a language the game
+/// isn't still shows its lessons in it, around a UI that falls back.
+///
 /// Works from the explicit per-locale handles [`load_locales`] collected
 /// rather than a `Handle<LoadedFolder>`, since this module deliberately
 /// never enumerates a directory — see the module doc comment.
 fn build_from_bundles(
     handles: &[Handle<LocaleBundle>],
     bundles: &Assets<LocaleBundle>,
+    pack_bundles: &[LocaleBundle],
     locale: &Locale,
 ) -> Localization {
     let entries: Vec<(LanguageIdentifier, &Handle<LocaleBundle>, &LocaleBundle)> = handles
@@ -212,12 +245,22 @@ fn build_from_bundles(
             Some((asset.locale().clone(), handle, asset))
         })
         .collect();
-    let fallback = locale.fallback_chain(entries.iter().map(|(lang, _, _)| lang));
+    let mut languages: Vec<LanguageIdentifier> =
+        entries.iter().map(|(l, _, _)| l.clone()).collect();
+    for bundle in pack_bundles {
+        if !languages.contains(bundle.locale()) {
+            languages.push(bundle.locale().clone());
+        }
+    }
+    let fallback = locale.fallback_chain(languages.iter());
 
     let mut localization = Localization::new();
     for lang in fallback {
         if let Some((_, handle, asset)) = entries.iter().find(|(l, _, _)| l == lang) {
-            localization.insert(handle, asset);
+            localization.insert(Some(handle), asset);
+        }
+        if let Some(pack) = pack_bundles.iter().find(|b| b.locale() == lang) {
+            localization.insert(None, pack);
         }
     }
     localization
@@ -288,7 +331,7 @@ impl Locale {
 /// system can take `Res<Localization>` without ordering against the load),
 /// and what tests construct to assert on the key-echoing fallback.
 #[derive(Resource, Default)]
-pub struct Localization(Vec<(Handle<LocaleBundle>, LocaleBundle)>);
+pub struct Localization(Vec<(Option<Handle<LocaleBundle>>, LocaleBundle)>);
 
 impl Localization {
     pub fn new() -> Self {
@@ -304,11 +347,12 @@ impl Localization {
     ///
     /// The `handle` is kept alongside it purely to hold the asset alive, so
     /// `Assets<LocaleBundle>` can't drop the bundle out from under a
-    /// long-lived `Localization`. Callers are expected to insert each
-    /// locale at most once — [`build_from_bundles`] walks a fallback chain
-    /// of distinct languages, so it does.
-    fn insert(&mut self, handle: &Handle<LocaleBundle>, bundle: &LocaleBundle) {
-        self.0.push((handle.clone(), bundle.clone()));
+    /// long-lived `Localization`; a pack's bundle is not an asset and has
+    /// none. Each language appears at most twice, the game's bundle before
+    /// the packs' — [`build_from_bundles`] walks a fallback chain of
+    /// distinct languages.
+    fn insert(&mut self, handle: Option<&Handle<LocaleBundle>>, bundle: &LocaleBundle) {
+        self.0.push((handle.cloned(), bundle.clone()));
     }
 }
 
@@ -507,6 +551,38 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    fn packs_add_strings_but_never_replace_the_games() {
+        use super::{Locale, LocaleBundle, LocalizationExt, build_from_bundles};
+        use bevy::asset::Assets;
+        use unic_langid::LanguageIdentifier;
+
+        let lang = |tag: &str| tag.parse::<LanguageIdentifier>().unwrap();
+        let mut assets = Assets::<LocaleBundle>::default();
+        let game = assets.add(LocaleBundle::from_sources(
+            lang("en-US"),
+            ["menu-play = Play\nshared = game\n".to_string()],
+        ));
+        let packs = [
+            LocaleBundle::from_sources(
+                lang("en-US"),
+                ["shared = pack\nlesson-x = Lesson\n".to_string()],
+            ),
+            LocaleBundle::from_sources(lang("de-DE"), ["lesson-x = Lektion\n".to_string()]),
+        ];
+
+        // German isn't one of the game's languages, but a pack speaks it.
+        let locale = Locale::new(lang("de-DE")).with_default(lang("en-US"));
+        let loc = build_from_bundles(std::slice::from_ref(&game), &assets, &packs, &locale);
+        assert_eq!(&*loc.msg("lesson-x"), "Lektion");
+        assert_eq!(&*loc.msg("menu-play"), "Play");
+        assert_eq!(&*loc.msg("shared"), "game");
+
+        let english = Locale::new(lang("en-US")).with_default(lang("en-US"));
+        let loc = build_from_bundles(&[game], &assets, &packs, &english);
+        assert_eq!(&*loc.msg("lesson-x"), "Lesson");
     }
 
     #[test]

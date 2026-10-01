@@ -61,9 +61,8 @@ Nothing below can be approved by a test.
 
 ## Content packs
 
-`docs/content_packs_plan.md` has the design and phase list. Open: phases 3–7
-(bundled localization, startup sync, Options UI, extraction into the two
-repositories, docs).
+`docs/content_packs_plan.md` has the design and phase list. Open: phases 4–7
+(startup sync, Options UI, extraction into the two repositories, docs).
 
 ## Deferred until a condition is met
 

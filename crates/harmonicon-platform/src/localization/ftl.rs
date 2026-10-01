@@ -61,6 +61,25 @@ impl LocaleBundle {
     pub fn locale(&self) -> &LanguageIdentifier {
         &self.0.locales[0]
     }
+
+    /// A bundle built from FTL source text directly rather than through the
+    /// asset server: how a pack's translations arrive, since packs are read
+    /// from disk the same way their lessons are. A message defined twice
+    /// keeps its first definition, so earlier `sources` win.
+    pub fn from_sources(
+        locale: LanguageIdentifier,
+        sources: impl IntoIterator<Item = String>,
+    ) -> Self {
+        let mut bundle = FluentBundle::new_concurrent(vec![locale]);
+        for source in sources {
+            if let Err(errors) = bundle.add_resource(Arc::new(parse_resource(source))) {
+                for error in errors {
+                    warn!("FTL resource overrides an existing message: {error}");
+                }
+            }
+        }
+        Self(Arc::new(bundle))
+    }
 }
 
 impl Deref for LocaleBundle {
