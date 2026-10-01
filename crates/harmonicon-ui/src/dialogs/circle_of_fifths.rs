@@ -6,7 +6,7 @@
 //! relationship already driving `Position::interval_below_jam_key` (2nd
 //! position is one step clockwise around the circle from the harp's own
 //! key, 3rd is two steps, and so on). First used by the circle-of-fifths
-//! lesson (`assets/lessons/04_scales/06_circle_of_fifths`); generic and
+//! lesson (`04_scales/06_circle_of_fifths` in the `harmonicon-lessons` pack); generic and
 //! lesson-agnostic per this crate's "new reusable widgets go in dialogs/"
 //! convention, so it can be reused wherever else a key relationship needs
 //! showing.

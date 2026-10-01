@@ -1,1 +1,0 @@
-{"id":"loop-isolation","unit":"practice","optional":true,"track":"practice","title_key":"lesson-loop-isolation-title","body_key":"lesson-loop-isolation-body","widgets":[{"type":"phrase-looper","title_key":"lesson-widget-practice-loop","steps":["A","!","B"],"bpm":60,"beats_per_step":1}],"prerequisites":["slow-practice"]}

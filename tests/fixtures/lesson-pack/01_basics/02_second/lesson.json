@@ -1,0 +1,11 @@
+{
+  "id": "fixture-second",
+  "unit": "basics",
+  "track": "tone",
+  "title_key": "fixture-second-title",
+  "body_key": "fixture-second-body",
+  "prerequisites": ["fixture-first"],
+  "widgets": [
+    {"type":"phrase-looper","title_key":"fixture-second-pattern","steps":["+4","-4","+5"],"bpm":70,"beats_per_step":1}
+  ]
+}

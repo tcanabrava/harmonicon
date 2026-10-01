@@ -1,1 +1,0 @@
-{"id":"throat-vibrato","unit":"expression","optional":true,"track":"vibrato","title_key":"lesson-throat-vibrato-title","body_key":"lesson-throat-vibrato-body","widgets":[{"type":"metronome","bpm":50,"tempo_steps":[40,50,60,70]}],"prerequisites":["vibrato"]}

@@ -4626,6 +4626,7 @@ dependencies = [
  "serde",
  "serde_json",
  "skrifa 0.47.0",
+ "tempfile",
  "thiserror 2.0.21",
  "wesl",
  "winit",
@@ -4860,6 +4861,7 @@ dependencies = [
  "bevy",
  "criterion",
  "dirs",
+ "fluent-syntax",
  "harmonicon-audio",
  "harmonicon-core",
  "harmonicon-packs",
@@ -4870,7 +4872,9 @@ dependencies = [
  "midly",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
+ "unic-langid",
 ]
 
 [[package]]

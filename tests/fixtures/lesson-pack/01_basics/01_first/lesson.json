@@ -1,0 +1,9 @@
+{
+  "id": "fixture-first",
+  "unit": "basics",
+  "track": "tone",
+  "title_key": "fixture-first-title",
+  "body_key": "fixture-first-body",
+  "chart": "song/chart.harpchart",
+  "pass_criteria": { "type": "accuracy", "threshold": 0.6 }
+}

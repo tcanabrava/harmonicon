@@ -15,6 +15,10 @@ bevy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 jsonschema = { workspace = true }
+# Parses lesson packs' translations in `lessons::validate`, so a syntax
+# error fails the pack's CI instead of silently dropping messages.
+fluent-syntax = "0.11"
+unic-langid = { workspace = true }
 midly = { workspace = true }
 image = { workspace = true }
 thiserror = { workspace = true }
@@ -33,6 +37,7 @@ workspace = true
 # than checking in fixtures — same reason harmonicon-score enables them.
 harmonicon-core = { path = "../harmonicon-core", features = ["test-support"] }
 criterion = { workspace = true }
+tempfile = "3"
 
 [[bench]]
 name = "chart_validation"

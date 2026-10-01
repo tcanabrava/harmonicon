@@ -131,6 +131,17 @@ pub enum LessonWidget {
     },
 }
 
+impl LessonWidget {
+    /// The Fluent key of the widget's own heading, for the widgets that have
+    /// one.
+    pub fn title_key(&self) -> Option<&str> {
+        match self {
+            LessonWidget::PhraseLooper { title_key, .. } => title_key.as_deref(),
+            _ => None,
+        }
+    }
+}
+
 fn default_harp_key() -> String {
     "C".into()
 }

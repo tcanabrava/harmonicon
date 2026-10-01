@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "kind": "lessons",
+  "id": "fixture-lessons",
+  "name": "Fixture lessons",
+  "version": "1.0.0",
+  "requires": { "lesson_format": 1 }
+}

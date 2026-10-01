@@ -23,8 +23,8 @@
 //! every cross-unit prerequisite points forward (`blowing` →
 //! `rhythm` → `blues` → …), so a unit gate can never contradict a lesson's
 //! own prerequisites or deadlock the player.
-//! [`crossing_prerequisites`] reports any that don't, and
-//! `tests/asset_layout.rs` fails the build over one.
+//! [`crossing_prerequisites`] reports any that don't, and `validate-pack`
+//! (the lesson pack's CI) fails over one.
 //!
 //! Pure and Bevy-free, like the rest of `lessons`' data layer.
 

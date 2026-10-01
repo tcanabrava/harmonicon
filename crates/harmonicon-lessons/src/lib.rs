@@ -11,6 +11,14 @@ use harmonicon_menu::menu::{MenuPage, scene};
 mod lesson_reader;
 mod lesson_tree;
 
+/// Whether the skill tree has a colour of its own for `track`. A track
+/// without one still draws, in the shared grey every unknown track gets, so
+/// `validate-pack` reports it as a warning: two such tracks in one pack are
+/// indistinguishable on the tree.
+pub fn track_has_colour(track: &str) -> bool {
+    lesson_tree::declared_track_color(track).is_some()
+}
+
 /// Registers the two lesson pages and their page-local state.
 pub struct LessonsUiPlugin;
 

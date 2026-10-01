@@ -1,6 +1,6 @@
 # Lessons: shipped curriculum and scoring design
 
-The 100 bundled lessons and their planned branches have shipped. This document remains a content reference for the lesson waves and their scoring limits; the asset manifests are the source of truth. Structure, progression, and generated trainings are tracked in `docs/training_tree_plan.md`.
+The 100 lessons and their planned branches have shipped; they live in the `harmonicon-lessons` pack repository, not here. This document remains a content reference for the lesson waves and their scoring limits; that pack's manifests are the source of truth. Structure, progression, and generated trainings are tracked in `docs/training_tree_plan.md`.
 
 ## Design principle: honest about what's scoreable
 
@@ -26,7 +26,8 @@ effort spent on a check that can't actually check anything.
 
 ## Wave 1 — shipped
 
-Units 1–2 and the whole engine are live. `assets/lessons/`:
+Units 1–2 and the whole engine are live (paths below are in the
+`harmonicon-lessons` pack):
 
 - **Unit 1 "How to blow"** (`01_blowing/`): `single-note` (clean-attack),
   `hand-wah` (wah oscillation), `multiple-notes` (chord targets),
@@ -71,7 +72,7 @@ per-chart scoring windows (how `using-your-feet` tightens timing), and
 ## Wave 2, part 1 — shipped
 
 Unit 1's harmonica-basics extensions, Unit 2's bar-counting drills, and the
-train trio are all live — 12 lessons, `assets/lessons/`:
+train trio are all live — 12 lessons:
 
 - **Unit 1 additions** (`01_blowing/`): `breathing` (`07_breathing`,
   clean-attack sustain), `first-bend` (`08_first_bend`, the 4-draw
@@ -95,7 +96,7 @@ train trio are all live — 12 lessons, `assets/lessons/`:
 ## Wave 2, part 2 — shipped
 
 Unit 3, the bridge from drills to *music*, is live — 7 lessons,
-`assets/lessons/03_blues/`. Licks are taught call-and-response — the
+`03_blues/`. Licks are taught call-and-response — the
 primitive built in wave 1 for exactly this — and improvisation deepens from
 "stay in the scale" (wave 1's `improvisation`) to chord-tone targeting and
 phrasing. All charts are original scale/chord-tone/vocabulary drills (the

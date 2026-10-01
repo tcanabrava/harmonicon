@@ -162,8 +162,9 @@ load-bearing about *this* crate.
 - **Lessons** (`harmonicon-song`'s `lessons/` — `manifest.rs`/`catalog.rs`/`progress.rs` —
   plus `harmonicon-menu`'s `menu/pages/lesson_tree.rs` and
   `lesson_reader.rs`; design in `docs/lessons_plan.md`):
-  `assets/lessons/<unit>/<lesson>/lesson.json` (schema
-  `assets/lesson_schema.dtd.json`, validated at startup scan; ids are
+  `<unit>/<lesson>/lesson.json` in a lesson pack — the official one is the
+  separate `harmonicon-lessons` repository; this repo ships no lessons
+  (schema `assets/lesson_schema.dtd.json`, validated at scan; ids are
   stable — profile keys and prerequisites reference them). A chart-backed
   lesson plays its `.harpchart` through the *ordinary* song pipeline — no
   lesson-specific scoring — with a `LessonContext` resource in flight:
@@ -172,9 +173,11 @@ load-bearing about *this* crate.
   `route_menu_entry` returns to the skill tree and removes it (Menu entry
   is the context's end-of-life; Results→Retry never passes through Menu, so
   retries keep it). Manifest text fields are Fluent *keys*
-  (`title_key`/`body_key`, `lesson-unit-<unit>`), never display strings;
-  `tests/asset_layout.rs` validates every bundled lesson (schema, chart,
-  file completeness, prereq integrity, locale-key existence).
+  (`title_key`/`body_key`, `lesson-unit-<unit>`), never display strings,
+  defined in the pack's own `locales/`. `lessons::validate` (run by the
+  `validate-pack` binary in the pack's CI) checks schema, charts,
+  prerequisites, the graph, translations and tab notation; its tests run
+  against `tests/fixtures/lesson-pack`.
   Reader-page teaching aids are declared in `widgets`: `circle-of-fifths`,
   `twelve-bar-grid`, `metronome`, or `form-map`. Metronomes accept
   `straight`, `shuffle`, and `triplet` feel; `tempo_steps` plus
@@ -192,8 +195,8 @@ load-bearing about *this* crate.
   - **`track` is what a row is**, and it is optional in the schema,
     falling back to `unit`: a lesson authored outside this repo and
     dropped into `~/Harmonicon/lessons` has no reason to know the track
-    vocabulary but still has to land somewhere. Every *bundled* lesson
-    declares one, enforced by `tests/asset_layout.rs`, or the tree grows
+    vocabulary but still has to land somewhere. Every lesson in the
+    official pack declares one (`validate-pack` warns otherwise), or the tree grows
     a row named after a unit by accident.
   - **A row is a family, not a chain.** Adjacent members needn't depend on
     each other (`country-scale` doesn't lead to `blues-scale`), so a
@@ -213,9 +216,8 @@ load-bearing about *this* crate.
     curriculum funnels, so a threshold would either fail or have to be
     tuned until it only described today's data. It applies the *unit* gate
     as well as prerequisites, as the tree does — prerequisites alone
-    overstate the choice. `tests/asset_layout.rs::curriculum_choice_report`
-    (ignored; run with `--ignored --nocapture`) prints it for the shipped
-    curriculum.
+    overstate the choice. `cargo run --bin validate-pack -- --choice-report
+    ../harmonicon-lessons` prints it for the shipped curriculum.
   - The Song Editor's lesson form doesn't write `track` yet, so a lesson
     authored there falls back to its unit until edited by hand.
 
@@ -248,24 +250,20 @@ load-bearing about *this* crate.
     *backwards* would be unsatisfiable, since the prerequisite's unit only
     opens once the depending lesson's unit is done.
     `units::crossing_prerequisites` reports them and
-    `tests/asset_layout.rs::the_bundled_curriculum_forms_a_drawable_graph`
-    fails the build over one.
+    `validate-pack` fails the pack's CI over one.
 
-- **Lessons also come from lesson packs** (`docs/content_packs_plan.md`):
-  `scan_all_lessons` reads bundled lessons, then every usable pack from
-  `ContentPacks` in configured order (chart paths `packs://<slug>/...`),
-  then `~/Harmonicon/lessons`, and keeps only the **first** lesson with each
+- **Lessons come from lesson packs** (`docs/content_packs_plan.md`):
+  `scan_all_lessons` reads every usable pack from `ContentPacks` in
+  configured order (chart paths `packs://<slug>/...`), then
+  `~/Harmonicon/lessons`, and keeps only the **first** lesson with each
   id, since an id is both a profile key and a prerequisite target.
   `LESSON_FORMAT_VERSION` (`manifest.rs`) is what a pack's
   `requires.lesson_format` is checked against — bump it in the same change
   that adds a widget or pass-criteria type an older build can't parse.
 
-- **Lessons can also live in `~/Harmonicon/lessons`**, same
-  bundled-plus-external pattern as songs/themes:
-  `lessons::catalog::scan_all_lessons` scans `assets/lessons` then, if
-  present, the external drop folder (bundled entries first, so shipped
-  curriculum ordering/prerequisites are unaffected by whatever a player
-  drops in), tagging external lessons' `chart_asset_path` with
+- **Lessons can also live in `~/Harmonicon/lessons`**, after the packs
+  (so the curriculum's ordering and prerequisites are unaffected by
+  whatever a player drops in), tagging external lessons' `chart_asset_path` with
   `external://lessons` the same way `assets_management::scan_artist_song`
   tags external songs. Both are kept live via the single shared
   `~/Harmonicon` watcher (`assets_management::watch`, see the Asset
@@ -280,21 +278,18 @@ load-bearing about *this* crate.
   same-page rebuild if the skill tree happens to be open.
 
 - **Lesson discovery is `#[cfg]`-split, and this crate has its own
-  `build.rs` because of it.** `scan_lessons_root` walks `assets/lessons`
-  with `std::fs::read_dir` and parses each `lesson.json`'s bytes *directly*,
-  not through `AssetServer` — which means it finds nothing at all on a
-  target whose `assets/` tree isn't a readable local directory (wasm has no
-  filesystem; Android's assets live inside the APK). So
-  `#[cfg(any(target_arch = "wasm32", target_os = "android"))]` selects a
-  sibling `scan_all_lessons` that reads `build.rs`'s generated
-  `BUNDLED_LESSONS` instead. Three things about it:
+  `build.rs` because of it.** `scan_lessons_root` walks a pack with
+  `std::fs::read_dir` and parses each `lesson.json`'s bytes *directly*, not
+  through `AssetServer`. Desktop and Android do that for their packs on
+  disk (Android has no `~/Harmonicon`, so packs only). wasm can neither
+  download a pack nor list a directory, so its `scan_all_lessons` reads
+  `build.rs`'s generated `BUNDLED_LESSONS`: the pack in the directory
+  `HARMONICON_LESSONS_DIR` names at build time (unset: no lessons, and a
+  cargo warning). The web bundle must serve that same pack under
+  `assets/lessons/`, which is where those charts' asset paths point.
   - It embeds the **JSON text** via `include_str!`, unlike
     `harmonicon-platform`'s manifests which carry only names — because of
     that direct-bytes read above.
   - It can't live in `harmonicon-platform`'s build script:
     `include!(concat!(env!("OUT_DIR"), ...))` reads the *including* crate's
     `OUT_DIR`, and `OUT_DIR` is per-package.
-  - It has no external-folder half. There's no `~/Harmonicon` to drop a
-    lesson into on either target, which is why it takes no root path.
-  Until the Android port added this, the module had no manifest path at
-  all — so the lesson menu was silently empty on wasm as well.

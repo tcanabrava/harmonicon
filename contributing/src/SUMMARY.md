@@ -12,6 +12,7 @@
 - [The Song Editor](song-editor-architecture.md)
 - [Jam Session](jam-session-architecture.md)
 - [The Lessons Engine](lessons-engine.md)
+- [Content Packs](content-packs.md)
 - [Localization and Theming](localization-and-theming.md)
 - [Persistence](persistence.md)
 - [Native vs. WebAssembly](cross-platform-wasm.md)

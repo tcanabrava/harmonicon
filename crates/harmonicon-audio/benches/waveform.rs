@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-//! Whole-file waveform preparation on the song-loading path. OGG inputs are
-//! bundled songs; WAV is a deterministic PCM backing track like the one
+//! Whole-file waveform preparation on the song-loading path. The OGG inputs
+//! are real backing tracks (a short lesson loop and a full song) kept beside
+//! the bench, since songs and lessons themselves now live in their own
+//! repositories; WAV is a deterministic PCM backing track like the one
 //! produced by MIDI import. `bucket_peaks` isolates the reduction used for
 //! already-decoded or generated audio.
 //!
@@ -15,10 +17,8 @@ use harmonicon_audio::waveform::{
 };
 use harmonicon_core::wav::encode_wav;
 
-const LESSON_OGG: &[u8] =
-    include_bytes!("../../../assets/lessons/02_rhythm/03_improvisation/song/music.ogg");
-const SONG_OGG: &[u8] =
-    include_bytes!("../../../assets/songs/Example Artist/Example Song/song/music.ogg");
+const LESSON_OGG: &[u8] = include_bytes!("fixtures/short.ogg");
+const SONG_OGG: &[u8] = include_bytes!("fixtures/long.ogg");
 
 fn pcm(seconds: usize) -> Vec<f32> {
     let samples = seconds * 44_100;

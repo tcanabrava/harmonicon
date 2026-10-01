@@ -505,8 +505,8 @@ load-bearing about *this* crate.
   *keys* (`title_key`/`body_key`), never display text, so an author's
   typed title/explanation can't be written as a real translation —
   `serialize_lesson` derives the keys from the lesson id and prints the
-  key/text pairs to add to the locale files by hand, the same manual
-  step authoring any bundled lesson already requires. A lesson save also
+  key/text pairs to add by hand to the lesson's own `locales/` in its pack,
+  the same manual step authoring any lesson already requires. A lesson save also
   skips `harpchart::save_midi_backing` (the MIDI-import backing-track
   convenience, `ContentKind::Song`-only) — author the chart as a song
   first if it needs a MIDI-derived backing track, then switch to Lesson
@@ -800,11 +800,14 @@ load-bearing about *this* crate.
   Multiple pitch techniques have an ambiguous target, and multiple expressions
   cannot be reproduced by the synth, so load validation rejects each category
   with its phrase and event location.
-- **Every bundled lesson/song chart must survive the editor.** The integration
-  tests walk `assets/{lessons,songs}/**/*.harpchart`, validate each source, load
+- **Every real lesson/song chart must survive the editor.** The integration
+  tests walk every `.harpchart` in `tests/fixtures`, `assets/songs` and — when
+  checked out beside this repo — `../harmonicon-lessons` and
+  `../harmonicon-songs` (`content_charts`), validate each source, load
   and serialize it, validate the saved result, and compare events, annotations,
   timing, instrument, scoring, loop, and metadata semantics after documented
-  normalization. Add a chart to assets only if these tests remain green.
+  normalization. CI has only the fixtures; run the tests locally with the
+  packs beside the repo before publishing a pack change that adds charts.
 - **The status bar warns when the selected detector cannot score chords.** A
   duplicate `(tick, len)` among grid notes is exactly a multi-event item after
   serialization. If `AudioSettings::pitch_algorithm.is_polyphonic()` is false,

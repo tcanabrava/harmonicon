@@ -1,1 +1,0 @@
-{"id":"dynamic-shaping","unit":"expression","optional":true,"track":"vibrato","title_key":"lesson-dynamic-shaping-title","body_key":"lesson-dynamic-shaping-body","widgets":[{"type":"metronome","bpm":50,"tempo_steps":[40,45,50,55]}],"prerequisites":["breathing"]}

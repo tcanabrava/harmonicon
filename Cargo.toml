@@ -171,6 +171,10 @@ workspace = true
 name = "hole-editor"
 path = "src/bin/hole_editor.rs"
 
+[[bin]]
+name = "validate-pack"
+path = "src/bin/validate_pack.rs"
+
 [profile.dev]
 opt-level = 1
 # Enough debug info for a backtrace to name a file and line, without the
@@ -223,6 +227,7 @@ getrandom03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 # crate and flags one this workspace names directly. Naming it here turned
 # Bevy's problem into ours and failed `cargo deny`.
 skrifa = "0.47"
+tempfile = "3"
 
 # Compiles `assets/shaders/*.wesl` in tests/shader_compile.rs with the same
 # compiler Bevy uses, so a broken shader fails `cargo test` rather than the

@@ -43,8 +43,8 @@ two-note chords and 1.30 ms for 2,048; `accidentals` took about 0.064 ms and
 not on every playhead move. Re-run with normal Criterion sampling before
 using the figures to judge an optimization.
 
-A quick local waveform run measured the bundled lesson OGG at about 82 ms and
-the bundled example-song OGG at about 350 ms, including decoding and peak
+A quick local waveform run measured the short (lesson-loop) OGG fixture at
+about 82 ms and the long (full-song) one at about 350 ms, including decoding and peak
 extraction. A generated 60-second mono WAV took about 9 ms; reducing its PCM
 after decoding took about 1.1 ms. The OGG path runs during asset loading or
 on the editor's worker, so these are load costs rather than frame costs.

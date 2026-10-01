@@ -23,6 +23,8 @@ than accumulating history (git log/commit messages are the historical record):
 - `PLAN.md` — every open item, in order, gathered from the plans below;
   delete a line when it lands
 - `docs/lessons_plan.md` — curriculum design for the Lessons feature
+- `docs/content_packs_plan.md` — lessons and songs as downloadable git
+  repositories (packs): what has landed and what's open
 - `docs/training_tree_plan.md` — the technique DAG, per-lesson training
   ladder, skill-tree view and practice-motivation design. The graph,
   training records, tree view, per-lesson mastery ring, the spaced
@@ -227,6 +229,23 @@ Manual testing needs a mic, audio out, and a display.
   - **A new crate must forward the `dev`/`trace_tracy` features** to its own
     `bevy` (`"harmonicon-x/dev"`), or feature unification breaks and the
     tree ends up with two differently-configured Bevy builds.
+- **Lessons and songs are content packs, not engine assets.** The game
+  downloads them as git repositories — `github.com/tcanabrava/
+  harmonicon-lessons` (checked out beside this repo as
+  `../harmonicon-lessons`) and `harmonicon-songs` — depth 1, at first start,
+  and offers updates without applying them. Each pack carries its own
+  `pack.json` (with the engine version and `LESSON_FORMAT_VERSION` it
+  needs) and its own translations. `contributing/src/content-packs.md` is
+  the architecture; `docs/content_packs_plan.md` has what's still open.
+  Consequences that bite:
+  - **A lesson's text is not in `ui.ftl`**: it is in the pack's
+    `locales/`. `ui.ftl` is the game's own UI only.
+  - **Content is validated in the pack's CI, not here**: `cargo run --bin
+    validate-pack -- ../harmonicon-lessons`. This repo tests the validator
+    against `tests/fixtures/lesson-pack`; the Song Editor round-trip tests
+    also cover sibling pack checkouts when present.
+  - **Adding a lesson widget or pass criterion** means bumping
+    `LESSON_FORMAT_VERSION` in the same change (the `add-lesson` skill).
 - **Profiling is Tracy-based** — see `contributing/src/profiling.md` for the whole
   story (why the `LogPlugin` filter is feature-gated, and which paths need
   a manual span because Bevy's per-system instrumentation can't reach
@@ -315,8 +334,10 @@ Manual testing needs a mic, audio out, and a display.
 Three recurring jobs have their steps (and their traps) written up as
 skills in `.claude/skills/`, loaded on demand rather than living here:
 
-- **`add-lesson`** — authoring `assets/lessons/<unit>/<lesson>/`: manifest
-  schema, pass criteria, prerequisites, what's honestly scoreable.
+- **`add-lesson`** — authoring a lesson in the `harmonicon-lessons` pack
+  (`../harmonicon-lessons`), or the engine support one needs: manifest
+  schema, pass criteria, translations, `LESSON_FORMAT_VERSION`, what's
+  honestly scoreable.
 - **`add-crate`** — adding or extracting a workspace crate: extract
   bottom-up, forward the features, and what breaks on a move
   (`include_str!` depth, `CARGO_MANIFEST_DIR`, `OUT_DIR`, the budget
@@ -501,14 +522,12 @@ skills in `.claude/skills/`, loaded on demand rather than living here:
   directly under a song's `song/` subfolder) so the two implementations
   can't drift — and its own guard must stay in step with the `#[cfg]` on the
   `manifest` module, since a mismatch is a missing-file build error rather
-  than a silent fallback. **Lessons need the same treatment but a different
-  manifest**: `lessons::catalog` reads each `lesson.json`'s *bytes* directly
-  instead of going through `AssetServer`, so
-  `crates/harmonicon-song/build.rs` embeds the JSON text with `include_str!`
-  rather than just directory names (and has to be its own build script, for
-  the same per-package `OUT_DIR` reason the platform one does). That module
-  had no manifest path at all until the Android port added one, so the
-  Lessons menu was silently empty on wasm too. The `~/Harmonicon`
+  than a silent fallback. **Lessons are not in `assets/` at all**: they are a
+  downloaded pack (see the Content packs bullet), read from disk on desktop
+  and Android. wasm can't download one, so `crates/harmonicon-song/build.rs`
+  embeds a pack's `lesson.json` texts at build time from
+  `HARMONICON_LESSONS_DIR` (its own build script, for the same per-package
+  `OUT_DIR` reason the platform one has). The `~/Harmonicon`
   external-folder equivalent has no manifest-backed
   version at all — no home directory concept in a browser, and an Android
   app can only reach its own sandbox — which the

@@ -192,17 +192,17 @@ fn track_color(track: &str) -> Color {
 /// The colour this build gives `track`, or `None` if it has none of its own.
 ///
 /// Separate from [`track_color`] so the fallback is *detectable*. Every
-/// bundled track must have its own entry — `every_bundled_track_has_its_own_colour`
-/// fails the build otherwise — while an externally authored lesson dropped
-/// into `~/Harmonicon/lessons` may still name any track at all and gets
-/// [`UNKNOWN_TRACK_COLOR`].
+/// track in the official lesson pack should have its own entry —
+/// `validate-pack` warns about one that doesn't — while any other pack, or a
+/// lesson dropped into `~/Harmonicon/lessons`, may name any track at all and
+/// gets [`UNKNOWN_TRACK_COLOR`].
 ///
 /// Hues are spread around the wheel rather than picked to taste: with
 /// twenty tracks, two that sit close together are two groups a player
 /// cannot tell apart. Saturation and value stay inside the range the
 /// original palette established, so a new track doesn't read as louder
 /// than the rest.
-fn declared_track_color(track: &str) -> Option<Color> {
+pub(crate) fn declared_track_color(track: &str) -> Option<Color> {
     Some(match track {
         "tone" => Color::srgb(0.42, 0.78, 0.95),
         "hand" => Color::srgb(0.95, 0.62, 0.42),
@@ -279,9 +279,10 @@ pub(crate) fn setup_lesson_tree(
         &laid_out_collapsed(&collapsed, &pending),
     ) {
         Ok(tree) => tree,
-        // A cycle or a dangling prerequisite. `tests/asset_layout.rs` fails
-        // the build over either, so this only fires for a lesson dropped
-        // into `~/Harmonicon/lessons` — say so rather than draw nothing.
+        // A cycle or a dangling prerequisite. `validate-pack` fails a pack's
+        // CI over either, so this only fires for an unvalidated pack or a
+        // lesson dropped into `~/Harmonicon/lessons` — say so rather than
+        // draw nothing.
         Err(error) => {
             let line = commands
                 .spawn_empty()
@@ -896,59 +897,6 @@ mod tests {
         // Unit titles are the only labels drawn *above* their node.
         let spine = node_centre(0.0, 0.0);
         assert!(spine.y - UNIT_PX / 2.0 - UNIT_FONT_PX * 2.0 >= 0.0);
-    }
-
-    #[test]
-    fn every_bundled_track_has_its_own_colour() {
-        // Colour is the only thing carrying track grouping, now that the
-        // tree places nodes by prerequisite depth rather than by track. A
-        // bundled lesson falling through to `UNKNOWN_TRACK_COLOR` doesn't
-        // fail anything — it just joins an undifferentiated grey pile, and
-        // five tracks once did exactly that. The fallback itself stays:
-        // an externally authored lesson may name any track at all.
-        //
-        // Built from `CARGO_MANIFEST_DIR`, not the working directory —
-        // `assets/` is two levels up from a crate, and a wrong runtime
-        // path is not a compile error.
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/lessons");
-        let units =
-            std::fs::read_dir(&root).unwrap_or_else(|e| panic!("reading {}: {e}", root.display()));
-
-        let mut seen = 0usize;
-        let mut uncoloured: Vec<String> = Vec::new();
-        for unit in units.flatten() {
-            for lesson in std::fs::read_dir(unit.path())
-                .into_iter()
-                .flatten()
-                .flatten()
-            {
-                let path = lesson.path().join("lesson.json");
-                let Ok(bytes) = std::fs::read(&path) else {
-                    continue;
-                };
-                let manifest = harmonicon_song::lessons::parse_lesson(&bytes)
-                    .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-                seen += 1;
-                if let Some(track) = manifest.track.as_deref()
-                    && declared_track_color(track).is_none()
-                {
-                    uncoloured.push(track.to_string());
-                }
-            }
-        }
-
-        assert!(
-            seen > 0,
-            "no bundled lessons found under {}",
-            root.display()
-        );
-        uncoloured.sort();
-        uncoloured.dedup();
-        assert!(
-            uncoloured.is_empty(),
-            "bundled tracks with no colour of their own, so they all draw \
-             the same grey: {uncoloured:?}"
-        );
     }
 
     #[test]

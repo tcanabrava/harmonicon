@@ -20,7 +20,8 @@ bundled and player-dropped lesson content.
 
 ## `LessonManifest`: the authored content
 
-A lesson is a `lesson.json` file (`assets/lessons/<unit>/<lesson>/`,
+A lesson is a `lesson.json` file (`<unit>/<lesson>/` in a lesson pack — the
+official curriculum is the separate `harmonicon-lessons` repository,
 schema-validated against `assets/lesson_schema.dtd.json`) with a stable
 `id` — referenced by other lessons' `prerequisites` and by
 `PlayerProfile`'s progress records, so ids are never meant to change once
@@ -56,8 +57,8 @@ means the Song Editor's own lesson-authoring UI (see
 [The Song Editor](song-editor-architecture.md)) can never accidentally
 write real display text into a manifest — `serialize_lesson` derives the
 keys from the lesson id and prints the key/text pairs to add by hand to
-the locale files, the same manual step every bundled lesson's authoring
-already requires.
+the lesson's own `locales/` files in its pack, the same manual step every
+lesson's authoring already requires.
 
 `pass_criteria` is a closed enum rather than open-ended scripting:
 `Accuracy { threshold }`, `Technique { technique, threshold }`, or one of
@@ -128,7 +129,7 @@ layering of the prerequisite graph.** Measured over the shipped
 curriculum, every cross-unit prerequisite points forward, so a unit gate
 can never contradict a lesson's own prerequisites or deadlock the player.
 `units::crossing_prerequisites` reports any that don't and
-`tests/asset_layout.rs` fails the build over one — this is checked, not
+`validate-pack` fails the lesson pack's CI over one — this is checked, not
 assumed, because authoring a backward edge is an easy mistake and an
 undiagnosable one at runtime.
 
@@ -378,13 +379,13 @@ The fix is a `PAN_SLOP_PX` threshold (8px) and, only once it's crossed,
 removing `Pressed` from the button the gesture started on. Jitter keeps
 the tap alive; a real swipe cannot activate what it began over.
 
-## Discovery: bundled plus external, kept live
+## Discovery: packs plus external, kept live
 
-`lessons::catalog::scan_all_lessons` scans `assets/lessons` and then, if
-present, `~/Harmonicon/lessons` — bundled entries first, so a
-player-dropped lesson can never silently reorder or shadow shipped
-curriculum. This mirrors `assets_management`'s own bundled-plus-external
-pattern for songs and themes exactly (see [Persistence](persistence.md)
+The game ships no lessons. `lessons::catalog::scan_all_lessons` scans every
+installed lesson pack (see [Content packs](content-packs.md)) and then, if
+present, `~/Harmonicon/lessons` — packs first, so a player-dropped lesson
+can never silently reorder or shadow the curriculum. This mirrors
+`assets_management`'s own pattern for songs and themes (see [Persistence](persistence.md)
 for the shared live-filesystem-watcher infrastructure both ride on) —
 deliberately: `lessons` depends on `assets_management` for the low-level
 watch machinery, never the other way around, since `assets_management`

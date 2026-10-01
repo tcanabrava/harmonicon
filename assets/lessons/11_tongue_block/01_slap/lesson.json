@@ -1,1 +1,0 @@
-{"id":"tongue-slap","unit":"tongue-block","optional":true,"track":"tongue","title_key":"lesson-tongue-slap-title","body_key":"lesson-tongue-slap-body","widgets":[{"type":"metronome","bpm":50,"tempo_steps":[40,50,60,70]}],"prerequisites":["tongue-blocking"]}

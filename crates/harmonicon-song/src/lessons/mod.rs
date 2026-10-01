@@ -4,7 +4,7 @@
 //! ([`catalog`]), and unlock/pass judgment ([`progress`]). See
 //! `docs/lessons_plan.md` for the full design.
 //!
-//! A lesson is a directory under `assets/lessons/<unit_dir>/<lesson_dir>/`
+//! A lesson is a directory `<unit_dir>/<lesson_dir>/` in a lesson pack
 //! holding a `lesson.json` manifest (schema-validated against
 //! `assets/lesson_schema.dtd.json`) and, for chart-backed lessons, a normal
 //! song folder (`song/chart.harpchart` + `song/music.ogg` + artwork) that
@@ -23,6 +23,7 @@ pub mod graph;
 mod manifest;
 mod progress;
 pub mod units;
+pub mod validate;
 
 pub use catalog::*;
 pub use manifest::*;

@@ -1604,11 +1604,21 @@ fn editor_load_validation_accepts_its_own_expression_intensity() {
         .expect("the editor must accept a chart it wrote itself");
 }
 
-#[test]
-fn every_bundled_chart_loads_and_resaves_as_a_valid_chart() {
+/// Every real chart within reach: the fixture packs, the songs still in
+/// `assets/`, and — when they are checked out beside this repository, as
+/// `../harmonicon-lessons` and `../harmonicon-songs` — the official packs.
+/// CI checks out only this repository and so covers the fixtures; a local
+/// run with the packs beside it covers every chart a player can get.
+fn content_charts() -> Vec<std::path::PathBuf> {
     fn charts_below(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
-        for entry in std::fs::read_dir(dir).unwrap() {
-            let path = entry.unwrap().path();
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if entry.file_name().to_string_lossy().starts_with('.') {
+                continue; // a checkout's .git
+            }
             if path.is_dir() {
                 charts_below(&path, out);
             } else if path.extension().is_some_and(|ext| ext == "harpchart") {
@@ -1617,15 +1627,27 @@ fn every_bundled_chart_loads_and_resaves_as_a_valid_chart() {
         }
     }
 
-    let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut paths = Vec::new();
-    charts_below(&assets.join("lessons"), &mut paths);
-    charts_below(&assets.join("songs"), &mut paths);
+    for dir in [
+        repo.join("tests/fixtures"),
+        repo.join("assets/songs"),
+        repo.join("../harmonicon-lessons"),
+        repo.join("../harmonicon-songs"),
+    ] {
+        charts_below(&dir, &mut paths);
+    }
     assert!(
         !paths.is_empty(),
-        "no bundled charts found under {}",
-        assets.display()
+        "no charts found under {}",
+        repo.display()
     );
+    paths
+}
+
+#[test]
+fn every_bundled_chart_loads_and_resaves_as_a_valid_chart() {
+    let paths = content_charts();
 
     for path in paths {
         let text = std::fs::read_to_string(&path).unwrap();
@@ -1872,21 +1894,7 @@ fn round_trip_differences(source: &serde_json::Value) -> Vec<String> {
 
 #[test]
 fn every_bundled_chart_means_the_same_after_a_round_trip() {
-    fn charts_below(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
-        for entry in std::fs::read_dir(dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                charts_below(&path, out);
-            } else if path.extension().is_some_and(|ext| ext == "harpchart") {
-                out.push(path);
-            }
-        }
-    }
-    let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
-    let mut paths = Vec::new();
-    charts_below(&assets.join("lessons"), &mut paths);
-    charts_below(&assets.join("songs"), &mut paths);
-    assert!(!paths.is_empty());
+    let paths = content_charts();
 
     let mut report = String::new();
     for path in &paths {
@@ -1895,10 +1903,7 @@ fn every_bundled_chart_means_the_same_after_a_round_trip() {
             .unwrap_or_else(|error| panic!("{} cannot be edited: {error}", path.display()));
         let diffs = round_trip_differences(&source);
         if !diffs.is_empty() {
-            report.push_str(&format!(
-                "\n{}:\n",
-                path.strip_prefix(&assets).unwrap().display()
-            ));
+            report.push_str(&format!("\n{}:\n", path.display()));
             for d in diffs {
                 report.push_str(&format!("  - {d}\n"));
             }

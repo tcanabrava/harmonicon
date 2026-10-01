@@ -13,6 +13,7 @@ use std::path::PathBuf;
 pub use harmonicon_core::chart::HarpChart;
 pub use harmonicon_core::harmonica::Harmonica;
 mod score_song;
+pub mod validate;
 
 pub use loader::{SongChartLoader, SongLoadError, validate_and_migrate_chart};
 pub use score_song::ScoreSongLoader;

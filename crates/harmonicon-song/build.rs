@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT
 
-//! Generates the bundled-lesson manifest that `lessons::catalog` includes on
-//! targets whose `assets/` tree isn't a readable local directory — wasm (no
-//! filesystem; the asset reader talks HTTP) and Android (assets live inside
-//! the APK, reachable only through the JNI `AssetManager`). iOS is *not* one
-//! of these: an app bundle's Resources directory reads like any other, so it
-//! keeps the runtime scan.
+//! Generates the bundled-lesson manifest that `lessons::catalog` includes
+//! on wasm, which can neither download a lesson pack nor list a directory
+//! (its asset reader talks HTTP). Every other target reads its packs from
+//! disk at runtime, Android included.
 //!
-//! Same reasoning as `harmonicon-platform`'s build script — and the same
-//! reason it can't live there: `include!(concat!(env!("OUT_DIR"), ...))`
-//! reads the *including* crate's own OUT_DIR, and OUT_DIR is per-package.
+//! The pack comes from the directory `HARMONICON_LESSONS_DIR` names (a
+//! relative path is taken from the workspace root) — a checkout of
+//! `harmonicon-lessons`, fetched by whatever builds the web
+//! bundle, which must also serve that pack under `assets/lessons/` so the
+//! charts load. Unset, the wasm build has no lessons and says so.
 //!
-//! Unlike the song/theme manifests, which only need *names* (their contents
-//! then load through the asset server), a lesson is discovered by reading
-//! `lesson.json` itself — `scan_lessons_root` parses those bytes directly
-//! rather than going through `AssetServer`. So this manifest embeds the JSON
-//! text with `include_str!`, not just the directory names.
+//! It can't live in `harmonicon-platform`'s build script:
+//! `include!(concat!(env!("OUT_DIR"), ...))` reads the *including* crate's
+//! own OUT_DIR, and OUT_DIR is per-package. And unlike the song/theme
+//! manifests, which only need *names*, a lesson is discovered by reading
+//! `lesson.json` itself, so this embeds the JSON text with `include_str!`.
 
 use std::path::Path;
 
@@ -23,26 +23,37 @@ fn main() {
     generate_bundled_lesson_manifest();
 }
 
-/// Writes `$OUT_DIR/lesson_manifest.rs`. A no-op (two env var reads) unless
-/// the crate is being built for a target that needs it, so desktop builds
-/// pay nothing and keep scanning `assets/lessons` for real at runtime.
+/// Writes `$OUT_DIR/lesson_manifest.rs`. A no-op (an env var read) unless
+/// building for wasm.
 fn generate_bundled_lesson_manifest() {
-    let arch = std::env::var("CARGO_CFG_TARGET_ARCH");
-    let os = std::env::var("CARGO_CFG_TARGET_OS");
-    if arch.as_deref() != Ok("wasm32") && os.as_deref() != Ok("android") {
+    if std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() != Ok("wasm32") {
         return;
     }
 
-    println!("cargo:rerun-if-changed=../../assets/lessons");
-
+    println!("cargo:rerun-if-env-changed=HARMONICON_LESSONS_DIR");
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set by cargo");
     let dest = Path::new(&out_dir).join("lesson_manifest.rs");
 
     // `include_str!` in the generated file resolves relative to that file,
     // which lives in OUT_DIR — so the paths it embeds have to be absolute.
-    let manifest_dir =
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set by cargo");
-    let lessons_root = Path::new(&manifest_dir).join("../../assets/lessons");
+    let lessons_root = match std::env::var("HARMONICON_LESSONS_DIR") {
+        Ok(dir) => {
+            // Relative to the workspace root, where the build is run from —
+            // not to this crate, which is where a build script runs.
+            let manifest_dir =
+                std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set by cargo");
+            let root = Path::new(&manifest_dir).join("../..").join(&dir);
+            println!("cargo:rerun-if-changed={}", root.display());
+            root.canonicalize()
+                .unwrap_or_else(|e| panic!("HARMONICON_LESSONS_DIR={dir}: {e}"))
+        }
+        Err(_) => {
+            println!(
+                "cargo:warning=HARMONICON_LESSONS_DIR is not set; this wasm build has no lessons"
+            );
+            Path::new(&out_dir).join("no-lessons")
+        }
+    };
 
     let mut out = String::from("// Auto-generated at build time by build.rs — do not edit.\n");
     out.push_str(
@@ -73,6 +84,7 @@ fn scan_lessons_for_manifest(root: &Path) -> Vec<(String, String, std::path::Pat
     let mut unit_dirs: Vec<_> = rd
         .flatten()
         .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
         .map(|e| e.path())
         .collect();
     unit_dirs.sort();

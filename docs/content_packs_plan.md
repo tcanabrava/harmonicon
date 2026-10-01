@@ -70,12 +70,12 @@ locales/<lang>.ftl             unit-* and track-* names
 5. **Options UI**: repository list per kind (version, short SHA, status),
    check/update/remove/add, confirmations through `dialogs::confirm_dialog`,
    a text-input widget in `dialogs/` if none exists, three locales.
-6. **Extraction**: populate both repositories, ship a `validate-pack`
-   binary (schemas, graph, prerequisites, key existence, chart completeness —
-   today's `tests/asset_layout.rs` lesson checks) and CI for each pack repo,
-   delete bundled content and the moved `ui.ftl` keys, replace bundled-lesson
-   tests with a fixture pack, keep `assets/debug_songs`, rewrite the
-   `add-lesson` skill and `scripts/generate_lesson_files.py`, wasm build-time
-   fetch.
-7. **Docs**: `CLAUDE.md` and crate notes, `docs/lessons_plan.md`, a player
-   chapter ("Content sources") and a contributor chapter (pack format).
+6. **Extraction** — lessons done: they live in `harmonicon-lessons` with
+   their translations, `validate-pack` checks them (and runs in that repo's
+   CI), and this repo tests the validator on `tests/fixtures/lesson-pack`.
+   Open: songs, the same way; a web build that sets
+   `HARMONICON_LESSONS_DIR` and serves the pack under `assets/lessons/`
+   (there is no web deploy yet, only CI's `cargo check`).
+7. **Docs**: the contributor chapter (`contributing/src/content-packs.md`)
+   and engine notes landed with phase 6; open is the player chapter in
+   `docs/book` ("Content sources"), once the Options page exists.
