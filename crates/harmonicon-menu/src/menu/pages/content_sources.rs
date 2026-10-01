@@ -219,7 +219,11 @@ fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<LoadedTheme>
         })
         .id();
     commands.entity(root).add_child(column);
-    commands.entity(column).with_children(|c| {
+    // In a row of its own: the column stretches its children across, and a
+    // full-width button reads as a heading.
+    let check_row = commands.spawn(Node::default()).id();
+    commands.entity(column).add_child(check_row);
+    commands.entity(check_row).with_children(|c| {
         c.spawn_empty().apply_scene(button::small(
             &check,
             |_: On<Activate>, mut checks: MessageWriter<CheckPackUpdates>| {

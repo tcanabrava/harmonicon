@@ -39,6 +39,8 @@
   unit snaps straight to the new layout instead of animating.
 - **Zoom** — scales the whole interface.
 - **Theme** — opens the [theme picker](themes.md).
+- **Lessons & songs** — where your lessons and songs come from, and
+  their updates: see [Lessons & Songs](content-sources.md).
 - **Calibrate input lag** — opens [input-lag calibration](calibration.md).
 
 All Options settings persist to disk automatically and apply the moment

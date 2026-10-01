@@ -76,6 +76,5 @@ locales/<lang>.ftl             unit-* and track-* names
    Open: songs, the same way; a web build that sets
    `HARMONICON_LESSONS_DIR` and serves the pack under `assets/lessons/`
    (there is no web deploy yet, only CI's `cargo check`).
-7. **Docs**: the contributor chapter (`contributing/src/content-packs.md`)
-   and engine notes landed with phase 6; open is the player chapter in
-   `docs/book` ("Content sources"), once the Options page exists.
+7. ~~**Docs**~~ — landed: `contributing/src/content-packs.md` and the
+   player chapter `docs/book/src/content-sources.md`.

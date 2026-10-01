@@ -62,8 +62,7 @@ Nothing below can be approved by a test.
 ## Content packs
 
 `docs/content_packs_plan.md` has the design and phase list. Open: a web
-build that bundles the packs, and the player guide's "Content sources"
-chapter.
+build that bundles the packs.
 
 ## Deferred until a condition is met
 

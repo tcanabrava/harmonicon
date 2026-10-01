@@ -16,6 +16,7 @@
 - [Options](options.md)
 - [Calibrating Input Lag](calibration.md)
 - [Themes](themes.md)
+- [Lessons & Songs](content-sources.md)
 - [Help / About](help-about.md)
 - [Guided Tour](tutorial.md)
 - [Controls Reference](controls.md)
