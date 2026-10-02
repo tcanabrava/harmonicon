@@ -116,3 +116,5 @@ the grid.
 Touch is **not yet verified on real hardware** — it's been exercised on an
 emulator only, and hit-target sizes in particular haven't been tuned for
 fingers.
+
+In the song picker, the active sort has a highlighted background and the current song has a bright border. Use Up/Down to move through songs, Home/End to jump to the first/last song, and Enter or Space to start the focused song. Tab and Shift+Tab move between sorting, search, view mode, and songs. Typing in Search filters the list without moving focus away from the field.

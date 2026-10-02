@@ -39,6 +39,7 @@ impl Plugin for MenuPlugin {
             .register_type::<bevy::state::state::NextState<AppState>>()
             .register_type::<bevy::state::state::NextState<MenuPage>>()
             .init_resource::<pages::harp_check::HarpChoice>()
+            .init_resource::<pages::artist_list::SongPickerState>()
             .init_resource::<pages::jam_generate::JamGenerateConfig>()
             .init_resource::<GameplayMode>()
             .init_resource::<JamProgression>()
@@ -84,7 +85,13 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::ArtistList), scene::cleanup_menu)
             .add_systems(
                 Update,
-                pages::artist_list::refresh_song_picker.run_if(in_state(MenuPage::ArtistList)),
+                (
+                    pages::artist_list::refresh_song_picker,
+                    pages::artist_list::navigate_song_picker,
+                    pages::artist_list::update_picker_feedback,
+                )
+                    .chain()
+                    .run_if(in_state(MenuPage::ArtistList)),
             )
             .add_systems(
                 OnEnter(MenuPage::HarpCheck),

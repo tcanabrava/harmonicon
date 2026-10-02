@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
 //! Minimal numeric, single-line, and multiline text boxes.
-//! `bevy_ui_widgets`' `EditableTextInputPlugin` — already registered
+//! `bevy_ui_widgets`' `TextInputPlugin` — already registered
 //! app-wide via `UiWidgetsPlugins` — supplies click-to-focus, cursor
 //! rendering, and keyboard editing for any entity carrying
-//! `bevy_text::EditableText`; this module only adds what's still missing:
+//! `bevy_ui_widgets::TextInput` and `bevy_text::EditableText`; this module adds:
 //! a bordered box, digit-only filtering for the numeric variant, and
 //! clamped/committed value reporting on Enter or losing focus, the same
 //! shape `dialogs::combobox::ComboboxSelect` reports a pick.
@@ -13,6 +13,7 @@ use bevy::ecs::system::IntoObserverSystem;
 use bevy::input_focus::{FocusLost, InputFocus, tab_navigation::TabIndex};
 use bevy::prelude::*;
 use bevy::text::{EditableText, EditableTextFilter, TextCursorStyle, TextEdit};
+use bevy::ui_widgets::TextInput;
 
 // ── Numeric input ────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ pub fn spawn_numeric_input<M: 'static>(
                 justify_content: JustifyContent::Center,
                 ..default()
             },
+            TextInput,
             BorderColor::all(border),
             BackgroundColor(bg),
             EditableText {
@@ -197,6 +199,7 @@ pub fn spawn_text_input<M: 'static>(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
+            TextInput,
             BorderColor::all(border),
             BackgroundColor(bg),
             EditableText::new(value),
@@ -247,6 +250,7 @@ pub fn spawn_multiline_text_input<M: 'static>(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
+            TextInput,
             BorderColor::all(border),
             BackgroundColor(bg),
             editable,
