@@ -851,3 +851,10 @@ coach-faster = Mais rápido
 coach-slower = Mais lento
 coach-on-rate = Bom
 coach-rate = {$rate}/s
+
+song-clear-search = Limpar
+song-results = {$count} músicas
+song-none-selected = Selecione uma música
+song-no-results = Nenhuma música encontrada. Tente menos palavras ou limpe a busca.
+song-picker-keys = Cima/Baixo: Selecionar   Enter: Jogar   /: Buscar   Esc: Voltar
+song-result-one = 1 música

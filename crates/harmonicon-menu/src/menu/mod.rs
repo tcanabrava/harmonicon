@@ -86,9 +86,11 @@ impl Plugin for MenuPlugin {
             .add_systems(
                 Update,
                 (
+                    pages::artist_list::focus_picker_search,
                     pages::artist_list::refresh_song_picker,
                     pages::artist_list::navigate_song_picker,
                     pages::artist_list::update_picker_feedback,
+                    pages::artist_list::update_picker_summary,
                 )
                     .chain()
                     .run_if(in_state(MenuPage::ArtistList)),

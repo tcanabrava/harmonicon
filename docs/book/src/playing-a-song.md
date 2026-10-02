@@ -2,19 +2,22 @@
 
 **Play → Play Song** starts the scored song flow:
 
-1. **Select Mode** — choose [Play 2D](play-2d.md) (a scrolling note
-   highway) or [Play 3D](play-3d.md) (the same notes on a lane in
-   perspective). Both modes share the same scoring, timing, and pause menu — it's
-   purely a visual choice.
-2. **Select Artist**, then **Select Song** — browse the songs Harmonicon
-   downloaded on its first start (and
-   anything you've dropped into `~/Harmonicon/songs/`, see
-   [Getting Started](getting-started.md#adding-your-own-content)).
-3. A **3-2-1 countdown** plays, showing the song title, key, and which
-   physical harmonica to grab, then the chart starts scrolling and the
-   backing track plays.
+1. **Select Song** — browse all downloaded songs and anything you've added to
+   `~/Harmonicon/songs/` (see
+   [Getting Started](getting-started.md#adding-your-own-content)). Click a column
+   header to sort by song name, band, genre, or difficulty; click it again to
+   reverse the order. Search accepts partial words and small typos.
+2. Choose **2d** or **3d** with the switch beside **Play**. [Play 2D](play-2d.md)
+   uses a scrolling note highway; [Play 3D](play-3d.md) puts the same notes on
+   a lane in perspective. Both share scoring, timing, and the pause menu.
+3. Use Up/Down to select a song and inspect its details, then press Enter or
+   **Play**. Clicking a song starts it directly. `/` focuses Search; **Clear**
+   resets the filter. Hovering a song previews its details without taking focus
+   away from Search.
+4. Confirm the physical harmonica you are holding. A **3-2-1 countdown** then
+   shows the song title and key before the chart and backing track start.
 
-![Mode select screen](images/mode-select.png)
+![Unified song picker](images/song-picker.png)
 
 ## Pickups and repeats
 

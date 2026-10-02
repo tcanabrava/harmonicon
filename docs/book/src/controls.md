@@ -117,4 +117,6 @@ Touch is **not yet verified on real hardware** — it's been exercised on an
 emulator only, and hit-target sizes in particular haven't been tuned for
 fingers.
 
-In the song picker, the active sort has a highlighted background and the current song has a bright border. Use Up/Down to move through songs, Home/End to jump to the first/last song, and Enter or Space to start the focused song. Tab and Shift+Tab move between sorting, search, view mode, and songs. Typing in Search filters the list without moving focus away from the field.
+In the song picker, the active column header has a highlighted background and a direction arrow; click it again to reverse the order. The current song has a bright border. Use Up/Down to move through songs, Home/End to jump to the first/last song, and Enter or Space to start the focused song. Tab and Shift+Tab move between sorting, search, view mode, and songs. Typing in Search filters the list without moving focus away from the field. Search matches partial words in song names, bands, and genres; multiple words can match across those fields. Words of 4–7 characters allow one typo, and longer words allow two, using Levenshtein distance.
+
+The picker shows a result count and a selected-song preview. Hover a song to preview its details without leaving Search. Clear resets search and keeps the field focused; `/` focuses Search when you are outside a text field. The two-position `2d` / `3d` switch beside Play shows the active view with a filled background. Play starts the selected song and is disabled when no songs match.

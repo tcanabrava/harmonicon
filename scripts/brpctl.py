@@ -56,6 +56,7 @@ TEXT = "bevy_ui::widget::text::Text"
 # `Text` alone reports every row as "📁" and nothing else.
 TEXT_SPAN = "bevy_text::text::TextSpan"
 CHILD_OF = "bevy_ecs::hierarchy::ChildOf"
+CHILDREN = "bevy_ecs::hierarchy::Children"
 # These two do *not* follow the same rule, and guessing either from the other
 # costs an afternoon. The component is registered under its declaring module
 # (`…::button::Button`); the `Activate` event is registered under the crate
@@ -169,9 +170,9 @@ def buttons():
     """
     labels, parent_of, button_ids = snapshot()
     text_of = dict(labels)
-    children = {}
-    for child, parent in parent_of.items():
-        children.setdefault(parent, []).append(child)
+    # ECS query order is unrelated to visual child order. Read Children so
+    # multi-label controls and catalog rows match their on-screen wording.
+    children = {r["entity"]: r["components"][CHILDREN] for r in query([CHILDREN])}
 
     found = []
     for entity in button_ids:
@@ -319,15 +320,16 @@ def resize(width, height):
     a 1920px-wide window is 1280 logical. Ask [`window`] for the live scale
     factor when that distinction matters.
     """
-    entity, _ = window()
-    for path, value in (
-        (".resolution.physical_width", int(round(width))),
-        (".resolution.physical_height", int(round(height))),
-    ):
-        rpc(
-            "world.mutate_components",
-            {"entity": entity, "component": WINDOW, "path": path, "value": value},
-        )
+    entity, current = window()
+    resolution = current["resolution"]
+    resolution["physical_width"] = int(round(width))
+    resolution["physical_height"] = int(round(height))
+    # Apply both dimensions together: an OS resize event between separate
+    # writes can restore the old height while accepting the new width.
+    rpc(
+        "world.mutate_components",
+        {"entity": entity, "component": WINDOW, "path": ".resolution", "value": resolution},
+    )
 
 
 # ── The screenshot tour ───────────────────────────────────────────────────
@@ -425,24 +427,25 @@ def to_main_menu():
 
 
 def enter_song(mode, artist, song):
-    """Main menu → a playing song. The route is Play → Play Song → mode →
-    artist → song → the "which harmonica are you holding?" page → Play."""
+    """Main menu → unified picker → harp check → a playing song."""
     _go("Play", exact=True)
     _go("Play Song")
-    _go(mode)
-    _go(artist)
-    _go(song)
+    # Play Song opens in 2D; the single switch flips to 3D when requested.
+    if mode == "Play 3D":
+        _go("2d 3d", exact=True)
+    elif mode != "Play 2D":
+        raise ValueError(f"unknown gameplay mode: {mode!r}")
+    _go(f"{song} {artist}")
     _go("Play", exact=True, settle=COUNTDOWN_SETTLE)
 
 
 def enter_jam(artist, song):
     """Main menu → a Jam Session on a real song. Play → Jam Session → Pick a
-    Song, then the same artist → song → harp-check tail as `enter_song`."""
+    Song, then the same unified picker → harp-check tail as `enter_song`."""
     _go("Play", exact=True)
     _go("Jam Session")
     _go("Pick a Song")
-    _go(artist)
-    _go(song)
+    _go(f"{song} {artist}")
     _go("Play", exact=True, settle=COUNTDOWN_SETTLE)
 
 

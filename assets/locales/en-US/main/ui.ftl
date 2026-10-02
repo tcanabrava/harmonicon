@@ -854,3 +854,10 @@ coach-faster = Faster
 coach-slower = Slower
 coach-on-rate = Good
 coach-rate = {$rate}/s
+
+song-clear-search = Clear
+song-results = {$count} songs
+song-none-selected = Select a song
+song-no-results = No matching songs. Try fewer words or clear your search.
+song-picker-keys = Up/Down: Select   Enter: Play   /: Search   Esc: Back
+song-result-one = 1 song
