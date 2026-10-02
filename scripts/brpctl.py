@@ -430,11 +430,23 @@ def enter_song(mode, artist, song):
     """Main menu → unified picker → harp check → a playing song."""
     _go("Play", exact=True)
     _go("Play Song")
-    # Play Song opens in 2D; the single switch flips to 3D when requested.
-    if mode == "Play 3D":
-        _go("2d 3d", exact=True)
-    elif mode != "Play 2D":
+    if mode not in ("Play 2D", "Play 3D"):
         raise ValueError(f"unknown gameplay mode: {mode!r}")
+    wanted = "2d" if mode == "Play 2D" else "3d"
+    background = "bevy_ui::ui_node::BackgroundColor"
+    def alpha(value):
+        if isinstance(value, dict):
+            if "alpha" in value:
+                return value["alpha"]
+            return max((alpha(child) for child in value.values()), default=0)
+        if isinstance(value, list):
+            return max((alpha(child) for child in value), default=0)
+        return 0
+    active = [r for r in query([TEXT, background]) if _unwrap(r["components"][TEXT]) == wanted and alpha(r["components"][background]) > 0]
+    # The picker remembers the last view; flip only if the requested side
+    # isn't filled, rather than assuming each visit begins in 2D.
+    if not active:
+        _go("2d 3d", exact=True)
     _go(f"{song} {artist}")
     _go("Play", exact=True, settle=COUNTDOWN_SETTLE)
 

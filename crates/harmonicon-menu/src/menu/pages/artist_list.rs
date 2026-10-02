@@ -38,7 +38,21 @@ pub(crate) struct SongPickerState {
     sort: SongSort,
     selected: Option<String>,
     descending: bool,
+    view_2d: Option<bool>,
 }
+
+impl SongPickerState {
+    pub(super) fn preferred_mode(&self) -> GameplayMode {
+        if self.view_2d.unwrap_or(true) {
+            GameplayMode::Play2D
+        } else {
+            GameplayMode::Play3D
+        }
+    }
+}
+
+#[derive(Component)]
+pub(crate) struct RevealSelectedSong;
 
 #[derive(Component)]
 pub(crate) struct SortChoice {
@@ -268,6 +282,7 @@ pub(crate) fn setup_artist_list(
     });
     commands.entity(rows).insert((
         SongPickerRows,
+        RevealSelectedSong,
         Node {
             width: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
@@ -412,15 +427,16 @@ fn spawn_mode_toggle(commands: &mut Commands, parent: Entity, is_2d: bool) {
         commands.entity(toggle).add_child(entity);
     }
     make_interactive(&mut commands.entity(toggle), Color::srgb(0.10, 0.13, 0.19));
-    commands
-        .entity(toggle)
-        .observe(|_: On<Activate>, mut mode: ResMut<GameplayMode>| {
+    commands.entity(toggle).observe(
+        |_: On<Activate>, mut mode: ResMut<GameplayMode>, mut state: ResMut<SongPickerState>| {
             *mode = if *mode == GameplayMode::Play2D {
                 GameplayMode::Play3D
             } else {
                 GameplayMode::Play2D
             };
-        });
+            state.view_2d = Some(*mode == GameplayMode::Play2D);
+        },
+    );
     commands.entity(parent).add_child(toggle);
 }
 
@@ -709,13 +725,18 @@ fn populate_rows(
         {
             commands.entity(row).insert(AutoFocus);
         }
+        // Layout changes can emit PointerOver beneath a stationary cursor.
+        // Only actual pointer movement should replace a keyboard selection.
         let preview_path = path.clone();
         commands.entity(row).observe(
-            move |_: On<bevy::picking::events::PointerOver>,
+            move |event: On<bevy::picking::events::PointerMove>,
                   mut state: ResMut<SongPickerState>,
                   mut focus: ResMut<InputFocus>,
                   mut visible: ResMut<InputFocusVisible>,
                   inputs: Query<(), With<EditableText>>| {
+                if event.delta == Vec2::ZERO {
+                    return;
+                }
                 if state.selected.as_deref() != Some(preview_path.as_str()) {
                     state.selected = Some(preview_path.clone());
                 }
@@ -773,6 +794,9 @@ pub(crate) fn refresh_song_picker(
     {
         return;
     }
+    let sort_changed = rendered
+        .as_ref()
+        .is_none_or(|(_, sort, descending)| *sort != state.sort || *descending != state.descending);
     *rendered = Some((state.query.clone(), state.sort, state.descending));
     let visible = collect_songs(&songs, &state);
     if !visible
@@ -786,6 +810,9 @@ pub(crate) fn refresh_song_picker(
         .map(|(entity, row)| (entity, row.path.clone()))
         .collect();
     for root in &roots {
+        if sort_changed {
+            commands.entity(root).insert(RevealSelectedSong);
+        }
         if rescanned {
             commands.entity(root).despawn_related::<Children>();
         }
@@ -797,6 +824,45 @@ pub(crate) fn refresh_song_picker(
             focus.get().is_none_or(|entity| song_rows.contains(entity)),
             if rescanned { &[] } else { &existing },
         );
+    }
+}
+
+/// Wait for UI layout so new row heights and ordering are available. Reveal
+/// once per sort or page entry, without stealing focus or fighting manual scroll.
+pub(crate) fn reveal_selected_song(
+    mut commands: Commands,
+    state: Res<SongPickerState>,
+    rows: Query<(&SongRow, &ComputedNode)>,
+    mut areas: Query<
+        (Entity, &ComputedNode, &mut ScrollPosition),
+        (With<SongPickerRows>, With<RevealSelectedSong>),
+    >,
+) {
+    let mut ordered: Vec<_> = rows.iter().collect();
+    ordered.sort_by_key(|(row, _)| row.index);
+    let selected = ordered
+        .iter()
+        .position(|(row, _)| Some(&row.path) == state.selected.as_ref());
+    for (entity, area, mut scroll) in &mut areas {
+        let Some(index) = selected else {
+            commands.entity(entity).remove::<RevealSelectedSong>();
+            continue;
+        };
+        let height = ordered[index].1.size().y * ordered[index].1.inverse_scale_factor;
+        let viewport = area.size().y * area.inverse_scale_factor;
+        if height <= 0.0 || viewport <= 0.0 {
+            continue;
+        }
+        let top: f32 = ordered[..index]
+            .iter()
+            .map(|(_, node)| node.size().y * node.inverse_scale_factor + 4.0)
+            .sum();
+        if top < scroll.0.y {
+            scroll.0.y = top;
+        } else if top + height > scroll.0.y + viewport {
+            scroll.0.y = (top + height - viewport).max(0.0);
+        }
+        commands.entity(entity).remove::<RevealSelectedSong>();
     }
 }
 
@@ -926,6 +992,105 @@ pub(crate) fn update_picker_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sorting_reveals_selection_once_and_keeps_control_focus() {
+        let mut app = App::new();
+        app.init_resource::<SongPickerState>()
+            .init_resource::<InputFocus>()
+            .add_systems(Update, reveal_selected_song);
+        app.world_mut().resource_mut::<SongPickerState>().selected = Some("song-2".into());
+        let control = app.world_mut().spawn_empty().id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(control, FocusCause::Navigated);
+        let area = app
+            .world_mut()
+            .spawn((
+                SongPickerRows,
+                RevealSelectedSong,
+                ComputedNode {
+                    size: Vec2::new(100.0, 50.0),
+                    inverse_scale_factor: 1.0,
+                    ..default()
+                },
+                ScrollPosition::default(),
+            ))
+            .id();
+        let mut entities = Vec::new();
+        for (index, height) in [20.0, 40.0, 30.0].into_iter().enumerate() {
+            entities.push(
+                app.world_mut()
+                    .spawn((
+                        SongRow {
+                            path: format!("song-{index}"),
+                            index,
+                        },
+                        ComputedNode {
+                            size: Vec2::new(100.0, height),
+                            inverse_scale_factor: 1.0,
+                            ..default()
+                        },
+                    ))
+                    .id(),
+            );
+        }
+        app.update();
+        assert_eq!(app.world().get::<ScrollPosition>(area).unwrap().0.y, 48.0);
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(control));
+        app.world_mut().get_mut::<ScrollPosition>(area).unwrap().0.y = 17.0;
+        app.update();
+        assert_eq!(app.world().get::<ScrollPosition>(area).unwrap().0.y, 17.0);
+        app.world_mut()
+            .get_mut::<SongRow>(entities[2])
+            .unwrap()
+            .index = 0;
+        app.world_mut()
+            .get_mut::<SongRow>(entities[0])
+            .unwrap()
+            .index = 2;
+        app.world_mut().entity_mut(area).insert(RevealSelectedSong);
+        app.update();
+        assert_eq!(app.world().get::<ScrollPosition>(area).unwrap().0.y, 0.0);
+    }
+
+    #[test]
+    fn play_song_restores_last_view_after_a_jam_session() {
+        let mut app = App::new();
+        app.init_resource::<SongPickerState>()
+            .insert_resource(GameplayMode::Play2D)
+            .init_resource::<NextState<MenuPage>>()
+            .add_systems(Startup, |mut commands: Commands| {
+                let parent = commands.spawn_empty().id();
+                spawn_mode_toggle(&mut commands, parent, true);
+            });
+        app.update();
+        let toggle = app
+            .world_mut()
+            .query_filtered::<Entity, With<WidgetButton>>()
+            .single(app.world())
+            .unwrap();
+        app.world_mut().trigger(Activate { entity: toggle });
+        assert_eq!(
+            app.world().resource::<SongPickerState>().preferred_mode(),
+            GameplayMode::Play3D
+        );
+        *app.world_mut().resource_mut::<GameplayMode>() = GameplayMode::JamSession;
+        let button = app
+            .world_mut()
+            .spawn_empty()
+            .observe(crate::menu::pages::play::open_song_picker)
+            .id();
+        app.world_mut().trigger(Activate { entity: button });
+        assert_eq!(
+            *app.world().resource::<GameplayMode>(),
+            GameplayMode::Play3D
+        );
+        assert!(matches!(
+            app.world().resource::<NextState<MenuPage>>(),
+            NextState::Pending(MenuPage::ArtistList)
+        ));
+    }
 
     #[test]
     fn search_shortcut_focuses_search_without_interrupting_other_text_fields() {

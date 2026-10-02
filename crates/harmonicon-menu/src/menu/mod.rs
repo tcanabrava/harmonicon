@@ -96,6 +96,12 @@ impl Plugin for MenuPlugin {
                     .run_if(in_state(MenuPage::ArtistList)),
             )
             .add_systems(
+                PostUpdate,
+                pages::artist_list::reveal_selected_song
+                    .after(bevy::ui::UiSystems::Layout)
+                    .run_if(in_state(MenuPage::ArtistList)),
+            )
+            .add_systems(
                 OnEnter(MenuPage::HarpCheck),
                 (
                     pages::harp_check::reset_harp_choice,

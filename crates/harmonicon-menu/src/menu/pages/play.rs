@@ -6,12 +6,22 @@
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
-use harmonicon_app::app::{AppState, GameplayMode};
+use harmonicon_app::app::AppState;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 
 use crate::menu::routing::MenuPage;
 use crate::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root};
+
+pub(super) fn open_song_picker(
+    _: On<Activate>,
+    state: Res<super::artist_list::SongPickerState>,
+    mut mode: ResMut<harmonicon_app::app::GameplayMode>,
+    mut page: ResMut<NextState<MenuPage>>,
+) {
+    *mode = state.preferred_mode();
+    page.set(MenuPage::ArtistList);
+}
 
 pub(crate) fn setup_play_menu(
     mut commands: Commands,
@@ -20,15 +30,7 @@ pub(crate) fn setup_play_menu(
 ) {
     let (root, header, _page_root) =
         spawn_menu_root(&mut commands, &loc.msg("menu-play"), None, &theme, "Play");
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("play-song"),
-        |_: On<Activate>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
-            *mode = GameplayMode::Play2D;
-            page.set(MenuPage::ArtistList);
-        },
-    );
+    spawn_button(&mut commands, root, &loc.msg("play-song"), open_song_picker);
     spawn_button(
         &mut commands,
         root,
