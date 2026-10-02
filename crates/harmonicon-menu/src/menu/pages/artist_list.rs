@@ -214,9 +214,14 @@ pub(crate) fn setup_artist_list(
             flex_grow: 1.0,
             min_width: Val::Px(80.0),
             height: Val::Px(38.0),
-            align_items: AlignItems::Center,
-            padding: UiRect::horizontal(Val::Px(12.0)),
+            // EditableText draws at the content-box origin; flex alignment
+            // does not position its glyphs. Inset its single line vertically.
+            padding: UiRect::axes(Val::Px(12.0), Val::Px(8.0)),
             border: UiRect::all(Val::Px(1.0)),
+            ..default()
+        },
+        TextFont {
+            font_size: FontSize::Px(16.0),
             ..default()
         },
     ));
