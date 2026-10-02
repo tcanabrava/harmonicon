@@ -16,6 +16,14 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // The Kotlin half of rustls-platform-verifier, which content packs'
+        // https downloads verify certificates through (app/build.gradle.kts).
+        // Published only here, not on Maven Central; scoped to its group so
+        // nothing else is ever resolved from it.
+        maven {
+            url = uri("https://github.com/rustls/rustls-platform-verifier/raw/maven-archive/android-release-support/maven/")
+            content { includeGroup("org.rustls") }
+        }
     }
 }
 

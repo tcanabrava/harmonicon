@@ -48,6 +48,33 @@ val sdkDir: File = run {
     File(path)
 }
 
+/**
+ * The version of `rustls-platform-verifier-android` in the workspace's
+ * Cargo.lock. Its Kotlin component (below) must be exactly that version: the
+ * Rust side calls into it by JNI, so a mismatch fails at runtime, on the first
+ * https download, not at build time. A ValueSource so Gradle's configuration
+ * cache tracks the lockfile.
+ */
+abstract class RustlsVerifierVersion : ValueSource<String, RustlsVerifierVersion.Params> {
+    interface Params : ValueSourceParameters {
+        val lockFile: RegularFileProperty
+    }
+
+    override fun obtain(): String {
+        val lines = parameters.lockFile.get().asFile.readLines()
+        val nameIdx = lines.indexOfFirst { it.trim() == "name = \"rustls-platform-verifier-android\"" }
+        check(nameIdx >= 0) { "rustls-platform-verifier-android is not in Cargo.lock" }
+        return lines.drop(nameIdx + 1)
+            .first { it.trimStart().startsWith("version = ") }
+            .substringAfter('"')
+            .substringBefore('"')
+    }
+}
+
+val rustlsVerifierVersion: Provider<String> = providers.of(RustlsVerifierVersion::class.java) {
+    parameters.lockFile.set(File(repoRoot, "Cargo.lock"))
+}
+
 android {
     namespace = "io.github.tcanabrava.harmonicon"
     compileSdk = 35
@@ -107,6 +134,14 @@ dependencies {
     // only showing up as a *suppressed* NoClassDefFoundError for
     // AppCompatActivity.
     implementation("androidx.appcompat:appcompat:1.7.1")
+    // Certificate verification for content packs' https downloads: reqwest
+    // verifies through rustls-platform-verifier, which on Android asks the
+    // system trust store through this Kotlin class. Missing, the first
+    // download fails with a ClassNotFoundException from JNI. Initialised in
+    // `crates/harmonicon-android`'s `android_main`. If release builds ever
+    // turn on minification, keep `org.rustls.platformverifier.**`: R8 can't
+    // see JNI callers.
+    implementation("org.rustls:rustls-platform-verifier:${rustlsVerifierVersion.get()}")
 }
 
 /**

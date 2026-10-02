@@ -11,6 +11,10 @@
          also be granted at runtime, which harmonicon-audio's `permission`
          module does before opening any cpal stream. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Lessons and songs are downloaded at first start (content packs,
+         docs/content_packs_plan.md). A "normal" permission: granted at
+         install, no runtime prompt. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-feature
         android:name="android.hardware.microphone"
         android:required="true" />

@@ -36,6 +36,13 @@ harmonicon = { path = "../..", version = "*" }
 # GameActivity.cpp from the NDK, so unlike NativeActivity this makes an NDK
 # a hard requirement for even `cargo check` on this target.
 bevy = { workspace = true, features = ["android-game-activity"] }
+# Content packs download over https; on Android, reqwest's certificate
+# verifier (rustls-platform-verifier, through harmonicon-packs) must be handed
+# the JVM and app context before the first connection — `android_main` does.
+# Same versions harmonicon-packs' reqwest already pulls in, so nothing new is
+# built.
+rustls-platform-verifier = "0.7"
+jni = { version = "0.22", default-features = false }
 
 [features]
 # Forwarded to the game exactly as every other crate forwards them, so

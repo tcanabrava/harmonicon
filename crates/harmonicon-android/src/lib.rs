@@ -16,6 +16,33 @@
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
 fn android_main(android_app: bevy::android::android_activity::AndroidApp) {
+    init_certificate_verifier(&android_app);
     let _ = bevy::android::ANDROID_APP.set(android_app);
     harmonicon::run();
+}
+
+/// Content packs download over https, and reqwest verifies certificates
+/// through `rustls-platform-verifier`, which on Android asks the system trust
+/// store through a Kotlin class (added in `packaging/android`'s Gradle
+/// build). It needs the JVM and the app's context to reach it, once, before
+/// the first connection; without them every download fails.
+///
+/// A failure here is logged, not fatal: the game runs without downloads, and
+/// the download screen shows each one's error.
+#[cfg(target_os = "android")]
+fn init_certificate_verifier(app: &bevy::android::android_activity::AndroidApp) {
+    use jni::JavaVM;
+    use jni::objects::JObject;
+
+    // SAFETY: both pointers come from android-activity, valid for the
+    // process's lifetime: the JavaVM it was loaded into, and a global
+    // reference to the activity.
+    let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr().cast()) };
+    let result = vm.attach_current_thread(|env| -> Result<(), jni::errors::Error> {
+        let activity = unsafe { JObject::from_raw(env, app.activity_as_ptr().cast()) };
+        rustls_platform_verifier::android::init_with_env(env, activity)
+    });
+    if let Err(e) = result {
+        bevy::log::error!("Certificate verification is unavailable; downloads will fail: {e}");
+    }
 }

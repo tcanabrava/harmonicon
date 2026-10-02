@@ -4638,6 +4638,8 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "harmonicon",
+ "jni 0.22.4",
+ "rustls-platform-verifier",
 ]
 
 [[package]]

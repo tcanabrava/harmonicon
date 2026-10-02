@@ -259,6 +259,31 @@ dialog doesn't justify routing that back across JNI.
 Off Android, `microphone_granted()` returns `true` and
 `request_microphone()` does nothing, so call sites need no `#[cfg]`.
 
+### Downloads: the network permission and certificate verification
+
+Lessons and songs are [content packs](content-packs.md) downloaded at first
+start, which needs two things a desktop build gets for free:
+
+- **`INTERNET`** in the manifest. A "normal" permission, granted at install
+  with no prompt — but without it every connection is refused.
+- **Certificate verification through Java.** reqwest's rustls backend always
+  verifies with `rustls-platform-verifier`, which on Android asks the system
+  trust store through a small Kotlin class. gix builds its reqwest client
+  internally, so there is no seam to substitute bundled root certificates
+  instead. Two halves, both required:
+  - The Kotlin class is the `org.rustls:rustls-platform-verifier` AAR,
+    published only in the project's own Maven repository on GitHub
+    (`settings.gradle.kts`). Its version must equal the
+    `rustls-platform-verifier-android` crate in `Cargo.lock` — the Rust side
+    calls it by JNI, so a mismatch fails at runtime — which is why
+    `app/build.gradle.kts` reads the version from the lockfile.
+  - `android_main` calls `rustls_platform_verifier::android::init_with_env`
+    with the JVM and the activity before the app starts. Without it, every
+    download fails.
+
+  If release builds ever enable minification, keep
+  `org.rustls.platformverifier.**`: R8 can't see JNI callers.
+
 ### `android_main`, and why the root package has a library
 
 Android never calls `main`: the platform loads a shared library and calls
