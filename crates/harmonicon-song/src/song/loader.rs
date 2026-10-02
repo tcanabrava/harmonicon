@@ -446,7 +446,7 @@ mod tests {
     fn a_chart_with_repeats_and_endings_validates() {
         let mut value = serde_json::json!({
             "metadata": { "format_version": CURRENT_FORMAT_VERSION },
-            "song": { "title": "T", "artist": "A", "tempo_bpm": 120.0,
+            "song": { "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0,
                       "key": "C", "difficulty": "easy" },
             "timing": {
                 "resolution": 12,

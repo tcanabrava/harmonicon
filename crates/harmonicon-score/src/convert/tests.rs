@@ -197,7 +197,7 @@ fn an_empty_track_is_never_worth_playing() {
 #[test]
 fn a_chart_converted_onto_its_own_harp_keeps_its_pitches() {
     let bytes = r#"{
-            "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+            "song": {"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
             "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
             "harmonica": {"type":"diatonic","holes":10,"bending_profile":"richter_standard",
                 "layout": {"blow":["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],

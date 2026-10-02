@@ -266,7 +266,7 @@ mod tests {
     fn c_diatonic() -> HarpChart {
         serde_json::from_str(
             r#"{
-                "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+                "song": {"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
                 "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
                 "harmonica": {"type":"diatonic","holes":10,"bending_profile":"richter_standard",
                     "layout": {"blow":["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],

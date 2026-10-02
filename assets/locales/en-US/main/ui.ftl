@@ -34,7 +34,7 @@ about-body = Harmonicon is a rhythm game for diatonic and chromatic harmonica: p
 about-version = Version { $version }
 
 # Mode select
-select-mode = Select Mode
+select-mode = Play view
 play-2d = Play 2D
 play-3d = Play 3D
 
@@ -116,12 +116,18 @@ sync-failed = Harmonicon could not download its lessons and songs.
 credits-back-to-menu = Back to Menu
 
 # Song / artist selection
-select-artist = Select Artist
+select-artist = Select Song
 circle-of-fifths-harp-label = harp
 artist-song-count-one = {$n} song
 artist-song-count-many = {$n} songs
 select-song = Select Song
-song-list-by-artist = by {$artist}
+song-search = Search
+song-sort-band = Band
+song-sort-difficulty = Difficulty
+song-sort-name = Song name
+song-sort-genre = Genre
+editor-field-genre = Genre
+editor-field-genre-tooltip = The song's musical genre.
 no-songs-found = No songs found. Add folders under assets/songs/<artist>/<song>/
 
 # Options
@@ -719,8 +725,8 @@ tutorial-title-main = Main Menu
 tutorial-body-main = Your home base — head into Play, open Options, or find Help / About from here.
 tutorial-title-play = Play
 tutorial-body-play = Pick a real song, create one, start a jam, practice bends, or work through lessons — choose how you want to play.
-tutorial-title-mode-select = Select Mode
-tutorial-body-mode-select = Choose 2D (a scrolling note highway) or 3D (a harmonica model you play along with).
+tutorial-title-mode-select = Song picker
+tutorial-body-mode-select = Browse every song, sort by band, difficulty, name, or genre, search the catalog, then choose 2D or 3D on this screen.
 tutorial-title-gameplay = Playing a Song
 tutorial-body-gameplay = Notes fall toward the hit line — play the right pitch on your harmonica at the right time to score them.
 tutorial-title-jam-session-menu = Jam Session

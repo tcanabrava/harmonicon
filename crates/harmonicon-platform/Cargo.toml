@@ -36,6 +36,7 @@ web-time = { workspace = true }
 # formats count as a song's chart. Depending on the same crate the runtime
 # scan reads `IMPORT_EXTENSIONS` from is what keeps the two from drifting.
 [build-dependencies]
+serde_json = { workspace = true }
 harmonicon-score = { path = "../harmonicon-score", version = "*" }
 
 [dev-dependencies]

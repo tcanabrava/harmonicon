@@ -38,7 +38,7 @@ pub struct Metadata {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.6.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.7.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.
@@ -104,14 +104,40 @@ fn strip_legacy_fx_mapping(value: &mut serde_json::Value) -> bool {
         .is_some_and(|obj| obj.remove("fx_mapping").is_some())
 }
 
+/// Adds the required song genre to older charts. Existing charts have no
+/// reliable genre source, so preserve loadability with a clear placeholder
+/// that authors can replace in the Song Editor.
+fn add_legacy_song_genre(value: &mut serde_json::Value) -> bool {
+    let Some(song) = value
+        .get_mut("song")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return false;
+    };
+    if song.contains_key("genre") {
+        return false;
+    }
+    song.insert(
+        "genre".to_string(),
+        serde_json::Value::String("Uncategorized".to_string()),
+    );
+    true
+}
+
 /// Every known schema-breaking change, oldest first. Add a new entry here
 /// whenever a future removal/rename needs migrating instead of just
 /// documented as an accepted break (see CLAUDE.md's Chart format notes on
 /// `additionalProperties: false`).
-const MIGRATIONS: &[Migration] = &[Migration {
-    target_version: "1.1.0",
-    apply: strip_legacy_fx_mapping,
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        target_version: "1.1.0",
+        apply: strip_legacy_fx_mapping,
+    },
+    Migration {
+        target_version: "1.7.0",
+        apply: add_legacy_song_genre,
+    },
+];
 
 /// Fixes up a chart's raw JSON in place so it validates against the current
 /// schema, running every [`MIGRATIONS`] step whose `target_version` is newer
@@ -261,6 +287,7 @@ mod format_version_tests {
 pub struct Song {
     pub title: String,
     pub artist: String,
+    pub genre: String,
     pub tempo_bpm: f32,
     pub key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -638,7 +665,7 @@ mod tests {
     use super::*;
 
     const MINIMAL_DIATONIC: &str = r#"{
-        "song": { "title": "Test", "artist": "Tester", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
+        "song": { "title": "Test", "artist": "Tester", "genre": "Test", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
         "timing": { "resolution": 480, "tempo_map": [{"tick": 0, "bpm": 120.0}] },
         "harmonica": {
             "type": "diatonic", "holes": 10, "bending_profile": "richter_standard",
@@ -683,7 +710,7 @@ mod tests {
     #[test]
     fn chromatic_harmonica_deserializes() {
         let json = r#"{
-            "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+            "song": {"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
             "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
             "harmonica": {
                 "type": "chromatic", "holes": 12,
@@ -707,7 +734,7 @@ mod tests {
     #[test]
     fn track_item_with_blow_event_parsed() {
         let json = r#"{
-            "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+            "song": {"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
             "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
             "harmonica": {"type":"diatonic","holes":10,"bending_profile":"richter_standard"},
             "track": [{"time": 1.0, "duration": 0.5, "events": [{"hole": 4, "action": "blow"}]}],
@@ -723,7 +750,7 @@ mod tests {
     #[test]
     fn combo_scoring_config_parsed() {
         let json = r#"{
-            "song": {"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
+            "song": {"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"C","difficulty":"easy"},
             "timing": {"resolution":480,"tempo_map":[{"tick":0,"bpm":120.0}]},
             "harmonica": {"type":"diatonic","holes":10,"bending_profile":"richter_standard"},
             "track": [],
@@ -907,7 +934,7 @@ mod tests {
         ] {
             let json = format!(
                 r#"{{
-                "song": {{"title":"T","artist":"A","tempo_bpm":120.0,"key":"C","difficulty":"{s}"}},
+                "song": {{"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"C","difficulty":"{s}"}},
                 "timing": {{"resolution":480,"tempo_map":[{{"tick":0,"bpm":120.0}}]}},
                 "harmonica": {{"type":"diatonic","holes":10,"bending_profile":"richter_standard"}},
                 "track": [],

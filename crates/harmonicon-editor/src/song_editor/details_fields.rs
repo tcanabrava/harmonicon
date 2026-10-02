@@ -13,6 +13,7 @@ pub(super) enum Field {
     Music,
     Name,
     Author,
+    Genre,
     Difficulty,
     SongFeel,
     Source,
@@ -66,7 +67,7 @@ impl Field {
     }
 }
 
-pub(super) const FIELDS: [(Field, &str); 24] = [
+pub(super) const FIELDS: [(Field, &str); 25] = [
     (Field::Tempo, "editor-field-tempo"),
     (Field::Pickup, "editor-field-pickup"),
     (Field::Key, "editor-field-key"),
@@ -74,6 +75,7 @@ pub(super) const FIELDS: [(Field, &str); 24] = [
     (Field::Music, "editor-field-music"),
     (Field::Name, "editor-field-name"),
     (Field::Author, "editor-field-author"),
+    (Field::Genre, "editor-field-genre"),
     (Field::Difficulty, "editor-field-difficulty"),
     (Field::SongFeel, "editor-field-feel"),
     (Field::Source, "editor-field-source"),

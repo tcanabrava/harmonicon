@@ -8,7 +8,7 @@ use bevy::prelude::*;
 
 use harmonicon_app::app::{
     AppState, GameplayMode, JamPositionCycle, JamProgression, JamScale, ReturnToHelpAbout,
-    ReturnToOptions, ReturnToPlay, ReturnToSongList, SelectedArtist, TourActive,
+    ReturnToOptions, ReturnToPlay, ReturnToSongList, TourActive,
 };
 use harmonicon_editor::song_editor;
 use harmonicon_jam::jam::backing::JamGenre;
@@ -38,7 +38,6 @@ impl Plugin for MenuPlugin {
             // the state itself; `NextState` is what you actually write to.
             .register_type::<bevy::state::state::NextState<AppState>>()
             .register_type::<bevy::state::state::NextState<MenuPage>>()
-            .init_resource::<SelectedArtist>()
             .init_resource::<pages::harp_check::HarpChoice>()
             .init_resource::<pages::jam_generate::JamGenerateConfig>()
             .init_resource::<GameplayMode>()
@@ -85,14 +84,8 @@ impl Plugin for MenuPlugin {
             .add_systems(OnExit(MenuPage::ArtistList), scene::cleanup_menu)
             .add_systems(
                 Update,
-                pages::artist_list::rebuild_on_songs_rescanned
-                    .run_if(in_state(MenuPage::ArtistList)),
+                pages::artist_list::refresh_song_picker.run_if(in_state(MenuPage::ArtistList)),
             )
-            .add_systems(
-                OnEnter(MenuPage::SongList),
-                pages::song_list::setup_song_list,
-            )
-            .add_systems(OnExit(MenuPage::SongList), scene::cleanup_menu)
             .add_systems(
                 OnEnter(MenuPage::HarpCheck),
                 (
@@ -112,11 +105,6 @@ impl Plugin for MenuPlugin {
                 )
                     .run_if(in_state(MenuPage::HarpCheck)),
             )
-            .add_systems(
-                OnEnter(MenuPage::ModeSelect),
-                pages::mode_select::setup_mode_select,
-            )
-            .add_systems(OnExit(MenuPage::ModeSelect), scene::cleanup_menu)
             .add_systems(
                 OnEnter(MenuPage::JamSessionMenu),
                 pages::jam_session::setup_jam_session_menu,

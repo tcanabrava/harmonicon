@@ -261,6 +261,7 @@ pub fn drill_chart(
         song: Song {
             title: title.to_string(),
             artist: artist.to_string(),
+            genre: "Practice".to_string(),
             tempo_bpm: bpm,
             key: crate::harmonica::detected_harp_key(harp).unwrap_or_else(|| "C".to_string()),
             difficulty: spec.tier.difficulty(),

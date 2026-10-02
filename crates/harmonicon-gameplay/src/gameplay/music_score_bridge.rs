@@ -127,7 +127,7 @@ mod tests {
     fn repeated_bars_follow_the_expanded_performance() {
         let mut chart: HarpChart = serde_json::from_str(
             r#"{
-            "song": {"title":"Repeat", "artist":"Test", "tempo_bpm":120,
+            "song": {"title":"Repeat", "artist":"Test", "genre":"Test", "tempo_bpm":120,
                      "key":"C", "difficulty":"easy", "time_signature":"4/4"},
             "timing": {"resolution":480, "tempo_map":[{"tick":0,"bpm":120}]},
             "harmonica": {"type":"diatonic", "holes":10,

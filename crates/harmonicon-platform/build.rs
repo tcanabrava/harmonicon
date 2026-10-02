@@ -72,9 +72,11 @@ fn generate_bundled_asset_manifest() {
 
     let mut out = String::new();
     out.push_str("// Auto-generated at build time by build.rs — do not edit.\n");
-    out.push_str("pub static SONGS: &[(&str, &str, &str)] = &[\n");
-    for (artist, name, asset_path) in &songs {
-        out.push_str(&format!("    ({artist:?}, {name:?}, {asset_path:?}),\n"));
+    out.push_str("pub static SONGS: &[(&str, &str, &str, &str, &str)] = &[\n");
+    for (artist, name, genre, difficulty, asset_path) in &songs {
+        out.push_str(&format!(
+            "    ({artist:?}, {name:?}, {genre:?}, {difficulty:?}, {asset_path:?}),\n"
+        ));
     }
     out.push_str("];\n\n");
 
@@ -105,12 +107,12 @@ fn asset_relative_path(path: &Path, strip: &Path) -> String {
         .join("/")
 }
 
-/// (artist, song name, asset-relative chart path) for every song under
+/// (artist, song name, genre, difficulty, asset-relative chart path) for every song under
 /// `root` — mirrors `assets_management::scan_songs_root`/`scan_artist_song`'s
 /// discovery rules exactly (first `*.harpchart` file directly under each
 /// song's `song/` subfolder), but as a one-shot build-time walk instead of a
 /// runtime `ResMut` system.
-fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String)> {
+fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, String)> {
     let mut out = Vec::new();
     let Ok(artists) = std::fs::read_dir(root) else {
         return out;
@@ -158,10 +160,22 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String)> {
             let Some(chart) = chart else {
                 continue;
             };
+            let chart_metadata = std::fs::read(&chart)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+            let catalog_field = |field: &str| {
+                chart_metadata
+                    .as_ref()
+                    .and_then(|value| value.get("song")?.get(field)?.as_str())
+                    .unwrap_or("Uncategorized")
+                    .to_string()
+            };
+            let genre = catalog_field("genre");
+            let difficulty = catalog_field("difficulty");
             let name = song_dir.file_name().to_string_lossy().into_owned();
             // Served under `assets/songs/` by the web bundle.
             let asset_path = format!("songs/{}", asset_relative_path(&chart, root));
-            out.push((artist.clone(), name, asset_path));
+            out.push((artist.clone(), name, genre, difficulty, asset_path));
         }
     }
     out.sort();

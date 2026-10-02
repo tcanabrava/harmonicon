@@ -273,6 +273,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     let mut song = json!({
         "title": title,
         "artist": artist,
+        "genre": state.genre.trim(),
         "tempo_bpm": bpm,
         "key": state.key,
         "time_signature": state.time_signature,
@@ -501,6 +502,10 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         if let Some(difficulty) = song["difficulty"].as_str() {
             state.difficulty = difficulty.to_string();
         }
+        state.genre = song["genre"]
+            .as_str()
+            .unwrap_or("Uncategorized")
+            .to_string();
         state.song_feel = song["feel"].as_str().unwrap_or("default").to_string();
     }
     if let Some(p) = v["harmonica"]["position"].as_str()

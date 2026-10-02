@@ -7,7 +7,7 @@ use harmonicon_core::midi::note_to_midi;
 fn chart_json(track: &str, extra_song: &str) -> Vec<u8> {
     format!(
         r#"{{
-            "song": {{"title":"T","artist":"A","tempo_bpm":140.0,"key":"C",
+            "song": {{"title":"T","artist":"A","genre":"Test","tempo_bpm":140.0,"key":"C",
                       "difficulty":"easy"{extra_song}}},
             "timing": {{"resolution":480,"tempo_map":[{{"tick":0,"bpm":140.0}}]}},
             "harmonica": {{"type":"diatonic","holes":10,"bending_profile":"richter_standard",

@@ -337,6 +337,7 @@ fn render_scenario(
         song: Song {
             title: format!("Synthetic {} — {}", key, scenario.name),
             artist: "note_bench synthetic".into(),
+            genre: "Synthetic".into(),
             tempo_bpm: 120.0,
             key: key.to_string(),
             time_signature: None,

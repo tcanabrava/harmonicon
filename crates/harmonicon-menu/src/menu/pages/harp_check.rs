@@ -349,7 +349,7 @@ pub(crate) fn setup_harp_check(
         &mut commands,
         header,
         &loc.msg("back"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::SongList),
+        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::ArtistList),
     );
 }
 

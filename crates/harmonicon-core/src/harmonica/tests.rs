@@ -5,7 +5,7 @@ use crate::chart::HarpChart;
 
 fn test_chart() -> HarpChart {
     serde_json::from_str(r#"{
-        "song": { "title": "T", "artist": "A", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
+        "song": { "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
         "timing": { "resolution": 480, "tempo_map": [{"tick": 0, "bpm": 120.0}] },
         "harmonica": {
             "type": "diatonic",
@@ -339,7 +339,7 @@ fn hole_count_reads_holes_from_either_variant() {
 
 fn test_chromatic_chart() -> HarpChart {
     serde_json::from_str(r#"{
-        "song": { "title": "T", "artist": "A", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
+        "song": { "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0, "key": "C", "difficulty": "easy" },
         "timing": { "resolution": 480, "tempo_map": [{"tick": 0, "bpm": 120.0}] },
         "harmonica": {
             "type": "chromatic",

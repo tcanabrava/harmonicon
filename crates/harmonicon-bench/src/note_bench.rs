@@ -501,6 +501,7 @@ mod tests {
             song: Song {
                 title: "Test".into(),
                 artist: "Test".into(),
+                genre: "Test".into(),
                 tempo_bpm: 120.0,
                 key: "C".into(),
                 time_signature: None,

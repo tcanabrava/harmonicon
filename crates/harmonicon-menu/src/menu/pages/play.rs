@@ -6,7 +6,7 @@
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
-use harmonicon_app::app::AppState;
+use harmonicon_app::app::{AppState, GameplayMode};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 
@@ -20,12 +20,14 @@ pub(crate) fn setup_play_menu(
 ) {
     let (root, header, _page_root) =
         spawn_menu_root(&mut commands, &loc.msg("menu-play"), None, &theme, "Play");
-    // The render mode is chosen up front, before picking a song.
     spawn_button(
         &mut commands,
         root,
         &loc.msg("play-song"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::ModeSelect),
+        |_: On<Activate>, mut mode: ResMut<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
+            *mode = GameplayMode::Play2D;
+            page.set(MenuPage::ArtistList);
+        },
     );
     spawn_button(
         &mut commands,

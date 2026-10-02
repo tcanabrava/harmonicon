@@ -43,6 +43,7 @@
         "artist",
         "tempo_bpm",
         "key",
+        "genre",
         "difficulty"
       ],
       "additionalProperties": false,
@@ -52,6 +53,11 @@
         },
         "artist": {
           "type": "string"
+        },
+        "genre": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Musical genre used to group songs in the song picker."
         },
         "tempo_bpm": {
           "type": "number",

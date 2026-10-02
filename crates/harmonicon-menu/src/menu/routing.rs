@@ -29,12 +29,10 @@ pub enum MenuPage {
     Welcome,
     Play,
     ArtistList,
-    SongList,
     /// "Which harmonica are you holding?" — between picking a song and
     /// loading it. Only on the song-list route; a lesson prescribes its own
     /// harp and the guided tour drives itself.
     HarpCheck,
-    ModeSelect,
     Options,
     Theme,
     /// Options → Lessons & songs: the lesson and song repositories, their
@@ -88,18 +86,12 @@ pub(crate) fn handle_menu_escape(
         }
         MenuPage::Play | MenuPage::HelpAbout => MenuPage::Main,
         MenuPage::JamSessionMenu => MenuPage::Play,
-        MenuPage::ModeSelect => MenuPage::Play,
-        // Shared by two flows — Play Song (via ModeSelect) and Jam
-        // Session's "Pick a Song" — see the Back button in
-        // `pages::artist_list::setup_artist_list` for why `GameplayMode` is
-        // what disambiguates.
         MenuPage::ArtistList => match *mode {
             GameplayMode::JamSession => MenuPage::JamSessionMenu,
-            GameplayMode::Play2D | GameplayMode::Play3D => MenuPage::ModeSelect,
+            GameplayMode::Play2D | GameplayMode::Play3D => MenuPage::Play,
         },
         MenuPage::JamGenerate => MenuPage::JamSessionMenu,
-        MenuPage::SongList => MenuPage::ArtistList,
-        MenuPage::HarpCheck => MenuPage::SongList,
+        MenuPage::HarpCheck => MenuPage::ArtistList,
         MenuPage::Theme | MenuPage::ContentSources => MenuPage::Options,
         MenuPage::LessonReader => MenuPage::LessonTree,
         MenuPage::About => MenuPage::HelpAbout,
@@ -188,7 +180,7 @@ pub(crate) fn route_menu_entry(
         next_page.set(MenuPage::JamGenerate);
     } else if ret_song.0 {
         ret_song.0 = false;
-        next_page.set(MenuPage::SongList);
+        next_page.set(MenuPage::ArtistList);
     } else if ret_opts.0 {
         ret_opts.0 = false;
         next_page.set(MenuPage::Options);

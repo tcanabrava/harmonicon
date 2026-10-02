@@ -904,6 +904,7 @@ pub fn generated_chart(
         song: Song {
             title: format!("Generated Jam \u{2014} Key of {key}"),
             artist: "Harmonicon".to_string(),
+            genre: genre.label().to_string(),
             tempo_bpm: bpm,
             key: key.to_string(),
             time_signature: Some("4/4".to_string()),

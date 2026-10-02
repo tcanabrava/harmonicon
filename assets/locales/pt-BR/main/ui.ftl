@@ -32,7 +32,7 @@ about-body = Harmonicon é um jogo de ritmo para gaita diatônica e cromática: 
 about-version = Versão { $version }
 
 # Seleção de modo
-select-mode = Selecionar Modo
+select-mode = Visualização de jogo
 play-2d = Tocar em 2D
 play-3d = Tocar em 3D
 
@@ -114,12 +114,18 @@ sync-failed = O Harmonicon não conseguiu baixar suas lições e músicas.
 credits-back-to-menu = Voltar ao Menu
 
 # Seleção de música / artista
-select-artist = Selecionar Artista
+select-artist = Selecionar Música
 circle-of-fifths-harp-label = gaita
 artist-song-count-one = {$n} música
 artist-song-count-many = {$n} músicas
 select-song = Selecionar Música
-song-list-by-artist = de {$artist}
+song-search = Buscar
+song-sort-band = Banda
+song-sort-difficulty = Dificuldade
+song-sort-name = Nome da música
+song-sort-genre = Gênero
+editor-field-genre = Gênero
+editor-field-genre-tooltip = O gênero musical da música.
 no-songs-found = Nenhuma música encontrada. Adicione pastas em assets/songs/<artista>/<música>/
 
 # Opções
@@ -717,8 +723,8 @@ tutorial-title-main = Menu Principal
 tutorial-body-main = Sua base — vá para Jogar, abra as Opções ou encontre Ajuda / Sobre por aqui.
 tutorial-title-play = Jogar
 tutorial-body-play = Escolha uma música de verdade, crie uma, comece uma jam, pratique bends ou siga as lições — escolha como quer jogar.
-tutorial-title-mode-select = Selecionar Modo
-tutorial-body-mode-select = Escolha 2D (uma pista de notas rolando) ou 3D (uma harmônica que você toca junto).
+tutorial-title-mode-select = Seletor de músicas
+tutorial-body-mode-select = Navegue por todas as músicas, ordene por banda, dificuldade, nome ou gênero, pesquise e escolha 2D ou 3D nesta tela.
 tutorial-title-gameplay = Tocando uma Música
 tutorial-body-gameplay = As notas caem em direção à linha de acerto — toque a nota certa na harmônica no momento certo para pontuar.
 tutorial-title-jam-session-menu = Jam Session

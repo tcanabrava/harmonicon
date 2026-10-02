@@ -42,6 +42,8 @@ pub struct ThemesRescanned;
 pub struct SongEntry {
     pub artist: String,
     pub name: String,
+    pub genre: String,
+    pub difficulty: String,
     pub asset_path: String,
 }
 
@@ -460,8 +462,21 @@ pub fn scan_artist_song(
                 asset_path: format!("{source_prefix}{relative}"),
                 artist: artist.clone(),
                 name,
+                genre: chart_catalog_field(&song_file, "genre"),
+                difficulty: chart_catalog_field(&song_file, "difficulty"),
             });
     }
+}
+
+/// Reads the small metadata subset needed by the song picker without
+/// loading or validating the full chart into the asset system.
+#[cfg(not(target_arch = "wasm32"))]
+fn chart_catalog_field(path: &std::path::Path, field: &str) -> String {
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|value| value.get("song")?.get(field)?.as_str().map(str::to_owned))
+        .unwrap_or_else(|| "Uncategorized".to_string())
 }
 
 /// `path` below `root`, `/`-separated whatever the platform, since asset
@@ -555,7 +570,7 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
     available.0.clear();
-    for (artist, name, asset_path) in manifest::SONGS {
+    for (artist, name, genre, difficulty, asset_path) in manifest::SONGS {
         available
             .0
             .entry((*artist).to_string())
@@ -563,6 +578,8 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
             .push(SongEntry {
                 artist: (*artist).to_string(),
                 name: (*name).to_string(),
+                genre: (*genre).to_string(),
+                difficulty: (*difficulty).to_string(),
                 asset_path: (*asset_path).to_string(),
             });
     }

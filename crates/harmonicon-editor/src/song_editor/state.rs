@@ -194,6 +194,7 @@ pub(super) struct EditorState {
     pub(super) music: String,
     pub(super) name: String,
     pub(super) author: String,
+    pub(super) genre: String,
     /// The chart file's authorship credit. The Details form's `Author`
     /// field edits `song.artist`; keep this separate so loading a chart does
     /// not replace `metadata.author` with the performing artist on save.
@@ -314,6 +315,7 @@ impl Default for EditorState {
             music: String::new(),
             name: String::new(),
             author: String::new(),
+            genre: "Uncategorized".into(),
             chart_author: String::new(),
             difficulty: "intermediate".into(),
             song_feel: "default".into(),
@@ -518,6 +520,7 @@ impl EditorState {
             Field::Music => &self.music,
             Field::Name => &self.name,
             Field::Author => &self.author,
+            Field::Genre => &self.genre,
             Field::Difficulty => &self.difficulty,
             Field::SongFeel => &self.song_feel,
             Field::Source => &self.source,
@@ -560,6 +563,7 @@ impl EditorState {
             Field::Music => &mut self.music,
             Field::Name => &mut self.name,
             Field::Author => &mut self.author,
+            Field::Genre => &mut self.genre,
             Field::Difficulty => &mut self.difficulty,
             Field::SongFeel => &mut self.song_feel,
             Field::Source => &mut self.source,

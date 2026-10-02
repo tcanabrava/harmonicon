@@ -32,7 +32,7 @@ about-body = Harmonicon es un juego de ritmo para armónica diatónica y cromát
 about-version = Versión { $version }
 
 # Selección de modo
-select-mode = Seleccionar Modo
+select-mode = Vista de juego
 play-2d = Jugar en 2D
 play-3d = Jugar en 3D
 
@@ -114,12 +114,18 @@ sync-failed = Harmonicon no pudo descargar sus lecciones y canciones.
 credits-back-to-menu = Volver al Menú
 
 # Selección de canción / artista
-select-artist = Seleccionar Artista
+select-artist = Seleccionar Canción
 circle-of-fifths-harp-label = armónica
 artist-song-count-one = {$n} canción
 artist-song-count-many = {$n} canciones
 select-song = Seleccionar Canción
-song-list-by-artist = de {$artist}
+song-search = Buscar
+song-sort-band = Banda
+song-sort-difficulty = Dificultad
+song-sort-name = Nombre de canción
+song-sort-genre = Género
+editor-field-genre = Género
+editor-field-genre-tooltip = El género musical de la canción.
 no-songs-found = No se encontraron canciones. Añade carpetas en assets/songs/<artista>/<canción>/
 
 # Opciones
@@ -717,8 +723,8 @@ tutorial-title-main = Menú Principal
 tutorial-body-main = Tu base — ve a Jugar, abre Opciones o encuentra Ayuda / Acerca de desde aquí.
 tutorial-title-play = Jugar
 tutorial-body-play = Elige una canción real, crea una, empieza una jam, practica bends o sigue las lecciones — elige cómo quieres jugar.
-tutorial-title-mode-select = Seleccionar Modo
-tutorial-body-mode-select = Elige 2D (un camino de notas que se desliza) o 3D (una armónica que tocas junto a ti).
+tutorial-title-mode-select = Selector de canciones
+tutorial-body-mode-select = Explora todas las canciones, ordénalas por banda, dificultad, nombre o género, búscalas y elige 2D o 3D aquí.
 tutorial-title-gameplay = Tocando una Canción
 tutorial-body-gameplay = Las notas caen hacia la línea de acierto — toca la nota correcta en tu armónica en el momento justo para anotar.
 tutorial-title-jam-session-menu = Jam Session

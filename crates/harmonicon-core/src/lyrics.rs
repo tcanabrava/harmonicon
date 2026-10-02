@@ -173,7 +173,7 @@ mod tests {
     fn chart(items: &[(f64, Option<&str>, Option<&str>)]) -> HarpChart {
         let mut chart: HarpChart = serde_json::from_str(
             r#"{
-                "song": { "title": "T", "artist": "A", "tempo_bpm": 120.0,
+                "song": { "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0,
                           "key": "C", "difficulty": "easy" },
                 "timing": { "resolution": 12, "tempo_map": [{"tick": 0, "bpm": 120.0}] },
                 "harmonica": {

@@ -80,7 +80,7 @@ const TOUR_STEPS: &[(TourTarget, &str, &str, f32)] = &[
         PAGE_STEP_SECONDS,
     ),
     (
-        TourTarget::Page(MenuPage::ModeSelect),
+        TourTarget::Page(MenuPage::ArtistList),
         "tutorial-title-mode-select",
         "tutorial-body-mode-select",
         PAGE_STEP_SECONDS,
@@ -442,6 +442,8 @@ mod tests {
                 .push(SongEntry {
                     artist: artist.to_string(),
                     name: name.to_string(),
+                    genre: "Uncategorized".to_string(),
+                    difficulty: "intermediate".to_string(),
                     asset_path: format!("packs://p/{artist}/{name}/song/chart.harpchart"),
                 });
         }

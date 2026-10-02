@@ -110,7 +110,7 @@ fn chart_with_meter(song_sig: Option<&str>, map_sig_at_zero: Option<&str>) -> Ha
     });
     serde_json::from_str(&format!(
         r#"{{
-            "song": {{ "title": "T", "artist": "A", "tempo_bpm": 120.0,
+            "song": {{ "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0,
                       "key": "C", "difficulty": "easy"{song_field} }},
             "timing": {{ "resolution": 480, "tempo_map": [{{"tick": 0, "bpm": 120.0}}]{map_field} }},
             "harmonica": {{

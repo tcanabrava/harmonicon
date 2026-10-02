@@ -303,6 +303,7 @@ pub fn to_chart(
         song: Song {
             title: score.title().unwrap_or("Imported").to_string(),
             artist: artist.to_string(),
+            genre: "Uncategorized".to_string(),
             tempo_bpm: tempo,
             key: harmonicon_core::harmonica::detected_harp_key(harp)
                 .unwrap_or_else(|| "C".to_string()),
