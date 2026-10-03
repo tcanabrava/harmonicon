@@ -154,6 +154,6 @@ It kills by the built path (`target/release/harmonicon`), not the bare name —
 
 ## Everything else here
 
-`generate_lesson_files.py`, `create_base_harp_model.py`, `make_note_cube.py`
-and the `.glb` models are one-off authoring/asset tools, run by hand.
+`generate_lesson_files.py` and `make_note_cube.py` are one-off
+authoring/asset tools, run by hand.
 `git-hooks/` holds the hooks and `install.sh`; run that once per clone.

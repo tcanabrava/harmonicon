@@ -25,7 +25,6 @@
 //! warns a too-small `backdrop_parent` causes (a click-outside-to-close
 //! that only works along one axis).
 
-use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::input_focus::tab_navigation::TabGroup;
 use bevy::prelude::*;
@@ -267,29 +266,6 @@ pub fn spawn_button<M: 'static>(
     let e = commands.spawn_scene(button::default(label, on_click)).insert(node).id();
     commands.entity(parent).add_child(e);
     e
-}
-
-/// Marks a glTF scene root whose descendants must all render on this
-/// layer. Scene children spawn a frame or two after the root and don't
-/// inherit `RenderLayers`, so without [`propagate_scene_layers`] a page's
-/// own camera would never see them.
-#[derive(Component)]
-pub struct SceneLayer(pub RenderLayers);
-
-/// Pushes each [`SceneLayer`] onto every descendant not yet layered.
-pub fn propagate_scene_layers(
-    mut commands: Commands,
-    roots: Query<(Entity, &SceneLayer)>,
-    children: Query<&Children>,
-    already_layered: Query<(), With<RenderLayers>>,
-) {
-    for (root, layer) in &roots {
-        for entity in children.iter_descendants(root) {
-            if already_layered.get(entity).is_err() {
-                commands.entity(entity).insert(layer.0.clone());
-            }
-        }
-    }
 }
 
 pub fn cleanup_menu(mut commands: Commands, roots: Query<Entity, With<MenuRoot>>) {

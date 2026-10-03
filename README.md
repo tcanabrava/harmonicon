@@ -67,8 +67,6 @@ turning MIDI files into playable charts.
   grid), a practice mode that scores your mic input against the chart as
   you edit, and lesson authoring alongside plain songs.
 - **Localization** — English, Portuguese (pt-BR), and Spanish (es-ES).
-- **Authoring tools** — `hole-editor` positions the clickable holes on a 3D
-  harmonica model.
 
 ---
 
@@ -229,14 +227,12 @@ src/                   # Binaries + the composition root
                        #   running game can be inspected, screenshotted and recorded
                        #   from a shell (contributing/src/remote-control.md)
   bin/
-    hole_editor.rs     # 3D harmonica hole-layout editor
     note_bench.rs      # Pitch-detection algorithm benchmark runner
 
 assets/
   songs/<artist>/<song>/         # background/elements art, 2d/3d note layouts
     song/                        #   the chart itself (*.harpchart) + either
                                  #   music.ogg/.wav or music.mid (per-track stems)
-  harmonicas/3d/<name>/     # harmonica.glb + holes.json (3D model + hole layout)
   lessons/<unit>/<lesson>/   # lesson.json + its own chart, for the Lessons curriculum
   themes/<name>/             # theme.json + art/sounds for the theme picker
   locales/<locale>/         # Fluent translations (en-US, es-ES, pt-BR)
@@ -278,11 +274,6 @@ windows. Songs can also be loaded from `~/Harmonicon` outside the bundled
 assets.
 
 ### Authoring tools
-
-```bash
-# Edit the clickable hole positions for a 3D harmonica model
-cargo run --bin hole-editor
-```
 
 To turn a MIDI file into a chart, use the in-game Song Editor's own MIDI
 import instead: pick a `.mid`/`.midi` file, choose a track, and its notes

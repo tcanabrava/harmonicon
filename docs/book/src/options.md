@@ -13,8 +13,6 @@
   A warning banner appears here (and nowhere else) if no working
   microphone is detected; see
   [Troubleshooting](troubleshooting.md#no-microphone-detected).
-- **Harmonica model** — pick which 3D harmonica model the Credits page
-  shows, with a live rotating preview of each option.
 - **Pitch detect** — which pitch-detection algorithm to use (FFT, YIN,
   pYIN, MPM, or NMF), each with a short explanation of its trade-offs
   shown alongside the picker. The default works well for most setups;

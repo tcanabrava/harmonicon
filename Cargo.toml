@@ -153,10 +153,6 @@ trace_tracy = ["bevy/trace_tracy", "harmonicon-audio/trace_tracy", "harmonicon-p
 workspace = true
 
 [[bin]]
-name = "hole-editor"
-path = "src/bin/hole_editor.rs"
-
-[[bin]]
 name = "validate-pack"
 path = "src/bin/validate_pack.rs"
 

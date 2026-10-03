@@ -67,8 +67,6 @@ fn generate_bundled_asset_manifest() {
     };
     let themes = scan_theme_dir_names(Path::new("../../assets/themes"));
     let notes_2d = scan_ext_stems(Path::new("../../assets/notes/2d"), "png");
-    let notes_3d = scan_ext_stems(Path::new("../../assets/notes/3d"), "glb");
-    let harmonicas = scan_harmonica_model_names(Path::new("../../assets/harmonicas/3d"));
 
     let mut out = String::new();
     out.push_str("// Auto-generated at build time by build.rs — do not edit.\n");
@@ -82,8 +80,6 @@ fn generate_bundled_asset_manifest() {
 
     write_str_slice(&mut out, "THEMES", &themes);
     write_str_slice(&mut out, "NOTE_THEMES_2D", &notes_2d);
-    write_str_slice(&mut out, "NOTE_THEMES_3D", &notes_3d);
-    write_str_slice(&mut out, "HARMONICA_MODELS", &harmonicas);
 
     std::fs::write(&dest, out).expect("failed to write asset manifest");
 }
@@ -208,21 +204,5 @@ fn scan_ext_stems(dir: &Path, ext: &str) -> Vec<String> {
         .collect();
     names.sort();
     names.dedup();
-    names
-}
-
-/// Names of subfolders under `root` that contain a `harmonica.glb` — mirrors
-/// `assets_management::scan_harmonica_models`.
-fn scan_harmonica_model_names(root: &Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(root) else {
-        return Vec::new();
-    };
-    let mut names: Vec<String> = entries
-        .flatten()
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        .filter(|e| e.path().join("harmonica.glb").exists())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
     names
 }

@@ -91,7 +91,7 @@ files at once, which don't naturally belong inside any single module's
 own unit tests:
 
 - **`tests/asset_layout.rs`** — schema-validates every bundled theme and
-  checks that harmonica models and shaders are complete. Songs and lessons
+  checks that its files and the shaders are complete. Songs and lessons
   are content packs in their own repositories, checked there by
   `validate-pack` (`tests/validate_pack.rs` and `harmonicon-song`'s
   `lessons::validate`/`song::validate` test it against `tests/fixtures`):
@@ -124,16 +124,11 @@ own unit tests:
 
 ## Developer tools as their own kind of testing infrastructure
 
-`src/bin/` holds four small binaries in the root package (see
+`src/bin/` holds three small binaries in the root package (see
 [System Overview](overview.md)), each existing specifically to make some
 kind of manual verification faster than it would be through the full
 game:
 
-- **`hole-editor`** — positions the clickable hole overlays on a 3D
-  harmonica model, writing the same `holes.json` format
-  `gameplay_3d`/`bending_trainer` read at runtime — a visual tool for
-  content that would otherwise mean hand-editing pixel coordinates in a
-  text editor and reloading to check them.
 - **`note-bench`** — an *offline pitch-detection benchmark*: replays a
   "debug recording" (raw captured mic audio plus the chart and detection
   metadata, dumped by the Song Editor's own `--features dev` "Debug

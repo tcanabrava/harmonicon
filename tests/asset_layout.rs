@@ -2,27 +2,18 @@
 
 //! Smoke test for the asset tree's minimum structure.
 //!
-//! Each 3D harmonica model and theme needs a fixed set of files for menu
-//! discovery, loading, and 3D behavior. A file missing here breaks the game far
-//! from where the symptom shows up, so this fails fast with a report listing
-//! every missing file, grouped by model or theme, for quick local diagnosis.
+//! Each theme needs a fixed set of files for menu discovery and loading. A
+//! file missing here breaks the game far from where the symptom shows up, so
+//! this fails fast with a report listing every missing file, grouped by
+//! theme, for quick local diagnosis.
 //!
 //! Songs and lessons are not here: they are content packs, checked by
 //! `validate-pack` in their own repositories (`tests/validate_pack.rs`).
 //!
 //! Paths checked (per the design docs / asset conventions):
-//!   assets/harmonicas/3d/<model>/{harmonica.glb, holes.json}
 //!   assets/themes/<name>/{theme.json (valid against schema), preview.png, + all files listed in theme.json}
 
 use std::path::{Path, PathBuf};
-
-/// Files every `assets/harmonicas/3d/<model>/` directory must contain.
-const MODEL_FILES: [&str; 2] = ["harmonica.glb", "holes.json"];
-
-/// The required files absent from `dir`, in declared order.
-fn missing_files(dir: &Path, required: &[&str]) -> Vec<String> {
-    required.iter().filter(|name| !dir.join(name).exists()).map(|name| name.to_string()).collect()
-}
 
 /// Immediate subdirectories of `root`, sorted by path. Empty if `root` is absent.
 fn subdirs(root: &Path) -> Vec<PathBuf> {
@@ -40,25 +31,6 @@ fn subdirs(root: &Path) -> Vec<PathBuf> {
 /// A path relative to `assets/`, for compact report lines.
 fn label(path: &Path) -> String {
     path.strip_prefix("assets/").unwrap_or(path).display().to_string()
-}
-
-#[test]
-fn harmonica_model_assets_are_complete() {
-    let root = Path::new("assets/harmonicas/3d");
-    assert!(root.is_dir(), "missing asset directory: {}", root.display());
-
-    let models = subdirs(root);
-    assert!(!models.is_empty(), "no harmonica models found under {}", root.display());
-
-    let mut report = String::new();
-    for model in models {
-        let missing = missing_files(&model, &MODEL_FILES);
-        if !missing.is_empty() {
-            report.push_str(&format!("  {}: missing {}\n", label(&model), missing.join(", ")));
-        }
-    }
-
-    assert!(report.is_empty(), "Incomplete harmonica model assets:\n{report}");
 }
 
 // ── Chart schema ──────────────────────────────────────────────────────────────

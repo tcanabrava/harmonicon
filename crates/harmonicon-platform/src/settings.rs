@@ -17,10 +17,7 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::assets_management::{
-    SelectedHarmonicaModel, SelectedNoteTheme2d, SelectedNoteTheme3d, SelectedTheme,
-    ShowNoteNumbers,
-};
+use crate::assets_management::{SelectedNoteTheme2d, SelectedTheme, ShowNoteNumbers};
 use crate::content_packs::ContentSources;
 use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::PitchAlgorithm;
@@ -228,8 +225,6 @@ struct Settings {
     metronome_volume: f32,
     input_latency_ms: i32,
     note_theme_2d: String,
-    note_theme_3d: String,
-    harmonica_model: String,
     ui_theme: String,
     pitch_algorithm: PitchAlgorithm,
     input_device: String,
@@ -250,8 +245,6 @@ impl Default for Settings {
             metronome_volume: 0.7,
             input_latency_ms: 0,
             note_theme_2d: "circular".into(),
-            note_theme_3d: "circular".into(),
-            harmonica_model: "default".into(),
             ui_theme: "default".into(),
             pitch_algorithm: PitchAlgorithm::default(),
             input_device: String::new(),
@@ -364,8 +357,6 @@ pub fn apply_loaded_settings(mut live: PersistedSettingsMut) {
 struct PersistedSettings<'w> {
     audio: Res<'w, AudioSettings>,
     theme_2d: Res<'w, SelectedNoteTheme2d>,
-    theme_3d: Res<'w, SelectedNoteTheme3d>,
-    model: Res<'w, SelectedHarmonicaModel>,
     ui_theme: Res<'w, SelectedTheme>,
     note_numbers: Res<'w, ShowNoteNumbers>,
     adaptive_difficulty: Res<'w, AdaptiveDifficultyEnabled>,
@@ -381,8 +372,6 @@ impl PersistedSettings<'_> {
     fn is_changed(&self) -> bool {
         self.audio.is_changed()
             || self.theme_2d.is_changed()
-            || self.theme_3d.is_changed()
-            || self.model.is_changed()
             || self.ui_theme.is_changed()
             || self.note_numbers.is_changed()
             || self.adaptive_difficulty.is_changed()
@@ -402,8 +391,6 @@ impl PersistedSettings<'_> {
             pitch_algorithm: self.audio.pitch_algorithm,
             input_device: self.audio.input_device.clone(),
             note_theme_2d: self.theme_2d.0.clone(),
-            note_theme_3d: self.theme_3d.0.clone(),
-            harmonica_model: self.model.0.clone(),
             ui_theme: self.ui_theme.0.clone(),
             show_note_numbers: self.note_numbers.0,
             adaptive_difficulty_enabled: self.adaptive_difficulty.0,
@@ -422,8 +409,6 @@ impl PersistedSettings<'_> {
 pub struct PersistedSettingsMut<'w> {
     audio: ResMut<'w, AudioSettings>,
     theme_2d: ResMut<'w, SelectedNoteTheme2d>,
-    theme_3d: ResMut<'w, SelectedNoteTheme3d>,
-    model: ResMut<'w, SelectedHarmonicaModel>,
     ui_theme: ResMut<'w, SelectedTheme>,
     note_numbers: ResMut<'w, ShowNoteNumbers>,
     adaptive_difficulty: ResMut<'w, AdaptiveDifficultyEnabled>,
@@ -443,8 +428,6 @@ impl PersistedSettingsMut<'_> {
         self.audio.pitch_algorithm = settings.pitch_algorithm;
         self.audio.input_device = settings.input_device;
         self.theme_2d.0 = settings.note_theme_2d;
-        self.theme_3d.0 = settings.note_theme_3d;
-        self.model.0 = settings.harmonica_model;
         self.ui_theme.0 = settings.ui_theme;
         self.note_numbers.0 = settings.show_note_numbers;
         self.adaptive_difficulty.0 = settings.adaptive_difficulty_enabled;

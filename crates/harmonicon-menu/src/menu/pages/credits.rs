@@ -1,22 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-//! Scrolling credits over a slowly moving 3D harmonica.
+//! Scrolling credits over the theme's Credits background.
 
-use bevy::{
-    camera::visibility::RenderLayers, input_focus::tab_navigation::TabGroup, prelude::*,
-    ui_widgets::Activate,
-};
+use bevy::{input_focus::tab_navigation::TabGroup, prelude::*, ui_widgets::Activate};
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use harmonicon_platform::assets_management::SelectedHarmonicaModel;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::theme::LoadedTheme;
 
 use crate::menu::scene::spawn_back_button;
 use harmonicon_app::app::AppState;
-
-// The credits 3D scene lives on its own render layer so it never touches the
-// gameplay or options-preview layers.
-const CREDITS_LAYER: usize = 20;
 
 const SCROLL_SPEED: f32 = 55.0; // pixels per second upward
 // Conservative start: text begins one screen-height below the viewport.
@@ -29,10 +22,6 @@ const SCROLL_START: f32 = 1000.0;
 /// Marks each credits root so cleanup removes its subtree.
 #[derive(Component, Default, Clone)]
 struct CreditsRoot;
-
-/// The rotating harmonica in the 3D background.
-#[derive(Component)]
-struct CreditsHarmonica;
 
 /// The scrolling container node. `offset` is the current `top` value in pixels;
 /// it starts positive (below the viewport) and decreases each frame.
@@ -48,38 +37,29 @@ pub struct CreditsPlugin;
 impl Plugin for CreditsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::Credits), setup)
-            .add_systems(OnExit(AppState::Credits), (cleanup, restore_camera))
+            .add_systems(OnExit(AppState::Credits), cleanup)
             .add_systems(
                 Update,
-                (
-                    rotate_harmonica,
-                    scroll_credits,
-                    crate::menu::scene::propagate_scene_layers,
-                    handle_input,
-                )
-                    .run_if(in_state(AppState::Credits)),
+                (scroll_credits, handle_input).run_if(in_state(AppState::Credits)),
             );
     }
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-fn setup(
-    mut commands: Commands,
-    harmonica_model: Res<SelectedHarmonicaModel>,
-    asset_server: Res<AssetServer>,
-    loc: Res<Localization>,
-    mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>,
-) {
-    // Same trick as 3D gameplay: push the shared Camera2d behind so the
-    // Camera3d renders the harmonica to the screen first.
-    for (mut cam, _) in &mut cameras {
-        cam.order = 1;
-        cam.clear_color = ClearColorConfig::None;
+fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<LoadedTheme>) {
+    if let Some(background) = theme.background_for("Credits") {
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            ImageNode::new(background.clone()),
+            CreditsRoot,
+        ));
     }
-
-    let layers = RenderLayers::layer(CREDITS_LAYER);
-    spawn_3d_scene(&mut commands, &asset_server, &harmonica_model.0, &layers);
     spawn_ui(&mut commands, &loc);
 }
 
@@ -87,68 +67,6 @@ fn cleanup(mut commands: Commands, roots: Query<Entity, With<CreditsRoot>>) {
     for e in &roots {
         commands.entity(e).despawn();
     }
-}
-
-fn restore_camera(mut cameras: Query<(&mut Camera, &mut Transform), With<Camera2d>>) {
-    for (mut cam, _) in &mut cameras {
-        cam.order = 0;
-        cam.clear_color = ClearColorConfig::Default;
-    }
-}
-
-// ── 3-D background scene ──────────────────────────────────────────────────────
-
-fn spawn_3d_scene(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    model: &str,
-    layers: &RenderLayers,
-) {
-    // Camera: renders layer CREDITS_LAYER only, sits in front of everything.
-    commands.spawn((
-        Camera3d::default(),
-        Camera { order: 0, ..default() },
-        Transform::from_xyz(-1.5, 1.8, 5.0).looking_at(Vec3::new(0.0, 0.2, 0.0), Vec3::Y),
-        layers.clone(),
-        CreditsRoot,
-    ));
-
-    // Key light — warm, from upper-right front.
-    commands.spawn((
-        DirectionalLight { illuminance: 7_000.0, color: Color::srgb(1.0, 0.96, 0.88), ..default() },
-        Transform::from_xyz(4.0, 6.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        layers.clone(),
-        CreditsRoot,
-    ));
-
-    // Fill light — cool, from behind-left.
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 1_800.0,
-            color: Color::srgb(0.55, 0.65, 0.90),
-            ..default()
-        },
-        Transform::from_xyz(-5.0, 2.0, -3.0).looking_at(Vec3::ZERO, Vec3::Y),
-        layers.clone(),
-        CreditsRoot,
-    ));
-
-    // Harmonica model scene, slightly angled so it reads well.
-    let scene_path = format!("harmonicas/3d/{model}/harmonica.glb#Scene0");
-    commands.spawn((
-        WorldAssetRoot(asset_server.load(scene_path)),
-        Transform::from_scale(Vec3::splat(0.14)).with_rotation(Quat::from_euler(
-            EulerRot::YXZ,
-            -0.4,
-            0.2,
-            0.0,
-        )),
-        // Visibility is auto-inserted by WorldAssetRoot's `#[require(Visibility)]`.
-        layers.clone(),
-        crate::menu::scene::SceneLayer(layers.clone()),
-        CreditsHarmonica,
-        CreditsRoot,
-    ));
 }
 
 // ── UI overlay ────────────────────────────────────────────────────────────────
@@ -350,21 +268,6 @@ fn spawn_credit_line(parent: &mut ChildSpawnerCommands, item: CreditLine) {
 }
 
 // ── Update systems ────────────────────────────────────────────────────────────
-
-fn rotate_harmonica(time: Res<Time>, mut q: Query<&mut Transform, With<CreditsHarmonica>>) {
-    let t = time.elapsed_secs();
-    for mut tf in &mut q {
-        // Slow Y-axis spin plus a gentle breathing bob.
-        tf.rotation = Quat::from_euler(
-            EulerRot::YXZ,
-            -0.4 + t * 0.18,
-            0.20 + (t * 0.7).sin() * 0.04,
-            (t * 0.5).sin() * 0.02,
-        );
-        // Tiny vertical float so it feels alive.
-        tf.translation.y = (t * 0.6).sin() * 0.008;
-    }
-}
 
 fn scroll_credits(time: Res<Time>, mut scrollers: Query<(&mut Node, &mut CreditsScroll)>) {
     let dt = time.delta_secs();

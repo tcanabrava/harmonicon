@@ -24,8 +24,8 @@ and nothing else. It exists because Android never calls a `main` — it
 loads a shared object and calls `android_main` (see
 [Android](android.md)) — so both entry points had to become thin
 wrappers around one shared function. `src/main.rs` (the desktop entry point) and
-everything in `src/bin/` (`hole-editor`, `note-bench`,
-`gen_synthetic_dataset` — small developer tools, described in
+everything in `src/bin/` (`note-bench`, `gen_synthetic_dataset`,
+`validate-pack` — small developer tools, described in
 [Testing Strategy](testing-strategy.md) and the [Song Editor](
 song-editor-architecture.md) chapter) go through it. Assembly only, never
 logic.

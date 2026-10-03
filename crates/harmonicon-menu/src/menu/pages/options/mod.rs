@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-//! The Options page: audio volume sliders plus 2D-note / 3D-note / harmonica
-//! pickers with live previews. The 3D previews render each model to an off-screen
-//! texture (one render layer per preview) shown as a UI image. Owns its page
-//! lifecycle via [`OptionsPlugin`]; the menu shell only routes to it.
+//! The Options page: audio volume sliders, the microphone and pitch-detection
+//! pickers, and display toggles. Owns its page lifecycle via
+//! [`OptionsPlugin`]; the menu shell only routes to it.
 
-use bevy::asset::RenderAssetUsages;
-use bevy::camera::RenderTarget;
-use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::picking::Pickable;
-use bevy::picking::events::{PointerOut, PointerOver};
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use bevy::ui_widgets::Button as WidgetButton;
 use bevy::ui_widgets::{
     Activate, Slider, SliderRange, SliderStep, SliderValue, TrackClick, ValueChange,
@@ -24,17 +18,13 @@ const TRACK_BG: Color = Color::srgb(0.14, 0.14, 0.22);
 
 use harmonicon_audio::AudioSettings;
 use harmonicon_audio::audio_input::{self, MicStatus};
-use harmonicon_platform::assets_management::{
-    AvailableHarmonicas, SelectedHarmonicaModel, ShowNoteNumbers,
-};
+use harmonicon_platform::assets_management::ShowNoteNumbers;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use harmonicon_platform::theme::LoadedTheme;
 
 use crate::menu::routing::MenuPage;
-use crate::menu::scene::{
-    MenuRoot, cleanup_menu, spawn_back_button, spawn_button, spawn_menu_root,
-};
+use crate::menu::scene::{cleanup_menu, spawn_back_button, spawn_button, spawn_menu_root};
 use harmonicon_app::app::AppState;
 
 use harmonicon_ui::dialogs::algo_picker::{algo_labels, attach_algo_tooltip, on_algo_selected};
@@ -43,20 +33,18 @@ use harmonicon_ui::dialogs::checkbox;
 use harmonicon_ui::dialogs::combobox;
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 
-mod harmonica;
 mod microphone;
 mod sliders;
 #[cfg(test)]
 mod tests;
 mod zoom;
 
-use harmonica::*;
 use microphone::*;
 use sliders::*;
 use zoom::*;
 
 /// Owns the Options page: builds it on entry, tears it down on exit, and runs
-/// the slider/preview interaction systems while it's open.
+/// the slider interaction systems while it's open.
 pub struct OptionsPlugin;
 
 impl Plugin for OptionsPlugin {
@@ -66,16 +54,13 @@ impl Plugin for OptionsPlugin {
             // Keep each slider's own SliderValue in sync as it's dragged or
             // stepped, so keyboard adjustment works from the current value.
             .add_observer(slider_self_update)
-            // Sliders and harmonica buttons carry their own change/click/hover
-            // behaviour as inline on(...) observers; these systems only mirror
-            // settings/selection onto the visuals.
+            // Sliders carry their own change behaviour as inline on(...)
+            // observers; these systems only mirror settings onto the visuals.
             .add_systems(
                 Update,
                 (
                     update_sliders,
                     update_latency_slider,
-                    harmonica_button_visuals,
-                    crate::menu::scene::propagate_scene_layers,
                     update_mic_banner,
                     sync_mic_combobox,
                     update_zoom_slider_visuals,
@@ -103,10 +88,6 @@ struct SliderFill(VolumeSlider);
 /// The "NN%" readout beside a slider.
 #[derive(Component)]
 struct SliderValueLabel(VolumeSlider);
-
-/// A harmonica-model choice button; carries the model name.
-#[derive(Component, Default, Clone)]
-struct HarmonicaButton(String);
 
 /// The "no microphone" warning banner, hidden only while
 /// [`MicStatus::Connected`] — see [`mic_banner_visible`]. See TODO.md: "No
@@ -155,10 +136,6 @@ fn setup_options_menu(
     loc: Res<Localization>,
     settings: Res<AudioSettings>,
     mic_status: Res<MicStatus>,
-    harmonicas: Res<AvailableHarmonicas>,
-    selected_harmonica: Res<SelectedHarmonicaModel>,
-    asset_server: Res<AssetServer>,
-    images: ResMut<Assets<Image>>,
     theme: Res<LoadedTheme>,
     show_numbers: Res<ShowNoteNumbers>,
     adaptive_difficulty: Res<harmonicon_platform::settings::AdaptiveDifficultyEnabled>,
@@ -229,11 +206,7 @@ fn setup_options_menu(
         page_root,
         mic_status,
         settings,
-        harmonicas,
         &loc,
-        selected_harmonica,
-        asset_server,
-        images,
         show_numbers,
         adaptive_difficulty,
         fullscreen,
@@ -251,11 +224,7 @@ fn spawn_left_column(
     page_root: Entity,
     mic_status: Res<MicStatus>,
     settings: Res<AudioSettings>,
-    harmonicas: Res<AvailableHarmonicas>,
     loc: &Localization,
-    selected_harmonica: Res<SelectedHarmonicaModel>,
-    asset_server: Res<AssetServer>,
-    mut images: ResMut<Assets<Image>>,
     show_numbers: Res<ShowNoteNumbers>,
     adaptive_difficulty: Res<harmonicon_platform::settings::AdaptiveDifficultyEnabled>,
     fullscreen: Res<harmonicon_platform::settings::FullscreenEnabled>,
@@ -292,28 +261,6 @@ fn spawn_left_column(
         &audio_input::input_device_names(),
         connected_device_name(&mic_status),
     );
-
-    // Harmonica previews: the model's glTF scene rendered to a texture (its own
-    // materials, no tint). Layers are assigned after the 3D-note layers so the
-    // preview cameras never capture each other's models.
-    let harmonica_base_layer = 1;
-    let previews_harmonica: Vec<(Handle<Image>, &str)> = harmonicas
-        .0
-        .iter()
-        .enumerate()
-        .map(|(i, m)| {
-            let handle = spawn_harmonica_preview(
-                commands,
-                &mut images,
-                &asset_server,
-                m,
-                harmonica_base_layer + i,
-            );
-            (handle, m.as_str())
-        })
-        .collect();
-
-    spawn_harmonica_row(commands, parent, loc, &previews_harmonica, &selected_harmonica.0);
 
     let algo_combo = combobox::spawn_combobox(
         commands,
