@@ -16,7 +16,7 @@ use harmonicon_audio::pitch_detect::{PitchAlgorithm, PitchEvent, PitchInfo};
 use harmonicon_core::chart::{HarpChart, Modifier};
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
-use harmonicon_core::scoring::{AttackGate, HitQuality};
+use harmonicon_core::scoring::{AttackGate, HitQuality, compute_multiplier};
 
 #[derive(Resource, Default)]
 pub struct ActivePitches(pub Vec<PitchInfo>);
@@ -473,6 +473,18 @@ impl Default for ScoringConfig {
             meter: MusicScoreMeter::default(),
             style_bonus: HashMap::new(),
         }
+    }
+}
+
+impl ScoringConfig {
+    /// The points multiplier a combo of `combo` earns — the one `score_notes`
+    /// applies and the HUD shows, so the two cannot disagree. 1 with combos
+    /// off.
+    pub fn multiplier(&self, combo: u32) -> f32 {
+        if !self.combo_enabled {
+            return 1.0;
+        }
+        compute_multiplier(combo, self.base_multiplier, self.step_multiplier, self.max_multiplier)
     }
 }
 

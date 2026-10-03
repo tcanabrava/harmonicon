@@ -92,7 +92,7 @@ pub(super) fn harmonica_button_scene(
 /// Renders a harmonica model's glTF scene to an off-screen texture for the
 /// Options UI. Like the note preview, but the model is a multi-mesh scene with
 /// its own materials, so it's spawned via `WorldAssetRoot` and shown untinted;
-/// `propagate_preview_layers` pushes the render layer onto the scene's children.
+/// `scene::propagate_scene_layers` pushes the render layer onto the scene's children.
 pub(super) fn spawn_harmonica_preview(
     commands: &mut Commands,
     images: &mut Assets<Image>,
@@ -113,7 +113,7 @@ pub(super) fn spawn_harmonica_preview(
     ));
 
     // The model scene, posed at a slight angle. Scene children get the render
-    // layer from `propagate_preview_layers` (they don't inherit it on spawn).
+    // layer from `scene::propagate_scene_layers` (they don't inherit it on spawn).
     commands.spawn((
         WorldAssetRoot(asset_server.load(format!("harmonicas/3d/{model}/harmonica.glb#Scene0"))),
         Transform::from_scale(Vec3::splat(0.1)).with_rotation(Quat::from_euler(
@@ -124,7 +124,7 @@ pub(super) fn spawn_harmonica_preview(
         )),
         Visibility::default(),
         layers.clone(),
-        PreviewSceneLayer(layers.clone()),
+        crate::menu::scene::SceneLayer(layers.clone()),
         MenuRoot,
     ));
 
@@ -155,32 +155,6 @@ pub(super) fn spawn_preview_light(commands: &mut Commands, layers: RenderLayers)
         layers,
         MenuRoot,
     ));
-}
-
-/// Forces each preview scene's render layer onto all of its descendants. glTF
-/// scene children spawn a frame or two after the root and don't inherit
-/// `RenderLayers`, so without this the preview camera would never see them.
-pub(super) fn propagate_preview_layers(
-    mut commands: Commands,
-    roots: Query<(Entity, &PreviewSceneLayer)>,
-    children: Query<&Children>,
-    already_layered: Query<(), With<RenderLayers>>,
-    mut stack: Local<Vec<Entity>>,
-) {
-    for (root, layer) in &roots {
-        stack.clear();
-        stack.push(root);
-        while let Some(entity) = stack.pop() {
-            if let Ok(kids) = children.get(entity) {
-                for child in kids {
-                    if already_layered.get(*child).is_err() {
-                        commands.entity(*child).insert(layer.0.clone());
-                    }
-                    stack.push(*child);
-                }
-            }
-        }
-    }
 }
 
 /// Hover highlight for harmonica buttons, never overriding the green selection.

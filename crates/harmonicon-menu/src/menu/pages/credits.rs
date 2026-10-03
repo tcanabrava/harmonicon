@@ -34,11 +34,6 @@ struct CreditsRoot;
 #[derive(Component)]
 struct CreditsHarmonica;
 
-/// Carries the desired `RenderLayers` so the layer-propagation system can push
-/// it onto children that glTF spawns a frame late.
-#[derive(Component)]
-struct CreditsSceneLayer(RenderLayers);
-
 /// The scrolling container node. `offset` is the current `top` value in pixels;
 /// it starts positive (below the viewport) and decreases each frame.
 #[derive(Component)]
@@ -56,7 +51,12 @@ impl Plugin for CreditsPlugin {
             .add_systems(OnExit(AppState::Credits), (cleanup, restore_camera))
             .add_systems(
                 Update,
-                (rotate_harmonica, scroll_credits, propagate_scene_layers, handle_input)
+                (
+                    rotate_harmonica,
+                    scroll_credits,
+                    crate::menu::scene::propagate_scene_layers,
+                    handle_input,
+                )
                     .run_if(in_state(AppState::Credits)),
             );
     }
@@ -145,7 +145,7 @@ fn spawn_3d_scene(
         )),
         // Visibility is auto-inserted by WorldAssetRoot's `#[require(Visibility)]`.
         layers.clone(),
-        CreditsSceneLayer(layers.clone()),
+        crate::menu::scene::SceneLayer(layers.clone()),
         CreditsHarmonica,
         CreditsRoot,
     ));
@@ -371,31 +371,6 @@ fn scroll_credits(time: Res<Time>, mut scrollers: Query<(&mut Node, &mut Credits
     for (mut node, mut scroll) in &mut scrollers {
         scroll.offset -= SCROLL_SPEED * dt;
         node.top = Val::Px(scroll.offset);
-    }
-}
-
-/// Pushes the credits render layer onto scene children that glTF spawns a
-/// frame late (they don't inherit `RenderLayers` from the parent on spawn).
-fn propagate_scene_layers(
-    mut commands: Commands,
-    roots: Query<(Entity, &CreditsSceneLayer)>,
-    children: Query<&Children>,
-    already_layered: Query<(), With<RenderLayers>>,
-    mut stack: Local<Vec<Entity>>,
-) {
-    for (root, layer) in &roots {
-        stack.clear();
-        stack.push(root);
-        while let Some(entity) = stack.pop() {
-            if let Ok(kids) = children.get(entity) {
-                for child in kids {
-                    if already_layered.get(*child).is_err() {
-                        commands.entity(*child).insert(layer.0.clone());
-                    }
-                    stack.push(*child);
-                }
-            }
-        }
     }
 }
 

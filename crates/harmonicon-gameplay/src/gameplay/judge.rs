@@ -17,7 +17,7 @@ use harmonicon_core::midi::midi_to_freq_hz;
 use harmonicon_core::pitch_map::map_pitch_playable;
 use harmonicon_core::scoring::{
     HitQuality, NoteOutcome, VIBRATO_MIN_SWING_CENTS, WAH_MIN_SWING_FRAC, chord_is_sounding,
-    classify_note, compute_multiplier, compute_points, is_clean_attack, measured_oscillation_hz,
+    classify_note, compute_points, is_clean_attack, measured_oscillation_hz,
     measured_relative_oscillation_hz, oscillation_matches_rate, should_decay_combo, sustain_points,
 };
 
@@ -491,16 +491,7 @@ pub fn score_notes(
                 score.last_hit_time = clock.get();
                 score.combo += 1;
                 score.max_combo = score.max_combo.max(score.combo);
-                let multiplier = if config.combo_enabled {
-                    compute_multiplier(
-                        score.combo,
-                        config.base_multiplier,
-                        config.step_multiplier,
-                        config.max_multiplier,
-                    )
-                } else {
-                    1.0
-                };
+                let multiplier = config.multiplier(score.combo);
                 score.points += compute_points(quality, multiplier);
                 // Reward executing the note's onset techniques. Bends are
                 // genuinely validated (the note's expected pitch is the bent

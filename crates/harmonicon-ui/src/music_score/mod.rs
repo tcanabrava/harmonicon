@@ -109,6 +109,38 @@ const GLYPH_LINE_HEIGHT_PX: f32 = 40.0;
 /// staff positions, so they meet a glyph only if this is right.
 const GLYPH_BASELINE_CORRECTION: f32 = GLYPH_LINE_HEIGHT_PX / 2.0;
 
+/// A Bravura glyph with its SMuFL origin at `(left, origin_y)` px, drawn in
+/// `ink`. Every Bravura `Text` is spawned through this, so none can miss the
+/// pinned line height [`GLYPH_BASELINE_CORRECTION`] depends on, or the
+/// `SkipFontFallback` opt-out that keeps the font fallback from replacing
+/// its Private-Use-Area codepoints.
+fn glyph(
+    bravura: &BravuraFont,
+    text: impl Into<String>,
+    left: f32,
+    origin_y: f32,
+    ink: Color,
+) -> impl Bundle {
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(left),
+            top: Val::Px(origin_y - GLYPH_BASELINE_CORRECTION),
+            ..default()
+        },
+        Text::new(text),
+        TextFont {
+            font: FontSource::Handle(bravura.0.clone()),
+            font_size: FontSize::Px(GLYPH_FONT_PX),
+            ..default()
+        },
+        LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
+        FontHinting::Disabled,
+        TextColor(ink),
+        crate::dialogs::font_fallback::SkipFontFallback,
+    )
+}
+
 /// Notehead stem attachment points, in staff spaces relative to the
 /// notehead's own origin (its bounding box's bottom-left corner) —
 /// `bravura_metadata.json`'s `glyphsWithAnchors.noteheadBlack`
@@ -646,23 +678,8 @@ pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFon
         // `rebuild_score_notes` once there are notes to judge the range by.
         let clef = Clef::default();
         panel.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(CLEF_X),
-                top: Val::Px(y_for_step(clef.anchor_step()) - GLYPH_BASELINE_CORRECTION),
-                ..default()
-            },
+            glyph(bravura, clef.glyph(), CLEF_X, y_for_step(clef.anchor_step()), Color::WHITE),
             MusicScoreClef,
-            Text::new(clef.glyph()),
-            TextFont {
-                font: FontSource::Handle(bravura.0.clone()),
-                font_size: FontSize::Px(GLYPH_FONT_PX),
-                ..default()
-            },
-            LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-            FontHinting::Disabled,
-            TextColor(Color::WHITE),
-            crate::dialogs::font_fallback::SkipFontFallback,
         ));
         // Time signature, beside the clef. Both digits are re-texted by
         // `rebuild_score_notes` when the meter changes; 4/4 to begin with,
@@ -673,23 +690,8 @@ pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFon
             (false, TIME_SIG_DENOMINATOR_STEP, meter.denominator),
         ] {
             panel.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(TIME_SIG_X),
-                    top: Val::Px(y_for_step(step) - GLYPH_BASELINE_CORRECTION),
-                    ..default()
-                },
+                glyph(bravura, time_sig_glyphs(digit), TIME_SIG_X, y_for_step(step), Color::WHITE),
                 MusicScoreTimeSig { numerator },
-                Text::new(time_sig_glyphs(digit)),
-                TextFont {
-                    font: FontSource::Handle(bravura.0.clone()),
-                    font_size: FontSize::Px(GLYPH_FONT_PX),
-                    ..default()
-                },
-                LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-                FontHinting::Disabled,
-                TextColor(Color::WHITE),
-                crate::dialogs::font_fallback::SkipFontFallback,
             ));
         }
         // "Now" reference line — notes scroll toward/through this the same
@@ -921,43 +923,19 @@ fn spawn_window(
             }
             let x = ((rest.start_beat - origin) * scale as f64) as f32;
             parent.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(x),
-                    top: Val::Px(y_for_step(rest.staff_step()) - GLYPH_BASELINE_CORRECTION),
-                    ..default()
-                },
-                Text::new(rest.glyph()),
-                TextFont {
-                    font: FontSource::Handle(bravura.0.clone()),
-                    font_size: FontSize::Px(GLYPH_FONT_PX),
-                    ..default()
-                },
-                LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-                FontHinting::Disabled,
-                TextColor(Color::WHITE),
+                glyph(bravura, rest.glyph(), x, y_for_step(rest.staff_step()), Color::WHITE),
                 MusicScoreNoteGlyph,
-                crate::dialogs::font_fallback::SkipFontFallback,
             ));
             if rest.dots > 0 {
                 parent.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(x + 1.5 * STAFF_LINE_SPACING),
-                        top: Val::Px(y_for_step(5) - GLYPH_BASELINE_CORRECTION),
-                        ..default()
-                    },
-                    Text::new(glyph::AUGMENTATION_DOT),
-                    TextFont {
-                        font: FontSource::Handle(bravura.0.clone()),
-                        font_size: FontSize::Px(GLYPH_FONT_PX),
-                        ..default()
-                    },
-                    LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-                    FontHinting::Disabled,
-                    TextColor(Color::WHITE),
+                    glyph(
+                        bravura,
+                        glyph::AUGMENTATION_DOT,
+                        x + 1.5 * STAFF_LINE_SPACING,
+                        y_for_step(5),
+                        Color::WHITE,
+                    ),
                     MusicScoreNoteGlyph,
-                    crate::dialogs::font_fallback::SkipFontFallback,
                 ));
             }
         }

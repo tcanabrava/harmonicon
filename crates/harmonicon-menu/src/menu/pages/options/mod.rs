@@ -75,7 +75,7 @@ impl Plugin for OptionsPlugin {
                     update_sliders,
                     update_latency_slider,
                     harmonica_button_visuals,
-                    propagate_preview_layers,
+                    crate::menu::scene::propagate_scene_layers,
                     update_mic_banner,
                     sync_mic_combobox,
                     update_zoom_slider_visuals,
@@ -117,12 +117,6 @@ struct MicBanner;
 /// The failure-reason text inside [`MicBanner`].
 #[derive(Component, Default, Clone)]
 struct MicBannerText;
-
-/// Marks a preview scene root (a `WorldAssetRoot`); the propagation system forces
-/// this `RenderLayers` onto all its descendants, since glTF scene children don't
-/// inherit it and would otherwise be invisible to the preview camera.
-#[derive(Component)]
-struct PreviewSceneLayer(RenderLayers);
 
 /// Marks the drag track of the input-latency slider.
 #[derive(Component, Default, Clone)]

@@ -91,21 +91,8 @@ pub(super) fn build_harp(key: &str, kind: HarmonicaKind) -> Harmonica {
 /// knows Overblow sits above the *draw* reed on holes 1/4/5/6 and Overdraw
 /// above the *blow* reed on holes 7–10.
 pub(super) fn note_freq(note: &GridNote, harp: &Harmonica) -> Option<f32> {
-    let action = match note.dir {
-        Dir::Blow => harmonicon_core::chart::Action::Blow,
-        Dir::Draw => harmonicon_core::chart::Action::Draw,
-    };
-    let label = match note.pitch {
-        Pitch::Normal => harp.wind_direction_label(note.hole, &action),
-        Pitch::Slide => harp.slide_label(note.hole, &action),
-        Pitch::Overblow | Pitch::Overdraw => hole_notes(harp, note.hole).over?,
-        Pitch::Bend(a) => {
-            let base = harp.wind_direction_label(note.hole, &action);
-            let midi = note_to_midi(&base)?;
-            return Some(midi_to_freq_hz(midi as f32 - a));
-        }
-    };
-    Some(midi_to_freq_hz(note_to_midi(&label)? as f32))
+    let (midi, bend) = resolve_pitch(note, harp)?;
+    Some(midi_to_freq_hz(midi as f32 - bend))
 }
 
 /// `note`'s resolved MIDI pitch on `harp` — same resolution as [`note_freq`],
@@ -113,21 +100,25 @@ pub(super) fn note_freq(note: &GridNote, harp: &Harmonica) -> Option<f32> {
 /// (bends rounded to the nearest semitone, like `gameplay::notes::
 /// target_pitch`). `None` under the same conditions as `note_freq`.
 pub(super) fn note_midi(note: &GridNote, harp: &Harmonica) -> Option<u8> {
+    let (midi, bend) = resolve_pitch(note, harp)?;
+    u8::try_from(midi - bend.round() as i32).ok()
+}
+
+/// The MIDI note `note`'s reed sounds on `harp`, and how many (fractional)
+/// semitones a bend takes it below that. `None` for a combination the harp
+/// can't produce.
+fn resolve_pitch(note: &GridNote, harp: &Harmonica) -> Option<(i32, f32)> {
     let action = match note.dir {
         Dir::Blow => harmonicon_core::chart::Action::Blow,
         Dir::Draw => harmonicon_core::chart::Action::Draw,
     };
-    let label = match note.pitch {
-        Pitch::Normal => harp.wind_direction_label(note.hole, &action),
-        Pitch::Slide => harp.slide_label(note.hole, &action),
-        Pitch::Overblow | Pitch::Overdraw => hole_notes(harp, note.hole).over?,
-        Pitch::Bend(a) => {
-            let base = harp.wind_direction_label(note.hole, &action);
-            let midi = note_to_midi(&base)?;
-            return u8::try_from(midi - a.round() as i32).ok();
-        }
+    let (label, bend) = match note.pitch {
+        Pitch::Normal => (harp.wind_direction_label(note.hole, &action), 0.0),
+        Pitch::Slide => (harp.slide_label(note.hole, &action), 0.0),
+        Pitch::Overblow | Pitch::Overdraw => (hole_notes(harp, note.hole).over?, 0.0),
+        Pitch::Bend(depth) => (harp.wind_direction_label(note.hole, &action), depth),
     };
-    note_to_midi(&label).and_then(|m| u8::try_from(m).ok())
+    Some((note_to_midi(&label)?, bend))
 }
 
 /// Ticks-to-seconds for `state.tempo` — the flat nominal-BPM conversion

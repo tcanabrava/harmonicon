@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 
-use harmonicon_core::scoring::{HitQuality, combo_label, compute_multiplier};
+use harmonicon_core::scoring::{HitQuality, combo_label};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use super::state::{
@@ -210,18 +210,7 @@ pub(crate) fn update_score_display(
             }
         }
 
-        // Same multiplier `score_notes` actually applies to points, so the HUD
-        // can never show a number the score disagrees with.
-        let multiplier = if config.combo_enabled {
-            compute_multiplier(
-                score.combo,
-                config.base_multiplier,
-                config.step_multiplier,
-                config.max_multiplier,
-            )
-        } else {
-            1.0
-        };
+        let multiplier = config.multiplier(score.combo);
         let combo = combo_label(score.combo, multiplier);
         for mut t in &mut q_combo {
             if t.0 != combo {

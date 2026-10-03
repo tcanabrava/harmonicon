@@ -149,20 +149,7 @@ fn spawn_cycle_row<T: Component, M: 'static>(
     marker: T,
     on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
 ) {
-    col.spawn(Node {
-        width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        column_gap: Val::Px(8.0),
-        ..default()
-    })
-    .with_children(|line| {
-        line.spawn_empty().apply_scene(bsn! {
-            Node { width: {Val::Px(FORM_LABEL_W)} }
-            Text({format!("{}:", loc.msg(label_key))})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({colors.label})
-        });
+    spawn_form_line(col, loc, colors, label_key, |line| {
         let mut btn = line.spawn((
             WidgetButton,
             TabIndex(0),
@@ -285,6 +272,34 @@ fn spawn_twelve_bar_tint_row(
     );
 }
 
+/// A form line: the `label_key` text in the label column, then whatever
+/// `fill` spawns beside it. Returns the line.
+fn spawn_form_line(
+    col: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    colors: SongEditorColors,
+    label_key: &str,
+    fill: impl FnOnce(&mut ChildSpawnerCommands),
+) -> Entity {
+    col.spawn(Node {
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::Center,
+        column_gap: Val::Px(8.0),
+        ..default()
+    })
+    .with_children(|line| {
+        line.spawn_empty().apply_scene(bsn! {
+            Node { width: {Val::Px(FORM_LABEL_W)} }
+            Text({format!("{}:", loc.msg(label_key))})
+            TextFont { font_size: {FontSize::Px(14.0)} }
+            TextColor({colors.label})
+        });
+        fill(line);
+    })
+    .id()
+}
+
 /// Spawns one labelled field row and returns its own entity — so a caller
 /// with a row whose relevance depends on another field's value (e.g.
 /// `lesson_form`'s `LessonThreshold`/`LessonTechnique`) can tag it with a
@@ -309,22 +324,7 @@ pub(super) fn spawn_field_row(
     field: Field,
     label: &str,
 ) -> Entity {
-    let mut row_ec = col.spawn(Node {
-        width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        column_gap: Val::Px(8.0),
-        ..default()
-    });
-    let row_id = row_ec.id();
-    row_ec.with_children(|line| {
-        line.spawn_empty().apply_scene(bsn! {
-            Node { width: {Val::Px(FORM_LABEL_W)} }
-            Text({format!("{}:", loc.msg(label))})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({colors.label})
-        });
-
+    spawn_form_line(col, loc, colors, label, |line| {
         if field.is_cycle() {
             let mut btn = line.spawn((
                 WidgetButton,
@@ -423,6 +423,7 @@ pub(super) fn spawn_field_row(
                     .insert(MetaFieldText(field));
             });
         } else {
+            let row_id = line.target_entity();
             let on_commit = move |ev: On<TextInputCommitted>, mut state: ResMut<EditorState>| {
                 state.field_text_mut(field).clone_from(&ev.value);
             };
@@ -491,8 +492,7 @@ pub(super) fn spawn_field_row(
                     });
                 });
         }
-    });
-    row_id
+    })
 }
 
 fn spawn_midi_track_row(
@@ -500,20 +500,7 @@ fn spawn_midi_track_row(
     loc: &Localization,
     colors: SongEditorColors,
 ) {
-    col.spawn(Node {
-        width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        column_gap: Val::Px(8.0),
-        ..default()
-    })
-    .with_children(|line| {
-        line.spawn_empty().apply_scene(bsn! {
-            Node { width: {Val::Px(FORM_LABEL_W)} }
-            Text({format!("{}:", loc.msg("editor-field-midi-track"))})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({colors.label})
-        });
+    spawn_form_line(col, loc, colors, "editor-field-midi-track", |line| {
         let mut import_midi = line.spawn((
             WidgetButton,
             TabIndex(0),

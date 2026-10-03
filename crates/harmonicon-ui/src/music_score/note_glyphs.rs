@@ -39,45 +39,18 @@ pub(super) fn spawn_note_glyphs(
         Accidental::None => None,
     } {
         parent.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(x - (width_sp + ACCIDENTAL_GAP_SP) * STAFF_LINE_SPACING),
-                top: Val::Px(notehead_y - GLYPH_BASELINE_CORRECTION),
-                ..default()
-            },
-            Text::new(mark),
-            TextFont {
-                font: FontSource::Handle(bravura.0.clone()),
-                font_size: FontSize::Px(GLYPH_FONT_PX),
-                ..default()
-            },
-            LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-            FontHinting::Disabled,
-            TextColor(ink),
+            super::glyph(
+                bravura,
+                mark,
+                x - (width_sp + ACCIDENTAL_GAP_SP) * STAFF_LINE_SPACING,
+                notehead_y,
+                ink,
+            ),
             MusicScoreNoteGlyph,
-            crate::dialogs::font_fallback::SkipFontFallback,
         ));
     }
 
-    parent.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(x),
-            top: Val::Px(notehead_y - GLYPH_BASELINE_CORRECTION),
-            ..default()
-        },
-        Text::new(kind.glyph()),
-        TextFont {
-            font: FontSource::Handle(bravura.0.clone()),
-            font_size: FontSize::Px(GLYPH_FONT_PX),
-            ..default()
-        },
-        LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-        FontHinting::Disabled,
-        TextColor(ink),
-        MusicScoreNoteGlyph,
-        crate::dialogs::font_fallback::SkipFontFallback,
-    ));
+    parent.spawn((super::glyph(bravura, kind.glyph(), x, notehead_y, ink), MusicScoreNoteGlyph));
 
     // Tie mark: a real curved arc (see `tie_material`'s own doc comment),
     // spanning the actual pixel gap from the previous segment's notehead
@@ -116,23 +89,14 @@ pub(super) fn spawn_note_glyphs(
     // Augmentation dot — right of the notehead, always in a space.
     if rhythm.dots > 0 {
         parent.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(x + (kind.width_sp() + DOT_GAP_SP) * STAFF_LINE_SPACING),
-                top: Val::Px(y_for_step(dot_step(step)) - GLYPH_BASELINE_CORRECTION),
-                ..default()
-            },
-            Text::new(glyph::AUGMENTATION_DOT),
-            TextFont {
-                font: FontSource::Handle(bravura.0.clone()),
-                font_size: FontSize::Px(GLYPH_FONT_PX),
-                ..default()
-            },
-            LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-            FontHinting::Disabled,
-            TextColor(ink),
+            super::glyph(
+                bravura,
+                glyph::AUGMENTATION_DOT,
+                x + (kind.width_sp() + DOT_GAP_SP) * STAFF_LINE_SPACING,
+                y_for_step(dot_step(step)),
+                ink,
+            ),
             MusicScoreNoteGlyph,
-            crate::dialogs::font_fallback::SkipFontFallback,
         ));
     }
 
@@ -218,23 +182,8 @@ pub(super) fn spawn_note_glyphs(
                 (_, false) => glyph::FLAG_16TH_DOWN,
             };
             parent.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(stem_x),
-                    top: Val::Px(stem_tip_y - GLYPH_BASELINE_CORRECTION),
-                    ..default()
-                },
-                Text::new(flag_glyph),
-                TextFont {
-                    font: FontSource::Handle(bravura.0.clone()),
-                    font_size: FontSize::Px(GLYPH_FONT_PX),
-                    ..default()
-                },
-                LineHeight::Px(GLYPH_LINE_HEIGHT_PX),
-                FontHinting::Disabled,
-                TextColor(ink),
+                super::glyph(bravura, flag_glyph, stem_x, stem_tip_y, ink),
                 MusicScoreNoteGlyph,
-                crate::dialogs::font_fallback::SkipFontFallback,
             ));
         }
     }
