@@ -74,6 +74,19 @@ Nothing below can be approved by a test.
 - **Recorded backing loops** per style (shuffle, slow blues, swing), as an
   alternative to the generated band.
 
+## Code size
+
+`docs/code_reduction_plan.md`, in order:
+
+- `rustfmt.toml` with `use_small_heuristics = "Max"`, alone in one commit,
+  listed in `.git-blame-ignore-revs`.
+- `SystemParam` bundles: persisted settings, editor transport.
+- Shared helpers for the clones (buttons, panel buttons, 2D/3D note
+  visuals, expected-notes layer).
+- `bsn!` conversion, `artist_list.rs` first.
+- Comment trim: history narration, long `//!` headers, crate `CLAUDE.md`s.
+- Test builders and table-driven tests.
+
 ## Release (1.0, desktop)
 
 - Flathub submission and release signing keys. Version/tag agreement is
