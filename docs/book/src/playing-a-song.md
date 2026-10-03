@@ -25,6 +25,21 @@ existing songs remain available and you can retry the update. Checks are availab
 
 ![Unified song picker](images/song-picker.png)
 
+## Removed and hidden songs
+
+Updates keep your local copy of songs removed from a repository, including
+backing tracks. Select one to see **Kept locally — no longer in …** and its
+source repository. If it returns to that repository, the latest copy replaces
+the retained version and the warning disappears. Each repository keeps its
+own copies independently.
+
+**Delete song** hides the selected song from that source after confirmation;
+it keeps the files. Hidden songs stay hidden across updates and restarts,
+even if their chart filename changes. A copy from another repository remains
+visible. Exclusions are stored in `hidden-songs.json` beside `settings.json`.
+To restore a hidden song, remove its entry from that file while the game is
+closed.
+
 ## Pickups and repeats
 
 Some tunes start before the first full bar — the "and a" before bar 1.

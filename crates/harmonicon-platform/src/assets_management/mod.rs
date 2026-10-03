@@ -44,6 +44,8 @@ pub struct SongEntry {
     pub name: String,
     pub genre: String,
     pub difficulty: String,
+    pub source_name: String,
+    pub retained: bool,
     pub asset_path: String,
 }
 
@@ -154,6 +156,7 @@ pub struct ShowNoteNumbers(pub bool);
 impl Plugin for AssetsManagementPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<AvailableSongs>()
+            .init_resource::<crate::song_library::SongLibrary>()
             .init_resource::<AvailableHarmonicas>()
             .init_resource::<SelectedHarmonicaModel>()
             .init_resource::<AvailableNoteThemes2d>()
@@ -203,6 +206,7 @@ fn rescan_on_external_change(
     mut available_songs: ResMut<AvailableSongs>,
     available_themes: ResMut<AvailableThemes>,
     packs: Option<Res<ContentPacks>>,
+    library: Option<Res<crate::song_library::SongLibrary>>,
     mut songs_rescanned: MessageWriter<SongsRescanned>,
     mut themes_rescanned: MessageWriter<ThemesRescanned>,
 ) {
@@ -215,6 +219,9 @@ fn rescan_on_external_change(
 
     if dirty_songs {
         scan_all_songs_into(&mut available_songs, packs.as_deref());
+        if let Some(library) = &library {
+            library.filter(&mut available_songs);
+        }
         songs_rescanned.write(SongsRescanned);
     }
     if dirty_themes {
@@ -459,6 +466,8 @@ pub fn scan_artist_song(
             .entry(artist.clone())
             .or_default()
             .push(SongEntry {
+                source_name: String::new(),
+                retained: false,
                 asset_path: format!("{source_prefix}{relative}"),
                 artist: artist.clone(),
                 name,
@@ -526,7 +535,32 @@ fn scan_song_packs(packs: Option<&ContentPacks>, available: &mut AvailableSongs)
         .into_iter()
         .flat_map(|p| p.usable(harmonicon_packs::pack::PackKind::Songs))
     {
-        scan_songs_root(&pack.root, &format!("{}/", pack.asset_prefix()), available);
+        let prefix = format!("{}/", pack.asset_prefix());
+        scan_songs_root(&pack.root, &prefix, available);
+        let retained = harmonicon_packs::retained_songs::read_index(&pack.root);
+        for song in available
+            .0
+            .values_mut()
+            .flatten()
+            .filter(|song| song.asset_path.starts_with(&prefix))
+        {
+            if let crate::content_packs::PackStatus::Ready { manifest, .. } = &pack.status {
+                song.source_name = match &pack.spec {
+                    harmonicon_packs::repo::RepoSpec::Remote { url, git_ref } => format!(
+                        "{} ({url}{})",
+                        manifest.name,
+                        git_ref
+                            .as_ref()
+                            .map_or(String::new(), |reference| format!(" @ {reference}"))
+                    ),
+                    harmonicon_packs::repo::RepoSpec::Local { path } => {
+                        format!("{} ({})", manifest.name, path.display())
+                    }
+                };
+            }
+            let relative = song.asset_path.strip_prefix(&prefix).unwrap();
+            song.retained = retained.contains(crate::song_library::song_identity(relative));
+        }
     }
 }
 
@@ -542,8 +576,15 @@ fn log_song_count(available: &AvailableSongs) {
     );
 }
 
-pub fn scan_all_songs(mut available: ResMut<AvailableSongs>, packs: Option<Res<ContentPacks>>) {
+pub fn scan_all_songs(
+    mut available: ResMut<AvailableSongs>,
+    packs: Option<Res<ContentPacks>>,
+    library: Option<Res<crate::song_library::SongLibrary>>,
+) {
     scan_all_songs_into(&mut available, packs.as_deref());
+    if let Some(library) = library {
+        library.filter(&mut available);
+    }
 }
 
 // Scans the external `~/Harmonicon/songs` drop folder if present, plus every
@@ -580,6 +621,8 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
                 name: (*name).to_string(),
                 genre: (*genre).to_string(),
                 difficulty: (*difficulty).to_string(),
+                source_name: String::new(),
+                retained: false,
                 asset_path: (*asset_path).to_string(),
             });
     }
@@ -627,6 +670,47 @@ mod tests {
             std::fs::write(p, "{}").unwrap();
         }
         dir
+    }
+
+    #[test]
+    fn retained_song_status_is_scoped_to_its_source() {
+        let first = song_tree(&["Band/Song/song/chart.harpchart"]);
+        let second = song_tree(&["Band/Song/song/chart.harpchart"]);
+        std::fs::write(
+            first.path().join(harmonicon_packs::retained_songs::INDEX),
+            br#"["Band/Song"]"#,
+        )
+        .unwrap();
+        let entry = |root: &std::path::Path, slug: &str| crate::content_packs::PackEntry {
+            kind: PackKind::Songs,
+            spec: harmonicon_packs::repo::RepoSpec::Remote {
+                url: format!("https://example.com/{slug}"),
+                git_ref: None,
+            },
+            slug: slug.into(),
+            root: root.into(),
+            status: crate::content_packs::PackStatus::Ready {
+                manifest: harmonicon_packs::pack::PackManifest::parse(
+                    br#"{"schema":1,"kind":"songs","id":"songs","name":"Songs","version":"1.0.0"}"#,
+                )
+                .unwrap()
+                .unwrap(),
+                commit: Some("commit".into()),
+            },
+        };
+        let packs = ContentPacks(vec![
+            entry(first.path(), "first"),
+            entry(second.path(), "second"),
+        ]);
+        let mut available = AvailableSongs::default();
+        scan_song_packs(Some(&packs), &mut available);
+        assert_eq!(available.0["Band"].len(), 2);
+        let songs = &available.0["Band"];
+        assert!(songs[0].retained);
+        assert!(!songs[1].retained);
+        assert!(songs[0].source_name.contains("https://example.com/first"));
+        assert!(songs[1].source_name.contains("https://example.com/second"));
+        assert_ne!(songs[0].asset_path, songs[1].asset_path);
     }
 
     #[test]

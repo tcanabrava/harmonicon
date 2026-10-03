@@ -860,3 +860,8 @@ song-picker-keys = Cima/Baixo: Selecionar   Enter: Jogar   /: Buscar   Esc: Volt
 song-result-one = 1 música
 
 song-update = Atualizar músicas: {$name}
+
+song-delete = Excluir música
+song-confirm-delete = Ocultar {$name} desta fonte? Continuará oculta após as atualizações. Os arquivos serão mantidos.
+song-retained = Mantida localmente — não está mais em {$repository}
+song-delete-failed = Não foi possível ocultar a música: {$error}

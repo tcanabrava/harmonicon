@@ -20,3 +20,5 @@ pub mod paths;
 pub mod responsive;
 pub mod settings;
 pub mod theme;
+
+pub mod song_library;

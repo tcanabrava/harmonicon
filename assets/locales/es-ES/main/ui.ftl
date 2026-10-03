@@ -862,3 +862,8 @@ song-picker-keys = Arriba/Abajo: Seleccionar   Enter: Jugar   /: Buscar   Esc: V
 song-result-one = 1 canción
 
 song-update = Actualizar canciones: {$name}
+
+song-delete = Eliminar canción
+song-confirm-delete = ¿Ocultar {$name} de esta fuente? Seguirá oculta tras las actualizaciones. Sus archivos se conservan.
+song-retained = Conservada localmente — ya no está en {$repository}
+song-delete-failed = No se pudo ocultar la canción: {$error}

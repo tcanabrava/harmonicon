@@ -17,11 +17,15 @@ use harmonicon_platform::assets_management::{AvailableSongs, SongEntry, SongsRes
 use harmonicon_platform::content_packs::{ContentPacks, PackEntry, PackStatus};
 use harmonicon_platform::content_sync::{PackSync, UpdateState};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::song_library::SongLibrary;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
 use harmonicon_ui::dialogs::button::{BaseButtonColor, CHOICE_SELECTED, make_interactive};
+use harmonicon_ui::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use harmonicon_ui::dialogs::text_input::spawn_text_input;
+
+const DELETE_SONG: DialogId = DialogId("song_picker_delete");
 
 use crate::menu::routing::MenuPage;
 use crate::menu::scene::{spawn_back_button, spawn_menu_root_plain};
@@ -42,6 +46,8 @@ pub(crate) struct SongPickerState {
     selected: Option<String>,
     descending: bool,
     view_2d: Option<bool>,
+    pending_delete: Option<String>,
+    deletion_error: Option<String>,
 }
 
 impl SongPickerState {
@@ -81,10 +87,14 @@ pub(crate) enum PickerSummary {
     Title,
     Metadata,
     Empty,
+    Status,
 }
 
 #[derive(Component)]
 pub(crate) struct PickerPlay;
+
+#[derive(Component)]
+pub(crate) struct PickerDelete;
 
 #[derive(Component)]
 pub(crate) struct ModeLabel(bool);
@@ -421,6 +431,39 @@ pub(crate) fn setup_artist_list(
     commands.entity(preview).add_child(details);
     spawn_summary(&mut commands, details, PickerSummary::Title, 22.0);
     spawn_summary(&mut commands, details, PickerSummary::Metadata, 15.0);
+    spawn_summary(&mut commands, details, PickerSummary::Status, 14.0);
+    let delete = commands
+        .spawn_empty()
+        .apply_scene(button::small(
+            &loc.msg("song-delete"),
+            |_: On<Activate>,
+             mut state: ResMut<SongPickerState>,
+             songs: Res<AvailableSongs>,
+             loc: Res<Localization>,
+             mut open: MessageWriter<OpenConfirmDialog>| {
+                let Some(song) = songs
+                    .0
+                    .values()
+                    .flatten()
+                    .find(|song| Some(&song.asset_path) == state.selected.as_ref())
+                else {
+                    return;
+                };
+                let path = song.asset_path.clone();
+                let name = song.name.clone();
+                state.pending_delete = Some(path);
+                state.deletion_error = None;
+                open.write(OpenConfirmDialog {
+                    purpose: DELETE_SONG,
+                    message: loc
+                        .msg_args("song-confirm-delete", &[("name", name)])
+                        .to_string(),
+                });
+            },
+        ))
+        .insert(PickerDelete)
+        .id();
+    commands.entity(preview).add_child(delete);
     spawn_mode_toggle(&mut commands, preview, *mode == GameplayMode::Play2D);
     let play = commands
         .spawn_empty()
@@ -552,9 +595,10 @@ pub(crate) fn update_picker_summary(
         (
             Entity,
             Has<bevy::ui::InteractionDisabled>,
+            Has<PickerDelete>,
             Option<&mut BaseButtonColor>,
         ),
-        With<PickerPlay>,
+        Or<(With<PickerPlay>, With<PickerDelete>)>,
     >,
     mut commands: Commands,
 ) {
@@ -594,6 +638,30 @@ pub(crate) fn update_picker_summary(
             PickerSummary::Metadata => selected.map_or_else(String::new, |song| {
                 format!("{} | {} | {}", song.artist, song.genre, song.difficulty)
             }),
+            PickerSummary::Status => {
+                let label = if let Some(error) = &state.deletion_error {
+                    loc.msg_args("song-delete-failed", &[("error", error.clone())])
+                        .to_string()
+                } else {
+                    selected.map_or_else(String::new, |song| {
+                        if song.retained {
+                            loc.msg_args(
+                                "song-retained",
+                                &[("repository", song.source_name.clone())],
+                            )
+                            .to_string()
+                        } else {
+                            song.source_name.clone()
+                        }
+                    })
+                };
+                node.display = if label.is_empty() {
+                    Display::None
+                } else {
+                    Display::Flex
+                };
+                label
+            }
             PickerSummary::Empty => {
                 node.display = if visible.is_empty() {
                     Display::Flex
@@ -605,9 +673,11 @@ pub(crate) fn update_picker_summary(
         };
         text.set_if_neq(Text::new(label));
     }
-    for (entity, disabled, color) in &mut plays {
+    for (entity, disabled, delete, color) in &mut plays {
         if let Some(mut color) = color {
-            let target = if selected.is_some() {
+            let target = if selected.is_some() && delete {
+                Color::srgb(0.24, 0.13, 0.16)
+            } else if selected.is_some() {
                 CHOICE_SELECTED
             } else {
                 Color::srgb(0.10, 0.11, 0.14)
@@ -868,6 +938,31 @@ fn populate_rows(
     commands.entity(root).replace_children(&children);
 }
 
+pub(crate) fn handle_song_delete(
+    mut chosen: MessageReader<ConfirmChosen>,
+    mut state: ResMut<SongPickerState>,
+    mut library: ResMut<SongLibrary>,
+    mut songs: ResMut<AvailableSongs>,
+    mut rescanned: MessageWriter<SongsRescanned>,
+) {
+    for choice in chosen.read().filter(|choice| choice.purpose == DELETE_SONG) {
+        let Some(path) = state.pending_delete.take() else {
+            continue;
+        };
+        if !choice.confirmed {
+            continue;
+        }
+        match library.hide(&path) {
+            Ok(()) => {
+                library.filter(&mut songs);
+                state.deletion_error = None;
+                rescanned.write(SongsRescanned);
+            }
+            Err(error) => state.deletion_error = Some(error.to_string()),
+        }
+    }
+}
+
 pub(crate) fn refresh_song_picker(
     mut commands: Commands,
     mut rescanned: MessageReader<SongsRescanned>,
@@ -890,6 +985,7 @@ pub(crate) fn refresh_song_picker(
     });
     let rescanned = rescanned.read().next().is_some();
     if !input_changed
+        && !songs.is_changed()
         && !rescanned
         && rendered.as_ref() == Some(&(state.query.clone(), state.sort, state.descending))
     {
@@ -1095,6 +1191,36 @@ mod tests {
     use super::*;
 
     #[test]
+    fn cancelling_song_deletion_keeps_selection_and_catalog() {
+        let mut app = App::new();
+        app.init_resource::<SongPickerState>()
+            .init_resource::<SongLibrary>()
+            .init_resource::<AvailableSongs>()
+            .add_message::<ConfirmChosen>()
+            .add_message::<SongsRescanned>()
+            .add_systems(Update, handle_song_delete);
+        {
+            let mut state = app.world_mut().resource_mut::<SongPickerState>();
+            state.selected = Some("packs://repo/Band/Song/song/chart.harpchart".into());
+            state.pending_delete = state.selected.clone();
+        }
+        app.world_mut().write_message(ConfirmChosen {
+            purpose: DELETE_SONG,
+            confirmed: false,
+        });
+        app.update();
+        let state = app.world().resource::<SongPickerState>();
+        assert!(state.pending_delete.is_none());
+        assert!(state.selected.is_some());
+        assert!(state.deletion_error.is_none());
+        assert!(
+            app.world()
+                .resource::<Messages<SongsRescanned>>()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn song_updates_require_a_checked_installed_remote_song_pack() {
         let mut entry = PackEntry {
             kind: PackKind::Songs,
@@ -1134,10 +1260,15 @@ mod tests {
         // A check finishing while this screen is open reveals the button;
         // successful installation removes it without replacing the catalog.
         let mut app = App::new();
-        app.insert_resource(ContentPacks(vec![entry.clone()]))
-            .insert_resource(PackSync::default())
-            .insert_resource(Localization::new())
-            .add_systems(Update, refresh_song_updates);
+        app.add_plugins((
+            MinimalPlugins,
+            AssetPlugin::default(),
+            bevy::scene::ScenePlugin,
+        ))
+        .insert_resource(ContentPacks(vec![entry.clone()]))
+        .insert_resource(PackSync::default())
+        .insert_resource(Localization::new())
+        .add_systems(Update, refresh_song_updates);
         let updates = app.world_mut().spawn((SongUpdates, Node::default())).id();
         let catalog = app.world_mut().spawn(SongPickerRows).id();
         app.update();
@@ -1338,6 +1469,8 @@ mod tests {
                 name: "Song".into(),
                 genre: "Rock".into(),
                 difficulty: "easy".into(),
+                source_name: String::new(),
+                retained: false,
                 asset_path: "song".into(),
             }],
         );
@@ -1349,6 +1482,11 @@ mod tests {
         let empty = app
             .world_mut()
             .spawn((PickerSummary::Empty, Text::new("")))
+            .id();
+        let delete = app.world_mut().spawn(PickerDelete).id();
+        let status = app
+            .world_mut()
+            .spawn((PickerSummary::Status, Text::new("")))
             .id();
         let play = app.world_mut().spawn(PickerPlay).id();
         app.update();
@@ -1362,6 +1500,19 @@ mod tests {
                 .get::<bevy::ui::InteractionDisabled>(play)
                 .is_none()
         );
+        app.world_mut()
+            .resource_mut::<AvailableSongs>()
+            .0
+            .get_mut("band")
+            .unwrap()[0]
+            .retained = true;
+        app.update();
+        assert_eq!(app.world().get::<Text>(status).unwrap().0, "song-retained");
+        assert!(
+            app.world()
+                .get::<bevy::ui::InteractionDisabled>(delete)
+                .is_none()
+        );
         app.world_mut().resource_mut::<SongPickerState>().query = "jazz".into();
         app.update();
         assert_eq!(
@@ -1371,6 +1522,11 @@ mod tests {
         assert!(
             app.world()
                 .get::<bevy::ui::InteractionDisabled>(play)
+                .is_some()
+        );
+        assert!(
+            app.world()
+                .get::<bevy::ui::InteractionDisabled>(delete)
                 .is_some()
         );
     }
@@ -1386,6 +1542,8 @@ mod tests {
                     name: "Zulu".into(),
                     genre: "Rock".into(),
                     difficulty: "expert".into(),
+                    source_name: String::new(),
+                    retained: false,
                     asset_path: "a".into(),
                 },
                 SongEntry {
@@ -1393,6 +1551,8 @@ mod tests {
                     name: "Alpha".into(),
                     genre: "Blues".into(),
                     difficulty: "easy".into(),
+                    source_name: String::new(),
+                    retained: false,
                     asset_path: "b".into(),
                 },
             ],
@@ -1463,6 +1623,8 @@ mod tests {
                 name: "Wonderful Tonight".into(),
                 genre: "Rock".into(),
                 difficulty: "easy".into(),
+                source_name: String::new(),
+                retained: false,
                 asset_path: "song".into(),
             }],
         );

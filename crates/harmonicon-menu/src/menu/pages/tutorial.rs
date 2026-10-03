@@ -444,6 +444,8 @@ mod tests {
                     name: name.to_string(),
                     genre: "Uncategorized".to_string(),
                     difficulty: "intermediate".to_string(),
+                    source_name: String::new(),
+                    retained: false,
                     asset_path: format!("packs://p/{artist}/{name}/song/chart.harpchart"),
                 });
         }

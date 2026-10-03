@@ -51,3 +51,9 @@ The first time Harmonicon starts, it downloads its lessons and songs before
 opening the menu (see [Getting Started](getting-started.md#the-first-launch)).
 If you remove every repository, the game still starts; it just has no
 lessons or songs until you add some.
+
+Song updates preserve songs removed upstream. The song picker labels those
+local copies with their original repository. **Delete song** in the picker
+hides a song persistently from that source, including after future updates;
+a copy supplied by another repository stays visible. See
+[Removed and hidden songs](playing-a-song.md#removed-and-hidden-songs).

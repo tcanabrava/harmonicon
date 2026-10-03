@@ -11,3 +11,6 @@
 pub mod git;
 pub mod pack;
 pub mod repo;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod retained_songs;

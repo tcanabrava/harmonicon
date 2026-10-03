@@ -863,3 +863,8 @@ song-picker-keys = Up/Down: Select   Enter: Play   /: Search   Esc: Back
 song-result-one = 1 song
 
 song-update = Update songs: {$name}
+
+song-delete = Delete song
+song-confirm-delete = Hide {$name} from this song source? It will stay hidden after updates. Its files are kept.
+song-retained = Kept locally — no longer in {$repository}
+song-delete-failed = Could not hide song: {$error}

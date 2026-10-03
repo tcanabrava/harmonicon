@@ -130,6 +130,11 @@ pub fn install(
     let result =
         clone_shallow(url, git_ref.as_deref(), &staging, should_interrupt).and_then(|commit| {
             let manifest = validate_checkout(&staging, kind, engine)?;
+            if kind == PackKind::Songs {
+                crate::retained_songs::preserve_removed(&packs_root.join(&slug), &staging)?;
+                // Validate the combined copy before touching the installed pack.
+                validate_checkout(&staging, kind, engine)?;
+            }
             Ok((commit, manifest))
         });
     let (commit, manifest) = match result {
@@ -370,6 +375,48 @@ mod tests {
                 .join(format!(".staging-{}", spec.slug()))
                 .exists()
         );
+    }
+
+    #[test]
+    fn updating_a_song_pack_preserves_upstream_deletions() {
+        let upstream = upstream(1);
+        let folder = upstream.path().join("Band/Removed");
+        std::fs::create_dir_all(folder.join("song")).unwrap();
+        std::fs::write(folder.join("song/chart.harpchart"), "chart").unwrap();
+        std::fs::write(folder.join("backing.ogg"), "audio").unwrap();
+        std::fs::write(
+            upstream.path().join("pack.json"),
+            PACK.replace("lessons", "songs"),
+        )
+        .unwrap();
+        git(upstream.path(), &["add", "-A"]);
+        git(upstream.path(), &["commit", "-q", "-m", "songs"]);
+        let root = tempfile::tempdir().unwrap();
+        let spec = spec_for(upstream.path(), None);
+        let update = || {
+            install(
+                &spec,
+                root.path(),
+                PackKind::Songs,
+                &engine(),
+                &AtomicBool::new(false),
+            )
+            .unwrap()
+        };
+        update();
+        std::fs::remove_dir_all(&folder).unwrap();
+        git(upstream.path(), &["add", "-A"]);
+        git(upstream.path(), &["commit", "-q", "-m", "remove song"]);
+        update();
+        let checkout = root.path().join(spec.slug());
+        assert!(checkout.join("Band/Removed/song/chart.harpchart").exists());
+        assert_eq!(
+            std::fs::read_to_string(checkout.join("Band/Removed/backing.ogg")).unwrap(),
+            "audio"
+        );
+        assert!(crate::retained_songs::read_index(&checkout).contains("Band/Removed"));
+        update();
+        assert!(checkout.join("Band/Removed/backing.ogg").exists());
     }
 
     #[test]
