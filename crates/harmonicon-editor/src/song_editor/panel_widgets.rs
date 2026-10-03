@@ -42,7 +42,7 @@ pub(super) fn button_content_text(style: ActionButtonStyle, icon: &str, label: &
 
 /// The bordered, padded, tooltipped button every panel button in this file
 /// is: no label and no click handler yet, so each shape below adds its own.
-fn spawn_shell<'a>(
+pub(super) fn spawn_shell<'a>(
     panel: &'a mut ChildSpawnerCommands,
     bg: Color,
     tooltip: LocalizedStr,
@@ -65,7 +65,10 @@ fn spawn_shell<'a>(
 }
 
 /// A shell's single-line white label.
-fn spawn_label<'a>(button: &'a mut ChildSpawnerCommands, text: String) -> EntityCommands<'a> {
+pub(super) fn spawn_label<'a>(
+    button: &'a mut ChildSpawnerCommands,
+    text: String,
+) -> EntityCommands<'a> {
     let mut ec = button.spawn_empty();
     ec.apply_scene(bsn! {
         Text({text})

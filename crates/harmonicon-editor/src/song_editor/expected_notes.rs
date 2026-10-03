@@ -39,7 +39,6 @@
 //! targets (single notes, bends, chords, short phrases), unlike the
 //! ordinary note grid, which must window for arbitrarily long real songs.
 
-use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::picking::Pickable;
 use bevy::picking::events::{PointerDrag, PointerDragEnd, PointerDragStart};
 use bevy::prelude::*;
@@ -47,19 +46,19 @@ use bevy::ui_widgets::Activate;
 use bevy::ui_widgets::Button as WidgetButton;
 
 use super::TICKS_PER_BEAT;
+use super::interaction::{
+    cycle_sticky_bend, cycle_sticky_pitch, next_expr, next_pitch, pitch_fits,
+};
 use super::panel::mod_button_active;
 use super::state::{
-    Dir, DragKind, DragState, Edge, EditorState, Expr, GridNote, Mode, Pitch, VIBRATO_HZ_MAX,
-    VIBRATO_HZ_MIN, VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN, WAH_HZ_STEP, apply_resize, max_bend,
-    move_target, note_rect, overblow_ok, overdraw_ok, pitch_color, pitch_compatible,
-    pitch_forced_dir,
+    Dir, DragKind, DragState, Edge, EditorState, GridNote, Mode, Pitch, apply_resize, move_target,
+    note_rect, pitch_color, pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{ExpectedNotesGroup, GridContent, ModButton, ModeButton};
 use harmonicon_app::app::AppState;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::settings::ActionButtonStyle;
 use harmonicon_platform::theme::{LoadedTheme, SongEditorColors};
-use harmonicon_ui::dialogs::tooltip::Tooltip;
 
 // ── EditorState accessors ────────────────────────────────────────────────────
 //
@@ -163,72 +162,33 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
         return;
     }
 
-    let harp = (kind == ModButton::Bend).then(|| state.effective_harp());
+    let harp = state.effective_harp();
     let Some(note) = state.expected_selected_note_mut() else {
         match kind {
-            ModButton::Bend => super::interaction::cycle_sticky_bend(state),
-            ModButton::Overblow => super::interaction::cycle_sticky_pitch(state, Pitch::Overblow),
-            ModButton::Overdraw => super::interaction::cycle_sticky_pitch(state, Pitch::Overdraw),
-            ModButton::Slide => super::interaction::cycle_sticky_pitch(state, Pitch::Slide),
-            ModButton::Wah => super::interaction::cycle_sticky_wah(state),
-            ModButton::Vibrato => super::interaction::cycle_sticky_vibrato(state),
+            ModButton::Bend => cycle_sticky_bend(state),
+            ModButton::Overblow => cycle_sticky_pitch(state, Pitch::Overblow),
+            ModButton::Overdraw => cycle_sticky_pitch(state, Pitch::Overdraw),
+            ModButton::Slide => cycle_sticky_pitch(state, Pitch::Slide),
+            ModButton::Wah | ModButton::Vibrato => {
+                state.sticky_expr = next_expr(kind, state.sticky_expr);
+            }
             _ => {}
         }
         return;
     };
-    match kind {
-        ModButton::Blow | ModButton::Draw => unreachable!(),
-        ModButton::Bend => {
-            let max = max_bend(harp.as_ref().unwrap(), note.hole);
-            if max <= 0.0 {
-                return;
-            }
-            let next = note.bend() + 0.5;
-            note.pitch = if next > max + f32::EPSILON { Pitch::Normal } else { Pitch::Bend(next) };
+    if matches!(kind, ModButton::Wah | ModButton::Vibrato) {
+        note.expr = next_expr(kind, note.expr);
+        return;
+    }
+    // The same cycle Edit mode runs, for a selection of exactly this note.
+    let Some(target) = next_pitch(kind, note, std::slice::from_ref(note), &harp) else {
+        return;
+    };
+    if target == Pitch::Normal || pitch_fits(target, note.hole, &harp) {
+        note.pitch = target;
+        if let Some(dir) = pitch_forced_dir(target) {
+            note.dir = dir;
         }
-        ModButton::Overblow => {
-            if overblow_ok(note.hole) {
-                note.pitch =
-                    if note.pitch == Pitch::Overblow { Pitch::Normal } else { Pitch::Overblow };
-                if note.pitch == Pitch::Overblow {
-                    note.dir = Dir::Blow;
-                }
-            }
-        }
-        ModButton::Overdraw => {
-            if overdraw_ok(note.hole) {
-                note.pitch =
-                    if note.pitch == Pitch::Overdraw { Pitch::Normal } else { Pitch::Overdraw };
-                if note.pitch == Pitch::Overdraw {
-                    note.dir = Dir::Draw;
-                }
-            }
-        }
-        ModButton::Slide => {
-            note.pitch = if note.pitch == Pitch::Slide { Pitch::Normal } else { Pitch::Slide };
-        }
-        ModButton::Wah => {
-            let next = match note.expr {
-                Expr::Wah(hz) => hz + WAH_HZ_STEP,
-                _ => WAH_HZ_MIN,
-            };
-            note.expr = if next > WAH_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Wah(next) };
-        }
-        ModButton::Vibrato => {
-            let next = match note.expr {
-                Expr::Vibrato(hz) => hz + VIBRATO_HZ_STEP,
-                _ => VIBRATO_HZ_MIN,
-            };
-            note.expr =
-                if next > VIBRATO_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Vibrato(next) };
-        }
-        ModButton::Delete
-        | ModButton::Depth
-        | ModButton::Call
-        | ModButton::Split
-        | ModButton::Phrase
-        | ModButton::TransposeUp
-        | ModButton::TransposeDown => unreachable!(),
     }
 }
 
@@ -278,34 +238,15 @@ fn spawn_expected_mod_button(
     style: ActionButtonStyle,
     colors: SongEditorColors,
 ) {
-    let mut ec = panel.spawn((
-        WidgetButton,
-        TabIndex(0),
-        ExpectedModButton(kind),
-        Node {
-            padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            border: UiRect::all(Val::Px(1.0)),
-            ..default()
-        },
-        BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-        Tooltip(String::from(tooltip)),
-    ));
-    harmonicon_ui::dialogs::button::make_interactive(&mut ec, colors.btn_bg);
-    ec.observe(move |_: On<Activate>, mut state: ResMut<EditorState>| {
-        apply_expected_modifier(&mut state, kind);
-    })
-    .with_children(|b| {
-        b.spawn_empty().apply_scene(bsn! {
-            Text({super::panel_widgets::button_content_text(
-                style, icon, &label,
-            )})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({Color::WHITE})
-            ~{Pickable::IGNORE}
+    let text = super::panel_widgets::button_content_text(style, icon, &label);
+    let mut ec = super::panel_widgets::spawn_shell(panel, colors.btn_bg, tooltip);
+    ec.insert(ExpectedModButton(kind))
+        .observe(move |_: On<Activate>, mut state: ResMut<EditorState>| {
+            apply_expected_modifier(&mut state, kind);
+        })
+        .with_children(|b| {
+            super::panel_widgets::spawn_label(b, text);
         });
-    });
 }
 
 /// Spawned once into the mod panel (`mod_panel.rs`), as its own
@@ -335,69 +276,25 @@ pub(super) fn spawn_expected_notes_group(
             },
         ))
         .with_children(|g| {
-            spawn_expected_mod_button(
-                g,
-                ModButton::Blow,
-                loc.msg("mod-blow"),
-                loc.msg("mod-blow-tooltip"),
-                "\u{2191}",
-                style,
-                colors,
-            );
-            spawn_expected_mod_button(
-                g,
-                ModButton::Draw,
-                loc.msg("mod-draw"),
-                loc.msg("mod-draw-tooltip"),
-                "\u{2193}",
-                style,
-                colors,
-            );
-            spawn_expected_mod_button(
-                g,
-                ModButton::Bend,
-                loc.msg("mod-bend"),
-                loc.msg("mod-bend-tooltip"),
-                "\u{007E}",
-                style,
-                colors,
-            );
-            spawn_expected_mod_button(
-                g,
-                ModButton::Overblow,
-                loc.msg("mod-overblow"),
-                loc.msg("mod-overblow-tooltip"),
-                "\u{21C8}",
-                style,
-                colors,
-            );
-            spawn_expected_mod_button(
-                g,
-                ModButton::Overdraw,
-                loc.msg("mod-overdraw"),
-                loc.msg("mod-overdraw-tooltip"),
-                "\u{21CA}",
-                style,
-                colors,
-            );
-            spawn_expected_mod_button(
-                g,
-                ModButton::Slide,
-                loc.msg("mod-slide"),
-                loc.msg("mod-slide-tooltip"),
-                "\u{2194}",
-                style,
-                colors,
-            );
-            spawn_expected_mod_button(
-                g,
-                ModButton::Delete,
-                loc.msg("mod-delete"),
-                loc.msg("mod-delete-tooltip"),
-                "\u{25CB}",
-                style,
-                colors,
-            );
+            for (kind, key, tooltip, icon) in [
+                (ModButton::Blow, "mod-blow", "mod-blow-tooltip", "\u{2191}"),
+                (ModButton::Draw, "mod-draw", "mod-draw-tooltip", "\u{2193}"),
+                (ModButton::Bend, "mod-bend", "mod-bend-tooltip", "\u{007E}"),
+                (ModButton::Overblow, "mod-overblow", "mod-overblow-tooltip", "\u{21C8}"),
+                (ModButton::Overdraw, "mod-overdraw", "mod-overdraw-tooltip", "\u{21CA}"),
+                (ModButton::Slide, "mod-slide", "mod-slide-tooltip", "\u{2194}"),
+                (ModButton::Delete, "mod-delete", "mod-delete-tooltip", "\u{25CB}"),
+            ] {
+                spawn_expected_mod_button(
+                    g,
+                    kind,
+                    loc.msg(key),
+                    loc.msg(tooltip),
+                    icon,
+                    style,
+                    colors,
+                );
+            }
         });
 }
 
@@ -657,5 +554,62 @@ impl Plugin for ExpectedNotesPlugin {
             )
                 .run_if(in_state(AppState::SongEditor2)),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::state::{Expr, WAH_HZ_MIN, max_bend};
+    use super::*;
+
+    fn with_note(hole: u8) -> EditorState {
+        let mut state = EditorState::default();
+        place_or_select_expected(&mut state, hole, 0);
+        state
+    }
+
+    fn note(state: &EditorState) -> &GridNote {
+        state.expected_selected_note().unwrap()
+    }
+
+    #[test]
+    fn overblow_toggles_on_a_hole_that_has_one_and_forces_blow() {
+        let mut state = with_note(4);
+        state.expected_notes[0].dir = Dir::Draw;
+        apply_expected_modifier(&mut state, ModButton::Overblow);
+        assert_eq!((note(&state).pitch, note(&state).dir), (Pitch::Overblow, Dir::Blow));
+        apply_expected_modifier(&mut state, ModButton::Overblow);
+        assert_eq!(note(&state).pitch, Pitch::Normal);
+    }
+
+    #[test]
+    fn overblow_does_nothing_on_a_hole_without_one() {
+        let mut state = with_note(2);
+        apply_expected_modifier(&mut state, ModButton::Overblow);
+        assert_eq!(note(&state).pitch, Pitch::Normal);
+    }
+
+    #[test]
+    fn bend_deepens_to_the_holes_cap_then_switches_off() {
+        let mut state = with_note(1);
+        let cap = max_bend(&state.effective_harp(), 1);
+        let mut depths = Vec::new();
+        for _ in 0..8 {
+            apply_expected_modifier(&mut state, ModButton::Bend);
+            depths.push(note(&state).bend());
+            if note(&state).pitch == Pitch::Normal {
+                break;
+            }
+        }
+        assert_eq!(depths.iter().copied().fold(0.0, f32::max), cap);
+        assert_eq!(depths.last(), Some(&0.0));
+    }
+
+    #[test]
+    fn wah_steps_its_rate_on_the_selected_note_only() {
+        let mut state = with_note(4);
+        apply_expected_modifier(&mut state, ModButton::Wah);
+        assert_eq!(note(&state).expr, Expr::Wah(WAH_HZ_MIN));
+        assert_eq!(state.sticky_expr, Expr::None);
     }
 }

@@ -197,8 +197,9 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
             ModButton::Overblow => cycle_sticky_pitch(state, Pitch::Overblow),
             ModButton::Overdraw => cycle_sticky_pitch(state, Pitch::Overdraw),
             ModButton::Slide => cycle_sticky_pitch(state, Pitch::Slide),
-            ModButton::Wah => cycle_sticky_wah(state),
-            ModButton::Vibrato => cycle_sticky_vibrato(state),
+            ModButton::Wah | ModButton::Vibrato => {
+                state.sticky_expr = next_expr(kind, state.sticky_expr);
+            }
             _ => {}
         }
         return;
@@ -268,7 +269,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
 
 /// Where the Wah or Vibrato button's cycle goes from `current`: the next
 /// rate step, or off past the fastest.
-fn next_expr(kind: ModButton, current: Expr) -> Expr {
+pub(super) fn next_expr(kind: ModButton, current: Expr) -> Expr {
     match kind {
         ModButton::Wah => {
             let next = match current {
@@ -291,7 +292,7 @@ fn next_expr(kind: ModButton, current: Expr) -> Expr {
 /// note. A bend steps half a semitone deeper, up to the deepest any
 /// selected hole allows, then off; the others toggle. `None` when no
 /// selected note can bend at all — the button does nothing.
-fn next_pitch(
+pub(super) fn next_pitch(
     kind: ModButton,
     anchor: &GridNote,
     selected: &[GridNote],
@@ -329,7 +330,7 @@ fn same_technique(kind: ModButton, pitch: Pitch) -> bool {
 }
 
 /// Whether a note on `hole` can play `pitch`.
-fn pitch_fits(pitch: Pitch, hole: u8, harp: &Harmonica) -> bool {
+pub(super) fn pitch_fits(pitch: Pitch, hole: u8, harp: &Harmonica) -> bool {
     match pitch {
         Pitch::Bend(depth) => depth <= max_bend(harp, hole) + f32::EPSILON,
         Pitch::Overblow => overblow_ok(hole),
@@ -395,23 +396,6 @@ pub(super) fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
     if let Some(dir) = pitch_forced_dir(state.sticky_pitch) {
         state.sticky_dir = dir;
     }
-}
-
-pub(super) fn cycle_sticky_wah(state: &mut EditorState) {
-    let next = match state.sticky_expr {
-        Expr::Wah(hz) => hz + WAH_HZ_STEP,
-        _ => WAH_HZ_MIN,
-    };
-    state.sticky_expr = if next > WAH_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Wah(next) };
-}
-
-pub(super) fn cycle_sticky_vibrato(state: &mut EditorState) {
-    let next = match state.sticky_expr {
-        Expr::Vibrato(hz) => hz + VIBRATO_HZ_STEP,
-        _ => VIBRATO_HZ_MIN,
-    };
-    state.sticky_expr =
-        if next > VIBRATO_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Vibrato(next) };
 }
 
 // ── Keyboard / scroll systems ─────────────────────────────────────────────────
