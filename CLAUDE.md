@@ -106,6 +106,13 @@ cargo test --features dev       # ~2,075 tests, whole workspace, incl. doctests
 cargo test -p harmonicon-core   # ~200 tests, no Bevy in its dependency tree
 cargo clippy --all-targets -- -D warnings               # what CI runs
 
+# Measuring size: scripts/loc_report.py (lines by crate and kind) and
+# scripts/find_duplicates.py (repeated line runs). What the latter still
+# reports is mostly shape — similar signatures, hover/out observer pairs —
+# not shared logic, and converting a screen to bsn! doesn't shorten it
+# (rustfmt doesn't format inside the macro). scripts/capture_static_screens.py
+# pixel-diffs the screens that hold still across a UI refactor.
+
 # Debug builds were 300 GB of `target/`. Three settings in Cargo.toml keep
 # a clean full build *plus the whole test suite* at 7.1 GB, and the game
 # binary at 287 MB (it was 2,410 MB). Each was measured, not guessed:

@@ -74,12 +74,6 @@ Nothing below can be approved by a test.
 - **Recorded backing loops** per style (shuffle, slow blues, swing), as an
   alternative to the generated band.
 
-## Code size
-
-`docs/code_reduction_plan.md`, in order:
-
-- Test builders and table-driven tests.
-
 ## Release (1.0, desktop)
 
 - Flathub submission and release signing keys. Version/tag agreement is
