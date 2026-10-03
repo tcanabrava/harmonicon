@@ -404,15 +404,7 @@ fn delete_selected_removes_every_note_in_a_multi_selection() {
 
 #[test]
 fn group_move_targets_shifts_every_member_by_the_same_delta() {
-    let make = |id: u32, hole: u8, tick: usize| GridNote {
-        id,
-        hole,
-        tick,
-        len: 4,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    };
+    let make = |id: u32, hole: u8, tick: usize| GridNote::plain(id, hole, tick, 4);
     let others = vec![make(2, 3, 8), make(3, 5, 16)];
     let targets = group_move_targets(&others, 1, TICKS_PER_BEAT as i32, 10);
     assert_eq!(
@@ -426,15 +418,7 @@ fn group_move_targets_shifts_every_member_by_the_same_delta() {
 
 #[test]
 fn group_move_targets_clamps_each_member_to_the_hole_range() {
-    let note = GridNote {
-        id: 1,
-        hole: 9,
-        tick: 0,
-        len: 4,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    };
+    let note = GridNote::plain(1, 9, 0, 4);
     let targets = group_move_targets(&[note], 5, 0, 10);
     assert_eq!(targets[0].1, 10); // clamped at the top hole
 }
@@ -460,26 +444,7 @@ fn group_move_valid_rejects_a_target_overlapping_a_note_outside_the_group() {
 fn group_move_valid_ignores_overlap_among_the_groups_own_members() {
     // Two notes in the same group, already overlapping each other (e.g. a
     // chord) — that must not block the move.
-    let notes = vec![
-        GridNote {
-            id: 1,
-            hole: 2,
-            tick: 0,
-            len: 4,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        },
-        GridNote {
-            id: 2,
-            hole: 5,
-            tick: 0,
-            len: 4,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        },
-    ];
+    let notes = vec![GridNote::plain(1, 2, 0, 4), GridNote::plain(2, 5, 0, 4)];
     let targets = vec![(1u32, 2, 4, 4, Pitch::Normal), (2u32, 5, 4, 4, Pitch::Normal)];
     assert!(group_move_valid(&notes, &build_harp("C", HarmonicaKind::Diatonic), &[1, 2], &targets));
 }
@@ -521,26 +486,7 @@ fn copy_selection_returns_only_the_selected_notes_verbatim() {
 
 #[test]
 fn paste_targets_shifts_the_earliest_note_to_the_target_tick() {
-    let clipboard = vec![
-        GridNote {
-            id: 1,
-            hole: 2,
-            tick: 4,
-            len: 4,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        },
-        GridNote {
-            id: 2,
-            hole: 5,
-            tick: 8,
-            len: 4,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        },
-    ];
+    let clipboard = vec![GridNote::plain(1, 2, 4, 4), GridNote::plain(2, 5, 8, 4)];
     let (pasted, next_id) = paste_targets(&clipboard, 20, 10, &[], 100);
     // The earliest note (tick 4) lands at 20; the other keeps its +4 offset.
     assert_eq!(pasted.iter().map(|n| (n.hole, n.tick)).collect::<Vec<_>>(), vec![(2, 20), (5, 24)]);
@@ -552,24 +498,8 @@ fn paste_targets_shifts_the_earliest_note_to_the_target_tick() {
 
 #[test]
 fn paste_targets_skips_a_note_landing_on_top_of_an_existing_one() {
-    let clipboard = vec![GridNote {
-        id: 1,
-        hole: 2,
-        tick: 0,
-        len: 4,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    }];
-    let existing = vec![GridNote {
-        id: 99,
-        hole: 2,
-        tick: 10,
-        len: 4,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    }];
+    let clipboard = vec![GridNote::plain(1, 2, 0, 4)];
+    let existing = vec![GridNote::plain(99, 2, 10, 4)];
     // Pasting right on top of the existing note is skipped...
     let (pasted, next_id) = paste_targets(&clipboard, 10, 10, &existing, 5);
     assert!(pasted.is_empty());
@@ -582,15 +512,7 @@ fn paste_targets_skips_a_note_landing_on_top_of_an_existing_one() {
 
 #[test]
 fn paste_targets_skips_a_note_beyond_the_current_harps_hole_count() {
-    let clipboard = vec![GridNote {
-        id: 1,
-        hole: 11,
-        tick: 0,
-        len: 4,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    }];
+    let clipboard = vec![GridNote::plain(1, 11, 0, 4)];
     // Fits a 12-hole chromatic harp...
     let (pasted, _) = paste_targets(&clipboard, 0, 12, &[], 0);
     assert_eq!(pasted.len(), 1);
@@ -975,33 +897,9 @@ fn setting_direction_propagates_to_simultaneous_notes() {
 fn enforce_unifies_overlap_chain_but_not_independent_notes() {
     let mut s = EditorState {
         notes: vec![
-            GridNote {
-                id: 0,
-                hole: 1,
-                tick: 0,
-                len: 3,
-                dir: Dir::Blow,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-            GridNote {
-                id: 1,
-                hole: 2,
-                tick: 2,
-                len: 3,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-            GridNote {
-                id: 2,
-                hole: 3,
-                tick: 10,
-                len: 1,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
+            GridNote::plain(0, 1, 0, 3),
+            GridNote { dir: Dir::Draw, ..GridNote::plain(1, 2, 2, 3) },
+            GridNote { dir: Dir::Draw, ..GridNote::plain(2, 3, 10, 1) },
         ],
         next_id: 3,
         ..Default::default()
@@ -1018,33 +916,9 @@ fn enforce_unifies_overlap_chain_but_not_independent_notes() {
 fn enforce_expr_unifies_overlap_chain_but_not_independent_notes() {
     let mut s = EditorState {
         notes: vec![
-            GridNote {
-                id: 0,
-                hole: 1,
-                tick: 0,
-                len: 3,
-                dir: Dir::Blow,
-                pitch: Pitch::Normal,
-                expr: Expr::Vibrato(5.0),
-            },
-            GridNote {
-                id: 1,
-                hole: 2,
-                tick: 2,
-                len: 3,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-            GridNote {
-                id: 2,
-                hole: 3,
-                tick: 10,
-                len: 1,
-                dir: Dir::Draw,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
+            GridNote { expr: Expr::Vibrato(5.0), ..GridNote::plain(0, 1, 0, 3) },
+            GridNote { dir: Dir::Draw, ..GridNote::plain(1, 2, 2, 3) },
+            GridNote { dir: Dir::Draw, ..GridNote::plain(2, 3, 10, 1) },
         ],
         next_id: 3,
         ..Default::default()
@@ -1217,26 +1091,7 @@ fn move_target_clamps_to_a_chromatic_hole_count() {
 
 #[test]
 fn move_is_blocked_where_a_note_already_sits() {
-    let notes = vec![
-        GridNote {
-            id: 0,
-            hole: 3,
-            tick: 0,
-            len: 2,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        },
-        GridNote {
-            id: 1,
-            hole: 3,
-            tick: 5,
-            len: 1,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        },
-    ];
+    let notes = vec![GridNote::plain(0, 3, 0, 2), GridNote::plain(1, 3, 5, 1)];
     let target = |hole, tick| vec![(1u32, hole, tick, 1, Pitch::Normal)];
     assert!(!group_move_valid(
         &notes,
@@ -1302,24 +1157,8 @@ fn serialize_harpchart_is_valid_json_with_required_fields() {
 fn unequal_simultaneous_note_lengths_round_trip_without_being_extended() {
     let state = EditorState {
         notes: vec![
-            GridNote {
-                id: 0,
-                hole: 1,
-                tick: 0,
-                len: TICKS_PER_BEAT,
-                dir: Dir::Blow,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
-            GridNote {
-                id: 1,
-                hole: 2,
-                tick: 0,
-                len: TICKS_PER_BEAT / 2,
-                dir: Dir::Blow,
-                pitch: Pitch::Normal,
-                expr: Expr::None,
-            },
+            GridNote::plain(0, 1, 0, TICKS_PER_BEAT),
+            GridNote::plain(1, 2, 0, TICKS_PER_BEAT / 2),
         ],
         ..Default::default()
     };
@@ -2545,15 +2384,7 @@ fn note_in_scale_uses_the_bent_target_pitch_not_the_natural_one() {
     let harp = build_harp("C", HarmonicaKind::Diatonic);
 
     // Draw-3 unbent is B4 (the major 7th) — outside the C blues scale.
-    let natural = GridNote {
-        id: 0,
-        hole: 3,
-        tick: 0,
-        len: 1,
-        dir: Dir::Draw,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    };
+    let natural = GridNote { dir: Dir::Draw, ..GridNote::plain(0, 3, 0, 1) };
     assert!(
         !note_in_scale(&natural, &harp, &scale),
         "unbent B (major 7th) is outside the blues scale"
@@ -2561,15 +2392,7 @@ fn note_in_scale_uses_the_bent_target_pitch_not_the_natural_one() {
 
     // Bending draw-3 down a step-and-a-half reaches Bb (the ♭7) — exactly
     // how a blues player accesses that blue note. Should read as in-scale.
-    let bent = GridNote {
-        id: 0,
-        hole: 3,
-        tick: 0,
-        len: 1,
-        dir: Dir::Draw,
-        pitch: Pitch::Bend(1.5),
-        expr: Expr::None,
-    };
+    let bent = GridNote { dir: Dir::Draw, pitch: Pitch::Bend(1.5), ..GridNote::plain(0, 3, 0, 1) };
     assert!(
         note_in_scale(&bent, &harp, &scale),
         "bending down 1.5 steps reaches Bb, the b7 — in scale"
@@ -2654,15 +2477,7 @@ fn parse_pitch_expr_defaults_for_empty_or_unknown_modifiers() {
 
 #[test]
 fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
-    let note = GridNote {
-        id: 0,
-        hole: 1,
-        tick: 0,
-        len: 1,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    };
+    let note = GridNote::plain(0, 1, 0, 1);
     let (left, top, width, height) = note_rect(&note);
     assert_eq!(left, 1.0);
     assert_eq!(top, HEADER_H + NOTE_PAD);
@@ -2672,24 +2487,8 @@ fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
 
 #[test]
 fn note_rect_advances_one_row_per_hole_and_scales_width_with_len() {
-    let a = GridNote {
-        id: 0,
-        hole: 1,
-        tick: 0,
-        len: 3,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    };
-    let b = GridNote {
-        id: 1,
-        hole: 2,
-        tick: 0,
-        len: 3,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    };
+    let a = GridNote::plain(0, 1, 0, 3);
+    let b = GridNote::plain(1, 2, 0, 3);
     let (_, top_a, width_a, _) = note_rect(&a);
     let (_, top_b, width_b, _) = note_rect(&b);
     assert_eq!(top_b - top_a, ROW_H, "hole 2 sits exactly one row below hole 1");
@@ -2976,14 +2775,13 @@ fn envelope_of_a_very_short_note_never_panics_or_exceeds_unity() {
 
 // ── Timeline erase/remove ────────────────────────────────────────────────────
 
-fn timeline_note(id: u32, hole: u8, tick: usize, len: usize) -> GridNote {
-    GridNote { id, hole, tick, len, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None }
-}
-
 #[test]
 fn song_end_tick_is_the_last_notes_end() {
-    let notes =
-        vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 10, 2), timeline_note(2, 3, 4, 4)];
+    let notes = vec![
+        GridNote::plain(0, 1, 0, 4),
+        GridNote::plain(1, 2, 10, 2),
+        GridNote::plain(2, 3, 4, 4),
+    ];
     assert_eq!(song_end_tick(&notes), 12);
 }
 
@@ -3071,14 +2869,14 @@ fn toggle_tempo_point_steps_from_whichever_tempo_is_already_in_effect() {
 
 #[test]
 fn silence_gaps_reports_the_space_between_consecutive_notes() {
-    let notes = vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 10, 2)];
+    let notes = vec![GridNote::plain(0, 1, 0, 4), GridNote::plain(1, 2, 10, 2)];
     assert_eq!(silence_gaps(&notes), vec![(4, 10)]);
 }
 
 #[test]
 fn silence_gaps_ignores_leading_and_trailing_silence() {
     // A single note has no "next" note to measure a gap up to.
-    let notes = vec![timeline_note(0, 1, 4, 4)];
+    let notes = vec![GridNote::plain(0, 1, 4, 4)];
     assert!(silence_gaps(&notes).is_empty());
 }
 
@@ -3087,17 +2885,17 @@ fn silence_gaps_treats_overlapping_notes_across_holes_as_one_sounding_span() {
     // A chord (same tick, different holes) and a note whose tail
     // overlaps the next note's onset must not read as silence.
     let notes = vec![
-        timeline_note(0, 1, 0, 4),
-        timeline_note(1, 2, 0, 4),  // chord with note 0
-        timeline_note(2, 3, 2, 6),  // overlaps note 0's tail
-        timeline_note(3, 4, 20, 2), // a real gap follows
+        GridNote::plain(0, 1, 0, 4),
+        GridNote::plain(1, 2, 0, 4),  // chord with note 0
+        GridNote::plain(2, 3, 2, 6),  // overlaps note 0's tail
+        GridNote::plain(3, 4, 20, 2), // a real gap follows
     ];
     assert_eq!(silence_gaps(&notes), vec![(8, 20)]);
 }
 
 #[test]
 fn silence_gaps_skips_touching_notes_since_nothing_is_ever_silent() {
-    let notes = vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 4, 4)];
+    let notes = vec![GridNote::plain(0, 1, 0, 4), GridNote::plain(1, 2, 4, 4)];
     assert!(silence_gaps(&notes).is_empty());
 }
 
@@ -3115,13 +2913,13 @@ fn normalize_range_orders_a_backwards_span() {
 
 #[test]
 fn split_side_range_left_is_song_start_to_the_split() {
-    let notes = vec![timeline_note(0, 1, 0, 20)];
+    let notes = vec![GridNote::plain(0, 1, 0, 20)];
     assert_eq!(split_side_range(8, Side::Left, &notes), (0, 8));
 }
 
 #[test]
 fn split_side_range_right_is_the_split_to_song_end() {
-    let notes = vec![timeline_note(0, 1, 0, 20)];
+    let notes = vec![GridNote::plain(0, 1, 0, 20)];
     assert_eq!(split_side_range(8, Side::Right, &notes), (8, 20));
 }
 
@@ -3133,10 +2931,10 @@ fn split_side_range_right_never_ends_before_the_split_on_an_empty_song() {
 #[test]
 fn erase_range_deletes_only_overlapping_notes_and_shifts_nothing() {
     let notes = vec![
-        timeline_note(0, 1, 0, 4),  // 0..4, fully before the range
-        timeline_note(1, 2, 4, 4),  // 4..8, inside the range
-        timeline_note(2, 3, 6, 4),  // 6..10, partially overlaps
-        timeline_note(3, 4, 12, 4), // 12..16, fully after the range
+        GridNote::plain(0, 1, 0, 4),  // 0..4, fully before the range
+        GridNote::plain(1, 2, 4, 4),  // 4..8, inside the range
+        GridNote::plain(2, 3, 6, 4),  // 6..10, partially overlaps
+        GridNote::plain(3, 4, 12, 4), // 12..16, fully after the range
     ];
     let out = erase_range(&notes, 4, 10);
     let ids: Vec<u32> = out.iter().map(|n| n.id).collect();
@@ -3148,9 +2946,9 @@ fn erase_range_deletes_only_overlapping_notes_and_shifts_nothing() {
 #[test]
 fn remove_range_deletes_overlapping_notes_and_shifts_the_rest_earlier() {
     let notes = vec![
-        timeline_note(0, 1, 0, 4),  // 0..4, before the range — untouched
-        timeline_note(1, 2, 4, 4),  // 4..8, inside the range — deleted
-        timeline_note(2, 3, 10, 4), // 10..14, after the range — shifts left by 6
+        GridNote::plain(0, 1, 0, 4),  // 0..4, before the range — untouched
+        GridNote::plain(1, 2, 4, 4),  // 4..8, inside the range — deleted
+        GridNote::plain(2, 3, 10, 4), // 10..14, after the range — shifts left by 6
     ];
     let out = remove_range(&notes, 4, 10);
     let ids: Vec<u32> = out.iter().map(|n| n.id).collect();
@@ -3161,14 +2959,14 @@ fn remove_range_deletes_overlapping_notes_and_shifts_the_rest_earlier() {
 
 #[test]
 fn remove_range_closes_the_gap_exactly_the_removed_length() {
-    let notes = vec![timeline_note(0, 1, 20, 4)];
+    let notes = vec![GridNote::plain(0, 1, 20, 4)];
     let out = remove_range(&notes, 5, 8); // remove a 3-tick span before it
     assert_eq!(out[0].tick, 17);
 }
 
 #[test]
 fn erase_and_remove_on_a_zero_length_range_are_no_ops() {
-    let notes = vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 8, 4)];
+    let notes = vec![GridNote::plain(0, 1, 0, 4), GridNote::plain(1, 2, 8, 4)];
     assert_eq!(erase_range(&notes, 6, 6), notes);
     assert_eq!(remove_range(&notes, 6, 6), notes);
 }
@@ -3571,9 +3369,9 @@ fn annotated(section: &str) -> PhraseAnnotation {
 /// section label on each onset and an intensity on the first note.
 fn state_with_metadata() -> EditorState {
     let mut s = state_with_notes(vec![
-        timeline_note(0, 1, 0, 4),
-        timeline_note(1, 2, 0, 4),
-        timeline_note(2, 3, 24, 4),
+        GridNote::plain(0, 1, 0, 4),
+        GridNote::plain(1, 2, 0, 4),
+        GridNote::plain(2, 3, 24, 4),
     ]);
     s.next_id = 3;
     s.phrase_annotations.insert(0, annotated("A"));
@@ -3766,7 +3564,7 @@ fn switching_harmonica_kind_drops_metadata_of_the_holes_it_removes() {
     // A 12-hole chromatic chart with a phrase on hole 12 alone; going to a
     // 10-hole diatonic removes that note and must take its label and
     // intensity with it, not leave them pointing at nothing.
-    let mut s = state_with_notes(vec![timeline_note(0, 12, 0, 4), timeline_note(1, 1, 24, 4)]);
+    let mut s = state_with_notes(vec![GridNote::plain(0, 12, 0, 4), GridNote::plain(1, 1, 24, 4)]);
     s.harmonica_kind = HarmonicaKind::Chromatic;
     s.phrase_annotations.insert(0, annotated("high"));
     s.phrase_annotations.insert(24, annotated("low"));
@@ -3885,8 +3683,10 @@ fn depth_label_is_a_percentage_or_nothing() {
 
 #[test]
 fn depth_button_steps_the_selected_notes_depth() {
-    let mut s =
-        state_with_notes(vec![GridNote { expr: Expr::Vibrato(5.0), ..timeline_note(0, 1, 0, 4) }]);
+    let mut s = state_with_notes(vec![GridNote {
+        expr: Expr::Vibrato(5.0),
+        ..GridNote::plain(0, 1, 0, 4)
+    }]);
     s.selected = vec![0];
     assert_eq!(s.depth_for_button(), "0.5", "default shown before any click");
     apply_modifier(&mut s, ModButton::Depth);
@@ -3901,7 +3701,7 @@ fn depth_button_steps_the_selected_notes_depth() {
 
 #[test]
 fn depth_button_leaves_a_note_with_no_expression_alone() {
-    let mut s = state_with_notes(vec![timeline_note(0, 1, 0, 4)]);
+    let mut s = state_with_notes(vec![GridNote::plain(0, 1, 0, 4)]);
     s.selected = vec![0];
     assert_eq!(s.depth_for_button(), "", "nothing to show a depth of");
     apply_modifier(&mut s, ModButton::Depth);
@@ -3955,7 +3755,7 @@ fn phrase_button_opens_the_editor_on_the_selected_notes_onset() {
     apply_modifier(&mut s, ModButton::Phrase);
     assert_eq!(s.phrase_editor, Some(24));
     // And on an onset with no annotation yet — the way to add the first.
-    let mut s = state_with_notes(vec![timeline_note(0, 1, 36, 4)]);
+    let mut s = state_with_notes(vec![GridNote::plain(0, 1, 36, 4)]);
     s.selected = vec![0];
     apply_modifier(&mut s, ModButton::Phrase);
     assert_eq!(s.phrase_editor, Some(36));

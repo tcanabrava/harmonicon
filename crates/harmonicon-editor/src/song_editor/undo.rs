@@ -249,7 +249,7 @@ pub(super) fn track_changes(
 
 #[cfg(test)]
 mod tests {
-    use super::super::state::{Dir, Expr, Pitch};
+    use super::super::state::Pitch;
     use super::*;
 
     #[test]
@@ -315,15 +315,7 @@ mod tests {
     fn undoing_a_harp_kind_change_restores_the_kind_with_its_notes() {
         let mut state = EditorState {
             harmonica_kind: HarmonicaKind::Chromatic,
-            notes: vec![GridNote {
-                id: 1,
-                hole: 12,
-                tick: 0,
-                len: 4,
-                dir: Dir::Blow,
-                pitch: Pitch::Slide,
-                expr: Expr::None,
-            }],
+            notes: vec![GridNote { pitch: Pitch::Slide, ..GridNote::plain(1, 12, 0, 4) }],
             next_id: 2,
             ..Default::default()
         };

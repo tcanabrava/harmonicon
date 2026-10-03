@@ -436,26 +436,7 @@ mod tests {
     #[test]
     fn monophonic_detector_warns_only_for_notes_that_serialize_as_a_chord() {
         let mut state = EditorState {
-            notes: vec![
-                GridNote {
-                    id: 1,
-                    hole: 4,
-                    tick: 0,
-                    len: 4,
-                    dir: Dir::Blow,
-                    pitch: Pitch::Normal,
-                    expr: Expr::None,
-                },
-                GridNote {
-                    id: 2,
-                    hole: 5,
-                    tick: 0,
-                    len: 2,
-                    dir: Dir::Blow,
-                    pitch: Pitch::Normal,
-                    expr: Expr::None,
-                },
-            ],
+            notes: vec![GridNote::plain(1, 4, 0, 4), GridNote::plain(2, 5, 0, 2)],
             ..Default::default()
         };
         let mut audio =

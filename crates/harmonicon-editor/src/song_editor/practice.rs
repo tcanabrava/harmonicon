@@ -397,7 +397,7 @@ mod tests {
     use super::super::playback::build_harp;
     use super::*;
     use crate::song_editor::interaction::select_or_add;
-    use crate::song_editor::state::{Dir, Expr, GridNote, Pitch};
+    use crate::song_editor::state::GridNote;
 
     fn state_with_notes(key: &str, placements: &[(u8, usize)]) -> EditorState {
         let mut state = EditorState { key: key.into(), ..Default::default() };
@@ -527,15 +527,7 @@ mod tests {
         // Hole 0 is out of the harp's 1..=10 range, so note_freq returns None
         // and the note must be dropped rather than panicking or defaulting.
         let mut state = EditorState::default();
-        state.notes.push(GridNote {
-            id: 0,
-            hole: 0,
-            tick: 0,
-            len: 4,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
-            expr: Expr::None,
-        });
+        state.notes.push(GridNote::plain(0, 0, 0, 4));
         assert!(build_schedule(&state).is_empty());
     }
 }

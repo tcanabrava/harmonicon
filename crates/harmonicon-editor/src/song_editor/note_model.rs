@@ -217,6 +217,15 @@ pub(super) struct GridNote {
     pub(super) expr: Expr,
 }
 
+#[cfg(test)]
+impl GridNote {
+    /// A plain blow note, the shape most tests start from; set the rest with
+    /// struct-update syntax (`GridNote { dir: Dir::Draw, ..GridNote::plain(…) }`).
+    pub(super) fn plain(id: u32, hole: u8, tick: usize, len: usize) -> Self {
+        Self { id, hole, tick, len, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None }
+    }
+}
+
 impl GridNote {
     pub(super) fn bend(&self) -> f32 {
         match self.pitch {
