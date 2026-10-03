@@ -805,6 +805,27 @@ fn cleanup_despawns_only_gameplay_entities() {
     assert!(world.entities().contains(keep), "unrelated entities must survive");
 }
 
+/// A world `score_notes` can run in: the clock at `clock`, `active`
+/// sounding, `valid` the pitches the played C Richter harp can make, and
+/// every scoring resource at its default. Callers add their `SongNotes`.
+fn scoring_world(clock: f64, active: Vec<PitchInfo>, valid: &[u8]) -> World {
+    let mut world = World::new();
+    world.insert_resource(GameplayClock::new(clock));
+    world.insert_resource(Time::<()>::default());
+    world.insert_resource(ActivePitches(active));
+    world.insert_resource(AudioFrame::default());
+    world.insert_resource(ValidHarpNotes(valid.iter().copied().collect()));
+    world.insert_resource(ScoringConfig::default());
+    world.insert_resource(AudioSettings::default());
+    world.insert_resource(Score::default());
+    world.insert_resource(SongStats::default());
+    world.insert_resource(HitFeedback::default());
+    world.insert_resource(PitchGate::default());
+    world.insert_resource(PlayedHarp(Some(harmonicon_core::harmonica::richter_harp("C"))));
+    world.init_resource::<Messages<NoteScored>>();
+    world
+}
+
 // ── score_notes (same-pitch overlap ordering) ───────────────────────────
 
 pub(super) fn overlap_test_note(time: f64) -> ScheduledNote {
@@ -819,25 +840,16 @@ fn score_notes_credits_the_closest_offset_when_two_same_pitch_notes_overlap() {
     // would coincidentally put the closer note second too, so this
     // checks that classification actually goes by |offset|, not array
     // position.
-    let mut world = World::new();
-    world.insert_resource(GameplayClock::new(0.5));
-    world.insert_resource(Time::<()>::default());
-    world.insert_resource(ActivePitches(vec![PitchInfo {
-        midi: 60,
-        note: "C".to_string(),
-        octave: 4,
-        frequency: midi_to_freq_hz(60.0),
-    }]));
-    world.insert_resource(AudioFrame::default());
-    world.insert_resource(ValidHarpNotes(HashSet::from([60u8])));
-    world.insert_resource(ScoringConfig::default());
-    world.insert_resource(AudioSettings::default());
-    world.insert_resource(Score::default());
-    world.insert_resource(SongStats::default());
-    world.insert_resource(HitFeedback::default());
-    world.insert_resource(PitchGate::default());
-    world.insert_resource(PlayedHarp(Some(harmonicon_core::harmonica::richter_harp("C"))));
-    world.init_resource::<Messages<NoteScored>>();
+    let mut world = scoring_world(
+        0.5,
+        vec![PitchInfo {
+            midi: 60,
+            note: "C".to_string(),
+            octave: 4,
+            frequency: midi_to_freq_hz(60.0),
+        }],
+        &[60],
+    );
     world.insert_resource(SongNotes {
         // Sorted by time: index 0 is farther from `judged` (offset
         // -0.10), index 1 is closer (offset -0.01).
@@ -863,20 +875,7 @@ fn score_notes_leaves_a_far_future_note_untouched() {
     // — so it's skipped before the sort/classify pass entirely (the
     // optimization for long charts). Confirm that skip doesn't change its
     // observable state: still neither hit nor missed.
-    let mut world = World::new();
-    world.insert_resource(GameplayClock::new(0.0));
-    world.insert_resource(Time::<()>::default());
-    world.insert_resource(ActivePitches(vec![]));
-    world.insert_resource(AudioFrame::default());
-    world.insert_resource(ValidHarpNotes(HashSet::from([60u8])));
-    world.insert_resource(ScoringConfig::default());
-    world.insert_resource(AudioSettings::default());
-    world.insert_resource(Score::default());
-    world.insert_resource(SongStats::default());
-    world.insert_resource(HitFeedback::default());
-    world.insert_resource(PitchGate::default());
-    world.insert_resource(PlayedHarp(Some(harmonicon_core::harmonica::richter_harp("C"))));
-    world.init_resource::<Messages<NoteScored>>();
+    let mut world = scoring_world(0.0, vec![], &[60]);
     world.insert_resource(SongNotes { notes: vec![overlap_test_note(120.0)], cursor: 0 });
 
     let mut schedule = Schedule::default();
@@ -894,20 +893,7 @@ fn score_notes_leaves_a_far_future_note_untouched() {
 /// against whatever `ActivePitches` the caller supplies, for the
 /// clean-attack tests below.
 fn clean_attack_test_world(active: Vec<PitchInfo>) -> World {
-    let mut world = World::new();
-    world.insert_resource(GameplayClock::new(0.5));
-    world.insert_resource(Time::<()>::default());
-    world.insert_resource(ActivePitches(active));
-    world.insert_resource(AudioFrame::default());
-    world.insert_resource(ValidHarpNotes(HashSet::from([60u8, 64u8])));
-    world.insert_resource(ScoringConfig::default());
-    world.insert_resource(AudioSettings::default());
-    world.insert_resource(Score::default());
-    world.insert_resource(SongStats::default());
-    world.insert_resource(HitFeedback::default());
-    world.insert_resource(PitchGate::default());
-    world.insert_resource(PlayedHarp(Some(harmonicon_core::harmonica::richter_harp("C"))));
-    world.init_resource::<Messages<NoteScored>>();
+    let mut world = scoring_world(0.5, active, &[60, 64]);
     world.insert_resource(SongNotes { notes: vec![overlap_test_note(0.49)], cursor: 0 });
     world
 }
@@ -968,20 +954,7 @@ fn chord_test_notes() -> Vec<ScheduledNote> {
 }
 
 fn chord_test_world(active: Vec<PitchInfo>) -> World {
-    let mut world = World::new();
-    world.insert_resource(GameplayClock::new(0.5));
-    world.insert_resource(Time::<()>::default());
-    world.insert_resource(ActivePitches(active));
-    world.insert_resource(AudioFrame::default());
-    world.insert_resource(ValidHarpNotes(HashSet::from([60u8, 64u8])));
-    world.insert_resource(ScoringConfig::default());
-    world.insert_resource(AudioSettings::default());
-    world.insert_resource(Score::default());
-    world.insert_resource(SongStats::default());
-    world.insert_resource(HitFeedback::default());
-    world.insert_resource(PitchGate::default());
-    world.insert_resource(PlayedHarp(Some(harmonicon_core::harmonica::richter_harp("C"))));
-    world.init_resource::<Messages<NoteScored>>();
+    let mut world = scoring_world(0.5, active, &[60, 64]);
     world.insert_resource(SongNotes { notes: chord_test_notes(), cursor: 0 });
     world
 }
@@ -1331,20 +1304,7 @@ fn wait_freeze_index_ignores_a_force_wait_note_thats_not_due_yet() {
 /// notes" manual check.
 #[test]
 fn end_to_end_synthetic_song_drives_score_combo_and_stats() {
-    let mut world = World::new();
-    world.insert_resource(GameplayClock::new(0.0));
-    world.insert_resource(Time::<()>::default());
-    world.insert_resource(ActivePitches(vec![]));
-    world.insert_resource(AudioFrame::default());
-    world.insert_resource(ValidHarpNotes(HashSet::from([60u8, 62, 64]))); // C4, D4, E4
-    world.insert_resource(ScoringConfig::default());
-    world.insert_resource(AudioSettings::default());
-    world.insert_resource(Score::default());
-    world.insert_resource(SongStats::default());
-    world.insert_resource(HitFeedback::default());
-    world.insert_resource(PitchGate::default());
-    world.insert_resource(PlayedHarp(Some(harmonicon_core::harmonica::richter_harp("C"))));
-    world.init_resource::<Messages<NoteScored>>();
+    let mut world = scoring_world(0.0, vec![], &[60, 62, 64]); // C4, D4, E4
 
     fn note(time: f64, pitch: u8) -> ScheduledNote {
         ScheduledNote { time, duration: 0.2, expected_pitch: Some(pitch), ..Default::default() }
