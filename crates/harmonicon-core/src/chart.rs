@@ -211,16 +211,29 @@ mod migration_tests {
     fn bumps_the_version_even_when_nothing_needed_fixing() {
         let mut value = json!({
             "metadata": { "format_version": "1.0.0" },
-            "song": {},
+            "song": { "genre": "Blues" },
         });
         assert!(
             !migrate_chart_json(&mut value),
-            "no fx_mapping present, so nothing actually changed"
+            "no legacy fields and genre is present, so only the version changes"
         );
         assert_eq!(
             value["metadata"]["format_version"],
             json!(CURRENT_FORMAT_VERSION)
         );
+    }
+
+    #[test]
+    fn an_older_chart_gains_required_genre_and_migrates_only_once() {
+        let mut value = json!({
+            "metadata": { "format_version": "1.6.0" },
+            "song": { "title": "Legacy song" },
+        });
+        assert!(migrate_chart_json(&mut value));
+        assert_eq!(value["song"]["genre"], "Uncategorized");
+        assert_eq!(value["song"]["title"], "Legacy song");
+        assert_eq!(value["metadata"]["format_version"], CURRENT_FORMAT_VERSION);
+        assert!(!migrate_chart_json(&mut value));
     }
 
     #[test]

@@ -12,9 +12,12 @@ use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area;
 
 use harmonicon_app::app::{GameplayMode, SelectedSong};
+#[cfg(not(target_arch = "wasm32"))]
 use harmonicon_packs::{pack::PackKind, repo::RepoSpec};
 use harmonicon_platform::assets_management::{AvailableSongs, SongEntry, SongsRescanned};
+#[cfg(not(target_arch = "wasm32"))]
 use harmonicon_platform::content_packs::{ContentPacks, PackEntry, PackStatus};
+#[cfg(not(target_arch = "wasm32"))]
 use harmonicon_platform::content_sync::{PackSync, UpdateState};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::song_library::SongLibrary;
@@ -102,6 +105,7 @@ pub(crate) struct ModeLabel(bool);
 #[derive(Component)]
 pub(crate) struct SongUpdates;
 
+#[cfg(not(target_arch = "wasm32"))]
 fn song_update_available(entry: &PackEntry, sync: &PackSync) -> bool {
     entry.kind == PackKind::Songs
         && matches!(entry.spec, RepoSpec::Remote { .. })
@@ -113,6 +117,11 @@ fn song_update_available(entry: &PackEntry, sync: &PackSync) -> bool {
         )
 }
 
+// Browser builds bundle songs and have no repository synchronization.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn refresh_song_updates() {}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn refresh_song_updates(
     mut commands: Commands,
     packs: Res<ContentPacks>,
@@ -164,6 +173,7 @@ pub(crate) fn refresh_song_updates(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn spawn_update_status(commands: &mut Commands, parent: Entity, message: String) {
     let status = commands
         .spawn((
@@ -706,10 +716,9 @@ pub(crate) fn focus_picker_search(
 ) {
     if keyboard.just_pressed(Key::Character("/".into()))
         && !focus.get().is_some_and(|entity| editable.contains(entity))
+        && let Some(entity) = inputs.iter().next()
     {
-        if let Some(entity) = inputs.iter().next() {
-            focus.set(entity, FocusCause::Navigated);
-        }
+        focus.set(entity, FocusCause::Navigated);
     }
 }
 

@@ -1892,6 +1892,16 @@ fn round_trip_differences(source: &serde_json::Value) -> Vec<String> {
 }
 
 #[test]
+fn a_minor_song_key_survives_loading_and_saving() {
+    let mut state = EditorState::default();
+    select_or_add(&mut state, 1, 0);
+    let mut source: serde_json::Value = serde_json::from_str(&serialize_harpchart(&state)).unwrap();
+    source["song"]["key"] = serde_json::json!("Am");
+    let differences = round_trip_differences(&source);
+    assert!(differences.is_empty(), "{differences:?}");
+}
+
+#[test]
 fn every_bundled_chart_means_the_same_after_a_round_trip() {
     let paths = content_charts();
 

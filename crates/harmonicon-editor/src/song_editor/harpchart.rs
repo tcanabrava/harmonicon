@@ -4,8 +4,7 @@ use bevy::prelude::*;
 
 use super::save_feedback::SaveFeedback;
 use super::state::{
-    Dir, EditorState, Expr, GridNote, HARP_KEYS, HarmonicaKind, LoadedHarmonica, POSITIONS, Pitch,
-    Scroll,
+    Dir, EditorState, Expr, GridNote, HarmonicaKind, LoadedHarmonica, POSITIONS, Pitch, Scroll,
 };
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use harmonicon_core::chart::{
@@ -486,9 +485,9 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         if let Some(b) = song["tempo_bpm"].as_f64() {
             state.tempo = format!("{}", b.round() as u32);
         }
-        if let Some(k) = song["key"].as_str()
-            && HARP_KEYS.contains(&k)
-        {
+        // Song keys include minor keys such as Am; HARP_KEYS only lists
+        // the choices for physical harmonicas, so it cannot validate this.
+        if let Some(k) = song["key"].as_str() {
             state.key = k.to_string();
         }
         // Round-trips whatever the chart declares. Not validated here: an

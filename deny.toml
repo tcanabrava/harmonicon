@@ -21,6 +21,9 @@ allow = [
     # `guitarpro` uses for the zipped score containers (GPX, GP7, MuseScore).
     "bzip2-1.0.6",
     "CC0-1.0",
+    # Mozilla's root certificate data, through webpki-root-certs. CDLA's
+    # permissive data license is separate from the TLS implementation.
+    "CDLA-Permissive-2.0",
     "ISC",
     "MIT",
     "MIT-0",
