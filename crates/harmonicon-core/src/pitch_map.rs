@@ -255,15 +255,15 @@ pub fn key_fit_score_for_harp(midi_keys: &[u8], harp: &Harmonica) -> f32 {
     if midi_keys.is_empty() {
         return 0.0;
     }
-    let exact = midi_keys
-        .iter()
-        .filter(|&&target| {
-            (1..=harp.hole_count()).any(|hole| {
-                harp.wind_direction_midi(hole, &Action::Blow) == Some(target)
-                    || harp.wind_direction_midi(hole, &Action::Draw) == Some(target)
-            })
-        })
-        .count();
+    let mut natural = [false; 256];
+    for hole in 1..=harp.hole_count() {
+        for action in [Action::Blow, Action::Draw] {
+            if let Some(midi) = harp.wind_direction_midi(hole, &action) {
+                natural[usize::from(midi)] = true;
+            }
+        }
+    }
+    let exact = midi_keys.iter().filter(|&&target| natural[usize::from(target)]).count();
     exact as f32 / midi_keys.len() as f32
 }
 

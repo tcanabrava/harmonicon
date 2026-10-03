@@ -40,62 +40,43 @@ fn to_midi_u8(note: &str) -> Option<u8> {
 /// reed); on holes 7-10 a bend pushes the *blow* reed down (blow-family)
 /// and an overdraw is produced by drawing (draw-family).
 pub fn reachable_directions(harp: &Harmonica, midi: u8) -> (bool, bool) {
-    let mut blow = false;
-    let mut draw = false;
-    for hole in 1..=harp.hole_count() {
-        let notes = hole_notes(harp, hole);
-        if notes.blow.as_deref().and_then(to_midi_u8) == Some(midi) {
-            blow = true;
+    let mut directions = (false, false);
+    visit_directions(harp, |note, blow| {
+        if note == midi {
+            directions.0 |= blow;
+            directions.1 |= !blow;
         }
-        if notes.draw.as_deref().and_then(to_midi_u8) == Some(midi) {
-            draw = true;
-        }
-        if notes.bends.iter().any(|b| to_midi_u8(b) == Some(midi)) {
-            if hole <= 6 {
-                draw = true;
-            } else {
-                blow = true;
-            }
-        }
-        if notes.over.as_deref().and_then(to_midi_u8) == Some(midi) {
-            if matches!(hole, 1 | 4 | 5 | 6) {
-                blow = true;
-            } else {
-                draw = true;
-            }
-        }
-    }
-    (blow, draw)
+    });
+    directions
 }
 
-/// [`reachable_directions`] for every MIDI pitch at once, from a single pass
-/// over the harp's holes — for a caller that asks about many pitches on the
-/// same harp (the note tracker asks several times per detector hop), where
-/// re-deriving every hole's notes per question would dominate the cost.
-fn direction_table(harp: &Harmonica) -> [(bool, bool); 128] {
-    fn mark(table: &mut [(bool, bool); 128], note: Option<&str>, blow: bool) {
-        if let Some(entry) =
-            note.and_then(to_midi_u8).and_then(|midi| table.get_mut(usize::from(midi)))
-        {
-            if blow {
-                entry.0 = true;
-            } else {
-                entry.1 = true;
-            }
+/// Visit each pitch with its breath family; repeated pitches may have both.
+fn visit_directions(harp: &Harmonica, mut visit: impl FnMut(u8, bool)) {
+    let mut mark = |note: Option<&str>, blow| {
+        if let Some(midi) = note.and_then(to_midi_u8) {
+            visit(midi, blow);
         }
-    }
-    let mut table = [(false, false); 128];
+    };
     for hole in 1..=harp.hole_count() {
         let notes = hole_notes(harp, hole);
-        mark(&mut table, notes.blow.as_deref(), true);
-        mark(&mut table, notes.draw.as_deref(), false);
-        // Same families as `reachable_directions`: bends are draw-family on
-        // holes 1-6 and blow-family above; overblows (1/4/5/6) are blown.
+        mark(notes.blow.as_deref(), true);
+        mark(notes.draw.as_deref(), false);
         for bend in &notes.bends {
-            mark(&mut table, Some(bend), hole > 6);
+            mark(Some(bend), hole > 6);
         }
-        mark(&mut table, notes.over.as_deref(), matches!(hole, 1 | 4 | 5 | 6));
+        mark(notes.over.as_deref(), matches!(hole, 1 | 4 | 5 | 6));
     }
+}
+
+/// Derive all MIDI breath families in a single pass over the harp's holes.
+fn direction_table<const N: usize>(harp: &Harmonica) -> [(bool, bool); N] {
+    let mut table = [(false, false); N];
+    visit_directions(harp, |midi, blow| {
+        if let Some(entry) = table.get_mut(usize::from(midi)) {
+            entry.0 |= blow;
+            entry.1 |= !blow;
+        }
+    });
     table
 }
 
@@ -144,7 +125,11 @@ impl BreathDirectionTracker {
     }
 
     pub fn filter(&mut self, harp: &Harmonica, candidates: &[u8]) -> Vec<u8> {
-        self.filter_by(|midi| reachable_directions(harp, midi), candidates)
+        if candidates.is_empty() {
+            return self.filter_by(|_| (false, false), candidates);
+        }
+        let table: [_; 256] = direction_table(harp);
+        self.filter_by(|midi| table[usize::from(midi)], candidates)
     }
 
     /// [`filter`](Self::filter) with the reachability question supplied, so

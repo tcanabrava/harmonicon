@@ -26,7 +26,7 @@ use harmonicon_platform::theme::SongEditorColors;
 use harmonicon_ui::dialogs::button::make_interactive;
 use harmonicon_ui::dialogs::checkbox::spawn_checkbox;
 use harmonicon_ui::dialogs::combobox::{ComboboxSelect, ComboboxValue, spawn_combobox};
-use harmonicon_ui::dialogs::file_dialog::{DialogMode, OpenFileDialog};
+use harmonicon_ui::dialogs::file_dialog::{DialogId, DialogMode, OpenFileDialog};
 use harmonicon_ui::dialogs::text_input::{
     TextInputCommitted, spawn_multiline_text_input, spawn_text_input,
 };
@@ -140,15 +140,16 @@ pub(super) fn spawn_form_column(
 /// the shared shape [`spawn_content_kind_row`]/[`spawn_harmonica_kind_row`]
 /// both build. `marker` tags the value text so its own `update_*_text`
 /// system can find it.
-fn spawn_cycle_row<T: Component, M: 'static>(
+fn spawn_cycle_row<T: Component, B: Bundle, M: 'static>(
     col: &mut ChildSpawnerCommands,
     loc: &Localization,
     colors: SongEditorColors,
     label_key: &str,
-    tooltip_key: &str,
+    tooltip_key: Option<&str>,
     marker: T,
+    button_marker: B,
     on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
-) {
+) -> Entity {
     spawn_form_line(col, loc, colors, label_key, |line| {
         let mut btn = line.spawn((
             WidgetButton,
@@ -162,8 +163,11 @@ fn spawn_cycle_row<T: Component, M: 'static>(
                 ..default()
             },
             BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            Tooltip(String::from(loc.msg(tooltip_key))),
+            button_marker,
         ));
+        if let Some(key) = tooltip_key {
+            btn.insert(Tooltip(String::from(loc.msg(key))));
+        }
         make_interactive(&mut btn, colors.field_bg);
         btn.observe(on_click).with_children(|b| {
             b.spawn_empty()
@@ -175,7 +179,7 @@ fn spawn_cycle_row<T: Component, M: 'static>(
                 })
                 .insert(marker);
         });
-    });
+    })
 }
 
 /// The "Record Song"/"Record Lesson" toggle — switching `content_kind` has
@@ -192,8 +196,9 @@ fn spawn_content_kind_row(
         loc,
         colors,
         "editor-field-content-kind",
-        "editor-content-kind-toggle-tooltip",
+        Some("editor-content-kind-toggle-tooltip"),
         ContentKindText,
+        (),
         |_: On<Activate>, mut state: ResMut<EditorState>| {
             state.content_kind = match state.content_kind {
                 ContentKind::Song => ContentKind::Lesson,
@@ -213,8 +218,9 @@ fn spawn_harmonica_kind_row(
         loc,
         colors,
         "editor-field-harmonica",
-        "editor-harmonica-toggle-tooltip",
+        Some("editor-harmonica-toggle-tooltip"),
         HarmonicaKindText,
+        (),
         |_: On<Activate>, mut state: ResMut<EditorState>| {
             let next = match state.harmonica_kind {
                 HarmonicaKind::Diatonic => HarmonicaKind::PaddyRichter,
@@ -241,8 +247,9 @@ fn spawn_snap_mode_row(
         loc,
         colors,
         "editor-field-snap-mode",
-        "editor-snap-mode-toggle-tooltip",
+        Some("editor-snap-mode-toggle-tooltip"),
         SnapModeText,
+        (),
         |_: On<Activate>, mut state: ResMut<EditorState>| {
             state.snap_mode = state.snap_mode.next();
         },
@@ -305,7 +312,7 @@ fn spawn_form_line(
 /// `lesson_form`'s `LessonThreshold`/`LessonTechnique`) can tag it with a
 /// marker component afterward for a visibility system to key on.
 ///
-/// Two widget shapes, branching on [`Field::is_cycle`]:
+/// Two widget shapes, branching on [`cycle_field`]:
 /// click-to-cycle fields (`Key`/`Position`, song enums, and lesson enums)
 /// stay a plain `WidgetButton` that steps the value on `Activate`; every
 /// other field gets a real text box (`dialogs::text_input::
@@ -321,173 +328,57 @@ pub(super) fn spawn_field_row(
     field: Field,
     label: &str,
 ) -> Entity {
+    if let Some((choices, tooltip)) = cycle_field(field) {
+        return spawn_cycle_row(
+            col,
+            loc,
+            colors,
+            label,
+            tooltip,
+            MetaFieldText(field),
+            MetaFieldBox(field),
+            move |_: On<Activate>, mut state: ResMut<EditorState>| {
+                let value = cycle_next(choices, state.field_text(field));
+                if field == Field::Key {
+                    state.set_key(value);
+                } else {
+                    *state.field_text_mut(field) = value;
+                }
+            },
+        );
+    }
     spawn_form_line(col, loc, colors, label, |line| {
-        if field.is_cycle() {
-            let mut btn = line.spawn((
-                WidgetButton,
-                TabIndex(0),
-                MetaFieldBox(field),
-                Node {
-                    width: Val::Px(240.0),
-                    height: Val::Px(26.0),
-                    align_items: AlignItems::Center,
-                    padding: UiRect::horizontal(Val::Px(8.0)),
-                    border: UiRect::all(Val::Px(1.0)),
-                    ..default()
-                },
-                BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            ));
-            make_interactive(&mut btn, colors.field_bg);
-
-            if field == Field::Key {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-key-tooltip")))).observe(
-                    |_: On<Activate>, mut state: ResMut<EditorState>| {
-                        let key = cycle_next(&HARP_KEYS, &state.key);
-                        state.set_key(key);
-                    },
-                );
-            } else if field == Field::Position {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-position-tooltip"))))
-                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                        state.position = cycle_next(&POSITIONS, &state.position);
-                    });
-            } else if field == Field::Difficulty {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-difficulty-tooltip"))))
-                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                        state.difficulty = cycle_next(&DIFFICULTIES, &state.difficulty);
-                    });
-            } else if field == Field::SongFeel {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-feel-tooltip")))).observe(
-                    |_: On<Activate>, mut state: ResMut<EditorState>| {
-                        state.song_feel = cycle_next(&SONG_FEELS, &state.song_feel);
-                    },
-                );
-            } else if field == Field::ComboEnabled {
-                btn.observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.combo.enabled =
-                        cycle_next(&["enabled", "disabled"], &state.combo.enabled);
-                });
-            } else if field == Field::LoopType {
-                btn.observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.loop_settings.kind = cycle_next(&LOOP_TYPES, &state.loop_settings.kind);
-                });
-            } else if field == Field::LoopRepeat {
-                btn.observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.loop_settings.repeat =
-                        cycle_next(&["no", "yes"], &state.loop_settings.repeat);
-                });
-            } else if field == Field::LessonPassCriteria {
-                btn.insert(Tooltip(String::from(
-                    loc.msg("editor-field-lesson-pass-criteria-tooltip"),
-                )))
-                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.lesson_pass_criteria =
-                        cycle_next(&PASS_CRITERIA_KINDS, &state.lesson_pass_criteria);
-                });
-            } else if field == Field::LessonTechnique {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-lesson-technique-tooltip"))))
-                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                        state.lesson_technique =
-                            cycle_next(&TECHNIQUE_NAMES, &state.lesson_technique);
-                    });
-            } else if field == Field::LessonProgression {
-                btn.insert(Tooltip(String::from(
-                    loc.msg("editor-field-lesson-progression-tooltip"),
-                )))
-                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.lesson_progression = cycle_next(&PROGRESSIONS, &state.lesson_progression);
-                });
-            } else if field == Field::LessonScale {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-lesson-scale-tooltip"))))
-                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                        state.lesson_scale = cycle_next(&LESSON_SCALES, &state.lesson_scale);
-                    });
-            } else {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-lesson-path-tooltip"))))
-                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                        state.lesson_path = cycle_next(&LESSON_PATHS, &state.lesson_path);
-                    });
-            }
-
-            btn.with_children(|b| {
-                b.spawn_empty()
-                    .apply_scene(bsn! {
-                        Text("")
-                        TextFont { font_size: {FontSize::Px(14.0)} }
-                        TextColor({Color::WHITE})
-                        ~{Pickable::IGNORE}
-                    })
-                    .insert(MetaFieldText(field));
-            });
-        } else {
-            let row_id = line.target_entity();
-            let on_commit = move |ev: On<TextInputCommitted>, mut state: ResMut<EditorState>| {
-                state.field_text_mut(field).clone_from(&ev.value);
-            };
-            let input_id = if field == Field::Description {
-                spawn_multiline_text_input(
-                    line.commands_mut(),
-                    row_id,
-                    state.field_text(field),
-                    240.0,
-                    colors.field_bg,
-                    Color::srgb(0.30, 0.30, 0.40),
-                    on_commit,
-                )
-            } else {
-                spawn_text_input(
-                    line.commands_mut(),
-                    row_id,
-                    state.field_text(field),
-                    240.0,
-                    colors.field_bg,
-                    Color::srgb(0.30, 0.30, 0.40),
-                    on_commit,
-                )
-            };
-            line.commands_mut().entity(input_id).insert((
-                MetaFieldBox(field),
-                Tooltip(String::from(loc.msg("editor-field-text-tooltip"))),
-            ));
-        }
+        let row_id = line.target_entity();
+        let on_commit = move |ev: On<TextInputCommitted>, mut state: ResMut<EditorState>| {
+            state.field_text_mut(field).clone_from(&ev.value);
+        };
+        let spawn_input =
+            if field == Field::Description { spawn_multiline_text_input } else { spawn_text_input };
+        let input_id = spawn_input(
+            line.commands_mut(),
+            row_id,
+            state.field_text(field),
+            240.0,
+            colors.field_bg,
+            Color::srgb(0.30, 0.30, 0.40),
+            on_commit,
+        );
+        line.commands_mut().entity(input_id).insert((
+            MetaFieldBox(field),
+            Tooltip(String::from(loc.msg("editor-field-text-tooltip"))),
+        ));
 
         if field == Field::Music {
-            let mut browse = line.spawn((
-                WidgetButton,
-                TabIndex(0),
-                Node {
-                    height: Val::Px(26.0),
-                    align_items: AlignItems::Center,
-                    padding: UiRect::horizontal(Val::Px(10.0)),
-                    border: UiRect::all(Val::Px(1.0)),
-                    ..default()
-                },
-                BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-                Tooltip(String::from(loc.msg("editor-browse-tooltip"))),
-            ));
-            make_interactive(&mut browse, Color::srgb(0.18, 0.24, 0.36));
-            browse
-                .observe(
-                    |_: On<Activate>,
-                     loc: Res<Localization>,
-                     mut open: MessageWriter<OpenFileDialog>| {
-                        open.write(OpenFileDialog {
-                            purpose: MUSIC_PURPOSE,
-                            title: String::from(loc.msg("dialog-select-music")),
-                            extensions: vec!["ogg".into()],
-                            start_dir: dirs::home_dir(),
-                            mode: DialogMode::Open,
-                        });
-                    },
-                )
-                .with_children(|b| {
-                    b.spawn_empty().apply_scene(bsn! {
-                        Text({String::from(loc.msg("editor-browse"))})
-                        TextFont { font_size: {FontSize::Px(13.0)} }
-                        TextColor({Color::WHITE})
-                        ~{Pickable::IGNORE}
-                    });
-                });
+            spawn_file_button(
+                line,
+                loc,
+                "editor-browse",
+                "editor-browse-tooltip",
+                Color::srgb(0.18, 0.24, 0.36),
+                MUSIC_PURPOSE,
+                "dialog-select-music",
+                &["ogg"],
+            );
         }
     })
 }
@@ -498,47 +389,94 @@ fn spawn_midi_track_row(
     colors: SongEditorColors,
 ) {
     spawn_form_line(col, loc, colors, "editor-field-midi-track", |line| {
-        let mut import_midi = line.spawn((
-            WidgetButton,
-            TabIndex(0),
-            Node {
-                height: Val::Px(26.0),
-                align_items: AlignItems::Center,
-                padding: UiRect::horizontal(Val::Px(10.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
-            Tooltip(String::from(loc.msg("editor-import-midi-tooltip"))),
-        ));
-        make_interactive(&mut import_midi, Color::srgb(0.24, 0.30, 0.20));
-        import_midi
-            .observe(
-                |_: On<Activate>,
-                 loc: Res<Localization>,
-                 mut open: MessageWriter<OpenFileDialog>| {
-                    open.write(OpenFileDialog {
-                        purpose: MIDI_PURPOSE,
-                        title: String::from(loc.msg("dialog-select-midi")),
-                        extensions: vec!["mid".into(), "midi".into()],
-                        start_dir: dirs::home_dir(),
-                        mode: DialogMode::Open,
-                    });
-                },
-            )
-            .with_children(|b| {
-                b.spawn_empty().apply_scene(bsn! {
-                    Text({String::from(loc.msg("editor-import-midi"))})
-                    TextFont { font_size: {FontSize::Px(13.0)} }
-                    TextColor({Color::WHITE})
-                    ~{Pickable::IGNORE}
-                });
-            });
+        spawn_file_button(
+            line,
+            loc,
+            "editor-import-midi",
+            "editor-import-midi-tooltip",
+            Color::srgb(0.24, 0.30, 0.20),
+            MIDI_PURPOSE,
+            "dialog-select-midi",
+            &["mid", "midi"],
+        );
         line.spawn((
             MidiTrackComboboxSlot,
             Node { flex_direction: FlexDirection::Column, ..default() },
         ));
     });
+}
+
+fn spawn_file_button(
+    line: &mut ChildSpawnerCommands,
+    loc: &Localization,
+    label_key: &str,
+    tooltip_key: &str,
+    color: Color,
+    purpose: DialogId,
+    title_key: &'static str,
+    extensions: &'static [&'static str],
+) {
+    let mut button = line.spawn((
+        WidgetButton,
+        TabIndex(0),
+        Node {
+            height: Val::Px(26.0),
+            align_items: AlignItems::Center,
+            padding: UiRect::horizontal(Val::Px(10.0)),
+            border: UiRect::all(Val::Px(1.0)),
+            ..default()
+        },
+        BorderColor::all(Color::srgb(0.30, 0.30, 0.40)),
+        Tooltip(String::from(loc.msg(tooltip_key))),
+    ));
+    make_interactive(&mut button, color);
+    button
+        .observe(
+            move |_: On<Activate>,
+                  loc: Res<Localization>,
+                  mut open: MessageWriter<OpenFileDialog>| {
+                open.write(OpenFileDialog {
+                    purpose,
+                    title: String::from(loc.msg(title_key)),
+                    extensions: extensions.iter().map(|s| (*s).to_string()).collect(),
+                    start_dir: dirs::home_dir(),
+                    mode: DialogMode::Open,
+                });
+            },
+        )
+        .with_children(|b| {
+            b.spawn_empty().apply_scene(bsn! {
+                Text({String::from(loc.msg(label_key))})
+                TextFont { font_size: {FontSize::Px(13.0)} }
+                TextColor({Color::WHITE})
+                ~{Pickable::IGNORE}
+            });
+        });
+}
+
+fn cycle_field(field: Field) -> Option<(&'static [&'static str], Option<&'static str>)> {
+    let (choices, tooltip) = match field {
+        Field::Key => (&HARP_KEYS[..], Some("editor-field-key-tooltip")),
+        Field::Position => (&POSITIONS[..], Some("editor-field-position-tooltip")),
+        Field::Difficulty => (&DIFFICULTIES[..], Some("editor-field-difficulty-tooltip")),
+        Field::SongFeel => (&SONG_FEELS[..], Some("editor-field-feel-tooltip")),
+        Field::ComboEnabled => (&["enabled", "disabled"][..], None),
+        Field::LoopType => (&LOOP_TYPES[..], None),
+        Field::LoopRepeat => (&["no", "yes"][..], None),
+        Field::LessonPassCriteria => {
+            (&PASS_CRITERIA_KINDS[..], Some("editor-field-lesson-pass-criteria-tooltip"))
+        }
+        Field::LessonTechnique => {
+            (&TECHNIQUE_NAMES[..], Some("editor-field-lesson-technique-tooltip"))
+        }
+        Field::LessonProgression => {
+            (&PROGRESSIONS[..], Some("editor-field-lesson-progression-tooltip"))
+        }
+        Field::LessonScale => (&LESSON_SCALES[..], Some("editor-field-lesson-scale-tooltip")),
+        Field::LessonPath => (&LESSON_PATHS[..], Some("editor-field-lesson-path-tooltip")),
+        _ => return None,
+    };
+    Some((choices, tooltip))
 }
 
 /// Fills in [`ScaleComboboxSlot`] the first time it's seen empty — a
@@ -743,4 +681,74 @@ pub(super) fn spawn_meta_form(
             },
         ));
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    #[test]
+    fn form_buttons_preserve_field_updates_and_dialog_requests() {
+        let mut app = App::new();
+        app.add_plugins((
+            MinimalPlugins,
+            bevy::asset::AssetPlugin::default(),
+            bevy::scene::ScenePlugin,
+        ));
+        let world = app.world_mut();
+        world.insert_resource(Localization::default());
+        world.init_resource::<Messages<OpenFileDialog>>();
+        world.insert_resource(EditorState {
+            loaded_harmonica: Some(super::super::state::LoadedHarmonica {
+                key: "C".into(),
+                kind: HarmonicaKind::Diatonic,
+                harp: harmonicon_core::harmonica::richter_harp("C"),
+            }),
+            ..default()
+        });
+        world
+            .run_system_once(
+                |mut commands: Commands, state: Res<EditorState>, loc: Res<Localization>| {
+                    commands.spawn_empty().with_children(|col| {
+                        let colors = SongEditorColors::default();
+                        for field in
+                            [Field::Key, Field::ComboEnabled, Field::LessonPath, Field::Music]
+                        {
+                            spawn_field_row(col, &loc, colors, &state, field, "label");
+                        }
+                        spawn_midi_track_row(col, &loc, colors);
+                    });
+                },
+            )
+            .unwrap();
+        let buttons: Vec<_> = world
+            .query_filtered::<(Entity, Option<&MetaFieldBox>), With<WidgetButton>>()
+            .iter(world)
+            .map(|(entity, field)| (entity, field.map(|f| f.0)))
+            .collect();
+        assert_eq!(buttons.len(), 5);
+        for (entity, field) in buttons {
+            let before =
+                field.map(|field| world.resource::<EditorState>().field_text(field).to_string());
+            world.trigger(Activate { entity });
+            if let Some(field) = field {
+                assert_ne!(world.resource::<EditorState>().field_text(field), before.unwrap());
+                if field == Field::Key {
+                    assert!(world.resource::<EditorState>().loaded_harmonica.is_none());
+                }
+            }
+        }
+        let requests: Vec<_> = world.resource_mut::<Messages<OpenFileDialog>>().drain().collect();
+        assert_eq!(requests.len(), 2);
+        for (purpose, title, extensions) in [
+            (MUSIC_PURPOSE, "dialog-select-music", vec!["ogg"]),
+            (MIDI_PURPOSE, "dialog-select-midi", vec!["mid", "midi"]),
+        ] {
+            let request = requests.iter().find(|r| r.purpose == purpose).unwrap();
+            assert_eq!(request.title, title);
+            assert_eq!(request.extensions, extensions);
+            assert!(matches!(request.mode, DialogMode::Open));
+        }
+    }
 }

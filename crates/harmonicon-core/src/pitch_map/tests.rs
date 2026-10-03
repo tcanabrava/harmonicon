@@ -369,3 +369,24 @@ fn the_slide_raises_every_reed_by_exactly_one_semitone() {
         }
     }
 }
+
+#[test]
+fn key_fit_preserves_note_weights_and_matches_reed_search_in_every_key() {
+    let keys: Vec<u8> = (0..=255).chain([60, 60, 67]).collect();
+    for key in HARP_KEYS {
+        for kind in [HarpKind::Diatonic, HarpKind::Chromatic] {
+            let harp = harp_for_key(key, kind);
+            let exact = keys
+                .iter()
+                .filter(|&&target| {
+                    (1..=harp.hole_count()).any(|hole| {
+                        [Action::Blow, Action::Draw]
+                            .iter()
+                            .any(|action| harp.wind_direction_midi(hole, action) == Some(target))
+                    })
+                })
+                .count();
+            assert_eq!(key_fit_score_for_harp(&keys, &harp), exact as f32 / keys.len() as f32);
+        }
+    }
+}

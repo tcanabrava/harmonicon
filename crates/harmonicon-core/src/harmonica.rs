@@ -108,36 +108,56 @@ fn transpose_table(notes: &[&str], offset: i32) -> Vec<String> {
     notes.iter().filter_map(|n| note_to_midi(n).map(|m| midi_to_note(m + offset))).collect()
 }
 
-/// A Richter diatonic harp for `key`, transposed from the [`C_BLOW`]/[`C_DRAW`]
-/// reference layout.
-pub fn richter_harp(key: &str) -> Harmonica {
-    let off = key_offset(key);
+fn diatonic_harp(
+    key: &str,
+    bending_profile: BendingProfile,
+    blow: &[&str],
+    draw: &[&str],
+) -> Harmonica {
+    let offset = key_offset(key);
     Harmonica::Diatonic {
-        holes: 10,
-        bending_profile: BendingProfile::RichterStandard,
+        holes: blow.len() as u8,
+        bending_profile,
         position: None,
         scale: None,
         layout: Some(DiatonicLayout {
-            blow: Some(transpose_table(&C_BLOW, off)),
-            draw: Some(transpose_table(&C_DRAW, off)),
+            blow: Some(transpose_table(blow, offset)),
+            draw: Some(transpose_table(draw, offset)),
         }),
     }
+}
+
+fn chromatic_layout_harp(
+    key: &str,
+    blow: &[&str],
+    draw: &[&str],
+    blow_slide: &[&str],
+    draw_slide: &[&str],
+) -> Harmonica {
+    let offset = key_offset(key);
+    Harmonica::Chromatic {
+        holes: blow.len() as u8,
+        position: None,
+        scale: None,
+        layout: Some(ChromaticLayout {
+            blow: Some(transpose_table(blow, offset)),
+            draw: Some(transpose_table(draw, offset)),
+            blow_slide: Some(transpose_table(blow_slide, offset)),
+            draw_slide: Some(transpose_table(draw_slide, offset)),
+        }),
+    }
+}
+
+/// A Richter diatonic harp for `key`, transposed from the [`C_BLOW`]/[`C_DRAW`]
+/// reference layout.
+pub fn richter_harp(key: &str) -> Harmonica {
+    diatonic_harp(key, BendingProfile::RichterStandard, &C_BLOW, &C_DRAW)
 }
 
 /// A country-tuned diatonic: standard Richter except draw 5 is raised a
 /// semitone.
 pub fn country_tuned_harp(key: &str) -> Harmonica {
-    let off = key_offset(key);
-    Harmonica::Diatonic {
-        holes: 10,
-        bending_profile: BendingProfile::CountryTuned,
-        position: None,
-        scale: None,
-        layout: Some(DiatonicLayout {
-            blow: Some(transpose_table(&C_BLOW, off)),
-            draw: Some(transpose_table(&C_DRAW_COUNTRY, off)),
-        }),
-    }
+    diatonic_harp(key, BendingProfile::CountryTuned, &C_BLOW, &C_DRAW_COUNTRY)
 }
 
 /// A Paddy Richter-tuned diatonic harp for `key`, transposed from the
@@ -145,67 +165,37 @@ pub fn country_tuned_harp(key: &str) -> Harmonica {
 /// with hole 3's blow note raised a whole step for direct 1st-position
 /// access to the major 6th.
 pub fn paddy_richter_harp(key: &str) -> Harmonica {
-    let off = key_offset(key);
-    Harmonica::Diatonic {
-        holes: 10,
-        bending_profile: BendingProfile::PaddyRichter,
-        position: None,
-        scale: None,
-        layout: Some(DiatonicLayout {
-            blow: Some(transpose_table(&C_BLOW_PADDY_RICHTER, off)),
-            draw: Some(transpose_table(&C_DRAW, off)),
-        }),
-    }
+    diatonic_harp(key, BendingProfile::PaddyRichter, &C_BLOW_PADDY_RICHTER, &C_DRAW)
 }
 
 /// A natural-minor-tuned diatonic harp for `key`, transposed from the
 /// [`C_BLOW_NATURAL_MINOR`]/[`C_DRAW_NATURAL_MINOR`] reference layout —
 /// gives a full natural minor scale in 1st position instead of major.
 pub fn natural_minor_harp(key: &str) -> Harmonica {
-    let off = key_offset(key);
-    Harmonica::Diatonic {
-        holes: 10,
-        bending_profile: BendingProfile::NaturalMinor,
-        position: None,
-        scale: None,
-        layout: Some(DiatonicLayout {
-            blow: Some(transpose_table(&C_BLOW_NATURAL_MINOR, off)),
-            draw: Some(transpose_table(&C_DRAW_NATURAL_MINOR, off)),
-        }),
-    }
+    diatonic_harp(key, BendingProfile::NaturalMinor, &C_BLOW_NATURAL_MINOR, &C_DRAW_NATURAL_MINOR)
 }
 
 /// A 12-hole chromatic harp for `key`, transposed from the reference layout.
 pub fn chromatic_harp(key: &str) -> Harmonica {
-    let off = key_offset(key);
-    Harmonica::Chromatic {
-        holes: 12,
-        position: None,
-        scale: None,
-        layout: Some(ChromaticLayout {
-            blow: Some(transpose_table(&C_BLOW_CHROMATIC, off)),
-            draw: Some(transpose_table(&C_DRAW_CHROMATIC, off)),
-            blow_slide: Some(transpose_table(&C_BLOW_SLIDE_CHROMATIC, off)),
-            draw_slide: Some(transpose_table(&C_DRAW_SLIDE_CHROMATIC, off)),
-        }),
-    }
+    chromatic_layout_harp(
+        key,
+        &C_BLOW_CHROMATIC,
+        &C_DRAW_CHROMATIC,
+        &C_BLOW_SLIDE_CHROMATIC,
+        &C_DRAW_SLIDE_CHROMATIC,
+    )
 }
 
 /// A 16-hole chromatic harp for `key`, transposed from the four-octave solo
 /// tuning reference layout.
 pub fn chromatic_16_harp(key: &str) -> Harmonica {
-    let off = key_offset(key);
-    Harmonica::Chromatic {
-        holes: 16,
-        position: None,
-        scale: None,
-        layout: Some(ChromaticLayout {
-            blow: Some(transpose_table(&C_BLOW_CHROMATIC_16, off)),
-            draw: Some(transpose_table(&C_DRAW_CHROMATIC_16, off)),
-            blow_slide: Some(transpose_table(&C_BLOW_SLIDE_CHROMATIC_16, off)),
-            draw_slide: Some(transpose_table(&C_DRAW_SLIDE_CHROMATIC_16, off)),
-        }),
-    }
+    chromatic_layout_harp(
+        key,
+        &C_BLOW_CHROMATIC_16,
+        &C_DRAW_CHROMATIC_16,
+        &C_BLOW_SLIDE_CHROMATIC_16,
+        &C_DRAW_SLIDE_CHROMATIC_16,
+    )
 }
 
 // ── Per-hole note set ─────────────────────────────────────────────────────────
@@ -527,63 +517,22 @@ pub fn ii_v_i_chords(key: &str, alt_dominant: bool) -> [(String, ChordQuality); 
 /// convention.
 pub fn progression_bars(key: &str, progression: Progression) -> [(String, ChordQuality); 12] {
     use ChordQuality::{Dominant7, Minor7};
-    let i = key.to_string();
-    let iv = semitone(key, 5);
-    let v = semitone(key, 7);
-    let q = if progression == Progression::Minor { Minor7 } else { Dominant7 };
+    let roots = [key.to_string(), semitone(key, 5), semitone(key, 7)];
+    let quality = if progression == Progression::Minor { Minor7 } else { Dominant7 };
+    let mut bars = [0, 0, 0, 0, 1, 1, 0, 0, 2, 1, 0, 2]
+        .map(|degree| (roots[degree].clone(), if degree == 2 { Dominant7 } else { quality }));
     match progression {
-        Progression::Standard | Progression::Minor => [
-            (i.clone(), q),
-            (i.clone(), q),
-            (i.clone(), q),
-            (i.clone(), q),
-            (iv.clone(), q),
-            (iv.clone(), q),
-            (i.clone(), q),
-            (i.clone(), q),
-            (v.clone(), Dominant7),
-            (iv, q),
-            (i, q),
-            (v, Dominant7),
-        ],
-        Progression::QuickChange => [
-            (i.clone(), Dominant7),
-            (iv.clone(), Dominant7),
-            (i.clone(), Dominant7),
-            (i.clone(), Dominant7),
-            (iv.clone(), Dominant7),
-            (iv.clone(), Dominant7),
-            (i.clone(), Dominant7),
-            (i.clone(), Dominant7),
-            (v.clone(), Dominant7),
-            (iv, Dominant7),
-            (i, Dominant7),
-            (v, Dominant7),
-        ],
-        // The standard "jazz blues" changes: bars 1–7 are the ordinary
-        // dominant-7th blues form, then bar 8's VI7 (a secondary dominant
-        // of ii) sets up a genuine ii7–V7 (bars 9–10) resolving to I7
-        // (bar 11) before the V7 turnaround (bar 12) — see
-        // `Progression::JazzBlues`'s own doc comment.
+        Progression::Standard | Progression::Minor => {}
+        Progression::QuickChange => bars[1] = (roots[1].clone(), Dominant7),
+        // Jazz blues adds VI7–ii7–V7 before returning to I7.
         Progression::JazzBlues => {
-            let vi = semitone(key, 9);
-            let ii = semitone(key, 2);
-            [
-                (i.clone(), Dominant7),
-                (iv.clone(), Dominant7),
-                (i.clone(), Dominant7),
-                (i.clone(), Dominant7),
-                (iv.clone(), Dominant7),
-                (iv.clone(), Dominant7),
-                (i.clone(), Dominant7),
-                (vi, Dominant7),
-                (ii, Minor7),
-                (v.clone(), Dominant7),
-                (i, Dominant7),
-                (v, Dominant7),
-            ]
+            bars[1] = (roots[1].clone(), Dominant7);
+            bars[7] = (semitone(key, 9), Dominant7);
+            bars[8] = (semitone(key, 2), Minor7);
+            bars[9] = (roots[2].clone(), Dominant7);
         }
     }
+    bars
 }
 
 /// The physical harp's own key, detected from its hole-1 blow note (a
@@ -772,24 +721,18 @@ impl Harmonica {
     /// equivalent of a diatonic bend. `"—"` for a diatonic harmonica (which
     /// has no slide button) or an out-of-range hole.
     pub fn slide_label(&self, hole: u8, action: &Action) -> String {
-        let default_return = "\u{2014}".into();
-        let Some(idx) = hole.checked_sub(1) else {
-            return default_return;
-        };
-        let Harmonica::Chromatic { layout: Some(l), .. } = self else {
-            return default_return;
-        };
-        let notes = match action {
-            Action::Blow => &l.blow_slide,
-            Action::Draw => &l.draw_slide,
-        };
-        let Some(notes) = notes else {
-            return default_return;
-        };
-        let Some(n) = notes.get(idx as usize) else {
-            return default_return;
-        };
-        n.clone()
+        let note = (|| {
+            let idx = usize::from(hole.checked_sub(1)?);
+            let Harmonica::Chromatic { layout: Some(layout), .. } = self else {
+                return None;
+            };
+            let notes = match action {
+                Action::Blow => &layout.blow_slide,
+                Action::Draw => &layout.draw_slide,
+            };
+            notes.as_ref()?.get(idx)
+        })();
+        note.map(String::as_str).unwrap_or("\u{2014}").to_string()
     }
 
     /// The configured playing position label (e.g. `"1st"`, `"2nd"`), if any.
@@ -879,14 +822,11 @@ impl Harmonica {
     ///
     /// [`build_valid_notes`]: Self::build_valid_notes
     pub fn frequency_range(&self) -> Option<(f32, f32)> {
-        let freqs: Vec<f32> =
-            self.build_valid_notes().iter().map(|&m| midi_to_freq_hz(m as f32)).collect();
-        if freqs.is_empty() {
-            return None;
-        }
-        let lo = freqs.iter().cloned().fold(f32::MAX, f32::min);
-        let hi = freqs.iter().cloned().fold(f32::MIN, f32::max);
-        Some((lo, hi))
+        let notes = self.build_valid_notes();
+        Some((
+            midi_to_freq_hz(*notes.iter().min()? as f32),
+            midi_to_freq_hz(*notes.iter().max()? as f32),
+        ))
     }
 }
 

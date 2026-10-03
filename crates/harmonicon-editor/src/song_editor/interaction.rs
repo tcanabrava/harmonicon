@@ -192,16 +192,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         // Nothing to edit, but every pitch/expr button still needs to
         // arm/cycle for notes not yet placed — cycles `sticky_pitch`/
         // `sticky_expr` directly instead of a selected note's own field.
-        match kind {
-            ModButton::Bend => cycle_sticky_bend(state),
-            ModButton::Overblow => cycle_sticky_pitch(state, Pitch::Overblow),
-            ModButton::Overdraw => cycle_sticky_pitch(state, Pitch::Overdraw),
-            ModButton::Slide => cycle_sticky_pitch(state, Pitch::Slide),
-            ModButton::Wah | ModButton::Vibrato => {
-                state.sticky_expr = next_expr(kind, state.sticky_expr);
-            }
-            _ => {}
-        }
+        apply_sticky_modifier(state, kind);
         return;
     };
 
@@ -264,6 +255,20 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     // it always has; in a selection it's worth saying which didn't change.
     if skipped > 0 && ids.len() > 1 {
         state.technique_notice = Some(skipped);
+    }
+}
+
+/// Arm a technique or expression for notes placed after an unselected edit.
+pub(super) fn apply_sticky_modifier(state: &mut EditorState, kind: ModButton) {
+    match kind {
+        ModButton::Bend => cycle_sticky_bend(state),
+        ModButton::Overblow => cycle_sticky_pitch(state, Pitch::Overblow),
+        ModButton::Overdraw => cycle_sticky_pitch(state, Pitch::Overdraw),
+        ModButton::Slide => cycle_sticky_pitch(state, Pitch::Slide),
+        ModButton::Wah | ModButton::Vibrato => {
+            state.sticky_expr = next_expr(kind, state.sticky_expr);
+        }
+        _ => {}
     }
 }
 

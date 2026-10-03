@@ -47,26 +47,6 @@ pub(super) enum Field {
     LessonScale,
 }
 
-impl Field {
-    pub(super) fn is_cycle(self) -> bool {
-        matches!(
-            self,
-            Self::Key
-                | Self::Position
-                | Self::Difficulty
-                | Self::SongFeel
-                | Self::ComboEnabled
-                | Self::LoopType
-                | Self::LoopRepeat
-                | Self::LessonPassCriteria
-                | Self::LessonTechnique
-                | Self::LessonProgression
-                | Self::LessonScale
-                | Self::LessonPath
-        )
-    }
-}
-
 pub(super) const FIELDS: [(Field, &str); 25] = [
     (Field::Tempo, "editor-field-tempo"),
     (Field::Pickup, "editor-field-pickup"),

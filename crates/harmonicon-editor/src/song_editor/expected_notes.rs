@@ -46,9 +46,7 @@ use bevy::ui_widgets::Activate;
 use bevy::ui_widgets::Button as WidgetButton;
 
 use super::TICKS_PER_BEAT;
-use super::interaction::{
-    cycle_sticky_bend, cycle_sticky_pitch, next_expr, next_pitch, pitch_fits,
-};
+use super::interaction::{apply_sticky_modifier, next_expr, next_pitch, pitch_fits};
 use super::panel::mod_button_active;
 use super::state::{
     Dir, DragKind, DragState, Edge, EditorState, GridNote, Mode, Pitch, apply_resize, move_target,
@@ -164,16 +162,7 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
 
     let harp = state.effective_harp();
     let Some(note) = state.expected_selected_note_mut() else {
-        match kind {
-            ModButton::Bend => cycle_sticky_bend(state),
-            ModButton::Overblow => cycle_sticky_pitch(state, Pitch::Overblow),
-            ModButton::Overdraw => cycle_sticky_pitch(state, Pitch::Overdraw),
-            ModButton::Slide => cycle_sticky_pitch(state, Pitch::Slide),
-            ModButton::Wah | ModButton::Vibrato => {
-                state.sticky_expr = next_expr(kind, state.sticky_expr);
-            }
-            _ => {}
-        }
+        apply_sticky_modifier(state, kind);
         return;
     };
     if matches!(kind, ModButton::Wah | ModButton::Vibrato) {
