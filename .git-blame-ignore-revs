@@ -1,0 +1,5 @@
+# Formatting-only commits, skipped by `git blame`. GitHub reads this file
+# automatically; locally, scripts/git-hooks/install.sh configures it.
+
+# rustfmt use_small_heuristics = "Max"
+b4956ceb2acc9b530b55a131664e1dbfb1ba0db9

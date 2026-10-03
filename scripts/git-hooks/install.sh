@@ -9,3 +9,5 @@ for hook in "$root"/scripts/git-hooks/*; do
     ln -sf "../../scripts/git-hooks/$name" "$root/.git/hooks/$name"
     echo "installed $name"
 done
+git -C "$root" config blame.ignoreRevsFile .git-blame-ignore-revs
+echo "blame skips the commits in .git-blame-ignore-revs"

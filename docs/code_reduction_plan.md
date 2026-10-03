@@ -1,7 +1,9 @@
 # Code reduction plan
 
-How to shrink the workspace's Rust without losing tests or behaviour. Every
-number below was measured on `42ff8fa6` with the two scripts this plan added:
+How to shrink the workspace's Rust without losing tests or behaviour. The
+totals below were measured after the `use_small_heuristics = "Max"`
+reformat; the per-site counts further down were measured before it, so
+their line spans are a little shorter now. Both come from these scripts:
 
 ```bash
 python3 scripts/loc_report.py --files 40       # lines by crate and kind
@@ -15,52 +17,36 @@ Re-run them after each phase; the phase is done when its target moves.
 
 | Kind | Lines | Share |
 |---|---:|---:|
-| Code | 51,935 | 46% |
-| Tests | 32,676 | 29% |
-| Comments | 18,563 | 17% |
+| Code | 48,128 | 47% |
+| Tests | 28,062 | 27% |
+| Comments | 18,563 | 18% |
 | Blank | 8,600 | 8% |
-| **Total** | **111,774** | |
+| **Total** | **103,353** | |
 
-Gameplay (24.1k) and the Song Editor (23.0k) together hold 42% of the total.
-The ~80k figure is code plus tests.
+Gameplay and the Song Editor together hold over 40% of the total.
 
-**There isn't much copy-paste.** Only 2,085 normalised non-test lines (4% of
-the code) sit in a repeated 6-line run, or 3,581 counting tests. Removing
+**There isn't much copy-paste.** Only about 2.1k normalised non-test lines (4%
+of the code) sit in a repeated 6-line run, or 3.6k counting tests. Removing
 clones, then, saves a few thousand lines at most. Most of the size comes
-from four sources:
+from three sources:
 
-1. **Formatting.** rustfmt's default heuristics break any expression, chain or
-   struct literal wider than about 60% of `max_width` across lines. Setting
-   `use_small_heuristics = "Max"` alone removes **8,421 net lines**
-   (−11,776 / +3,355 across 266 files) with no change to meaning. That one
-   switch saves more than all of the deduplication below combined.
-2. **Boilerplate around the same resource sets.** There are 2,098
+1. **Boilerplate around the same resource sets.** There are 2,098
    one-per-line system parameters. Several groups of them travel together in
    every signature; the worst case is listed under Phase 2.
-3. **Imperative UI.** There are 736 `spawn(`/`spawn_empty(` calls against
+2. **Imperative UI.** There are 736 `spawn(`/`spawn_empty(` calls against
    265 `bsn!` blocks, which breaks the "UI is authored with `bsn!`" convention.
    Imperative spawning takes 2–3× the lines of the same tree in `bsn!`.
    `artist_list.rs` alone has 1,141 code lines, 0 `bsn!` blocks and a
    330-line `setup_artist_list`.
-4. **Comment volume.** At 18.5k lines, comments make up 22% of non-blank
+3. **Comment volume.** At 18.5k lines, comments make up 22% of non-blank
    lines: 101 blocks run 15 lines or more (2,177 lines in total), and 100
    comment lines narrate history ("used to", "previously", "before this").
    That breaks the rule that comments explain current behaviour only.
 
-## Phase 1 — Formatting (mechanical, ~−8.4k)
-
-- Add `rustfmt.toml` with `use_small_heuristics = "Max"`. Leave out
-  `fn_params_layout = "Compressed"`: it saves only another ~1.9k lines and
-  packs several system parameters onto one line, which makes Bevy signatures
-  harder to scan.
-- Run it in **one commit that contains nothing else**, and add that commit's
-  hash to a new `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile`)
-  so `git blame` skips the reformat.
-- `tests/physical_design.rs` allowlists files over its 1,250-line budget, and
-  `allowlist_has_no_stale_entries` fails once a file drops under it. Prune
-  those entries in the same commit.
-- The pre-commit hook formats automatically, so the new config is enforced
-  without any extra check.
+`rustfmt.toml` deliberately leaves out `fn_params_layout = "Compressed"`:
+it would save another ~1.9k lines, but it packs several system parameters
+onto one line, which makes Bevy signatures harder to scan. A future
+formatting-only commit goes in `.git-blame-ignore-revs`.
 
 ## Phase 2 — Fold repeated resource groups into `SystemParam`s (~−600)
 
@@ -193,15 +179,14 @@ Coverage stays exactly the same. What shrinks is how each case is written:
 
 | Phase | Effort | Risk | Est. lines |
 |---|---|---|---:|
-| 1 Formatting | minutes | none | −8,400 |
 | 2 `SystemParam` bundles | ~1 day | low | −600 |
 | 3 Clones | 2–3 days | low–medium (2D/3D) | −1,500 |
 | 4 `bsn!` conversion | ~1 week, incremental | medium (visual) | −2,500 |
 | 5 Comments | ~1 day | none | −2,000 |
 | 6 Test builders/tables | 2–3 days | low | −3,000 |
-| **Total** | | | **≈ −18,000 (−16%)** |
+| **Total** | | | **≈ −9,600 (−9%)** |
 
-Phases 1 and 5 shrink the files without changing the code. Phases 2–4 and 6
+Phase 5 shrinks the files without changing the code. Phases 2–4 and 6
 change its structure, and each lands as its own commit with
 `cargo test --features dev` and `cargo clippy --all-targets -- -D warnings`
 green.
