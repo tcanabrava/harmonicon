@@ -19,17 +19,12 @@ use super::state::ScoringConfig;
 /// Every bar-length figure in gameplay, Jam Session and the metronome
 /// derives from the `MusicScoreMeter` this returns, through its own
 /// methods (`beats_per_bar` for quarter-note beats, `numerator` for the
-/// meter's own, `bar_secs` for seconds). Before this there were four
-/// independent readings of the same field — two took the numerator alone
-/// and called it a beat count, one rounded to whole quarters, one assumed
-/// 4/4 outright — and they disagreed with each other on the same chart:
-/// in 6/8 the metronome accented every second bar while the ruler was
-/// right, and in 3/8 the accent walked around the bar and never settled.
+/// meter's own, `bar_secs` for seconds). Don't derive one yourself: taking
+/// the numerator as a beat count, say, makes 6/8 accent every second bar
+/// and walks the accent around a 3/8 bar.
 ///
 /// A `timing.time_signature_map` entry at tick 0 wins over the song-level
-/// field, the same precedence `setup_scoring_config` always applied — the
-/// metronome used to skip the map and could disagree with scoring on a
-/// chart that had one.
+/// field.
 pub fn chart_meter(chart: &HarpChart) -> MusicScoreMeter {
     let sig = chart
         .timing

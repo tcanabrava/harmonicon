@@ -148,7 +148,7 @@ fn each_tier_asks_for_notes_faster_than_the_one_before() {
 
 #[test]
 fn a_phrase_never_repeats_one_note_three_times() {
-    // The degenerate figure the in-context tier used to emit when its
+    // The degenerate figure the in-context tier would emit if its
     // "neighbouring hole" resolved to the target's own.
     for tier in Tier::ALL {
         let chart = drill(tier, &[2, 3, 4]);

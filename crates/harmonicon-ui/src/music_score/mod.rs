@@ -513,9 +513,8 @@ impl MusicScoreMeter {
 /// power of two can appear there. Typing `4/3` asks for four thirds of a
 /// whole note, which standard notation has no symbol for — and since
 /// [`parse_time_signature`] only rejects what won't parse at all, such a
-/// string used to sail through and be silently rounded into a bar length
-/// that matched nothing. Offering the real ones makes that unrepresentable
-/// instead of merely detected.
+/// string would be silently rounded into a bar length that matches nothing.
+/// Offering the real ones makes that unrepresentable.
 ///
 /// Not exhaustive, and not meant to be — an exhaustive list is every
 /// numerator crossed with five denominators, far too many to pick from.
@@ -527,10 +526,9 @@ pub const TIME_SIGNATURES: [&str; 10] =
 /// reads a time-signature string.** Everything that needs a bar length,
 /// beat count or beat duration asks the returned [`MusicScoreMeter`]
 /// rather than parsing the string itself: `gameplay::bars::chart_meter`
-/// for a chart, `EditorState::meter` for the editor. There used to be four
-/// independent readings, two of which took the numerator alone and called
-/// it a beat count — six for a 6/8 bar that is three quarters long — and
-/// they disagreed with each other on the same file.
+/// for a chart, `EditorState::meter` for the editor. Taking the numerator
+/// alone as a beat count would give six for a 6/8 bar that is three
+/// quarters long.
 ///
 /// Anything unparseable falls back to 4/4 rather than failing — a chart
 /// already on disk with a malformed signature should still open, costing
@@ -648,10 +646,7 @@ pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFon
             border: UiRect::top(Val::Px(1.0)),
             ..default()
         },
-        // Shared with `gameplay::song_progress_overlay::spawn_song_
-        // progress`'s own bar background — the two used to be two
-        // independently-tuned near-blacks, which read as separate widgets
-        // rather than one panel.
+        // Shared with the song-progress bar, so the two read as one panel.
         BackgroundColor(harmonicon_platform::theme::HUD_PANEL_BG),
         BorderColor::all(harmonicon_platform::theme::HUD_DIVIDER_COLOR),
         MusicScorePanel,

@@ -28,16 +28,10 @@ fn from_core(assignment: HoleAssignment) -> (u8, Dir, Pitch) {
     (assignment.hole, dir, pitch)
 }
 
-/// Resolves `target` onto `harp` only if it can genuinely produce it.
-///
-/// `kind` is accepted for call-site continuity but no longer consulted: core
-/// reads the harp family off the [`Harmonica`] itself, which is the one
-/// source that cannot disagree with the layout being searched.
-pub(super) fn map_pitch_playable(
-    target: u8,
-    harp: &Harmonica,
-    _kind: HarmonicaKind,
-) -> Option<(u8, Dir, Pitch)> {
+/// Resolves `target` onto `harp` only if it can genuinely produce it. Core
+/// reads the harp family off the [`Harmonica`] itself, the one source that
+/// cannot disagree with the layout being searched.
+pub(super) fn map_pitch_playable(target: u8, harp: &Harmonica) -> Option<(u8, Dir, Pitch)> {
     pitch_map::map_pitch_playable(target, harp).map(from_core)
 }
 
@@ -49,7 +43,7 @@ pub(super) fn playable_assignments(target: u8, harp: &Harmonica) -> Vec<(u8, Dir
 }
 
 /// [`map_pitch_playable`] with core's nearest-natural-note fallback.
-pub(super) fn map_pitch(target: u8, harp: &Harmonica, _kind: HarmonicaKind) -> (u8, Dir, Pitch) {
+pub(super) fn map_pitch(target: u8, harp: &Harmonica) -> (u8, Dir, Pitch) {
     from_core(pitch_map::map_pitch(target, harp))
 }
 
@@ -125,8 +119,8 @@ mod tests {
     #[test]
     fn import_always_resolves_where_recording_refuses() {
         let harp = richter_harp("C");
-        assert_eq!(map_pitch_playable(0, &harp, HarmonicaKind::Diatonic), None);
-        let (hole, _, pitch) = map_pitch(0, &harp, HarmonicaKind::Diatonic);
+        assert_eq!(map_pitch_playable(0, &harp), None);
+        let (hole, _, pitch) = map_pitch(0, &harp);
         assert_eq!(pitch, Pitch::Normal);
         assert!((1..=10).contains(&hole));
     }
@@ -135,9 +129,6 @@ mod tests {
     fn a_chromatic_harp_still_resolves_its_slide() {
         let harp = chromatic_harp("C");
         let c4 = harmonicon_core::midi::note_to_midi("C4").unwrap() as u8;
-        assert_eq!(
-            map_pitch_playable(c4 + 1, &harp, HarmonicaKind::Chromatic),
-            Some((1, Dir::Blow, Pitch::Slide))
-        );
+        assert_eq!(map_pitch_playable(c4 + 1, &harp), Some((1, Dir::Blow, Pitch::Slide)));
     }
 }

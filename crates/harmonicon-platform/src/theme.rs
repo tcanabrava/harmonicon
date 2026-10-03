@@ -207,12 +207,8 @@ pub fn effective_note_colors(theme_colors: NoteColors, colorblind: bool) -> Note
 
 /// Shared background for the gameplay song-timeline HUD's panels —
 /// `gameplay::song_progress_overlay::spawn_song_progress`'s bar and
-/// `music_score::spawn_music_score`'s staff panel used to each carry their
-/// own independently-tuned near-black (`srgba(0,0,0,0.55)` vs.
-/// `srgba(0.05,0.05,0.08,0.85)`), which read as two different, unrelated
-/// widgets rather than one panel. One shared, fully-opaque constant instead —
-/// opaque reads as intentional chrome, unlike the bar's old half-transparent
-/// backdrop.
+/// `music_score::spawn_music_score`'s staff panel — so they read as one
+/// panel rather than two unrelated widgets.
 pub const HUD_PANEL_BG: Color = Color::srgba(0.05, 0.05, 0.08, 0.85);
 
 /// Shared 1px seam between the song-timeline HUD's stacked rows (waveform /
@@ -223,11 +219,9 @@ pub const HUD_DIVIDER_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 0.10);
 
 /// The surface a modal's own content sits on — confirm/file dialogs and the
 /// pause menu. **Near-opaque on purpose.** A modal that only dims what is
-/// behind it still lets that content compete with its own: the pause menu
-/// used to be a bare 65%-black wash, and its 13px practice labels landed on
-/// top of the song-info panel's text, leaving both unreadable at every window
-/// size. Dimming controls *emphasis*; only an opaque surface controls what is
-/// legible.
+/// behind it still lets that content compete with its own (the pause
+/// menu's small labels over the song-info panel's text, say). Dimming
+/// controls *emphasis*; only an opaque surface controls what is legible.
 pub const MODAL_PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.11, 0.98);
 
 /// The wash a modal paints over the screen behind its [`MODAL_PANEL_BG`]

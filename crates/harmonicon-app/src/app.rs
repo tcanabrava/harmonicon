@@ -66,8 +66,7 @@ pub struct JamProgression(pub Progression);
 
 /// The scale Jam Session's live hole-map feedback (`jam::session::
 /// JamHoleGuide`) judges played notes against — see `song::chart::Scale`.
-/// Defaults to `FirstPosition` (the blues hexatonic — unchanged Jam
-/// Session behavior before this resource existed). Set explicitly by
+/// Defaults to `FirstPosition` (the blues hexatonic). Set explicitly by
 /// "Generate Jam" (`menu::jam_generate`) and by a jam-based lesson's
 /// `scale` manifest field (`menu::pages::lesson_reader::parse_scale`); the
 /// real-song "Jam Session" button resets it to `FirstPosition`, mirroring
@@ -155,11 +154,10 @@ pub struct SelectedSong(pub Handle<SongManifest>);
 /// against a chart with [`Self::harp_for`] rather than reading the field:
 /// that keeps the fallback in one place.
 ///
-/// **Everything the microphone depends on must resolve through here.** A
-/// chart's expected pitches, `PitchRange` and `ValidHarpNotes` all used to
-/// come straight off `chart.harmonica`; if any one of them keeps doing that
-/// while the others don't, the game listens for notes the player's harp
-/// cannot make. `harmonicon_core::harp_remap` documents the same invariant
+/// **Everything the microphone depends on must resolve through here.** If
+/// a chart's expected pitches, `PitchRange` or `ValidHarpNotes` read
+/// `chart.harmonica` directly while the others don't, the game listens for
+/// notes the player's harp cannot make. `harmonicon_core::harp_remap` documents the same invariant
 /// from the pure side.
 #[derive(Resource, Default, Clone, Debug)]
 pub struct EffectiveHarmonica {

@@ -13,8 +13,8 @@
 //! through whatever nodes and labels lay between them; crossing reduction
 //! can't help when the endpoints are genuinely that far apart. Grouping by
 //! unit turns those eighteen into four spine edges and leaves every other
-//! edge local to one cluster. A cross-unit prerequisite is no longer drawn
-//! at all — [`tooltip_for`] names it on the node instead.
+//! edge local to one cluster. A cross-unit prerequisite isn't drawn at
+//! all — [`tooltip_for`] names it on the node instead.
 //!
 //! **The canvas is wider than the window on purpose**, which is why this
 //! page builds a two-axis `spawn_scroll_area_xy` instead of taking
@@ -37,10 +37,9 @@
 //! An elective branch is dotted instead, and its dots *are* plain nodes:
 //! they are axis-aligned already, so they clip correctly with no shader.
 //!
-//! **There is no list view any more.** This replaced it rather than sitting
-//! beside it, so a lesson has one home and unit gating is stated in one
-//! place. The tree is wide, and a small screen reaches the rest of it by
-//! scrolling; `responsive::is_compact` no longer routes anywhere.
+//! **This is the curriculum's only view**, so a lesson has one home and
+//! unit gating is stated in one place. A small screen reaches the rest of
+//! the wide tree by scrolling.
 
 mod edges;
 mod layout;

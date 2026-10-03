@@ -416,10 +416,8 @@ mod tests {
 
     #[test]
     fn a_result_queues_instead_of_dropping_when_a_hold_is_active() {
-        // The bug this whole thing exists to fix: a second note scored
-        // quickly after another used to overwrite the first result
-        // immediately (or worse, silently lose it) instead of respecting
-        // the hold.
+        // A second note scored quickly after another must not overwrite
+        // (or silently lose) the first result while it is still held.
         assert_eq!(decide_msg_action(true, true, false), MsgAction::Queue);
         // Still queues (replacing whatever was already queued) even if
         // something was already pending.
@@ -518,10 +516,9 @@ mod tests {
         // `build_schedule` computes `secs_per_tick` in `f32` (production
         // code shares it with real-time playback, where `f32` is the
         // established precision throughout); at `TICKS_PER_BEAT` values
-        // that aren't an exact power-of-two fraction of a beat (12 isn't,
-        // unlike the old 4), that `f32` rounding no longer cancels out
-        // exactly against this test's own `f64` computation — hence the
-        // epsilon rather than `assert_eq!`.
+        // that aren't an exact power-of-two fraction of a beat (12 isn't),
+        // that `f32` rounding doesn't cancel out exactly against this
+        // test's own `f64` computation — hence the epsilon.
         assert!((schedule[0].end_secs - state.notes[0].len as f64 * secs_per_tick).abs() < 1e-6);
     }
 

@@ -97,8 +97,7 @@ fn practice_speed_label_text(loc: &Localization, speed: f32) -> String {
     loc.msg_args("pause-speed", &[("pct", format!("{:.0}", speed * 100.0))]).into()
 }
 
-/// `50%..=100%` in `10%` steps — same range the old click-to-cycle button
-/// stepped through.
+/// `50%..=100%` in `10%` steps.
 const PRACTICE_SPEED_MIN: f32 = 0.5;
 const PRACTICE_SPEED_MAX: f32 = 1.0;
 

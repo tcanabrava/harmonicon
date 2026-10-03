@@ -14,12 +14,9 @@
 //! index — the widget only owns the selection state and its visuals.
 //!
 //! [`TabBarSelected`] mirrors the current index for read access (e.g. the
-//! Lessons unit-tab caller doesn't otherwise track it); unlike before this
-//! module rode on `RadioGroup`, it's no longer meant to be written
-//! directly to switch tabs from outside — nothing needs that today, and
-//! `RadioGroup`'s own external-state-management model (see its doc
-//! comment) doesn't naturally support both directions without real
-//! complexity, so it isn't attempted.
+//! Lessons unit-tab caller doesn't otherwise track it). Writing it does not
+//! switch tabs: `RadioGroup`'s state model (see its doc comment) doesn't
+//! support both directions without real complexity, and nothing needs it.
 
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::input_focus::tab_navigation::TabIndex;
@@ -44,7 +41,7 @@ pub struct TabSelect {
 
 /// The active tab's index, on the bar's root entity — kept in sync by
 /// [`on_radio_group_value_change`] for read access; see the module doc
-/// comment for why writing it directly no longer switches tabs.
+/// comment for why writing it directly doesn't switch tabs.
 #[derive(Component, Clone, Debug, Default)]
 pub struct TabBarSelected(pub usize);
 

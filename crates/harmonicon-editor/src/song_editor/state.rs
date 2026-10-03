@@ -216,8 +216,7 @@ pub(super) struct EditorState {
     pub(super) lesson_details_expanded: bool,
     /// Whether the meta form's third column (`meta_form::spawn_color_legend`)
     /// is shown — toggled by the mod panel's "ℹ Legend" button
-    /// (`mod_panel.rs`). Visible by default, same as before this toggle
-    /// existed.
+    /// (`mod_panel.rs`). Visible by default.
     pub(super) legend_visible: bool,
     /// User's own Lock toggle, independent of `mode`. See [`EditorState::locked`].
     pub(super) user_locked: bool,

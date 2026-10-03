@@ -61,8 +61,7 @@ fn a_prerequisite_always_precedes_its_dependents() {
 
 #[test]
 fn a_cycle_is_refused_rather_than_half_built() {
-    // Unchecked before this module existed. Every lesson in a cycle is
-    // unreachable forever, and a renderer following the edges would not
+    // Every lesson in a cycle is unreachable forever, and a renderer following the edges would not
     // terminate — so this must fail loudly at build, not produce a graph
     // that looks fine until someone walks it.
     let err = LessonGraph::build(&[

@@ -55,7 +55,7 @@ use super::pitch_map::map_pitch_playable;
 use super::playback::{
     EditorAudio, PendingMusicSeek, Playhead, secs_per_tick, spawn_background_music, toggle_pause,
 };
-use super::state::{Dir, EditorState, Expr, GridNote, HarmonicaKind, Pitch};
+use super::state::{Dir, EditorState, Expr, GridNote, Pitch};
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
 
@@ -158,7 +158,7 @@ pub(super) fn start_record(
     record.active = true;
 
     let harp = state.effective_harp();
-    record.table = build_pitch_table(&harp, state.harmonica_kind);
+    record.table = build_pitch_table(&harp);
     record.tracker = Some(HarmonicaNoteTracker::new(
         harp.clone(),
         NoteTrackerConfig { onset_frames: 1, release_frames: 1, direction_change_frames: 2 },
@@ -294,8 +294,8 @@ pub(super) fn record_tick(
 /// MIDI → (hole, dir, pitch) for all 128 MIDI notes on `harp`, `None` where
 /// the harp can't produce that pitch (exactly `map_pitch_playable`'s
 /// verdict, precomputed) — see [`RecordState::table`].
-fn build_pitch_table(harp: &Harmonica, kind: HarmonicaKind) -> Vec<Option<(u8, Dir, Pitch)>> {
-    (0..=127u8).map(|midi| map_pitch_playable(midi, harp, kind)).collect()
+fn build_pitch_table(harp: &Harmonica) -> Vec<Option<(u8, Dir, Pitch)>> {
+    (0..=127u8).map(|midi| map_pitch_playable(midi, harp)).collect()
 }
 
 /// Removes every note overlapping `[start, end)` ticks that is *not* part
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn build_pitch_table_resolves_playable_pitches_and_rejects_the_rest() {
         let harp = richter_harp("C");
-        let table = build_pitch_table(&harp, HarmonicaKind::Diatonic);
+        let table = build_pitch_table(&harp);
         assert_eq!(table.len(), 128);
         // C4 is hole 1 blow on a C richter harp.
         let c4 = harmonicon_core::midi::note_to_midi("C4").unwrap() as usize;
@@ -520,7 +520,7 @@ mod tests {
         // does — recording a bent note shouldn't just snap to the nearest
         // natural note.
         let draw2 = harp.wind_direction_midi(2, &harmonicon_core::chart::Action::Draw).unwrap();
-        let table = build_pitch_table(&harp, HarmonicaKind::Diatonic);
+        let table = build_pitch_table(&harp);
         match table[(draw2 - 1) as usize] {
             Some((2, Dir::Draw, Pitch::Bend(_))) => {}
             other => panic!("expected a hole-2 draw bend, got {other:?}"),
@@ -543,7 +543,7 @@ mod tests {
     fn recording_setup() -> (RecordState, EditorState, u8) {
         let record = RecordState {
             active: true,
-            table: build_pitch_table(&richter_harp("C"), HarmonicaKind::Diatonic),
+            table: build_pitch_table(&richter_harp("C")),
             ..RecordState::default()
         };
         let c4 = harmonicon_core::midi::note_to_midi("C4").unwrap() as u8;

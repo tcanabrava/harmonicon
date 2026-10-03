@@ -122,8 +122,8 @@ fn chart_meter_defaults_to_common_time() {
 
 #[test]
 fn chart_meter_lets_the_map_at_tick_zero_win() {
-    // The precedence `setup_scoring_config` always applied — and that the
-    // metronome used to skip, so the two could disagree on one chart.
+    // Scoring and the metronome both read the meter through this, so they
+    // agree on a chart with a meter map.
     let m = chart_meter(&chart_with_meter(Some("4/4"), Some("6/8")));
     assert_eq!((m.numerator, m.denominator), (6, 8));
 }

@@ -286,10 +286,10 @@ pub(super) fn import_track_notes(
     let mut notes = Vec::with_capacity(raw_notes.len());
     let mut approximated = 0;
     for (id, n) in raw_notes.into_iter().enumerate() {
-        if map_pitch_playable(n.key, &harp, kind).is_none() {
+        if map_pitch_playable(n.key, &harp).is_none() {
             approximated += 1;
         }
-        let (hole, dir, pitch) = map_pitch(n.key, &harp, kind);
+        let (hole, dir, pitch) = map_pitch(n.key, &harp);
         let start_secs = tick_to_seconds(n.start_tick, tpq, &midi_tempo);
         let end_secs = tick_to_seconds(n.start_tick + n.dur_ticks, tpq, &midi_tempo);
         let tick = seconds_to_tick(start_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;

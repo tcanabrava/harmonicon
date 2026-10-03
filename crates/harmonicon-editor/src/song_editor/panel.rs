@@ -93,8 +93,7 @@ pub(super) fn update_mod_panel(
 }
 
 /// Keeps click-to-cycle fields' displayed text in step with `EditorState` —
-/// free-text fields render themselves (see
-/// [`sync_meta_field_text`]) and no longer carry a [`MetaFieldText`] child.
+/// free-text fields render themselves (see [`sync_meta_field_text`]).
 pub(super) fn update_meta_fields(
     state: Res<EditorState>,
     mut texts: Query<(&MetaFieldText, &mut Text)>,
@@ -112,8 +111,7 @@ pub(super) fn update_meta_fields(
 /// `EditorState` whenever it changes from outside the widget itself — Load,
 /// MIDI import, Browse picking a music file, ... — since typing only
 /// commits into `EditorState` on blur/Enter (`dialogs::text_input`), and
-/// nothing else re-renders a box's buffer from `EditorState` every frame the
-/// way the old `MetaFieldText` display used to. Skips whichever field
+/// nothing else re-renders a box's buffer from `EditorState`. Skips whichever field
 /// currently has real keyboard focus so it never fights the player's own
 /// in-progress typing. Can't gate on `EditorState::is_changed()` to detect
 /// "a field's text changed" — the resource changes on essentially every

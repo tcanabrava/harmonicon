@@ -48,11 +48,8 @@ pub struct ScoreReadoutAnchor {
 
 /// The one score/combo/judgment readout, used by both 2D and 3D.
 ///
-/// **Composition is shared; only the anchor differs.** These four markers
-/// used to be spawned twice with different sizes in opposite corners of the
-/// screen — bottom-right in 2D, top-right in 3D — which is how the two modes
-/// drifted into looking like different games. A shared spawner means a change
-/// to the readout is a change to both.
+/// **Composition is shared; only the anchor differs**, so a change to the
+/// readout is a change to both modes and they can't drift apart.
 ///
 /// Laid out hugging the two edges of the band with the middle left clear, so
 /// the lanes a note actually falls down stay unobstructed: score and combo on

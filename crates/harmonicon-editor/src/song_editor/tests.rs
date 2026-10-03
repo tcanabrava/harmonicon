@@ -623,10 +623,7 @@ fn bend_cycles_and_caps_at_hole_max() {
 fn unbendable_hole_ignores_bend() {
     // Hole 5's two reeds are a semitone apart (E and F on a C harp), so
     // there is no note in between for a bend to land on — `max_bend` is 0
-    // and the button does nothing, which is what this test's name has
-    // always said. It previously asserted one half-step was accepted,
-    // because `max_bend`'s table disagreed with the notes the hole
-    // actually has (see `pitch_map::max_bend`).
+    // and the button does nothing (see `pitch_map::max_bend`).
     let mut s = EditorState::default();
     select_or_add(&mut s, 5, 0);
     let hole5 = s.notes[0].id;
@@ -723,8 +720,8 @@ fn switching_harmonica_kind_sanitizes_an_incompatible_sticky_pitch() {
 // Overblow only exists while blowing and Overdraw only while drawing
 // (see `state::pitch_forced_dir`'s doc comment) — a note (or the sticky
 // arm) must never end up with e.g. `pitch: Overblow, dir: Draw`, a
-// physically impossible combination that used to be reachable by
-// arming direction and pitch independently.
+// physically impossible combination, however direction and pitch are
+// armed.
 
 #[test]
 fn arming_overblow_then_draw_with_nothing_selected_clears_the_pitch() {
@@ -1139,11 +1136,9 @@ fn note_freq_maps_holes_bends_and_key() {
 
 #[test]
 fn note_freq_resolves_overblow_and_overdraw_from_the_correct_reed() {
-    // Regression: this used to take whichever table `note.dir` picked
-    // (whatever the player happened to set the note's Blow/Draw arrow
-    // to) and add a flat +1 semitone, rather than deriving the reed the
-    // technique actually sounds from — wrong for the very common case of
-    // an Overblow note left at its default `Dir::Blow`. Overblow (holes
+    // The reed comes from the technique, not from `note.dir` plus a
+    // semitone — which would be wrong for the very common case of an
+    // Overblow note left at its default `Dir::Blow`. Overblow (holes
     // 1/4/5/6) always sounds a semitone above the *draw* reed, and
     // Overdraw (holes 7-10) a semitone above the *blow* reed, regardless
     // of the note's own `dir` — see `song::harmonica::hole_notes`.
@@ -1183,10 +1178,9 @@ fn note_freq_reads_the_chromatic_layout_and_slide_table() {
 
 #[test]
 fn render_and_wav_have_expected_size() {
-    // One full beat long (`note()`'s own default `len: 4` predates
-    // `TICKS_PER_BEAT` becoming 12 and is no longer one beat) — the
-    // `expected` computation below assumes exactly one beat's worth of
-    // note (0.5s at 120bpm) plus the synth's fixed tail.
+    // One full beat long (`note()`'s default `len: 4` is a third of one)
+    // — `expected` below assumes exactly one beat of note (0.5s at
+    // 120bpm) plus the synth's fixed tail.
     let notes = [GridNote { len: TICKS_PER_BEAT, ..note(4, Dir::Draw, Pitch::Normal) }];
     let harp = build_harp("C", HarmonicaKind::Diatonic);
     let phrase: Vec<PhraseNote> = notes
@@ -4058,7 +4052,7 @@ fn the_sticky_bend_cap_is_the_deepest_any_hole_of_the_harp_allows() {
 #[test]
 fn the_bend_button_respects_the_tuning_not_a_richter_table() {
     // Country tuning's raised draw 5 bends a semitone; Richter's hole 5
-    // does not. The editor used to consult a Richter table for both.
+    // does not.
     let mut country =
         EditorState { harmonica_kind: HarmonicaKind::CountryTuned, ..Default::default() };
     select_or_add(&mut country, 5, 0);

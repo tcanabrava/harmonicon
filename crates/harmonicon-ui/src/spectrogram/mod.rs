@@ -135,9 +135,8 @@ impl Plugin for SpectrogramPlugin {
 
 /// Cycles the visualization style on **V** — [`rebuild_on_style_change`]
 /// does the actual rebuild, so this and [`cycle_style_button`] (the
-/// on-screen equivalent, since **V** used to be the *only* way to change
-/// this — unusable on a touch-only device with no keyboard) share it
-/// instead of each duplicating the despawn/respawn dance.
+/// on-screen equivalent, for a touch-only device with no keyboard) share
+/// it.
 fn switch_visualization_on_key(
     keys: Res<ButtonInput<KeyCode>>,
     mut style: ResMut<SpectrogramStyle>,

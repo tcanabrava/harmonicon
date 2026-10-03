@@ -3,8 +3,7 @@
 //! One lesson's page: the instructional body, a Start button for
 //! chart-backed lessons, Mark-as-Done for instructional-only ones, and the
 //! row of five training tiers under it. Reached from a node of
-//! `lesson_tree`, which is the only way in — the curriculum used to
-//! have a flat list page here as well, and now has one home per lesson.
+//! `lesson_tree`, which is the only way in, so a lesson has one home.
 //!
 //! Discovery/unlock/pass logic lives in `harmonicon_song::lessons`; this
 //! module is only the menu surface.

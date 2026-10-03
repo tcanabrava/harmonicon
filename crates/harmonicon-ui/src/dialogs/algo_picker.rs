@@ -75,8 +75,7 @@ pub fn on_algo_selected(
 
 /// Attaches a [`Tooltip`] describing `selected` to a pitch-algorithm
 /// combobox's root entity (the `Entity` returned by
-/// `combobox::spawn_combobox`), kept current by [`update_algo_tooltip`] —
-/// replaces the old always-visible explanation panel with an on-hover one.
+/// `combobox::spawn_combobox`), kept current by [`update_algo_tooltip`].
 pub fn attach_algo_tooltip(
     commands: &mut Commands,
     combobox_root: Entity,

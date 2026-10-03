@@ -97,8 +97,8 @@ fn title_column_with_subtitle_scene(title: String, subtitle: String) -> impl Sce
 
 /// The body column: fills whatever height `header` leaves behind
 /// (`flex_grow: 1.0`), spans the full width, and centers its content as a
-/// whole — same "short content stays centered, long content scrolls"
-/// behaviour the root used to provide directly. `min_height: Val::Px(0.0)`
+/// whole, so short content stays centered and long content scrolls.
+/// `min_height: Val::Px(0.0)`
 /// is the flexbox "min-height:auto" shrink trick (see `dialogs::
 /// scroll_area::spawn_scroll_area`'s own use of it one level down) that
 /// lets this force-shrink below its content's natural height once the

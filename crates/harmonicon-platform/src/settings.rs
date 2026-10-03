@@ -85,10 +85,6 @@ pub struct ReducedMotion(pub bool);
 /// — is here because it describes the *instrument*, not the player's
 /// progress: it stays true across every session with that harp and means
 /// nothing about how well anyone plays it.
-///
-/// Defaults reproduce the behaviour that used to be hardcoded in
-/// `gameplay::bending_trainer`, so an existing player sees no change until
-/// they open the drawer.
 #[derive(Resource, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BendingTrainerSettings {

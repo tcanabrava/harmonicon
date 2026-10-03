@@ -52,8 +52,8 @@ impl Harmonica {
     /// [`summary`](Self::summary) joined in English —
     /// `"Diatonic · 10 holes · 2nd position · Richter"` — for logs and
     /// tests. The position segment appears only when the chart declares
-    /// one: a chart without it used to print `? position`, which reads as a
-    /// defect rather than an absence, and on a chromatic harp (fully
+    /// one: `? position` would read as a defect rather than an absence,
+    /// and on a chromatic harp (fully
     /// chromatic, so "position" is mostly a diatonic idea) it's usually
     /// absent by design.
     pub fn display(&self) -> String {

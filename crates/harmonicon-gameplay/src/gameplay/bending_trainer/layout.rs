@@ -51,8 +51,8 @@ pub struct SetupSummary;
 #[derive(Component)]
 pub struct SkipSlot;
 
-/// Wraps the drill's explanation: shown while the drill is off, as the
-/// answer to "what does this button do" that used to be hover-only.
+/// Wraps the drill's explanation: shown while the drill is off, answering
+/// "what does this button do" without a hover.
 #[derive(Component)]
 pub struct DrillIntroSlot;
 

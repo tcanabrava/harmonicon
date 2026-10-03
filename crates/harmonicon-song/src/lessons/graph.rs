@@ -12,8 +12,7 @@
 //! Pure and Bevy-free, like the rest of `lessons`' data layer.
 //!
 //! **Only one of the checks this module runs is real.** Three were planned:
-//! - **Cycles** — genuinely possible, genuinely unchecked before this, and
-//!   fatal twice over: a lesson in a cycle can never unlock, and a renderer
+//! - **Cycles** — genuinely possible, and fatal twice over: a lesson in a cycle can never unlock, and a renderer
 //!   walking the edges would not terminate. [`LessonGraph::build`] refuses
 //!   to construct rather than returning something unusable.
 //! - *Every edge points forward* — vacuous. [`depth`](LessonNode::depth) is

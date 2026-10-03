@@ -24,9 +24,8 @@ pub struct CountdownText;
 /// `song_info` is `None` for Jam Session, which has no chart to describe.
 ///
 /// The countdown is one of the two moments the player is not playing, so it
-/// is where the song's own details belong — key, harp, description, author.
-/// They used to hold a column of the HUD for the whole performance instead,
-/// which is time nobody spends reading them.
+/// is where the song's own details belong — key, harp, description, author
+/// — rather than in a HUD column nobody reads mid-performance.
 pub fn spawn_countdown(
     commands: &mut Commands,
     loc: &Localization,

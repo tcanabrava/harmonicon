@@ -291,8 +291,8 @@ fn bend_depths_follow_the_tuning_not_a_richter_table() {
 
 #[test]
 fn the_three_draw_bends_low_notes_are_reachable() {
-    // The specific notes the old cap made unplayable: hole 2 draw down two
-    // semitones, hole 3 draw down two and three.
+    // The deep draw bends a per-hole Richter table would cap: hole 2 draw
+    // down two semitones, hole 3 draw down two and three.
     let harp = richter_harp("C");
     for (note, hole, depth) in [("F4", 2u8, 2.0), ("A4", 3, 2.0), ("Ab4", 3, 3.0)] {
         let target = note_to_midi(note).unwrap() as u8;

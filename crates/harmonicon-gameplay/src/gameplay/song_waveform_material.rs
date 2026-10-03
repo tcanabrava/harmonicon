@@ -38,14 +38,12 @@ impl UiMaterial for SongWaveformMaterial {
 /// Packs `waveform` (0..1 peak amplitudes, `song::loader` always analyzes
 /// exactly [`WAVEFORM_BUCKETS`] of them when there's any music to analyze,
 /// but a music-less song, per `SongManifest::music: None`, hands this an
-/// empty slice) into the fixed-size uniform array — floored the same way
-/// the plain-`Node` bars this replaces used to be, so silence still reads
-/// as a continuous shape rather than a gap. Deliberately no data-side
-/// smoothing beyond that floor: an earlier version also ran a moving
-/// average over the buckets before packing them, which rounded the
-/// silhouette off enough that it stopped reading as an actual audio
-/// waveform at all — the shader's own inter-bucket interpolation
-/// (`song_waveform.wesl`) is the only smoothing this applies.
+/// empty slice) into the fixed-size uniform array — floored, so silence
+/// still reads as a continuous shape rather than a gap. Deliberately no
+/// data-side smoothing beyond that floor: a moving average rounds the
+/// silhouette off until it stops reading as an audio waveform. The
+/// shader's inter-bucket interpolation (`song_waveform.wesl`) is the only
+/// smoothing.
 pub fn pack_amplitudes(waveform: &[f32], floor: f32) -> [Vec4; PACKED] {
     let mut amplitudes = [Vec4::ZERO; PACKED];
     for (i, &amplitude) in waveform.iter().take(WAVEFORM_BUCKETS).enumerate() {

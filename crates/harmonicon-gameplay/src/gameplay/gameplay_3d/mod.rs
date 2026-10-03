@@ -267,11 +267,9 @@ fn spawn_hud_overlay(
     song_info: &SongInfo,
     panels: ContextualPanels,
 ) {
-    // The same panel 2D carries, on the same side of the screen. It used to
-    // sit top-left here and right in 2D, with the same contents in a
-    // different order — the drift `hud_panel` exists to stop. All of it is
-    // supplementary, so compact mode skips the panel outright rather than
-    // trimming it piecemeal (`contextual_panels`).
+    // The same panel 2D carries, on the same side of the screen (see
+    // `hud_panel`). All of it is supplementary, so compact mode skips the
+    // panel outright rather than trimming it piecemeal (`contextual_panels`).
     if panels.side_panel {
         let legend_materials = if panels.technique_legend {
             build_legend_materials(&mut shape_materials, modifiers)

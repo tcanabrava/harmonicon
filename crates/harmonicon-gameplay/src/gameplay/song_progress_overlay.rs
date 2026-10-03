@@ -24,9 +24,8 @@
 //! *whole* bar height (covering the waveform, which isn't useful reference
 //! while paused anyway), with a single bar growing up from the bottom —
 //! height, not color, encodes the learned fraction (see
-//! [`phrase_bar_height_px`]) — instead of the old continuous color
-//! gradient, which two adjacent phrases at close-but-different fractions
-//! made hard to tell apart at a glance.
+//! [`phrase_bar_height_px`]), since two adjacent phrases at close
+//! fractions are hard to tell apart by colour.
 //!
 //! A song with no background music (`SongManifest::music: None`) has no
 //! waveform and a `music_duration_secs` of `0.0`, but the chart itself
@@ -64,11 +63,9 @@ const WAVEFORM_FLOOR: f32 = 0.04;
 
 /// Waveform fill color — a desaturated, receding, dark gray-blue,
 /// deliberately *not* the same hue as a note marker's blow color drawn over
-/// it. The two used to share almost the same light blue, which made
-/// "there's sound here" and "this is a blow note" read as the same signal
-/// in one panel. Kept translucent (alpha 0.55) now that it sits directly
-/// behind the note markers rather than in its own row — see
-/// [`spawn_song_progress`].
+/// it, or "there's sound here" and "this is a blow note" read as the same
+/// signal. Translucent (alpha 0.55) because it sits directly behind the
+/// note markers — see [`spawn_song_progress`].
 const WAVEFORM_COLOR: Color = Color::srgba(0.32, 0.37, 0.45, 0.55);
 
 /// Height (px) of the note-lanes strip — tall enough that even a 12-hole
@@ -87,8 +84,8 @@ const PHRASE_RECT_BORDER: f32 = 1.5;
 /// Total height (px) of the bar, pinned at the very top of the screen.
 /// `pub` so gameplay HUDs can reserve this much space instead of placing
 /// content under it, where the bar (painted above them — see
-/// [`BAR_Z_INDEX`]) would cover it. Just the note-lanes strip's own height
-/// now — the waveform no longer has a separate row (see [`NOTE_LANES_HEIGHT`]).
+/// [`BAR_Z_INDEX`]) would cover it. The waveform shares the note-lanes
+/// strip (see [`NOTE_LANES_HEIGHT`]).
 pub const BAR_HEIGHT: f32 = NOTE_LANES_HEIGHT;
 
 /// Narrowest a note's marker is ever drawn (fraction 0..1 of the bar),
@@ -109,12 +106,11 @@ const NOTE_MARKER_DRAW_FALLBACK: Color = Color::srgba(1.00, 0.62, 0.35, 0.9);
 
 /// Alpha applied to whichever blow/draw [`harmonicon_platform::theme::NoteColors`] a note
 /// marker resolves to (the theme colors themselves carry no alpha of their
-/// own) — matches the old hardcoded markers' opacity.
+/// own).
 const NOTE_MARKER_ALPHA: f32 = 0.9;
 
 /// Single fixed color for every [`PhraseMasteryBar`] — learned fraction is
-/// now encoded by the bar's *height* (see [`phrase_bar_height_px`]), not by
-/// color, so unlike the old gradient this never changes with `learned`. A
+/// encoded by the bar's *height* (see [`phrase_bar_height_px`]). A
 /// warm gold, distinct from blow (blue-ish)/draw (orange-ish) note colors
 /// and the waveform's own gray-blue, and echoing
 /// [`SELECTED_PHRASE_RECT_BORDER_COLOR`]'s gold for a cohesive "meter" look.

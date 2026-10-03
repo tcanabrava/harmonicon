@@ -309,13 +309,10 @@ fn spawn_form_line(
 /// click-to-cycle fields (`Key`/`Position`, song enums, and lesson enums)
 /// stay a plain `WidgetButton` that steps the value on `Activate`; every
 /// other field gets a real text box (`dialogs::text_input::
-/// spawn_text_input`, built on `bevy_text::EditableText`) instead of the
-/// hand-rolled per-character `KeyboardInput` capture the editor used to
-/// drive itself with (see `panel::sync_meta_field_text` for how a
-/// programmatic write — Load, MIDI import, Browse picking a file — reaches
-/// a field the player isn't actively typing into, since the text box no
-/// longer re-renders from `EditorState` every frame the way the old
-/// `MetaFieldText` display did).
+/// spawn_text_input`, built on `bevy_text::EditableText`). A text box
+/// doesn't re-render from `EditorState`; `panel::sync_meta_field_text` is
+/// how a programmatic write — Load, MIDI import, Browse picking a file —
+/// reaches a field the player isn't typing into.
 pub(super) fn spawn_field_row(
     col: &mut ChildSpawnerCommands,
     loc: &Localization,
@@ -631,14 +628,11 @@ pub(super) fn sync_scale_combobox_value(
 /// the same spawn-once gate, fixed option list and fixed-chrome placement
 /// [`spawn_scale_combobox`] documents in full.
 ///
-/// Replaces what used to be a free-text row in [`FIELDS`]. A time
-/// signature's lower number names a note value — whole, half, quarter,
-/// eighth, sixteenth — so only a power of two can appear there; typed,
-/// `4/3` parsed fine and then got rounded into a bar length that matched
-/// no meter at all. Picking from `music_score::TIME_SIGNATURES` makes that
-/// unrepresentable rather than merely detectable, and saves a
-/// validate-and-revert path that would have had to fight
-/// `panel::sync_meta_field_text`'s deliberate skip of the focused box.
+/// A picker, not a text row in [`FIELDS`]: a time signature's lower
+/// number names a note value, so only a power of two belongs there, and
+/// typed text like `4/3` parses fine into a bar length that matches no
+/// meter. Picking from `music_score::TIME_SIGNATURES` makes that
+/// unrepresentable rather than merely detectable.
 pub(super) fn spawn_time_signature_combobox(
     mut commands: Commands,
     state: Res<EditorState>,

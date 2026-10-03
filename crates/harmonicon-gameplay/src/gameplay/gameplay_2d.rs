@@ -93,8 +93,8 @@ pub fn setup(
     // entities/materials yet) plus the one piece of render data that isn't
     // already on `ScheduledNote` (the chord/split badge). Actual note
     // *visuals* are spawned later, lazily, by `spawn_visible_notes` as each
-    // one enters the `LOOKAHEAD` window — a long/dense chart no longer pays
-    // for every note's UI subtree (and comet-tail material) at song load.
+    // one enters the `LOOKAHEAD` window, so a long chart doesn't pay for
+    // every note's UI subtree at song load.
     let (notes, play_mode_tags) = super::build_scheduled_notes(&effective, chart, &adaptive);
     *song_notes = SongNotes { notes, cursor: 0 };
     *render_assets = NoteRenderAssets { play_mode_tags };

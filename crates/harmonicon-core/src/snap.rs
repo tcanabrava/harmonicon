@@ -9,13 +9,10 @@ use crate::synth::TICKS_PER_BEAT;
 
 /// `TICKS_PER_BEAT` (12) is the lowest resolution divisible by both 4
 /// (straight 16ths) and 3 (triplets), so every mode's positions below are
-/// exact integer ticks — no rounding error the way a true triplet would
-/// have had on the old 4-ticks-per-beat grid. See [`SnapMode::grid_points`].
+/// exact integer ticks. See [`SnapMode::grid_points`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum SnapMode {
-    /// Straight 16th notes — ticks 0, 3, 6, 9. What every click already
-    /// snapped to before this mode existed (all 4 of `TICKS_PER_BEAT`'s old
-    /// positions, just expressed at the new finer resolution).
+    /// Straight 16th notes — ticks 0, 3, 6, 9.
     #[default]
     Sixteenth,
     /// Swung ("shuffle") 8th notes — a 2:1 long-short pair, ticks 0 and 8.

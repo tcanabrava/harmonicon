@@ -161,12 +161,10 @@ pub fn start_capture(world: &mut World) {
 /// Turns a cpal stream error into [`MicStatus::Failed`], so a microphone
 /// unplugged *mid-session* is reported the same way one that never opened is.
 ///
-/// Startup failure was always handled — `start_capture` sets `Failed` when
-/// the stream won't open. A device that dies *after* opening is a different
-/// path entirely: cpal reports it through the stream's error callback on its
-/// own thread, and that callback used to only `eprintln!`. So `MicStatus`
-/// stayed `Connected`, the Options banner stayed hidden, the in-play warning
-/// never fired, and the player just watched their notes stop scoring.
+/// `start_capture` sets `Failed` when the stream won't open. A device that
+/// dies *after* opening reaches cpal's error callback on its own thread
+/// instead; without this, `MicStatus` would stay `Connected`, hiding both
+/// the Options banner and the in-play warning while notes stop scoring.
 ///
 /// Deliberately does **not** try to reopen the stream. An automatic retry
 /// would need a backoff (cpal errors arrive in bursts), and on a machine with

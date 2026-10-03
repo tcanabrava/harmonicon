@@ -292,10 +292,8 @@ pub enum Accidental {
 /// **The naturals are the reason this can't just be "skip the repeats".**
 /// Marking the first F# and nothing afterwards would leave a plain F later
 /// in the same bar reading as F# too, since the alteration is still in
-/// force. Every such note now gets an explicit natural. So this is a
-/// correctness fix that usually also saves width, not purely a saving — a
-/// bar alternating F# and F ends up with *more* glyphs than before, and
-/// says something true where it previously said something false.
+/// force, so every such note gets an explicit natural — a bar alternating
+/// F# and F draws more glyphs than one marking every sharp.
 ///
 /// Keyed on staff *position*, not pitch: [`staff_step`] puts F4 and F#4 on
 /// the same line, which is exactly what an accidental applies to. Expects
@@ -1331,9 +1329,8 @@ mod tests {
 
     #[test]
     fn note_rhythm_spells_the_dotted_durations() {
-        // These are the cases the old thresholds got wrong: both used to
-        // draw as the *next longer* undotted value, which reads as more
-        // beats than the note actually lasts.
+        // Drawn as the *next longer* undotted value, these would read as
+        // more beats than the note actually lasts.
         let dotted_half = note_rhythm(3.0);
         assert_eq!(dotted_half.head, NoteheadKind::Half);
         assert_eq!(dotted_half.dots, 1);

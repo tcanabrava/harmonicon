@@ -65,9 +65,9 @@ fn a_single_unnamed_track_is_played_without_asking() {
 
 #[test]
 fn several_unnamed_tracks_are_all_offered_with_one_chosen() {
-    // This used to refuse outright, because an asset loader has nowhere to
-    // ask which part is the harmonica. Every part is now converted and the
-    // harp-check screen offers the list, so a default is safe to pick.
+    // An asset loader has nowhere to ask which part is the harmonica, but
+    // every part is converted and the harp-check screen offers the list,
+    // so a default is safe to pick.
     let low: Vec<u8> = (40u8..46).collect();
     let converted =
         convert_score("mid", midi_file(&[("", &low), ("", &easy_notes())]), "A", None).unwrap();
@@ -136,9 +136,8 @@ fn an_unexpected_layout_falls_back_rather_than_panicking() {
 
 #[test]
 fn the_song_title_comes_from_its_folder_not_the_track_name() {
-    // Seen on screen before this was fixed: a file whose only track is
-    // named "Harmonica" produced a song called "Harmonica", because MIDI's
-    // title convention is the first track's name.
+    // MIDI's title convention is the first track's name, which would call
+    // a file whose only track is "Harmonica" a song named "Harmonica".
     let chart =
         chart_of(midi_file(&[("Harmonica", &easy_notes())]), "A", Some("Scale Practice".into()));
     assert_eq!(chart.song.title, "Scale Practice");

@@ -613,11 +613,9 @@ fn hole_1_overblow_is_a_semitone_above_draw() {
 ///
 /// `judge::score_notes` filters detected pitches through
 /// `build_valid_notes` before scoring anything, so a pitch missing here is
-/// not merely undocumented — it is unhittable. Seven of a C harp's eight
-/// over-pitches used to be absent (hole 8's survived only by coinciding
-/// with a bend), which meant a chart note carrying `Modifier::Overblow`
-/// could never be scored, with nothing on screen to explain why. Latent
-/// only because no shipped chart uses one yet.
+/// not merely undocumented — it is unhittable: a chart note carrying
+/// `Modifier::Overblow` could never be scored, with nothing on screen to
+/// explain why.
 #[test]
 fn the_valid_note_set_includes_overblows_and_overdraws() {
     use crate::pitch_map::HARP_KEYS;

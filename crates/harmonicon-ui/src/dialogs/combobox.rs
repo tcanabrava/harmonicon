@@ -98,8 +98,8 @@ pub struct ComboboxValue(pub String);
 ///
 /// `list` is the whole bordered popover panel (what gets shown/hidden);
 /// `items_area` is the scrollable column inside it that actually parents the
-/// `ComboboxItemButton`s — the two used to be the same entity, before the
-/// panel gained a scrollbar sibling next to the items (see `spawn_combobox`).
+/// `ComboboxItemButton`s, beside the panel's scrollbar (see
+/// `spawn_combobox`).
 #[derive(Component, Clone, Copy)]
 pub(crate) struct ComboboxLinks {
     list: Entity,

@@ -195,8 +195,8 @@ pub(super) enum ModButton {
     /// the next quarter above it.
     Depth,
     /// Toggles call-and-response on the selected note's *phrase* (its
-    /// onset) — a phrase property reached through the note, like the
-    /// Details form used to; no sticky meaning with nothing selected.
+    /// onset) — a phrase property reached through the note; no sticky
+    /// meaning with nothing selected.
     Call,
     /// Toggles the tongue-block split on the selected note's phrase.
     Split,
@@ -628,8 +628,7 @@ fn on_editor_tab_select(
 /// The editor's always-visible chrome, above the scrollable form area: the
 /// grid row (hole column + grid + its own horizontal scrollbar). Kept out of
 /// the `ScrollArea` — see [`setup`]'s own comment for why. The tool palette
-/// is no longer here: it's the left sidebar `setup` spawns as this column's
-/// sibling (`mod_panel::spawn_mod_panel`).
+/// is the left sidebar beside it (`mod_panel::spawn_mod_panel`).
 fn spawn_fixed_chrome(
     root: &mut ChildSpawnerCommands,
     loc: &Localization,

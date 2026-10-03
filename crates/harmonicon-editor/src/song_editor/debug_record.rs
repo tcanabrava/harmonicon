@@ -287,9 +287,8 @@ fn update_checkbox_glyph(
 }
 
 /// Distinguishes "armed but no take running yet" from "actually capturing
-/// right now" — the label the checkbox alone used to drive said "Recording"
-/// the instant it was checked, which looked like clicking it had started
-/// something; it hadn't (see the module docs).
+/// right now": checking the box starts nothing (see the module docs), so
+/// the label must not say "Recording" until a take does.
 fn update_debug_record_status_label(
     checkbox: Query<Has<Checked>, With<DebugRecordCheckbox>>,
     record: Res<RecordState>,

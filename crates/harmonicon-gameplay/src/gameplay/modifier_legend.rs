@@ -55,8 +55,7 @@ fn modifier_kind(modifier: &Modifier) -> u8 {
 /// Representative legend entries for only the techniques present in a chart.
 /// Keeping this decision independent of rendering makes it impossible for a
 /// plain-note song to spend permanent HUD space teaching five unrelated
-/// symbols, and gives chromatic slide charts the entry the old fixed legend
-/// omitted entirely.
+/// symbols, and gives chromatic slide charts their slide entry.
 fn used_legend_techniques(modifiers: &[Modifier]) -> Vec<(Modifier, &'static str)> {
     legend_techniques()
         .into_iter()

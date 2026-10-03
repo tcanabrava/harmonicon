@@ -209,7 +209,7 @@ fn row_to_technique(row: Row) -> Option<Technique> {
 }
 
 /// Sets the drill/ear-training target from a click on the harmonica diagram
-/// — the picker itself, replacing the old hole/technique stepper buttons.
+/// — the trainer's target picker.
 /// Shared across every selectable cell (see `spawn_harmonica_overlay_selectable`);
 /// looks up which cell fired via `DiagramCellTarget` on the clicked entity
 /// rather than a per-cell closure.
