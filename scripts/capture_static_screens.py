@@ -29,9 +29,10 @@ def capture_all(outdir, artist, song):
     time.sleep(1.0)
     brpctl.to_main_menu()
     brpctl.capture(outdir, "menu-home")
-    brpctl.set_state("menu", "Options")
-    time.sleep(3.0)
-    brpctl.capture(outdir, "menu-options")
+    for page in ["Options", "ArtistList"]:
+        brpctl.set_state("menu", page)
+        time.sleep(3.0)
+        brpctl.capture(outdir, f"menu-{page.lower()}")
     # Credits scrolls, so only its first frames are comparable: capture as
     # soon as it settles rather than after a fixed wait.
     brpctl.set_state("app", "Credits")

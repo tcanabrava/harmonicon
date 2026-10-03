@@ -176,6 +176,24 @@ pub fn make_interactive<'a, 'b>(
         .observe(mouse_drag_end)
 }
 
+/// The hover/press tint over a resting `base` colour — the scene form of
+/// [`make_interactive`], for a button authored in `bsn!`. Pair it with a
+/// `WidgetButton` and `TabIndex`; a caller's own active-state tint writes
+/// [`BaseButtonColor`].
+pub fn tinted(base: Color) -> impl Scene {
+    bsn! {
+        BackgroundColor({base})
+        BaseButtonColor({base})
+        ButtonInteractionState
+        on(mouse_over)
+        on(mouse_out)
+        on(mouse_press)
+        on(mouse_release)
+        on(mouse_press_interrupted)
+        on(mouse_drag_end)
+    }
+}
+
 /// What every button below shares: keyboard focus, the hover/press tint
 /// (see [`BaseButtonColor`]), the click handler, and a white label
 /// (`justify` only matters once it wraps) centred in a node that keeps its natural size inside height-constrained scroll
@@ -190,16 +208,8 @@ fn interactive<M: 'static>(
     bsn! {
         WidgetButton
         TabIndex(0)
-        BackgroundColor({color_default()})
-        BaseButtonColor({color_default()})
-        ButtonInteractionState
+        @tinted(color_default())
         on(on_click)
-        on(mouse_over)
-        on(mouse_out)
-        on(mouse_press)
-        on(mouse_release)
-        on(mouse_press_interrupted)
-        on(mouse_drag_end)
         Node {
             justify_content: {JustifyContent::Center},
             flex_shrink: {0.0_f32},

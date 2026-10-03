@@ -24,7 +24,7 @@ use harmonicon_platform::song_library::SongLibrary;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
-use harmonicon_ui::dialogs::button::{BaseButtonColor, CHOICE_SELECTED, make_interactive};
+use harmonicon_ui::dialogs::button::{BaseButtonColor, CHOICE_SELECTED};
 use harmonicon_ui::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use harmonicon_ui::dialogs::text_input::spawn_text_input;
 
@@ -62,13 +62,13 @@ impl SongPickerState {
 #[derive(Component)]
 pub(crate) struct RevealSelectedSong;
 
-#[derive(Component)]
+#[derive(Component, Clone, FromTemplate)]
 pub(crate) struct SortChoice {
     sort: SongSort,
     arrow: Entity,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct SongRow {
     path: String,
     index: usize,
@@ -80,7 +80,7 @@ pub(crate) struct SongPickerRows;
 #[derive(Component)]
 pub(crate) struct SongPickerSearch;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) enum PickerSummary {
     Count,
     Title,
@@ -89,16 +89,16 @@ pub(crate) enum PickerSummary {
     Status,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone, Default)]
 pub(crate) struct PickerPlay;
 
-#[derive(Component)]
+#[derive(Component, Clone, Default)]
 pub(crate) struct PickerDelete;
 
-#[derive(Component)]
+#[derive(Component, Clone, Default)]
 pub(crate) struct ModeLabel(bool);
 
-#[derive(Component)]
+#[derive(Component, Clone, Default)]
 pub(crate) struct SongUpdates;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -192,106 +192,121 @@ pub(crate) fn setup_artist_list(
         ..default()
     });
     let updates = commands
-        .spawn((
-            SongUpdates,
+        .spawn_scene(bsn! {
+            SongUpdates
             Node {
-                display: Display::None,
-                width: Val::Percent(100.0),
-                flex_shrink: 0.0,
-                flex_wrap: FlexWrap::Wrap,
-                column_gap: Val::Px(8.0),
-                row_gap: Val::Px(8.0),
-                ..default()
-            },
-        ))
+                display: {Display::None},
+                width: {Val::Percent(100.0)},
+                flex_shrink: {0.0_f32},
+                flex_wrap: {FlexWrap::Wrap},
+                column_gap: {Val::Px(8.0)},
+                row_gap: {Val::Px(8.0)},
+            }
+        })
         .id();
-    commands.entity(content).add_child(updates);
+    let search_row = spawn_search_row(&mut commands, &loc, &state.query);
+    let empty = commands
+        .spawn_scene(bsn! {
+            @summary(PickerSummary::Empty, 18.0)
+            Node { display: {Display::None}, padding: {UiRect::all(Val::Px(20.0))} }
+        })
+        .id();
     let sort_row = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            width: Val::Percent(100.0),
-            flex_shrink: 0.0,
-            border: UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) },
-            ..default()
+        .spawn_scene(bsn! {
+            Node {
+                flex_direction: {FlexDirection::Row},
+                width: {Val::Percent(100.0)},
+                flex_shrink: {0.0_f32},
+                border: {UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) }},
+            }
+            Children [
+                @sort_choice(SongSort::Song, 40.0, loc.msg("song-sort-name").to_string())
+                --
+                @sort_choice(SongSort::Band, 25.0, loc.msg("song-sort-band").to_string())
+                --
+                @sort_choice(SongSort::Genre, 20.0, loc.msg("song-sort-genre").to_string())
+                --
+                @sort_choice(SongSort::Difficulty, 15.0, loc.msg("song-sort-difficulty").to_string())
+            ]
         })
         .id();
-    for (sort, width, label) in [
-        (SongSort::Song, 40.0, loc.msg("song-sort-name").to_string()),
-        (SongSort::Band, 25.0, loc.msg("song-sort-band").to_string()),
-        (SongSort::Genre, 20.0, loc.msg("song-sort-genre").to_string()),
-        (SongSort::Difficulty, 15.0, loc.msg("song-sort-difficulty").to_string()),
-    ] {
-        let arrow = commands
-            .spawn((
-                Text::new("↑"),
-                TextFont { font_size: FontSize::Px(15.0), ..default() },
-                TextColor(Color::WHITE),
-                Visibility::Hidden,
-                bevy::picking::Pickable::IGNORE,
-            ))
-            .id();
-        let label = commands
-            .spawn((
-                Text::new(label),
-                TextFont { font_size: FontSize::Px(15.0), ..default() },
-                TextColor(Color::WHITE),
-                bevy::picking::Pickable::IGNORE,
-            ))
-            .id();
-        let entity = commands
-            .spawn((
-                WidgetButton,
-                TabIndex(0),
-                SortChoice { sort, arrow },
-                Node {
-                    width: Val::Percent(width),
-                    min_width: Val::Px(0.0),
-                    flex_shrink: 0.0,
-                    padding: UiRect::axes(Val::Px(12.0), Val::Px(10.0)),
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(6.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.14, 0.14, 0.22)),
-            ))
-            .id();
-        commands.entity(entity).add_children(&[label, arrow]);
-        make_interactive(&mut commands.entity(entity), Color::srgb(0.14, 0.14, 0.22));
-        commands.entity(entity).observe(
-            move |_: On<Activate>, mut state: ResMut<SongPickerState>| {
-                if state.sort == sort {
-                    state.descending = !state.descending;
-                } else {
-                    state.sort = sort;
-                    state.descending = false;
-                }
-            },
-        );
-        commands.entity(sort_row).add_child(entity);
-    }
-    let search_row = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(10.0),
-            width: Val::Percent(100.0),
-            flex_shrink: 0.0,
-            ..default()
+    let list_frame = commands
+        .spawn_scene(bsn! {
+            Node {
+                width: {Val::Percent(100.0)},
+                flex_grow: {1.0_f32},
+                min_height: {Val::Px(0.0)},
+                flex_direction: {FlexDirection::Column},
+            }
         })
         .id();
-    commands.entity(content).add_child(search_row);
-    let label = commands
-        .spawn((
-            Text::new(loc.msg("song-search")),
-            TextFont { font_size: FontSize::Px(16.0), ..default() },
-            TextColor(Color::WHITE),
-        ))
+    let mut rows = Entity::PLACEHOLDER;
+    commands.entity(list_frame).with_children(|parent| {
+        rows =
+            spawn_scroll_area(parent, Color::srgb(0.40, 0.58, 0.73), Color::srgb(0.08, 0.10, 0.15));
+    });
+    commands.entity(rows).insert((
+        SongPickerRows,
+        RevealSelectedSong,
+        Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(4.0),
+            min_height: Val::Px(0.0),
+            flex_grow: 1.0,
+            overflow: Overflow::scroll_y(),
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.045, 0.055, 0.085, 0.94)),
+    ));
+    let preview = commands.spawn_scene(preview_panel(&loc, *mode == GameplayMode::Play2D)).id();
+    let hints = commands
+        .spawn_scene(bsn! {
+            Text({String::from(loc.msg("song-picker-keys"))})
+            TextFont { font_size: {FontSize::Px(13.0)} }
+            TextColor({Color::srgb(0.65, 0.70, 0.80)})
+        })
         .id();
-    commands.entity(search_row).add_child(label);
-    let search = spawn_text_input(
+    commands
+        .entity(content)
+        .add_children(&[updates, search_row, empty, sort_row, list_frame, preview, hints]);
+    spawn_back_button(
         &mut commands,
-        search_row,
-        &state.query,
+        header,
+        &loc.msg("back"),
+        |_: On<Activate>, mode: Res<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(if *mode == GameplayMode::JamSession {
+                MenuPage::JamSessionMenu
+            } else {
+                MenuPage::Play
+            })
+        },
+    );
+    populate_rows(&mut commands, rows, &songs, &state, true, &[]);
+}
+
+/// The search label, text field, Clear button and result count.
+fn spawn_search_row(commands: &mut Commands, loc: &Localization, query: &str) -> Entity {
+    let row = commands
+        .spawn_scene(bsn! {
+            Node {
+                flex_direction: {FlexDirection::Row},
+                align_items: {AlignItems::Center},
+                column_gap: {Val::Px(10.0)},
+                width: {Val::Percent(100.0)},
+                flex_shrink: {0.0_f32},
+            }
+            Children [
+                Text({String::from(loc.msg("song-search"))})
+                TextFont { font_size: {FontSize::Px(16.0)} }
+                TextColor({Color::WHITE})
+            ]
+        })
+        .id();
+    let search = spawn_text_input(
+        commands,
+        row,
+        query,
         420.0,
         Color::srgb(0.12, 0.12, 0.17),
         Color::srgb(0.30, 0.30, 0.40),
@@ -312,10 +327,10 @@ pub(crate) fn setup_artist_list(
         },
         TextFont { font_size: FontSize::Px(16.0), ..default() },
     ));
-    let clear = commands
-        .spawn_empty()
-        .apply_scene(button::small(
-            &loc.msg("song-clear-search"),
+    let clear_label = loc.msg("song-clear-search");
+    commands.entity(row).with_children(|r| {
+        r.spawn_empty().apply_scene(button::small(
+            &clear_label,
             |_: On<Activate>,
              mut inputs: Query<(Entity, &mut EditableText), With<SongPickerSearch>>,
              mut focus: ResMut<InputFocus>| {
@@ -324,205 +339,175 @@ pub(crate) fn setup_artist_list(
                     focus.set(entity, FocusCause::Navigated);
                 }
             },
-        ))
-        .id();
-    commands.entity(search_row).add_child(clear);
-    spawn_summary(&mut commands, search_row, PickerSummary::Count, 14.0);
-    let empty = spawn_summary(&mut commands, content, PickerSummary::Empty, 18.0);
-    commands.entity(empty).insert(Node {
-        display: Display::None,
-        padding: UiRect::all(Val::Px(20.0)),
-        ..default()
+        ));
+        r.spawn_empty().apply_scene(summary(PickerSummary::Count, 14.0));
     });
-    commands.entity(content).add_child(sort_row);
-    let list_frame = commands
-        .spawn(Node {
-            width: Val::Percent(100.0),
-            flex_grow: 1.0,
-            min_height: Val::Px(0.0),
-            flex_direction: FlexDirection::Column,
-            ..default()
-        })
-        .id();
-    commands.entity(content).add_child(list_frame);
-    let mut rows = Entity::PLACEHOLDER;
-    commands.entity(list_frame).with_children(|parent| {
-        rows =
-            spawn_scroll_area(parent, Color::srgb(0.40, 0.58, 0.73), Color::srgb(0.08, 0.10, 0.15));
-    });
-    commands.entity(rows).insert((
-        SongPickerRows,
-        RevealSelectedSong,
+    row
+}
+
+const SORT_BG: Color = Color::srgb(0.14, 0.14, 0.22);
+
+/// A column header: clicking sorts by it, clicking again reverses.
+fn sort_choice(sort: SongSort, width: f32, label: String) -> impl Scene {
+    bsn! {
+        WidgetButton
+        TabIndex(0)
+        SortChoice { sort: {sort}, arrow: #Arrow }
         Node {
-            width: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(4.0),
-            min_height: Val::Px(0.0),
-            flex_grow: 1.0,
-            overflow: Overflow::scroll_y(),
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.045, 0.055, 0.085, 0.94)),
-    ));
-    let preview = commands
-        .spawn((
-            Node {
-                width: Val::Percent(100.0),
-                flex_shrink: 0.0,
-                padding: UiRect::all(Val::Px(16.0)),
-                column_gap: Val::Px(20.0),
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            BackgroundColor(Color::srgb(0.075, 0.10, 0.15)),
-        ))
-        .id();
-    commands.entity(content).add_child(preview);
-    let details = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            flex_grow: 1.0,
-            min_width: Val::Px(0.0),
-            row_gap: Val::Px(6.0),
-            ..default()
-        })
-        .id();
-    commands.entity(preview).add_child(details);
-    spawn_summary(&mut commands, details, PickerSummary::Title, 22.0);
-    spawn_summary(&mut commands, details, PickerSummary::Metadata, 15.0);
-    spawn_summary(&mut commands, details, PickerSummary::Status, 14.0);
-    let delete = commands
-        .spawn_empty()
-        .apply_scene(button::small(
-            &loc.msg("song-delete"),
-            |_: On<Activate>,
-             mut state: ResMut<SongPickerState>,
-             songs: Res<AvailableSongs>,
-             loc: Res<Localization>,
-             mut open: MessageWriter<OpenConfirmDialog>| {
-                let Some(song) = songs
-                    .0
-                    .values()
-                    .flatten()
-                    .find(|song| Some(&song.asset_path) == state.selected.as_ref())
-                else {
-                    return;
-                };
-                let path = song.asset_path.clone();
-                let name = song.name.clone();
-                state.pending_delete = Some(path);
-                state.deletion_error = None;
-                open.write(OpenConfirmDialog {
-                    purpose: DELETE_SONG,
-                    message: loc.msg_args("song-confirm-delete", &[("name", name)]).to_string(),
-                });
-            },
-        ))
-        .insert(PickerDelete)
-        .id();
-    commands.entity(preview).add_child(delete);
-    spawn_mode_toggle(&mut commands, preview, *mode == GameplayMode::Play2D);
-    let play = commands
-        .spawn_empty()
-        .apply_scene(button::small(
-            &loc.msg("menu-play"),
-            |_: On<Activate>,
-             state: Res<SongPickerState>,
-             asset_server: Res<AssetServer>,
-             mut commands: Commands,
-             mut page: ResMut<NextState<MenuPage>>| {
-                if let Some(path) = &state.selected {
-                    commands.insert_resource(SelectedSong(
-                        asset_server.load::<SongManifest>(path.clone()),
-                    ));
-                    page.set(MenuPage::HarpCheck);
-                }
-            },
-        ))
-        .insert(PickerPlay)
-        .id();
-    commands.entity(preview).add_child(play);
-    let hints = commands
-        .spawn((
-            Text::new(loc.msg("song-picker-keys")),
-            TextFont { font_size: FontSize::Px(13.0), ..default() },
-            TextColor(Color::srgb(0.65, 0.70, 0.80)),
-        ))
-        .id();
-    commands.entity(content).add_child(hints);
-    spawn_back_button(
-        &mut commands,
-        header,
-        &loc.msg("back"),
-        |_: On<Activate>, mode: Res<GameplayMode>, mut page: ResMut<NextState<MenuPage>>| {
-            page.set(if *mode == GameplayMode::JamSession {
-                MenuPage::JamSessionMenu
+            width: {Val::Percent(width)},
+            min_width: {Val::Px(0.0)},
+            flex_shrink: {0.0_f32},
+            padding: {UiRect::axes(Val::Px(12.0), Val::Px(10.0))},
+            align_items: {AlignItems::Center},
+            column_gap: {Val::Px(6.0)},
+        }
+        @button::tinted(SORT_BG)
+        on(move |_: On<Activate>, mut state: ResMut<SongPickerState>| {
+            if state.sort == sort {
+                state.descending = !state.descending;
             } else {
-                MenuPage::Play
-            })
-        },
-    );
-    populate_rows(&mut commands, rows, &songs, &state, true, &[]);
-}
-
-fn spawn_summary(
-    commands: &mut Commands,
-    parent: Entity,
-    kind: PickerSummary,
-    size: f32,
-) -> Entity {
-    let entity = commands
-        .spawn((
-            kind,
-            Text::new(""),
-            TextFont { font_size: FontSize::Px(size), ..default() },
-            TextColor(Color::WHITE),
-        ))
-        .id();
-    commands.entity(parent).add_child(entity);
-    entity
-}
-
-fn spawn_mode_toggle(commands: &mut Commands, parent: Entity, is_2d: bool) {
-    let toggle = commands
-        .spawn((
-            WidgetButton,
-            TabIndex(0),
-            Node {
-                border: UiRect::all(Val::Px(1.0)),
-                padding: UiRect::all(Val::Px(3.0)),
-                column_gap: Val::Px(3.0),
-                ..default()
-            },
-            BorderColor::all(Color::srgb(0.30, 0.40, 0.52)),
-        ))
-        .id();
-    for (two_d, label) in [(true, "2d"), (false, "3d")] {
-        let entity = commands
-            .spawn((
-                ModeLabel(two_d),
-                Text::new(label),
-                TextFont { font_size: FontSize::Px(16.0), ..default() },
-                TextColor(Color::WHITE),
-                Node { padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)), ..default() },
-                BackgroundColor(if two_d == is_2d { CHOICE_SELECTED } else { Color::NONE }),
-                bevy::picking::Pickable::IGNORE,
-            ))
-            .id();
-        commands.entity(toggle).add_child(entity);
+                state.sort = sort;
+                state.descending = false;
+            }
+        })
+        Children [
+            Text({label})
+            TextFont { font_size: {FontSize::Px(15.0)} }
+            TextColor({Color::WHITE})
+            ~{bevy::picking::Pickable::IGNORE}
+            --
+            #Arrow
+            Text("↑")
+            TextFont { font_size: {FontSize::Px(15.0)} }
+            TextColor({Color::WHITE})
+            ~{Visibility::Hidden}
+            ~{bevy::picking::Pickable::IGNORE}
+        ]
     }
-    make_interactive(&mut commands.entity(toggle), Color::srgb(0.10, 0.13, 0.19));
-    commands.entity(toggle).observe(
-        |_: On<Activate>, mut mode: ResMut<GameplayMode>, mut state: ResMut<SongPickerState>| {
+}
+
+/// The selected song's details, with Delete, the 2D/3D toggle and Play.
+fn preview_panel(loc: &Localization, is_2d: bool) -> impl Scene {
+    let delete_label = loc.msg("song-delete").to_string();
+    let play_label = loc.msg("menu-play").to_string();
+    bsn! {
+        Node {
+            width: {Val::Percent(100.0)},
+            flex_shrink: {0.0_f32},
+            padding: {UiRect::all(Val::Px(16.0))},
+            column_gap: {Val::Px(20.0)},
+            align_items: {AlignItems::Center},
+        }
+        BackgroundColor({Color::srgb(0.075, 0.10, 0.15)})
+        Children [
+            Node {
+                flex_direction: {FlexDirection::Column},
+                flex_grow: {1.0_f32},
+                min_width: {Val::Px(0.0)},
+                row_gap: {Val::Px(6.0)},
+            }
+            Children [
+                @summary(PickerSummary::Title, 22.0)
+                --
+                @summary(PickerSummary::Metadata, 15.0)
+                --
+                @summary(PickerSummary::Status, 14.0)
+            ]
+            --
+            @button::small(&delete_label, request_song_delete)
+            PickerDelete
+            --
+            @mode_toggle(is_2d)
+            --
+            @button::small(&play_label, play_selected_song)
+            PickerPlay
+        ]
+    }
+}
+
+fn request_song_delete(
+    _: On<Activate>,
+    mut state: ResMut<SongPickerState>,
+    songs: Res<AvailableSongs>,
+    loc: Res<Localization>,
+    mut open: MessageWriter<OpenConfirmDialog>,
+) {
+    let Some(song) =
+        songs.0.values().flatten().find(|song| Some(&song.asset_path) == state.selected.as_ref())
+    else {
+        return;
+    };
+    let name = song.name.clone();
+    state.pending_delete = Some(song.asset_path.clone());
+    state.deletion_error = None;
+    open.write(OpenConfirmDialog {
+        purpose: DELETE_SONG,
+        message: loc.msg_args("song-confirm-delete", &[("name", name)]).to_string(),
+    });
+}
+
+fn play_selected_song(
+    _: On<Activate>,
+    state: Res<SongPickerState>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+    mut page: ResMut<NextState<MenuPage>>,
+) {
+    if let Some(path) = &state.selected {
+        commands.insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
+        page.set(MenuPage::HarpCheck);
+    }
+}
+
+/// An empty text line `update_picker_summary` fills in for `kind`.
+fn summary(kind: PickerSummary, size: f32) -> impl Scene {
+    bsn! {
+        ~{kind}
+        Text("")
+        TextFont { font_size: {FontSize::Px(size)} }
+        TextColor({Color::WHITE})
+    }
+}
+
+/// The 2D/3D switch: one button, the active mode's half highlighted.
+fn mode_toggle(is_2d: bool) -> impl Scene {
+    bsn! {
+        WidgetButton
+        TabIndex(0)
+        Node {
+            border: {UiRect::all(Val::Px(1.0))},
+            padding: {UiRect::all(Val::Px(3.0))},
+            column_gap: {Val::Px(3.0)},
+        }
+        ~{BorderColor::all(Color::srgb(0.30, 0.40, 0.52))}
+        @button::tinted(Color::srgb(0.10, 0.13, 0.19))
+        on(|_: On<Activate>, mut mode: ResMut<GameplayMode>, mut state: ResMut<SongPickerState>| {
             *mode = if *mode == GameplayMode::Play2D {
                 GameplayMode::Play3D
             } else {
                 GameplayMode::Play2D
             };
             state.view_2d = Some(*mode == GameplayMode::Play2D);
-        },
-    );
-    commands.entity(parent).add_child(toggle);
+        })
+        Children [
+            @mode_label(true, "2d", is_2d)
+            --
+            @mode_label(false, "3d", is_2d)
+        ]
+    }
+}
+
+fn mode_label(two_d: bool, label: &'static str, is_2d: bool) -> impl Scene {
+    let bg = if two_d == is_2d { CHOICE_SELECTED } else { Color::NONE };
+    bsn! {
+        ModeLabel({two_d})
+        Text({label})
+        TextFont { font_size: {FontSize::Px(16.0)} }
+        TextColor({Color::WHITE})
+        Node { padding: {UiRect::axes(Val::Px(14.0), Val::Px(8.0))} }
+        BackgroundColor({bg})
+        ~{bevy::picking::Pickable::IGNORE}
+    }
 }
 
 pub(crate) fn update_picker_summary(
@@ -722,30 +707,83 @@ fn collect_songs(available: &AvailableSongs, state: &SongPickerState) -> Vec<Son
 }
 
 /// Shared column widths and padding keep headers and song metadata aligned.
-fn spawn_song_cell(commands: &mut Commands, parent: Entity, label: &str, width: f32, title: bool) {
-    let cell = commands
-        .spawn((
-            Node {
-                width: Val::Percent(width),
-                min_width: Val::Px(0.0),
-                flex_shrink: 0.0,
-                padding: UiRect::axes(Val::Px(12.0), Val::Px(12.0)),
-                overflow: Overflow::clip(),
-                ..default()
-            },
-            bevy::picking::Pickable::IGNORE,
-        ))
-        .id();
-    let text = commands
-        .spawn((
-            Text::new(label),
-            TextFont { font_size: FontSize::Px(if title { 18.0 } else { 15.0 }), ..default() },
-            TextColor(if title { Color::WHITE } else { Color::srgb(0.76, 0.80, 0.87) }),
-            bevy::picking::Pickable::IGNORE,
-        ))
-        .id();
-    commands.entity(cell).add_child(text);
-    commands.entity(parent).add_child(cell);
+fn song_cell(label: String, width: f32, title: bool) -> impl Scene {
+    let (size, color) =
+        if title { (18.0, Color::WHITE) } else { (15.0, Color::srgb(0.76, 0.80, 0.87)) };
+    bsn! {
+        Node {
+            width: {Val::Percent(width)},
+            min_width: {Val::Px(0.0)},
+            flex_shrink: {0.0_f32},
+            padding: {UiRect::axes(Val::Px(12.0), Val::Px(12.0))},
+            overflow: {Overflow::clip()},
+        }
+        ~{bevy::picking::Pickable::IGNORE}
+        Children [
+            Text({label})
+            TextFont { font_size: {FontSize::Px(size)} }
+            TextColor({color})
+            ~{bevy::picking::Pickable::IGNORE}
+        ]
+    }
+}
+
+/// One song in the list. Moving the pointer over it previews it; activating
+/// it opens the harp check for it.
+fn song_row(song: SongEntry, index: usize, selected: bool) -> impl Scene {
+    let base = if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
+    let border = if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE };
+    let path = song.asset_path.clone();
+    let preview_path = path.clone();
+    let row = SongRow { path: path.clone(), index };
+    bsn! {
+        WidgetButton
+        TabIndex(0)
+        ~{row}
+        ~{BorderColor::all(border)}
+        Node {
+            width: {Val::Percent(100.0)},
+            border: {UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) }},
+            align_items: {AlignItems::Center},
+            flex_shrink: {0.0_f32},
+            justify_content: {JustifyContent::FlexStart},
+        }
+        @button::tinted(base)
+        // Layout changes can emit PointerOver beneath a stationary cursor.
+        // Only actual pointer movement should replace a keyboard selection.
+        on(move |event: On<bevy::picking::events::PointerMove>,
+                 mut state: ResMut<SongPickerState>,
+                 mut focus: ResMut<InputFocus>,
+                 mut visible: ResMut<InputFocusVisible>,
+                 inputs: Query<(), With<EditableText>>| {
+            if event.delta == Vec2::ZERO {
+                return;
+            }
+            if state.selected.as_deref() != Some(preview_path.as_str()) {
+                state.selected = Some(preview_path.clone());
+            }
+            if !focus.get().is_some_and(|entity| inputs.contains(entity)) {
+                focus.set(event.entity, FocusCause::Navigated);
+                visible.0 = false;
+            }
+        })
+        on(move |_: On<Activate>,
+                 asset_server: Res<AssetServer>,
+                 mut page: ResMut<NextState<MenuPage>>,
+                 mut commands: Commands| {
+            commands.insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
+            page.set(MenuPage::HarpCheck);
+        })
+        Children [
+            @song_cell(song.name.clone(), 40.0, true)
+            --
+            @song_cell(song.artist.clone(), 25.0, false)
+            --
+            @song_cell(song.genre.clone(), 20.0, false)
+            --
+            @song_cell(song.difficulty.clone(), 15.0, false)
+        ]
+    }
 }
 
 fn populate_rows(
@@ -765,71 +803,10 @@ fn populate_rows(
             continue;
         }
         let selected = state.selected.as_deref() == Some(path.as_str());
-        let base =
-            if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
-        let row = commands
-            .spawn((
-                bevy::ui_widgets::Button,
-                TabIndex(0),
-                SongRow { path: path.clone(), index },
-                BorderColor::all(if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE }),
-                Node {
-                    width: Val::Percent(100.0),
-                    border: UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) },
-                    align_items: AlignItems::Center,
-                    flex_shrink: 0.0,
-                    justify_content: JustifyContent::FlexStart,
-                    ..default()
-                },
-                BackgroundColor(base),
-            ))
-            .id();
-        for (label, width, title) in [
-            (song.name.as_str(), 40.0, true),
-            (song.artist.as_str(), 25.0, false),
-            (song.genre.as_str(), 20.0, false),
-            (song.difficulty.as_str(), 15.0, false),
-        ] {
-            spawn_song_cell(commands, row, label, width, title);
-        }
-        make_interactive(&mut commands.entity(row), base);
-        if focus_rows
-            && (state.selected.as_deref() == Some(path.as_str())
-                || (state.selected.is_none() && index == 0))
-        {
+        let row = commands.spawn_scene(song_row(song, index, selected)).id();
+        if focus_rows && (selected || (state.selected.is_none() && index == 0)) {
             commands.entity(row).insert(AutoFocus);
         }
-        // Layout changes can emit PointerOver beneath a stationary cursor.
-        // Only actual pointer movement should replace a keyboard selection.
-        let preview_path = path.clone();
-        commands.entity(row).observe(
-            move |event: On<bevy::picking::events::PointerMove>,
-                  mut state: ResMut<SongPickerState>,
-                  mut focus: ResMut<InputFocus>,
-                  mut visible: ResMut<InputFocusVisible>,
-                  inputs: Query<(), With<EditableText>>| {
-                if event.delta == Vec2::ZERO {
-                    return;
-                }
-                if state.selected.as_deref() != Some(preview_path.as_str()) {
-                    state.selected = Some(preview_path.clone());
-                }
-                if !focus.get().is_some_and(|entity| inputs.contains(entity)) {
-                    focus.set(row, FocusCause::Navigated);
-                    visible.0 = false;
-                }
-            },
-        );
-        commands.entity(row).observe(
-            move |_: On<Activate>,
-                  asset_server: Res<AssetServer>,
-                  mut page: ResMut<NextState<MenuPage>>,
-                  mut commands: Commands| {
-                commands
-                    .insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
-                page.set(MenuPage::HarpCheck);
-            },
-        );
         children.push(row);
     }
     for (entity, _) in existing {
@@ -1211,12 +1188,12 @@ mod tests {
     #[test]
     fn play_song_restores_last_view_after_a_jam_session() {
         let mut app = App::new();
-        app.init_resource::<SongPickerState>()
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin))
+            .init_resource::<SongPickerState>()
             .insert_resource(GameplayMode::Play2D)
             .init_resource::<NextState<MenuPage>>()
             .add_systems(Startup, |mut commands: Commands| {
-                let parent = commands.spawn_empty().id();
-                spawn_mode_toggle(&mut commands, parent, true);
+                commands.spawn_scene(mode_toggle(true));
             });
         app.update();
         let toggle = app
