@@ -78,8 +78,6 @@ Nothing below can be approved by a test.
 
 `docs/code_reduction_plan.md`, in order:
 
-- Shared helpers for the clones (buttons, panel buttons, 2D/3D note
-  visuals, expected-notes layer).
 - `bsn!` conversion, `artist_list.rs` first.
 - Comment trim: history narration, long `//!` headers, crate `CLAUDE.md`s.
 - Test builders and table-driven tests.
