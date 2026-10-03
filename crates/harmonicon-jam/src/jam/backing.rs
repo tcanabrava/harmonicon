@@ -31,7 +31,7 @@ use harmonicon_core::harmonica::{
 };
 use harmonicon_core::midi::{midi_to_freq_hz, note_to_midi};
 use harmonicon_core::wav::encode_wav;
-use harmonicon_song::song::{BackingStemAudio, NoteCube3dConfig, NoteThemeConfig, SongManifest};
+use harmonicon_song::song::{BackingStemAudio, NoteThemeConfig, SongManifest};
 
 mod humanize;
 mod preview;
@@ -973,8 +973,6 @@ pub fn assemble_generated_manifest(
         elements,
         assets_2d: None,
         assets_2d_config: NoteThemeConfig::default(),
-        assets_3d: None,
-        assets_3d_config: NoteCube3dConfig::default(),
         // A generated jam has no source file to have picked a track from,
         // so there is nothing for the harp-check picker to offer.
         source_tracks: Vec::new(),

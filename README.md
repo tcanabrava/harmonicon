@@ -6,8 +6,8 @@ and you play them on a *real harmonica* — Harmonicon listens to your
 microphone, detects the pitches you're playing in real time, and scores you on
 timing.
 
-It ships with two render modes (a clean 2D lane view and a 3D view with an
-animated harmonica model), a free-play **Jam Session** mode over a 12-bar blues
+It ships with two render modes (a clean 2D lane view and a perspective 3D lane
+view), a free-play **Jam Session** mode over a 12-bar blues
 backing, a guided **Lessons** curriculum, a **Bending Trainer**, a full
 in-game **song editor**, a live audio spectrogram, and a small toolchain for
 turning MIDI files into playable charts.
@@ -27,8 +27,8 @@ turning MIDI files into playable charts.
   - **2D** — falling notes, one lane per harmonica hole (sized from the
     chart's harmonica — 10-hole diatonic or chromatic), with a hit line, hole
     indicators, and a live score/combo HUD.
-  - **3D** — the same gameplay rendered around a 3D harmonica model that grooves
-    to the beat, with a configurable per-model hole layout.
+  - **3D** — the same gameplay on perspective lanes, with note ribbons and
+    a row of glowing hole pads.
 - **Jam Session** — free play over a rolling 12-bar blues chart and metronome,
   with a live hole map that highlights chord tones and blues-scale notes per
   bar of the cycle. A song authored from a MIDI file with its tracks kept
@@ -230,7 +230,7 @@ src/                   # Binaries + the composition root
     note_bench.rs      # Pitch-detection algorithm benchmark runner
 
 assets/
-  songs/<artist>/<song>/         # background/elements art, 2d/3d note layouts
+  songs/<artist>/<song>/         # background/elements art, 2d note layout
     song/                        #   the chart itself (*.harpchart) + either
                                  #   music.ogg/.wav or music.mid (per-track stems)
   lessons/<unit>/<lesson>/   # lesson.json + its own chart, for the Lessons curriculum
@@ -280,9 +280,6 @@ import instead: pick a `.mid`/`.midi` file, choose a track, and its notes
 drop straight onto the grid, auto-mapped onto the best-fitting harp key —
 reaching unavailable notes with a bend/slide where possible and snapping to
 the nearest playable note otherwise.
-
-The `scripts/` directory contains the Python helpers used to generate the 3D
-harmonica `.glb` models.
 
 ---
 

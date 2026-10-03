@@ -109,7 +109,7 @@ Covered in depth in their own chapters — this is the index:
   `ThemeJson` into a real `AssetServer`-loaded `Asset`.
 - [Chart Format and Asset Loading](chart-and-assets.md) /
   [Persistence](persistence.md): `assets_management`'s song/theme/
-  harmonica-model discovery, fixed with a `#[cfg]`-gated pair — native
+  note-theme discovery, fixed with a `#[cfg]`-gated pair — native
   keeps its real `std::fs::read_dir` scan unchanged, wasm reads a
   `build.rs`-generated manifest instead (built at *build* time, on the
   native host, regardless of the crate's own `--target`).
@@ -164,7 +164,7 @@ Verified via headless Chromium (checked for zero panics across a full
 run): WGPU initializes, localization loads, mic capture fails
 *gracefully* exactly like a real permission-less browser would
 (`MicStatus::Failed`, no panic — cpal simply has nothing to talk to
-under wasm), and bundled songs/themes/note-themes/harmonica-models all
+under wasm), and bundled songs/themes/note-themes all
 load correctly. What's explicitly still missing, none of which have a
 drop-in browser equivalent to reach for:
 

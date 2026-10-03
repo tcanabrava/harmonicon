@@ -43,7 +43,6 @@ fn generate_bundled_asset_manifest() {
     println!("cargo:rerun-if-env-changed=HARMONICON_SONGS_DIR");
     println!("cargo:rerun-if-changed=../../assets/themes");
     println!("cargo:rerun-if-changed=../../assets/notes");
-    println!("cargo:rerun-if-changed=../../assets/harmonicas");
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set by cargo");
     let dest = Path::new(&out_dir).join("asset_manifest.rs");

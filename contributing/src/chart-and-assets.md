@@ -99,8 +99,6 @@ class SongManifest {
   elements: Handle<Image>
   assets_2d: Option<AssetPath>
   assets_2d_config: NoteThemeConfig
-  assets_3d: Option<AssetPath>
-  assets_3d_config: NoteCube3dConfig
 }
 
 class BackingStemAudio {
@@ -170,8 +168,8 @@ else missing
   end
 end
 
-loader -> ctx : read_asset_bytes(2d/note_2d.*, 3d/note_3d.*)
-note right: Noted (AssetPath), not loaded here —\ngameplay_2d/gameplay_3d load these lazily,\nonly for the mode actually entered.
+loader -> ctx : read_asset_bytes(2d/note_2d.*)
+note right: Noted (AssetPath), not loaded here.
 @enduml
 ```
 
@@ -189,12 +187,9 @@ pack exists specifically to exercise this path: it ships *only* a chart,
 on purpose, so this fallback behavior has a real song to check it with
 (`docs/gameplay_validation.md`).
 
-**2D/3D note assets are noted, not loaded, here.** `assets_2d`/
-`assets_3d` are stored as an `AssetPath`, not a `Handle` — loading them
-here would make them a manifest dependency kept resident for the
-*entire* song regardless of which render mode (if either) actually gets
-entered. `gameplay_2d::setup`/`gameplay_3d::setup` load the matching one
-on demand, and free it again on exit.
+**The 2D note asset is noted, not loaded, here.** `assets_2d` is stored
+as an `AssetPath`, not a `Handle`, so it never becomes a manifest
+dependency kept resident for the whole song.
 
 ## Why the asset source matters: bundled vs. external
 

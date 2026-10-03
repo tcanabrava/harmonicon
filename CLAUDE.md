@@ -493,8 +493,8 @@ skills in `.claude/skills/`, loaded on demand rather than living here:
   against what's actually on disk, since nothing else does anymore now
   that nothing scans the directory at runtime. The same directory-listing
   constraint applies to anything else that might run under wasm.
-  `assets_management`'s song/note-theme/harmonica-model discovery
-  (`scan_all_songs`, `scan_note_themes`, `scan_harmonica_models`,
+  `assets_management`'s song/note-theme discovery
+  (`scan_all_songs`, `scan_note_themes`,
   `scan_ui_themes`) takes the build-time-manifest approach instead: each is
   now two `#[cfg]`-gated implementations under the same name — the original
   `std::fs::read_dir`-based body, unchanged, behind

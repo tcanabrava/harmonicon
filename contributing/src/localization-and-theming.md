@@ -72,9 +72,8 @@ for the next section.
 
 Themes have the same directory-listing problem localization did, but a
 critically different shape: while there are only three fixed locales, a
-player can drop an arbitrary number of new songs, themes, and harmonica
-models into `~/Harmonicon` on native **without a rebuild** — so
-`assets_management`'s song/theme/note-theme/harmonica-model discovery
+player can drop an arbitrary number of new songs and themes into `~/Harmonicon` on native **without a rebuild** — so
+`assets_management`'s song/theme/note-theme discovery
 *cannot* become a fixed compile-time list the way `LOCALES` did, without
 breaking that entirely. This is the one place the localization fix's own
 pattern had to be rejected, deliberately, rather than reused:
@@ -105,7 +104,7 @@ end note
 ```
 
 `assets_management`'s scan functions (`scan_all_songs`,
-`scan_note_themes`, `scan_harmonica_models`, `scan_ui_themes`) are each
+`scan_note_themes`, `scan_ui_themes`) are each
 two `#[cfg]`-gated implementations under the same name: the original
 `std::fs::read_dir`-based body, completely unchanged, behind
 `#[cfg(not(target_arch = "wasm32"))]`; and a `#[cfg(target_arch =

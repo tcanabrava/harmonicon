@@ -36,7 +36,7 @@ pub enum AppState {
     Results,
     /// Latency calibration screen (outside the menu sub-state hierarchy).
     Calibration,
-    /// Credits screen with scrolling text and 3D harmonica background.
+    /// Credits screen with scrolling text over the theme background.
     Credits,
     /// Song authoring tool, launched from the main menu.
     SongEditor2,

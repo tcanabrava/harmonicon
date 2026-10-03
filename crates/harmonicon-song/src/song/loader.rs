@@ -263,28 +263,6 @@ pub(super) async fn assemble_manifest(
             }
         };
 
-    // Note the song's own 3D GLB path if present (without loading it, same
-    // reasoning as 2D above). gameplay_3d::setup loads it with the
-    // `#Mesh0/Primitive0` label when entering a 3D game; otherwise it falls
-    // back to the selected theme's default mesh.
-    let glb_rel = sibling(song_folder.join("3d/note_3d.glb"));
-    let assets_3d: Option<AssetPath<'static>> =
-        match load_context.read_asset_bytes(glb_rel.clone()).await {
-            Ok(_) => Some(glb_rel),
-            Err(_) => None,
-        };
-
-    // 3D note layout: the song's own json if present, else the default
-    // circular.json layout (bundled source, same reasoning as 2D above).
-    let note_3d_json =
-        match load_context.read_asset_bytes(sibling(song_folder.join("3d/note_3d.json"))).await {
-            Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
-            Err(_) => {
-                let res = load_context.read_asset_bytes("notes/3d/circular.json").await;
-                String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
-            }
-        };
-
     Ok(SongManifest {
         path: song_folder,
         chart,
@@ -296,8 +274,6 @@ pub(super) async fn assemble_manifest(
         elements,
         assets_2d,
         assets_2d_config: serde_json::from_str(&note_2d_json).unwrap_or_default(),
-        assets_3d,
-        assets_3d_config: serde_json::from_str(&note_3d_json).unwrap_or_default(),
         source_tracks,
         source_track,
     })

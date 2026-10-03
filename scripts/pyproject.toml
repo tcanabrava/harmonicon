@@ -9,5 +9,4 @@ dependencies = [
     "pillow>=12.2.0",
     "scikit-image>=0.26.0",
     "scipy>=1.17.1",
-    "trimesh>=4.12.2",
 ]

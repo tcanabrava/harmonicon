@@ -77,10 +77,6 @@ pub struct SongManifest {
     /// `~/Harmonicon` drop folder). `None` → use the theme default.
     pub assets_2d: Option<AssetPath<'static>>,
     pub assets_2d_config: NoteThemeConfig,
-    /// Asset path of the song's own 3D note GLB, if it ships one. Lazily loaded
-    /// by `gameplay_3d::setup` (with the `#Mesh0/Primitive0` label) the same way.
-    pub assets_3d: Option<AssetPath<'static>>,
-    pub assets_3d_config: NoteCube3dConfig,
     /// Every playable part of the source file, each already converted onto
     /// its own best-fitting harmonica — see [`TrackChart`].
     ///
@@ -120,8 +116,6 @@ pub fn training_manifest(chart: HarpChart) -> SongManifest {
         elements: Handle::default(),
         assets_2d: None,
         assets_2d_config: NoteThemeConfig::default(),
-        assets_3d: None,
-        assets_3d_config: NoteCube3dConfig::default(),
         source_tracks: Vec::new(),
         source_track: None,
     }
@@ -171,22 +165,6 @@ pub struct NoteThemeConfig {
 impl Default for NoteThemeConfig {
     fn default() -> Self {
         Self { tail_x: 0.5, tail_y: 0.5, tail_width: 0.45, head: NoteHeadRect::default() }
-    }
-}
-
-/// Per-song 3D note layout. Loaded from the song's own `3d/note_3d.json` when it
-/// ships one, otherwise the default theme's `notes/3d/<theme>.json`.
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct NoteCube3dConfig {
-    /// Uniform scale applied to the cube head (relative to a lane-wide note).
-    pub head_scale: f32,
-    /// Tail ribbon width as a fraction of the note width.
-    pub tail_width: f32,
-}
-
-impl Default for NoteCube3dConfig {
-    fn default() -> Self {
-        Self { head_scale: 0.8, tail_width: 0.6 }
     }
 }
 

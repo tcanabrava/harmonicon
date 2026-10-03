@@ -13,7 +13,7 @@ pub fn color_default() -> Color {
 }
 
 /// Background for a "this option is currently selected" choice button —
-/// shared by any button-group picker (pitch algorithm, harmonica model, ...).
+/// shared by any button-group picker (pitch algorithm, note style, ...).
 pub const CHOICE_SELECTED: Color = Color::srgb(0.25, 0.45, 0.30);
 /// Hover background for an unselected choice button in the same group.
 pub const CHOICE_HOVER: Color = Color::srgb(0.20, 0.20, 0.32);
