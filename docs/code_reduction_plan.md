@@ -60,29 +60,16 @@ pairs differing only in the colour they write, and asset-loader trait
 boilerplate. Merging those would need generics that cost more clarity than
 lines; leave them unless one starts carrying real logic.
 
-## Phase 4 — Convert imperative UI to `bsn!` (~−2.5k)
+## `bsn!` conversion is not a size lever
 
-These are the files with the most imperative spawning, ranked by
-`spawn(`/`spawn_empty(`/`with_children` count:
-
-| File | Count |
-|---|---:|
-| `bending_trainer/layout.rs` | 51 |
-| `jam/session.rs` | 50 |
-| `menu/pages/artist_list.rs` | 42 |
-| `song_editor/meta_form.rs` | 37 |
-| `pause_menu.rs` | 36 |
-| `song_editor/panel.rs` | 36 |
-| `song_editor/ui.rs` | 34 |
-| `calibration.rs` | 33 |
-| `content_sources.rs` | 24 |
-| `results.rs` | 24 |
-
-Convert one screen per commit, and take a BRP screenshot before and after
-each one (`scripts/brpctl.py`) so a layout regression shows up as a picture
-rather than in prose. Do `artist_list.rs` first: it is the largest file in the
-tree, and splitting `setup_artist_list` into scene functions also takes it
-well under budget.
+Converting the song picker (`artist_list.rs`) to `bsn!` saved 12 lines
+(373 added, 385 removed). Since the `use_small_heuristics = "Max"`
+reformat, imperative struct literals mostly fit on one line, while rustfmt
+does not format inside `bsn!`, which needs `{...}` around every
+expression and puts one field per line. Convert a screen when the
+convention calls for it — a new screen, or one being reworked — not to
+cut lines. `dialogs::button::tinted` and `scripts/capture_static_screens.py`
+exist for that.
 
 ## Phase 5 — Comments (~−2k)
 
@@ -118,13 +105,12 @@ Coverage stays exactly the same. What shrinks is how each case is written:
 
 | Phase | Effort | Risk | Est. lines |
 |---|---|---|---:|
-| 4 `bsn!` conversion | ~1 week, incremental | medium (visual) | −2,500 |
 | 5 Comments | ~1 day | none | −2,000 |
 | 6 Test builders/tables | 2–3 days | low | −3,000 |
-| **Total** | | | **≈ −7,500 (−7%)** |
+| **Total** | | | **≈ −5,000 (−5%)** |
 
-Phase 5 shrinks the files without changing the code. Phases 4 and 6
-change its structure, and each lands as its own commit with
+Phase 5 shrinks the files without changing the code. Phase 6
+changes its structure, and lands as its own commit with
 `cargo test --features dev` and `cargo clippy --all-targets -- -D warnings`
 green.
 
