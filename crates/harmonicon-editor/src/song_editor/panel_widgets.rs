@@ -40,23 +40,12 @@ pub(super) fn button_content_text(style: ActionButtonStyle, icon: &str, label: &
     }
 }
 
-/// The shared button shell every panel button in this file builds on: a
-/// padded, bordered button with a tooltip and a single-line white label
-/// (rendered via [`button_content_text`]), observing one click handler.
-/// `mode_button`/`transport_button` are plain wrappers over this (the only
-/// two shapes here with no per-button extras). `mod_button`/
-/// `timeline_tool_button` need extra per-button children (`BendDot`, a
-/// swappable label, a `kind`-dependent observer body) that don't fit this
-/// shape cleanly, so they stay separate rather than forcing a
-/// less-readable shared abstraction onto them.
-fn spawn_button_shell<'a, M: 'static>(
+/// The bordered, padded, tooltipped button every panel button in this file
+/// is: no label and no click handler yet, so each shape below adds its own.
+fn spawn_shell<'a>(
     panel: &'a mut ChildSpawnerCommands,
     bg: Color,
-    label: LocalizedStr,
     tooltip: LocalizedStr,
-    icon: &str,
-    style: ActionButtonStyle,
-    on_click: impl bevy::ecs::system::IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
 ) -> EntityCommands<'a> {
     let mut ec = panel.spawn_empty();
     ec.apply_scene(bsn! {
@@ -70,15 +59,38 @@ fn spawn_button_shell<'a, M: 'static>(
         }
         ~{BorderColor::all(Color::srgb(0.30, 0.30, 0.40))}
         Tooltip({String::from(tooltip)})
-        on(on_click)
-        Children [
-            Text({button_content_text(style, icon, &label)})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({Color::WHITE})
-            ~{Pickable::IGNORE}
-        ]
     });
     make_interactive(&mut ec, bg);
+    ec
+}
+
+/// A shell's single-line white label.
+fn spawn_label<'a>(button: &'a mut ChildSpawnerCommands, text: String) -> EntityCommands<'a> {
+    let mut ec = button.spawn_empty();
+    ec.apply_scene(bsn! {
+        Text({text})
+        TextFont { font_size: {FontSize::Px(14.0)} }
+        TextColor({Color::WHITE})
+        ~{Pickable::IGNORE}
+    });
+    ec
+}
+
+/// A shell labelled via [`button_content_text`], observing one click handler.
+fn spawn_button_shell<'a, M: 'static>(
+    panel: &'a mut ChildSpawnerCommands,
+    bg: Color,
+    label: LocalizedStr,
+    tooltip: LocalizedStr,
+    icon: &str,
+    style: ActionButtonStyle,
+    on_click: impl bevy::ecs::system::IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
+) -> EntityCommands<'a> {
+    let text = button_content_text(style, icon, &label);
+    let mut ec = spawn_shell(panel, bg, tooltip);
+    ec.observe(on_click).with_children(|b| {
+        spawn_label(b, text);
+    });
     ec
 }
 
@@ -126,30 +138,12 @@ pub(super) fn timeline_tool_button(
         sel.drag = None;
         state.timeline_split = None;
     };
-    let mut ec = panel.spawn_empty();
-    ec.apply_scene(bsn! {
-        WidgetButton
-        TabIndex(0)
-        Node {
-            padding: {UiRect::axes(Val::Px(14.0), Val::Px(8.0))},
-            align_items: {AlignItems::Center},
-            justify_content: {JustifyContent::Center},
-            border: {UiRect::all(Val::Px(1.0))},
-        }
-        ~{kind}
-        ~{BorderColor::all(Color::srgb(0.30, 0.30, 0.40))}
-        Tooltip({String::from(tooltip)})
-        on(on_click)
-        Children [
-            Text({button_content_text(style, icon, &label)})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({Color::WHITE})
-            ~{Pickable::IGNORE}
-        ]
-    });
-    make_interactive(&mut ec, colors.btn_bg);
+    spawn_button_shell(panel, colors.btn_bg, label, tooltip, icon, style, on_click).insert(kind);
 }
 
+/// A note-technique toggle. Wah/Vibrato/Depth mark their label so
+/// `panel::update_mod_panel` can append a live value; Bend gets the dot it
+/// lights while a bend is armed.
 pub(super) fn mod_button(
     panel: &mut ChildSpawnerCommands,
     kind: ModButton,
@@ -159,50 +153,31 @@ pub(super) fn mod_button(
     style: ActionButtonStyle,
     colors: SongEditorColors,
 ) {
-    let mut ec = panel.spawn_empty();
-    ec.apply_scene(bsn! {
-        WidgetButton
-        TabIndex(0)
-        Node {
-            padding: {UiRect::axes(Val::Px(14.0), Val::Px(8.0))},
-            align_items: {AlignItems::Center},
-            justify_content: {JustifyContent::Center},
-            border: {UiRect::all(Val::Px(1.0))},
-        }
-        ~{kind}
-        ~{BorderColor::all(Color::srgb(0.30, 0.30, 0.40))}
-        Tooltip({String::from(tooltip)})
-    });
-    make_interactive(&mut ec, colors.btn_bg);
-    ec.observe(move |_: On<Activate>, mut state: ResMut<EditorState>| {
-        apply_modifier(&mut state, kind);
-    })
-    .with_children(|b| {
-        let base = button_content_text(style, icon, &label);
-        let mut text = b.spawn_empty();
-        text.apply_scene(bsn! {
-            Text({base.clone()})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({Color::WHITE})
-            ~{Pickable::IGNORE}
+    let base = button_content_text(style, icon, &label);
+    let mut ec = spawn_shell(panel, colors.btn_bg, tooltip);
+    ec.insert(kind)
+        .observe(move |_: On<Activate>, mut state: ResMut<EditorState>| {
+            apply_modifier(&mut state, kind);
+        })
+        .with_children(|b| {
+            let mut text = spawn_label(b, base.clone());
+            if matches!(kind, ModButton::Wah | ModButton::Vibrato | ModButton::Depth) {
+                text.insert(ModButtonLabel { kind, base });
+            }
+            if kind == ModButton::Bend {
+                b.spawn_empty().apply_scene(bsn! {
+                    BendDot
+                    Node {
+                        width: {Val::Px(10.0)},
+                        height: {Val::Px(10.0)},
+                        margin: {UiRect::left(Val::Px(6.0))},
+                    }
+                    BackgroundColor({Color::srgb(0.90, 0.20, 0.20)})
+                    ~{Visibility::Hidden}
+                    ~{Pickable::IGNORE}
+                });
+            }
         });
-        if matches!(kind, ModButton::Wah | ModButton::Vibrato | ModButton::Depth) {
-            text.insert(ModButtonLabel { kind, base });
-        }
-        if kind == ModButton::Bend {
-            b.spawn_empty().apply_scene(bsn! {
-                BendDot
-                Node {
-                    width: {Val::Px(10.0)},
-                    height: {Val::Px(10.0)},
-                    margin: {UiRect::left(Val::Px(6.0))},
-                }
-                BackgroundColor({Color::srgb(0.90, 0.20, 0.20)})
-                ~{Visibility::Hidden}
-                ~{Pickable::IGNORE}
-            });
-        }
-    });
 }
 
 pub(super) fn panel_separator(panel: &mut ChildSpawnerCommands) {

@@ -176,10 +176,15 @@ pub fn make_interactive<'a, 'b>(
         .observe(mouse_drag_end)
 }
 
-/// A compact button (no 220px min-width, smaller padding/font) for HUD-style
-/// controls. Same colours/hover as [`default`].
-pub fn small<M: 'static>(
+/// What every button below shares: keyboard focus, the hover/press tint
+/// (see [`BaseButtonColor`]), the click handler, and a white label
+/// (`justify` only matters once it wraps) centred in a node that keeps its natural size inside height-constrained scroll
+/// lists rather than being compressed to fit. Each public constructor
+/// patches the `Node` with its own sizing.
+fn interactive<M: 'static>(
     label: &str,
+    font_size: f32,
+    justify: Justify,
     on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
 ) -> impl Scene {
     bsn! {
@@ -196,16 +201,28 @@ pub fn small<M: 'static>(
         on(mouse_press_interrupted)
         on(mouse_drag_end)
         Node {
-            padding: {UiRect::axes(Val::Px(12.0), Val::Px(6.0))},
             justify_content: {JustifyContent::Center},
             flex_shrink: {0.0_f32},
         }
         Children [
             Text({label.to_string()})
-            TextFont { font_size: {FontSize::Px(15.0)} }
+            TextFont { font_size: {FontSize::Px(font_size)} }
             TextColor({Color::WHITE})
+            TextLayout { justify: {justify} }
             Pickable { should_block_lower: {false}, is_hoverable: {false} }
         ]
+    }
+}
+
+/// A compact button (no 220px min-width, smaller padding/font) for HUD-style
+/// controls. Same colours/hover as [`default`].
+pub fn small<M: 'static>(
+    label: &str,
+    on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
+) -> impl Scene {
+    bsn! {
+        @interactive(label, 15.0, Justify::Left, on_click)
+        Node { padding: {UiRect::axes(Val::Px(12.0), Val::Px(6.0))} }
     }
 }
 
@@ -223,32 +240,12 @@ pub fn sized<M: 'static>(
     on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
 ) -> impl Scene {
     bsn! {
-        WidgetButton
-        TabIndex(0)
-        BackgroundColor({color_default()})
-        BaseButtonColor({color_default()})
-        ButtonInteractionState
-        on(on_click)
-        on(mouse_over)
-        on(mouse_out)
-        on(mouse_press)
-        on(mouse_release)
-        on(mouse_press_interrupted)
-        on(mouse_drag_end)
+        @interactive(label, font_size, Justify::Center, on_click)
         Node {
             width: {Val::Px(width)},
             padding: {UiRect::axes(Val::Px(16.0), Val::Px(12.0))},
-            justify_content: {JustifyContent::Center},
             align_items: {AlignItems::Center},
-            flex_shrink: {0.0_f32},
         }
-        Children [
-                Text({label.to_string()})
-                TextFont { font_size: {FontSize::Px(font_size)} }
-                TextColor({Color::WHITE})
-                TextLayout { justify: {Justify::Center} }
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-        ]
     }
 }
 
@@ -261,31 +258,12 @@ pub fn icon<M: 'static>(
     on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
 ) -> impl Scene {
     bsn! {
-        WidgetButton
-        TabIndex(0)
-        BackgroundColor({color_default()})
-        BaseButtonColor({color_default()})
-        ButtonInteractionState
-        on(on_click)
-        on(mouse_over)
-        on(mouse_out)
-        on(mouse_press)
-        on(mouse_release)
-        on(mouse_press_interrupted)
-        on(mouse_drag_end)
+        @interactive(glyph, 20.0, Justify::Left, on_click)
         Node {
             width: {Val::Px(40.0)},
             height: {Val::Px(40.0)},
-            justify_content: {JustifyContent::Center},
             align_items: {AlignItems::Center},
-            flex_shrink: {0.0_f32},
         }
-        Children [
-                Text({glyph.to_string()})
-                TextFont { font_size: {FontSize::Px(20.0)} }
-                TextColor({Color::WHITE})
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-        ]
     }
 }
 
@@ -294,32 +272,11 @@ pub fn default<M: 'static>(
     on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
 ) -> impl Scene {
     bsn! {
-        WidgetButton
-        TabIndex(0)
-        BackgroundColor({color_default()})
-        BaseButtonColor({color_default()})
-        ButtonInteractionState
-        on(on_click)
-        on(mouse_over)
-        on(mouse_out)
-        on(mouse_press)
-        on(mouse_release)
-        on(mouse_press_interrupted)
-        on(mouse_drag_end)
+        @interactive(label, 20.0, Justify::Left, on_click)
         Node {
             min_width: {Val::Px(220.0)},
             padding: {UiRect::axes(Val::Px(28.0), Val::Px(12.0))},
-            justify_content: {JustifyContent::Center},
-            // Keep natural size inside height-constrained scroll lists (the file
-            // dialog) instead of being compressed to fit.
-            flex_shrink: {0.0_f32},
         }
-        Children [
-                Text({label.to_string()})
-                TextFont { font_size: {FontSize::Px(20.0)} }
-                TextColor({Color::WHITE})
-                Pickable { should_block_lower: {false}, is_hoverable: {false} }
-        ]
     }
 }
 
