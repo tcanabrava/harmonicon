@@ -14,7 +14,6 @@ harmonicon-app = { path = "../harmonicon-app", version = "*" }
 harmonicon-ui = { path = "../harmonicon-ui", version = "*" }
 bevy = { workspace = true }
 rand = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]

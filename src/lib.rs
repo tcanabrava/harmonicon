@@ -19,8 +19,8 @@ use bevy::image::ImageSamplerDescriptor;
 use bevy::prelude::*;
 
 /// Reverse-DNS app id. On Wayland the icon comes from a matching desktop file
-/// (`<APP_ID>.desktop`); this sets the window's app_id so the compositor can find
-/// it. On X11/Windows/macOS the pixel icon set in `set_window_icon` is used.
+/// (`<APP_ID>.desktop`); this sets the window's app_id so the compositor can
+/// find it. The game sets no window icon of its own on other platforms.
 const APP_ID: &str = "io.github.tcanabrava.Harmonicon";
 
 use harmonicon_app::app::AppState;

@@ -11,10 +11,8 @@ publish = false
 [dependencies]
 harmonicon-core = { path = "../harmonicon-core" }
 harmonicon-dsp = { path = "../harmonicon-dsp" }
-serde = { workspace = true }
 bevy = { workspace = true }
 cpal = { workspace = true }
-rustfft = { workspace = true }
 crossbeam-channel = { workspace = true }
 rodio = { workspace = true }
 

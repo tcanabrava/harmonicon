@@ -2361,7 +2361,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa8876b300ab35ba921adea3dfd70157a46249b33f95c9084ae5709785478946"
 dependencies = [
  "clap_builder",
- "clap_derive",
 ]
 
 [[package]]
@@ -2370,22 +2369,8 @@ version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0797fb7aeb1406c84efac526901f7ec3ead2124f946b494e72879d4b54704d"
 dependencies = [
- "anstream",
  "anstyle",
  "clap_lex",
- "strsim",
-]
-
-[[package]]
-name = "clap_derive"
-version = "4.6.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9c751b79415d4e559e3d1fcf128e09e720eb673a06d26cf6f392d37d75b66e0"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn 3.0.6",
 ]
 
 [[package]]
@@ -4594,11 +4579,7 @@ name = "harmonicon"
 version = "0.0.13"
 dependencies = [
  "bevy",
- "clap",
- "cpal",
- "crossbeam-channel",
  "dirs",
- "figment",
  "getrandom 0.3.4",
  "getrandom 0.4.3",
  "harmonicon-app",
@@ -4615,21 +4596,12 @@ dependencies = [
  "harmonicon-platform",
  "harmonicon-song",
  "harmonicon-ui",
- "image",
  "jsonschema",
- "midly",
- "notify-debouncer-full",
- "rand",
  "regex",
- "rodio",
- "rustfft",
- "serde",
  "serde_json",
  "skrifa 0.47.0",
  "tempfile",
- "thiserror 2.0.21",
  "wesl",
- "winit",
 ]
 
 [[package]]
@@ -4648,7 +4620,6 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "figment",
- "harmonicon-audio",
  "harmonicon-core",
  "harmonicon-platform",
  "harmonicon-song",
@@ -4668,8 +4639,6 @@ dependencies = [
  "harmonicon-dsp",
  "jni 0.21.1",
  "rodio",
- "rustfft",
- "serde",
 ]
 
 [[package]]
@@ -4719,8 +4688,6 @@ dependencies = [
  "harmonicon-ui",
  "jsonschema",
  "midly",
- "rand",
- "serde",
  "serde_json",
 ]
 
@@ -4737,7 +4704,6 @@ dependencies = [
  "harmonicon-song",
  "harmonicon-ui",
  "rand",
- "serde",
  "serde_json",
 ]
 
@@ -4747,7 +4713,6 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "criterion",
- "dirs",
  "harmonicon-app",
  "harmonicon-audio",
  "harmonicon-core",
@@ -4755,10 +4720,7 @@ dependencies = [
  "harmonicon-platform",
  "harmonicon-song",
  "harmonicon-ui",
- "jsonschema",
- "midly",
  "rand",
- "serde",
  "serde_json",
 ]
 
@@ -4782,7 +4744,6 @@ name = "harmonicon-menu"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "dirs",
  "harmonicon-app",
  "harmonicon-audio",
  "harmonicon-core",
@@ -4793,11 +4754,8 @@ dependencies = [
  "harmonicon-platform",
  "harmonicon-song",
  "harmonicon-ui",
- "jsonschema",
- "midly",
  "pulldown-cmark",
  "rand",
- "serde",
  "serde_json",
 ]
 
@@ -4891,8 +4849,6 @@ dependencies = [
  "harmonicon-core",
  "harmonicon-platform",
  "harmonicon-song",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -8011,12 +7967,6 @@ dependencies = [
  "phf_shared",
  "precomputed-hash",
 ]
-
-[[package]]
-name = "strsim"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"

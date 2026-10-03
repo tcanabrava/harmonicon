@@ -5,14 +5,17 @@ edition = "2024"
 license = "MIT"
 publish = false
 
+# Only referenced from [features], to forward `dev`/`trace_tracy` to it;
+# cargo-machete reads source, not features.
+[package.metadata.cargo-machete]
+ignored = ["harmonicon-song"]
+
 [dependencies]
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
 harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
 harmonicon-platform = { path = "../harmonicon-platform", version = "*" }
 harmonicon-song = { path = "../harmonicon-song", version = "*" }
 harmonicon-app = { path = "../harmonicon-app", version = "*" }
-serde = { workspace = true }
-serde_json = { workspace = true }
 dirs = { workspace = true }
 bevy = { workspace = true }
 

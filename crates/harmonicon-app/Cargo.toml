@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 harmonicon-core = { path = "../harmonicon-core", version = "*" }
-harmonicon-audio = { path = "../harmonicon-audio", version = "*" }
 harmonicon-platform = { path = "../harmonicon-platform", version = "*" }
 harmonicon-song = { path = "../harmonicon-song", version = "*" }
 figment = { workspace = true }

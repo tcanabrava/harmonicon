@@ -14,6 +14,11 @@ publish = false
 # docs/physical_design_plan.md). Keeping the game itself here rather than
 # moving it to crates/harmonicon means assets/, build.rs and tests/ all stay
 # put, so the split lands one crate at a time instead of all at once.
+# Only referenced from [features], to forward `dev`/`trace_tracy` to it;
+# cargo-machete reads source, not features.
+[package.metadata.cargo-machete]
+ignored = ["harmonicon-editor"]
+
 [workspace]
 members = ["crates/*"]
 # Without this, a bare `cargo test` at the root selects only the root
@@ -82,30 +87,10 @@ harmonicon-bench = { path = "crates/harmonicon-bench", version = "*" }
 # `wav` lets bevy_audio decode the in-memory WAV the song editor synthesises for
 # its Play button (and user-supplied .wav background tracks).
 bevy = { workspace = true }
-cpal = { workspace = true }
-rustfft = { workspace = true }
-crossbeam-channel = { workspace = true }
-# Audio decode for Song Editor tempo analysis (ogg via lewton; matches the
-# version bevy_audio already pulls in, so no duplicate rodio).
-rodio = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 jsonschema = { workspace = true }
-thiserror = { workspace = true }
-midly = { workspace = true }
-figment = { workspace = true }
 dirs = { workspace = true }
-# Window icon: winit must match Bevy's version; image decodes the PNG.
-winit = "0.30"
-image = { workspace = true }
 regex = "1.13.1"
-rand = { workspace = true }
-clap = { version = "4.6.7", features = ["derive"] }
-# Watches ~/Harmonicon (songs/, themes/) so drop-in content is picked up
-# live instead of needing a manual refresh or restart. crossbeam-channel
-# feature: bridges the watcher's background thread into ECS the same way
-# audio_input.rs already bridges the mic capture thread.
-notify-debouncer-full = { workspace = true }
 
 [features]
 # Local iteration: Bevy's dev tools + asset file watcher. Never ship it.
