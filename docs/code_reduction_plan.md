@@ -71,20 +71,10 @@ convention calls for it — a new screen, or one being reworked — not to
 cut lines. `dialogs::button::tinted` and `scripts/capture_static_screens.py`
 exist for that.
 
-## Phase 5 — Comments (~−2k)
-
-- Remove history narration: the 100 lines matching `used to|previously|no
-  longer|before this|originally|an earlier version|the old`. Where a line
-  carries a real constraint, restate it as a present-tense rule.
-- Shorten `//!` headers over ~15 lines: 101 blocks, led by `build.rs` (73),
-  `lesson_tree/mod.rs` (41) and `song_progress_overlay.rs` (40). Move design
-  rationale into the `contributing/` chapter for that subsystem, and keep only
-  what a reader needs at the call site.
-- The per-crate `CLAUDE.md` files aren't Rust, but they suffer from the same
-  problem: `harmonicon-editor/CLAUDE.md` is 906 lines, mostly feature history.
-  Trim them alongside the Rust comments; the root `CLAUDE.md` also repeats its
-  `dev` feature and `harmonicon-core` test paragraphs twice.
-- Comment-only commits need no build (`feedback_no_verify_comment_only_edits`).
+Comments narrating history are rewritten as the rule they explained
+(~130 Rust lines, plus the CLAUDE.md files). What remains is mostly dense
+design rationale; cutting it further would lose knowledge rather than
+padding, so it is left alone.
 
 ## Phase 6 — Tests (~−3k, no coverage lost)
 
@@ -105,12 +95,10 @@ Coverage stays exactly the same. What shrinks is how each case is written:
 
 | Phase | Effort | Risk | Est. lines |
 |---|---|---|---:|
-| 5 Comments | ~1 day | none | −2,000 |
 | 6 Test builders/tables | 2–3 days | low | −3,000 |
-| **Total** | | | **≈ −5,000 (−5%)** |
+| **Total** | | | **≈ −3,000 (−3%)** |
 
-Phase 5 shrinks the files without changing the code. Phase 6
-changes its structure, and lands as its own commit with
+Phase 6 changes the tests' structure and lands as its own commit with
 `cargo test --features dev` and `cargo clippy --all-targets -- -D warnings`
 green.
 

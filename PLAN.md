@@ -78,7 +78,6 @@ Nothing below can be approved by a test.
 
 `docs/code_reduction_plan.md`, in order:
 
-- Comment trim: history narration, long `//!` headers, crate `CLAUDE.md`s.
 - Test builders and table-driven tests.
 
 ## Release (1.0, desktop)
