@@ -12,26 +12,14 @@ fn manifest(
     trainings: bool,
 ) -> LessonManifest {
     LessonManifest {
-        id: id.to_string(),
-        unit: unit.to_string(),
-        optional: false,
         track: Some(track.to_string()),
-        title_key: format!("lesson-{id}-title"),
-        body_key: format!("lesson-{id}-body"),
-        chart: None,
-        aural: false,
-        prerequisites: prerequisites.iter().map(|s| s.to_string()).collect(),
-        pass_criteria: None,
         training: trainings.then(|| TrainingBlock {
             technique: "bend".to_string(),
             holes: vec![2],
             seed: None,
         }),
-        progression: None,
-        scale: None,
-        diagram: None,
-        widgets: Vec::new(),
-        position_cycle: false,
+        prerequisites: prerequisites.iter().map(|s| s.to_string()).collect(),
+        ..LessonManifest::new(id, unit)
     }
 }
 

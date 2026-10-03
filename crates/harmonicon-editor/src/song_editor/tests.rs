@@ -282,25 +282,14 @@ fn serialize_lesson_writes_elective_only_when_selected() {
 #[test]
 fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
     let manifest = LessonManifest {
-        id: "hand-wah".into(),
-        unit: "blowing".into(),
-        optional: false,
-        track: None,
-        training: None,
         title_key: "t".into(),
         body_key: "b".into(),
-        chart: None,
-        aural: false,
         prerequisites: vec!["single-note".into()],
         pass_criteria: Some(PassCriteria::Technique {
             technique: "wah-wah".into(),
             threshold: 0.5,
         }),
-        progression: None,
-        scale: None,
-        diagram: None,
-        widgets: Vec::new(),
-        position_cycle: false,
+        ..LessonManifest::new("hand-wah", "blowing")
     };
     let mut s = EditorState::default();
     populate_from_lesson_manifest(&manifest, &mut s);
@@ -318,22 +307,11 @@ fn populate_from_lesson_manifest_round_trips_a_technique_criterion() {
 #[test]
 fn populate_from_lesson_manifest_defaults_pass_criteria_to_none_when_absent() {
     let manifest = LessonManifest {
-        id: "x".into(),
-        unit: "u".into(),
-        optional: false,
-        track: None,
-        training: None,
         title_key: "t".into(),
         body_key: "b".into(),
-        chart: None,
-        aural: false,
-        prerequisites: Vec::new(),
-        pass_criteria: None,
         progression: Some("standard".into()),
         scale: Some("major".into()),
-        diagram: None,
-        widgets: Vec::new(),
-        position_cycle: false,
+        ..LessonManifest::new("x", "u")
     };
     let mut s = EditorState::default();
     populate_from_lesson_manifest(&manifest, &mut s);

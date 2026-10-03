@@ -5,22 +5,8 @@ use super::*;
 /// A manifest with only the fields this module reads.
 fn lesson(id: &str, unit: &str, prerequisites: &[&str]) -> LessonManifest {
     LessonManifest {
-        id: id.to_string(),
-        unit: unit.to_string(),
-        optional: false,
-        track: None,
-        training: None,
-        title_key: format!("lesson-{id}-title"),
-        body_key: format!("lesson-{id}-body"),
-        chart: None,
-        aural: false,
         prerequisites: prerequisites.iter().map(|s| s.to_string()).collect(),
-        pass_criteria: None,
-        progression: None,
-        scale: None,
-        diagram: None,
-        widgets: Vec::new(),
-        position_cycle: false,
+        ..LessonManifest::new(id, unit)
     }
 }
 

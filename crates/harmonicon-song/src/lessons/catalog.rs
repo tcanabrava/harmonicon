@@ -245,27 +245,7 @@ mod tests {
     use harmonicon_packs::pack::PackKind;
 
     fn entry(id: &str, unit: &str) -> LessonEntry {
-        LessonEntry {
-            manifest: LessonManifest {
-                id: id.into(),
-                unit: unit.into(),
-                optional: false,
-                track: None,
-                training: None,
-                title_key: format!("lesson-{id}-title"),
-                body_key: format!("lesson-{id}-body"),
-                chart: None,
-                aural: false,
-                prerequisites: Vec::new(),
-                pass_criteria: None,
-                progression: None,
-                scale: None,
-                diagram: None,
-                widgets: Vec::new(),
-                position_cycle: false,
-            },
-            chart_asset_path: None,
-        }
+        LessonEntry { manifest: LessonManifest::new(id, unit), chart_asset_path: None }
     }
 
     // ── group_by_unit ─────────────────────────────────────────────────────────

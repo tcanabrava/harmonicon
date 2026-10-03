@@ -270,6 +270,30 @@ pub fn parse_lesson(bytes: &[u8]) -> Result<LessonManifest, String> {
 }
 
 impl LessonManifest {
+    /// A core lesson with only an id and a unit: its text keys follow the
+    /// packs' `lesson-<id>-title`/`-body` convention and every optional
+    /// field is empty. Set the rest with struct-update syntax.
+    pub fn new(id: &str, unit: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            unit: unit.to_string(),
+            optional: false,
+            track: None,
+            training: None,
+            title_key: format!("lesson-{id}-title"),
+            body_key: format!("lesson-{id}-body"),
+            chart: None,
+            aural: false,
+            prerequisites: Vec::new(),
+            pass_criteria: None,
+            progression: None,
+            scale: None,
+            diagram: None,
+            widgets: Vec::new(),
+            position_cycle: false,
+        }
+    }
+
     /// The skill-tree row this lesson belongs to, falling back to its unit
     /// when it declares no `track` of its own.
     pub fn track(&self) -> &str {

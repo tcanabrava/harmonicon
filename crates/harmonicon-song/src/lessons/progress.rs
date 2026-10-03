@@ -90,22 +90,8 @@ mod tests {
 
     fn manifest(id: &str, prereqs: &[&str]) -> LessonManifest {
         LessonManifest {
-            id: id.into(),
-            unit: "blowing".into(),
-            optional: false,
-            track: None,
-            training: None,
-            title_key: format!("lesson-{id}-title"),
-            body_key: format!("lesson-{id}-body"),
-            chart: None,
-            aural: false,
             prerequisites: prereqs.iter().map(|s| s.to_string()).collect(),
-            pass_criteria: None,
-            progression: None,
-            scale: None,
-            diagram: None,
-            widgets: Vec::new(),
-            position_cycle: false,
+            ..LessonManifest::new(id, "blowing")
         }
     }
 

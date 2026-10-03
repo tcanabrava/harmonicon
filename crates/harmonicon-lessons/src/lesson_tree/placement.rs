@@ -302,22 +302,8 @@ mod tests {
     fn lesson(id: &str, unit: &str) -> LessonEntry {
         LessonEntry {
             manifest: LessonManifest {
-                id: id.to_string(),
-                unit: unit.to_string(),
-                optional: false,
                 track: Some("bend".to_string()),
-                title_key: format!("lesson-{id}-title"),
-                body_key: format!("lesson-{id}-body"),
-                chart: None,
-                aural: false,
-                prerequisites: Vec::new(),
-                pass_criteria: None,
-                training: None,
-                progression: None,
-                scale: None,
-                diagram: None,
-                widgets: Vec::new(),
-                position_cycle: false,
+                ..LessonManifest::new(id, unit)
             },
             chart_asset_path: None,
         }
