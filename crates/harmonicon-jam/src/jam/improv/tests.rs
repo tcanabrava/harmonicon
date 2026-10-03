@@ -8,12 +8,7 @@ use super::*;
 
 /// Standard Richter C diatonic, matching `harmonica.rs`'s test layout.
 fn c_harp() -> Harmonica {
-    serde_json::from_str(
-        r#"{"type":"diatonic","holes":10,"bending_profile":"richter_standard",
-            "layout":{"blow":["C4","E4","G4","C5","E5","G5","C6","E6","G6","C7"],
-                      "draw":["D4","G4","B4","D5","F5","A5","B5","D6","F6","A6"]}}"#,
-    )
-    .unwrap()
+    harmonicon_core::harmonica::richter_harp("C")
 }
 
 // ── ImprovStats ───────────────────────────────────────────────────────────
