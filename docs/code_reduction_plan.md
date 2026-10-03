@@ -17,28 +17,25 @@ Re-run them after each phase; the phase is done when its target moves.
 
 | Kind | Lines | Share |
 |---|---:|---:|
-| Code | 48,128 | 47% |
+| Code | 47,935 | 46% |
 | Tests | 28,062 | 27% |
-| Comments | 18,563 | 18% |
-| Blank | 8,600 | 8% |
-| **Total** | **103,353** | |
+| Comments | 18,570 | 18% |
+| Blank | 8,612 | 8% |
+| **Total** | **103,179** | |
 
 Gameplay and the Song Editor together hold over 40% of the total.
 
 **There isn't much copy-paste.** Only about 2.1k normalised non-test lines (4%
 of the code) sit in a repeated 6-line run, or 3.6k counting tests. Removing
 clones, then, saves a few thousand lines at most. Most of the size comes
-from three sources:
+from two sources:
 
-1. **Boilerplate around the same resource sets.** There are 2,098
-   one-per-line system parameters. Several groups of them travel together in
-   every signature; the worst case is listed under Phase 2.
-2. **Imperative UI.** There are 736 `spawn(`/`spawn_empty(` calls against
+1. **Imperative UI.** There are 736 `spawn(`/`spawn_empty(` calls against
    265 `bsn!` blocks, which breaks the "UI is authored with `bsn!`" convention.
    Imperative spawning takes 2–3× the lines of the same tree in `bsn!`.
    `artist_list.rs` alone has 1,141 code lines, 0 `bsn!` blocks and a
    330-line `setup_artist_list`.
-3. **Comment volume.** At 18.5k lines, comments make up 22% of non-blank
+2. **Comment volume.** At 18.5k lines, comments make up 22% of non-blank
    lines: 101 blocks run 15 lines or more (2,177 lines in total), and 100
    comment lines narrate history ("used to", "previously", "before this").
    That breaks the rule that comments explain current behaviour only.
@@ -48,28 +45,11 @@ it would save another ~1.9k lines, but it packs several system parameters
 onto one line, which makes Bevy signatures harder to scan. A future
 formatting-only commit goes in `.git-blame-ignore-revs`.
 
-## Phase 2 — Fold repeated resource groups into `SystemParam`s (~−600)
-
-There are no `#[derive(SystemParam)]` bundles in the workspace today. Each of
-the following removes a parameter list that is repeated verbatim:
-
-- **`harmonicon-platform/src/settings.rs`**: lists the same 13 persisted
-  resources five times: the `mark_settings_dirty` run condition,
-  `apply_loaded_settings`, `save_current`, `tick_pending_save` and
-  `flush_pending_save_on_exit`. Replace them with one `PersistedSettings`
-  `SystemParam` that has `to_settings()`, `apply(Settings)` and
-  `is_changed()`. This also stops a new setting from going unsaved because one
-  of the five copies was missed. ~−120.
-- **Editor transport (`song_editor::transport`, `mod_panel`)**:
-  `stop_record(&mut state, &playing, &mut record, &mut playhead, &mut
-  pitch_range, &mut count_in, &mut commands)` appears 8+ times, and each
-  closure redeclares those 7–12 parameters. A `Transport` `SystemParam` with
-  `stop_all()`, `stop_record()`, `start_playback()` and `start_practice()`
-  methods cuts each button closure to a few lines. ~−200 across `transport.rs`
-  and `mod_panel.rs`.
-- **Recurring pairs**: `Res<Localization>` (109 times) plus `Res<LoadedTheme>`
-  (37 times) in menu and gameplay setup systems can share one `UiCtx` param.
-  Only adopt it where both are actually used.
+Resource groups repeated verbatim across signatures are already bundled
+(`settings::PersistedSettings`, `song_editor::transport::Transport`). A
+`Localization` + `LoadedTheme` bundle was considered and dropped: only 22
+systems take both, so it would save ~22 lines while renaming every use in
+their bodies. Bundle a group when it recurs as a *list*, not as a pair.
 
 ## Phase 3 — Real clones (~−1.5k code)
 
@@ -179,14 +159,13 @@ Coverage stays exactly the same. What shrinks is how each case is written:
 
 | Phase | Effort | Risk | Est. lines |
 |---|---|---|---:|
-| 2 `SystemParam` bundles | ~1 day | low | −600 |
 | 3 Clones | 2–3 days | low–medium (2D/3D) | −1,500 |
 | 4 `bsn!` conversion | ~1 week, incremental | medium (visual) | −2,500 |
 | 5 Comments | ~1 day | none | −2,000 |
 | 6 Test builders/tables | 2–3 days | low | −3,000 |
-| **Total** | | | **≈ −9,600 (−9%)** |
+| **Total** | | | **≈ −9,000 (−9%)** |
 
-Phase 5 shrinks the files without changing the code. Phases 2–4 and 6
+Phase 5 shrinks the files without changing the code. Phases 3, 4 and 6
 change its structure, and each lands as its own commit with
 `cargo test --features dev` and `cargo clippy --all-targets -- -D warnings`
 green.
