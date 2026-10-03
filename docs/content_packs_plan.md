@@ -64,8 +64,8 @@ locales/<lang>.ftl             unit-* and track-* names
    content moves to phase 6, where the content keys leave `ui.ftl`.
 4. ~~**Startup sync**~~ — landed: `content_sync` and the
    `AppState::Syncing` screen. **Until the two official repositories have a
-   commit, a fresh install cannot get past that screen** (it shows "the
-   repository has no commits yet" with Retry and Quit) — phase 6 has to
+   commit, a fresh install cannot download that content** (it shows "the
+   repository has no commits yet" with Retry, Continue, and Quit) — phase 6 has to
    populate them before this ships.
 5. ~~**Options UI**~~ — landed: Options → Lessons & songs
    (`pages::content_sources`). Not built: following a branch or tag other

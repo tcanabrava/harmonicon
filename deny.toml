@@ -53,7 +53,7 @@ exclude-unpublished = true
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# Bevy is pinned to the `v0.20.0-rc.1` tag: a release candidate is not
+# Bevy is pinned to the `v0.20.0-rc.2` tag: a release candidate is not
 # published to crates.io, so the git source is the only way to get it.
 # Remove this entry — and the `git`/`tag` keys in `Cargo.toml` — once
 # 0.20.0 final is on crates.io.

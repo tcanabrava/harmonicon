@@ -23,6 +23,7 @@ use bevy::ui_widgets::Activate;
 use bevy::ui_widgets::Button as WidgetButton;
 use bevy::ui_widgets::ScrollArea;
 
+use super::confirm_dialog::{ConfirmChosen, OpenConfirmDialog};
 use crate::dialogs::button;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
@@ -79,7 +80,10 @@ pub struct FileDialog {
     pub mode: DialogMode,
     /// Current contents of the filename text field (Save mode only).
     save_filename: String,
+    pending_overwrite: Option<PathBuf>,
 }
+
+const OVERWRITE_PURPOSE: DialogId = DialogId("file-overwrite");
 
 #[derive(Component, Default, Clone)]
 struct FileDialogRoot;
@@ -153,6 +157,7 @@ fn handle_open(
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("/"));
 
+    dialog.pending_overwrite = None;
     dialog.open = true;
     dialog.dir = std::fs::canonicalize(&start).unwrap_or(start);
     dialog.extensions = req.extensions.clone();
@@ -241,10 +246,12 @@ fn handle_open(
                     on(|_: On<Activate>,
                         mut dialog: ResMut<FileDialog>,
                         mut chosen: MessageWriter<FileChosen>,
+                        mut confirm: MessageWriter<OpenConfirmDialog>,
+                        loc: Res<Localization>,
                         roots: Query<Entity, With<FileDialogRoot>>,
                         next: ResMut<NextState<FileDialogState>>,
                         mut commands: Commands| {
-                        confirm_save(&mut dialog, &mut chosen, &roots, next, &mut commands);
+                        confirm_save(&mut dialog, &mut chosen, &mut confirm, &loc, &roots, next, &mut commands);
                     })
                     Children [
                         Text({"Save".to_string()})
@@ -364,20 +371,35 @@ fn spawn_file_entry(parent: &mut ChildSpawnerCommands, label: String, path: Path
     ));
 }
 
-/// Confirm a save: emit [`FileChosen`] with `dir/filename` and close.
+/// Confirm a save, asking before replacing an existing destination.
 /// Does nothing if the filename field is empty.
 fn confirm_save(
     dialog: &mut FileDialog,
     chosen: &mut MessageWriter<FileChosen>,
+    confirm: &mut MessageWriter<OpenConfirmDialog>,
+    loc: &Localization,
     roots: &Query<Entity, With<FileDialogRoot>>,
     next: ResMut<NextState<FileDialogState>>,
     commands: &mut Commands,
 ) {
-    if dialog.save_filename.is_empty() {
+    if dialog.save_filename.is_empty() || dialog.pending_overwrite.is_some() {
         return;
     }
     if let Some(purpose) = dialog.purpose {
         let path = dialog.dir.join(&dialog.save_filename);
+        if path.symlink_metadata().is_ok() {
+            confirm.write(OpenConfirmDialog {
+                purpose: OVERWRITE_PURPOSE,
+                message: String::from(
+                    loc.msg_args("dialog-overwrite", &[("path", path.display().to_string())]),
+                ),
+            });
+            dialog.pending_overwrite = Some(path);
+            for root in roots {
+                commands.entity(root).insert(Visibility::Hidden);
+            }
+            return;
+        }
         chosen.write(FileChosen { purpose, path });
     }
     close(dialog, roots, next, commands);
@@ -410,8 +432,14 @@ fn dialog_keys(
     next_state: ResMut<NextState<FileDialogState>>,
     mut refresh_req: MessageWriter<RefreshFileList>,
     mut chosen: MessageWriter<FileChosen>,
+    mut confirm: MessageWriter<OpenConfirmDialog>,
+    loc: Res<Localization>,
     mut commands: Commands,
 ) {
+    if dialog.pending_overwrite.is_some() {
+        key_events.clear();
+        return;
+    }
     match &dialog.mode {
         DialogMode::Save { .. } => {
             // Collect the action first so `next_state` isn't moved inside a loop.
@@ -452,9 +480,15 @@ fn dialog_keys(
             }
 
             match act {
-                Act::Confirm => {
-                    confirm_save(&mut dialog, &mut chosen, &roots, next_state, &mut commands)
-                }
+                Act::Confirm => confirm_save(
+                    &mut dialog,
+                    &mut chosen,
+                    &mut confirm,
+                    &loc,
+                    &roots,
+                    next_state,
+                    &mut commands,
+                ),
                 Act::Cancel => close(&mut dialog, &roots, next_state, &mut commands),
                 Act::None => {}
             }
@@ -473,12 +507,40 @@ fn dialog_keys(
     }
 }
 
+/// Keep the file picker open on refusal, preserving the chosen folder and
+/// filename. The accepted path is the one originally shown in the question.
+fn handle_overwrite(
+    mut replies: MessageReader<ConfirmChosen>,
+    mut dialog: ResMut<FileDialog>,
+    mut chosen: MessageWriter<FileChosen>,
+    roots: Query<Entity, With<FileDialogRoot>>,
+    next: ResMut<NextState<FileDialogState>>,
+    mut commands: Commands,
+) {
+    for reply in replies.read().filter(|r| r.purpose == OVERWRITE_PURPOSE) {
+        let Some(path) = dialog.pending_overwrite.take() else {
+            continue;
+        };
+        if reply.confirmed {
+            if let Some(purpose) = dialog.purpose {
+                chosen.write(FileChosen { purpose, path });
+            }
+            close(&mut dialog, &roots, next, &mut commands);
+            return;
+        }
+        for root in &roots {
+            commands.entity(root).insert(Visibility::Inherited);
+        }
+    }
+}
+
 fn close(
     dialog: &mut FileDialog,
     roots: &Query<Entity, With<FileDialogRoot>>,
     mut next_state: ResMut<NextState<FileDialogState>>,
     commands: &mut Commands,
 ) {
+    dialog.pending_overwrite = None;
     dialog.open = false;
     dialog.purpose = None;
     for e in roots {
@@ -499,7 +561,9 @@ impl Plugin for FileDialogsPlugin {
             .add_systems(Update, handle_open.run_if(in_state(FileDialogState::Closed)))
             .add_systems(
                 Update,
-                (refresh, sync_save_filename, dialog_keys).run_if(in_state(FileDialogState::Open)),
+                (refresh, sync_save_filename, dialog_keys, handle_overwrite)
+                    .chain()
+                    .run_if(in_state(FileDialogState::Open)),
             );
     }
 }
@@ -528,5 +592,90 @@ mod tests {
     fn list_dir_filter_is_case_insensitive_and_skips_hidden() {
         let (dirs, _) = list_dir(&asset_root("assets"), &[]);
         assert!(dirs.iter().all(|d| !file_name(d).starts_with('.')));
+    }
+
+    fn request_save(
+        mut dialog: ResMut<FileDialog>,
+        mut chosen: MessageWriter<FileChosen>,
+        mut confirm: MessageWriter<OpenConfirmDialog>,
+        loc: Res<Localization>,
+        roots: Query<Entity, With<FileDialogRoot>>,
+        next: ResMut<NextState<FileDialogState>>,
+        mut commands: Commands,
+    ) {
+        confirm_save(&mut dialog, &mut chosen, &mut confirm, &loc, &roots, next, &mut commands);
+    }
+
+    fn save_world(name: &str, existing: bool) -> (World, PathBuf) {
+        let dir =
+            std::env::temp_dir().join(format!("harmonicon-picker-{}-{name}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        if existing {
+            std::fs::write(dir.join("chart.harpchart"), "original").unwrap();
+        }
+        let mut world = World::new();
+        world.init_resource::<Messages<FileChosen>>();
+        world.init_resource::<Messages<OpenConfirmDialog>>();
+        world.init_resource::<Messages<ConfirmChosen>>();
+        world.init_resource::<Localization>();
+        world.init_resource::<NextState<FileDialogState>>();
+        world.insert_resource(FileDialog {
+            open: true,
+            dir: dir.clone(),
+            purpose: Some(DialogId("test-save")),
+            mode: DialogMode::Save { default_name: "chart.harpchart".into() },
+            save_filename: "chart.harpchart".into(),
+            ..default()
+        });
+        world.spawn((FileDialogRoot, Visibility::Inherited));
+        (world, dir)
+    }
+
+    #[test]
+    fn existing_destination_is_not_emitted_until_overwrite_is_accepted() {
+        use bevy::ecs::system::RunSystemOnce;
+        let (mut world, dir) = save_world("accept", true);
+        world.run_system_once(request_save).unwrap();
+        assert!(world.resource::<Messages<FileChosen>>().is_empty());
+        assert_eq!(world.resource::<Messages<OpenConfirmDialog>>().len(), 1);
+        // Repeated Save/Enter cannot bypass the pending question.
+        world.run_system_once(request_save).unwrap();
+        assert!(world.resource::<Messages<FileChosen>>().is_empty());
+        assert_eq!(world.resource::<Messages<OpenConfirmDialog>>().len(), 1);
+        world.write_message(ConfirmChosen { purpose: OVERWRITE_PURPOSE, confirmed: true });
+        world.run_system_once(handle_overwrite).unwrap();
+        let picks: Vec<_> = world.resource_mut::<Messages<FileChosen>>().drain().collect();
+        assert_eq!(picks.len(), 1);
+        assert_eq!(picks[0].path, dir.join("chart.harpchart"));
+        assert!(!world.resource::<FileDialog>().open);
+        assert_eq!(std::fs::read_to_string(&picks[0].path).unwrap(), "original");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn declined_overwrite_keeps_the_picker_open_without_emitting_a_save() {
+        use bevy::ecs::system::RunSystemOnce;
+        let (mut world, dir) = save_world("decline", true);
+        world.run_system_once(request_save).unwrap();
+        world.write_message(ConfirmChosen { purpose: OVERWRITE_PURPOSE, confirmed: false });
+        world.run_system_once(handle_overwrite).unwrap();
+        assert!(world.resource::<Messages<FileChosen>>().is_empty());
+        let dialog = world.resource::<FileDialog>();
+        assert!(dialog.open);
+        assert!(dialog.pending_overwrite.is_none());
+        assert_eq!(dialog.save_filename, "chart.harpchart");
+        assert_eq!(world.query::<&Visibility>().single(&world).unwrap(), &Visibility::Inherited);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn new_destination_saves_without_an_overwrite_question() {
+        use bevy::ecs::system::RunSystemOnce;
+        let (mut world, dir) = save_world("new", false);
+        world.run_system_once(request_save).unwrap();
+        assert_eq!(world.resource::<Messages<FileChosen>>().len(), 1);
+        assert!(world.resource::<Messages<OpenConfirmDialog>>().is_empty());
+        assert!(!world.resource::<FileDialog>().open);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

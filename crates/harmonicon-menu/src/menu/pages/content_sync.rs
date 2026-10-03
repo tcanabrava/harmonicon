@@ -3,7 +3,7 @@
 //! The first-run download screen (`AppState::Syncing`): shown only while a
 //! configured lesson or song pack has never been downloaded, since the game
 //! has nothing to teach or play without them. Opens the menu once every
-//! pack is installed; on a failure it shows the error with Retry and Quit.
+//! pack is installed; on a failure it shows the error with Retry, Continue, and Quit.
 //!
 //! The downloads themselves are `harmonicon_platform::content_sync`'s, which
 //! starts them at `Startup`; this screen only watches.
@@ -28,8 +28,7 @@ struct SyncStatusText;
 #[derive(Component, Default, Clone)]
 struct SyncIntroText;
 
-/// Holds Retry/Quit while a download has failed; empty otherwise, so no
-/// hidden button is ever a Tab stop.
+/// Holds Continue/Quit, plus Retry after a download failure.
 #[derive(Component, Default, Clone)]
 struct SyncActions;
 
@@ -157,23 +156,34 @@ fn update_actions(
     sync: Res<PackSync>,
     loc: Res<Localization>,
     actions: Query<(Entity, Option<&Children>), With<SyncActions>>,
+    mut last_failed: Local<Option<bool>>,
 ) {
-    let show = failed(&packs, &sync);
-    for (container, children) in &actions {
-        let shown = children.is_some_and(|c| !c.is_empty());
-        if show && !shown {
-            commands.entity(container).with_children(|row| {
+    let failure = failed(&packs, &sync);
+    if *last_failed == Some(failure)
+        && actions.iter().all(|(_, children)| children.is_some_and(|c| !c.is_empty()))
+    {
+        return;
+    }
+    *last_failed = Some(failure);
+    for (container, _) in &actions {
+        commands.entity(container).despawn_related::<Children>();
+        commands.entity(container).with_children(|row| {
+            if failure {
                 row.spawn_empty().apply_scene(button::default(&loc.msg("sync-retry"), retry));
-                row.spawn_empty().apply_scene(button::default(
-                    &loc.msg("sync-quit"),
-                    |_: On<Activate>, mut exit: MessageWriter<AppExit>| {
-                        exit.write(AppExit::Success);
-                    },
-                ));
-            });
-        } else if !show && shown {
-            commands.entity(container).despawn_related::<Children>();
-        }
+            }
+            row.spawn_empty().apply_scene(button::default(
+                &loc.msg("sync-continue"),
+                |_: On<Activate>, mut next: ResMut<NextState<AppState>>| {
+                    next.set(AppState::Menu);
+                },
+            ));
+            row.spawn_empty().apply_scene(button::default(
+                &loc.msg("sync-quit"),
+                |_: On<Activate>, mut exit: MessageWriter<AppExit>| {
+                    exit.write(AppExit::Success);
+                },
+            ));
+        });
     }
 }
 

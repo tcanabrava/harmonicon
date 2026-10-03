@@ -3965,3 +3965,84 @@ fn depth_steps_every_selected_note_with_an_expression() {
     assert_eq!(depth(2), None);
     assert_eq!(state.technique_notice, Some(1));
 }
+
+#[test]
+fn lesson_chart_failure_is_reported_and_does_not_replace_the_manifest() {
+    let dir =
+        std::env::temp_dir().join(format!("harmonicon-lesson-save-failure-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("lesson.json");
+    std::fs::write(&path, "original manifest").unwrap();
+    // A file where the song directory should be forces a companion failure.
+    std::fs::write(dir.join("song"), "keep").unwrap();
+    let state = EditorState { notes: vec![GridNote::plain(0, 4, 0, 4)], ..Default::default() };
+    assert!(super::lesson_form::save_lesson(&path, &state).is_err());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "original manifest");
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn lesson_save_writes_a_loadable_companion_chart() {
+    let dir =
+        std::env::temp_dir().join(format!("harmonicon-lesson-save-success-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("lesson.json");
+    let state = EditorState {
+        lesson_id: "save-test".into(),
+        lesson_unit: "basics".into(),
+        notes: vec![GridNote::plain(0, 4, 0, 4)],
+        ..Default::default()
+    };
+    super::lesson_form::save_lesson(&path, &state).unwrap();
+    let chart = std::fs::read_to_string(dir.join("song/chart.harpchart")).unwrap();
+    validated_harpchart(&chart).unwrap();
+    let manifest = harmonicon_song::lessons::parse_lesson(&std::fs::read(path).unwrap()).unwrap();
+    assert_eq!(manifest.id, "save-test");
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn lesson_chart_write_failure_keeps_the_existing_manifest_and_chart() {
+    let dir = std::env::temp_dir()
+        .join(format!("harmonicon-lesson-chart-failure-{}", std::process::id()));
+    let chart = dir.join("song/chart.harpchart");
+    std::fs::create_dir_all(&chart).unwrap();
+    std::fs::write(chart.join("keep"), "original chart").unwrap();
+    let path = dir.join("lesson.json");
+    std::fs::write(&path, "original manifest").unwrap();
+    let state = EditorState { notes: vec![GridNote::plain(0, 4, 0, 4)], ..Default::default() };
+    assert!(super::lesson_form::save_lesson(&path, &state).is_err());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "original manifest");
+    assert_eq!(std::fs::read_to_string(chart.join("keep")).unwrap(), "original chart");
+    assert_eq!(std::fs::read_dir(dir.join("song")).unwrap().count(), 1);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn file_picker_keys_do_not_delete_or_transpose_selected_notes() {
+    use bevy::ecs::system::RunSystemOnce;
+    use bevy::input_focus::InputFocus;
+    use bevy::prelude::*;
+    use harmonicon_ui::dialogs::file_dialog::FileDialog;
+    let mut world = World::new();
+    let note = GridNote::plain(0, 4, 0, 4);
+    world.insert_resource(EditorState {
+        notes: vec![note],
+        selected: vec![0],
+        ..Default::default()
+    });
+    world.init_resource::<FileDialog>();
+    world.resource_mut::<FileDialog>().open = true;
+    world.init_resource::<super::state::TimelineSelection>();
+    world.init_resource::<NextState<harmonicon_app::app::AppState>>();
+    world.init_resource::<harmonicon_app::app::ReturnToPlay>();
+    world.init_resource::<InputFocus>();
+    let mut keyboard = ButtonInput::<KeyCode>::default();
+    keyboard.press(KeyCode::Backspace);
+    keyboard.press(KeyCode::ControlLeft);
+    keyboard.press(KeyCode::ArrowUp);
+    world.insert_resource(keyboard);
+    world.run_system_once(super::interaction::grid_keys).unwrap();
+    assert_eq!(world.resource::<EditorState>().notes, vec![note]);
+    assert_eq!(world.resource::<EditorState>().selected, vec![0]);
+}

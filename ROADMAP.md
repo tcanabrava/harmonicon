@@ -9,8 +9,8 @@ lives in `PLAN.md`.
 
 **0.2 "Trustworthy" and 0.3 "Practice" are fully shipped** (git history
 has the detail). Neither has a tag of its own: releases follow a separate
-`v0.0.x` line (newest `v0.0.11`, matching `Cargo.toml`) that never tracked
-these phase numbers, and reconciling the two is part of 1.0 below.
+`v0.0.x` line (current manifest `0.0.13`) that never tracked
+these phase numbers, and roadmap phases are separate from package versions.
 
 ## 1.0 — "Ready for strangers" (desktop)
 
@@ -36,43 +36,19 @@ hears the game hear them.
   welcome page offering microphone setup → guided tour → a first lesson,
   each returning to it when done, every step skippable, and the whole page
   re-runnable from Help / About.
-- Surface mic trouble where a confused player is actually looking.
-  `MicStatus::{Failed, AwaitingPermission}` and its Options banner already
-  exist; nothing shows them on the screens where the silence is noticed.
+- Microphone startup and stream failures are surfaced in Options and during
+  gameplay, including Jam Session. Verify physical unplug/reconnect recovery
+  during a real session before beta.
 
-### 1.0-rc2 — don't lose the player's work — **largely already true**
+### 1.0-rc2 — don't lose the player's work
 
-An earlier draft of this section claimed 92 `.unwrap()`s outside test
-modules, 46 of them in `harmonicon-editor`. **That number was wrong**, and
-the correction is worth keeping because the same mistake is easy to repeat:
-the scan treated any file without a literal `#[cfg(test)]` line as
-production code, so it swallowed `song_editor/tests.rs` whole (a pure test
-file — `tests.rs` carries its `cfg` on the `mod` declaration, which is why
-`physical_design.rs` exempts those files from the line budget too) and also
-missed `#[cfg(any(test, feature = "test-support"))]`.
+Settings, profiles, and editor files use atomic replacement. Lesson saves
+report companion-chart failures, and MIDI-backed song saves report backing
+failures instead of claiming success. The file picker asks before replacing
+an existing destination. Multi-file saves are not a single transaction.
 
-Counted properly — excluding `tests.rs` and stopping at the first `cfg`
-gate — it is **four**, and all four are safe:
-
-| | |
-|---|---|
-| `core/midi_file.rs` | behind `#[cfg(any(test, feature = "test-support"))]`; not in a shipped build |
-| `core/note_parser.rs` | `analyze_notes` has no caller outside its own tests — dead `pub` code |
-| `dsp/lib.rs` ×2 | guarded by construction: `n < 2` returns early, and `nmf_dict` is assigned in the branch immediately above |
-
-The three degradation paths this section asked for are already in place:
-the chart loader is fully `Result`-based over a typed `SongLoadError`
-(including schema validation), and the theme loader falls back to defaults
-with a `warn!` rather than aborting.
-
-What remains genuinely open, and is *not* yet verified:
-
-- A microphone that disappears **mid-session** (unplugged while playing),
-  as opposed to one that fails at startup.
-- The nine `.expect(...)` calls are all programmer invariants with real
-  messages ("embedded song schema must compile", "checked by caller"), and
-  the four `unreachable!()` are enum arms behind prior filtering. Worth a
-  read, not a rewrite.
+The remaining gate is exercising the complete authoring and recovery flows
+on packaged desktop builds, alongside the real-microphone checks in `PLAN.md`.
 
 ### 1.0-rc3 — content that matches the theme
 
@@ -88,12 +64,10 @@ existing scoring primitives, and Record-mode tooling.
 
 ### 1.0 — release engineering
 
-- **Reconcile the version.** `Cargo.toml` has said `0.1.0` through 0.2, 0.3
-  and most of 0.4; the tag line ran to `v0.0.9.1` independently.
+- Version/tag agreement is enforced by the release workflow. Keep release
+  metadata and user-facing documentation aligned with the manifest.
 - Flathub submission — the flatpak workflow already builds.
-- Real signing keys in place of the debug ones.
-- Clear the four line-budget allowlist entries (`gameplay_2d`,
-  `gameplay_3d`, `bending_trainer`, `options`). Cleanup, not a gate.
+- Release signing and macOS notarization.
 
 ## Bring your own harp, bring your own songs — shipped
 
@@ -212,7 +186,7 @@ remains:
   based settings/profile persistence and the `~/Harmonicon` external-folder
   watcher (`notify-debouncer-full`), none of which have browser
   equivalents.
-- Android: **a real APK builds; it has never been run on a device.** See
+- Android: **a real APK builds; menu and lesson-tree navigation have been exercised on real hardware.** See
   `contributing/src/android-build.md` for the full record and `PLAN.md` for what is still open.
   `packaging/android` (Gradle + cargo-ndk) emits a signed, installable APK
   with verified contents, and CI type-checks the target — so the port can't
@@ -220,11 +194,9 @@ remains:
   the APK and opens a capture stream once RECORD_AUDIO is granted. What's
   left needs a phone in hand: above all confirming **the mic actually
   captures usably**, which for this game is the whole product. Before that
-  is worth much, though, **persistence needs fixing** —
-  `dirs::config_dir()` is `None` on Android, so lesson progress, scores and
-  settings are all lost on exit. Then a touch/hit-target pass, an app
-  icon (there is none yet), more than just arm64-v8a, and a real signing key
-  in place of the debug one.
+  is worth much, though, verify persistence across restarts on the device: saves now use
+  Android's private internal-data directory. Then a touch/hit-target pass,
+  ABIs beyond arm64-v8a, and a release signing key.
   - Mic input is *not* blocked the way it is for
     wasm — checked cpal 0.17.3's own source directly, and both Android
     (`host/aaudio`) and iOS (`host/coreaudio/ios`) have real, non-stub

@@ -327,22 +327,9 @@ pub(super) fn serialize_lesson(state: &EditorState) -> (String, Vec<String>) {
     (json_text, warnings)
 }
 
-/// Writes `path` as the lesson's `lesson.json`, and — if the editor
-/// currently has any notes — also writes `song/chart.harpchart` next to it
-/// (relative to `path`'s own directory) via the ordinary
-/// `harpchart::serialize_harpchart`, matching every shipped lesson's own
-/// `"chart": "song/chart.harpchart"` convention. `Ok` carries
-/// `serialize_lesson`'s own validation warnings (empty when there's
-/// nothing to report), so a save that "succeeded" but left the lesson
-/// unloadable still shows something more useful than plain "Saved" — the
-/// caller (`handle_save_lesson_chosen`) picks between a plain success and
-/// a "saved with warnings" status-bar message based on whether this is
-/// empty. `Err` covers only a failure writing the primary `lesson.json`
-/// (the save attempt as a whole didn't succeed); a chart-write failure is
-/// logged but doesn't turn the overall result into an error, since the
-/// manifest itself did save — the same "primary vs. secondary outcome"
-/// split `harpchart::save_midi_backing` already draws for its own bonus
-/// files.
+/// Saves the chart before publishing its lesson manifest. Every write is
+/// atomic, and any companion-chart failure fails the save visibly. The files
+/// are independently atomic, not a transaction across both paths.
 pub(super) fn save_lesson(
     path: &std::path::Path,
     state: &EditorState,
@@ -351,29 +338,17 @@ pub(super) fn save_lesson(
     for w in &warnings {
         warn!("Song editor: lesson {w}");
     }
-    if let Err(e) = std::fs::write(path, json.as_bytes()) {
-        warn!("Song editor: save failed (write {}): {e}", path.display());
-        return Err(e.to_string());
+    let parent = path.parent().ok_or_else(|| "lesson path has no parent".to_string())?;
+    if !state.notes.is_empty() {
+        let song_dir = parent.join("song");
+        std::fs::create_dir_all(&song_dir).map_err(|e| e.to_string())?;
+        let chart_path = song_dir.join("chart.harpchart");
+        let chart_json = super::harpchart::serialize_harpchart(state);
+        harmonicon_core::config_file::write_atomic(&chart_path, &chart_json)
+            .map_err(|e| format!("{}: {e}", chart_path.display()))?;
     }
+    harmonicon_core::config_file::write_atomic(path, &json).map_err(|e| e.to_string())?;
     info!("Song editor: saved lesson {}", path.display());
-
-    if state.notes.is_empty() {
-        return Ok(warnings);
-    }
-    let Some(parent) = path.parent() else {
-        return Ok(warnings);
-    };
-    let song_dir = parent.join("song");
-    if let Err(e) = std::fs::create_dir_all(&song_dir) {
-        warn!("Song editor: save failed (mkdir {}): {e}", song_dir.display());
-        return Ok(warnings);
-    }
-    let chart_path = song_dir.join("chart.harpchart");
-    let chart_json = super::harpchart::serialize_harpchart(state);
-    match std::fs::write(&chart_path, chart_json.as_bytes()) {
-        Ok(()) => info!("Song editor: saved lesson chart {}", chart_path.display()),
-        Err(e) => warn!("Song editor: save failed (write {}): {e}", chart_path.display()),
-    }
     Ok(warnings)
 }
 

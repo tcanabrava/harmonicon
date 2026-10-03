@@ -434,7 +434,7 @@ pub(super) fn grid_keys(
     focus: Res<InputFocus>,
     fields: Query<(), With<EditableText>>,
 ) {
-    if a_text_field_has_focus(&focus, &fields) {
+    if file_dialog.open || a_text_field_has_focus(&focus, &fields) {
         return;
     }
     if keyboard.just_pressed(KeyCode::Delete) || keyboard.just_pressed(KeyCode::Backspace) {
@@ -476,6 +476,7 @@ pub(super) fn grid_keys(
 /// occupied); the notes that land become the new selection.
 pub(super) fn handle_copy_paste(
     keyboard: Res<ButtonInput<KeyCode>>,
+    file_dialog: Res<FileDialog>,
     mut state: ResMut<EditorState>,
     mut clipboard: ResMut<NoteClipboard>,
     scroll: Res<Scroll>,
@@ -483,7 +484,7 @@ pub(super) fn handle_copy_paste(
     focus: Res<InputFocus>,
     fields: Query<(), With<EditableText>>,
 ) {
-    if a_text_field_has_focus(&focus, &fields) || !ctrl_held(&keyboard) {
+    if file_dialog.open || a_text_field_has_focus(&focus, &fields) || !ctrl_held(&keyboard) {
         return;
     }
     if keyboard.just_pressed(KeyCode::KeyC) && !state.selected.is_empty() {
@@ -510,12 +511,13 @@ pub(super) fn handle_copy_paste(
 /// into a meta-form text field never steals these keys.
 pub(super) fn handle_undo_redo(
     keyboard: Res<ButtonInput<KeyCode>>,
+    file_dialog: Res<FileDialog>,
     mut state: ResMut<EditorState>,
     mut history: ResMut<super::undo::UndoHistory>,
     focus: Res<InputFocus>,
     fields: Query<(), With<EditableText>>,
 ) {
-    if a_text_field_has_focus(&focus, &fields) || !ctrl_held(&keyboard) {
+    if file_dialog.open || a_text_field_has_focus(&focus, &fields) || !ctrl_held(&keyboard) {
         return;
     }
     if keyboard.just_pressed(KeyCode::KeyZ) {

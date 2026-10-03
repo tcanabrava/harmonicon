@@ -13,7 +13,7 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
   traditional. Same rights-and-judgment constraint as the content item
   below — **not to be authored unsupervised**.
 
-- [ ] **Bevy is pinned to the `v0.20.0-rc.1` git tag**, because a release
+- [ ] **Bevy is pinned to the `v0.20.0-rc.2` git tag**, because a release
   candidate is not published to crates.io. When 0.20.0 final lands: drop the
   `git`/`tag` keys from `Cargo.toml`'s `bevy` entry and the matching
   `allow-git` exemption from `deny.toml` (`unknown-git = "deny"` rejects the

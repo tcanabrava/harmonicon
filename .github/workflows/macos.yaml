@@ -24,6 +24,9 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'crates/**'
+      - 'packaging/macos/**'
+      - 'build.rs'
       - 'assets/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -32,6 +35,9 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'crates/**'
+      - 'packaging/macos/**'
+      - 'build.rs'
       - 'assets/**'
       - 'Cargo.toml'
       - 'Cargo.lock'

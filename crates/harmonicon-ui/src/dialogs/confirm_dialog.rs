@@ -16,6 +16,7 @@ use harmonicon_platform::theme::{MODAL_BACKDROP_BG, MODAL_PANEL_BG, MODAL_PANEL_
 
 use super::button;
 pub use super::file_dialog::DialogId;
+use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 /// Request to open the confirm dialog.
 #[derive(Message)]
@@ -43,6 +44,7 @@ fn handle_open(
     mut open: ResMut<ConfirmDialogOpen>,
     roots: Query<Entity, With<ConfirmDialogRoot>>,
     mut commands: Commands,
+    loc: Res<Localization>,
 ) {
     let Some(req) = requests.read().last() else {
         return;
@@ -66,7 +68,7 @@ fn handle_open(
                 justify_content: {JustifyContent::Center},
             }
             BackgroundColor({MODAL_BACKDROP_BG})
-            GlobalZIndex(300)
+            GlobalZIndex(400)
             Children [
                 Node {
                     flex_direction: {FlexDirection::Column},
@@ -89,9 +91,9 @@ fn handle_open(
                         column_gap: {Val::Px(12.0)},
                     }
                     Children [
-                        @choice_button(purpose, true, "Yes")
+                        @choice_button(purpose, true, &loc.msg("dialog-yes"))
                         --
-                        @choice_button(purpose, false, "No")
+                        @choice_button(purpose, false, &loc.msg("dialog-no"))
                     ]
                 ]
             ]
@@ -104,7 +106,7 @@ fn handle_open(
         ));
 }
 
-fn choice_button(purpose: DialogId, confirmed: bool, label: &'static str) -> impl Scene {
+fn choice_button(purpose: DialogId, confirmed: bool, label: &str) -> impl Scene {
     button::small(
         label,
         move |_: On<Activate>,

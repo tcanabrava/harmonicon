@@ -15,7 +15,9 @@ on:
     paths:
       - 'packaging/flatpak/**'
       - 'src/**'
+      - 'crates/**'
       - 'assets/**'
+      - 'build.rs'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/flatpak.yaml'
@@ -24,7 +26,9 @@ on:
     paths:
       - 'packaging/flatpak/**'
       - 'src/**'
+      - 'crates/**'
       - 'assets/**'
+      - 'build.rs'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/flatpak.yaml'

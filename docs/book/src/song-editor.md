@@ -466,3 +466,9 @@ the original file and the current editor contents remain untouched.
 For songs you want the game to discover automatically without editing the
 bundled assets, drop the finished chart folder into `~/Harmonicon/songs/`
 (see [Getting Started](getting-started.md#adding-your-own-content)).
+
+Saving over an existing file asks for confirmation. Chart, lesson, and backing
+files are written through temporary files before replacement. If a lesson's
+chart or a MIDI backing file cannot be written, the status bar reports a save
+failure. A save involving several files is not a single transaction: some
+companion files may already have been replaced when a later write fails.

@@ -801,12 +801,15 @@ pub(super) fn handle_save_chosen(
         // before (see `save_midi_backing`).
         if let (Some(midi), Some(parent)) = (midi.as_deref(), ev.path.parent())
             && let Some(track_index) = midi.selected
+            && let Err(detail) = save_midi_backing(parent, midi, track_index, &mut state)
         {
-            save_midi_backing(parent, midi, track_index, &mut state);
+            warn!("Song editor: save failed (MIDI backing): {detail}");
+            feedback.set(loc.msg_args("editor-save-failed", &[("detail", detail)]));
+            continue;
         }
 
         let json = serialize_harpchart(&state);
-        match std::fs::write(&ev.path, json.as_bytes()) {
+        match harmonicon_core::config_file::write_atomic(&ev.path, &json) {
             Ok(()) => {
                 info!("Song editor: saved {}", ev.path.display());
                 feedback.set(
@@ -833,42 +836,22 @@ fn save_midi_backing(
     midi: &super::midi_import::MidiImport,
     track_index: usize,
     state: &mut EditorState,
-) {
-    match super::midi_import::remove_track_bytes(&midi.bytes, track_index) {
-        Ok(bytes) => {
-            let stem = midi.path.file_stem().and_then(|s| s.to_str()).unwrap_or("song");
-            let out = dir.join(format!("{stem}_processed.mid"));
-            match std::fs::write(&out, &bytes) {
-                Ok(()) => info!(
-                    "Song editor: wrote {} \u{2014} a copy of {} with the imported track \
-                     removed; the original is untouched.",
-                    out.display(),
-                    midi.path.display()
-                ),
-                Err(e) => warn!("Song editor: save failed (processed MIDI): {e}"),
-            }
-        }
-        Err(e) => warn!("Song editor: save failed (processed MIDI): {e}"),
-    }
-
-    match super::midi_import::render_backing_pcm(&midi.bytes, track_index) {
-        Ok((_bpm, pcm)) => {
-            let wav = harmonicon_core::wav::encode_wav(&pcm, harmonicon_core::synth::SAMPLE_RATE);
-            let out = dir.join("music.wav");
-            match std::fs::write(&out, &wav) {
-                Ok(()) => {
-                    info!(
-                        "Song editor: wrote {} \u{2014} a synthesized backing track from the \
-                         MIDI file's other tracks.",
-                        out.display()
-                    );
-                    state.music = out.to_string_lossy().into_owned();
-                }
-                Err(e) => warn!("Song editor: save failed (backing track): {e}"),
-            }
-        }
-        Err(e) => warn!("Song editor: no backing track written: {e}"),
-    }
+) -> Result<(), String> {
+    // Render both outputs before touching any existing files.
+    let bytes = super::midi_import::remove_track_bytes(&midi.bytes, track_index)
+        .map_err(|e| format!("processed MIDI: {e}"))?;
+    let (_, pcm) = super::midi_import::render_backing_pcm(&midi.bytes, track_index)
+        .map_err(|e| format!("backing track: {e}"))?;
+    let wav = harmonicon_core::wav::encode_wav(&pcm, harmonicon_core::synth::SAMPLE_RATE);
+    let stem = midi.path.file_stem().and_then(|s| s.to_str()).unwrap_or("song");
+    let processed = dir.join(format!("{stem}_processed.mid"));
+    harmonicon_core::config_file::write_atomic_bytes(&processed, &bytes)
+        .map_err(|e| format!("{}: {e}", processed.display()))?;
+    let out = dir.join("music.wav");
+    harmonicon_core::config_file::write_atomic_bytes(&out, &wav)
+        .map_err(|e| format!("{}: {e}", out.display()))?;
+    state.music = out.to_string_lossy().into_owned();
+    Ok(())
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

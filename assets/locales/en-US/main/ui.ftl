@@ -866,3 +866,8 @@ song-delete = Delete song
 song-confirm-delete = Hide {$name} from this song source? It will stay hidden after updates. Its files are kept.
 song-retained = Kept locally — no longer in {$repository}
 song-delete-failed = Could not hide song: {$error}
+
+dialog-overwrite = Replace the existing file {$path}?
+sync-continue = Continue without missing packs
+dialog-yes = Yes
+dialog-no = No

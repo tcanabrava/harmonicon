@@ -863,3 +863,8 @@ song-delete = Excluir música
 song-confirm-delete = Ocultar {$name} desta fonte? Continuará oculta após as atualizações. Os arquivos serão mantidos.
 song-retained = Mantida localmente — não está mais em {$repository}
 song-delete-failed = Não foi possível ocultar a música: {$error}
+
+dialog-overwrite = Substituir o arquivo existente {$path}?
+sync-continue = Continuar sem os pacotes ausentes
+dialog-yes = Sim
+dialog-no = Não

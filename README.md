@@ -12,7 +12,7 @@ backing, a guided **Lessons** curriculum, a **Bending Trainer**, a full
 in-game **song editor**, a live audio spectrogram, and a small toolchain for
 turning MIDI files into playable charts.
 
-> Status: early/experimental (`0.1.0`), tracking Bevy `0.19`.
+> Status: experimental desktop alpha candidate (`0.0.13`), tracking Bevy `0.20.0-rc.2`.
 
 ---
 
@@ -74,6 +74,8 @@ turning MIDI files into playable charts.
 
 - A recent **Rust** toolchain (Rust 2024 edition; use the latest stable via
   [rustup](https://rustup.rs/)).
+- Lessons and songs download on first launch. You can continue to the menu
+  and configure local content packs instead.
 - A working **microphone** to play along (the game still runs without one;
   you just won't be able to hit notes).
 - Bevy's system dependencies for your platform — see Bevy's
@@ -181,7 +183,7 @@ landing quietly.
 
 ## Project layout
 
-A Cargo workspace: twelve library crates under `crates/`, and a root package
+A Cargo workspace: fifteen library crates under `crates/`, and a root package
 holding the binaries plus the composition root. Each crate may depend only on
 ones *earlier* in this list, so the layering is enforced by Cargo rather than
 by convention — a circular dependency between crates simply cannot be

@@ -85,8 +85,6 @@ Nothing below can be approved by a test.
 
 - Run on a real phone or tablet: does the mic capture usably, and what are
   its latency and AGC like?
-- Persist progress and settings on Android: `dirs::config_dir()` is `None`
-  there, so both are lost on exit.
 - A touch and hit-target pass, re-tuning `CompactLayout` against a real
   device rather than a small desktop window.
 - An app icon, ABIs beyond arm64, and a release key in place of the debug

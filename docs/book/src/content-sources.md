@@ -49,6 +49,11 @@ Lessons and songs are only data — charts, text and pictures, never programs
 
 The first time Harmonicon starts, it downloads its lessons and songs before
 opening the menu (see [Getting Started](getting-started.md#the-first-launch)).
+You can leave downloads running with **Continue without missing packs**.
+If a download fails, **Retry** tries again. **Continue without missing packs**
+opens the menu with whatever content is already available. You can then open
+**Options → Lessons & songs** to retry downloads or add a local folder.
+
 If you remove every repository, the game still starts; it just has no
 lessons or songs until you add some.
 
