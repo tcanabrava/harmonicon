@@ -808,25 +808,7 @@ fn cleanup_despawns_only_gameplay_entities() {
 // ── score_notes (same-pitch overlap ordering) ───────────────────────────
 
 pub(super) fn overlap_test_note(time: f64) -> ScheduledNote {
-    ScheduledNote {
-        time,
-        duration: 1.0,
-        hole: 1,
-        is_blow: true,
-        expected_pitch: Some(60), // C4
-        hit: false,
-        missed: false,
-        held: 0.0,
-        sustain_scored: false,
-        modifiers: Vec::new(),
-        pitch_samples: Vec::new(),
-        amp_samples: Vec::new(),
-        phrase_section: 0,
-        chord_pitches: Vec::new(),
-        playable: true,
-        miss_evidence: None,
-        force_wait: false,
-    }
+    ScheduledNote { time, duration: 1.0, expected_pitch: Some(60), ..Default::default() }
 }
 
 #[test]
@@ -1365,25 +1347,7 @@ fn end_to_end_synthetic_song_drives_score_combo_and_stats() {
     world.init_resource::<Messages<NoteScored>>();
 
     fn note(time: f64, pitch: u8) -> ScheduledNote {
-        ScheduledNote {
-            time,
-            duration: 0.2,
-            hole: 1,
-            is_blow: true,
-            expected_pitch: Some(pitch),
-            hit: false,
-            missed: false,
-            held: 0.0,
-            sustain_scored: false,
-            modifiers: Vec::new(),
-            pitch_samples: Vec::new(),
-            amp_samples: Vec::new(),
-            phrase_section: 0,
-            chord_pitches: Vec::new(),
-            playable: true,
-            miss_evidence: None,
-            force_wait: false,
-        }
+        ScheduledNote { time, duration: 0.2, expected_pitch: Some(pitch), ..Default::default() }
     }
     fn pitch(note: &str, octave: i32) -> PitchInfo {
         let midi = note_to_midi(&format!("{note}{octave}")).unwrap() as u8;

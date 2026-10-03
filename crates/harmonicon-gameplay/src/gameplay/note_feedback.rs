@@ -156,20 +156,10 @@ mod tests {
             time,
             duration,
             hole: 4,
-            is_blow: true,
             expected_pitch: Some(60),
             hit,
-            missed: false,
             held,
-            sustain_scored: false,
-            modifiers: Vec::new(),
-            pitch_samples: Vec::new(),
-            amp_samples: Vec::new(),
-            phrase_section: 0,
-            chord_pitches: Vec::new(),
-            playable: true,
-            miss_evidence: None,
-            force_wait: false,
+            ..Default::default()
         }
     }
 

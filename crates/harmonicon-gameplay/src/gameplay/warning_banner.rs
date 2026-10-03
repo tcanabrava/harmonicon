@@ -183,23 +183,12 @@ mod tests {
     fn song_notes(chord_pitches: Vec<u8>) -> SongNotes {
         SongNotes {
             notes: vec![ScheduledNote {
-                time: 0.0,
                 duration: 0.5,
                 hole: 2,
                 is_blow: false,
                 expected_pitch: Some(62),
-                hit: false,
-                missed: false,
-                held: 0.0,
-                sustain_scored: false,
-                modifiers: Vec::new(),
-                pitch_samples: Vec::new(),
-                amp_samples: Vec::new(),
-                phrase_section: 0,
                 chord_pitches,
-                playable: true,
-                miss_evidence: None,
-                force_wait: false,
+                ..Default::default()
             }],
             cursor: 0,
         }

@@ -138,25 +138,7 @@ mod tests {
     use super::*;
 
     fn note(time: f64, duration: f64, midi: u8) -> ScheduledNote {
-        ScheduledNote {
-            time,
-            duration,
-            hole: 4,
-            is_blow: true,
-            expected_pitch: Some(midi),
-            hit: false,
-            missed: false,
-            held: 0.0,
-            sustain_scored: false,
-            modifiers: Vec::new(),
-            pitch_samples: Vec::new(),
-            amp_samples: Vec::new(),
-            phrase_section: 0,
-            chord_pitches: Vec::new(),
-            playable: true,
-            miss_evidence: None,
-            force_wait: false,
-        }
+        ScheduledNote { time, duration, hole: 4, expected_pitch: Some(midi), ..Default::default() }
     }
 
     #[test]

@@ -382,23 +382,14 @@ mod tests {
 
     fn note(hit: bool, missed: bool, section: usize) -> ScheduledNote {
         ScheduledNote {
-            time: 0.0,
             duration: 0.1,
             hole: 4,
             is_blow: false,
             expected_pitch: Some(62),
             hit,
             missed,
-            held: 0.0,
-            sustain_scored: false,
-            modifiers: Vec::new(),
-            pitch_samples: Vec::new(),
-            amp_samples: Vec::new(),
             phrase_section: section,
-            chord_pitches: Vec::new(),
-            playable: true,
-            miss_evidence: None,
-            force_wait: false,
+            ..Default::default()
         }
     }
 
@@ -617,18 +608,7 @@ mod tests {
             hole,
             is_blow,
             expected_pitch: Some(60),
-            hit: false,
-            missed: false,
-            held: 0.0,
-            sustain_scored: false,
-            modifiers: Vec::new(),
-            pitch_samples: Vec::new(),
-            amp_samples: Vec::new(),
-            phrase_section: 0,
-            chord_pitches: Vec::new(),
-            playable: true,
-            miss_evidence: None,
-            force_wait: false,
+            ..Default::default()
         }
     }
 

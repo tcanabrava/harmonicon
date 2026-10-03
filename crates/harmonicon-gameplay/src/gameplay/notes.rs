@@ -113,6 +113,33 @@ pub struct ScheduledNote {
     pub force_wait: bool,
 }
 
+/// A pending, playable blow note on hole 1 at time 0 with nothing recorded
+/// yet. Chart loading sets every field itself; this is the baseline tests
+/// and benches vary with struct-update syntax.
+impl Default for ScheduledNote {
+    fn default() -> Self {
+        Self {
+            time: 0.0,
+            duration: 0.0,
+            hole: 1,
+            is_blow: true,
+            expected_pitch: None,
+            hit: false,
+            missed: false,
+            held: 0.0,
+            sustain_scored: false,
+            modifiers: Vec::new(),
+            pitch_samples: Vec::new(),
+            amp_samples: Vec::new(),
+            phrase_section: 0,
+            chord_pitches: Vec::new(),
+            playable: true,
+            miss_evidence: None,
+            force_wait: false,
+        }
+    }
+}
+
 /// Every note in the loaded chart, sorted by `time` ascending (matches chart
 /// authoring order; nothing re-sorts `chart.track` elsewhere either). The
 /// scoring systems (`judge::score_notes`, `clock::handle_loop_boundary`,

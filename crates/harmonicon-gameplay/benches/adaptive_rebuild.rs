@@ -22,14 +22,8 @@ fn note(i: usize, time: f64) -> ScheduledNote {
         missed: i % 3 == 1,
         held: 0.1,
         sustain_scored: i.is_multiple_of(3),
-        modifiers: Vec::new(),
-        pitch_samples: Vec::new(),
-        amp_samples: Vec::new(),
         phrase_section: i / 16,
-        chord_pitches: Vec::new(),
-        playable: true,
-        miss_evidence: None,
-        force_wait: false,
+        ..Default::default()
     }
 }
 
