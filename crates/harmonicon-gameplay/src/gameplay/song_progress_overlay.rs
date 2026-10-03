@@ -1,44 +1,30 @@
 // SPDX-License-Identifier: MIT
 
 //! A song-progress bar pinned to the top of the screen, shared by the 2D and
-//! 3D gameplay views. A note-lanes strip spans the harmonica's full hole
-//! range — highest hole at top, lowest at bottom (opposite the Song
-//! Editor's own scrollbar minimap, which the "note as a proportional rect"
-//! language is otherwise modeled on: `song_editor::interaction::
-//! scrollbar_marker`). Each note is a rectangle in its hole's lane, sized to
-//! its real duration and tinted by blow/draw, drawn *over* the song's whole
-//! waveform (pre-analyzed at asset-load time — see `audio_system::
-//! waveform`/`SongManifest::waveform`), which renders as this same strip's
-//! own translucent background rather than a separate row — a player can see
-//! where in the song they're aiming (for picking a loop range) and how a
-//! note lines up against the backing track's own energy at that instant, in
-//! one glance instead of two. A thin red playhead line (styled like the
-//! Song Editor's `PlayheadLine`) marks the current position.
+//! 3D gameplay views. A note-lanes strip spans the harp's hole range,
+//! highest hole on top (the reverse of the Song Editor's scrollbar minimap,
+//! `song_editor::interaction::scrollbar_marker`, whose "note as a
+//! proportional rect" it borrows). Each note is a rect in its hole's lane,
+//! sized to its duration and tinted blow/draw, drawn over the song's
+//! waveform (`SongManifest::waveform`), so where a note sits and how loud
+//! the backing is there read at one glance. A thin red playhead marks the
+//! current position.
 //!
-//! The per-phrase adaptive-difficulty info is a separate overlay, shown
-//! only while paused (see [`PhraseOverlay`]/[`sync_phrase_overlay_visibility`])
-//! — Rocksmith's Dynamic Difficulty/Riff Repeater keeps exactly this split:
-//! a live note highway never gets cluttered with mastery info, which only
-//! earns real screen space in a paused/practice-picking context, where it's
-//! actually actionable. Each phrase renders as one column spanning the
-//! *whole* bar height (covering the waveform, which isn't useful reference
-//! while paused anyway), with a single bar growing up from the bottom —
-//! height, not color, encodes the learned fraction (see
-//! [`phrase_bar_height_px`]), since two adjacent phrases at close
-//! fractions are hard to tell apart by colour.
+//! Per-phrase mastery is a separate overlay shown only while paused
+//! ([`PhraseOverlay`], [`sync_phrase_overlay_visibility`]): a live highway
+//! stays uncluttered, and mastery earns space only where it's actionable.
+//! Each phrase is a full-height column with a bar growing from the bottom;
+//! height, not colour, encodes the learned fraction
+//! ([`phrase_bar_height_px`]), since close fractions are hard to tell apart
+//! by colour.
 //!
-//! A song with no background music (`SongManifest::music: None`) has no
-//! waveform and a `music_duration_secs` of `0.0`, but the chart itself
-//! still has real length — [`spawn_song_progress`] falls back to the
-//! notes'/phrase-sections' own extent as the bar's timescale instead of
-//! reading as empty (see its own doc comment). Only the waveform background
-//! stays empty in that case — the note-lanes strip itself is unaffected.
+//! A song with no music has no waveform and a `music_duration_secs` of 0;
+//! [`spawn_song_progress`] then times the bar by the notes' and phrases'
+//! own extent.
 //!
-//! The bar has two [`ProgressBarMode`]s: pure visualization while playing,
-//! or — while paused — editable, click-and-drag anywhere to sweep out a new
-//! A–B loop range (live yellow preview). Releasing fires
-//! [`RequestLoopRange`] rather than writing `LoopConfig` directly, keeping
-//! the drag interaction and the loop-adoption policy decoupled.
+//! While playing the bar only shows; while paused ([`ProgressBarMode`]) a
+//! drag sweeps out an A–B loop range and fires [`RequestLoopRange`] rather
+//! than writing `LoopConfig`, keeping the gesture and the loop policy apart.
 
 use bevy::picking::events::{PointerClick, PointerDrag, PointerDragEnd, PointerDragStart};
 use bevy::picking::pointer::PointerButton;

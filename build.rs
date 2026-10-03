@@ -1,76 +1,28 @@
 // SPDX-License-Identifier: MIT
 //
-// Build-time lint: reject hardcoded natural-language strings reaching the
-// screen, anywhere under `src/`. Four sink shapes are checked:
+// Build-time lints over `src/` and every `crates/*/src/`, plus Windows
+// installer assets.
 //
-//   1. Text::new("...") / Text::from("...") — a literal passed directly.
-//   2. Text::new(format!("...")) / Text::from(format!("...")) /
-//      TextSpan::new(format!("...")) / TextSpan::from(format!("...")) — a
-//      literal template, formatted. Only the literal *template* pieces are
-//      inspected (e.g. `format!("Key: {}", key)` flags on `"Key: {}"`); the
-//      format! call may itself span two lines (`format!(\n    "..."\n)`).
-//   3. Text({"..."}) — the `bsn!` macro's literal-binding shape.
-//   4. A literal passed as the label/text argument to one of a fixed list of
-//      shared spawn helpers (`KNOWN_LABEL_SINKS`) that all display it —
-//      whether on the same line as the call or, since these are often
-//      multi-line calls, on one of the next few argument lines.
-//   5. Any of the above given a bare identifier (`Text::new(prompt)`,
-//      `Text({label})`, `button::small(&label, ...)`) whose binding is a
-//      literal or `format!` template within the previous `LET_LOOKBACK_LINES`
-//      lines — `let prompt = format!("Play Hole {} {}", ...)` — or a
-//      module-level `const NAME: &str = "…"` anywhere in the file. One hop
-//      only: a binding that is itself built from another variable isn't
-//      followed. The wait-for-note prompt and the Bending Trainer's drill
-//      explanation both shipped as exactly these shapes, invisible to
-//      rules 1–4.
-//
-// A "raw" string literal is one whose content contains at least one ASCII
-// letter AND at least one whitespace character — a reliable fingerprint of
-// natural-language text that should instead come from the localization
-// system via `loc.msg("key")`/`loc.msg_args("key", &[...])`. This
-// deliberately does not flag single-word literals (e.g. "Retry", "Cancel")
-// — widening the fingerprint itself (not just the sink shapes it's applied
-// to) is a separate, much larger content-migration task; see TODO.md.
-//
-// Patterns that are intentionally allowed:
-//   Text::new("")             — empty placeholder
-//   Text::new("&")            — single punctuation symbol
-//   Text::new("↑")            — unicode arrow (no ASCII letter)
-//   Text::new("Retry")        — single word (no whitespace)
-//   Text::new(some_var)       — variable (no leading `"`)
-//   Text::new(format!("{}", n))         — no literal words in the template
-//   Text::new(String::from(loc.msg("key"))) — already localized
-//
-// `mod tests { ... }` blocks are exempt — test fixture text is never
-// user-visible. Every `mod tests` in this codebase is the last item in its
-// file (convention, not enforced elsewhere), so once a `mod tests {` line is
-// seen the rest of the file is skipped rather than tracking brace depth.
-//
-// A second, independent check below enforces that every `#[derive(Message)]`
-// type is registered somewhere with `.add_message::<T>()`: Bevy 0.19 panics
-// at runtime — "Message not initialized" — the moment a `MessageReader`/
-// `MessageWriter` for an unregistered message type actually runs, which is
-// easy to miss until that code path fires (`ExternalFolderChanged` shipped
-// this way once). Same static/textual approach as the localization check:
-// it can't see through a derive attribute split across multiple lines, but
-// every message in this codebase is declared as a single-line
-// `#[derive(..., Message, ...)]` immediately followed by its `struct`/`enum`.
-//
-// A third, unrelated responsibility lives here too when the target is
-// `wasm32`: `generate_asset_manifest()` walks `assets/{songs,themes,notes,
-// harmonicas}` and writes a `$OUT_DIR/asset_manifest.rs` that
-// `assets_management`'s wasm-only scan functions `include!()`. Bevy's wasm
-// `AssetReader` talks over plain HTTP and can't list a directory the way
-// `std::fs::read_dir` can — see `assets_management`'s module doc — so wasm
-// needs the equivalent of a directory scan baked in at build time instead.
-// This is safe and correct specifically because a build script always
-// compiles for and runs on the *host* (native) machine regardless of the
-// crate's own `--target`, so `std::fs::read_dir` here works exactly the same
-// whether the crate itself is being built for `wasm32-unknown-unknown` or
-// not. Native builds are unaffected: they keep scanning for real at runtime
-// (`assets_management`'s `#[cfg(not(target_arch = "wasm32"))]` functions),
-// which is required so a player can drop a new song into
-// `~/Harmonicon/songs/` without a rebuild.
+// 1. Localization: no hardcoded natural-language string may reach the
+//    screen. A string is natural language when it has an ASCII letter and
+//    whitespace outside `{…}` (single words like "Retry" pass; widening
+//    that is a content migration, see TODO.md). Checked sinks:
+//    - `Text::new/from("...")`, and `Text`/`TextSpan` given a `format!`
+//      template (only its literal pieces, even split over two lines);
+//    - `bsn!`'s `Text({"..."})`;
+//    - the label argument of a `KNOWN_LABEL_SINKS` helper, on the call
+//      line or the next few argument lines;
+//    - any of those given an identifier bound to such a literal within
+//      `LET_LOOKBACK_LINES`, or to a module-level `const` (one hop only).
+//    `mod tests { ... }` is exempt, and since it is always a file's last
+//    item, everything after it is skipped.
+// 2. Every `#[derive(Message)]` type is registered with
+//    `.add_message::<T>()` somewhere; an unregistered one compiles and
+//    panics only when a reader or writer first runs. Derives are expected
+//    on one line.
+// 3. Click handlers are `On<Activate>`, never `On<PointerClick>`, unless
+//    marked `not-a-widget-button:`.
+// 4. GLB/scene assets spawn through `WorldAssetRoot`, not `SceneRoot`.
 
 use std::path::Path;
 
