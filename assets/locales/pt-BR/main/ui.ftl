@@ -858,3 +858,5 @@ song-none-selected = Selecione uma música
 song-no-results = Nenhuma música encontrada. Tente menos palavras ou limpe a busca.
 song-picker-keys = Cima/Baixo: Selecionar   Enter: Jogar   /: Buscar   Esc: Voltar
 song-result-one = 1 música
+
+song-update = Atualizar músicas: {$name}

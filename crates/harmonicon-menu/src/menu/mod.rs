@@ -86,6 +86,7 @@ impl Plugin for MenuPlugin {
             .add_systems(
                 Update,
                 (
+                    pages::artist_list::refresh_song_updates,
                     pages::artist_list::focus_picker_search,
                     pages::artist_list::refresh_song_picker,
                     pages::artist_list::navigate_song_picker,

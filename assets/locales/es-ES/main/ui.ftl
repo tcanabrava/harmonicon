@@ -860,3 +860,5 @@ song-none-selected = Selecciona una canción
 song-no-results = No hay canciones coincidentes. Prueba menos palabras o borra la búsqueda.
 song-picker-keys = Arriba/Abajo: Seleccionar   Enter: Jugar   /: Buscar   Esc: Volver
 song-result-one = 1 canción
+
+song-update = Actualizar canciones: {$name}

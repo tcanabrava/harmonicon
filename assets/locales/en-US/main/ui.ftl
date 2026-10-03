@@ -861,3 +861,5 @@ song-none-selected = Select a song
 song-no-results = No matching songs. Try fewer words or clear your search.
 song-picker-keys = Up/Down: Select   Enter: Play   /: Search   Esc: Back
 song-result-one = 1 song
+
+song-update = Update songs: {$name}

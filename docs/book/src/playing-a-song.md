@@ -17,6 +17,12 @@
 4. Confirm the physical harmonica you are holding. A **3-2-1 countdown** then
    shows the song title and key before the chart and backing track start.
 
+When a repository check finds newer songs, an **Update songs** button appears
+above the catalog. Confirm it to download that repository’s latest version;
+the catalog refreshes when the download finishes. If a download fails, the
+existing songs remain available and you can retry the update. Checks are available in
+**Options → Lessons & songs**.
+
 ![Unified song picker](images/song-picker.png)
 
 ## Pickups and repeats

@@ -76,8 +76,9 @@ impl Plugin for ContentSourcesPlugin {
             .add_systems(OnExit(MenuPage::ContentSources), cleanup_menu)
             .add_systems(
                 Update,
-                (rebuild_lists, handle_confirm).run_if(in_state(MenuPage::ContentSources)),
-            );
+                rebuild_lists.run_if(in_state(MenuPage::ContentSources)),
+            )
+            .add_systems(Update, handle_confirm);
     }
 }
 
@@ -452,22 +453,9 @@ fn spawn_row(
     commands.entity(buttons).with_children(|b| {
         match status {
             RowStatus::UpdateAvailable { .. } => {
-                let (spec, shown_name) = (spec.clone(), shown_name.clone());
                 b.spawn_empty().apply_scene(button::small(
                     &loc.msg("content-update"),
-                    move |_: On<Activate>,
-                          mut pending: ResMut<PendingAction>,
-                          loc: Res<Localization>,
-                          mut open: MessageWriter<OpenConfirmDialog>| {
-                        pending.0 = Some((kind, spec.clone()));
-                        open.write(OpenConfirmDialog {
-                            purpose: UPDATE_PURPOSE,
-                            message: String::from(loc.msg_args(
-                                "content-confirm-update",
-                                &[("name", shown_name.clone())],
-                            )),
-                        });
-                    },
+                    update_action(kind, spec.clone(), shown_name.clone()),
                 ));
             }
             RowStatus::NotInstalled | RowStatus::DownloadFailed(_) => {
@@ -502,6 +490,47 @@ fn spawn_row(
     });
 }
 
+/// Shared by Options and the song picker, including the confirmation dialog.
+fn update_action(
+    kind: PackKind,
+    spec: RepoSpec,
+    shown_name: String,
+) -> impl FnMut(On<Activate>, ResMut<PendingAction>, Res<Localization>, MessageWriter<OpenConfirmDialog>)
++ Clone
++ Sync
++ 'static {
+    move |_: On<Activate>,
+          mut pending: ResMut<PendingAction>,
+          loc: Res<Localization>,
+          mut open: MessageWriter<OpenConfirmDialog>| {
+        pending.0 = Some((kind, spec.clone()));
+        open.write(OpenConfirmDialog {
+            purpose: UPDATE_PURPOSE,
+            message: loc
+                .msg_args("content-confirm-update", &[("name", shown_name.clone())])
+                .to_string(),
+        });
+    }
+}
+
+pub(super) fn spawn_song_update(
+    commands: &mut Commands,
+    parent: Entity,
+    entry: &PackEntry,
+    loc: &Localization,
+) {
+    let name = display_name(entry);
+    let label = loc.msg_args("song-update", &[("name", name.clone())]);
+    let button = commands
+        .spawn_empty()
+        .apply_scene(button::small(
+            &label,
+            update_action(entry.kind, entry.spec.clone(), name),
+        ))
+        .id();
+    commands.entity(parent).add_child(button);
+}
+
 /// Carries out the update or removal the player just confirmed.
 fn handle_confirm(
     mut chosen: MessageReader<ConfirmChosen>,
@@ -534,6 +563,36 @@ fn handle_confirm(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_update_confirmation_installs_only_after_accepting() {
+        let mut app = App::new();
+        app.init_resource::<PendingAction>()
+            .init_resource::<ContentSources>()
+            .add_message::<ConfirmChosen>()
+            .add_message::<InstallPack>()
+            .add_systems(Update, handle_confirm);
+        for confirmed in [false, true] {
+            app.world_mut().resource_mut::<PendingAction>().0 = Some((PackKind::Songs, remote()));
+            app.world_mut().write_message(ConfirmChosen {
+                purpose: UPDATE_PURPOSE,
+                confirmed,
+            });
+            app.update();
+            let requests: Vec<_> = app
+                .world_mut()
+                .resource_mut::<Messages<InstallPack>>()
+                .drain()
+                .collect();
+            assert_eq!(requests.len(), usize::from(confirmed));
+            if confirmed {
+                assert_eq!(requests[0].kind, PackKind::Songs);
+                assert_eq!(requests[0].spec, remote());
+            }
+            assert!(app.world().resource::<PendingAction>().0.is_none());
+        }
+    }
+
     use harmonicon_packs::pack::PackManifest;
 
     fn entry(spec: RepoSpec, status: PackStatus) -> PackEntry {

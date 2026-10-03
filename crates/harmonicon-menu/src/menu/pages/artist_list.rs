@@ -12,7 +12,10 @@ use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area;
 
 use harmonicon_app::app::{GameplayMode, SelectedSong};
+use harmonicon_packs::{pack::PackKind, repo::RepoSpec};
 use harmonicon_platform::assets_management::{AvailableSongs, SongEntry, SongsRescanned};
+use harmonicon_platform::content_packs::{ContentPacks, PackEntry, PackStatus};
+use harmonicon_platform::content_sync::{PackSync, UpdateState};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::song::SongManifest;
@@ -86,6 +89,89 @@ pub(crate) struct PickerPlay;
 #[derive(Component)]
 pub(crate) struct ModeLabel(bool);
 
+#[derive(Component)]
+pub(crate) struct SongUpdates;
+
+fn song_update_available(entry: &PackEntry, sync: &PackSync) -> bool {
+    entry.kind == PackKind::Songs
+        && matches!(entry.spec, RepoSpec::Remote { .. })
+        && matches!(entry.status, PackStatus::Ready { .. })
+        && !sync.installing(&entry.slug)
+        && matches!(
+            sync.updates.get(&entry.slug),
+            Some(UpdateState::Available { .. })
+        )
+}
+
+pub(crate) fn refresh_song_updates(
+    mut commands: Commands,
+    packs: Res<ContentPacks>,
+    sync: Res<PackSync>,
+    loc: Res<Localization>,
+    mut rows: Query<(Entity, &mut Node), With<SongUpdates>>,
+    added: Query<(), Added<SongUpdates>>,
+) {
+    if !packs.is_changed() && !sync.is_changed() && added.is_empty() {
+        return;
+    }
+    for (row, mut node) in &mut rows {
+        commands.entity(row).despawn_children();
+        let updates: Vec<_> = packs
+            .0
+            .iter()
+            .filter(|entry| {
+                song_update_available(entry, &sync)
+                    || (entry.kind == PackKind::Songs && sync.installing(&entry.slug))
+            })
+            .collect();
+        node.display = if updates.is_empty() {
+            Display::None
+        } else {
+            Display::Flex
+        };
+        for entry in updates {
+            if sync.installing(&entry.slug) {
+                spawn_update_status(
+                    &mut commands,
+                    row,
+                    loc.msg("content-status-downloading").to_string(),
+                );
+            } else {
+                super::content_sources::spawn_song_update(&mut commands, row, entry, &loc);
+                if let Some(error) = sync.failures.get(&entry.slug) {
+                    spawn_update_status(
+                        &mut commands,
+                        row,
+                        loc.msg_args(
+                            "content-status-download-failed",
+                            &[("error", error.clone())],
+                        )
+                        .to_string(),
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn spawn_update_status(commands: &mut Commands, parent: Entity, message: String) {
+    let status = commands
+        .spawn((
+            Text::new(message),
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(Color::srgb(0.90, 0.78, 0.62)),
+            Node {
+                max_width: Val::Percent(100.0),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(parent).add_child(status);
+}
+
 pub(crate) fn setup_artist_list(
     mut commands: Commands,
     songs: Res<AvailableSongs>,
@@ -110,6 +196,21 @@ pub(crate) fn setup_artist_list(
         row_gap: Val::Px(8.0),
         ..default()
     });
+    let updates = commands
+        .spawn((
+            SongUpdates,
+            Node {
+                display: Display::None,
+                width: Val::Percent(100.0),
+                flex_shrink: 0.0,
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: Val::Px(8.0),
+                row_gap: Val::Px(8.0),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(content).add_child(updates);
     let sort_row = commands
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -992,6 +1093,107 @@ pub(crate) fn update_picker_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn song_updates_require_a_checked_installed_remote_song_pack() {
+        let mut entry = PackEntry {
+            kind: PackKind::Songs,
+            spec: RepoSpec::Remote {
+                url: "https://example.com/songs".into(),
+                git_ref: None,
+            },
+            slug: "songs".into(),
+            root: "/songs".into(),
+            status: PackStatus::Ready {
+                manifest: harmonicon_packs::pack::PackManifest::parse(
+                    br#"{"schema":1,"kind":"songs","id":"songs","name":"Songs","version":"1.0.0"}"#,
+                )
+                .unwrap()
+                .unwrap(),
+                commit: Some("old".into()),
+            },
+        };
+        let mut sync = PackSync::default();
+        assert!(!song_update_available(&entry, &sync));
+        for state in [
+            UpdateState::Checking,
+            UpdateState::UpToDate,
+            UpdateState::Failed("offline".into()),
+        ] {
+            sync.updates.insert(entry.slug.clone(), state);
+            assert!(!song_update_available(&entry, &sync));
+        }
+        sync.updates.insert(
+            entry.slug.clone(),
+            UpdateState::Available {
+                commit: "new".into(),
+            },
+        );
+        assert!(song_update_available(&entry, &sync));
+
+        // A check finishing while this screen is open reveals the button;
+        // successful installation removes it without replacing the catalog.
+        let mut app = App::new();
+        app.insert_resource(ContentPacks(vec![entry.clone()]))
+            .insert_resource(PackSync::default())
+            .insert_resource(Localization::new())
+            .add_systems(Update, refresh_song_updates);
+        let updates = app.world_mut().spawn((SongUpdates, Node::default())).id();
+        let catalog = app.world_mut().spawn(SongPickerRows).id();
+        app.update();
+        assert_eq!(
+            app.world().get::<Node>(updates).unwrap().display,
+            Display::None
+        );
+        app.world_mut().resource_mut::<PackSync>().updates.insert(
+            entry.slug.clone(),
+            UpdateState::Available {
+                commit: "new".into(),
+            },
+        );
+        app.update();
+        assert_eq!(
+            app.world().get::<Node>(updates).unwrap().display,
+            Display::Flex
+        );
+        assert_eq!(app.world().get::<Children>(updates).unwrap().len(), 1);
+        app.world_mut()
+            .resource_mut::<PackSync>()
+            .failures
+            .insert(entry.slug.clone(), "offline".into());
+        app.update();
+        assert_eq!(app.world().get::<Children>(updates).unwrap().len(), 2);
+
+        app.world_mut()
+            .resource_mut::<PackSync>()
+            .updates
+            .insert(entry.slug.clone(), UpdateState::UpToDate);
+        app.update();
+        assert_eq!(
+            app.world().get::<Node>(updates).unwrap().display,
+            Display::None
+        );
+        assert!(
+            app.world()
+                .get::<Children>(updates)
+                .is_none_or(|children| children.is_empty())
+        );
+        assert!(app.world().get::<SongPickerRows>(catalog).is_some());
+
+        entry.kind = PackKind::Lessons;
+        assert!(!song_update_available(&entry, &sync));
+        entry.kind = PackKind::Songs;
+        entry.spec = RepoSpec::Local {
+            path: "/songs".into(),
+        };
+        assert!(!song_update_available(&entry, &sync));
+        entry.spec = RepoSpec::Remote {
+            url: "https://example.com/songs".into(),
+            git_ref: None,
+        };
+        entry.status = PackStatus::NotInstalled;
+        assert!(!song_update_available(&entry, &sync));
+    }
 
     #[test]
     fn sorting_reveals_selection_once_and_keeps_control_focus() {
