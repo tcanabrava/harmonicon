@@ -7,6 +7,7 @@
 //! whenever a setting changes. The file lives in the user's config directory at
 //! `<config>/harmonicon/settings.json`.
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::window::{MonitorSelection, PrimaryWindow, WindowMode};
 use figment::{
@@ -73,11 +74,9 @@ pub struct ReducedMotion(pub bool);
 ///
 /// **One resource rather than a resource per knob**, unlike every setting
 /// above it: these are one screen's worth of preferences, always read
-/// together, and this module threads each persisted resource through five
-/// places by hand (`apply_loaded_settings`, `mark_settings_dirty`,
-/// `tick_pending_save`, `flush_pending_save_on_exit`, `save_current`) —
-/// seven more would have crowded out the settings that genuinely are
-/// independent, and pushed those systems toward Bevy's parameter limit.
+/// together, and each persisted resource is a field in both
+/// `PersistedSettings` bundles — seven more would crowd out the settings
+/// that genuinely are independent.
 ///
 /// Every field is a *preference*, persisted here rather than on the player
 /// profile, which holds per-target performance evidence
@@ -334,41 +333,13 @@ impl Plugin for SettingsPlugin {
             .init_resource::<ContentSources>()
             .init_resource::<PendingSave>()
             .add_systems(Startup, apply_loaded_settings)
-            // Save whenever either settings resource changes. The Startup load
+            // Save whenever a persisted resource changes. The Startup load
             // also marks them changed, so the file is created on first run
             // (after one debounce interval).
             .add_systems(
                 Update,
                 (
-                    mark_settings_dirty.run_if(
-                        |audio: Res<AudioSettings>,
-                         theme_2d: Res<SelectedNoteTheme2d>,
-                         theme_3d: Res<SelectedNoteTheme3d>,
-                         model: Res<SelectedHarmonicaModel>,
-                         ui_theme: Res<SelectedTheme>,
-                         note_numbers: Res<ShowNoteNumbers>,
-                         adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
-                         fullscreen: Res<FullscreenEnabled>,
-                         colorblind_palette: Res<ColorblindPalette>,
-                         reduced_motion: Res<ReducedMotion>,
-                         action_button_style: Res<ActionButtonStyle>,
-                         bending_trainer: Res<BendingTrainerSettings>,
-                         content_sources: Res<ContentSources>| {
-                            audio.is_changed()
-                                || theme_2d.is_changed()
-                                || theme_3d.is_changed()
-                                || model.is_changed()
-                                || ui_theme.is_changed()
-                                || note_numbers.is_changed()
-                                || adaptive_difficulty.is_changed()
-                                || fullscreen.is_changed()
-                                || colorblind_palette.is_changed()
-                                || reduced_motion.is_changed()
-                                || action_button_style.is_changed()
-                                || bending_trainer.is_changed()
-                                || content_sources.is_changed()
-                        },
-                    ),
+                    mark_settings_dirty.run_if(|s: PersistedSettings| s.is_changed()),
                     tick_pending_save,
                     apply_fullscreen,
                 )
@@ -383,95 +354,114 @@ impl Plugin for SettingsPlugin {
 /// Loads the saved settings into the live resources at startup. `pub` so
 /// other Startup systems that need the loaded values (e.g. audio capture
 /// reading `AudioSettings::input_device`) can order themselves `.after` it.
-pub fn apply_loaded_settings(
-    mut audio: ResMut<AudioSettings>,
-    mut theme_2d: ResMut<SelectedNoteTheme2d>,
-    mut theme_3d: ResMut<SelectedNoteTheme3d>,
-    mut model: ResMut<SelectedHarmonicaModel>,
-    mut ui_theme: ResMut<SelectedTheme>,
-    mut note_numbers: ResMut<ShowNoteNumbers>,
-    mut adaptive_difficulty: ResMut<AdaptiveDifficultyEnabled>,
-    mut fullscreen: ResMut<FullscreenEnabled>,
-    mut colorblind_palette: ResMut<ColorblindPalette>,
-    mut reduced_motion: ResMut<ReducedMotion>,
-    mut action_button_style: ResMut<ActionButtonStyle>,
-    mut bending_trainer: ResMut<BendingTrainerSettings>,
-    mut content_sources: ResMut<ContentSources>,
-) {
+pub fn apply_loaded_settings(mut live: PersistedSettingsMut) {
     let settings = load_settings();
-    audio.music_volume = settings.music_volume;
-    audio.metronome_volume = settings.metronome_volume;
-    audio.input_latency_ms = settings.input_latency_ms;
-    audio.pitch_algorithm = settings.pitch_algorithm;
-    audio.input_device = settings.input_device;
-    theme_2d.0 = settings.note_theme_2d;
-    theme_3d.0 = settings.note_theme_3d;
-    model.0 = settings.harmonica_model;
-    ui_theme.0 = settings.ui_theme;
-    note_numbers.0 = settings.show_note_numbers;
-    adaptive_difficulty.0 = settings.adaptive_difficulty_enabled;
-    fullscreen.0 = settings.fullscreen;
-    colorblind_palette.0 = settings.colorblind_palette;
-    reduced_motion.0 = settings.reduced_motion;
-    *action_button_style = settings.action_button_style;
-    // Clamped on the way in, not just on the way out: `settings.json` is a
-    // plain file, and an out-of-range value would otherwise reach the
-    // trainer's maths before the player ever opens the drawer.
-    *bending_trainer = settings.bending_trainer.clamped();
-    *content_sources = settings.content_sources;
-    info!(
-        "Loaded settings: music={:.2} metronome={:.2} latency={}ms themes(2d={}, 3d={}) harmonica={} ui_theme={} note_numbers={} adaptive_difficulty={} fullscreen={} colorblind_palette={} reduced_motion={} action_button_style={:?}",
-        audio.music_volume,
-        audio.metronome_volume,
-        audio.input_latency_ms,
-        theme_2d.0,
-        theme_3d.0,
-        model.0,
-        ui_theme.0,
-        note_numbers.0,
-        adaptive_difficulty.0,
-        fullscreen.0,
-        colorblind_palette.0,
-        reduced_motion.0,
-        *action_button_style,
-    );
+    info!("Loaded settings: {settings:?}");
+    live.apply(settings);
 }
 
-/// Writes the current resource values back to disk.
-fn save_current(
-    audio: &AudioSettings,
-    theme_2d: &SelectedNoteTheme2d,
-    theme_3d: &SelectedNoteTheme3d,
-    model: &SelectedHarmonicaModel,
-    ui_theme: &SelectedTheme,
-    note_numbers: &ShowNoteNumbers,
-    adaptive_difficulty: &AdaptiveDifficultyEnabled,
-    fullscreen: &FullscreenEnabled,
-    colorblind_palette: &ColorblindPalette,
-    reduced_motion: &ReducedMotion,
-    action_button_style: &ActionButtonStyle,
-    bending_trainer: &BendingTrainerSettings,
-    content_sources: &ContentSources,
-) {
-    save_settings(&Settings {
-        music_volume: audio.music_volume,
-        metronome_volume: audio.metronome_volume,
-        input_latency_ms: audio.input_latency_ms,
-        pitch_algorithm: audio.pitch_algorithm,
-        input_device: audio.input_device.clone(),
-        note_theme_2d: theme_2d.0.clone(),
-        note_theme_3d: theme_3d.0.clone(),
-        harmonica_model: model.0.clone(),
-        ui_theme: ui_theme.0.clone(),
-        show_note_numbers: note_numbers.0,
-        adaptive_difficulty_enabled: adaptive_difficulty.0,
-        fullscreen: fullscreen.0,
-        colorblind_palette: colorblind_palette.0,
-        reduced_motion: reduced_motion.0,
-        action_button_style: *action_button_style,
-        bending_trainer: bending_trainer.clone(),
-        content_sources: content_sources.clone(),
-    });
+/// Every resource persisted to `settings.json`, read-only. A new setting is
+/// a field here and in [`PersistedSettingsMut`], plus a line in
+/// [`to_settings`](Self::to_settings) and [`PersistedSettingsMut::apply`];
+/// the load, change-detection and save systems then cover it.
+#[derive(SystemParam)]
+struct PersistedSettings<'w> {
+    audio: Res<'w, AudioSettings>,
+    theme_2d: Res<'w, SelectedNoteTheme2d>,
+    theme_3d: Res<'w, SelectedNoteTheme3d>,
+    model: Res<'w, SelectedHarmonicaModel>,
+    ui_theme: Res<'w, SelectedTheme>,
+    note_numbers: Res<'w, ShowNoteNumbers>,
+    adaptive_difficulty: Res<'w, AdaptiveDifficultyEnabled>,
+    fullscreen: Res<'w, FullscreenEnabled>,
+    colorblind_palette: Res<'w, ColorblindPalette>,
+    reduced_motion: Res<'w, ReducedMotion>,
+    action_button_style: Res<'w, ActionButtonStyle>,
+    bending_trainer: Res<'w, BendingTrainerSettings>,
+    content_sources: Res<'w, ContentSources>,
+}
+
+impl PersistedSettings<'_> {
+    fn is_changed(&self) -> bool {
+        self.audio.is_changed()
+            || self.theme_2d.is_changed()
+            || self.theme_3d.is_changed()
+            || self.model.is_changed()
+            || self.ui_theme.is_changed()
+            || self.note_numbers.is_changed()
+            || self.adaptive_difficulty.is_changed()
+            || self.fullscreen.is_changed()
+            || self.colorblind_palette.is_changed()
+            || self.reduced_motion.is_changed()
+            || self.action_button_style.is_changed()
+            || self.bending_trainer.is_changed()
+            || self.content_sources.is_changed()
+    }
+
+    fn to_settings(&self) -> Settings {
+        Settings {
+            music_volume: self.audio.music_volume,
+            metronome_volume: self.audio.metronome_volume,
+            input_latency_ms: self.audio.input_latency_ms,
+            pitch_algorithm: self.audio.pitch_algorithm,
+            input_device: self.audio.input_device.clone(),
+            note_theme_2d: self.theme_2d.0.clone(),
+            note_theme_3d: self.theme_3d.0.clone(),
+            harmonica_model: self.model.0.clone(),
+            ui_theme: self.ui_theme.0.clone(),
+            show_note_numbers: self.note_numbers.0,
+            adaptive_difficulty_enabled: self.adaptive_difficulty.0,
+            fullscreen: self.fullscreen.0,
+            colorblind_palette: self.colorblind_palette.0,
+            reduced_motion: self.reduced_motion.0,
+            action_button_style: *self.action_button_style,
+            bending_trainer: self.bending_trainer.clone(),
+            content_sources: self.content_sources.clone(),
+        }
+    }
+}
+
+/// The writable twin of [`PersistedSettings`], used once, at startup.
+#[derive(SystemParam)]
+pub struct PersistedSettingsMut<'w> {
+    audio: ResMut<'w, AudioSettings>,
+    theme_2d: ResMut<'w, SelectedNoteTheme2d>,
+    theme_3d: ResMut<'w, SelectedNoteTheme3d>,
+    model: ResMut<'w, SelectedHarmonicaModel>,
+    ui_theme: ResMut<'w, SelectedTheme>,
+    note_numbers: ResMut<'w, ShowNoteNumbers>,
+    adaptive_difficulty: ResMut<'w, AdaptiveDifficultyEnabled>,
+    fullscreen: ResMut<'w, FullscreenEnabled>,
+    colorblind_palette: ResMut<'w, ColorblindPalette>,
+    reduced_motion: ResMut<'w, ReducedMotion>,
+    action_button_style: ResMut<'w, ActionButtonStyle>,
+    bending_trainer: ResMut<'w, BendingTrainerSettings>,
+    content_sources: ResMut<'w, ContentSources>,
+}
+
+impl PersistedSettingsMut<'_> {
+    fn apply(&mut self, settings: Settings) {
+        self.audio.music_volume = settings.music_volume;
+        self.audio.metronome_volume = settings.metronome_volume;
+        self.audio.input_latency_ms = settings.input_latency_ms;
+        self.audio.pitch_algorithm = settings.pitch_algorithm;
+        self.audio.input_device = settings.input_device;
+        self.theme_2d.0 = settings.note_theme_2d;
+        self.theme_3d.0 = settings.note_theme_3d;
+        self.model.0 = settings.harmonica_model;
+        self.ui_theme.0 = settings.ui_theme;
+        self.note_numbers.0 = settings.show_note_numbers;
+        self.adaptive_difficulty.0 = settings.adaptive_difficulty_enabled;
+        self.fullscreen.0 = settings.fullscreen;
+        self.colorblind_palette.0 = settings.colorblind_palette;
+        self.reduced_motion.0 = settings.reduced_motion;
+        *self.action_button_style = settings.action_button_style;
+        // Clamped on the way in, not just on the way out: `settings.json` is
+        // a plain file, and an out-of-range value would otherwise reach the
+        // trainer's maths before the player ever opens the drawer.
+        *self.bending_trainer = settings.bending_trainer.clamped();
+        *self.content_sources = settings.content_sources;
+    }
 }
 
 /// (Re)starts the debounce countdown — called only when something actually
@@ -493,23 +483,7 @@ fn tick_debounce(remaining: Option<f32>, dt: f32) -> (bool, Option<f32>) {
 
 /// Ticks the debounce countdown; once it elapses, writes the current
 /// resource values to disk exactly once.
-fn tick_pending_save(
-    time: Res<Time>,
-    mut pending: ResMut<PendingSave>,
-    audio: Res<AudioSettings>,
-    theme_2d: Res<SelectedNoteTheme2d>,
-    theme_3d: Res<SelectedNoteTheme3d>,
-    model: Res<SelectedHarmonicaModel>,
-    ui_theme: Res<SelectedTheme>,
-    note_numbers: Res<ShowNoteNumbers>,
-    adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
-    fullscreen: Res<FullscreenEnabled>,
-    colorblind_palette: Res<ColorblindPalette>,
-    reduced_motion: Res<ReducedMotion>,
-    action_button_style: Res<ActionButtonStyle>,
-    bending_trainer: Res<BendingTrainerSettings>,
-    content_sources: Res<ContentSources>,
-) {
+fn tick_pending_save(time: Res<Time>, mut pending: ResMut<PendingSave>, live: PersistedSettings) {
     // Nothing pending is the usual state; don't rewrite it every frame.
     if pending.0.is_none() {
         return;
@@ -517,21 +491,7 @@ fn tick_pending_save(
     let (should_save, remaining) = tick_debounce(pending.0, time.delta_secs());
     pending.0 = remaining;
     if should_save {
-        save_current(
-            &audio,
-            &theme_2d,
-            &theme_3d,
-            &model,
-            &ui_theme,
-            &note_numbers,
-            &adaptive_difficulty,
-            &fullscreen,
-            &colorblind_palette,
-            &reduced_motion,
-            &action_button_style,
-            &bending_trainer,
-            &content_sources,
-        );
+        save_settings(&live.to_settings());
     }
 }
 
@@ -540,39 +500,13 @@ fn tick_pending_save(
 fn flush_pending_save_on_exit(
     mut exit: MessageReader<AppExit>,
     mut pending: ResMut<PendingSave>,
-    audio: Res<AudioSettings>,
-    theme_2d: Res<SelectedNoteTheme2d>,
-    theme_3d: Res<SelectedNoteTheme3d>,
-    model: Res<SelectedHarmonicaModel>,
-    ui_theme: Res<SelectedTheme>,
-    note_numbers: Res<ShowNoteNumbers>,
-    adaptive_difficulty: Res<AdaptiveDifficultyEnabled>,
-    fullscreen: Res<FullscreenEnabled>,
-    colorblind_palette: Res<ColorblindPalette>,
-    reduced_motion: Res<ReducedMotion>,
-    action_button_style: Res<ActionButtonStyle>,
-    bending_trainer: Res<BendingTrainerSettings>,
-    content_sources: Res<ContentSources>,
+    live: PersistedSettings,
 ) {
     if exit.read().next().is_none() || pending.0.is_none() {
         return;
     }
     pending.0 = None;
-    save_current(
-        &audio,
-        &theme_2d,
-        &theme_3d,
-        &model,
-        &ui_theme,
-        &note_numbers,
-        &adaptive_difficulty,
-        &fullscreen,
-        &colorblind_palette,
-        &reduced_motion,
-        &action_button_style,
-        &bending_trainer,
-        &content_sources,
-    );
+    save_settings(&live.to_settings());
 }
 
 /// Mirrors [`FullscreenEnabled`] onto the primary window's `WindowMode`.
