@@ -71,13 +71,8 @@ load-bearing about *this* crate.
   6/8), `bar_secs(bpm)`/`beat_secs(bpm)` for seconds. **Don't derive one
   of those yourself** — hold the meter and ask. `MetronomeTempo` and
   `ScoringConfig` both carry the meter for exactly this reason, not a
-  number computed from it. Before this there were four independent
-  readings of the same string, two of which took the numerator alone and
-  called it a beat count, and they disagreed with each other on the same
-  chart: Greensleeves (6/8) had its metronome accenting every second bar
-  while the editor's ruler was right, and the gameplay bar tracker
-  honoured the map while the gameplay metronome ignored it. Three things
-  that follow:
+  number computed from it: taking the numerator as a beat count makes
+  6/8 accent every second bar. Three things that follow:
   - **The metronome clicks the meter's own beat, not a quarter note.**
     `MusicScoreMeter::beat_secs` is `60 / bpm × 4 / denominator` — an
     eighth's worth in 6/8. This is what makes odd meters accentable at
@@ -133,8 +128,8 @@ load-bearing about *this* crate.
   intermediate slot positions are ratios of two table entries, unaffected by
   either shift, and subtracting it there would double-count. Everything
   adjustable lives in `harmonicon_platform::settings::BendingTrainerSettings`
-  (one resource, not one per knob — see its doc comment), whose defaults
-  reproduce what used to be hardcoded here. Two things that follow:
+  (one resource, not one per knob — see its doc comment). Two things that
+  follow:
   - **`clamped` runs on load, not only on edit.** `settings.json` is a file
     a player can edit, and a `tolerance_cents` of `0` would otherwise reach
     the maths as a divide-by-zero.
@@ -272,10 +267,7 @@ load-bearing about *this* crate.
     per-pitch `PitchGate` freshness check, so a chord only scores when its
     siblings are struck together — playing the same holes one at a time
     doesn't satisfy it (also excluded from `clean_attack`: a chord note is
-    supposed to have company). No chart schema change was needed —
-    multi-event `TrackItem`s already existed for the visual chord/split
-    badge; nothing previously required their events to sound together.
-    Unlike `clean_attack`, this needed no dedicated `SongStats` bucket —
+    supposed to have company). Unlike `clean_attack`, this needed no dedicated `SongStats` bucket —
     `chord_is_sounding` gates `Hit` itself, so an out-of-sync chord already
     reads as a plain miss in ordinary accuracy.
   - There's a headless end-to-end test driving `score_notes` with a
@@ -305,10 +297,8 @@ load-bearing about *this* crate.
 
 - **One score readout, two modes.** `hud::spawn_score_readout` spawns the
   `ScoreText`/`ComboText`/`FeedbackText`/`FeedbackDetailText` markers, and
-  both `gameplay_2d` and `gameplay_3d` call it — they used to spawn the same
-  four markers separately at different sizes in opposite corners
-  (bottom-right vs. top-right), which is how the two modes drifted into
-  looking like different games. Composition is shared; only the
+  both `gameplay_2d` and `gameplay_3d` call it, so the two modes can't
+  drift into looking like different games. Composition is shared; only the
   `ScoreReadoutAnchor` differs, because the hit line is a different kind of
   thing in each: 2D's is the bottom of a real UI node (so the readout is a
   child of the highway, offset by `HIT_H_PCT`), while 3D's is a mesh at
@@ -321,9 +311,7 @@ load-bearing about *this* crate.
 - **The scored-play HUD is one spawner, not two.** `hud_panel::
   spawn_hud_panel` builds the side panel — song title, phrase banner, tab
   ribbon, metronome, technique legend — and both modes call it, on the same
-  side of the screen, in the same order. 2D and 3D used to build that column
-  separately and identically except for where it sat (right vs. top-left),
-  which is how they drifted into reading as different games. Likewise
+  side of the screen, in the same order. Likewise
   `hud_panel::used_modifiers`: both flattened `chart.track` themselves, and a
   technique legend that disagrees with the notes is worse than none.
   - **The one honest difference is the blow/draw key**, and it follows from
@@ -432,12 +420,11 @@ load-bearing about *this* crate.
   to the note's own duration, floored so a very short note doesn't
   vanish), tinted blue (blow) or orange (draw), the same "note as a
   proportional colored rect" language `song_editor::interaction::
-  scrollbar_marker` established for the Song Editor's scrollbar minimap —
-  replacing what used to be a fixed-width white sliver with no duration,
-  hole, or direction information at all. The per-phrase adaptive-
+  scrollbar_marker` established for the Song Editor's scrollbar minimap.
+  The per-phrase adaptive-
   difficulty rectangles are painted as a translucent *overlay* on that
   same strip (spawned first, so the note markers stay legible on top),
-  not their own separate row below it as before — one load-bearing
+  not a separate row — one load-bearing
   consequence: a loop-range drag can now only start in the waveform band,
   since a phrase rect covering part of the note-lanes strip intercepts
   clicks there (see `spawn_song_progress`'s own comment on the trade-off).

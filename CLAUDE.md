@@ -85,7 +85,7 @@ doesn't break it.
 ```bash
 cargo run --features dev,dynamic_linking   # local iteration; ~7s relink
 cargo run --release             # playable build; never ship dev/dynamic_linking
-cargo test --features dev       # 1675 tests, whole workspace, incl. doctests
+cargo test --features dev       # ~2,075 tests, whole workspace, incl. doctests
 
 # The two loops want different things, which is why dynamic_linking is its
 # own feature rather than part of `dev`:
@@ -106,13 +106,6 @@ cargo test --features dev       # 1675 tests, whole workspace, incl. doctests
 cargo test -p harmonicon-core   # ~200 tests, no Bevy in its dependency tree
 cargo clippy --all-targets -- -D warnings               # what CI runs
 
-# `dev` is not just a speed switch: `#[cfg(feature = "dev")]` modules
-# (song_editor::debug_record, the expected-notes layer) are *not compiled
-# at all* without it. A bare `cargo test` will happily pass with those
-# broken — check the dev build before claiming a change is clean.
-
-# Working on pure logic? Skip the engine entirely — seconds, not a minute:
-cargo test -p harmonicon-core   # ~200 tests, no Bevy in its dependency tree
 # Debug builds were 300 GB of `target/`. Three settings in Cargo.toml keep
 # a clean full build *plus the whole test suite* at 7.1 GB, and the game
 # binary at 287 MB (it was 2,410 MB). Each was measured, not guessed:

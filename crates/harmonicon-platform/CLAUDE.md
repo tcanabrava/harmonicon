@@ -86,10 +86,10 @@ load-bearing about *this* crate.
   `localization::ftl` holds the `.ftl`/`.ftl.ron` `AssetLoader`s and the
   `LocaleBundle` asset; `localization::Locale` does the language
   negotiation; `localization::Localization` is the negotiated bundle set
-  every other crate takes as `Res<Localization>`. All of that used to be
-  `bevy_fluent`, whose version tracks Bevy's — absorbed here (see
-  `LICENSE-bevy_fluent`, MIT) so a Bevy upgrade can't be blocked on a
-  third-party plugin's release cadence. Everything *below* it (`fluent`,
+  every other crate takes as `Res<Localization>`. It is absorbed from
+  `bevy_fluent` (see `LICENSE-bevy_fluent`, MIT), whose version tracks
+  Bevy's, so a Bevy upgrade can't be blocked on a third-party plugin's
+  release cadence. Everything *below* it (`fluent`,
   `fluent_content`, `fluent-langneg`, `intl-memoizer`) has no Bevy in its
   tree and stays a plain dependency.
   - Two things the absorbed version deliberately doesn't have: the

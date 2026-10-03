@@ -45,11 +45,10 @@ load-bearing about *this* crate.
   hole)` and `max_bend(harp, hole)` (core) count the semitones between a
   hole's two reeds, so country tuning's raised draw 5 bends, Paddy
   Richter's hole 3 bends one semitone rather than Richter's three, and a
-  custom layout gets whatever its widest reed pair gives. Before this
-  they were a Richter table, which disagreed with the alternate tunings
-  on nine holes in both directions — forbidding real bends and permitting
-  impossible ones — and the same table capped gameplay's harp-substitution
-  and the drill generator. `overblow_ok`/`overdraw_ok` deliberately stay
+  custom layout gets whatever its widest reed pair gives. Don't
+  reintroduce a Richter table: it disagrees with the alternate tunings
+  on nine holes, forbidding real bends and permitting impossible ones.
+  `overblow_ok`/`overdraw_ok` deliberately stay
   by hole number: *which* holes get overblown is a convention of the
   instrument (1/4/5/6 and 7–10), not reed physics. The hole-free sticky
   cap is `interaction::deepest_bend(harp)`, asked of the effective harp
@@ -83,10 +82,8 @@ load-bearing about *this* crate.
   `HARP_KEYS` are re-exports of core's and `pitch_compatible` delegates to
   `technique_fits_hole`, so what the UI lets you place cannot drift from
   what the resolver considers reachable. Core's resolver also reaches
-  overblows and overdraws, which the editor's own never did — those
-  pitches previously fell through to the nearest-note fallback, so a MIDI
-  import could silently relocate a note the harp could actually have
-  played.) The key itself isn't just whatever was
+  overblows and overdraws, so a MIDI import never relocates a note the
+  harp can actually play.) The key itself isn't just whatever was
   already selected: `on_midi_track_selected` first scores every
   `state::HARP_KEYS` entry via `suggest_key`/`key_fit_score_for_harp`, built
   with the selected tuning and hole count (the fraction of the track's raw
@@ -254,16 +251,13 @@ load-bearing about *this* crate.
 - **Save/Load outcomes show up in the status bar, not just the log**
   (`song_editor::save_feedback`). `harpchart::handle_save_chosen`/
   `handle_load_chosen` and `lesson_form::handle_save_lesson_chosen`/
-  `handle_load_lesson_chosen` used to report every outcome with a bare
-  `println!` — invisible in a normal, non-terminal launch of a packaged
-  build. Each now also calls `SaveFeedback::set` with a localized
+  `handle_load_lesson_chosen` each call `SaveFeedback::set` with a localized
   success/warning/failure message, displayed by `panel::
   update_status_bar` as its own highest-priority tier (above even a
   count-in) for `save_feedback::DISPLAY_SECS` (4 s) before falling back
-  to whatever the bar would otherwise show; every outcome is still
-  logged via `info!`/`warn!` too; for developers running from a
-  terminal, that's strictly more visible than the old `println!` (structured,
-  filterable). `lesson_form::serialize_lesson` now returns its
+  to whatever the bar would otherwise show — a packaged build has no
+  terminal. Every outcome is also logged via `info!`/`warn!`.
+  `lesson_form::serialize_lesson` returns its
   validation warnings (empty id/unit, or the manifest not passing its
   own schema) as `Vec<String>` instead of printing them directly —
   `save_lesson` folds them into the save's own status ("saved with
@@ -645,16 +639,13 @@ load-bearing about *this* crate.
     column loop, not inside it. In 4/4 every position works out exactly
     where the column loop would have put it.
   - **`EditorState::meter` is the only place the editor reads the time
-    signature**, and there is deliberately no `beats_per_bar` on it any
-    more. There used to be one that rounded a bar to whole quarter notes
-    — exact only when the meter's bar happens to be one; 7/8's 3.5 became
-    4 and put every bar line half a beat out, and 3/8's 1.5 became 2 and
-    made the metronome's accent walk around the bar. Everything bar-shaped
+    signature**, and there is deliberately no `beats_per_bar` on it:
+    rounding a bar to whole quarter notes puts 7/8's bar lines half a
+    beat out and walks 3/8's accent around the bar. Everything bar-shaped
     (`ticks_per_bar`/`ticks_per_signature_beat` for the grid and
     timeline, `metronome::sync_tempo` and `count_in_secs` for the click)
     asks the `MusicScoreMeter` it returns. Gameplay's counterpart is
-    `bars::chart_meter`; see that crate's notes for the four-way
-    disagreement this closed.
+    `bars::chart_meter`.
   - **Beat numbers count the meter's own beat**, so 7/8 reads 1–7 and
     6/8 reads 1–6. Counting syllables (`snap::off_beat_labels`) stay
     *quarter*-relative, because they mirror the snap grid rather than the

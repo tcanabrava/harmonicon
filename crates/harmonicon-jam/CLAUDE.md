@@ -58,8 +58,7 @@ load-bearing about *this* crate.
   resetting every 12 bars). All three read different fields off the same
   always-accumulating `ImprovStats` (`chord_tone`/`in_scale`/
   `out_of_scale`/`rest_violations`); `menu::pages::lesson_reader::is_jam_criteria`
-  routes any of the three into `JamSession` the same way
-  `ScaleAdherence` alone used to, and `gameplay::pause_menu::
+  routes any of the three into `JamSession`, and `gameplay::pause_menu::
   jam_fraction_for` picks the one relevant fraction for whichever
   criterion a given lesson declares before calling `lesson_passed`.
   Separately, `LessonManifest::progression` (an optional

@@ -14,14 +14,14 @@ load-bearing about *this* crate.
 ## Architecture (load-bearing facts)
 
 - **Every menu page's content area auto-scrolls once it overflows.**
-  `menu::scene::spawn_menu_root` no longer returns the outer root's own
+  `menu::scene::spawn_menu_root` doesn't return the outer root's own
   entity for callers to add buttons/rows to — it spawns a
   `dialogs::scroll_area::spawn_scroll_area` (a `bevy_ui_widgets::
   ScrollArea` column paired with a real `Scrollbar`/`ScrollbarThumb`,
   generalized out of the Song Editor's own `song_editor::scroll::
   spawn_editor_scrollbar`) as a child of the root and returns *that*
-  entity instead, so all 22 existing `spawn_menu_root` call sites needed
-  zero changes to gain scrolling. The scrollbar
+  entity instead, so every `spawn_menu_root` page scrolls with no work of
+  its own. The scrollbar
   (`dialogs::scroll_area::update_scrollbar_visibility`, registered once
   app-wide via `ScrollAreaPlugin`) toggles both `Visibility` and
   `Node::display` together, collapsed to `Display::None` whenever content
@@ -35,9 +35,9 @@ load-bearing about *this* crate.
 - **The skill tree is the curriculum's only view, and the one page that
   scrolls both ways.** `harmonicon-lessons/src/lesson_tree` draws two levels: a
   spine of *unit* nodes across the top (`harmonicon_song::lessons::units`),
-  each unit's own lessons hanging below it as a small layered graph. A flat
-  list page (`MenuPage::Lessons`) used to sit beside it and was deleted —
-  one home per lesson, and unit gating stated once.
+  each unit's own lessons hanging below it as a small layered graph. There
+  is no list page beside it: one home per lesson, and unit gating stated
+  once.
   - **Why two levels: edge length.** As one flat graph, the curriculum's
     eighteen cross-unit prerequisites became edges four and five columns
     long, drawn straight through whatever nodes and labels lay between.
