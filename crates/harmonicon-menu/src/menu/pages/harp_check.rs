@@ -95,10 +95,7 @@ fn kind_label(kind: HarpKind, loc: &Localization) -> String {
 }
 
 fn kind_labels(loc: &Localization) -> Vec<String> {
-    vec![
-        kind_label(HarpKind::Diatonic, loc),
-        kind_label(HarpKind::Chromatic, loc),
-    ]
+    vec![kind_label(HarpKind::Diatonic, loc), kind_label(HarpKind::Chromatic, loc)]
 }
 
 /// Resolved against the same localized labels the list was built from, for
@@ -122,10 +119,9 @@ pub(crate) fn harp_name(harp: &Harmonica, loc: &Localization) -> String {
         Harmonica::Diatonic { .. } => HarpKind::Diatonic,
     };
     let key = detected_harp_key(harp).unwrap_or_else(|| "?".to_string());
-    String::from(loc.msg_args(
-        "harp-check-chart-harp",
-        &[("key", key), ("kind", kind_label(kind, loc))],
-    ))
+    String::from(
+        loc.msg_args("harp-check-chart-harp", &[("key", key), ("kind", kind_label(kind, loc))]),
+    )
 }
 
 fn mapping_labels(loc: &Localization) -> Vec<String> {
@@ -184,22 +180,19 @@ pub(crate) fn cost_message(cost: &RemapCost, baseline: &RemapCost, loc: &Localiz
     }
     let mut parts: Vec<String> = Vec::new();
     if added_bends > 0 {
-        parts.push(String::from(loc.msg_args(
-            "harp-check-cost-bends",
-            &[("count", added_bends.to_string())],
-        )));
+        parts.push(String::from(
+            loc.msg_args("harp-check-cost-bends", &[("count", added_bends.to_string())]),
+        ));
     }
     if added_overblows > 0 {
-        parts.push(String::from(loc.msg_args(
-            "harp-check-cost-overblows",
-            &[("count", added_overblows.to_string())],
-        )));
+        parts.push(String::from(
+            loc.msg_args("harp-check-cost-overblows", &[("count", added_overblows.to_string())]),
+        ));
     }
     if cost.unplayable > 0 {
-        parts.push(String::from(loc.msg_args(
-            "harp-check-cost-unreachable",
-            &[("count", cost.unplayable.to_string())],
-        )));
+        parts.push(String::from(
+            loc.msg_args("harp-check-cost-unreachable", &[("count", cost.unplayable.to_string())]),
+        ));
     }
     parts.join("  ·  ")
 }
@@ -215,21 +208,12 @@ pub(crate) fn setup_harp_check(
     // Seed from the chart when it's already resident (the common case: the
     // song list holds a strong handle, so it is usually decoded by now).
     // When it isn't, `refresh_harp_cost` seeds on the frame it arrives.
-    if let Some(chart) = selected
-        .as_ref()
-        .and_then(|s| manifests.get(&s.0))
-        .map(|m| &m.chart)
-    {
+    if let Some(chart) = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart) {
         seed_choice(&mut choice, chart);
     }
 
-    let (root, header, page_root) = spawn_menu_root(
-        &mut commands,
-        &loc.msg("harp-check-title"),
-        None,
-        &theme,
-        "HarpCheck",
-    );
+    let (root, header, page_root) =
+        spawn_menu_root(&mut commands, &loc.msg("harp-check-title"), None, &theme, "HarpCheck");
 
     let intro = commands
         .spawn_empty()
@@ -330,10 +314,7 @@ pub(crate) fn setup_harp_check(
          manifests: Res<Assets<SongManifest>>,
          mut effective: ResMut<EffectiveHarmonica>,
          mut state: ResMut<NextState<AppState>>| {
-            let chart = selected
-                .as_ref()
-                .and_then(|s| manifests.get(&s.0))
-                .map(|m| &m.chart);
+            let chart = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart);
             // Leave the default alone when nothing was actually changed, so
             // an untouched song stays on gameplay's original path.
             effective.harp = match chart {
@@ -376,11 +357,7 @@ pub(crate) fn refresh_harp_cost(
     mut labels: Query<&mut Text, With<HarpCostLabel>>,
     mut harp_labels: Query<&mut Text, (With<ChartHarpLabel>, Without<HarpCostLabel>)>,
 ) {
-    let Some(chart) = selected
-        .as_ref()
-        .and_then(|s| manifests.get(&s.0))
-        .map(|m| &m.chart)
-    else {
+    let Some(chart) = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart) else {
         return;
     };
     if !choice.seeded {
@@ -421,21 +398,15 @@ pub(crate) struct TrackPickerSlot;
 /// numbers and invisible in a name like "Track 4".
 pub(crate) fn track_label(entry: &TrackChart, loc: &Localization) -> String {
     let name = entry.track.name.clone().unwrap_or_else(|| {
-        loc.msg_args(
-            "harp-check-track-unnamed",
-            &[("index", entry.track.index.to_string())],
-        )
-        .to_string()
+        loc.msg_args("harp-check-track-unnamed", &[("index", entry.track.index.to_string())])
+            .to_string()
     });
     loc.msg_args(
         "harp-check-track-option",
         &[
             ("name", name),
             ("notes", entry.report.total.to_string()),
-            (
-                "percent",
-                ((entry.report.reachable_fraction() * 100.0).round() as u32).to_string(),
-            ),
+            ("percent", ((entry.report.reachable_fraction() * 100.0).round() as u32).to_string()),
         ],
     )
     .to_string()
@@ -467,10 +438,9 @@ pub(crate) fn spawn_track_picker(
     if children.is_some_and(|c| !c.is_empty()) {
         return;
     }
-    let (Some(manifest), Ok(backdrop_parent)) = (
-        selected.as_ref().and_then(|s| manifests.get(&s.0)),
-        page_root.single(),
-    ) else {
+    let (Some(manifest), Ok(backdrop_parent)) =
+        (selected.as_ref().and_then(|s| manifests.get(&s.0)), page_root.single())
+    else {
         return;
     };
     if manifest.source_tracks.len() < 2 {
@@ -478,10 +448,7 @@ pub(crate) fn spawn_track_picker(
     }
 
     let options = track_labels(&manifest.source_tracks, &loc);
-    let current = manifest
-        .source_track
-        .and_then(|i| options.get(i))
-        .unwrap_or(&options[0]);
+    let current = manifest.source_track.and_then(|i| options.get(i)).unwrap_or(&options[0]);
 
     combobox::spawn_combobox(
         &mut commands,

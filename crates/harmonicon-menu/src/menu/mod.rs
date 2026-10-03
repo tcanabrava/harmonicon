@@ -61,27 +61,18 @@ impl Plugin for MenuPlugin {
             .add_systems(OnEnter(AppState::Menu), routing::route_menu_entry)
             // Each page manages its own lifetime.
             .add_systems(OnEnter(MenuPage::Main), pages::main_menu::setup_main_menu)
-            .add_systems(
-                OnEnter(MenuPage::Welcome),
-                pages::welcome::setup_welcome_menu,
-            )
+            .add_systems(OnEnter(MenuPage::Welcome), pages::welcome::setup_welcome_menu)
             // `cleanup_menu` is not optional — every page below registers it,
             // and without it this page's nodes stay on screen underneath the
             // next one.
             .add_systems(
                 OnExit(MenuPage::Welcome),
-                (
-                    scene::cleanup_menu,
-                    pages::welcome::persist_profile_on_welcome_exit,
-                ),
+                (scene::cleanup_menu, pages::welcome::persist_profile_on_welcome_exit),
             )
             .add_systems(OnExit(MenuPage::Main), scene::cleanup_menu)
             .add_systems(OnEnter(MenuPage::Play), pages::play::setup_play_menu)
             .add_systems(OnExit(MenuPage::Play), scene::cleanup_menu)
-            .add_systems(
-                OnEnter(MenuPage::ArtistList),
-                pages::artist_list::setup_artist_list,
-            )
+            .add_systems(OnEnter(MenuPage::ArtistList), pages::artist_list::setup_artist_list)
             .add_systems(OnExit(MenuPage::ArtistList), scene::cleanup_menu)
             .add_systems(
                 Update,
@@ -105,21 +96,14 @@ impl Plugin for MenuPlugin {
             )
             .add_systems(
                 OnEnter(MenuPage::HarpCheck),
-                (
-                    pages::harp_check::reset_harp_choice,
-                    pages::harp_check::setup_harp_check,
-                )
-                    .chain(),
+                (pages::harp_check::reset_harp_choice, pages::harp_check::setup_harp_check).chain(),
             )
             .add_systems(OnExit(MenuPage::HarpCheck), scene::cleanup_menu)
             // The chart may still be decoding when the page is built, so the
             // cost line is filled in on whichever frame it resolves.
             .add_systems(
                 Update,
-                (
-                    pages::harp_check::spawn_track_picker,
-                    pages::harp_check::refresh_harp_cost,
-                )
+                (pages::harp_check::spawn_track_picker, pages::harp_check::refresh_harp_cost)
                     .run_if(in_state(MenuPage::HarpCheck)),
             )
             .add_systems(
@@ -139,20 +123,11 @@ impl Plugin for MenuPlugin {
                 Update,
                 pages::jam_generate::finish_pending_jam.run_if(in_state(MenuPage::JamGenerate)),
             )
-            .add_systems(
-                OnEnter(MenuPage::HelpAbout),
-                pages::help_about::setup_help_about_menu,
-            )
+            .add_systems(OnEnter(MenuPage::HelpAbout), pages::help_about::setup_help_about_menu)
             .add_systems(OnExit(MenuPage::HelpAbout), scene::cleanup_menu)
-            .add_systems(
-                OnEnter(MenuPage::About),
-                pages::help_about::setup_about_page,
-            )
+            .add_systems(OnEnter(MenuPage::About), pages::help_about::setup_about_page)
             .add_systems(OnExit(MenuPage::About), scene::cleanup_menu)
-            .add_systems(
-                Update,
-                routing::check_loading.run_if(in_state(AppState::SongLoading)),
-            )
+            .add_systems(Update, routing::check_loading.run_if(in_state(AppState::SongLoading)))
             // The guided tour drives `NextState<AppState>`/`NextState<
             // MenuPage>` itself on a timer, and some steps leave
             // `AppState::Menu` entirely (a live gameplay/Bending Trainer/
@@ -216,30 +191,15 @@ mod tests {
         track_page(&mut app, MenuPage::Play, "Play");
 
         // Enter the menu → its default page (Main) opens.
-        app.world_mut()
-            .resource_mut::<NextState<AppState>>()
-            .set(AppState::Menu);
+        app.world_mut().resource_mut::<NextState<AppState>>().set(AppState::Menu);
         app.update();
         // Open Play (Main must close first), then go Back to Main (Play closes).
-        app.world_mut()
-            .resource_mut::<NextState<MenuPage>>()
-            .set(MenuPage::Play);
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::Play);
         app.update();
-        app.world_mut()
-            .resource_mut::<NextState<MenuPage>>()
-            .set(MenuPage::Main);
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::Main);
         app.update();
 
         let log = &app.world().resource::<PageLog>().0;
-        assert_eq!(
-            log,
-            &[
-                "enter Main",
-                "exit Main",
-                "enter Play",
-                "exit Play",
-                "enter Main"
-            ],
-        );
+        assert_eq!(log, &["enter Main", "exit Main", "enter Play", "exit Play", "enter Main"],);
     }
 }

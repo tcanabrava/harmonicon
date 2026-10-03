@@ -33,11 +33,8 @@ fn notation_segments(
 ) -> Vec<NotationNote> {
     let start = note.tick as u64;
     let end = (note.tick + note.len.max(1)) as u64;
-    MusicScoreBarMap {
-        meter: meter_map.clone(),
-        quarter_ticks: TICKS_PER_BEAT as u32,
-    }
-    .split_note(start, end, midi, selected)
+    MusicScoreBarMap { meter: meter_map.clone(), quarter_ticks: TICKS_PER_BEAT as u32 }
+        .split_note(start, end, midi, selected)
 }
 
 /// Rebuilds [`MusicScoreNotes`] from `EditorState::notes` whenever the
@@ -62,10 +59,8 @@ pub(super) fn sync_music_score(
     }
     let harp = state.effective_harp();
     let meter_map = state.meter_map();
-    let next_bar_map = MusicScoreBarMap {
-        meter: meter_map.clone(),
-        quarter_ticks: TICKS_PER_BEAT as u32,
-    };
+    let next_bar_map =
+        MusicScoreBarMap { meter: meter_map.clone(), quarter_ticks: TICKS_PER_BEAT as u32 };
     if *bar_map != next_bar_map {
         *bar_map = next_bar_map;
     }
@@ -74,12 +69,7 @@ pub(super) fn sync_music_score(
         .iter()
         .filter_map(|n| {
             let midi = note_midi(n, &harp)?;
-            Some(notation_segments(
-                n,
-                midi,
-                &meter_map,
-                state.is_selected(n.id),
-            ))
+            Some(notation_segments(n, midi, &meter_map, state.is_selected(n.id)))
         })
         .flatten()
         .collect();
@@ -185,11 +175,7 @@ mod tests {
 
         let starts: Vec<_> = segments.iter().map(|segment| segment.start_beat).collect();
         assert_eq!(starts, vec![3.0, 3.5, 6.5]);
-        assert!(
-            segments[1..]
-                .iter()
-                .all(|segment| segment.tied_from_previous)
-        );
+        assert!(segments[1..].iter().all(|segment| segment.tied_from_previous));
     }
 
     #[test]
@@ -201,16 +187,10 @@ mod tests {
             .iter()
             .flat_map(|n| notation_segments(n, 60, &map, false))
             .collect::<Vec<_>>();
-        let bars = MusicScoreBarMap {
-            meter: map,
-            quarter_ticks: TICKS_PER_BEAT as u32,
-        };
+        let bars = MusicScoreBarMap { meter: map, quarter_ticks: TICKS_PER_BEAT as u32 };
         let rests = rests_between_notes(&staff, &bars);
         assert_eq!(
-            rests
-                .iter()
-                .map(|r| (r.start_beat, r.duration_beats))
-                .collect::<Vec<_>>(),
+            rests.iter().map(|r| (r.start_beat, r.duration_beats)).collect::<Vec<_>>(),
             vec![(1.0, 0.25), (2.25, 0.75)]
         );
     }

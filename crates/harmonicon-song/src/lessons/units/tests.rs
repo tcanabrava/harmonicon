@@ -70,19 +70,14 @@ fn electives_do_not_raise_a_units_gate() {
     ];
     let chain = UnitChain::build(&lessons);
     assert_eq!(chain.required(0), 1);
-    assert_eq!(
-        chain.completed(0, &passed(&["elective-a", "elective-b"])),
-        0
-    );
+    assert_eq!(chain.completed(0, &passed(&["elective-a", "elective-b"])), 0);
     assert_eq!(chain.completed(0, &passed(&["core"])), 1);
 }
 
 #[test]
 fn an_elective_only_unit_never_blocks_the_required_course() {
-    let lessons = [
-        optional(lesson("advanced", "electives", &[])),
-        lesson("next-core", "next", &[]),
-    ];
+    let lessons =
+        [optional(lesson("advanced", "electives", &[])), lesson("next-core", "next", &[])];
     let chain = UnitChain::build(&lessons);
     assert_eq!(chain.required(0), 0);
     assert!(chain.is_unlocked(1, &HashSet::new()));
@@ -97,10 +92,7 @@ fn an_elective_only_unit_is_open_before_the_core_units_ahead_of_it() {
         optional(lesson("side", "electives", &["core-a"])),
     ];
     let chain = UnitChain::build(&lessons);
-    assert!(
-        !chain.is_unlocked(1, &HashSet::new()),
-        "the core chain still gates"
-    );
+    assert!(!chain.is_unlocked(1, &HashSet::new()), "the core chain still gates");
     assert!(chain.is_unlocked(2, &HashSet::new()));
 }
 
@@ -118,10 +110,7 @@ fn a_unit_is_elective_only_when_nothing_in_it_counts_toward_a_gate() {
     let chain = UnitChain::build(&lessons);
     assert!(chain.is_elective_only(0));
     assert!(!chain.is_elective_only(1), "a mixed unit still has a gate");
-    assert!(
-        !chain.is_elective_only(9),
-        "no such unit is not elective-only"
-    );
+    assert!(!chain.is_elective_only(9), "no such unit is not elective-only");
 
     assert_eq!(chain.total(0), 2);
     assert_eq!(chain.total(1), 2, "total counts electives alongside core");

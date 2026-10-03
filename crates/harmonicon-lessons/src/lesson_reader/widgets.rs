@@ -189,11 +189,7 @@ pub(super) fn highlight_rhythm_step(
     backgrounds: &mut Query<&mut BackgroundColor>,
 ) {
     paint_cells(&pattern.cells, backgrounds, |index| {
-        if index == selected {
-            RHYTHM_ACTIVE_BG
-        } else {
-            step_bg(&pattern.steps[index])
-        }
+        if index == selected { RHYTHM_ACTIVE_BG } else { step_bg(&pattern.steps[index]) }
     });
 }
 
@@ -203,11 +199,7 @@ pub(super) fn highlight_phrase_step(
     backgrounds: &mut Query<&mut BackgroundColor>,
 ) {
     paint_cells(&looper.cells, backgrounds, |index| {
-        if index == selected {
-            LOOP_ACTIVE_BG
-        } else {
-            LOOP_CELL_BG
-        }
+        if index == selected { LOOP_ACTIVE_BG } else { LOOP_CELL_BG }
     });
 }
 
@@ -279,11 +271,8 @@ pub(crate) fn update_lesson_metronomes(
         if !metronome.muted
             && let Some((accent, gain)) = pattern.click(tick, metronome.beats_per_bar as f64)
         {
-            let sample = if accent {
-                "sounds/metronome_high.ogg"
-            } else {
-                "sounds/metronome_low.ogg"
-            };
+            let sample =
+                if accent { "sounds/metronome_high.ogg" } else { "sounds/metronome_low.ogg" };
             commands.spawn((
                 AudioPlayer::<AudioSource>(asset_server.load(sample)),
                 PlaybackSettings::DESPAWN

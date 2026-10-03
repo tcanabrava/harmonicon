@@ -56,11 +56,7 @@ struct TabButton {
 }
 
 fn tab_color(active: bool) -> Color {
-    if active {
-        button::CHOICE_SELECTED
-    } else {
-        button::color_default()
-    }
+    if active { button::CHOICE_SELECTED } else { button::color_default() }
 }
 
 /// Spawns a tab bar as a child of `parent`, one tab per label, with
@@ -191,10 +187,7 @@ fn on_radio_group_value_change(
             }
         }
     }
-    commands.trigger(TabSelect {
-        tab_bar: ev.source,
-        index: clicked_tab.index,
-    });
+    commands.trigger(TabSelect { tab_bar: ev.source, index: clicked_tab.index });
 }
 
 /// Registers the observers every tab bar needs. Add once per app.
@@ -202,8 +195,7 @@ pub struct TabBarPlugin;
 
 impl Plugin for TabBarPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(radio_self_update)
-            .add_observer(on_radio_group_value_change);
+        app.add_observer(radio_self_update).add_observer(on_radio_group_value_change);
     }
 }
 
@@ -237,11 +229,7 @@ mod tests {
     /// the group once a real click resolves — the actual entry point
     /// `on_radio_group_value_change` reacts to.
     fn click_tab(app: &mut App, bar: Entity, tab: Entity) {
-        app.world_mut().trigger(ValueChange::<Entity> {
-            source: bar,
-            value: tab,
-            is_final: true,
-        });
+        app.world_mut().trigger(ValueChange::<Entity> { source: bar, value: tab, is_final: true });
     }
 
     #[test]
@@ -290,10 +278,8 @@ mod tests {
 
         // Deliberately wrong tint on the other bar's tab: switching bar_a
         // must not "fix" it (it only walks its own bar's tabs).
-        app.world_mut()
-            .get_mut::<BackgroundColor>(tabs_b[1])
-            .unwrap()
-            .0 = Color::srgb(1.0, 0.0, 0.0);
+        app.world_mut().get_mut::<BackgroundColor>(tabs_b[1]).unwrap().0 =
+            Color::srgb(1.0, 0.0, 0.0);
 
         click_tab(&mut app, bar_a, tabs_a[1]);
         app.update();
@@ -319,9 +305,6 @@ mod tests {
         });
         app.update();
 
-        assert_eq!(
-            app.world().get::<BackgroundColor>(tabs[0]).unwrap().0,
-            tab_color(true)
-        );
+        assert_eq!(app.world().get::<BackgroundColor>(tabs[0]).unwrap().0, tab_color(true));
     }
 }

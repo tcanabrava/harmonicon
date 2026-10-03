@@ -22,12 +22,7 @@ struct OrbitState {
 
 impl Default for OrbitState {
     fn default() -> Self {
-        Self {
-            yaw: 0.3,
-            pitch: 0.4,
-            radius: 15.0,
-            target: Vec3::ZERO,
-        }
+        Self { yaw: 0.3, pitch: 0.4, radius: 15.0, target: Vec3::ZERO }
     }
 }
 
@@ -71,28 +66,10 @@ fn main() {
             }),
             ..default()
         }))
-        .insert_resource(EditorState {
-            model_name,
-            config,
-            selected: 0,
-            dirty: false,
-        })
-        .insert_resource(OrbitState {
-            yaw: 0.3,
-            pitch: 0.4,
-            radius: 15.0,
-            target: Vec3::ZERO,
-        })
+        .insert_resource(EditorState { model_name, config, selected: 0, dirty: false })
+        .insert_resource(OrbitState { yaw: 0.3, pitch: 0.4, radius: 15.0, target: Vec3::ZERO })
         .add_systems(Startup, setup)
-        .add_systems(
-            Update,
-            (
-                orbit_camera,
-                handle_input,
-                update_hole_meshes,
-                update_info_text,
-            ),
-        )
+        .add_systems(Update, (orbit_camera, handle_input, update_hole_meshes, update_info_text))
         .run();
 }
 
@@ -110,27 +87,18 @@ fn setup(
     ));
 
     commands.spawn((
-        DirectionalLight {
-            illuminance: 8_000.0,
-            ..default()
-        },
+        DirectionalLight { illuminance: 8_000.0, ..default() },
         Transform::from_xyz(5.0, 10.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
-    commands.spawn(AmbientLight {
-        brightness: 400.0,
-        ..default()
-    });
+    commands.spawn(AmbientLight { brightness: 400.0, ..default() });
 
     let [tx, ty, tz] = state.config.model_translation;
     commands.spawn((
-        WorldAssetRoot(asset_server.load(format!(
-            "harmonicas/3d/{}/harmonica.glb#Scene0",
-            state.model_name
-        ))),
+        WorldAssetRoot(
+            asset_server.load(format!("harmonicas/3d/{}/harmonica.glb#Scene0", state.model_name)),
+        ),
         Transform::from_xyz(tx, ty, tz)
-            .with_rotation(Quat::from_rotation_y(
-                state.config.model_rotation_y_deg.to_radians(),
-            ))
+            .with_rotation(Quat::from_rotation_y(state.config.model_rotation_y_deg.to_radians()))
             .with_scale(Vec3::splat(state.config.model_scale)),
     ));
 
@@ -153,10 +121,7 @@ fn setup(
 
     commands.spawn((
         Text::new(""),
-        TextFont {
-            font_size: FontSize::Px(13.0),
-            ..default()
-        },
+        TextFont { font_size: FontSize::Px(13.0), ..default() },
         TextColor(Color::WHITE),
         Node {
             position_type: PositionType::Absolute,
@@ -294,11 +259,7 @@ fn handle_input(
 fn update_hole_meshes(
     state: Res<EditorState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut indicators: Query<(
-        &HoleIndicator,
-        &mut Transform,
-        &MeshMaterial3d<StandardMaterial>,
-    )>,
+    mut indicators: Query<(&HoleIndicator, &mut Transform, &MeshMaterial3d<StandardMaterial>)>,
 ) {
     if !state.is_changed() {
         return;

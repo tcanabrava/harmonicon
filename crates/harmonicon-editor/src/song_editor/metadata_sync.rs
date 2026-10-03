@@ -94,8 +94,7 @@ impl EditorState {
             return;
         }
         self.selected.clear();
-        self.selected
-            .extend(self.notes.iter().filter(|n| n.tick == tick).map(|n| n.id));
+        self.selected.extend(self.notes.iter().filter(|n| n.tick == tick).map(|n| n.id));
         self.phrase_editor = Some(tick);
     }
 
@@ -103,8 +102,7 @@ impl EditorState {
     /// ids no note has. Idempotent; cheap enough to run after any removal.
     pub(super) fn drop_orphaned_metadata(&mut self) {
         let onsets: BTreeSet<usize> = self.notes.iter().map(|n| n.tick).collect();
-        self.phrase_annotations
-            .retain(|tick, _| onsets.contains(tick));
+        self.phrase_annotations.retain(|tick, _| onsets.contains(tick));
         let ids: BTreeSet<u32> = self.notes.iter().map(|n| n.id).collect();
         self.expression_intensities.retain(|id, _| ids.contains(id));
     }
@@ -121,19 +119,13 @@ impl EditorState {
             .iter()
             .filter_map(|&(id, _, new_tick)| {
                 let old_tick = self.notes.iter().find(|n| n.id == id)?.tick;
-                let stays_occupied = self
-                    .notes
-                    .iter()
-                    .any(|n| n.tick == old_tick && !moving.contains(&n.id));
+                let stays_occupied =
+                    self.notes.iter().any(|n| n.tick == old_tick && !moving.contains(&n.id));
                 (!stays_occupied).then_some((old_tick, new_tick))
             })
             .collect();
-        let occupied_before: BTreeSet<usize> = self
-            .notes
-            .iter()
-            .filter(|n| !moving.contains(&n.id))
-            .map(|n| n.tick)
-            .collect();
+        let occupied_before: BTreeSet<usize> =
+            self.notes.iter().filter(|n| !moving.contains(&n.id)).map(|n| n.tick).collect();
 
         for &(id, hole, tick) in targets {
             if let Some(n) = self.notes.iter_mut().find(|n| n.id == id) {
@@ -147,9 +139,7 @@ impl EditorState {
                 continue;
             };
             if !occupied_before.contains(&new_tick) {
-                self.phrase_annotations
-                    .entry(new_tick)
-                    .or_insert(annotation);
+                self.phrase_annotations.entry(new_tick).or_insert(annotation);
             }
         }
         self.drop_orphaned_metadata();
@@ -160,33 +150,17 @@ impl EditorState {
     /// annotation, both keyed by their *source* id/tick so a paste can
     /// re-key them onto what actually lands.
     pub(super) fn copy_selection(&self) -> NoteClipboard {
-        let notes: Vec<_> = self
-            .notes
-            .iter()
-            .filter(|n| self.selected.contains(&n.id))
-            .copied()
-            .collect();
+        let notes: Vec<_> =
+            self.notes.iter().filter(|n| self.selected.contains(&n.id)).copied().collect();
         let intensities = notes
             .iter()
-            .filter_map(|n| {
-                self.expression_intensities
-                    .get(&n.id)
-                    .map(|v| (n.id, v.clone()))
-            })
+            .filter_map(|n| self.expression_intensities.get(&n.id).map(|v| (n.id, v.clone())))
             .collect();
         let annotations = notes
             .iter()
-            .filter_map(|n| {
-                self.phrase_annotations
-                    .get(&n.tick)
-                    .map(|a| (n.tick, a.clone()))
-            })
+            .filter_map(|n| self.phrase_annotations.get(&n.tick).map(|a| (n.tick, a.clone())))
             .collect();
-        NoteClipboard {
-            notes,
-            intensities,
-            annotations,
-        }
+        NoteClipboard { notes, intensities, annotations }
     }
 
     /// Pastes `clip` with its earliest note at `target_tick`, re-keying the
@@ -214,9 +188,7 @@ impl EditorState {
                 self.expression_intensities.insert(placed.id, v.clone());
             }
             if let Some(a) = clip.annotations.get(&source.tick) {
-                self.phrase_annotations
-                    .entry(placed.tick)
-                    .or_insert_with(|| a.clone());
+                self.phrase_annotations.entry(placed.tick).or_insert_with(|| a.clone());
             }
         }
         self.notes.extend(placed.into_iter().map(|(_, p)| p));
@@ -242,12 +214,7 @@ impl EditorState {
         if start == 0 && start < end {
             self.tempo = format!("{opening_tempo}");
         }
-        close_timing_gap(
-            &mut self.time_signature,
-            &mut self.meter_changes,
-            start,
-            end,
-        );
+        close_timing_gap(&mut self.time_signature, &mut self.meter_changes, start, end);
         super::repeat_marks::close_gap(&mut self.repeats, start as u64, end as u64);
         let shifted: BTreeMap<usize, PhraseAnnotation> =
             std::mem::take(&mut self.phrase_annotations)

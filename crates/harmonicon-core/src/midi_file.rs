@@ -183,12 +183,7 @@ pub fn notes_to_phrase(
             let end_secs = tick_to_seconds(n.start_tick + n.dur_ticks, tpq, tempo);
             let tick = (start_secs / secs_per_tick).round() as usize;
             let len = (((end_secs - start_secs) / secs_per_tick).round() as usize).max(1);
-            PhraseNote {
-                tick,
-                len,
-                freq: Some(midi_to_freq_hz(n.key as f32)),
-                expr: Expr::None,
-            }
+            PhraseNote { tick, len, freq: Some(midi_to_freq_hz(n.key as f32)), expr: Expr::None }
         })
         .collect()
 }
@@ -225,10 +220,7 @@ pub fn render_track_pcm(
 
 #[cfg(any(test, feature = "test-support"))]
 pub fn meta(delta: u32, kind: MetaMessage<'static>) -> midly::TrackEvent<'static> {
-    midly::TrackEvent {
-        delta: midly::num::u28::from(delta),
-        kind: TrackEventKind::Meta(kind),
-    }
+    midly::TrackEvent { delta: midly::num::u28::from(delta), kind: TrackEventKind::Meta(kind) }
 }
 
 #[cfg(any(test, feature = "test-support"))]
@@ -285,10 +277,7 @@ mod tests {
 
     #[test]
     fn track_name_of_reads_the_first_track_name_event() {
-        let track = vec![
-            meta(0, MetaMessage::TrackName(b"Bass")),
-            note_on(0, 60, 100),
-        ];
+        let track = vec![meta(0, MetaMessage::TrackName(b"Bass")), note_on(0, 60, 100)];
         assert_eq!(track_name_of(&track).as_deref(), Some("Bass"));
     }
 
@@ -305,12 +294,8 @@ mod tests {
 
     #[test]
     fn note_on_count_ignores_zero_velocity_note_ons() {
-        let track = vec![
-            note_on(0, 60, 100),
-            note_on(10, 62, 0),
-            note_off(10, 60),
-            note_on(0, 64, 80),
-        ];
+        let track =
+            vec![note_on(0, 60, 100), note_on(10, 62, 0), note_off(10, 60), note_on(0, 64, 80)];
         assert_eq!(note_on_count(&track), 2);
     }
 
@@ -337,32 +322,20 @@ mod tests {
             vec![meta(0, MetaMessage::TimeSignature(6, 3, 24, 8))],
         ]);
         let smf = Smf::parse(&bytes).unwrap();
-        assert_eq!(
-            collect_time_signature_map(&smf),
-            vec![(0, 6, 8), (480, 3, 4)]
-        );
+        assert_eq!(collect_time_signature_map(&smf), vec![(0, 6, 8), (480, 3, 4)]);
     }
 
     #[test]
     fn collect_time_signature_map_supplies_opening_four_four() {
-        let bytes = smf_bytes(vec![vec![meta(
-            480,
-            MetaMessage::TimeSignature(7, 3, 24, 8),
-        )]]);
+        let bytes = smf_bytes(vec![vec![meta(480, MetaMessage::TimeSignature(7, 3, 24, 8))]]);
         let smf = Smf::parse(&bytes).unwrap();
-        assert_eq!(
-            collect_time_signature_map(&smf),
-            vec![(0, 4, 4), (480, 7, 8)]
-        );
+        assert_eq!(collect_time_signature_map(&smf), vec![(0, 4, 4), (480, 7, 8)]);
     }
 
     #[test]
     fn collect_tempo_map_collects_and_sorts_changes_across_tracks() {
         let bytes = smf_bytes(vec![
-            vec![meta(
-                100,
-                MetaMessage::Tempo(midly::num::u24::from(300_000)),
-            )],
+            vec![meta(100, MetaMessage::Tempo(midly::num::u24::from(300_000)))],
             vec![meta(0, MetaMessage::Tempo(midly::num::u24::from(500_000)))],
         ]);
         let smf = Smf::parse(&bytes).unwrap();
@@ -405,12 +378,8 @@ mod tests {
 
     #[test]
     fn extract_notes_orders_overlapping_notes_by_start_then_key() {
-        let track = vec![
-            note_on(0, 64, 100),
-            note_on(0, 60, 100),
-            note_off(100, 64),
-            note_off(0, 60),
-        ];
+        let track =
+            vec![note_on(0, 64, 100), note_on(0, 60, 100), note_off(100, 64), note_off(0, 60)];
         let notes = extract_notes(&track);
         let keys: Vec<u8> = notes.iter().map(|n| n.key).collect();
         assert_eq!(keys, vec![60, 64]);
@@ -443,11 +412,7 @@ mod tests {
 
     #[test]
     fn notes_to_phrase_converts_tick_timing_into_the_synth_grid() {
-        let notes = vec![RawNote {
-            start_tick: 0,
-            dur_ticks: 240,
-            key: 60,
-        }];
+        let notes = vec![RawNote { start_tick: 0, dur_ticks: 240, key: 60 }];
         // tpq 480, 120 BPM (500_000 us/quarter, so one quarter = 0.5s) ->
         // 240 ticks (a quarter of that quarter) is 0.25s; at
         // secs_per_tick = 1.0 / TICKS_PER_BEAT (one beat per second), that's

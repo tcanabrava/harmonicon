@@ -52,24 +52,12 @@ impl AssetLoader for ScoreSongLoader {
         reader.read_to_end(&mut bytes).await?;
 
         let path = load_context.path().path();
-        let extension = path
-            .extension()
-            .map(|e| e.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let converted = convert_score(
-            &extension,
-            bytes,
-            &artist_from_path(path),
-            title_from_path(path),
-        )?;
+        let extension =
+            path.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default();
+        let converted =
+            convert_score(&extension, bytes, &artist_from_path(path), title_from_path(path))?;
         let chart = converted.tracks[converted.selected].chart.clone();
-        assemble_manifest(
-            chart,
-            converted.tracks,
-            Some(converted.selected),
-            load_context,
-        )
-        .await
+        assemble_manifest(chart, converted.tracks, Some(converted.selected), load_context).await
     }
 
     /// Exactly what `harmonicon_score` can read — never a hand-written list,
@@ -113,10 +101,7 @@ pub fn convert_score(
     let selected = choose_track(&tracks).ok_or_else(|| {
         // Reached only when no part survives the harp — a file with no notes
         // at all was already refused while parsing.
-        let best = tracks
-            .iter()
-            .map(|t| t.report.reachable_fraction())
-            .fold(0.0f32, f32::max);
+        let best = tracks.iter().map(|t| t.report.reachable_fraction()).fold(0.0f32, f32::max);
         SongLoadError::Validation(format!(
             "no track in this file is playable on a harmonica — the best manages only \
              {percent}% of its notes. Name the harmonica part \"Harmonica\" if there is one.",
@@ -148,10 +133,7 @@ fn artist_from_path(path: &std::path::Path) -> String {
 /// A fallback, not an override: a format that records a real title keeps it
 /// (see [`convert_score`]). Left as `None` when the layout doesn't match.
 fn title_from_path(path: &std::path::Path) -> Option<String> {
-    path.ancestors()
-        .nth(2)
-        .and_then(|p| p.file_name())
-        .map(|n| n.to_string_lossy().into_owned())
+    path.ancestors().nth(2).and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned())
 }
 
 #[cfg(test)]

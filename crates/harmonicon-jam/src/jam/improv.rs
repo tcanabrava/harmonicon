@@ -92,11 +92,7 @@ impl ImprovStats {
     /// scale notes. The `chord-tone-improv` lesson's criterion.
     pub fn chord_tone_adherence(&self) -> Option<f32> {
         let total = self.total();
-        if total == 0 {
-            None
-        } else {
-            Some(self.chord_tone as f32 / total as f32)
-        }
+        if total == 0 { None } else { Some(self.chord_tone as f32 / total as f32) }
     }
 
     /// Fraction of attacks that landed *outside* a rest window — "did you
@@ -104,11 +100,7 @@ impl ImprovStats {
     /// criterion.
     pub fn phrase_discipline(&self) -> Option<f32> {
         let total = self.total();
-        if total == 0 {
-            None
-        } else {
-            Some(1.0 - (self.rest_violations as f32 / total as f32))
-        }
+        if total == 0 { None } else { Some(1.0 - (self.rest_violations as f32 / total as f32)) }
     }
 }
 

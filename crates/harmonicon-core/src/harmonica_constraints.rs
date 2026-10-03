@@ -74,9 +74,8 @@ pub fn reachable_directions(harp: &Harmonica, midi: u8) -> (bool, bool) {
 /// re-deriving every hole's notes per question would dominate the cost.
 fn direction_table(harp: &Harmonica) -> [(bool, bool); 128] {
     fn mark(table: &mut [(bool, bool); 128], note: Option<&str>, blow: bool) {
-        if let Some(entry) = note
-            .and_then(to_midi_u8)
-            .and_then(|midi| table.get_mut(usize::from(midi)))
+        if let Some(entry) =
+            note.and_then(to_midi_u8).and_then(|midi| table.get_mut(usize::from(midi)))
         {
             if blow {
                 entry.0 = true;
@@ -95,11 +94,7 @@ fn direction_table(harp: &Harmonica) -> [(bool, bool); 128] {
         for bend in &notes.bends {
             mark(&mut table, Some(bend), hole > 6);
         }
-        mark(
-            &mut table,
-            notes.over.as_deref(),
-            matches!(hole, 1 | 4 | 5 | 6),
-        );
+        mark(&mut table, notes.over.as_deref(), matches!(hole, 1 | 4 | 5 | 6));
     }
     table
 }
@@ -107,10 +102,7 @@ fn direction_table(harp: &Harmonica) -> [(bool, bool); 128] {
 /// A pitch's `(blow, draw)` reachability from a [`direction_table`]; a
 /// pitch outside the MIDI range is reachable neither way.
 fn table_directions(table: &[(bool, bool); 128], midi: u8) -> (bool, bool) {
-    table
-        .get(usize::from(midi))
-        .copied()
-        .unwrap_or((false, false))
+    table.get(usize::from(midi)).copied().unwrap_or((false, false))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -137,22 +129,13 @@ pub struct BreathDirectionTracker {
 
 impl Default for BreathDirectionTracker {
     fn default() -> Self {
-        Self {
-            current: None,
-            pending: None,
-            pending_frames: 0,
-            silent_frames: 0,
-            change_frames: 2,
-        }
+        Self { current: None, pending: None, pending_frames: 0, silent_frames: 0, change_frames: 2 }
     }
 }
 
 impl BreathDirectionTracker {
     pub fn with_change_frames(change_frames: u8) -> Self {
-        Self {
-            change_frames: change_frames.max(1),
-            ..Self::default()
-        }
+        Self { change_frames: change_frames.max(1), ..Self::default() }
     }
 
     pub fn reset(&mut self) {
@@ -321,9 +304,7 @@ impl HarmonicaNoteTracker {
         // One wind direction first: a pitch the current breath cannot produce
         // is not a candidate for onset counting at all.
         let reach = &self.reach;
-        let allowed = self
-            .direction
-            .filter_by(|midi| table_directions(reach, midi), candidates);
+        let allowed = self.direction.filter_by(|midi| table_directions(reach, midi), candidates);
         // `allowed` is sorted and deduplicated, so membership is a binary
         // search — no per-hop set.
         let is_allowed = |midi: &u8| allowed.binary_search(midi).is_ok();
@@ -342,8 +323,7 @@ impl HarmonicaNoteTracker {
                 self.active.insert(midi, 0);
             }
         }
-        self.pending
-            .retain(|midi, _| !self.active.contains_key(midi));
+        self.pending.retain(|midi, _| !self.active.contains_key(midi));
         self.active.retain(|midi, missed| {
             if is_allowed(midi) {
                 true
@@ -546,10 +526,7 @@ mod tests {
         let harp = richter_harp("C");
         let mut tracker = HarmonicaNoteTracker::new(
             harp,
-            NoteTrackerConfig {
-                onset_frames: 1,
-                ..NoteTrackerConfig::default()
-            },
+            NoteTrackerConfig { onset_frames: 1, ..NoteTrackerConfig::default() },
         );
         // G4: hole 2 draw and hole 3 blow.
         assert_eq!(tracker.update(&[67]).active, vec![67]);
@@ -574,11 +551,7 @@ mod tests {
              merge into a single sustain"
         );
         tracker.update(&[60]);
-        assert_eq!(
-            tracker.update(&[60]).confirmed,
-            vec![60],
-            "the re-attack must confirm again"
-        );
+        assert_eq!(tracker.update(&[60]).confirmed, vec![60], "the re-attack must confirm again");
     }
 
     #[test]
@@ -588,11 +561,7 @@ mod tests {
         let harp = richter_harp("C");
         let mut tracker = HarmonicaNoteTracker::new(
             harp.clone(),
-            NoteTrackerConfig {
-                onset_frames: 0,
-                release_frames: 0,
-                direction_change_frames: 0,
-            },
+            NoteTrackerConfig { onset_frames: 0, release_frames: 0, direction_change_frames: 0 },
         );
         assert_eq!(tracker.onset_frames(), 1);
         assert_eq!(tracker.update(&[60]).confirmed, vec![60]);
@@ -610,10 +579,7 @@ mod tests {
         let harp = richter_harp("C");
         let mut tracker = HarmonicaNoteTracker::new(
             harp,
-            NoteTrackerConfig {
-                release_frames: 2,
-                ..NoteTrackerConfig::default()
-            },
+            NoteTrackerConfig { release_frames: 2, ..NoteTrackerConfig::default() },
         );
         tracker.update(&[60]);
         tracker.update(&[60]);
@@ -633,14 +599,10 @@ mod tests {
         for onset_frames in 1..=4u8 {
             let mut tracker = HarmonicaNoteTracker::new(
                 harp.clone(),
-                NoteTrackerConfig {
-                    onset_frames,
-                    ..NoteTrackerConfig::default()
-                },
+                NoteTrackerConfig { onset_frames, ..NoteTrackerConfig::default() },
             );
-            let confirmed_on: Vec<usize> = (0..8)
-                .filter(|_| !tracker.update(&[60]).confirmed.is_empty())
-                .collect();
+            let confirmed_on: Vec<usize> =
+                (0..8).filter(|_| !tracker.update(&[60]).confirmed.is_empty()).collect();
             assert_eq!(
                 confirmed_on,
                 vec![onset_frames as usize - 1],

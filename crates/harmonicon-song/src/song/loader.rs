@@ -70,10 +70,7 @@ fn validate_and_parse_chart(
 
     // Deserializes from a borrow: no copy of the whole JSON tree.
     let chart = <HarpChart as serde::Deserialize>::deserialize(&*chart_value)?;
-    let declared_version = chart
-        .metadata
-        .as_ref()
-        .and_then(|m| m.format_version.as_deref());
+    let declared_version = chart.metadata.as_ref().and_then(|m| m.format_version.as_deref());
     if !format_version_supported(declared_version, CURRENT_FORMAT_VERSION) {
         return Err(SongLoadError::Validation(format!(
             "chart declares metadata.format_version {declared:?}, which this build's loader \
@@ -108,9 +105,7 @@ impl AssetLoader for SongChartLoader {
         // returned future must be.
         use bevy::log::tracing::Instrument;
         let span = info_span!("SongChartLoader::load", path = %load_context.path());
-        Self::load_inner(reader, load_context)
-            .instrument(span)
-            .await
+        Self::load_inner(reader, load_context).instrument(span).await
     }
 
     fn extensions(&self) -> &[&str] {
@@ -224,23 +219,13 @@ pub(super) async fn assemble_manifest(
                 &bytes,
                 harmonicon_audio::waveform::WAVEFORM_BUCKETS,
             );
-            (
-                Some(load_context.load::<AudioSource>(ogg_path)),
-                None,
-                waveform,
-                duration,
-            )
+            (Some(load_context.load::<AudioSource>(ogg_path)), None, waveform, duration)
         } else if let Ok(bytes) = load_context.read_asset_bytes(wav_path.clone()).await {
             let (waveform, duration) = harmonicon_audio::waveform::analyze_wav_waveform(
                 &bytes,
                 harmonicon_audio::waveform::WAVEFORM_BUCKETS,
             );
-            (
-                Some(load_context.load::<AudioSource>(wav_path)),
-                None,
-                waveform,
-                duration,
-            )
+            (Some(load_context.load::<AudioSource>(wav_path)), None, waveform, duration)
         } else if let Ok(bytes) = load_context.read_asset_bytes(mid_path.clone()).await {
             // A raw `.mid` — unlike `.ogg`/`.wav`, this isn't itself
             // audio the AssetServer can load; each of its tracks is
@@ -269,18 +254,14 @@ pub(super) async fn assemble_manifest(
     // path is a bare string with no `source`, so it always resolves
     // against the bundled `assets/` source — shared defaults live there
     // regardless of where the song itself came from.
-    let note_2d_json = match load_context
-        .read_asset_bytes(sibling(song_folder.join("2d/note_2d.json")))
-        .await
-    {
-        Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
-        Err(_) => {
-            let res = load_context
-                .read_asset_bytes("notes/2d/circular.json")
-                .await;
-            String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
-        }
-    };
+    let note_2d_json =
+        match load_context.read_asset_bytes(sibling(song_folder.join("2d/note_2d.json"))).await {
+            Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+            Err(_) => {
+                let res = load_context.read_asset_bytes("notes/2d/circular.json").await;
+                String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
+            }
+        };
 
     // Note the song's own 3D GLB path if present (without loading it, same
     // reasoning as 2D above). gameplay_3d::setup loads it with the
@@ -295,18 +276,14 @@ pub(super) async fn assemble_manifest(
 
     // 3D note layout: the song's own json if present, else the default
     // circular.json layout (bundled source, same reasoning as 2D above).
-    let note_3d_json = match load_context
-        .read_asset_bytes(sibling(song_folder.join("3d/note_3d.json")))
-        .await
-    {
-        Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
-        Err(_) => {
-            let res = load_context
-                .read_asset_bytes("notes/3d/circular.json")
-                .await;
-            String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
-        }
-    };
+    let note_3d_json =
+        match load_context.read_asset_bytes(sibling(song_folder.join("3d/note_3d.json"))).await {
+            Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+            Err(_) => {
+                let res = load_context.read_asset_bytes("notes/3d/circular.json").await;
+                String::from_utf8_lossy(&res.unwrap_or_default()).to_string()
+            }
+        };
 
     Ok(SongManifest {
         path: song_folder,
@@ -363,10 +340,8 @@ fn load_midi_tracks(
         let name = harmonicon_core::midi_file::track_name_of(track)
             .unwrap_or_else(|| format!("Track {index}"));
         let wav = encode_wav(&pcm, SAMPLE_RATE);
-        let source = load_context.add_labeled_asset(
-            format!("midi_track_{index}"),
-            AudioSource { bytes: wav.into() },
-        );
+        let source = load_context
+            .add_labeled_asset(format!("midi_track_{index}"), AudioSource { bytes: wav.into() });
         tracks.push(BackingStemAudio { name, source });
     }
 

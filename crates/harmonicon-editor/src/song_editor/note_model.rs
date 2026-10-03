@@ -280,9 +280,6 @@ impl DragState {
     /// other selected note (the anchor `note` itself is excluded — it's
     /// already tracked via `id`/`start_hole`/`start_tick`).
     pub(super) fn new_group(id: u32, note: &GridNote, group: Vec<GridNote>) -> Self {
-        Self {
-            group,
-            ..Self::new(id, DragKind::Move, note)
-        }
+        Self { group, ..Self::new(id, DragKind::Move, note) }
     }
 }

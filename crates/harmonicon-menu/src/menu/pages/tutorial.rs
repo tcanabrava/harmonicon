@@ -28,11 +28,7 @@ const DEMO_SONG: (&str, &str) = ("Example Artist", "Example Song");
 /// `None`.
 fn demo_song_path(songs: &AvailableSongs) -> Option<String> {
     let (artist, title) = DEMO_SONG;
-    if let Some(song) = songs
-        .0
-        .get(artist)
-        .and_then(|list| list.iter().find(|s| s.name == title))
-    {
+    if let Some(song) = songs.0.get(artist).and_then(|list| list.iter().find(|s| s.name == title)) {
         return Some(song.asset_path.clone());
     }
     songs
@@ -363,10 +359,7 @@ pub(crate) fn sync_tutorial_overlay(
     };
     let step_text = String::from(loc.msg_args(
         "tutorial-step",
-        &[
-            ("n", (tour.step + 1).to_string()),
-            ("total", TOUR_STEPS.len().to_string()),
-        ],
+        &[("n", (tour.step + 1).to_string()), ("total", TOUR_STEPS.len().to_string())],
     ));
 
     commands
@@ -435,19 +428,15 @@ mod tests {
     fn songs(entries: &[(&str, &str)]) -> AvailableSongs {
         let mut songs = AvailableSongs::default();
         for (artist, name) in entries {
-            songs
-                .0
-                .entry(artist.to_string())
-                .or_default()
-                .push(SongEntry {
-                    artist: artist.to_string(),
-                    name: name.to_string(),
-                    genre: "Uncategorized".to_string(),
-                    difficulty: "intermediate".to_string(),
-                    source_name: String::new(),
-                    retained: false,
-                    asset_path: format!("packs://p/{artist}/{name}/song/chart.harpchart"),
-                });
+            songs.0.entry(artist.to_string()).or_default().push(SongEntry {
+                artist: artist.to_string(),
+                name: name.to_string(),
+                genre: "Uncategorized".to_string(),
+                difficulty: "intermediate".to_string(),
+                source_name: String::new(),
+                retained: false,
+                asset_path: format!("packs://p/{artist}/{name}/song/chart.harpchart"),
+            });
         }
         songs
     }
@@ -494,10 +483,7 @@ mod tests {
         // `start_tutorial_tour` only handles a `Page` first step (it can
         // set `NextState<MenuPage>` directly, since it's already in
         // `AppState::Menu` — see its doc comment).
-        assert!(matches!(
-            TOUR_STEPS.first(),
-            Some((TourTarget::Page(_), ..))
-        ));
+        assert!(matches!(TOUR_STEPS.first(), Some((TourTarget::Page(_), ..))));
     }
 
     #[test]
@@ -559,9 +545,7 @@ mod tests {
             return_to: MenuPage::Main,
         });
         app.update();
-        let mut query = app
-            .world_mut()
-            .query_filtered::<Entity, With<TutorialOverlayRoot>>();
+        let mut query = app.world_mut().query_filtered::<Entity, With<TutorialOverlayRoot>>();
         let first = query.single(app.world()).unwrap();
 
         app.world_mut()

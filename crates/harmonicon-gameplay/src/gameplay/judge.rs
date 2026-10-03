@@ -179,10 +179,7 @@ pub(crate) fn modifier_fx_key(modifier: &Modifier) -> &'static str {
 /// Style-bonus points awarded for a hit note's techniques, summed over its
 /// modifiers using the chart's `style_bonus` table (keyed by technique name).
 pub fn style_bonus_points(modifiers: &[Modifier], table: &HashMap<String, f32>) -> f32 {
-    modifiers
-        .iter()
-        .map(|m| table.get(modifier_fx_key(m)).copied().unwrap_or(0.0))
-        .sum()
+    modifiers.iter().map(|m| table.get(modifier_fx_key(m)).copied().unwrap_or(0.0)).sum()
 }
 
 /// What one frame inside `note`'s window says about why it is failing, or
@@ -204,27 +201,18 @@ fn observed_failure(
     gate: &PitchGate,
     harp: &PlayedHarp,
 ) -> Option<MissReason> {
-    let mut attacked = sounding
-        .iter()
-        .copied()
-        .filter(|&pitch| gate.is_fresh(pitch, true))
-        .peekable();
+    let mut attacked =
+        sounding.iter().copied().filter(|&pitch| gate.is_fresh(pitch, true)).peekable();
     attacked.peek()?;
     if !note.chord_pitches.is_empty()
-        && note
-            .chord_pitches
-            .iter()
-            .any(|pitch| sounding.contains(pitch))
+        && note.chord_pitches.iter().any(|pitch| sounding.contains(pitch))
         && !chord_is_sounding(&note.chord_pitches, sounding)
     {
         return Some(MissReason::IncompleteChord);
     }
     let expected = note.expected_pitch.filter(|e| !sounding.contains(e))?;
     Some(MissReason::WrongPitch {
-        expected: HoleTab {
-            hole: note.hole,
-            is_blow: note.is_blow,
-        },
+        expected: HoleTab { hole: note.hole, is_blow: note.is_blow },
         heard: nearest_attacked(attacked, expected).and_then(|pitch| heard_tab(pitch, harp)),
     })
 }
@@ -235,9 +223,7 @@ fn observed_failure(
 /// `HashSet` — so this has to pick by a rule rather than take the first, or
 /// the same frame could report different pitches on different runs.
 pub(super) fn nearest_attacked(attacked: impl IntoIterator<Item = u8>, expected: u8) -> Option<u8> {
-    attacked
-        .into_iter()
-        .min_by_key(|&pitch| (pitch.abs_diff(expected), pitch))
+    attacked.into_iter().min_by_key(|&pitch| (pitch.abs_diff(expected), pitch))
 }
 
 /// The hole and breath that produce `pitch` on the harp the player is
@@ -246,10 +232,7 @@ pub(super) fn nearest_attacked(attacked: impl IntoIterator<Item = u8>, expected:
 /// passes `ValidHarpNotes` for the chart's harp but not the played one.
 pub(super) fn heard_tab(pitch: u8, harp: &PlayedHarp) -> Option<HoleTab> {
     let assignment = map_pitch_playable(pitch, harp.0.as_ref()?)?;
-    Some(HoleTab {
-        hole: assignment.hole,
-        is_blow: matches!(assignment.action, Action::Blow),
-    })
+    Some(HoleTab { hole: assignment.hole, is_blow: matches!(assignment.action, Action::Blow) })
 }
 
 /// Per-frame working storage for [`score_notes`], kept between frames so
@@ -296,29 +279,15 @@ pub fn score_notes(
     let judged = judged_instant(clock.get(), &audio, pitch_filter.as_deref());
 
     if config.combo_enabled
-        && should_decay_combo(
-            score.combo,
-            clock.get(),
-            score.last_hit_time,
-            config.decay_secs,
-        )
+        && should_decay_combo(score.combo, clock.get(), score.last_hit_time, config.decay_secs)
     {
         score.combo = 0;
         scored.write(NoteScored { judgment: None });
     }
 
-    let JudgeScratch {
-        harp_pitches,
-        pending,
-    } = &mut *scratch;
+    let JudgeScratch { harp_pitches, pending } = &mut *scratch;
     harp_pitches.clear();
-    harp_pitches.extend(
-        active
-            .0
-            .iter()
-            .map(|p| p.midi)
-            .filter(|m| valid_notes.0.contains(m)),
-    );
+    harp_pitches.extend(active.0.iter().map(|p| p.midi).filter(|m| valid_notes.0.contains(m)));
     let harp_pitches = &*harp_pitches;
 
     // Re-arm any pitch the player has stopped sounding, so its next attack is
@@ -365,10 +334,7 @@ pub fn score_notes(
             if clock.get() < note.time + note.duration {
                 // The held pitch stays "consumed" by the gate, so checking the
                 // raw detected set keeps crediting this same note's sustain.
-                if note
-                    .expected_pitch
-                    .is_some_and(|m| harp_pitches.contains(&m))
-                {
+                if note.expected_pitch.is_some_and(|m| harp_pitches.contains(&m)) {
                     note.held += dt;
                 }
                 // Track pitch/loudness through the hold so a declared vibrato
@@ -378,8 +344,7 @@ pub fn score_notes(
                         && let Some(hz) = active_frequency_for(&active.0, midi)
                     {
                         let expected_hz = midi_to_freq_hz(midi as f32);
-                        note.pitch_samples
-                            .push((clock.get(), 1200.0 * (hz / expected_hz).log2()));
+                        note.pitch_samples.push((clock.get(), 1200.0 * (hz / expected_hz).log2()));
                     }
                     let level = *frame_rms.get_or_insert_with(|| rms(&frame.samples));
                     note.amp_samples.push((clock.get(), level));
@@ -387,12 +352,8 @@ pub fn score_notes(
             } else {
                 score.points += sustain_points(note.held, note.duration);
 
-                let sustained: Vec<Modifier> = note
-                    .modifiers
-                    .iter()
-                    .filter(|&x| is_sustained_technique(x))
-                    .cloned()
-                    .collect();
+                let sustained: Vec<Modifier> =
+                    note.modifiers.iter().filter(|&x| is_sustained_technique(x)).cloned().collect();
                 let mut technique_missed = false;
                 if !sustained.is_empty() {
                     let (verified, unverified): (Vec<Modifier>, Vec<Modifier>) =
@@ -410,11 +371,8 @@ pub fn score_notes(
                     }
                 }
                 note.sustain_scored = true;
-                let judgment = if technique_missed {
-                    Some(JudgmentFeedback::TechniqueMiss)
-                } else {
-                    None
-                };
+                let judgment =
+                    if technique_missed { Some(JudgmentFeedback::TechniqueMiss) } else { None };
                 if let Some(judgment) = judgment {
                     feedback.judgment = Some(judgment);
                     feedback.timer = FAILURE_FEEDBACK_SECS;
@@ -440,9 +398,7 @@ pub fn score_notes(
     pending.sort_by(|&a, &b| {
         let offset_a = (judged - song_notes.notes[a].time).abs();
         let offset_b = (judged - song_notes.notes[b].time).abs();
-        offset_a
-            .partial_cmp(&offset_b)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        offset_a.partial_cmp(&offset_b).unwrap_or(std::cmp::Ordering::Equal)
     });
 
     for &i in pending.iter() {
@@ -493,9 +449,7 @@ pub fn score_notes(
                 let judgment = JudgmentFeedback::Miss(reason);
                 feedback.judgment = Some(judgment);
                 feedback.timer = FAILURE_FEEDBACK_SECS;
-                scored.write(NoteScored {
-                    judgment: Some(judgment),
-                });
+                scored.write(NoteScored { judgment: Some(judgment) });
             }
             NoteOutcome::TooEarly | NoteOutcome::Gap | NoteOutcome::Waiting => {}
             NoteOutcome::Hit(quality) => {
@@ -556,9 +510,7 @@ pub fn score_notes(
                 let judgment = JudgmentFeedback::Hit { quality, offset };
                 feedback.judgment = Some(judgment);
                 feedback.timer = HIT_FEEDBACK_SECS;
-                scored.write(NoteScored {
-                    judgment: Some(judgment),
-                });
+                scored.write(NoteScored { judgment: Some(judgment) });
             }
         }
     }

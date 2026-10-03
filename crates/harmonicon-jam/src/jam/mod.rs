@@ -83,10 +83,7 @@ impl Plugin for JamPlugin {
             // no-op for an ordinary jam (`JamPositionCycle` off).
             .add_systems(
                 Update,
-                (
-                    jam_position_guide::cycle_position,
-                    jam_position_guide::on_position_called,
-                )
+                (jam_position_guide::cycle_position, jam_position_guide::on_position_called)
                     .chain()
                     .after(GameplayLogic)
                     .before(improv::accumulate_improv_stats)

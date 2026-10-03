@@ -15,10 +15,7 @@ fn midi_file(tracks: &[(&str, &[u8])]) -> Vec<u8> {
     let built: Vec<Vec<midly::TrackEvent<'static>>> = tracks
         .iter()
         .map(|(name, keys)| {
-            let mut events = vec![meta(
-                0,
-                MetaMessage::TrackName(name.as_bytes().to_vec().leak()),
-            )];
+            let mut events = vec![meta(0, MetaMessage::TrackName(name.as_bytes().to_vec().leak()))];
             for &key in *keys {
                 events.push(note_on(0, key, 100));
                 events.push(note_off(480, key));
@@ -43,11 +40,7 @@ fn chart_of(bytes: Vec<u8>, artist: &str, title: Option<String>) -> HarpChart {
 
 #[test]
 fn a_simple_midi_becomes_a_playable_chart() {
-    let chart = chart_of(
-        midi_file(&[("Harmonica", &easy_notes())]),
-        "Some Artist",
-        None,
-    );
+    let chart = chart_of(midi_file(&[("Harmonica", &easy_notes())]), "Some Artist", None);
     assert_eq!(chart.track.len(), easy_notes().len());
     assert_eq!(chart.song.artist, "Some Artist");
     assert!(
@@ -61,11 +54,7 @@ fn the_track_named_harmonica_is_the_one_played() {
     // A guitar part converted to harmonica is mostly unreachable notes, so
     // picking by name is what makes a multi-track file usable at all.
     let low: Vec<u8> = (40u8..46).collect();
-    let chart = chart_of(
-        midi_file(&[("Guitar", &low), ("Harmonica", &easy_notes())]),
-        "A",
-        None,
-    );
+    let chart = chart_of(midi_file(&[("Guitar", &low), ("Harmonica", &easy_notes())]), "A", None);
     assert_eq!(chart.track.len(), easy_notes().len());
 }
 
@@ -80,18 +69,9 @@ fn several_unnamed_tracks_are_all_offered_with_one_chosen() {
     // ask which part is the harmonica. Every part is now converted and the
     // harp-check screen offers the list, so a default is safe to pick.
     let low: Vec<u8> = (40u8..46).collect();
-    let converted = convert_score(
-        "mid",
-        midi_file(&[("", &low), ("", &easy_notes())]),
-        "A",
-        None,
-    )
-    .unwrap();
-    assert_eq!(
-        converted.tracks.len(),
-        2,
-        "both parts must remain offerable"
-    );
+    let converted =
+        convert_score("mid", midi_file(&[("", &low), ("", &easy_notes())]), "A", None).unwrap();
+    assert_eq!(converted.tracks.len(), 2, "both parts must remain offerable");
     assert_eq!(
         converted.tracks[converted.selected].track.index, 1,
         "the part that actually fits a harmonica should be the default"
@@ -107,10 +87,7 @@ fn a_part_no_harmonica_can_play_is_refused_with_a_reason() {
     let err = convert_score("mid", midi_file(&[("Harmonica", &bass)]), "A", None)
         .unwrap_err()
         .to_string();
-    assert!(
-        err.contains("playable on a harmonica"),
-        "unhelpful error: {err}"
-    );
+    assert!(err.contains("playable on a harmonica"), "unhelpful error: {err}");
 }
 
 #[test]
@@ -118,11 +95,7 @@ fn every_playable_track_is_converted_not_just_the_chosen_one() {
     // What makes the picker possible without a reload.
     let converted = convert_score(
         "mid",
-        midi_file(&[
-            ("Tempo", &[]),
-            ("Guitar", &easy_notes()),
-            ("Harmonica", &easy_notes()),
-        ]),
+        midi_file(&[("Tempo", &[]), ("Guitar", &easy_notes()), ("Harmonica", &easy_notes())]),
         "A",
         None,
     )
@@ -158,10 +131,7 @@ fn the_artist_comes_from_the_folder_that_holds_the_song() {
 
 #[test]
 fn an_unexpected_layout_falls_back_rather_than_panicking() {
-    assert_eq!(
-        artist_from_path(std::path::Path::new("tune.mid")),
-        "Imported"
-    );
+    assert_eq!(artist_from_path(std::path::Path::new("tune.mid")), "Imported");
 }
 
 #[test]
@@ -169,11 +139,8 @@ fn the_song_title_comes_from_its_folder_not_the_track_name() {
     // Seen on screen before this was fixed: a file whose only track is
     // named "Harmonica" produced a song called "Harmonica", because MIDI's
     // title convention is the first track's name.
-    let chart = chart_of(
-        midi_file(&[("Harmonica", &easy_notes())]),
-        "A",
-        Some("Scale Practice".into()),
-    );
+    let chart =
+        chart_of(midi_file(&[("Harmonica", &easy_notes())]), "A", Some("Scale Practice".into()));
     assert_eq!(chart.song.title, "Scale Practice");
 }
 

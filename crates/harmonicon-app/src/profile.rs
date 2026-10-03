@@ -248,9 +248,7 @@ impl PlayerProfile {
         }
         let passed = (1..=tiers)
             .filter(|t| {
-                self.trainings
-                    .get(&training_key(lesson_id, *t as u8))
-                    .is_some_and(|r| r.passed)
+                self.trainings.get(&training_key(lesson_id, *t as u8)).is_some_and(|r| r.passed)
             })
             .count();
         passed as f32 / tiers as f32
@@ -259,11 +257,7 @@ impl PlayerProfile {
     /// Ids of every lesson whose pass criteria have been met — the shape
     /// `lessons::is_unlocked` takes for prerequisite gating.
     pub fn passed_lesson_ids(&self) -> Vec<&str> {
-        self.lessons
-            .iter()
-            .filter(|(_, r)| r.passed)
-            .map(|(id, _)| id.as_str())
-            .collect()
+        self.lessons.iter().filter(|(_, r)| r.passed).map(|(id, _)| id.as_str()).collect()
     }
 }
 
@@ -283,10 +277,7 @@ pub fn record_play(
     record.best_score = record.best_score.max(score);
     record.best_accuracy = record.best_accuracy.max(accuracy);
     for &(name, acc) in technique_accuracy {
-        let best = record
-            .technique_best_accuracy
-            .entry(name.into())
-            .or_default();
+        let best = record.technique_best_accuracy.entry(name.into()).or_default();
         if acc > *best {
             *best = acc;
         }
@@ -432,10 +423,7 @@ impl Plugin for ProfilePlugin {
             // long before anything can save — see `is_first_run`.
             .insert_resource(FirstRun(is_first_run()))
             .add_systems(Startup, apply_loaded_profile)
-            .add_systems(
-                Update,
-                accumulate_play_time.run_if(in_state(AppState::Playing)),
-            )
+            .add_systems(Update, accumulate_play_time.run_if(in_state(AppState::Playing)))
             .add_systems(Last, flush_profile_on_exit);
     }
 }
@@ -498,10 +486,7 @@ mod tests {
         let improved = record_play(&mut r, 300, 0.5, &[("bend", 0.4)]);
         assert!(!improved, "a lower score shouldn't report as a new best");
         assert_eq!(r.best_score, 800, "best score must not regress");
-        assert!(
-            (r.best_accuracy - 0.9).abs() < f32::EPSILON,
-            "best accuracy must not regress"
-        );
+        assert!((r.best_accuracy - 0.9).abs() < f32::EPSILON, "best accuracy must not regress");
         assert_eq!(
             r.technique_best_accuracy.get("bend"),
             Some(&0.9),
@@ -553,13 +538,7 @@ mod tests {
     #[test]
     fn passed_lesson_ids_lists_only_passed_lessons() {
         let mut p = PlayerProfile::default();
-        p.lessons.insert(
-            "a".into(),
-            LessonRecord {
-                passed: true,
-                ..Default::default()
-            },
-        );
+        p.lessons.insert("a".into(), LessonRecord { passed: true, ..Default::default() });
         p.lessons.insert("b".into(), LessonRecord::default());
         let mut ids = p.passed_lesson_ids();
         ids.sort_unstable();
@@ -615,10 +594,7 @@ mod training_tests {
         let mut p = PlayerProfile::default();
         assert_eq!(p.mastery("first-bend", 5), 0.0);
         for tier in [1, 2] {
-            let r = p
-                .trainings
-                .entry(training_key("first-bend", tier))
-                .or_default();
+            let r = p.trainings.entry(training_key("first-bend", tier)).or_default();
             record_training(r, true, 0.8, 100);
         }
         assert_eq!(p.mastery("first-bend", 5), 0.4);
@@ -644,10 +620,7 @@ mod training_tests {
         // The load-bearing separation: a passed tier must not satisfy a
         // prerequisite, or finishing practice would unlock the curriculum.
         let mut p = PlayerProfile::default();
-        let r = p
-            .trainings
-            .entry(training_key("first-bend", 5))
-            .or_default();
+        let r = p.trainings.entry(training_key("first-bend", 5)).or_default();
         record_training(r, true, 1.0, 100);
         assert!(p.passed_lesson_ids().is_empty());
     }
@@ -656,11 +629,7 @@ mod training_tests {
     fn a_first_pass_is_due_again_tomorrow_and_a_failure_schedules_nothing() {
         let mut r = TrainingRecord::default();
         record_training(&mut r, false, 0.3, 100);
-        assert_eq!(
-            r.review_due_day(),
-            None,
-            "nothing passed, nothing to review"
-        );
+        assert_eq!(r.review_due_day(), None, "nothing passed, nothing to review");
         record_training(&mut r, true, 0.8, 100);
         assert_eq!(r.review_due_day(), Some(101));
     }
@@ -710,11 +679,7 @@ mod training_tests {
         assert_eq!(streak.current(101), 2);
         streak.record(103); // 102 missed: forgiven
         assert_eq!(streak.current(103), 3);
-        assert_eq!(
-            streak.current(105),
-            3,
-            "still continuable after one missed day"
-        );
+        assert_eq!(streak.current(105), 3, "still continuable after one missed day");
     }
 
     #[test]

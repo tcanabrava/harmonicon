@@ -41,10 +41,7 @@ struct DragScrollStart {
 /// [`bounded_scroll_position`] reads the area's own [`Overflow`]: a
 /// vertical-only area stays pinned at x with nothing extra said here.
 fn drag_to_pan(mut area: EntityCommands) -> Entity {
-    area.insert(DragScrollStart::default())
-        .observe(begin_drag_scroll)
-        .observe(drag_scroll)
-        .id()
+    area.insert(DragScrollStart::default()).observe(begin_drag_scroll).observe(drag_scroll).id()
 }
 
 fn begin_drag_scroll(
@@ -63,12 +60,7 @@ fn drag_scroll(
     mut commands: Commands,
     ui_scale: Res<UiScale>,
     mut areas: Query<
-        (
-            &Node,
-            &ComputedNode,
-            &mut DragScrollStart,
-            &mut ScrollPosition,
-        ),
+        (&Node, &ComputedNode, &mut DragScrollStart, &mut ScrollPosition),
         With<ScrollArea>,
     >,
     buttons: Query<(), With<WidgetButton>>,
@@ -107,16 +99,8 @@ fn is_pan_gesture(distance: Vec2) -> bool {
 fn bounded_scroll_position(overflow: Overflow, requested: Vec2, available_range: Vec2) -> Vec2 {
     let max = available_range.max(Vec2::ZERO);
     Vec2::new(
-        if overflow.x == OverflowAxis::Scroll {
-            requested.x.clamp(0.0, max.x)
-        } else {
-            0.0
-        },
-        if overflow.y == OverflowAxis::Scroll {
-            requested.y.clamp(0.0, max.y)
-        } else {
-            0.0
-        },
+        if overflow.x == OverflowAxis::Scroll { requested.x.clamp(0.0, max.x) } else { 0.0 },
+        if overflow.y == OverflowAxis::Scroll { requested.y.clamp(0.0, max.y) } else { 0.0 },
     )
 }
 
@@ -199,13 +183,7 @@ pub fn spawn_scroll_area(
                 },
                 ScrollArea,
             )));
-            spawn_scrollbar(
-                outer,
-                area,
-                ControlOrientation::Vertical,
-                thumb_color,
-                track_color,
-            );
+            spawn_scrollbar(outer, area, ControlOrientation::Vertical, thumb_color, track_color);
         });
     area
 }
@@ -268,13 +246,7 @@ pub fn spawn_scroll_area_xy(
                         track_color,
                     );
                 });
-            spawn_scrollbar(
-                column,
-                area,
-                ControlOrientation::Horizontal,
-                thumb_color,
-                track_color,
-            );
+            spawn_scrollbar(column, area, ControlOrientation::Horizontal, thumb_color, track_color);
         });
     area
 }
@@ -305,11 +277,7 @@ pub fn update_scrollbar_visibility(
         };
         // Written only on a flip: every menu page has a scroll area, and an
         // unconditional `Node` write each frame forces a UI layout pass.
-        let visibility = if needed {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+        let visibility = if needed { Visibility::Visible } else { Visibility::Hidden };
         if *vis != visibility {
             *vis = visibility;
         }
@@ -343,11 +311,7 @@ mod tests {
         // inserted in the same place they are attached, and nothing else
         // inserts it.
         let mut app = App::new();
-        app.add_plugins((
-            MinimalPlugins,
-            AssetPlugin::default(),
-            bevy::scene::ScenePlugin,
-        ));
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin));
         let world = app.world_mut();
         let mut areas = Vec::new();
         {

@@ -13,10 +13,7 @@ fn validate(dir: &Path) -> (bool, String) {
         .arg(dir)
         .output()
         .expect("validate-pack runs");
-    (
-        out.status.success(),
-        String::from_utf8_lossy(&out.stdout).into_owned(),
-    )
+    (out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 fn fixture() -> std::path::PathBuf {
@@ -27,10 +24,7 @@ fn fixture() -> std::path::PathBuf {
 fn the_fixture_lesson_pack_passes() {
     let (ok, out) = validate(&fixture());
     assert!(ok, "{out}");
-    assert!(
-        out.contains("lessons pack fixture-lessons 1.0.0: 0 error(s)"),
-        "{out}"
-    );
+    assert!(out.contains("lessons pack fixture-lessons 1.0.0: 0 error(s)"), "{out}");
 }
 
 #[test]

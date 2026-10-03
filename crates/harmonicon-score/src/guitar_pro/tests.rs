@@ -21,12 +21,7 @@ fn track_of(name: &str, tuning: Vec<(i8, i8)>, played: &[(i8, i16)]) -> Track {
     let mut beats = Vec::new();
     for (index, &(string, fret)) in played.iter().enumerate() {
         beats.push(Beat {
-            notes: vec![Note {
-                value: fret,
-                string,
-                kind: NoteType::Normal,
-                ..Default::default()
-            }],
+            notes: vec![Note { value: fret, string, kind: NoteType::Normal, ..Default::default() }],
             start: Some(960 + 960 * index as i64),
             ..Default::default()
         });
@@ -35,10 +30,7 @@ fn track_of(name: &str, tuning: Vec<(i8, i8)>, played: &[(i8, i16)]) -> Track {
         name: name.to_string(),
         strings: tuning,
         measures: vec![Measure {
-            voices: vec![Voice {
-                beats,
-                ..Default::default()
-            }],
+            voices: vec![Voice { beats, ..Default::default() }],
             ..Default::default()
         }],
         ..Default::default()
@@ -50,11 +42,7 @@ fn song_of(tracks: Vec<Track>) -> GpSong {
         name: "Test Piece".to_string(),
         tempo: 120,
         tracks,
-        measure_headers: vec![MeasureHeader {
-            start: 960,
-            tempo: 120,
-            ..Default::default()
-        }],
+        measure_headers: vec![MeasureHeader { start: 960, tempo: 120, ..Default::default() }],
         ..Default::default()
     }
 }
@@ -70,11 +58,8 @@ fn a_fret_becomes_a_pitch_by_way_of_its_strings_tuning() {
     // The whole reason a tab needs a reader rather than a field read: the
     // file says "third fret, second string", and only the track's tuning
     // turns that into a sounding note. Open first string is E4 (64).
-    let score = score_of(vec![track_of(
-        "Guitar",
-        standard_tuning(),
-        &[(1, 0), (1, 3), (2, 1), (6, 5)],
-    )]);
+    let score =
+        score_of(vec![track_of("Guitar", standard_tuning(), &[(1, 0), (1, 3), (2, 1), (6, 5)])]);
     let pitches: Vec<u8> = score.notes(0).unwrap().iter().map(|n| n.midi).collect();
     assert_eq!(pitches, vec![64, 67, 60, 45]);
 }
@@ -108,11 +93,7 @@ fn tied_rest_and_dead_notes_produce_no_pitch() {
 fn an_out_of_range_fret_is_dropped_rather_than_wrapping() {
     // A corrupt or exotic file can put a fret past MIDI's range; wrapping a
     // u8 would land it somewhere plausible and wrong.
-    let score = score_of(vec![track_of(
-        "Guitar",
-        standard_tuning(),
-        &[(1, 0), (1, 120)],
-    )]);
+    let score = score_of(vec![track_of("Guitar", standard_tuning(), &[(1, 0), (1, 120)])]);
     assert_eq!(score.notes(0).unwrap().len(), 1);
 }
 
@@ -129,17 +110,8 @@ fn the_first_note_starts_at_zero_not_one_beat_in() {
 
 #[test]
 fn quarter_notes_at_120_bpm_land_half_a_second_apart() {
-    let score = score_of(vec![track_of(
-        "Guitar",
-        standard_tuning(),
-        &[(1, 0), (1, 2), (1, 4)],
-    )]);
-    let starts: Vec<f64> = score
-        .notes(0)
-        .unwrap()
-        .iter()
-        .map(|n| n.start_secs)
-        .collect();
+    let score = score_of(vec![track_of("Guitar", standard_tuning(), &[(1, 0), (1, 2), (1, 4)])]);
+    let starts: Vec<f64> = score.notes(0).unwrap().iter().map(|n| n.start_secs).collect();
     assert_eq!(starts, vec![0.0, 0.5, 1.0]);
 }
 
@@ -149,22 +121,14 @@ fn unplaced_measure(header_index: usize, played: &[(i8, i16)]) -> Measure {
     let beats = played
         .iter()
         .map(|&(string, fret)| Beat {
-            notes: vec![Note {
-                value: fret,
-                string,
-                kind: NoteType::Normal,
-                ..Default::default()
-            }],
+            notes: vec![Note { value: fret, string, kind: NoteType::Normal, ..Default::default() }],
             start: None,
             ..Default::default()
         })
         .collect();
     Measure {
         header_index,
-        voices: vec![Voice {
-            beats,
-            ..Default::default()
-        }],
+        voices: vec![Voice { beats, ..Default::default() }],
         ..Default::default()
     }
 }
@@ -184,17 +148,9 @@ fn a_tempo_change_at_a_bar_line_shifts_only_what_follows_it() {
         ],
         ..Default::default()
     }]);
-    song.measure_headers.push(MeasureHeader {
-        tempo: 240,
-        ..Default::default()
-    });
+    song.measure_headers.push(MeasureHeader { tempo: 240, ..Default::default() });
     let score = GpScore::from_song(song, ScoreFormat::GuitarPro);
-    let starts: Vec<f64> = score
-        .notes(0)
-        .unwrap()
-        .iter()
-        .map(|n| n.start_secs)
-        .collect();
+    let starts: Vec<f64> = score.notes(0).unwrap().iter().map(|n| n.start_secs).collect();
     // Bar one at 120 BPM: quarters half a second apart, the bar four beats
     // long. Bar two at 240 BPM: a quarter of a second apart.
     assert_eq!(starts, vec![0.0, 0.5, 2.0, 2.25]);
@@ -214,14 +170,8 @@ fn a_file_that_states_no_beat_positions_still_yields_notes() {
     }]);
     let score = GpScore::from_song(song, ScoreFormat::GuitarPro);
     let notes = score.notes(0).unwrap();
-    assert_eq!(
-        notes.iter().map(|n| n.midi).collect::<Vec<_>>(),
-        vec![64, 67, 60]
-    );
-    assert_eq!(
-        notes.iter().map(|n| n.start_secs).collect::<Vec<_>>(),
-        vec![0.0, 0.5, 1.0]
-    );
+    assert_eq!(notes.iter().map(|n| n.midi).collect::<Vec<_>>(), vec![64, 67, 60]);
+    assert_eq!(notes.iter().map(|n| n.start_secs).collect::<Vec<_>>(), vec![0.0, 0.5, 1.0]);
 }
 
 #[test]
@@ -247,10 +197,7 @@ fn a_percussion_track_offers_no_notes() {
     // then play nothing resembling the song.
     let mut drums = track_of("Drums", standard_tuning(), &[(1, 0), (1, 2)]);
     drums.percussion_track = true;
-    let score = score_of(vec![
-        track_of("Harmonica", standard_tuning(), &[(1, 0)]),
-        drums,
-    ]);
+    let score = score_of(vec![track_of("Harmonica", standard_tuning(), &[(1, 0)]), drums]);
     assert_eq!(score.tracks()[0].note_count, 1);
     assert_eq!(score.tracks()[1].note_count, 0);
     assert!(!score.tracks()[1].is_playable());
@@ -298,12 +245,7 @@ fn round_trip(extension: &str, bytes: Vec<u8>) {
         .unwrap_or_else(|e| panic!(".{extension} failed to read back: {e}"));
     let harmonica = crate::pick_harmonica_track(score.tracks())
         .unwrap_or_else(|| panic!(".{extension} lost its track names"));
-    let pitches: Vec<u8> = score
-        .notes(harmonica)
-        .unwrap()
-        .iter()
-        .map(|n| n.midi)
-        .collect();
+    let pitches: Vec<u8> = score.notes(harmonica).unwrap().iter().map(|n| n.midi).collect();
     assert_eq!(pitches, vec![64, 67, 60], "{extension} changed the notes");
 }
 
@@ -407,18 +349,11 @@ fn an_mxl_without_a_manifest_falls_back_to_its_first_xml() {
     let xml = musicxml_bytes();
     let mxl = zipped(&[("anything.musicxml", &xml)]);
     let plain = crate::parse_import("musicxml", xml.clone());
-    assert!(
-        plain.is_ok(),
-        "the serialized MusicXML itself: {:?}",
-        plain.err()
-    );
+    assert!(plain.is_ok(), "the serialized MusicXML itself: {:?}", plain.err());
     let read = crate::parse_import("mxl", mxl);
     assert!(read.is_ok(), "{:?}", read.err());
     let empty = zipped(&[("META-INF/container.xml", b"<container/>")]);
-    assert!(
-        crate::parse_import("mxl", empty).is_err(),
-        "nothing to read"
-    );
+    assert!(crate::parse_import("mxl", empty).is_err(), "nothing to read");
     assert!(crate::parse_import("mxl", b"not a zip".to_vec()).is_err());
 }
 
@@ -447,9 +382,7 @@ fn only_a_musicxml_root_element_reads_as_a_score() {
     assert!(!looks_like_musicxml(
         b"<?xml version=\"1.0\"?><settings><volume>1</volume></settings>"
     ));
-    assert!(!looks_like_musicxml(
-        b"<!-- <score-partwise> is only mentioned here --><settings/>"
-    ));
+    assert!(!looks_like_musicxml(b"<!-- <score-partwise> is only mentioned here --><settings/>"));
     assert!(!looks_like_musicxml(b""));
 }
 
@@ -457,22 +390,13 @@ fn only_a_musicxml_root_element_reads_as_a_score() {
 
 /// One 4/4 bar's marks at bar `index` (3840 ticks a bar).
 fn bar(index: u64, open: bool, close: i8, alternative: u8) -> MeasureMarks {
-    MeasureMarks {
-        start: index * 3840,
-        end: (index + 1) * 3840,
-        open,
-        close,
-        alternative,
-    }
+    MeasureMarks { start: index * 3840, end: (index + 1) * 3840, open, close, alternative }
 }
 
 #[test]
 fn a_close_without_an_open_repeats_from_the_top() {
-    let repeats = repeats_from_marks(&[
-        bar(0, false, -1, 0),
-        bar(1, false, 1, 0),
-        bar(2, false, -1, 0),
-    ]);
+    let repeats =
+        repeats_from_marks(&[bar(0, false, -1, 0), bar(1, false, 1, 0), bar(2, false, -1, 0)]);
     assert_eq!(repeats.len(), 1);
     assert_eq!((repeats[0].start_tick, repeats[0].end_tick), (0, 2 * 3840));
     assert_eq!(repeats[0].passes(), 2, "one repeat is two passes");
@@ -499,11 +423,8 @@ fn first_and_second_endings_attach_to_their_repeat() {
 
 #[test]
 fn a_multi_bar_ending_is_one_ending() {
-    let repeats = repeats_from_marks(&[
-        bar(0, true, -1, 0),
-        bar(1, false, -1, 0b01),
-        bar(2, false, 1, 0b01),
-    ]);
+    let repeats =
+        repeats_from_marks(&[bar(0, true, -1, 0), bar(1, false, -1, 0b01), bar(2, false, 1, 0b01)]);
     assert_eq!(repeats[0].endings.len(), 1);
     assert_eq!(repeats[0].endings[0].start_tick, 3840);
     assert_eq!(repeats[0].endings[0].end_tick, 3 * 3840);
@@ -528,10 +449,7 @@ fn a_repeated_bar_is_played_again_with_its_endings() {
         repeat_alternative: 0b01,
         ..Default::default()
     });
-    song.measure_headers.push(MeasureHeader {
-        repeat_alternative: 0b10,
-        ..Default::default()
-    });
+    song.measure_headers.push(MeasureHeader { repeat_alternative: 0b10, ..Default::default() });
     let score = GpScore::from_song(song, ScoreFormat::GuitarPro);
     let notes = score.notes(0).unwrap();
     let played: Vec<(f64, u8)> = notes.iter().map(|n| (n.start_secs, n.midi)).collect();
@@ -547,10 +465,7 @@ fn a_repeat_survives_a_gp7_round_trip() {
     let mut song = song_of(vec![Track {
         name: "Harmonica".to_string(),
         strings: standard_tuning(),
-        measures: vec![
-            unplaced_measure(0, &[(1, 0)]),
-            unplaced_measure(1, &[(1, 2)]),
-        ],
+        measures: vec![unplaced_measure(0, &[(1, 0)]), unplaced_measure(1, &[(1, 2)])],
         ..Default::default()
     }]);
     song.measure_headers[0].repeat_open = true;
@@ -579,17 +494,10 @@ fn a_gp7_file_keeps_each_bar_in_its_place() {
     }]);
     song.measure_headers.push(MeasureHeader::default());
     song.measure_headers.push(MeasureHeader::default());
-    for (extension, bytes) in [
-        ("gp", song.write_gp().unwrap()),
-        ("gpx", song.write_gpx().unwrap()),
-    ] {
+    for (extension, bytes) in [("gp", song.write_gp().unwrap()), ("gpx", song.write_gpx().unwrap())]
+    {
         let score = crate::parse_import(extension, bytes).unwrap();
-        let starts: Vec<f64> = score
-            .notes(0)
-            .unwrap()
-            .iter()
-            .map(|n| n.start_secs)
-            .collect();
+        let starts: Vec<f64> = score.notes(0).unwrap().iter().map(|n| n.start_secs).collect();
         assert_eq!(starts, vec![0.0, 2.0, 4.0], ".{extension}");
     }
 }

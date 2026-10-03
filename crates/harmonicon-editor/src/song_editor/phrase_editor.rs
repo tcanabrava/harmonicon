@@ -131,10 +131,7 @@ pub(super) fn populate_phrase_editor(
         h.spawn((
             PhraseEditorTitle,
             Text::new(String::new()),
-            TextFont {
-                font_size: FontSize::Px(13.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(13.0), ..default() },
             TextColor(colors.accent),
             Pickable::IGNORE,
         ));
@@ -244,10 +241,7 @@ pub(super) fn update_phrase_editor(
             return;
         }
     };
-    let area_width = area
-        .single()
-        .map(|c| c.size().x * c.inverse_scale_factor())
-        .unwrap_or(WIDTH);
+    let area_width = area.single().map(|c| c.size().x * c.inverse_scale_factor()).unwrap_or(WIDTH);
     if node.display != Display::Flex {
         node.display = Display::Flex;
     }

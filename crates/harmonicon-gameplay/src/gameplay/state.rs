@@ -71,11 +71,7 @@ impl HarmonicaPitchFilter {
     ///
     /// [`engaged`]: Self::engaged
     pub(crate) fn onset_lag_secs(&self, algorithm: PitchAlgorithm) -> f64 {
-        if self.engaged(algorithm) {
-            self.lag_secs
-        } else {
-            0.0
-        }
+        if self.engaged(algorithm) { self.lag_secs } else { 0.0 }
     }
 
     /// Feeds one detector hop through the tracker and writes the pitches it
@@ -93,12 +89,7 @@ impl HarmonicaPitchFilter {
         self.midis.extend(raw.iter().map(|pitch| pitch.midi));
         let tracked = tracker.update(&self.midis);
         self.pitches.retain(|midi, _| tracked.active.contains(midi));
-        out.extend(
-            tracked
-                .active
-                .iter()
-                .filter_map(|midi| self.pitches.get(midi).cloned()),
-        );
+        out.extend(tracked.active.iter().filter_map(|midi| self.pitches.get(midi).cloned()));
     }
 }
 
@@ -192,11 +183,7 @@ impl TechniqueStats {
     /// this song (nothing to report, not "0% accurate").
     pub fn accuracy(&self) -> Option<f32> {
         let total = self.total();
-        if total == 0 {
-            None
-        } else {
-            Some(self.hits as f32 / total as f32)
-        }
+        if total == 0 { None } else { Some(self.hits as f32 / total as f32) }
     }
 }
 
@@ -245,9 +232,7 @@ impl TimingHistogram {
 
     /// Hits within ±`ON_TIME_MS` of the target.
     pub fn on_time(&self) -> u32 {
-        self.buckets[TIMING_BUCKETS / 2 - 1..=TIMING_BUCKETS / 2 + 1]
-            .iter()
-            .sum()
+        self.buckets[TIMING_BUCKETS / 2 - 1..=TIMING_BUCKETS / 2 + 1].iter().sum()
     }
 
     /// Hits more than `ON_TIME_MS` after the target.
@@ -377,10 +362,7 @@ pub enum MissReason {
     /// this note wanted. `expected` is the note's own tab; `heard` is the
     /// attacked pitch resolved back onto the played harp, and is `None` only
     /// if that harp has no way to produce it.
-    WrongPitch {
-        expected: HoleTab,
-        heard: Option<HoleTab>,
-    },
+    WrongPitch { expected: HoleTab, heard: Option<HoleTab> },
     /// Part of a chord/octave-split sounded, but never all of it at once.
     IncompleteChord,
 }
@@ -589,10 +571,7 @@ mod valid_harp_notes_tests {
         // 3D setups go through here for exactly that reason.
         let chart = chart_in_c();
         let substitute = richter_harp("A");
-        let effective = EffectiveHarmonica {
-            harp: Some(substitute.clone()),
-            ..default()
-        };
+        let effective = EffectiveHarmonica { harp: Some(substitute.clone()), ..default() };
         let (valid, played) = ValidHarpNotes::for_played_harp(&effective, &chart);
         assert_eq!(valid.0, substitute.build_valid_notes());
         assert_ne!(
@@ -629,12 +608,7 @@ mod pitch_filter_tests {
     use harmonicon_core::midi::midi_to_freq_hz;
 
     fn pitch(midi: u8) -> PitchInfo {
-        PitchInfo {
-            midi,
-            note: String::new(),
-            octave: 0,
-            frequency: midi_to_freq_hz(midi as f32),
-        }
+        PitchInfo { midi, note: String::new(), octave: 0, frequency: midi_to_freq_hz(midi as f32) }
     }
 
     fn run(filter: &mut HarmonicaPitchFilter, raw: &[PitchInfo]) -> Vec<PitchInfo> {

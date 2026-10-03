@@ -64,22 +64,10 @@ fn the_box_is_the_same_whichever_end_is_given_first() {
 fn the_diagonal_follows_the_direction_the_edge_actually_runs() {
     // Screen y grows downward, so "down and to the right" is the same
     // diagonal as "up and to the left".
-    assert_eq!(
-        edge_diagonal(Vec2::new(0.0, 0.0), Vec2::new(10.0, 10.0)),
-        1.0
-    );
-    assert_eq!(
-        edge_diagonal(Vec2::new(10.0, 10.0), Vec2::new(0.0, 0.0)),
-        1.0
-    );
-    assert_eq!(
-        edge_diagonal(Vec2::new(0.0, 10.0), Vec2::new(10.0, 0.0)),
-        -1.0
-    );
-    assert_eq!(
-        edge_diagonal(Vec2::new(10.0, 0.0), Vec2::new(0.0, 10.0)),
-        -1.0
-    );
+    assert_eq!(edge_diagonal(Vec2::new(0.0, 0.0), Vec2::new(10.0, 10.0)), 1.0);
+    assert_eq!(edge_diagonal(Vec2::new(10.0, 10.0), Vec2::new(0.0, 0.0)), 1.0);
+    assert_eq!(edge_diagonal(Vec2::new(0.0, 10.0), Vec2::new(10.0, 0.0)), -1.0);
+    assert_eq!(edge_diagonal(Vec2::new(10.0, 0.0), Vec2::new(0.0, 10.0)), -1.0);
 }
 
 #[test]
@@ -113,17 +101,11 @@ fn the_reconstructed_endpoints_match_the_ones_the_box_was_built_from() {
 }
 
 fn lesson(column: f32, row: f32) -> Endpoint {
-    Endpoint {
-        centre: node_centre(column, row),
-        radius: NODE_PX / 2.0,
-    }
+    Endpoint { centre: node_centre(column, row), radius: NODE_PX / 2.0 }
 }
 
 fn unit(column: f32, row: f32) -> Endpoint {
-    Endpoint {
-        centre: node_centre(column, row),
-        radius: UNIT_PX / 2.0,
-    }
+    Endpoint { centre: node_centre(column, row), radius: UNIT_PX / 2.0 }
 }
 
 #[test]
@@ -204,34 +186,22 @@ fn dots_follow_a_diagonal_edge() {
     let direction = (end - start).normalize();
     for dot in dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX) {
         let along = (dot - start).dot(direction);
-        assert!(
-            (start + direction * along).distance(dot) < 1.0e-3,
-            "dot {dot} sits off the line"
-        );
+        assert!((start + direction * along).distance(dot) < 1.0e-3, "dot {dot} sits off the line");
     }
 }
 
 #[test]
 fn a_span_too_short_for_two_dots_draws_one() {
     let (start, end) = (Vec2::new(0.0, 0.0), Vec2::new(2.0, 0.0));
-    assert_eq!(
-        dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX),
-        vec![Vec2::new(1.0, 0.0)]
-    );
+    assert_eq!(dot_centres(start, end, EDGE_PX, EDGE_DOT_GAP_PX), vec![Vec2::new(1.0, 0.0)]);
 }
 
 #[test]
 fn nodes_too_close_to_separate_draw_no_edge() {
     // Nearer than their combined radii, the pull-backs would cross and
     // the segment would run backwards through both nodes.
-    let touching = Endpoint {
-        centre: Vec2::new(100.0, 100.0),
-        radius: 40.0,
-    };
-    let overlapping = Endpoint {
-        centre: Vec2::new(110.0, 100.0),
-        radius: 40.0,
-    };
+    let touching = Endpoint { centre: Vec2::new(100.0, 100.0), radius: 40.0 };
+    let overlapping = Endpoint { centre: Vec2::new(110.0, 100.0), radius: 40.0 };
     assert_eq!(edge_span(touching, overlapping), None);
     assert_eq!(edge_span(touching, touching), None);
 }

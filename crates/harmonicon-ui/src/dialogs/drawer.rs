@@ -74,11 +74,7 @@ pub fn sync_drawers(
     mut commands: Commands,
 ) {
     for (entity, drawer, mut node) in &mut drawers {
-        node.display = if drawer.open {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        node.display = if drawer.open { Display::Flex } else { Display::None };
         for descendant in children.iter_descendants(entity) {
             let Ok((mut tab_index, suppressed)) = tabs.get_mut(descendant) else {
                 continue;
@@ -87,9 +83,7 @@ pub fn sync_drawers(
                 TabChange::Keep => {}
                 TabChange::Suppress { original } => {
                     tab_index.0 = -1;
-                    commands
-                        .entity(descendant)
-                        .insert(SuppressedTabIndex(original));
+                    commands.entity(descendant).insert(SuppressedTabIndex(original));
                 }
                 TabChange::Restore { original } => {
                     tab_index.0 = original;
@@ -114,18 +108,9 @@ mod tests {
 
     #[test]
     fn closing_records_a_reachable_index_and_opening_restores_it() {
-        assert_eq!(
-            tab_change(false, 0, None),
-            TabChange::Suppress { original: 0 }
-        );
-        assert_eq!(
-            tab_change(false, 3, None),
-            TabChange::Suppress { original: 3 }
-        );
-        assert_eq!(
-            tab_change(true, -1, Some(3)),
-            TabChange::Restore { original: 3 }
-        );
+        assert_eq!(tab_change(false, 0, None), TabChange::Suppress { original: 0 });
+        assert_eq!(tab_change(false, 3, None), TabChange::Suppress { original: 3 });
+        assert_eq!(tab_change(true, -1, Some(3)), TabChange::Restore { original: 3 });
     }
 
     #[test]

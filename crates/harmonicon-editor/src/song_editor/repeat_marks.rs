@@ -51,10 +51,8 @@ pub(super) fn bar_span(map: &MeterMap, start: usize, end: usize) -> (u64, u64) {
         return (from, to);
     }
     let bar = map.segment_at(from).ticks_per_bar.max(1);
-    let next = map
-        .bar_starts(from + 1, from + 2 * bar + 1)
-        .first()
-        .map_or(from + bar, |&(tick, _)| tick);
+    let next =
+        map.bar_starts(from + 1, from + 2 * bar + 1).first().map_or(from + bar, |&(tick, _)| tick);
     (from, next)
 }
 
@@ -65,11 +63,8 @@ pub(super) fn bar_span(map: &MeterMap, start: usize, end: usize) -> (u64, u64) {
 pub(super) fn fit_endings(repeat: &mut Repeat) {
     let passes = repeat.passes();
     for ending in &mut repeat.endings {
-        ending.passes = if ending.end_tick <= repeat.end_tick {
-            (1..passes).collect()
-        } else {
-            vec![passes]
-        };
+        ending.passes =
+            if ending.end_tick <= repeat.end_tick { (1..passes).collect() } else { vec![passes] };
     }
 }
 
@@ -78,10 +73,7 @@ pub(super) fn fit_endings(repeat: &mut Repeat) {
 /// the sign. Otherwise it repeats the passage twice, replacing any repeat
 /// it overlaps, since the format has no nesting.
 pub(super) fn toggle_repeat(repeats: &mut Vec<Repeat>, start: u64, end: u64) {
-    if let Some(index) = repeats
-        .iter()
-        .position(|r| r.start_tick == start && r.end_tick == end)
-    {
+    if let Some(index) = repeats.iter().position(|r| r.start_tick == start && r.end_tick == end) {
         let passes = repeats[index].passes();
         if passes >= MAX_EDITOR_PASSES {
             repeats.remove(index);
@@ -92,12 +84,7 @@ pub(super) fn toggle_repeat(repeats: &mut Vec<Repeat>, start: u64, end: u64) {
         return;
     }
     repeats.retain(|r| r.end_tick <= start || r.start_tick >= end);
-    repeats.push(Repeat {
-        start_tick: start,
-        end_tick: end,
-        times: None,
-        endings: Vec::new(),
-    });
+    repeats.push(Repeat { start_tick: start, end_tick: end, times: None, endings: Vec::new() });
     repeats.sort_by_key(|r| r.start_tick);
 }
 
@@ -107,10 +94,8 @@ pub(super) fn toggle_repeat(repeats: &mut Vec<Repeat>, start: u64, end: u64) {
 /// Anywhere else it does nothing and says so.
 pub(super) fn toggle_ending(repeats: &mut [Repeat], start: u64, end: u64) -> bool {
     for repeat in repeats.iter_mut() {
-        if let Some(index) = repeat
-            .endings
-            .iter()
-            .position(|e| e.start_tick == start && e.end_tick == end)
+        if let Some(index) =
+            repeat.endings.iter().position(|e| e.start_tick == start && e.end_tick == end)
         {
             repeat.endings.remove(index);
             return true;
@@ -122,14 +107,8 @@ pub(super) fn toggle_ending(repeats: &mut [Repeat], start: u64, end: u64) -> boo
     else {
         return false;
     };
-    repeat
-        .endings
-        .retain(|e| e.end_tick <= start || e.start_tick >= end);
-    repeat.endings.push(Ending {
-        start_tick: start,
-        end_tick: end,
-        passes: Vec::new(),
-    });
+    repeat.endings.retain(|e| e.end_tick <= start || e.start_tick >= end);
+    repeat.endings.push(Ending { start_tick: start, end_tick: end, passes: Vec::new() });
     repeat.endings.sort_by_key(|e| e.start_tick);
     fit_endings(repeat);
     true
@@ -146,9 +125,7 @@ pub(super) fn close_gap(repeats: &mut Vec<Repeat>, start: u64, end: u64) {
     let shift = |tick: u64| if tick >= end { tick - span } else { tick };
     repeats.retain(|r| !overlaps(r.start_tick, r.end_tick));
     for repeat in repeats.iter_mut() {
-        repeat
-            .endings
-            .retain(|e| !overlaps(e.start_tick, e.end_tick));
+        repeat.endings.retain(|e| !overlaps(e.start_tick, e.end_tick));
         repeat.start_tick = shift(repeat.start_tick);
         repeat.end_tick = shift(repeat.end_tick);
         for ending in &mut repeat.endings {
@@ -198,11 +175,7 @@ pub(super) fn spawn(
         );
     };
     for repeat in repeats {
-        let end = repeat
-            .endings
-            .iter()
-            .map(|e| e.end_tick)
-            .fold(repeat.end_tick, u64::max);
+        let end = repeat.endings.iter().map(|e| e.end_tick).fold(repeat.end_tick, u64::max);
         if end < first || repeat.start_tick > last {
             continue;
         }
@@ -243,10 +216,7 @@ pub(super) fn spawn(
     };
     for repeat in repeats {
         if visible(repeat.start_tick) {
-            label(
-                "\u{2016}:".to_string(),
-                repeat.start_tick as f32 * TICK_W + 6.0,
-            );
+            label("\u{2016}:".to_string(), repeat.start_tick as f32 * TICK_W + 6.0);
         }
         if visible(repeat.end_tick) {
             label(
@@ -256,10 +226,7 @@ pub(super) fn spawn(
         }
         for ending in &repeat.endings {
             if ending.end_tick > first && ending.start_tick < last {
-                label(
-                    ending_label(ending),
-                    ending.start_tick as f32 * TICK_W + 5.0,
-                );
+                label(ending_label(ending), ending.start_tick as f32 * TICK_W + 5.0);
             }
         }
     }
@@ -323,20 +290,12 @@ mod tests {
         toggle_repeat(&mut repeats, 0, 4 * BAR);
         assert!(toggle_ending(&mut repeats, 3 * BAR, 4 * BAR));
         assert!(toggle_ending(&mut repeats, 4 * BAR, 5 * BAR));
-        let passes: Vec<Vec<u32>> = repeats[0]
-            .endings
-            .iter()
-            .map(|e| e.passes.clone())
-            .collect();
+        let passes: Vec<Vec<u32>> = repeats[0].endings.iter().map(|e| e.passes.clone()).collect();
         assert_eq!(passes, vec![vec![1], vec![2]]);
 
         // A third pass: the first-time bar now serves passes 1 and 2.
         toggle_repeat(&mut repeats, 0, 4 * BAR);
-        let passes: Vec<Vec<u32>> = repeats[0]
-            .endings
-            .iter()
-            .map(|e| e.passes.clone())
-            .collect();
+        let passes: Vec<Vec<u32>> = repeats[0].endings.iter().map(|e| e.passes.clone()).collect();
         assert_eq!(passes, vec![vec![1, 2], vec![3]]);
         assert_eq!(ending_label(&repeats[0].endings[0]), "1, 2.");
     }
@@ -348,14 +307,8 @@ mod tests {
         assert!(toggle_ending(&mut repeats, BAR, 2 * BAR));
         assert!(toggle_ending(&mut repeats, BAR, 2 * BAR));
         assert!(repeats[0].endings.is_empty());
-        assert!(
-            !toggle_ending(&mut repeats, 5 * BAR, 6 * BAR),
-            "no passage there"
-        );
-        assert!(
-            !toggle_ending(&mut repeats, 0, BAR),
-            "an ending can't start the passage it ends"
-        );
+        assert!(!toggle_ending(&mut repeats, 5 * BAR, 6 * BAR), "no passage there");
+        assert!(!toggle_ending(&mut repeats, 0, BAR), "an ending can't start the passage it ends");
     }
 
     #[test]

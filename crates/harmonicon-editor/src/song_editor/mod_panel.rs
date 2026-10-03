@@ -45,11 +45,7 @@ pub(super) fn two_columns(style: ActionButtonStyle) -> bool {
 /// The toolbar's width with the note column shown (Edit mode) — see
 /// [`two_columns`].
 pub(super) fn toolbar_width_with_note_column(style: ActionButtonStyle) -> f32 {
-    if two_columns(style) {
-        2.0 * toolbar_width(style)
-    } else {
-        toolbar_width(style)
-    }
+    if two_columns(style) { 2.0 * toolbar_width(style) } else { toolbar_width(style) }
 }
 
 /// Builds the scrollable document and note-control columns beside the grid.
@@ -65,19 +61,12 @@ pub(super) fn spawn_mod_panel(
     let width_without = toolbar_width(style);
     let width_with_note_column = toolbar_width_with_note_column(style);
     root.spawn((
-        EditorToolbar {
-            width_with_note_column,
-            width_without,
-        },
+        EditorToolbar { width_with_note_column, width_without },
         // Read by `view_scroll::wheel_toolbar`, so a wheel gesture over the
         // toolbar scrolls it instead of panning the grid sideways.
         bevy::picking::hover::Hovered::default(),
         Node {
-            width: Val::Px(if mode == Mode::Edit {
-                width_with_note_column
-            } else {
-                width_without
-            }),
+            width: Val::Px(if mode == Mode::Edit { width_with_note_column } else { width_without }),
             height: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
             // Never let the grid squeeze the toolbar: a flex row hands out
@@ -569,11 +558,7 @@ pub(super) fn spawn_mod_panel(
                             align_items: AlignItems::Stretch,
                             row_gap: Val::Px(6.0),
                             padding: UiRect::axes(Val::Px(6.0), Val::Px(6.0)),
-                            display: if mode == Mode::Edit {
-                                Display::Flex
-                            } else {
-                                Display::None
-                            },
+                            display: if mode == Mode::Edit { Display::Flex } else { Display::None },
                             ..default()
                         },
                     ))
@@ -723,10 +708,7 @@ fn spawn_note_column_buttons(
         style,
         colors,
     );
-    g.spawn(Node {
-        flex_grow: 1.0,
-        ..default()
-    });
+    g.spawn(Node { flex_grow: 1.0, ..default() });
     mod_button(
         g,
         ModButton::Delete,

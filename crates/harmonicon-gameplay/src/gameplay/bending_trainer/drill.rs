@@ -102,12 +102,7 @@ impl DrillStat {
 /// save/load, and it cannot drift from the `practiced_at` stamps it is
 /// compared against.
 pub(super) fn next_sequence(stats: &std::collections::HashMap<(u8, Technique), DrillStat>) -> u32 {
-    stats
-        .values()
-        .map(|stat| stat.practiced_at)
-        .max()
-        .unwrap_or(0)
-        + 1
+    stats.values().map(|stat| stat.practiced_at).max().unwrap_or(0) + 1
 }
 
 /// Which slice of the harp the drill draws targets from. The default is
@@ -125,18 +120,10 @@ pub enum DrillScope {
 }
 
 impl DrillScope {
-    const ALL: [Self; 5] = [
-        Self::FirstBends,
-        Self::AllBends,
-        Self::BlowBends,
-        Self::Overbends,
-        Self::Custom,
-    ];
+    const ALL: [Self; 5] =
+        [Self::FirstBends, Self::AllBends, Self::BlowBends, Self::Overbends, Self::Custom];
     fn next(self) -> Self {
-        let index = Self::ALL
-            .iter()
-            .position(|scope| *scope == self)
-            .unwrap_or(0);
+        let index = Self::ALL.iter().position(|scope| *scope == self).unwrap_or(0);
         Self::ALL[(index + 1) % Self::ALL.len()]
     }
 }
@@ -178,14 +165,9 @@ pub fn cycle_drill_scope(
     drill.attempted = false;
     if drill.enabled {
         let harp = key.harp();
-        if let Some(next) = pick_next_target(
-            harp,
-            &drill.stats,
-            Some(*target),
-            drill.scope,
-            &drill.custom,
-            *target,
-        ) {
+        if let Some(next) =
+            pick_next_target(harp, &drill.stats, Some(*target), drill.scope, &drill.custom, *target)
+        {
             *target = next;
         }
     }
@@ -204,14 +186,10 @@ pub(super) fn scope_status(loc: &Localization, scope: DrillScope, custom_cells: 
             loc.msg("bending-scope-custom-selected").to_string()
         }
         DrillScope::Custom => loc
-            .msg_args(
-                "bending-scope-custom-count",
-                &[("count", custom_cells.to_string())],
-            )
+            .msg_args("bending-scope-custom-count", &[("count", custom_cells.to_string())])
             .to_string(),
     };
-    loc.msg_args("bending-scope-status", &[("scope", label)])
-        .to_string()
+    loc.msg_args("bending-scope-status", &[("scope", label)]).to_string()
 }
 
 pub fn update_drill_scope_label(
@@ -328,9 +306,7 @@ pub fn update_drill_progress_tint(
     mut cells: Query<(&HarpOverlayCell, &DiagramCellTarget, &mut BackgroundColor)>,
 ) {
     for (cell, target, mut bg) in &mut cells {
-        let lit = cell
-            .midi
-            .is_some_and(|m| active.0.iter().any(|p| p.midi == m));
+        let lit = cell.midi.is_some_and(|m| active.0.iter().any(|p| p.midi == m));
         let color = if lit {
             CELL_LIT
         } else {
@@ -348,9 +324,7 @@ pub fn update_drill_progress_tint(
 pub(super) fn valid_targets(harp: &Harmonica) -> Vec<TrainerTarget> {
     (1..=10)
         .flat_map(|hole| {
-            ALL_TECHNIQUES
-                .iter()
-                .map(move |&technique| TrainerTarget { hole, technique })
+            ALL_TECHNIQUES.iter().map(move |&technique| TrainerTarget { hole, technique })
         })
         .filter(|t| target_note(harp, *t).is_some())
         .collect()
@@ -375,10 +349,9 @@ pub(super) fn targets_for_scope(
                     (2 | 3, Technique::Bend1) | (3, Technique::Bend2)
                 )
             }
-            DrillScope::AllBends => matches!(
-                target.technique,
-                Technique::Bend1 | Technique::Bend2 | Technique::Bend3
-            ),
+            DrillScope::AllBends => {
+                matches!(target.technique, Technique::Bend1 | Technique::Bend2 | Technique::Bend3)
+            }
             DrillScope::BlowBends => {
                 target.hole >= 7
                     && matches!(
@@ -415,13 +388,7 @@ pub(super) fn pick_next_target(
     let sequence = next_sequence(stats);
     let weights: Vec<f32> = pool
         .iter()
-        .map(|t| {
-            stats
-                .get(&(t.hole, t.technique))
-                .copied()
-                .unwrap_or_default()
-                .weight(sequence)
-        })
+        .map(|t| stats.get(&(t.hole, t.technique)).copied().unwrap_or_default().weight(sequence))
         .collect();
     let total: f32 = weights.iter().sum();
     let mut roll = rand::random_range(0.0..total);
@@ -524,11 +491,7 @@ pub(super) fn drill_outcome(
     if elapsed_secs < settings.timeout_secs {
         return None;
     }
-    Some(if attempted {
-        DrillOutcome::Missed
-    } else {
-        DrillOutcome::Skipped
-    })
+    Some(if attempted { DrillOutcome::Missed } else { DrillOutcome::Skipped })
 }
 
 /// Drives the adaptive drill while it's on: waits for the current practice
@@ -593,13 +556,7 @@ pub fn drill_update(
         return;
     };
 
-    finish_attempt(
-        &mut drill,
-        &mut target,
-        harp,
-        outcome,
-        trace.stability_cents,
-    );
+    finish_attempt(&mut drill, &mut target, harp, outcome, trace.stability_cents);
 }
 
 /// Records how the current attempt ended and serves the next target. The
@@ -615,10 +572,7 @@ pub(super) fn finish_attempt(
     stability: Option<f32>,
 ) {
     let sequence = next_sequence(&drill.stats);
-    let stat = drill
-        .stats
-        .entry((target.hole, target.technique))
-        .or_default();
+    let stat = drill.stats.entry((target.hole, target.technique)).or_default();
     match outcome {
         DrillOutcome::Controlled => {
             stat.record_attempt(true, stability, sequence);
@@ -633,14 +587,9 @@ pub(super) fn finish_attempt(
             drill.streak = 0;
         }
     }
-    if let Some(next) = pick_next_target(
-        harp,
-        &drill.stats,
-        Some(*target),
-        drill.scope,
-        &drill.custom,
-        *target,
-    ) {
+    if let Some(next) =
+        pick_next_target(harp, &drill.stats, Some(*target), drill.scope, &drill.custom, *target)
+    {
         *target = next;
     }
     drill.hold_secs = 0.0;
@@ -691,13 +640,7 @@ pub fn skip_drill_target(
     if !drill.enabled {
         return;
     }
-    finish_attempt(
-        &mut drill,
-        &mut target,
-        key.harp(),
-        DrillOutcome::Skipped,
-        None,
-    );
+    finish_attempt(&mut drill, &mut target, key.harp(), DrillOutcome::Skipped, None);
 }
 
 /// Persists the session's drill hit-rates to `profile.json` on the way out
@@ -746,11 +689,7 @@ pub fn update_drill_button_visual(
     if !drill.is_changed() {
         return;
     }
-    let color = if drill.enabled {
-        DRILL_ACTIVE_COLOR
-    } else {
-        button::color_default()
-    };
+    let color = if drill.enabled { DRILL_ACTIVE_COLOR } else { button::color_default() };
     for mut base in &mut buttons {
         base.0 = color;
     }

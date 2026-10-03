@@ -65,10 +65,7 @@ pub(super) fn build_song_notes_3d(
 ) -> (super::super::SongNotes, NoteRenderAssets3D) {
     let (notes, _) = super::super::build_scheduled_notes(effective, chart, adaptive);
     let hole_count = effective.harp_for(chart).hole_count();
-    (
-        super::super::SongNotes { notes, cursor: 0 },
-        NoteRenderAssets3D { hole_count },
-    )
+    (super::super::SongNotes { notes, cursor: 0 }, NoteRenderAssets3D { hole_count })
 }
 
 /// Spawns 3D note visuals for any note newly within the `LOOKAHEAD` window.
@@ -152,10 +149,8 @@ pub(super) fn spawn_note_visual_3d(
         shape: Vec4::new(ribbon_len, RIBBON_CAP, 0.0, note_id as f32 * 1.7),
         hold: Vec4::ZERO,
     });
-    let mesh = meshes.add(Mesh::from(Plane3d::new(
-        Vec3::Y,
-        Vec2::new(ribbon_w * 0.5, ribbon_len * 0.5),
-    )));
+    let mesh =
+        meshes.add(Mesh::from(Plane3d::new(Vec3::Y, Vec2::new(ribbon_w * 0.5, ribbon_len * 0.5))));
 
     let note_entity = commands
         .spawn((
@@ -213,10 +208,7 @@ pub(super) fn spawn_note_visual_3d(
                 }),
                 BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
                 Visibility::Hidden,
-                NoteHoleLabel3D {
-                    target: note_entity,
-                    on_right,
-                },
+                NoteHoleLabel3D { target: note_entity, on_right },
                 GameplayRoot,
             ))
             .with_children(|l| {
@@ -377,9 +369,7 @@ pub fn update_note_visuals_3d(
         // re-upload even for an unchanged value, so compare first.
         for child in children {
             if let Ok(h) = ribbon_meshes.get(*child)
-                && ribbons
-                    .get(&h.0)
-                    .is_some_and(|m| m.color != color || m.hold != hold)
+                && ribbons.get(&h.0).is_some_and(|m| m.color != color || m.hold != hold)
                 && let Some(mut m) = ribbons.get_mut(&h.0)
             {
                 m.color = color;
@@ -399,13 +389,7 @@ pub fn animate_judged_notes_3d(
     song_notes: Res<super::super::SongNotes>,
     clock: Res<super::super::GameplayClock>,
     reduced_motion: Res<harmonicon_platform::settings::ReducedMotion>,
-    mut notes: Query<(
-        Entity,
-        &NoteVisual3D,
-        &mut JudgedState,
-        Option<&Judged>,
-        &Children,
-    )>,
+    mut notes: Query<(Entity, &NoteVisual3D, &mut JudgedState, Option<&Judged>, &Children)>,
     mut ribbons: Query<&mut Transform, With<NoteRibbon3d>>,
     labels: Query<(&NoteHoleLabel3D, &Children)>,
     mut label_texts: Query<&mut Text, With<NoteHoleLabelText3D>>,
@@ -434,9 +418,8 @@ pub fn animate_judged_notes_3d(
         } else {
             judged.copied()
         };
-        let scale = judged.map_or(1.0, |j| {
-            judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0)
-        });
+        let scale =
+            judged.map_or(1.0, |j| judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0));
         for child in children {
             if let Ok(mut transform) = ribbons.get_mut(*child)
                 && transform.scale.x != scale

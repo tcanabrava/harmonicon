@@ -33,9 +33,7 @@ fn tracker_streams() -> [(&'static str, Vec<Vec<u8>>); 3] {
     // Hole 4 blow held throughout.
     let steady = vec![vec![72]; HOPS];
     // Hole 4 blow and draw (C5/D5), switching every four hops.
-    let alternating = (0..HOPS)
-        .map(|i| vec![if (i / 4) % 2 == 0 { 72 } else { 74 }])
-        .collect();
+    let alternating = (0..HOPS).map(|i| vec![if (i / 4) % 2 == 0 { 72 } else { 74 }]).collect();
     // Up to six candidates per hop, mixing blow, draw and unplayable pitches.
     let pool = [60u8, 62, 64, 65, 67, 71, 72, 74, 76, 61, 70, 90];
     let mut state: u32 = 0x9e37_79b9;
@@ -43,16 +41,10 @@ fn tracker_streams() -> [(&'static str, Vec<Vec<u8>>); 3] {
         .map(|_| {
             state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
             let count = 1 + (state >> 29) as usize % 6;
-            (0..count)
-                .map(|k| pool[((state >> (k * 4)) as usize + k) % pool.len()])
-                .collect()
+            (0..count).map(|k| pool[((state >> (k * 4)) as usize + k) % pool.len()]).collect()
         })
         .collect();
-    [
-        ("steady", steady),
-        ("alternating", alternating),
-        ("noisy", noisy),
-    ]
+    [("steady", steady), ("alternating", alternating), ("noisy", noisy)]
 }
 
 fn tracker_update(c: &mut Criterion) {
@@ -80,10 +72,7 @@ const SEGMENT_TICKS: u64 = RESOLUTION as u64 * 16;
 
 fn tempo_map(points: usize) -> Vec<TempoPoint> {
     (0..points)
-        .map(|i| TempoPoint {
-            tick: i as u64 * SEGMENT_TICKS,
-            bpm: 90.0 + (i % 7) as f32 * 5.0,
-        })
+        .map(|i| TempoPoint { tick: i as u64 * SEGMENT_TICKS, bpm: 90.0 + (i % 7) as f32 * 5.0 })
         .collect()
 }
 
@@ -93,35 +82,22 @@ fn tempo_conversions(c: &mut Criterion) {
     for points in [1usize, 16, 256] {
         let map = tempo_map(points);
         let song_ticks = points as u64 * SEGMENT_TICKS;
-        let ticks: Vec<u64> = (0..HOPS as u64)
-            .map(|i| i * song_ticks / HOPS as u64)
-            .collect();
-        let secs: Vec<f64> = ticks
-            .iter()
-            .map(|&t| tick_to_seconds(t, RESOLUTION, &map))
-            .collect();
-        group.bench_with_input(
-            BenchmarkId::new("tick_to_seconds", points),
-            &ticks,
-            |b, ticks| {
-                b.iter(|| {
-                    for &t in ticks {
-                        black_box(tick_to_seconds(black_box(t), RESOLUTION, &map));
-                    }
-                });
-            },
-        );
-        group.bench_with_input(
-            BenchmarkId::new("seconds_to_tick", points),
-            &secs,
-            |b, secs| {
-                b.iter(|| {
-                    for &s in secs {
-                        black_box(seconds_to_tick(black_box(s), RESOLUTION, &map));
-                    }
-                });
-            },
-        );
+        let ticks: Vec<u64> = (0..HOPS as u64).map(|i| i * song_ticks / HOPS as u64).collect();
+        let secs: Vec<f64> = ticks.iter().map(|&t| tick_to_seconds(t, RESOLUTION, &map)).collect();
+        group.bench_with_input(BenchmarkId::new("tick_to_seconds", points), &ticks, |b, ticks| {
+            b.iter(|| {
+                for &t in ticks {
+                    black_box(tick_to_seconds(black_box(t), RESOLUTION, &map));
+                }
+            });
+        });
+        group.bench_with_input(BenchmarkId::new("seconds_to_tick", points), &secs, |b, secs| {
+            b.iter(|| {
+                for &s in secs {
+                    black_box(seconds_to_tick(black_box(s), RESOLUTION, &map));
+                }
+            });
+        });
     }
     group.finish();
 }
@@ -136,11 +112,7 @@ fn phrase(count: usize) -> Vec<PhraseNote> {
             tick: i * eighth,
             len: eighth,
             freq: Some(midi_to_freq_hz(scale[i % scale.len()] as f32)),
-            expr: if i % 4 == 3 {
-                Expr::Vibrato(5.0)
-            } else {
-                Expr::None
-            },
+            expr: if i % 4 == 3 { Expr::Vibrato(5.0) } else { Expr::None },
         })
         .collect()
 }

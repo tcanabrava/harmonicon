@@ -249,10 +249,7 @@ pub fn combo_label(combo: u32, multiplier: f32) -> String {
         return String::new();
     }
     if multiplier > 1.0 {
-        format!(
-            "\u{00D7}{combo} [\u{00D7}{} pts]",
-            format_multiplier(multiplier)
-        )
+        format!("\u{00D7}{combo} [\u{00D7}{} pts]", format_multiplier(multiplier))
     } else {
         format!("\u{00D7}{combo}")
     }

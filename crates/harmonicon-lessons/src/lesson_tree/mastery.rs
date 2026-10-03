@@ -42,10 +42,7 @@ pub(crate) fn track_mastery(
     tiers: usize,
 ) -> Vec<TrackMastery> {
     let mut totals: Vec<(String, f32, usize)> = Vec::new();
-    for entry in entries
-        .iter()
-        .filter(|entry| entry.manifest.training.is_some())
-    {
+    for entry in entries.iter().filter(|entry| entry.manifest.training.is_some()) {
         let track = entry.manifest.track();
         let mastered = profile.mastery(&entry.manifest.id, tiers);
         match totals.iter_mut().find(|(name, ..)| name == track) {
@@ -58,10 +55,7 @@ pub(crate) fn track_mastery(
     }
     totals
         .into_iter()
-        .map(|(track, sum, count)| TrackMastery {
-            track,
-            mastery: sum / count as f32,
-        })
+        .map(|(track, sum, count)| TrackMastery { track, mastery: sum / count as f32 })
         .collect()
 }
 
@@ -95,14 +89,8 @@ pub(crate) fn spawn_track_meters(
         let label = loc.msg_args(
             "lesson-tree-track-mastery",
             &[
-                (
-                    "track",
-                    String::from(loc.msg(&format!("lesson-track-{}", meter.track))),
-                ),
-                (
-                    "percent",
-                    ((meter.mastery * 100.0).round() as u32).to_string(),
-                ),
+                ("track", String::from(loc.msg(&format!("lesson-track-{}", meter.track)))),
+                ("percent", ((meter.mastery * 100.0).round() as u32).to_string()),
             ],
         );
         commands.entity(row).with_children(|row| {
@@ -179,10 +167,7 @@ mod tests {
     }
 
     fn pass(profile: &mut PlayerProfile, lesson: &str, tier: u8) {
-        let record = profile
-            .trainings
-            .entry(training_key(lesson, tier))
-            .or_default();
+        let record = profile.trainings.entry(training_key(lesson, tier)).or_default();
         record_training(record, true, 0.9, 100);
     }
 
@@ -202,10 +187,7 @@ mod tests {
         let meters = track_mastery(&entries, &profile, 5);
         assert_eq!(
             meters,
-            vec![TrackMastery {
-                track: "bend".to_string(),
-                mastery: 0.2,
-            }],
+            vec![TrackMastery { track: "bend".to_string(), mastery: 0.2 }],
             "a track with no trainings gets no meter"
         );
     }
@@ -217,10 +199,7 @@ mod tests {
         pass(&mut profile, "first-bend", 1);
         let before = track_mastery(&entries, &profile, 5)[0].mastery;
 
-        let record = profile
-            .trainings
-            .entry(training_key("first-bend", 1))
-            .or_default();
+        let record = profile.trainings.entry(training_key("first-bend", 1)).or_default();
         record_training(record, false, 0.1, 100);
 
         assert_eq!(track_mastery(&entries, &profile, 5)[0].mastery, before);

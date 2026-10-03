@@ -46,18 +46,12 @@ impl Span {
 /// than playing the passage once. Endings outside `start..` or ending
 /// before they start are dropped the same way.
 fn playable(repeats: &[Repeat]) -> Vec<Repeat> {
-    let mut sorted: Vec<Repeat> = repeats
-        .iter()
-        .filter(|r| r.start_tick < r.end_tick)
-        .cloned()
-        .collect();
+    let mut sorted: Vec<Repeat> =
+        repeats.iter().filter(|r| r.start_tick < r.end_tick).cloned().collect();
     sorted.sort_by_key(|r| r.start_tick);
     let mut kept: Vec<Repeat> = Vec::with_capacity(sorted.len());
     for mut repeat in sorted {
-        if kept
-            .last()
-            .is_some_and(|prev| repeat.start_tick < prev.end_tick)
-        {
+        if kept.last().is_some_and(|prev| repeat.start_tick < prev.end_tick) {
             continue;
         }
         let (start, end) = (repeat.start_tick, repeat.end_tick);
@@ -85,11 +79,7 @@ pub fn spans(repeats: &[Repeat]) -> Vec<Span> {
     let mut performed = 0;
     let mut play = |from: u64, to: u64| {
         if to > from {
-            spans.push(Span {
-                written_start: from,
-                written_end: to,
-                performed,
-            });
+            spans.push(Span { written_start: from, written_end: to, performed });
             performed = performed.saturating_add(to - from);
         }
     };
@@ -98,10 +88,8 @@ pub fn spans(repeats: &[Repeat]) -> Vec<Span> {
     for repeat in playable(repeats) {
         play(cursor, repeat.start_tick);
         let passes = repeat.passes();
-        let (inside, after): (Vec<_>, Vec<_>) = repeat
-            .endings
-            .iter()
-            .partition(|e| e.end_tick <= repeat.end_tick);
+        let (inside, after): (Vec<_>, Vec<_>) =
+            repeat.endings.iter().partition(|e| e.end_tick <= repeat.end_tick);
         for pass in 1..=passes {
             let mut at = repeat.start_tick;
             for ending in inside.iter().filter(|e| !e.passes.contains(&pass)) {
@@ -173,11 +161,7 @@ pub fn expand(mut chart: HarpChart) -> HarpChart {
     let spans = spans(&timing.repeats);
     let written_tick = |item: &TrackItem| {
         item.tick.unwrap_or_else(|| {
-            seconds_to_tick(
-                item.time.unwrap_or(0.0),
-                timing.resolution,
-                &timing.tempo_map,
-            )
+            seconds_to_tick(item.time.unwrap_or(0.0), timing.resolution, &timing.tempo_map)
         })
     };
 
@@ -200,14 +184,7 @@ pub fn expand(mut chart: HarpChart) -> HarpChart {
         &spans,
         &timing.tempo_map,
         |p| p.tick,
-        |tick| {
-            timing
-                .tempo_map
-                .iter()
-                .rev()
-                .find(|p| p.tick <= tick)
-                .cloned()
-        },
+        |tick| timing.tempo_map.iter().rev().find(|p| p.tick <= tick).cloned(),
         |p, tick| TempoPoint { tick, ..p },
         |a, b| a.bpm == b.bpm,
     );
@@ -217,10 +194,8 @@ pub fn expand(mut chart: HarpChart) -> HarpChart {
             map,
             |p| p.tick,
             |tick| {
-                time_sig_at_tick(tick, map).map(|sig| TimeSigPoint {
-                    tick,
-                    time_signature: sig.to_string(),
-                })
+                time_sig_at_tick(tick, map)
+                    .map(|sig| TimeSigPoint { tick, time_signature: sig.to_string() })
             },
             |p, tick| TimeSigPoint { tick, ..p },
             |a, b| a.time_signature == b.time_signature,
@@ -250,20 +225,11 @@ mod tests {
     use crate::chart::Ending;
 
     fn repeat(start: u64, end: u64) -> Repeat {
-        Repeat {
-            start_tick: start,
-            end_tick: end,
-            times: None,
-            endings: Vec::new(),
-        }
+        Repeat { start_tick: start, end_tick: end, times: None, endings: Vec::new() }
     }
 
     fn ending(start: u64, end: u64, passes: &[u32]) -> Ending {
-        Ending {
-            start_tick: start,
-            end_tick: end,
-            passes: passes.to_vec(),
-        }
+        Ending { start_tick: start, end_tick: end, passes: passes.to_vec() }
     }
 
     /// `(written_start, written_end)` of every span but the open final one.
@@ -328,10 +294,7 @@ mod tests {
         let mut r = repeat(0, 100);
         r.times = Some(3);
         r.endings = vec![ending(80, 100, &[1, 2]), ending(100, 120, &[3])];
-        assert_eq!(
-            played(&[r]),
-            vec![(0, 100), (0, 100), (0, 80), (100, u64::MAX)]
-        );
+        assert_eq!(played(&[r]), vec![(0, 100), (0, 100), (0, 80), (100, u64::MAX)]);
     }
 
     #[test]
@@ -358,10 +321,7 @@ mod tests {
             ending(50, 120, &[1]),  // starts before the passage
             ending(180, 180, &[1]), // empty
         ];
-        assert_eq!(
-            played(&[r]),
-            vec![(0, 100), (100, 200), (100, 200), (200, u64::MAX)]
-        );
+        assert_eq!(played(&[r]), vec![(0, 100), (100, 200), (100, 200), (200, u64::MAX)]);
     }
 
     fn chart(track: &[u64], repeats: Vec<Repeat>) -> HarpChart {
@@ -414,17 +374,10 @@ mod tests {
     #[test]
     fn a_tempo_change_inside_the_passage_happens_on_every_pass() {
         let expanded = expand(chart(&[], vec![repeat(100, 300)]));
-        let tempo: Vec<(u64, f32)> = expanded
-            .timing
-            .tempo_map
-            .iter()
-            .map(|p| (p.tick, p.bpm))
-            .collect();
+        let tempo: Vec<(u64, f32)> =
+            expanded.timing.tempo_map.iter().map(|p| (p.tick, p.bpm)).collect();
         // Pass 1 starts at 120 and slows at 150; pass 2 restarts at 120.
-        assert_eq!(
-            tempo,
-            vec![(0, 120.0), (150, 60.0), (300, 120.0), (350, 60.0)]
-        );
+        assert_eq!(tempo, vec![(0, 120.0), (150, 60.0), (300, 120.0), (350, 60.0)]);
         assert_eq!(
             expanded.timing.time_signature_map.unwrap().len(),
             1,

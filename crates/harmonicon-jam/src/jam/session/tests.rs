@@ -66,27 +66,15 @@ fn note_fit_orders_chord_tone_above_scale_above_out_of_scale() {
 fn classify_note_fit_prefers_chord_tone_over_plain_scale_membership() {
     let chord_tones = HashSet::from(["C".to_string()]);
     let scale = HashSet::from(["C".to_string(), "E".to_string()]);
-    assert_eq!(
-        classify_note_fit("C", &chord_tones, &scale),
-        NoteFit::ChordTone
-    );
-    assert_eq!(
-        classify_note_fit("E", &chord_tones, &scale),
-        NoteFit::InScale
-    );
-    assert_eq!(
-        classify_note_fit("F", &chord_tones, &scale),
-        NoteFit::OutOfScale
-    );
+    assert_eq!(classify_note_fit("C", &chord_tones, &scale), NoteFit::ChordTone);
+    assert_eq!(classify_note_fit("E", &chord_tones, &scale), NoteFit::InScale);
+    assert_eq!(classify_note_fit("F", &chord_tones, &scale), NoteFit::OutOfScale);
 }
 
 #[test]
 fn banner_derives_harp_key_from_hole_1_blow() {
     // c_harp() has no position field → the "no position" wording.
-    assert_eq!(
-        harp_banner(&c_harp(), "G"),
-        "Use a C harmonica  \u{00B7}  key of G"
-    );
+    assert_eq!(harp_banner(&c_harp(), "G"), "Use a C harmonica  \u{00B7}  key of G");
 }
 
 #[test]

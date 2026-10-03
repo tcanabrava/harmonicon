@@ -163,9 +163,7 @@ impl BendingTrainerSettings {
         self.a4_hz = clamp(self.a4_hz, Self::A4_HZ);
         self.trace_secs = clamp(self.trace_secs, Self::TRACE_SECS);
         self.trace_smoothing = clamp(self.trace_smoothing, Self::TRACE_SMOOTHING);
-        self.subdivision = self
-            .subdivision
-            .clamp(Self::SUBDIVISION.0, Self::SUBDIVISION.1);
+        self.subdivision = self.subdivision.clamp(Self::SUBDIVISION.0, Self::SUBDIVISION.1);
         self
     }
 
@@ -222,10 +220,7 @@ impl ActionButtonStyle {
         label: &str,
     ) -> Option<Self> {
         use crate::localization::LocalizationExt;
-        Self::all()
-            .iter()
-            .copied()
-            .find(|s| &*loc.msg(s.loc_key()) == label)
+        Self::all().iter().copied().find(|s| &*loc.msg(s.loc_key()) == label)
     }
 }
 
@@ -493,11 +488,7 @@ fn tick_debounce(remaining: Option<f32>, dt: f32) -> (bool, Option<f32>) {
         return (false, None);
     };
     let remaining = remaining - dt;
-    if remaining > 0.0 {
-        (false, Some(remaining))
-    } else {
-        (true, None)
-    }
+    if remaining > 0.0 { (false, Some(remaining)) } else { (true, None) }
 }
 
 /// Ticks the debounce countdown; once it elapses, writes the current
@@ -638,20 +629,14 @@ mod tests {
             ..default()
         }
         .clamped();
-        assert_eq!(
-            wild.tolerance_cents,
-            BendingTrainerSettings::TOLERANCE_CENTS.0
-        );
+        assert_eq!(wild.tolerance_cents, BendingTrainerSettings::TOLERANCE_CENTS.0);
         assert_eq!(wild.hold_secs, BendingTrainerSettings::HOLD_SECS.0);
         assert_eq!(wild.timeout_secs, BendingTrainerSettings::TIMEOUT_SECS.1);
         assert_eq!(wild.a4_hz, BendingTrainerSettings::A4_HZ.0);
         // NaN can't be clamped into range — it takes the floor rather than
         // propagating into the trace window's arithmetic.
         assert_eq!(wild.trace_secs, BendingTrainerSettings::TRACE_SECS.0);
-        assert_eq!(
-            wild.trace_smoothing,
-            BendingTrainerSettings::TRACE_SMOOTHING.1
-        );
+        assert_eq!(wild.trace_smoothing, BendingTrainerSettings::TRACE_SMOOTHING.1);
         assert_eq!(wild.subdivision, BendingTrainerSettings::SUBDIVISION.1);
     }
 
@@ -711,9 +696,7 @@ mod tests {
         assert!(s.content_sources.lessons.is_empty());
         assert_eq!(
             s.content_sources.songs,
-            [harmonicon_packs::repo::RepoSpec::Local {
-                path: "/home/me/songs".into()
-            }]
+            [harmonicon_packs::repo::RepoSpec::Local { path: "/home/me/songs".into() }]
         );
     }
 
@@ -760,10 +743,7 @@ mod tests {
     #[test]
     fn action_button_style_defaults_to_text_only() {
         assert_eq!(ActionButtonStyle::default(), ActionButtonStyle::TextOnly);
-        assert_eq!(
-            Settings::default().action_button_style,
-            ActionButtonStyle::TextOnly
-        );
+        assert_eq!(Settings::default().action_button_style, ActionButtonStyle::TextOnly);
     }
 
     #[test]
@@ -781,20 +761,14 @@ mod tests {
             // round trip through whatever `loc.msg` actually returns, not
             // real translated text.
             let label = loc.msg(style.loc_key());
-            assert_eq!(
-                ActionButtonStyle::from_localized_label(&loc, &label),
-                Some(*style)
-            );
+            assert_eq!(ActionButtonStyle::from_localized_label(&loc, &label), Some(*style));
         }
     }
 
     #[test]
     fn from_localized_label_rejects_unknown_text() {
         let loc = Localization::default();
-        assert_eq!(
-            ActionButtonStyle::from_localized_label(&loc, "not a real label"),
-            None
-        );
+        assert_eq!(ActionButtonStyle::from_localized_label(&loc, "not a real label"), None);
     }
 
     // ── tick_debounce ────────────────────────────────────────────────────────

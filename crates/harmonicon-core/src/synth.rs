@@ -164,13 +164,7 @@ struct Oscillator {
 impl Oscillator {
     fn new(freq: f32) -> Self {
         let (step_sin, step_cos) = (TAU * freq / SAMPLE_RATE as f32).sin_cos();
-        Self {
-            freq,
-            step_sin,
-            step_cos,
-            sin: 0.0,
-            cos: 1.0,
-        }
+        Self { freq, step_sin, step_cos, sin: 0.0, cos: 1.0 }
     }
 
     /// `(sin, cos)` of the phase at sample `i` of the note. Must be called
@@ -192,16 +186,9 @@ impl Oscillator {
 pub fn envelope(i: usize, dur: usize) -> f32 {
     let attack = (SAMPLE_RATE as f32 * ATTACK_SECS) as usize;
     let release = (SAMPLE_RATE as f32 * RELEASE_SECS) as usize;
-    let atk = if attack > 0 && i < attack {
-        i as f32 / attack as f32
-    } else {
-        1.0
-    };
-    let rel = if dur > release && i > dur - release {
-        (dur - i) as f32 / release as f32
-    } else {
-        1.0
-    };
+    let atk = if attack > 0 && i < attack { i as f32 / attack as f32 } else { 1.0 };
+    let rel =
+        if dur > release && i > dur - release { (dur - i) as f32 / release as f32 } else { 1.0 };
     atk.min(rel).clamp(0.0, 1.0)
 }
 
@@ -382,14 +369,7 @@ mod tests {
     /// directly.
     fn reference_wave(freq: f32, t: f32, phase_mod: f32) -> (f32, f32) {
         let mut s = 0.0f32;
-        for (k, amp) in [
-            (1.0f32, P1),
-            (2.0, P2),
-            (3.0, P3),
-            (4.0, P4),
-            (5.0, P5),
-            (6.0, P6),
-        ] {
+        for (k, amp) in [(1.0f32, P1), (2.0, P2), (3.0, P3), (4.0, P4), (5.0, P5), (6.0, P6)] {
             s += amp * (TAU * freq * k * t + k * phase_mod).sin();
         }
         (s / PARTIALS_SUM, (TAU * freq * t + phase_mod).sin())
@@ -405,9 +385,7 @@ mod tests {
         let truth = |freq: f32, t: f64, phase_mod: f32| {
             let x = std::f64::consts::TAU * f64::from(freq) * t + f64::from(phase_mod);
             let amps = [P1, P2, P3, P4, P5, P6];
-            let sum: f64 = (1..=6)
-                .map(|k| f64::from(amps[k - 1]) * (k as f64 * x).sin())
-                .sum();
+            let sum: f64 = (1..=6).map(|k| f64::from(amps[k - 1]) * (k as f64 * x).sin()).sum();
             (sum / f64::from(PARTIALS_SUM), x.sin())
         };
         let (mut new_worst, mut old_worst) = (0.0f64, 0.0f64);
@@ -419,15 +397,11 @@ mod tests {
                 let t = i as f32 / SAMPLE_RATE as f32;
                 for phase_mod in [0.0, vibrato_phase_mod(freq, 5.5, t)] {
                     let error = |(bright, muffled): (f32, f32), (want_b, want_m): (f64, f64)| {
-                        (f64::from(bright) - want_b)
-                            .abs()
-                            .max((f64::from(muffled) - want_m).abs())
+                        (f64::from(bright) - want_b).abs().max((f64::from(muffled) - want_m).abs())
                     };
                     let (sin_x, cos_x) = voice_phase(freq, t64, phase_mod).sin_cos();
-                    new_worst = new_worst.max(error(
-                        harmonica_wave(sin_x, cos_x),
-                        truth(freq, t64, phase_mod),
-                    ));
+                    new_worst = new_worst
+                        .max(error(harmonica_wave(sin_x, cos_x), truth(freq, t64, phase_mod)));
                     old_worst = old_worst.max(error(
                         reference_wave(freq, t, phase_mod),
                         truth(freq, f64::from(t), phase_mod),
@@ -469,24 +443,11 @@ mod tests {
         // The drift test above would also pass if vibrato did nothing at
         // all, so pin that the modulation is really there: a vibrato note
         // and a plain one must not be sample-identical.
-        let note = |expr| {
-            render_pcm(
-                &[PhraseNote {
-                    tick: 0,
-                    len: 500,
-                    freq: Some(440.0),
-                    expr,
-                }],
-                0.001,
-            )
-        };
+        let note =
+            |expr| render_pcm(&[PhraseNote { tick: 0, len: 500, freq: Some(440.0), expr }], 0.001);
         let plain = note(Expr::None);
         let vib = note(Expr::Vibrato(5.0));
-        let diff = plain
-            .iter()
-            .zip(&vib)
-            .map(|(a, b)| (a - b).abs())
-            .fold(0.0f32, f32::max);
+        let diff = plain.iter().zip(&vib).map(|(a, b)| (a - b).abs()).fold(0.0f32, f32::max);
         assert!(diff > 0.01, "vibrato left the waveform unchanged");
     }
 }

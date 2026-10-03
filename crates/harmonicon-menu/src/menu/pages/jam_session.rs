@@ -22,13 +22,8 @@ pub(crate) fn setup_jam_session_menu(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
 ) {
-    let (root, header, _page_root) = spawn_menu_root(
-        &mut commands,
-        &loc.msg("jam-session"),
-        None,
-        &theme,
-        "JamSessionMenu",
-    );
+    let (root, header, _page_root) =
+        spawn_menu_root(&mut commands, &loc.msg("jam-session"), None, &theme, "JamSessionMenu");
     spawn_button(
         &mut commands,
         root,

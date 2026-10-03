@@ -119,12 +119,7 @@ impl GpScore {
     }
 
     fn from_song(song: GpSong, format: ScoreFormat) -> Self {
-        let origin = song
-            .measure_headers
-            .iter()
-            .map(|h| h.start)
-            .min()
-            .unwrap_or(0);
+        let origin = song.measure_headers.iter().map(|h| h.start).min().unwrap_or(0);
         let measure_starts = measure_starts(&song, origin);
         let tempo_map = build_tempo_map(&song, &measure_starts, origin);
         let repeats = repeats_from_marks(&measure_marks(&song, &measure_starts, origin));
@@ -150,16 +145,7 @@ impl GpScore {
             })
             .collect();
 
-        Self {
-            song,
-            format,
-            tracks,
-            tempo_map,
-            measure_starts,
-            origin,
-            time_signature,
-            repeats,
-        }
+        Self { song, format, tracks, tempo_map, measure_starts, origin, time_signature, repeats }
     }
 
     /// Seconds from the start of the piece for an absolute tick position.
@@ -174,11 +160,8 @@ impl GpScore {
             if tick <= start {
                 break;
             }
-            let segment_end = self
-                .tempo_map
-                .get(index + 1)
-                .map(|&(next, _)| next)
-                .unwrap_or(i64::MAX);
+            let segment_end =
+                self.tempo_map.get(index + 1).map(|&(next, _)| next).unwrap_or(i64::MAX);
             let end = segment_end.min(tick);
             seconds += ticks_to_seconds(end - start, bpm);
             if end >= tick {
@@ -206,11 +189,7 @@ impl GpScore {
         // it at 0 on every measure, which stacked a whole tune on its first
         // bar.
         for (header, measure) in track.measures.iter().enumerate() {
-            let base = self
-                .measure_starts
-                .get(header)
-                .copied()
-                .unwrap_or(fallback_start);
+            let base = self.measure_starts.get(header).copied().unwrap_or(fallback_start);
             let mut measure_end = base;
             for voice in &measure.voices {
                 // Each voice restarts at the bar line — two voices are
@@ -248,11 +227,7 @@ impl ScoreFile for GpScore {
     }
 
     fn notes(&self, track: usize) -> Result<Vec<ScoreNote>, ScoreError> {
-        let source = self
-            .song
-            .tracks
-            .get(track)
-            .ok_or(ScoreError::NoSuchTrack(track))?;
+        let source = self.song.tracks.get(track).ok_or(ScoreError::NoSuchTrack(track))?;
         let placed = self.placed_beats(source);
 
         // Every onset in the track, so a length can be clamped to whatever
@@ -307,18 +282,13 @@ impl ScoreFile for GpScore {
             }
         }
         notes.sort_by(|a, b| {
-            a.start_secs
-                .partial_cmp(&b.start_secs)
-                .unwrap_or(std::cmp::Ordering::Equal)
+            a.start_secs.partial_cmp(&b.start_secs).unwrap_or(std::cmp::Ordering::Equal)
         });
         Ok(notes)
     }
 
     fn tempo_bpm(&self) -> f32 {
-        self.tempo_map
-            .first()
-            .map(|&(_, bpm)| bpm)
-            .unwrap_or(DEFAULT_BPM) as f32
+        self.tempo_map.first().map(|&(_, bpm)| bpm).unwrap_or(DEFAULT_BPM) as f32
     }
 
     fn time_signature(&self) -> (u8, u8) {
@@ -394,11 +364,7 @@ fn ticks_to_seconds(ticks: i64, bpm: f64) -> f64 {
 /// is carried forward; the first entry is pinned to the origin so
 /// [`GpScore::seconds_at`] always has something to start from.
 fn build_tempo_map(song: &GpSong, measure_starts: &[i64], origin: i64) -> Vec<(i64, f64)> {
-    let mut current = if song.tempo > 0 {
-        f64::from(song.tempo)
-    } else {
-        DEFAULT_BPM
-    };
+    let mut current = if song.tempo > 0 { f64::from(song.tempo) } else { DEFAULT_BPM };
     let mut map = vec![(0, current)];
     for (index, header) in song.measure_headers.iter().enumerate() {
         if header.tempo > 0 && f64::from(header.tempo) != current {
@@ -454,11 +420,7 @@ fn measure_marks(song: &GpSong, measure_starts: &[i64], origin: i64) -> Vec<Meas
         .iter()
         .enumerate()
         .map(|(index, header)| {
-            let at = |i: usize| {
-                measure_starts
-                    .get(i)
-                    .map(|&tick| (tick - origin).max(0) as u64)
-            };
+            let at = |i: usize| measure_starts.get(i).map(|&tick| (tick - origin).max(0) as u64);
             let start = at(index).unwrap_or(0);
             // The last bar has no successor to end at; its own length is
             // the next start `measure_starts` would have produced.
@@ -515,19 +477,13 @@ fn repeats_from_marks(marks: &[MeasureMarks]) -> Vec<Repeat> {
 
     let mut endings: Vec<Ending> = Vec::new();
     for mark in marks.iter().filter(|m| m.alternative != 0) {
-        let passes: Vec<u32> = (0..8)
-            .filter(|bit| mark.alternative & (1 << bit) != 0)
-            .map(|bit| bit + 1)
-            .collect();
+        let passes: Vec<u32> =
+            (0..8).filter(|bit| mark.alternative & (1 << bit) != 0).map(|bit| bit + 1).collect();
         match endings.last_mut() {
             Some(last) if last.end_tick == mark.start && last.passes == passes => {
                 last.end_tick = mark.end;
             }
-            _ => endings.push(Ending {
-                start_tick: mark.start,
-                end_tick: mark.end,
-                passes,
-            }),
+            _ => endings.push(Ending { start_tick: mark.start, end_tick: mark.end, passes }),
         }
     }
     for ending in endings {
@@ -548,10 +504,7 @@ fn denominator_of(duration: &GpDuration) -> u8 {
 }
 
 fn parse_error(format: &'static str, error: impl std::fmt::Display) -> ScoreError {
-    ScoreError::Parse {
-        format,
-        detail: error.to_string(),
-    }
+    ScoreError::Parse { format, detail: error.to_string() }
 }
 
 /// MuseScore: unzip, parse the `.mscx` inside, then reuse the crate's own
@@ -559,9 +512,7 @@ fn parse_error(format: &'static str, error: impl std::fmt::Display) -> ScoreErro
 fn mscz_song(bytes: &[u8]) -> Result<GpSong, ScoreError> {
     let file = guitarpro::read_mscz_bytes(bytes).map_err(|e| parse_error("mscz", e))?;
     let outcome = guitarpro::convert::mscz::to_optimized::mscx_to_loaded_score(&file.mscx);
-    Ok(guitarpro::convert::legacy::loaded_score_to_legacy_song(
-        &outcome.score,
-    ))
+    Ok(guitarpro::convert::legacy::loaded_score_to_legacy_song(&outcome.score))
 }
 
 /// `.mxl` is a zip holding the MusicXML plus a `META-INF/container.xml`
@@ -577,11 +528,7 @@ pub(crate) fn unzip_mxl(bytes: &[u8]) -> Result<Vec<u8>, ScoreError> {
         .find(|n| *n == "META-INF/container.xml")
         .and_then(|container| {
             let mut text = String::new();
-            archive
-                .by_name(container)
-                .ok()?
-                .read_to_string(&mut text)
-                .ok()?;
+            archive.by_name(container).ok()?.read_to_string(&mut text).ok()?;
             container_rootfile(&text)
         })
         .or_else(|| {
@@ -619,9 +566,7 @@ pub(crate) fn container_rootfile(container_xml: &str) -> Option<String> {
                     .filter_map(Result::ok)
                     .find(|attribute| attribute.key.local_name().into_inner() == "full-path")
                     .and_then(|attribute| {
-                        attribute
-                            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                            .ok()
+                        attribute.normalized_value(quick_xml::XmlVersion::Implicit1_0).ok()
                     })
                     .map(|path| path.into_owned());
             }
@@ -638,9 +583,7 @@ fn musicxml_song(bytes: &[u8]) -> Result<GpSong, ScoreError> {
         .map_err(|e| parse_error("musicxml", format!("not valid UTF-8: {e}")))?;
     let score: guitarpro::model::musicxml::ScorePartwise =
         quick_xml::de::from_str(text).map_err(|e| parse_error("musicxml", e))?;
-    Ok(guitarpro::convert::guitarpro::musicxml_to_legacy_song(
-        &score,
-    ))
+    Ok(guitarpro::convert::guitarpro::musicxml_to_legacy_song(&score))
 }
 
 #[cfg(test)]

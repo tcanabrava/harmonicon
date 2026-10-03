@@ -55,11 +55,7 @@ pub(crate) struct SongPickerState {
 
 impl SongPickerState {
     pub(super) fn preferred_mode(&self) -> GameplayMode {
-        if self.view_2d.unwrap_or(true) {
-            GameplayMode::Play2D
-        } else {
-            GameplayMode::Play3D
-        }
+        if self.view_2d.unwrap_or(true) { GameplayMode::Play2D } else { GameplayMode::Play3D }
     }
 }
 
@@ -111,10 +107,7 @@ fn song_update_available(entry: &PackEntry, sync: &PackSync) -> bool {
         && matches!(entry.spec, RepoSpec::Remote { .. })
         && matches!(entry.status, PackStatus::Ready { .. })
         && !sync.installing(&entry.slug)
-        && matches!(
-            sync.updates.get(&entry.slug),
-            Some(UpdateState::Available { .. })
-        )
+        && matches!(sync.updates.get(&entry.slug), Some(UpdateState::Available { .. }))
 }
 
 // Browser builds bundle songs and have no repository synchronization.
@@ -143,11 +136,7 @@ pub(crate) fn refresh_song_updates(
                     || (entry.kind == PackKind::Songs && sync.installing(&entry.slug))
             })
             .collect();
-        node.display = if updates.is_empty() {
-            Display::None
-        } else {
-            Display::Flex
-        };
+        node.display = if updates.is_empty() { Display::None } else { Display::Flex };
         for entry in updates {
             if sync.installing(&entry.slug) {
                 spawn_update_status(
@@ -161,11 +150,8 @@ pub(crate) fn refresh_song_updates(
                     spawn_update_status(
                         &mut commands,
                         row,
-                        loc.msg_args(
-                            "content-status-download-failed",
-                            &[("error", error.clone())],
-                        )
-                        .to_string(),
+                        loc.msg_args("content-status-download-failed", &[("error", error.clone())])
+                            .to_string(),
                     );
                 }
             }
@@ -178,15 +164,9 @@ fn spawn_update_status(commands: &mut Commands, parent: Entity, message: String)
     let status = commands
         .spawn((
             Text::new(message),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(14.0), ..default() },
             TextColor(Color::srgb(0.90, 0.78, 0.62)),
-            Node {
-                max_width: Val::Percent(100.0),
-                ..default()
-            },
+            Node { max_width: Val::Percent(100.0), ..default() },
         ))
         .id();
     commands.entity(parent).add_child(status);
@@ -200,13 +180,8 @@ pub(crate) fn setup_artist_list(
     mode: Res<GameplayMode>,
     state: Res<SongPickerState>,
 ) {
-    let (content, header, _) = spawn_menu_root_plain(
-        &mut commands,
-        &loc.msg("select-song"),
-        None,
-        &theme,
-        "SongPicker",
-    );
+    let (content, header, _) =
+        spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme, "SongPicker");
     commands.entity(content).insert(Node {
         width: Val::Percent(90.0),
         flex_grow: 1.0,
@@ -236,34 +211,20 @@ pub(crate) fn setup_artist_list(
             flex_direction: FlexDirection::Row,
             width: Val::Percent(100.0),
             flex_shrink: 0.0,
-            border: UiRect {
-                left: Val::Px(4.0),
-                ..UiRect::all(Val::Px(1.0))
-            },
+            border: UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) },
             ..default()
         })
         .id();
     for (sort, width, label) in [
         (SongSort::Song, 40.0, loc.msg("song-sort-name").to_string()),
         (SongSort::Band, 25.0, loc.msg("song-sort-band").to_string()),
-        (
-            SongSort::Genre,
-            20.0,
-            loc.msg("song-sort-genre").to_string(),
-        ),
-        (
-            SongSort::Difficulty,
-            15.0,
-            loc.msg("song-sort-difficulty").to_string(),
-        ),
+        (SongSort::Genre, 20.0, loc.msg("song-sort-genre").to_string()),
+        (SongSort::Difficulty, 15.0, loc.msg("song-sort-difficulty").to_string()),
     ] {
         let arrow = commands
             .spawn((
                 Text::new("↑"),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::WHITE),
                 Visibility::Hidden,
                 bevy::picking::Pickable::IGNORE,
@@ -272,10 +233,7 @@ pub(crate) fn setup_artist_list(
         let label = commands
             .spawn((
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(15.0),
-                    ..default()
-                },
+                TextFont { font_size: FontSize::Px(15.0), ..default() },
                 TextColor(Color::WHITE),
                 bevy::picking::Pickable::IGNORE,
             ))
@@ -325,10 +283,7 @@ pub(crate) fn setup_artist_list(
     let label = commands
         .spawn((
             Text::new(loc.msg("song-search")),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(16.0), ..default() },
             TextColor(Color::WHITE),
         ))
         .id();
@@ -355,10 +310,7 @@ pub(crate) fn setup_artist_list(
             border: UiRect::all(Val::Px(1.0)),
             ..default()
         },
-        TextFont {
-            font_size: FontSize::Px(16.0),
-            ..default()
-        },
+        TextFont { font_size: FontSize::Px(16.0), ..default() },
     ));
     let clear = commands
         .spawn_empty()
@@ -395,11 +347,8 @@ pub(crate) fn setup_artist_list(
     commands.entity(content).add_child(list_frame);
     let mut rows = Entity::PLACEHOLDER;
     commands.entity(list_frame).with_children(|parent| {
-        rows = spawn_scroll_area(
-            parent,
-            Color::srgb(0.40, 0.58, 0.73),
-            Color::srgb(0.08, 0.10, 0.15),
-        );
+        rows =
+            spawn_scroll_area(parent, Color::srgb(0.40, 0.58, 0.73), Color::srgb(0.08, 0.10, 0.15));
     });
     commands.entity(rows).insert((
         SongPickerRows,
@@ -465,9 +414,7 @@ pub(crate) fn setup_artist_list(
                 state.deletion_error = None;
                 open.write(OpenConfirmDialog {
                     purpose: DELETE_SONG,
-                    message: loc
-                        .msg_args("song-confirm-delete", &[("name", name)])
-                        .to_string(),
+                    message: loc.msg_args("song-confirm-delete", &[("name", name)]).to_string(),
                 });
             },
         ))
@@ -498,10 +445,7 @@ pub(crate) fn setup_artist_list(
     let hints = commands
         .spawn((
             Text::new(loc.msg("song-picker-keys")),
-            TextFont {
-                font_size: FontSize::Px(13.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(13.0), ..default() },
             TextColor(Color::srgb(0.65, 0.70, 0.80)),
         ))
         .id();
@@ -531,10 +475,7 @@ fn spawn_summary(
         .spawn((
             kind,
             Text::new(""),
-            TextFont {
-                font_size: FontSize::Px(size),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(size), ..default() },
             TextColor(Color::WHITE),
         ))
         .id();
@@ -561,20 +502,10 @@ fn spawn_mode_toggle(commands: &mut Commands, parent: Entity, is_2d: bool) {
             .spawn((
                 ModeLabel(two_d),
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(16.0),
-                    ..default()
-                },
+                TextFont { font_size: FontSize::Px(16.0), ..default() },
                 TextColor(Color::WHITE),
-                Node {
-                    padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)),
-                    ..default()
-                },
-                BackgroundColor(if two_d == is_2d {
-                    CHOICE_SELECTED
-                } else {
-                    Color::NONE
-                }),
+                Node { padding: UiRect::axes(Val::Px(14.0), Val::Px(8.0)), ..default() },
+                BackgroundColor(if two_d == is_2d { CHOICE_SELECTED } else { Color::NONE }),
                 bevy::picking::Pickable::IGNORE,
             ))
             .id();
@@ -613,13 +544,11 @@ pub(crate) fn update_picker_summary(
     mut commands: Commands,
 ) {
     for (label, mut bg) in &mut modes {
-        bg.set_if_neq(BackgroundColor(
-            if label.0 == (*mode == GameplayMode::Play2D) {
-                CHOICE_SELECTED
-            } else {
-                Color::NONE
-            },
-        ));
+        bg.set_if_neq(BackgroundColor(if label.0 == (*mode == GameplayMode::Play2D) {
+            CHOICE_SELECTED
+        } else {
+            Color::NONE
+        }));
     }
     if !state.is_changed()
         && !songs.is_changed()
@@ -628,9 +557,7 @@ pub(crate) fn update_picker_summary(
         return;
     }
     let visible = collect_songs(&songs, &state);
-    let selected = visible
-        .iter()
-        .find(|song| Some(&song.asset_path) == state.selected.as_ref());
+    let selected = visible.iter().find(|song| Some(&song.asset_path) == state.selected.as_ref());
     for (mut text, mut node, kind) in &mut summaries {
         let label = match *kind {
             PickerSummary::Count => {
@@ -650,8 +577,7 @@ pub(crate) fn update_picker_summary(
             }),
             PickerSummary::Status => {
                 let label = if let Some(error) = &state.deletion_error {
-                    loc.msg_args("song-delete-failed", &[("error", error.clone())])
-                        .to_string()
+                    loc.msg_args("song-delete-failed", &[("error", error.clone())]).to_string()
                 } else {
                     selected.map_or_else(String::new, |song| {
                         if song.retained {
@@ -665,19 +591,11 @@ pub(crate) fn update_picker_summary(
                         }
                     })
                 };
-                node.display = if label.is_empty() {
-                    Display::None
-                } else {
-                    Display::Flex
-                };
+                node.display = if label.is_empty() { Display::None } else { Display::Flex };
                 label
             }
             PickerSummary::Empty => {
-                node.display = if visible.is_empty() {
-                    Display::Flex
-                } else {
-                    Display::None
-                };
+                node.display = if visible.is_empty() { Display::Flex } else { Display::None };
                 loc.msg("song-no-results").to_string()
             }
         };
@@ -697,13 +615,9 @@ pub(crate) fn update_picker_summary(
             }
         }
         if selected.is_none() && !disabled {
-            commands
-                .entity(entity)
-                .insert(bevy::ui::InteractionDisabled);
+            commands.entity(entity).insert(bevy::ui::InteractionDisabled);
         } else if selected.is_some() && disabled {
-            commands
-                .entity(entity)
-                .remove::<bevy::ui::InteractionDisabled>();
+            commands.entity(entity).remove::<bevy::ui::InteractionDisabled>();
         }
     }
 }
@@ -825,15 +739,8 @@ fn spawn_song_cell(commands: &mut Commands, parent: Entity, label: &str, width: 
     let text = commands
         .spawn((
             Text::new(label),
-            TextFont {
-                font_size: FontSize::Px(if title { 18.0 } else { 15.0 }),
-                ..default()
-            },
-            TextColor(if title {
-                Color::WHITE
-            } else {
-                Color::srgb(0.76, 0.80, 0.87)
-            }),
+            TextFont { font_size: FontSize::Px(if title { 18.0 } else { 15.0 }), ..default() },
+            TextColor(if title { Color::WHITE } else { Color::srgb(0.76, 0.80, 0.87) }),
             bevy::picking::Pickable::IGNORE,
         ))
         .id();
@@ -858,30 +765,17 @@ fn populate_rows(
             continue;
         }
         let selected = state.selected.as_deref() == Some(path.as_str());
-        let base = if selected {
-            Color::srgb(0.16, 0.30, 0.43)
-        } else {
-            Color::srgb(0.11, 0.11, 0.16)
-        };
+        let base =
+            if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
         let row = commands
             .spawn((
                 bevy::ui_widgets::Button,
                 TabIndex(0),
-                SongRow {
-                    path: path.clone(),
-                    index,
-                },
-                BorderColor::all(if selected {
-                    Color::srgb(0.65, 0.85, 1.0)
-                } else {
-                    Color::NONE
-                }),
+                SongRow { path: path.clone(), index },
+                BorderColor::all(if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE }),
                 Node {
                     width: Val::Percent(100.0),
-                    border: UiRect {
-                        left: Val::Px(4.0),
-                        ..UiRect::all(Val::Px(1.0))
-                    },
+                    border: UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) },
                     align_items: AlignItems::Center,
                     flex_shrink: 0.0,
                     justify_content: JustifyContent::FlexStart,
@@ -931,9 +825,8 @@ fn populate_rows(
                   asset_server: Res<AssetServer>,
                   mut page: ResMut<NextState<MenuPage>>,
                   mut commands: Commands| {
-                commands.insert_resource(SelectedSong(
-                    asset_server.load::<SongManifest>(path.clone()),
-                ));
+                commands
+                    .insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
                 page.set(MenuPage::HarpCheck);
             },
         );
@@ -1005,16 +898,11 @@ pub(crate) fn refresh_song_picker(
         .is_none_or(|(_, sort, descending)| *sort != state.sort || *descending != state.descending);
     *rendered = Some((state.query.clone(), state.sort, state.descending));
     let visible = collect_songs(&songs, &state);
-    if !visible
-        .iter()
-        .any(|song| Some(&song.asset_path) == state.selected.as_ref())
-    {
+    if !visible.iter().any(|song| Some(&song.asset_path) == state.selected.as_ref()) {
         state.selected = visible.first().map(|song| song.asset_path.clone());
     }
-    let existing: Vec<_> = song_rows
-        .iter()
-        .map(|(entity, row)| (entity, row.path.clone()))
-        .collect();
+    let existing: Vec<_> =
+        song_rows.iter().map(|(entity, row)| (entity, row.path.clone())).collect();
     for root in &roots {
         if sort_changed {
             commands.entity(root).insert(RevealSelectedSong);
@@ -1046,9 +934,7 @@ pub(crate) fn reveal_selected_song(
 ) {
     let mut ordered: Vec<_> = rows.iter().collect();
     ordered.sort_by_key(|(row, _)| row.index);
-    let selected = ordered
-        .iter()
-        .position(|(row, _)| Some(&row.path) == state.selected.as_ref());
+    let selected = ordered.iter().position(|(row, _)| Some(&row.path) == state.selected.as_ref());
     for (entity, area, mut scroll) in &mut areas {
         let Some(index) = selected else {
             commands.entity(entity).remove::<RevealSelectedSong>();
@@ -1084,14 +970,9 @@ pub(crate) fn navigate_song_picker(
     if focus.get().is_some_and(|entity| inputs.contains(entity)) {
         return;
     }
-    let navigating = [
-        KeyCode::ArrowDown,
-        KeyCode::ArrowUp,
-        KeyCode::Home,
-        KeyCode::End,
-    ]
-    .iter()
-    .any(|key| keyboard.just_pressed(*key));
+    let navigating = [KeyCode::ArrowDown, KeyCode::ArrowUp, KeyCode::Home, KeyCode::End]
+        .iter()
+        .any(|key| keyboard.just_pressed(*key));
     // Hover can preview another song without stealing focus from Search.
     // An unchanged keyboard focus must not overwrite that preview each frame.
     if !navigating && !focus.is_changed() {
@@ -1102,9 +983,7 @@ pub(crate) fn navigate_song_picker(
     if ordered.is_empty() {
         return;
     }
-    let current = ordered
-        .iter()
-        .position(|(entity, _, _)| Some(*entity) == focus.get());
+    let current = ordered.iter().position(|(entity, _, _)| Some(*entity) == focus.get());
     let next = if keyboard.just_pressed(KeyCode::ArrowDown) {
         Some(current.map_or(0, |i| (i + 1).min(ordered.len() - 1)))
     } else if keyboard.just_pressed(KeyCode::ArrowUp) {
@@ -1117,14 +996,9 @@ pub(crate) fn navigate_song_picker(
         current
     };
     if let Some(index) = next {
-        if [
-            KeyCode::ArrowDown,
-            KeyCode::ArrowUp,
-            KeyCode::Home,
-            KeyCode::End,
-        ]
-        .iter()
-        .any(|key| keyboard.just_pressed(*key))
+        if [KeyCode::ArrowDown, KeyCode::ArrowUp, KeyCode::Home, KeyCode::End]
+            .iter()
+            .any(|key| keyboard.just_pressed(*key))
         {
             focus_visible.0 = true;
         }
@@ -1166,11 +1040,7 @@ pub(crate) fn update_picker_feedback(
         let active = state.sort == choice.sort;
         if let Ok((mut text, mut visibility)) = arrows.get_mut(choice.arrow) {
             text.set_if_neq(Text::new(if state.descending { "↓" } else { "↑" }));
-            visibility.set_if_neq(if active {
-                Visibility::Inherited
-            } else {
-                Visibility::Hidden
-            });
+            visibility.set_if_neq(if active { Visibility::Inherited } else { Visibility::Hidden });
         }
         color.0 = if active {
             CHOICE_SELECTED
@@ -1182,16 +1052,10 @@ pub(crate) fn update_picker_feedback(
     }
     for (row, mut color, mut border) in &mut rows {
         let selected = state.selected.as_deref() == Some(row.path.as_str());
-        color.0 = if selected {
-            Color::srgb(0.16, 0.30, 0.43)
-        } else {
-            Color::srgb(0.11, 0.11, 0.16)
-        };
-        *border = BorderColor::all(if selected {
-            Color::srgb(0.65, 0.85, 1.0)
-        } else {
-            Color::NONE
-        });
+        color.0 =
+            if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
+        *border =
+            BorderColor::all(if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE });
     }
 }
 
@@ -1213,30 +1077,20 @@ mod tests {
             state.selected = Some("packs://repo/Band/Song/song/chart.harpchart".into());
             state.pending_delete = state.selected.clone();
         }
-        app.world_mut().write_message(ConfirmChosen {
-            purpose: DELETE_SONG,
-            confirmed: false,
-        });
+        app.world_mut().write_message(ConfirmChosen { purpose: DELETE_SONG, confirmed: false });
         app.update();
         let state = app.world().resource::<SongPickerState>();
         assert!(state.pending_delete.is_none());
         assert!(state.selected.is_some());
         assert!(state.deletion_error.is_none());
-        assert!(
-            app.world()
-                .resource::<Messages<SongsRescanned>>()
-                .is_empty()
-        );
+        assert!(app.world().resource::<Messages<SongsRescanned>>().is_empty());
     }
 
     #[test]
     fn song_updates_require_a_checked_installed_remote_song_pack() {
         let mut entry = PackEntry {
             kind: PackKind::Songs,
-            spec: RepoSpec::Remote {
-                url: "https://example.com/songs".into(),
-                git_ref: None,
-            },
+            spec: RepoSpec::Remote { url: "https://example.com/songs".into(), git_ref: None },
             slug: "songs".into(),
             root: "/songs".into(),
             status: PackStatus::Ready {
@@ -1250,52 +1104,33 @@ mod tests {
         };
         let mut sync = PackSync::default();
         assert!(!song_update_available(&entry, &sync));
-        for state in [
-            UpdateState::Checking,
-            UpdateState::UpToDate,
-            UpdateState::Failed("offline".into()),
-        ] {
+        for state in
+            [UpdateState::Checking, UpdateState::UpToDate, UpdateState::Failed("offline".into())]
+        {
             sync.updates.insert(entry.slug.clone(), state);
             assert!(!song_update_available(&entry, &sync));
         }
-        sync.updates.insert(
-            entry.slug.clone(),
-            UpdateState::Available {
-                commit: "new".into(),
-            },
-        );
+        sync.updates.insert(entry.slug.clone(), UpdateState::Available { commit: "new".into() });
         assert!(song_update_available(&entry, &sync));
 
         // A check finishing while this screen is open reveals the button;
         // successful installation removes it without replacing the catalog.
         let mut app = App::new();
-        app.add_plugins((
-            MinimalPlugins,
-            AssetPlugin::default(),
-            bevy::scene::ScenePlugin,
-        ))
-        .insert_resource(ContentPacks(vec![entry.clone()]))
-        .insert_resource(PackSync::default())
-        .insert_resource(Localization::new())
-        .add_systems(Update, refresh_song_updates);
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin))
+            .insert_resource(ContentPacks(vec![entry.clone()]))
+            .insert_resource(PackSync::default())
+            .insert_resource(Localization::new())
+            .add_systems(Update, refresh_song_updates);
         let updates = app.world_mut().spawn((SongUpdates, Node::default())).id();
         let catalog = app.world_mut().spawn(SongPickerRows).id();
         app.update();
-        assert_eq!(
-            app.world().get::<Node>(updates).unwrap().display,
-            Display::None
-        );
-        app.world_mut().resource_mut::<PackSync>().updates.insert(
-            entry.slug.clone(),
-            UpdateState::Available {
-                commit: "new".into(),
-            },
-        );
+        assert_eq!(app.world().get::<Node>(updates).unwrap().display, Display::None);
+        app.world_mut()
+            .resource_mut::<PackSync>()
+            .updates
+            .insert(entry.slug.clone(), UpdateState::Available { commit: "new".into() });
         app.update();
-        assert_eq!(
-            app.world().get::<Node>(updates).unwrap().display,
-            Display::Flex
-        );
+        assert_eq!(app.world().get::<Node>(updates).unwrap().display, Display::Flex);
         assert_eq!(app.world().get::<Children>(updates).unwrap().len(), 1);
         app.world_mut()
             .resource_mut::<PackSync>()
@@ -1309,28 +1144,16 @@ mod tests {
             .updates
             .insert(entry.slug.clone(), UpdateState::UpToDate);
         app.update();
-        assert_eq!(
-            app.world().get::<Node>(updates).unwrap().display,
-            Display::None
-        );
-        assert!(
-            app.world()
-                .get::<Children>(updates)
-                .is_none_or(|children| children.is_empty())
-        );
+        assert_eq!(app.world().get::<Node>(updates).unwrap().display, Display::None);
+        assert!(app.world().get::<Children>(updates).is_none_or(|children| children.is_empty()));
         assert!(app.world().get::<SongPickerRows>(catalog).is_some());
 
         entry.kind = PackKind::Lessons;
         assert!(!song_update_available(&entry, &sync));
         entry.kind = PackKind::Songs;
-        entry.spec = RepoSpec::Local {
-            path: "/songs".into(),
-        };
+        entry.spec = RepoSpec::Local { path: "/songs".into() };
         assert!(!song_update_available(&entry, &sync));
-        entry.spec = RepoSpec::Remote {
-            url: "https://example.com/songs".into(),
-            git_ref: None,
-        };
+        entry.spec = RepoSpec::Remote { url: "https://example.com/songs".into(), git_ref: None };
         entry.status = PackStatus::NotInstalled;
         assert!(!song_update_available(&entry, &sync));
     }
@@ -1343,9 +1166,7 @@ mod tests {
             .add_systems(Update, reveal_selected_song);
         app.world_mut().resource_mut::<SongPickerState>().selected = Some("song-2".into());
         let control = app.world_mut().spawn_empty().id();
-        app.world_mut()
-            .resource_mut::<InputFocus>()
-            .set(control, FocusCause::Navigated);
+        app.world_mut().resource_mut::<InputFocus>().set(control, FocusCause::Navigated);
         let area = app
             .world_mut()
             .spawn((
@@ -1364,10 +1185,7 @@ mod tests {
             entities.push(
                 app.world_mut()
                     .spawn((
-                        SongRow {
-                            path: format!("song-{index}"),
-                            index,
-                        },
+                        SongRow { path: format!("song-{index}"), index },
                         ComputedNode {
                             size: Vec2::new(100.0, height),
                             inverse_scale_factor: 1.0,
@@ -1383,14 +1201,8 @@ mod tests {
         app.world_mut().get_mut::<ScrollPosition>(area).unwrap().0.y = 17.0;
         app.update();
         assert_eq!(app.world().get::<ScrollPosition>(area).unwrap().0.y, 17.0);
-        app.world_mut()
-            .get_mut::<SongRow>(entities[2])
-            .unwrap()
-            .index = 0;
-        app.world_mut()
-            .get_mut::<SongRow>(entities[0])
-            .unwrap()
-            .index = 2;
+        app.world_mut().get_mut::<SongRow>(entities[2]).unwrap().index = 0;
+        app.world_mut().get_mut::<SongRow>(entities[0]).unwrap().index = 2;
         app.world_mut().entity_mut(area).insert(RevealSelectedSong);
         app.update();
         assert_eq!(app.world().get::<ScrollPosition>(area).unwrap().0.y, 0.0);
@@ -1418,16 +1230,10 @@ mod tests {
             GameplayMode::Play3D
         );
         *app.world_mut().resource_mut::<GameplayMode>() = GameplayMode::JamSession;
-        let button = app
-            .world_mut()
-            .spawn_empty()
-            .observe(crate::menu::pages::play::open_song_picker)
-            .id();
+        let button =
+            app.world_mut().spawn_empty().observe(crate::menu::pages::play::open_song_picker).id();
         app.world_mut().trigger(Activate { entity: button });
-        assert_eq!(
-            *app.world().resource::<GameplayMode>(),
-            GameplayMode::Play3D
-        );
+        assert_eq!(*app.world().resource::<GameplayMode>(), GameplayMode::Play3D);
         assert!(matches!(
             app.world().resource::<NextState<MenuPage>>(),
             NextState::Pending(MenuPage::ArtistList)
@@ -1440,25 +1246,14 @@ mod tests {
         app.init_resource::<InputFocus>()
             .init_resource::<ButtonInput<Key>>()
             .add_systems(Update, focus_picker_search);
-        let search = app
-            .world_mut()
-            .spawn((SongPickerSearch, EditableText::new("")))
-            .id();
-        app.world_mut()
-            .resource_mut::<ButtonInput<Key>>()
-            .press(Key::Character("/".into()));
+        let search = app.world_mut().spawn((SongPickerSearch, EditableText::new(""))).id();
+        app.world_mut().resource_mut::<ButtonInput<Key>>().press(Key::Character("/".into()));
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(search));
         let other = app.world_mut().spawn(EditableText::new("text")).id();
-        app.world_mut()
-            .resource_mut::<InputFocus>()
-            .set(other, FocusCause::Navigated);
-        app.world_mut()
-            .resource_mut::<ButtonInput<Key>>()
-            .reset_all();
-        app.world_mut()
-            .resource_mut::<ButtonInput<Key>>()
-            .press(Key::Character("/".into()));
+        app.world_mut().resource_mut::<InputFocus>().set(other, FocusCause::Navigated);
+        app.world_mut().resource_mut::<ButtonInput<Key>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<Key>>().press(Key::Character("/".into()));
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(other));
     }
@@ -1484,60 +1279,25 @@ mod tests {
             }],
         );
         app.world_mut().resource_mut::<SongPickerState>().selected = Some("song".into());
-        let title = app
-            .world_mut()
-            .spawn((PickerSummary::Title, Text::new("")))
-            .id();
-        let empty = app
-            .world_mut()
-            .spawn((PickerSummary::Empty, Text::new("")))
-            .id();
+        let title = app.world_mut().spawn((PickerSummary::Title, Text::new(""))).id();
+        let empty = app.world_mut().spawn((PickerSummary::Empty, Text::new(""))).id();
         let delete = app.world_mut().spawn(PickerDelete).id();
-        let status = app
-            .world_mut()
-            .spawn((PickerSummary::Status, Text::new("")))
-            .id();
+        let status = app.world_mut().spawn((PickerSummary::Status, Text::new(""))).id();
         let play = app.world_mut().spawn(PickerPlay).id();
         app.update();
         assert_eq!(app.world().get::<Text>(title).unwrap().0, "Song");
-        assert_eq!(
-            app.world().get::<Node>(empty).unwrap().display,
-            Display::None
-        );
-        assert!(
-            app.world()
-                .get::<bevy::ui::InteractionDisabled>(play)
-                .is_none()
-        );
-        app.world_mut()
-            .resource_mut::<AvailableSongs>()
-            .0
-            .get_mut("band")
-            .unwrap()[0]
-            .retained = true;
+        assert_eq!(app.world().get::<Node>(empty).unwrap().display, Display::None);
+        assert!(app.world().get::<bevy::ui::InteractionDisabled>(play).is_none());
+        app.world_mut().resource_mut::<AvailableSongs>().0.get_mut("band").unwrap()[0].retained =
+            true;
         app.update();
         assert_eq!(app.world().get::<Text>(status).unwrap().0, "song-retained");
-        assert!(
-            app.world()
-                .get::<bevy::ui::InteractionDisabled>(delete)
-                .is_none()
-        );
+        assert!(app.world().get::<bevy::ui::InteractionDisabled>(delete).is_none());
         app.world_mut().resource_mut::<SongPickerState>().query = "jazz".into();
         app.update();
-        assert_eq!(
-            app.world().get::<Node>(empty).unwrap().display,
-            Display::Flex
-        );
-        assert!(
-            app.world()
-                .get::<bevy::ui::InteractionDisabled>(play)
-                .is_some()
-        );
-        assert!(
-            app.world()
-                .get::<bevy::ui::InteractionDisabled>(delete)
-                .is_some()
-        );
+        assert_eq!(app.world().get::<Node>(empty).unwrap().display, Display::Flex);
+        assert!(app.world().get::<bevy::ui::InteractionDisabled>(play).is_some());
+        assert!(app.world().get::<bevy::ui::InteractionDisabled>(delete).is_some());
     }
 
     #[test]
@@ -1597,16 +1357,10 @@ mod tests {
             "claptn rock",
             "wonder eric",
         ] {
-            assert!(
-                matches_search(query, &fields),
-                "expected match for {query:?}"
-            );
+            assert!(matches_search(query, &fields), "expected match for {query:?}");
         }
         for query in ["jazz", "wonder jazz", "zz", "rok", "abcdefgh"] {
-            assert!(
-                !matches_search(query, &fields),
-                "unexpected match for {query:?}"
-            );
+            assert!(!matches_search(query, &fields), "unexpected match for {query:?}");
         }
     }
 
@@ -1638,44 +1392,19 @@ mod tests {
             }],
         );
         let root = app.world_mut().spawn(SongPickerRows).id();
-        let row = app
-            .world_mut()
-            .spawn(SongRow {
-                path: "song".into(),
-                index: 0,
-            })
-            .id();
+        let row = app.world_mut().spawn(SongRow { path: "song".into(), index: 0 }).id();
         app.world_mut().entity_mut(root).add_child(row);
-        let input = app
-            .world_mut()
-            .spawn((SongPickerSearch, EditableText::new("")))
-            .id();
-        app.world_mut()
-            .resource_mut::<InputFocus>()
-            .set(input, FocusCause::Navigated);
+        let input = app.world_mut().spawn((SongPickerSearch, EditableText::new(""))).id();
+        app.world_mut().resource_mut::<InputFocus>().set(input, FocusCause::Navigated);
         app.update();
         for query in ["w", "won", "wondr", "wonderful"] {
-            app.world_mut()
-                .get_mut::<EditableText>(input)
-                .unwrap()
-                .editor_mut()
-                .set_text(query);
+            app.world_mut().get_mut::<EditableText>(input).unwrap().editor_mut().set_text(query);
             app.update();
             assert_eq!(app.world().get::<Children>(root).unwrap()[0], row);
             assert_eq!(app.world().resource::<InputFocus>().get(), Some(input));
-            assert_eq!(
-                app.world()
-                    .resource::<SongPickerState>()
-                    .selected
-                    .as_deref(),
-                Some("song")
-            );
+            assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song"));
         }
-        app.world_mut()
-            .get_mut::<EditableText>(input)
-            .unwrap()
-            .editor_mut()
-            .set_text("jazz");
+        app.world_mut().get_mut::<EditableText>(input).unwrap().editor_mut().set_text("jazz");
         app.update();
         assert!(app.world().get::<SongRow>(row).is_none());
         assert!(app.world().resource::<SongPickerState>().selected.is_none());
@@ -1692,10 +1421,7 @@ mod tests {
             .map(|index| {
                 app.world_mut()
                     .spawn((
-                        SongRow {
-                            path: format!("song-{index}"),
-                            index,
-                        },
+                        SongRow { path: format!("song-{index}"), index },
                         ComputedNode::default(),
                     ))
                     .id()
@@ -1707,61 +1433,29 @@ mod tests {
     #[test]
     fn unchanged_keyboard_focus_preserves_mouse_preview() {
         let (mut app, rows) = navigation_app();
-        app.world_mut()
-            .resource_mut::<InputFocus>()
-            .set(rows[0], FocusCause::Navigated);
+        app.world_mut().resource_mut::<InputFocus>().set(rows[0], FocusCause::Navigated);
         app.update();
         app.world_mut().resource_mut::<SongPickerState>().selected = Some("song-2".into());
         app.update();
-        assert_eq!(
-            app.world()
-                .resource::<SongPickerState>()
-                .selected
-                .as_deref(),
-            Some("song-2")
-        );
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::ArrowDown);
+        assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song-2"));
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowDown);
         app.update();
-        assert_eq!(
-            app.world()
-                .resource::<SongPickerState>()
-                .selected
-                .as_deref(),
-            Some("song-1")
-        );
+        assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song-1"));
     }
 
     #[test]
     fn picker_navigation_moves_and_clamps_at_list_ends() {
         let (mut app, rows) = navigation_app();
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::End);
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::End);
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(rows[2]));
-        assert_eq!(
-            app.world()
-                .resource::<SongPickerState>()
-                .selected
-                .as_deref(),
-            Some("song-2")
-        );
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .reset_all();
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::ArrowDown);
+        assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song-2"));
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowDown);
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(rows[2]));
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .reset_all();
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::ArrowUp);
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().reset_all();
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowUp);
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(rows[1]));
     }
@@ -1770,12 +1464,8 @@ mod tests {
     fn picker_navigation_keeps_search_keyboard_input_in_the_field() {
         let (mut app, _) = navigation_app();
         let input = app.world_mut().spawn(EditableText::new("search")).id();
-        app.world_mut()
-            .resource_mut::<InputFocus>()
-            .set(input, FocusCause::Navigated);
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::End);
+        app.world_mut().resource_mut::<InputFocus>().set(input, FocusCause::Navigated);
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::End);
         app.update();
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(input));
         assert!(app.world().resource::<SongPickerState>().selected.is_none());

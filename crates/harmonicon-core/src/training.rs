@@ -54,13 +54,8 @@ pub enum Tier {
 }
 
 impl Tier {
-    pub const ALL: [Tier; 5] = [
-        Tier::Isolate,
-        Tier::Consolidate,
-        Tier::Vary,
-        Tier::InContext,
-        Tier::Interleave,
-    ];
+    pub const ALL: [Tier; 5] =
+        [Tier::Isolate, Tier::Consolidate, Tier::Vary, Tier::InContext, Tier::Interleave];
 
     /// 1-based, as a player sees it.
     pub fn number(self) -> u8 {
@@ -168,11 +163,7 @@ struct Step {
 /// that is which way round it sits. Same rule `pitch_map::map_pitch_playable`
 /// resolves by; `bend_action_matches_the_resolver` pins the two together.
 pub fn bend_action(hole: u8) -> Action {
-    if hole <= 6 {
-        Action::Draw
-    } else {
-        Action::Blow
-    }
+    if hole <= 6 { Action::Draw } else { Action::Blow }
 }
 
 /// Every bend `hole` can actually produce, shallowest first, as semitone
@@ -224,12 +215,8 @@ pub fn drill_chart(
         // `harp_remap::source_pitch`), so stating the bent pitch would apply
         // the bend twice.
         let reed = harp.wind_direction_label(step.hole, &action);
-        let modifiers = (step.depth > 0).then(|| {
-            vec![Modifier::Bend {
-                semitones: -f32::from(step.depth),
-                intensity: None,
-            }]
-        });
+        let modifiers = (step.depth > 0)
+            .then(|| vec![Modifier::Bend { semitones: -f32::from(step.depth), intensity: None }]);
         track.push(TrackItem {
             id: None,
             time: Some(i as f64 * secs_per_note),
@@ -241,12 +228,7 @@ pub fn drill_chart(
             play_mode: None,
             call: false,
             lyric: None,
-            events: vec![NoteEvent {
-                hole: step.hole,
-                action,
-                note: Some(reed),
-                modifiers,
-            }],
+            events: vec![NoteEvent { hole: step.hole, action, note: Some(reed), modifiers }],
         });
     }
 
@@ -294,9 +276,7 @@ fn bend_steps(holes: &[u8], harp: &Harmonica, tier: Tier, seed: u64) -> Vec<Step
     let targets: Vec<Step> = holes
         .iter()
         .flat_map(|&hole| {
-            depths_available(harp, hole)
-                .into_iter()
-                .map(move |depth| Step { hole, depth })
+            depths_available(harp, hole).into_iter().map(move |depth| Step { hole, depth })
         })
         .collect();
     if targets.is_empty() {
@@ -309,19 +289,13 @@ fn bend_steps(holes: &[u8], harp: &Harmonica, tier: Tier, seed: u64) -> Vec<Step
         // reed as the ear's reference, then the bend, over and over.
         Tier::Isolate | Tier::Consolidate => {
             let first = targets[0];
-            steps.push(Step {
-                hole: first.hole,
-                depth: 0,
-            });
+            steps.push(Step { hole: first.hole, depth: 0 });
             steps.push(first);
         }
         // Same shape, but across every hole and every depth they reach.
         Tier::Vary => {
             for t in &targets {
-                steps.push(Step {
-                    hole: t.hole,
-                    depth: 0,
-                });
+                steps.push(Step { hole: t.hole, depth: 0 });
                 steps.push(*t);
             }
         }
@@ -340,18 +314,9 @@ fn bend_steps(holes: &[u8], harp: &Harmonica, tier: Tier, seed: u64) -> Vec<Step
                     .map(|i| holes[(i + 1) % holes.len()])
                     .filter(|h| *h != t.hole)
                     .unwrap_or(t.hole);
-                steps.push(Step {
-                    hole: t.hole,
-                    depth: 0,
-                });
-                steps.push(Step {
-                    hole: neighbour,
-                    depth: 0,
-                });
-                steps.push(Step {
-                    hole: t.hole,
-                    depth: 0,
-                });
+                steps.push(Step { hole: t.hole, depth: 0 });
+                steps.push(Step { hole: neighbour, depth: 0 });
+                steps.push(Step { hole: t.hole, depth: 0 });
                 steps.push(*t);
             }
         }
@@ -359,10 +324,7 @@ fn bend_steps(holes: &[u8], harp: &Harmonica, tier: Tier, seed: u64) -> Vec<Step
         // is the tier that trains recall rather than repetition.
         Tier::Interleave => {
             for t in &targets {
-                steps.push(Step {
-                    hole: t.hole,
-                    depth: 0,
-                });
+                steps.push(Step { hole: t.hole, depth: 0 });
                 steps.push(*t);
             }
             shuffle(&mut steps, seed);

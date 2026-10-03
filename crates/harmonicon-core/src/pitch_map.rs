@@ -52,9 +52,7 @@ pub struct HoleAssignment {
 
 /// The twelve keys a harmonica is sold in, in the order [`suggest_key`]
 /// considers them — which is also its tie-break, so the result is stable.
-pub const HARP_KEYS: [&str; 12] = [
-    "C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B",
-];
+pub const HARP_KEYS: [&str; 12] = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 
 /// Which family of harp to build for a key.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -154,11 +152,7 @@ pub fn playable_assignments(target: u8, harp: &Harmonica) -> Vec<HoleAssignment>
     let hole_count = harp.hole_count();
     let mut out = Vec::new();
     let mut assign = |hole, action, technique| {
-        out.push(HoleAssignment {
-            hole,
-            action,
-            technique,
-        });
+        out.push(HoleAssignment { hole, action, technique });
     };
 
     for hole in 1..=hole_count {
@@ -173,10 +167,9 @@ pub fn playable_assignments(target: u8, harp: &Harmonica) -> Vec<HoleAssignment>
     match harp {
         Harmonica::Diatonic { .. } => {
             // Draw bends live on the low holes, blow bends on the high ones.
-            for (range, action) in [
-                (1..=hole_count.min(6), Action::Draw),
-                (7..=hole_count, Action::Blow),
-            ] {
+            for (range, action) in
+                [(1..=hole_count.min(6), Action::Draw), (7..=hole_count, Action::Blow)]
+            {
                 for hole in range {
                     if let Some(reed) = harp.wind_direction_midi(hole, &action)
                         && reed > target
@@ -192,10 +185,7 @@ pub fn playable_assignments(target: u8, harp: &Harmonica) -> Vec<HoleAssignment>
             // otherwise simply doesn't have.
             for hole in 1..=hole_count {
                 if let Some((action, technique)) = over_action(hole)
-                    && hole_notes(harp, hole)
-                        .over
-                        .as_deref()
-                        .and_then(note_to_midi)
+                    && hole_notes(harp, hole).over.as_deref().and_then(note_to_midi)
                         == Some(target as i32)
                 {
                     assign(hole, action, technique);
@@ -236,11 +226,7 @@ pub fn map_pitch(target: u8, harp: &Harmonica) -> HoleAssignment {
                 let dist = m.abs_diff(target);
                 if best.is_none_or(|(_, best_dist)| dist < best_dist) {
                     best = Some((
-                        HoleAssignment {
-                            hole,
-                            action,
-                            technique: Technique::Natural,
-                        },
+                        HoleAssignment { hole, action, technique: Technique::Natural },
                         dist,
                     ));
                 }
@@ -251,11 +237,7 @@ pub fn map_pitch(target: u8, harp: &Harmonica) -> HoleAssignment {
         // Only reachable if the harp has no playable holes at all, which no
         // real Diatonic/Chromatic value is — hole 1 blow is as safe a
         // default as any.
-        .unwrap_or(HoleAssignment {
-            hole: 1,
-            action: Action::Blow,
-            technique: Technique::Natural,
-        })
+        .unwrap_or(HoleAssignment { hole: 1, action: Action::Blow, technique: Technique::Natural })
 }
 
 /// Fraction of `midi_keys` reachable on `key`'s harp by an *exact* natural

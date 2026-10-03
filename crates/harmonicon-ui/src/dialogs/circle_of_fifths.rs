@@ -83,19 +83,13 @@ pub fn spawn_circle_of_fifths(
         .collect();
 
     parent
-        .spawn(Node {
-            width: Val::Px(SIZE_PX),
-            height: Val::Px(SIZE_PX),
-            ..default()
-        })
+        .spawn(Node { width: Val::Px(SIZE_PX), height: Val::Px(SIZE_PX), ..default() })
         .with_children(|circle| {
             for (i, key) in keys.iter().enumerate() {
                 let (x, y) = circle_point(i, keys.len(), RADIUS_FRAC);
                 let is_harp_key = i == 0;
-                let position_label = position_at_step
-                    .iter()
-                    .find(|(steps, _)| *steps == i)
-                    .map(|(_, label)| *label);
+                let position_label =
+                    position_at_step.iter().find(|(steps, _)| *steps == i).map(|(_, label)| *label);
                 let key_color = if is_harp_key {
                     colors.harp_key
                 } else if position_label.is_some() {

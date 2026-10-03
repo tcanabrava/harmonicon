@@ -82,19 +82,13 @@ fn the_time_signature_survives_both_halves() {
     // Every other caller in the tree keeps only the numerator; a score
     // file's meter is the first thing that needs the denominator too.
     let bytes = chart_json(r#"[]"#, r#","time_signature":"6/8""#);
-    assert_eq!(
-        HarpChartScore::parse(&bytes).unwrap().time_signature(),
-        (6, 8)
-    );
+    assert_eq!(HarpChartScore::parse(&bytes).unwrap().time_signature(), (6, 8));
 }
 
 #[test]
 fn a_missing_time_signature_falls_back_to_common_time() {
     let bytes = chart_json(r#"[]"#, "");
-    assert_eq!(
-        HarpChartScore::parse(&bytes).unwrap().time_signature(),
-        (4, 4)
-    );
+    assert_eq!(HarpChartScore::parse(&bytes).unwrap().time_signature(), (4, 4));
 }
 
 #[test]

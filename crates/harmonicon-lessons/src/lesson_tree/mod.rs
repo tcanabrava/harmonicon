@@ -273,11 +273,7 @@ pub(crate) fn setup_lesson_tree(
 
     // A fresh build already reflects every toggle made so far.
     request.pending = false;
-    let tree = match build_layout(
-        &lessons,
-        &profile,
-        &laid_out_collapsed(&collapsed, &pending),
-    ) {
+    let tree = match build_layout(&lessons, &profile, &laid_out_collapsed(&collapsed, &pending)) {
         Ok(tree) => tree,
         // A cycle or a dangling prerequisite. `validate-pack` fails a pack's
         // CI over either, so this only fires for an unvalidated pack or a
@@ -314,16 +310,10 @@ pub(crate) fn setup_lesson_tree(
 
     let live_units: HashSet<&str> = tree.units.iter().map(|unit| unit.id.as_str()).collect();
     collapsed.0.retain(|id| live_units.contains(id.as_str()));
-    expansions
-        .0
-        .retain(|id, _| live_units.contains(id.as_str()));
+    expansions.0.retain(|id, _| live_units.contains(id.as_str()));
     pending.0.retain(|id| live_units.contains(id.as_str()));
     slides.0.retain(|id, _| live_units.contains(id.as_str()));
-    if request
-        .anchor_unit
-        .as_deref()
-        .is_some_and(|id| !live_units.contains(id))
-    {
+    if request.anchor_unit.as_deref().is_some_and(|id| !live_units.contains(id)) {
         request.anchor_unit = None;
     }
 
@@ -345,11 +335,7 @@ pub(crate) fn setup_lesson_tree(
     // A unit discovered while the app is running starts expanded. Existing
     // animation values survive page rebuilds and visits to the reader.
     for unit in &tree.units {
-        let initial = if collapsed.0.contains(&unit.id) {
-            0.0
-        } else {
-            1.0
-        };
+        let initial = if collapsed.0.contains(&unit.id) { 0.0 } else { 1.0 };
         expansions.0.entry(unit.id.clone()).or_insert(initial);
     }
 
@@ -375,10 +361,8 @@ pub(crate) fn setup_lesson_tree(
     spawn_streak(&mut commands, root, profile.practice.current(today), &loc);
     let due = due_reviews(&lessons.0, &profile, today);
     spawn_warmups(&mut commands, root, &lessons.0, warmups(&due), &loc);
-    let due: std::collections::HashSet<&str> = due
-        .iter()
-        .map(|warmup| lessons.0[warmup.entry].manifest.id.as_str())
-        .collect();
+    let due: std::collections::HashSet<&str> =
+        due.iter().map(|warmup| lessons.0[warmup.entry].manifest.id.as_str()).collect();
     spawn_track_meters(
         &mut commands,
         root,
@@ -390,9 +374,7 @@ pub(crate) fn setup_lesson_tree(
     commands.entity(root).with_children(|parent| {
         scroller = spawn_scroll_area_xy(parent, SCROLLBAR_THUMB, SCROLLBAR_TRACK);
     });
-    commands
-        .entity(scroller)
-        .insert((LessonTreeScroller, ScrollPosition(viewport.0)));
+    commands.entity(scroller).insert((LessonTreeScroller, ScrollPosition(viewport.0)));
 
     // Every node is positioned absolutely inside this box, so it has to
     // keep the height it asks for. Left to shrink — the flexbox default
@@ -434,13 +416,7 @@ pub(crate) fn setup_lesson_tree(
     spawn_edges(&mut commands, edge_layer, &tree, &mut materials);
 
     for unit in &tree.units {
-        spawn_unit(
-            &mut commands,
-            canvas,
-            unit,
-            !collapsed.0.contains(&unit.id),
-            &loc,
-        );
+        spawn_unit(&mut commands, canvas, unit, !collapsed.0.contains(&unit.id), &loc);
     }
     for node in &tree.nodes {
         let review_due = due.contains(node.id.as_str());
@@ -618,10 +594,7 @@ fn spawn_unit(
             },
             PartKind::UnitLabel.part(&unit.id),
             Text::new(String::from(loc.msg(&unit.title_key))),
-            TextFont {
-                font_size: FontSize::Px(UNIT_FONT_PX),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(UNIT_FONT_PX), ..default() },
             TextLayout::justify(Justify::Center),
             TextColor(ring),
             LayoutOwner(unit.id.clone()),
@@ -655,10 +628,7 @@ fn tooltip_for(node: &PlacedNode, loc: &Localization) -> String {
         }
         wants.push_str(&loc.msg(key));
     }
-    format!(
-        "{head}\n{}",
-        loc.msg_args("lesson-tree-needs", &[("lessons", wants)])
-    )
+    format!("{head}\n{}", loc.msg_args("lesson-tree-needs", &[("lessons", wants)]))
 }
 
 fn spawn_node(
@@ -714,11 +684,7 @@ fn spawn_node(
             WidgetButton,
             TabIndex(0),
             Tooltip(if review_due {
-                format!(
-                    "{}\n{}",
-                    tooltip_for(node, loc),
-                    loc.msg("lesson-tree-review-due")
-                )
+                format!("{}\n{}", tooltip_for(node, loc), loc.msg("lesson-tree-review-due"))
             } else {
                 tooltip_for(node, loc)
             }),
@@ -921,18 +887,9 @@ mod tests {
 
     #[test]
     fn neighboring_unit_slide_uses_a_smooth_complete_transition() {
-        let start = UnitSlide {
-            from_px: 300.0,
-            amount: 0.0,
-        };
-        let middle = UnitSlide {
-            amount: 0.5,
-            ..start
-        };
-        let end = UnitSlide {
-            amount: 1.0,
-            ..start
-        };
+        let start = UnitSlide { from_px: 300.0, amount: 0.0 };
+        let middle = UnitSlide { amount: 0.5, ..start };
+        let end = UnitSlide { amount: 1.0, ..start };
         assert_eq!(slide_offset(&start), 300.0);
         assert_eq!(slide_offset(&middle), 150.0);
         assert_eq!(slide_offset(&end), 0.0);

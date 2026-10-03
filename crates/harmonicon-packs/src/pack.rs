@@ -93,10 +93,7 @@ pub enum Incompatible {
     )]
     SchemaTooNew { found: u32, supported: u32 },
     #[error("this pack needs Harmonicon {required}, but this is {engine}")]
-    EngineMismatch {
-        required: VersionReq,
-        engine: Version,
-    },
+    EngineMismatch { required: VersionReq, engine: Version },
     #[error(
         "this pack's lessons use format {found}, newer than the {supported} this Harmonicon understands; update Harmonicon"
     )]
@@ -136,10 +133,7 @@ impl PackManifest {
     /// Whether `engine` can use this pack as a `expected` pack.
     pub fn check(&self, expected: PackKind, engine: &EngineSupport) -> Result<(), Incompatible> {
         if self.kind != expected {
-            return Err(Incompatible::WrongKind {
-                expected,
-                found: self.kind,
-            });
+            return Err(Incompatible::WrongKind { expected, found: self.kind });
         }
         if let Some(req) = &self.requires.harmonicon {
             // A release candidate satisfies the requirement its release
@@ -172,9 +166,7 @@ fn is_plain_name(id: &str) -> bool {
     !id.is_empty()
         && id != "."
         && id != ".."
-        && id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 #[cfg(test)]
@@ -182,10 +174,7 @@ mod tests {
     use super::*;
 
     fn engine() -> EngineSupport {
-        EngineSupport {
-            harmonicon: Version::parse("0.5.0").unwrap(),
-            lesson_format: 2,
-        }
+        EngineSupport { harmonicon: Version::parse("0.5.0").unwrap(), lesson_format: 2 }
     }
 
     fn parse_ok(json: &str) -> PackManifest {
@@ -206,10 +195,7 @@ mod tests {
         let outcome = PackManifest::parse(br#"{"schema":9,"shape":"unknown to us"}"#).unwrap();
         assert_eq!(
             outcome.unwrap_err(),
-            Incompatible::SchemaTooNew {
-                found: 9,
-                supported: PACK_SCHEMA
-            }
+            Incompatible::SchemaTooNew { found: 9, supported: PACK_SCHEMA }
         );
     }
 
@@ -231,10 +217,8 @@ mod tests {
             r#"{"schema":1,"kind":"songs","id":"s","name":"S","version":"1.0.0",
                 "requires":{"harmonicon":">=0.5"}}"#,
         );
-        let rc = EngineSupport {
-            harmonicon: Version::parse("0.5.0-rc.1").unwrap(),
-            lesson_format: 1,
-        };
+        let rc =
+            EngineSupport { harmonicon: Version::parse("0.5.0-rc.1").unwrap(), lesson_format: 1 };
         assert_eq!(pack.check(PackKind::Songs, &rc), Ok(()));
     }
 
@@ -246,10 +230,7 @@ mod tests {
         );
         assert_eq!(
             pack.check(PackKind::Lessons, &engine()),
-            Err(Incompatible::LessonFormatTooNew {
-                found: 3,
-                supported: 2
-            })
+            Err(Incompatible::LessonFormatTooNew { found: 3, supported: 2 })
         );
     }
 
@@ -267,10 +248,7 @@ mod tests {
         for id in ["", "..", "a/b", "../x", "a b"] {
             let json = MINIMAL.replace("\"core\"", &format!("{id:?}"));
             assert!(
-                matches!(
-                    PackManifest::parse(json.as_bytes()),
-                    Err(PackError::BadId(_))
-                ),
+                matches!(PackManifest::parse(json.as_bytes()), Err(PackError::BadId(_))),
                 "{id:?} was accepted"
             );
         }
@@ -278,10 +256,8 @@ mod tests {
 
     #[test]
     fn unknown_requirement_keys_are_rejected() {
-        let json = MINIMAL.replace(
-            "\"version\":\"1.2.0\"",
-            "\"version\":\"1.2.0\",\"requires\":{\"typo\":1}",
-        );
+        let json = MINIMAL
+            .replace("\"version\":\"1.2.0\"", "\"version\":\"1.2.0\",\"requires\":{\"typo\":1}");
         assert!(PackManifest::parse(json.as_bytes()).is_err());
     }
 }

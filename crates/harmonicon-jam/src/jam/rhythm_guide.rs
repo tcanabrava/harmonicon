@@ -152,11 +152,7 @@ pub(crate) fn update_rhythm_guide(
         if *border != outline {
             *border = outline;
         }
-        let brightness = if slot.0 == current {
-            (1.0 - phase).powf(1.5)
-        } else {
-            0.0
-        };
+        let brightness = if slot.0 == current { (1.0 - phase).powf(1.5) } else { 0.0 };
         let color = BackgroundColor(HIT_IDLE.mix(&HIT_PEAK, brightness));
         if *bg != color {
             *bg = color;
@@ -219,10 +215,7 @@ mod tests {
             let t = i as f64 * 0.01;
             for swung in [false, true] {
                 let (_, phase) = active_slot(t, 1.0, swung);
-                assert!(
-                    (0.0..=1.0).contains(&phase),
-                    "t={t} swung={swung} phase={phase}"
-                );
+                assert!((0.0..=1.0).contains(&phase), "t={t} swung={swung} phase={phase}");
             }
         }
     }

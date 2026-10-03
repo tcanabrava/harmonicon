@@ -70,13 +70,10 @@ pub(super) fn attempt_stability(samples: &VecDeque<TraceSample>) -> Option<Attem
     }
     let n = samples.len() as f32;
     let mean_cents = samples.iter().map(|s| s.target_cents).sum::<f32>() / n;
-    let (lo, hi) = samples.iter().fold((f32::MAX, f32::MIN), |(lo, hi), s| {
-        (lo.min(s.target_cents), hi.max(s.target_cents))
-    });
-    Some(AttemptStability {
-        mean_cents,
-        spread_cents: hi - lo,
-    })
+    let (lo, hi) = samples
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(lo, hi), s| (lo.min(s.target_cents), hi.max(s.target_cents)));
+    Some(AttemptStability { mean_cents, spread_cents: hi - lo })
 }
 
 /// A vibrato measurement: how fast the pitch is oscillating and how wide.
@@ -126,10 +123,7 @@ pub(super) fn vibrato(samples: &VecDeque<TraceSample>) -> Option<Vibrato> {
     if crossings < 2 {
         return None;
     }
-    Some(Vibrato {
-        rate_hz: crossings as f32 / 2.0 / span,
-        depth_cents: stability.spread_cents,
-    })
+    Some(Vibrato { rate_hz: crossings as f32 / 2.0 / span, depth_cents: stability.spread_cents })
 }
 
 /// The drawn path, low-passed by `smoothing` (0 = the raw samples).
@@ -284,11 +278,7 @@ pub(super) fn spawn_bend_rail(card: &mut ChildSpawnerCommands, loc: &Localizatio
         ..default()
     })
     .with_children(|metrics| {
-        for metric in [
-            BendMetric::Distance,
-            BendMetric::Stability,
-            BendMetric::Hold,
-        ] {
+        for metric in [BendMetric::Distance, BendMetric::Stability, BendMetric::Hold] {
             metrics
                 .spawn_empty()
                 .apply_scene(bsn! {
@@ -315,11 +305,7 @@ pub(super) fn intermediate_bend_notes(harp: &Harmonica, target: TrainerTarget) -
         Technique::Bend3 => 2,
         _ => 0,
     };
-    hole_notes(harp, target.hole)
-        .bends
-        .into_iter()
-        .take(count)
-        .collect()
+    hole_notes(harp, target.hole).bends.into_iter().take(count).collect()
 }
 
 #[cfg(test)]
@@ -339,15 +325,8 @@ fn residual_rms_iter(samples: impl Iterator<Item = TraceSample> + Clone) -> Opti
 
     let n = n as f32;
     let mean_t = samples.clone().map(|sample| sample.time).sum::<f32>() / n;
-    let mean_c = samples
-        .clone()
-        .map(|sample| sample.target_cents)
-        .sum::<f32>()
-        / n;
-    let variance_t = samples
-        .clone()
-        .map(|sample| (sample.time - mean_t).powi(2))
-        .sum::<f32>();
+    let mean_c = samples.clone().map(|sample| sample.target_cents).sum::<f32>() / n;
+    let variance_t = samples.clone().map(|sample| (sample.time - mean_t).powi(2)).sum::<f32>();
     if variance_t <= f32::EPSILON {
         return None;
     }
@@ -394,10 +373,7 @@ pub fn update_bend_trace(
     match tuner_observation(harp, *target, &active, shift) {
         Some(TunerObservation::TargetFamily(target_cents)) => {
             let elapsed = trace.elapsed;
-            trace.samples.push_back(TraceSample {
-                time: elapsed,
-                target_cents,
-            });
+            trace.samples.push_back(TraceSample { time: elapsed, target_cents });
             while trace
                 .samples
                 .front()
@@ -412,9 +388,8 @@ pub fn update_bend_trace(
                     .filter(|sample| elapsed - sample.time <= STABILITY_HISTORY_SECS)
                     .copied(),
             );
-            trace.unstable = trace
-                .stability_cents
-                .is_some_and(|residual| residual > UNSTABLE_RESIDUAL_CENTS);
+            trace.unstable =
+                trace.stability_cents.is_some_and(|residual| residual > UNSTABLE_RESIDUAL_CENTS);
             trace.target_cents = Some(target_cents);
             trace.centered_hold_secs =
                 if target_cents.abs() <= settings.tolerance_cents && !trace.unstable {
@@ -422,9 +397,8 @@ pub fn update_bend_trace(
                 } else {
                     0.0
                 };
-            trace.longest_centered_hold_secs = trace
-                .longest_centered_hold_secs
-                .max(trace.centered_hold_secs);
+            trace.longest_centered_hold_secs =
+                trace.longest_centered_hold_secs.max(trace.centered_hold_secs);
         }
         _ => {
             trace.samples.clear();
@@ -450,45 +424,24 @@ pub fn update_bend_rail(
     // structural and a missing exclusion is a startup panic (B0001), not a
     // compile error. Each query excludes every earlier one it shares a
     // component with.
-    mut dots: Query<(
-        &BendTraceDot,
-        &mut Node,
-        &mut BackgroundColor,
-        &mut Visibility,
-    )>,
+    mut dots: Query<(&BendTraceDot, &mut Node, &mut BackgroundColor, &mut Visibility)>,
     mut marker: Query<(&mut Node, &mut Visibility), (With<BendLiveMarker>, Without<BendTraceDot>)>,
     mut band: Query<
         &mut Node,
-        (
-            With<BendTargetBand>,
-            Without<BendTraceDot>,
-            Without<BendLiveMarker>,
-        ),
+        (With<BendTargetBand>, Without<BendTraceDot>, Without<BendLiveMarker>),
     >,
     mut slots: Query<
         (&BendSlotMarker, &mut Node, &mut Text, &mut Visibility),
-        (
-            Without<BendTraceDot>,
-            Without<BendLiveMarker>,
-            Without<BendTargetBand>,
-        ),
+        (Without<BendTraceDot>, Without<BendLiveMarker>, Without<BendTargetBand>),
     >,
     mut natural_labels: Query<&mut Text, (With<BendNaturalLabel>, Without<BendSlotMarker>)>,
     mut target_labels: Query<
         &mut Text,
-        (
-            With<BendTargetLabel>,
-            Without<BendSlotMarker>,
-            Without<BendNaturalLabel>,
-        ),
+        (With<BendTargetLabel>, Without<BendSlotMarker>, Without<BendNaturalLabel>),
     >,
     mut metrics: Query<
         (&BendMetric, &mut Text),
-        (
-            Without<BendSlotMarker>,
-            Without<BendNaturalLabel>,
-            Without<BendTargetLabel>,
-        ),
+        (Without<BendSlotMarker>, Without<BendNaturalLabel>, Without<BendTargetLabel>),
     >,
 ) {
     let harp = key.harp();
@@ -506,10 +459,9 @@ pub fn update_bend_rail(
     let natural_cents = 1200.0 * (natural_freq / target_freq).log2();
 
     for mut text in &mut natural_labels {
-        *text = Text::new(String::from(loc.msg_args(
-            "bending-rail-natural-note",
-            &[("note", natural_note.clone())],
-        )));
+        *text = Text::new(String::from(
+            loc.msg_args("bending-rail-natural-note", &[("note", natural_note.clone())]),
+        ));
     }
     for mut text in &mut target_labels {
         *text = Text::new(String::from(
@@ -520,9 +472,7 @@ pub fn update_bend_rail(
         let (key, value) = match metric {
             BendMetric::Distance => (
                 "bending-metric-distance",
-                trace
-                    .target_cents
-                    .map_or_else(|| "—".to_string(), |cents| format!("{cents:+.0}c")),
+                trace.target_cents.map_or_else(|| "—".to_string(), |cents| format!("{cents:+.0}c")),
             ),
             BendMetric::Stability => (
                 "bending-metric-stability",
@@ -530,10 +480,9 @@ pub fn update_bend_rail(
                     .stability_cents
                     .map_or_else(|| "—".to_string(), |cents| format!("{cents:.0}c")),
             ),
-            BendMetric::Hold => (
-                "bending-metric-hold",
-                format!("{:.1}s", trace.centered_hold_secs),
-            ),
+            BendMetric::Hold => {
+                ("bending-metric-hold", format!("{:.1}s", trace.centered_hold_secs))
+            }
         };
         *text = Text::new(String::from(loc.msg_args(key, &[("value", value)])));
     }

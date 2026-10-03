@@ -58,23 +58,14 @@ fn configured_asset_plugin() -> AssetPlugin {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")));
     let root = root.canonicalize().unwrap_or_else(|err| {
-        panic!(
-            "could not resolve macOS debug asset root '{}': {err}",
-            root.display()
-        )
+        panic!("could not resolve macOS debug asset root '{}': {err}", root.display())
     });
 
     std::env::set_current_dir(&root).unwrap_or_else(|err| {
-        panic!(
-            "could not switch to macOS debug asset root '{}': {err}",
-            root.display()
-        )
+        panic!("could not switch to macOS debug asset root '{}': {err}", root.display())
     });
 
-    AssetPlugin {
-        file_path: root.join("assets").to_string_lossy().into_owned(),
-        ..default()
-    }
+    AssetPlugin { file_path: root.join("assets").to_string_lossy().into_owned(), ..default() }
 }
 
 #[cfg(not(all(target_os = "macos", debug_assertions)))]
@@ -158,9 +149,7 @@ pub fn run() {
             // Linear filtering on all three stages (mag, min, mipmap) so that
             // assets scaled down from their source resolution stay sharp instead
             // of aliasing or blurring without mip interpolation.
-            .set(ImagePlugin {
-                default_sampler: ImageSamplerDescriptor::linear(),
-            }),
+            .set(ImagePlugin { default_sampler: ImageSamplerDescriptor::linear() }),
     )
     .add_plugins((
         AssetsManagementPlugin,
@@ -228,10 +217,7 @@ pub fn run() {
                 .run_if(harmonicon_platform::localization::localization_ready),
         )
         .add_plugins(harmonicon_audio::AudioPipelinePlugin)
-        .add_systems(
-            Update,
-            pipeline::log_pitches.run_if(in_state(AppState::Playing)),
-        )
+        .add_systems(Update, pipeline::log_pitches.run_if(in_state(AppState::Playing)))
         .run();
 }
 
@@ -243,9 +229,5 @@ fn spawn_camera(mut commands: Commands) {
 /// downloaded — the game has nothing to teach or play without them — and
 /// otherwise straight to the menu.
 fn leave_startup_when_localized(packs: Res<ContentPacks>, mut next: ResMut<NextState<AppState>>) {
-    next.set(if packs.any_missing() {
-        AppState::Syncing
-    } else {
-        AppState::Menu
-    });
+    next.set(if packs.any_missing() { AppState::Syncing } else { AppState::Menu });
 }

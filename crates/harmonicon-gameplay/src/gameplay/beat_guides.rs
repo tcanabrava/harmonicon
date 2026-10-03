@@ -127,11 +127,7 @@ pub(super) fn update_beat_guides(
             if node.height != height {
                 node.height = height;
             }
-            let tint = if is_downbeat {
-                DOWNBEAT_COLOR
-            } else {
-                BEAT_COLOR
-            };
+            let tint = if is_downbeat { DOWNBEAT_COLOR } else { BEAT_COLOR };
             if color.0 != tint {
                 color.0 = tint;
             }

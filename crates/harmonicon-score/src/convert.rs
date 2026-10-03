@@ -94,11 +94,7 @@ pub fn convert_all_tracks(
         let notes = score.notes(track.index)?;
         let harp = suggested_harp(&notes.iter().map(|n| n.midi).collect::<Vec<_>>());
         let (chart, report) = to_chart(score, track.index, &harp, artist)?;
-        converted.push(TrackConversion {
-            track: track.clone(),
-            chart,
-            report,
-        });
+        converted.push(TrackConversion { track: track.clone(), chart, report });
     }
     Ok(converted)
 }
@@ -116,18 +112,10 @@ pub fn convert_all_tracks(
 /// because it is a *default*: the picker makes it correctable, which is
 /// what allows offering an ambiguous file at all instead of refusing it.
 pub fn choose_track(tracks: &[TrackConversion]) -> Option<usize> {
-    let playable = || {
-        tracks
-            .iter()
-            .enumerate()
-            .filter(|(_, t)| t.report.is_worth_playing())
-    };
+    let playable = || tracks.iter().enumerate().filter(|(_, t)| t.report.is_worth_playing());
 
     let named = crate::pick_harmonica_track(
-        &tracks
-            .iter()
-            .map(|t| t.track.clone())
-            .collect::<Vec<ScoreTrack>>(),
+        &tracks.iter().map(|t| t.track.clone()).collect::<Vec<ScoreTrack>>(),
     );
     if let Some(index) =
         named.and_then(|i| playable().find(|(_, t)| t.track.index == i).map(|(n, _)| n))
@@ -169,10 +157,7 @@ pub fn suggested_harp(pitches: &[u8]) -> Harmonica {
     if reachable(pitches, &diatonic) >= MIN_REACHABLE {
         return diatonic;
     }
-    let chromatic = harp_for_key(
-        suggest_key(pitches, HarpKind::Chromatic),
-        HarpKind::Chromatic,
-    );
+    let chromatic = harp_for_key(suggest_key(pitches, HarpKind::Chromatic), HarpKind::Chromatic);
     if reachable(pitches, &chromatic) > reachable(pitches, &diatonic) {
         chromatic
     } else {
@@ -185,10 +170,7 @@ fn reachable(pitches: &[u8], harp: &Harmonica) -> f32 {
     if pitches.is_empty() {
         return 0.0;
     }
-    let hit = pitches
-        .iter()
-        .filter(|&&p| map_pitch_playable(p, harp).is_some())
-        .count();
+    let hit = pitches.iter().filter(|&&p| map_pitch_playable(p, harp).is_some()).count();
     hit as f32 / pitches.len() as f32
 }
 
@@ -253,10 +235,7 @@ pub fn to_chart(
             Technique::Bend(depth) => {
                 report.bends += 1;
                 // Charts store a bend as a negative (downward) offset.
-                vec![Modifier::Bend {
-                    semitones: -depth,
-                    intensity: None,
-                }]
+                vec![Modifier::Bend { semitones: -depth, intensity: None }]
             }
             Technique::Overblow => {
                 report.overblows += 1;
@@ -321,10 +300,7 @@ pub fn to_chart(
             // timebase. Carrying a source file's full tempo automation
             // through is worth doing later; it changes nothing about when
             // notes land.
-            tempo_map: vec![TempoPoint {
-                tick: 0,
-                bpm: tempo,
-            }],
+            tempo_map: vec![TempoPoint { tick: 0, bpm: tempo }],
             time_signature_map: None,
             pickup_ticks: None,
             repeats: Vec::new(),

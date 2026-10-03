@@ -62,11 +62,7 @@ struct KaraokeNext;
 /// Where the strip starts: under the song-progress bar, and under the staff
 /// too when one is drawn.
 pub(super) fn strip_top(staff: bool) -> f32 {
-    let staff_height = if staff {
-        harmonicon_ui::music_score::PANEL_HEIGHT
-    } else {
-        0.0
-    };
+    let staff_height = if staff { harmonicon_ui::music_score::PANEL_HEIGHT } else { 0.0 };
     super::song_progress_overlay::BAR_HEIGHT + staff_height
 }
 
@@ -144,11 +140,7 @@ fn update_karaoke(
         span.0 = rest;
     }
     if let Ok(mut text) = next.single_mut() {
-        text.0 = strip
-            .lines
-            .get(position.line + 1)
-            .map(LyricLine::text)
-            .unwrap_or_default();
+        text.0 = strip.lines.get(position.line + 1).map(LyricLine::text).unwrap_or_default();
     }
 }
 
@@ -162,51 +154,33 @@ mod tests {
         LyricLine {
             syllables: words
                 .iter()
-                .map(|&(text, start)| Syllable {
-                    text: text.into(),
-                    start,
-                    joins_next: false,
-                })
+                .map(|&(text, start)| Syllable { text: text.into(), start, joins_next: false })
                 .collect(),
         }
     }
 
     fn spans(world: &mut World) -> (String, String, String) {
-        let sung = world
-            .query_filtered::<&TextSpan, With<KaraokeSung>>()
-            .single(world)
-            .unwrap()
-            .0
-            .clone();
+        let sung =
+            world.query_filtered::<&TextSpan, With<KaraokeSung>>().single(world).unwrap().0.clone();
         let unsung = world
             .query_filtered::<&TextSpan, With<KaraokeUnsung>>()
             .single(world)
             .unwrap()
             .0
             .clone();
-        let next = world
-            .query_filtered::<&Text, With<KaraokeNext>>()
-            .single(world)
-            .unwrap()
-            .0
-            .clone();
+        let next =
+            world.query_filtered::<&Text, With<KaraokeNext>>().single(world).unwrap().0.clone();
         (sung, unsung, next)
     }
 
     #[test]
     fn the_strip_follows_the_clock() {
         let mut app = App::new();
-        app.add_plugins((
-            MinimalPlugins,
-            AssetPlugin::default(),
-            bevy::scene::ScenePlugin,
-        ));
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin));
         let world = app.world_mut();
         world.insert_resource(GameplayClock::default());
-        let lines = vec![
-            line(&[("how", 1.0), ("sweet", 2.0)]),
-            line(&[("the", 3.0), ("sound", 4.0)]),
-        ];
+        let lines =
+            vec![line(&[("how", 1.0), ("sweet", 2.0)]), line(&[("the", 3.0), ("sound", 4.0)])];
         world
             .run_system_once(move |mut commands: Commands| {
                 spawn_karaoke(&mut commands, lines.clone(), 0.0);
@@ -218,23 +192,11 @@ mod tests {
             world.run_system_once(update_karaoke).unwrap();
             spans(world)
         };
-        assert_eq!(
-            at(world, 0.0),
-            (String::new(), "how sweet".into(), "the sound".into())
-        );
-        assert_eq!(
-            at(world, 1.5),
-            ("how ".into(), "sweet".into(), "the sound".into())
-        );
-        assert_eq!(
-            at(world, 3.5),
-            ("the ".into(), "sound".into(), String::new())
-        );
+        assert_eq!(at(world, 0.0), (String::new(), "how sweet".into(), "the sound".into()));
+        assert_eq!(at(world, 1.5), ("how ".into(), "sweet".into(), "the sound".into()));
+        assert_eq!(at(world, 3.5), ("the ".into(), "sound".into(), String::new()));
         // A loop rewinding the clock brings the first line back.
-        assert_eq!(
-            at(world, 1.0),
-            ("how ".into(), "sweet".into(), "the sound".into())
-        );
+        assert_eq!(at(world, 1.0), ("how ".into(), "sweet".into(), "the sound".into()));
     }
 
     #[test]

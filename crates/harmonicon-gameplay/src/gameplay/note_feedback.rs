@@ -33,11 +33,7 @@ pub fn hold_uniform(
         return Vec4::ZERO;
     }
     let elapsed = (judged - note.time).clamp(0.0, note.duration);
-    let integrity = if elapsed > 0.0 {
-        (note.held / elapsed).clamp(0.0, 1.0) as f32
-    } else {
-        1.0
-    };
+    let integrity = if elapsed > 0.0 { (note.held / elapsed).clamp(0.0, 1.0) as f32 } else { 1.0 };
     let technique = match technique {
         Some(true) => 1.0,
         Some(false) => -1.0,
@@ -154,10 +150,7 @@ mod tests {
 
     #[test]
     fn an_unhit_note_has_no_hold_state() {
-        assert_eq!(
-            hold_uniform(&note(false, 1.0, 2.0, 1.0), 2.0, true, None),
-            Vec4::ZERO
-        );
+        assert_eq!(hold_uniform(&note(false, 1.0, 2.0, 1.0), 2.0, true, None), Vec4::ZERO);
     }
 
     #[test]
@@ -168,24 +161,15 @@ mod tests {
         assert!((u.y - 0.5).abs() < 1e-6);
         let u = hold_uniform(&note(true, 1.0, 2.0, 1.0), 2.0, false, None);
         assert_eq!(u.x, 0.0, "pitch dropped out this frame");
-        assert!(
-            (u.y - 1.0).abs() < 1e-6,
-            "…but everything so far was credited"
-        );
+        assert!((u.y - 1.0).abs() < 1e-6, "…but everything so far was credited");
     }
 
     #[test]
     fn hold_integrity_is_whole_on_the_hit_frame_and_capped_after_the_end() {
         // Nothing has elapsed yet: nothing lost yet either.
-        assert_eq!(
-            hold_uniform(&note(true, 1.0, 2.0, 0.0), 1.0, true, None).y,
-            1.0
-        );
+        assert_eq!(hold_uniform(&note(true, 1.0, 2.0, 0.0), 1.0, true, None).y, 1.0);
         // Past the end, `held` can exceed the clamped elapsed time.
-        assert_eq!(
-            hold_uniform(&note(true, 1.0, 2.0, 5.0), 9.0, true, None).y,
-            1.0
-        );
+        assert_eq!(hold_uniform(&note(true, 1.0, 2.0, 5.0), 9.0, true, None).y, 1.0);
     }
 
     #[test]
@@ -201,10 +185,7 @@ mod tests {
         assert!((judged_scale(true, 0.0, false) - POP_PEAK).abs() < 1e-6);
         assert!(judged_scale(true, POP_SECS * 0.5, false) > 1.0);
         assert!((judged_scale(true, POP_SECS, false) - 1.0).abs() < 1e-6);
-        assert!(
-            (judged_scale(true, 10.0, false) - 1.0).abs() < 1e-6,
-            "and stays there"
-        );
+        assert!((judged_scale(true, 10.0, false) - 1.0).abs() < 1e-6, "and stays there");
     }
 
     #[test]

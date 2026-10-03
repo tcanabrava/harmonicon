@@ -39,15 +39,10 @@ impl RepoSpec {
         match self {
             RepoSpec::Local { .. } => Ok(()),
             RepoSpec::Remote { url, .. } => {
-                let ok = ["https://", "ssh://", "file://"]
-                    .iter()
-                    .any(|scheme| url.starts_with(scheme))
-                    || is_scp_like(url);
-                if ok {
-                    Ok(())
-                } else {
-                    Err(SpecError::UnsupportedUrl(url.clone()))
-                }
+                let ok =
+                    ["https://", "ssh://", "file://"].iter().any(|scheme| url.starts_with(scheme))
+                        || is_scp_like(url);
+                if ok { Ok(()) } else { Err(SpecError::UnsupportedUrl(url.clone())) }
             }
         }
     }
@@ -72,9 +67,7 @@ impl RepoSpec {
 /// `git@host:owner/repo.git`.
 fn is_scp_like(url: &str) -> bool {
     !url.contains("://")
-        && url
-            .split_once(':')
-            .is_some_and(|(host, path)| host.contains('@') && !path.is_empty())
+        && url.split_once(':').is_some_and(|(host, path)| host.contains('@') && !path.is_empty())
 }
 
 fn slug_of(text: &str) -> String {
@@ -85,13 +78,7 @@ fn slug_of(text: &str) -> String {
         .trim_end_matches(".git");
     let slug: String = text
         .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '.' || c == '_' {
-                c
-            } else {
-                '-'
-            }
-        })
+        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '_' { c } else { '-' })
         .collect();
     slug.trim_matches('-').trim_start_matches('.').to_string()
 }
@@ -140,10 +127,7 @@ mod tests {
     use super::*;
 
     fn remote(url: &str) -> RepoSpec {
-        RepoSpec::Remote {
-            url: url.into(),
-            git_ref: None,
-        }
+        RepoSpec::Remote { url: url.into(), git_ref: None }
     }
 
     #[test]
@@ -157,13 +141,7 @@ mod tests {
         ] {
             assert_eq!(remote(ok).validate(), Ok(()), "{ok}");
         }
-        for bad in [
-            "http://example.com/a",
-            "ext::sh -c evil",
-            "/just/a/path",
-            "ftp://x/y",
-            "",
-        ] {
+        for bad in ["http://example.com/a", "ext::sh -c evil", "/just/a/path", "ftp://x/y", ""] {
             assert!(remote(bad).validate().is_err(), "{bad}");
         }
     }
@@ -192,13 +170,8 @@ mod tests {
     fn specs_round_trip_through_json() {
         let specs = vec![
             remote("https://h/a/b"),
-            RepoSpec::Remote {
-                url: "https://h/a/c".into(),
-                git_ref: Some("v1".into()),
-            },
-            RepoSpec::Local {
-                path: "../harmonicon-lessons".into(),
-            },
+            RepoSpec::Remote { url: "https://h/a/c".into(), git_ref: Some("v1".into()) },
+            RepoSpec::Local { path: "../harmonicon-lessons".into() },
         ];
         let json = serde_json::to_string(&specs).unwrap();
         assert_eq!(serde_json::from_str::<Vec<RepoSpec>>(&json).unwrap(), specs);

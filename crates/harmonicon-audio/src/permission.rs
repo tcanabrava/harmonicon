@@ -118,9 +118,7 @@ fn with_activity<T>(
 ) -> jni::errors::Result<T> {
     let app = bevy::android::ANDROID_APP
         .get()
-        .ok_or(jni::errors::Error::NullPtr(
-            "ANDROID_APP is not initialized",
-        ))?;
+        .ok_or(jni::errors::Error::NullPtr("ANDROID_APP is not initialized"))?;
     // SAFETY: both pointers belong to the `AndroidApp` the platform handed to
     // `android_main`, and outlive the process's use of them.
     let vm = unsafe { jni::JavaVM::from_raw(app.vm_as_ptr().cast()) }?;

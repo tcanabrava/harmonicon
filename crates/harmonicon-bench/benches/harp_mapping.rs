@@ -15,9 +15,7 @@ use harmonicon_core::pitch_map::{HarpKind, map_pitch_playable, suggest_key};
 use harmonicon_score::convert::suggested_harp;
 
 fn pitches(count: usize) -> Vec<u8> {
-    const PHRASE: [u8; 16] = [
-        60, 62, 64, 65, 67, 68, 70, 72, 74, 76, 77, 79, 81, 83, 48, 88,
-    ];
+    const PHRASE: [u8; 16] = [60, 62, 64, 65, 67, 68, 70, 72, 74, 76, 77, 79, 81, 83, 48, 88];
     (0..count).map(|i| PHRASE[i % PHRASE.len()]).collect()
 }
 

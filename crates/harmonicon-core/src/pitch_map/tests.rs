@@ -9,11 +9,7 @@ fn midi(note: &str) -> u8 {
 }
 
 fn natural(hole: u8, action: Action) -> Option<HoleAssignment> {
-    Some(HoleAssignment {
-        hole,
-        action,
-        technique: Technique::Natural,
-    })
+    Some(HoleAssignment { hole, action, technique: Technique::Natural })
 }
 
 // ── Exact reeds ─────────────────────────────────────────────────────────────
@@ -22,20 +18,14 @@ fn natural(hole: u8, action: Action) -> Option<HoleAssignment> {
 fn a_directly_playable_blow_note_maps_to_its_own_reed() {
     // C4 is hole 1 blow on a C Richter harp.
     let harp = richter_harp("C");
-    assert_eq!(
-        map_pitch_playable(midi("C4"), &harp),
-        natural(1, Action::Blow)
-    );
+    assert_eq!(map_pitch_playable(midi("C4"), &harp), natural(1, Action::Blow));
 }
 
 #[test]
 fn every_playable_home_is_returned_easiest_first() {
     let harp = richter_harp("C");
     let assignments = playable_assignments(midi("G4"), &harp);
-    assert_eq!(
-        assignments.first(),
-        map_pitch_playable(midi("G4"), &harp).as_ref()
-    );
+    assert_eq!(assignments.first(), map_pitch_playable(midi("G4"), &harp).as_ref());
     assert!(assignments.contains(&HoleAssignment {
         hole: 2,
         action: Action::Draw,
@@ -56,11 +46,7 @@ fn a_semitone_under_a_draw_reed_is_reached_by_bending_it() {
     let harp = richter_harp("C");
     assert_eq!(
         map_pitch_playable(midi("D4") - 1, &harp),
-        Some(HoleAssignment {
-            hole: 1,
-            action: Action::Draw,
-            technique: Technique::Bend(1.0),
-        })
+        Some(HoleAssignment { hole: 1, action: Action::Draw, technique: Technique::Bend(1.0) })
     );
 }
 
@@ -161,23 +147,19 @@ fn a_resolved_assignment_sounds_the_pitch_it_was_asked_for() {
                 };
                 let sounded = match a.technique {
                     Technique::Natural => harp.wind_direction_midi(a.hole, &a.action),
-                    Technique::Bend(depth) => harp
-                        .wind_direction_midi(a.hole, &a.action)
-                        .map(|reed| reed - depth as u8),
-                    Technique::Slide => harp
-                        .wind_direction_midi(a.hole, &a.action)
-                        .map(|reed| reed + 1),
+                    Technique::Bend(depth) => {
+                        harp.wind_direction_midi(a.hole, &a.action).map(|reed| reed - depth as u8)
+                    }
+                    Technique::Slide => {
+                        harp.wind_direction_midi(a.hole, &a.action).map(|reed| reed + 1)
+                    }
                     Technique::Overblow | Technique::Overdraw => hole_notes(&harp, a.hole)
                         .over
                         .as_deref()
                         .and_then(note_to_midi)
                         .map(|m| m as u8),
                 };
-                assert_eq!(
-                    sounded,
-                    Some(target),
-                    "{key}: {a:?} does not sound MIDI {target}"
-                );
+                assert_eq!(sounded, Some(target), "{key}: {a:?} does not sound MIDI {target}");
             }
         }
     }
@@ -200,10 +182,7 @@ fn a_chromatic_harp_never_resolves_a_diatonic_over_technique() {
     let harp = chromatic_harp("C");
     for target in 0u8..=127 {
         if let Some(a) = map_pitch_playable(target, &harp) {
-            assert!(!matches!(
-                a.technique,
-                Technique::Overblow | Technique::Overdraw
-            ));
+            assert!(!matches!(a.technique, Technique::Overblow | Technique::Overdraw));
         }
     }
 }
@@ -285,11 +264,7 @@ fn richter_bend_depths_are_the_ones_every_harp_player_knows() {
     for key in HARP_KEYS {
         let harp = richter_harp(key);
         for hole in 1..=10u8 {
-            assert_eq!(
-                max_bend(&harp, hole),
-                expected(hole),
-                "hole {hole} on a {key} harp"
-            );
+            assert_eq!(max_bend(&harp, hole), expected(hole), "hole {hole} on a {key} harp");
         }
     }
 }
@@ -354,13 +329,9 @@ fn a_chromatic_reaches_every_semitone_across_its_three_octaves() {
     // to C7 were unreachable, and a chromatic scored worse than a diatonic
     // in `convert::suggested_harp`, which is backwards.
     let harp = chromatic_harp("C");
-    let unreachable: Vec<i32> = (60..=96)
-        .filter(|&p| map_pitch_playable(p as u8, &harp).is_none())
-        .collect();
-    assert!(
-        unreachable.is_empty(),
-        "a C chromatic cannot play MIDI {unreachable:?}"
-    );
+    let unreachable: Vec<i32> =
+        (60..=96).filter(|&p| map_pitch_playable(p as u8, &harp).is_none()).collect();
+    assert!(unreachable.is_empty(), "a C chromatic cannot play MIDI {unreachable:?}");
 }
 
 #[test]
@@ -368,15 +339,8 @@ fn a_chromatic_is_solo_tuned_with_its_repeating_four_hole_group() {
     // The property that makes one fingering work in every octave, and the
     // reason hole 4 blow and hole 5 blow are both C.
     let harp = chromatic_harp("C");
-    let blow: Vec<String> = (1..=12)
-        .map(|h| harp.wind_direction_label(h, &Action::Blow))
-        .collect();
-    assert_eq!(
-        blow,
-        [
-            "C4", "E4", "G4", "C5", "C5", "E5", "G5", "C6", "C6", "E6", "G6", "C7"
-        ]
-    );
+    let blow: Vec<String> = (1..=12).map(|h| harp.wind_direction_label(h, &Action::Blow)).collect();
+    assert_eq!(blow, ["C4", "E4", "G4", "C5", "C5", "E5", "G5", "C6", "C6", "E6", "G6", "C7"]);
 }
 
 #[test]
@@ -388,9 +352,7 @@ fn the_slide_raises_every_reed_by_exactly_one_semitone() {
     for key in HARP_KEYS {
         let harp = chromatic_harp(key);
         let (blow, draw, blow_slide, draw_slide) = match &harp {
-            Harmonica::Chromatic {
-                layout: Some(l), ..
-            } => (
+            Harmonica::Chromatic { layout: Some(l), .. } => (
                 l.blow.clone().unwrap(),
                 l.draw.clone().unwrap(),
                 l.blow_slide.clone().unwrap(),
@@ -398,11 +360,7 @@ fn the_slide_raises_every_reed_by_exactly_one_semitone() {
             ),
             _ => panic!("{key} chromatic has no layout"),
         };
-        for (plain, slid) in blow
-            .iter()
-            .zip(&blow_slide)
-            .chain(draw.iter().zip(&draw_slide))
-        {
+        for (plain, slid) in blow.iter().zip(&blow_slide).chain(draw.iter().zip(&draw_slide)) {
             assert_eq!(
                 note_to_midi(slid).unwrap(),
                 note_to_midi(plain).unwrap() + 1,

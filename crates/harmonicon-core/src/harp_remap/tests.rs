@@ -5,10 +5,7 @@ use crate::harmonica::{chromatic_harp, richter_harp};
 use crate::pitch_map::HARP_KEYS;
 
 fn bend(semitones: f32) -> Modifier {
-    Modifier::Bend {
-        semitones,
-        intensity: None,
-    }
+    Modifier::Bend { semitones, intensity: None }
 }
 
 /// Every (hole, action) a diatonic harp actually has a note for.
@@ -54,15 +51,7 @@ fn same_holes_keeps_the_tab_and_lets_the_pitch_follow_the_new_harp() {
     let c = richter_harp("C");
     let g = richter_harp("G");
     // Hole 4 blow: C5 on a C harp, G4 on a G harp.
-    let out = remap_event(
-        4,
-        Action::Blow,
-        Some("C5"),
-        &[],
-        &c,
-        &g,
-        HarpMapping::SameHoles,
-    );
+    let out = remap_event(4, Action::Blow, Some("C5"), &[], &c, &g, HarpMapping::SameHoles);
     assert_eq!((out.hole, out.action), (4, Action::Blow));
     assert_eq!(out.midi, g.wind_direction_midi(4, &Action::Blow));
     assert_ne!(out.midi, c.wind_direction_midi(4, &Action::Blow));
@@ -76,15 +65,7 @@ fn same_holes_ignores_the_charts_own_note_name() {
     // original harp while the player blows a different one.
     let c = richter_harp("C");
     let a = richter_harp("A");
-    let out = remap_event(
-        1,
-        Action::Blow,
-        Some("C4"),
-        &[],
-        &c,
-        &a,
-        HarpMapping::SameHoles,
-    );
+    let out = remap_event(1, Action::Blow, Some("C4"), &[], &c, &a, HarpMapping::SameHoles);
     assert_eq!(
         out.midi,
         a.wind_direction_midi(1, &Action::Blow),
@@ -113,15 +94,7 @@ fn same_holes_keeps_a_bend_as_a_bend() {
     let c = richter_harp("C");
     let g = richter_harp("G");
     let mods = [bend(-1.0)];
-    let out = remap_event(
-        3,
-        Action::Draw,
-        Some("B4"),
-        &mods,
-        &c,
-        &g,
-        HarpMapping::SameHoles,
-    );
+    let out = remap_event(3, Action::Draw, Some("B4"), &mods, &c, &g, HarpMapping::SameHoles);
     assert_eq!(out.modifiers, mods.to_vec());
     // A semitone below hole 3 draw on the *G* harp, not the C one.
     let reed = g.wind_direction_midi(3, &Action::Draw).unwrap();
@@ -136,15 +109,7 @@ fn transpose_keeps_the_sounding_pitch_and_moves_the_hole() {
     let g = richter_harp("G");
     // G4 is hole 3 blow on a C harp. A G harp is pitched *below* C — its
     // hole 1 blow is G3 — so the same pitch lands on hole 4 blow, not hole 1.
-    let out = remap_event(
-        3,
-        Action::Blow,
-        Some("G4"),
-        &[],
-        &c,
-        &g,
-        HarpMapping::Transpose,
-    );
+    let out = remap_event(3, Action::Blow, Some("G4"), &[], &c, &g, HarpMapping::Transpose);
     assert!(out.playable);
     assert_eq!(out.midi, note_to_midi("G4").map(|m| m as u8));
     assert_eq!(out.hole, 4);
@@ -156,15 +121,7 @@ fn transpose_reports_a_note_the_target_harp_cannot_reach_as_unplayable() {
     let c = richter_harp("C");
     let g = richter_harp("G");
     // Far below any G harp reed, and not bendable or overblowable into range.
-    let out = remap_event(
-        1,
-        Action::Blow,
-        Some("C2"),
-        &[],
-        &c,
-        &g,
-        HarpMapping::Transpose,
-    );
+    let out = remap_event(1, Action::Blow, Some("C2"), &[], &c, &g, HarpMapping::Transpose);
     assert!(!out.playable);
     assert_eq!(
         out.midi,
@@ -179,20 +136,11 @@ fn transpose_drops_a_bend_when_the_new_harp_has_the_note_outright() {
     // A#4 is a bend on a C harp (hole 3 draw, down one) and a plain blow
     // reed on a Bb harp — hole 4 blow, since a Bb harp's hole 1 blow is Bb3.
     let bb = richter_harp("Bb");
-    let out = remap_event(
-        3,
-        Action::Draw,
-        Some("B4"),
-        &[bend(-1.0)],
-        &c,
-        &bb,
-        HarpMapping::Transpose,
-    );
+    let out =
+        remap_event(3, Action::Draw, Some("B4"), &[bend(-1.0)], &c, &bb, HarpMapping::Transpose);
     assert!(out.playable);
     assert!(
-        !out.modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::Bend { .. })),
+        !out.modifiers.iter().any(|m| matches!(m, Modifier::Bend { .. })),
         "a note the new harp plays naturally should not still be bent: {:?}",
         out.modifiers
     );
@@ -202,26 +150,10 @@ fn transpose_drops_a_bend_when_the_new_harp_has_the_note_outright() {
 fn transpose_preserves_expression_but_recomputes_pitch_techniques() {
     let c = richter_harp("C");
     let g = richter_harp("G");
-    let mods = [
-        bend(-1.0),
-        Modifier::Vibrato {
-            oscillation_hz: 5.0,
-            intensity: None,
-        },
-    ];
-    let out = remap_event(
-        3,
-        Action::Draw,
-        Some("B4"),
-        &mods,
-        &c,
-        &g,
-        HarpMapping::Transpose,
-    );
+    let mods = [bend(-1.0), Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }];
+    let out = remap_event(3, Action::Draw, Some("B4"), &mods, &c, &g, HarpMapping::Transpose);
     assert!(
-        out.modifiers
-            .iter()
-            .any(|m| matches!(m, Modifier::Vibrato { .. })),
+        out.modifiers.iter().any(|m| matches!(m, Modifier::Vibrato { .. })),
         "vibrato is expression and must survive the swap"
     );
 }
@@ -375,15 +307,8 @@ fn same_holes_refuses_an_overblow_on_a_hole_that_cannot_overblow() {
     // Holes 2/3 have no overblow. Keeping the tab onto such a hole has to
     // report unplayable rather than inventing a pitch.
     let c = richter_harp("C");
-    let out = remap_event(
-        2,
-        Action::Blow,
-        None,
-        &[Modifier::Overblow],
-        &c,
-        &c,
-        HarpMapping::SameHoles,
-    );
+    let out =
+        remap_event(2, Action::Blow, None, &[Modifier::Overblow], &c, &c, HarpMapping::SameHoles);
     assert!(!out.playable);
 }
 
@@ -427,11 +352,7 @@ fn the_same_harp_is_the_identity_for_bent_notes_too() {
     for (hole, action) in playable_positions(&c) {
         let natural = c.wind_direction_label(hole, &action);
         for depth in [0.0f32, -0.5, -1.0] {
-            let mods: Vec<Modifier> = if depth == 0.0 {
-                vec![]
-            } else {
-                vec![bend(depth)]
-            };
+            let mods: Vec<Modifier> = if depth == 0.0 { vec![] } else { vec![bend(depth)] };
             for mapping in HarpMapping::all() {
                 let out = remap_event(hole, action, Some(&natural), &mods, &c, &c, *mapping);
                 if !out.playable {

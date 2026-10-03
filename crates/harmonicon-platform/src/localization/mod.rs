@@ -126,10 +126,7 @@ impl Plugin for LocalizationPlugin {
             // Read by `packs::reload_on_packs_changed`; registered here too
             // so an app without `ContentPacksPlugin` (tests, tools) runs.
             .add_message::<ContentPacksChanged>()
-            .add_systems(
-                Startup,
-                (load_locales, packs::load_at_startup.after(ContentPacksSet)),
-            )
+            .add_systems(Startup, (load_locales, packs::load_at_startup.after(ContentPacksSet)))
             .add_systems(
                 Update,
                 (
@@ -146,9 +143,7 @@ impl Plugin for LocalizationPlugin {
 fn parse_lang(tag: &str) -> LanguageIdentifier {
     tag.parse().unwrap_or_else(|err| {
         warn!("Invalid language tag {tag:?} ({err}); using {DEFAULT_LANGUAGE}");
-        DEFAULT_LANGUAGE
-            .parse()
-            .expect("DEFAULT_LANGUAGE must be a valid language tag")
+        DEFAULT_LANGUAGE.parse().expect("DEFAULT_LANGUAGE must be a valid language tag")
     })
 }
 
@@ -202,11 +197,7 @@ fn build_localization(
     }
     let Some(handles) = handles else { return };
     // Wait for every bundle *and* the `.ftl` resource each references.
-    if !handles
-        .0
-        .iter()
-        .all(|handle| asset_server.is_loaded_with_dependencies(handle))
-    {
+    if !handles.0.iter().all(|handle| asset_server.is_loaded_with_dependencies(handle)) {
         return;
     }
     ready.0 = true;
@@ -283,10 +274,7 @@ pub struct Locale {
 
 impl Locale {
     pub fn new(requested: LanguageIdentifier) -> Self {
-        Self {
-            requested,
-            default: None,
-        }
+        Self { requested, default: None }
     }
 
     pub fn with_default(mut self, default: LanguageIdentifier) -> Self {
@@ -363,17 +351,13 @@ where
 {
     /// The first bundle in fallback order that defines `request`'s key.
     fn content(&self, request: T) -> Option<String> {
-        self.0
-            .iter()
-            .find_map(|(_, bundle)| (**bundle).content(request))
+        self.0.iter().find_map(|(_, bundle)| (**bundle).content(request))
     }
 }
 
 impl fmt::Debug for Localization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Localization")
-            .field(&self.locales().collect::<Vec<_>>())
-            .finish()
+        f.debug_tuple("Localization").field(&self.locales().collect::<Vec<_>>()).finish()
     }
 }
 
@@ -504,11 +488,7 @@ impl LocalizationExt for Localization {
 /// rendered label loses the invisible marks.
 fn strip_bidi_isolates(s: String) -> String {
     const MARKS: [char; 2] = ['\u{2068}', '\u{2069}'];
-    if s.contains(MARKS) {
-        s.replace(MARKS, "")
-    } else {
-        s
-    }
+    if s.contains(MARKS) { s.replace(MARKS, "") } else { s }
 }
 
 #[cfg(test)]
@@ -516,14 +496,8 @@ mod tests {
     #[test]
     fn enum_label_keys_are_kebab_case() {
         use super::enum_label_key;
-        assert_eq!(
-            enum_label_key("progression", "Quick Change"),
-            "progression-quick-change"
-        );
-        assert_eq!(
-            enum_label_key("scale", "1st Position"),
-            "scale-1st-position"
-        );
+        assert_eq!(enum_label_key("progression", "Quick Change"), "progression-quick-change");
+        assert_eq!(enum_label_key("scale", "1st Position"), "scale-1st-position");
         assert_eq!(enum_label_key("position", "12th"), "position-12th");
         assert_eq!(enum_label_key("genre", "Blues"), "genre-blues");
     }
@@ -597,14 +571,9 @@ mod tests {
     #[test]
     fn fallback_chain_prefers_requested_then_default() {
         let locale = super::default_locale();
-        let locale = super::Locale {
-            requested: super::parse_lang("pt-BR"),
-            ..locale
-        };
-        let available: Vec<_> = ["en-US", "pt-BR", "es-ES"]
-            .iter()
-            .map(|tag| super::parse_lang(tag))
-            .collect();
+        let locale = super::Locale { requested: super::parse_lang("pt-BR"), ..locale };
+        let available: Vec<_> =
+            ["en-US", "pt-BR", "es-ES"].iter().map(|tag| super::parse_lang(tag)).collect();
 
         let chain: Vec<String> = locale
             .fallback_chain(available.iter())
@@ -623,10 +592,7 @@ mod tests {
         let reference = std::fs::read_to_string(locales.join("en-US/main/ui.ftl"))
             .expect("en-US ui.ftl must exist");
         let reference_keys = message_keys(&reference);
-        assert!(
-            !reference_keys.is_empty(),
-            "en-US ui.ftl defined no message keys"
-        );
+        assert!(!reference_keys.is_empty(), "en-US ui.ftl defined no message keys");
 
         for entry in std::fs::read_dir(&locales).expect("locales dir must exist") {
             let dir = entry.unwrap().path();
@@ -664,10 +630,7 @@ mod tests {
             .filter(|line| line.contains("{$"))
             .filter_map(|line| line.split_once(" = ").map(|(key, _)| key.trim()))
             .collect();
-        assert!(
-            !takes_args.is_empty(),
-            "expected some keys to use variables"
-        );
+        assert!(!takes_args.is_empty(), "expected some keys to use variables");
 
         let mut dirs = vec![root.join("src")];
         for entry in std::fs::read_dir(root.join("crates")).expect("crates dir") {
@@ -729,9 +692,6 @@ mod tests {
         let mut expected: Vec<String> = super::LOCALES.iter().map(|s| s.to_string()).collect();
         expected.sort();
 
-        assert_eq!(
-            on_disk, expected,
-            "localization::LOCALES is out of sync with assets/locales/"
-        );
+        assert_eq!(on_disk, expected, "localization::LOCALES is out of sync with assets/locales/");
     }
 }

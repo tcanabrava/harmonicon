@@ -236,11 +236,7 @@ pub(super) fn tick_count_in(
     if !count_in.active() {
         return;
     }
-    let count_in_tempo = MetronomeTempo {
-        bpm: tempo.bpm,
-        meter: count_in.meter,
-        lead_beats: 0.0,
-    };
+    let count_in_tempo = MetronomeTempo { bpm: tempo.bpm, meter: count_in.meter, lead_beats: 0.0 };
     play_click_if_due(
         count_in.elapsed_secs() as f64,
         &count_in_tempo,
@@ -370,19 +366,13 @@ mod tests {
 
     #[test]
     fn tempo_bpm_reads_the_editors_own_tempo_field() {
-        let state = EditorState {
-            tempo: "90".into(),
-            ..Default::default()
-        };
+        let state = EditorState { tempo: "90".into(), ..Default::default() };
         assert!((tempo_bpm(&state) - 90.0).abs() < 1e-3);
     }
 
     #[test]
     fn tempo_bpm_falls_back_to_120_for_an_unparseable_tempo() {
-        let state = EditorState {
-            tempo: "not a number".into(),
-            ..Default::default()
-        };
+        let state = EditorState { tempo: "not a number".into(), ..Default::default() };
         assert!((tempo_bpm(&state) - 120.0).abs() < 1e-3);
     }
 
@@ -406,11 +396,8 @@ mod tests {
     fn a_pickup_clicks_the_last_beat_and_accents_bar_one() {
         use harmonicon_ui::dialogs::metronome::{MetronomeFeel, is_downbeat, tick_index};
         // One-beat pickup in 4/4 at 120: bar 1 starts half a second in.
-        let state = EditorState {
-            tempo: "120".into(),
-            pickup_beats: "1".into(),
-            ..Default::default()
-        };
+        let state =
+            EditorState { tempo: "120".into(), pickup_beats: "1".into(), ..Default::default() };
         let map = state.meter_map();
         let spt = secs_per_tick(&state);
         let beat = |elapsed: f32| {
@@ -418,10 +405,7 @@ mod tests {
             tick_index(clock, 0.5, MetronomeFeel::Straight).unwrap()
         };
         assert!(!is_downbeat(beat(0.0), 4.0), "the pickup is beat 4");
-        assert!(
-            is_downbeat(beat(0.5), 4.0),
-            "bar 1's first beat is accented"
-        );
+        assert!(is_downbeat(beat(0.5), 4.0), "bar 1's first beat is accented");
     }
 
     #[test]

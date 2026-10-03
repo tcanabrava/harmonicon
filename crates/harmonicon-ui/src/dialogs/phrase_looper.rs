@@ -117,10 +117,7 @@ mod tests {
 
     #[test]
     fn clock_wraps_from_b_to_a() {
-        let mut clock = PhraseLoopClock {
-            running: true,
-            ..default()
-        };
+        let mut clock = PhraseLoopClock { running: true, ..default() };
         assert_eq!(clock.advance(0.5, 120.0, 1.0, 3), Some(1));
         assert_eq!(clock.advance(0.5, 120.0, 1.0, 3), Some(2));
         assert_eq!(clock.advance(0.5, 120.0, 1.0, 3), Some(0));
@@ -135,10 +132,7 @@ mod tests {
 
     #[test]
     fn manual_step_wraps_and_resets_fractional_time() {
-        let mut clock = PhraseLoopClock {
-            running: true,
-            ..default()
-        };
+        let mut clock = PhraseLoopClock { running: true, ..default() };
         assert_eq!(clock.advance(0.25, 60.0, 1.0, 4), None);
         assert_eq!(clock.step(-1, 4), 3);
         assert_eq!(clock.advance(0.75, 60.0, 1.0, 4), None);

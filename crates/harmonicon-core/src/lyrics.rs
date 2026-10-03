@@ -59,11 +59,7 @@ impl LyricLine {
     /// space after a finished word stays with the sung half.
     pub fn split_at(&self, sung: usize) -> (String, String) {
         let spaced = |s: &Syllable| {
-            if s.joins_next {
-                s.text.clone()
-            } else {
-                format!("{} ", s.text)
-            }
+            if s.joins_next { s.text.clone() } else { format!("{} ", s.text) }
         };
         let sung = sung.min(self.syllables.len());
         let mut first: String = self.syllables[..sung].iter().map(spaced).collect();
@@ -79,22 +75,15 @@ impl LyricLine {
 
 fn item_seconds(item: &TrackItem, chart: &HarpChart) -> f64 {
     item.time.unwrap_or_else(|| {
-        tick_to_seconds(
-            item.tick.unwrap_or(0),
-            chart.timing.resolution,
-            &chart.timing.tempo_map,
-        )
+        tick_to_seconds(item.tick.unwrap_or(0), chart.timing.resolution, &chart.timing.tempo_map)
     })
 }
 
 /// Every line of `chart`'s lyrics, in time order. Empty when nothing has a
 /// lyric, which is most charts.
 pub fn lyric_lines(chart: &HarpChart) -> Vec<LyricLine> {
-    let mut items: Vec<(f64, &TrackItem)> = chart
-        .track
-        .iter()
-        .map(|item| (item_seconds(item, chart), item))
-        .collect();
+    let mut items: Vec<(f64, &TrackItem)> =
+        chart.track.iter().map(|item| (item_seconds(item, chart), item)).collect();
     items.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     let mut lines: Vec<LyricLine> = Vec::new();
@@ -110,9 +99,7 @@ pub fn lyric_lines(chart: &HarpChart) -> Vec<LyricLine> {
         };
         let word_ended = current.last().is_some_and(|s: &Syllable| !s.joins_next);
         if (breaks || (word_ended && chars > WRAP_CHARS)) && !current.is_empty() {
-            lines.push(LyricLine {
-                syllables: std::mem::take(&mut current),
-            });
+            lines.push(LyricLine { syllables: std::mem::take(&mut current) });
             chars = 0;
         }
         let (joins_next, text) = match raw.strip_suffix('-') {
@@ -125,11 +112,7 @@ pub fn lyric_lines(chart: &HarpChart) -> Vec<LyricLine> {
             continue;
         }
         chars += text.chars().count() + 1;
-        current.push(Syllable {
-            text: text.to_string(),
-            start,
-            joins_next,
-        });
+        current.push(Syllable { text: text.to_string(), start, joins_next });
     }
     if !current.is_empty() {
         lines.push(LyricLine { syllables: current });
@@ -159,9 +142,7 @@ pub fn karaoke_at(lines: &[LyricLine], clock: f64) -> Option<KaraokePosition> {
     if lines.is_empty() {
         return None;
     }
-    let line = lines
-        .partition_point(|l| l.start() <= clock)
-        .saturating_sub(1);
+    let line = lines.partition_point(|l| l.start() <= clock).saturating_sub(1);
     let sung = lines[line].syllables.partition_point(|s| s.start <= clock);
     Some(KaraokePosition { line, sung })
 }
@@ -248,23 +229,13 @@ mod tests {
     #[test]
     fn a_long_line_wraps_between_words_not_inside_one() {
         let words: Vec<(f64, Option<&str>, Option<&str>)> = (0..30)
-            .map(|i| {
-                (
-                    i as f64,
-                    Some(if i % 3 == 2 { "ing" } else { "sing-" }),
-                    None,
-                )
-            })
+            .map(|i| (i as f64, Some(if i % 3 == 2 { "ing" } else { "sing-" }), None))
             .collect();
         let lines = lyric_lines(&chart(&words));
         assert!(lines.len() > 1);
         for line in &lines {
             assert!(!line.syllables.last().unwrap().joins_next);
-            assert!(
-                line.text().chars().count() <= WRAP_CHARS + 20,
-                "{}",
-                line.text()
-            );
+            assert!(line.text().chars().count() <= WRAP_CHARS + 20, "{}", line.text());
         }
     }
 

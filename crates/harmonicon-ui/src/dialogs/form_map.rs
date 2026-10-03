@@ -5,9 +5,8 @@
 use bevy::prelude::*;
 
 pub fn section_bg(label: &str) -> Color {
-    let hash = label.bytes().fold(0_u32, |acc, byte| {
-        acc.wrapping_mul(31).wrapping_add(u32::from(byte))
-    });
+    let hash =
+        label.bytes().fold(0_u32, |acc, byte| acc.wrapping_mul(31).wrapping_add(u32::from(byte)));
     let hue = (hash % 360) as f32;
     Color::hsl(hue, 0.42, 0.30)
 }

@@ -66,19 +66,11 @@ pub(super) fn update_mod_panel(
             ModButton::Split => split,
             _ => mod_button_active(*kind, dir, pitch, expr),
         };
-        bg.0 = if active {
-            colors.btn_active
-        } else {
-            colors.btn_bg
-        };
+        bg.0 = if active { colors.btn_active } else { colors.btn_bg };
     }
     let bent = matches!(pitch, Pitch::Bend(_));
     for mut vis in &mut dot {
-        *vis = if bent {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+        *vis = if bent { Visibility::Inherited } else { Visibility::Hidden };
     }
     // Show the selected (or, with nothing selected, sticky-armed) rate next
     // to Wah/Vibrato (e.g. "Vibrato 5Hz") so cycling the rate with repeated
@@ -166,11 +158,7 @@ pub(super) fn update_mode_buttons(
             ModeButton::Lock => state.locked(),
             ModeButton::ExpectedNotes => state.mode == Mode::ExpectedNotes,
         };
-        bg.0 = if active {
-            colors.btn_active
-        } else {
-            colors.btn_bg
-        };
+        bg.0 = if active { colors.btn_active } else { colors.btn_bg };
     }
 }
 
@@ -181,11 +169,7 @@ pub(super) fn update_timeline_tool_buttons(
 ) {
     let colors = theme.song_editor_colors();
     for (kind, mut bg) in &mut buttons {
-        bg.0 = if kind.0 == state.timeline_tool {
-            colors.btn_active
-        } else {
-            colors.btn_bg
-        };
+        bg.0 = if kind.0 == state.timeline_tool { colors.btn_active } else { colors.btn_bg };
     }
 }
 
@@ -204,11 +188,7 @@ pub(super) fn update_undo_redo_buttons(
             UndoRedoButton::Undo => history.can_undo(),
             UndoRedoButton::Redo => history.can_redo(),
         };
-        bg.0 = if available {
-            colors.btn_bg
-        } else {
-            colors.btn_bg.with_alpha(0.35)
-        };
+        bg.0 = if available { colors.btn_bg } else { colors.btn_bg.with_alpha(0.35) };
     }
 }
 
@@ -222,11 +202,7 @@ pub(super) fn update_metronome_toggle_button(
     mut buttons: Query<&mut BaseButtonColor, With<super::ui::MetronomeToggleButton>>,
 ) {
     let colors = theme.song_editor_colors();
-    let bg = if muted.0 {
-        colors.btn_bg.with_alpha(0.35)
-    } else {
-        colors.btn_bg
-    };
+    let bg = if muted.0 { colors.btn_bg.with_alpha(0.35) } else { colors.btn_bg };
     for mut button_bg in &mut buttons {
         button_bg.0 = bg;
     }
@@ -315,21 +291,14 @@ pub(super) fn update_note_column(
 ) {
     let editing = state.mode == Mode::Edit;
     for mut node in &mut column {
-        let want = if editing {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        let want = if editing { Display::Flex } else { Display::None };
         if node.display != want {
             node.display = want;
         }
     }
     for (widths, mut node) in &mut toolbar {
-        let want = Val::Px(if editing {
-            widths.width_with_note_column
-        } else {
-            widths.width_without
-        });
+        let want =
+            Val::Px(if editing { widths.width_with_note_column } else { widths.width_without });
         if node.width != want {
             node.width = want;
         }
@@ -350,11 +319,7 @@ pub(super) fn update_technique_button_visibility(
             ModButton::Slide => !diatonic_only,
             _ => continue,
         };
-        let want = if visible {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        let want = if visible { Display::Flex } else { Display::None };
         if node.display != want {
             node.display = want;
         }
@@ -436,19 +401,12 @@ pub(super) fn update_status_bar(
     **text = if let Some(msg) = feedback.current() {
         msg.to_string()
     } else if let Some(secs) = count_in.remaining_secs_display() {
-        loc.msg_args(
-            "editor-count-in-status",
-            &[("seconds", format!("{secs:.1}"))],
-        )
-        .to_string()
+        loc.msg_args("editor-count-in-status", &[("seconds", format!("{secs:.1}"))]).to_string()
     } else if !state.drag_msg.is_empty() {
         state.drag_msg.to_string()
     } else if record.active {
-        loc.msg_args(
-            "editor-record-status",
-            &[("count", record.note_count.to_string())],
-        )
-        .to_string()
+        loc.msg_args("editor-record-status", &[("count", record.note_count.to_string())])
+            .to_string()
     } else if editor_chords_unhearable(&state, &audio) {
         loc.msg("chord-warning-monophonic").to_string()
     } else {
@@ -464,10 +422,7 @@ fn editor_chords_unhearable(state: &EditorState, audio: &AudioSettings) -> bool 
         return false;
     }
     let mut spans = std::collections::HashSet::new();
-    state
-        .notes
-        .iter()
-        .any(|note| !spans.insert((note.tick, note.len)))
+    state.notes.iter().any(|note| !spans.insert((note.tick, note.len)))
 }
 
 #[cfg(test)]
@@ -477,15 +432,7 @@ mod tests {
     use harmonicon_audio::pitch_detect::PitchAlgorithm;
 
     fn note(dir: Dir, pitch: Pitch, expr: Expr) -> GridNote {
-        GridNote {
-            id: 1,
-            hole: 4,
-            tick: 0,
-            len: 1,
-            dir,
-            pitch,
-            expr,
-        }
+        GridNote { id: 1, hole: 4, tick: 0, len: 1, dir, pitch, expr }
     }
 
     #[test]
@@ -513,10 +460,8 @@ mod tests {
             ],
             ..Default::default()
         };
-        let mut audio = AudioSettings {
-            pitch_algorithm: PitchAlgorithm::Yin,
-            ..Default::default()
-        };
+        let mut audio =
+            AudioSettings { pitch_algorithm: PitchAlgorithm::Yin, ..Default::default() };
 
         assert!(!editor_chords_unhearable(&state, &audio));
         state.notes[1].len = 4;
@@ -539,30 +484,17 @@ mod tests {
         world.insert_resource(LoadedTheme::default());
         let colors = LoadedTheme::default().song_editor_colors();
 
-        let blow = world
-            .spawn((ModButton::Blow, BaseButtonColor(colors.btn_bg)))
-            .id();
-        let draw = world
-            .spawn((ModButton::Draw, BaseButtonColor(colors.btn_bg)))
-            .id();
+        let blow = world.spawn((ModButton::Blow, BaseButtonColor(colors.btn_bg))).id();
+        let draw = world.spawn((ModButton::Draw, BaseButtonColor(colors.btn_bg))).id();
         let bend_dot = world.spawn((BendDot, Visibility::Hidden)).id();
         let vibrato_label = world
             .spawn((
-                ModButtonLabel {
-                    kind: ModButton::Vibrato,
-                    base: "Vibrato".into(),
-                },
+                ModButtonLabel { kind: ModButton::Vibrato, base: "Vibrato".into() },
                 Text::new("Vibrato"),
             ))
             .id();
         let wah_label = world
-            .spawn((
-                ModButtonLabel {
-                    kind: ModButton::Wah,
-                    base: "Wah".into(),
-                },
-                Text::new("Wah"),
-            ))
+            .spawn((ModButtonLabel { kind: ModButton::Wah, base: "Wah".into() }, Text::new("Wah")))
             .id();
 
         let mut schedule = Schedule::default();
@@ -604,31 +536,19 @@ mod tests {
         // read "on" even though nothing is selected. Every pitch/expr
         // button stays off, since `sticky_pitch`/`sticky_expr` default to
         // their own "off" variants.
-        let blow = world
-            .spawn((ModButton::Blow, BaseButtonColor(colors.btn_bg)))
-            .id();
-        let draw = world
-            .spawn((ModButton::Draw, BaseButtonColor(colors.btn_active)))
-            .id();
-        let bend = world
-            .spawn((ModButton::Bend, BaseButtonColor(colors.btn_active)))
-            .id();
+        let blow = world.spawn((ModButton::Blow, BaseButtonColor(colors.btn_bg))).id();
+        let draw = world.spawn((ModButton::Draw, BaseButtonColor(colors.btn_active))).id();
+        let bend = world.spawn((ModButton::Bend, BaseButtonColor(colors.btn_active))).id();
         let bend_dot = world.spawn((BendDot, Visibility::Inherited)).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_mod_panel);
         schedule.run(&mut world);
 
-        assert_eq!(
-            world.get::<BaseButtonColor>(blow).unwrap().0,
-            colors.btn_active
-        );
+        assert_eq!(world.get::<BaseButtonColor>(blow).unwrap().0, colors.btn_active);
         assert_eq!(world.get::<BaseButtonColor>(draw).unwrap().0, colors.btn_bg);
         assert_eq!(world.get::<BaseButtonColor>(bend).unwrap().0, colors.btn_bg);
-        assert_eq!(
-            *world.get::<Visibility>(bend_dot).unwrap(),
-            Visibility::Hidden
-        );
+        assert_eq!(*world.get::<Visibility>(bend_dot).unwrap(), Visibility::Hidden);
     }
 
     #[test]
@@ -640,30 +560,17 @@ mod tests {
             selected: vec![1],
             ..Default::default()
         };
-        state.phrase_annotations.insert(
-            0,
-            PhraseAnnotation {
-                call: true,
-                ..Default::default()
-            },
-        );
+        state.phrase_annotations.insert(0, PhraseAnnotation { call: true, ..Default::default() });
         state.expression_intensities.insert(1, "0.75".into());
         world.insert_resource(state);
         world.insert_resource(LoadedTheme::default());
         let colors = LoadedTheme::default().song_editor_colors();
 
-        let call = world
-            .spawn((ModButton::Call, BaseButtonColor(colors.btn_bg)))
-            .id();
-        let split = world
-            .spawn((ModButton::Split, BaseButtonColor(colors.btn_bg)))
-            .id();
+        let call = world.spawn((ModButton::Call, BaseButtonColor(colors.btn_bg))).id();
+        let split = world.spawn((ModButton::Split, BaseButtonColor(colors.btn_bg))).id();
         let depth_label = world
             .spawn((
-                ModButtonLabel {
-                    kind: ModButton::Depth,
-                    base: "Depth".into(),
-                },
+                ModButtonLabel { kind: ModButton::Depth, base: "Depth".into() },
                 Text::new("Depth"),
             ))
             .id();
@@ -696,10 +603,7 @@ mod tests {
         world.insert_resource(LoadedTheme::default());
         let depth_label = world
             .spawn((
-                ModButtonLabel {
-                    kind: ModButton::Depth,
-                    base: "Depth".into(),
-                },
+                ModButtonLabel { kind: ModButton::Depth, base: "Depth".into() },
                 Text::new("Depth 50%"),
             ))
             .id();
@@ -721,46 +625,22 @@ mod tests {
         world.insert_resource(LoadedTheme::default());
         let colors = LoadedTheme::default().song_editor_colors();
 
-        let draw = world
-            .spawn((ModButton::Draw, BaseButtonColor(colors.btn_bg)))
-            .id();
-        let bend = world
-            .spawn((ModButton::Bend, BaseButtonColor(colors.btn_bg)))
-            .id();
-        let wah = world
-            .spawn((ModButton::Wah, BaseButtonColor(colors.btn_bg)))
-            .id();
+        let draw = world.spawn((ModButton::Draw, BaseButtonColor(colors.btn_bg))).id();
+        let bend = world.spawn((ModButton::Bend, BaseButtonColor(colors.btn_bg))).id();
+        let wah = world.spawn((ModButton::Wah, BaseButtonColor(colors.btn_bg))).id();
         let bend_dot = world.spawn((BendDot, Visibility::Hidden)).id();
         let wah_label = world
-            .spawn((
-                ModButtonLabel {
-                    kind: ModButton::Wah,
-                    base: "Wah".into(),
-                },
-                Text::new("Wah"),
-            ))
+            .spawn((ModButtonLabel { kind: ModButton::Wah, base: "Wah".into() }, Text::new("Wah")))
             .id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_mod_panel);
         schedule.run(&mut world);
 
-        assert_eq!(
-            world.get::<BaseButtonColor>(draw).unwrap().0,
-            colors.btn_active
-        );
-        assert_eq!(
-            world.get::<BaseButtonColor>(bend).unwrap().0,
-            colors.btn_active
-        );
-        assert_eq!(
-            world.get::<BaseButtonColor>(wah).unwrap().0,
-            colors.btn_active
-        );
-        assert_eq!(
-            *world.get::<Visibility>(bend_dot).unwrap(),
-            Visibility::Inherited
-        );
+        assert_eq!(world.get::<BaseButtonColor>(draw).unwrap().0, colors.btn_active);
+        assert_eq!(world.get::<BaseButtonColor>(bend).unwrap().0, colors.btn_active);
+        assert_eq!(world.get::<BaseButtonColor>(wah).unwrap().0, colors.btn_active);
+        assert_eq!(*world.get::<Visibility>(bend_dot).unwrap(), Visibility::Inherited);
         assert_eq!(world.get::<Text>(wah_label).unwrap().0, "Wah 3Hz");
     }
 
@@ -769,26 +649,17 @@ mod tests {
     #[test]
     fn update_meta_fields_formats_the_key_field_specially() {
         let mut world = World::new();
-        let state = EditorState {
-            key: "G".into(),
-            position: "3rd".into(),
-            ..Default::default()
-        };
+        let state = EditorState { key: "G".into(), position: "3rd".into(), ..Default::default() };
         world.insert_resource(state);
 
         let key_text = world.spawn((MetaFieldText(Field::Key), Text::new(""))).id();
-        let position_text = world
-            .spawn((MetaFieldText(Field::Position), Text::new("")))
-            .id();
+        let position_text = world.spawn((MetaFieldText(Field::Position), Text::new(""))).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_meta_fields);
         schedule.run(&mut world);
 
-        assert_eq!(
-            world.get::<Text>(key_text).unwrap().0,
-            "\u{2039}  G  \u{203A}"
-        );
+        assert_eq!(world.get::<Text>(key_text).unwrap().0, "\u{2039}  G  \u{203A}");
         assert_eq!(world.get::<Text>(position_text).unwrap().0, "3rd");
     }
 
@@ -797,41 +668,26 @@ mod tests {
     #[test]
     fn sync_meta_field_text_pushes_an_external_change_into_the_unfocused_box() {
         let mut world = World::new();
-        world.insert_resource(EditorState {
-            name: "New Title".into(),
-            ..Default::default()
-        });
+        world.insert_resource(EditorState { name: "New Title".into(), ..Default::default() });
         world.insert_resource(InputFocus::default());
 
-        let name_input = world
-            .spawn((MetaFieldBox(Field::Name), EditableText::new("Old Title")))
-            .id();
+        let name_input =
+            world.spawn((MetaFieldBox(Field::Name), EditableText::new("Old Title"))).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(sync_meta_field_text);
         schedule.run(&mut world);
 
-        assert_eq!(
-            world
-                .get::<EditableText>(name_input)
-                .unwrap()
-                .value()
-                .to_string(),
-            "New Title"
-        );
+        assert_eq!(world.get::<EditableText>(name_input).unwrap().value().to_string(), "New Title");
     }
 
     #[test]
     fn sync_meta_field_text_never_touches_the_focused_box() {
         let mut world = World::new();
-        world.insert_resource(EditorState {
-            name: "New Title".into(),
-            ..Default::default()
-        });
+        world.insert_resource(EditorState { name: "New Title".into(), ..Default::default() });
 
-        let name_input = world
-            .spawn((MetaFieldBox(Field::Name), EditableText::new("still typing")))
-            .id();
+        let name_input =
+            world.spawn((MetaFieldBox(Field::Name), EditableText::new("still typing"))).id();
         let mut focus = InputFocus::default();
         focus.set(name_input, bevy::input_focus::FocusCause::Pressed);
         world.insert_resource(focus);
@@ -841,11 +697,7 @@ mod tests {
         schedule.run(&mut world);
 
         assert_eq!(
-            world
-                .get::<EditableText>(name_input)
-                .unwrap()
-                .value()
-                .to_string(),
+            world.get::<EditableText>(name_input).unwrap().value().to_string(),
             "still typing",
             "the box the player is actively typing into must never be overwritten"
         );
@@ -856,41 +708,24 @@ mod tests {
     #[test]
     fn update_mode_buttons_highlights_the_active_mode_and_lock_state() {
         let mut world = World::new();
-        let state = EditorState {
-            mode: Mode::Play,
-            ..Default::default()
-        };
+        let state = EditorState { mode: Mode::Play, ..Default::default() };
         world.insert_resource(state);
         world.insert_resource(LoadedTheme::default());
         let colors = LoadedTheme::default().song_editor_colors();
 
-        let edit = world
-            .spawn((ModeButton::Edit, BaseButtonColor(colors.btn_active)))
-            .id();
-        let record = world
-            .spawn((ModeButton::Record, BaseButtonColor(colors.btn_active)))
-            .id();
-        let play = world
-            .spawn((ModeButton::Play, BaseButtonColor(colors.btn_bg)))
-            .id();
+        let edit = world.spawn((ModeButton::Edit, BaseButtonColor(colors.btn_active))).id();
+        let record = world.spawn((ModeButton::Record, BaseButtonColor(colors.btn_active))).id();
+        let play = world.spawn((ModeButton::Play, BaseButtonColor(colors.btn_bg))).id();
         // Play mode is always locked, even without the user's own toggle.
-        let lock = world
-            .spawn((ModeButton::Lock, BaseButtonColor(colors.btn_bg)))
-            .id();
+        let lock = world.spawn((ModeButton::Lock, BaseButtonColor(colors.btn_bg))).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_mode_buttons);
         schedule.run(&mut world);
 
         assert_eq!(world.get::<BaseButtonColor>(edit).unwrap().0, colors.btn_bg);
-        assert_eq!(
-            world.get::<BaseButtonColor>(record).unwrap().0,
-            colors.btn_bg
-        );
-        assert_eq!(
-            world.get::<BaseButtonColor>(play).unwrap().0,
-            colors.btn_active
-        );
+        assert_eq!(world.get::<BaseButtonColor>(record).unwrap().0, colors.btn_bg);
+        assert_eq!(world.get::<BaseButtonColor>(play).unwrap().0, colors.btn_active);
         assert_eq!(
             world.get::<BaseButtonColor>(lock).unwrap().0,
             colors.btn_active,
@@ -903,10 +738,7 @@ mod tests {
     #[test]
     fn update_mode_visibility_shows_only_the_current_modes_group() {
         let mut world = World::new();
-        let state = EditorState {
-            mode: Mode::Play,
-            ..Default::default()
-        };
+        let state = EditorState { mode: Mode::Play, ..Default::default() };
         world.insert_resource(state);
 
         let edit_group = world.spawn((EditModeGroup, Node::default())).id();
@@ -917,18 +749,9 @@ mod tests {
         schedule.add_systems(update_mode_visibility);
         schedule.run(&mut world);
 
-        assert_eq!(
-            world.get::<Node>(edit_group).unwrap().display,
-            Display::None
-        );
-        assert_eq!(
-            world.get::<Node>(record_group).unwrap().display,
-            Display::None
-        );
-        assert_eq!(
-            world.get::<Node>(play_group).unwrap().display,
-            Display::Flex
-        );
+        assert_eq!(world.get::<Node>(edit_group).unwrap().display, Display::None);
+        assert_eq!(world.get::<Node>(record_group).unwrap().display, Display::None);
+        assert_eq!(world.get::<Node>(play_group).unwrap().display, Display::Flex);
     }
 
     // ── update_technique_button_visibility ────────────────────────────────────
@@ -936,24 +759,14 @@ mod tests {
     #[test]
     fn update_technique_button_visibility_shows_bend_family_for_diatonic_and_slide_for_chromatic() {
         let mut world = World::new();
-        let state = EditorState {
-            harmonica_kind: HarmonicaKind::Chromatic,
-            ..Default::default()
-        };
+        let state = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
         world.insert_resource(state);
 
         let bend = world.spawn((ModButton::Bend, Node::default())).id();
         let slide = world.spawn((ModButton::Slide, Node::default())).id();
         // Untouched by either branch — must be left exactly as spawned.
-        let blow = world
-            .spawn((
-                ModButton::Blow,
-                Node {
-                    display: Display::Grid,
-                    ..default()
-                },
-            ))
-            .id();
+        let blow =
+            world.spawn((ModButton::Blow, Node { display: Display::Grid, ..default() })).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_technique_button_visibility);
@@ -973,10 +786,7 @@ mod tests {
     #[test]
     fn update_harmonica_kind_text_keys_off_the_current_harmonica_kind() {
         let mut world = World::new();
-        let state = EditorState {
-            harmonica_kind: HarmonicaKind::Chromatic,
-            ..Default::default()
-        };
+        let state = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
         world.insert_resource(state);
         world.insert_resource(Localization::default());
 
@@ -988,10 +798,7 @@ mod tests {
 
         // No FTL bundle is loaded, so `loc.msg` falls back to the key itself
         // — enough to confirm the right key was chosen for this kind.
-        assert_eq!(
-            world.get::<Text>(label).unwrap().0,
-            "editor-harmonica-chromatic"
-        );
+        assert_eq!(world.get::<Text>(label).unwrap().0, "editor-harmonica-chromatic");
     }
 
     // ── update_status_bar ─────────────────────────────────────────────────────
@@ -1000,10 +807,7 @@ mod tests {
     fn update_status_bar_prefers_the_drag_message_over_the_practice_message() {
         let mut world = World::new();
         let loc = Localization::default();
-        let state = EditorState {
-            drag_msg: loc.msg("editor-drag-msg"),
-            ..Default::default()
-        };
+        let state = EditorState { drag_msg: loc.msg("editor-drag-msg"), ..Default::default() };
         world.insert_resource(state);
         // `PracticeState` has private fields not reachable from here, so a
         // `..Default::default()` struct literal isn't an option — only the

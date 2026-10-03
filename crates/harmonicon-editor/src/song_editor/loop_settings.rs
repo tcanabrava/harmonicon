@@ -10,12 +10,7 @@ pub(super) struct LoopSettings {
 
 impl Default for LoopSettings {
     fn default() -> Self {
-        Self {
-            kind: "full".into(),
-            repeat: "no".into(),
-            start: "0".into(),
-            end: "last".into(),
-        }
+        Self { kind: "full".into(), repeat: "no".into(), start: "0".into(), end: "last".into() }
     }
 }
 

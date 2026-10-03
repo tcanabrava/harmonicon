@@ -18,17 +18,10 @@ impl FakeScore {
         let notes: Vec<ScoreNote> = midis
             .iter()
             .enumerate()
-            .map(|(i, &midi)| ScoreNote {
-                start_secs: i as f64 * 0.5,
-                duration_secs: 0.5,
-                midi,
-            })
+            .map(|(i, &midi)| ScoreNote { start_secs: i as f64 * 0.5, duration_secs: 0.5, midi })
             .collect();
-        let tracks = vec![ScoreTrack {
-            index: 0,
-            name: Some("Harmonica".into()),
-            note_count: notes.len(),
-        }];
+        let tracks =
+            vec![ScoreTrack { index: 0, name: Some("Harmonica".into()), note_count: notes.len() }];
         Self { notes, tracks }
     }
 }
@@ -67,10 +60,7 @@ fn notes_a_c_harp_plays_naturally_convert_without_technique() {
     let (chart, report) = to_chart(&score, 0, &richter_harp("C"), "A").unwrap();
     assert_eq!(report.total, 3);
     assert_eq!(report.natural, 3);
-    assert_eq!(
-        (report.bends, report.overblows, report.unreachable),
-        (0, 0, 0)
-    );
+    assert_eq!((report.bends, report.overblows, report.unreachable), (0, 0, 0));
     assert!(chart.track.iter().all(|i| i.events[0].modifiers.is_none()));
 }
 
@@ -87,11 +77,8 @@ fn every_converted_note_sounds_the_pitch_it_came_from() {
     let (chart, _) = to_chart(&score, 0, &harp, "A").unwrap();
 
     // The pitches that survived, in order — unreachable ones are dropped.
-    let kept: Vec<u8> = source
-        .iter()
-        .copied()
-        .filter(|&p| map_pitch_playable(p, &harp).is_some())
-        .collect();
+    let kept: Vec<u8> =
+        source.iter().copied().filter(|&p| map_pitch_playable(p, &harp).is_some()).collect();
     assert_eq!(chart.track.len(), kept.len());
 
     for (item, expected) in chart.track.iter().zip(&kept) {
@@ -103,11 +90,7 @@ fn every_converted_note_sounds_the_pitch_it_came_from() {
             event.modifiers.as_deref().unwrap_or(&[]),
             &harp,
         );
-        assert_eq!(
-            sounded,
-            Some(*expected),
-            "event {event:?} should sound MIDI {expected}"
-        );
+        assert_eq!(sounded, Some(*expected), "event {event:?} should sound MIDI {expected}");
     }
 }
 
@@ -136,10 +119,7 @@ fn a_bend_is_written_with_the_charts_negative_convention() {
     };
     match mods[0] {
         Modifier::Bend { semitones, .. } => {
-            assert!(
-                semitones < 0.0,
-                "a downward bend must be negative, got {semitones}"
-            )
+            assert!(semitones < 0.0, "a downward bend must be negative, got {semitones}")
         }
         ref other => panic!("expected a bend, got {other:?}"),
     }
@@ -216,12 +196,8 @@ fn a_chart_converted_onto_its_own_harp_keeps_its_pitches() {
     let (chart, report) = to_chart(&source, 0, &richter_harp("C"), "A").unwrap();
     assert_eq!(report.unreachable, 0);
 
-    let round_tripped: Vec<u8> = HarpChartScore::from_chart(chart)
-        .notes(0)
-        .unwrap()
-        .iter()
-        .map(|n| n.midi)
-        .collect();
+    let round_tripped: Vec<u8> =
+        HarpChartScore::from_chart(chart).notes(0).unwrap().iter().map(|n| n.midi).collect();
     assert_eq!(round_tripped, original);
 }
 
@@ -229,9 +205,7 @@ fn a_chart_converted_onto_its_own_harp_keeps_its_pitches() {
 
 /// A C-major run every C harp plays on plain blow reeds.
 fn easy_notes() -> Vec<u8> {
-    ["C4", "E4", "G4", "C5", "E5", "G5"]
-        .map(|n| note_to_midi(n).unwrap() as u8)
-        .to_vec()
+    ["C4", "E4", "G4", "C5", "E5", "G5"].map(|n| note_to_midi(n).unwrap() as u8).to_vec()
 }
 
 #[test]
@@ -239,10 +213,7 @@ fn the_harmonica_is_chosen_to_fit_the_music() {
     // A tune in C should land on a C diatonic, not on whatever the default
     // happens to be.
     let harp = suggested_harp(&easy_notes());
-    assert_eq!(
-        harmonicon_core::harmonica::detected_harp_key(&harp).as_deref(),
-        Some("C")
-    );
+    assert_eq!(harmonicon_core::harmonica::detected_harp_key(&harp).as_deref(), Some("C"));
     assert!(matches!(harp, Harmonica::Diatonic { .. }));
 }
 
@@ -252,10 +223,7 @@ fn a_diatonic_is_preferred_when_it_fits() {
     // Handing a beginner a 12-hole chromatic for a tune a C diatonic plays
     // cleanly is the wrong default.
     let harp = suggested_harp(&easy_notes());
-    assert!(
-        matches!(harp, Harmonica::Diatonic { .. }),
-        "a plainly diatonic tune chose {harp:?}"
-    );
+    assert!(matches!(harp, Harmonica::Diatonic { .. }), "a plainly diatonic tune chose {harp:?}");
 }
 
 #[test]
@@ -283,16 +251,10 @@ fn a_chromatic_run_still_fits_a_diatonic() {
 /// A conversion result with only the fields `choose_track` reads.
 fn conversion(index: usize, name: Option<&str>, report: ConversionReport) -> TrackConversion {
     TrackConversion {
-        track: ScoreTrack {
-            index,
-            name: name.map(str::to_string),
-            note_count: report.total,
-        },
+        track: ScoreTrack { index, name: name.map(str::to_string), note_count: report.total },
         // `choose_track` reads only the track and the report; the chart is
         // carried along for the caller, so any valid one will do here.
-        chart: to_chart(&FakeScore::of(&[60]), 0, &richter_harp("C"), "A")
-            .unwrap()
-            .0,
+        chart: to_chart(&FakeScore::of(&[60]), 0, &richter_harp("C"), "A").unwrap().0,
         report,
     }
 }
@@ -321,30 +283,21 @@ fn a_named_harmonica_track_wins_even_with_a_worse_score() {
 #[test]
 fn with_nothing_named_the_best_fitting_part_is_chosen() {
     // Beats "the busiest track", which is routinely a guitar.
-    let tracks = [
-        conversion(0, None, report(100, 40, 0)),
-        conversion(1, None, report(10, 0, 0)),
-    ];
+    let tracks = [conversion(0, None, report(100, 40, 0)), conversion(1, None, report(10, 0, 0))];
     assert_eq!(choose_track(&tracks), Some(1));
 }
 
 #[test]
 fn a_tie_prefers_the_part_needing_fewer_bends() {
     // Both fully reachable; one is playable by a beginner and one isn't.
-    let tracks = [
-        conversion(0, None, report(10, 0, 8)),
-        conversion(1, None, report(10, 0, 0)),
-    ];
+    let tracks = [conversion(0, None, report(10, 0, 8)), conversion(1, None, report(10, 0, 0))];
     assert_eq!(choose_track(&tracks), Some(1));
 }
 
 #[test]
 fn nothing_is_chosen_when_no_part_survives_the_harp() {
     // The caller turns this into an error naming how close the best got.
-    let tracks = [
-        conversion(0, None, report(10, 9, 0)),
-        conversion(1, None, report(10, 8, 0)),
-    ];
+    let tracks = [conversion(0, None, report(10, 9, 0)), conversion(1, None, report(10, 8, 0))];
     assert_eq!(choose_track(&tracks), None);
 }
 
@@ -370,10 +323,7 @@ fn a_file_whose_only_named_part_is_unplayable_yields_nothing() {
 fn an_otherwise_tied_pair_prefers_the_longer_part() {
     // Both fully playable with the same bends: the substantive part is the
     // likelier lead, and a six-note comp is the likelier accompaniment.
-    let tracks = [
-        conversion(0, None, report(6, 0, 2)),
-        conversion(1, None, report(8, 0, 2)),
-    ];
+    let tracks = [conversion(0, None, report(6, 0, 2)), conversion(1, None, report(8, 0, 2))];
     assert_eq!(choose_track(&tracks), Some(1));
 }
 
@@ -381,9 +331,6 @@ fn an_otherwise_tied_pair_prefers_the_longer_part() {
 fn a_complete_tie_resolves_to_the_earlier_track() {
     // `max_by` keeps the last maximum, so without the final comparison this
     // would silently be "the last track" while the docs said otherwise.
-    let tracks = [
-        conversion(0, None, report(8, 0, 2)),
-        conversion(1, None, report(8, 0, 2)),
-    ];
+    let tracks = [conversion(0, None, report(8, 0, 2)), conversion(1, None, report(8, 0, 2))];
     assert_eq!(choose_track(&tracks), Some(0));
 }

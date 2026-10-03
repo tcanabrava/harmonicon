@@ -79,9 +79,7 @@ pub(super) fn spawn_file_buttons(
                     title: String::from(loc.msg("dialog-save-lesson")),
                     extensions: vec!["json".into()],
                     start_dir: drop_folder("lessons"),
-                    mode: DialogMode::Save {
-                        default_name: "lesson.json".into(),
-                    },
+                    mode: DialogMode::Save { default_name: "lesson.json".into() },
                 },
             });
         },
@@ -163,14 +161,7 @@ pub(super) fn spawn_playback_buttons(
                 &mut count_in,
                 &mut commands,
             );
-            start_playback(
-                &state,
-                &mut sources,
-                &settings,
-                &playing,
-                &mut playhead,
-                &mut commands,
-            );
+            start_playback(&state, &mut sources, &settings, &playing, &mut playhead, &mut commands);
         },
     );
     transport_button(

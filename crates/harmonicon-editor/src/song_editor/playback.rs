@@ -174,9 +174,7 @@ pub(super) fn spawn_background_music(
     }
     match std::fs::read(music) {
         Ok(bytes) => {
-            let handle = sources.add(AudioSource {
-                bytes: bytes.into(),
-            });
+            let handle = sources.add(AudioSource { bytes: bytes.into() });
             commands.spawn((
                 EditorAudio,
                 AudioPlayer::<AudioSource>(handle),
@@ -225,29 +223,12 @@ pub(super) fn start_playback(
     let phrase: Vec<PhraseNote> = state
         .notes
         .iter()
-        .map(|n| PhraseNote {
-            tick: n.tick,
-            len: n.len,
-            freq: note_freq(n, &harp),
-            expr: n.expr,
-        })
+        .map(|n| PhraseNote { tick: n.tick, len: n.len, freq: note_freq(n, &harp), expr: n.expr })
         .collect();
-    let end_tick = state
-        .notes
-        .iter()
-        .map(|n| n.tick + n.len)
-        .max()
-        .unwrap_or(0);
+    let end_tick = state.notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
     let task = AsyncComputeTaskPool::get()
         .spawn(async move { encode_wav(&render_pcm(&phrase, spt), SAMPLE_RATE) });
-    commands.spawn((
-        EditorAudio,
-        PendingPlayback {
-            task,
-            end_tick,
-            secs_per_tick: spt,
-        },
-    ));
+    commands.spawn((EditorAudio, PendingPlayback { task, end_tick, secs_per_tick: spt }));
 }
 
 /// Starts a Play preview once its render lands. The synth track, the
@@ -266,10 +247,10 @@ pub(super) fn finish_pending_playback(
             continue;
         };
         let handle = sources.add(AudioSource { bytes: wav.into() });
-        commands.entity(entity).remove::<PendingPlayback>().insert((
-            AudioPlayer::<AudioSource>(handle),
-            PlaybackSettings::DESPAWN,
-        ));
+        commands
+            .entity(entity)
+            .remove::<PendingPlayback>()
+            .insert((AudioPlayer::<AudioSource>(handle), PlaybackSettings::DESPAWN));
         *playhead = playhead_for(render.end_tick, render.secs_per_tick);
         spawn_background_music(&state, &mut sources, &settings, &mut commands);
     }

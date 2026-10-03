@@ -107,10 +107,7 @@ pub(super) fn sync_timeline_surface(
     let width_px = (super::grid::visible_beats(win_w) + 1) as f32 * BEAT_W;
     for (mut node, mut geom) in &mut surfaces {
         if geom.scroll_px != scroll.px || geom.width_px != width_px {
-            *geom = TimelineSurfaceGeometry {
-                scroll_px: scroll.px,
-                width_px,
-            };
+            *geom = TimelineSurfaceGeometry { scroll_px: scroll.px, width_px };
             node.left = Val::Px(scroll.px);
             node.width = Val::Px(width_px);
         }
@@ -151,18 +148,9 @@ pub(super) fn request_confirm(
     let map = state.meter_map();
     state.pending_timeline_op = Some((tool, start, end));
     let message = loc
-        .msg_args(
-            key,
-            &[
-                ("from", describe_tick(start, &map)),
-                ("to", describe_tick(end, &map)),
-            ],
-        )
+        .msg_args(key, &[("from", describe_tick(start, &map)), ("to", describe_tick(end, &map))])
         .to_string();
-    open.write(OpenConfirmDialog {
-        purpose: TIMELINE_CONFIRM_PURPOSE,
-        message,
-    });
+    open.write(OpenConfirmDialog { purpose: TIMELINE_CONFIRM_PURPOSE, message });
 }
 
 // ── Observers ─────────────────────────────────────────────────────────────────
@@ -238,9 +226,7 @@ pub(super) fn cycle_meter_point(state: &mut EditorState, tick: usize) {
     let offset = tick - segment.start_tick as usize;
     let snapped = segment.start_tick as usize + (offset + beat / 2) / beat * beat;
     let current = format!("{}/{}", segment.meter.numerator, segment.meter.denominator);
-    state
-        .meter_changes
-        .push((snapped, next_signature(&current)));
+    state.meter_changes.push((snapped, next_signature(&current)));
 }
 
 /// The Meter tool's whole interaction — the Tempo tool's sibling, same
@@ -351,10 +337,7 @@ pub(super) fn on_timeline_drag(
     if !state.timeline_tool.is_active() {
         return;
     }
-    let Some(TimelineDrag {
-        start, scroll_px, ..
-    }) = sel.drag
-    else {
+    let Some(TimelineDrag { start, scroll_px, .. }) = sel.drag else {
         return;
     };
     let end = drag_end_tick(start, ev.distance.x, ui_scale.0, scroll.px - scroll_px);
@@ -411,10 +394,7 @@ pub(super) fn on_timeline_drag_end(
         // from an earlier abandoned click sequence. Stays in
         // `TimelineSelection` as the persisted selection, but frozen —
         // released spans must not keep tracking scroll.
-        sel.drag = Some(TimelineDrag {
-            live: false,
-            ..drag
-        });
+        sel.drag = Some(TimelineDrag { live: false, ..drag });
         state.timeline_split = None;
         return;
     }
@@ -430,13 +410,8 @@ pub(super) fn on_timeline_drag_end(
             let (start, end) = split_side_range(split, side, &state.notes);
             state.timeline_split = None;
             if end > start {
-                sel.drag = Some(TimelineDrag {
-                    start,
-                    end,
-                    scroll_px: 0.0,
-                    pointer_px: 0.0,
-                    live: false,
-                });
+                sel.drag =
+                    Some(TimelineDrag { start, end, scroll_px: 0.0, pointer_px: 0.0, live: false });
             }
         }
     }
@@ -455,11 +430,7 @@ fn selected_bars(
         return None;
     };
     let (start, end) = normalize_range(start, end);
-    Some(super::repeat_marks::bar_span(
-        &state.meter_map(),
-        start,
-        end,
-    ))
+    Some(super::repeat_marks::bar_span(&state.meter_map(), start, end))
 }
 
 /// The Repeat button: repeats the selected bars, or adds a pass to a

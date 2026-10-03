@@ -121,11 +121,8 @@ pub(super) fn timeline_tool_button(
             }
         };
 
-        state.timeline_tool = if state.timeline_tool == kind.0 {
-            TimelineTool::None
-        } else {
-            kind.0
-        };
+        state.timeline_tool =
+            if state.timeline_tool == kind.0 { TimelineTool::None } else { kind.0 };
         sel.drag = None;
         state.timeline_split = None;
     };
@@ -262,9 +259,6 @@ mod tests {
 
     #[test]
     fn text_only_shows_just_the_label() {
-        assert_eq!(
-            button_content_text(ActionButtonStyle::TextOnly, "\u{21B6}", "Undo"),
-            "Undo"
-        );
+        assert_eq!(button_content_text(ActionButtonStyle::TextOnly, "\u{21B6}", "Undo"), "Undo");
     }
 }

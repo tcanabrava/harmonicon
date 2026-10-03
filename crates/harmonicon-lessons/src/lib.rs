@@ -35,10 +35,7 @@ impl Plugin for LessonsUiPlugin {
             .init_resource::<lesson_tree::UnitSlides>()
             .init_resource::<lesson_tree::LessonTreeViewport>()
             .init_resource::<lesson_tree::PendingLessonFocus>()
-            .add_systems(
-                OnEnter(MenuPage::LessonTree),
-                lesson_tree::setup_lesson_tree,
-            )
+            .add_systems(OnEnter(MenuPage::LessonTree), lesson_tree::setup_lesson_tree)
             .add_systems(OnExit(MenuPage::LessonTree), scene::cleanup_menu)
             .add_systems(
                 Update,
@@ -56,10 +53,7 @@ impl Plugin for LessonsUiPlugin {
                     .chain()
                     .run_if(in_state(MenuPage::LessonTree)),
             )
-            .add_systems(
-                OnEnter(MenuPage::LessonReader),
-                lesson_reader::setup_lesson_reader,
-            )
+            .add_systems(OnEnter(MenuPage::LessonReader), lesson_reader::setup_lesson_reader)
             .add_systems(
                 Update,
                 (

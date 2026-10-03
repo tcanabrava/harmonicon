@@ -121,14 +121,12 @@ pub(super) fn autoplay_pitches(
         f64::from(autoplay.late_ms) / 1000.0,
     );
     active.0.clear();
-    active
-        .0
-        .extend(pitches.into_iter().map(|(midi, cents)| PitchInfo {
-            midi,
-            note: midi_to_note(i32::from(midi)),
-            octave: i32::from(midi) / 12 - 1,
-            frequency: midi_to_freq_hz(f32::from(midi) + cents / 100.0),
-        }));
+    active.0.extend(pitches.into_iter().map(|(midi, cents)| PitchInfo {
+        midi,
+        note: midi_to_note(i32::from(midi)),
+        octave: i32::from(midi) / 12 - 1,
+        frequency: midi_to_freq_hz(f32::from(midi) + cents / 100.0),
+    }));
     // The judge reads loudness as the RMS of this block, so a flat block at
     // `amplitude` *is* that loudness.
     frame.samples.resize(256, amplitude);
@@ -204,16 +202,10 @@ mod tests {
     fn vibrato_wobbles_the_pitch_and_wah_pumps_the_loudness() {
         let mut vib = note(0.0, 4.0, 60);
         vib.hit = true;
-        vib.modifiers = vec![Modifier::Vibrato {
-            oscillation_hz: 5.0,
-            intensity: None,
-        }];
+        vib.modifiers = vec![Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }];
         let mut wah = note(0.0, 4.0, 62);
         wah.hit = true;
-        wah.modifiers = vec![Modifier::WahWah {
-            oscillation_hz: 3.0,
-            intensity: None,
-        }];
+        wah.modifiers = vec![Modifier::WahWah { oscillation_hz: 3.0, intensity: None }];
         let notes = [vib, wah];
         // A quarter of a 5 Hz cycle in: the vibrato is at its peak swing.
         let (pitches, amp) = sounding(&notes, 0, 0.05, 0.05, 0.0);

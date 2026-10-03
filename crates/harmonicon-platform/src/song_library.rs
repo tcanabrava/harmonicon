@@ -14,9 +14,7 @@ pub struct SongLibrary {
 /// Chart filenames can change on update; the source and song folder identify
 /// a catalog entry. A second repository's identical song remains independent.
 pub fn song_identity(asset_path: &str) -> &str {
-    asset_path
-        .rsplit_once("/song/")
-        .map_or(asset_path, |(folder, _)| folder)
+    asset_path.rsplit_once("/song/").map_or(asset_path, |(folder, _)| folder)
 }
 
 impl Default for SongLibrary {
@@ -76,20 +74,14 @@ mod tests {
     fn exclusions_survive_reload_and_chart_renames_but_do_not_cross_repositories() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("hidden.json");
-        let mut library = SongLibrary {
-            hidden: BTreeSet::new(),
-        };
-        library
-            .hide_at("packs://first/Band/Song/song/old.harpchart", &path)
-            .unwrap();
+        let mut library = SongLibrary { hidden: BTreeSet::new() };
+        library.hide_at("packs://first/Band/Song/song/old.harpchart", &path).unwrap();
         let hidden: BTreeSet<String> =
             serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         assert!(hidden.contains(song_identity("packs://first/Band/Song/song/new.harpchart")));
         assert!(!hidden.contains(song_identity("packs://second/Band/Song/song/old.harpchart")));
         let mut library = SongLibrary { hidden };
-        library
-            .hide_at("packs://second/Band/Other/song/chart.harpchart", &path)
-            .unwrap();
+        library.hide_at("packs://second/Band/Other/song/chart.harpchart", &path).unwrap();
         assert_eq!(library.hidden.len(), 2);
         let entry = |source: &str| crate::assets_management::SongEntry {
             artist: "Band".into(),
@@ -103,9 +95,7 @@ mod tests {
         let mut songs = AvailableSongs::default();
         for _ in 0..2 {
             // Simulates a fresh catalog scan after restart or repository update.
-            songs
-                .0
-                .insert("Band".into(), vec![entry("first"), entry("second")]);
+            songs.0.insert("Band".into(), vec![entry("first"), entry("second")]);
             library.filter(&mut songs);
             assert_eq!(songs.0["Band"].len(), 1);
             assert_eq!(songs.0["Band"][0].source_name, "second");

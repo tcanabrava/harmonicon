@@ -51,10 +51,9 @@ impl Plugin for ContentSyncPlugin {
 /// read: its address without the scheme.
 fn display_name(entry: &PackEntry) -> String {
     match &entry.spec {
-        RepoSpec::Remote { url, .. } => url
-            .split_once("://")
-            .map_or(url.as_str(), |(_, rest)| rest)
-            .to_string(),
+        RepoSpec::Remote { url, .. } => {
+            url.split_once("://").map_or(url.as_str(), |(_, rest)| rest).to_string()
+        }
         RepoSpec::Local { path } => path.display().to_string(),
     }
 }
@@ -143,11 +142,7 @@ fn update_status(
             text.0.clone_from(&lines);
         }
     }
-    let key = if failed(&packs, &sync) {
-        "sync-failed"
-    } else {
-        "sync-in-progress"
-    };
+    let key = if failed(&packs, &sync) { "sync-failed" } else { "sync-in-progress" };
     let line = String::from(loc.msg(key));
     for mut text in &mut intro {
         if text.0 != line {
@@ -168,8 +163,7 @@ fn update_actions(
         let shown = children.is_some_and(|c| !c.is_empty());
         if show && !shown {
             commands.entity(container).with_children(|row| {
-                row.spawn_empty()
-                    .apply_scene(button::default(&loc.msg("sync-retry"), retry));
+                row.spawn_empty().apply_scene(button::default(&loc.msg("sync-retry"), retry));
                 row.spawn_empty().apply_scene(button::default(
                     &loc.msg("sync-quit"),
                     |_: On<Activate>, mut exit: MessageWriter<AppExit>| {
@@ -184,15 +178,8 @@ fn update_actions(
 }
 
 fn retry(_: On<Activate>, packs: Res<ContentPacks>, mut install: MessageWriter<InstallPack>) {
-    for entry in packs
-        .0
-        .iter()
-        .filter(|e| e.status == PackStatus::NotInstalled)
-    {
-        install.write(InstallPack {
-            kind: entry.kind,
-            spec: entry.spec.clone(),
-        });
+    for entry in packs.0.iter().filter(|e| e.status == PackStatus::NotInstalled) {
+        install.write(InstallPack { kind: entry.kind, spec: entry.spec.clone() });
     }
 }
 
@@ -212,25 +199,13 @@ mod tests {
     use harmonicon_packs::pack::PackKind;
 
     fn entry(url: &str, status: PackStatus) -> PackEntry {
-        let spec = RepoSpec::Remote {
-            url: url.into(),
-            git_ref: None,
-        };
-        PackEntry {
-            kind: PackKind::Songs,
-            slug: spec.slug(),
-            spec,
-            root: "/x".into(),
-            status,
-        }
+        let spec = RepoSpec::Remote { url: url.into(), git_ref: None };
+        PackEntry { kind: PackKind::Songs, slug: spec.slug(), spec, root: "/x".into(), status }
     }
 
     #[test]
     fn names_a_repository_by_its_address() {
-        let e = entry(
-            "https://github.com/tcanabrava/harmonicon-songs",
-            PackStatus::NotInstalled,
-        );
+        let e = entry("https://github.com/tcanabrava/harmonicon-songs", PackStatus::NotInstalled);
         assert_eq!(display_name(&e), "github.com/tcanabrava/harmonicon-songs");
     }
 
@@ -241,8 +216,7 @@ mod tests {
             entry("https://h/broken", PackStatus::Unusable("x".into())),
         ]);
         let mut sync = PackSync::default();
-        sync.failures
-            .insert(packs.0[0].slug.clone(), "offline".into());
+        sync.failures.insert(packs.0[0].slug.clone(), "offline".into());
         let lines = status_lines(&packs, &sync, &Localization::default());
         assert_eq!(lines.lines().count(), 1);
         assert!(lines.contains("sync-repo-failed"), "{lines}");
@@ -251,10 +225,7 @@ mod tests {
 
     #[test]
     fn nothing_missing_is_not_a_failure() {
-        let packs = ContentPacks(vec![entry(
-            "https://h/broken",
-            PackStatus::Unusable("x".into()),
-        )]);
+        let packs = ContentPacks(vec![entry("https://h/broken", PackStatus::Unusable("x".into()))]);
         assert!(!failed(&packs, &PackSync::default()));
     }
 }

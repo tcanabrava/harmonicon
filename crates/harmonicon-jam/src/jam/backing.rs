@@ -99,13 +99,7 @@ impl Genre {
     /// Every selectable genre, in the order the "Generate Jam" combobox
     /// offers them.
     pub fn all() -> &'static [Genre] {
-        &[
-            Genre::Blues,
-            Genre::Jazz,
-            Genre::Rock,
-            Genre::Reggae,
-            Genre::Country,
-        ]
+        &[Genre::Blues, Genre::Jazz, Genre::Rock, Genre::Reggae, Genre::Country]
     }
 
     /// Display label for the picker.
@@ -164,16 +158,8 @@ pub struct JamGenre(pub Genre);
 /// pattern below: root/5th/flat-7th are shared between a dominant-7th and
 /// minor-7th chord (`song::harmonica::chord_intervals`) — only the 3rd
 /// differs, and none of these patterns ever play one.
-const BLUES_PATTERN: [Option<i32>; 8] = [
-    Some(0),
-    Some(0),
-    Some(7),
-    Some(7),
-    Some(10),
-    Some(10),
-    Some(7),
-    Some(10),
-];
+const BLUES_PATTERN: [Option<i32>; 8] =
+    [Some(0), Some(0), Some(7), Some(7), Some(10), Some(10), Some(7), Some(10)];
 /// Walking-quarter-note contour: root, 5th, flat-7th, 5th, one note per
 /// beat (the off-beat slots rest) — swung like the classic blues shape,
 /// just sparser.
@@ -181,16 +167,8 @@ const JAZZ_PATTERN: [Option<i32>; 8] =
     [Some(0), None, Some(7), None, Some(10), None, Some(7), None];
 /// Straight, driving root pulse with a 5th lift in the second half of the
 /// bar — a simplified "power chord" bass line, no swing.
-const ROCK_PATTERN: [Option<i32>; 8] = [
-    Some(0),
-    Some(0),
-    Some(0),
-    Some(0),
-    Some(7),
-    Some(7),
-    Some(0),
-    Some(0),
-];
+const ROCK_PATTERN: [Option<i32>; 8] =
+    [Some(0), Some(0), Some(0), Some(0), Some(7), Some(7), Some(0), Some(0)];
 /// The classic reggae "skank": silence on every downbeat, a hit on every
 /// off-beat. This is a deliberate simplification, not a transcription of
 /// real reggae form (which usually isn't a 12-bar blues at all) — the
@@ -229,12 +207,7 @@ pub(crate) struct GrooveArrangement {
 }
 
 const fn drum(kick: bool, snare: bool, hat: bool, accent: f32) -> DrumEvent {
-    DrumEvent {
-        kick,
-        snare,
-        hat,
-        accent,
-    }
+    DrumEvent { kick, snare, hat, accent }
 }
 
 const fn comp(hit: bool, accent: f32) -> CompingEvent {
@@ -364,12 +337,7 @@ pub(crate) fn groove_arrangement(genre: Genre) -> GrooveArrangement {
             ],
         ),
     };
-    GrooveArrangement {
-        swung,
-        bass,
-        drums,
-        comping,
-    }
+    GrooveArrangement { swung, bass, drums, comping }
 }
 
 /// Applies restrained phrase and turnaround variations to the base groove.
@@ -501,16 +469,9 @@ fn bass_tone(freq_hz: f32, duration_secs: f32) -> Vec<f32> {
     (0..n)
         .map(|i| {
             let t = i as f32 / SAMPLE_RATE as f32;
-            let atk = if attack > 0 && i < attack {
-                i as f32 / attack as f32
-            } else {
-                1.0
-            };
-            let rel = if n > release && i > n - release {
-                (n - i) as f32 / release as f32
-            } else {
-                1.0
-            };
+            let atk = if attack > 0 && i < attack { i as f32 / attack as f32 } else { 1.0 };
+            let rel =
+                if n > release && i > n - release { (n - i) as f32 / release as f32 } else { 1.0 };
             let env = atk.min(rel).clamp(0.0, 1.0);
             let s = (TAU * freq_hz * t).sin()
                 + 0.4 * (TAU * freq_hz * 2.0 * t).sin()
@@ -539,12 +500,7 @@ pub fn generate_ending_stems(
     let mut bass = bass_tone(midi_to_freq_hz(midi as f32), duration * 0.9);
     bass.resize(samples, 0.0);
 
-    let mut drums = drum_slot(
-        drum(true, genre != Genre::Jazz, true, 0.9),
-        0,
-        duration,
-        genre,
-    );
+    let mut drums = drum_slot(drum(true, genre != Genre::Jazz, true, 0.9), 0, duration, genre);
     drums.resize(samples, 0.0);
 
     let mut comping = comping_slot(key, quality, duration, genre);
@@ -592,21 +548,14 @@ fn generate_bass_pcm_seeded(
     // rest; a straight genre splits the beat evenly instead — either way
     // long+short always sums to exactly one beat, so a bar's total length
     // is unaffected by genre (still 4 beats), only how it's subdivided.
-    let long_secs = if swung {
-        secs_per_beat * SWING_LONG_FRAC
-    } else {
-        secs_per_beat * 0.5
-    };
+    let long_secs = if swung { secs_per_beat * SWING_LONG_FRAC } else { secs_per_beat * 0.5 };
     let short_secs = secs_per_beat - long_secs;
     let roots = progression_bars(key, progression).map(|(root, _)| root);
     let mut buf = Vec::new();
     for chorus in 0..CHORUSES as usize {
         for (bar, root) in roots.iter().enumerate() {
             let arrangement = groove_arrangement_for_position(genre, chorus, bar);
-            for (slot, freq) in bar_beat_freqs(root, &arrangement.bass)
-                .into_iter()
-                .enumerate()
-            {
+            for (slot, freq) in bar_beat_freqs(root, &arrangement.bass).into_iter().enumerate() {
                 let note_secs = if slot % 2 == 0 { long_secs } else { short_secs };
                 let sound = freq
                     .map(|hz| bass_tone(hz, note_secs * (1.0 - NOTE_GAP_FRAC)))
@@ -639,9 +588,7 @@ fn drum_slot(event: DrumEvent, slot: usize, duration_secs: f32, genre: Genre) ->
                 sample += phase.sin() * env * 0.24;
             }
             if event.snare {
-                let hash = (i as u32)
-                    .wrapping_mul(1_664_525)
-                    .wrapping_add(1_013_904_223);
+                let hash = (i as u32).wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
                 let noise = (hash as f32 / u32::MAX as f32) * 2.0 - 1.0;
                 sample += match genre {
                     Genre::Jazz => noise * (-t * 16.0).exp() * 0.07,
@@ -713,11 +660,7 @@ fn comping_slot(
 fn generate_drums_pcm(bpm: f32, genre: Genre, energy: BandEnergy, seed: u64) -> Vec<f32> {
     let secs_per_beat = 60.0 / bpm.max(1.0);
     let swung = groove_arrangement(genre).swung;
-    let long = if swung {
-        secs_per_beat * SWING_LONG_FRAC
-    } else {
-        secs_per_beat * 0.5
-    };
+    let long = if swung { secs_per_beat * SWING_LONG_FRAC } else { secs_per_beat * 0.5 };
     let short = secs_per_beat - long;
     let mut out = Vec::new();
     for chorus in 0..CHORUSES as usize {
@@ -746,11 +689,7 @@ fn generate_comping_pcm(
 ) -> Vec<f32> {
     let secs_per_beat = 60.0 / bpm.max(1.0);
     let swung = groove_arrangement(genre).swung;
-    let long = if swung {
-        secs_per_beat * SWING_LONG_FRAC
-    } else {
-        secs_per_beat * 0.5
-    };
+    let long = if swung { secs_per_beat * SWING_LONG_FRAC } else { secs_per_beat * 0.5 };
     let short = secs_per_beat - long;
     let bars = progression_bars(key, progression);
     let mut out = Vec::new();
@@ -808,11 +747,7 @@ pub fn render_band_answer(
 ) -> Vec<f32> {
     let secs_per_beat = 60.0 / bpm.max(1.0);
     let swung = groove_arrangement(genre).swung;
-    let long = if swung {
-        secs_per_beat * SWING_LONG_FRAC
-    } else {
-        secs_per_beat * 0.5
-    };
+    let long = if swung { secs_per_beat * SWING_LONG_FRAC } else { secs_per_beat * 0.5 };
     let short = secs_per_beat - long;
     let mut out = Vec::new();
     for slot in 0..4 {
@@ -827,14 +762,11 @@ pub fn render_band_answer(
                 genre,
             )),
             BandAnswer::Chord if !rest && slot != 1 => out.extend(
-                comping_slot(root, quality, secs, genre)
-                    .into_iter()
-                    .map(|sample| sample * accent),
+                comping_slot(root, quality, secs, genre).into_iter().map(|sample| sample * accent),
             ),
-            BandAnswer::Chord => out.extend(std::iter::repeat_n(
-                0.0,
-                (secs * SAMPLE_RATE as f32).max(1.0) as usize,
-            )),
+            BandAnswer::Chord => {
+                out.extend(std::iter::repeat_n(0.0, (secs * SAMPLE_RATE as f32).max(1.0) as usize))
+            }
         }
     }
     out
@@ -859,11 +791,7 @@ pub fn generate_backing_stems(
     comping.resize(target, 0.0);
     drums.truncate(target);
     comping.truncate(target);
-    [
-        ("Bass".to_string(), bass),
-        ("Drums".to_string(), drums),
-        ("Comping".to_string(), comping),
-    ]
+    [("Bass".to_string(), bass), ("Drums".to_string(), drums), ("Comping".to_string(), comping)]
 }
 
 /// The chart half of a generated jam: a diatonic Richter harp for `position`
@@ -930,12 +858,7 @@ pub fn generated_chart(
             play_mode: None,
             call: false,
             lyric: None,
-            events: vec![NoteEvent {
-                hole: 1,
-                action: Action::Blow,
-                note: None,
-                modifiers: None,
-            }],
+            events: vec![NoteEvent { hole: 1, action: Action::Blow, note: None, modifiers: None }],
         }],
         loop_section: None,
         scoring: Scoring {
@@ -978,10 +901,7 @@ pub fn render_generated_backing(
     }
     RenderedBacking {
         waveform: bucket_peaks(&mix, WAVEFORM_BUCKETS),
-        stems: stems
-            .into_iter()
-            .map(|(name, pcm)| (name, encode_wav(&pcm, SAMPLE_RATE)))
-            .collect(),
+        stems: stems.into_iter().map(|(name, pcm)| (name, encode_wav(&pcm, SAMPLE_RATE))).collect(),
         music_duration_secs,
     }
 }
@@ -1033,11 +953,7 @@ pub fn assemble_generated_manifest(
     elements: Handle<Image>,
     sources: &mut Assets<AudioSource>,
 ) -> SongManifest {
-    let RenderedBacking {
-        stems,
-        waveform,
-        music_duration_secs,
-    } = rendered;
+    let RenderedBacking { stems, waveform, music_duration_secs } = rendered;
     let backing_stems = stems
         .into_iter()
         .map(|(name, wav)| BackingStemAudio {
@@ -1078,14 +994,10 @@ mod tests {
         let freqs = bar_beat_freqs("C", &BLUES_PATTERN);
         let hz = |note: &str| midi_to_freq_hz(note_to_midi(note).unwrap() as f32);
         let (root_hz, fifth_hz, flat7_hz) = (hz("C3"), hz("G3"), hz("A#3"));
-        let expected = [
-            root_hz, root_hz, fifth_hz, fifth_hz, flat7_hz, flat7_hz, fifth_hz, flat7_hz,
-        ];
+        let expected =
+            [root_hz, root_hz, fifth_hz, fifth_hz, flat7_hz, flat7_hz, fifth_hz, flat7_hz];
         for (i, (got, want)) in freqs.iter().zip(expected).enumerate() {
-            assert!(
-                (got.unwrap() - want).abs() < 0.01,
-                "note {i}: got {got:?}, expected {want}"
-            );
+            assert!((got.unwrap() - want).abs() < 0.01, "note {i}: got {got:?}, expected {want}");
         }
     }
 
@@ -1098,10 +1010,7 @@ mod tests {
         for genre in Genre::all() {
             let arrangement = groove_arrangement(*genre);
             for &f in bar_beat_freqs("C", &arrangement.bass).iter().flatten() {
-                assert!(
-                    f > 100.0,
-                    "{genre:?}: {f} Hz is below typical small-speaker cutoff"
-                );
+                assert!(f > 100.0, "{genre:?}: {f} Hz is below typical small-speaker cutoff");
             }
         }
     }
@@ -1144,33 +1053,18 @@ mod tests {
     fn every_arrangement_has_bounded_role_events() {
         for &genre in Genre::all() {
             let arrangement = groove_arrangement(genre);
+            assert!(arrangement.bass.iter().any(Option::is_some), "{genre:?} bass");
             assert!(
-                arrangement.bass.iter().any(Option::is_some),
-                "{genre:?} bass"
-            );
-            assert!(
-                arrangement
-                    .drums
-                    .iter()
-                    .any(|event| event.kick || event.snare || event.hat),
+                arrangement.drums.iter().any(|event| event.kick || event.snare || event.hat),
                 "{genre:?} drums"
             );
+            assert!(arrangement.comping.iter().any(|event| event.hit), "{genre:?} comping");
             assert!(
-                arrangement.comping.iter().any(|event| event.hit),
-                "{genre:?} comping"
-            );
-            assert!(
-                arrangement
-                    .drums
-                    .iter()
-                    .all(|event| (0.0..=1.0).contains(&event.accent)),
+                arrangement.drums.iter().all(|event| (0.0..=1.0).contains(&event.accent)),
                 "{genre:?} drum accent"
             );
             assert!(
-                arrangement
-                    .comping
-                    .iter()
-                    .all(|event| (0.0..=1.0).contains(&event.accent)),
+                arrangement.comping.iter().all(|event| (0.0..=1.0).contains(&event.accent)),
                 "{genre:?} comping accent"
             );
         }
@@ -1186,10 +1080,7 @@ mod tests {
         assert_ne!(blues_comp, reggae_comp);
 
         let event = drum(false, false, true, 1.0);
-        assert_ne!(
-            drum_slot(event, 1, 0.5, Genre::Blues),
-            drum_slot(event, 1, 0.5, Genre::Jazz)
-        );
+        assert_ne!(drum_slot(event, 1, 0.5, Genre::Blues), drum_slot(event, 1, 0.5, Genre::Jazz));
     }
 
     #[test]
@@ -1230,14 +1121,8 @@ mod tests {
                     .sum::<f32>()
             };
             assert!(active_comp(0) <= active_comp(1), "{genre:?} sparse opening");
-            assert!(
-                drum_energy(2) > drum_energy(0),
-                "{genre:?} third chorus lift"
-            );
-            assert!(
-                drum_energy(3) < drum_energy(2),
-                "{genre:?} fourth chorus relax"
-            );
+            assert!(drum_energy(2) > drum_energy(0), "{genre:?} third chorus lift");
+            assert!(drum_energy(3) < drum_energy(2), "{genre:?} fourth chorus relax");
         }
     }
 
@@ -1251,33 +1136,17 @@ mod tests {
                 arrangement.comping.iter().filter(|event| event.hit).count()
             };
             let drum_energy = |arrangement: &GrooveArrangement| {
-                arrangement
-                    .drums
-                    .iter()
-                    .map(|event| event.accent)
-                    .sum::<f32>()
+                arrangement.drums.iter().map(|event| event.accent).sum::<f32>()
             };
 
             assert_eq!(low.bass, medium.bass, "{genre:?} low bass");
             assert_eq!(high.bass, medium.bass, "{genre:?} high bass");
             assert_eq!(low.swung, medium.swung, "{genre:?} low feel");
             assert_eq!(high.swung, medium.swung, "{genre:?} high feel");
-            assert!(
-                comp_hits(&low) <= comp_hits(&medium),
-                "{genre:?} low density"
-            );
-            assert!(
-                comp_hits(&high) >= comp_hits(&medium),
-                "{genre:?} high density"
-            );
-            assert!(
-                drum_energy(&low) < drum_energy(&medium),
-                "{genre:?} low dynamics"
-            );
-            assert!(
-                drum_energy(&high) >= drum_energy(&medium),
-                "{genre:?} high dynamics"
-            );
+            assert!(comp_hits(&low) <= comp_hits(&medium), "{genre:?} low density");
+            assert!(comp_hits(&high) >= comp_hits(&medium), "{genre:?} high density");
+            assert!(drum_energy(&low) < drum_energy(&medium), "{genre:?} low dynamics");
+            assert!(drum_energy(&high) >= drum_energy(&medium), "{genre:?} high dynamics");
         }
     }
 
@@ -1287,10 +1156,7 @@ mod tests {
     fn generate_bass_pcm_is_audible() {
         let pcm = generate_bass_pcm("C", 90.0, Progression::Standard, Genre::Blues);
         assert!(!pcm.is_empty());
-        assert!(
-            pcm.iter().any(|&s| s.abs() > 0.01),
-            "generated backing should not be silent"
-        );
+        assert!(pcm.iter().any(|&s| s.abs() > 0.01), "generated backing should not be silent");
     }
 
     #[test]
@@ -1368,10 +1234,7 @@ mod tests {
         for &genre in Genre::all() {
             let pcm = generate_bass_pcm("C", 90.0, Progression::Standard, genre);
             let diff_secs = (blues.len() as f64 - pcm.len() as f64).abs() / SAMPLE_RATE as f64;
-            assert!(
-                diff_secs < 0.1,
-                "{genre:?} loop length diverged from Blues by {diff_secs}s"
-            );
+            assert!(diff_secs < 0.1, "{genre:?} loop length diverged from Blues by {diff_secs}s");
         }
     }
 
@@ -1427,14 +1290,8 @@ mod tests {
 
     #[test]
     fn generated_chart_carries_the_requested_key_and_tempo() {
-        let chart = generated_chart(
-            "G",
-            100.0,
-            Progression::Standard,
-            Position::First,
-            Genre::Blues,
-            30.0,
-        );
+        let chart =
+            generated_chart("G", 100.0, Progression::Standard, Position::First, Genre::Blues, 30.0);
         assert_eq!(chart.song.key, "G");
         assert_eq!(chart.song.tempo_bpm, 100.0);
         assert_eq!(chart.timing.tempo_map[0].bpm, 100.0);
@@ -1442,21 +1299,10 @@ mod tests {
 
     #[test]
     fn generated_chart_harmonica_is_a_diatonic_richter_harp_in_key_at_first_position() {
-        let chart = generated_chart(
-            "D",
-            90.0,
-            Progression::Standard,
-            Position::First,
-            Genre::Blues,
-            30.0,
-        );
+        let chart =
+            generated_chart("D", 90.0, Progression::Standard, Position::First, Genre::Blues, 30.0);
         match chart.harmonica {
-            harmonicon_core::harmonica::Harmonica::Diatonic {
-                holes,
-                layout,
-                position,
-                ..
-            } => {
+            harmonicon_core::harmonica::Harmonica::Diatonic { holes, layout, position, .. } => {
                 assert_eq!(holes, 10);
                 let layout = layout.expect("richter_harp always sets a layout");
                 assert_eq!(layout.blow.unwrap()[0], "D4");
@@ -1469,18 +1315,10 @@ mod tests {
     #[test]
     fn generated_chart_second_position_picks_a_harp_a_fourth_below_the_jam_key() {
         // A cross-harp jam in G is played on a C harp.
-        let chart = generated_chart(
-            "G",
-            90.0,
-            Progression::Standard,
-            Position::Second,
-            Genre::Blues,
-            30.0,
-        );
+        let chart =
+            generated_chart("G", 90.0, Progression::Standard, Position::Second, Genre::Blues, 30.0);
         match chart.harmonica {
-            harmonicon_core::harmonica::Harmonica::Diatonic {
-                layout, position, ..
-            } => {
+            harmonicon_core::harmonica::Harmonica::Diatonic { layout, position, .. } => {
                 let layout = layout.expect("richter_harp always sets a layout");
                 assert_eq!(layout.blow.unwrap()[0], "C4");
                 assert_eq!(position.as_deref(), Some("2nd"));
@@ -1493,14 +1331,8 @@ mod tests {
     fn generated_chart_track_is_never_empty() {
         // The chart schema requires `track.minItems: 1` — a generated jam
         // has no real notes to schedule, but must still satisfy it.
-        let chart = generated_chart(
-            "C",
-            90.0,
-            Progression::Standard,
-            Position::First,
-            Genre::Blues,
-            30.0,
-        );
+        let chart =
+            generated_chart("C", 90.0, Progression::Standard, Position::First, Genre::Blues, 30.0);
         assert!(!chart.track.is_empty());
         assert!(!chart.track[0].events.is_empty());
     }
@@ -1508,14 +1340,8 @@ mod tests {
     #[test]
     fn generated_chart_feel_matches_genre() {
         for &genre in Genre::all() {
-            let chart = generated_chart(
-                "C",
-                90.0,
-                Progression::Standard,
-                Position::First,
-                genre,
-                30.0,
-            );
+            let chart =
+                generated_chart("C", 90.0, Progression::Standard, Position::First, genre, 30.0);
             assert_eq!(chart.song.feel, Some(genre.metronome_feel()), "{genre:?}");
         }
     }
@@ -1535,17 +1361,11 @@ mod tests {
                     pcm.len()
                 );
                 let peak = pcm.iter().fold(0.0f32, |m, s| m.max(s.abs()));
-                assert!(
-                    peak > 0.02 && peak <= 1.0,
-                    "{genre:?} {answer:?} peak {peak}"
-                );
+                assert!(peak > 0.02 && peak <= 1.0, "{genre:?} {answer:?} peak {peak}");
                 // The final eighth (the short one when swung) is silence, so
                 // the answer never covers the downbeat it points at.
-                let short = if groove_arrangement(*genre).swung {
-                    1.0 - SWING_LONG_FRAC
-                } else {
-                    0.5
-                };
+                let short =
+                    if groove_arrangement(*genre).swung { 1.0 - SWING_LONG_FRAC } else { 0.5 };
                 let tail = (short * 60.0 / 120.0 * SAMPLE_RATE as f32) as usize - 8;
                 assert!(
                     pcm[pcm.len() - tail..].iter().all(|s| *s == 0.0),
@@ -1573,15 +1393,10 @@ mod tests {
             &mut sources,
         );
         assert!(manifest.music.is_none());
-        let stems = manifest
-            .backing_stems
-            .expect("generated jam always has rhythm-section stems");
+        let stems = manifest.backing_stems.expect("generated jam always has rhythm-section stems");
         assert_eq!(stems.len(), 3);
         assert_eq!(
-            stems
-                .iter()
-                .map(|stem| stem.name.as_str())
-                .collect::<Vec<_>>(),
+            stems.iter().map(|stem| stem.name.as_str()).collect::<Vec<_>>(),
             ["Bass", "Drums", "Comping"]
         );
         assert_eq!(stems[COMPING_STEM].name, "Comping");

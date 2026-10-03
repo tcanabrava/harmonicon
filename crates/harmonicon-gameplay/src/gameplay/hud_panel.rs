@@ -124,11 +124,7 @@ pub(super) fn spawn_hud_panel(parent: &mut ChildSpawnerCommands, panel: HudPanel
     }
 
     parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(6.0),
-            ..default()
-        })
+        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), ..default() })
         .with_children(|metro| {
             spawn_metronome(metro, panel.loc, panel.beats_per_bar, panel.bpm);
         });
@@ -179,10 +175,7 @@ mod tests {
             assert!(!panels.notation_staff);
             assert!(!panels.technique_legend, "the legend lives in the panel");
             assert!(!panels.blow_draw_in_panel);
-            assert!(
-                panels.progress_notes,
-                "the progress bar is not a supplement"
-            );
+            assert!(panels.progress_notes, "the progress bar is not a supplement");
         }
     }
 
@@ -231,13 +224,7 @@ mod tests {
                         contextual_panels(LaneSurface::Lane3d, compact, aural, techniques, false);
                     assert!(!two_d.blow_draw_in_panel, "2D prints it under the holes");
                     assert_eq!(three_d.blow_draw_in_panel, three_d.side_panel);
-                    assert_eq!(
-                        ContextualPanels {
-                            blow_draw_in_panel: false,
-                            ..three_d
-                        },
-                        two_d
-                    );
+                    assert_eq!(ContextualPanels { blow_draw_in_panel: false, ..three_d }, two_d);
                 }
             }
         }

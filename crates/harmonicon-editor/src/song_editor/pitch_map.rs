@@ -45,10 +45,7 @@ pub(super) fn map_pitch_playable(
 /// Transposition uses the alternatives when two simultaneous pitches would
 /// otherwise compete for the same hole.
 pub(super) fn playable_assignments(target: u8, harp: &Harmonica) -> Vec<(u8, Dir, Pitch)> {
-    pitch_map::playable_assignments(target, harp)
-        .into_iter()
-        .map(from_core)
-        .collect()
+    pitch_map::playable_assignments(target, harp).into_iter().map(from_core).collect()
 }
 
 /// [`map_pitch_playable`] with core's nearest-natural-note fallback.
@@ -86,11 +83,8 @@ mod tests {
             (Technique::Overdraw, Pitch::Overdraw),
             (Technique::Slide, Pitch::Slide),
         ] {
-            let (_, _, pitch) = from_core(HoleAssignment {
-                hole: 4,
-                action: Action::Blow,
-                technique,
-            });
+            let (_, _, pitch) =
+                from_core(HoleAssignment { hole: 4, action: Action::Blow, technique });
             assert_eq!(pitch, expected);
         }
     }
@@ -120,11 +114,8 @@ mod tests {
     #[test]
     fn both_breath_directions_survive_the_translation() {
         for (action, expected) in [(Action::Blow, Dir::Blow), (Action::Draw, Dir::Draw)] {
-            let (_, dir, _) = from_core(HoleAssignment {
-                hole: 1,
-                action,
-                technique: Technique::Natural,
-            });
+            let (_, dir, _) =
+                from_core(HoleAssignment { hole: 1, action, technique: Technique::Natural });
             assert_eq!(dir, expected);
         }
     }

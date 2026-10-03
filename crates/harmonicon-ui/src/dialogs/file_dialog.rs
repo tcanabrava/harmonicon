@@ -130,9 +130,7 @@ fn list_dir(dir: &std::path::Path, extensions: &[String]) -> (Vec<PathBuf>, Vec<
 }
 
 fn file_name(p: &std::path::Path) -> String {
-    p.file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default()
+    p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
 }
 
 /// Open the dialog when an [`OpenFileDialog`] arrives: set state and spawn the
@@ -168,11 +166,7 @@ fn handle_open(
 
     let title = dialog.title.clone();
     let is_save = matches!(dialog.mode, DialogMode::Save { .. });
-    let save_row_display = if is_save {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    let save_row_display = if is_save { Display::Flex } else { Display::None };
     let initial_filename = dialog.save_filename.clone();
 
     commands
@@ -356,10 +350,7 @@ fn spawn_file_entry(parent: &mut ChildSpawnerCommands, label: String, path: Path
             match &dialog.mode {
                 DialogMode::Open => {
                     if let Some(purpose) = dialog.purpose {
-                        chosen.write(FileChosen {
-                            purpose,
-                            path: path.clone(),
-                        });
+                        chosen.write(FileChosen { purpose, path: path.clone() });
                     }
                     close(&mut dialog, &roots, next, &mut commands);
                 }
@@ -505,10 +496,7 @@ impl Plugin for FileDialogsPlugin {
             .add_message::<RefreshFileList>()
             .init_resource::<FileDialog>()
             .init_state::<FileDialogState>()
-            .add_systems(
-                Update,
-                handle_open.run_if(in_state(FileDialogState::Closed)),
-            )
+            .add_systems(Update, handle_open.run_if(in_state(FileDialogState::Closed)))
             .add_systems(
                 Update,
                 (refresh, sync_save_filename, dialog_keys).run_if(in_state(FileDialogState::Open)),
@@ -524,9 +512,7 @@ mod tests {
     /// with the *package* root as its working directory — so these reach
     /// for it explicitly rather than relying on CWD.
     fn asset_root(rel: &str) -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join(rel)
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(rel)
     }
 
     #[test]
@@ -535,11 +521,7 @@ mod tests {
         assert!(!dirs.is_empty(), "expected asset subfolders");
         let (_, files) = list_dir(&asset_root("assets/sounds"), &["ogg".into()]);
         assert!(!files.is_empty(), "expected the metronome clicks");
-        assert!(
-            files
-                .iter()
-                .all(|f| f.extension().and_then(|e| e.to_str()) == Some("ogg"))
-        );
+        assert!(files.iter().all(|f| f.extension().and_then(|e| e.to_str()) == Some("ogg")));
     }
 
     #[test]

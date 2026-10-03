@@ -80,11 +80,7 @@ pub fn section_keys(sections: &[PhraseSection]) -> Vec<String> {
         .map(|s| {
             let n = counts.entry(s.name.as_str()).or_insert(0);
             *n += 1;
-            if *n == 1 {
-                s.name.clone()
-            } else {
-                format!("{} #{}", s.name, n)
-            }
+            if *n == 1 { s.name.clone() } else { format!("{} #{}", s.name, n) }
         })
         .collect()
 }
@@ -95,10 +91,7 @@ pub fn section_keys(sections: &[PhraseSection]) -> Vec<String> {
 /// documents. A section with no entry in `map` (never played, or renamed
 /// since it was) reads as unlearned (0.0).
 pub fn learned_vec_from_map(sections: &[PhraseSection], map: &HashMap<String, f32>) -> Vec<f32> {
-    section_keys(sections)
-        .iter()
-        .map(|key| map.get(key).copied().unwrap_or(0.0))
-        .collect()
+    section_keys(sections).iter().map(|key| map.get(key).copied().unwrap_or(0.0)).collect()
 }
 
 /// Writes the session's ordinal `learned` vector back into the persisted,
@@ -167,16 +160,10 @@ pub fn unlocked_flags(
             ordinal = 0;
         }
         first = false;
-        let note_count = sections
-            .get(section_idx)
-            .map(|s| s.note_count)
-            .unwrap_or(count);
+        let note_count = sections.get(section_idx).map(|s| s.note_count).unwrap_or(count);
         let learned_frac = learned.get(section_idx).copied().unwrap_or(0.0);
-        let active_count = if enabled {
-            active_note_count(note_count, learned_frac)
-        } else {
-            note_count
-        };
+        let active_count =
+            if enabled { active_note_count(note_count, learned_frac) } else { note_count };
         for _ in 0..count {
             flags.push((ordinal < active_count, section_idx));
             ordinal += 1;
@@ -230,13 +217,7 @@ pub fn track_items<'a>(
 ) -> Vec<(f64, Option<&'a str>, usize)> {
     track
         .iter()
-        .map(|item| {
-            (
-                resolve_item_time(item, timing),
-                item.phrase.as_deref(),
-                item.events.len(),
-            )
-        })
+        .map(|item| (resolve_item_time(item, timing), item.phrase.as_deref(), item.events.len()))
         .collect()
 }
 
@@ -280,10 +261,7 @@ pub fn carry_over_note_state(old: &[ScheduledNote], new: &mut [ScheduledNote]) {
 /// notes such that whatever the old cursor pointed at is no longer
 /// meaningful.
 pub fn first_unresolved_index(notes: &[ScheduledNote]) -> usize {
-    notes
-        .iter()
-        .position(|n| !(n.missed || (n.hit && n.sustain_scored)))
-        .unwrap_or(notes.len())
+    notes.iter().position(|n| !(n.missed || (n.hit && n.sustain_scored))).unwrap_or(notes.len())
 }
 
 /// The shared core of `gameplay_2d`/`gameplay_3d`'s own
@@ -334,13 +312,7 @@ pub(super) fn resync_notes_on_adaptive_change(
 pub(super) fn invalidate_note_visuals(
     mut rebuilt: MessageReader<NotesRebuilt>,
     mut commands: Commands,
-    visuals: Query<
-        Entity,
-        Or<(
-            With<super::NoteVisual>,
-            With<super::gameplay_3d::NoteVisual3D>,
-        )>,
-    >,
+    visuals: Query<Entity, Or<(With<super::NoteVisual>, With<super::gameplay_3d::NoteVisual3D>)>>,
 ) {
     if rebuilt.read().count() == 0 {
         return;
@@ -399,14 +371,9 @@ pub(super) fn setup_adaptive_difficulty(
 
     let key = manifest.path.display().to_string();
     let record = profile.songs.get(&key);
-    let learned = record
-        .map(|r| learned_vec_from_map(&sections, &r.phrase_learned))
-        .unwrap_or_default();
-    *adaptive = AdaptiveDifficulty {
-        enabled: enabled_for_lesson && setting.0,
-        learned,
-        sections,
-    };
+    let learned =
+        record.map(|r| learned_vec_from_map(&sections, &r.phrase_learned)).unwrap_or_default();
+    *adaptive = AdaptiveDifficulty { enabled: enabled_for_lesson && setting.0, learned, sections };
 }
 
 #[cfg(test)]
@@ -455,11 +422,7 @@ mod tests {
 
     #[test]
     fn phrase_tags_split_into_sections() {
-        let items = [
-            (0.0, Some("intro"), 2usize),
-            (1.0, None, 1),
-            (2.0, Some("turnaround"), 3),
-        ];
+        let items = [(0.0, Some("intro"), 2usize), (1.0, None, 1), (2.0, Some("turnaround"), 3)];
         let sections = group_phrase_sections(&items, 10.0);
         assert_eq!(sections.len(), 2);
         assert_eq!(sections[0].name, "intro");
@@ -549,10 +512,7 @@ mod tests {
         let items = [(0.0, Some("intro"), 2usize), (1.0, Some("turnaround"), 2)];
         let sections = group_phrase_sections(&items, 5.0);
         let flags = unlocked_flags(&items, &sections, &[1.0, 1.0], true);
-        assert_eq!(
-            flags.iter().map(|&(_, s)| s).collect::<Vec<_>>(),
-            vec![0, 0, 1, 1]
-        );
+        assert_eq!(flags.iter().map(|&(_, s)| s).collect::<Vec<_>>(), vec![0, 0, 1, 1]);
     }
 
     // ── bump_learned_sections ────────────────────────────────────────────────
@@ -602,12 +562,7 @@ mod tests {
     // ── section_keys / learned_vec_from_map / write_learned_into_map ────────
 
     fn section(name: &str) -> PhraseSection {
-        PhraseSection {
-            name: name.to_string(),
-            start_time: 0.0,
-            end_time: 1.0,
-            note_count: 1,
-        }
+        PhraseSection { name: name.to_string(), start_time: 0.0, end_time: 1.0, note_count: 1 }
     }
 
     #[test]
@@ -619,10 +574,7 @@ mod tests {
     #[test]
     fn section_keys_disambiguates_repeated_names() {
         let sections = [section("chorus"), section("verse"), section("chorus")];
-        assert_eq!(
-            section_keys(&sections),
-            vec!["chorus", "verse", "chorus #2"]
-        );
+        assert_eq!(section_keys(&sections), vec!["chorus", "verse", "chorus #2"]);
     }
 
     #[test]
@@ -712,10 +664,7 @@ mod tests {
         let old_notes = vec![old];
         let mut new_notes = vec![note_at(1.0, 1, false), note_at(5.0, 3, true)];
         carry_over_note_state(&old_notes, &mut new_notes);
-        assert!(
-            !new_notes[0].missed,
-            "the newly-inserted note must not match"
-        );
+        assert!(!new_notes[0].missed, "the newly-inserted note must not match");
         assert!(new_notes[1].missed, "the pre-existing note keeps its state");
     }
 
@@ -764,16 +713,10 @@ mod invalidation_tests {
     #[test]
     fn both_presentations_invalidate_only_after_a_successful_rebuild() {
         let mut app = App::new();
-        app.add_message::<NotesRebuilt>()
-            .add_systems(Update, invalidate_note_visuals);
-        let two = app
-            .world_mut()
-            .spawn(super::super::NoteVisual { note_id: 0 })
-            .id();
-        let three = app
-            .world_mut()
-            .spawn(super::super::gameplay_3d::NoteVisual3D { note_id: 0 })
-            .id();
+        app.add_message::<NotesRebuilt>().add_systems(Update, invalidate_note_visuals);
+        let two = app.world_mut().spawn(super::super::NoteVisual { note_id: 0 }).id();
+        let three =
+            app.world_mut().spawn(super::super::gameplay_3d::NoteVisual3D { note_id: 0 }).id();
         let other = app.world_mut().spawn_empty().id();
         app.update();
         assert!(app.world().get_entity(two).is_ok());

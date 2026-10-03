@@ -191,9 +191,7 @@ fn apply_font_fallback(
 
         let (first_text, first_kind) = &runs[0];
         if first_text != &text.0 {
-            commands
-                .entity(entity)
-                .insert(Text::new(first_text.clone()));
+            commands.entity(entity).insert(Text::new(first_text.clone()));
         }
         set_font(
             &mut font,
@@ -213,11 +211,7 @@ fn apply_font_fallback(
                 };
                 parent.spawn((
                     TextSpan::new(run_text.clone()),
-                    TextFont {
-                        font: font_source,
-                        font_size: base_size,
-                        ..default()
-                    },
+                    TextFont { font: font_source, font_size: base_size, ..default() },
                     TextColor(base_color),
                     GeneratedSpan,
                 ));
@@ -237,10 +231,8 @@ impl Plugin for FontFallbackPlugin {
         // frame — a note head stamped ✓ on the hit, a tuner flipping to
         // in-tune — drew one frame of tofu whenever the writer happened to
         // run after it.
-        app.add_systems(Startup, load_fallback_fonts).add_systems(
-            PostUpdate,
-            apply_font_fallback.before(bevy::ui::UiSystems::Content),
-        );
+        app.add_systems(Startup, load_fallback_fonts)
+            .add_systems(PostUpdate, apply_font_fallback.before(bevy::ui::UiSystems::Content));
     }
 }
 
@@ -311,15 +303,8 @@ mod tests {
             "\u{23F8} Pause",
         ] {
             let runs = split_runs(label);
-            assert_eq!(
-                runs.len(),
-                2,
-                "expected an icon run + text run for {label:?}"
-            );
-            assert!(
-                runs[0].1.is_some(),
-                "icon run should need a fallback font for {label:?}"
-            );
+            assert_eq!(runs.len(), 2, "expected an icon run + text run for {label:?}");
+            assert!(runs[0].1.is_some(), "icon run should need a fallback font for {label:?}");
             assert!(
                 runs[1].1.is_none(),
                 "trailing text run should use the default font for {label:?}"
@@ -360,11 +345,7 @@ mod tests {
         let mut app = test_app();
         let id = app
             .world_mut()
-            .spawn((
-                Text::new("Listen"),
-                TextFont::default(),
-                TextColor::default(),
-            ))
+            .spawn((Text::new("Listen"), TextFont::default(), TextColor::default()))
             .id();
         app.update();
 
@@ -378,11 +359,7 @@ mod tests {
         let mut app = test_app();
         let id = app
             .world_mut()
-            .spawn((
-                Text::new("\u{1F50A} Listen"),
-                TextFont::default(),
-                TextColor::default(),
-            ))
+            .spawn((Text::new("\u{1F50A} Listen"), TextFont::default(), TextColor::default()))
             .id();
         app.update();
 
@@ -390,22 +367,14 @@ mod tests {
         // The entity's own Text keeps just the icon; "Listen" moves to a span.
         assert_eq!(world.get::<Text>(id).unwrap().0, "\u{1F50A}");
         let font = world.get::<TextFont>(id).unwrap();
-        assert_ne!(
-            font.font,
-            FontSource::default(),
-            "icon run should use the fallback font"
-        );
+        assert_ne!(font.font, FontSource::default(), "icon run should use the fallback font");
 
         let children = world.get::<Children>(id).expect("span child spawned");
         assert_eq!(children.len(), 1);
         let span = world.get::<TextSpan>(children[0]).unwrap();
         assert_eq!(span.0, " Listen");
         let span_font = world.get::<TextFont>(children[0]).unwrap();
-        assert_eq!(
-            span_font.font,
-            FontSource::default(),
-            "the text run keeps the default font"
-        );
+        assert_eq!(span_font.font, FontSource::default(), "the text run keeps the default font");
     }
 
     #[test]
@@ -443,11 +412,7 @@ mod tests {
         let mut app = test_app();
         let id = app
             .world_mut()
-            .spawn((
-                Text::new("\u{2713} A"),
-                TextFont::default(),
-                TextColor::default(),
-            ))
+            .spawn((Text::new("\u{2713} A"), TextFont::default(), TextColor::default()))
             .id();
         app.update();
         let first_span = app.world().get::<Children>(id).unwrap()[0];
@@ -458,15 +423,8 @@ mod tests {
 
         let world = app.world();
         let children = world.get::<Children>(id).unwrap();
-        assert_eq!(
-            children.len(),
-            1,
-            "stale span shouldn't linger alongside the new one"
-        );
+        assert_eq!(children.len(), 1, "stale span shouldn't linger alongside the new one");
         assert_eq!(world.get::<TextSpan>(children[0]).unwrap().0, " B");
-        assert!(
-            world.get_entity(first_span).is_err(),
-            "the old span should be despawned"
-        );
+        assert!(world.get_entity(first_span).is_err(), "the old span should be despawned");
     }
 }

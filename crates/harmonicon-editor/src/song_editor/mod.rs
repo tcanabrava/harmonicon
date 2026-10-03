@@ -134,10 +134,7 @@ pub struct SongEditor2Plugin;
 impl Plugin for SongEditor2Plugin {
     fn build(&self, app: &mut App) {
         #[cfg(feature = "dev")]
-        app.add_plugins((
-            debug_record::DebugRecordPlugin,
-            expected_notes::ExpectedNotesPlugin,
-        ));
+        app.add_plugins((debug_record::DebugRecordPlugin, expected_notes::ExpectedNotesPlugin));
 
         app.add_plugins(material::EditorNoteMaterialPlugin)
             .add_systems(
@@ -302,10 +299,7 @@ impl Plugin for SongEditor2Plugin {
             .add_systems(
                 Update,
                 (
-                    (
-                        midi_import::handle_midi_chosen,
-                        midi_import::rebuild_midi_track_combobox,
-                    )
+                    (midi_import::handle_midi_chosen, midi_import::rebuild_midi_track_combobox)
                         .chain(),
                     meta_form::spawn_scale_combobox,
                     meta_form::spawn_time_signature_combobox,

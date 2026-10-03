@@ -43,11 +43,8 @@ pub(crate) const POSITION_CYCLE_BARS: usize = 4;
 /// `Scale` variants with a matching `Position` (see this module's own doc
 /// comment for why the others — `Major`/`MinorPentatonic`/`Country` — don't
 /// apply here).
-pub(crate) const POSITION_CYCLE: [Scale; 3] = [
-    Scale::FirstPosition,
-    Scale::SecondPosition,
-    Scale::ThirdPosition,
-];
+pub(crate) const POSITION_CYCLE: [Scale; 3] =
+    [Scale::FirstPosition, Scale::SecondPosition, Scale::ThirdPosition];
 
 /// Which `Scale` should be active at `absolute_bar` (an open-ended, non-
 /// wrapped bar count — see `gameplay::AbsoluteBar`), cycling through
@@ -135,13 +132,7 @@ pub(crate) fn on_position_called(
     let position = scale_as_position(scale).unwrap_or(Position::First);
     commands.entity(slot_entity).despawn_related::<Children>();
     commands.entity(slot_entity).with_children(|col| {
-        spawn_position_caption(
-            col,
-            &loc,
-            &slot.0,
-            position,
-            theme.circle_of_fifths_colors(),
-        );
+        spawn_position_caption(col, &loc, &slot.0, position, theme.circle_of_fifths_colors());
     });
 }
 
@@ -237,18 +228,9 @@ mod tests {
 
     #[test]
     fn the_three_position_scales_map_to_their_matching_position() {
-        assert_eq!(
-            scale_as_position(Scale::FirstPosition),
-            Some(Position::First)
-        );
-        assert_eq!(
-            scale_as_position(Scale::SecondPosition),
-            Some(Position::Second)
-        );
-        assert_eq!(
-            scale_as_position(Scale::ThirdPosition),
-            Some(Position::Third)
-        );
+        assert_eq!(scale_as_position(Scale::FirstPosition), Some(Position::First));
+        assert_eq!(scale_as_position(Scale::SecondPosition), Some(Position::Second));
+        assert_eq!(scale_as_position(Scale::ThirdPosition), Some(Position::Third));
     }
 
     #[test]

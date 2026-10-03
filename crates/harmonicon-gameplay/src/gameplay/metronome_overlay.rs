@@ -46,11 +46,7 @@ pub struct MetronomeTempo {
 
 impl Default for MetronomeTempo {
     fn default() -> Self {
-        Self {
-            bpm: 90.0,
-            meter: MusicScoreMeter::default(),
-            lead_beats: 0.0,
-        }
+        Self { bpm: 90.0, meter: MusicScoreMeter::default(), lead_beats: 0.0 }
     }
 }
 
@@ -216,11 +212,7 @@ pub fn spawn_metronome(
         });
 
     parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(6.0),
-            ..default()
-        })
+        .spawn(Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(6.0), ..default() })
         .with_children(|row| {
             for i in 0..beats_per_bar {
                 let size = if i == 0 { Val::Px(28.0) } else { Val::Px(22.0) };
@@ -281,11 +273,7 @@ pub fn update_metronome(
     let t = beat_pos.fract() as f32;
 
     for (cell, mut bg) in &mut beats {
-        let brightness = if cell.0 == current {
-            beat_brightness(t, *feel)
-        } else {
-            0.0
-        };
+        let brightness = if cell.0 == current { beat_brightness(t, *feel) } else { 0.0 };
         let is_downbeat = cell.0 == 0;
         let base = if is_downbeat { 0.25 } else { 0.12 };
         let color = Color::srgba(
@@ -352,11 +340,7 @@ pub fn play_click_if_due(
     let Some((accent, gain)) = click_for_tick(current, tempo.beats_per_bar() as f64, feel) else {
         return;
     };
-    let sample = if accent {
-        sounds.downbeat.clone()
-    } else {
-        sounds.beat.clone()
-    };
+    let sample = if accent { sounds.downbeat.clone() } else { sounds.beat.clone() };
     commands.spawn((
         AudioPlayer::<AudioSource>(sample),
         PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.metronome_volume * gain)),
@@ -524,29 +508,19 @@ impl Plugin for MetronomePlugin {
             .init_resource::<MetronomeFeel>()
             .init_resource::<MetronomeTempo>()
             .add_systems(Startup, load_metronome_sounds)
-            .add_systems(
-                OnEnter(AppState::Playing),
-                (reset_click_tracking, set_tempo_from_song),
-            )
+            .add_systems(OnEnter(AppState::Playing), (reset_click_tracking, set_tempo_from_song))
             .add_systems(OnEnter(AppState::BendingTrainer), reset_click_tracking)
             // Clicks/beat animation: gameplay (unpaused) and the Bending Trainer.
             .add_systems(
                 Update,
-                (update_metronome, click_metronome)
-                    .after(GameplayLogic)
-                    .run_if(metronome_running),
+                (update_metronome, click_metronome).after(GameplayLogic).run_if(metronome_running),
             )
             // Toggles + label refreshes stay responsive even while paused. The
             // buttons' click/hover ride along as inline on(...) observers (see
             // spawn_metronome).
             .add_systems(
                 Update,
-                (
-                    toggle_mute_key,
-                    update_mute_label,
-                    update_feel_label,
-                    update_tempo_label,
-                )
+                (toggle_mute_key, update_mute_label, update_feel_label, update_tempo_label)
                     .run_if(metronome_ui_active),
             );
     }
@@ -564,9 +538,7 @@ mod tests {
         let mut schedule = Schedule::default();
         schedule.add_systems(update_mute_label);
         let label = |world: &mut World| {
-            world
-                .spawn((Text::new(""), TextColor(Color::WHITE), MetronomeMuteLabel))
-                .id()
+            world.spawn((Text::new(""), TextColor(Color::WHITE), MetronomeMuteLabel)).id()
         };
 
         let first = label(&mut world);
@@ -646,11 +618,7 @@ mod tests {
         // Greensleeves: 6/8 at 180. The old click ran at 60/180 = a third
         // of a second — a quarter — and accented every 6 of them: every
         // second bar. The beat is an eighth, six to a 1 s bar.
-        let t = MetronomeTempo {
-            bpm: 180.0,
-            meter: parse_time_signature("6/8"),
-            lead_beats: 0.0,
-        };
+        let t = MetronomeTempo { bpm: 180.0, meter: parse_time_signature("6/8"), lead_beats: 0.0 };
         assert_eq!(t.beats_per_bar(), 6);
         assert!((t.beat_secs() - 1.0 / 6.0).abs() < 1e-9);
         assert!((t.bar_secs() - 1.0).abs() < 1e-9);
@@ -662,11 +630,7 @@ mod tests {
         // Für Elise: 3/8 at 120. A bar is 1.5 quarters, which no whole
         // number of quarter-note clicks could ever accent; three eighths
         // can.
-        let t = MetronomeTempo {
-            bpm: 120.0,
-            meter: parse_time_signature("3/8"),
-            lead_beats: 0.0,
-        };
+        let t = MetronomeTempo { bpm: 120.0, meter: parse_time_signature("3/8"), lead_beats: 0.0 };
         assert_eq!(t.beats_per_bar(), 3);
         assert!((t.bar_secs() - 0.75).abs() < 1e-9);
         let tick = tick_index(0.75, t.beat_secs(), MetronomeFeel::Straight).unwrap();
@@ -677,11 +641,7 @@ mod tests {
     fn a_pickup_moves_the_accent_to_bar_one() {
         // A one-beat pickup in 4/4 at 120: the music's first beat is bar
         // 0's fourth, and the accent falls half a second in.
-        let t = MetronomeTempo {
-            bpm: 120.0,
-            lead_beats: 3.0,
-            ..Default::default()
-        };
+        let t = MetronomeTempo { bpm: 120.0, lead_beats: 3.0, ..Default::default() };
         let tick_at = |clock: f64| {
             tick_index(t.grid_clock(clock), t.beat_secs(), MetronomeFeel::Straight).unwrap()
         };
@@ -692,10 +652,7 @@ mod tests {
 
     #[test]
     fn in_common_time_nothing_changes() {
-        let t = MetronomeTempo {
-            bpm: 120.0,
-            ..Default::default()
-        };
+        let t = MetronomeTempo { bpm: 120.0, ..Default::default() };
         assert_eq!(t.beats_per_bar(), 4);
         assert!((t.beat_secs() - Q120).abs() < 1e-9);
         assert!((t.bar_secs() - 2.0).abs() < 1e-9);
@@ -750,10 +707,7 @@ mod tests {
             let t = i as f32 / 1000.0;
             for feel in [MetronomeFeel::Straight, MetronomeFeel::Shuffle] {
                 let b = beat_brightness(t, feel);
-                assert!(
-                    (0.0..=1.0).contains(&b),
-                    "t={t} feel={feel:?} brightness={b}"
-                );
+                assert!((0.0..=1.0).contains(&b), "t={t} feel={feel:?} brightness={b}");
             }
         }
     }

@@ -69,19 +69,12 @@ pub(super) fn transpose_notes(
             };
             playable_assignments(target, harp)
                 .into_iter()
-                .map(|(hole, dir, pitch)| GridNote {
-                    hole,
-                    dir,
-                    pitch,
-                    ..*n
-                })
+                .map(|(hole, dir, pitch)| GridNote { hole, dir, pitch, ..*n })
                 .collect()
         })
         .collect();
-    let mut choices: Vec<Option<usize>> = candidates
-        .iter()
-        .map(|options| (!options.is_empty()).then_some(0))
-        .collect();
+    let mut choices: Vec<Option<usize>> =
+        candidates.iter().map(|options| (!options.is_empty()).then_some(0)).collect();
 
     // Settle collisions: a candidate that would overlap another note's
     // final place gives up and stays put. One revert per pass, then look
@@ -112,10 +105,7 @@ pub(super) fn transpose_notes(
         }
     }
 
-    let mut outcome = TransposeOutcome {
-        semitones,
-        ..Default::default()
-    };
+    let mut outcome = TransposeOutcome { semitones, ..Default::default() };
     for (i, n) in notes.iter_mut().enumerate() {
         if !in_scope(n) {
             continue;
@@ -153,10 +143,7 @@ pub(super) fn outcome_message(outcome: &TransposeOutcome, loc: &Localization) ->
     if clean {
         loc.msg_args(
             "editor-transposed",
-            &[
-                ("count", outcome.moved.to_string()),
-                ("semitones", semitones),
-            ],
+            &[("count", outcome.moved.to_string()), ("semitones", semitones)],
         )
     } else {
         loc.msg_args(
@@ -166,10 +153,7 @@ pub(super) fn outcome_message(outcome: &TransposeOutcome, loc: &Localization) ->
                 ("semitones", semitones),
                 ("kept", outcome.kept.to_string()),
                 ("mixed", outcome.diagnostics.mixed_breath_groups.to_string()),
-                (
-                    "duplicate",
-                    outcome.diagnostics.duplicate_hole_groups.to_string(),
-                ),
+                ("duplicate", outcome.diagnostics.duplicate_hole_groups.to_string()),
             ],
         )
     }

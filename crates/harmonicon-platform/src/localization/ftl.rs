@@ -194,13 +194,8 @@ async fn load_bundle(
             (Some(parent), true) => parent.join(path),
             _ => path,
         };
-        let loaded = load_context
-            .load_builder()
-            .load_untyped_value(path.clone())
-            .await?;
-        let resource = loaded
-            .get::<FtlResource>()
-            .ok_or(FtlLoadError::NotAnFtlResource(path))?;
+        let loaded = load_context.load_builder().load_untyped_value(path.clone()).await?;
+        let resource = loaded.get::<FtlResource>().ok_or(FtlLoadError::NotAnFtlResource(path))?;
         if let Err(errors) = bundle.add_resource(resource.0.clone()) {
             for error in errors {
                 warn!("FTL resource overrides an existing message: {error}");

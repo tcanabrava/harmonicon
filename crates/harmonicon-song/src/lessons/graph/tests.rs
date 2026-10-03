@@ -97,10 +97,7 @@ fn a_prerequisite_that_does_not_exist_is_its_own_error() {
     let err = LessonGraph::build(&[lesson("a", "t", &["ghost"])]).unwrap_err();
     assert_eq!(
         err,
-        GraphError::UnknownPrerequisite {
-            lesson: "a".into(),
-            missing: "ghost".into()
-        }
+        GraphError::UnknownPrerequisite { lesson: "a".into(), missing: "ghost".into() }
     );
 }
 
@@ -219,10 +216,7 @@ fn a_single_gateway_is_named_as_the_chokepoint() {
     );
     assert_eq!(r.fewest, 1);
     // `a` is the only start as well; each is the sole option once a trial.
-    assert_eq!(
-        r.sole_options,
-        vec![("a".to_string(), 50), ("gate".to_string(), 50)]
-    );
+    assert_eq!(r.sole_options, vec![("a".to_string(), 50), ("gate".to_string(), 50)]);
 }
 
 #[test]

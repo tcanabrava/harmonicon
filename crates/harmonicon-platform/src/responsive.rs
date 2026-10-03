@@ -60,8 +60,7 @@ pub struct ResponsivePlugin;
 
 impl Plugin for ResponsivePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CompactLayout>()
-            .add_systems(Update, update_compact_layout);
+        app.init_resource::<CompactLayout>().add_systems(Update, update_compact_layout);
     }
 }
 

@@ -23,20 +23,12 @@ pub(super) fn setup_camera_3d(commands: &mut Commands) {
 
 pub(super) fn setup_lighting(commands: &mut Commands) {
     commands.spawn((
-        DirectionalLight {
-            illuminance: 8_000.0,
-            color: Color::srgb(1.0, 0.97, 0.90),
-            ..default()
-        },
+        DirectionalLight { illuminance: 8_000.0, color: Color::srgb(1.0, 0.97, 0.90), ..default() },
         Transform::from_xyz(8.0, 20.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
         GameplayRoot,
     ));
     commands.spawn((
-        AmbientLight {
-            color: Color::srgb(0.15, 0.15, 0.22),
-            brightness: 200.0,
-            ..default()
-        },
+        AmbientLight { color: Color::srgb(0.15, 0.15, 0.22), brightness: 200.0, ..default() },
         GameplayRoot,
     ));
 }
@@ -187,11 +179,7 @@ pub fn update_holes_3d(
         let hint = if lesson.as_ref().is_some_and(|lesson| lesson.aural) {
             None
         } else {
-            targets
-                .0
-                .iter()
-                .find(|(h, _)| *h == cell.0)
-                .map(|(_, b)| *b)
+            targets.0.iter().find(|(h, _)| *h == cell.0).map(|(_, b)| *b)
         };
 
         super::super::gameplay_2d::step_hole_glow(

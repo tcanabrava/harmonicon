@@ -188,17 +188,11 @@ impl EffectiveHarmonica {
     /// off its hole-1 blow note.
     pub fn song_key_for(&self, chart: &HarpChart) -> String {
         let chart_key = chart.song.key.as_str();
-        let Some(played) = self
-            .harp
-            .as_ref()
-            .filter(|_| self.mapping == HarpMapping::SameHoles)
+        let Some(played) = self.harp.as_ref().filter(|_| self.mapping == HarpMapping::SameHoles)
         else {
             return chart_key.to_string();
         };
-        match (
-            detected_harp_key(&chart.harmonica),
-            detected_harp_key(played),
-        ) {
+        match (detected_harp_key(&chart.harmonica), detected_harp_key(played)) {
             (Some(from), Some(to)) => semitone(chart_key, key_offset(&to) - key_offset(&from)),
             _ => chart_key.to_string(),
         }
@@ -305,10 +299,7 @@ mod tests {
     fn the_sounding_key_moves_with_the_harp_only_under_same_holes() {
         // A chart in C for a C harp, played on a G harp.
         let chart = chart_in("C", "C");
-        let on_g = |mapping| EffectiveHarmonica {
-            harp: Some(richter_harp("G")),
-            mapping,
-        };
+        let on_g = |mapping| EffectiveHarmonica { harp: Some(richter_harp("G")), mapping };
         assert_eq!(on_g(HarpMapping::SameHoles).song_key_for(&chart), "G");
         assert_eq!(on_g(HarpMapping::Transpose).song_key_for(&chart), "C");
         assert_eq!(EffectiveHarmonica::default().song_key_for(&chart), "C");
@@ -319,10 +310,8 @@ mod tests {
         // A tune in G on a C harp (2nd position), played on an A harp: the
         // harp moved up a major sixth (C → A), so the tune moves G → E.
         let chart = chart_in("G", "C");
-        let on_a = EffectiveHarmonica {
-            harp: Some(richter_harp("A")),
-            mapping: HarpMapping::SameHoles,
-        };
+        let on_a =
+            EffectiveHarmonica { harp: Some(richter_harp("A")), mapping: HarpMapping::SameHoles };
         assert_eq!(on_a.song_key_for(&chart), "E");
     }
 }

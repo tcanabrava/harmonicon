@@ -68,8 +68,7 @@ mod tests {
     fn update_consumers_see_current_audio_regardless_of_registration_order() {
         for consumer_first in [false, true] {
             let mut app = App::new();
-            app.init_resource::<Time<Real>>()
-                .init_resource::<Observed>();
+            app.init_resource::<Time<Real>>().init_resource::<Observed>();
             if consumer_first {
                 app.add_systems(Update, consume);
             }
@@ -77,9 +76,7 @@ mod tests {
             if !consumer_first {
                 app.add_systems(Update, consume);
             }
-            app.world_mut()
-                .resource_mut::<pitch_detect::AudioFrame>()
-                .samples = vec![1.0];
+            app.world_mut().resource_mut::<pitch_detect::AudioFrame>().samples = vec![1.0];
             app.update();
             let seen = app.world().resource::<Observed>();
             assert_eq!(seen.messages, 1);

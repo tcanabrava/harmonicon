@@ -53,14 +53,8 @@ pub struct ContentSources {
 
 impl Default for ContentSources {
     fn default() -> Self {
-        let official = |url: &str| RepoSpec::Remote {
-            url: url.into(),
-            git_ref: None,
-        };
-        Self {
-            songs: vec![official(OFFICIAL_SONGS)],
-            lessons: vec![official(OFFICIAL_LESSONS)],
-        }
+        let official = |url: &str| RepoSpec::Remote { url: url.into(), git_ref: None };
+        Self { songs: vec![official(OFFICIAL_SONGS)], lessons: vec![official(OFFICIAL_LESSONS)] }
     }
 }
 
@@ -110,18 +104,12 @@ pub fn parse_repo_input(input: &str, already: &[RepoSpec]) -> Result<RepoSpec, R
     let looks_remote = input.contains("://")
         || (input.contains('@') && input.contains(':') && !input.starts_with('/'));
     let spec = if looks_remote {
-        let spec = RepoSpec::Remote {
-            url: input.to_string(),
-            git_ref: None,
-        };
-        spec.validate()
-            .map_err(|_| RepoInputError::NotARepository)?;
+        let spec = RepoSpec::Remote { url: input.to_string(), git_ref: None };
+        spec.validate().map_err(|_| RepoInputError::NotARepository)?;
         spec
     } else {
         let path = match input.strip_prefix("~/") {
-            Some(rest) => dirs::home_dir()
-                .ok_or(RepoInputError::NotARepository)?
-                .join(rest),
+            Some(rest) => dirs::home_dir().ok_or(RepoInputError::NotARepository)?.join(rest),
             None => PathBuf::from(input),
         };
         if !path.is_dir() {
@@ -146,10 +134,7 @@ pub enum PackStatus {
     /// A remote that has never been downloaded.
     NotInstalled,
     /// Installed and compatible. `commit` is `None` for a local folder.
-    Ready {
-        manifest: PackManifest,
-        commit: Option<String>,
-    },
+    Ready { manifest: PackManifest, commit: Option<String> },
     /// Present but unusable; the text is what the player is shown.
     Unusable(String),
 }
@@ -216,13 +201,7 @@ pub fn evaluate(
             installed.repos.get(&slug).map(|r| r.commit.clone())
         }),
     };
-    PackEntry {
-        kind,
-        spec: spec.clone(),
-        slug,
-        root,
-        status,
-    }
+    PackEntry { kind, spec: spec.clone(), slug, root, status }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -233,10 +212,7 @@ fn read_status(
     commit: impl FnOnce() -> Option<String>,
 ) -> PackStatus {
     match harmonicon_packs::git::read_manifest(root, kind, engine) {
-        Ok(manifest) => PackStatus::Ready {
-            manifest,
-            commit: commit(),
-        },
+        Ok(manifest) => PackStatus::Ready { manifest, commit: commit() },
         Err(e) => PackStatus::Unusable(e.to_string()),
     }
 }
@@ -284,9 +260,7 @@ struct PackAssetReader(PackRoots);
 
 impl PackAssetReader {
     fn locate(&self, path: &Path) -> Result<PathBuf, AssetReaderError> {
-        self.0
-            .resolve(path)
-            .ok_or_else(|| AssetReaderError::NotFound(path.to_path_buf()))
+        self.0.resolve(path).ok_or_else(|| AssetReaderError::NotFound(path.to_path_buf()))
     }
 
     fn read_file(&self, path: &Path) -> Result<VecReader, AssetReaderError> {
@@ -330,9 +304,8 @@ impl AssetReader for PackAssetReader {
 
     async fn is_directory<'a>(&'a self, path: &'a Path) -> Result<bool, AssetReaderError> {
         let full = self.locate(path)?;
-        let metadata = full
-            .metadata()
-            .map_err(|_| AssetReaderError::NotFound(path.to_path_buf()))?;
+        let metadata =
+            full.metadata().map_err(|_| AssetReaderError::NotFound(path.to_path_buf()))?;
         Ok(metadata.is_dir())
     }
 }
@@ -475,9 +448,7 @@ impl Plugin for ContentPacksPlugin {
             )
             .add_systems(
                 Update,
-                (refresh_when_sources_change, refresh_on_request)
-                    .chain()
-                    .in_set(ContentPacksSet),
+                (refresh_when_sources_change, refresh_on_request).chain().in_set(ContentPacksSet),
             );
         #[cfg(not(target_arch = "wasm32"))]
         crate::content_sync::build(app);
@@ -490,17 +461,11 @@ mod tests {
     use harmonicon_packs::repo::InstalledRepo;
 
     fn engine() -> EngineSupport {
-        EngineSupport {
-            harmonicon: semver::Version::new(0, 5, 0),
-            lesson_format: 1,
-        }
+        EngineSupport { harmonicon: semver::Version::new(0, 5, 0), lesson_format: 1 }
     }
 
     fn remote(url: &str) -> RepoSpec {
-        RepoSpec::Remote {
-            url: url.into(),
-            git_ref: None,
-        }
+        RepoSpec::Remote { url: url.into(), git_ref: None }
     }
 
     fn write_pack(dir: &Path, kind: &str, requires: &str) {
@@ -543,13 +508,7 @@ mod tests {
                 pack_version: "1.0.0".into(),
             },
         );
-        let entry = evaluate(
-            PackKind::Songs,
-            &spec,
-            packs_dir.path(),
-            &installed,
-            &engine(),
-        );
+        let entry = evaluate(PackKind::Songs, &spec, packs_dir.path(), &installed, &engine());
         let PackStatus::Ready { commit, manifest } = entry.status else {
             panic!("{:?}", entry.status);
         };
@@ -561,18 +520,9 @@ mod tests {
     fn an_incompatible_pack_is_unusable_with_a_reason() {
         let packs_dir = tempfile::tempdir().unwrap();
         let spec = remote("https://h/a/b");
-        write_pack(
-            &packs_dir.path().join(spec.slug()),
-            "lessons",
-            r#""harmonicon":">=9""#,
-        );
-        let entry = evaluate(
-            PackKind::Lessons,
-            &spec,
-            packs_dir.path(),
-            &Installed::default(),
-            &engine(),
-        );
+        write_pack(&packs_dir.path().join(spec.slug()), "lessons", r#""harmonicon":">=9""#);
+        let entry =
+            evaluate(PackKind::Lessons, &spec, packs_dir.path(), &Installed::default(), &engine());
         let PackStatus::Unusable(why) = entry.status else {
             panic!("{:?}", entry.status);
         };
@@ -583,9 +533,7 @@ mod tests {
     fn a_local_folder_is_used_in_place() {
         let author = tempfile::tempdir().unwrap();
         write_pack(author.path(), "lessons", "");
-        let spec = RepoSpec::Local {
-            path: author.path().into(),
-        };
+        let spec = RepoSpec::Local { path: author.path().into() };
         let entry = evaluate(
             PackKind::Lessons,
             &spec,
@@ -594,10 +542,7 @@ mod tests {
             &engine(),
         );
         assert_eq!(entry.root, author.path());
-        assert!(matches!(
-            entry.status,
-            PackStatus::Ready { commit: None, .. }
-        ));
+        assert!(matches!(entry.status, PackStatus::Ready { commit: None, .. }));
     }
 
     #[test]
@@ -618,11 +563,7 @@ mod tests {
         };
         let mut missing = ready(PackKind::Songs);
         missing.status = PackStatus::NotInstalled;
-        let packs = ContentPacks(vec![
-            ready(PackKind::Songs),
-            ready(PackKind::Lessons),
-            missing,
-        ]);
+        let packs = ContentPacks(vec![ready(PackKind::Songs), ready(PackKind::Lessons), missing]);
         assert_eq!(packs.usable(PackKind::Songs).count(), 1);
         assert_eq!(packs.usable(PackKind::Lessons).count(), 1);
         assert!(packs.any_missing());
@@ -654,19 +595,11 @@ mod tests {
         );
         assert_eq!(
             parse_repo_input(&folder.path().display().to_string(), &[]),
-            Ok(RepoSpec::Local {
-                path: folder.path().into()
-            })
+            Ok(RepoSpec::Local { path: folder.path().into() })
         );
         assert_eq!(parse_repo_input("", &[]), Err(RepoInputError::Empty));
-        assert_eq!(
-            parse_repo_input("http://insecure/x", &[]),
-            Err(RepoInputError::NotARepository)
-        );
-        assert_eq!(
-            parse_repo_input("/no/such/folder", &[]),
-            Err(RepoInputError::NotARepository)
-        );
+        assert_eq!(parse_repo_input("http://insecure/x", &[]), Err(RepoInputError::NotARepository));
+        assert_eq!(parse_repo_input("/no/such/folder", &[]), Err(RepoInputError::NotARepository));
         assert_eq!(
             parse_repo_input("https://h/a/b", &[remote("https://h/a/b.git")]),
             Err(RepoInputError::AlreadyListed)
@@ -685,10 +618,7 @@ mod tests {
             .collect();
         assert_eq!(
             urls,
-            [
-                (PackKind::Songs, OFFICIAL_SONGS),
-                (PackKind::Lessons, OFFICIAL_LESSONS)
-            ]
+            [(PackKind::Songs, OFFICIAL_SONGS), (PackKind::Lessons, OFFICIAL_LESSONS)]
         );
     }
 }

@@ -6,12 +6,7 @@ use crate::midi::note_to_midi;
 use crate::pitch_map::{map_pitch_playable, max_bend};
 
 fn spec(tier: Tier, holes: &[u8]) -> DrillSpec {
-    DrillSpec {
-        technique: DrillTechnique::Bend,
-        holes: holes.to_vec(),
-        tier,
-        seed: 4242,
-    }
+    DrillSpec { technique: DrillTechnique::Bend, holes: holes.to_vec(), tier, seed: 4242 }
 }
 
 fn drill(tier: Tier, holes: &[u8]) -> HarpChart {
@@ -59,10 +54,7 @@ fn a_bent_note_states_the_reed_so_the_bend_is_applied_once() {
         Some("B4"),
         "hole 3 draw's reed is B4; the bend modifier moves it down from there"
     );
-    assert_eq!(
-        sounded_pitch(event, &harp),
-        note_to_midi("A#4").map(|m| m as u8)
-    );
+    assert_eq!(sounded_pitch(event, &harp), note_to_midi("A#4").map(|m| m as u8));
 }
 
 #[test]
@@ -109,18 +101,9 @@ fn high_register_training_generates_real_blow_bends() {
     let mut saw_whole_step_ten = false;
     for item in &chart.track {
         let event = &item.events[0];
-        let bend = event
-            .modifiers
-            .as_deref()
-            .unwrap_or(&[])
-            .iter()
-            .find_map(|m| {
-                if let Modifier::Bend { semitones, .. } = m {
-                    Some(*semitones)
-                } else {
-                    None
-                }
-            });
+        let bend = event.modifiers.as_deref().unwrap_or(&[]).iter().find_map(|m| {
+            if let Modifier::Bend { semitones, .. } = m { Some(*semitones) } else { None }
+        });
         if let Some(semitones) = bend {
             assert_eq!(event.action, Action::Blow);
             assert!(sounded_pitch(event, &harp).is_some());
@@ -136,13 +119,7 @@ fn a_hole_that_cannot_bend_yields_no_drill() {
     // reach. Returning `None` beats generating a drill of plain notes that
     // silently trains nothing.
     assert!(
-        drill_chart(
-            &spec(Tier::Isolate, &[5]),
-            &richter_harp("C"),
-            "Drill",
-            "Trainer"
-        )
-        .is_none()
+        drill_chart(&spec(Tier::Isolate, &[5]), &richter_harp("C"), "Drill", "Trainer").is_none()
     );
     assert!(
         drill_chart(&spec(Tier::Isolate, &[]), &richter_harp("C"), "D", "T").is_none(),
@@ -262,10 +239,7 @@ fn the_same_seed_gives_the_same_exercise() {
     let a = drill_chart(&spec(Tier::Interleave, &[2, 3, 4]), &harp, "D", "T").unwrap();
     let b = drill_chart(&spec(Tier::Interleave, &[2, 3, 4]), &harp, "D", "T").unwrap();
     let holes = |c: &HarpChart| -> Vec<(u8, bool)> {
-        c.track
-            .iter()
-            .map(|i| (i.events[0].hole, i.events[0].modifiers.is_some()))
-            .collect()
+        c.track.iter().map(|i| (i.events[0].hole, i.events[0].modifiers.is_some())).collect()
     };
     assert_eq!(holes(&a), holes(&b));
 }
@@ -298,9 +272,7 @@ fn bend_action_matches_the_resolver() {
     let harp = richter_harp("C");
     for hole in 1..=10u8 {
         for depth in depths_available(&harp, hole) {
-            let reed = harp
-                .wind_direction_midi(hole, &bend_action(hole))
-                .expect("a reed");
+            let reed = harp.wind_direction_midi(hole, &bend_action(hole)).expect("a reed");
             let target = reed - depth;
             let resolved = map_pitch_playable(target, &harp).expect("a reachable bend");
             if resolved.hole == hole {

@@ -43,11 +43,8 @@ impl NotationRest {
             _ => 320.0,
         };
         let glyph_right = right_units / 1000.0 * (4.0 * staff_line_spacing);
-        let right = if self.dots > 0 {
-            glyph_right.max(1.85 * staff_line_spacing)
-        } else {
-            glyph_right
-        };
+        let right =
+            if self.dots > 0 { glyph_right.max(1.85 * staff_line_spacing) } else { glyph_right };
         (right + staff_line_spacing) / self.duration_beats as f32
     }
 
@@ -56,16 +53,8 @@ impl NotationRest {
     }
 }
 
-const VALUES: &[(f64, u8)] = &[
-    (4.0, 0),
-    (3.0, 1),
-    (2.0, 0),
-    (1.5, 1),
-    (1.0, 0),
-    (0.75, 1),
-    (0.5, 0),
-    (0.25, 0),
-];
+const VALUES: &[(f64, u8)] =
+    &[(4.0, 0), (3.0, 1), (2.0, 0), (1.5, 1), (1.0, 0), (0.75, 1), (0.5, 0), (0.25, 0)];
 
 /// Rests before and between notes, ending at the final sounded note.
 /// If a gap crosses a bar line, leave the earlier bar's tail blank and
@@ -117,11 +106,7 @@ fn spell_gap(mut at: f64, end: f64, out: &mut Vec<NotationRest>) {
         else {
             break;
         };
-        out.push(NotationRest {
-            start_beat: at,
-            duration_beats: duration,
-            dots,
-        });
+        out.push(NotationRest { start_beat: at, duration_beats: duration, dots });
         at += duration;
     }
 }
@@ -146,10 +131,7 @@ mod tests {
         let bars = MusicScoreBarMap::default();
         let rests = rests_between_notes(&[note(1.0, 1.0), note(3.0, 1.0)], &bars);
         assert_eq!(
-            rests
-                .iter()
-                .map(|r| (r.start_beat, r.duration_beats))
-                .collect::<Vec<_>>(),
+            rests.iter().map(|r| (r.start_beat, r.duration_beats)).collect::<Vec<_>>(),
             vec![(0.0, 1.0), (2.0, 1.0)]
         );
     }
@@ -158,36 +140,18 @@ mod tests {
     fn chords_and_overlapping_notes_leave_no_false_rest() {
         let bars = MusicScoreBarMap::default();
         let rests = rests_between_notes(
-            &[
-                note(0.0, 2.0),
-                note(0.0, 1.0),
-                note(1.5, 1.0),
-                note(3.0, 1.0),
-            ],
+            &[note(0.0, 2.0), note(0.0, 1.0), note(1.5, 1.0), note(3.0, 1.0)],
             &bars,
         );
-        assert_eq!(
-            rests,
-            vec![NotationRest {
-                start_beat: 2.5,
-                duration_beats: 0.5,
-                dots: 0
-            }]
-        );
+        assert_eq!(rests, vec![NotationRest { start_beat: 2.5, duration_beats: 0.5, dots: 0 }]);
     }
 
     #[test]
     fn a_gap_across_bars_skips_the_first_bars_tail() {
-        let bars = MusicScoreBarMap {
-            meter: MeterMap::constant("4/4", 12),
-            quarter_ticks: 12,
-        };
+        let bars = MusicScoreBarMap { meter: MeterMap::constant("4/4", 12), quarter_ticks: 12 };
         let rests = rests_between_notes(&[note(0.0, 1.0), note(6.0, 1.0)], &bars);
         assert_eq!(
-            rests
-                .iter()
-                .map(|r| (r.start_beat, r.duration_beats))
-                .collect::<Vec<_>>(),
+            rests.iter().map(|r| (r.start_beat, r.duration_beats)).collect::<Vec<_>>(),
             vec![(4.0, 2.0)]
         );
     }
@@ -203,10 +167,7 @@ mod tests {
         let bars = MusicScoreBarMap::default();
         let rests = rests_between_notes(&[note(0.0, 1.0), note(9.0, 1.0)], &bars);
         assert_eq!(
-            rests
-                .iter()
-                .map(|r| (r.start_beat, r.duration_beats))
-                .collect::<Vec<_>>(),
+            rests.iter().map(|r| (r.start_beat, r.duration_beats)).collect::<Vec<_>>(),
             vec![(4.0, 4.0), (8.0, 1.0)]
         );
     }
@@ -218,14 +179,7 @@ mod tests {
             quarter_ticks: 12,
         };
         let rests = rests_between_notes(&[note(3.5, 0.5)], &bars);
-        assert_eq!(
-            rests,
-            vec![NotationRest {
-                start_beat: 3.0,
-                duration_beats: 0.5,
-                dots: 0
-            }]
-        );
+        assert_eq!(rests, vec![NotationRest { start_beat: 3.0, duration_beats: 0.5, dots: 0 }]);
     }
 
     #[test]
@@ -236,18 +190,11 @@ mod tests {
 
     #[test]
     fn a_sixteenth_rest_is_hidden_when_its_glyph_would_reach_the_next_note() {
-        let rest = NotationRest {
-            start_beat: 2.0,
-            duration_beats: 0.25,
-            dots: 0,
-        };
+        let rest = NotationRest { start_beat: 2.0, duration_beats: 0.25, dots: 0 };
         assert!(!rest.fits_slot(34.0, 9.0));
         assert!(!rest.fits_slot(68.0, 9.0));
         assert!(rest.fits_slot(rest.required_pixels_per_beat(9.0).ceil(), 9.0));
-        let quarter = NotationRest {
-            duration_beats: 1.0,
-            ..rest
-        };
+        let quarter = NotationRest { duration_beats: 1.0, ..rest };
         assert!(quarter.fits_slot(34.0, 9.0));
     }
 }

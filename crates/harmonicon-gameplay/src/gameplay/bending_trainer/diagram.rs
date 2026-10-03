@@ -156,30 +156,24 @@ pub fn attach_progress_bars(
         let Some(technique) = row_to_technique(cell.row) else {
             continue;
         };
-        commands
-            .entity(entity)
-            .insert(HasProgressBar)
-            .with_children(|cell_node| {
-                cell_node.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Px(0.0),
-                        bottom: Val::Px(0.0),
-                        height: Val::Px(3.0),
-                        width: Val::Percent(0.0),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.92, 0.94, 1.0, 0.85)),
-                    Visibility::Hidden,
-                    // A decoration, not a target: without this it would take
-                    // the click meant for the cell it sits in.
-                    Pickable::IGNORE,
-                    CellProgressBar(TrainerTarget {
-                        hole: cell.hole,
-                        technique,
-                    }),
-                ));
-            });
+        commands.entity(entity).insert(HasProgressBar).with_children(|cell_node| {
+            cell_node.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    bottom: Val::Px(0.0),
+                    height: Val::Px(3.0),
+                    width: Val::Percent(0.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.92, 0.94, 1.0, 0.85)),
+                Visibility::Hidden,
+                // A decoration, not a target: without this it would take
+                // the click meant for the cell it sits in.
+                Pickable::IGNORE,
+                CellProgressBar(TrainerTarget { hole: cell.hole, technique }),
+            ));
+        });
     }
 }
 

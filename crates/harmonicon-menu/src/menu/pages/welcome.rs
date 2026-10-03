@@ -22,13 +22,8 @@ pub(crate) fn setup_welcome_menu(
     loc: Res<Localization>,
     welcome: Res<WelcomeFlow>,
 ) {
-    let (root, _header, _page_root) = spawn_menu_root(
-        &mut commands,
-        &loc.msg("welcome-title"),
-        None,
-        &theme,
-        "Welcome",
-    );
+    let (root, _header, _page_root) =
+        spawn_menu_root(&mut commands, &loc.msg("welcome-title"), None, &theme, "Welcome");
 
     // The scrim keeps body text readable over theme backgrounds.
     let scrim = commands
@@ -98,11 +93,7 @@ pub(crate) fn setup_welcome_menu(
 /// A step's button label, with a check in front once the step has been
 /// taken this session.
 fn step_label(label: &str, done: bool) -> String {
-    if done {
-        format!("\u{2713} {label}")
-    } else {
-        label.to_string()
-    }
+    if done { format!("\u{2713} {label}") } else { label.to_string() }
 }
 
 /// Save on exit so the first-run greeting stays completed after a crash.

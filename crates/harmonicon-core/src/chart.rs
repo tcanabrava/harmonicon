@@ -99,28 +99,20 @@ struct Migration {
 /// gameplay effect (per-technique audio FX mapping was unbuilt), so
 /// dropping it is always safe.
 fn strip_legacy_fx_mapping(value: &mut serde_json::Value) -> bool {
-    value
-        .as_object_mut()
-        .is_some_and(|obj| obj.remove("fx_mapping").is_some())
+    value.as_object_mut().is_some_and(|obj| obj.remove("fx_mapping").is_some())
 }
 
 /// Adds the required song genre to older charts. Existing charts have no
 /// reliable genre source, so preserve loadability with a clear placeholder
 /// that authors can replace in the Song Editor.
 fn add_legacy_song_genre(value: &mut serde_json::Value) -> bool {
-    let Some(song) = value
-        .get_mut("song")
-        .and_then(serde_json::Value::as_object_mut)
-    else {
+    let Some(song) = value.get_mut("song").and_then(serde_json::Value::as_object_mut) else {
         return false;
     };
     if song.contains_key("genre") {
         return false;
     }
-    song.insert(
-        "genre".to_string(),
-        serde_json::Value::String("Uncategorized".to_string()),
-    );
+    song.insert("genre".to_string(), serde_json::Value::String("Uncategorized".to_string()));
     true
 }
 
@@ -129,14 +121,8 @@ fn add_legacy_song_genre(value: &mut serde_json::Value) -> bool {
 /// documented as an accepted break (see CLAUDE.md's Chart format notes on
 /// `additionalProperties: false`).
 const MIGRATIONS: &[Migration] = &[
-    Migration {
-        target_version: "1.1.0",
-        apply: strip_legacy_fx_mapping,
-    },
-    Migration {
-        target_version: "1.7.0",
-        apply: add_legacy_song_genre,
-    },
+    Migration { target_version: "1.1.0", apply: strip_legacy_fx_mapping },
+    Migration { target_version: "1.7.0", apply: add_legacy_song_genre },
 ];
 
 /// Fixes up a chart's raw JSON in place so it validates against the current
@@ -179,9 +165,7 @@ pub fn migrate_chart_json(value: &mut serde_json::Value) -> bool {
     }
 
     if needs_version_bump && let Some(obj) = value.as_object_mut() {
-        let metadata = obj
-            .entry("metadata")
-            .or_insert_with(|| serde_json::json!({}));
+        let metadata = obj.entry("metadata").or_insert_with(|| serde_json::json!({}));
         metadata["format_version"] = serde_json::Value::String(CURRENT_FORMAT_VERSION.to_string());
     }
 
@@ -201,10 +185,7 @@ mod migration_tests {
         });
         assert!(migrate_chart_json(&mut value));
         assert!(value.get("fx_mapping").is_none());
-        assert_eq!(
-            value["metadata"]["format_version"],
-            json!(CURRENT_FORMAT_VERSION)
-        );
+        assert_eq!(value["metadata"]["format_version"], json!(CURRENT_FORMAT_VERSION));
     }
 
     #[test]
@@ -217,10 +198,7 @@ mod migration_tests {
             !migrate_chart_json(&mut value),
             "no legacy fields and genre is present, so only the version changes"
         );
-        assert_eq!(
-            value["metadata"]["format_version"],
-            json!(CURRENT_FORMAT_VERSION)
-        );
+        assert_eq!(value["metadata"]["format_version"], json!(CURRENT_FORMAT_VERSION));
     }
 
     #[test]
@@ -257,10 +235,7 @@ mod migration_tests {
     fn creates_a_metadata_object_when_the_chart_has_none_at_all() {
         let mut value = json!({ "song": {}, "fx_mapping": {} });
         assert!(migrate_chart_json(&mut value));
-        assert_eq!(
-            value["metadata"]["format_version"],
-            json!(CURRENT_FORMAT_VERSION)
-        );
+        assert_eq!(value["metadata"]["format_version"], json!(CURRENT_FORMAT_VERSION));
     }
 }
 
@@ -666,11 +641,7 @@ pub fn seconds_to_tick(secs: f64, resolution: u32, tempo_map: &[TempoPoint]) -> 
 /// Return the time-signature string active at `tick`, scanning `time_sig_map`
 /// (which must be sorted by tick). Returns `None` when the map is empty.
 pub fn time_sig_at_tick(tick: u64, time_sig_map: &[TimeSigPoint]) -> Option<&str> {
-    time_sig_map
-        .iter()
-        .rev()
-        .find(|p| p.tick <= tick)
-        .map(|p| p.time_signature.as_str())
+    time_sig_map.iter().rev().find(|p| p.tick <= tick).map(|p| p.time_signature.as_str())
 }
 
 #[cfg(test)]
@@ -705,12 +676,7 @@ mod tests {
     #[test]
     fn diatonic_layout_fields_parsed() {
         let chart: HarpChart = serde_json::from_str(MINIMAL_DIATONIC).unwrap();
-        let Harmonica::Diatonic {
-            holes,
-            layout: Some(ref l),
-            ..
-        } = chart.harmonica
-        else {
+        let Harmonica::Diatonic { holes, layout: Some(ref l), .. } = chart.harmonica else {
             panic!("expected Diatonic with layout");
         };
         assert_eq!(holes, 10);
@@ -738,10 +704,7 @@ mod tests {
             "scoring": {"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}
         }"#;
         let chart: HarpChart = serde_json::from_str(json).unwrap();
-        assert!(matches!(
-            chart.harmonica,
-            Harmonica::Chromatic { holes: 12, .. }
-        ));
+        assert!(matches!(chart.harmonica, Harmonica::Chromatic { holes: 12, .. }));
     }
 
     #[test]
@@ -791,19 +754,13 @@ mod tests {
 
     #[test]
     fn tick_zero_is_zero_seconds() {
-        let map = vec![TempoPoint {
-            tick: 0,
-            bpm: 120.0,
-        }];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
         assert_eq!(tick_to_seconds(0, 480, &map), 0.0);
     }
 
     #[test]
     fn one_beat_at_120bpm() {
-        let map = vec![TempoPoint {
-            tick: 0,
-            bpm: 120.0,
-        }];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
         let secs = tick_to_seconds(480, 480, &map);
         assert!((secs - 0.5).abs() < 1e-9, "got {secs}");
     }
@@ -811,32 +768,14 @@ mod tests {
     #[test]
     fn tempo_change_midway() {
         // 0..960 @ 120 bpm (2 beats = 1 s), then 960..1440 @ 180 bpm (1 beat = 1/3 s)
-        let map = vec![
-            TempoPoint {
-                tick: 0,
-                bpm: 120.0,
-            },
-            TempoPoint {
-                tick: 960,
-                bpm: 180.0,
-            },
-        ];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }, TempoPoint { tick: 960, bpm: 180.0 }];
         let secs = tick_to_seconds(1440, 480, &map);
         assert!((secs - (1.0 + 1.0 / 3.0)).abs() < 1e-9, "got {secs}");
     }
 
     #[test]
     fn tick_at_tempo_change_boundary() {
-        let map = vec![
-            TempoPoint {
-                tick: 0,
-                bpm: 120.0,
-            },
-            TempoPoint {
-                tick: 960,
-                bpm: 180.0,
-            },
-        ];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }, TempoPoint { tick: 960, bpm: 180.0 }];
         let secs = tick_to_seconds(960, 480, &map);
         assert!((secs - 1.0).abs() < 1e-9, "got {secs}");
     }
@@ -850,51 +789,30 @@ mod tests {
 
     #[test]
     fn zero_seconds_is_tick_zero() {
-        let map = vec![TempoPoint {
-            tick: 0,
-            bpm: 120.0,
-        }];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
         assert_eq!(seconds_to_tick(0.0, 480, &map), 0);
     }
 
     #[test]
     fn half_a_second_at_120bpm_is_one_beat() {
-        let map = vec![TempoPoint {
-            tick: 0,
-            bpm: 120.0,
-        }];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
         assert_eq!(seconds_to_tick(0.5, 480, &map), 480);
     }
 
     #[test]
     fn seconds_to_tick_inverts_tick_to_seconds_across_a_tempo_change() {
         // Same map as `tempo_change_midway`: 0..960 @ 120bpm, then @ 180bpm.
-        let map = vec![
-            TempoPoint {
-                tick: 0,
-                bpm: 120.0,
-            },
-            TempoPoint {
-                tick: 960,
-                bpm: 180.0,
-            },
-        ];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }, TempoPoint { tick: 960, bpm: 180.0 }];
         for tick in [0u64, 240, 480, 960, 1200, 1440] {
             let secs = tick_to_seconds(tick, 480, &map);
             let round_tripped = seconds_to_tick(secs, 480, &map);
-            assert_eq!(
-                round_tripped, tick,
-                "tick {tick} -> {secs}s -> {round_tripped}"
-            );
+            assert_eq!(round_tripped, tick, "tick {tick} -> {secs}s -> {round_tripped}");
         }
     }
 
     #[test]
     fn negative_or_zero_seconds_and_empty_map_resolve_to_tick_zero() {
-        let map = vec![TempoPoint {
-            tick: 0,
-            bpm: 120.0,
-        }];
+        let map = vec![TempoPoint { tick: 0, bpm: 120.0 }];
         assert_eq!(seconds_to_tick(-1.0, 480, &map), 0);
         assert_eq!(seconds_to_tick(1.0, 480, &[]), 0);
     }
@@ -904,14 +822,8 @@ mod tests {
     #[test]
     fn time_sig_at_start() {
         let map = vec![
-            TimeSigPoint {
-                tick: 0,
-                time_signature: "4/4".into(),
-            },
-            TimeSigPoint {
-                tick: 960,
-                time_signature: "3/4".into(),
-            },
+            TimeSigPoint { tick: 0, time_signature: "4/4".into() },
+            TimeSigPoint { tick: 960, time_signature: "3/4".into() },
         ];
         assert_eq!(time_sig_at_tick(0, &map), Some("4/4"));
     }
@@ -919,14 +831,8 @@ mod tests {
     #[test]
     fn time_sig_changes_at_tick() {
         let map = vec![
-            TimeSigPoint {
-                tick: 0,
-                time_signature: "4/4".into(),
-            },
-            TimeSigPoint {
-                tick: 960,
-                time_signature: "3/4".into(),
-            },
+            TimeSigPoint { tick: 0, time_signature: "4/4".into() },
+            TimeSigPoint { tick: 960, time_signature: "3/4".into() },
         ];
         assert_eq!(time_sig_at_tick(960, &map), Some("3/4"));
         assert_eq!(time_sig_at_tick(959, &map), Some("4/4"));

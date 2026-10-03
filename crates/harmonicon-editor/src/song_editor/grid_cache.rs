@@ -72,18 +72,14 @@ impl GridCache {
             snapshot.notes.clone_from(&state.notes);
             snapshot.tempo_changes.clone_from(&state.tempo_changes);
             snapshot.meter_changes.clone_from(&state.meter_changes);
-            snapshot
-                .phrase_annotations
-                .clone_from(&state.phrase_annotations);
+            snapshot.phrase_annotations.clone_from(&state.phrase_annotations);
             snapshot.tempo.clone_from(&state.tempo);
             snapshot.key.clone_from(&state.key);
             snapshot.time_signature.clone_from(&state.time_signature);
             snapshot.pickup_beats.clone_from(&state.pickup_beats);
             snapshot.repeats.clone_from(&state.repeats);
             snapshot.harmonica_kind = state.harmonica_kind;
-            snapshot
-                .loaded_harmonica
-                .clone_from(&state.loaded_harmonica);
+            snapshot.loaded_harmonica.clone_from(&state.loaded_harmonica);
             snapshot.mode = state.mode;
             snapshot.user_locked = state.user_locked;
             snapshot.scale = state.scale;
@@ -156,27 +152,13 @@ mod tests {
         app.init_resource::<EditorState>()
             .init_resource::<LoadedTheme>()
             .add_systems(Update, update_selection);
-        let entity = app
-            .world_mut()
-            .spawn((NoteView(42), Node::default(), BorderColor::default()))
-            .id();
-        app.world_mut()
-            .resource_mut::<EditorState>()
-            .selected
-            .push(42);
+        let entity =
+            app.world_mut().spawn((NoteView(42), Node::default(), BorderColor::default())).id();
+        app.world_mut().resource_mut::<EditorState>().selected.push(42);
         app.update();
-        assert_eq!(
-            app.world().get::<Node>(entity).unwrap().border,
-            UiRect::all(Val::Px(2.0))
-        );
-        app.world_mut()
-            .resource_mut::<EditorState>()
-            .selected
-            .clear();
+        assert_eq!(app.world().get::<Node>(entity).unwrap().border, UiRect::all(Val::Px(2.0)));
+        app.world_mut().resource_mut::<EditorState>().selected.clear();
         app.update();
-        assert_eq!(
-            app.world().get::<Node>(entity).unwrap().border,
-            UiRect::all(Val::Px(0.0))
-        );
+        assert_eq!(app.world().get::<Node>(entity).unwrap().border, UiRect::all(Val::Px(0.0)));
     }
 }

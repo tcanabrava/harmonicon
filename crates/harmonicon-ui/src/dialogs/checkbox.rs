@@ -103,11 +103,7 @@ fn sync_checkbox_visuals(
     mut marks: Query<&mut Visibility, With<CheckMark>>,
 ) {
     for (children, checked) in &boxes {
-        let visible = if checked {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+        let visible = if checked { Visibility::Visible } else { Visibility::Hidden };
         for child in children {
             if let Ok(mut vis) = marks.get_mut(*child)
                 && *vis != visible
@@ -122,7 +118,6 @@ pub struct CheckboxPlugin;
 
 impl Plugin for CheckboxPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(checkbox_self_update)
-            .add_systems(Update, sync_checkbox_visuals);
+        app.add_observer(checkbox_self_update).add_systems(Update, sync_checkbox_visuals);
     }
 }

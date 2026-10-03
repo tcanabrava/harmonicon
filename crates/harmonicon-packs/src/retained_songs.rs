@@ -27,11 +27,8 @@ fn has_chart(folder: &Path) -> io::Result<bool> {
     for entry in entries {
         let entry = entry?;
         if entry.file_type()?.is_file()
-            && entry
-                .path()
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| {
+            && entry.path().extension().and_then(|extension| extension.to_str()).is_some_and(
+                |extension| {
                     matches!(
                         extension.to_ascii_lowercase().as_str(),
                         "harpchart"
@@ -47,7 +44,8 @@ fn has_chart(folder: &Path) -> io::Result<bool> {
                             | "xml"
                             | "mxl"
                     )
-                })
+                },
+            )
         {
             return Ok(true);
         }
@@ -138,14 +136,8 @@ mod tests {
         song(&next, "Band/Changed", "new");
         preserve_removed(&old, &next).unwrap();
         assert_eq!(read_index(&next), BTreeSet::from(["Band/Removed".into()]));
-        assert_eq!(
-            fs::read_to_string(next.join("Band/Removed/backing.ogg")).unwrap(),
-            "old"
-        );
-        assert_eq!(
-            fs::read_to_string(next.join("Band/Changed/backing.ogg")).unwrap(),
-            "new"
-        );
+        assert_eq!(fs::read_to_string(next.join("Band/Removed/backing.ogg")).unwrap(), "old");
+        assert_eq!(fs::read_to_string(next.join("Band/Changed/backing.ogg")).unwrap(), "new");
         let later = temp.path().join("later");
         fs::create_dir_all(&later).unwrap();
         preserve_removed(&next, &later).unwrap();
@@ -168,10 +160,7 @@ mod tests {
         song(&next, "Band/Song", "partial");
         fs::remove_file(next.join("Band/Song/song/chart.harpchart")).unwrap();
         preserve_removed(&old, &next).unwrap();
-        assert_eq!(
-            fs::read_to_string(next.join("Band/Song/backing.ogg")).unwrap(),
-            "old"
-        );
+        assert_eq!(fs::read_to_string(next.join("Band/Song/backing.ogg")).unwrap(), "old");
         assert!(next.join("Band/Song/song/chart.harpchart").exists());
         assert!(read_index(&next).contains("Band/Song"));
     }

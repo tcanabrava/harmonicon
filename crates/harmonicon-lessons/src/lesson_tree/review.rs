@@ -67,17 +67,12 @@ pub(crate) fn due_reviews(
         .filter(|(_, entry)| entry.manifest.training.is_some())
         .filter_map(|(index, entry)| {
             let (tier, record) = Tier::ALL.into_iter().rev().find_map(|tier| {
-                let record = profile
-                    .trainings
-                    .get(&training_key(&entry.manifest.id, tier.number()))?;
+                let record =
+                    profile.trainings.get(&training_key(&entry.manifest.id, tier.number()))?;
                 record.passed.then_some((tier, record))
             })?;
             let day = record.review_due_day()?;
-            (day <= today).then_some(Warmup {
-                entry: index,
-                tier,
-                due: day,
-            })
+            (day <= today).then_some(Warmup { entry: index, tier, due: day })
         })
         .collect();
     // Stable, so equally overdue reviews keep catalogue order.
@@ -239,10 +234,7 @@ mod tests {
     }
 
     fn pass(profile: &mut PlayerProfile, lesson: &str, tier: u8, day: u32) {
-        let record = profile
-            .trainings
-            .entry(training_key(lesson, tier))
-            .or_default();
+        let record = profile.trainings.entry(training_key(lesson, tier)).or_default();
         record_training(record, true, 0.9, day);
     }
 
@@ -251,18 +243,10 @@ mod tests {
         let entries = [lesson("a")];
         let mut profile = PlayerProfile::default();
         pass(&mut profile, "a", 1, 100);
-        assert!(
-            warmups(&due_reviews(&entries, &profile, 100))
-                .to_vec()
-                .is_empty()
-        );
+        assert!(warmups(&due_reviews(&entries, &profile, 100)).to_vec().is_empty());
         assert_eq!(
             warmups(&due_reviews(&entries, &profile, 101)).to_vec(),
-            vec![Warmup {
-                entry: 0,
-                tier: Tier::Isolate,
-                due: 101,
-            }]
+            vec![Warmup { entry: 0, tier: Tier::Isolate, due: 101 }]
         );
     }
 
@@ -306,10 +290,6 @@ mod tests {
         let mut profile = PlayerProfile::default();
         let record = profile.trainings.entry(training_key("a", 1)).or_default();
         record_training(record, false, 0.2, 10);
-        assert!(
-            warmups(&due_reviews(&entries, &profile, 1_000))
-                .to_vec()
-                .is_empty()
-        );
+        assert!(warmups(&due_reviews(&entries, &profile, 1_000)).to_vec().is_empty());
     }
 }

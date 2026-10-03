@@ -76,11 +76,7 @@ fn main() -> ExitCode {
         report.errors.len(),
         report.warnings.len()
     );
-    if report.errors.is_empty() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    }
+    if report.errors.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }
 
 fn fail(message: &str) -> ExitCode {
@@ -128,10 +124,7 @@ fn print_choice_report(root: &std::path::Path) {
     };
     let chain = UnitChain::build(&manifests);
     let report = choice_report(&graph, &chain, 3000, 4, 0x5eed);
-    println!(
-        "{} lessons, 3000 playthroughs, counting while at least 4 remain",
-        manifests.len()
-    );
+    println!("{} lessons, 3000 playthroughs, counting while at least 4 remain", manifests.len());
     println!("fewest lessons ever on offer: {}", report.fewest);
     println!("only lesson on offer, by how often:");
     for (id, count) in &report.sole_options {

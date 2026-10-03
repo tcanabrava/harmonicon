@@ -85,10 +85,7 @@ pub(crate) fn note_class(note: &str) -> &str {
 /// The four note classes of `quality`'s chord rooted on `chord_root` (root,
 /// 3rd, 5th, 7th — see `song::harmonica::chord_intervals`).
 fn chord_tone_classes(chord_root: &str, quality: ChordQuality) -> HashSet<String> {
-    chord_intervals(quality)
-        .iter()
-        .map(|&n| semitone(chord_root, n))
-        .collect()
+    chord_intervals(quality).iter().map(|&n| semitone(chord_root, n)).collect()
 }
 
 /// Build the per-hole render data and the live-feedback lookup from the harp
@@ -254,10 +251,8 @@ pub fn update_hole_map(
         }
     }
 
-    let ghost_holes: &[u8] = call_response
-        .as_deref()
-        .map(|s| s.lick_holes.as_slice())
-        .unwrap_or(&[]);
+    let ghost_holes: &[u8] =
+        call_response.as_deref().map(|s| s.lick_holes.as_slice()).unwrap_or(&[]);
 
     for (cell, mut bg) in &mut cells {
         let color = match lit[cell.hole as usize] {
@@ -322,11 +317,7 @@ pub fn update_detected_note(
     };
     let (reading, color) = match lowest_sounding(&active.0, &guide.playable) {
         Some((pitch, note)) => {
-            let key = if note.blow {
-                "jam-detected-blow"
-            } else {
-                "jam-detected-draw"
-            };
+            let key = if note.blow { "jam-detected-blow" } else { "jam-detected-draw" };
             let fit = classify_note_fit(
                 &pitch.note,
                 &guide.chord_tones_by_bar[current.0],

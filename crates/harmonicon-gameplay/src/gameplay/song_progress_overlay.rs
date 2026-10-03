@@ -460,9 +460,7 @@ pub fn spawn_song_progress(
                             ..default()
                         },
                         BackgroundColor(fallback),
-                        NoteMarkerRect {
-                            is_blow: note.is_blow,
-                        },
+                        NoteMarkerRect { is_blow: note.is_blow },
                         Pickable::IGNORE,
                     ));
                 }
@@ -705,11 +703,7 @@ fn cursor_to_time(normalized_x: Option<f32>, duration_secs: f64) -> Option<f64> 
 /// actually paused — dragging a loop range while notes keep flying by would
 /// mean fighting the clock the whole time.
 fn sync_progress_bar_mode(paused: Res<Paused>, mut mode: ResMut<ProgressBarMode>) {
-    let wanted = if paused.0 {
-        ProgressBarMode::Edit
-    } else {
-        ProgressBarMode::Visualization
-    };
+    let wanted = if paused.0 { ProgressBarMode::Edit } else { ProgressBarMode::Visualization };
     if *mode != wanted {
         *mode = wanted;
     }
@@ -731,11 +725,7 @@ fn on_drag_start(
     let Some(time) = cursor_to_time(rel.normalized.map(|n| n.x), duration.0) else {
         return;
     };
-    *drag = LoopDrag {
-        active: true,
-        origin_time: time,
-        current_time: time,
-    };
+    *drag = LoopDrag { active: true, origin_time: time, current_time: time };
 }
 
 fn on_drag(
@@ -861,11 +851,7 @@ fn sync_phrase_overlay_visibility(
         return;
     }
     for mut node in &mut overlays {
-        node.display = if paused.0 {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        node.display = if paused.0 { Display::Flex } else { Display::None };
     }
 }
 
@@ -889,11 +875,7 @@ fn sync_note_marker_colors(
         if !all && !marker.is_added() {
             continue;
         }
-        let base = if marker.is_blow {
-            colors.blow
-        } else {
-            colors.draw
-        };
+        let base = if marker.is_blow { colors.blow } else { colors.draw };
         *color = BackgroundColor(base.with_alpha(NOTE_MARKER_ALPHA));
     }
 }
@@ -961,11 +943,7 @@ impl Plugin for SongProgressPlugin {
             )
             .add_systems(
                 Update,
-                (
-                    sync_progress_bar_mode,
-                    apply_requested_loop_range,
-                    update_loop_marker,
-                )
+                (sync_progress_bar_mode, apply_requested_loop_range, update_loop_marker)
                     .chain()
                     .run_if(in_state(AppState::Playing)),
             )
@@ -1076,21 +1054,11 @@ mod tests {
     // ── effective_duration (the no-background-music fallback) ────────────────
 
     fn marker(time: f64, duration: f64) -> NoteMarker {
-        NoteMarker {
-            time,
-            duration,
-            hole: 1,
-            is_blow: true,
-        }
+        NoteMarker { time, duration, hole: 1, is_blow: true }
     }
 
     fn section(start_time: f64, end_time: f64) -> PhraseSection {
-        PhraseSection {
-            name: String::new(),
-            start_time,
-            end_time,
-            note_count: 0,
-        }
+        PhraseSection { name: String::new(), start_time, end_time, note_count: 0 }
     }
 
     #[test]
@@ -1241,10 +1209,7 @@ mod tests {
         let mut world = World::new();
         world.insert_resource(LoopConfig::default());
         world.init_resource::<Messages<RequestLoopRange>>();
-        world.write_message(RequestLoopRange {
-            start_time: 8.0,
-            end_time: 16.0,
-        });
+        world.write_message(RequestLoopRange { start_time: 8.0, end_time: 16.0 });
         let mut schedule = Schedule::default();
         schedule.add_systems(apply_requested_loop_range);
         schedule.run(&mut world);
@@ -1259,10 +1224,7 @@ mod tests {
         let mut world = World::new();
         world.insert_resource(LoopConfig::default());
         world.init_resource::<Messages<RequestLoopRange>>();
-        world.write_message(RequestLoopRange {
-            start_time: 8.0,
-            end_time: 8.0,
-        });
+        world.write_message(RequestLoopRange { start_time: 8.0, end_time: 8.0 });
         let mut schedule = Schedule::default();
         schedule.add_systems(apply_requested_loop_range);
         schedule.run(&mut world);
@@ -1283,9 +1245,6 @@ mod tests {
 
         world.insert_resource(Paused(false));
         schedule.run(&mut world);
-        assert_eq!(
-            *world.resource::<ProgressBarMode>(),
-            ProgressBarMode::Visualization
-        );
+        assert_eq!(*world.resource::<ProgressBarMode>(), ProgressBarMode::Visualization);
     }
 }

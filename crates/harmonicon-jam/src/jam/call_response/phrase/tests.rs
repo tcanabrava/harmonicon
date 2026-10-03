@@ -7,18 +7,12 @@ use harmonicon_core::harmonica::{ChordQuality, chord_intervals, richter_harp, se
 use super::*;
 
 fn chord(root: &str, quality: ChordQuality) -> HashSet<String> {
-    chord_intervals(quality)
-        .iter()
-        .map(|&n| semitone(root, n))
-        .collect()
+    chord_intervals(quality).iter().map(|&n| semitone(root, n)).collect()
 }
 
 /// The C blues hexatonic, in note-class spelling.
 fn blues_scale() -> HashSet<String> {
-    ["C", "D#", "F", "F#", "G", "A#"]
-        .into_iter()
-        .map(String::from)
-        .collect()
+    ["C", "D#", "F", "F#", "G", "A#"].into_iter().map(String::from).collect()
 }
 
 fn c_harp() -> Vec<PlayableNote> {
@@ -34,12 +28,7 @@ struct Fixture {
 
 impl Fixture {
     fn new(opening: HashSet<String>, ending: HashSet<String>) -> Self {
-        Self {
-            playable: c_harp(),
-            opening,
-            ending,
-            scale: blues_scale(),
-        }
+        Self { playable: c_harp(), opening, ending, scale: blues_scale() }
     }
 
     fn ctx(&self, density: CallDensity, swung: bool, seed: u64) -> CallContext<'_> {
@@ -67,11 +56,8 @@ fn chord_pairs() -> Vec<(HashSet<String>, HashSet<String>)> {
     ]
 }
 
-const DENSITIES: [CallDensity; 3] = [
-    CallDensity::Sparse,
-    CallDensity::Conversational,
-    CallDensity::Busy,
-];
+const DENSITIES: [CallDensity; 3] =
+    [CallDensity::Sparse, CallDensity::Conversational, CallDensity::Busy];
 
 fn note_fit(note: PlayableNote, chord: &HashSet<String>, scale: &HashSet<String>) -> Fit {
     fit(note.midi, chord, scale)
@@ -83,16 +69,8 @@ fn note_fit(note: PlayableNote, chord: &HashSet<String>, scale: &HashSet<String>
 fn playable_notes_lists_every_blow_and_draw_of_the_harp() {
     let notes = c_harp();
     assert_eq!(notes.len(), 20);
-    assert!(notes.contains(&PlayableNote {
-        midi: 60,
-        hole: 1,
-        blow: true
-    }));
-    assert!(notes.contains(&PlayableNote {
-        midi: 67,
-        hole: 2,
-        blow: false
-    }));
+    assert!(notes.contains(&PlayableNote { midi: 60, hole: 1, blow: true }));
+    assert!(notes.contains(&PlayableNote { midi: 67, hole: 2, blow: false }));
     assert!(notes.iter().all(|n| (1..=10).contains(&n.hole)));
 }
 
@@ -137,9 +115,7 @@ fn every_density_has_a_rest_and_a_pickup_in_its_openings() {
     for density in DENSITIES {
         let cells = openings(density);
         assert!(
-            cells
-                .iter()
-                .any(|c| c.iter().map(|&(_, l)| l).sum::<u8>() < SLOTS_PER_BAR),
+            cells.iter().any(|c| c.iter().map(|&(_, l)| l).sum::<u8>() < SLOTS_PER_BAR),
             "{density:?} never rests"
         );
         // A pickup: a one-eighth note on an off-beat leading into a longer
@@ -155,11 +131,7 @@ fn every_density_has_a_rest_and_a_pickup_in_its_openings() {
 
 #[test]
 fn lay_out_marks_held_notes_and_shaves_the_articulation_gap() {
-    let n = PlayableNote {
-        midi: 64,
-        hole: 2,
-        blow: true,
-    };
+    let n = PlayableNote { midi: 64, hole: 2, blow: true };
     let notes = lay_out(&[(0, 1), (4, 3)], &[n, n], 1, false);
     assert_eq!(notes.len(), 2);
     assert_eq!(notes[0].tick, TICKS_PER_BAR);
@@ -174,16 +146,8 @@ fn lay_out_marks_held_notes_and_shaves_the_articulation_gap() {
 
 #[test]
 fn a_breath_change_is_playable_on_the_same_or_next_hole_only() {
-    let blow = |hole| PlayableNote {
-        midi: 60,
-        hole,
-        blow: true,
-    };
-    let draw = |hole| PlayableNote {
-        midi: 60,
-        hole,
-        blow: false,
-    };
+    let blow = |hole| PlayableNote { midi: 60, hole, blow: true };
+    let draw = |hole| PlayableNote { midi: 60, hole, blow: false };
     assert!(transition_ok(blow(4), draw(4)));
     assert!(transition_ok(blow(4), draw(5)));
     assert!(transition_ok(blow(4), blow(6)));
@@ -215,11 +179,7 @@ fn different_seeds_yield_different_calls() {
                 .collect()
         })
         .collect();
-    assert!(
-        calls.len() > 4,
-        "only {} distinct calls in 16 seeds",
-        calls.len()
-    );
+    assert!(calls.len() > 4, "only {} distinct calls in 16 seeds", calls.len());
 }
 
 #[test]
@@ -252,11 +212,7 @@ fn every_call_is_playable_reachable_resolved_and_leaves_space() {
                     assert!(call_end_tick(&call) <= call_space_tick());
 
                     let chord_for = |n: &CallNote| {
-                        if n.tick < TICKS_PER_BAR {
-                            &fx.opening
-                        } else {
-                            &fx.ending
-                        }
+                        if n.tick < TICKS_PER_BAR { &fx.opening } else { &fx.ending }
                     };
                     for n in &call {
                         assert!(fx.playable.contains(&n.note), "{density:?} seed {seed}");
@@ -296,9 +252,8 @@ fn density_changes_how_many_notes_a_call_has() {
     let (opening, ending) = chord_pairs().remove(0);
     let fx = Fixture::new(opening, ending);
     let mean = |density| {
-        let total: usize = (0..40u64)
-            .map(|seed| generate_call(&fx.ctx(density, true, seed)).len())
-            .sum();
+        let total: usize =
+            (0..40u64).map(|seed| generate_call(&fx.ctx(density, true, seed)).len()).sum();
         total as f32 / 40.0
     };
     let sparse = mean(CallDensity::Sparse);
@@ -315,20 +270,12 @@ fn calls_use_rests_held_notes_and_repeated_notes() {
     let calls: Vec<Vec<CallNote>> = (0..40u64)
         .map(|seed| generate_call(&fx.ctx(CallDensity::Conversational, false, seed)))
         .collect();
+    assert!(calls.iter().any(|c| c.iter().any(|n| n.held)), "never holds");
     assert!(
-        calls.iter().any(|c| c.iter().any(|n| n.held)),
-        "never holds"
-    );
-    assert!(
-        calls
-            .iter()
-            .any(|c| c.windows(2).any(|w| w[0].note.midi == w[1].note.midi)),
+        calls.iter().any(|c| c.windows(2).any(|w| w[0].note.midi == w[1].note.midi)),
         "never repeats a note"
     );
-    assert!(
-        calls.iter().any(|c| c[0].tick > 0),
-        "never opens with a rest"
-    );
+    assert!(calls.iter().any(|c| c[0].tick > 0), "never opens with a rest");
 }
 
 #[test]
@@ -342,21 +289,9 @@ fn a_chord_the_harp_cannot_sound_yields_no_call() {
 
 fn opening_e_g_c() -> Vec<PlayableNote> {
     vec![
-        PlayableNote {
-            midi: 64,
-            hole: 2,
-            blow: true,
-        },
-        PlayableNote {
-            midi: 67,
-            hole: 3,
-            blow: true,
-        },
-        PlayableNote {
-            midi: 72,
-            hole: 4,
-            blow: true,
-        },
+        PlayableNote { midi: 64, hole: 2, blow: true },
+        PlayableNote { midi: 67, hole: 3, blow: true },
+        PlayableNote { midi: 72, hole: 4, blow: true },
     ]
 }
 
@@ -365,14 +300,8 @@ fn a_repeat_answer_over_the_same_chord_sings_the_motif_again() {
     let (opening, ending) = chord_pairs().remove(0);
     let fx = Fixture::new(opening, ending);
     let ctx = fx.ctx(CallDensity::Conversational, true, 7);
-    let answer = answer_pitches(
-        &ctx,
-        &fx.ending,
-        &opening_e_g_c(),
-        3,
-        Contour::Repeat,
-        &mut Rng(7),
-    );
+    let answer =
+        answer_pitches(&ctx, &fx.ending, &opening_e_g_c(), 3, Contour::Repeat, &mut Rng(7));
     let midis: Vec<u8> = answer.iter().map(|n| n.midi).collect();
     assert_eq!(midis, vec![64, 67, 72]);
 }
@@ -390,10 +319,7 @@ fn up_and_down_answers_move_the_anchor_and_keep_the_contour() {
     assert!(up[0].midi > 64, "up answer starts at {}", up[0].midi);
     assert!(down[0].midi < 64, "down answer starts at {}", down[0].midi);
     for a in [&up, &down] {
-        assert!(
-            a.windows(2).all(|w| w[1].midi >= w[0].midi),
-            "{a:?} lost the rising contour"
-        );
+        assert!(a.windows(2).all(|w| w[1].midi >= w[0].midi), "{a:?} lost the rising contour");
     }
 }
 

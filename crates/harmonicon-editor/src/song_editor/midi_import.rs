@@ -89,10 +89,8 @@ pub(super) struct MidiFileLoaded;
 /// candidate harp keys against.
 pub(super) fn track_midi_keys(bytes: &[u8], track_index: usize) -> Result<Vec<u8>, String> {
     let smf = Smf::parse(bytes).map_err(|e| e.to_string())?;
-    let track = smf
-        .tracks
-        .get(track_index)
-        .ok_or_else(|| "track index out of range".to_string())?;
+    let track =
+        smf.tracks.get(track_index).ok_or_else(|| "track index out of range".to_string())?;
     Ok(extract_notes(track).into_iter().map(|n| n.key).collect())
 }
 
@@ -109,10 +107,7 @@ pub(super) fn list_midi_tracks(bytes: &[u8]) -> Result<Vec<MidiTrackInfo>, Strin
             // which is why this fallback lives here and not in `ScoreTrack`
             // — a reader reports what the file says, and "unnamed" is a
             // fact the picker's own selection rules depend on.
-            name: t
-                .name
-                .clone()
-                .unwrap_or_else(|| format!("Track {}", t.index)),
+            name: t.name.clone().unwrap_or_else(|| format!("Track {}", t.index)),
             note_count: t.note_count,
         })
         .collect())
@@ -163,10 +158,7 @@ fn editor_tempo_map(midi_tempo: &[(u64, u32)], tpq: u32) -> Vec<TempoPoint> {
             let secs = tick_to_seconds(tick, tpq, midi_tempo);
             seconds_to_tick(secs, TICKS_PER_BEAT as u32, &editor_map)
         };
-        editor_map.push(TempoPoint {
-            tick: editor_tick,
-            bpm,
-        });
+        editor_map.push(TempoPoint { tick: editor_tick, bpm });
     }
     editor_map
 }
@@ -174,10 +166,9 @@ fn editor_tempo_map(midi_tempo: &[(u64, u32)], tpq: u32) -> Vec<TempoPoint> {
 fn editor_meter_map(midi_meter: &[(u64, u8, u8)], tpq: u32) -> Vec<(usize, String)> {
     let mut editor_map: Vec<(usize, String)> = Vec::with_capacity(midi_meter.len());
     for &(tick, numerator, denominator) in midi_meter {
-        let editor_tick = tick
-            .saturating_mul(TICKS_PER_BEAT as u64)
-            .saturating_add(u64::from(tpq) / 2)
-            / u64::from(tpq);
+        let editor_tick =
+            tick.saturating_mul(TICKS_PER_BEAT as u64).saturating_add(u64::from(tpq) / 2)
+                / u64::from(tpq);
         let signature = format!("{numerator}/{denominator}");
         if let Some(last) = editor_map.last_mut()
             && last.0 == editor_tick as usize
@@ -221,10 +212,7 @@ pub(super) fn phrase_diagnostics(notes: &[GridNote], approximated: usize) -> Imp
     for note in notes {
         by_tick.entry(note.tick).or_default().push(note);
     }
-    let mut diagnostics = ImportDiagnostics {
-        approximated,
-        ..Default::default()
-    };
+    let mut diagnostics = ImportDiagnostics { approximated, ..Default::default() };
     for group in by_tick.values().filter(|group| group.len() > 1) {
         if group.iter().any(|note| note.dir == super::state::Dir::Blow)
             && group.iter().any(|note| note.dir == super::state::Dir::Draw)
@@ -281,10 +269,8 @@ pub(super) fn import_track_notes(
 ) -> Result<ImportedTrack, String> {
     let smf = Smf::parse(bytes).map_err(|e| e.to_string())?;
     let tpq = ticks_per_quarter(&smf)?;
-    let track = smf
-        .tracks
-        .get(track_index)
-        .ok_or_else(|| "track index out of range".to_string())?;
+    let track =
+        smf.tracks.get(track_index).ok_or_else(|| "track index out of range".to_string())?;
     let raw_notes = extract_notes(track);
     if raw_notes.is_empty() {
         return Err("selected track has no notes".to_string());
@@ -309,20 +295,9 @@ pub(super) fn import_track_notes(
         let tick = seconds_to_tick(start_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
         let end_tick = seconds_to_tick(end_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
         let len = end_tick.saturating_sub(tick).max(1);
-        notes.push(GridNote {
-            id: id as u32,
-            hole,
-            tick,
-            len,
-            dir,
-            pitch,
-            expr: Expr::None,
-        });
+        notes.push(GridNote { id: id as u32, hole, tick, len, dir, pitch, expr: Expr::None });
     }
-    let tempo_changes = editor_map[1..]
-        .iter()
-        .map(|p| (p.tick as usize, p.bpm))
-        .collect();
+    let tempo_changes = editor_map[1..].iter().map(|p| (p.tick as usize, p.bpm)).collect();
     Ok(ImportedTrack {
         initial_bpm,
         time_signature,
@@ -441,11 +416,7 @@ pub(super) fn rebuild_midi_track_combobox(
             commands.entity(c).despawn();
         }
     }
-    let options: Vec<String> = midi
-        .tracks
-        .iter()
-        .map(MidiTrackInfo::option_label)
-        .collect();
+    let options: Vec<String> = midi.tracks.iter().map(MidiTrackInfo::option_label).collect();
     // `default_track`, not `options.first()`: track 0 is conventionally the
     // tempo/metadata track, so defaulting to it shows an empty grid.
     let Some(selected) = default_track(&midi.tracks)
@@ -463,9 +434,9 @@ pub(super) fn rebuild_midi_track_combobox(
         &selected,
         on_midi_track_selected,
     );
-    commands.entity(combo).insert(Tooltip(String::from(
-        loc.msg("editor-field-midi-track-tooltip"),
-    )));
+    commands
+        .entity(combo)
+        .insert(Tooltip(String::from(loc.msg("editor-field-midi-track-tooltip"))));
 
     // A track the file itself names as the harmonica needs no decision from
     // the user, so import it now rather than leaving the grid empty behind a
@@ -611,11 +582,7 @@ mod tests {
     fn a_track_named_harmonica_is_the_default_even_when_it_is_not_first() {
         let bytes = smf_bytes(vec![
             vec![meta(0, MetaMessage::TrackName(b"Tempo"))],
-            vec![
-                meta(0, MetaMessage::TrackName(b"Guitar")),
-                note_on(0, 40, 100),
-                note_off(10, 40),
-            ],
+            vec![meta(0, MetaMessage::TrackName(b"Guitar")), note_on(0, 40, 100), note_off(10, 40)],
             vec![
                 meta(0, MetaMessage::TrackName(b"Harmonica")),
                 note_on(0, 60, 100),
@@ -632,11 +599,7 @@ mod tests {
         // combobox's own "first option" default would show an empty grid.
         let bytes = smf_bytes(vec![
             vec![meta(0, MetaMessage::TrackName(b"Conductor"))],
-            vec![
-                meta(0, MetaMessage::TrackName(b"Lead")),
-                note_on(0, 60, 100),
-                note_off(10, 60),
-            ],
+            vec![meta(0, MetaMessage::TrackName(b"Lead")), note_on(0, 60, 100), note_off(10, 60)],
         ]);
         let tracks = list_midi_tracks(&bytes).unwrap();
         assert_eq!(default_track(&tracks), Some(1));
@@ -652,9 +615,7 @@ mod tests {
             note_off(10, 60),
         ]]);
         let tracks = list_midi_tracks(&bytes).unwrap();
-        assert!(!harmonicon_score::track::name_says_harmonica(Some(
-            tracks[0].name.as_str()
-        )));
+        assert!(!harmonicon_score::track::name_says_harmonica(Some(tracks[0].name.as_str())));
         assert_eq!(default_track(&tracks), Some(0));
     }
 
@@ -672,11 +633,7 @@ mod tests {
     #[test]
     fn list_midi_tracks_reports_name_and_note_count_per_track() {
         let bytes = smf_bytes(vec![
-            vec![
-                meta(0, MetaMessage::TrackName(b"Bass")),
-                note_on(0, 40, 100),
-                note_off(10, 40),
-            ],
+            vec![meta(0, MetaMessage::TrackName(b"Bass")), note_on(0, 40, 100), note_off(10, 40)],
             vec![meta(0, MetaMessage::TrackName(b"Lead"))],
         ]);
         let tracks = list_midi_tracks(&bytes).unwrap();
@@ -689,11 +646,7 @@ mod tests {
 
     #[test]
     fn option_label_encodes_index_name_and_count_uniquely() {
-        let info = MidiTrackInfo {
-            index: 2,
-            name: "Bass".to_string(),
-            note_count: 5,
-        };
+        let info = MidiTrackInfo { index: 2, name: "Bass".to_string(), note_count: 5 };
         assert_eq!(info.option_label(), "[2] Bass (5 notes)");
     }
 
@@ -762,10 +715,7 @@ mod tests {
         let imported = import_track_notes(&bytes, 1, "C", HarmonicaKind::Diatonic).unwrap();
 
         assert_eq!(imported.time_signature, "4/4");
-        assert_eq!(
-            imported.meter_changes,
-            vec![(TICKS_PER_BEAT, "3/4".to_string())]
-        );
+        assert_eq!(imported.meter_changes, vec![(TICKS_PER_BEAT, "3/4".to_string())]);
     }
 
     #[test]
@@ -787,11 +737,7 @@ mod tests {
             expr: Expr::None,
         };
         let diagnostics = phrase_diagnostics(
-            &[
-                note(0, 1, Dir::Blow),
-                note(1, 1, Dir::Draw),
-                note(2, 2, Dir::Blow),
-            ],
+            &[note(0, 1, Dir::Blow), note(1, 1, Dir::Draw), note(2, 2, Dir::Blow)],
             0,
         );
         assert_eq!(diagnostics.mixed_breath_groups, 1);
@@ -843,10 +789,7 @@ mod tests {
         let (bpm, pcm) = render_backing_pcm(&bytes, 0).unwrap();
         assert!(bpm > 0.0);
         assert!(!pcm.is_empty());
-        assert!(
-            pcm.iter().any(|&s| s.abs() > 0.01),
-            "backing track should be audible"
-        );
+        assert!(pcm.iter().any(|&s| s.abs() > 0.01), "backing track should be audible");
     }
 
     #[test]

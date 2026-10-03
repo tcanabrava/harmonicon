@@ -245,10 +245,7 @@ pub struct MusicScoreBarMap {
 
 impl Default for MusicScoreBarMap {
     fn default() -> Self {
-        Self {
-            meter: MeterMap::constant("4/4", 12),
-            quarter_ticks: 12,
-        }
+        Self { meter: MeterMap::constant("4/4", 12), quarter_ticks: 12 }
     }
 }
 
@@ -335,10 +332,7 @@ mod bar_map_tests {
         };
         assert_eq!(bars.beats(0.0, 7.0), vec![3.5, 6.5]);
         let parts = bars.split_note(36, 54, 60, false);
-        assert_eq!(
-            parts.iter().map(|n| n.start_beat).collect::<Vec<_>>(),
-            vec![3.0, 3.5]
-        );
+        assert_eq!(parts.iter().map(|n| n.start_beat).collect::<Vec<_>>(), vec![3.0, 3.5]);
         assert!(parts[1].tied_from_previous);
     }
 
@@ -403,12 +397,8 @@ fn derive_score_spacing(
 }
 
 fn score_pixels_per_beat(notes: &[NotationNote], bar_map: &MusicScoreBarMap) -> f32 {
-    let note_scale = pixels_per_beat(
-        notes,
-        STAFF_LINE_SPACING,
-        PIXELS_PER_BEAT,
-        MAX_PIXELS_PER_BEAT,
-    );
+    let note_scale =
+        pixels_per_beat(notes, STAFF_LINE_SPACING, PIXELS_PER_BEAT, MAX_PIXELS_PER_BEAT);
     let rest_scale = rests_between_notes(notes, bar_map)
         .into_iter()
         .map(|rest| rest.required_pixels_per_beat(STAFF_LINE_SPACING))
@@ -428,10 +418,7 @@ pub struct MusicScoreMeter {
 
 impl Default for MusicScoreMeter {
     fn default() -> Self {
-        Self {
-            numerator: 4,
-            denominator: 4,
-        }
+        Self { numerator: 4, denominator: 4 }
     }
 }
 
@@ -462,8 +449,7 @@ impl MusicScoreMeter {
     /// Ticks spanned by one bar. `None` under the same conditions as
     /// [`ticks_per_beat`](Self::ticks_per_beat).
     pub fn ticks_per_bar(self, quarter_ticks: u32) -> Option<u32> {
-        self.ticks_per_beat(quarter_ticks)?
-            .checked_mul(u32::from(self.numerator))
+        self.ticks_per_beat(quarter_ticks)?.checked_mul(u32::from(self.numerator))
     }
 
     /// Seconds spanned by one beat *of this meter* at `bpm` quarter notes a
@@ -502,9 +488,8 @@ impl MusicScoreMeter {
 /// Not exhaustive, and not meant to be — an exhaustive list is every
 /// numerator crossed with five denominators, far too many to pick from.
 /// `meters_are_all_well_formed` is what keeps this honest.
-pub const TIME_SIGNATURES: [&str; 10] = [
-    "4/4", "3/4", "2/4", "2/2", "6/8", "9/8", "12/8", "5/4", "7/8", "5/8",
-];
+pub const TIME_SIGNATURES: [&str; 10] =
+    ["4/4", "3/4", "2/4", "2/2", "6/8", "9/8", "12/8", "5/4", "7/8", "5/8"];
 
 /// Parses `"6/8"` into its two halves — **the only place in the tree that
 /// reads a time-signature string.** Everything that needs a bar length,
@@ -524,10 +509,7 @@ pub fn parse_time_signature(s: &str) -> MusicScoreMeter {
     let numerator = parts.next().and_then(|n| n.trim().parse().ok());
     let denominator = parts.next().and_then(|d| d.trim().parse().ok());
     match (numerator, denominator) {
-        (Some(n), Some(d)) if n > 0 && d > 0 => MusicScoreMeter {
-            numerator: n,
-            denominator: d,
-        },
+        (Some(n), Some(d)) if n > 0 && d > 0 => MusicScoreMeter { numerator: n, denominator: d },
         _ => MusicScoreMeter::default(),
     }
 }
@@ -801,10 +783,7 @@ fn rebuild_score_notes(
     // px, so this needs `inverse_scale_factor()` to match — same
     // conversion `gameplay_2d::size_note_ribbons` already applies for the
     // same reason.
-    let Some(panel_width) = panels
-        .iter()
-        .next()
-        .map(|n| n.size().x * n.inverse_scale_factor())
+    let Some(panel_width) = panels.iter().next().map(|n| n.size().x * n.inverse_scale_factor())
     else {
         return;
     };
@@ -846,13 +825,7 @@ fn rebuild_score_notes(
             &mut clefs,
             &mut time_sigs,
         );
-        *window = Some(SpawnedWindow {
-            layer,
-            panel_width,
-            origin: now,
-            lo,
-            hi,
-        });
+        *window = Some(SpawnedWindow { layer, panel_width, origin: now, lo, hi });
     }
 
     let Some(origin) = window.as_ref().map(|w| w.origin) else {
@@ -898,11 +871,7 @@ fn spawn_window(
     }
 
     for (slot, mut text) in time_sigs.iter_mut() {
-        let digit = if slot.numerator {
-            meter.numerator
-        } else {
-            meter.denominator
-        };
+        let digit = if slot.numerator { meter.numerator } else { meter.denominator };
         let glyphs = time_sig_glyphs(digit);
         if text.0 != glyphs {
             text.0 = glyphs;
@@ -998,10 +967,7 @@ fn spawn_window(
             if visible {
                 // Looked up over every note, not just the visible ones: the
                 // segment a tie starts from may have scrolled off already.
-                let tied_from = note
-                    .tied_from_previous
-                    .then(|| tied_from(notes, i))
-                    .flatten();
+                let tied_from = note.tied_from_previous.then(|| tied_from(notes, i)).flatten();
                 spawn_note_glyphs(
                     parent,
                     bravura,
@@ -1045,31 +1011,20 @@ mod tests {
     #[test]
     fn parse_time_signature_falls_back_to_four_four_when_malformed() {
         for bad in ["", "4", "x/y", "4/0", "0/4", "//"] {
-            assert_eq!(
-                parse_time_signature(bad),
-                MusicScoreMeter::default(),
-                "{bad:?}"
-            );
+            assert_eq!(parse_time_signature(bad), MusicScoreMeter::default(), "{bad:?}");
         }
     }
     #[test]
     fn meters_are_all_well_formed() {
         for s in TIME_SIGNATURES {
             let m = parse_time_signature(s);
-            assert_ne!(
-                (m.numerator, m.denominator),
-                (0, 0),
-                "{s} did not parse at all"
-            );
+            assert_ne!((m.numerator, m.denominator), (0, 0), "{s} did not parse at all");
             assert!(m.numerator > 0, "{s} has no beats in a bar");
             assert!(
                 m.denominator.is_power_of_two(),
                 "{s}: the lower number must name a note value, so a power of two"
             );
-            assert!(
-                m.denominator <= 16,
-                "{s} is finer than the editor's tick grid can place"
-            );
+            assert!(m.denominator <= 16, "{s} is finer than the editor's tick grid can place");
             assert_eq!(
                 format!("{}/{}", m.numerator, m.denominator),
                 s,
@@ -1085,10 +1040,7 @@ mod tests {
         // boundary ever has to be rounded.
         for s in TIME_SIGNATURES {
             let m = parse_time_signature(s);
-            assert!(
-                m.ticks_per_beat(12).is_some(),
-                "{s}: beat is not a whole number of ticks"
-            );
+            assert!(m.ticks_per_beat(12).is_some(), "{s}: beat is not a whole number of ticks");
             assert!(m.ticks_per_bar(12).is_some(), "{s}: bar is not either");
         }
     }

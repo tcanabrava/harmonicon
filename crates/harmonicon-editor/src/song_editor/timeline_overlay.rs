@@ -34,10 +34,7 @@ pub(super) struct TimelineHighlight;
 pub(super) fn timeline_surface_bundle() -> impl Bundle {
     (
         TimelineSurface,
-        TimelineSurfaceGeometry {
-            scroll_px: 0.0,
-            width_px: 0.0,
-        },
+        TimelineSurfaceGeometry { scroll_px: 0.0, width_px: 0.0 },
         RelativeCursorPosition::default(),
         Node {
             position_type: PositionType::Absolute,
@@ -149,18 +146,13 @@ pub(super) fn update_timeline_overlays(
         }
     }
 
-    let Some(hover) = surfaces
-        .iter()
-        .find_map(|(geom, rel)| rel.normalized.map(|n| geom.tick_at(n.x)))
+    let Some(hover) =
+        surfaces.iter().find_map(|(geom, rel)| rel.normalized.map(|n| geom.tick_at(n.x)))
     else {
         hide(&mut highlights);
         return;
     };
-    let side = if hover < split {
-        Side::Left
-    } else {
-        Side::Right
-    };
+    let side = if hover < split { Side::Left } else { Side::Right };
     let (start, end) = split_side_range(split, side, &state.notes);
     set_highlight(&mut highlights, start, end.max(start + 1));
 }

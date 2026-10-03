@@ -75,8 +75,7 @@ impl EditorState {
     }
 
     fn expected_selected_note(&self) -> Option<&GridNote> {
-        self.expected_selected
-            .and_then(|id| self.expected_note_by_id(id))
+        self.expected_selected.and_then(|id| self.expected_note_by_id(id))
     }
 
     fn expected_selected_note_mut(&mut self) -> Option<&mut GridNote> {
@@ -114,15 +113,7 @@ pub(super) fn place_or_select_expected(state: &mut EditorState, hole: u8, tick: 
 
     let id = state.expected_next_id;
     state.expected_next_id += 1;
-    state.expected_notes.push(GridNote {
-        id,
-        hole,
-        tick,
-        len: TICKS_PER_BEAT,
-        dir,
-        pitch,
-        expr,
-    });
+    state.expected_notes.push(GridNote { id, hole, tick, len: TICKS_PER_BEAT, dir, pitch, expr });
     state.expected_selected = Some(id);
 }
 
@@ -158,11 +149,7 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
         return;
     }
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
-        let dir = if kind == ModButton::Blow {
-            Dir::Blow
-        } else {
-            Dir::Draw
-        };
+        let dir = if kind == ModButton::Blow { Dir::Blow } else { Dir::Draw };
         state.sticky_dir = dir;
         if pitch_forced_dir(state.sticky_pitch).is_some_and(|d| d != dir) {
             state.sticky_pitch = Pitch::Normal;
@@ -197,19 +184,12 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
                 return;
             }
             let next = note.bend() + 0.5;
-            note.pitch = if next > max + f32::EPSILON {
-                Pitch::Normal
-            } else {
-                Pitch::Bend(next)
-            };
+            note.pitch = if next > max + f32::EPSILON { Pitch::Normal } else { Pitch::Bend(next) };
         }
         ModButton::Overblow => {
             if overblow_ok(note.hole) {
-                note.pitch = if note.pitch == Pitch::Overblow {
-                    Pitch::Normal
-                } else {
-                    Pitch::Overblow
-                };
+                note.pitch =
+                    if note.pitch == Pitch::Overblow { Pitch::Normal } else { Pitch::Overblow };
                 if note.pitch == Pitch::Overblow {
                     note.dir = Dir::Blow;
                 }
@@ -217,44 +197,30 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
         }
         ModButton::Overdraw => {
             if overdraw_ok(note.hole) {
-                note.pitch = if note.pitch == Pitch::Overdraw {
-                    Pitch::Normal
-                } else {
-                    Pitch::Overdraw
-                };
+                note.pitch =
+                    if note.pitch == Pitch::Overdraw { Pitch::Normal } else { Pitch::Overdraw };
                 if note.pitch == Pitch::Overdraw {
                     note.dir = Dir::Draw;
                 }
             }
         }
         ModButton::Slide => {
-            note.pitch = if note.pitch == Pitch::Slide {
-                Pitch::Normal
-            } else {
-                Pitch::Slide
-            };
+            note.pitch = if note.pitch == Pitch::Slide { Pitch::Normal } else { Pitch::Slide };
         }
         ModButton::Wah => {
             let next = match note.expr {
                 Expr::Wah(hz) => hz + WAH_HZ_STEP,
                 _ => WAH_HZ_MIN,
             };
-            note.expr = if next > WAH_HZ_MAX + f32::EPSILON {
-                Expr::None
-            } else {
-                Expr::Wah(next)
-            };
+            note.expr = if next > WAH_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Wah(next) };
         }
         ModButton::Vibrato => {
             let next = match note.expr {
                 Expr::Vibrato(hz) => hz + VIBRATO_HZ_STEP,
                 _ => VIBRATO_HZ_MIN,
             };
-            note.expr = if next > VIBRATO_HZ_MAX + f32::EPSILON {
-                Expr::None
-            } else {
-                Expr::Vibrato(next)
-            };
+            note.expr =
+                if next > VIBRATO_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Vibrato(next) };
         }
         ModButton::Delete
         | ModButton::Depth
@@ -381,11 +347,7 @@ pub(super) fn spawn_expected_notes_group(
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(8.0),
                 row_gap: Val::Px(6.0),
-                display: if mode == Mode::ExpectedNotes {
-                    Display::Flex
-                } else {
-                    Display::None
-                },
+                display: if mode == Mode::ExpectedNotes { Display::Flex } else { Display::None },
                 ..default()
             },
         ))
@@ -467,11 +429,7 @@ fn update_expected_technique_button_visibility(
             ModButton::Slide => !diatonic_only,
             _ => continue,
         };
-        let display = if visible {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        let display = if visible { Display::Flex } else { Display::None };
         if node.display != display {
             node.display = display;
         }
@@ -491,11 +449,7 @@ fn update_expected_mod_panel(
     };
     for (ExpectedModButton(kind), mut bg) in &mut buttons {
         let active = mod_button_active(*kind, dir, pitch, expr);
-        let color = if active {
-            colors.btn_active
-        } else {
-            colors.btn_bg
-        };
+        let color = if active { colors.btn_active } else { colors.btn_bg };
         if bg.0 != color {
             bg.0 = color;
         }
@@ -538,11 +492,7 @@ fn rebuild_expected_notes_overlay(
     // any other mode this is a pure review overlay, and must not steal
     // clicks meant for the ordinary grid underneath it.
     let interactive = state.mode == Mode::ExpectedNotes;
-    let pick = if interactive {
-        Pickable::default()
-    } else {
-        Pickable::IGNORE
-    };
+    let pick = if interactive { Pickable::default() } else { Pickable::IGNORE };
     commands.entity(content).with_children(|c| {
         for note in &state.expected_notes {
             let (left, top, width, height) = note_rect(note);
@@ -571,18 +521,16 @@ fn rebuild_expected_notes_overlay(
             ec.observe(move |_: On<Activate>, mut state: ResMut<EditorState>| {
                 state.expected_selected = Some(id);
             })
-            .observe(
-                move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
-                    if state.expected_dragging.is_some() {
-                        return;
-                    }
-                    let Some(note) = state.expected_note_by_id(id).copied() else {
-                        return;
-                    };
-                    state.expected_selected = Some(id);
-                    state.expected_dragging = Some(DragState::new(id, DragKind::Move, &note));
-                },
-            )
+            .observe(move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
+                if state.expected_dragging.is_some() {
+                    return;
+                }
+                let Some(note) = state.expected_note_by_id(id).copied() else {
+                    return;
+                };
+                state.expected_selected = Some(id);
+                state.expected_dragging = Some(DragState::new(id, DragKind::Move, &note));
+            })
             .observe(
                 move |ev: On<PointerDrag>,
                       mut state: ResMut<EditorState>,
@@ -614,13 +562,11 @@ fn rebuild_expected_notes_overlay(
                     }
                 },
             )
-            .observe(
-                move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
-                    if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Move) {
-                        state.expected_dragging = None;
-                    }
-                },
-            );
+            .observe(move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
+                if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Move) {
+                    state.expected_dragging = None;
+                }
+            });
             ec.with_children(|n| {
                 n.spawn_empty().apply_scene(bsn! {
                     Text({note.dir.arrow()})
@@ -666,23 +612,17 @@ fn spawn_expected_resize_handle(
         Edge::Right => node.right = Val::Px(0.0),
     }
     parent
-        .spawn((
-            node,
-            BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.35)),
-            pick,
-        ))
-        .observe(
-            move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
-                if state.expected_dragging.is_some() {
-                    return;
-                }
-                let Some(note) = state.expected_note_by_id(id).copied() else {
-                    return;
-                };
-                state.expected_selected = Some(id);
-                state.expected_dragging = Some(DragState::new(id, DragKind::Resize(edge), &note));
-            },
-        )
+        .spawn((node, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.35)), pick))
+        .observe(move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
+            if state.expected_dragging.is_some() {
+                return;
+            }
+            let Some(note) = state.expected_note_by_id(id).copied() else {
+                return;
+            };
+            state.expected_selected = Some(id);
+            state.expected_dragging = Some(DragState::new(id, DragKind::Resize(edge), &note));
+        })
         .observe(
             move |ev: On<PointerDrag>,
                   mut state: ResMut<EditorState>,
@@ -712,13 +652,11 @@ fn spawn_expected_resize_handle(
                 }
             },
         )
-        .observe(
-            move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
-                if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Resize(edge)) {
-                    state.expected_dragging = None;
-                }
-            },
-        );
+        .observe(move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
+            if matches!(&state.expected_dragging, Some(d) if d.kind == DragKind::Resize(edge)) {
+                state.expected_dragging = None;
+            }
+        });
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────

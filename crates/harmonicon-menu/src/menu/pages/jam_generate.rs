@@ -92,38 +92,23 @@ pub(crate) fn energy_key(energy: BandEnergy) -> String {
 }
 
 fn progression_labels(loc: &Localization) -> Vec<String> {
-    Progression::all()
-        .iter()
-        .map(|p| loc.msg(&progression_key(*p)).into())
-        .collect()
+    Progression::all().iter().map(|p| loc.msg(&progression_key(*p)).into()).collect()
 }
 
 fn position_labels(loc: &Localization) -> Vec<String> {
-    Position::all()
-        .iter()
-        .map(|p| loc.msg(&position_key(*p)).into())
-        .collect()
+    Position::all().iter().map(|p| loc.msg(&position_key(*p)).into()).collect()
 }
 
 fn scale_labels(loc: &Localization) -> Vec<String> {
-    Scale::all()
-        .iter()
-        .map(|s| loc.msg(&scale_key(*s)).into())
-        .collect()
+    Scale::all().iter().map(|s| loc.msg(&scale_key(*s)).into()).collect()
 }
 
 fn genre_labels(loc: &Localization) -> Vec<String> {
-    Genre::all()
-        .iter()
-        .map(|g| loc.msg(&genre_key(*g)).into())
-        .collect()
+    Genre::all().iter().map(|g| loc.msg(&genre_key(*g)).into()).collect()
 }
 
 fn energy_labels(loc: &Localization) -> Vec<String> {
-    BandEnergy::all()
-        .iter()
-        .map(|energy| loc.msg(&energy_key(*energy)).into())
-        .collect()
+    BandEnergy::all().iter().map(|energy| loc.msg(&energy_key(*energy)).into()).collect()
 }
 
 pub(crate) fn setup_jam_generate_menu(
@@ -275,13 +260,8 @@ pub(crate) fn setup_jam_generate_menu(
             }
             let config = config.clone();
             let seed = rand::random();
-            let (key, bpm, progression, genre, energy) = (
-                config.key.clone(),
-                config.bpm,
-                config.progression,
-                config.genre,
-                config.energy,
-            );
+            let (key, bpm, progression, genre, energy) =
+                (config.key.clone(), config.bpm, config.progression, config.genre, config.energy);
             let task = AsyncComputeTaskPool::get().spawn(async move {
                 render_generated_backing(&key, bpm, progression, genre, energy, seed)
             });
@@ -339,9 +319,8 @@ pub(crate) fn finish_pending_jam(
     mut commands: Commands,
     mut state: ResMut<NextState<AppState>>,
 ) {
-    let Some(rendered) = pending
-        .as_mut()
-        .and_then(|p| future::block_on(future::poll_once(&mut p.task)))
+    let Some(rendered) =
+        pending.as_mut().and_then(|p| future::block_on(future::poll_once(&mut p.task)))
     else {
         return;
     };
@@ -411,13 +390,8 @@ mod tests {
     }
 
     fn pending(config: JamGenerateConfig, seed: u64) -> PendingJam {
-        let (key, bpm, progression, genre, energy) = (
-            config.key.clone(),
-            config.bpm,
-            config.progression,
-            config.genre,
-            config.energy,
-        );
+        let (key, bpm, progression, genre, energy) =
+            (config.key.clone(), config.bpm, config.progression, config.genre, config.energy);
         PendingJam {
             task: AsyncComputeTaskPool::get().spawn(async move {
                 render_generated_backing(&key, bpm, progression, genre, energy, seed)
@@ -431,11 +405,8 @@ mod tests {
     fn a_finished_render_enters_the_jam_with_the_pressed_settings() {
         let mut app = app();
         app.add_systems(Update, finish_pending_jam);
-        let config = JamGenerateConfig {
-            bpm: 160.0,
-            genre: Genre::Rock,
-            ..JamGenerateConfig::default()
-        };
+        let config =
+            JamGenerateConfig { bpm: 160.0, genre: Genre::Rock, ..JamGenerateConfig::default() };
         app.insert_resource(pending(config, 7));
 
         for _ in 0..300 {
@@ -448,10 +419,7 @@ mod tests {
         app.update();
 
         let world = app.world();
-        assert!(
-            !world.contains_resource::<PendingJam>(),
-            "render never landed"
-        );
+        assert!(!world.contains_resource::<PendingJam>(), "render never landed");
         assert_eq!(*world.resource::<GameplayMode>(), GameplayMode::JamSession);
         assert_eq!(world.resource::<GeneratedJamSession>().seed, 7);
         assert_eq!(world.resource::<JamGenre>().0, Genre::Rock);
@@ -465,19 +433,13 @@ mod tests {
     fn leaving_the_page_cancels_a_render_in_flight() {
         let mut app = app();
         app.add_systems(OnExit(MenuPage::JamGenerate), cancel_pending_jam);
-        app.world_mut()
-            .resource_mut::<NextState<AppState>>()
-            .set(AppState::Menu);
+        app.world_mut().resource_mut::<NextState<AppState>>().set(AppState::Menu);
         app.update();
-        app.world_mut()
-            .resource_mut::<NextState<MenuPage>>()
-            .set(MenuPage::JamGenerate);
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::JamGenerate);
         app.update();
         app.insert_resource(pending(JamGenerateConfig::default(), 1));
 
-        app.world_mut()
-            .resource_mut::<NextState<MenuPage>>()
-            .set(MenuPage::JamSessionMenu);
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::JamSessionMenu);
         app.update();
 
         assert!(!app.world().contains_resource::<PendingJam>());

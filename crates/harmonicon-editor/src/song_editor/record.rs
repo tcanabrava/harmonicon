@@ -161,11 +161,7 @@ pub(super) fn start_record(
     record.table = build_pitch_table(&harp, state.harmonica_kind);
     record.tracker = Some(HarmonicaNoteTracker::new(
         harp.clone(),
-        NoteTrackerConfig {
-            onset_frames: 1,
-            release_frames: 1,
-            direction_change_frames: 2,
-        },
+        NoteTrackerConfig { onset_frames: 1, release_frames: 1, direction_change_frames: 2 },
     ));
     // Same harp-sized narrowing gameplay applies from a loaded chart
     // (`gameplay::lifecycle::setup_scoring_config`) — fewer candidates for
@@ -270,9 +266,8 @@ pub(super) fn record_tick(
     // window before now — plus the player's calibrated input latency (same
     // `input_latency_ms` gameplay's judge subtracts). Without this, every
     // recorded note lands systematically late.
-    let half_window = capture
-        .map(|c| CHUNK_SIZE as f32 * 0.5 / c.sample_rate.max(1) as f32)
-        .unwrap_or(0.0);
+    let half_window =
+        capture.map(|c| CHUNK_SIZE as f32 * 0.5 / c.sample_rate.max(1) as f32).unwrap_or(0.0);
     record.detect_delay = half_window + settings.input_latency_ms as f32 / 1000.0;
     let t = (playhead.elapsed - record.detect_delay).max(0.0);
     let secs_per_tick = playhead.secs_per_tick;
@@ -284,19 +279,11 @@ pub(super) fn record_tick(
         raw.clear();
         raw.extend(ev.0.iter().map(|p| p.midi));
         let tracked = record.tracker.as_mut().map(|tracker| tracker.update(&raw));
-        let detected = tracked
-            .as_ref()
-            .map_or(raw.as_slice(), |notes| &notes.active);
+        let detected = tracked.as_ref().map_or(raw.as_slice(), |notes| &notes.active);
         apply_detected_pitches(&mut record, &mut state, detected, t, secs_per_tick);
     }
 
-    grow_open_notes(
-        &mut state.notes,
-        &record.open,
-        &record.take_ids,
-        t,
-        secs_per_tick,
-    );
+    grow_open_notes(&mut state.notes, &record.open, &record.take_ids, t, secs_per_tick);
     // Both of the above punch out whatever the take overlaps, so a note
     // that was selected before the take started can vanish under it.
     state.prune_selection();
@@ -308,9 +295,7 @@ pub(super) fn record_tick(
 /// the harp can't produce that pitch (exactly `map_pitch_playable`'s
 /// verdict, precomputed) — see [`RecordState::table`].
 fn build_pitch_table(harp: &Harmonica, kind: HarmonicaKind) -> Vec<Option<(u8, Dir, Pitch)>> {
-    (0..=127u8)
-        .map(|midi| map_pitch_playable(midi, harp, kind))
-        .collect()
+    (0..=127u8).map(|midi| map_pitch_playable(midi, harp, kind)).collect()
 }
 
 /// Removes every note overlapping `[start, end)` ticks that is *not* part
@@ -375,23 +360,10 @@ fn apply_detected_pitches(
         let id = state.next_id;
         state.next_id += 1;
         let note = spawn_open_note(id, mapped, t, secs_per_tick);
-        punch_out_overlaps(
-            &mut state.notes,
-            &record.take_ids,
-            note.tick,
-            note.tick + note.len,
-        );
+        punch_out_overlaps(&mut state.notes, &record.take_ids, note.tick, note.tick + note.len);
         state.notes.push(note);
         record.take_ids.insert(id);
-        record.open.insert(
-            midi,
-            OpenNote {
-                id,
-                start_secs: t,
-                events_seen: 1,
-                missed_events: 0,
-            },
-        );
+        record.open.insert(midi, OpenNote { id, start_secs: t, events_seen: 1, missed_events: 0 });
         record.note_count += 1;
     }
 }
@@ -432,15 +404,7 @@ fn spawn_open_note(
     secs_per_tick: f32,
 ) -> GridNote {
     let tick = (start_secs / secs_per_tick).round() as usize;
-    GridNote {
-        id,
-        hole,
-        tick,
-        len: 1,
-        dir,
-        pitch,
-        expr: Expr::None,
-    }
+    GridNote { id, hole, tick, len: 1, dir, pitch, expr: Expr::None }
 }
 
 /// Extends every currently-sounding note's length to reflect `t` — called
@@ -481,12 +445,7 @@ mod tests {
     use harmonicon_core::harmonica::richter_harp;
 
     fn open(id: u32, start_secs: f32) -> OpenNote {
-        OpenNote {
-            id,
-            start_secs,
-            events_seen: CONFIRM_EVENTS,
-            missed_events: 0,
-        }
+        OpenNote { id, start_secs, events_seen: CONFIRM_EVENTS, missed_events: 0 }
     }
 
     // ── grow_open_notes ──────────────────────────────────────────────────────
@@ -560,9 +519,7 @@ mod tests {
         // step) must resolve to a Bend, exactly like MIDI import already
         // does — recording a bent note shouldn't just snap to the nearest
         // natural note.
-        let draw2 = harp
-            .wind_direction_midi(2, &harmonicon_core::chart::Action::Draw)
-            .unwrap();
+        let draw2 = harp.wind_direction_midi(2, &harmonicon_core::chart::Action::Draw).unwrap();
         let table = build_pitch_table(&harp, HarmonicaKind::Diatonic);
         match table[(draw2 - 1) as usize] {
             Some((2, Dir::Draw, Pitch::Bend(_))) => {}
@@ -686,11 +643,7 @@ mod tests {
         let e4 = harmonicon_core::midi::note_to_midi("E4").unwrap() as u8;
         apply_detected_pitches(&mut record, &mut state, &[c4, e4], 0.0, 0.125);
         grow_open_notes(&mut state.notes, &record.open, &record.take_ids, 0.5, 0.125);
-        assert_eq!(
-            state.notes.len(),
-            2,
-            "simultaneous notes of one take must coexist"
-        );
+        assert_eq!(state.notes.len(), 2, "simultaneous notes of one take must coexist");
     }
 
     #[test]

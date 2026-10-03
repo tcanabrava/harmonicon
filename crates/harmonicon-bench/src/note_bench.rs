@@ -155,10 +155,7 @@ pub fn run_algorithm(
         let mut detected: Vec<u8> = analysis.pitches.iter().map(|p| p.midi).collect();
         detected.sort_unstable();
         detected.dedup();
-        frames.push(Frame {
-            time_secs,
-            detected,
-        });
+        frames.push(Frame { time_secs, detected });
         pos += HOP_SIZE;
     }
     frames
@@ -174,10 +171,7 @@ pub fn run_algorithm(
 pub fn apply_constraints(harp: &Harmonica, frames: &[Frame]) -> Vec<Frame> {
     frames
         .iter()
-        .map(|f| Frame {
-            time_secs: f.time_secs,
-            detected: plausible_notes(harp, &f.detected),
-        })
+        .map(|f| Frame { time_secs: f.time_secs, detected: plausible_notes(harp, &f.detected) })
         .collect()
 }
 
@@ -353,9 +347,7 @@ pub fn note_timings(
             timings.never_detected += 1;
             continue;
         };
-        timings
-            .onset_secs
-            .push(frames[onset].time_secs - note.start_secs);
+        timings.onset_secs.push(frames[onset].time_secs - note.start_secs);
 
         let continued = expected.iter().any(|other| {
             other.midi == note.midi
@@ -365,10 +357,7 @@ pub fn note_timings(
         if continued {
             continue;
         }
-        if let Some(release) = frames[onset..]
-            .iter()
-            .find(|f| !f.detected.contains(&note.midi))
-        {
+        if let Some(release) = frames[onset..].iter().find(|f| !f.detected.contains(&note.midi)) {
             timings.release_secs.push(release.time_secs - note.end_secs);
         }
     }
@@ -510,10 +499,7 @@ mod tests {
             },
             timing: Timing {
                 resolution: 480,
-                tempo_map: vec![TempoPoint {
-                    tick: 0,
-                    bpm: 120.0,
-                }],
+                tempo_map: vec![TempoPoint { tick: 0, bpm: 120.0 }],
                 time_signature_map: None,
                 pickup_ticks: None,
                 repeats: Vec::new(),
@@ -543,12 +529,7 @@ mod tests {
             play_mode: Some(PlayMode::Single),
             call: false,
             lyric: None,
-            events: vec![NoteEvent {
-                hole,
-                action,
-                note: Some(note.to_string()),
-                modifiers: None,
-            }],
+            events: vec![NoteEvent { hole, action, note: Some(note.to_string()), modifiers: None }],
         }
     }
 
@@ -619,20 +600,11 @@ mod tests {
     // ── compare ───────────────────────────────────────────────────────────────
 
     fn expected(midi: u8) -> ExpectedNote {
-        ExpectedNote {
-            start_secs: 0.0,
-            end_secs: 1.0,
-            midi,
-            blow: true,
-            label: String::new(),
-        }
+        ExpectedNote { start_secs: 0.0, end_secs: 1.0, midi, blow: true, label: String::new() }
     }
 
     fn frame(time_secs: f64, detected: &[u8]) -> Frame {
-        Frame {
-            time_secs,
-            detected: detected.to_vec(),
-        }
+        Frame { time_secs, detected: detected.to_vec() }
     }
 
     #[test]
@@ -728,13 +700,7 @@ mod tests {
     // ── timing ───────────────────────────────────────────────────────────────
 
     fn note(midi: u8, start: f64, end: f64) -> ExpectedNote {
-        ExpectedNote {
-            start_secs: start,
-            end_secs: end,
-            midi,
-            blow: true,
-            label: String::new(),
-        }
+        ExpectedNote { start_secs: start, end_secs: end, midi, blow: true, label: String::new() }
     }
 
     /// A 10 ms frame grid where `midi` is detected over `[on, off)`.
@@ -742,11 +708,7 @@ mod tests {
         (0..=(until * 100.0) as usize)
             .map(|i| {
                 let t = i as f64 / 100.0;
-                let d: &[u8] = if t >= on - 1e-9 && t < off - 1e-9 {
-                    &[midi]
-                } else {
-                    &[]
-                };
+                let d: &[u8] = if t >= on - 1e-9 && t < off - 1e-9 { &[midi] } else { &[] };
                 frame(t, d)
             })
             .collect()

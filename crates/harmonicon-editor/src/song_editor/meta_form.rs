@@ -63,11 +63,7 @@ pub(super) fn spawn_hole_column_rows(
     hole_count: u8,
     loc: &Localization,
 ) {
-    col.spawn(Node {
-        width: Val::Percent(100.0),
-        height: Val::Px(HEADER_H),
-        ..default()
-    });
+    col.spawn(Node { width: Val::Percent(100.0), height: Val::Px(HEADER_H), ..default() });
     for hole in 1..=hole_count {
         col.spawn(Node {
             width: Val::Percent(100.0),
@@ -347,30 +343,28 @@ pub(super) fn spawn_field_row(
             make_interactive(&mut btn, colors.field_bg);
 
             if field == Field::Key {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-key-tooltip"))))
-                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
+                btn.insert(Tooltip(String::from(loc.msg("editor-field-key-tooltip")))).observe(
+                    |_: On<Activate>, mut state: ResMut<EditorState>| {
                         let key = cycle_next(&HARP_KEYS, &state.key);
                         state.set_key(key);
-                    });
+                    },
+                );
             } else if field == Field::Position {
-                btn.insert(Tooltip(String::from(
-                    loc.msg("editor-field-position-tooltip"),
-                )))
-                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.position = cycle_next(&POSITIONS, &state.position);
-                });
-            } else if field == Field::Difficulty {
-                btn.insert(Tooltip(String::from(
-                    loc.msg("editor-field-difficulty-tooltip"),
-                )))
-                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.difficulty = cycle_next(&DIFFICULTIES, &state.difficulty);
-                });
-            } else if field == Field::SongFeel {
-                btn.insert(Tooltip(String::from(loc.msg("editor-field-feel-tooltip"))))
+                btn.insert(Tooltip(String::from(loc.msg("editor-field-position-tooltip"))))
                     .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                        state.song_feel = cycle_next(&SONG_FEELS, &state.song_feel);
+                        state.position = cycle_next(&POSITIONS, &state.position);
                     });
+            } else if field == Field::Difficulty {
+                btn.insert(Tooltip(String::from(loc.msg("editor-field-difficulty-tooltip"))))
+                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
+                        state.difficulty = cycle_next(&DIFFICULTIES, &state.difficulty);
+                    });
+            } else if field == Field::SongFeel {
+                btn.insert(Tooltip(String::from(loc.msg("editor-field-feel-tooltip")))).observe(
+                    |_: On<Activate>, mut state: ResMut<EditorState>| {
+                        state.song_feel = cycle_next(&SONG_FEELS, &state.song_feel);
+                    },
+                );
             } else if field == Field::ComboEnabled {
                 btn.observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
                     state.combo.enabled =
@@ -394,12 +388,11 @@ pub(super) fn spawn_field_row(
                         cycle_next(&PASS_CRITERIA_KINDS, &state.lesson_pass_criteria);
                 });
             } else if field == Field::LessonTechnique {
-                btn.insert(Tooltip(String::from(
-                    loc.msg("editor-field-lesson-technique-tooltip"),
-                )))
-                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.lesson_technique = cycle_next(&TECHNIQUE_NAMES, &state.lesson_technique);
-                });
+                btn.insert(Tooltip(String::from(loc.msg("editor-field-lesson-technique-tooltip"))))
+                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
+                        state.lesson_technique =
+                            cycle_next(&TECHNIQUE_NAMES, &state.lesson_technique);
+                    });
             } else if field == Field::LessonProgression {
                 btn.insert(Tooltip(String::from(
                     loc.msg("editor-field-lesson-progression-tooltip"),
@@ -408,19 +401,15 @@ pub(super) fn spawn_field_row(
                     state.lesson_progression = cycle_next(&PROGRESSIONS, &state.lesson_progression);
                 });
             } else if field == Field::LessonScale {
-                btn.insert(Tooltip(String::from(
-                    loc.msg("editor-field-lesson-scale-tooltip"),
-                )))
-                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.lesson_scale = cycle_next(&LESSON_SCALES, &state.lesson_scale);
-                });
+                btn.insert(Tooltip(String::from(loc.msg("editor-field-lesson-scale-tooltip"))))
+                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
+                        state.lesson_scale = cycle_next(&LESSON_SCALES, &state.lesson_scale);
+                    });
             } else {
-                btn.insert(Tooltip(String::from(
-                    loc.msg("editor-field-lesson-path-tooltip"),
-                )))
-                .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
-                    state.lesson_path = cycle_next(&LESSON_PATHS, &state.lesson_path);
-                });
+                btn.insert(Tooltip(String::from(loc.msg("editor-field-lesson-path-tooltip"))))
+                    .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
+                        state.lesson_path = cycle_next(&LESSON_PATHS, &state.lesson_path);
+                    });
             }
 
             btn.with_children(|b| {
@@ -563,10 +552,7 @@ fn spawn_midi_track_row(
             });
         line.spawn((
             MidiTrackComboboxSlot,
-            Node {
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
+            Node { flex_direction: FlexDirection::Column, ..default() },
         ));
     });
 }
@@ -615,9 +601,7 @@ pub(super) fn spawn_scale_combobox(
         &scale_label(state.scale, &loc),
         on_scale_selected,
     );
-    commands
-        .entity(combo)
-        .insert(Tooltip(String::from(loc.msg("editor-field-scale-tooltip"))));
+    commands.entity(combo).insert(Tooltip(String::from(loc.msg("editor-field-scale-tooltip"))));
 }
 
 /// A scale's label in the player's language.
@@ -691,9 +675,9 @@ pub(super) fn spawn_time_signature_combobox(
         &state.time_signature,
         on_time_signature_selected,
     );
-    commands.entity(combo).insert(Tooltip(String::from(
-        loc.msg("editor-field-time-signature-tooltip"),
-    )));
+    commands
+        .entity(combo)
+        .insert(Tooltip(String::from(loc.msg("editor-field-time-signature-tooltip"))));
 }
 
 fn on_time_signature_selected(ev: On<ComboboxSelect>, mut state: ResMut<EditorState>) {
@@ -742,11 +726,7 @@ pub(super) fn spawn_meta_form(
     const MID: usize = FIELDS.len() / 2;
     root.spawn(Node {
         width: Val::Percent(100.0),
-        flex_direction: if compact {
-            FlexDirection::Column
-        } else {
-            FlexDirection::Row
-        },
+        flex_direction: if compact { FlexDirection::Column } else { FlexDirection::Row },
         column_gap: Val::Px(24.0),
         row_gap: Val::Px(24.0),
         padding: UiRect::all(Val::Px(12.0)),
@@ -777,11 +757,7 @@ pub(super) fn spawn_meta_form(
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(6.0),
                 flex_grow: 1.0,
-                display: if legend_visible {
-                    Display::Flex
-                } else {
-                    Display::None
-                },
+                display: if legend_visible { Display::Flex } else { Display::None },
                 ..default()
             },
         ));

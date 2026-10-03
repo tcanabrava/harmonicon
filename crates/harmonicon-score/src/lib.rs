@@ -35,10 +35,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum ScoreError {
     #[error("not valid {format}: {detail}")]
-    Parse {
-        format: &'static str,
-        detail: String,
-    },
+    Parse { format: &'static str, detail: String },
     #[error("this file has no tracks with any notes in it")]
     NoPlayableTracks,
     #[error("track {0} does not exist in this file")]
@@ -72,10 +69,7 @@ pub const IMPORT_EXTENSIONS: &[&str] = &[
 /// The directory scans that pick a song folder's chart use this; the asset
 /// loader keeps [`IMPORT_EXTENSIONS`], since by then the file was chosen.
 pub fn is_importable_file(path: &std::path::Path) -> bool {
-    let Some(ext) = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
+    let Some(ext) = path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase())
     else {
         return false;
     };
@@ -249,9 +243,7 @@ mod tests {
     #[test]
     fn an_extension_is_matched_case_insensitively() {
         // Real files arrive as .MID as often as .mid.
-        let err = parse_import("MID", b"not a real file".to_vec())
-            .err()
-            .unwrap();
+        let err = parse_import("MID", b"not a real file".to_vec()).err().unwrap();
         assert!(!matches!(err, ScoreError::UnsupportedFormat(_)));
     }
 }

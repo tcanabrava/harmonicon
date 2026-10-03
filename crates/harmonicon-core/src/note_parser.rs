@@ -22,10 +22,7 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
         // Regex uses ^...$, and while the internal groups are optional,
         // it requires at least one note base to start. Empty string fails.
         println!("Empty notes to analyze");
-        return MatchResult {
-            matched: false,
-            is_valid: false,
-        };
+        return MatchResult { matched: false, is_valid: false };
     }
     let input = str::from_utf8(bytes).unwrap().to_string();
     println!("Analyzing {}", input);
@@ -139,30 +136,18 @@ pub fn analyze_notes(bytes: &[u8]) -> MatchResult {
 
         if state == State::Failed {
             println!("Failed to parse note at byte {:?}", b);
-            return MatchResult {
-                matched: false,
-                is_valid: false,
-            };
+            return MatchResult { matched: false, is_valid: false };
         }
     }
 
     // Evaluate final state when stream terminates
     let res = match state {
         // Safe terminal positions that represent a complete, valid string
-        State::Failed => MatchResult {
-            matched: false,
-            is_valid: false,
-        },
-        _ => MatchResult {
-            matched: true,
-            is_valid: !has_minus,
-        },
+        State::Failed => MatchResult { matched: false, is_valid: false },
+        _ => MatchResult { matched: true, is_valid: !has_minus },
     };
 
-    println!(
-        "Analyzed notes: matched={} is_valid={}",
-        res.matched, res.is_valid
-    );
+    println!("Analyzed notes: matched={} is_valid={}", res.matched, res.is_valid);
     res
 }
 
@@ -174,16 +159,8 @@ mod tests {
     macro_rules! assert_analysis {
         ($input:expr, $matched:expr, $is_valid:expr) => {
             let res = analyze_notes($input.as_bytes());
-            assert_eq!(
-                res.matched, $matched,
-                "Expected matched={} for {:?}",
-                $matched, $input
-            );
-            assert_eq!(
-                res.is_valid, $is_valid,
-                "Expected is_valid={} for {:?}",
-                $is_valid, $input
-            );
+            assert_eq!(res.matched, $matched, "Expected matched={} for {:?}", $matched, $input);
+            assert_eq!(res.is_valid, $is_valid, "Expected is_valid={} for {:?}", $is_valid, $input);
         };
     }
 

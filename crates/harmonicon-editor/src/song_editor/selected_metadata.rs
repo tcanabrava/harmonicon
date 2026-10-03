@@ -25,10 +25,7 @@ impl EditorState {
     /// `metadata_sync::drop_orphaned_metadata` exists to remove, so
     /// accepting it would only lose the text at the next prune.
     pub(super) fn set_annotation(&mut self, tick: usize, field: Field, value: String) {
-        if !matches!(
-            field,
-            Field::Section | Field::Chord | Field::Groove | Field::Lyric
-        ) {
+        if !matches!(field, Field::Section | Field::Chord | Field::Groove | Field::Lyric) {
             return;
         }
         if !self.notes.iter().any(|n| n.tick == tick) {
@@ -57,18 +54,10 @@ impl EditorState {
             self.set_annotation(tick, Field::Lyric, text.trim().to_string());
             return;
         }
-        let onsets: std::collections::BTreeSet<usize> = self
-            .notes
-            .iter()
-            .map(|n| n.tick)
-            .filter(|&t| t >= tick)
-            .collect();
+        let onsets: std::collections::BTreeSet<usize> =
+            self.notes.iter().map(|n| n.tick).filter(|&t| t >= tick).collect();
         for (onset, syllable) in onsets.into_iter().zip(syllables) {
-            let value = if syllable == "_" {
-                String::new()
-            } else {
-                syllable.to_string()
-            };
+            let value = if syllable == "_" { String::new() } else { syllable.to_string() };
             self.set_annotation(onset, Field::Lyric, value);
         }
     }
@@ -87,10 +76,7 @@ impl EditorState {
         if note.expr == Expr::None {
             return "";
         }
-        self.expression_intensities
-            .get(&note.id)
-            .map(String::as_str)
-            .unwrap_or("0.5")
+        self.expression_intensities.get(&note.id).map(String::as_str).unwrap_or("0.5")
     }
 
     /// The depth the Depth button shows and steps from: the selected
@@ -141,10 +127,7 @@ impl EditorState {
     /// Sets note `id`'s vibrato/wah depth; `false` for a note with neither,
     /// which has no depth to set. `0.5` is the default and is never stored.
     fn set_expression_intensity(&mut self, id: u32, value: &str) -> bool {
-        if self
-            .note_by_id(id)
-            .is_none_or(|note| note.expr == Expr::None)
-        {
+        if self.note_by_id(id).is_none_or(|note| note.expr == Expr::None) {
             return false;
         }
         let value = value.trim();
@@ -193,18 +176,14 @@ impl EditorState {
     }
 
     fn remove_empty_annotation(&mut self, tick: usize) {
-        if self
-            .phrase_annotations
-            .get(&tick)
-            .is_some_and(|annotation| {
-                annotation.section.is_none()
-                    && annotation.chord.is_none()
-                    && annotation.groove.is_none()
-                    && annotation.lyric.is_none()
-                    && !annotation.call
-                    && !annotation.split
-            })
-        {
+        if self.phrase_annotations.get(&tick).is_some_and(|annotation| {
+            annotation.section.is_none()
+                && annotation.chord.is_none()
+                && annotation.groove.is_none()
+                && annotation.lyric.is_none()
+                && !annotation.call
+                && !annotation.split
+        }) {
             self.phrase_annotations.remove(&tick);
         }
     }
@@ -217,20 +196,10 @@ impl EditorState {
 /// visibly changes something. Unparseable input counts as the default.
 pub(super) fn next_depth_step(current: &str) -> String {
     const STEPS: [f32; 4] = [0.25, 0.5, 0.75, 1.0];
-    let current: f32 = current
-        .trim()
-        .parse()
-        .unwrap_or_else(|_| DEFAULT_INTENSITY.parse().unwrap());
-    let next = STEPS
-        .iter()
-        .copied()
-        .find(|&step| step > current + 1e-6)
-        .unwrap_or(STEPS[0]);
-    if (next - 0.5).abs() < 1e-6 {
-        DEFAULT_INTENSITY.to_string()
-    } else {
-        format!("{next}")
-    }
+    let current: f32 =
+        current.trim().parse().unwrap_or_else(|_| DEFAULT_INTENSITY.parse().unwrap());
+    let next = STEPS.iter().copied().find(|&step| step > current + 1e-6).unwrap_or(STEPS[0]);
+    if (next - 0.5).abs() < 1e-6 { DEFAULT_INTENSITY.to_string() } else { format!("{next}") }
 }
 
 /// `"0.75"` as `"75%"` — the Depth button's label. A value the map stores

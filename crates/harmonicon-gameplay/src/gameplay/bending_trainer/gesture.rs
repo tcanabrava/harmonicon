@@ -28,10 +28,7 @@ impl PracticeShape {
         Self::OverbendResponse,
     ];
     fn next(self) -> Self {
-        let index = Self::ALL
-            .iter()
-            .position(|shape| *shape == self)
-            .unwrap_or(0);
+        let index = Self::ALL.iter().position(|shape| *shape == self).unwrap_or(0);
         Self::ALL[(index + 1) % Self::ALL.len()]
     }
     fn label_key(self) -> &'static str {
@@ -204,9 +201,7 @@ pub fn update_gesture_practice(
     let pulse_secs = tempo.beat_secs() / f64::from(settings.subdivision.max(1));
     let beat = (clock.get() / pulse_secs).floor() as i64;
     let previous_phase = practice.phase;
-    practice
-        .bypass_change_detection()
-        .advance(frame, time.delta_secs(), Some(beat));
+    practice.bypass_change_detection().advance(frame, time.delta_secs(), Some(beat));
     if practice.phase != previous_phase {
         practice.set_changed();
     }

@@ -73,11 +73,7 @@ fn mid_song(count: usize) -> (SongNotes, f64, u8) {
         n.missed = true;
         cursor += 1;
     }
-    (
-        SongNotes { notes, cursor },
-        clock,
-        PITCHES[due % PITCHES.len()],
-    )
+    (SongNotes { notes, cursor }, clock, PITCHES[due % PITCHES.len()])
 }
 
 fn world(clock: f64, sounding: Option<u8>) -> World {
@@ -118,10 +114,7 @@ fn score_frame(c: &mut Criterion) {
             schedule.add_systems(score_notes);
             group.bench_function(BenchmarkId::new(label, count), |b| {
                 b.iter_batched(
-                    || SongNotes {
-                        notes: song.notes.clone(),
-                        cursor: song.cursor,
-                    },
+                    || SongNotes { notes: song.notes.clone(), cursor: song.cursor },
                     |notes| {
                         world.insert_resource(notes);
                         world.insert_resource(PitchGate::default());
@@ -179,11 +172,7 @@ fn build_notes(c: &mut Criterion) {
             &chart,
             |b, chart| {
                 b.iter(|| {
-                    black_box(build_scheduled_notes(
-                        &effective,
-                        black_box(chart),
-                        &adaptive,
-                    ))
+                    black_box(build_scheduled_notes(&effective, black_box(chart), &adaptive))
                 });
             },
         );

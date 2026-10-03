@@ -22,9 +22,7 @@ const SONG_OGG: &[u8] = include_bytes!("fixtures/long.ogg");
 
 fn pcm(seconds: usize) -> Vec<f32> {
     let samples = seconds * 44_100;
-    (0..samples)
-        .map(|i| ((i % 441) as f32 / 441.0 - 0.5) * 0.5)
-        .collect()
+    (0..samples).map(|i| ((i % 441) as f32 / 441.0 - 0.5) * 0.5).collect()
 }
 
 fn waveform(c: &mut Criterion) {

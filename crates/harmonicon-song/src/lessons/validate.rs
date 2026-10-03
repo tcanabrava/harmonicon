@@ -58,11 +58,7 @@ fn check_locales_dir(dir: &Path, root: &Path, report: &mut Report) -> BTreeSet<S
         if path.extension().is_none_or(|e| e != "ftl") {
             continue;
         }
-        let lang = path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned();
+        let lang = path.file_stem().unwrap_or_default().to_string_lossy().into_owned();
         if lang.parse::<unic_langid::LanguageIdentifier>().is_err() {
             report.error(&path, root, format!("{lang:?} is not a language tag"));
             continue;
@@ -144,10 +140,7 @@ pub fn validate_lesson_pack(root: &Path) -> Report {
     let engine_keys = ftl_keys(ENGINE_STRINGS).unwrap_or_default();
 
     let mut lessons: Vec<(PathBuf, LessonManifest)> = Vec::new();
-    for unit in content_dirs(root)
-        .into_iter()
-        .filter(|d| !d.ends_with("locales"))
-    {
+    for unit in content_dirs(root).into_iter().filter(|d| !d.ends_with("locales")) {
         for dir in content_dirs(&unit) {
             let manifest_path = dir.join("lesson.json");
             let bytes = match std::fs::read(&manifest_path) {
@@ -212,43 +205,27 @@ pub fn validate_lesson_pack(root: &Path) -> Report {
     }
 
     if lessons.is_empty() {
-        report.error(
-            root,
-            root,
-            "no lessons found (expected <unit>/<lesson>/lesson.json)",
-        );
+        report.error(root, root, "no lessons found (expected <unit>/<lesson>/lesson.json)");
         return report;
     }
 
     let mut seen = HashSet::new();
     for (dir, m) in &lessons {
         if !seen.insert(m.id.as_str()) {
-            report.error(
-                dir,
-                root,
-                format!("id {:?} is already used by another lesson", m.id),
-            );
+            report.error(dir, root, format!("id {:?} is already used by another lesson", m.id));
         }
     }
     for (dir, m) in &lessons {
         for prerequisite in &m.prerequisites {
             if !seen.contains(prerequisite.as_str()) {
-                report.error(
-                    dir,
-                    root,
-                    format!("prerequisite {prerequisite:?} names no lesson"),
-                );
+                report.error(dir, root, format!("prerequisite {prerequisite:?} names no lesson"));
             }
         }
     }
 
     let manifests: Vec<&LessonManifest> = lessons.iter().map(|(_, m)| m).collect();
     if let Err(e) = LessonGraph::build(&manifests) {
-        report.error(
-            root,
-            root,
-            format!("the curriculum is not a drawable graph: {e}"),
-        );
+        report.error(root, root, format!("the curriculum is not a drawable graph: {e}"));
     }
     let owned: Vec<LessonManifest> = manifests.iter().map(|m| (*m).clone()).collect();
     for (lesson, prerequisite) in crossing_prerequisites(&owned) {
@@ -316,18 +293,9 @@ mod tests {
     #[test]
     fn a_missing_prerequisite_is_reported() {
         let errors = errors_after(|p| {
-            rewrite(
-                &p.join("01_basics/02_second/lesson.json"),
-                "\"fixture-first\"]",
-                "\"nope\"]",
-            )
+            rewrite(&p.join("01_basics/02_second/lesson.json"), "\"fixture-first\"]", "\"nope\"]")
         });
-        assert!(
-            errors
-                .iter()
-                .any(|e| e.contains("\"nope\" names no lesson")),
-            "{errors:#?}"
-        );
+        assert!(errors.iter().any(|e| e.contains("\"nope\" names no lesson")), "{errors:#?}");
     }
 
     #[test]
@@ -339,10 +307,7 @@ mod tests {
                 "\"prerequisites\": [\"fixture-second\"],\n  \"chart\"",
             )
         });
-        assert!(
-            errors.iter().any(|e| e.contains("not a drawable graph")),
-            "{errors:#?}"
-        );
+        assert!(errors.iter().any(|e| e.contains("not a drawable graph")), "{errors:#?}");
     }
 
     #[test]
@@ -355,9 +320,7 @@ mod tests {
             )
         });
         assert!(
-            errors
-                .iter()
-                .any(|e| e.contains("\"fixture-second-title\" is not defined")),
+            errors.iter().any(|e| e.contains("\"fixture-second-title\" is not defined")),
             "{errors:#?}"
         );
     }
@@ -371,10 +334,7 @@ mod tests {
                 "",
             )
         });
-        assert!(
-            errors.iter().any(|e| e.contains("pt-BR.ftl: missing")),
-            "{errors:#?}"
-        );
+        assert!(errors.iter().any(|e| e.contains("pt-BR.ftl: missing")), "{errors:#?}");
     }
 
     #[test]
@@ -382,10 +342,7 @@ mod tests {
         let errors = errors_after(|p| {
             std::fs::write(p.join("locales/pt-BR.ftl"), "lesson-unit-basics = {\n").unwrap()
         });
-        assert!(
-            errors.iter().any(|e| e.contains("Fluent syntax")),
-            "{errors:#?}"
-        );
+        assert!(errors.iter().any(|e| e.contains("Fluent syntax")), "{errors:#?}");
     }
 
     #[test]
@@ -393,27 +350,17 @@ mod tests {
         let errors = errors_after(|p| {
             std::fs::write(p.join("01_basics/01_first/song/chart.harpchart"), "{}").unwrap()
         });
-        assert!(
-            errors.iter().any(|e| e.contains("chart.harpchart")),
-            "{errors:#?}"
-        );
+        assert!(errors.iter().any(|e| e.contains("chart.harpchart")), "{errors:#?}");
         let errors = errors_after(|p| {
             std::fs::remove_file(p.join("01_basics/01_first/song/chart.harpchart")).unwrap()
         });
-        assert!(
-            errors.iter().any(|e| e.contains("does not exist")),
-            "{errors:#?}"
-        );
+        assert!(errors.iter().any(|e| e.contains("does not exist")), "{errors:#?}");
     }
 
     #[test]
     fn unsupported_tab_notation_is_reported() {
         let errors = errors_after(|p| {
-            rewrite(
-                &p.join("01_basics/02_second/lesson.json"),
-                "\"-4\"",
-                "\"-11\"",
-            )
+            rewrite(&p.join("01_basics/02_second/lesson.json"), "\"-4\"", "\"-11\"")
         });
         assert!(errors.iter().any(|e| e.contains("\"-11\"")), "{errors:#?}");
     }

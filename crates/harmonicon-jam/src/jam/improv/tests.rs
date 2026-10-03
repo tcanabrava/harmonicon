@@ -25,35 +25,20 @@ fn improv_stats_adherence_is_none_with_nothing_played() {
 
 #[test]
 fn improv_stats_adherence_counts_chord_tone_and_in_scale_as_good() {
-    let stats = ImprovStats {
-        chord_tone: 3,
-        in_scale: 5,
-        out_of_scale: 2,
-        rest_violations: 0,
-    };
+    let stats = ImprovStats { chord_tone: 3, in_scale: 5, out_of_scale: 2, rest_violations: 0 };
     assert_eq!(stats.total(), 10);
     assert!((stats.adherence().unwrap() - 0.8).abs() < 1e-6);
 }
 
 #[test]
 fn improv_stats_chord_tone_adherence_only_counts_chord_tones() {
-    let stats = ImprovStats {
-        chord_tone: 3,
-        in_scale: 5,
-        out_of_scale: 2,
-        rest_violations: 0,
-    };
+    let stats = ImprovStats { chord_tone: 3, in_scale: 5, out_of_scale: 2, rest_violations: 0 };
     assert!((stats.chord_tone_adherence().unwrap() - 0.3).abs() < 1e-6);
 }
 
 #[test]
 fn improv_stats_phrase_discipline_is_one_minus_the_violation_fraction() {
-    let stats = ImprovStats {
-        chord_tone: 4,
-        in_scale: 4,
-        out_of_scale: 2,
-        rest_violations: 3,
-    };
+    let stats = ImprovStats { chord_tone: 4, in_scale: 4, out_of_scale: 2, rest_violations: 3 };
     assert!((stats.phrase_discipline().unwrap() - 0.7).abs() < 1e-6);
 }
 

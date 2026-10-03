@@ -93,11 +93,7 @@ pub(super) fn update_practice_badges(
     }
 
     let mut set = |visibility: &mut Visibility, children: &Children, label: Option<String>| {
-        *visibility = if label.is_some() {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+        *visibility = if label.is_some() { Visibility::Visible } else { Visibility::Hidden };
         if let Some(label) = label {
             for child in children.iter() {
                 if let Ok(mut text) = texts.get_mut(child) {
@@ -111,10 +107,9 @@ pub(super) fn update_practice_badges(
     // 100% on the first frame of a song — hence "changed" rather than a
     // toggle, and no assumption that it starts at 1.0.
     let speed_label = (speed.0 < 0.999).then(|| {
-        String::from(loc.msg_args(
-            "gameplay-badge-speed",
-            &[("pct", format!("{:.0}", speed.0 * 100.0))],
-        ))
+        String::from(
+            loc.msg_args("gameplay-badge-speed", &[("pct", format!("{:.0}", speed.0 * 100.0))]),
+        )
     });
     let wait_label = wait.0.then(|| String::from(loc.msg("gameplay-badge-wait")));
     let loop_label = looping.active.then(|| {

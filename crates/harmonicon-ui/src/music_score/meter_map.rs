@@ -103,10 +103,8 @@ impl MeterMap {
         quarter_ticks: u32,
         pickup_ticks: u64,
     ) -> Self {
-        let mut points: Vec<(u64, MusicScoreMeter)> = points
-            .into_iter()
-            .map(|(tick, sig)| (tick, parse_time_signature(sig)))
-            .collect();
+        let mut points: Vec<(u64, MusicScoreMeter)> =
+            points.into_iter().map(|(tick, sig)| (tick, parse_time_signature(sig))).collect();
         points.sort_by_key(|(tick, _)| *tick);
         points.dedup_by(|later, earlier| {
             if later.0 == earlier.0 {
@@ -124,26 +122,22 @@ impl MeterMap {
         let mut next_bar = 0usize;
         let mut pickup = false;
         for (i, &(start_tick, meter)) in points.iter().enumerate() {
-            let (ticks_per_beat, ticks_per_bar) = match (
-                meter.ticks_per_beat(quarter_ticks),
-                meter.ticks_per_bar(quarter_ticks),
-            ) {
-                (Some(beat), Some(bar)) if beat > 0 && bar > 0 => (u64::from(beat), u64::from(bar)),
-                _ => {
-                    let fallback = MusicScoreMeter::default();
-                    (
-                        u64::from(fallback.ticks_per_beat(quarter_ticks).unwrap_or(1).max(1)),
-                        u64::from(fallback.ticks_per_bar(quarter_ticks).unwrap_or(4).max(1)),
-                    )
-                }
-            };
+            let (ticks_per_beat, ticks_per_bar) =
+                match (meter.ticks_per_beat(quarter_ticks), meter.ticks_per_bar(quarter_ticks)) {
+                    (Some(beat), Some(bar)) if beat > 0 && bar > 0 => {
+                        (u64::from(beat), u64::from(bar))
+                    }
+                    _ => {
+                        let fallback = MusicScoreMeter::default();
+                        (
+                            u64::from(fallback.ticks_per_beat(quarter_ticks).unwrap_or(1).max(1)),
+                            u64::from(fallback.ticks_per_bar(quarter_ticks).unwrap_or(4).max(1)),
+                        )
+                    }
+                };
             // Only the piece's own start can be part-way into a bar; a
             // change always begins a fresh one.
-            let into_bar = if i == 0 {
-                pickup_ticks % ticks_per_bar
-            } else {
-                0
-            };
+            let into_bar = if i == 0 { pickup_ticks % ticks_per_bar } else { 0 };
             let phase_ticks = (ticks_per_bar - into_bar) % ticks_per_bar;
             pickup |= phase_ticks > 0;
             segments.push(MeterSegment {
@@ -174,11 +168,7 @@ impl MeterMap {
     /// The bar number a musician reads for 0-based `bar`: 1 for the first
     /// full bar. `None` for a pickup's bar 0, which is not numbered.
     pub fn bar_number(&self, bar: usize) -> Option<usize> {
-        if self.pickup {
-            (bar > 0).then_some(bar)
-        } else {
-            Some(bar + 1)
-        }
+        if self.pickup { (bar > 0).then_some(bar) } else { Some(bar + 1) }
     }
 
     /// A map with one meter for the whole piece.
@@ -192,10 +182,7 @@ impl MeterMap {
 
     /// The segment in force at `tick`.
     pub fn segment_at(&self, tick: u64) -> &MeterSegment {
-        let idx = self
-            .segments
-            .partition_point(|s| s.start_tick <= tick)
-            .saturating_sub(1);
+        let idx = self.segments.partition_point(|s| s.start_tick <= tick).saturating_sub(1);
         &self.segments[idx]
     }
 
@@ -269,10 +256,7 @@ impl MeterMap {
     /// Every meter *change* (every segment after the first) as
     /// `(tick, meter)` — for drawing change markers.
     pub fn changes(&self) -> impl Iterator<Item = (u64, MusicScoreMeter)> + '_ {
-        self.segments
-            .iter()
-            .skip(1)
-            .map(|s| (s.start_tick, s.meter))
+        self.segments.iter().skip(1).map(|s| (s.start_tick, s.meter))
     }
 }
 
@@ -328,11 +312,7 @@ mod tests {
         let map = MeterMap::new([(0, "6/8"), (36, "7/8")], Q);
         assert_eq!(map.position(30).beat, 5, "sixth eighth of the 6/8 bar");
         assert_eq!(map.position(36).bar, 1);
-        assert_eq!(
-            map.position(36 + 6 * 6).beat,
-            6,
-            "seventh eighth of the 7/8 bar"
-        );
+        assert_eq!(map.position(36 + 6 * 6).beat, 6, "seventh eighth of the 7/8 bar");
         assert_eq!(map.position(36 + 42).bar, 2);
     }
 
@@ -351,11 +331,7 @@ mod tests {
     fn beat_starts_switches_beat_unit_at_the_change() {
         // 4/4 (quarter beats, 12 ticks) then 6/8 (eighth beats, 6 ticks).
         let map = MeterMap::new([(0, "4/4"), (48, "6/8")], Q);
-        let ticks: Vec<u64> = map
-            .beat_starts(36, 72)
-            .into_iter()
-            .map(|(t, _)| t)
-            .collect();
+        let ticks: Vec<u64> = map.beat_starts(36, 72).into_iter().map(|(t, _)| t).collect();
         assert_eq!(ticks, vec![36, 48, 54, 60, 66]);
         let (_, p) = map.beat_starts(54, 55)[0];
         assert_eq!((p.bar, p.beat), (1, 1));

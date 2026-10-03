@@ -99,21 +99,11 @@ fn sync_wait_freeze_prompt(
     let target = state.0.and_then(|i| song_notes.notes.get(i)).map(|note| {
         String::from(loc.msg_args(
             "gameplay-wait-play",
-            &[(
-                "tab",
-                tab_label(HoleTab {
-                    hole: note.hole,
-                    is_blow: note.is_blow,
-                }),
-            )],
+            &[("tab", tab_label(HoleTab { hole: note.hole, is_blow: note.is_blow }))],
         ))
     });
     for mut vis in &mut roots {
-        let wanted = if target.is_some() {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+        let wanted = if target.is_some() { Visibility::Visible } else { Visibility::Hidden };
         if *vis != wanted {
             *vis = wanted;
         }
@@ -152,11 +142,7 @@ fn update_wait_freeze_heard(
     let Some(note) = state.0.and_then(|i| song_notes.notes.get(i)) else {
         return;
     };
-    let sounding = active
-        .0
-        .iter()
-        .map(|p| p.midi)
-        .filter(|m| valid.0.contains(m));
+    let sounding = active.0.iter().map(|p| p.midi).filter(|m| valid.0.contains(m));
     let heard = note
         .expected_pitch
         .and_then(|expected| nearest_attacked(sounding, expected))

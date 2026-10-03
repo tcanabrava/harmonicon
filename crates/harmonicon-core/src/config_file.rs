@@ -50,10 +50,7 @@ mod tests {
         let target = PathBuf::from("/home/someone/.config/harmonicon/settings.json");
         let tmp = temp_path(&target);
         assert_eq!(tmp.parent(), target.parent());
-        assert_eq!(
-            tmp.file_name().and_then(|n| n.to_str()),
-            Some("settings.json.tmp")
-        );
+        assert_eq!(tmp.file_name().and_then(|n| n.to_str()), Some("settings.json.tmp"));
     }
 
     #[test]
@@ -66,10 +63,7 @@ mod tests {
         write_atomic(&path, "new").unwrap();
 
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
-        assert!(
-            !temp_path(&path).exists(),
-            "the temp file must not survive a successful write"
-        );
+        assert!(!temp_path(&path).exists(), "the temp file must not survive a successful write");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

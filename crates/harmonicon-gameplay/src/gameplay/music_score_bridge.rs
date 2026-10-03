@@ -46,19 +46,12 @@ fn bar_map_for_chart(chart: &HarpChart) -> MusicScoreBarMap {
     let timing = &chart.timing;
     let meter = MeterMap::with_pickup(
         std::iter::once((0, chart.song.time_signature.as_deref().unwrap_or("4/4"))).chain(
-            timing
-                .time_signature_map
-                .iter()
-                .flatten()
-                .map(|p| (p.tick, p.time_signature.as_str())),
+            timing.time_signature_map.iter().flatten().map(|p| (p.tick, p.time_signature.as_str())),
         ),
         timing.resolution,
         timing.pickup(),
     );
-    MusicScoreBarMap {
-        meter,
-        quarter_ticks: timing.resolution,
-    }
+    MusicScoreBarMap { meter, quarter_ticks: timing.resolution }
 }
 
 /// Rebuilds [`MusicScoreNotes`] whenever [`SongNotes`] changes — song setup,
@@ -87,12 +80,8 @@ fn sync_music_score_notes(
     if *bar_map != next_bar_map {
         *bar_map = next_bar_map;
     }
-    score_notes.0 = notes_to_notation(
-        &song_notes.notes,
-        timing.resolution,
-        &timing.tempo_map,
-        &bar_map,
-    );
+    score_notes.0 =
+        notes_to_notation(&song_notes.notes, timing.resolution, &timing.tempo_map, &bar_map);
 }
 
 /// Keeps [`MusicScorePlayhead`] following the same [`GameplayClock`] every
@@ -146,14 +135,8 @@ mod tests {
             endings: Vec::new(),
         }];
         chart.timing.time_signature_map = Some(vec![
-            TimeSigPoint {
-                tick: 0,
-                time_signature: "4/4".into(),
-            },
-            TimeSigPoint {
-                tick: 960,
-                time_signature: "2/4".into(),
-            },
+            TimeSigPoint { tick: 0, time_signature: "4/4".into() },
+            TimeSigPoint { tick: 960, time_signature: "2/4".into() },
         ]);
         chart.track.push(
             serde_json::from_value(serde_json::json!({

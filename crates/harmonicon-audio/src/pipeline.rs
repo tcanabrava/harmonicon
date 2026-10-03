@@ -55,10 +55,8 @@ impl RawCaptureBuffer {
             let available = new_count.min(chunk.samples.len());
             // Missing capture hops remain silence in the recording rather
             // than shifting every subsequent note earlier in time.
-            self.samples
-                .resize(self.samples.len() + new_count - available, 0.0);
-            self.samples
-                .extend_from_slice(&chunk.samples[chunk.samples.len() - available..]);
+            self.samples.resize(self.samples.len() + new_count - available, 0.0);
+            self.samples.extend_from_slice(&chunk.samples[chunk.samples.len() - available..]);
         }
         self.last_sample_end = chunk.end_sample;
     }
@@ -110,10 +108,8 @@ pub fn process_audio(
         }
     }
     if let Some(chunk) = latest {
-        *last_received = Some(
-            time.elapsed()
-                .saturating_sub(now.saturating_duration_since(chunk.captured_at)),
-        );
+        *last_received =
+            Some(time.elapsed().saturating_sub(now.saturating_duration_since(chunk.captured_at)));
         let samples = chunk.samples;
         let _span = info_span!("process_audio_chunk", samples = samples.len()).entered();
         // One FFT per chunk for the spectrum; pitches use the chosen algorithm.
@@ -191,10 +187,7 @@ fn pitch_label(pitch: &PitchInfo) -> String {
 fn pitch_key(pitch: &PitchInfo) -> (u8, i32) {
     // Widen before scaling so f32 multiplication cannot push a value across
     // the displayed decimal boundary. Formatting also rounds ties to even.
-    (
-        pitch.midi,
-        (f64::from(pitch.frequency) * 10.0).round_ties_even() as i32,
-    )
+    (pitch.midi, (f64::from(pitch.frequency) * 10.0).round_ties_even() as i32)
 }
 
 /// Logs the detected pitches whenever they change during Playing, at
@@ -236,12 +229,7 @@ mod tests {
     use crossbeam_channel::bounded;
 
     fn a4(frequency: f32) -> PitchInfo {
-        PitchInfo {
-            midi: 69,
-            note: "A".to_string(),
-            octave: 4,
-            frequency,
-        }
+        PitchInfo { midi: 69, note: "A".to_string(), octave: 4, frequency }
     }
 
     #[test]
@@ -288,9 +276,7 @@ mod tests {
             sample_rate: 44100,
             device_name: "test".into(),
         })
-        .insert_resource(audio_input::MicStatus::Connected {
-            device_name: "test".into(),
-        })
+        .insert_resource(audio_input::MicStatus::Connected { device_name: "test".into() })
         .init_resource::<Time<Real>>()
         .init_resource::<AudioSettings>()
         .init_resource::<PitchRange>()
@@ -304,11 +290,8 @@ mod tests {
         let frame = app.world().resource::<AudioFrame>();
         assert!(frame.samples.is_empty());
         assert!(frame.magnitudes.is_empty());
-        let messages: Vec<_> = app
-            .world_mut()
-            .resource_mut::<Messages<PitchEvent>>()
-            .drain()
-            .collect();
+        let messages: Vec<_> =
+            app.world_mut().resource_mut::<Messages<PitchEvent>>().drain().collect();
         assert!(messages.last().unwrap().0.is_empty());
     }
 
@@ -317,9 +300,7 @@ mod tests {
         let (mut app, tx) = app();
         tx.send(chunk(0.1)).unwrap();
         app.world_mut()
-            .insert_resource(audio_input::MicStatus::Failed {
-                reason: "unplugged".into(),
-            });
+            .insert_resource(audio_input::MicStatus::Failed { reason: "unplugged".into() });
         app.update();
         assert_silent(&mut app);
         assert!(tx.is_empty());
@@ -331,9 +312,7 @@ mod tests {
         tx.send(chunk(0.0)).unwrap();
         app.update();
         assert_eq!(app.world().resource::<AudioFrame>().samples.len(), 4096);
-        app.world_mut()
-            .resource_mut::<Time<Real>>()
-            .advance_by(CAPTURE_TIMEOUT);
+        app.world_mut().resource_mut::<Time<Real>>().advance_by(CAPTURE_TIMEOUT);
         app.update();
         assert_silent(&mut app);
         tx.send(chunk(0.0)).unwrap();
@@ -344,8 +323,7 @@ mod tests {
     #[test]
     fn missing_capture_repeatedly_publishes_silence_for_resuming_consumers() {
         let (mut app, _) = app();
-        app.world_mut()
-            .remove_resource::<audio_input::AudioCapture>();
+        app.world_mut().remove_resource::<audio_input::AudioCapture>();
         for _ in 0..4 {
             app.update();
             assert_silent(&mut app);
@@ -365,8 +343,7 @@ mod tests {
             })
             .after(process_audio),
         );
-        app.world_mut()
-            .remove_resource::<audio_input::AudioCapture>();
+        app.world_mut().remove_resource::<audio_input::AudioCapture>();
         app.update();
         for _ in 0..3 {
             app.update();
@@ -382,20 +359,9 @@ mod tests {
         tx.send(chunk(0.0001)).unwrap();
         tx.send(chunk(0.0002)).unwrap();
         app.update();
-        assert_eq!(
-            app.world().resource::<AudioFrame>().samples,
-            vec![0.0002; 4096]
-        );
-        assert_eq!(
-            app.world_mut()
-                .resource_mut::<Messages<PitchEvent>>()
-                .drain()
-                .count(),
-            1
-        );
-        app.world_mut()
-            .resource_mut::<Time<Real>>()
-            .advance_by(CAPTURE_TIMEOUT);
+        assert_eq!(app.world().resource::<AudioFrame>().samples, vec![0.0002; 4096]);
+        assert_eq!(app.world_mut().resource_mut::<Messages<PitchEvent>>().drain().count(), 1);
+        app.world_mut().resource_mut::<Time<Real>>().advance_by(CAPTURE_TIMEOUT);
         let mut old = chunk(0.1);
         old.captured_at -= CAPTURE_TIMEOUT * 2;
         tx.send(old).unwrap();

@@ -151,12 +151,7 @@ pub struct NoteHeadRect {
 
 impl Default for NoteHeadRect {
     fn default() -> Self {
-        Self {
-            x: 0.0,
-            y: 0.0,
-            width: 100.0,
-            height: 100.0,
-        }
+        Self { x: 0.0, y: 0.0, width: 100.0, height: 100.0 }
     }
 }
 
@@ -175,12 +170,7 @@ pub struct NoteThemeConfig {
 
 impl Default for NoteThemeConfig {
     fn default() -> Self {
-        Self {
-            tail_x: 0.5,
-            tail_y: 0.5,
-            tail_width: 0.45,
-            head: NoteHeadRect::default(),
-        }
+        Self { tail_x: 0.5, tail_y: 0.5, tail_width: 0.45, head: NoteHeadRect::default() }
     }
 }
 
@@ -196,10 +186,7 @@ pub struct NoteCube3dConfig {
 
 impl Default for NoteCube3dConfig {
     fn default() -> Self {
-        Self {
-            head_scale: 0.8,
-            tail_width: 0.6,
-        }
+        Self { head_scale: 0.8, tail_width: 0.6 }
     }
 }
 

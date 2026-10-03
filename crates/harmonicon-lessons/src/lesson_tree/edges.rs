@@ -78,11 +78,7 @@ pub(crate) fn edge_box(start: Vec2, end: Vec2, half_thickness: f32) -> (Vec2, Ve
 /// way — both diagonals of a box that thin describe the same line.
 pub(crate) fn edge_diagonal(start: Vec2, end: Vec2) -> f32 {
     let delta = end - start;
-    if (delta.x >= 0.0) == (delta.y >= 0.0) {
-        1.0
-    } else {
-        -1.0
-    }
+    if (delta.x >= 0.0) == (delta.y >= 0.0) { 1.0 } else { -1.0 }
 }
 
 /// Clearance two node boundaries need before an edge between them is worth
@@ -121,10 +117,7 @@ pub(crate) fn edge_span(from: Endpoint, to: Endpoint) -> Option<(Vec2, Vec2)> {
         return None;
     }
     let direction = offset / gap;
-    Some((
-        from.centre + direction * from.radius,
-        to.centre - direction * to.radius,
-    ))
+    Some((from.centre + direction * from.radius, to.centre - direction * to.radius))
 }
 
 /// Repositions a moving edge's node.
@@ -179,9 +172,7 @@ pub(crate) fn dot_centres(start: Vec2, end: Vec2, diameter: f32, gap: f32) -> Ve
     let direction = delta / length;
     let count = ((travel / (diameter + gap)).round() as usize + 1).max(2);
     let spacing = travel / (count - 1) as f32;
-    (0..count)
-        .map(|i| start + direction * (diameter / 2.0 + spacing * i as f32))
-        .collect()
+    (0..count).map(|i| start + direction * (diameter / 2.0 + spacing * i as f32)).collect()
 }
 
 /// An elective branch, as a run of round dots.
@@ -213,10 +204,7 @@ pub(crate) fn spawn_dotted_edge(
             BackgroundColor({style.color})
         });
         if let Some(unit_id) = unit_id {
-            dot.insert((
-                ClusterMember(unit_id.to_string()),
-                LayoutOwner(unit_id.to_string()),
-            ));
+            dot.insert((ClusterMember(unit_id.to_string()), LayoutOwner(unit_id.to_string())));
         }
     }
 }
@@ -238,9 +226,7 @@ pub(crate) fn spawn_edge(
     let Some((start, end)) = edge_span(from, to) else {
         return;
     };
-    let EdgeStyle {
-        thickness, color, ..
-    } = style;
+    let EdgeStyle { thickness, color, .. } = style;
     if style.dotted {
         spawn_dotted_edge(parent, start, end, style, unit_id);
         return;

@@ -51,24 +51,10 @@ fn a_fresh_state_is_reset_apart_from_its_seed() {
 
 #[test]
 fn call_phrase_notes_keeps_timing_and_breathes_on_held_notes() {
-    let note = PlayableNote {
-        midi: 64,
-        hole: 2,
-        blow: true,
-    };
+    let note = PlayableNote { midi: 64, hole: 2, blow: true };
     let call = [
-        CallNote {
-            tick: 0,
-            len: 5,
-            note,
-            held: false,
-        },
-        CallNote {
-            tick: 24,
-            len: 35,
-            note,
-            held: true,
-        },
+        CallNote { tick: 0, len: 5, note, held: false },
+        CallNote { tick: 24, len: 35, note, held: true },
     ];
     let notes = call_phrase_notes(&call);
     assert_eq!(notes.len(), 2);

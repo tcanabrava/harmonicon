@@ -60,11 +60,7 @@ impl CalState {
     fn reset(&mut self) {
         let generation = self.generation.wrapping_add(1);
         let offsets = std::mem::take(&mut self.offsets);
-        *self = Self {
-            generation,
-            offsets,
-            ..default()
-        };
+        *self = Self { generation, offsets, ..default() };
         self.offsets.clear();
     }
 
@@ -205,11 +201,7 @@ fn play_clicks(
         return;
     }
     *last_click = Some(beat);
-    let sample = if beat % 4 == 0 {
-        sounds.downbeat.clone()
-    } else {
-        sounds.beat.clone()
-    };
+    let sample = if beat % 4 == 0 { sounds.downbeat.clone() } else { sounds.beat.clone() };
     commands.spawn((
         AudioPlayer::<AudioSource>(sample),
         PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.metronome_volume)),
@@ -417,10 +409,7 @@ fn update_status(
         CalPhase::Recording if cal.beat_count <= WARMUP_BEATS => loc.msg("calibration-get-ready"),
         CalPhase::Recording => loc.msg_args(
             "calibration-hits-recorded",
-            &[
-                ("hits", cal.offsets.len().to_string()),
-                ("total", BEATS_NEEDED.to_string()),
-            ],
+            &[("hits", cal.offsets.len().to_string()), ("total", BEATS_NEEDED.to_string())],
         ),
         CalPhase::Done => loc.msg("calibration-complete"),
     });
@@ -484,21 +473,13 @@ fn sync_phase_visibility(
     let show_w = cal.phase == CalPhase::Waiting;
     let show_d = cal.phase == CalPhase::Done;
     for mut v in &mut waiting {
-        let wanted = if show_w {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+        let wanted = if show_w { Visibility::Inherited } else { Visibility::Hidden };
         if *v != wanted {
             *v = wanted;
         }
     }
     for mut v in &mut done {
-        let wanted = if show_d {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+        let wanted = if show_d { Visibility::Inherited } else { Visibility::Hidden };
         if *v != wanted {
             *v = wanted;
         }
@@ -721,11 +702,7 @@ fn setup_ui(mut commands: Commands, loc: Res<Localization>) {
 
         // Waiting-only row
         p.spawn((
-            Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(14.0),
-                ..default()
-            },
+            Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(14.0), ..default() },
             ShowWaiting,
         ))
         .with_children(|row| {
@@ -734,11 +711,7 @@ fn setup_ui(mut commands: Commands, loc: Res<Localization>) {
 
         // Done-only row
         p.spawn((
-            Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(14.0),
-                ..default()
-            },
+            Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(14.0), ..default() },
             Visibility::Hidden,
             ShowDone,
         ))
@@ -769,31 +742,11 @@ fn spawn_timing_zones(bar: &mut ChildSpawnerCommands) {
     let right_outer = ms_to_pct(BAR_RANGE_MS); // 100%
 
     let zones: &[(f32, f32, Color)] = &[
-        (
-            left_outer,
-            left_good - left_outer,
-            Color::srgb(0.30, 0.10, 0.10),
-        ), // dark red left
-        (
-            left_good,
-            left_perf - left_good,
-            Color::srgb(0.50, 0.32, 0.08),
-        ), // orange left
-        (
-            left_perf,
-            right_perf - left_perf,
-            Color::srgb(0.10, 0.38, 0.14),
-        ), // green centre
-        (
-            right_perf,
-            right_good - right_perf,
-            Color::srgb(0.50, 0.32, 0.08),
-        ), // orange right
-        (
-            right_good,
-            right_outer - right_good,
-            Color::srgb(0.30, 0.10, 0.10),
-        ), // dark red right
+        (left_outer, left_good - left_outer, Color::srgb(0.30, 0.10, 0.10)), // dark red left
+        (left_good, left_perf - left_good, Color::srgb(0.50, 0.32, 0.08)),   // orange left
+        (left_perf, right_perf - left_perf, Color::srgb(0.10, 0.38, 0.14)),  // green centre
+        (right_perf, right_good - right_perf, Color::srgb(0.50, 0.32, 0.08)), // orange right
+        (right_good, right_outer - right_good, Color::srgb(0.30, 0.10, 0.10)), // dark red right
     ];
 
     for &(left, width, color) in zones {
@@ -829,9 +782,7 @@ fn spawn_cal_button<M: 'static>(
     label: &str,
     on_click: impl IntoObserverSystem<Activate, M> + Clone + Sync + 'static,
 ) {
-    parent
-        .spawn_empty()
-        .apply_scene(button::default(label, on_click));
+    parent.spawn_empty().apply_scene(button::default(label, on_click));
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -841,10 +792,7 @@ mod tests {
     use super::*;
 
     fn state_with_offsets(offsets: &[f64]) -> CalState {
-        CalState {
-            offsets: offsets.to_vec(),
-            ..default()
-        }
+        CalState { offsets: offsets.to_vec(), ..default() }
     }
 
     #[test]
@@ -866,9 +814,7 @@ mod tests {
 
     #[test]
     fn mixed_offsets_average_correctly() {
-        let ms = state_with_offsets(&[0.040, 0.060])
-            .mean_offset_ms()
-            .unwrap();
+        let ms = state_with_offsets(&[0.040, 0.060]).mean_offset_ms().unwrap();
         assert!((ms - 50.0).abs() < 0.1, "expected 50ms, got {ms}");
     }
 
@@ -899,11 +845,7 @@ mod tests {
     #[test]
     fn faded_hits_do_not_respawn_but_new_hits_and_sessions_do() {
         let mut app = App::new();
-        app.add_plugins((
-            MinimalPlugins,
-            AssetPlugin::default(),
-            bevy::scene::ScenePlugin,
-        ));
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin));
         let world = app.world_mut();
         world.insert_resource(state_with_offsets(&[0.03]));
         world.spawn(TimingBarContainer);

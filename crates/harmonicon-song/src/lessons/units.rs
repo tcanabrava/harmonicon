@@ -91,11 +91,7 @@ impl UnitChain {
                     id: m.unit.clone(),
                     title_key: format!("lesson-unit-{}", m.unit),
                     lessons: vec![m.id.clone()],
-                    core_lessons: if m.optional {
-                        Vec::new()
-                    } else {
-                        vec![m.id.clone()]
-                    },
+                    core_lessons: if m.optional { Vec::new() } else { vec![m.id.clone()] },
                 }),
             }
         }
@@ -117,9 +113,7 @@ impl UnitChain {
 
     /// Which unit a lesson belongs to.
     pub fn unit_of(&self, lesson: &str) -> Option<usize> {
-        self.units
-            .iter()
-            .position(|u| u.lessons.iter().any(|l| l == lesson))
+        self.units.iter().position(|u| u.lessons.iter().any(|l| l == lesson))
     }
 
     /// How many of this unit's *core* lessons must be passed for the next
@@ -153,9 +147,7 @@ impl UnitChain {
     /// out-of-range index answers — the drawing needs "this unit is
     /// genuinely all-elective", not "there was nothing to ask about".
     pub fn is_elective_only(&self, unit: usize) -> bool {
-        self.units
-            .get(unit)
-            .is_some_and(|u| u.core_lessons.is_empty() && !u.lessons.is_empty())
+        self.units.get(unit).is_some_and(|u| u.core_lessons.is_empty() && !u.lessons.is_empty())
     }
 
     /// How many lessons the unit holds, core and elective together.
@@ -167,12 +159,7 @@ impl UnitChain {
     pub fn completed(&self, unit: usize, passed: &HashSet<&str>) -> usize {
         self.units
             .get(unit)
-            .map(|u| {
-                u.core_lessons
-                    .iter()
-                    .filter(|l| passed.contains(l.as_str()))
-                    .count()
-            })
+            .map(|u| u.core_lessons.iter().filter(|l| passed.contains(l.as_str())).count())
             .unwrap_or(0)
     }
 

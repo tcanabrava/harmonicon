@@ -21,11 +21,7 @@ pub(super) enum TrainerOrientation {
 /// the side-by-side layout is the one designed for the wider screens this
 /// game treats as its baseline.
 pub(super) fn orientation_for(width: f32, height: f32) -> TrainerOrientation {
-    if height > width {
-        TrainerOrientation::Portrait
-    } else {
-        TrainerOrientation::Landscape
-    }
+    if height > width { TrainerOrientation::Portrait } else { TrainerOrientation::Landscape }
 }
 
 /// Landscape puts the diagram beside the bend path; portrait stacks it
@@ -70,14 +66,7 @@ const DRAWER_BG: Color = Color::srgb(0.09, 0.09, 0.13);
 const MUTED: Color = Color::srgb(0.70, 0.70, 0.80);
 
 fn label(text: String, size: f32, color: Color) -> impl Bundle {
-    (
-        Text::new(text),
-        TextFont {
-            font_size: FontSize::Px(size),
-            ..default()
-        },
-        TextColor(color),
-    )
+    (Text::new(text), TextFont { font_size: FontSize::Px(size), ..default() }, TextColor(color))
 }
 
 /// A horizontal cluster inside the strip or the card.
@@ -96,10 +85,7 @@ fn cluster() -> Node {
 pub(super) fn setup_summary(loc: &Localization, key: &str, audio: &AudioSettings) -> String {
     String::from(loc.msg_args(
         "bending-setup-summary",
-        &[
-            ("key", key.to_string()),
-            ("algo", audio.pitch_algorithm.label().to_string()),
-        ],
+        &[("key", key.to_string()), ("algo", audio.pitch_algorithm.label().to_string())],
     ))
 }
 
@@ -111,10 +97,7 @@ pub(super) fn progress_text(loc: &Localization, stat: Option<&DrillStat>) -> Str
         None => String::from(loc.msg("bending-progress-none")),
         Some(stat) => String::from(loc.msg_args(
             "bending-progress",
-            &[
-                ("hits", stat.hits.to_string()),
-                ("attempts", stat.attempts.to_string()),
-            ],
+            &[("hits", stat.hits.to_string()), ("attempts", stat.attempts.to_string())],
         )),
     }
 }
@@ -145,30 +128,21 @@ pub(super) fn spawn_strip(
     commands.entity(root_id).add_child(strip);
     commands.entity(strip).with_children(|strip| {
         strip.spawn(cluster()).with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                &loc.msg("bending-setup-button"),
-                toggle_setup_drawer,
-            ));
-            row.spawn((
-                label(setup_summary(loc, key, audio), 14.0, MUTED),
-                SetupSummary,
-            ));
+            row.spawn_empty()
+                .apply_scene(button::small(&loc.msg("bending-setup-button"), toggle_setup_drawer));
+            row.spawn((label(setup_summary(loc, key, audio), 14.0, MUTED), SetupSummary));
         });
         strip.spawn(cluster()).with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                &loc.msg("bending-scope-button"),
-                cycle_drill_scope,
-            ));
+            row.spawn_empty()
+                .apply_scene(button::small(&loc.msg("bending-scope-button"), cycle_drill_scope));
             row.spawn((
                 label(scope_status(loc, DrillScope::default(), 0), 14.0, MUTED),
                 DrillScopeLabel,
             ));
         });
         strip.spawn(cluster()).with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                &loc.msg("bending-shape-button"),
-                cycle_practice_shape,
-            ));
+            row.spawn_empty()
+                .apply_scene(button::small(&loc.msg("bending-shape-button"), cycle_practice_shape));
             row.spawn((
                 label(String::from(loc.msg("bending-shape-free")), 14.0, MUTED),
                 PracticeShapeLabel,
@@ -202,10 +176,8 @@ pub(super) fn spawn_strip(
                 .insert(Tooltip(String::from(loc.msg("bending-tempo-increase"))));
         });
         strip.spawn(cluster()).with_children(|row| {
-            row.spawn_empty().apply_scene(button::small(
-                &loc.msg("bending-adv-toggle"),
-                toggle_advanced_drawer,
-            ));
+            row.spawn_empty()
+                .apply_scene(button::small(&loc.msg("bending-adv-toggle"), toggle_advanced_drawer));
         });
     });
 }
@@ -265,21 +237,16 @@ pub(super) fn spawn_body(
             // stop" rule `dialogs::tab_bar` follows. Fifty cells as fifty Tab
             // stops would make every control after them unreachable in
             // practice.
-            side.spawn((Node::default(), OverlayHost, TabIndex(0)))
-                .with_children(|host| {
-                    spawn_harmonica_overlay_selectable(
-                        host,
-                        &richter_harp(key),
-                        on_diagram_cell_clicked,
-                        loc,
-                    );
-                });
+            side.spawn((Node::default(), OverlayHost, TabIndex(0))).with_children(|host| {
+                spawn_harmonica_overlay_selectable(
+                    host,
+                    &richter_harp(key),
+                    on_diagram_cell_clicked,
+                    loc,
+                );
+            });
             side.spawn((
-                Node {
-                    width: Val::Px(320.0),
-                    padding: UiRect::all(Val::Px(8.0)),
-                    ..default()
-                },
+                Node { width: Val::Px(320.0), padding: UiRect::all(Val::Px(8.0)), ..default() },
                 BackgroundColor(CARD_BG),
             ))
             .with_children(|card| {
@@ -379,15 +346,9 @@ fn spawn_target_card(
                     ),
                     TargetLabel,
                 ));
-                row.spawn((
-                    label(progress_text(loc, None), 14.0, MUTED),
-                    TargetProgressLabel,
-                ));
+                row.spawn((label(progress_text(loc, None), 14.0, MUTED), TargetProgressLabel));
             });
-            card.spawn((
-                label(String::new(), 20.0, Color::srgb(0.55, 0.85, 0.60)),
-                TunerReadout,
-            ));
+            card.spawn((label(String::new(), 20.0, Color::srgb(0.55, 0.85, 0.60)), TunerReadout));
             spawn_bend_rail(card, loc);
 
             card.spawn(cluster()).with_children(|row| {
@@ -400,40 +361,36 @@ fn spawn_target_card(
                     play_target_reference,
                 ));
                 row.spawn_empty()
-                    .apply_scene(button::small(
-                        &loc.msg("bending-drill-button"),
-                        toggle_drill,
-                    ))
+                    .apply_scene(button::small(&loc.msg("bending-drill-button"), toggle_drill))
                     .insert(DrillToggleButton);
-                row.spawn((Node::default(), Drawer { open: false }, SkipSlot))
-                    .with_children(|slot| {
+                row.spawn((Node::default(), Drawer { open: false }, SkipSlot)).with_children(
+                    |slot| {
                         slot.spawn_empty().apply_scene(button::small(
                             &loc.msg("bending-skip-button"),
                             skip_drill_target,
                         ));
-                    });
+                    },
+                );
                 row.spawn((
                     label(String::from(loc.msg("bending-drill-off")), 15.0, MUTED),
                     DrillLabel,
                 ));
             });
-            card.spawn((Node::default(), Drawer { open: true }, DrillIntroSlot))
-                .with_children(|slot| {
+            card.spawn((Node::default(), Drawer { open: true }, DrillIntroSlot)).with_children(
+                |slot| {
                     slot.spawn(label(
                         String::from(loc.msg("bending-drill-explanation")),
                         14.0,
                         Color::srgb(0.60, 0.60, 0.70),
                     ));
-                });
+                },
+            );
 
             card.spawn(cluster()).with_children(|row| {
                 row.spawn_empty().apply_scene(button::small(
                     &loc.msg("bending-check-natural-button"),
                     |_: On<Activate>, mut check: ResMut<NaturalCheck>| {
-                        *check = NaturalCheck {
-                            requested: true,
-                            ..default()
-                        };
+                        *check = NaturalCheck { requested: true, ..default() };
                     },
                 ));
                 row.spawn((

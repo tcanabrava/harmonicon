@@ -50,16 +50,12 @@ pub fn technique_buckets(stats: &SongStats) -> [(&'static str, TechniqueStats); 
 /// by misses (notes to be gained), then by accuracy, then display order.
 /// Sample counts stay attached so a 0/1 row can't masquerade as a trend.
 pub fn ranked_techniques(stats: &SongStats) -> Vec<(&'static str, TechniqueStats)> {
-    let mut rows: Vec<_> = technique_buckets(stats)
-        .into_iter()
-        .filter(|(_, s)| s.total() > 0)
-        .collect();
+    let mut rows: Vec<_> =
+        technique_buckets(stats).into_iter().filter(|(_, s)| s.total() > 0).collect();
     // `sort_by` is stable, so equal rows keep display order.
     rows.sort_by(|(_, a), (_, b)| {
         b.misses.cmp(&a.misses).then_with(|| {
-            a.accuracy()
-                .partial_cmp(&b.accuracy())
-                .unwrap_or(std::cmp::Ordering::Equal)
+            a.accuracy().partial_cmp(&b.accuracy()).unwrap_or(std::cmp::Ordering::Equal)
         })
     });
     rows
@@ -149,9 +145,8 @@ pub fn observation(stats: &SongStats) -> Option<Observation> {
     // A technique that trails plain notes is the most specific thing there
     // is to say. Without enough plain notes to compare against, the
     // absolute rate has to stand on its own.
-    let baseline = (stats.normal.total() >= MIN_TECHNIQUE_SAMPLES)
-        .then(|| stats.normal.accuracy())
-        .flatten();
+    let baseline =
+        (stats.normal.total() >= MIN_TECHNIQUE_SAMPLES).then(|| stats.normal.accuracy()).flatten();
     let weakest = technique_buckets(stats)
         .into_iter()
         .filter(|(name, s)| {
@@ -161,18 +156,11 @@ pub fn observation(stats: &SongStats) -> Option<Observation> {
         .filter(|(_, _, a)| *a < WEAK_TECHNIQUE && baseline.is_none_or(|b| b - *a >= TECHNIQUE_GAP))
         .min_by(|(_, _, a), (_, _, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     if let Some((technique, s, _)) = weakest {
-        return Some(Observation::Technique {
-            technique,
-            hits: s.hits,
-            total: s.total(),
-        });
+        return Some(Observation::Technique { technique, hits: s.hits, total: s.total() });
     }
 
     if stats.miss as f32 / total as f32 >= HIGH_MISS_RATE {
-        return Some(Observation::MissedNotes {
-            misses: stats.miss,
-            total,
-        });
+        return Some(Observation::MissedNotes { misses: stats.miss, total });
     }
 
     if let Some((late, share)) = timing_lean(stats) {
@@ -183,10 +171,7 @@ pub fn observation(stats: &SongStats) -> Option<Observation> {
     if clean.total() >= MIN_TECHNIQUE_SAMPLES
         && clean.accuracy().is_some_and(|a| a < WEAK_TECHNIQUE)
     {
-        return Some(Observation::LeakyAttacks {
-            clean: clean.hits,
-            total: clean.total(),
-        });
+        return Some(Observation::LeakyAttacks { clean: clean.hits, total: clean.total() });
     }
 
     Some(Observation::Solid)
@@ -203,10 +188,7 @@ pub fn lesson_progress(
 ) -> Option<(f32, f32)> {
     match criteria? {
         PassCriteria::Accuracy { threshold } => Some((accuracy, *threshold)),
-        PassCriteria::Technique {
-            technique,
-            threshold,
-        } => {
+        PassCriteria::Technique { technique, threshold } => {
             let reached = technique_accuracy
                 .iter()
                 .find(|(name, _)| name == technique)
@@ -237,14 +219,9 @@ pub fn missed_range(
         }
     }
     let (first, end_idx) = best?;
-    let last_end = misses[first..end_idx]
-        .iter()
-        .map(|&(_, end)| end)
-        .fold(f64::NEG_INFINITY, f64::max);
-    Some((
-        (misses[first].0 - lead_in_secs).max(0.0),
-        last_end + lead_in_secs,
-    ))
+    let last_end =
+        misses[first..end_idx].iter().map(|&(_, end)| end).fold(f64::NEG_INFINITY, f64::max);
+    Some(((misses[first].0 - lead_in_secs).max(0.0), last_end + lead_in_secs))
 }
 
 #[cfg(test)]
@@ -253,18 +230,9 @@ mod tests {
     use crate::gameplay::state::{TIMING_BUCKETS, TimingHistogram};
 
     fn stats(perfect: u32, good: u32, delayed: u32, miss: u32) -> SongStats {
-        let mut s = SongStats {
-            perfect,
-            good,
-            delayed,
-            miss,
-            ..Default::default()
-        };
+        let mut s = SongStats { perfect, good, delayed, miss, ..Default::default() };
         // Plain notes by default, so a technique test has to opt in.
-        s.normal = TechniqueStats {
-            hits: perfect + good + delayed,
-            misses: miss,
-        };
+        s.normal = TechniqueStats { hits: perfect + good + delayed, misses: miss };
         s
     }
 
@@ -348,12 +316,7 @@ mod tests {
         // Mean is +5 ms, but the hits are all over the place: nothing an
         // Input-lag change would fix.
         let mut s = stats(10, 0, 0, 0);
-        with_hits(
-            &mut s,
-            &[
-                -80.0, -60.0, -40.0, -40.0, 0.0, 10.0, 50.0, 60.0, 70.0, 80.0,
-            ],
-        );
+        with_hits(&mut s, &[-80.0, -60.0, -40.0, -40.0, 0.0, 10.0, 50.0, 60.0, 70.0, 80.0]);
         assert_eq!(timing_lean(&s), None);
         assert_eq!(latency_suggestion(&s), None);
     }
@@ -362,10 +325,7 @@ mod tests {
     fn a_tiny_mean_is_not_worth_a_click() {
         let mut s = stats(10, 0, 0, 0);
         // Lopsided late, but only just.
-        with_hits(
-            &mut s,
-            &[31.0, 31.0, 31.0, 31.0, 31.0, 31.0, -60.0, -60.0, -60.0, 4.0],
-        );
+        with_hits(&mut s, &[31.0, 31.0, 31.0, 31.0, 31.0, 31.0, -60.0, -60.0, -60.0, 4.0]);
         assert_eq!(timing_lean(&s), Some((true, 0.6)));
         assert_eq!(latency_suggestion(&s), None);
     }
@@ -399,11 +359,7 @@ mod tests {
         s.bend = TechniqueStats { hits: 1, misses: 4 };
         assert_eq!(
             observation(&s),
-            Some(Observation::Technique {
-                technique: "bend",
-                hits: 1,
-                total: 5
-            })
+            Some(Observation::Technique { technique: "bend", hits: 1, total: 5 })
         );
     }
 
@@ -414,10 +370,7 @@ mod tests {
         s.overblow = TechniqueStats { hits: 1, misses: 4 };
         assert!(matches!(
             observation(&s),
-            Some(Observation::Technique {
-                technique: "overblow",
-                ..
-            })
+            Some(Observation::Technique { technique: "overblow", .. })
         ));
     }
 
@@ -426,13 +379,7 @@ mod tests {
         // Everything lands at ~50%: the problem is hitting notes, not bends.
         let mut s = stats(10, 0, 0, 10);
         s.bend = TechniqueStats { hits: 2, misses: 3 };
-        assert_eq!(
-            observation(&s),
-            Some(Observation::MissedNotes {
-                misses: 10,
-                total: 20
-            })
-        );
+        assert_eq!(observation(&s), Some(Observation::MissedNotes { misses: 10, total: 20 }));
     }
 
     #[test]
@@ -440,26 +387,14 @@ mod tests {
         let mut s = stats(3, 0, 0, 6);
         s.normal = TechniqueStats::default();
         s.bend = TechniqueStats { hits: 3, misses: 6 };
-        assert!(matches!(
-            observation(&s),
-            Some(Observation::Technique {
-                technique: "bend",
-                ..
-            })
-        ));
+        assert!(matches!(observation(&s), Some(Observation::Technique { technique: "bend", .. })));
     }
 
     #[test]
     fn late_timing_is_reported_when_notes_otherwise_land() {
         let mut s = stats(10, 0, 0, 1);
         with_hits(&mut s, &[50.0; 10]);
-        assert_eq!(
-            observation(&s),
-            Some(Observation::Timing {
-                late: true,
-                share: 1.0
-            })
-        );
+        assert_eq!(observation(&s), Some(Observation::Timing { late: true, share: 1.0 }));
     }
 
     #[test]
@@ -467,13 +402,7 @@ mod tests {
         let mut s = stats(10, 0, 0, 0);
         with_hits(&mut s, &[0.0; 10]);
         s.clean_attack = TechniqueStats { hits: 3, misses: 7 };
-        assert_eq!(
-            observation(&s),
-            Some(Observation::LeakyAttacks {
-                clean: 3,
-                total: 10
-            })
-        );
+        assert_eq!(observation(&s), Some(Observation::LeakyAttacks { clean: 3, total: 10 }));
     }
 
     // ── ranked_techniques ──────────────────────────────────────────────────
@@ -481,10 +410,7 @@ mod tests {
     #[test]
     fn techniques_rank_by_misses_then_accuracy_then_display_order() {
         let s = SongStats {
-            normal: TechniqueStats {
-                hits: 18,
-                misses: 2,
-            },
+            normal: TechniqueStats { hits: 18, misses: 2 },
             bend: TechniqueStats { hits: 2, misses: 2 },
             vibrato: TechniqueStats { hits: 6, misses: 2 },
             wah: TechniqueStats { hits: 1, misses: 4 },
@@ -496,10 +422,7 @@ mod tests {
 
     #[test]
     fn unused_techniques_are_not_listed() {
-        let s = SongStats {
-            normal: TechniqueStats { hits: 5, misses: 0 },
-            ..Default::default()
-        };
+        let s = SongStats { normal: TechniqueStats { hits: 5, misses: 0 }, ..Default::default() };
         assert_eq!(ranked_techniques(&s).len(), 1);
     }
 
@@ -510,14 +433,8 @@ mod tests {
         let acc = Some(PassCriteria::Accuracy { threshold: 0.7 });
         assert_eq!(lesson_progress(acc.as_ref(), 0.55, &[]), Some((0.55, 0.7)));
 
-        let tech = Some(PassCriteria::Technique {
-            technique: "bend".into(),
-            threshold: 0.8,
-        });
-        assert_eq!(
-            lesson_progress(tech.as_ref(), 0.9, &[("bend", 0.5)]),
-            Some((0.5, 0.8))
-        );
+        let tech = Some(PassCriteria::Technique { technique: "bend".into(), threshold: 0.8 });
+        assert_eq!(lesson_progress(tech.as_ref(), 0.9, &[("bend", 0.5)]), Some((0.5, 0.8)));
         // A technique the run never exercised counts as zero progress.
         assert_eq!(lesson_progress(tech.as_ref(), 0.9, &[]), Some((0.0, 0.8)));
     }
@@ -539,13 +456,7 @@ mod tests {
     #[test]
     fn the_densest_window_wins() {
         // One miss at 2 s, three clustered at 20–22 s, one at 40 s.
-        let misses = [
-            (2.0, 2.5),
-            (20.0, 20.5),
-            (21.0, 21.5),
-            (22.0, 22.5),
-            (40.0, 40.5),
-        ];
+        let misses = [(2.0, 2.5), (20.0, 20.5), (21.0, 21.5), (22.0, 22.5), (40.0, 40.5)];
         assert_eq!(missed_range(&misses, 4.0, 1.0), Some((19.0, 23.5)));
     }
 

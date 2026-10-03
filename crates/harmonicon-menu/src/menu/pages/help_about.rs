@@ -27,10 +27,9 @@ struct DocsStatusLabel;
 /// neither exists; the docs aren't bundled into builds yet (see CLAUDE.md).
 fn locate_docs_index() -> Option<std::path::PathBuf> {
     let candidates = [
-        std::env::current_exe().ok().and_then(|exe| {
-            exe.parent()
-                .map(|dir| dir.join("docs/book/book/index.html"))
-        }),
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|dir| dir.join("docs/book/book/index.html"))),
         // `CARGO_MANIFEST_DIR` is *this crate's* directory, not the workspace
         // root — hence the `../..`. The book lives at the repo root alongside
         // `assets/`, which the root package owns (see `CLAUDE.md`, "Paths
@@ -57,10 +56,7 @@ fn open_in_default_app(path: &std::path::Path) -> std::io::Result<()> {
     }
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", ""])
-            .arg(path)
-            .spawn()?;
+        std::process::Command::new("cmd").args(["/C", "start", ""]).arg(path).spawn()?;
     }
 
     // Anywhere else — wasm, and Android, which is deliberately not covered by
@@ -83,13 +79,8 @@ pub(crate) fn setup_help_about_menu(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
 ) {
-    let (root, header, _page_root) = spawn_menu_root(
-        &mut commands,
-        &loc.msg("help-about-title"),
-        None,
-        &theme,
-        "HelpAbout",
-    );
+    let (root, header, _page_root) =
+        spawn_menu_root(&mut commands, &loc.msg("help-about-title"), None, &theme, "HelpAbout");
     spawn_button(
         &mut commands,
         root,
@@ -114,12 +105,7 @@ pub(crate) fn setup_help_about_menu(
         &loc.msg("menu-about"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::About),
     );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("menu-tutorial"),
-        tutorial::start_tutorial_tour,
-    );
+    spawn_button(&mut commands, root, &loc.msg("menu-tutorial"), tutorial::start_tutorial_tour);
     // The first-run welcome, re-runnable: the same three steps a fresh
     // install offers, reachable without deleting the profile.
     spawn_button(
@@ -157,13 +143,8 @@ pub(crate) fn setup_about_page(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
 ) {
-    let (root, header, _page_root) = spawn_menu_root(
-        &mut commands,
-        &loc.msg("about-title"),
-        None,
-        &theme,
-        "About",
-    );
+    let (root, header, _page_root) =
+        spawn_menu_root(&mut commands, &loc.msg("about-title"), None, &theme, "About");
     let body = commands
         .spawn_empty()
         .apply_scene(bsn! {

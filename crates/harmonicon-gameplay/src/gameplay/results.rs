@@ -92,11 +92,7 @@ fn technique_key(name: &str) -> &'static str {
 fn observation_text(loc: &Localization, obs: Observation) -> String {
     let pct = |share: f32| format!("{:.0}", share * 100.0);
     match obs {
-        Observation::Technique {
-            technique,
-            hits,
-            total,
-        } => loc
+        Observation::Technique { technique, hits, total } => loc
             .msg_args(
                 "results-observation-technique",
                 &[
@@ -112,12 +108,12 @@ fn observation_text(loc: &Localization, obs: Observation) -> String {
                 &[("misses", misses.to_string()), ("total", total.to_string())],
             )
             .into(),
-        Observation::Timing { late: true, share } => loc
-            .msg_args("results-observation-late", &[("pct", pct(share))])
-            .into(),
-        Observation::Timing { late: false, share } => loc
-            .msg_args("results-observation-early", &[("pct", pct(share))])
-            .into(),
+        Observation::Timing { late: true, share } => {
+            loc.msg_args("results-observation-late", &[("pct", pct(share))]).into()
+        }
+        Observation::Timing { late: false, share } => {
+            loc.msg_args("results-observation-early", &[("pct", pct(share))]).into()
+        }
         Observation::LeakyAttacks { clean, total } => loc
             .msg_args(
                 "results-observation-leaky",
@@ -152,18 +148,12 @@ fn lesson_goal_lines(
 /// The loop range "Practice missed section" would enter, from the run's
 /// missed notes: two bars around the densest cluster, one beat of lead-in.
 fn practice_range(notes: &SongNotes, config: &ScoringConfig, bpm: f64) -> Option<PracticeRange> {
-    let misses: Vec<(f64, f64)> = notes
-        .notes
-        .iter()
-        .filter(|n| n.missed)
-        .map(|n| (n.time, n.time + n.duration))
-        .collect();
+    let misses: Vec<(f64, f64)> =
+        notes.notes.iter().filter(|n| n.missed).map(|n| (n.time, n.time + n.duration)).collect();
     let window = config.meter.bar_secs(bpm) * PRACTICE_WINDOW_BARS;
     let lead_in = config.meter.beat_secs(bpm) * PRACTICE_LEAD_IN_BEATS;
-    missed_range(&misses, window, lead_in).map(|(start_time, end_time)| PracticeRange {
-        start_time,
-        end_time,
-    })
+    missed_range(&misses, window, lead_in)
+        .map(|(start_time, end_time)| PracticeRange { start_time, end_time })
 }
 
 pub(super) fn setup(
@@ -359,26 +349,10 @@ pub(super) fn setup(
             // The tally. No "Hits" row: it's the sum of the three hit kinds
             // and reads as a fourth category beside them.
             let rows = [
-                (
-                    "results-biggest-combo",
-                    score.max_combo,
-                    Color::srgb(0.90, 0.72, 0.20),
-                ),
-                (
-                    "results-perfect-hits",
-                    stats.perfect,
-                    Color::srgb(1.00, 0.85, 0.20),
-                ),
-                (
-                    "results-good-hits",
-                    stats.good,
-                    Color::srgb(0.45, 1.00, 0.45),
-                ),
-                (
-                    "results-delayed-hits",
-                    stats.delayed,
-                    Color::srgb(0.95, 0.62, 0.30),
-                ),
+                ("results-biggest-combo", score.max_combo, Color::srgb(0.90, 0.72, 0.20)),
+                ("results-perfect-hits", stats.perfect, Color::srgb(1.00, 0.85, 0.20)),
+                ("results-good-hits", stats.good, Color::srgb(0.45, 1.00, 0.45)),
+                ("results-delayed-hits", stats.delayed, Color::srgb(0.95, 0.62, 0.30)),
                 ("results-misses", stats.miss, Color::srgb(0.95, 0.35, 0.35)),
             ];
             for (key, value, color) in rows {
@@ -433,8 +407,7 @@ pub(super) fn setup(
                 ..default()
             })
             .with_children(|row| {
-                row.spawn_empty()
-                    .apply_scene(button::default(&loc.msg("results-retry"), on_retry));
+                row.spawn_empty().apply_scene(button::default(&loc.msg("results-retry"), on_retry));
                 if let Some(range) = practice {
                     row.spawn_empty().apply_scene(button::default(
                         &loc.msg("results-practice-missed"),
@@ -502,11 +475,7 @@ const LATE_COLOR: Color = Color::srgb(0.95, 0.62, 0.30);
 fn spawn_timing_bar(parent: &mut ChildSpawnerCommands, loc: &Localization, stats: &SongStats) {
     let counts = [
         ("results-timing-early", stats.timing.early(), EARLY_COLOR),
-        (
-            "results-timing-on-time",
-            stats.timing.on_time(),
-            ON_TIME_COLOR,
-        ),
+        ("results-timing-on-time", stats.timing.on_time(), ON_TIME_COLOR),
         ("results-timing-late", stats.timing.late(), LATE_COLOR),
     ];
     parent
@@ -605,13 +574,7 @@ mod tests {
     use super::*;
 
     fn stats(perfect: u32, good: u32, delayed: u32, miss: u32) -> SongStats {
-        SongStats {
-            perfect,
-            good,
-            delayed,
-            miss,
-            ..Default::default()
-        }
+        SongStats { perfect, good, delayed, miss, ..Default::default() }
     }
 
     #[test]

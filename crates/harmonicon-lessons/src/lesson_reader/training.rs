@@ -64,10 +64,7 @@ pub(super) fn tier_about_key(tier: Tier) -> &'static str {
 /// The tier the panel opens on: the first one not yet passed, or the top
 /// tier once every one is — the next thing worth practising either way.
 pub(super) fn first_open_tier(passed: impl Fn(Tier) -> bool) -> Tier {
-    Tier::ALL
-        .into_iter()
-        .find(|tier| !passed(*tier))
-        .unwrap_or(Tier::Interleave)
+    Tier::ALL.into_iter().find(|tier| !passed(*tier)).unwrap_or(Tier::Interleave)
 }
 
 /// What `tier` asks, and the goal it is judged on, as two localized lines.
@@ -146,10 +143,8 @@ pub(super) fn spawn_training_panel(
             format!("{tick}{} {}", tier.number(), loc.msg(tier_name_key(tier)))
         })
         .collect();
-    let lines: Vec<(String, String)> = Tier::ALL
-        .into_iter()
-        .map(|tier| tier_lines(loc, entry, tier))
-        .collect();
+    let lines: Vec<(String, String)> =
+        Tier::ALL.into_iter().map(|tier| tier_lines(loc, entry, tier)).collect();
     let opening = first_open_tier(passed);
     let (about, goal) = lines[usize::from(opening.number() - 1)].clone();
 
@@ -186,21 +181,12 @@ pub(super) fn spawn_training_panel(
               mut mode: ResMut<GameplayMode>,
               mut state: ResMut<NextState<AppState>>,
               mut commands: Commands| {
-            let Some(tier) = bars
-                .get(bar)
-                .ok()
-                .and_then(|selected| Tier::ALL.get(selected.0).copied())
+            let Some(tier) =
+                bars.get(bar).ok().and_then(|selected| Tier::ALL.get(selected.0).copied())
             else {
                 return;
             };
-            start_training(
-                &manifest,
-                tier,
-                &mut manifests,
-                &mut mode,
-                &mut state,
-                &mut commands,
-            );
+            start_training(&manifest, tier, &mut manifests, &mut mode, &mut state, &mut commands);
         },
     );
 }
@@ -248,11 +234,7 @@ mod tests {
     #[test]
     fn the_panel_opens_on_the_first_tier_not_yet_passed() {
         assert_eq!(first_open_tier(|_| false), Tier::Isolate);
-        assert_eq!(
-            first_open_tier(|tier| tier.number() <= 2),
-            Tier::Vary,
-            "tiers 1 and 2 passed"
-        );
+        assert_eq!(first_open_tier(|tier| tier.number() <= 2), Tier::Vary, "tiers 1 and 2 passed");
         // Tiers aren't gated, so a gap below a passed tier is found first.
         assert_eq!(
             first_open_tier(|tier| tier == Tier::Isolate || tier == Tier::Vary),

@@ -46,11 +46,7 @@ impl Snapshot {
         self.notes.capacity() * std::mem::size_of::<GridNote>()
             + self.tempo_changes.capacity() * std::mem::size_of::<(usize, f32)>()
             + self.meter_changes.capacity() * std::mem::size_of::<(usize, String)>()
-            + self
-                .meter_changes
-                .iter()
-                .map(|(_, meter)| meter.capacity())
-                .sum::<usize>()
+            + self.meter_changes.iter().map(|(_, meter)| meter.capacity()).sum::<usize>()
             + self
                 .repeats
                 .iter()
@@ -69,11 +65,7 @@ impl Snapshot {
                 .map(String::capacity)
                 .sum::<usize>()
             + self.expression_intensities.len() * std::mem::size_of::<(u32, String)>()
-            + self
-                .expression_intensities
-                .values()
-                .map(String::capacity)
-                .sum::<usize>()
+            + self.expression_intensities.values().map(String::capacity).sum::<usize>()
             + self.loaded_harmonica.as_ref().map_or(0, |loaded| {
                 std::mem::size_of::<LoadedHarmonica>()
                     + loaded.key.capacity()
@@ -131,17 +123,11 @@ fn harp_allocated_bytes(harp: &Harmonica) -> usize {
     }
 
     match harp {
-        Harmonica::Diatonic {
-            position, layout, ..
-        } => {
+        Harmonica::Diatonic { position, layout, .. } => {
             position.as_ref().map_or(0, String::capacity)
-                + layout
-                    .as_ref()
-                    .map_or(0, |l| layout_bytes([l.blow.as_ref(), l.draw.as_ref()]))
+                + layout.as_ref().map_or(0, |l| layout_bytes([l.blow.as_ref(), l.draw.as_ref()]))
         }
-        Harmonica::Chromatic {
-            position, layout, ..
-        } => {
+        Harmonica::Chromatic { position, layout, .. } => {
             position.as_ref().map_or(0, String::capacity)
                 + layout.as_ref().map_or(0, |l| {
                     layout_bytes([
@@ -178,12 +164,7 @@ impl UndoHistory {
     fn trim_to(&mut self, budget: usize) {
         // The current snapshot is required for comparisons, even if a single
         // document exceeds the budget. Drop old undo/redo entries first.
-        let mut bytes: usize = self
-            .past
-            .iter()
-            .chain(&self.future)
-            .map(Snapshot::bytes)
-            .sum();
+        let mut bytes: usize = self.past.iter().chain(&self.future).map(Snapshot::bytes).sum();
         bytes += self.last.as_ref().map_or(0, Snapshot::bytes);
         while self.past.len() + self.future.len() > HISTORY_LIMIT || bytes > budget {
             let removed = if !self.past.is_empty() {
@@ -312,20 +293,13 @@ mod tests {
         state.meter_changes.push((4, "4/4".repeat(100)));
         state.phrase_annotations.insert(
             8,
-            PhraseAnnotation {
-                section: Some("verse".repeat(100)),
-                ..Default::default()
-            },
+            PhraseAnnotation { section: Some("verse".repeat(100)), ..Default::default() },
         );
         state.expression_intensities.insert(1, "0.5".repeat(100));
 
         let snapshot = Snapshot::capture(&state);
         let nested_bytes = state.meter_changes[0].1.capacity()
-            + state.phrase_annotations[&8]
-                .section
-                .as_ref()
-                .unwrap()
-                .capacity()
+            + state.phrase_annotations[&8].section.as_ref().unwrap().capacity()
             + state.expression_intensities[&1].capacity();
         assert!(snapshot.bytes() >= nested_bytes);
 

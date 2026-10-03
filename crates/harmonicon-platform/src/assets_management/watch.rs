@@ -169,16 +169,14 @@ mod tests {
     fn a_file_open_is_not_a_content_change() {
         // The self-triggering-loop case: our own scan opening a chart file
         // must not read back as "the folder changed".
-        assert!(!is_content_change(&EventKind::Access(AccessKind::Open(
-            AccessMode::Any
-        ))));
+        assert!(!is_content_change(&EventKind::Access(AccessKind::Open(AccessMode::Any))));
     }
 
     #[test]
     fn a_metadata_only_touch_is_not_a_content_change() {
-        assert!(!is_content_change(&EventKind::Modify(
-            ModifyKind::Metadata(notify_debouncer_full::notify::event::MetadataKind::Any)
-        )));
+        assert!(!is_content_change(&EventKind::Modify(ModifyKind::Metadata(
+            notify_debouncer_full::notify::event::MetadataKind::Any
+        ))));
     }
 
     #[test]
@@ -225,10 +223,7 @@ mod tests {
             root.join("themes/mytheme/theme.json"),
         ];
         let dirs = changed_top_level_dirs(root, &paths);
-        assert_eq!(
-            dirs,
-            HashSet::from(["songs".to_string(), "themes".to_string()])
-        );
+        assert_eq!(dirs, HashSet::from(["songs".to_string(), "themes".to_string()]));
     }
 
     #[test]

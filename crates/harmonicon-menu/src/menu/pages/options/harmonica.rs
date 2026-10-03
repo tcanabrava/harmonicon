@@ -53,11 +53,7 @@ pub(super) fn harmonica_button_scene(
     name: String,
     is_selected: bool,
 ) -> impl Scene {
-    let color = if is_selected {
-        button::CHOICE_SELECTED
-    } else {
-        button::color_default()
-    };
+    let color = if is_selected { button::CHOICE_SELECTED } else { button::color_default() };
     let label = name.clone();
     let pick = name.clone();
     bsn! {
@@ -109,11 +105,7 @@ pub(super) fn spawn_harmonica_preview(
 
     commands.spawn((
         Camera3d::default(),
-        Camera {
-            clear_color: ClearColorConfig::Custom(Color::NONE),
-            order: -1,
-            ..default()
-        },
+        Camera { clear_color: ClearColorConfig::Custom(Color::NONE), order: -1, ..default() },
         RenderTarget::from(handle.clone()),
         Transform::from_xyz(0.0, 1.6, 4.2).looking_at(Vec3::ZERO, Vec3::Y),
         layers.clone(),
@@ -142,11 +134,7 @@ pub(super) fn spawn_harmonica_preview(
 
 /// Allocates a transparent render-target image for a 3D preview.
 pub(super) fn preview_target(images: &mut Assets<Image>) -> Handle<Image> {
-    let size = Extent3d {
-        width: 128,
-        height: 128,
-        depth_or_array_layers: 1,
-    };
+    let size = Extent3d { width: 128, height: 128, depth_or_array_layers: 1 };
     let mut image = Image::new_fill(
         size,
         TextureDimension::D2,
@@ -162,10 +150,7 @@ pub(super) fn preview_target(images: &mut Assets<Image>) -> Handle<Image> {
 /// A directional light on `layers` so a preview model is shaded, not flat.
 pub(super) fn spawn_preview_light(commands: &mut Commands, layers: RenderLayers) {
     commands.spawn((
-        DirectionalLight {
-            illuminance: 6000.0,
-            ..default()
-        },
+        DirectionalLight { illuminance: 6000.0, ..default() },
         Transform::from_xyz(3.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
         layers,
         MenuRoot,
@@ -238,11 +223,8 @@ pub(super) fn harmonica_button_visuals(
         return;
     }
     for (button, mut bg) in &mut buttons {
-        let wanted = if button.0 == selected.0 {
-            button::CHOICE_SELECTED
-        } else {
-            button::color_default()
-        };
+        let wanted =
+            if button.0 == selected.0 { button::CHOICE_SELECTED } else { button::color_default() };
         if bg.0 != wanted {
             bg.0 = wanted;
         }

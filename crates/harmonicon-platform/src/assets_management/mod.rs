@@ -185,10 +185,7 @@ impl Plugin for AssetsManagementPlugin {
             )
             .add_systems(
                 Update,
-                (
-                    watch::process_external_folder_events,
-                    rescan_on_external_change,
-                )
+                (watch::process_external_folder_events, rescan_on_external_change)
                     .chain()
                     .after(ContentPacksSet),
             );
@@ -237,10 +234,7 @@ fn scan_note_themes(
 ) {
     available_2d.0 = scan_theme_dir("assets/notes/2d", "png");
     available_3d.0 = scan_theme_dir("assets/notes/3d", "glb");
-    info!(
-        "Found note themes — 2D: {:?}  3D: {:?}",
-        available_2d.0, available_3d.0
-    );
+    info!("Found note themes — 2D: {:?}  3D: {:?}", available_2d.0, available_3d.0);
 }
 
 /// Collects the `<name>` stems of files with `ext` directly under `dir`.
@@ -270,18 +264,9 @@ fn scan_note_themes(
     mut available_2d: ResMut<AvailableNoteThemes2d>,
     mut available_3d: ResMut<AvailableNoteThemes3d>,
 ) {
-    available_2d.0 = manifest::NOTE_THEMES_2D
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    available_3d.0 = manifest::NOTE_THEMES_3D
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    info!(
-        "Found note themes — 2D: {:?}  3D: {:?}",
-        available_2d.0, available_3d.0
-    );
+    available_2d.0 = manifest::NOTE_THEMES_2D.iter().map(|s| s.to_string()).collect();
+    available_3d.0 = manifest::NOTE_THEMES_3D.iter().map(|s| s.to_string()).collect();
+    info!("Found note themes — 2D: {:?}  3D: {:?}", available_2d.0, available_3d.0);
 }
 
 /// Replace Bevy's built-in default font (FiraMono) with GNU FreeSans, so text
@@ -363,30 +348,17 @@ fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
         if !entry.path().join("harmonica.glb").exists() {
             continue;
         }
-        available
-            .0
-            .push(entry.file_name().to_string_lossy().into_owned());
+        available.0.push(entry.file_name().to_string_lossy().into_owned());
     }
     available.0.sort_unstable();
-    info!(
-        "Found {} harmonica model(s): {:?}",
-        available.0.len(),
-        available.0
-    );
+    info!("Found {} harmonica model(s): {:?}", available.0.len(), available.0);
 }
 
 /// wasm sibling of the native `scan_harmonica_models` above.
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 fn scan_harmonica_models(mut available: ResMut<AvailableHarmonicas>) {
-    available.0 = manifest::HARMONICA_MODELS
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    info!(
-        "Found {} harmonica model(s): {:?}",
-        available.0.len(),
-        available.0
-    );
+    available.0 = manifest::HARMONICA_MODELS.iter().map(|s| s.to_string()).collect();
+    info!("Found {} harmonica model(s): {:?}", available.0.len(), available.0);
 }
 
 /// `songs_root` is the folder holding artist folders, and `source_prefix`
@@ -426,10 +398,8 @@ pub fn scan_artist_song(
         // would simply never appear in the song list, with nothing to
         // explain why.
         let song_file = (|| {
-            let entries: Vec<_> = std::fs::read_dir(song_dir.path().join("song"))
-                .ok()?
-                .flatten()
-                .collect();
+            let entries: Vec<_> =
+                std::fs::read_dir(song_dir.path().join("song")).ok()?.flatten().collect();
             // Case-insensitively, matching `harmonicon_score::parse_import`
             // — a file saved as `.MID` is as common as `.mid`.
             let has_extension = |entry: &std::fs::DirEntry, want: &[&str]| {
@@ -445,9 +415,7 @@ pub fn scan_artist_song(
                 .find(|e| has_extension(e, &["harpchart"]))
                 .or_else(|| {
                     // `.xml` is only offered when its head is MusicXML.
-                    entries
-                        .iter()
-                        .find(|e| harmonicon_score::is_importable_file(&e.path()))
+                    entries.iter().find(|e| harmonicon_score::is_importable_file(&e.path()))
                 })
                 .map(|e| e.path())
         })();
@@ -461,19 +429,15 @@ pub fn scan_artist_song(
         };
 
         let name = song_dir.file_name().to_string_lossy().into_owned();
-        available
-            .0
-            .entry(artist.clone())
-            .or_default()
-            .push(SongEntry {
-                source_name: String::new(),
-                retained: false,
-                asset_path: format!("{source_prefix}{relative}"),
-                artist: artist.clone(),
-                name,
-                genre: chart_catalog_field(&song_file, "genre"),
-                difficulty: chart_catalog_field(&song_file, "difficulty"),
-            });
+        available.0.entry(artist.clone()).or_default().push(SongEntry {
+            source_name: String::new(),
+            retained: false,
+            asset_path: format!("{source_prefix}{relative}"),
+            artist: artist.clone(),
+            name,
+            genre: chart_catalog_field(&song_file, "genre"),
+            difficulty: chart_catalog_field(&song_file, "difficulty"),
+        });
     }
 }
 
@@ -531,18 +495,12 @@ fn scan_songs_root(
 /// Every usable song pack, after whatever else is already in `available`.
 #[cfg(not(target_arch = "wasm32"))]
 fn scan_song_packs(packs: Option<&ContentPacks>, available: &mut AvailableSongs) {
-    for pack in packs
-        .into_iter()
-        .flat_map(|p| p.usable(harmonicon_packs::pack::PackKind::Songs))
-    {
+    for pack in packs.into_iter().flat_map(|p| p.usable(harmonicon_packs::pack::PackKind::Songs)) {
         let prefix = format!("{}/", pack.asset_prefix());
         scan_songs_root(&pack.root, &prefix, available);
         let retained = harmonicon_packs::retained_songs::read_index(&pack.root);
-        for song in available
-            .0
-            .values_mut()
-            .flatten()
-            .filter(|song| song.asset_path.starts_with(&prefix))
+        for song in
+            available.0.values_mut().flatten().filter(|song| song.asset_path.starts_with(&prefix))
         {
             if let crate::content_packs::PackStatus::Ready { manifest, .. } = &pack.status {
                 song.source_name = match &pack.spec {
@@ -569,11 +527,7 @@ fn scan_song_packs(_packs: Option<&ContentPacks>, _available: &mut AvailableSong
 
 fn log_song_count(available: &AvailableSongs) {
     let total: usize = available.0.values().map(|v| v.len()).sum();
-    info!(
-        "Found {} song(s) across {} artist(s)",
-        total,
-        available.0.len()
-    );
+    info!("Found {} song(s) across {} artist(s)", total, available.0.len());
 }
 
 pub fn scan_all_songs(
@@ -612,19 +566,15 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
 pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
     available.0.clear();
     for (artist, name, genre, difficulty, asset_path) in manifest::SONGS {
-        available
-            .0
-            .entry((*artist).to_string())
-            .or_default()
-            .push(SongEntry {
-                artist: (*artist).to_string(),
-                name: (*name).to_string(),
-                genre: (*genre).to_string(),
-                difficulty: (*difficulty).to_string(),
-                source_name: String::new(),
-                retained: false,
-                asset_path: (*asset_path).to_string(),
-            });
+        available.0.entry((*artist).to_string()).or_default().push(SongEntry {
+            artist: (*artist).to_string(),
+            name: (*name).to_string(),
+            genre: (*genre).to_string(),
+            difficulty: (*difficulty).to_string(),
+            source_name: String::new(),
+            retained: false,
+            asset_path: (*asset_path).to_string(),
+        });
     }
     scan_song_packs(packs, available);
     log_song_count(available);
@@ -644,20 +594,10 @@ mod tests {
         schedule.add_systems(scan_all_songs);
 
         schedule.run(&mut world);
-        let first: usize = world
-            .resource::<AvailableSongs>()
-            .0
-            .values()
-            .map(|v| v.len())
-            .sum();
+        let first: usize = world.resource::<AvailableSongs>().0.values().map(|v| v.len()).sum();
 
         schedule.run(&mut world);
-        let second: usize = world
-            .resource::<AvailableSongs>()
-            .0
-            .values()
-            .map(|v| v.len())
-            .sum();
+        let second: usize = world.resource::<AvailableSongs>().0.values().map(|v| v.len()).sum();
 
         assert_eq!(first, second);
     }
@@ -698,10 +638,8 @@ mod tests {
                 commit: Some("commit".into()),
             },
         };
-        let packs = ContentPacks(vec![
-            entry(first.path(), "first"),
-            entry(second.path(), "second"),
-        ]);
+        let packs =
+            ContentPacks(vec![entry(first.path(), "first"), entry(second.path(), "second")]);
         let mut available = AvailableSongs::default();
         scan_song_packs(Some(&packs), &mut available);
         assert_eq!(available.0["Band"].len(), 2);
@@ -751,29 +689,18 @@ mod tests {
         .unwrap();
         let entry = |slug: &str, status| PackEntry {
             kind: PackKind::Songs,
-            spec: RepoSpec::Local {
-                path: root.path().into(),
-            },
+            spec: RepoSpec::Local { path: root.path().into() },
             slug: slug.into(),
             root: root.path().into(),
             status,
         };
         let packs = ContentPacks(vec![
-            entry(
-                "ready",
-                PackStatus::Ready {
-                    manifest,
-                    commit: None,
-                },
-            ),
+            entry("ready", PackStatus::Ready { manifest, commit: None }),
             entry("broken", PackStatus::Unusable("no".into())),
         ]);
         let mut available = AvailableSongs::default();
         scan_song_packs(Some(&packs), &mut available);
-        let paths: Vec<_> = available.0["Bach"]
-            .iter()
-            .map(|s| s.asset_path.as_str())
-            .collect();
+        let paths: Vec<_> = available.0["Bach"].iter().map(|s| s.asset_path.as_str()).collect();
         assert_eq!(paths, ["packs://ready/Bach/Minuet/song/chart.harpchart"]);
     }
 

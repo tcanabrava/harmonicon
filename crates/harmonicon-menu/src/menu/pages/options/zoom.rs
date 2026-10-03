@@ -15,11 +15,7 @@ pub(super) struct ZoomSlider;
 pub(super) struct ZoomSliderFill;
 
 pub(super) fn zoom_label_text(loc: &Localization, scale: f32) -> String {
-    loc.msg_args(
-        "options-zoom-label",
-        &[("percent", (scale * 100.0).round().to_string())],
-    )
-    .into()
+    loc.msg_args("options-zoom-label", &[("percent", (scale * 100.0).round().to_string())]).into()
 }
 
 /// Where `scale` sits between `dialogs::ui_scale`'s `MIN_SCALE`/`MAX_SCALE`,

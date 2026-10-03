@@ -71,12 +71,7 @@ mod tests {
         out_of_scale: u32,
         rest_violations: u32,
     ) -> ImprovStats {
-        ImprovStats {
-            chord_tone,
-            in_scale,
-            out_of_scale,
-            rest_violations,
-        }
+        ImprovStats { chord_tone, in_scale, out_of_scale, rest_violations }
     }
 
     #[test]
@@ -87,10 +82,7 @@ mod tests {
             s.adherence()
         );
         assert_eq!(
-            jam_fraction_for(
-                Some(&PassCriteria::ChordToneAdherence { threshold: 0.1 }),
-                &s
-            ),
+            jam_fraction_for(Some(&PassCriteria::ChordToneAdherence { threshold: 0.1 }), &s),
             s.chord_tone_adherence()
         );
         assert_eq!(
@@ -103,9 +95,6 @@ mod tests {
     fn jam_fraction_for_is_none_for_a_non_jam_criterion() {
         let s = stats(3, 5, 2, 1);
         assert_eq!(jam_fraction_for(None, &s), None);
-        assert_eq!(
-            jam_fraction_for(Some(&PassCriteria::Accuracy { threshold: 0.5 }), &s),
-            None
-        );
+        assert_eq!(jam_fraction_for(Some(&PassCriteria::Accuracy { threshold: 0.5 }), &s), None);
     }
 }

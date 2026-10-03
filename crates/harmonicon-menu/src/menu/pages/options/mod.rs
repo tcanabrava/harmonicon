@@ -208,11 +208,7 @@ fn setup_options_menu(
     // `root`'s own centering — same mechanism every single-column page
     // already relies on.
     let main_layout = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(20.0),
-            ..default()
-        })
+        .spawn(Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(20.0), ..default() })
         .id();
 
     let left_layout = commands
@@ -226,11 +222,7 @@ fn setup_options_menu(
         .id();
 
     let right_layout = commands
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(20.0),
-            ..default()
-        })
+        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(20.0), ..default() })
         .id();
 
     commands.entity(root).add_child(main_layout);
@@ -327,13 +319,7 @@ fn spawn_left_column(
         })
         .collect();
 
-    spawn_harmonica_row(
-        commands,
-        parent,
-        loc,
-        &previews_harmonica,
-        &selected_harmonica.0,
-    );
+    spawn_harmonica_row(commands, parent, loc, &previews_harmonica, &selected_harmonica.0);
 
     let algo_combo = combobox::spawn_combobox(
         commands,
@@ -362,9 +348,7 @@ fn spawn_right_column(commands: &mut Commands, parent: Entity, loc: &Localizatio
         &loc.msg("options-theme"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Theme),
     );
-    commands
-        .entity(theme_btn)
-        .insert(Tooltip(String::from(loc.msg("options-theme-tooltip"))));
+    commands.entity(theme_btn).insert(Tooltip(String::from(loc.msg("options-theme-tooltip"))));
 
     // Downloaded content: wasm's is bundled at build time, so it has no
     // repositories to manage.
@@ -389,9 +373,9 @@ fn spawn_right_column(commands: &mut Commands, parent: Entity, loc: &Localizatio
         &loc.msg("options-calibrate-input-lag"),
         |_: On<Activate>, mut state: ResMut<NextState<AppState>>| state.set(AppState::Calibration),
     );
-    commands.entity(calibrate_btn).insert(Tooltip(String::from(
-        loc.msg("options-calibrate-input-lag-tooltip"),
-    )));
+    commands
+        .entity(calibrate_btn)
+        .insert(Tooltip(String::from(loc.msg("options-calibrate-input-lag-tooltip"))));
 }
 
 /// Flips whether falling notes show their hole number instead of the
@@ -415,9 +399,7 @@ fn spawn_note_numbers_toggle(
         show_numbers,
         set_note_numbers,
     );
-    commands.entity(row).insert(Tooltip(String::from(
-        loc.msg("options-note-labels-tooltip"),
-    )));
+    commands.entity(row).insert(Tooltip(String::from(loc.msg("options-note-labels-tooltip"))));
 }
 
 /// Flips the single global adaptive-difficulty setting — not per-song, see
@@ -450,9 +432,9 @@ fn spawn_adaptive_difficulty_toggle(
         enabled,
         set_adaptive_difficulty,
     );
-    commands.entity(row).insert(Tooltip(String::from(
-        loc.msg("options-adaptive-difficulty-tooltip"),
-    )));
+    commands
+        .entity(row)
+        .insert(Tooltip(String::from(loc.msg("options-adaptive-difficulty-tooltip"))));
 }
 
 /// Flips the fullscreen preference; `settings::apply_fullscreen` mirrors the
@@ -478,9 +460,7 @@ fn spawn_fullscreen_toggle(
         enabled,
         set_fullscreen,
     );
-    commands
-        .entity(row)
-        .insert(Tooltip(String::from(loc.msg("options-fullscreen-tooltip"))));
+    commands.entity(row).insert(Tooltip(String::from(loc.msg("options-fullscreen-tooltip"))));
 }
 
 /// A combobox picking `settings::ActionButtonStyle` — how the Song Editor's
@@ -505,9 +485,7 @@ fn spawn_action_button_style_combobox(
         &loc.msg(current.loc_key()),
         on_action_button_style_selected,
     );
-    commands.entity(combo).insert(Tooltip(String::from(
-        loc.msg("options-button-style-tooltip"),
-    )));
+    commands.entity(combo).insert(Tooltip(String::from(loc.msg("options-button-style-tooltip"))));
 }
 
 fn on_action_button_style_selected(
@@ -546,9 +524,9 @@ fn spawn_colorblind_palette_toggle(
         enabled,
         set_colorblind_palette,
     );
-    commands.entity(row).insert(Tooltip(String::from(
-        loc.msg("options-colorblind-palette-tooltip"),
-    )));
+    commands
+        .entity(row)
+        .insert(Tooltip(String::from(loc.msg("options-colorblind-palette-tooltip"))));
 }
 
 /// Stills the highway's decorative motion — see
@@ -574,7 +552,5 @@ fn spawn_reduced_motion_toggle(
         enabled,
         set_reduced_motion,
     );
-    commands.entity(row).insert(Tooltip(String::from(
-        loc.msg("options-reduced-motion-tooltip"),
-    )));
+    commands.entity(row).insert(Tooltip(String::from(loc.msg("options-reduced-motion-tooltip"))));
 }

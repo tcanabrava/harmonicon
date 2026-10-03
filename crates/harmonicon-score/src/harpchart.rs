@@ -27,10 +27,8 @@ pub struct HarpChartScore {
 
 impl HarpChartScore {
     pub fn parse(bytes: &[u8]) -> Result<Self, ScoreError> {
-        let chart: HarpChart = serde_json::from_slice(bytes).map_err(|e| ScoreError::Parse {
-            format: "harpchart",
-            detail: e.to_string(),
-        })?;
+        let chart: HarpChart = serde_json::from_slice(bytes)
+            .map_err(|e| ScoreError::Parse { format: "harpchart", detail: e.to_string() })?;
         Ok(Self::from_chart(chart))
     }
 
@@ -40,11 +38,8 @@ impl HarpChartScore {
         // A chart has exactly one part. The track list exists so callers
         // need no special case, not because there is a choice to make.
         let note_count = chart.track.iter().map(|item| item.events.len()).sum();
-        let tracks = vec![ScoreTrack {
-            index: 0,
-            name: Some(chart.song.title.clone()),
-            note_count,
-        }];
+        let tracks =
+            vec![ScoreTrack { index: 0, name: Some(chart.song.title.clone()), note_count }];
         Self { chart, tracks }
     }
 
@@ -98,17 +93,11 @@ impl ScoreFile for HarpChartScore {
                 ) else {
                     continue;
                 };
-                notes.push(ScoreNote {
-                    start_secs: start,
-                    duration_secs: item.duration,
-                    midi,
-                });
+                notes.push(ScoreNote { start_secs: start, duration_secs: item.duration, midi });
             }
         }
         notes.sort_by(|a, b| {
-            a.start_secs
-                .partial_cmp(&b.start_secs)
-                .unwrap_or(std::cmp::Ordering::Equal)
+            a.start_secs.partial_cmp(&b.start_secs).unwrap_or(std::cmp::Ordering::Equal)
         });
         Ok(notes)
     }
@@ -118,12 +107,7 @@ impl ScoreFile for HarpChartScore {
     }
 
     fn time_signature(&self) -> (u8, u8) {
-        self.chart
-            .song
-            .time_signature
-            .as_deref()
-            .and_then(parse_time_signature)
-            .unwrap_or((4, 4))
+        self.chart.song.time_signature.as_deref().and_then(parse_time_signature).unwrap_or((4, 4))
     }
 }
 
@@ -132,10 +116,7 @@ impl ScoreFile for HarpChartScore {
 /// `MusicScoreMeter`; the tuple is converted into one at the boundary.
 pub fn parse_time_signature(text: &str) -> Option<(u8, u8)> {
     let (numerator, denominator) = text.split_once('/')?;
-    Some((
-        numerator.trim().parse().ok()?,
-        denominator.trim().parse().ok()?,
-    ))
+    Some((numerator.trim().parse().ok()?, denominator.trim().parse().ok()?))
 }
 
 #[cfg(test)]

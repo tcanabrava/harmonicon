@@ -74,10 +74,7 @@ impl Plugin for ContentSourcesPlugin {
             .init_resource::<PendingAction>()
             .add_systems(OnEnter(MenuPage::ContentSources), setup)
             .add_systems(OnExit(MenuPage::ContentSources), cleanup_menu)
-            .add_systems(
-                Update,
-                rebuild_lists.run_if(in_state(MenuPage::ContentSources)),
-            )
+            .add_systems(Update, rebuild_lists.run_if(in_state(MenuPage::ContentSources)))
             .add_systems(Update, handle_confirm);
     }
 }
@@ -130,19 +127,15 @@ fn row_status(entry: &PackEntry, sync: &PackSync) -> RowStatus {
                 return RowStatus::Local { version };
             }
             if let Some(error) = sync.failures.get(&entry.slug) {
-                return RowStatus::CheckFailed {
-                    version,
-                    error: error.clone(),
-                };
+                return RowStatus::CheckFailed { version, error: error.clone() };
             }
             match sync.updates.get(&entry.slug) {
                 Some(UpdateState::Checking) => RowStatus::Checking { version },
                 Some(UpdateState::UpToDate) => RowStatus::UpToDate { version },
                 Some(UpdateState::Available { .. }) => RowStatus::UpdateAvailable { version },
-                Some(UpdateState::Failed(error)) => RowStatus::CheckFailed {
-                    version,
-                    error: error.clone(),
-                },
+                Some(UpdateState::Failed(error)) => {
+                    RowStatus::CheckFailed { version, error: error.clone() }
+                }
                 None => RowStatus::Installed { version },
             }
         }
@@ -166,10 +159,9 @@ fn status_text(status: &RowStatus, loc: &Localization) -> String {
         RowStatus::UpdateAvailable { version } => {
             loc.msg_args("content-status-update-available", &[v(version)])
         }
-        RowStatus::CheckFailed { version, error } => loc.msg_args(
-            "content-status-check-failed",
-            &[v(version), ("error", error.clone())],
-        ),
+        RowStatus::CheckFailed { version, error } => {
+            loc.msg_args("content-status-check-failed", &[v(version), ("error", error.clone())])
+        }
         RowStatus::Installed { version } => loc.msg_args("content-status-installed", &[v(version)]),
     })
 }
@@ -185,10 +177,7 @@ fn display_name(entry: &PackEntry) -> String {
 fn address(spec: &RepoSpec) -> String {
     match spec {
         RepoSpec::Remote { url, git_ref: None } => url.clone(),
-        RepoSpec::Remote {
-            url,
-            git_ref: Some(r),
-        } => format!("{url} ({r})"),
+        RepoSpec::Remote { url, git_ref: Some(r) } => format!("{url} ({r})"),
         RepoSpec::Local { path } => path.display().to_string(),
     }
 }
@@ -233,10 +222,9 @@ fn setup(mut commands: Commands, loc: Res<Localization>, theme: Res<LoadedTheme>
         ));
     });
 
-    for (kind, heading) in [
-        (PackKind::Songs, "content-songs"),
-        (PackKind::Lessons, "content-lessons"),
-    ] {
+    for (kind, heading) in
+        [(PackKind::Songs, "content-songs"), (PackKind::Lessons, "content-lessons")]
+    {
         spawn_section(&mut commands, column, kind, &loc.msg(heading), &loc);
     }
 
@@ -269,11 +257,7 @@ fn spawn_section(
         });
         c.spawn((
             PackList(kind),
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(8.0),
-                ..default()
-            },
+            Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(8.0), ..default() },
         ));
     });
 
@@ -342,10 +326,7 @@ fn spawn_section(
         c.spawn((
             AddError(kind),
             Text::new(""),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(14.0), ..default() },
             TextColor(WARN),
         ));
     });
@@ -463,10 +444,7 @@ fn spawn_row(
                 b.spawn_empty().apply_scene(button::small(
                     &loc.msg("content-download"),
                     move |_: On<Activate>, mut install: MessageWriter<InstallPack>| {
-                        install.write(InstallPack {
-                            kind,
-                            spec: spec.clone(),
-                        });
+                        install.write(InstallPack { kind, spec: spec.clone() });
                     },
                 ));
             }
@@ -523,10 +501,7 @@ pub(super) fn spawn_song_update(
     let label = loc.msg_args("song-update", &[("name", name.clone())]);
     let button = commands
         .spawn_empty()
-        .apply_scene(button::small(
-            &label,
-            update_action(entry.kind, entry.spec.clone(), name),
-        ))
+        .apply_scene(button::small(&label, update_action(entry.kind, entry.spec.clone(), name)))
         .id();
     commands.entity(parent).add_child(button);
 }
@@ -574,16 +549,10 @@ mod tests {
             .add_systems(Update, handle_confirm);
         for confirmed in [false, true] {
             app.world_mut().resource_mut::<PendingAction>().0 = Some((PackKind::Songs, remote()));
-            app.world_mut().write_message(ConfirmChosen {
-                purpose: UPDATE_PURPOSE,
-                confirmed,
-            });
+            app.world_mut().write_message(ConfirmChosen { purpose: UPDATE_PURPOSE, confirmed });
             app.update();
-            let requests: Vec<_> = app
-                .world_mut()
-                .resource_mut::<Messages<InstallPack>>()
-                .drain()
-                .collect();
+            let requests: Vec<_> =
+                app.world_mut().resource_mut::<Messages<InstallPack>>().drain().collect();
             assert_eq!(requests.len(), usize::from(confirmed));
             if confirmed {
                 assert_eq!(requests[0].kind, PackKind::Songs);
@@ -596,13 +565,7 @@ mod tests {
     use harmonicon_packs::pack::PackManifest;
 
     fn entry(spec: RepoSpec, status: PackStatus) -> PackEntry {
-        PackEntry {
-            kind: PackKind::Lessons,
-            slug: spec.slug(),
-            root: "/x".into(),
-            spec,
-            status,
-        }
+        PackEntry { kind: PackKind::Lessons, slug: spec.slug(), root: "/x".into(), spec, status }
     }
 
     fn ready() -> PackStatus {
@@ -617,34 +580,16 @@ mod tests {
     }
 
     fn remote() -> RepoSpec {
-        RepoSpec::Remote {
-            url: "https://h/me/licks".into(),
-            git_ref: None,
-        }
+        RepoSpec::Remote { url: "https://h/me/licks".into(), git_ref: None }
     }
 
     #[test]
     fn an_installed_pack_reports_what_its_check_found() {
         let e = entry(remote(), ready());
         let mut sync = PackSync::default();
-        assert_eq!(
-            row_status(&e, &sync),
-            RowStatus::Installed {
-                version: "1.2.0".into()
-            }
-        );
-        sync.updates.insert(
-            e.slug.clone(),
-            UpdateState::Available {
-                commit: "def".into(),
-            },
-        );
-        assert_eq!(
-            row_status(&e, &sync),
-            RowStatus::UpdateAvailable {
-                version: "1.2.0".into()
-            }
-        );
+        assert_eq!(row_status(&e, &sync), RowStatus::Installed { version: "1.2.0".into() });
+        sync.updates.insert(e.slug.clone(), UpdateState::Available { commit: "def".into() });
+        assert_eq!(row_status(&e, &sync), RowStatus::UpdateAvailable { version: "1.2.0".into() });
         assert_eq!(display_name(&e), "Blues licks");
     }
 
@@ -653,26 +598,16 @@ mod tests {
         let e = entry(remote(), PackStatus::NotInstalled);
         let mut sync = PackSync::default();
         sync.failures.insert(e.slug.clone(), "offline".into());
-        assert_eq!(
-            row_status(&e, &sync),
-            RowStatus::DownloadFailed("offline".into())
-        );
+        assert_eq!(row_status(&e, &sync), RowStatus::DownloadFailed("offline".into()));
         assert_eq!(display_name(&e), "https://h/me/licks");
     }
 
     #[test]
     fn a_local_folder_is_never_offered_an_update() {
-        let e = entry(
-            RepoSpec::Local {
-                path: "/home/me/licks".into(),
-            },
-            ready(),
-        );
+        let e = entry(RepoSpec::Local { path: "/home/me/licks".into() }, ready());
         assert_eq!(
             row_status(&e, &PackSync::default()),
-            RowStatus::Local {
-                version: "1.2.0".into()
-            }
+            RowStatus::Local { version: "1.2.0".into() }
         );
     }
 
@@ -684,9 +619,7 @@ mod tests {
             RowStatus::DownloadFailed("e".into()),
             RowStatus::NotInstalled,
             RowStatus::Unusable("r".into()),
-            RowStatus::UpToDate {
-                version: "1".into(),
-            },
+            RowStatus::UpToDate { version: "1".into() },
         ] {
             assert!(!status_text(&status, &loc).is_empty());
         }

@@ -116,9 +116,7 @@ fn build_schedule(state: &EditorState) -> Vec<PracticeNote> {
         .collect();
 
     notes.sort_by(|a, b| {
-        a.start_secs
-            .partial_cmp(&b.start_secs)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        a.start_secs.partial_cmp(&b.start_secs).unwrap_or(std::cmp::Ordering::Equal)
     });
     notes
 }
@@ -147,12 +145,7 @@ pub(super) fn start_practice(
     practice.active = true;
 
     let spt = secs_per_tick(state);
-    let end_tick = state
-        .notes
-        .iter()
-        .map(|n| n.tick + n.len)
-        .max()
-        .unwrap_or(0);
+    let end_tick = state.notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
     *playhead = playhead_for(end_tick, spt);
 
     if !spawn_background_music(state, sources, settings, commands) {
@@ -232,11 +225,10 @@ pub(super) fn practice_tick(
     // re-articulate to score the next occurrence of the same pitch.
     let mut consumed = std::mem::take(&mut practice.consumed);
     consumed.release_absent(|idx| {
-        practice.notes.get(idx).is_some_and(|n| {
-            detected
-                .iter()
-                .any(|p| freq_matches(p.frequency, n.expected_freq))
-        })
+        practice
+            .notes
+            .get(idx)
+            .is_some_and(|n| detected.iter().any(|p| freq_matches(p.frequency, n.expected_freq)))
     });
 
     // Score all notes, collecting mutations for application after the loop.
@@ -259,10 +251,7 @@ pub(super) fn practice_tick(
                 continue;
             }
             if judged < note.end_secs {
-                if detected
-                    .iter()
-                    .any(|p| freq_matches(p.frequency, note.expected_freq))
-                {
+                if detected.iter().any(|p| freq_matches(p.frequency, note.expected_freq)) {
                     note.held += dt;
                 }
             } else {
@@ -275,18 +264,10 @@ pub(super) fn practice_tick(
         let offset = judged - note.start_secs;
         // A note scores only on a fresh attack: the pitch must be sounding AND
         // not already consumed by an earlier note in this continuous breath.
-        let is_playing = detected
-            .iter()
-            .any(|p| freq_matches(p.frequency, note.expected_freq));
+        let is_playing = detected.iter().any(|p| freq_matches(p.frequency, note.expected_freq));
         let playing_expected = consumed.is_fresh(i, is_playing);
 
-        match classify_note(
-            offset,
-            playing_expected,
-            PERFECT_WINDOW,
-            GOOD_WINDOW,
-            MISS_WINDOW,
-        ) {
+        match classify_note(offset, playing_expected, PERFECT_WINDOW, GOOD_WINDOW, MISS_WINDOW) {
             NoteOutcome::Missed => {
                 note.missed = true;
                 misses_delta += 1;
@@ -299,18 +280,13 @@ pub(super) fn practice_tick(
             }
             NoteOutcome::Waiting => {
                 new_msg.get_or_insert_with(|| {
-                    let got = detected
-                        .first()
-                        .map(|p| freq_to_name(p.frequency))
-                        .unwrap_or_default();
+                    let got =
+                        detected.first().map(|p| freq_to_name(p.frequency)).unwrap_or_default();
                     let expected = note.expected_name.clone();
                     if got.is_empty() {
                         loc.msg_args("practice-prompt", &[("note", expected)])
                     } else {
-                        loc.msg_args(
-                            "practice-wrong-note",
-                            &[("got", got), ("expected", expected)],
-                        )
+                        loc.msg_args("practice-wrong-note", &[("got", got), ("expected", expected)])
                     }
                 });
             }
@@ -326,10 +302,8 @@ pub(super) fn practice_tick(
                         "practice-hit-perfect",
                         &[("note", name), ("pts", pts.to_string())],
                     ),
-                    HitQuality::Good => loc.msg_args(
-                        "practice-hit-good",
-                        &[("note", name), ("pts", pts.to_string())],
-                    ),
+                    HitQuality::Good => loc
+                        .msg_args("practice-hit-good", &[("note", name), ("pts", pts.to_string())]),
                 });
                 is_result_msg = true;
             }
@@ -392,11 +366,7 @@ enum MsgAction {
 /// overwritten before it's readable.
 fn decide_msg_action(is_result_msg: bool, hold_active: bool, has_pending: bool) -> MsgAction {
     if is_result_msg {
-        if hold_active {
-            MsgAction::Queue
-        } else {
-            MsgAction::ShowNew
-        }
+        if hold_active { MsgAction::Queue } else { MsgAction::ShowNew }
     } else if hold_active {
         MsgAction::Keep
     } else if has_pending {
@@ -430,10 +400,7 @@ mod tests {
     use crate::song_editor::state::{Dir, Expr, GridNote, Pitch};
 
     fn state_with_notes(key: &str, placements: &[(u8, usize)]) -> EditorState {
-        let mut state = EditorState {
-            key: key.into(),
-            ..Default::default()
-        };
+        let mut state = EditorState { key: key.into(), ..Default::default() };
         for &(hole, tick) in placements {
             select_or_add(&mut state, hole, tick);
         }
@@ -467,10 +434,7 @@ mod tests {
 
     #[test]
     fn a_pending_result_is_promoted_over_a_fresh_prompt_once_the_hold_expires() {
-        assert_eq!(
-            decide_msg_action(false, false, true),
-            MsgAction::PromotePending
-        );
+        assert_eq!(decide_msg_action(false, false, true), MsgAction::PromotePending);
     }
 
     #[test]

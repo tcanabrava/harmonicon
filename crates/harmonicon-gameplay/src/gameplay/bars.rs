@@ -91,12 +91,7 @@ pub fn beat_ticks_in_range(
             (end_tick + lead_ticks) / ticks_per_beat,
         )
     };
-    (first..=last).map(move |beat| {
-        (
-            beat * ticks_per_beat - lead_ticks,
-            beat % beats_per_bar == 0,
-        )
-    })
+    (first..=last).map(move |beat| (beat * ticks_per_beat - lead_ticks, beat % beats_per_bar == 0))
 }
 
 /// How many whole bars have elapsed since the clock last hit 0 (song/jam

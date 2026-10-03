@@ -47,10 +47,7 @@ pub struct Spectrum {
 
 impl Default for Spectrum {
     fn default() -> Self {
-        Self {
-            bands: vec![0.0; NUM_BANDS],
-            waveform: vec![0.0; WAVE_POINTS],
-        }
+        Self { bands: vec![0.0; NUM_BANDS], waveform: vec![0.0; WAVE_POINTS] }
     }
 }
 
@@ -87,11 +84,7 @@ pub fn spawn_spectrogram(
 ) {
     parent
         .spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                ..default()
-            },
+            Node { width: Val::Percent(100.0), height: Val::Percent(100.0), ..default() },
             SpectrogramRoot,
         ))
         .with_children(|root| spawn_content(root, style, osc));
@@ -121,11 +114,7 @@ impl Plugin for SpectrogramPlugin {
             .add_systems(Update, analyze_audio.run_if(in_state(AppState::Playing)))
             .add_systems(
                 Update,
-                (
-                    switch_visualization_on_key,
-                    rebuild_on_style_change,
-                    update_style_label,
-                )
+                (switch_visualization_on_key, rebuild_on_style_change, update_style_label)
                     .run_if(in_state(AppState::Playing)),
             )
             .add_systems(
@@ -182,9 +171,7 @@ fn rebuild_on_style_change(
             }
         }
         let handle = handle.clone();
-        commands
-            .entity(root)
-            .with_children(move |c| spawn_content(c, style, &handle));
+        commands.entity(root).with_children(move |c| spawn_content(c, style, &handle));
     }
 }
 
@@ -363,12 +350,8 @@ mod tests {
         mags[(440.0 / freq_res) as usize] = 1.0;
 
         let bands = bands_from_magnitudes(&mags, freq_res);
-        let loudest = bands
-            .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            .unwrap()
-            .0;
+        let loudest =
+            bands.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0;
         let expected = band_index_for(440.0);
         assert!(
             (loudest as i32 - expected as i32).abs() <= 1,
@@ -392,11 +375,7 @@ mod tests {
         let wave = compute_waveform(&samples, WAVE_POINTS);
         assert_eq!(wave.len(), WAVE_POINTS);
         // Trigger is a rising zero crossing, so the trace starts near zero rising.
-        assert!(
-            wave[0].abs() < 0.2,
-            "starts near the trigger, got {}",
-            wave[0]
-        );
+        assert!(wave[0].abs() < 0.2, "starts near the trigger, got {}", wave[0]);
         assert!(wave[1] >= wave[0], "rising after the trigger");
         // Auto-gain: a quarter-scale sine should still reach near full deflection.
         let peak = wave.iter().fold(0.0f32, |m, &v| m.max(v.abs()));
@@ -423,10 +402,7 @@ mod tests {
         let up = smooth_toward(0.0, 1.0, 0.5, 0.1);
         let down = smooth_toward(1.0, 0.0, 0.5, 0.1);
         assert!((up - 0.5).abs() < 1e-6, "attack moves halfway up, got {up}");
-        assert!(
-            (down - 0.9).abs() < 1e-6,
-            "decay eases down slowly, got {down}"
-        );
+        assert!((down - 0.9).abs() < 1e-6, "decay eases down slowly, got {down}");
     }
 
     #[test]
@@ -439,10 +415,7 @@ mod tests {
             assert!(v > prev, "must keep rising toward the target");
             prev = v;
         }
-        assert!(
-            v > 0.9,
-            "approaches the target after enough frames, got {v}"
-        );
+        assert!(v > 0.9, "approaches the target after enough frames, got {v}");
     }
 
     // ── analyze_audio: reacts to the shared frame, reuses its FFT ──────────────
@@ -461,11 +434,7 @@ mod tests {
             .collect();
 
         let mut world = World::new();
-        world.insert_resource(AudioFrame {
-            samples,
-            magnitudes,
-            freq_res,
-        });
+        world.insert_resource(AudioFrame { samples, magnitudes, freq_res });
         world.insert_resource(Spectrum::default());
         let mut t = Time::<Real>::default();
         t.advance_by(Duration::from_millis(16));

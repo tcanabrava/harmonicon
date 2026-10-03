@@ -205,11 +205,7 @@ pub(super) fn spawn_debug_waveform_strip(
         },
     ))
     .with_children(|row| {
-        row.spawn(Node {
-            width: Val::Px(HOLE_COL_W),
-            flex_shrink: 0.0,
-            ..default()
-        });
+        row.spawn(Node { width: Val::Px(HOLE_COL_W), flex_shrink: 0.0, ..default() });
         row.spawn((
             Node {
                 flex_grow: 1.0,
@@ -226,11 +222,7 @@ pub(super) fn spawn_debug_waveform_strip(
             for i in 0..WAVEFORM_BUCKETS {
                 bars.spawn((
                     DebugWaveformBar(i),
-                    Node {
-                        flex_grow: 1.0,
-                        height: Val::Px(1.0),
-                        ..default()
-                    },
+                    Node { flex_grow: 1.0, height: Val::Px(1.0), ..default() },
                     BackgroundColor(colors.accent.with_alpha(0.65)),
                 ));
             }
@@ -256,11 +248,7 @@ fn update_debug_waveform(
     let Ok(mut row_node) = row.single_mut() else {
         return;
     };
-    let display = if checked {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    let display = if checked { Display::Flex } else { Display::None };
     if row_node.display != display {
         row_node.display = display;
     }
@@ -292,11 +280,7 @@ fn update_checkbox_glyph(
     let Ok(mut vis) = glyph.single_mut() else {
         return;
     };
-    let visibility = if checked {
-        Visibility::Inherited
-    } else {
-        Visibility::Hidden
-    };
+    let visibility = if checked { Visibility::Inherited } else { Visibility::Hidden };
     if *vis != visibility {
         *vis = visibility;
     }
@@ -321,10 +305,7 @@ fn update_debug_record_status_label(
         loc.msg("editor-debug-recording-off")
     } else if record.active || practice.active {
         let secs = raw.samples.len() as f32 / raw.sample_rate.max(1) as f32;
-        loc.msg_args(
-            "editor-debug-recording-status",
-            &[("secs", format!("{secs:.1}"))],
-        )
+        loc.msg_args("editor-debug-recording-status", &[("secs", format!("{secs:.1}"))])
     } else {
         loc.msg("editor-debug-recording-armed")
     };
@@ -403,11 +384,8 @@ fn write_debug_recording_on_save(
             );
             continue;
         }
-        let song_name = safe_path_segment(if state.name.is_empty() {
-            "untitled"
-        } else {
-            &state.name
-        });
+        let song_name =
+            safe_path_segment(if state.name.is_empty() { "untitled" } else { &state.name });
         let dir = std::path::Path::new("assets/debug_songs").join(&song_name);
         if let Err(e) = std::fs::create_dir_all(&dir) {
             println!("Debug recording: mkdir failed: {e}");
@@ -435,11 +413,8 @@ fn write_debug_recording_on_save(
 
         // Resampled to a fixed rate regardless of what the capture device
         // actually used, so recordings from different machines line up.
-        let resampled = resample_linear(
-            &raw.samples,
-            raw.sample_rate.max(1),
-            DEBUG_RECORDING_SAMPLE_RATE,
-        );
+        let resampled =
+            resample_linear(&raw.samples, raw.sample_rate.max(1), DEBUG_RECORDING_SAMPLE_RATE);
         let wav = encode_wav(&resampled, DEBUG_RECORDING_SAMPLE_RATE);
         let wav_path = dir.join("recording.wav");
         if let Err(e) = std::fs::write(&wav_path, &wav) {
@@ -473,10 +448,9 @@ fn write_debug_recording_on_save(
             "detected_notes": detected_notes,
         });
         let meta_path = dir.join("recording.json");
-        if let Err(e) = std::fs::write(
-            &meta_path,
-            serde_json::to_string_pretty(&metadata).unwrap_or_default(),
-        ) {
+        if let Err(e) =
+            std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap_or_default())
+        {
             println!("Debug recording: metadata write failed: {e}");
         }
 

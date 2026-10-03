@@ -102,10 +102,7 @@ fn single_notes_scenario(harp: &Harmonica) -> SyntheticScenario {
             t += STEP_SECS;
         }
     }
-    SyntheticScenario {
-        name: "single_notes",
-        items,
-    }
+    SyntheticScenario { name: "single_notes", items }
 }
 
 /// Every bend on `harp` (draw bends on holes 1-6, blow bends on 7-10 — see
@@ -115,11 +112,7 @@ fn bends_scenario(harp: &Harmonica) -> SyntheticScenario {
     let mut t = GAP_SECS;
     for hole in 1..=harp.hole_count() {
         let hn = hole_notes(harp, hole);
-        let action = if hole <= 6 {
-            Action::Draw
-        } else {
-            Action::Blow
-        };
+        let action = if hole <= 6 { Action::Draw } else { Action::Blow };
         for bend in &hn.bends {
             let Some(midi) = to_midi_u8(bend) else {
                 continue;
@@ -132,10 +125,7 @@ fn bends_scenario(harp: &Harmonica) -> SyntheticScenario {
             t += STEP_SECS;
         }
     }
-    SyntheticScenario {
-        name: "bends",
-        items,
-    }
+    SyntheticScenario { name: "bends", items }
 }
 
 /// Every overblow/overdraw `harp` supports, one at a time.
@@ -147,11 +137,7 @@ fn overblows_overdraws_scenario(harp: &Harmonica) -> SyntheticScenario {
         let Some(midi) = hn.over.as_deref().and_then(to_midi_u8) else {
             continue;
         };
-        let action = if matches!(hole, 1 | 4 | 5 | 6) {
-            Action::Blow
-        } else {
-            Action::Draw
-        };
+        let action = if matches!(hole, 1 | 4 | 5 | 6) { Action::Blow } else { Action::Draw };
         items.push(SyntheticItem {
             start_secs: t,
             duration_secs: NOTE_DUR_SECS,
@@ -159,10 +145,7 @@ fn overblows_overdraws_scenario(harp: &Harmonica) -> SyntheticScenario {
         });
         t += STEP_SECS;
     }
-    SyntheticScenario {
-        name: "overblows_overdraws",
-        items,
-    }
+    SyntheticScenario { name: "overblows_overdraws", items }
 }
 
 /// A couple of representative same-direction adjacent-hole chords (e.g. the
@@ -193,17 +176,10 @@ fn chords_scenario(harp: &Harmonica) -> SyntheticScenario {
         if events.len() < 2 {
             continue;
         }
-        items.push(SyntheticItem {
-            start_secs: t,
-            duration_secs: NOTE_DUR_SECS,
-            events,
-        });
+        items.push(SyntheticItem { start_secs: t, duration_secs: NOTE_DUR_SECS, events });
         t += STEP_SECS;
     }
-    SyntheticScenario {
-        name: "chords",
-        items,
-    }
+    SyntheticScenario { name: "chords", items }
 }
 
 /// Up to 4 same-direction hole pairs a full octave apart (e.g. holes 1 & 4
@@ -218,10 +194,9 @@ fn octaves_scenario(harp: &Harmonica) -> SyntheticScenario {
         let hn_a = hole_notes(harp, hole_a);
         for hole_b in (hole_a + 1)..=hole_count {
             let hn_b = hole_notes(harp, hole_b);
-            for (action, note_a, note_b) in [
-                (Action::Blow, &hn_a.blow, &hn_b.blow),
-                (Action::Draw, &hn_a.draw, &hn_b.draw),
-            ] {
+            for (action, note_a, note_b) in
+                [(Action::Blow, &hn_a.blow, &hn_b.blow), (Action::Draw, &hn_a.draw, &hn_b.draw)]
+            {
                 let (Some(ma), Some(mb)) = (
                     note_a.as_deref().and_then(to_midi_u8),
                     note_b.as_deref().and_then(to_midi_u8),
@@ -235,16 +210,8 @@ fn octaves_scenario(harp: &Harmonica) -> SyntheticScenario {
                     start_secs: t,
                     duration_secs: NOTE_DUR_SECS,
                     events: vec![
-                        SyntheticEvent {
-                            hole: hole_a,
-                            action,
-                            midi: ma,
-                        },
-                        SyntheticEvent {
-                            hole: hole_b,
-                            action,
-                            midi: mb,
-                        },
+                        SyntheticEvent { hole: hole_a, action, midi: ma },
+                        SyntheticEvent { hole: hole_b, action, midi: mb },
                     ],
                 });
                 t += STEP_SECS;
@@ -255,10 +222,7 @@ fn octaves_scenario(harp: &Harmonica) -> SyntheticScenario {
             }
         }
     }
-    SyntheticScenario {
-        name: "octaves",
-        items,
-    }
+    SyntheticScenario { name: "octaves", items }
 }
 
 fn build_scenarios(harp: &Harmonica) -> Vec<SyntheticScenario> {
@@ -306,11 +270,7 @@ fn render_scenario(
             phrase: None,
             groove: None,
             chord: None,
-            play_mode: Some(if events.len() > 1 {
-                PlayMode::Chord
-            } else {
-                PlayMode::Single
-            }),
+            play_mode: Some(if events.len() > 1 { PlayMode::Chord } else { PlayMode::Single }),
             call: false,
             lyric: None,
             events,
@@ -329,10 +289,7 @@ fn render_scenario(
                     .into(),
             ),
             license: None,
-            description: Some(format!(
-                "Synthetic '{}' scenario, {} harp",
-                scenario.name, key
-            )),
+            description: Some(format!("Synthetic '{}' scenario, {} harp", scenario.name, key)),
         }),
         song: Song {
             title: format!("Synthetic {} — {}", key, scenario.name),
@@ -346,10 +303,7 @@ fn render_scenario(
         },
         timing: Timing {
             resolution: 480,
-            tempo_map: vec![TempoPoint {
-                tick: 0,
-                bpm: 120.0,
-            }],
+            tempo_map: vec![TempoPoint { tick: 0, bpm: 120.0 }],
             time_signature_map: None,
             pickup_ticks: None,
             repeats: Vec::new(),
@@ -382,11 +336,7 @@ fn write_scenario(
     scenario: &SyntheticScenario,
 ) -> std::io::Result<PathBuf> {
     let (samples, chart) = render_scenario(key, harp, scenario);
-    let dir = out_root.join(format!(
-        "synthetic_{}_{}",
-        key.to_lowercase(),
-        scenario.name
-    ));
+    let dir = out_root.join(format!("synthetic_{}_{}", key.to_lowercase(), scenario.name));
     std::fs::create_dir_all(&dir)?;
     std::fs::write(dir.join("recording.wav"), encode_wav(&samples, SAMPLE_RATE))?;
     let chart_json = serde_json::to_string_pretty(&chart)

@@ -158,9 +158,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    bevy::color::Srgba::hex(&s)
-        .map(Color::from)
-        .map_err(serde::de::Error::custom)
+    bevy::color::Srgba::hex(&s).map(Color::from).map_err(serde::de::Error::custom)
 }
 
 /// Blow/draw colors for scored note visuals (the falling-note highway in
@@ -181,10 +179,7 @@ pub struct NoteColors {
 
 impl Default for NoteColors {
     fn default() -> Self {
-        Self {
-            blow: Color::srgb(0.25, 0.55, 0.95),
-            draw: Color::srgb(0.95, 0.38, 0.15),
-        }
+        Self { blow: Color::srgb(0.25, 0.55, 0.95), draw: Color::srgb(0.95, 0.38, 0.15) }
     }
 }
 
@@ -197,10 +192,8 @@ impl Default for NoteColors {
 /// leans on hue discrimination a colorblind player may have little of.
 /// Blue-vs-yellow adds a large luminance gap on top of the hue difference,
 /// which keeps working even under full monochromacy.
-pub const COLORBLIND_NOTE_COLORS: NoteColors = NoteColors {
-    blow: Color::srgb(0.0, 0.45, 0.75),
-    draw: Color::srgb(0.95, 0.75, 0.0),
-};
+pub const COLORBLIND_NOTE_COLORS: NoteColors =
+    NoteColors { blow: Color::srgb(0.0, 0.45, 0.75), draw: Color::srgb(0.95, 0.75, 0.0) };
 
 /// Which blow/draw [`NoteColors`] a note visual should actually use: the
 /// fixed [`COLORBLIND_NOTE_COLORS`] pair when the player has the
@@ -209,11 +202,7 @@ pub const COLORBLIND_NOTE_COLORS: NoteColors = NoteColors {
 /// `gameplay_2d`/`gameplay_3d`'s note spawners/tinters can resolve it once
 /// per frame instead of re-deriving the same branch in each of them.
 pub fn effective_note_colors(theme_colors: NoteColors, colorblind: bool) -> NoteColors {
-    if colorblind {
-        COLORBLIND_NOTE_COLORS
-    } else {
-        theme_colors
-    }
+    if colorblind { COLORBLIND_NOTE_COLORS } else { theme_colors }
 }
 
 /// Shared background for the gameplay song-timeline HUD's panels —
@@ -387,35 +376,27 @@ pub struct LoadedTheme {
 impl LoadedTheme {
     /// Background for `menu_id`, falling back to the theme default.
     pub fn background_for(&self, menu_id: &str) -> Option<&Handle<Image>> {
-        self.menu_backgrounds
-            .get(menu_id)
-            .or(self.default_background.as_ref())
+        self.menu_backgrounds.get(menu_id).or(self.default_background.as_ref())
     }
 
     /// Song editor colors for the active theme, or [`SongEditorColors::default`]
     /// if the theme's `theme.json` has no `"colors"` block at all.
     pub fn song_editor_colors(&self) -> SongEditorColors {
-        self.colors
-            .as_ref()
-            .map_or_else(SongEditorColors::default, |c| c.song_editor)
+        self.colors.as_ref().map_or_else(SongEditorColors::default, |c| c.song_editor)
     }
 
     /// 12-bar-blues chord-function colors for the active theme, or
     /// [`TwelveBarColors::default`] if the theme's `theme.json` has no
     /// `"colors"` block at all.
     pub fn twelve_bar_colors(&self) -> TwelveBarColors {
-        self.colors
-            .as_ref()
-            .map_or_else(TwelveBarColors::default, |c| c.twelve_bar)
+        self.colors.as_ref().map_or_else(TwelveBarColors::default, |c| c.twelve_bar)
     }
 
     /// Circle-of-fifths diagram colors for the active theme, or
     /// [`CircleOfFifthsColors::default`] if the theme's `theme.json` has no
     /// `"colors"` block at all.
     pub fn circle_of_fifths_colors(&self) -> CircleOfFifthsColors {
-        self.colors
-            .as_ref()
-            .map_or_else(CircleOfFifthsColors::default, |c| c.circle_of_fifths)
+        self.colors.as_ref().map_or_else(CircleOfFifthsColors::default, |c| c.circle_of_fifths)
     }
 
     /// Blow/draw note colors for the active theme, or [`NoteColors::default`]
@@ -423,9 +404,7 @@ impl LoadedTheme {
     /// wanting the colorblind-aware choice should pass this through
     /// [`effective_note_colors`] rather than using it directly.
     pub fn note_colors(&self) -> NoteColors {
-        self.colors
-            .as_ref()
-            .map_or_else(NoteColors::default, |c| c.notes)
+        self.colors.as_ref().map_or_else(NoteColors::default, |c| c.notes)
     }
 }
 
@@ -544,11 +523,7 @@ fn request_theme_load(
 
     let prefix = theme_source_prefix(&selected.0);
     let handle = asset_server.load(format!("{prefix}themes/{}/theme.json", selected.0));
-    commands.insert_resource(PendingTheme {
-        handle,
-        prefix,
-        name: selected.0.clone(),
-    });
+    commands.insert_resource(PendingTheme { handle, prefix, name: selected.0.clone() });
 }
 
 /// Polls the load [`request_theme_load`] started, applying it to
@@ -726,10 +701,7 @@ mod tests {
             "menus": { "Credits": { "background_image": "bg.png" } }
         }"#;
         let d: ThemeJson = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            d.menus["Credits"].background_image.as_deref(),
-            Some("bg.png")
-        );
+        assert_eq!(d.menus["Credits"].background_image.as_deref(), Some("bg.png"));
     }
 
     // ── LoadedTheme::background_for ───────────────────────────────────────
@@ -743,10 +715,8 @@ mod tests {
 
     #[test]
     fn background_for_falls_back_to_default_for_unconfigured_menu() {
-        let theme = LoadedTheme {
-            default_background: Some(Handle::default()),
-            ..Default::default()
-        };
+        let theme =
+            LoadedTheme { default_background: Some(Handle::default()), ..Default::default() };
         // "Unknown" has no per-menu entry → falls back to default_background
         assert!(theme.background_for("Unknown").is_some());
     }
@@ -754,9 +724,7 @@ mod tests {
     #[test]
     fn background_for_returns_some_for_menu_with_explicit_entry() {
         let mut theme = LoadedTheme::default();
-        theme
-            .menu_backgrounds
-            .insert("Main".into(), Handle::default());
+        theme.menu_backgrounds.insert("Main".into(), Handle::default());
         assert!(theme.background_for("Main").is_some());
     }
 
@@ -793,43 +761,24 @@ mod tests {
         app.add_plugins(MinimalPlugins)
             .insert_resource(SelectedTheme("default".into()))
             .init_resource::<ReloadCount>()
-            .add_systems(
-                PreUpdate,
-                count_reloads.run_if(|s: Res<SelectedTheme>| s.is_changed()),
-            );
+            .add_systems(PreUpdate, count_reloads.run_if(|s: Res<SelectedTheme>| s.is_changed()));
 
         // First update: SelectedTheme was just inserted → is_changed fires.
         app.update();
-        assert_eq!(
-            app.world().resource::<ReloadCount>().0,
-            1,
-            "should fire on insert"
-        );
+        assert_eq!(app.world().resource::<ReloadCount>().0, 1, "should fire on insert");
 
         // No change → silent.
         app.update();
-        assert_eq!(
-            app.world().resource::<ReloadCount>().0,
-            1,
-            "should not fire without change"
-        );
+        assert_eq!(app.world().resource::<ReloadCount>().0, 1, "should not fire without change");
 
         // Change the theme → fires again.
         app.world_mut().resource_mut::<SelectedTheme>().0 = "dark".into();
         app.update();
-        assert_eq!(
-            app.world().resource::<ReloadCount>().0,
-            2,
-            "should fire when theme changes"
-        );
+        assert_eq!(app.world().resource::<ReloadCount>().0, 2, "should fire when theme changes");
 
         // No further change → silent.
         app.update();
-        assert_eq!(
-            app.world().resource::<ReloadCount>().0,
-            2,
-            "should not fire without change"
-        );
+        assert_eq!(app.world().resource::<ReloadCount>().0, 2, "should not fire without change");
     }
 
     #[test]
@@ -838,10 +787,7 @@ mod tests {
         app.add_plugins(MinimalPlugins)
             .insert_resource(SelectedTheme("default".into()))
             .init_resource::<ReloadCount>()
-            .add_systems(
-                PreUpdate,
-                count_reloads.run_if(|s: Res<SelectedTheme>| s.is_changed()),
-            );
+            .add_systems(PreUpdate, count_reloads.run_if(|s: Res<SelectedTheme>| s.is_changed()));
 
         app.update(); // insert fires once
         for theme in ["dark", "light", "neon", "default"] {

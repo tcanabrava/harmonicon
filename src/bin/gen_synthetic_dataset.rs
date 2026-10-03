@@ -13,9 +13,7 @@ use harmonicon_bench::synthetic_dataset::write_all;
 use std::path::Path;
 
 fn main() {
-    let out_dir = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "assets/debug_songs".to_string());
+    let out_dir = std::env::args().nth(1).unwrap_or_else(|| "assets/debug_songs".to_string());
     let out_dir = Path::new(&out_dir);
 
     match write_all(out_dir) {

@@ -138,15 +138,10 @@ fn spawn_menu_chrome(
 
     let title_column = if let Some(sub) = subtitle {
         commands
-            .spawn_scene(title_column_with_subtitle_scene(
-                title.to_string(),
-                sub.to_string(),
-            ))
+            .spawn_scene(title_column_with_subtitle_scene(title.to_string(), sub.to_string()))
             .id()
     } else {
-        commands
-            .spawn_scene(title_column_scene(title.to_string()))
-            .id()
+        commands.spawn_scene(title_column_scene(title.to_string())).id()
     };
     let header = commands.spawn_scene(header_scene()).id();
     commands.entity(header).add_child(title_column);
@@ -268,10 +263,7 @@ pub fn spawn_button<M: 'static>(
 
     // Plain button: authored declaratively; click + hover ride along as
     // inline on(...)
-    let e = commands
-        .spawn_scene(button::default(label, on_click))
-        .insert(node)
-        .id();
+    let e = commands.spawn_scene(button::default(label, on_click)).insert(node).id();
     commands.entity(parent).add_child(e);
     e
 }

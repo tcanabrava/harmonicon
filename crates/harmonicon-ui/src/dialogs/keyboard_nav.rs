@@ -78,7 +78,6 @@ pub struct KeyboardNavPlugin;
 
 impl Plugin for KeyboardNavPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(TabNavigationPlugin)
-            .add_systems(Update, update_focus_ring);
+        app.add_plugins(TabNavigationPlugin).add_systems(Update, update_focus_ring);
     }
 }

@@ -23,22 +23,16 @@ pub struct Report {
 
 impl Report {
     pub fn error(&mut self, at: &Path, root: &Path, message: impl std::fmt::Display) {
-        self.errors
-            .push(format!("{}: {message}", relative(at, root)));
+        self.errors.push(format!("{}: {message}", relative(at, root)));
     }
 
     pub fn warning(&mut self, at: &Path, root: &Path, message: impl std::fmt::Display) {
-        self.warnings
-            .push(format!("{}: {message}", relative(at, root)));
+        self.warnings.push(format!("{}: {message}", relative(at, root)));
     }
 }
 
 fn relative(path: &Path, root: &Path) -> String {
-    let rel = path
-        .strip_prefix(root)
-        .unwrap_or(path)
-        .display()
-        .to_string();
+    let rel = path.strip_prefix(root).unwrap_or(path).display().to_string();
     if rel.is_empty() { ".".into() } else { rel }
 }
 
@@ -91,9 +85,7 @@ pub fn check_chart(path: &Path, root: &Path, report: &mut Report) {
 /// A chromatic's four note tables, for comparing two harmonicas by layout.
 fn chromatic_layout(harp: &Harmonica) -> Option<Vec<Vec<String>>> {
     match harp {
-        Harmonica::Chromatic {
-            layout: Some(l), ..
-        } => Some(vec![
+        Harmonica::Chromatic { layout: Some(l), .. } => Some(vec![
             l.blow.clone().unwrap_or_default(),
             l.draw.clone().unwrap_or_default(),
             l.blow_slide.clone().unwrap_or_default(),
@@ -118,15 +110,9 @@ pub fn validate_song_pack(root: &Path) -> Report {
                 .flatten()
                 .map(|e| e.path())
                 .collect();
-            let charts: Vec<&PathBuf> = files
-                .iter()
-                .filter(|p| p.extension().is_some_and(|e| e == "harpchart"))
-                .collect();
-            if charts.is_empty()
-                && !files
-                    .iter()
-                    .any(|p| harmonicon_score::is_importable_file(p))
-            {
+            let charts: Vec<&PathBuf> =
+                files.iter().filter(|p| p.extension().is_some_and(|e| e == "harpchart")).collect();
+            if charts.is_empty() && !files.iter().any(|p| harmonicon_score::is_importable_file(p)) {
                 report.error(&song, root, "no .harpchart or importable score under song/");
             }
             for chart in charts {
@@ -135,11 +121,7 @@ pub fn validate_song_pack(root: &Path) -> Report {
         }
     }
     if songs == 0 {
-        report.error(
-            root,
-            root,
-            "no songs found (expected <artist>/<song>/song/)",
-        );
+        report.error(root, root, "no songs found (expected <artist>/<song>/song/)");
     }
     report
 }
@@ -172,11 +154,7 @@ mod tests {
     fn a_song_without_a_chart_and_a_broken_chart_are_reported() {
         let dir = tempfile::tempdir().unwrap();
         write(dir.path(), "Bach/Empty/song/readme.txt", "");
-        write(
-            dir.path(),
-            "Bach/Broken/song/chart.harpchart",
-            r#"{"metadata":{}}"#,
-        );
+        write(dir.path(), "Bach/Broken/song/chart.harpchart", r#"{"metadata":{}}"#);
         let report = validate_song_pack(dir.path());
         assert_eq!(report.errors.len(), 2, "{:?}", report.errors);
         assert!(
@@ -184,11 +162,7 @@ mod tests {
             "{:?}",
             report.errors
         );
-        assert!(
-            report.errors[1].starts_with("Bach/Empty"),
-            "{:?}",
-            report.errors
-        );
+        assert!(report.errors[1].starts_with("Bach/Empty"), "{:?}", report.errors);
     }
 
     fn fixture() -> PathBuf {
@@ -209,24 +183,14 @@ mod tests {
         let source = fixture().join("Ludwig van Beethoven/Fur Elise/song/chart.harpchart");
         let mut chart: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&source).unwrap()).unwrap();
-        assert_eq!(
-            chart["harmonica"]["type"], "chromatic",
-            "the fixture must be a chromatic"
-        );
+        assert_eq!(chart["harmonica"]["type"], "chromatic", "the fixture must be a chromatic");
         let blow = chart["harmonica"]["layout"]["blow"].as_array_mut().unwrap();
         blow.swap(0, 1);
 
         let dir = tempfile::tempdir().unwrap();
-        write(
-            dir.path(),
-            "Beethoven/Fur Elise/song/chart.harpchart",
-            &chart.to_string(),
-        );
+        write(dir.path(), "Beethoven/Fur Elise/song/chart.harpchart", &chart.to_string());
         let errors = validate_song_pack(dir.path()).errors;
-        assert!(
-            errors.iter().any(|e| e.contains("no real harmonica")),
-            "{errors:#?}"
-        );
+        assert!(errors.iter().any(|e| e.contains("no real harmonica")), "{errors:#?}");
     }
 
     #[test]

@@ -106,11 +106,8 @@ pub fn phrase_tab_sequence(items: &[(f64, Option<&str>, &[NoteEvent])], clock: f
     if clock < 0.0 {
         return String::new();
     }
-    let start_idx = items
-        .iter()
-        .enumerate()
-        .rfind(|(_, (t, p, _))| *t <= clock && p.is_some())
-        .map(|(i, _)| i);
+    let start_idx =
+        items.iter().enumerate().rfind(|(_, (t, p, _))| *t <= clock && p.is_some()).map(|(i, _)| i);
     let Some(start_idx) = start_idx else {
         return String::new();
     };
@@ -219,11 +216,7 @@ fn update_tab_ribbon(
         .track
         .iter()
         .map(|item| {
-            (
-                resolve_item_time(item, &chart.timing),
-                item.phrase.as_deref(),
-                item.events.as_slice(),
-            )
+            (resolve_item_time(item, &chart.timing), item.phrase.as_deref(), item.events.as_slice())
         })
         .collect();
     let label = phrase_tab_sequence(&items, clock.get());
@@ -252,11 +245,7 @@ fn update_phrase(
 
     let (phrase, groove) = active_phrase_groove(
         chart.track.iter().map(|item| {
-            (
-                resolve_item_time(item, &chart.timing),
-                item.phrase.as_deref(),
-                item.groove.as_deref(),
-            )
+            (resolve_item_time(item, &chart.timing), item.phrase.as_deref(), item.groove.as_deref())
         }),
         clock.get(),
     );
@@ -345,18 +334,12 @@ mod tests {
 
     #[test]
     fn label_phrase_only() {
-        assert_eq!(
-            format_phrase_label(Some("call_high"), None),
-            "\u{266A} call high"
-        );
+        assert_eq!(format_phrase_label(Some("call_high"), None), "\u{266A} call high");
     }
 
     #[test]
     fn label_groove_only() {
-        assert_eq!(
-            format_phrase_label(None, Some("shuffle")),
-            "\u{266A} shuffle"
-        );
+        assert_eq!(format_phrase_label(None, Some("shuffle")), "\u{266A} shuffle");
     }
 
     #[test]
@@ -374,12 +357,7 @@ mod tests {
 
     #[test]
     fn tab_label_bend_depth_is_one_apostrophe_per_semitone() {
-        let bend = |semitones| {
-            vec![Modifier::Bend {
-                semitones,
-                intensity: None,
-            }]
-        };
+        let bend = |semitones| vec![Modifier::Bend { semitones, intensity: None }];
         assert_eq!(tab_label(4, false, &bend(-1.0)), "-4'");
         assert_eq!(tab_label(4, false, &bend(-2.0)), "-4''");
         // Rounds to the nearest semitone rather than truncating.
@@ -400,14 +378,7 @@ mod tests {
     #[test]
     fn tab_label_ignores_vibrato_and_wah() {
         assert_eq!(
-            tab_label(
-                2,
-                false,
-                &[Modifier::Vibrato {
-                    oscillation_hz: 5.0,
-                    intensity: None
-                }]
-            ),
+            tab_label(2, false, &[Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }]),
             "-2"
         );
     }
@@ -415,12 +386,7 @@ mod tests {
     // ── phrase_tab_sequence ────────────────────────────────────────────────────
 
     fn note_event(hole: u8, action: Action) -> NoteEvent {
-        NoteEvent {
-            hole,
-            action,
-            note: None,
-            modifiers: None,
-        }
+        NoteEvent { hole, action, note: None, modifiers: None }
     }
 
     #[test]
@@ -445,11 +411,7 @@ mod tests {
         let e1 = [note_event(4, Action::Draw)];
         let e2 = [note_event(5, Action::Blow)];
         let e3 = [note_event(4, Action::Draw)];
-        let items = [
-            (0.0, Some("intro"), &e1[..]),
-            (1.0, None, &e2[..]),
-            (2.0, None, &e3[..]),
-        ];
+        let items = [(0.0, Some("intro"), &e1[..]), (1.0, None, &e2[..]), (2.0, None, &e3[..])];
         assert_eq!(phrase_tab_sequence(&items, 0.5), "-4 +5 -4");
     }
 
@@ -457,10 +419,7 @@ mod tests {
     fn phrase_tab_sequence_stops_at_the_next_phrase() {
         let e1 = [note_event(4, Action::Draw)];
         let e2 = [note_event(5, Action::Blow)];
-        let items = [
-            (0.0, Some("intro"), &e1[..]),
-            (2.0, Some("turnaround"), &e2[..]),
-        ];
+        let items = [(0.0, Some("intro"), &e1[..]), (2.0, Some("turnaround"), &e2[..])];
         assert_eq!(phrase_tab_sequence(&items, 0.5), "-4");
         assert_eq!(phrase_tab_sequence(&items, 2.5), "+5");
     }
@@ -469,10 +428,7 @@ mod tests {
     fn phrase_tab_sequence_formats_each_event_as_tab() {
         let e = [note_event(4, Action::Draw)];
         let mut with_bend = e.clone();
-        with_bend[0].modifiers = Some(vec![Modifier::Bend {
-            semitones: -1.0,
-            intensity: None,
-        }]);
+        with_bend[0].modifiers = Some(vec![Modifier::Bend { semitones: -1.0, intensity: None }]);
         let items = [(0.0, Some("call"), &with_bend[..])];
         assert_eq!(phrase_tab_sequence(&items, 0.0), "-4'");
     }
@@ -492,10 +448,7 @@ mod tests {
     #[test]
     fn watch_phrase_boundaries_emits_only_on_a_boundary_crossing() {
         let mut world = World::new();
-        world.insert_resource(PhraseBoundaries {
-            banner: vec![0.0, 4.0],
-            ribbon: vec![0.0, 2.0],
-        });
+        world.insert_resource(PhraseBoundaries { banner: vec![0.0, 4.0], ribbon: vec![0.0, 2.0] });
         world.insert_resource(GameplayClock::new(-1.0));
         world.init_resource::<Messages<PhraseChanged>>();
         world.init_resource::<PhraseChangeLog>();

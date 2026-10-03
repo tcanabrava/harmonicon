@@ -188,11 +188,7 @@ pub fn spawn_combobox<M: 'static>(
     // nested in a `with_children` closure) so its `Entity` id is available
     // below, for the dropdown list to parent itself to directly — see the
     // `list` comment for why.
-    let toggle = commands
-        .spawn_empty()
-        .apply_scene(toggle_scene())
-        .insert(ComboboxRoot(root))
-        .id();
+    let toggle = commands.spawn_empty().apply_scene(toggle_scene()).insert(ComboboxRoot(root)).id();
     commands.entity(row).add_child(toggle);
     commands.entity(toggle).with_children(|t| {
         t.spawn_empty()
@@ -261,11 +257,7 @@ pub fn spawn_combobox<M: 'static>(
                     align: PopoverAlign::Start,
                     gap: 4.0,
                 },
-                PopoverPlacement {
-                    side: PopoverSide::Top,
-                    align: PopoverAlign::Start,
-                    gap: 4.0,
-                },
+                PopoverPlacement { side: PopoverSide::Top, align: PopoverAlign::Start, gap: 4.0 },
             ],
             window_margin: 8.0,
         })
@@ -327,11 +319,7 @@ pub fn spawn_combobox<M: 'static>(
             let is_selected = value == current;
             l.spawn_empty()
                 .apply_scene(item_scene(value.clone(), is_selected))
-                .insert(ComboboxItemButton {
-                    root,
-                    value: value.clone(),
-                    index,
-                });
+                .insert(ComboboxItemButton { root, value: value.clone(), index });
         }
     });
     commands.entity(toggle).add_child(list);
@@ -357,11 +345,7 @@ pub fn spawn_combobox<M: 'static>(
         .id();
     commands.entity(backdrop_parent).add_child(backdrop);
 
-    commands.entity(root).insert(ComboboxLinks {
-        list,
-        items_area,
-        backdrop,
-    });
+    commands.entity(root).insert(ComboboxLinks { list, items_area, backdrop });
     commands.entity(trigger_parent).add_child(root);
     root
 }
@@ -387,11 +371,7 @@ fn toggle_scene() -> impl Scene {
 /// One choice in the list: its label + hover, recoloured to
 /// `button::CHOICE_SELECTED` by [`sync_combobox_visuals`] once selected.
 fn item_scene(value: String, is_selected: bool) -> impl Scene {
-    let color = if is_selected {
-        button::CHOICE_SELECTED
-    } else {
-        button::color_default()
-    };
+    let color = if is_selected { button::CHOICE_SELECTED } else { button::color_default() };
     bsn! {
         WidgetButton
         // Starts unreachable via Tab (negative index) since the dropdown
@@ -461,14 +441,7 @@ fn toggle_click(
         return;
     };
     let opening = !is_combobox_open(root, &links, &nodes);
-    set_combobox_open(
-        root,
-        opening,
-        &links,
-        &mut nodes,
-        &list_children,
-        &mut item_tab_indices,
-    );
+    set_combobox_open(root, opening, &links, &mut nodes, &list_children, &mut item_tab_indices);
 }
 
 /// Clicking the backdrop means clicking outside the dropdown — close it
@@ -488,14 +461,7 @@ fn backdrop_click(
     let Ok(&ComboboxRoot(root)) = backdrops.get(ev.entity) else {
         return;
     };
-    set_combobox_open(
-        root,
-        false,
-        &links,
-        &mut nodes,
-        &list_children,
-        &mut item_tab_indices,
-    );
+    set_combobox_open(root, false, &links, &mut nodes, &list_children, &mut item_tab_indices);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -516,19 +482,8 @@ fn item_click(
     if let Ok(mut v) = values.get_mut(root) {
         v.0 = value.clone();
     }
-    set_combobox_open(
-        root,
-        false,
-        &links,
-        &mut nodes,
-        &list_children,
-        &mut item_tab_indices,
-    );
-    commands.trigger(ComboboxSelect {
-        combobox: root,
-        value,
-        index,
-    });
+    set_combobox_open(root, false, &links, &mut nodes, &list_children, &mut item_tab_indices);
+    commands.trigger(ComboboxSelect { combobox: root, value, index });
 }
 
 fn item_over(
@@ -605,11 +560,9 @@ fn close_open_comboboxes_on_escape(
     if !keyboard.just_pressed(KeyCode::Escape) {
         return;
     }
-    let any_open = all_links.iter().any(|links| {
-        nodes
-            .get(links.list)
-            .is_ok_and(|n| n.display != Display::None)
-    });
+    let any_open = all_links
+        .iter()
+        .any(|links| nodes.get(links.list).is_ok_and(|n| n.display != Display::None));
     if !any_open {
         return;
     }
@@ -646,10 +599,7 @@ impl Plugin for ComboboxPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (
-                sync_combobox_visuals,
-                close_open_comboboxes_on_escape.in_set(ComboboxEscapeSet),
-            ),
+            (sync_combobox_visuals, close_open_comboboxes_on_escape.in_set(ComboboxEscapeSet)),
         );
     }
 }

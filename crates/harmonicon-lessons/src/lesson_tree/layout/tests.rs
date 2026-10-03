@@ -110,10 +110,7 @@ fn crossings(l: &TreeLayout) -> usize {
 
 #[test]
 fn a_lesson_with_unmet_prerequisites_is_locked() {
-    let e = [
-        entry("root", "t", &[], false),
-        entry("later", "t", &["root"], false),
-    ];
+    let e = [entry("root", "t", &[], false), entry("later", "t", &["root"], false)];
     let l = build(&e, &PlayerProfile::default());
     assert_eq!(l.node("root").unwrap().state, NodeState::Available);
     assert_eq!(l.node("later").unwrap().state, NodeState::Locked);
@@ -121,10 +118,7 @@ fn a_lesson_with_unmet_prerequisites_is_locked() {
 
 #[test]
 fn passing_a_prerequisite_unlocks_what_follows() {
-    let e = [
-        entry("root", "t", &[], false),
-        entry("later", "t", &["root"], false),
-    ];
+    let e = [entry("root", "t", &[], false), entry("later", "t", &["root"], false)];
     let mut p = PlayerProfile::default();
     pass(&mut p, "root");
     let l = build(&e, &p);
@@ -136,29 +130,20 @@ fn passing_a_prerequisite_unlocks_what_follows() {
 fn a_lesson_in_a_shut_unit_is_locked_even_with_every_prerequisite_met() {
     // The second gate. `b1` needs nothing at all, so without the unit gate
     // it would read as playable from the first minute of the game.
-    let e = [
-        entry_in("alpha", "a1", "t", &[], false),
-        entry_in("beta", "b1", "t", &[], false),
-    ];
+    let e = [entry_in("alpha", "a1", "t", &[], false), entry_in("beta", "b1", "t", &[], false)];
     let l = build(&e, &PlayerProfile::default());
     assert_eq!(l.node("b1").unwrap().state, NodeState::Locked);
 
     let mut p = PlayerProfile::default();
     satisfy(&mut p, &e, "alpha");
-    assert_eq!(
-        build(&e, &p).node("b1").unwrap().state,
-        NodeState::Available
-    );
+    assert_eq!(build(&e, &p).node("b1").unwrap().state, NodeState::Available);
 }
 
 #[test]
 fn a_locked_lesson_names_what_it_is_waiting_on() {
     // The cross-unit prerequisites aren't drawn as edges any more, so this
     // is the only place that information still surfaces.
-    let e = [
-        entry("root", "t", &[], false),
-        entry("later", "t", &["root"], false),
-    ];
+    let e = [entry("root", "t", &[], false), entry("later", "t", &["root"], false)];
     let l = build(&e, &PlayerProfile::default());
     assert_eq!(l.node("later").unwrap().unmet, ["lesson-root-title"]);
     assert!(l.node("root").unwrap().unmet.is_empty());
@@ -166,10 +151,7 @@ fn a_locked_lesson_names_what_it_is_waiting_on() {
 
 #[test]
 fn a_passed_prerequisite_drops_off_the_waiting_list() {
-    let e = [
-        entry("root", "t", &[], false),
-        entry("later", "t", &["root"], false),
-    ];
+    let e = [entry("root", "t", &[], false), entry("later", "t", &["root"], false)];
     let mut p = PlayerProfile::default();
     pass(&mut p, "root");
     assert!(build(&e, &p).node("later").unwrap().unmet.is_empty());
@@ -186,10 +168,7 @@ fn a_passed_lesson_is_mastered_only_once_every_tier_is_too() {
         let r = p.trainings.entry(training_key("bend", tier)).or_default();
         record_training(r, true, 1.0, 100);
     }
-    assert_eq!(
-        build(&e, &p).node("bend").unwrap().state,
-        NodeState::Mastered
-    );
+    assert_eq!(build(&e, &p).node("bend").unwrap().state, NodeState::Mastered);
 }
 
 #[test]
@@ -221,10 +200,7 @@ fn mastery_is_the_fraction_of_tiers_passed() {
 fn a_locked_lesson_still_shows_what_it_has_practised() {
     // Trainings are not gated on the lesson, so a player can have earned
     // ring segments on something still locked.
-    let e = [
-        entry("root", "t", &[], false),
-        entry("bend", "t", &["root"], true),
-    ];
+    let e = [entry("root", "t", &[], false), entry("bend", "t", &["root"], true)];
     let mut p = PlayerProfile::default();
     let r = p.trainings.entry(training_key("bend", 1)).or_default();
     record_training(r, true, 1.0, 100);
@@ -249,26 +225,15 @@ fn units_run_left_to_right_along_one_row() {
     assert_eq!(ids, ["alpha", "beta", "gamma"]);
     assert!(l.units.iter().all(|u| u.row == SPINE_ROW));
     for pair in l.units.windows(2) {
-        assert!(
-            pair[0].column < pair[1].column,
-            "units out of order: {:?}",
-            l.units
-        );
+        assert!(pair[0].column < pair[1].column, "units out of order: {:?}", l.units);
     }
 }
 
 #[test]
 fn each_unit_is_linked_to_the_next() {
-    let e = [
-        entry_in("alpha", "a1", "t", &[], false),
-        entry_in("beta", "b1", "t", &[], false),
-    ];
+    let e = [entry_in("alpha", "a1", "t", &[], false), entry_in("beta", "b1", "t", &[], false)];
     let l = build(&e, &PlayerProfile::default());
-    let spine: Vec<&Edge> = l
-        .edges
-        .iter()
-        .filter(|x| x.kind == EdgeKind::Spine)
-        .collect();
+    let spine: Vec<&Edge> = l.edges.iter().filter(|x| x.kind == EdgeKind::Spine).collect();
     assert_eq!(spine.len(), 1);
     assert_eq!(spine[0].from, (l.units[0].column, SPINE_ROW));
     assert_eq!(spine[0].to, (l.units[1].column, SPINE_ROW));
@@ -296,10 +261,8 @@ fn a_units_lessons_all_sit_under_it_and_left_of_the_next_unit() {
 #[test]
 fn a_cluster_root_hangs_off_its_own_unit_node() {
     // Otherwise the first column of every unit floats unattached.
-    let e = [
-        entry_in("alpha", "a1", "t", &[], false),
-        entry_in("alpha", "a2", "t", &["a1"], false),
-    ];
+    let e =
+        [entry_in("alpha", "a1", "t", &[], false), entry_in("alpha", "a2", "t", &["a1"], false)];
     let l = build(&e, &PlayerProfile::default());
     let unit = l.unit("alpha").unwrap();
     let a1 = l.node("a1").unwrap();
@@ -319,17 +282,12 @@ fn a_cross_unit_prerequisite_is_not_drawn() {
     // The whole reason for the two-level shape: as one flat graph this is
     // the edge that spans the width of a cluster and cuts through whatever
     // lies in between. The unit gate stands in for it.
-    let e = [
-        entry_in("alpha", "a1", "t", &[], false),
-        entry_in("beta", "b1", "t", &["a1"], false),
-    ];
+    let e = [entry_in("alpha", "a1", "t", &[], false), entry_in("beta", "b1", "t", &["a1"], false)];
     let l = build(&e, &PlayerProfile::default());
     let a1 = l.node("a1").unwrap();
     let b1 = l.node("b1").unwrap();
     assert!(
-        !l.edges
-            .iter()
-            .any(|x| x.from == (a1.column, a1.row) && x.to == (b1.column, b1.row)),
+        !l.edges.iter().any(|x| x.from == (a1.column, a1.row) && x.to == (b1.column, b1.row)),
         "the cross-unit edge was drawn after all: {:?}",
         l.edges
     );
@@ -340,9 +298,8 @@ fn a_cross_unit_prerequisite_is_not_drawn() {
 #[test]
 fn a_unit_reports_how_close_it_is_to_opening_the_next() {
     // A gate whose terms the player can't see is just an obstacle.
-    let e: Vec<LessonEntry> = (1..=5)
-        .map(|i| entry_in("alpha", &format!("a{i}"), "t", &[], false))
-        .collect();
+    let e: Vec<LessonEntry> =
+        (1..=5).map(|i| entry_in("alpha", &format!("a{i}"), "t", &[], false)).collect();
     let mut p = PlayerProfile::default();
     pass(&mut p, "a1");
     pass(&mut p, "a2");
@@ -355,10 +312,7 @@ fn a_unit_reports_how_close_it_is_to_opening_the_next() {
 
 #[test]
 fn a_unit_the_player_has_not_reached_is_locked() {
-    let e = [
-        entry_in("alpha", "a1", "t", &[], false),
-        entry_in("beta", "b1", "t", &[], false),
-    ];
+    let e = [entry_in("alpha", "a1", "t", &[], false), entry_in("beta", "b1", "t", &[], false)];
     let l = build(&e, &PlayerProfile::default());
     assert!(!l.unit("alpha").unwrap().locked);
     assert!(l.unit("beta").unwrap().locked);
@@ -426,12 +380,8 @@ fn a_single_root_sits_alone_in_the_first_lesson_row() {
         entry("b", "u", &["start"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let first: Vec<&str> = l
-        .nodes
-        .iter()
-        .filter(|n| n.row == CLUSTER_TOP_ROW)
-        .map(|n| n.id.as_str())
-        .collect();
+    let first: Vec<&str> =
+        l.nodes.iter().filter(|n| n.row == CLUSTER_TOP_ROW).map(|n| n.id.as_str()).collect();
     assert_eq!(first, vec!["start"]);
 }
 
@@ -446,10 +396,7 @@ fn a_short_row_is_centred_against_a_wide_one() {
     ];
     let l = build(&e, &PlayerProfile::default());
     let root_column = l.node("root").unwrap().column;
-    let children: Vec<f32> = ["a", "b", "c"]
-        .iter()
-        .map(|id| l.node(id).unwrap().column)
-        .collect();
+    let children: Vec<f32> = ["a", "b", "c"].iter().map(|id| l.node(id).unwrap().column).collect();
     let mean = children.iter().sum::<f32>() / 3.0;
     assert!(
         (root_column - mean).abs() < 0.01,
@@ -467,10 +414,8 @@ fn a_unit_is_centred_over_its_widest_lesson_row() {
         entry("d", "t", &["root"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let children: Vec<f32> = ["a", "b", "c", "d"]
-        .iter()
-        .map(|id| l.node(id).unwrap().column)
-        .collect();
+    let children: Vec<f32> =
+        ["a", "b", "c", "d"].iter().map(|id| l.node(id).unwrap().column).collect();
     let midpoint = (children[0] + children[3]) / 2.0;
     assert_eq!(l.unit("u").unwrap().column, midpoint);
     assert_eq!(l.node("root").unwrap().column, midpoint);
@@ -478,10 +423,7 @@ fn a_unit_is_centred_over_its_widest_lesson_row() {
 
 #[test]
 fn no_lesson_is_ever_level_with_the_spine() {
-    let e = [
-        entry("root", "t", &[], false),
-        entry("a", "t", &["root"], false),
-    ];
+    let e = [entry("root", "t", &[], false), entry("a", "t", &["root"], false)];
     let l = build(&e, &PlayerProfile::default());
     assert!(l.nodes.iter().all(|n| n.row >= CLUSTER_TOP_ROW));
 }
@@ -495,12 +437,8 @@ fn siblings_in_one_depth_row_never_share_a_column() {
         entry("c", "t", &["root"], false),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let mut columns: Vec<f32> = l
-        .nodes
-        .iter()
-        .filter(|n| n.row == CLUSTER_TOP_ROW + 1.0)
-        .map(|n| n.column)
-        .collect();
+    let mut columns: Vec<f32> =
+        l.nodes.iter().filter(|n| n.row == CLUSTER_TOP_ROW + 1.0).map(|n| n.column).collect();
     columns.sort_by(|a, b| a.partial_cmp(b).unwrap());
     for w in columns.windows(2) {
         assert!(w[1] - w[0] >= 1.0, "columns overlap: {columns:?}");
@@ -545,25 +483,14 @@ fn a_track_travels_with_its_node_for_colouring() {
     // Tracks stopped being rows, so colour is the only thing left carrying
     // the grouping.
     let e = [entry("a", "bend", &[], false)];
-    assert_eq!(
-        build(&e, &PlayerProfile::default())
-            .node("a")
-            .unwrap()
-            .track,
-        "bend"
-    );
+    assert_eq!(build(&e, &PlayerProfile::default()).node("a").unwrap().track, "bend");
 }
 
 #[test]
 fn an_elective_marker_travels_with_its_node() {
     let mut e = entry("advanced", "bend", &[], false);
     e.manifest.optional = true;
-    assert!(
-        build(&[e], &PlayerProfile::default())
-            .node("advanced")
-            .unwrap()
-            .optional
-    );
+    assert!(build(&[e], &PlayerProfile::default()).node("advanced").unwrap().optional);
 }
 
 /// An elective: visible and playable, but outside its unit's gate.
@@ -575,10 +502,7 @@ fn elective(mut e: LessonEntry) -> LessonEntry {
 /// The edge arriving at `id`, whatever it hangs off.
 fn edge_into<'a>(l: &'a TreeLayout, id: &str) -> &'a Edge {
     let node = l.node(id).expect("a placed node");
-    l.edges
-        .iter()
-        .find(|x| x.to == (node.column, node.row))
-        .expect("an edge arriving at it")
+    l.edges.iter().find(|x| x.to == (node.column, node.row)).expect("an edge arriving at it")
 }
 
 #[test]
@@ -652,10 +576,7 @@ fn an_elective_hanging_off_an_elective_stays_elective() {
 fn a_unit_branch_into_an_elective_root_is_elective() {
     // An elective needing no prerequisites hangs straight off its unit, so
     // that edge is the only one carrying the distinction.
-    let e = [
-        entry("core", "t", &[], false),
-        elective(entry("standalone", "bend", &[], false)),
-    ];
+    let e = [entry("core", "t", &[], false), elective(entry("standalone", "bend", &[], false))];
     let l = build(&e, &PlayerProfile::default());
     let edge = edge_into(&l, "standalone");
     assert_eq!(edge.kind, EdgeKind::UnitBranch);
@@ -672,11 +593,7 @@ fn the_spine_is_never_elective() {
         elective(entry_in("beta", "b1", "t", &[], false)),
     ];
     let l = build(&e, &PlayerProfile::default());
-    let spine: Vec<&Edge> = l
-        .edges
-        .iter()
-        .filter(|x| x.kind == EdgeKind::Spine)
-        .collect();
+    let spine: Vec<&Edge> = l.edges.iter().filter(|x| x.kind == EdgeKind::Spine).collect();
     assert!(!spine.is_empty(), "no spine to check");
     assert!(spine.iter().all(|x| !x.optional));
 }
@@ -738,11 +655,7 @@ fn the_canvas_is_sized_for_the_spine_even_with_no_lessons_under_it() {
     // the canvas too narrow for its own spine.
     let e = [entry("a", "t", &[], false)];
     let l = build(&e, &PlayerProfile::default());
-    let spine_width = l
-        .units
-        .iter()
-        .map(|u| u.column + 1.0)
-        .fold(0.0_f32, f32::max);
+    let spine_width = l.units.iter().map(|u| u.column + 1.0).fold(0.0_f32, f32::max);
     assert!(l.columns() >= spine_width);
 }
 

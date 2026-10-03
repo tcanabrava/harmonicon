@@ -144,11 +144,7 @@ pub(super) fn rebuild_grid(
     // else keyed off `locked`) stay exactly as locked as before.
     let cell_locked = state.user_locked || matches!(state.mode, Mode::Record | Mode::Play);
     let pickable = |locked: bool| {
-        if locked {
-            Pickable::IGNORE
-        } else {
-            Pickable::default()
-        }
+        if locked { Pickable::IGNORE } else { Pickable::default() }
     };
     for e in &old {
         commands.entity(e).despawn();
@@ -193,11 +189,7 @@ pub(super) fn rebuild_grid(
 
         for hole in 1..=hole_count {
             let y = HEADER_H + (hole as f32 - 1.0) * ROW_H;
-            let lane = if hole % 2 == 0 {
-                colors.lane_a
-            } else {
-                colors.lane_b
-            };
+            let lane = if hole % 2 == 0 { colors.lane_a } else { colors.lane_b };
             let lane = match bar_tint {
                 Some(tint) => mix_srgba(lane, tint, BAR_TINT_MIX),
                 None => lane,
@@ -353,10 +345,7 @@ pub(super) fn rebuild_grid(
         let bar_number = meter_map.bar_number(pos.bar).unwrap_or(0);
         let label = match (is_bar, changes.get(&tick)) {
             (true, Some(meter)) => {
-                format!(
-                    "{} \u{00B7} {}/{}",
-                    bar_number, meter.numerator, meter.denominator
-                )
+                format!("{} \u{00B7} {}/{}", bar_number, meter.numerator, meter.denominator)
             }
             (true, None) => format!("{bar_number}"),
             (false, _) => format!("{}", pos.beat + 1),
@@ -687,11 +676,7 @@ pub(super) fn spawn_note(
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { colors.accent } else { Color::NONE };
     let id = note.id;
-    let pick = if locked {
-        Pickable::IGNORE
-    } else {
-        Pickable::default()
-    };
+    let pick = if locked { Pickable::IGNORE } else { Pickable::default() };
     // Flag the exception (a note outside the song's blues scale), not the
     // common case: an in-scale note keeps its plain technique color; an
     // outside note gets a warm red warning blended in. Bend/overblow/overdraw
@@ -700,11 +685,7 @@ pub(super) fn spawn_note(
     // the ♭7, so that bent note reads as in-scale even though its natural
     // (unbent) pitch wouldn't.
     let note_color = |base: Color| {
-        if in_scale {
-            base
-        } else {
-            mix_srgba(base, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX)
-        }
+        if in_scale { base } else { mix_srgba(base, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX) }
     };
 
     let root = commands
@@ -739,33 +720,31 @@ pub(super) fn spawn_note(
                 }
             },
         )
-        .observe(
-            move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
-                if state.dragging.is_some() {
-                    return;
-                }
-                let Some(anchor) = state.note_by_id(id).copied() else {
-                    return;
-                };
-                // Dragging a note that's part of the current multi-selection
-                // (more than one note selected, this one among them) moves
-                // the whole group together; otherwise a drag behaves like
-                // before — it exclusively selects just the note being
-                // dragged.
-                let group: Vec<GridNote> = if state.selected.len() > 1 && state.is_selected(id) {
-                    state
-                        .selected
-                        .iter()
-                        .filter(|&&gid| gid != id)
-                        .filter_map(|&gid| state.note_by_id(gid).copied())
-                        .collect()
-                } else {
-                    state.select_only(id);
-                    Vec::new()
-                };
-                state.dragging = Some(DragState::new_group(id, &anchor, group));
-            },
-        )
+        .observe(move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
+            if state.dragging.is_some() {
+                return;
+            }
+            let Some(anchor) = state.note_by_id(id).copied() else {
+                return;
+            };
+            // Dragging a note that's part of the current multi-selection
+            // (more than one note selected, this one among them) moves
+            // the whole group together; otherwise a drag behaves like
+            // before — it exclusively selects just the note being
+            // dragged.
+            let group: Vec<GridNote> = if state.selected.len() > 1 && state.is_selected(id) {
+                state
+                    .selected
+                    .iter()
+                    .filter(|&&gid| gid != id)
+                    .filter_map(|&gid| state.note_by_id(gid).copied())
+                    .collect()
+            } else {
+                state.select_only(id);
+                Vec::new()
+            };
+            state.dragging = Some(DragState::new_group(id, &anchor, group));
+        })
         .observe(
             move |ev: On<PointerDrag>,
                   mut state: ResMut<EditorState>,
@@ -818,12 +797,7 @@ pub(super) fn spawn_note(
                 let hole_delta = hole as i32 - drag.start_hole as i32;
                 let tick_delta = tick as i32 - drag.start_tick as i32;
                 let mut targets = vec![(id, hole, tick, drag.start_len, pitch)];
-                targets.extend(group_move_targets(
-                    &drag.group,
-                    hole_delta,
-                    tick_delta,
-                    hole_count,
-                ));
+                targets.extend(group_move_targets(&drag.group, hole_delta, tick_delta, hole_count));
                 let mut moving_ids: Vec<u32> = vec![id];
                 moving_ids.extend(drag.group.iter().map(|n| n.id));
                 let valid = group_move_valid(&state.notes, &harp, &moving_ids, &targets);
@@ -841,51 +815,39 @@ pub(super) fn spawn_note(
                 }
             },
         )
-        .observe(
-            move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
-                let Some(drag) = state.dragging.take() else {
-                    return;
-                };
-                state.drag_msg = harmonicon_platform::localization::LocalizedStr::default();
-                if drag.kind == DragKind::Move && drag.valid {
-                    let hole_count = state.hole_count();
-                    let hole_delta = drag.target_hole as i32 - drag.start_hole as i32;
-                    let tick_delta = drag.target_tick as i32 - drag.start_tick as i32;
-                    let group_targets =
-                        group_move_targets(&drag.group, hole_delta, tick_delta, hole_count);
-                    // One call for anchor and group together, so an onset
-                    // the whole group vacates is seen as vacated — moving
-                    // them one at a time would leave its annotation behind.
-                    let mut moves = vec![(id, drag.target_hole, drag.target_tick)];
-                    moves.extend(
-                        group_targets
-                            .iter()
-                            .map(|&(gid, gh, gt, _, _)| (gid, gh, gt)),
-                    );
-                    state.move_notes(&moves);
-                    enforce_direction(&mut state, id);
-                    enforce_expr(&mut state, id);
-                    for &(gid, _, _, _, _) in &group_targets {
-                        enforce_direction(&mut state, gid);
-                        enforce_expr(&mut state, gid);
-                    }
+        .observe(move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
+            let Some(drag) = state.dragging.take() else {
+                return;
+            };
+            state.drag_msg = harmonicon_platform::localization::LocalizedStr::default();
+            if drag.kind == DragKind::Move && drag.valid {
+                let hole_count = state.hole_count();
+                let hole_delta = drag.target_hole as i32 - drag.start_hole as i32;
+                let tick_delta = drag.target_tick as i32 - drag.start_tick as i32;
+                let group_targets =
+                    group_move_targets(&drag.group, hole_delta, tick_delta, hole_count);
+                // One call for anchor and group together, so an onset
+                // the whole group vacates is seen as vacated — moving
+                // them one at a time would leave its annotation behind.
+                let mut moves = vec![(id, drag.target_hole, drag.target_tick)];
+                moves.extend(group_targets.iter().map(|&(gid, gh, gt, _, _)| (gid, gh, gt)));
+                state.move_notes(&moves);
+                enforce_direction(&mut state, id);
+                enforce_expr(&mut state, id);
+                for &(gid, _, _, _, _) in &group_targets {
+                    enforce_direction(&mut state, gid);
+                    enforce_expr(&mut state, gid);
                 }
-            },
-        )
+            }
+        })
         .id();
 
     match note.expr {
         Expr::None => {
-            commands
-                .entity(root)
-                .insert(BackgroundColor(note_color(pitch_color(note.pitch))));
+            commands.entity(root).insert(BackgroundColor(note_color(pitch_color(note.pitch))));
         }
         Expr::Wah(_) | Expr::Vibrato(_) => {
-            let mode = if matches!(note.expr, Expr::Vibrato(_)) {
-                0.0
-            } else {
-                1.0
-            };
+            let mode = if matches!(note.expr, Expr::Vibrato(_)) { 0.0 } else { 1.0 };
             let mat = note_mats.add(EditorNoteMaterial {
                 color: note_color(pitch_color(note.pitch)).to_linear(),
                 params: Vec4::new(mode, width, 0.0, 0.0),

@@ -21,11 +21,7 @@ const MODEL_FILES: [&str; 2] = ["harmonica.glb", "holes.json"];
 
 /// The required files absent from `dir`, in declared order.
 fn missing_files(dir: &Path, required: &[&str]) -> Vec<String> {
-    required
-        .iter()
-        .filter(|name| !dir.join(name).exists())
-        .map(|name| name.to_string())
-        .collect()
+    required.iter().filter(|name| !dir.join(name).exists()).map(|name| name.to_string()).collect()
 }
 
 /// Immediate subdirectories of `root`, sorted by path. Empty if `root` is absent.
@@ -43,10 +39,7 @@ fn subdirs(root: &Path) -> Vec<PathBuf> {
 
 /// A path relative to `assets/`, for compact report lines.
 fn label(path: &Path) -> String {
-    path.strip_prefix("assets/")
-        .unwrap_or(path)
-        .display()
-        .to_string()
+    path.strip_prefix("assets/").unwrap_or(path).display().to_string()
 }
 
 #[test]
@@ -55,28 +48,17 @@ fn harmonica_model_assets_are_complete() {
     assert!(root.is_dir(), "missing asset directory: {}", root.display());
 
     let models = subdirs(root);
-    assert!(
-        !models.is_empty(),
-        "no harmonica models found under {}",
-        root.display()
-    );
+    assert!(!models.is_empty(), "no harmonica models found under {}", root.display());
 
     let mut report = String::new();
     for model in models {
         let missing = missing_files(&model, &MODEL_FILES);
         if !missing.is_empty() {
-            report.push_str(&format!(
-                "  {}: missing {}\n",
-                label(&model),
-                missing.join(", ")
-            ));
+            report.push_str(&format!("  {}: missing {}\n", label(&model), missing.join(", ")));
         }
     }
 
-    assert!(
-        report.is_empty(),
-        "Incomplete harmonica model assets:\n{report}"
-    );
+    assert!(report.is_empty(), "Incomplete harmonica model assets:\n{report}");
 }
 
 // ── Chart schema ──────────────────────────────────────────────────────────────
@@ -114,12 +96,8 @@ fn a_generated_chart_serializes_to_something_the_schema_accepts() {
 
     let validator = schema_validator("assets/song_schema.dtd.json");
     for tier in Tier::ALL {
-        let spec = DrillSpec {
-            technique: DrillTechnique::Bend,
-            holes: vec![2, 3, 4],
-            tier,
-            seed: 4242,
-        };
+        let spec =
+            DrillSpec { technique: DrillTechnique::Bend, holes: vec![2, 3, 4], tier, seed: 4242 };
         let chart = drill_chart(&spec, &richter_harp("C"), "Drill", "Trainer")
             .expect("a C harp bends holes 2-4");
         let value = serde_json::to_value(&chart).expect("a chart must serialize");
@@ -152,11 +130,7 @@ fn theme_json_validates_against_schema() {
     let validator = theme_schema_validator();
     let root = Path::new("assets/themes");
     let themes = subdirs(root);
-    assert!(
-        !themes.is_empty(),
-        "no themes found under {}",
-        root.display()
-    );
+    assert!(!themes.is_empty(), "no themes found under {}", root.display());
 
     let mut report = String::new();
     for theme_dir in themes {
@@ -183,18 +157,11 @@ fn theme_json_validates_against_schema() {
             .map(|e| format!("    - {e} (at /{path})", path = e.instance_path()))
             .collect();
         if !errors.is_empty() {
-            report.push_str(&format!(
-                "  {}:\n{}\n",
-                label(&theme_dir),
-                errors.join("\n")
-            ));
+            report.push_str(&format!("  {}:\n{}\n", label(&theme_dir), errors.join("\n")));
         }
     }
 
-    assert!(
-        report.is_empty(),
-        "Theme JSON validation failures:\n{report}"
-    );
+    assert!(report.is_empty(), "Theme JSON validation failures:\n{report}");
 }
 
 /// Collects every file path referenced inside a parsed `theme.json` value.
@@ -213,28 +180,19 @@ fn collect_theme_file_refs(theme: &serde_json::Value) -> Vec<String> {
 
     // default_menu_button.*
     let btn = &theme["default_menu_button"];
-    if let Some(f) = btn
-        .pointer("/background_image/image_file")
-        .and_then(|v| v.as_str())
-    {
+    if let Some(f) = btn.pointer("/background_image/image_file").and_then(|v| v.as_str()) {
         refs.push(f.to_string());
     }
     if let Some(f) = btn.pointer("/icon/image_file").and_then(|v| v.as_str()) {
         refs.push(f.to_string());
     }
     for state in ["hover", "click", "idle"] {
-        if let Some(f) = btn
-            .pointer(&format!("/button_shaders/{state}"))
-            .and_then(|v| v.as_str())
-        {
+        if let Some(f) = btn.pointer(&format!("/button_shaders/{state}")).and_then(|v| v.as_str()) {
             refs.push(f.to_string());
         }
     }
     for state in ["hover", "click"] {
-        if let Some(f) = btn
-            .pointer(&format!("/button_sounds/{state}"))
-            .and_then(|v| v.as_str())
-        {
+        if let Some(f) = btn.pointer(&format!("/button_sounds/{state}")).and_then(|v| v.as_str()) {
             refs.push(f.to_string());
         }
     }
@@ -257,11 +215,7 @@ fn collect_theme_file_refs(theme: &serde_json::Value) -> Vec<String> {
 fn theme_assets_are_complete() {
     let root = Path::new("assets/themes");
     let themes = subdirs(root);
-    assert!(
-        !themes.is_empty(),
-        "no themes found under {}",
-        root.display()
-    );
+    assert!(!themes.is_empty(), "no themes found under {}", root.display());
 
     let mut report = String::new();
     for theme_dir in themes {
@@ -291,11 +245,7 @@ fn theme_assets_are_complete() {
         }
 
         if !missing.is_empty() {
-            report.push_str(&format!(
-                "  {}: missing {}\n",
-                label(&theme_dir),
-                missing.join(", ")
-            ));
+            report.push_str(&format!("  {}: missing {}\n", label(&theme_dir), missing.join(", ")));
         }
     }
 
@@ -324,10 +274,7 @@ fn shader_ref_paths_exist() {
     for crate_dir in subdirs(&repo.join("crates")) {
         collect_rust_sources(&crate_dir.join("src"), &mut sources);
     }
-    assert!(
-        !sources.is_empty(),
-        "found no Rust sources to scan for shader paths"
-    );
+    assert!(!sources.is_empty(), "found no Rust sources to scan for shader paths");
 
     let mut referenced: Vec<(String, String)> = Vec::new();
     for path in &sources {

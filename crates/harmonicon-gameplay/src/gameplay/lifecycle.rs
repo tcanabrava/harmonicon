@@ -226,19 +226,15 @@ pub(crate) fn start_at_practice_range(
     if !music_started.0 {
         return;
     }
-    let has_music = manifests
-        .get(&selected.0)
-        .is_some_and(|m| m.music.is_some() || m.backing_stems.is_some());
+    let has_music =
+        manifests.get(&selected.0).is_some_and(|m| m.music.is_some() || m.backing_stems.is_some());
     if has_music && sinks.is_empty() {
         return;
     }
     practice.0 = None;
     skip_notes_before(&mut song_notes.notes, range.start_time);
     clock.rewind_to(range.start_time, sinks.single().ok());
-    info!(
-        "Practice range: {:.2}s – {:.2}s",
-        range.start_time, range.end_time
-    );
+    info!("Practice range: {:.2}s – {:.2}s", range.start_time, range.end_time);
 }
 
 /// Marks every still-pending note that starts before `t` as resolved, so

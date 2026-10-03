@@ -105,10 +105,7 @@ fn technique_modifier(technique: Technique) -> Option<Modifier> {
     match technique {
         Technique::Natural => None,
         // Back to the chart's negative-is-down convention.
-        Technique::Bend(depth) => Some(Modifier::Bend {
-            semitones: -depth,
-            intensity: None,
-        }),
+        Technique::Bend(depth) => Some(Modifier::Bend { semitones: -depth, intensity: None }),
         Technique::Overblow => Some(Modifier::Overblow),
         Technique::Overdraw => Some(Modifier::Overdraw),
         Technique::Slide => Some(Modifier::Slide),
@@ -160,9 +157,8 @@ pub fn remap_event(
             // the wrong pitch — the same class of error as honouring
             // `explicit`, just arrived at differently.
             let depth = bend_depth(modifiers);
-            let over = modifiers
-                .iter()
-                .any(|m| matches!(m, Modifier::Overblow | Modifier::Overdraw));
+            let over =
+                modifiers.iter().any(|m| matches!(m, Modifier::Overblow | Modifier::Overdraw));
             let slide = modifiers.iter().any(|m| matches!(m, Modifier::Slide));
 
             let midi = if over {
@@ -191,13 +187,7 @@ pub fn remap_event(
                 depth == 0.0 || technique_fits(Technique::Bend(depth), target_harp, hole)
             };
             let playable = midi.is_some() && hole <= target_harp.hole_count() && technique_ok;
-            RemappedEvent {
-                hole,
-                action,
-                modifiers: modifiers.to_vec(),
-                midi,
-                playable,
-            }
+            RemappedEvent { hole, action, modifiers: modifiers.to_vec(), midi, playable }
         }
         HarpMapping::Transpose => {
             let Some(target) = source_pitch(hole, action, explicit, modifiers, chart_harp) else {

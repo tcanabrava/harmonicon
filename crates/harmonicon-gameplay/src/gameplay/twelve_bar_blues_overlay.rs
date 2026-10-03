@@ -34,11 +34,8 @@ pub fn update_bar(
     // Only Jam Session's own progression is ever anything but Standard —
     // scored gameplay's grid is an educational reference independent of the
     // loaded chart, same reasoning as `twelve_bar`'s doc comment.
-    let progression = if *mode == GameplayMode::JamSession {
-        jam_progression.0
-    } else {
-        Progression::Standard
-    };
+    let progression =
+        if *mode == GameplayMode::JamSession { jam_progression.0 } else { Progression::Standard };
 
     for (cell, mut bg) in &mut cells {
         *bg = if cell.0 == current.0 {

@@ -234,10 +234,7 @@ pub fn last_note_end(
     track: &[harmonicon_core::chart::TrackItem],
     timing: &harmonicon_core::chart::Timing,
 ) -> f64 {
-    track
-        .iter()
-        .map(|item| resolve_item_time(item, timing) + item.duration)
-        .fold(0.0_f64, f64::max)
+    track.iter().map(|item| resolve_item_time(item, timing) + item.duration).fold(0.0_f64, f64::max)
 }
 
 /// The MIDI note the player must actually produce for a note. A `bend`
@@ -281,12 +278,7 @@ pub fn build_scheduled_notes(
     adaptive: &AdaptiveDifficulty,
 ) -> (Vec<ScheduledNote>, Vec<Option<&'static str>>) {
     let items = track_items(&chart.track, &chart.timing);
-    let flags = unlocked_flags(
-        &items,
-        &adaptive.sections,
-        &adaptive.learned,
-        adaptive.enabled,
-    );
+    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
     let mut flags = flags.into_iter();
     let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
     for item in &chart.track {
@@ -313,9 +305,7 @@ pub fn build_scheduled_notes(
                     // blow/draw layout lookup cannot reproduce.
                     None => {
                         let natural_pitch = event.note.clone().unwrap_or_else(|| {
-                            chart
-                                .harmonica
-                                .wind_direction_label(event.hole, &event.action)
+                            chart.harmonica.wind_direction_label(event.hole, &event.action)
                         });
                         let expected_pitch = target_pitch(&natural_pitch, &modifiers);
                         (event.hole, event.action, modifiers, expected_pitch, true)
@@ -377,11 +367,7 @@ pub fn build_scheduled_notes(
             ));
         }
     }
-    combined.sort_by(|a, b| {
-        a.0.time
-            .partial_cmp(&b.0.time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    combined.sort_by(|a, b| a.0.time.partial_cmp(&b.0.time).unwrap_or(std::cmp::Ordering::Equal));
     combined.into_iter().unzip()
 }
 
@@ -517,10 +503,7 @@ mod tests {
         );
         assert_eq!(notes.len(), 1);
         assert!(notes[0].chord_pitches.is_empty());
-        assert!(
-            notes[0].force_wait,
-            "call: true carries through to force_wait"
-        );
+        assert!(notes[0].force_wait, "call: true carries through to force_wait");
     }
 
     // ── Playing on a substituted harmonica ────────────────────────────────────
@@ -528,10 +511,7 @@ mod tests {
     /// Every note of a small chart, as `(hole, is_blow, expected_pitch)`.
     fn scheduled(effective: &EffectiveHarmonica, chart: &HarpChart) -> Vec<(u8, bool, Option<u8>)> {
         let (notes, _) = build_scheduled_notes(effective, chart, &AdaptiveDifficulty::default());
-        notes
-            .iter()
-            .map(|n| (n.hole, n.is_blow, n.expected_pitch))
-            .collect()
+        notes.iter().map(|n| (n.hole, n.is_blow, n.expected_pitch)).collect()
     }
 
     fn three_note_chart() -> HarpChart {
@@ -566,10 +546,8 @@ mod tests {
     #[test]
     fn same_holes_keeps_the_tab_and_moves_every_expected_pitch() {
         let chart = three_note_chart();
-        let effective = EffectiveHarmonica {
-            harp: Some(richter_harp("G")),
-            mapping: HarpMapping::SameHoles,
-        };
+        let effective =
+            EffectiveHarmonica { harp: Some(richter_harp("G")), mapping: HarpMapping::SameHoles };
         let notes = scheduled(&effective, &chart);
         let holes: Vec<(u8, bool)> = notes.iter().map(|(h, b, _)| (*h, *b)).collect();
         assert_eq!(
@@ -592,10 +570,8 @@ mod tests {
     #[test]
     fn transpose_keeps_every_expected_pitch_and_moves_the_tab() {
         let chart = three_note_chart();
-        let effective = EffectiveHarmonica {
-            harp: Some(richter_harp("G")),
-            mapping: HarpMapping::Transpose,
-        };
+        let effective =
+            EffectiveHarmonica { harp: Some(richter_harp("G")), mapping: HarpMapping::Transpose };
         let original = scheduled(&EffectiveHarmonica::default(), &chart);
         let moved = scheduled(&effective, &chart);
         assert_eq!(
@@ -617,10 +593,7 @@ mod tests {
             let harp = richter_harp(key);
             let valid = harp.build_valid_notes();
             for mapping in HarpMapping::all() {
-                let effective = EffectiveHarmonica {
-                    harp: Some(harp.clone()),
-                    mapping: *mapping,
-                };
+                let effective = EffectiveHarmonica { harp: Some(harp.clone()), mapping: *mapping };
                 let (notes, _) =
                     build_scheduled_notes(&effective, &chart, &AdaptiveDifficulty::default());
                 for note in &notes {
@@ -650,10 +623,8 @@ mod tests {
         let chart = c_diatonic_chart(
             r#"[{"time":0.0,"duration":0.5,"events":[{"hole":1,"action":"blow","note":"C4"}]}]"#,
         );
-        let effective = EffectiveHarmonica {
-            harp: Some(chromatic_harp("C")),
-            mapping: HarpMapping::SameHoles,
-        };
+        let effective =
+            EffectiveHarmonica { harp: Some(chromatic_harp("C")), mapping: HarpMapping::SameHoles };
         let (notes, _) = build_scheduled_notes(&effective, &chart, &AdaptiveDifficulty::default());
         assert!(notes.iter().all(|n| n.playable), "hole 1 exists on both");
     }

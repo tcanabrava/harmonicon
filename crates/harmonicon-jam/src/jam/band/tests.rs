@@ -3,25 +3,13 @@
 use super::*;
 
 /// A quarter-note line: four attacks a bar, sparse.
-const PLAYING: BeatActivity = BeatActivity {
-    attacks: 1,
-    sounding: true,
-};
+const PLAYING: BeatActivity = BeatActivity { attacks: 1, sounding: true };
 /// Steady eighths: eight attacks a bar, dense.
-const BUSY: BeatActivity = BeatActivity {
-    attacks: 2,
-    sounding: true,
-};
-const QUIET: BeatActivity = BeatActivity {
-    attacks: 0,
-    sounding: false,
-};
+const BUSY: BeatActivity = BeatActivity { attacks: 2, sounding: true };
+const QUIET: BeatActivity = BeatActivity { attacks: 0, sounding: false };
 /// A note held over from an earlier beat: nothing new attacked, but still
 /// sounding.
-const HELD: BeatActivity = BeatActivity {
-    attacks: 0,
-    sounding: true,
-};
+const HELD: BeatActivity = BeatActivity { attacks: 0, sounding: true };
 
 /// Feeds `beats` to a listener starting at beat 0 and collects every
 /// answer as `(beat index the answer begins on, kind)`.
@@ -96,14 +84,8 @@ fn silence_is_left_alone_not_filled() {
 fn a_stray_note_or_two_is_not_a_phrase() {
     let mut listener = BandListener::default();
     let mut beats = vec![QUIET; 16];
-    beats[5] = BeatActivity {
-        attacks: 1,
-        sounding: true,
-    };
-    beats[9] = BeatActivity {
-        attacks: 2,
-        sounding: true,
-    };
+    beats[5] = BeatActivity { attacks: 1, sounding: true };
+    beats[9] = BeatActivity { attacks: 2, sounding: true };
     assert!(run(&mut listener, &beats).is_empty());
 }
 
@@ -116,10 +98,7 @@ fn answers_are_rate_capped_and_alternate_drums_and_chord() {
     }
     let answers = run(&mut listener, &beats);
     // Four phrase ends, but at least eight bars between answers: two answers.
-    assert_eq!(
-        answers,
-        vec![(14, BandAnswer::Drums), (46, BandAnswer::Chord)]
-    );
+    assert_eq!(answers, vec![(14, BandAnswer::Drums), (46, BandAnswer::Chord)]);
 }
 
 #[test]
@@ -142,11 +121,7 @@ fn comping_target_only_changes_at_phrase_boundaries() {
     let mut listener = BandListener::default();
     for i in 0..15 {
         listener.observe(i, BUSY);
-        assert_eq!(
-            listener.comping_target(),
-            1.0,
-            "changed mid-phrase at beat {i}"
-        );
+        assert_eq!(listener.comping_target(), 1.0, "changed mid-phrase at beat {i}");
     }
     listener.observe(15, BUSY);
     assert_eq!(listener.comping_target(), THINNED_COMPING);
@@ -168,10 +143,7 @@ fn an_answer_due_on_a_skipped_beat_is_still_returned() {
     run(&mut listener, &[PLAYING; 11]);
     // Beats 12 and 13 pass silently inside one frame; the answer due as
     // beat 14 begins is not lost.
-    assert_eq!(
-        listener.observe_until(11, PLAYING, 15),
-        Some(BandAnswer::Drums)
-    );
+    assert_eq!(listener.observe_until(11, PLAYING, 15), Some(BandAnswer::Drums));
 }
 
 #[test]

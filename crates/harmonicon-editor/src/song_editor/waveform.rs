@@ -38,10 +38,7 @@ pub(super) struct MusicWaveform {
 /// file or unsupported extension, same convention as `analyze_ogg_
 /// waveform`/`analyze_wav_waveform` themselves.
 fn decode_music_waveform(path: &std::path::Path) -> (Vec<f32>, f64) {
-    let extension = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or_default();
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or_default();
     if !extension.eq_ignore_ascii_case("ogg") && !extension.eq_ignore_ascii_case("wav") {
         return (vec![0.0; WAVEFORM_BUCKETS], 0.0);
     }
@@ -107,11 +104,7 @@ pub(super) fn waveform_bar_geometry(
     }
     let bucket_secs = duration_secs / bucket_count as f64;
     let start_tick = seconds_to_tick(i as f64 * bucket_secs, TICKS_PER_BEAT as u32, tempo_map);
-    let end_tick = seconds_to_tick(
-        (i + 1) as f64 * bucket_secs,
-        TICKS_PER_BEAT as u32,
-        tempo_map,
-    );
+    let end_tick = seconds_to_tick((i + 1) as f64 * bucket_secs, TICKS_PER_BEAT as u32, tempo_map);
     let x = start_tick as f32 * super::TICK_W;
     let w = end_tick.saturating_sub(start_tick) as f32 * super::TICK_W;
     (x, w)
@@ -136,12 +129,8 @@ pub(super) fn visible_waveform_buckets(
     let end_tick = ((scroll_beat + cols) * TICKS_PER_BEAT) as u64;
     let start_secs = tick_to_seconds(start_tick, TICKS_PER_BEAT as u32, tempo_map);
     let end_secs = tick_to_seconds(end_tick, TICKS_PER_BEAT as u32, tempo_map);
-    let start = (start_secs / bucket_secs)
-        .floor()
-        .clamp(0.0, bucket_count as f64) as usize;
-    let end = (end_secs / bucket_secs)
-        .ceil()
-        .clamp(0.0, bucket_count as f64) as usize;
+    let start = (start_secs / bucket_secs).floor().clamp(0.0, bucket_count as f64) as usize;
+    let end = (end_secs / bucket_secs).ceil().clamp(0.0, bucket_count as f64) as usize;
     start..end
 }
 
@@ -151,10 +140,7 @@ mod tests {
 
     #[test]
     fn stale_background_result_cannot_replace_new_selection() {
-        let mut waveform = MusicWaveform {
-            path: "new.wav".into(),
-            ..default()
-        };
+        let mut waveform = MusicWaveform { path: "new.wav".into(), ..default() };
         waveform.apply_result("old.wav", vec![1.0], 60.0);
         assert!(waveform.buckets.is_empty());
         waveform.apply_result("new.wav", vec![0.5], 30.0);
@@ -163,10 +149,7 @@ mod tests {
     }
 
     fn flat_120() -> Vec<TempoPoint> {
-        vec![TempoPoint {
-            tick: 0,
-            bpm: 120.0,
-        }]
+        vec![TempoPoint { tick: 0, bpm: 120.0 }]
     }
 
     // ── waveform_bar_geometry ────────────────────────────────────────────────
@@ -206,21 +189,12 @@ mod tests {
         // at the same spot.
         let flat = flat_120();
         let changed = vec![
-            TempoPoint {
-                tick: 0,
-                bpm: 120.0,
-            },
-            TempoPoint {
-                tick: TICKS_PER_BEAT as u64,
-                bpm: 240.0,
-            }, // one beat in (0.5s @ 120bpm), doubles
+            TempoPoint { tick: 0, bpm: 120.0 },
+            TempoPoint { tick: TICKS_PER_BEAT as u64, bpm: 240.0 }, // one beat in (0.5s @ 120bpm), doubles
         ];
         let (x_flat, _) = waveform_bar_geometry(5, 10, 20.0, &flat);
         let (x_changed, _) = waveform_bar_geometry(5, 10, 20.0, &changed);
-        assert!(
-            x_changed > x_flat,
-            "{x_changed} should be later than {x_flat}"
-        );
+        assert!(x_changed > x_flat, "{x_changed} should be later than {x_flat}");
     }
 
     // ── visible_waveform_buckets ─────────────────────────────────────────────

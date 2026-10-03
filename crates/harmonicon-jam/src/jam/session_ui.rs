@@ -47,16 +47,8 @@ pub fn update_jam_guides(
     if !guides.is_changed() && added.is_empty() {
         return;
     }
-    let display = if guides.0 {
-        Display::Flex
-    } else {
-        Display::None
-    };
-    let visible = if guides.0 {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
+    let display = if guides.0 { Display::Flex } else { Display::None };
+    let visible = if guides.0 { Visibility::Visible } else { Visibility::Hidden };
     for (mut node, mut visibility) in &mut panels {
         if node.display != display {
             node.display = display;
@@ -71,11 +63,7 @@ pub fn update_jam_guides(
             node.width = width;
         }
     }
-    let label = loc.msg(if guides.0 {
-        "jam-guides-on"
-    } else {
-        "jam-guides-off"
-    });
+    let label = loc.msg(if guides.0 { "jam-guides-on" } else { "jam-guides-off" });
     for mut text in &mut labels {
         if text.0 != *label {
             text.0.clear();

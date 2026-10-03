@@ -38,9 +38,7 @@ fn app(ribbons: usize, animate: bool) -> App {
     if animate {
         app.add_systems(Update, animate_note_ribbons);
     }
-    let mut materials = app
-        .world_mut()
-        .resource_mut::<Assets<NoteRibbon2dMaterial>>();
+    let mut materials = app.world_mut().resource_mut::<Assets<NoteRibbon2dMaterial>>();
     // Handles are kept alive for the app's lifetime, as spawned notes do.
     let handles: Vec<Handle<NoteRibbon2dMaterial>> = (0..ribbons)
         .map(|i| {

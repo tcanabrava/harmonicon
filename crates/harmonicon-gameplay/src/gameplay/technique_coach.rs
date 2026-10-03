@@ -119,17 +119,10 @@ pub(super) fn spawn_technique_coach(parent: &mut ChildSpawnerCommands) {
     let mut coach = None;
     row.with_children(|row| {
         let start_label = label(row, 140.0);
-        let (mut band, mut reference, mut marker) = (
-            Entity::PLACEHOLDER,
-            Entity::PLACEHOLDER,
-            Entity::PLACEHOLDER,
-        );
+        let (mut band, mut reference, mut marker) =
+            (Entity::PLACEHOLDER, Entity::PLACEHOLDER, Entity::PLACEHOLDER);
         row.spawn((
-            Node {
-                flex_grow: 1.0,
-                height: Val::Px(TRACK_PX),
-                ..default()
-            },
+            Node { flex_grow: 1.0, height: Val::Px(TRACK_PX), ..default() },
             BackgroundColor(TRACK_BG),
         ))
         .with_children(|track| {
@@ -139,14 +132,7 @@ pub(super) fn spawn_technique_coach(parent: &mut ChildSpawnerCommands) {
         });
         let end_label = label(row, 140.0);
         let advice = label(row, 260.0);
-        coach = Some(TechniqueCoach {
-            start_label,
-            band,
-            reference,
-            marker,
-            end_label,
-            advice,
-        });
+        coach = Some(TechniqueCoach { start_label, band, reference, marker, end_label, advice });
     });
     if let Some(coach) = coach {
         // Outlined so the marker stays distinct inside the band it aims for.

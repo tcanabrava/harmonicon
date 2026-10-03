@@ -62,10 +62,8 @@ impl Plugin for TieMaterialPlugin {
 
 fn load_tie_material(mut materials: ResMut<Assets<TieMaterial>>, mut commands: Commands) {
     let mut tie = |color: Color, above: f32| {
-        materials.add(TieMaterial {
-            color: color.into(),
-            params: Vec4::new(0.85, 0.16, above, 0.0),
-        })
+        materials
+            .add(TieMaterial { color: color.into(), params: Vec4::new(0.85, 0.16, above, 0.0) })
     };
     commands.insert_resource(TieMaterialHandle {
         below: tie(Color::WHITE, 0.0),

@@ -153,10 +153,7 @@ pub(super) fn spawn_latency_slider(
 
     let track = commands
         .spawn_scene(latency_slider_scene(value_ms as f32, frac))
-        .insert((
-            SliderRange::new(0.0, LATENCY_MAX_MS as f32),
-            SliderStep(1.0),
-        ))
+        .insert((SliderRange::new(0.0, LATENCY_MAX_MS as f32), SliderStep(1.0)))
         .id();
     commands.entity(row).add_child(track);
 

@@ -92,11 +92,7 @@ pub fn update_countdown(
     // The overlay's visibility is only written when it flips: rewriting the
     // same value re-runs visibility propagation over its whole subtree, and
     // this system runs every frame of the song.
-    let wanted = if clock.get() >= 0.0 {
-        Visibility::Hidden
-    } else {
-        Visibility::Visible
-    };
+    let wanted = if clock.get() >= 0.0 { Visibility::Hidden } else { Visibility::Visible };
     for mut vis in &mut overlay {
         if *vis != wanted {
             *vis = wanted;

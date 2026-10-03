@@ -39,11 +39,7 @@ pub(super) fn spawn_mic_banner(
     let visible = mic_banner_visible(status);
     let text = mic_banner_text(status, loc);
 
-    let display = if visible {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    let display = if visible { Display::Flex } else { Display::None };
     let banner = commands
         .spawn_empty()
         .apply_scene(bsn! {
@@ -83,10 +79,9 @@ pub(super) fn spawn_mic_banner(
 /// the useful part, even untranslated.
 pub(super) fn mic_banner_text(status: &MicStatus, loc: &Localization) -> String {
     match status {
-        MicStatus::Failed { reason } => String::from(loc.msg_args(
-            mic_banner_key(status).unwrap_or_default(),
-            &[("reason", reason.clone())],
-        )),
+        MicStatus::Failed { reason } => String::from(
+            loc.msg_args(mic_banner_key(status).unwrap_or_default(), &[("reason", reason.clone())]),
+        ),
         MicStatus::AwaitingPermission => {
             String::from(loc.msg(mic_banner_key(status).unwrap_or_default()))
         }
@@ -138,11 +133,7 @@ pub(super) fn update_mic_banner(
     }
     let visible = mic_banner_visible(&status);
     for mut node in &mut banners {
-        let display = if visible {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        let display = if visible { Display::Flex } else { Display::None };
         if node.display != display {
             node.display = display;
         }
@@ -182,10 +173,9 @@ pub(super) fn spawn_mic_combobox(
         connected.unwrap_or("None"),
         on_mic_selected,
     );
-    commands.entity(root).insert((
-        MicCombobox,
-        Tooltip(String::from(loc.msg("options-microphone-tooltip"))),
-    ));
+    commands
+        .entity(root)
+        .insert((MicCombobox, Tooltip(String::from(loc.msg("options-microphone-tooltip")))));
 }
 
 pub(super) fn on_mic_selected(

@@ -42,10 +42,7 @@ pub struct PitchRange {
 impl Default for PitchRange {
     fn default() -> Self {
         // Roughly C4 (262 Hz) to the top of a 10-hole diatonic.
-        Self {
-            min_freq: 200.0,
-            max_freq: 2500.0,
-        }
+        Self { min_freq: 200.0, max_freq: 2500.0 }
     }
 }
 
@@ -61,17 +58,13 @@ impl PitchRange {
     /// a bend or attack landing just past a charted note still detects.
     /// Falls back to [`PitchRange::default`] when `freqs` is empty.
     pub fn from_freqs(freqs: impl IntoIterator<Item = f32>, margin_semitones: f32) -> Self {
-        let (lo, hi) = freqs
-            .into_iter()
-            .fold((f32::MAX, f32::MIN), |(lo, hi), f| (lo.min(f), hi.max(f)));
+        let (lo, hi) =
+            freqs.into_iter().fold((f32::MAX, f32::MIN), |(lo, hi), f| (lo.min(f), hi.max(f)));
         if lo > hi {
             return Self::default();
         }
         let ratio = 2f32.powf(margin_semitones / 12.0);
-        Self {
-            min_freq: lo / ratio,
-            max_freq: hi * ratio,
-        }
+        Self { min_freq: lo / ratio, max_freq: hi * ratio }
     }
 }
 
@@ -255,14 +248,7 @@ impl Default for FftState {
 /// default [`PitchRange`]. Thin wrapper over [`analyze`] for callers that only
 /// want the pitches.
 pub fn detect_pitches(samples: &[f32], sample_rate: u32, state: &mut FftState) -> Vec<PitchInfo> {
-    analyze(
-        samples,
-        sample_rate,
-        state,
-        PitchAlgorithm::Fft,
-        PitchRange::default(),
-    )
-    .pitches
+    analyze(samples, sample_rate, state, PitchAlgorithm::Fft, PitchRange::default()).pitches
 }
 
 /// Window + FFT a block once (for the magnitude spectrum), then extract pitches
@@ -276,16 +262,8 @@ pub fn analyze(
     range: PitchRange,
 ) -> Analysis {
     let n = samples.len();
-    let freq_res = if n > 0 {
-        sample_rate as f32 / n as f32
-    } else {
-        0.0
-    };
-    let silent = Analysis {
-        pitches: vec![],
-        magnitudes: vec![],
-        freq_res,
-    };
+    let freq_res = if n > 0 { sample_rate as f32 / n as f32 } else { 0.0 };
+    let silent = Analysis { pitches: vec![], magnitudes: vec![], freq_res };
 
     if n < 2 {
         return silent;
@@ -311,16 +289,11 @@ pub fn analyze(
             Complex::new(s * w, 0.0)
         }));
 
-        state
-            .scratch
-            .resize(plan.get_inplace_scratch_len(), Complex::new(0.0, 0.0));
+        state.scratch.resize(plan.get_inplace_scratch_len(), Complex::new(0.0, 0.0));
         plan.process_with_scratch(buffer, &mut state.scratch);
 
         let half = n / 2;
-        buffer[..half]
-            .iter()
-            .map(|c| c.norm())
-            .collect::<Vec<f32>>()
+        buffer[..half].iter().map(|c| c.norm()).collect::<Vec<f32>>()
     };
 
     // Pitches come from the selected algorithm; the magnitudes above are always
@@ -354,31 +327,18 @@ pub fn analyze(
             if stale {
                 state.nmf_dict = Some(build_nmf_dict(sample_rate, n_bins, range));
             }
-            nmf_pitches(
-                &magnitudes,
-                state.nmf_dict.as_ref().unwrap(),
-                &mut state.nmf_scratch,
-            )
+            nmf_pitches(&magnitudes, state.nmf_dict.as_ref().unwrap(), &mut state.nmf_scratch)
         }
     };
 
-    Analysis {
-        pitches,
-        magnitudes,
-        freq_res,
-    }
+    Analysis { pitches, magnitudes, freq_res }
 }
 
 /// Wrap a single monophonic fundamental (if any) into the `Vec<PitchInfo>` the
 /// rest of the pipeline expects.
 fn mono_pitch(freq: Option<f32>) -> Vec<PitchInfo> {
     freq.and_then(|f| {
-        freq_to_note(f).map(|(midi, note, octave)| PitchInfo {
-            midi,
-            note,
-            octave,
-            frequency: f,
-        })
+        freq_to_note(f).map(|(midi, note, octave)| PitchInfo { midi, note, octave, frequency: f })
     })
     .into_iter()
     .collect()
@@ -511,11 +471,7 @@ fn yin_cmnd(
         let sum = f32::sqeuclidean(&samples[..w], &samples[tau..tau + w])
             .expect("YIN compares equal-length sample windows") as f32;
         running += sum;
-        cmnd[tau] = if running > 0.0 {
-            sum * tau as f32 / running
-        } else {
-            1.0
-        };
+        cmnd[tau] = if running > 0.0 { sum * tau as f32 / running } else { 1.0 };
     }
     Some((tau_min, tau_max))
 }
@@ -541,9 +497,7 @@ fn first_dip_below(cmnd: &[f32], tau_min: usize, tau_max: usize, threshold: f32)
 fn cmnd_to_freq(cmnd: &[f32], tau: usize, sample_rate: u32, range: PitchRange) -> Option<f32> {
     let refined = parabolic_vertex(cmnd, tau);
     let f0 = sample_rate as f32 / refined;
-    (range.min_freq..=range.max_freq)
-        .contains(&f0)
-        .then_some(f0)
+    (range.min_freq..=range.max_freq).contains(&f0).then_some(f0)
 }
 
 // ── pYIN (probabilistic YIN) ──────────────────────────────────────────────────
@@ -578,11 +532,8 @@ fn pyin_pitch(
         }
     }
 
-    let best = (tau_min..=tau_max).max_by(|&a, &b| {
-        prob[a]
-            .partial_cmp(&prob[b])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    })?;
+    let best = (tau_min..=tau_max)
+        .max_by(|&a, &b| prob[a].partial_cmp(&prob[b]).unwrap_or(std::cmp::Ordering::Equal))?;
     if prob[best] <= 0.0 {
         return None;
     }
@@ -604,11 +555,7 @@ fn parabolic_vertex(c: &[f32], tau: usize) -> f32 {
     }
     let (a, b, g) = (c[tau - 1], c[tau], c[tau + 1]);
     let denom = a - 2.0 * b + g;
-    if denom.abs() < 1e-10 {
-        tau as f32
-    } else {
-        tau as f32 + 0.5 * (a - g) / denom
-    }
+    if denom.abs() < 1e-10 { tau as f32 } else { tau as f32 + 0.5 * (a - g) / denom }
 }
 
 // ── McLeod Pitch Method (MPM) ─────────────────────────────────────────────────
@@ -652,11 +599,7 @@ fn mpm_pitch(
         let b = &samples[tau..];
         let acf = f32::dot(a, b).expect("MPM compares equal-length sample windows");
         let norm = f32::dot(a, a).unwrap() + f32::dot(b, b).unwrap();
-        nsdf[tau] = if norm > 0.0 {
-            (2.0 * acf / norm) as f32
-        } else {
-            0.0
-        };
+        nsdf[tau] = if norm > 0.0 { (2.0 * acf / norm) as f32 } else { 0.0 };
     }
 
     // Pick the first key maximum within MPM_CLARITY of the strongest one —
@@ -674,9 +617,7 @@ fn mpm_pitch(
 
     let refined = parabolic_vertex(nsdf, chosen);
     let f0 = sr / refined;
-    (range.min_freq..=range.max_freq)
-        .contains(&f0)
-        .then_some(f0)
+    (range.min_freq..=range.max_freq).contains(&f0).then_some(f0)
 }
 
 /// Peaks of positive NSDF humps after the zero-lag lobe, in lag order.
@@ -806,15 +747,7 @@ fn build_nmf_dict(sample_rate: u32, n_bins: usize, range: PitchRange) -> NmfDict
         }
     }
 
-    NmfDict {
-        sample_rate,
-        n_bins,
-        range,
-        n_notes,
-        freqs,
-        columns,
-        dtd,
-    }
+    NmfDict { sample_rate, n_bins, range, n_notes, freqs, columns, dtd }
 }
 
 /// Solve `y ≈ D·a` (a ≥ 0) with multiplicative updates and report the notes
@@ -858,9 +791,8 @@ fn nmf_pitches(magnitudes: &[f32], dict: &NmfDict, scratch: &mut NmfScratch) -> 
         if activation.is_nan() || activation < threshold {
             continue;
         }
-        let rank = strongest
-            .iter()
-            .position(|entry| entry.is_none_or(|(_, value)| activation > value));
+        let rank =
+            strongest.iter().position(|entry| entry.is_none_or(|(_, value)| activation > value));
         if let Some(rank) = rank {
             strongest[rank..].rotate_right(1);
             strongest[rank] = Some((*frequency, activation));

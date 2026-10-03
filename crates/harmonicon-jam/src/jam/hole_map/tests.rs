@@ -71,12 +71,8 @@ fn c_chromatic_harp() -> Harmonica {
 
 #[test]
 fn guide_covers_all_twelve_holes_for_a_chromatic_harp() {
-    let (holes, _) = build_hole_guide(
-        &c_chromatic_harp(),
-        "C",
-        Progression::Standard,
-        Scale::FirstPosition,
-    );
+    let (holes, _) =
+        build_hole_guide(&c_chromatic_harp(), "C", Progression::Standard, Scale::FirstPosition);
     assert_eq!(holes.len(), 12);
 }
 
@@ -108,15 +104,9 @@ fn guide_indexes_chord_tones_per_bar_of_the_twelve_bar_cycle() {
     // `twelve_bar`. Bar 4 is IV (F7); bar 8 is V (G7).
     let (_, guide) = build_hole_guide(&c_harp(), "C", Progression::Standard, Scale::FirstPosition);
     assert!(guide.chord_tones_by_bar[0].contains("C"), "bar 0 is I (C7)");
-    assert!(
-        guide.chord_tones_by_bar[4].contains("F"),
-        "bar 4 is IV (F7)"
-    );
+    assert!(guide.chord_tones_by_bar[4].contains("F"), "bar 4 is IV (F7)");
     assert!(guide.chord_tones_by_bar[8].contains("G"), "bar 8 is V (G7)");
-    assert!(
-        !guide.chord_tones_by_bar[0].contains("F"),
-        "F is not a tone of the I chord"
-    );
+    assert!(!guide.chord_tones_by_bar[0].contains("F"), "F is not a tone of the I chord");
 }
 
 #[test]
@@ -125,16 +115,9 @@ fn guide_follows_a_non_standard_progression() {
     // C7 = C,E,G,A#; F7 = F,A,C,D# — "E" is the major 3rd of C7 and
     // not a tone of F7 at all, so it distinguishes the two even though
     // both chords happen to share the note C (F7's 5th).
-    let (_, guide) = build_hole_guide(
-        &c_harp(),
-        "C",
-        Progression::QuickChange,
-        Scale::FirstPosition,
-    );
-    assert!(
-        guide.chord_tones_by_bar[1].contains("F"),
-        "quick change moves bar 1 to IV (F7)"
-    );
+    let (_, guide) =
+        build_hole_guide(&c_harp(), "C", Progression::QuickChange, Scale::FirstPosition);
+    assert!(guide.chord_tones_by_bar[1].contains("F"), "quick change moves bar 1 to IV (F7)");
     assert!(!guide.chord_tones_by_bar[1].contains("E"));
 }
 

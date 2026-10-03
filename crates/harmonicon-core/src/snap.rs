@@ -233,10 +233,7 @@ mod tests {
                 (9, GridlineKind::Sixteenth),
             ]
         );
-        assert_eq!(
-            sub_beat_gridlines(SnapMode::Shuffle),
-            vec![(8, GridlineKind::Triplet)]
-        );
+        assert_eq!(sub_beat_gridlines(SnapMode::Shuffle), vec![(8, GridlineKind::Triplet)]);
         assert_eq!(
             sub_beat_gridlines(SnapMode::Triplet),
             vec![(4, GridlineKind::Triplet), (8, GridlineKind::Triplet)]
@@ -260,16 +257,9 @@ mod tests {
     fn a_counting_syllable_always_names_the_same_tick() {
         // The shuffle's single off-beat is the triplet's *third* partial,
         // tick 8 — the same "a" the triplet mode labels there, not an "&".
-        let tick_of = |mode, key| {
-            off_beat_labels(mode)
-                .iter()
-                .find(|(_, k)| *k == key)
-                .map(|(t, _)| *t)
-        };
-        assert_eq!(
-            tick_of(SnapMode::Sixteenth, "editor-beat-count-and"),
-            Some(6)
-        );
+        let tick_of =
+            |mode, key| off_beat_labels(mode).iter().find(|(_, k)| *k == key).map(|(t, _)| *t);
+        assert_eq!(tick_of(SnapMode::Sixteenth, "editor-beat-count-and"), Some(6));
         assert_eq!(tick_of(SnapMode::Triplet, "editor-beat-count-and"), Some(4));
         assert_eq!(tick_of(SnapMode::Shuffle, "editor-beat-count-a"), Some(8));
         assert_eq!(tick_of(SnapMode::Triplet, "editor-beat-count-a"), Some(8));

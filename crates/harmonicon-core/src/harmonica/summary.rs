@@ -29,12 +29,7 @@ impl Harmonica {
     /// `None` for a chromatic harp, which has no bending profile.
     pub fn summary(&self) -> HarpSummary<'_> {
         match self {
-            Harmonica::Diatonic {
-                holes,
-                bending_profile,
-                position,
-                ..
-            } => HarpSummary {
+            Harmonica::Diatonic { holes, bending_profile, position, .. } => HarpSummary {
                 chromatic: false,
                 holes: *holes,
                 position: position.as_deref(),
@@ -45,9 +40,7 @@ impl Harmonica {
                     BendingProfile::NaturalMinor => "Natural Minor",
                 }),
             },
-            Harmonica::Chromatic {
-                holes, position, ..
-            } => HarpSummary {
+            Harmonica::Chromatic { holes, position, .. } => HarpSummary {
                 chromatic: true,
                 holes: *holes,
                 position: position.as_deref(),

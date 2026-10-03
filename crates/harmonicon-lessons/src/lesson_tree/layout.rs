@@ -238,11 +238,7 @@ pub fn layout_with_collapsed(
             .collect();
         let is_passed = passed.contains(id.as_str());
         let has_trainings = entry.manifest.training.is_some();
-        let mastery = if has_trainings {
-            profile.mastery(id, tiers)
-        } else {
-            0.0
-        };
+        let mastery = if has_trainings { profile.mastery(id, tiers) } else { 0.0 };
         nodes.push(PlacedNode {
             id: id.clone(),
             unit_id: entry.manifest.unit.clone(),
@@ -272,11 +268,8 @@ pub fn layout_with_collapsed(
         return TreeLayout::default();
     }
 
-    let index: HashMap<&str, usize> = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.id.as_str(), i))
-        .collect();
+    let index: HashMap<&str, usize> =
+        nodes.iter().enumerate().map(|(i, n)| (n.id.as_str(), i)).collect();
 
     // Adjacency, by node index, and **only within a unit** — a cross-unit
     // prerequisite is represented by the spine, not by an edge.
@@ -306,9 +299,7 @@ pub fn layout_with_collapsed(
     let mut units: Vec<PlacedUnit> = Vec::new();
     let mut cursor = 0.0_f32;
     for (ix, unit) in chain.units().iter().enumerate() {
-        let members: Vec<usize> = (0..nodes.len())
-            .filter(|&n| unit_of_node[n] == ix)
-            .collect();
+        let members: Vec<usize> = (0..nodes.len()).filter(|&n| unit_of_node[n] == ix).collect();
         if members.is_empty() {
             continue;
         }
@@ -366,11 +357,7 @@ pub fn layout_with_collapsed(
         units.push(PlacedUnit {
             id: unit.id.clone(),
             title_key: unit.title_key.clone(),
-            column: if is_collapsed {
-                cursor
-            } else {
-                cursor + (tallest - 1.0) / 2.0
-            },
+            column: if is_collapsed { cursor } else { cursor + (tallest - 1.0) / 2.0 },
             row: SPINE_ROW,
             locked: !chain.is_unlocked(ix, &passed),
             // An all-elective unit has no gate, so it reports progress
@@ -385,18 +372,11 @@ pub fn layout_with_collapsed(
             } else {
                 chain.completed(ix, &passed)
             },
-            required: if elective_only {
-                chain.total(ix)
-            } else {
-                chain.required(ix)
-            },
+            required: if elective_only { chain.total(ix) } else { chain.required(ix) },
             elective_only,
         });
-        cursor += if is_collapsed {
-            1.0 + UNIT_GAP_COLUMNS
-        } else {
-            tallest.max(1.0) + UNIT_GAP_COLUMNS
-        };
+        cursor +=
+            if is_collapsed { 1.0 + UNIT_GAP_COLUMNS } else { tallest.max(1.0) + UNIT_GAP_COLUMNS };
     }
 
     let mut edges: Vec<Edge> = Vec::new();
@@ -415,10 +395,7 @@ pub fn layout_with_collapsed(
         if preds.is_empty() {
             // A cluster root hangs off its unit node — otherwise the first
             // column of every unit floats unattached to anything.
-            if let Some(unit) = units
-                .iter()
-                .find(|u| u.id == chain.units()[unit_of_node[to]].id)
-            {
+            if let Some(unit) = units.iter().find(|u| u.id == chain.units()[unit_of_node[to]].id) {
                 edges.push(Edge {
                     from: (unit.column, unit.row),
                     to: (nodes[to].column, nodes[to].row),
@@ -445,20 +422,13 @@ pub fn layout_with_collapsed(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    TreeLayout {
-        units,
-        nodes,
-        edges,
-    }
+    TreeLayout { units, nodes, edges }
 }
 
 /// A lesson's Fluent title key, for naming it somewhere other than its own
 /// node.
 fn title_key_of(entries: &[LessonEntry], id: &str) -> Option<String> {
-    entries
-        .iter()
-        .find(|e| e.manifest.id == id)
-        .map(|e| e.manifest.title_key.clone())
+    entries.iter().find(|e| e.manifest.id == id).map(|e| e.manifest.title_key.clone())
 }
 
 /// Reorders each layer so edges cross as little as possible.
@@ -493,10 +463,8 @@ fn order_layers(layers: &mut [Vec<usize>], predecessors: &[Vec<usize>], successo
 
     let resort =
         |layer: &mut Vec<usize>, neighbours: &[Vec<usize>], row_of: &mut HashMap<usize, f32>| {
-            let mut keyed: Vec<(f32, usize)> = layer
-                .iter()
-                .map(|&n| (barycentre(n, &neighbours[n], row_of), n))
-                .collect();
+            let mut keyed: Vec<(f32, usize)> =
+                layer.iter().map(|&n| (barycentre(n, &neighbours[n], row_of), n)).collect();
             keyed.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
             layer.clear();
             layer.extend(keyed.into_iter().map(|(_, n)| n));

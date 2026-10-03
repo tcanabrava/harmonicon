@@ -24,10 +24,7 @@ pub struct PitchRange(pub harmonicon_dsp::PitchRange);
 impl PitchRange {
     /// Same chart-derived construction as the inner type, wrapped.
     pub fn from_freqs(freqs: impl IntoIterator<Item = f32>, margin_semitones: f32) -> Self {
-        Self(harmonicon_dsp::PitchRange::from_freqs(
-            freqs,
-            margin_semitones,
-        ))
+        Self(harmonicon_dsp::PitchRange::from_freqs(freqs, margin_semitones))
     }
 }
 

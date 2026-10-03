@@ -99,11 +99,8 @@ impl AdvancedKnob {
                 );
             }
             Self::A4 => {
-                settings.a4_hz = step(
-                    settings.a4_hz,
-                    direction * A4_STEP,
-                    BendingTrainerSettings::A4_HZ,
-                );
+                settings.a4_hz =
+                    step(settings.a4_hz, direction * A4_STEP, BendingTrainerSettings::A4_HZ);
             }
             Self::Trace => {
                 settings.trace_secs = step(
@@ -213,9 +210,7 @@ pub(super) fn spawn_advanced_drawer(
         // `spawn_gameplay_music_score` documents).
         BackgroundColor(Color::srgb(0.09, 0.09, 0.13)),
         GlobalZIndex(2),
-        Drawer {
-            open: settings.advanced_open,
-        },
+        Drawer { open: settings.advanced_open },
         AdvancedDrawer,
     ))
     .with_children(|drawer| {

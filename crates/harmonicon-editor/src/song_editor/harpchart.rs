@@ -32,20 +32,16 @@ fn note_name_for(n: &GridNote, harp: &Harmonica) -> String {
     let label = match n.pitch {
         Pitch::Normal => harp.wind_direction_label(n.hole, &action),
         Pitch::Slide => harp.slide_label(n.hole, &action),
-        Pitch::Overblow | Pitch::Overdraw => hole_notes(harp, n.hole)
-            .over
-            .unwrap_or_else(|| "C4".to_string()),
+        Pitch::Overblow | Pitch::Overdraw => {
+            hole_notes(harp, n.hole).over.unwrap_or_else(|| "C4".to_string())
+        }
         Pitch::Bend(a) => {
             let base = harp.wind_direction_label(n.hole, &action);
             let midi = note_to_midi(&base).unwrap_or(60);
             return midi_to_note((midi as f32 - a).round() as i32);
         }
     };
-    if label == "\u{2014}" {
-        "C4".to_string()
-    } else {
-        label
-    }
+    if label == "\u{2014}" { "C4".to_string() } else { label }
 }
 
 pub(super) fn serialize_harpchart(state: &EditorState) -> String {
@@ -170,16 +166,8 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         })
         .collect();
 
-    let title = if state.name.is_empty() {
-        "Untitled"
-    } else {
-        &state.name
-    };
-    let artist = if state.author.is_empty() {
-        "Unknown Artist"
-    } else {
-        &state.author
-    };
+    let title = if state.name.is_empty() { "Untitled" } else { &state.name };
+    let artist = if state.author.is_empty() { "Unknown Artist" } else { &state.author };
     let last_phrase = track.len().saturating_sub(1);
 
     // The harp's own layout, transposed to `state.key` like every note in
@@ -193,12 +181,9 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         | HarmonicaKind::PaddyRichter
         | HarmonicaKind::NaturalMinor => {
             let (blow, draw) = match &harp {
-                Harmonica::Diatonic {
-                    layout: Some(l), ..
-                } => (
-                    l.blow.as_deref().unwrap_or(&[]),
-                    l.draw.as_deref().unwrap_or(&[]),
-                ),
+                Harmonica::Diatonic { layout: Some(l), .. } => {
+                    (l.blow.as_deref().unwrap_or(&[]), l.draw.as_deref().unwrap_or(&[]))
+                }
                 _ => (&[][..], &[][..]),
             };
             let bending_profile = match state.harmonica_kind {
@@ -219,9 +204,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         }
         HarmonicaKind::Chromatic | HarmonicaKind::Chromatic16 => {
             let (blow, draw, blow_slide, draw_slide) = match &harp {
-                Harmonica::Chromatic {
-                    layout: Some(l), ..
-                } => (
+                Harmonica::Chromatic { layout: Some(l), .. } => (
                     l.blow.as_deref().unwrap_or(&[]),
                     l.draw.as_deref().unwrap_or(&[]),
                     l.blow_slide.as_deref().unwrap_or(&[]),
@@ -248,11 +231,8 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     // round-trip convenience (gameplay always loads `song/*.ogg` by
     // convention, never this field) — omit it entirely rather than writing
     // an empty string when no audio file has been picked yet.
-    let chart_author = if state.chart_author.is_empty() {
-        artist
-    } else {
-        state.chart_author.as_str()
-    };
+    let chart_author =
+        if state.chart_author.is_empty() { artist } else { state.chart_author.as_str() };
     let mut metadata = json!({
         "format_version": CURRENT_FORMAT_VERSION,
         "author": chart_author,
@@ -281,12 +261,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     if state.song_feel != "default" {
         song["feel"] = json!(state.song_feel);
     }
-    let loop_start = state
-        .loop_settings
-        .start
-        .parse::<usize>()
-        .unwrap_or(0)
-        .min(last_phrase);
+    let loop_start = state.loop_settings.start.parse::<usize>().unwrap_or(0).min(last_phrase);
     let loop_end = state
         .loop_settings
         .end
@@ -315,12 +290,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         })
     });
     let positive_ms = |value: &str, fallback: u64| {
-        value
-            .trim()
-            .parse::<u64>()
-            .ok()
-            .filter(|value| *value > 0)
-            .unwrap_or(fallback)
+        value.trim().parse::<u64>().ok().filter(|value| *value > 0).unwrap_or(fallback)
     };
     scoring["perfect_window_ms"] = json!(positive_ms(&state.perfect_window_ms, 60));
     scoring["good_window_ms"] = json!(positive_ms(&state.good_window_ms, 120));
@@ -410,9 +380,7 @@ pub(super) fn pickup_beats_text(
     editor_ticks: f64,
     meter: harmonicon_ui::music_score::MusicScoreMeter,
 ) -> String {
-    let beat_ticks = meter
-        .ticks_per_beat(TICKS_PER_BEAT as u32)
-        .unwrap_or(TICKS_PER_BEAT as u32);
+    let beat_ticks = meter.ticks_per_beat(TICKS_PER_BEAT as u32).unwrap_or(TICKS_PER_BEAT as u32);
     let beats = editor_ticks.round() / f64::from(beat_ticks);
     if beats <= 0.0 {
         String::new()
@@ -427,40 +395,20 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     state.preserved_scoring = v.get("scoring").cloned();
     if let Some(loop_settings) = v.get("loop") {
         state.loop_settings.kind = loop_settings["type"].as_str().unwrap_or("full").to_string();
-        state.loop_settings.repeat = if loop_settings["repeat"].as_bool().unwrap_or(false) {
-            "yes"
-        } else {
-            "no"
-        }
-        .into();
-        state.loop_settings.start = loop_settings["start_index"]
-            .as_u64()
-            .unwrap_or(0)
-            .to_string();
+        state.loop_settings.repeat =
+            if loop_settings["repeat"].as_bool().unwrap_or(false) { "yes" } else { "no" }.into();
+        state.loop_settings.start = loop_settings["start_index"].as_u64().unwrap_or(0).to_string();
         state.loop_settings.end = loop_settings["end_index"]
             .as_u64()
             .map_or_else(|| "last".into(), |value| value.to_string());
     }
     if let Some(scoring) = v.get("scoring") {
-        state.perfect_window_ms = scoring["perfect_window_ms"]
-            .as_u64()
-            .unwrap_or(60)
-            .to_string();
-        state.good_window_ms = scoring["good_window_ms"]
-            .as_u64()
-            .unwrap_or(120)
-            .to_string();
-        state.miss_window_ms = scoring["miss_window_ms"]
-            .as_u64()
-            .unwrap_or(220)
-            .to_string();
+        state.perfect_window_ms = scoring["perfect_window_ms"].as_u64().unwrap_or(60).to_string();
+        state.good_window_ms = scoring["good_window_ms"].as_u64().unwrap_or(120).to_string();
+        state.miss_window_ms = scoring["miss_window_ms"].as_u64().unwrap_or(220).to_string();
         let combo = &scoring["combo"];
-        state.combo.enabled = if combo["enabled"].as_bool().unwrap_or(true) {
-            "enabled"
-        } else {
-            "disabled"
-        }
-        .into();
+        state.combo.enabled =
+            if combo["enabled"].as_bool().unwrap_or(true) { "enabled" } else { "disabled" }.into();
         state.combo.base = combo["base_multiplier"].as_f64().unwrap_or(1.0).to_string();
         state.combo.step = combo["step_multiplier"].as_f64().unwrap_or(0.1).to_string();
         state.combo.max = combo["max_multiplier"].as_f64().unwrap_or(4.0).to_string();
@@ -501,10 +449,7 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         if let Some(difficulty) = song["difficulty"].as_str() {
             state.difficulty = difficulty.to_string();
         }
-        state.genre = song["genre"]
-            .as_str()
-            .unwrap_or("Uncategorized")
-            .to_string();
+        state.genre = song["genre"].as_str().unwrap_or("Uncategorized").to_string();
         state.song_feel = song["feel"].as_str().unwrap_or("default").to_string();
     }
     if let Some(p) = v["harmonica"]["position"].as_str()
@@ -515,10 +460,8 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     if let Ok(scale) = serde_json::from_value::<Scale>(v["harmonica"]["scale"].clone()) {
         state.scale = scale;
     }
-    state.harmonica_kind = match (
-        v["harmonica"]["type"].as_str(),
-        v["harmonica"]["holes"].as_u64(),
-    ) {
+    state.harmonica_kind = match (v["harmonica"]["type"].as_str(), v["harmonica"]["holes"].as_u64())
+    {
         (Some("chromatic"), Some(16)) => HarmonicaKind::Chromatic16,
         (Some("chromatic"), _) => HarmonicaKind::Chromatic,
         _ => match v["harmonica"]["bending_profile"].as_str() {
@@ -530,11 +473,7 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     };
     state.loaded_harmonica = serde_json::from_value::<Harmonica>(v["harmonica"].clone())
         .ok()
-        .map(|harp| LoadedHarmonica {
-            key: state.key.clone(),
-            kind: state.harmonica_kind,
-            harp,
-        });
+        .map(|harp| LoadedHarmonica { key: state.key.clone(), kind: state.harmonica_kind, harp });
     if let Some(meta) = v.get("metadata")
         && let Some(audio) = meta["audio_file"].as_str()
         && !audio.is_empty()
@@ -558,19 +497,13 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
         .map(|arr| {
             arr.iter()
                 .filter_map(|p| {
-                    Some(TempoPoint {
-                        tick: p["tick"].as_u64()?,
-                        bpm: p["bpm"].as_f64()? as f32,
-                    })
+                    Some(TempoPoint { tick: p["tick"].as_u64()?, bpm: p["bpm"].as_f64()? as f32 })
                 })
                 .collect::<Vec<_>>()
         })
         .filter(|m| !m.is_empty())
         .unwrap_or_else(|| {
-            vec![TempoPoint {
-                tick: 0,
-                bpm: state.tempo.parse::<f32>().unwrap_or(120.0).max(1.0),
-            }]
+            vec![TempoPoint { tick: 0, bpm: state.tempo.parse::<f32>().unwrap_or(120.0).max(1.0) }]
         });
 
     // Editor ticks and file ticks are both "N per quarter note" grids
@@ -694,11 +627,8 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
                 if !(1..=hole_count).contains(&hole) {
                     continue;
                 }
-                let dir = if event["action"].as_str() == Some("draw") {
-                    Dir::Draw
-                } else {
-                    Dir::Blow
-                };
+                let dir =
+                    if event["action"].as_str() == Some("draw") { Dir::Draw } else { Dir::Blow };
                 let mods = event["modifiers"].as_array().map_or(&[][..], Vec::as_slice);
                 let (pitch, expr) = parse_pitch_expr(mods);
                 if let Some(intensity) = mods.iter().find_map(|modifier| {
@@ -707,19 +637,9 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
                         .flatten()
                 }) && intensity != 0.5
                 {
-                    state
-                        .expression_intensities
-                        .insert(next_id, intensity.to_string());
+                    state.expression_intensities.insert(next_id, intensity.to_string());
                 }
-                notes.push(GridNote {
-                    id: next_id,
-                    hole,
-                    tick: start_tick,
-                    len,
-                    dir,
-                    pitch,
-                    expr,
-                });
+                notes.push(GridNote { id: next_id, hole, tick: start_tick, len, dir, pitch, expr });
                 next_id += 1;
             }
         }
@@ -825,20 +745,15 @@ pub(super) fn handle_load_chosen(
         let v = match validated_harpchart(&text) {
             Ok(v) => v,
             Err(e) => {
-                warn!(
-                    "Song editor: load failed (validation {}): {e}",
-                    ev.path.display()
-                );
+                warn!("Song editor: load failed (validation {}): {e}", ev.path.display());
                 feedback.set(loc.msg_args("editor-load-failed", &[("detail", e.to_string())]));
                 continue;
             }
         };
         load_harpchart(&v, &mut state, &mut scroll);
         info!("Song editor: loaded {}", ev.path.display());
-        feedback.set(loc.msg_args(
-            "editor-load-success",
-            &[("path", ev.path.display().to_string())],
-        ));
+        feedback
+            .set(loc.msg_args("editor-load-success", &[("path", ev.path.display().to_string())]));
     }
 }
 
@@ -894,16 +809,12 @@ pub(super) fn handle_save_chosen(
         match std::fs::write(&ev.path, json.as_bytes()) {
             Ok(()) => {
                 info!("Song editor: saved {}", ev.path.display());
-                feedback.set(loc.msg_args(
-                    "editor-save-success",
-                    &[("path", ev.path.display().to_string())],
-                ));
+                feedback.set(
+                    loc.msg_args("editor-save-success", &[("path", ev.path.display().to_string())]),
+                );
             }
             Err(e) => {
-                warn!(
-                    "Song editor: save failed (write {}): {e}",
-                    ev.path.display()
-                );
+                warn!("Song editor: save failed (write {}): {e}", ev.path.display());
                 feedback.set(loc.msg_args("editor-save-failed", &[("detail", e.to_string())]));
             }
         }
@@ -925,11 +836,7 @@ fn save_midi_backing(
 ) {
     match super::midi_import::remove_track_bytes(&midi.bytes, track_index) {
         Ok(bytes) => {
-            let stem = midi
-                .path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("song");
+            let stem = midi.path.file_stem().and_then(|s| s.to_str()).unwrap_or("song");
             let out = dir.join(format!("{stem}_processed.mid"));
             match std::fs::write(&out, &bytes) {
                 Ok(()) => info!(

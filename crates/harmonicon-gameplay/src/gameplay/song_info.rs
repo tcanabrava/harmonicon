@@ -76,9 +76,7 @@ pub(super) fn time_signature_label(chart: &HarpChart) -> String {
 /// wording the enum doesn't know, which is still worth showing.
 pub fn position_label(raw: &str, loc: &Localization) -> String {
     match Position::from_label(raw) {
-        Some(position) => loc
-            .msg(&enum_label_key("position", position.label()))
-            .into(),
+        Some(position) => loc.msg(&enum_label_key("position", position.label())).into(),
         None => raw.to_string(),
     }
 }
@@ -115,15 +113,11 @@ pub fn harp_banner_text(harp: &Harmonica, song_key: &str, loc: &Localization) ->
             loc.msg_args("harp-banner-fallback", &[("key", song_key.to_string())]),
         );
     };
-    let mut parts = vec![String::from(
-        loc.msg_args("harp-banner-use", &[("key", harp_key)]),
-    )];
+    let mut parts = vec![String::from(loc.msg_args("harp-banner-use", &[("key", harp_key)]))];
     parts.extend(harp.position().map(|p| {
         String::from(loc.msg_args("harp-summary-position", &[("pos", position_label(p, loc))]))
     }));
-    parts.push(String::from(
-        loc.msg_args("harp-banner-key", &[("key", song_key.to_string())]),
-    ));
+    parts.push(String::from(loc.msg_args("harp-banner-key", &[("key", song_key.to_string())])));
     parts.join("  \u{00B7}  ")
 }
 
@@ -157,16 +151,8 @@ pub fn spawn_song_details(parent: &mut ChildSpawnerCommands, info: &SongInfo) {
                 (Some(&info.title), 20.0, Color::WHITE),
                 (Some(&info.meter), 15.0, Color::srgb(0.60, 0.65, 0.75)),
                 (Some(&info.harp), 15.0, Color::srgb(0.45, 0.72, 0.55)),
-                (
-                    info.description.as_ref(),
-                    15.0,
-                    Color::srgb(0.50, 0.50, 0.55),
-                ),
-                (
-                    info.chart_author.as_ref(),
-                    15.0,
-                    Color::srgb(0.40, 0.40, 0.45),
-                ),
+                (info.description.as_ref(), 15.0, Color::srgb(0.50, 0.50, 0.55)),
+                (info.chart_author.as_ref(), 15.0, Color::srgb(0.40, 0.40, 0.45)),
             ] {
                 let Some(text) = text else { continue };
                 col.spawn_empty().apply_scene(bsn! {

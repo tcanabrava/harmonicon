@@ -92,27 +92,20 @@ pub fn setup(
     // count (empty for an ordinary, non-MIDI-backed song, so the mute row
     // below simply doesn't spawn and the apply/UI systems have nothing to
     // iterate).
-    stem_mute
-        .0
-        .resize(manifest.backing_stems.as_ref().map_or(0, Vec::len), false);
+    stem_mute.0.resize(manifest.backing_stems.as_ref().map_or(0, Vec::len), false);
     stem_mute.0.fill(false);
 
     let chart = &manifest.chart;
     let key = chart.song.key.as_str();
     let bpm = chart.song.tempo_bpm;
     let progression = jam_progression.0;
-    let chords: Vec<String> = progression_bars(key, progression)
-        .into_iter()
-        .map(|(root, _)| root)
-        .collect();
+    let chords: Vec<String> =
+        progression_bars(key, progression).into_iter().map(|(root, _)| root).collect();
     let title = format!("{} \u{2014} {}", chart.song.artist, chart.song.title);
     // From gameplay's one reading of a chart's meter (`bars::chart_meter`),
     // so the HUD's beat dots can't disagree with the click they animate.
-    let beats_per_bar = usize::from(
-        harmonicon_gameplay::gameplay::chart_meter(chart)
-            .numerator
-            .max(1),
-    );
+    let beats_per_bar =
+        usize::from(harmonicon_gameplay::gameplay::chart_meter(chart).numerator.max(1));
 
     // Per-hole note labels + the lookup the live feedback system uses to light
     // the hole(s) the player is currently sounding, coloured by scale fit and
@@ -391,11 +384,7 @@ pub fn setup(
                                 ..default()
                             },
                             JamGuidePanel,
-                            if guides_visible {
-                                Visibility::Visible
-                            } else {
-                                Visibility::Hidden
-                            },
+                            if guides_visible { Visibility::Visible } else { Visibility::Hidden },
                         ))
                         .with_children(|grid| {
                             let _ = spawn_12_bar_grid(
@@ -415,11 +404,7 @@ pub fn setup(
                                 ..default()
                             },
                             JamGuidePanel,
-                            if guides_visible {
-                                Visibility::Visible
-                            } else {
-                                Visibility::Hidden
-                            },
+                            if guides_visible { Visibility::Visible } else { Visibility::Hidden },
                         ))
                         .with_children(|metro| {
                             spawn_metronome(metro, &loc, beats_per_bar, bpm);
@@ -447,11 +432,7 @@ pub fn setup(
                                 ..default()
                             },
                             JamGuidePanel,
-                            if guides_visible {
-                                Visibility::Visible
-                            } else {
-                                Visibility::Hidden
-                            },
+                            if guides_visible { Visibility::Visible } else { Visibility::Hidden },
                         ))
                         .with_children(|diagnostics| {
                             harmonicon_ui::spectrogram::spawn_style_toggle(
@@ -486,11 +467,7 @@ pub fn setup(
                             ..default()
                         },
                         JamGuidePanel,
-                        if guides_visible {
-                            Visibility::Visible
-                        } else {
-                            Visibility::Hidden
-                        },
+                        if guides_visible { Visibility::Visible } else { Visibility::Hidden },
                     ))
                     .with_children(|right| {
                         spawn_harmonica_overlay(right, harp, &loc);
@@ -594,11 +571,7 @@ pub fn update_jam_loop_label(
     if !jam_loop.is_changed() && added.is_empty() {
         return;
     }
-    let want = loc.msg(if jam_loop.0 {
-        "jam-loop-on"
-    } else {
-        "jam-loop-off"
-    });
+    let want = loc.msg(if jam_loop.0 { "jam-loop-on" } else { "jam-loop-off" });
     for mut text in &mut labels {
         if text.0 != *want {
             text.0.clear();

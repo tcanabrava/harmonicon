@@ -9,10 +9,7 @@ fn midi_with(tracks: &[(&str, &[(u32, u8, u32)])]) -> Vec<u8> {
     let built: Vec<Vec<midly::TrackEvent<'static>>> = tracks
         .iter()
         .map(|(name, notes)| {
-            let mut events = vec![meta(
-                0,
-                MetaMessage::TrackName(name.as_bytes().to_vec().leak()),
-            )];
+            let mut events = vec![meta(0, MetaMessage::TrackName(name.as_bytes().to_vec().leak()))];
             for &(delta, key, len) in *notes {
                 events.push(note_on(delta, key, 100));
                 events.push(note_off(len, key));
@@ -83,10 +80,7 @@ fn notes_are_sorted_by_start_time() {
 fn a_file_with_no_notes_anywhere_is_rejected_up_front() {
     // Better than handing back a score whose every track plays silence.
     let bytes = midi_with(&[("Conductor", &[]), ("Markers", &[])]);
-    assert!(matches!(
-        MidiScore::parse(bytes),
-        Err(crate::ScoreError::NoPlayableTracks)
-    ));
+    assert!(matches!(MidiScore::parse(bytes), Err(crate::ScoreError::NoPlayableTracks)));
 }
 
 #[test]

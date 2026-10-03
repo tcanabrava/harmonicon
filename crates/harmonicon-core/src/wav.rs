@@ -50,12 +50,8 @@ pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
 /// a Song Editor MIDI import's synthesized `song/music.wav` backing track.
 pub fn decode_wav_pcm16(bytes: &[u8]) -> Option<(Vec<f32>, u16, u32)> {
     let (data, channels, sample_rate) = wav_pcm16_data(bytes)?;
-    let samples = data
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|b| i16::from_le_bytes(*b) as f32 / 32768.0)
-        .collect();
+    let samples =
+        data.as_chunks::<2>().0.iter().map(|b| i16::from_le_bytes(*b) as f32 / 32768.0).collect();
     Some((samples, channels, sample_rate))
 }
 

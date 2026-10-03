@@ -22,11 +22,7 @@ pub(super) fn update_legend_visibility(
     if !state.is_changed() {
         return;
     }
-    let display = if state.legend_visible {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    let display = if state.legend_visible { Display::Flex } else { Display::None };
     for mut node in &mut columns {
         if node.display != display {
             node.display = display;
@@ -147,11 +143,7 @@ pub(super) fn spawn_color_legend(
     spawn_legend_row(
         col,
         colors,
-        mix_srgba(
-            pitch_color(Pitch::Normal),
-            OUT_OF_SCALE_TINT,
-            OUT_OF_SCALE_MIX,
-        ),
+        mix_srgba(pitch_color(Pitch::Normal), OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX),
         false,
         loc.msg("editor-legend-out-of-scale").to_string(),
     );

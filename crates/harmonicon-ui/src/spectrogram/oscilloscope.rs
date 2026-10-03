@@ -45,11 +45,7 @@ pub fn init_material(mut commands: Commands, mut materials: ResMut<Assets<Oscill
 /// Spawns the full-panel trace node.
 pub fn spawn(parent: &mut ChildSpawnerCommands, material: &Handle<OscilloscopeMaterial>) {
     parent.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            ..default()
-        },
+        Node { width: Val::Percent(100.0), height: Val::Percent(100.0), ..default() },
         MaterialNode(material.clone()),
     ));
 }

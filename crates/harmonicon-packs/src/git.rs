@@ -91,9 +91,7 @@ pub fn remote_head(checkout: &Path, spec: &RepoSpec) -> Result<String, SyncError
             }
         }
     }
-    Err(SyncError::NoSuchRef(
-        git_ref.clone().unwrap_or_else(|| "HEAD".into()),
-    ))
+    Err(SyncError::NoSuchRef(git_ref.clone().unwrap_or_else(|| "HEAD".into())))
 }
 
 /// Full ref names `git_ref` may mean, in the order git itself resolves them.
@@ -170,27 +168,30 @@ fn clone_shallow(
     if let Some(name) = git_ref {
         prepare = prepare.with_ref_name(Some(name)).map_err(fetch_err)?;
     }
-    let (mut checkout, _) = prepare
-        .fetch_then_checkout(Discard, should_interrupt)
-        .map_err(|e| match (&e, git_ref) {
-            // Nothing on the remote matched what we asked for: the named
-            // branch or tag doesn't exist, or, following the default branch,
-            // the repository has none yet. gix's own wording for both lists
-            // refspecs, which says nothing to a player.
-            (
-                gix::clone::fetch::Error::RefNameMissing { .. }
-                | gix::clone::fetch::Error::Fetch(gix::remote::fetch::Error::NoMapping { .. }),
-                Some(name),
-            ) => SyncError::NoSuchRef(name.into()),
-            (
-                gix::clone::fetch::Error::Fetch(gix::remote::fetch::Error::NoMapping { .. }),
-                None,
-            ) => SyncError::EmptyRepository,
-            _ => fetch_err(e),
+    let (mut checkout, _) =
+        prepare.fetch_then_checkout(Discard, should_interrupt).map_err(|e| {
+            match (&e, git_ref) {
+                // Nothing on the remote matched what we asked for: the named
+                // branch or tag doesn't exist, or, following the default branch,
+                // the repository has none yet. gix's own wording for both lists
+                // refspecs, which says nothing to a player.
+                (
+                    gix::clone::fetch::Error::RefNameMissing { .. }
+                    | gix::clone::fetch::Error::Fetch(gix::remote::fetch::Error::NoMapping {
+                        ..
+                    }),
+                    Some(name),
+                ) => SyncError::NoSuchRef(name.into()),
+                (
+                    gix::clone::fetch::Error::Fetch(gix::remote::fetch::Error::NoMapping {
+                        ..
+                    }),
+                    None,
+                ) => SyncError::EmptyRepository,
+                _ => fetch_err(e),
+            }
         })?;
-    let (repo, _) = checkout
-        .main_worktree(Discard, should_interrupt)
-        .map_err(fetch_err)?;
+    let (repo, _) = checkout.main_worktree(Discard, should_interrupt).map_err(fetch_err)?;
     let head = repo.head_id().map_err(fetch_err)?;
     Ok(head.to_string())
 }
@@ -259,10 +260,8 @@ fn check_tree(dir: &Path) -> Result<(), SyncError> {
 /// deleted after the new one is in place, so at every instant one complete
 /// copy exists under a known name.
 fn swap_into_place(staging: &Path, dest: &Path) -> std::io::Result<()> {
-    let old = dest.with_file_name(format!(
-        ".old-{}",
-        dest.file_name().unwrap_or_default().to_string_lossy()
-    ));
+    let old = dest
+        .with_file_name(format!(".old-{}", dest.file_name().unwrap_or_default().to_string_lossy()));
     remove_if_present(&old)?;
     if dest.exists() {
         std::fs::rename(dest, &old)?;
@@ -295,31 +294,17 @@ mod tests {
 
     fn git(dir: &Path, args: &[&str]) -> String {
         let out = Command::new("git")
-            .args([
-                "-c",
-                "user.name=t",
-                "-c",
-                "user.email=t@t",
-                "-c",
-                "init.defaultBranch=main",
-            ])
+            .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"])
             .args(args)
             .current_dir(dir)
             .output()
             .expect("git is installed");
-        assert!(
-            out.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
         String::from_utf8(out.stdout).unwrap().trim().to_string()
     }
 
     fn engine() -> EngineSupport {
-        EngineSupport {
-            harmonicon: semver::Version::new(0, 5, 0),
-            lesson_format: 1,
-        }
+        EngineSupport { harmonicon: semver::Version::new(0, 5, 0), lesson_format: 1 }
     }
 
     const PACK: &str =
@@ -346,14 +331,7 @@ mod tests {
     }
 
     fn install_into(spec: &RepoSpec, root: &Path) -> Result<InstalledRepo, SyncError> {
-        install(
-            spec,
-            root,
-            PackKind::Lessons,
-            &engine(),
-            &AtomicBool::new(false),
-        )
-        .map(|(r, _)| r)
+        install(spec, root, PackKind::Lessons, &engine(), &AtomicBool::new(false)).map(|(r, _)| r)
     }
 
     #[test]
@@ -369,12 +347,7 @@ mod tests {
         assert!(checkout.join("pack.json").is_file());
         let count = git(&checkout, &["rev-list", "--count", "HEAD"]);
         assert_eq!(count, "1", "history was downloaded");
-        assert!(
-            !root
-                .path()
-                .join(format!(".staging-{}", spec.slug()))
-                .exists()
-        );
+        assert!(!root.path().join(format!(".staging-{}", spec.slug())).exists());
     }
 
     #[test]
@@ -384,24 +357,15 @@ mod tests {
         std::fs::create_dir_all(folder.join("song")).unwrap();
         std::fs::write(folder.join("song/chart.harpchart"), "chart").unwrap();
         std::fs::write(folder.join("backing.ogg"), "audio").unwrap();
-        std::fs::write(
-            upstream.path().join("pack.json"),
-            PACK.replace("lessons", "songs"),
-        )
-        .unwrap();
+        std::fs::write(upstream.path().join("pack.json"), PACK.replace("lessons", "songs"))
+            .unwrap();
         git(upstream.path(), &["add", "-A"]);
         git(upstream.path(), &["commit", "-q", "-m", "songs"]);
         let root = tempfile::tempdir().unwrap();
         let spec = spec_for(upstream.path(), None);
         let update = || {
-            install(
-                &spec,
-                root.path(),
-                PackKind::Songs,
-                &engine(),
-                &AtomicBool::new(false),
-            )
-            .unwrap()
+            install(&spec, root.path(), PackKind::Songs, &engine(), &AtomicBool::new(false))
+                .unwrap()
         };
         update();
         std::fs::remove_dir_all(&folder).unwrap();
@@ -434,10 +398,7 @@ mod tests {
         git(up.path(), &["commit", "-q", "-m", "new"]);
         let new_head = git(up.path(), &["rev-parse", "HEAD"]);
         assert_eq!(remote_head(&checkout, &spec).unwrap(), new_head);
-        assert!(
-            !checkout.join("new.txt").exists(),
-            "a check must not update"
-        );
+        assert!(!checkout.join("new.txt").exists(), "a check must not update");
 
         let updated = install_into(&spec, root.path()).unwrap();
         assert_eq!(updated.commit, new_head);
@@ -459,10 +420,7 @@ mod tests {
 
         let root = tempfile::tempdir().unwrap();
         let branch = spec_for(up.path(), Some("harmonicon-0.5"));
-        assert_eq!(
-            install_into(&branch, root.path()).unwrap().commit,
-            branch_head
-        );
+        assert_eq!(install_into(&branch, root.path()).unwrap().commit, branch_head);
         assert!(root.path().join(branch.slug()).join("branch.txt").exists());
         let checkout = root.path().join(branch.slug());
         assert_eq!(remote_head(&checkout, &branch).unwrap(), branch_head);
@@ -489,18 +447,14 @@ mod tests {
         git(up.path(), &["commit", "-q", "-am", "needs newer engine"]);
 
         let err = install_into(&spec, root.path()).unwrap_err();
-        assert!(matches!(
-            err,
-            SyncError::Incompatible(Incompatible::LessonFormatTooNew { .. })
-        ));
+        assert!(matches!(err, SyncError::Incompatible(Incompatible::LessonFormatTooNew { .. })));
         let checkout = root.path().join(spec.slug());
         assert_eq!(git(&checkout, &["rev-parse", "HEAD"]), first.commit);
-        assert!(std::fs::read_dir(root.path()).unwrap().all(|e| {
-            !e.unwrap()
-                .file_name()
-                .to_string_lossy()
-                .starts_with(".staging")
-        }));
+        assert!(
+            std::fs::read_dir(root.path())
+                .unwrap()
+                .all(|e| { !e.unwrap().file_name().to_string_lossy().starts_with(".staging") })
+        );
     }
 
     #[test]
@@ -566,12 +520,7 @@ mod tests {
     #[test]
     fn local_specs_are_never_downloaded() {
         let root = tempfile::tempdir().unwrap();
-        let spec = RepoSpec::Local {
-            path: root.path().into(),
-        };
-        assert!(matches!(
-            install_into(&spec, root.path()),
-            Err(SyncError::LocalSpec)
-        ));
+        let spec = RepoSpec::Local { path: root.path().into() };
+        assert!(matches!(install_into(&spec, root.path()), Err(SyncError::LocalSpec)));
     }
 }

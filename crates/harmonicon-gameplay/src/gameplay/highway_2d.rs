@@ -92,52 +92,48 @@ pub(super) fn spawn_harmonica_strip(
 ) {
     let hole_count = harp.hole_count();
     let lane_pct = 100.0 / hole_count as f32;
-    col.spawn(Node {
-        flex_direction: FlexDirection::Row,
-        width: Val::Percent(100.0),
-        ..default()
-    })
-    .with_children(|row| {
-        for hole in 1u8..=hole_count {
-            let b = harp.wind_direction_label(hole, &Action::Blow);
-            let d = harp.wind_direction_label(hole, &Action::Draw);
-            // Fixed px, not Vh — Vh resolves from the physical viewport and
-            // doesn't respond to `UiScale`, unlike this cell's own text, so
-            // the cell would stay a fixed size on screen while its labels
-            // scaled independently.
-            row.spawn_empty()
-                .apply_scene(bsn! {
-                    Node {
-                        width: {Val::Percent(lane_pct)},
-                        height: {Val::Px(96.0)},
-                        flex_direction: {FlexDirection::Column},
-                        align_items: {AlignItems::Center},
-                        justify_content: {JustifyContent::SpaceAround},
-                        border: {UiRect::all(Val::Px(1.0))},
-                    }
-                    BackgroundColor({Color::srgb(0.10, 0.12, 0.16)})
-                    ~{BorderColor::all(Color::srgb(0.28, 0.30, 0.40))}
-                    HoleCell(hole)
-                })
-                .with_children(|cell| {
-                    cell.spawn_empty().apply_scene(bsn! {
-                        Text({b})
-                        TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::srgb(0.50, 0.75, 1.00)})
+    col.spawn(Node { flex_direction: FlexDirection::Row, width: Val::Percent(100.0), ..default() })
+        .with_children(|row| {
+            for hole in 1u8..=hole_count {
+                let b = harp.wind_direction_label(hole, &Action::Blow);
+                let d = harp.wind_direction_label(hole, &Action::Draw);
+                // Fixed px, not Vh — Vh resolves from the physical viewport and
+                // doesn't respond to `UiScale`, unlike this cell's own text, so
+                // the cell would stay a fixed size on screen while its labels
+                // scaled independently.
+                row.spawn_empty()
+                    .apply_scene(bsn! {
+                        Node {
+                            width: {Val::Percent(lane_pct)},
+                            height: {Val::Px(96.0)},
+                            flex_direction: {FlexDirection::Column},
+                            align_items: {AlignItems::Center},
+                            justify_content: {JustifyContent::SpaceAround},
+                            border: {UiRect::all(Val::Px(1.0))},
+                        }
+                        BackgroundColor({Color::srgb(0.10, 0.12, 0.16)})
+                        ~{BorderColor::all(Color::srgb(0.28, 0.30, 0.40))}
+                        HoleCell(hole)
+                    })
+                    .with_children(|cell| {
+                        cell.spawn_empty().apply_scene(bsn! {
+                            Text({b})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({Color::srgb(0.50, 0.75, 1.00)})
+                        });
+                        cell.spawn_empty().apply_scene(bsn! {
+                            Text({format!("{hole}")})
+                            TextFont { font_size: {FontSize::Px(16.0)} }
+                            TextColor({Color::WHITE})
+                        });
+                        cell.spawn_empty().apply_scene(bsn! {
+                            Text({d})
+                            TextFont { font_size: {FontSize::Px(15.0)} }
+                            TextColor({Color::srgb(1.00, 0.62, 0.35)})
+                        });
                     });
-                    cell.spawn_empty().apply_scene(bsn! {
-                        Text({format!("{hole}")})
-                        TextFont { font_size: {FontSize::Px(16.0)} }
-                        TextColor({Color::WHITE})
-                    });
-                    cell.spawn_empty().apply_scene(bsn! {
-                        Text({d})
-                        TextFont { font_size: {FontSize::Px(15.0)} }
-                        TextColor({Color::srgb(1.00, 0.62, 0.35)})
-                    });
-                });
-        }
-    });
+            }
+        });
 
     spawn_blow_draw_legend(col, loc, 20.0, 0.0);
 }
@@ -181,11 +177,7 @@ mod tests {
     /// Every `Text` under the strip, in spawn order.
     fn strip_texts(harp: &Harmonica) -> Vec<String> {
         let mut app = App::new();
-        app.add_plugins((
-            MinimalPlugins,
-            AssetPlugin::default(),
-            bevy::scene::ScenePlugin,
-        ));
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin));
         let world = app.world_mut();
         let loc = Localization::default();
         world
@@ -193,11 +185,8 @@ mod tests {
             .spawn(Node::default())
             .with_children(|col| spawn_harmonica_strip(col, harp, &loc));
         world.flush();
-        let mut texts: Vec<String> = world
-            .query::<&Text>()
-            .iter(world)
-            .map(|t| t.0.clone())
-            .collect();
+        let mut texts: Vec<String> =
+            world.query::<&Text>().iter(world).map(|t| t.0.clone()).collect();
         texts.retain(|t| !t.is_empty());
         texts
     }

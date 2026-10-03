@@ -597,10 +597,8 @@ pub(super) fn setup(
     // Chart / Details. Splitting the form off into its own tab is what frees
     // the vertical space the grid needs on a short screen — see
     // `DetailsTabPanel`.
-    let labels = [
-        String::from(loc.msg("editor-tab-chart")),
-        String::from(loc.msg("editor-tab-details")),
-    ];
+    let labels =
+        [String::from(loc.msg("editor-tab-chart")), String::from(loc.msg("editor-tab-details"))];
     harmonicon_ui::dialogs::tab_bar::spawn_tab_bar(
         &mut commands,
         tab_slot,
@@ -620,18 +618,10 @@ fn on_editor_tab_select(
 ) {
     let show_chart = ev.index == 0;
     if let Ok(mut node) = chart.single_mut() {
-        node.display = if show_chart {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        node.display = if show_chart { Display::Flex } else { Display::None };
     }
     if let Ok(mut node) = details.single_mut() {
-        node.display = if show_chart {
-            Display::None
-        } else {
-            Display::Flex
-        };
+        node.display = if show_chart { Display::None } else { Display::Flex };
     }
 }
 
@@ -807,24 +797,11 @@ fn spawn_fixed_chrome(
         ..default()
     })
     .with_children(|row| {
-        row.spawn(Node {
-            width: Val::Px(HOLE_COL_W),
-            flex_shrink: 0.0,
-            ..default()
-        });
-        row.spawn((
-            ScaleComboboxSlot,
-            Node {
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-        ));
+        row.spawn(Node { width: Val::Px(HOLE_COL_W), flex_shrink: 0.0, ..default() });
+        row.spawn((ScaleComboboxSlot, Node { flex_direction: FlexDirection::Column, ..default() }));
         row.spawn((
             TimeSignatureComboboxSlot,
-            Node {
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
+            Node { flex_direction: FlexDirection::Column, ..default() },
         ));
     });
 }

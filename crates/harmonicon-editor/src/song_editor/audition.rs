@@ -37,12 +37,7 @@ pub(super) struct LastAuditioned(Option<u32>);
 /// `playback::note_freq`'s own `None` case).
 fn audition_wav(note: &GridNote, harp: &Harmonica) -> Option<Vec<u8>> {
     let freq = note_freq(note, harp)?;
-    let phrase = [PhraseNote {
-        tick: 0,
-        len: 1,
-        freq: Some(freq),
-        expr: note.expr,
-    }];
+    let phrase = [PhraseNote { tick: 0, len: 1, freq: Some(freq), expr: note.expr }];
     Some(encode_wav(&render_pcm(&phrase, AUDITION_SECS), SAMPLE_RATE))
 }
 
@@ -82,15 +77,7 @@ mod tests {
     use harmonicon_core::harmonica::richter_harp;
 
     fn note(hole: u8, dir: Dir, pitch: Pitch) -> GridNote {
-        GridNote {
-            id: 1,
-            hole,
-            tick: 0,
-            len: 4,
-            dir,
-            pitch,
-            expr: Expr::None,
-        }
+        GridNote { id: 1, hole, tick: 0, len: 4, dir, pitch, expr: Expr::None }
     }
 
     #[test]

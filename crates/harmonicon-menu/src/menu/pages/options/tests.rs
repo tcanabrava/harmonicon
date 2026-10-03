@@ -25,46 +25,31 @@ fn zoom_fraction_clamps_outside_the_range() {
 
 #[test]
 fn mic_banner_hidden_only_once_connected() {
-    assert!(!mic_banner_visible(&MicStatus::Connected {
-        device_name: "Mic".into(),
-    }));
-    assert!(mic_banner_visible(&MicStatus::Failed {
-        reason: "no device".into(),
-    }));
+    assert!(!mic_banner_visible(&MicStatus::Connected { device_name: "Mic".into() }));
+    assert!(mic_banner_visible(&MicStatus::Failed { reason: "no device".into() }));
     assert!(mic_banner_visible(&MicStatus::AwaitingPermission));
 }
 
 #[test]
 fn connected_device_name_is_none_unless_connected() {
     assert_eq!(
-        connected_device_name(&MicStatus::Connected {
-            device_name: "USB Mic".into(),
-        }),
+        connected_device_name(&MicStatus::Connected { device_name: "USB Mic".into() }),
         Some("USB Mic")
     );
-    assert_eq!(
-        connected_device_name(&MicStatus::Failed {
-            reason: "no device".into(),
-        }),
-        None
-    );
+    assert_eq!(connected_device_name(&MicStatus::Failed { reason: "no device".into() }), None);
     assert_eq!(connected_device_name(&MicStatus::AwaitingPermission), None);
 }
 
 #[test]
 fn mic_banner_text_is_distinct_per_status() {
     assert_eq!(
-        mic_banner_key(&MicStatus::Connected {
-            device_name: "Mic".into(),
-        }),
+        mic_banner_key(&MicStatus::Connected { device_name: "Mic".into() }),
         None,
         "a working mic has nothing to say"
     );
     assert_ne!(
         mic_banner_key(&MicStatus::AwaitingPermission),
-        mic_banner_key(&MicStatus::Failed {
-            reason: "no device".into(),
-        }),
+        mic_banner_key(&MicStatus::Failed { reason: "no device".into() }),
         "awaiting-permission needs its own message, not the generic failure one"
     );
 }

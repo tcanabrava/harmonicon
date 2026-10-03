@@ -83,9 +83,7 @@ impl StubResolver {
     }
 
     fn with_inline(name: &str, source: &str) -> Self {
-        Self {
-            inline: Some((name.to_string(), source.to_string())),
-        }
+        Self { inline: Some((name.to_string(), source.to_string())) }
     }
 }
 
@@ -136,10 +134,7 @@ fn compiler(resolver: StubResolver) -> Wesl<StubResolver> {
 }
 
 fn module(name: &str) -> ModulePath {
-    ModulePath::new(
-        PathOrigin::Absolute,
-        vec!["shaders".to_string(), name.to_string()],
-    )
+    ModulePath::new(PathOrigin::Absolute, vec!["shaders".to_string(), name.to_string()])
 }
 
 fn shader_names() -> Vec<String> {
@@ -190,10 +185,7 @@ fn the_compiler_rejects_broken_shaders() {
             "@group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> c: vec4<f32>;",
         ),
         // naga_oil's import syntax.
-        (
-            "naga_oil import",
-            "#import bevy_ui_render::ui_vertex_output::UiVertexOutput\n",
-        ),
+        ("naga_oil import", "#import bevy_ui_render::ui_vertex_output::UiVertexOutput\n"),
         // A plain typo: no such function.
         (
             "unknown identifier",

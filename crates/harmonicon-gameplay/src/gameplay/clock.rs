@@ -143,12 +143,7 @@ pub(crate) fn tick_clock(
     song_notes: Res<SongNotes>,
     sinks: Query<&AudioSink, With<MusicPlayer>>,
 ) {
-    let due = wait_freeze_index(
-        &song_notes.notes,
-        song_notes.cursor,
-        clock.get(),
-        wait_mode.0,
-    );
+    let due = wait_freeze_index(&song_notes.notes, song_notes.cursor, clock.get(), wait_mode.0);
     // Gated so `ResMut`'s change detection (which `wait_freeze_overlay`'s
     // prompt reacts to) only fires on an actual transition, not every frame.
     if due != wait_freeze.0 {

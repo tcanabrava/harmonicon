@@ -79,20 +79,16 @@ fn criteria_goal(loc: &Localization, criteria: &PassCriteria) -> String {
         PassCriteria::Accuracy { threshold } => {
             loc.msg_args("lesson-goal-accuracy", &[("pct", pct(*threshold))])
         }
-        PassCriteria::Technique {
-            technique,
-            threshold,
-        } => loc.msg_args(
+        PassCriteria::Technique { technique, threshold } => loc.msg_args(
             "lesson-goal-technique",
             &[("pct", pct(*threshold)), ("technique", technique.clone())],
         ),
         PassCriteria::ScaleAdherence { threshold } => {
             loc.msg_args("lesson-goal-scale-adherence", &[("pct", pct(*threshold))])
         }
-        PassCriteria::ChordToneAdherence { threshold } => loc.msg_args(
-            "lesson-goal-chord-tone-adherence",
-            &[("pct", pct(*threshold))],
-        ),
+        PassCriteria::ChordToneAdherence { threshold } => {
+            loc.msg_args("lesson-goal-chord-tone-adherence", &[("pct", pct(*threshold))])
+        }
         PassCriteria::PhraseDiscipline { threshold } => {
             loc.msg_args("lesson-goal-phrase-discipline", &[("pct", pct(*threshold))])
         }
@@ -193,14 +189,9 @@ pub(crate) fn setup_lesson_reader(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
 ) {
-    let entry = selected
-        .0
-        .as_deref()
-        .and_then(|id| find_lesson(&lessons, id));
+    let entry = selected.0.as_deref().and_then(|id| find_lesson(&lessons, id));
 
-    let title = entry
-        .map(|e| String::from(loc.msg(&e.manifest.title_key)))
-        .unwrap_or_default();
+    let title = entry.map(|e| String::from(loc.msg(&e.manifest.title_key))).unwrap_or_default();
     let (root, header, _page_root) =
         spawn_menu_root(&mut commands, &title, None, &theme, "Lessons");
 
@@ -237,10 +228,7 @@ pub(crate) fn setup_lesson_reader(
     // the original diagram's useful overview without verbose manifest data.
     for widget in &entry.manifest.widgets {
         match widget {
-            LessonWidget::CircleOfFifths {
-                harp_key,
-                positions,
-            } => {
+            LessonWidget::CircleOfFifths { harp_key, positions } => {
                 let selected: Vec<Position> = if positions.is_empty() {
                     Position::all().to_vec()
                 } else {
@@ -276,10 +264,9 @@ pub(crate) fn setup_lesson_reader(
                     })
                     .id();
                 commands.entity(root).add_child(state);
-                for (message, semitones) in [
-                    ("lesson-widget-key-previous", -1),
-                    ("lesson-widget-key-next", 1),
-                ] {
+                for (message, semitones) in
+                    [("lesson-widget-key-previous", -1), ("lesson-widget-key-next", 1)]
+                {
                     let target = state;
                     spawn_button(
                         &mut commands,
@@ -303,16 +290,10 @@ pub(crate) fn setup_lesson_reader(
                     );
                 }
             }
-            LessonWidget::TwelveBarGrid {
-                key,
-                progression,
-                sync_group,
-            } => {
+            LessonWidget::TwelveBarGrid { key, progression, sync_group } => {
                 let progression = parse_progression(Some(progression));
-                let chords: Vec<String> = progression_bars(key, progression)
-                    .into_iter()
-                    .map(|(root, _)| root)
-                    .collect();
+                let chords: Vec<String> =
+                    progression_bars(key, progression).into_iter().map(|(root, _)| root).collect();
                 let mut cells = Vec::new();
                 commands.entity(root).with_children(|parent| {
                     cells = spawn_12_bar_grid(
@@ -372,11 +353,7 @@ pub(crate) fn setup_lesson_reader(
                     cells = spawn_form_map(parent, sections);
                 });
                 let marker = commands
-                    .spawn(LessonFormMap {
-                        cells,
-                        sections: sections.clone(),
-                        current_section: 0,
-                    })
+                    .spawn(LessonFormMap { cells, sections: sections.clone(), current_section: 0 })
                     .id();
                 commands.entity(root).add_child(marker);
 
@@ -423,13 +400,8 @@ pub(crate) fn setup_lesson_reader(
                 commands.entity(root).with_children(|parent| {
                     cells = spawn_rhythm_pattern(parent, &steps);
                 });
-                let marker = commands
-                    .spawn(LessonRhythmPattern {
-                        cells,
-                        steps,
-                        current_step: 0,
-                    })
-                    .id();
+                let marker =
+                    commands.spawn(LessonRhythmPattern { cells, steps, current_step: 0 }).id();
                 commands.entity(root).add_child(marker);
 
                 for (message, delta) in [
@@ -462,12 +434,7 @@ pub(crate) fn setup_lesson_reader(
                     );
                 }
             }
-            LessonWidget::PhraseLooper {
-                title_key,
-                steps,
-                bpm,
-                beats_per_step,
-            } => {
+            LessonWidget::PhraseLooper { title_key, steps, bpm, beats_per_step } => {
                 if let Some(title_key) = title_key {
                     spawn_reader_line(
                         &mut commands,

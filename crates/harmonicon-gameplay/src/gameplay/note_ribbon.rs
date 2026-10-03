@@ -57,32 +57,21 @@ mod tests {
     use super::*;
 
     fn bend(semitones: f32) -> Modifier {
-        Modifier::Bend {
-            semitones,
-            intensity: None,
-        }
+        Modifier::Bend { semitones, intensity: None }
     }
 
     #[test]
     fn a_wobble_carries_its_charted_rate() {
-        let vibrato = ribbon_technique(&[Modifier::Vibrato {
-            oscillation_hz: 5.0,
-            intensity: None,
-        }]);
+        let vibrato =
+            ribbon_technique(&[Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }]);
         assert_eq!((vibrato.x, vibrato.y), (2.0, 5.0));
-        let wah = ribbon_technique(&[Modifier::WahWah {
-            oscillation_hz: 3.0,
-            intensity: None,
-        }]);
+        let wah = ribbon_technique(&[Modifier::WahWah { oscillation_hz: 3.0, intensity: None }]);
         assert_eq!((wah.x, wah.y), (3.0, 3.0));
     }
 
     #[test]
     fn a_deeper_bend_leans_further_and_pitch_up_leans_the_other_way() {
-        let (half, whole) = (
-            ribbon_technique(&[bend(-1.0)]),
-            ribbon_technique(&[bend(-2.0)]),
-        );
+        let (half, whole) = (ribbon_technique(&[bend(-1.0)]), ribbon_technique(&[bend(-2.0)]));
         assert_eq!(half.x, 1.0);
         assert!(half.z < 0.0 && whole.z < half.z);
         let up = ribbon_technique(&[Modifier::Overblow]);
@@ -94,10 +83,7 @@ mod tests {
     #[test]
     fn a_vibrato_on_a_bend_keeps_the_bend_and_rides_on_it() {
         let t = ribbon_technique(&[
-            Modifier::Vibrato {
-                oscillation_hz: 5.0,
-                intensity: None,
-            },
+            Modifier::Vibrato { oscillation_hz: 5.0, intensity: None },
             bend(-1.0),
         ]);
         assert_eq!((t.x, t.w), (1.0, 1.0));

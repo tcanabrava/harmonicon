@@ -72,11 +72,7 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
 
     let mut entries = Vec::new();
     let mut unit_dirs: Vec<_> = match std::fs::read_dir(root) {
-        Ok(rd) => rd
-            .flatten()
-            .filter(is_visible_dir)
-            .map(|e| e.path())
-            .collect(),
+        Ok(rd) => rd.flatten().filter(is_visible_dir).map(|e| e.path()).collect(),
         Err(_) => return entries,
     };
     unit_dirs.sort();
@@ -85,11 +81,8 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
         let Ok(rd) = std::fs::read_dir(&unit_dir) else {
             continue;
         };
-        let mut lesson_dirs: Vec<_> = rd
-            .flatten()
-            .filter(is_visible_dir)
-            .map(|e| e.path())
-            .collect();
+        let mut lesson_dirs: Vec<_> =
+            rd.flatten().filter(is_visible_dir).map(|e| e.path()).collect();
         lesson_dirs.sort();
 
         for lesson_dir in lesson_dirs {
@@ -112,10 +105,7 @@ fn scan_lessons_root(root: &Path, asset_prefix: &str) -> Vec<LessonEntry> {
                 let lesson = lesson_dir.file_name()?.to_str()?;
                 Some(format!("{asset_prefix}/{unit}/{lesson}/{chart}"))
             });
-            entries.push(LessonEntry {
-                manifest,
-                chart_asset_path,
-            });
+            entries.push(LessonEntry { manifest, chart_asset_path });
         }
     }
     entries
@@ -180,25 +170,18 @@ fn dedupe_by_id(entries: Vec<LessonEntry>) -> Vec<LessonEntry> {
 /// CI (`validate-pack`) should have refused it first.
 #[cfg(target_arch = "wasm32")]
 fn scan_all_lessons(_packs: Option<&ContentPacks>) -> Vec<LessonEntry> {
-    let bundled = bundled::BUNDLED_LESSONS
-        .iter()
-        .filter_map(|(unit, lesson, json)| {
-            let manifest = match parse_lesson(json.as_bytes()) {
-                Ok(m) => m,
-                Err(err) => {
-                    warn!("Skipping invalid lesson {unit}/{lesson}: {err}");
-                    return None;
-                }
-            };
-            let chart_asset_path = manifest
-                .chart
-                .as_ref()
-                .map(|chart| format!("lessons/{unit}/{lesson}/{chart}"));
-            Some(LessonEntry {
-                manifest,
-                chart_asset_path,
-            })
-        });
+    let bundled = bundled::BUNDLED_LESSONS.iter().filter_map(|(unit, lesson, json)| {
+        let manifest = match parse_lesson(json.as_bytes()) {
+            Ok(m) => m,
+            Err(err) => {
+                warn!("Skipping invalid lesson {unit}/{lesson}: {err}");
+                return None;
+            }
+        };
+        let chart_asset_path =
+            manifest.chart.as_ref().map(|chart| format!("lessons/{unit}/{lesson}/{chart}"));
+        Some(LessonEntry { manifest, chart_asset_path })
+    });
     dedupe_by_id(bundled.collect())
 }
 
@@ -231,18 +214,12 @@ fn rescan_lessons_on_external_change(
     packs: Option<Res<ContentPacks>>,
     mut rescanned: MessageWriter<LessonsRescanned>,
 ) {
-    let external = changed
-        .read()
-        .any(|ev| ev.top_level_dirs.contains("lessons"));
+    let external = changed.read().any(|ev| ev.top_level_dirs.contains("lessons"));
     let dirty = packs_changed.read().count() > 0 || external;
     if dirty {
         available.0 = scan_all_lessons(packs.as_deref());
         let ids: Vec<&str> = available.0.iter().map(|l| l.manifest.id.as_str()).collect();
-        info!(
-            "Re-scanned lessons: found {} lesson(s): {:?}",
-            ids.len(),
-            ids
-        );
+        info!("Re-scanned lessons: found {} lesson(s): {:?}", ids.len(), ids);
         rescanned.write(LessonsRescanned);
     }
 }
@@ -257,10 +234,7 @@ impl Plugin for LessonsPlugin {
             // without `ContentPacksPlugin` (tests, tools) still runs.
             .add_message::<ContentPacksChanged>()
             .add_systems(Startup, scan_lessons.after(ContentPacksSet))
-            .add_systems(
-                Update,
-                rescan_lessons_on_external_change.after(ContentPacksSet),
-            );
+            .add_systems(Update, rescan_lessons_on_external_change.after(ContentPacksSet));
     }
 }
 
@@ -307,11 +281,7 @@ mod tests {
         let grouped = group_by_unit(&lessons);
         assert_eq!(grouped.len(), 2);
         assert_eq!(grouped[0].0, "blowing");
-        let ids: Vec<&str> = grouped[0]
-            .1
-            .iter()
-            .map(|l| l.manifest.id.as_str())
-            .collect();
+        let ids: Vec<&str> = grouped[0].1.iter().map(|l| l.manifest.id.as_str()).collect();
         assert_eq!(ids, ["a1", "a2", "a3"]);
         assert_eq!(grouped[1].0, "rhythm");
     }
@@ -403,10 +373,7 @@ mod tests {
             spec: RepoSpec::Local { path: dir.clone() },
             slug: "core".into(),
             root: dir.clone(),
-            status: PackStatus::Ready {
-                manifest,
-                commit: None,
-            },
+            status: PackStatus::Ready { manifest, commit: None },
         }]);
 
         let entries = scan_lesson_packs(Some(&packs));

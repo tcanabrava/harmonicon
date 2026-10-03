@@ -37,17 +37,11 @@ pub(super) fn performance_variation(
         .wrapping_add(genre as u32 + 1)
         .wrapping_mul(0x9e37_79b9);
     for value in [role as u32, chorus as u32, bar as u32, slot as u32] {
-        hash ^= value
-            .wrapping_add(0x9e37_79b9)
-            .wrapping_add(hash << 6)
-            .wrapping_add(hash >> 2);
+        hash ^= value.wrapping_add(0x9e37_79b9).wrapping_add(hash << 6).wrapping_add(hash >> 2);
     }
     let unit = |bits: u32| bits as f32 / u16::MAX as f32;
-    let delay_secs = if slot.is_multiple_of(2) {
-        0.0
-    } else {
-        unit(hash & 0xffff) * MAX_HUMANIZE_SECS
-    };
+    let delay_secs =
+        if slot.is_multiple_of(2) { 0.0 } else { unit(hash & 0xffff) * MAX_HUMANIZE_SECS };
     let gain = 0.94 + unit(hash >> 16) * 0.12;
     PerformanceVariation { delay_secs, gain }
 }
@@ -77,32 +71,20 @@ mod tests {
     #[test]
     fn variation_is_deterministic_bounded_and_role_specific() {
         let bass = performance_variation(17, Genre::Blues, GrooveRole::Bass, 2, 6, 3);
-        assert_eq!(
-            bass,
-            performance_variation(17, Genre::Blues, GrooveRole::Bass, 2, 6, 3)
-        );
+        assert_eq!(bass, performance_variation(17, Genre::Blues, GrooveRole::Bass, 2, 6, 3));
         assert!((0.0..=MAX_HUMANIZE_SECS).contains(&bass.delay_secs));
         assert!((0.94..=1.06).contains(&bass.gain));
-        assert_ne!(
-            bass,
-            performance_variation(17, Genre::Blues, GrooveRole::Drums, 2, 6, 3)
-        );
+        assert_ne!(bass, performance_variation(17, Genre::Blues, GrooveRole::Drums, 2, 6, 3));
         assert_eq!(
             performance_variation(17, Genre::Blues, GrooveRole::Comping, 2, 6, 2).delay_secs,
             0.0
         );
-        assert_ne!(
-            bass,
-            performance_variation(18, Genre::Blues, GrooveRole::Bass, 2, 6, 3)
-        );
+        assert_ne!(bass, performance_variation(18, Genre::Blues, GrooveRole::Bass, 2, 6, 3));
     }
 
     #[test]
     fn varied_slot_delays_sound_without_changing_slot_length() {
-        let variation = PerformanceVariation {
-            delay_secs: 0.003,
-            gain: 0.5,
-        };
+        let variation = PerformanceVariation { delay_secs: 0.003, gain: 0.5 };
         let slot = varied_slot(vec![1.0; 100], 0.01, variation);
         assert_eq!(slot.len(), (0.01 * SAMPLE_RATE as f32) as usize);
         let delay = (variation.delay_secs * SAMPLE_RATE as f32) as usize;

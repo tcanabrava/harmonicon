@@ -117,13 +117,8 @@ type Cell = &'static [(u8, u8)];
 
 // Opening cells (the first bar). Each density has rests and at least one
 // pickup (a short note leading into a longer one on a beat).
-const SPARSE_OPENINGS: &[Cell] = &[
-    &[(0, 2), (4, 3)],
-    &[(2, 2), (6, 2)],
-    &[(0, 3)],
-    &[(1, 1), (2, 4)],
-    &[(3, 1), (4, 3)],
-];
+const SPARSE_OPENINGS: &[Cell] =
+    &[&[(0, 2), (4, 3)], &[(2, 2), (6, 2)], &[(0, 3)], &[(1, 1), (2, 4)], &[(3, 1), (4, 3)]];
 const CONVERSATIONAL_OPENINGS: &[Cell] = &[
     &[(0, 1), (1, 1), (2, 3), (6, 2)],
     &[(0, 3), (3, 1), (4, 1), (6, 2)],
@@ -146,17 +141,10 @@ const ENDING_LAST_SLOT: u8 = 4;
 // Ending cells (the last bar). Every one finishes by `ENDING_LAST_SLOT`.
 // Sparse includes an empty cell: the whole answer was in the first bar.
 const SPARSE_ENDINGS: &[Cell] = &[&[(0, 4)], &[(0, 2)], &[(1, 3)], &[]];
-const CONVERSATIONAL_ENDINGS: &[Cell] = &[
-    &[(0, 1), (1, 1), (2, 2)],
-    &[(0, 2), (2, 2)],
-    &[(1, 1), (2, 2)],
-    &[(0, 1), (2, 2)],
-];
-const BUSY_ENDINGS: &[Cell] = &[
-    &[(0, 1), (1, 1), (2, 1), (3, 1)],
-    &[(0, 1), (1, 1), (2, 2)],
-    &[(0, 1), (1, 1), (3, 1)],
-];
+const CONVERSATIONAL_ENDINGS: &[Cell] =
+    &[&[(0, 1), (1, 1), (2, 2)], &[(0, 2), (2, 2)], &[(1, 1), (2, 2)], &[(0, 1), (2, 2)]];
+const BUSY_ENDINGS: &[Cell] =
+    &[&[(0, 1), (1, 1), (2, 1), (3, 1)], &[(0, 1), (1, 1), (2, 2)], &[(0, 1), (1, 1), (3, 1)]];
 
 fn openings(density: CallDensity) -> &'static [Cell] {
     match density {
@@ -247,11 +235,7 @@ fn slot_tick(slot: u8, swung: bool) -> usize {
     debug_assert!(slot <= SLOTS_PER_BAR);
     let beat = usize::from(slot / 2);
     let off = if slot % 2 == 1 {
-        if swung {
-            TICKS_PER_BEAT * 2 / 3
-        } else {
-            TICKS_PER_BEAT / 2
-        }
+        if swung { TICKS_PER_BEAT * 2 / 3 } else { TICKS_PER_BEAT / 2 }
     } else {
         0
     };
@@ -300,16 +284,9 @@ fn snap(
         .filter(|&p| prev.is_none_or(|prev| transition_ok(prev, p)))
         .min_by_key(|p| {
             let f = fit(p.midi, chord_tones, ctx.scale);
-            let (turns, reach) = prev.map_or((false, 0), |prev| {
-                (prev.blow != p.blow, prev.hole.abs_diff(p.hole))
-            });
-            (
-                (i32::from(p.midi) - target).abs(),
-                std::cmp::Reverse(f),
-                turns,
-                reach,
-                p.midi,
-            )
+            let (turns, reach) =
+                prev.map_or((false, 0), |prev| (prev.blow != p.blow, prev.hole.abs_diff(p.hole)));
+            ((i32::from(p.midi) - target).abs(), std::cmp::Reverse(f), turns, reach, p.midi)
         })
 }
 
@@ -325,11 +302,8 @@ fn anchor(ctx: &CallContext, chord_tones: &HashSet<String>, rng: &mut Rng) -> Op
         .copied()
         .filter(|p| fit(p.midi, chord_tones, ctx.scale) == Fit::Chord)
         .collect();
-    let middle: Vec<PlayableNote> = chord
-        .iter()
-        .copied()
-        .filter(|p| (lo..=hi).contains(&p.hole))
-        .collect();
+    let middle: Vec<PlayableNote> =
+        chord.iter().copied().filter(|p| (lo..=hi).contains(&p.hole)).collect();
     let pool = if middle.is_empty() { &chord } else { &middle };
     (!pool.is_empty()).then(|| *rng.pick(pool))
 }
@@ -417,13 +391,7 @@ fn resolve_from(
     if fit(prev.midi, chord_tones, ctx.scale) == Fit::Chord {
         return Some(prev);
     }
-    snap(
-        ctx,
-        chord_tones,
-        i32::from(prev.midi),
-        Some(prev),
-        Fit::Chord,
-    )
+    snap(ctx, chord_tones, i32::from(prev.midi), Some(prev), Fit::Chord)
 }
 
 /// How the answering bar relates to the opening one.
@@ -530,14 +498,8 @@ pub fn generate_call(ctx: &CallContext) -> Vec<CallNote> {
     if opening.is_empty() {
         return Vec::new();
     }
-    let mut answer = answer_pitches(
-        ctx,
-        ctx.ending_chord,
-        &opening,
-        ending_cell.len(),
-        contour,
-        &mut rng,
-    );
+    let mut answer =
+        answer_pitches(ctx, ctx.ending_chord, &opening, ending_cell.len(), contour, &mut rng);
     if answer.is_empty() {
         // The whole phrase is the opening bar; it still has to land.
         resolve_last(ctx, ctx.opening_chord, &mut opening);

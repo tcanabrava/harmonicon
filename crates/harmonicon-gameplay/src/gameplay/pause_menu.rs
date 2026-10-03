@@ -94,8 +94,7 @@ pub(super) struct PracticeSpeedLabel;
 pub(super) struct PracticeSpeedFill;
 
 fn practice_speed_label_text(loc: &Localization, speed: f32) -> String {
-    loc.msg_args("pause-speed", &[("pct", format!("{:.0}", speed * 100.0))])
-        .into()
+    loc.msg_args("pause-speed", &[("pct", format!("{:.0}", speed * 100.0))]).into()
 }
 
 /// `50%..=100%` in `10%` steps — same range the old click-to-cycle button
@@ -132,10 +131,7 @@ fn spawn_practice_speed_row(
     });
     let track = commands
         .spawn_scene(practice_speed_slider_scene(value))
-        .insert((
-            SliderRange::new(PRACTICE_SPEED_MIN, PRACTICE_SPEED_MAX),
-            SliderStep(0.1),
-        ))
+        .insert((SliderRange::new(PRACTICE_SPEED_MIN, PRACTICE_SPEED_MAX), SliderStep(0.1)))
         .id();
     commands.entity(row).add_child(track);
     commands.entity(row).with_children(|r| {
@@ -211,10 +207,7 @@ fn loop_label_text(loc: &Localization, cfg: &LoopConfig) -> String {
     if cfg.active {
         loc.msg_args(
             "pause-loop-range",
-            &[
-                ("start", format!("{:.0}", cfg.start_time)),
-                ("end", format!("{:.0}", cfg.end_time)),
-            ],
+            &[("start", format!("{:.0}", cfg.start_time)), ("end", format!("{:.0}", cfg.end_time))],
         )
         .into()
     } else {
@@ -263,9 +256,7 @@ pub(super) struct AdaptiveDifficultyLabel;
 /// Looks up the current song's `PlayerProfile` record key the same way
 /// `results.rs` does (the manifest's own path, stable across restarts).
 fn song_key(selected: &SelectedSong, manifests: &Assets<SongManifest>) -> Option<String> {
-    manifests
-        .get(&selected.0)
-        .map(|m| m.path.display().to_string())
+    manifests.get(&selected.0).map(|m| m.path.display().to_string())
 }
 
 /// Pure so the readout is unit-testable without a live `AdaptiveDifficulty`.
@@ -274,10 +265,7 @@ fn phrase_selector_text(loc: &Localization, name: Option<&str>, learned: f32) ->
         Some(name) => loc
             .msg_args(
                 "pause-phrase-section",
-                &[
-                    ("name", name.to_string()),
-                    ("pct", format!("{:.0}", learned * 100.0)),
-                ],
+                &[("name", name.to_string()), ("pct", format!("{:.0}", learned * 100.0))],
             )
             .into(),
         None => loc.msg("pause-phrase-no-sections").into(),
@@ -297,9 +285,8 @@ pub(super) fn update_phrase_selector_label(
         return;
     }
     let section = adaptive.sections.get(selected.0);
-    let learned = section
-        .map(|_| adaptive.learned.get(selected.0).copied().unwrap_or(0.0))
-        .unwrap_or(0.0);
+    let learned =
+        section.map(|_| adaptive.learned.get(selected.0).copied().unwrap_or(0.0)).unwrap_or(0.0);
     let text = phrase_selector_text(&loc, section.map(|s| s.name.as_str()), learned);
     for mut label in &mut labels {
         if label.0 != text {
@@ -564,17 +551,10 @@ pub(super) fn setup_pause_menu(
     // Jam Session has no natural end — so it needs its own explicit
     // "submit for judgment" action here instead.
     let is_lesson_jam = is_jam && lesson.is_some();
-    let learned = adaptive
-        .learned
-        .get(selected_phrase.0)
-        .copied()
-        .unwrap_or(0.0);
+    let learned = adaptive.learned.get(selected_phrase.0).copied().unwrap_or(0.0);
     let phrase_text = phrase_selector_text(
         &loc,
-        adaptive
-            .sections
-            .get(selected_phrase.0)
-            .map(|s| s.name.as_str()),
+        adaptive.sections.get(selected_phrase.0).map(|s| s.name.as_str()),
         learned,
     );
 
@@ -634,17 +614,12 @@ pub(super) fn setup_pause_menu(
             TextFont { font_size: {FontSize::Px(34.0)} }
             TextColor({Color::WHITE})
         });
-        col.spawn_empty()
-            .apply_scene(button::default(&loc.msg("pause-resume"), on_resume));
-        col.spawn_empty()
-            .apply_scene(button::default(&loc.msg("pause-restart"), on_restart));
-        col.spawn_empty()
-            .apply_scene(button::default(&loc.msg("pause-quit-song"), on_quit));
+        col.spawn_empty().apply_scene(button::default(&loc.msg("pause-resume"), on_resume));
+        col.spawn_empty().apply_scene(button::default(&loc.msg("pause-restart"), on_restart));
+        col.spawn_empty().apply_scene(button::default(&loc.msg("pause-quit-song"), on_quit));
         if is_lesson_jam {
-            col.spawn_empty().apply_scene(button::default(
-                &loc.msg("pause-finish-lesson"),
-                on_finish_lesson,
-            ));
+            col.spawn_empty()
+                .apply_scene(button::default(&loc.msg("pause-finish-lesson"), on_finish_lesson));
         }
     });
 
@@ -787,9 +762,7 @@ pub(super) fn setup_pause_menu(
         })
         .insert(GameplayRoot)
         .with_children(|parent| {
-            parent
-                .spawn_empty()
-                .apply_scene(button::small("\u{23F8}", on_pause_button_click));
+            parent.spawn_empty().apply_scene(button::small("\u{23F8}", on_pause_button_click));
         });
 }
 
@@ -826,11 +799,7 @@ fn on_restart(
     // `SongLoading` exists to wait for on the normal, asset-server path.
     // Checked on `GeneratedSong` rather than `GeneratedJamSession` so a
     // generated *training* restarts correctly too.
-    let target = if generated.is_some() {
-        AppState::Playing
-    } else {
-        AppState::SongLoading
-    };
+    let target = if generated.is_some() { AppState::Playing } else { AppState::SongLoading };
     apply_restart(&mut paused, &mut next_state, target);
 }
 
@@ -889,11 +858,7 @@ fn toggle_pause(
 ) {
     paused.0 = !paused.0;
     for mut vis in overlay.iter_mut() {
-        *vis = if paused.0 {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+        *vis = if paused.0 { Visibility::Visible } else { Visibility::Hidden };
     }
     for sink in sinks.iter() {
         if paused.0 {
@@ -954,19 +919,13 @@ mod tests {
         // First Escape: pause + show overlay.
         schedule.run(&mut world);
         assert!(world.resource::<Paused>().0, "Escape should pause");
-        assert_eq!(
-            *world.get::<Visibility>(overlay).unwrap(),
-            Visibility::Visible
-        );
+        assert_eq!(*world.get::<Visibility>(overlay).unwrap(), Visibility::Visible);
 
         // Second (fresh) Escape: resume + hide overlay.
         world.insert_resource(escape_down());
         schedule.run(&mut world);
         assert!(!world.resource::<Paused>().0, "Escape again should resume");
-        assert_eq!(
-            *world.get::<Visibility>(overlay).unwrap(),
-            Visibility::Hidden
-        );
+        assert_eq!(*world.get::<Visibility>(overlay).unwrap(), Visibility::Hidden);
     }
 
     fn pending_state(next: &NextState<AppState>) -> Option<AppState> {
@@ -1023,10 +982,7 @@ mod tests {
     #[test]
     fn loop_label_is_off_by_default() {
         let loc = Localization::default();
-        assert_eq!(
-            loop_label_text(&loc, &LoopConfig::default()),
-            "pause-loop-off"
-        );
+        assert_eq!(loop_label_text(&loc, &LoopConfig::default()), "pause-loop-off");
     }
 
     #[test]
@@ -1034,22 +990,14 @@ mod tests {
         // A zero-width range (e.g. a degenerate drag) leaves start/end
         // nonzero but inactive — the readout should still read "off".
         let loc = Localization::default();
-        let cfg = LoopConfig {
-            active: false,
-            start_time: 8.0,
-            end_time: 8.0,
-        };
+        let cfg = LoopConfig { active: false, start_time: 8.0, end_time: 8.0 };
         assert_eq!(loop_label_text(&loc, &cfg), "pause-loop-off");
     }
 
     #[test]
     fn loop_label_shows_the_range_once_active() {
         let loc = Localization::default();
-        let cfg = LoopConfig {
-            active: true,
-            start_time: 8.0,
-            end_time: 16.0,
-        };
+        let cfg = LoopConfig { active: true, start_time: 8.0, end_time: 16.0 };
         assert_eq!(loop_label_text(&loc, &cfg), "pause-loop-range");
     }
 
@@ -1067,32 +1015,20 @@ mod tests {
     #[test]
     fn phrase_selector_text_picks_the_section_key_when_named() {
         let loc = Localization::default();
-        assert_eq!(
-            phrase_selector_text(&loc, Some("intro"), 0.25),
-            "pause-phrase-section"
-        );
+        assert_eq!(phrase_selector_text(&loc, Some("intro"), 0.25), "pause-phrase-section");
     }
 
     #[test]
     fn phrase_selector_text_handles_no_sections() {
         let loc = Localization::default();
-        assert_eq!(
-            phrase_selector_text(&loc, None, 0.0),
-            "pause-phrase-no-sections"
-        );
+        assert_eq!(phrase_selector_text(&loc, None, 0.0), "pause-phrase-no-sections");
     }
 
     #[test]
     fn adaptive_difficulty_label_reflects_state() {
         let loc = Localization::default();
-        assert_eq!(
-            adaptive_difficulty_label_text(&loc, true),
-            "pause-adaptive-difficulty-on"
-        );
-        assert_eq!(
-            adaptive_difficulty_label_text(&loc, false),
-            "pause-adaptive-difficulty-off"
-        );
+        assert_eq!(adaptive_difficulty_label_text(&loc, true), "pause-adaptive-difficulty-on");
+        assert_eq!(adaptive_difficulty_label_text(&loc, false), "pause-adaptive-difficulty-off");
     }
 
     #[test]

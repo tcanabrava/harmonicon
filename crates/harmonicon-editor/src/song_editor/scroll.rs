@@ -31,11 +31,7 @@ pub(super) fn update_editor_scrollbar_visibility(
         return;
     };
     let needed = area.content_size().y > area.size().y + 1.0;
-    let next = if needed {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
+    let next = if needed { Visibility::Visible } else { Visibility::Hidden };
     if *vis != next {
         *vis = next;
     }

@@ -333,10 +333,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             m.widgets,
-            vec![LessonWidget::CircleOfFifths {
-                harp_key: "C".into(),
-                positions: Vec::new(),
-            }]
+            vec![LessonWidget::CircleOfFifths { harp_key: "C".into(), positions: Vec::new() }]
         );
     }
 
@@ -407,10 +404,7 @@ mod tests {
                  {"label":"1","rest":true,"accent":true},{"label":"&"}]}]}"#,
         )
         .unwrap_err();
-        assert!(
-            error.contains("rest") || error.contains("accent"),
-            "{error}"
-        );
+        assert!(error.contains("rest") || error.contains("accent"), "{error}");
     }
 
     #[test]
@@ -529,10 +523,7 @@ mod tests {
         assert_eq!(m.prerequisites, vec!["single-note"]);
         assert_eq!(
             m.pass_criteria,
-            Some(PassCriteria::Technique {
-                technique: "wah-wah".into(),
-                threshold: 0.5
-            })
+            Some(PassCriteria::Technique { technique: "wah-wah".into(), threshold: 0.5 })
         );
     }
 
@@ -548,10 +539,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             m.pass_criteria,
-            Some(PassCriteria::Technique {
-                technique: "clean-attack".into(),
-                threshold: 0.6
-            })
+            Some(PassCriteria::Technique { technique: "clean-attack".into(), threshold: 0.6 })
         );
     }
 
@@ -564,10 +552,7 @@ mod tests {
                  "pass_criteria":{"type":"scale-adherence","threshold":0.8}}"#,
         )
         .unwrap();
-        assert_eq!(
-            m.pass_criteria,
-            Some(PassCriteria::ScaleAdherence { threshold: 0.8 })
-        );
+        assert_eq!(m.pass_criteria, Some(PassCriteria::ScaleAdherence { threshold: 0.8 }));
     }
 
     #[test]
@@ -577,10 +562,7 @@ mod tests {
                  "pass_criteria":{"type":"chord-tone-adherence","threshold":0.4}}"#,
         )
         .unwrap();
-        assert_eq!(
-            m.pass_criteria,
-            Some(PassCriteria::ChordToneAdherence { threshold: 0.4 })
-        );
+        assert_eq!(m.pass_criteria, Some(PassCriteria::ChordToneAdherence { threshold: 0.4 }));
     }
 
     #[test]
@@ -590,10 +572,7 @@ mod tests {
                  "pass_criteria":{"type":"phrase-discipline","threshold":0.7}}"#,
         )
         .unwrap();
-        assert_eq!(
-            m.pass_criteria,
-            Some(PassCriteria::PhraseDiscipline { threshold: 0.7 })
-        );
+        assert_eq!(m.pass_criteria, Some(PassCriteria::PhraseDiscipline { threshold: 0.7 }));
     }
 
     #[test]

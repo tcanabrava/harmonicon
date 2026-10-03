@@ -84,11 +84,7 @@ mod tests {
     use super::*;
 
     fn step(rest: bool, accent: bool) -> RhythmStep {
-        RhythmStep {
-            label: "1".into(),
-            rest,
-            accent,
-        }
+        RhythmStep { label: "1".into(), rest, accent }
     }
 
     #[test]

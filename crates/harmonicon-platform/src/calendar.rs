@@ -23,9 +23,7 @@ pub fn day_of(secs: u64) -> u32 {
 /// Today, as days since 1970-01-01 (UTC). A clock set before 1970 reads as
 /// day 0 rather than failing: the worst it can do is make a review due.
 pub fn today() -> u32 {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |elapsed| elapsed.as_secs());
+    let secs = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_secs());
     day_of(secs)
 }
 

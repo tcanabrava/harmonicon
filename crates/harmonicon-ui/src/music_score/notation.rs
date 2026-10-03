@@ -310,11 +310,8 @@ pub fn accidentals(notes: &[NotationNote], clef: Clef, beats_per_bar: f64) -> Ve
     let mut current_bar: Option<i64> = None;
 
     for note in notes {
-        let bar = if beats_per_bar > 0.0 {
-            (note.start_beat / beats_per_bar).floor() as i64
-        } else {
-            0
-        };
+        let bar =
+            if beats_per_bar > 0.0 { (note.start_beat / beats_per_bar).floor() as i64 } else { 0 };
         if current_bar != Some(bar) {
             altered.clear();
             current_bar = Some(bar);
@@ -460,11 +457,7 @@ pub fn note_rhythm(duration_beats: f64) -> Rhythm {
 /// in a space (odd step) that is its own step, and for one on a line (even
 /// step) it is the space just above.
 pub fn dot_step(step: i32) -> i32 {
-    if step.rem_euclid(2) == 0 {
-        step + 1
-    } else {
-        step
-    }
+    if step.rem_euclid(2) == 0 { step + 1 } else { step }
 }
 
 pub fn notehead_kind(duration_beats: f64) -> NoteheadKind {
@@ -547,10 +540,7 @@ pub struct StemRole {
 /// Groups consecutive notes into beams, returning one entry per input note
 /// (`None` where the note is not beamed) — [`stem_roles`]' beams alone.
 pub fn beam_groups(notes: &[NotationNote], clef: Clef) -> Vec<Option<BeamPlacement>> {
-    stem_roles(notes, clef)
-        .into_iter()
-        .map(|r| r.beam)
-        .collect()
+    stem_roles(notes, clef).into_iter().map(|r| r.beam).collect()
 }
 
 /// Notes starting together with the same length sound as one chord, and a
@@ -594,9 +584,7 @@ fn chords(notes: &[NotationNote]) -> Vec<Vec<usize>> {
 pub fn stem_roles(notes: &[NotationNote], clef: Clef) -> Vec<StemRole> {
     let step = |i: usize| staff_step(notes[i].midi, clef);
     let furthest = |steps: &mut dyn Iterator<Item = i32>| {
-        steps
-            .max_by_key(|s| (*s - MIDDLE_LINE_STEP).abs())
-            .unwrap_or(MIDDLE_LINE_STEP)
+        steps.max_by_key(|s| (*s - MIDDLE_LINE_STEP).abs()).unwrap_or(MIDDLE_LINE_STEP)
     };
     let chords = chords(notes);
 
@@ -656,33 +644,22 @@ pub fn stem_roles(notes: &[NotationNote], clef: Clef) -> Vec<StemRole> {
         c = d + 1;
     }
 
-    let mut roles = vec![
-        StemRole {
-            stem_up: true,
-            draws_stem: true,
-            reach_step: MIDDLE_LINE_STEP,
-            beam: None,
-        };
-        notes.len()
-    ];
+    let mut roles =
+        vec![
+            StemRole { stem_up: true, draws_stem: true, reach_step: MIDDLE_LINE_STEP, beam: None };
+            notes.len()
+        ];
     for (chord, beamed) in chords.iter().zip(&beam_of) {
         let steps: Vec<i32> = chord.iter().map(|&i| step(i)).collect();
         let stem_up = match beamed {
             Some(beam) => beam.stem_up,
             None => furthest(&mut steps.iter().copied()) < MIDDLE_LINE_STEP,
         };
-        let (low, high) = (
-            *steps.iter().min().unwrap_or(&0),
-            *steps.iter().max().unwrap_or(&0),
-        );
+        let (low, high) = (*steps.iter().min().unwrap_or(&0), *steps.iter().max().unwrap_or(&0));
         let (root, reach) = if stem_up { (low, high) } else { (high, low) };
         // Exactly one member draws: the first at the far end, should two
         // notes of a chord share a step (a unison).
-        let owner = chord
-            .iter()
-            .copied()
-            .find(|&i| step(i) == root)
-            .unwrap_or(chord[0]);
+        let owner = chord.iter().copied().find(|&i| step(i) == root).unwrap_or(chord[0]);
         for &i in chord {
             let draws_stem = i == owner;
             roles[i] = StemRole {
@@ -839,10 +816,7 @@ mod tests {
     fn the_8va_clef_draws_a_note_an_octave_lower_than_treble_would() {
         // C7 is six ledger lines above the treble staff; under 8va it
         // lands on the same step C6 would in plain treble.
-        assert_eq!(
-            staff_step(96, Clef::Treble8va),
-            staff_step(84, Clef::Treble)
-        );
+        assert_eq!(staff_step(96, Clef::Treble8va), staff_step(84, Clef::Treble));
     }
 
     #[test]
@@ -921,12 +895,7 @@ mod tests {
         // Four eighths: 0.0/0.5 share beat 0, 1.0/1.5 share beat 1. That
         // is two beams of two, not one of four — the point of beaming is
         // to keep the beat visible.
-        let ns = [
-            eighth(64, 0.0),
-            eighth(64, 0.5),
-            eighth(64, 1.0),
-            eighth(64, 1.5),
-        ];
+        let ns = [eighth(64, 0.0), eighth(64, 0.5), eighth(64, 1.0), eighth(64, 1.5)];
         let b = beam_groups(&ns, Clef::Treble);
         assert!(b[0].unwrap().is_first);
         assert!(!b[1].unwrap().is_first);
@@ -1171,12 +1140,7 @@ mod tests {
         let notes = run(&[66, 66, 66, 66]); // F#4 four times, one bar of 4/4
         assert_eq!(
             accidentals(&notes, Clef::Treble, 4.0),
-            vec![
-                Accidental::Sharp,
-                Accidental::None,
-                Accidental::None,
-                Accidental::None
-            ]
+            vec![Accidental::Sharp, Accidental::None, Accidental::None, Accidental::None]
         );
     }
 
@@ -1466,10 +1430,8 @@ mod tests {
         // (beat 1 of bar 3). Segments: [3,4), [4,8), [8,12), [12,13).
         let segments = split_at_bar_lines(note(3.0, 10.0), 4.0);
         let expected: Vec<(f64, f64)> = vec![(3.0, 1.0), (4.0, 4.0), (8.0, 4.0), (12.0, 1.0)];
-        let actual: Vec<(f64, f64)> = segments
-            .iter()
-            .map(|s| (s.start_beat, s.duration_beats))
-            .collect();
+        let actual: Vec<(f64, f64)> =
+            segments.iter().map(|s| (s.start_beat, s.duration_beats)).collect();
         assert_eq!(actual, expected);
         assert!(!segments[0].tied_from_previous);
         assert!(segments[1..].iter().all(|s| s.tied_from_previous));

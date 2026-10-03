@@ -269,12 +269,7 @@ pub fn setup(
     }
     let harp_hint =
         super::song_info::harp_banner_text(played, &effective.song_key_for(chart), &hud.loc);
-    spawn_countdown(
-        &mut commands,
-        &hud.loc,
-        Some(&harp_hint),
-        Some(&hud.song_info),
-    );
+    spawn_countdown(&mut commands, &hud.loc, Some(&harp_hint), Some(&hud.song_info));
 }
 
 fn spawn_hud_overlay(

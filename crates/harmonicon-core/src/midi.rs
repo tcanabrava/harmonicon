@@ -6,9 +6,8 @@
 /// `song::harmonica::semitone`'s transposition table, `audio_system::
 /// pitch_detect`'s detected-pitch display, and the key pickers in
 /// `gameplay::bending_trainer`/`menu::jam_generate`).
-pub const NOTE_NAMES: [&str; 12] = [
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-];
+pub const NOTE_NAMES: [&str; 12] =
+    ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 // Convert a note string like "G4", "C#5", "Bb3" to a MIDI number.
 pub fn note_to_midi(note: &str) -> Option<i32> {
@@ -116,11 +115,7 @@ mod tests {
         // midi_to_note only produces sharps, so every value round-trips cleanly.
         for midi in 0i32..=127 {
             let name = midi_to_note(midi);
-            assert_eq!(
-                note_to_midi(&name),
-                Some(midi),
-                "roundtrip failed for midi={midi}"
-            );
+            assert_eq!(note_to_midi(&name), Some(midi), "roundtrip failed for midi={midi}");
         }
     }
 
@@ -151,11 +146,7 @@ mod tests {
     fn freq_to_midi_round_trips_through_midi_to_freq_hz() {
         for midi in 21i32..=108 {
             let freq = midi_to_freq_hz(midi as f32);
-            assert_eq!(
-                freq_to_midi(freq),
-                Some(midi),
-                "round trip failed for {midi}"
-            );
+            assert_eq!(freq_to_midi(freq), Some(midi), "round trip failed for {midi}");
         }
     }
 }

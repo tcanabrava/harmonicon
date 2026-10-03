@@ -22,11 +22,7 @@ pub struct MetronomeClock {
 
 impl Default for MetronomeClock {
     fn default() -> Self {
-        Self {
-            elapsed: 0.0,
-            running: false,
-            last_tick: None,
-        }
+        Self { elapsed: 0.0, running: false, last_tick: None }
     }
 }
 
@@ -112,10 +108,7 @@ mod tests {
 
     #[test]
     fn local_clock_emits_each_tick_once_and_pauses() {
-        let mut clock = MetronomeClock {
-            running: true,
-            ..Default::default()
-        };
+        let mut clock = MetronomeClock { running: true, ..Default::default() };
         // One-second beats.
         assert_eq!(clock.advance(0.0, 1.0, MetronomeFeel::Straight), Some(0));
         assert_eq!(clock.advance(0.5, 1.0, MetronomeFeel::Straight), None);
@@ -127,15 +120,9 @@ mod tests {
 
     #[test]
     fn shuffle_clicks_on_the_beat_and_swung_and() {
-        assert_eq!(
-            click_for_tick(0, 4.0, MetronomeFeel::Shuffle),
-            Some((true, 1.0))
-        );
+        assert_eq!(click_for_tick(0, 4.0, MetronomeFeel::Shuffle), Some((true, 1.0)));
         assert_eq!(click_for_tick(1, 4.0, MetronomeFeel::Shuffle), None);
-        assert_eq!(
-            click_for_tick(2, 4.0, MetronomeFeel::Shuffle),
-            Some((false, 0.55))
-        );
+        assert_eq!(click_for_tick(2, 4.0, MetronomeFeel::Shuffle), Some((false, 0.55)));
     }
 
     #[test]

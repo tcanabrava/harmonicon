@@ -72,13 +72,7 @@ fn analyze_warm(c: &mut Criterion) {
         for (label, samples) in &signals {
             let mut state = FftState::default();
             // Build the plan and any dictionary before timing.
-            analyze(
-                samples,
-                SAMPLE_RATE,
-                &mut state,
-                algorithm,
-                PitchRange::default(),
-            );
+            analyze(samples, SAMPLE_RATE, &mut state, algorithm, PitchRange::default());
             group.bench_with_input(
                 BenchmarkId::new(algorithm.label(), label),
                 samples,

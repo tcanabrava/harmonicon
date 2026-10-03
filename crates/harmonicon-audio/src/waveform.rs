@@ -21,10 +21,7 @@ fn downmix_to_mono(samples: &[f32], channels: usize) -> Vec<f32> {
     if channels <= 1 {
         return samples.to_vec();
     }
-    samples
-        .chunks(channels)
-        .map(|frame| frame.iter().sum::<f32>() / frame.len() as f32)
-        .collect()
+    samples.chunks(channels).map(|frame| frame.iter().sum::<f32>() / frame.len() as f32).collect()
 }
 
 /// Splits mono samples into `buckets` equal-width windows and takes the peak
@@ -39,10 +36,7 @@ pub fn bucket_peaks(samples: &[f32], buckets: usize) -> Vec<f32> {
         .map(|i| {
             let start = i * len / buckets;
             let end = ((i + 1) * len / buckets).max(start + 1).min(len);
-            samples[start..end]
-                .iter()
-                .fold(0.0f32, |peak, &s| peak.max(s.abs()))
-                .clamp(0.0, 1.0)
+            samples[start..end].iter().fold(0.0f32, |peak, &s| peak.max(s.abs())).clamp(0.0, 1.0)
         })
         .collect()
 }
@@ -72,10 +66,7 @@ pub fn analyze_ogg_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
     let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes)) else {
         return (vec![0.0; buckets], 0.0);
     };
-    (
-        stream_peaks(decoder, channels, frames, buckets),
-        frames as f64 / sample_rate,
-    )
+    (stream_peaks(decoder, channels, frames, buckets), frames as f64 / sample_rate)
 }
 
 /// Same as [`analyze_ogg_waveform`], but for a `song/music.wav` backing
@@ -93,11 +84,7 @@ pub fn analyze_wav_waveform(bytes: &[u8], buckets: usize) -> (Vec<f32>, f64) {
         return (vec![0.0; buckets], 0.0);
     };
     let frames = data.len() / (usize::from(channels) * 2);
-    let samples = data
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|b| i16::from_le_bytes(*b) as f32 / 32768.0);
+    let samples = data.as_chunks::<2>().0.iter().map(|b| i16::from_le_bytes(*b) as f32 / 32768.0);
     (
         stream_peaks(samples, usize::from(channels), frames, buckets),
         frames as f64 / f64::from(sample_rate),
@@ -124,9 +111,7 @@ fn stream_peaks(
             // like bucket_peaks, without buffering the whole decoded stream.
             let mut peak = if start < consumed { last.abs() } else { 0.0 };
             while consumed < end {
-                last = (0..channels)
-                    .map(|_| samples.next().unwrap_or(0.0))
-                    .sum::<f32>()
+                last = (0..channels).map(|_| samples.next().unwrap_or(0.0)).sum::<f32>()
                     / channels as f32;
                 peak = peak.max(last.abs());
                 consumed += 1;
@@ -144,9 +129,8 @@ mod tests {
     fn streaming_matches_reference_for_short_uneven_and_multichannel_input() {
         for frames in [0, 1, 2, 7, 31, 1000] {
             for channels in [1, 2, 6] {
-                let samples: Vec<f32> = (0..frames * channels)
-                    .map(|i| (i % 17) as f32 / 8.0 - 1.0)
-                    .collect();
+                let samples: Vec<f32> =
+                    (0..frames * channels).map(|i| (i % 17) as f32 / 8.0 - 1.0).collect();
                 for buckets in [0, 1, 3, 16, 300] {
                     let expected = bucket_peaks(&downmix_to_mono(&samples, channels), buckets);
                     assert_eq!(
@@ -220,9 +204,7 @@ mod tests {
 
     #[test]
     fn analyze_wav_waveform_reads_a_real_wav_and_its_duration() {
-        let samples: Vec<f32> = (0..44_100)
-            .map(|i| ((i % 100) as f32 / 50.0) - 1.0)
-            .collect();
+        let samples: Vec<f32> = (0..44_100).map(|i| ((i % 100) as f32 / 50.0) - 1.0).collect();
         let wav = harmonicon_core::wav::encode_wav(&samples, 44_100);
         let (waveform, duration) = analyze_wav_waveform(&wav, 8);
         assert_eq!(waveform.len(), 8);

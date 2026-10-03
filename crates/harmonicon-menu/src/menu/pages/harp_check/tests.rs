@@ -32,12 +32,7 @@ fn plain_chart() -> HarpChart {
 }
 
 fn choice(key: &str, mapping: HarpMapping) -> HarpChoice {
-    HarpChoice {
-        key: key.to_string(),
-        kind: HarpKind::Diatonic,
-        mapping,
-        seeded: true,
-    }
+    HarpChoice { key: key.to_string(), kind: HarpKind::Diatonic, mapping, seeded: true }
 }
 
 #[test]

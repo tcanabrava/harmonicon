@@ -97,10 +97,7 @@ fn non_test_line_count(contents: &str) -> usize {
 
 #[test]
 fn no_file_exceeds_the_line_budget_unless_allowlisted() {
-    assert!(
-        Path::new("src").is_dir(),
-        "missing src/ — run from the workspace root"
-    );
+    assert!(Path::new("src").is_dir(), "missing src/ — run from the workspace root");
 
     let mut violations = Vec::new();
     for path in all_rust_files() {
@@ -172,12 +169,7 @@ fn allowlist_has_no_stale_entries() {
 /// are therefore allowed to reach all of them.
 fn module_of(path: &Path) -> Option<String> {
     let rel = path.strip_prefix("src").ok()?;
-    let first = rel
-        .components()
-        .next()?
-        .as_os_str()
-        .to_string_lossy()
-        .into_owned();
+    let first = rel.components().next()?.as_os_str().to_string_lossy().into_owned();
     match first.strip_suffix(".rs") {
         // A directory module: src/<name>/...
         None => Some(first),
@@ -190,9 +182,7 @@ fn module_of(path: &Path) -> Option<String> {
 /// The leading `foo` of `foo::Bar`, `foo as f`, or a bare `foo`.
 fn leading_ident(s: &str) -> Option<String> {
     let s = s.trim_start();
-    let end = s
-        .find(|c: char| !c.is_alphanumeric() && c != '_')
-        .unwrap_or(s.len());
+    let end = s.find(|c: char| !c.is_alphanumeric() && c != '_').unwrap_or(s.len());
     (end > 0).then(|| s[..end].to_string())
 }
 
@@ -268,10 +258,7 @@ fn crate_refs(contents: &str) -> Vec<(usize, String)> {
 #[test]
 fn no_module_dependency_cycles() {
     let files = all_rust_files();
-    assert!(
-        !files.is_empty(),
-        "missing src/ — run from the workspace root"
-    );
+    assert!(!files.is_empty(), "missing src/ — run from the workspace root");
 
     // module -> what it imports, each edge remembering one witness so a
     // failure names the line to go delete rather than just the cycle.

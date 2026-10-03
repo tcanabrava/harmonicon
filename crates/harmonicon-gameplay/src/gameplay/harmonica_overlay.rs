@@ -353,12 +353,9 @@ fn spawn_note_cell<'a>(
     color: Color,
 ) -> EntityCommands<'a> {
     let mut ec = cell(row, CELL_DEFAULT);
-    ec.insert(HarpOverlayCell {
-        midi: note_to_midi(note).and_then(|m| u8::try_from(m).ok()),
-    });
+    ec.insert(HarpOverlayCell { midi: note_to_midi(note).and_then(|m| u8::try_from(m).ok()) });
     ec.with_children(|c| {
-        c.spawn_empty()
-            .apply_scene(cell_text(note_class(note).to_string(), color));
+        c.spawn_empty().apply_scene(cell_text(note_class(note).to_string(), color));
     });
     ec
 }
@@ -366,8 +363,7 @@ fn spawn_note_cell<'a>(
 /// A static text cell (header numbers), no highlight.
 fn spawn_text_cell(row: &mut ChildSpawnerCommands, text: &str, color: Color) {
     cell(row, Color::NONE).with_children(|c| {
-        c.spawn_empty()
-            .apply_scene(cell_text(text.to_string(), color));
+        c.spawn_empty().apply_scene(cell_text(text.to_string(), color));
     });
 }
 
@@ -405,9 +401,7 @@ pub fn update_harmonica_overlay(
 ) {
     // A handful of sounding pitches at most, so a scan beats building a set.
     for (cell, mut bg) in &mut cells {
-        let lit = cell
-            .midi
-            .is_some_and(|m| active.0.iter().any(|p| p.midi == m));
+        let lit = cell.midi.is_some_and(|m| active.0.iter().any(|p| p.midi == m));
         let color = if lit { CELL_LIT } else { CELL_DEFAULT };
         if bg.0 != color {
             bg.0 = color;
@@ -542,27 +536,15 @@ mod tests {
     #[test]
     fn chromatic_note_for_reads_blow_and_draw() {
         let harp = c_chromatic_harp();
-        assert_eq!(
-            chromatic_note_for(&harp, 1, ChromaticRow::Blow).as_deref(),
-            Some("C4")
-        );
-        assert_eq!(
-            chromatic_note_for(&harp, 1, ChromaticRow::Draw).as_deref(),
-            Some("D4")
-        );
+        assert_eq!(chromatic_note_for(&harp, 1, ChromaticRow::Blow).as_deref(), Some("C4"));
+        assert_eq!(chromatic_note_for(&harp, 1, ChromaticRow::Draw).as_deref(), Some("D4"));
     }
 
     #[test]
     fn chromatic_note_for_reads_the_slide_tables() {
         let harp = c_chromatic_harp();
-        assert_eq!(
-            chromatic_note_for(&harp, 1, ChromaticRow::BlowSlide).as_deref(),
-            Some("C#4")
-        );
-        assert_eq!(
-            chromatic_note_for(&harp, 1, ChromaticRow::DrawSlide).as_deref(),
-            Some("D#4")
-        );
+        assert_eq!(chromatic_note_for(&harp, 1, ChromaticRow::BlowSlide).as_deref(), Some("C#4"));
+        assert_eq!(chromatic_note_for(&harp, 1, ChromaticRow::DrawSlide).as_deref(), Some("D#4"));
     }
 
     #[test]

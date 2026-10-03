@@ -27,11 +27,7 @@ pub fn spawn(parent: &mut ChildSpawnerCommands) {
         .with_children(|row| {
             for b in 0..NUM_BANDS {
                 row.spawn((
-                    Node {
-                        width: Val::Px(10.0),
-                        height: Val::Percent(1.0),
-                        ..default()
-                    },
+                    Node { width: Val::Px(10.0), height: Val::Percent(1.0), ..default() },
                     BackgroundColor(band_color(b, 0.0)),
                     SpectrumBar(b),
                 ));
@@ -45,12 +41,7 @@ pub fn update_bars(
     mut bars: Query<(&SpectrumBar, &mut Node, &mut BackgroundColor)>,
 ) {
     for (bar, mut node, mut bg) in &mut bars {
-        let level = spectrum
-            .bands
-            .get(bar.0)
-            .copied()
-            .unwrap_or(0.0)
-            .clamp(0.0, 1.0);
+        let level = spectrum.bands.get(bar.0).copied().unwrap_or(0.0).clamp(0.0, 1.0);
         // Keep a 1% floor so idle bars stay visible as a baseline. Written
         // only on a change, so settled (e.g. silent) bars leave layout alone.
         let height = Val::Percent(1.0 + level * 99.0);
@@ -85,10 +76,7 @@ mod tests {
             for level in [0.0, 0.5, 1.0] {
                 let c = band_color(band, level).to_srgba();
                 for channel in [c.red, c.green, c.blue] {
-                    assert!(
-                        (0.0..=1.0).contains(&channel),
-                        "channel {channel} out of range"
-                    );
+                    assert!((0.0..=1.0).contains(&channel), "channel {channel} out of range");
                 }
             }
         }

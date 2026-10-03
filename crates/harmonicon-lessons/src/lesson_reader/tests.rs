@@ -28,39 +28,18 @@ fn triplet_pattern_clicks_three_equal_subdivisions() {
 
 #[test]
 fn lesson_metronome_pattern_cycles_through_every_mode() {
-    assert!(matches!(
-        LessonMetronomePattern::Straight.next(),
-        LessonMetronomePattern::Shuffle
-    ));
-    assert!(matches!(
-        LessonMetronomePattern::Shuffle.next(),
-        LessonMetronomePattern::Triplet
-    ));
-    assert!(matches!(
-        LessonMetronomePattern::Triplet.next(),
-        LessonMetronomePattern::Straight
-    ));
+    assert!(matches!(LessonMetronomePattern::Straight.next(), LessonMetronomePattern::Shuffle));
+    assert!(matches!(LessonMetronomePattern::Shuffle.next(), LessonMetronomePattern::Triplet));
+    assert!(matches!(LessonMetronomePattern::Triplet.next(), LessonMetronomePattern::Straight));
 }
 
 #[test]
 fn tempo_schedule_advances_on_configured_bar_boundaries() {
     let steps = [75.0, 80.0];
-    assert_eq!(
-        scheduled_tempo(3, 4, 1, LessonMetronomePattern::Straight, 0, &steps),
-        None
-    );
-    assert_eq!(
-        scheduled_tempo(4, 4, 1, LessonMetronomePattern::Straight, 0, &steps),
-        Some(75.0)
-    );
-    assert_eq!(
-        scheduled_tempo(12, 4, 1, LessonMetronomePattern::Triplet, 1, &steps),
-        Some(80.0)
-    );
-    assert_eq!(
-        scheduled_tempo(4, 4, 1, LessonMetronomePattern::Straight, 2, &steps),
-        None
-    );
+    assert_eq!(scheduled_tempo(3, 4, 1, LessonMetronomePattern::Straight, 0, &steps), None);
+    assert_eq!(scheduled_tempo(4, 4, 1, LessonMetronomePattern::Straight, 0, &steps), Some(75.0));
+    assert_eq!(scheduled_tempo(12, 4, 1, LessonMetronomePattern::Triplet, 1, &steps), Some(80.0));
+    assert_eq!(scheduled_tempo(4, 4, 1, LessonMetronomePattern::Straight, 2, &steps), None);
 }
 
 #[test]
@@ -90,9 +69,7 @@ fn every_jam_based_criterion_routes_into_jam_session() {
 #[test]
 fn chart_based_criteria_and_none_stay_on_the_ordinary_pipeline() {
     assert!(!is_jam_criteria(None));
-    assert!(!is_jam_criteria(Some(&PassCriteria::Accuracy {
-        threshold: 0.5
-    })));
+    assert!(!is_jam_criteria(Some(&PassCriteria::Accuracy { threshold: 0.5 })));
     assert!(!is_jam_criteria(Some(&PassCriteria::Technique {
         technique: "bend".into(),
         threshold: 0.5
@@ -104,15 +81,9 @@ fn chart_based_criteria_and_none_stay_on_the_ordinary_pipeline() {
 #[test]
 fn parse_progression_reads_each_known_value() {
     assert_eq!(parse_progression(Some("standard")), Progression::Standard);
-    assert_eq!(
-        parse_progression(Some("quick-change")),
-        Progression::QuickChange
-    );
+    assert_eq!(parse_progression(Some("quick-change")), Progression::QuickChange);
     assert_eq!(parse_progression(Some("minor")), Progression::Minor);
-    assert_eq!(
-        parse_progression(Some("jazz-blues")),
-        Progression::JazzBlues
-    );
+    assert_eq!(parse_progression(Some("jazz-blues")), Progression::JazzBlues);
 }
 
 #[test]
@@ -129,10 +100,7 @@ fn parse_scale_reads_each_known_value() {
     assert_eq!(parse_scale(Some("second-position")), Scale::SecondPosition);
     assert_eq!(parse_scale(Some("third-position")), Scale::ThirdPosition);
     assert_eq!(parse_scale(Some("major")), Scale::Major);
-    assert_eq!(
-        parse_scale(Some("minor-pentatonic")),
-        Scale::MinorPentatonic
-    );
+    assert_eq!(parse_scale(Some("minor-pentatonic")), Scale::MinorPentatonic);
     assert_eq!(parse_scale(Some("country")), Scale::Country);
 }
 

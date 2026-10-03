@@ -85,10 +85,7 @@ fn a_ribbon_clears_every_surface_it_crosses() {
 fn a_wobble_crosses_the_hit_line_at_the_charted_rate() {
     // Crests `1 / cycles` units apart, scrolling at `lane_speed`, pass the
     // hit line `cycles * lane_speed` times a second.
-    let vibrato = [Modifier::Vibrato {
-        oscillation_hz: 5.0,
-        intensity: None,
-    }];
+    let vibrato = [Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }];
     let t = ribbon_technique_3d(&vibrato);
     assert!((t.y * lane_speed() - 5.0).abs() < 1e-4);
 }
@@ -113,11 +110,7 @@ fn leaving_3d_restores_the_2d_camera() {
     let cam = world
         .spawn((
             Camera2d,
-            Camera {
-                order: 1,
-                clear_color: ClearColorConfig::None,
-                ..default()
-            },
+            Camera { order: 1, clear_color: ClearColorConfig::None, ..default() },
             Transform::default(),
         ))
         .id();

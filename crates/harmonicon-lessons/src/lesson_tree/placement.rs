@@ -65,18 +65,16 @@ impl PartKind {
     pub(super) fn top_left(self, centre: Vec2) -> Vec2 {
         match self {
             PartKind::UnitButton => centre - Vec2::splat(UNIT_PX / 2.0),
-            PartKind::UnitLabel => Vec2::new(
-                centre.x - UNIT_LABEL_PX / 2.0,
-                centre.y - UNIT_PX / 2.0 - 34.0,
-            ),
+            PartKind::UnitLabel => {
+                Vec2::new(centre.x - UNIT_LABEL_PX / 2.0, centre.y - UNIT_PX / 2.0 - 34.0)
+            }
             PartKind::LessonButton => centre - Vec2::splat(NODE_PX / 2.0),
             PartKind::LessonLabel => {
                 Vec2::new(centre.x - LABEL_PX / 2.0, centre.y + NODE_PX / 2.0 + 6.0)
             }
-            PartKind::Badge => Vec2::new(
-                centre.x + NODE_PX / 2.0 + BADGE_GAP_PX,
-                centre.y - BADGE_PX / 2.0,
-            ),
+            PartKind::Badge => {
+                Vec2::new(centre.x + NODE_PX / 2.0 + BADGE_GAP_PX, centre.y - BADGE_PX / 2.0)
+            }
             PartKind::DueBadge => Vec2::new(
                 centre.x - NODE_PX / 2.0 - BADGE_GAP_PX - BADGE_PX,
                 centre.y - BADGE_PX / 2.0,
@@ -94,10 +92,7 @@ impl PartKind {
 
     /// The tag for this part of entry `id`.
     pub(super) fn part(self, id: &str) -> TreePart {
-        TreePart {
-            id: id.to_string(),
-            kind: self,
-        }
+        TreePart { id: id.to_string(), kind: self }
     }
 }
 
@@ -120,9 +115,7 @@ pub(super) fn build_layout(
     let manifests: Vec<&LessonManifest> = lessons.0.iter().map(|e| &e.manifest).collect();
     let chain = UnitChain::build(&manifests);
     let graph = LessonGraph::build(&manifests).map_err(|e| e.to_string())?;
-    Ok(layout_with_collapsed(
-        &lessons.0, &graph, &chain, profile, collapsed,
-    ))
+    Ok(layout_with_collapsed(&lessons.0, &graph, &chain, profile, collapsed))
 }
 
 /// The units the layout should compact: those collapsed, less any still
@@ -147,10 +140,7 @@ pub(super) fn tree_canvas_size(tree: &TreeLayout) -> Vec2 {
 
 /// Each unit's canvas x.
 pub(super) fn unit_positions(tree: &TreeLayout) -> HashMap<String, f32> {
-    tree.units
-        .iter()
-        .map(|unit| (unit.id.clone(), node_centre(unit.column, unit.row).x))
-        .collect()
+    tree.units.iter().map(|unit| (unit.id.clone(), node_centre(unit.column, unit.row).x)).collect()
 }
 
 /// Lays the tree out again after a toggle and moves what is already on
@@ -182,20 +172,15 @@ pub(crate) fn relayout_tree(
     }
     request.pending = false;
     let anchor = request.anchor_unit.take();
-    let (Ok((mut scroll, computed)), Ok(layer), Ok(mut canvas)) = (
-        scroller.single_mut(),
-        edge_layer.single(),
-        canvas.single_mut(),
-    ) else {
+    let (Ok((mut scroll, computed)), Ok(layer), Ok(mut canvas)) =
+        (scroller.single_mut(), edge_layer.single(), canvas.single_mut())
+    else {
         return;
     };
     // The graph was valid when the page was built, and a toggle doesn't
     // change it; a rescan that breaks it rebuilds the page instead.
-    let Ok(tree) = build_layout(
-        &lessons,
-        &profile,
-        &laid_out_collapsed(&collapsed, &compacting),
-    ) else {
+    let Ok(tree) = build_layout(&lessons, &profile, &laid_out_collapsed(&collapsed, &compacting))
+    else {
         return;
     };
 
@@ -215,13 +200,7 @@ pub(crate) fn relayout_tree(
         computed.size().x * computed.inverse_scale_factor,
         size.x,
     );
-    slides.0 = screen_space_slides(
-        &positions.0,
-        &slides.0,
-        old_scroll,
-        &new_positions,
-        new_scroll,
-    );
+    slides.0 = screen_space_slides(&positions.0, &slides.0, old_scroll, &new_positions, new_scroll);
     positions.0 = new_positions;
     scroll.x = new_scroll;
 
@@ -236,11 +215,7 @@ pub(crate) fn relayout_tree(
         .map(|node| (node.id.as_str(), node_centre(node.column, node.row)))
         .collect();
     for (part, mut node) in &mut parts {
-        let centres = if part.kind.is_unit() {
-            &unit_centres
-        } else {
-            &lesson_centres
-        };
+        let centres = if part.kind.is_unit() { &unit_centres } else { &lesson_centres };
         let Some(&centre) = centres.get(part.id.as_str()) else {
             continue;
         };
@@ -299,11 +274,7 @@ pub(super) fn spawn_edges(
                     .units
                     .iter()
                     .find(|unit| (unit.column, unit.row) == edge.from)
-                    .zip(
-                        tree.units
-                            .iter()
-                            .find(|unit| (unit.column, unit.row) == edge.to),
-                    )
+                    .zip(tree.units.iter().find(|unit| (unit.column, unit.row) == edge.to))
                     .map(|(from, to)| (from.id.as_str(), to.id.as_str())),
                 EdgeKind::UnitBranch | EdgeKind::Branch => {
                     edge.unit_id.as_deref().map(|unit| (unit, unit))
@@ -311,14 +282,8 @@ pub(super) fn spawn_edges(
             };
             spawn_edge(
                 parent,
-                Endpoint {
-                    centre: node_centre(edge.from.0, edge.from.1),
-                    radius: from_radius,
-                },
-                Endpoint {
-                    centre: node_centre(edge.to.0, edge.to.1),
-                    radius: to_radius,
-                },
+                Endpoint { centre: node_centre(edge.from.0, edge.from.1), radius: from_radius },
+                Endpoint { centre: node_centre(edge.to.0, edge.to.1), radius: to_radius },
                 style,
                 edge.unit_id.as_deref(),
                 owners,
@@ -367,11 +332,8 @@ mod tests {
     fn collapsing_a_unit_moves_the_existing_entities_instead_of_rebuilding() {
         // Unit `wide` holds two side-by-side lessons; `next` sits after it.
         // Compacting `wide` pulls `next` left.
-        let lessons = AvailableLessons(vec![
-            lesson("a", "wide"),
-            lesson("b", "wide"),
-            lesson("c", "next"),
-        ]);
+        let lessons =
+            AvailableLessons(vec![lesson("a", "wide"), lesson("b", "wide"), lesson("c", "next")]);
         let profile = PlayerProfile::default();
         let expanded = build_layout(&lessons, &profile, &HashSet::new()).unwrap();
         let compacted =
@@ -395,19 +357,11 @@ mod tests {
         world.spawn((Node::default(), LessonTreeCanvas));
         let layer = world.spawn((Node::default(), EdgeLayer)).id();
         let stale_edge = world.spawn(ChildOf(layer)).id();
-        world.spawn((
-            LessonTreeScroller,
-            ScrollPosition(Vec2::ZERO),
-            ComputedNode::default(),
-        ));
+        world.spawn((LessonTreeScroller, ScrollPosition(Vec2::ZERO), ComputedNode::default()));
         let at = PartKind::LessonButton.top_left(lesson_centre(&expanded, "c"));
         let button = world
             .spawn((
-                Node {
-                    left: Val::Px(at.x),
-                    top: Val::Px(at.y),
-                    ..default()
-                },
+                Node { left: Val::Px(at.x), top: Val::Px(at.y), ..default() },
                 PartKind::LessonButton.part("c"),
             ))
             .id();
@@ -419,19 +373,13 @@ mod tests {
         let want = PartKind::LessonButton.top_left(lesson_centre(&compacted, "c"));
         let node = world.get::<Node>(button).expect("the same entity survives");
         assert_eq!((node.left, node.top), (Val::Px(want.x), Val::Px(want.y)));
-        assert!(
-            want.x < at.x,
-            "compacting the unit before it pulls the lesson left"
-        );
+        assert!(want.x < at.x, "compacting the unit before it pulls the lesson left");
         assert!(world.get_entity(stale_edge).is_err(), "edges are recreated");
         assert!(
             world.resource::<UnitSlides>().0.contains_key("next"),
             "the moved unit glides rather than jumps"
         );
-        assert_eq!(
-            world.resource::<CanvasSize>().0,
-            tree_canvas_size(&compacted)
-        );
+        assert_eq!(world.resource::<CanvasSize>().0, tree_canvas_size(&compacted));
         assert!(!world.resource::<RelayoutRequest>().pending);
     }
 }

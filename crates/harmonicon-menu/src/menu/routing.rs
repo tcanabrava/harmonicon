@@ -214,9 +214,7 @@ mod tests {
             .init_resource::<ReturnToHelpAbout>()
             .init_resource::<harmonicon_app::app::WelcomeFlow>()
             .add_systems(Update, route_menu_entry);
-        app.world_mut()
-            .resource_mut::<NextState<AppState>>()
-            .set(AppState::Menu);
+        app.world_mut().resource_mut::<NextState<AppState>>().set(AppState::Menu);
         app.update();
         app
     }
@@ -245,9 +243,7 @@ mod tests {
 
         // Simulate leaving the menu and coming back, the way quitting a song
         // does: routing runs again and must now behave like any other visit.
-        app.world_mut()
-            .resource_mut::<NextState<MenuPage>>()
-            .set(MenuPage::Play);
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(MenuPage::Play);
         app.update();
         app.update();
         assert_eq!(current_page(&app), MenuPage::Play);
@@ -272,9 +268,7 @@ mod tests {
         app.update();
         assert_eq!(current_page(&app), MenuPage::Welcome);
 
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::Escape);
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
         app.update();
         app.update();
         assert_eq!(current_page(&app), MenuPage::Main);
@@ -291,14 +285,10 @@ mod tests {
             .init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<GameplayMode>();
         app.insert_resource(flow);
-        app.world_mut()
-            .resource_mut::<NextState<MenuPage>>()
-            .set(page);
+        app.world_mut().resource_mut::<NextState<MenuPage>>().set(page);
         app.update();
         app.update();
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::Escape);
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::Escape);
         app.update();
         app.update();
         let flow = *app.world().resource::<harmonicon_app::app::WelcomeFlow>();
@@ -308,16 +298,10 @@ mod tests {
     #[test]
     fn a_welcome_step_returns_to_welcome_and_marks_itself_done() {
         use harmonicon_app::app::WelcomeFlow;
-        let from_welcome = WelcomeFlow {
-            return_to_welcome: true,
-            ..Default::default()
-        };
+        let from_welcome = WelcomeFlow { return_to_welcome: true, ..Default::default() };
         let (page, flow) = escape_from(MenuPage::Options, from_welcome);
         assert_eq!(page, MenuPage::Welcome);
-        assert!(
-            flow.mic_done && !flow.return_to_welcome,
-            "consumed: {flow:?}"
-        );
+        assert!(flow.mic_done && !flow.return_to_welcome, "consumed: {flow:?}");
 
         let (page, flow) = escape_from(MenuPage::LessonTree, from_welcome);
         assert_eq!(page, MenuPage::Welcome);

@@ -61,11 +61,7 @@ fn range_overlaps(tick: usize, len: usize, start: usize, end: usize) -> bool {
 /// exactly where it is — the song's own length is unaffected, just a gap
 /// where those notes used to be. The **Erase** tool.
 pub(super) fn erase_range(notes: &[GridNote], start: usize, end: usize) -> Vec<GridNote> {
-    notes
-        .iter()
-        .copied()
-        .filter(|n| !range_overlaps(n.tick, n.len, start, end))
-        .collect()
+    notes.iter().copied().filter(|n| !range_overlaps(n.tick, n.len, start, end)).collect()
 }
 
 /// Deletes every note overlapping `[start, end)`, *and* shifts every note

@@ -71,21 +71,11 @@ pub fn spawn_numeric_input<M: 'static>(
             },
             EditableTextFilter::new(|c: char| c.is_ascii_digit()),
             TextLayout::no_wrap(),
-            TextFont {
-                font_size: FontSize::Px(18.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(18.0), ..default() },
             TextColor(Color::WHITE),
-            TextCursorStyle {
-                color: Color::WHITE,
-                ..default()
-            },
+            TextCursorStyle { color: Color::WHITE, ..default() },
             TabIndex(0),
-            NumericInputState {
-                min,
-                max,
-                last_value: value,
-            },
+            NumericInputState { min, max, last_value: value },
         ))
         .id();
     commands.entity(input).observe(on_commit);
@@ -115,10 +105,7 @@ fn commit(
         text.editor_mut().set_text(&formatted);
         text.queue_edit(TextEdit::TextEnd(false));
     }
-    commands.trigger(NumericInputCommitted {
-        input: entity,
-        value,
-    });
+    commands.trigger(NumericInputCommitted { input: entity, value });
 }
 
 fn commit_on_blur(
@@ -204,19 +191,11 @@ pub fn spawn_text_input<M: 'static>(
             BackgroundColor(bg),
             EditableText::new(value),
             TextLayout::no_wrap(),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(14.0), ..default() },
             TextColor(Color::WHITE),
-            TextCursorStyle {
-                color: Color::WHITE,
-                ..default()
-            },
+            TextCursorStyle { color: Color::WHITE, ..default() },
             TabIndex(0),
-            TextInputState {
-                commit_on_enter: true,
-            },
+            TextInputState { commit_on_enter: true },
         ))
         .id();
     commands.entity(input).observe(on_commit);
@@ -255,19 +234,11 @@ pub fn spawn_multiline_text_input<M: 'static>(
             BackgroundColor(bg),
             editable,
             TextLayout::default(),
-            TextFont {
-                font_size: FontSize::Px(14.0),
-                ..default()
-            },
+            TextFont { font_size: FontSize::Px(14.0), ..default() },
             TextColor(Color::WHITE),
-            TextCursorStyle {
-                color: Color::WHITE,
-                ..default()
-            },
+            TextCursorStyle { color: Color::WHITE, ..default() },
             TabIndex(0),
-            TextInputState {
-                commit_on_enter: false,
-            },
+            TextInputState { commit_on_enter: false },
         ))
         .id();
     commands.entity(input).observe(on_commit);
@@ -277,10 +248,7 @@ pub fn spawn_multiline_text_input<M: 'static>(
 }
 
 fn commit_text(entity: Entity, text: &EditableText, commands: &mut Commands) {
-    commands.trigger(TextInputCommitted {
-        input: entity,
-        value: text.value().to_string(),
-    });
+    commands.trigger(TextInputCommitted { input: entity, value: text.value().to_string() });
 }
 
 fn commit_text_on_blur(

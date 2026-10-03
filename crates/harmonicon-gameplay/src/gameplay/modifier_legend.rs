@@ -32,27 +32,9 @@ struct TechniqueLegendToggleLabel;
 fn legend_techniques() -> [(Modifier, &'static str); 6] {
     use harmonicon_core::chart::Modifier::*;
     [
-        (
-            Bend {
-                semitones: -1.0,
-                intensity: None,
-            },
-            "mod-bend",
-        ),
-        (
-            Vibrato {
-                oscillation_hz: 5.0,
-                intensity: Some(0.9),
-            },
-            "mod-vibrato",
-        ),
-        (
-            WahWah {
-                oscillation_hz: 3.0,
-                intensity: Some(0.9),
-            },
-            "mod-wah",
-        ),
+        (Bend { semitones: -1.0, intensity: None }, "mod-bend"),
+        (Vibrato { oscillation_hz: 5.0, intensity: Some(0.9) }, "mod-vibrato"),
+        (WahWah { oscillation_hz: 3.0, intensity: Some(0.9) }, "mod-wah"),
         (Overblow, "mod-overblow"),
         (Overdraw, "mod-overdraw"),
         (Slide, "mod-slide"),
@@ -79,9 +61,7 @@ fn used_legend_techniques(modifiers: &[Modifier]) -> Vec<(Modifier, &'static str
     legend_techniques()
         .into_iter()
         .filter(|(candidate, _)| {
-            modifiers
-                .iter()
-                .any(|used| modifier_kind(used) == modifier_kind(candidate))
+            modifiers.iter().any(|used| modifier_kind(used) == modifier_kind(candidate))
         })
         .collect()
 }
@@ -126,11 +106,8 @@ fn toggle_arrow(collapsed: bool) -> &'static str {
 /// shared by the initial `bsn!` placeholder and
 /// [`update_technique_legend_visibility`] so the two can't drift apart.
 fn technique_legend_toggle_text(loc: &Localization, collapsed: bool) -> String {
-    loc.msg_args(
-        "gameplay-techniques-toggle",
-        &[("arrow", toggle_arrow(collapsed).to_string())],
-    )
-    .into()
+    loc.msg_args("gameplay-techniques-toggle", &[("arrow", toggle_arrow(collapsed).to_string())])
+        .into()
 }
 
 /// Spawns the techniques legend: a small ribbon preview beside each
@@ -143,11 +120,7 @@ pub fn spawn_modifier_legend(
     entries: &[(Handle<NoteRibbon2dMaterial>, &'static str)],
 ) {
     parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(4.0),
-            ..default()
-        })
+        .spawn(Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(4.0), ..default() })
         .with_children(|col| {
             col.spawn_empty().apply_scene(bsn! {
                 WidgetButton
@@ -168,11 +141,7 @@ pub fn spawn_modifier_legend(
             // instead of wrapping, so the legend's width never varies with how
             // many entries fit per line.
             col.spawn((
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(6.0),
-                    ..default()
-                },
+                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), ..default() },
                 TechniqueLegendBody,
             ))
             .with_children(|list| {
@@ -188,11 +157,7 @@ pub fn spawn_modifier_legend(
                         // has no `Template` impl (its handle isn't `Unpin`),
                         // so this stays a plain tuple spawn.
                         row.spawn((
-                            Node {
-                                width: Val::Px(24.0),
-                                height: Val::Px(44.0),
-                                ..default()
-                            },
+                            Node { width: Val::Px(24.0), height: Val::Px(44.0), ..default() },
                             MaterialNode(handle.clone()),
                         ));
                         row.spawn_empty().apply_scene(bsn! {
@@ -222,11 +187,7 @@ fn update_technique_legend_visibility(
     let all = collapsed.is_changed() || loc.is_changed();
     for (mut node, marker) in &mut bodies {
         if all || marker.is_added() {
-            node.display = if collapsed.0 {
-                Display::None
-            } else {
-                Display::Flex
-            };
+            node.display = if collapsed.0 { Display::None } else { Display::Flex };
         }
     }
     for (mut text, marker) in &mut labels {
@@ -259,14 +220,7 @@ mod tests {
         let names: Vec<&str> = legend_techniques().iter().map(|(_, n)| *n).collect();
         assert_eq!(
             names,
-            [
-                "mod-bend",
-                "mod-vibrato",
-                "mod-wah",
-                "mod-overblow",
-                "mod-overdraw",
-                "mod-slide"
-            ]
+            ["mod-bend", "mod-vibrato", "mod-wah", "mod-overblow", "mod-overdraw", "mod-slide"]
         );
     }
 
@@ -274,16 +228,11 @@ mod tests {
     fn legend_contains_only_techniques_the_chart_uses_in_canonical_order() {
         let used = [
             Modifier::Slide,
-            Modifier::Vibrato {
-                oscillation_hz: 4.0,
-                intensity: None,
-            },
+            Modifier::Vibrato { oscillation_hz: 4.0, intensity: None },
             Modifier::Slide,
         ];
-        let names: Vec<&str> = used_legend_techniques(&used)
-            .into_iter()
-            .map(|(_, name)| name)
-            .collect();
+        let names: Vec<&str> =
+            used_legend_techniques(&used).into_iter().map(|(_, name)| name).collect();
         assert_eq!(names, ["mod-vibrato", "mod-slide"]);
     }
 

@@ -139,9 +139,7 @@ fn spawn_conditional_field_row(
 ) {
     let row = super::meta_form::spawn_field_row(col, loc, colors, state, field, label);
     if matches!(field, Field::LessonThreshold | Field::LessonTechnique) {
-        col.commands()
-            .entity(row)
-            .insert(LessonConditionalRow(field));
+        col.commands().entity(row).insert(LessonConditionalRow(field));
     }
 }
 
@@ -167,18 +165,13 @@ fn spawn_lesson_details_header(
             padding: UiRect::all(Val::Px(8.0)),
             ..default()
         },
-        Tooltip(String::from(
-            loc.msg("editor-lesson-details-toggle-tooltip"),
-        )),
+        Tooltip(String::from(loc.msg("editor-lesson-details-toggle-tooltip"))),
     ))
     .observe(|_: On<Activate>, mut state: ResMut<EditorState>| {
         state.lesson_details_expanded = !state.lesson_details_expanded;
     })
     .with_children(|b| {
-        let marker = LessonDetailsToggleLabel {
-            collapsed: collapsed.clone(),
-            expanded,
-        };
+        let marker = LessonDetailsToggleLabel { collapsed: collapsed.clone(), expanded };
         b.spawn_empty()
             .apply_scene(bsn! {
                 Text({collapsed})
@@ -198,11 +191,7 @@ pub(super) fn update_lesson_form_visibility(
     mut groups: Query<&mut Node, With<LessonFormGroup>>,
 ) {
     let visible = state.content_kind == ContentKind::Lesson;
-    let display = if visible {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    let display = if visible { Display::Flex } else { Display::None };
     for mut node in &mut groups {
         if node.display != display {
             node.display = display;
@@ -217,22 +206,14 @@ pub(super) fn update_lesson_details_visibility(
     mut bodies: Query<&mut Node, With<LessonDetailsBody>>,
     mut labels: Query<(&mut Text, &LessonDetailsToggleLabel)>,
 ) {
-    let display = if state.lesson_details_expanded {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    let display = if state.lesson_details_expanded { Display::Flex } else { Display::None };
     for mut node in &mut bodies {
         if node.display != display {
             node.display = display;
         }
     }
     for (mut text, label) in &mut labels {
-        let value = if state.lesson_details_expanded {
-            &label.expanded
-        } else {
-            &label.collapsed
-        };
+        let value = if state.lesson_details_expanded { &label.expanded } else { &label.collapsed };
         if text.0 != *value {
             text.0.clone_from(value);
         }
@@ -301,12 +282,8 @@ pub(super) fn serialize_lesson(state: &EditorState) -> (String, Vec<String>) {
         manifest["chart"] = json!("song/chart.harpchart");
     }
 
-    let prerequisites: Vec<&str> = state
-        .lesson_prerequisites
-        .split(',')
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .collect();
+    let prerequisites: Vec<&str> =
+        state.lesson_prerequisites.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
     if !prerequisites.is_empty() {
         manifest["prerequisites"] = json!(prerequisites);
     }
@@ -336,11 +313,7 @@ pub(super) fn serialize_lesson(state: &EditorState) -> (String, Vec<String>) {
         warnings.push(format!("doesn't pass its own schema yet: {err}"));
     }
 
-    let title_text = if state.name.is_empty() {
-        "(no title entered)"
-    } else {
-        &state.name
-    };
+    let title_text = if state.name.is_empty() { "(no title entered)" } else { &state.name };
     let body_text = if state.lesson_explanation.is_empty() {
         "(no explanation entered)"
     } else {
@@ -392,20 +365,14 @@ pub(super) fn save_lesson(
     };
     let song_dir = parent.join("song");
     if let Err(e) = std::fs::create_dir_all(&song_dir) {
-        warn!(
-            "Song editor: save failed (mkdir {}): {e}",
-            song_dir.display()
-        );
+        warn!("Song editor: save failed (mkdir {}): {e}", song_dir.display());
         return Ok(warnings);
     }
     let chart_path = song_dir.join("chart.harpchart");
     let chart_json = super::harpchart::serialize_harpchart(state);
     match std::fs::write(&chart_path, chart_json.as_bytes()) {
         Ok(()) => info!("Song editor: saved lesson chart {}", chart_path.display()),
-        Err(e) => warn!(
-            "Song editor: save failed (write {}): {e}",
-            chart_path.display()
-        ),
+        Err(e) => warn!("Song editor: save failed (write {}): {e}", chart_path.display()),
     }
     Ok(warnings)
 }
@@ -421,11 +388,7 @@ pub(super) fn save_lesson(
 pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &mut EditorState) {
     state.lesson_id = manifest.id.clone();
     state.lesson_unit = manifest.unit.clone();
-    state.lesson_path = if manifest.optional {
-        "elective".into()
-    } else {
-        "core".into()
-    };
+    state.lesson_path = if manifest.optional { "elective".into() } else { "core".into() };
     state.lesson_prerequisites = manifest.prerequisites.join(", ");
     match &manifest.pass_criteria {
         None => state.lesson_pass_criteria = "none".into(),
@@ -433,10 +396,7 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
             state.lesson_pass_criteria = "accuracy".into();
             state.lesson_threshold = threshold.to_string();
         }
-        Some(PassCriteria::Technique {
-            technique,
-            threshold,
-        }) => {
+        Some(PassCriteria::Technique { technique, threshold }) => {
             state.lesson_pass_criteria = "technique".into();
             state.lesson_technique = technique.clone();
             state.lesson_threshold = threshold.to_string();
@@ -454,10 +414,7 @@ pub(super) fn populate_from_lesson_manifest(manifest: &LessonManifest, state: &m
             state.lesson_threshold = threshold.to_string();
         }
     }
-    state.lesson_progression = manifest
-        .progression
-        .clone()
-        .unwrap_or_else(|| "none".into());
+    state.lesson_progression = manifest.progression.clone().unwrap_or_else(|| "none".into());
     state.lesson_scale = manifest.scale.clone().unwrap_or_else(|| "none".into());
 }
 
@@ -526,10 +483,9 @@ pub(super) fn handle_save_lesson_chosen(
         }
         match save_lesson(&ev.path, &state) {
             Ok(warnings) if warnings.is_empty() => {
-                feedback.set(loc.msg_args(
-                    "editor-save-success",
-                    &[("path", ev.path.display().to_string())],
-                ));
+                feedback.set(
+                    loc.msg_args("editor-save-success", &[("path", ev.path.display().to_string())]),
+                );
             }
             Ok(warnings) => {
                 feedback
@@ -556,10 +512,9 @@ pub(super) fn handle_load_lesson_chosen(
         }
         match load_lesson(&ev.path, &mut state, &mut scroll) {
             Ok(()) => {
-                feedback.set(loc.msg_args(
-                    "editor-load-success",
-                    &[("path", ev.path.display().to_string())],
-                ));
+                feedback.set(
+                    loc.msg_args("editor-load-success", &[("path", ev.path.display().to_string())]),
+                );
             }
             Err(detail) => {
                 warn!("Song editor: load failed ({}): {detail}", ev.path.display());

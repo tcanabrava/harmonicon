@@ -21,11 +21,7 @@ fn notes(count: usize, chord: bool) -> Vec<NotationNote> {
         result.push(NotationNote {
             start_beat,
             duration_beats: 0.5,
-            midi: if tied {
-                72
-            } else {
-                [60, 62, 64, 65, 67, 69, 71, 72][i % 8]
-            },
+            midi: if tied { 72 } else { [60, 62, 64, 65, 67, 69, 71, 72][i % 8] },
             tied_from_previous: tied,
             highlighted: false,
         });
@@ -33,11 +29,7 @@ fn notes(count: usize, chord: bool) -> Vec<NotationNote> {
             result.push(NotationNote {
                 start_beat,
                 duration_beats: 0.5,
-                midi: if tied {
-                    76
-                } else {
-                    [64, 65, 67, 69, 71, 72, 74, 76][i % 8]
-                },
+                midi: if tied { 76 } else { [64, 65, 67, 69, 71, 72, 74, 76][i % 8] },
                 tied_from_previous: tied,
                 highlighted: false,
             });
@@ -48,11 +40,9 @@ fn notes(count: usize, chord: bool) -> Vec<NotationNote> {
 
 fn notation(c: &mut Criterion) {
     let mut group = c.benchmark_group("notation_rebuild");
-    for (label, count, chord) in [
-        ("melody_256", 256, false),
-        ("chords_256", 256, true),
-        ("chords_2048", 2048, true),
-    ] {
+    for (label, count, chord) in
+        [("melody_256", 256, false), ("chords_256", 256, true), ("chords_2048", 2048, true)]
+    {
         let notes = notes(count, chord);
         group.bench_function(BenchmarkId::new("stem_roles", label), |b| {
             b.iter(|| black_box(stem_roles(black_box(&notes), Clef::Treble)));

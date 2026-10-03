@@ -108,18 +108,15 @@ pub fn spawn_score_readout(commands: &mut Commands, parent: Entity, anchor: Scor
 /// not a threshold reapplied here.
 fn feedback_style(judgment: JudgmentFeedback) -> (&'static str, f32, f32, f32) {
     match judgment {
-        JudgmentFeedback::Hit {
-            quality: HitQuality::Perfect,
-            ..
-        } => ("gameplay-judgment-perfect", 1.00, 0.85, 0.10),
-        JudgmentFeedback::Hit {
-            quality: HitQuality::Good,
-            offset,
-        } if offset < 0.0 => ("gameplay-judgment-early", 0.40, 0.82, 1.00),
-        JudgmentFeedback::Hit {
-            quality: HitQuality::Good,
-            offset,
-        } if offset > 0.0 => ("gameplay-judgment-late", 1.00, 0.68, 0.28),
+        JudgmentFeedback::Hit { quality: HitQuality::Perfect, .. } => {
+            ("gameplay-judgment-perfect", 1.00, 0.85, 0.10)
+        }
+        JudgmentFeedback::Hit { quality: HitQuality::Good, offset } if offset < 0.0 => {
+            ("gameplay-judgment-early", 0.40, 0.82, 1.00)
+        }
+        JudgmentFeedback::Hit { quality: HitQuality::Good, offset } if offset > 0.0 => {
+            ("gameplay-judgment-late", 1.00, 0.68, 0.28)
+        }
         JudgmentFeedback::Hit { .. } => ("gameplay-judgment-good", 0.40, 1.00, 0.35),
         JudgmentFeedback::Miss(MissReason::NoAttack) => {
             ("gameplay-judgment-no-attack", 1.00, 0.35, 0.35)
@@ -138,11 +135,7 @@ fn feedback_style(judgment: JudgmentFeedback) -> (&'static str, f32, f32, f32) {
 /// and ↓ for draw — the same arrows the hole map and the wait-for-note prompt
 /// use, so one glyph means one thing everywhere on screen.
 pub fn tab_label(tab: HoleTab) -> String {
-    format!(
-        "{}{}",
-        tab.hole,
-        if tab.is_blow { "\u{2191}" } else { "\u{2193}" }
-    )
+    format!("{}{}", tab.hole, if tab.is_blow { "\u{2191}" } else { "\u{2193}" })
 }
 
 /// The detail line's text for one judgment — empty for everything a single
@@ -163,10 +156,7 @@ fn feedback_detail(judgment: JudgmentFeedback, loc: &Localization) -> String {
     match heard {
         Some(heard) => String::from(loc.msg_args(
             "gameplay-judgment-wrong-pitch-detail",
-            &[
-                ("expected", tab_label(expected)),
-                ("heard", tab_label(heard)),
-            ],
+            &[("expected", tab_label(expected)), ("heard", tab_label(heard))],
         )),
         None => String::from(loc.msg_args(
             "gameplay-judgment-wrong-pitch-detail-unplaceable",
@@ -188,39 +178,19 @@ pub(crate) fn update_score_display(
     time: Res<Time>,
     mut q_score: Query<
         &mut Text,
-        (
-            With<ScoreText>,
-            Without<ComboText>,
-            Without<FeedbackText>,
-            Without<FeedbackDetailText>,
-        ),
+        (With<ScoreText>, Without<ComboText>, Without<FeedbackText>, Without<FeedbackDetailText>),
     >,
     mut q_combo: Query<
         &mut Text,
-        (
-            With<ComboText>,
-            Without<ScoreText>,
-            Without<FeedbackText>,
-            Without<FeedbackDetailText>,
-        ),
+        (With<ComboText>, Without<ScoreText>, Without<FeedbackText>, Without<FeedbackDetailText>),
     >,
     mut q_feedback: Query<
         (&mut Text, &mut TextColor),
-        (
-            With<FeedbackText>,
-            Without<ScoreText>,
-            Without<ComboText>,
-            Without<FeedbackDetailText>,
-        ),
+        (With<FeedbackText>, Without<ScoreText>, Without<ComboText>, Without<FeedbackDetailText>),
     >,
     mut q_detail: Query<
         (&mut Text, &mut TextColor),
-        (
-            With<FeedbackDetailText>,
-            Without<ScoreText>,
-            Without<ComboText>,
-            Without<FeedbackText>,
-        ),
+        (With<FeedbackDetailText>, Without<ScoreText>, Without<ComboText>, Without<FeedbackText>),
     >,
 ) {
     let mut score_moved = false;

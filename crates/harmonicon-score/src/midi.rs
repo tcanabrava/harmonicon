@@ -28,10 +28,8 @@ pub struct MidiScore {
 
 impl MidiScore {
     pub fn parse(bytes: Vec<u8>) -> Result<Self, ScoreError> {
-        let smf = Smf::parse(&bytes).map_err(|e| ScoreError::Parse {
-            format: "MIDI",
-            detail: e.to_string(),
-        })?;
+        let smf = Smf::parse(&bytes)
+            .map_err(|e| ScoreError::Parse { format: "MIDI", detail: e.to_string() })?;
 
         let tracks: Vec<ScoreTrack> = smf
             .tracks
@@ -58,12 +56,7 @@ impl MidiScore {
 
         let time_signature = midi_file::time_signature_of(&smf).unwrap_or((4, 4));
 
-        Ok(Self {
-            bytes,
-            tracks,
-            tempo_bpm,
-            time_signature,
-        })
+        Ok(Self { bytes, tracks, tempo_bpm, time_signature })
     }
 }
 
@@ -89,19 +82,12 @@ impl ScoreFile for MidiScore {
     }
 
     fn notes(&self, track: usize) -> Result<Vec<ScoreNote>, ScoreError> {
-        let smf = Smf::parse(&self.bytes).map_err(|e| ScoreError::Parse {
-            format: "MIDI",
-            detail: e.to_string(),
-        })?;
-        let events = smf
-            .tracks
-            .get(track)
-            .ok_or(ScoreError::NoSuchTrack(track))?;
+        let smf = Smf::parse(&self.bytes)
+            .map_err(|e| ScoreError::Parse { format: "MIDI", detail: e.to_string() })?;
+        let events = smf.tracks.get(track).ok_or(ScoreError::NoSuchTrack(track))?;
 
-        let tpq = midi_file::ticks_per_quarter(&smf).map_err(|detail| ScoreError::Parse {
-            format: "MIDI",
-            detail,
-        })?;
+        let tpq = midi_file::ticks_per_quarter(&smf)
+            .map_err(|detail| ScoreError::Parse { format: "MIDI", detail })?;
         let tempo = midi_file::collect_tempo_map(&smf);
 
         let mut notes: Vec<ScoreNote> = midi_file::extract_notes(events)
@@ -123,9 +109,7 @@ impl ScoreFile for MidiScore {
         // insurance, since the trait promises sorted output and a future
         // reader might not.
         notes.sort_by(|a, b| {
-            a.start_secs
-                .partial_cmp(&b.start_secs)
-                .unwrap_or(std::cmp::Ordering::Equal)
+            a.start_secs.partial_cmp(&b.start_secs).unwrap_or(std::cmp::Ordering::Equal)
         });
         Ok(notes)
     }

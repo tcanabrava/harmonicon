@@ -44,8 +44,7 @@ fn generate_bundled_lesson_manifest() {
                 std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set by cargo");
             let root = Path::new(&manifest_dir).join("../..").join(&dir);
             println!("cargo:rerun-if-changed={}", root.display());
-            root.canonicalize()
-                .unwrap_or_else(|e| panic!("HARMONICON_LESSONS_DIR={dir}: {e}"))
+            root.canonicalize().unwrap_or_else(|e| panic!("HARMONICON_LESSONS_DIR={dir}: {e}"))
         }
         Err(_) => {
             println!(

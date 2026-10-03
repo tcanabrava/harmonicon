@@ -122,10 +122,7 @@ impl CallResponseState {
     /// gets its own phrases, while within one jam each bar's call is a pure
     /// function of that seed.
     pub fn fresh() -> Self {
-        Self {
-            seed: rand::random(),
-            ..Self::default()
-        }
+        Self { seed: rand::random(), ..Self::default() }
     }
 }
 
@@ -157,11 +154,7 @@ fn call_phrase_notes(call: &[CallNote]) -> Vec<PhraseNote> {
             tick: n.tick,
             len: n.len,
             freq: Some(midi_to_freq_hz(f32::from(n.note.midi))),
-            expr: if n.held {
-                Expr::Vibrato(HELD_VIBRATO_HZ)
-            } else {
-                Expr::None
-            },
+            expr: if n.held { Expr::Vibrato(HELD_VIBRATO_HZ) } else { Expr::None },
         })
         .collect()
 }
@@ -171,11 +164,7 @@ fn call_phrase_notes(call: &[CallNote]) -> Vec<PhraseNote> {
 /// than stepping.
 fn approach(current: f32, target: f32, dt_secs: f32) -> f32 {
     let step = (1.0 - DUCK_GAIN) * dt_secs / DUCK_SECS;
-    if current < target {
-        (current + step).min(target)
-    } else {
-        (current - step).max(target)
-    }
+    if current < target { (current + step).min(target) } else { (current - step).max(target) }
 }
 
 /// The turn-taking banner's text node.
@@ -254,11 +243,7 @@ pub fn update_call_response_label(
     if !enabled.is_changed() && added.is_empty() {
         return;
     }
-    let want = loc.msg(if enabled.0 {
-        "jam-call-response-on"
-    } else {
-        "jam-call-response-off"
-    });
+    let want = loc.msg(if enabled.0 { "jam-call-response-on" } else { "jam-call-response-off" });
     for mut text in &mut labels {
         if text.0 != *want {
             text.0.clear();
@@ -303,10 +288,7 @@ pub fn update_call_duck(
     time: Res<Time>,
     mut duck: ResMut<CallDuck>,
 ) {
-    let speaking = enabled.0
-        && state
-            .speaking_until
-            .is_some_and(|until| clock.get() < until);
+    let speaking = enabled.0 && state.speaking_until.is_some_and(|until| clock.get() < until);
     let target = if speaking { DUCK_GAIN } else { 1.0 };
     let next = approach(duck.0, target, time.delta_secs());
     if next != duck.0 {

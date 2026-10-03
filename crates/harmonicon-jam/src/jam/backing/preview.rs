@@ -21,7 +21,5 @@ pub fn generate_listening_preview(
     let stems = generate_backing_stems(key, bpm, progression, genre, energy, seed);
     let chorus_samples = (12.0 * 4.0 * 60.0 / bpm.max(1.0) * SAMPLE_RATE as f32) as usize;
     let len = chorus_samples.min(stems[0].1.len());
-    (0..len)
-        .map(|sample| stems.iter().map(|(_, pcm)| pcm[sample]).sum())
-        .collect()
+    (0..len).map(|sample| stems.iter().map(|(_, pcm)| pcm[sample]).sum()).collect()
 }

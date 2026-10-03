@@ -56,12 +56,7 @@ impl Plugin for CreditsPlugin {
             .add_systems(OnExit(AppState::Credits), (cleanup, restore_camera))
             .add_systems(
                 Update,
-                (
-                    rotate_harmonica,
-                    scroll_credits,
-                    propagate_scene_layers,
-                    handle_input,
-                )
+                (rotate_harmonica, scroll_credits, propagate_scene_layers, handle_input)
                     .run_if(in_state(AppState::Credits)),
             );
     }
@@ -112,10 +107,7 @@ fn spawn_3d_scene(
     // Camera: renders layer CREDITS_LAYER only, sits in front of everything.
     commands.spawn((
         Camera3d::default(),
-        Camera {
-            order: 0,
-            ..default()
-        },
+        Camera { order: 0, ..default() },
         Transform::from_xyz(-1.5, 1.8, 5.0).looking_at(Vec3::new(0.0, 0.2, 0.0), Vec3::Y),
         layers.clone(),
         CreditsRoot,
@@ -123,11 +115,7 @@ fn spawn_3d_scene(
 
     // Key light — warm, from upper-right front.
     commands.spawn((
-        DirectionalLight {
-            illuminance: 7_000.0,
-            color: Color::srgb(1.0, 0.96, 0.88),
-            ..default()
-        },
+        DirectionalLight { illuminance: 7_000.0, color: Color::srgb(1.0, 0.96, 0.88), ..default() },
         Transform::from_xyz(4.0, 6.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
         layers.clone(),
         CreditsRoot,
@@ -197,9 +185,7 @@ fn spawn_ui(commands: &mut Commands, loc: &Localization) {
                 row_gap: Val::Px(0.0),
                 ..default()
             },
-            CreditsScroll {
-                offset: SCROLL_START,
-            },
+            CreditsScroll { offset: SCROLL_START },
         ))
         .id();
 
@@ -351,10 +337,7 @@ fn spawn_credit_line(parent: &mut ChildSpawnerCommands, item: CreditLine) {
             return;
         }
         CreditLine::Gap(px) => {
-            parent.spawn(Node {
-                height: Val::Px(px),
-                ..default()
-            });
+            parent.spawn(Node { height: Val::Px(px), ..default() });
             return;
         }
     };

@@ -50,10 +50,7 @@ pub struct TrainerKey {
 
 impl TrainerKey {
     pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            harp: richter_harp(name),
-        }
+        Self { name: name.to_string(), harp: richter_harp(name) }
     }
 
     pub fn name(&self) -> &str {
@@ -188,10 +185,7 @@ pub struct TrainerTarget {
 impl Default for TrainerTarget {
     fn default() -> Self {
         // Hole 2's half-step draw bend: the classic first bend most players learn.
-        Self {
-            hole: 2,
-            technique: Technique::Bend1,
-        }
+        Self { hole: 2, technique: Technique::Bend1 }
     }
 }
 
@@ -244,14 +238,7 @@ fn on_diagram_cell_clicked(
     let Some(technique) = row_to_technique(cell.row) else {
         return;
     };
-    choose_cell(
-        &mut drill,
-        &mut target,
-        TrainerTarget {
-            hole: cell.hole,
-            technique,
-        },
-    );
+    choose_cell(&mut drill, &mut target, TrainerTarget { hole: cell.hole, technique });
 }
 
 /// What choosing a diagram cell does, shared by a click and by Enter/Space
@@ -362,10 +349,7 @@ fn technique_hint_key(technique: Technique, hole: u8) -> &'static str {
 }
 
 fn technique_hint(loc: &Localization, technique: Technique, hole: u8) -> String {
-    String::from(loc.msg_args(
-        technique_hint_key(technique, hole),
-        &[("hole", hole.to_string())],
-    ))
+    String::from(loc.msg_args(technique_hint_key(technique, hole), &[("hole", hole.to_string())]))
 }
 
 /// The pitch detector's search range for `key`'s transposed Richter harp,
@@ -426,9 +410,8 @@ pub fn setup(
     // and doesn't want its background image/scroll-area/`MenuRoot` cleanup
     // tag. Not separately tagged `GameplayRoot` — despawning `root_id` on
     // exit (`cleanup_gameplay`) already recurses into every child.
-    let title_column = commands
-        .spawn_scene(title_column_scene(String::from(loc.msg("bending-trainer"))))
-        .id();
+    let title_column =
+        commands.spawn_scene(title_column_scene(String::from(loc.msg("bending-trainer")))).id();
     let header = commands.spawn_scene(header_scene()).id();
     commands.entity(header).add_child(title_column);
     commands.entity(root_id).add_child(header);
@@ -529,10 +512,7 @@ fn target_label_text(loc: &Localization, hole: u8, technique: Technique) -> Stri
     let technique = loc.msg(technique.label_key(hole));
     String::from(loc.msg_args(
         "bending-target-label",
-        &[
-            ("hole", hole.to_string()),
-            ("technique", technique.to_string()),
-        ],
+        &[("hole", hole.to_string()), ("technique", technique.to_string())],
     ))
 }
 

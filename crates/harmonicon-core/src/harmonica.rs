@@ -37,14 +37,12 @@ pub const C_DRAW_COUNTRY: [&str; 10] =
 /// semitone *below* hole 5 blow: solo tuning repeats a four-hole group so
 /// the same fingering works in every octave, which is the whole point of
 /// the instrument.
-pub const C_BLOW_CHROMATIC: [&str; 12] = [
-    "C4", "E4", "G4", "C5", "C5", "E5", "G5", "C6", "C6", "E6", "G6", "C7",
-];
+pub const C_BLOW_CHROMATIC: [&str; 12] =
+    ["C4", "E4", "G4", "C5", "C5", "E5", "G5", "C6", "C6", "E6", "G6", "C7"];
 /// Standard 12-hole C chromatic draw notes — solo tuning's `D F A B`,
 /// repeating up three octaves alongside [`C_BLOW_CHROMATIC`].
-pub const C_DRAW_CHROMATIC: [&str; 12] = [
-    "D4", "F4", "A4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6", "B6",
-];
+pub const C_DRAW_CHROMATIC: [&str; 12] =
+    ["D4", "F4", "A4", "B4", "D5", "F5", "A5", "B5", "D6", "F6", "A6", "B6"];
 /// Paddy Richter-tuned C-harp blow notes: identical to [`C_BLOW`] except
 /// hole 3, raised a whole step (G4 → A4) — the tuning's one deliberate
 /// change, popularized for Irish/Celtic tunes that need 1st position's
@@ -56,29 +54,25 @@ pub const C_BLOW_PADDY_RICHTER: [&str; 10] =
 /// Natural-minor-tuned C-harp blow notes: a tonic minor triad (root, ♭3rd,
 /// 5th) repeating across octaves, the minor-tuning counterpart of
 /// [`C_BLOW`]'s major triad — see [`natural_minor_harp`].
-pub const C_BLOW_NATURAL_MINOR: [&str; 10] = [
-    "C4", "D#4", "G4", "C5", "D#5", "G5", "C6", "D#6", "G6", "C7",
-];
+pub const C_BLOW_NATURAL_MINOR: [&str; 10] =
+    ["C4", "D#4", "G4", "C5", "D#5", "G5", "C6", "D#6", "G6", "C7"];
 /// Natural-minor-tuned C-harp draw notes: the same Richter draw scale-degree
 /// slot per hole as [`C_DRAW`] (2nd/5th/7th on the low holes, 2nd/4th/6th/7th
 /// above), reinterpreted with the natural minor scale's flatted degrees —
 /// see [`natural_minor_harp`]. Sharp-spelled (D#/G#, not Eb/Ab) to match
 /// this crate's one note-spelling convention (`audio_system::midi::
 /// NOTE_NAMES`).
-pub const C_DRAW_NATURAL_MINOR: [&str; 10] = [
-    "D4", "G4", "A#4", "D5", "F5", "G#5", "A#5", "D6", "F6", "G#6",
-];
+pub const C_DRAW_NATURAL_MINOR: [&str; 10] =
+    ["D4", "G4", "A#4", "D5", "F5", "G#5", "A#5", "D6", "F6", "G#6"];
 
 /// Blow notes with the slide button pressed: each a half-step above the
 /// unslid blow note.
-pub const C_BLOW_SLIDE_CHROMATIC: [&str; 12] = [
-    "C#4", "F4", "G#4", "C#5", "C#5", "F5", "G#5", "C#6", "C#6", "F6", "G#6", "C#7",
-];
+pub const C_BLOW_SLIDE_CHROMATIC: [&str; 12] =
+    ["C#4", "F4", "G#4", "C#5", "C#5", "F5", "G#5", "C#6", "C#6", "F6", "G#6", "C#7"];
 /// Draw notes with the slide button pressed: each a half-step above the
 /// unslid draw note.
-pub const C_DRAW_SLIDE_CHROMATIC: [&str; 12] = [
-    "D#4", "F#4", "A#4", "C5", "D#5", "F#5", "A#5", "C6", "D#6", "F#6", "A#6", "C7",
-];
+pub const C_DRAW_SLIDE_CHROMATIC: [&str; 12] =
+    ["D#4", "F#4", "A#4", "C5", "D#5", "F#5", "A#5", "C6", "D#6", "F#6", "A#6", "C7"];
 
 /// Standard 16-hole C chromatic blow notes — four-octave solo tuning from
 /// C3 through C7. The upper twelve holes are the ordinary 12-hole layout.
@@ -111,10 +105,7 @@ pub fn key_offset(key: &str) -> i32 {
 
 /// Transposes each entry of a reference table by `offset` semitones.
 fn transpose_table(notes: &[&str], offset: i32) -> Vec<String> {
-    notes
-        .iter()
-        .filter_map(|n| note_to_midi(n).map(|m| midi_to_note(m + offset)))
-        .collect()
+    notes.iter().filter_map(|n| note_to_midi(n).map(|m| midi_to_note(m + offset))).collect()
 }
 
 /// A Richter diatonic harp for `key`, transposed from the [`C_BLOW`]/[`C_DRAW`]
@@ -275,12 +266,7 @@ pub fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
         }
     }
 
-    HoleNotes {
-        over,
-        blow,
-        draw,
-        bends,
-    }
+    HoleNotes { over, blow, draw, bends }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -532,16 +518,8 @@ pub fn chord_intervals(quality: ChordQuality) -> &'static [i32] {
 pub fn ii_v_i_chords(key: &str, alt_dominant: bool) -> [(String, ChordQuality); 3] {
     let ii = semitone(key, 2);
     let v = semitone(key, 7);
-    let v_quality = if alt_dominant {
-        ChordQuality::Dominant7Alt
-    } else {
-        ChordQuality::Dominant7
-    };
-    [
-        (ii, ChordQuality::Minor7),
-        (v, v_quality),
-        (key.to_string(), ChordQuality::Major7),
-    ]
+    let v_quality = if alt_dominant { ChordQuality::Dominant7Alt } else { ChordQuality::Dominant7 };
+    [(ii, ChordQuality::Minor7), (v, v_quality), (key.to_string(), ChordQuality::Major7)]
 }
 
 /// The 12 bars of `progression` in `key`: each bar's chord root + quality.
@@ -552,11 +530,7 @@ pub fn progression_bars(key: &str, progression: Progression) -> [(String, ChordQ
     let i = key.to_string();
     let iv = semitone(key, 5);
     let v = semitone(key, 7);
-    let q = if progression == Progression::Minor {
-        Minor7
-    } else {
-        Dominant7
-    };
+    let q = if progression == Progression::Minor { Minor7 } else { Dominant7 };
     match progression {
         Progression::Standard | Progression::Minor => [
             (i.clone(), q),
@@ -618,9 +592,7 @@ pub fn progression_bars(key: &str, progression: Progression) -> [(String, ChordQ
 /// Session position compass (`jam::position_guide`).
 pub fn detected_harp_key(harp: &Harmonica) -> Option<String> {
     let blow1 = harp.wind_direction_label(1, &Action::Blow);
-    let key = blow1
-        .trim_end_matches(|c: char| c.is_ascii_digit())
-        .to_string();
+    let key = blow1.trim_end_matches(|c: char| c.is_ascii_digit()).to_string();
     (!key.is_empty() && key != "\u{2014}").then_some(key)
 }
 
@@ -657,10 +629,7 @@ const BLUES_SCALE_INTERVALS: [i32; 6] = [0, 3, 5, 6, 7, 10];
 /// [`Scale::classes`]'s position variants) the song editor's scale-aware
 /// note coloring, so both reflect the same blues-scale definition.
 pub fn blues_scale_classes(key: &str) -> HashSet<String> {
-    BLUES_SCALE_INTERVALS
-        .iter()
-        .map(|&n| semitone(key, n))
-        .collect()
+    BLUES_SCALE_INTERVALS.iter().map(|&n| semitone(key, n)).collect()
 }
 
 /// Semitone offsets of the major (Ionian) scale's seven degrees above the
@@ -745,10 +714,7 @@ impl Scale {
     /// selectable alternative to a fixed [`blues_scale_classes`] call.
     pub fn classes(self, harp_key: &str) -> HashSet<String> {
         let root = semitone(harp_key, self.root_offset_semitones());
-        self.degree_intervals()
-            .iter()
-            .map(|&n| semitone(&root, n))
-            .collect()
+        self.degree_intervals().iter().map(|&n| semitone(&root, n)).collect()
     }
 }
 
@@ -769,15 +735,11 @@ impl Harmonica {
     fn wind_direction_note(&self, hole: u8, action: &Action) -> Option<&str> {
         let idx = hole.checked_sub(1)?;
         let notes = match self {
-            Harmonica::Diatonic {
-                layout: Some(l), ..
-            } => match action {
+            Harmonica::Diatonic { layout: Some(l), .. } => match action {
                 Action::Blow => &l.blow,
                 Action::Draw => &l.draw,
             },
-            Harmonica::Chromatic {
-                layout: Some(l), ..
-            } => match action {
+            Harmonica::Chromatic { layout: Some(l), .. } => match action {
                 Action::Blow => &l.blow,
                 Action::Draw => &l.draw,
             },
@@ -788,9 +750,7 @@ impl Harmonica {
 
     // Returns the blow/draw label for the given hole, or a dash if not available.
     pub fn wind_direction_label(&self, hole: u8, action: &Action) -> String {
-        self.wind_direction_note(hole, action)
-            .unwrap_or("\u{2014}")
-            .to_string()
+        self.wind_direction_note(hole, action).unwrap_or("\u{2014}").to_string()
     }
 
     /// The MIDI note number for `hole`'s `action` (blow/draw), or `None` for
@@ -816,10 +776,7 @@ impl Harmonica {
         let Some(idx) = hole.checked_sub(1) else {
             return default_return;
         };
-        let Harmonica::Chromatic {
-            layout: Some(l), ..
-        } = self
-        else {
+        let Harmonica::Chromatic { layout: Some(l), .. } = self else {
             return default_return;
         };
         let notes = match action {
@@ -865,9 +822,7 @@ impl Harmonica {
 
         let mut set = HashSet::new();
         match &self {
-            Harmonica::Diatonic {
-                layout: Some(l), ..
-            } => {
+            Harmonica::Diatonic { layout: Some(l), .. } => {
                 let blow = l.blow.as_deref().unwrap_or(&[]);
                 let draw = l.draw.as_deref().unwrap_or(&[]);
                 for (i, (b, d)) in blow.iter().zip(draw.iter()).enumerate() {
@@ -903,12 +858,8 @@ impl Harmonica {
                     set.extend(over.and_then(|m| u8::try_from(m).ok()));
                 }
             }
-            Harmonica::Chromatic {
-                layout: Some(l), ..
-            } => {
-                for notes in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide]
-                    .into_iter()
-                    .flatten()
+            Harmonica::Chromatic { layout: Some(l), .. } => {
+                for notes in [&l.blow, &l.draw, &l.blow_slide, &l.draw_slide].into_iter().flatten()
                 {
                     for n in notes {
                         set.extend(to_midi_u8(n));
@@ -928,11 +879,8 @@ impl Harmonica {
     ///
     /// [`build_valid_notes`]: Self::build_valid_notes
     pub fn frequency_range(&self) -> Option<(f32, f32)> {
-        let freqs: Vec<f32> = self
-            .build_valid_notes()
-            .iter()
-            .map(|&m| midi_to_freq_hz(m as f32))
-            .collect();
+        let freqs: Vec<f32> =
+            self.build_valid_notes().iter().map(|&m| midi_to_freq_hz(m as f32)).collect();
         if freqs.is_empty() {
             return None;
         }

@@ -159,17 +159,10 @@ pub fn setup(
                 8.0 + BAR_HEIGHT + music_score::PANEL_HEIGHT
             };
             root.spawn(Node {
-                width: if compact {
-                    Val::Percent(88.0)
-                } else {
-                    Val::Percent(74.0)
-                },
+                width: if compact { Val::Percent(88.0) } else { Val::Percent(74.0) },
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect {
-                    top: Val::Px(left_top_padding),
-                    ..UiRect::all(Val::Px(8.0))
-                },
+                padding: UiRect { top: Val::Px(left_top_padding), ..UiRect::all(Val::Px(8.0)) },
                 row_gap: Val::Px(4.0),
                 ..default()
             })
@@ -223,17 +216,10 @@ pub fn setup(
                 // banner, tab ribbon, metronome, technique legend — and the
                 // width it gave up goes to the highway, which is the thing
                 // the player is actually reading.
-                width: if compact {
-                    Val::Px(140.0)
-                } else {
-                    Val::Percent(26.0)
-                },
+                width: if compact { Val::Px(140.0) } else { Val::Percent(26.0) },
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect {
-                    top: Val::Px(right_top_padding),
-                    ..UiRect::all(Val::Px(12.0))
-                },
+                padding: UiRect { top: Val::Px(right_top_padding), ..UiRect::all(Val::Px(12.0)) },
                 row_gap: Val::Px(12.0),
                 ..default()
             })
@@ -500,9 +486,7 @@ fn spawn_note_visual(
         },
         MaterialNode(material),
         NoteVisual { note_id },
-        NoteRibbon {
-            duration_frac: (note.duration / LOOKAHEAD) as f32,
-        },
+        NoteRibbon { duration_frac: (note.duration / LOOKAHEAD) as f32 },
         JudgedState::default(),
     ))
     .with_children(|note_e| {
@@ -519,10 +503,7 @@ fn spawn_note_visual(
             },
             children![(
                 Text::new(label),
-                TextFont {
-                    font_size: FontSize::Px(18.0),
-                    ..default()
-                },
+                TextFont { font_size: FontSize::Px(18.0), ..default() },
                 TextColor(head_label_color(None)),
                 NoteCapLabel,
             )],
@@ -684,9 +665,7 @@ pub fn update_note_visuals(
         );
         // Writing through `get_mut` queues `AssetEvent::Modified` and a GPU
         // re-upload even for an unchanged value, so compare first.
-        if ribbons
-            .get(&material.0)
-            .is_some_and(|m| m.color != color || m.hold != hold)
+        if ribbons.get(&material.0).is_some_and(|m| m.color != color || m.hold != hold)
             && let Some(mut m) = ribbons.get_mut(&material.0)
         {
             m.color = color;
@@ -754,9 +733,8 @@ pub fn animate_judged_notes(
         } else {
             judged.copied()
         };
-        let scale = judged.map_or(1.0, |j| {
-            judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0)
-        });
+        let scale =
+            judged.map_or(1.0, |j| judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0));
         let width = lane_pct * NOTE_W;
         let lane_left = (note.hole as f32 - 1.0) * lane_pct + (lane_pct - width) * 0.5;
         let (left, scaled) = scaled_span(lane_left, width, scale);
@@ -818,13 +796,7 @@ pub(super) fn harp_pitches(
     out: &mut HashSet<u8>,
 ) {
     out.clear();
-    out.extend(
-        active
-            .0
-            .iter()
-            .map(|p| p.midi)
-            .filter(|m| valid_notes.0.contains(m)),
-    );
+    out.extend(active.0.iter().map(|p| p.midi).filter(|m| valid_notes.0.contains(m)));
 }
 
 /// One hole cell's brightness/hint glow step for one frame — the shared
@@ -863,11 +835,7 @@ pub(super) fn step_hole_glow(
         state.is_blow = is_blow;
     }
 
-    let factor = if target > state.brightness {
-        attack
-    } else {
-        decay
-    };
+    let factor = if target > state.brightness { attack } else { decay };
     state.brightness += (target - state.brightness) * factor;
     // Exponential easing never lands exactly; settle once the remaining gap
     // is far below one 8-bit colour step, so an idle cell stops repainting.
@@ -906,11 +874,7 @@ pub fn update_holes(
         let hint = if lesson.as_ref().is_some_and(|lesson| lesson.aural) {
             None
         } else {
-            targets
-                .0
-                .iter()
-                .find(|(h, _)| *h == cell.0)
-                .map(|(_, b)| *b)
+            targets.0.iter().find(|(h, _)| *h == cell.0).map(|(_, b)| *b)
         };
 
         step_hole_glow(&mut state, blow, draw, hint, &sounding, attack, decay);
@@ -967,10 +931,7 @@ mod tests {
     fn attack_descends_over_time() {
         let b0 = note_attack_pct(2.0, 0.0, LOOKAHEAD);
         let b1 = note_attack_pct(2.0, 1.0, LOOKAHEAD);
-        assert!(
-            b1 < b0,
-            "a note should fall (smaller bottom%) as time advances"
-        );
+        assert!(b1 < b0, "a note should fall (smaller bottom%) as time advances");
     }
 
     #[test]
@@ -1003,15 +964,9 @@ mod tests {
     #[test]
     fn blow_and_draw_ribbons_differ_and_follow_the_colorblind_palette() {
         let colors = NoteColors::default();
-        assert_ne!(
-            ribbon_color(false, true, colors),
-            ribbon_color(false, false, colors)
-        );
+        assert_ne!(ribbon_color(false, true, colors), ribbon_color(false, false, colors));
         let colorblind = harmonicon_platform::theme::COLORBLIND_NOTE_COLORS;
-        assert_ne!(
-            ribbon_color(false, true, colorblind),
-            ribbon_color(false, true, colors)
-        );
+        assert_ne!(ribbon_color(false, true, colorblind), ribbon_color(false, true, colors));
     }
 
     // ── harp_pitches / step_hole_glow ─────────────────────────────────────────
@@ -1040,10 +995,7 @@ mod tests {
         let sounding = HashSet::from([60u8]);
         step_hole_glow(&mut state, Some(60), Some(64), None, &sounding, 1.0, 0.1);
         assert!(state.is_blow);
-        assert!(
-            (state.brightness - 1.0).abs() < 1e-6,
-            "attack=1.0 should snap fully"
-        );
+        assert!((state.brightness - 1.0).abs() < 1e-6, "attack=1.0 should snap fully");
     }
 
     #[test]
@@ -1051,19 +1003,8 @@ mod tests {
         let mut state = HoleState::default();
         let sounding = HashSet::from([64u8]);
         // Draw (64) is actually sounding; the hint says blow — the real hit wins.
-        step_hole_glow(
-            &mut state,
-            Some(60),
-            Some(64),
-            Some(true),
-            &sounding,
-            1.0,
-            0.1,
-        );
-        assert!(
-            !state.is_blow,
-            "the real draw hit should win over the blow hint"
-        );
+        step_hole_glow(&mut state, Some(60), Some(64), Some(true), &sounding, 1.0, 0.1);
+        assert!(!state.is_blow, "the real draw hit should win over the blow hint");
         assert!((state.brightness - 1.0).abs() < 1e-6);
     }
 
@@ -1071,15 +1012,7 @@ mod tests {
     fn step_hole_glow_uses_a_dim_floor_for_a_hint_with_nothing_sounding() {
         let mut state = HoleState::default();
         let sounding = HashSet::new();
-        step_hole_glow(
-            &mut state,
-            Some(60),
-            Some(64),
-            Some(true),
-            &sounding,
-            1.0,
-            0.1,
-        );
+        step_hole_glow(&mut state, Some(60), Some(64), Some(true), &sounding, 1.0, 0.1);
         // A hint alone (no actual hit) only nudges brightness toward the dim
         // floor — `is_blow` is only ever written on a real hit, so it stays
         // at its prior value (the `Default` false) regardless of the hint.
@@ -1089,10 +1022,7 @@ mod tests {
 
     #[test]
     fn step_hole_glow_decays_toward_zero_with_nothing_sounding_or_hinted() {
-        let mut state = HoleState {
-            brightness: 1.0,
-            is_blow: true,
-        };
+        let mut state = HoleState { brightness: 1.0, is_blow: true };
         let sounding = HashSet::new();
         step_hole_glow(&mut state, Some(60), Some(64), None, &sounding, 1.0, 0.5);
         // decay=0.5 halves the distance to the 0.0 target each step.
@@ -1102,10 +1032,7 @@ mod tests {
 
     #[test]
     fn step_hole_glow_settles_exactly_on_its_target() {
-        let mut state = HoleState {
-            brightness: 1.0,
-            is_blow: true,
-        };
+        let mut state = HoleState { brightness: 1.0, is_blow: true };
         let sounding = HashSet::new();
         for _ in 0..200 {
             step_hole_glow(&mut state, Some(60), Some(64), None, &sounding, 1.0, 0.1);

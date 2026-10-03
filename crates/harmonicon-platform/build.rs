@@ -136,27 +136,23 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, 
             // `harmonicon_score::IMPORT_EXTENSIONS` — a bundled song whose
             // chart is a score file would otherwise be visible on desktop
             // and silently missing on wasm/Android.
-            let chart = std::fs::read_dir(song_dir.path().join("song"))
-                .ok()
-                .and_then(|entries| {
-                    let entries: Vec<_> = entries.flatten().collect();
-                    let has_extension = |e: &std::fs::DirEntry, want: &[&str]| {
-                        e.path()
-                            .extension()
-                            .and_then(|x| x.to_str())
-                            .map(|x| x.to_ascii_lowercase())
-                            .is_some_and(|x| want.contains(&x.as_str()))
-                    };
-                    entries
-                        .iter()
-                        .find(|e| has_extension(e, &["harpchart"]))
-                        .or_else(|| {
-                            entries
-                                .iter()
-                                .find(|e| harmonicon_score::is_importable_file(&e.path()))
-                        })
-                        .map(|e| e.path())
-                });
+            let chart = std::fs::read_dir(song_dir.path().join("song")).ok().and_then(|entries| {
+                let entries: Vec<_> = entries.flatten().collect();
+                let has_extension = |e: &std::fs::DirEntry, want: &[&str]| {
+                    e.path()
+                        .extension()
+                        .and_then(|x| x.to_str())
+                        .map(|x| x.to_ascii_lowercase())
+                        .is_some_and(|x| want.contains(&x.as_str()))
+                };
+                entries
+                    .iter()
+                    .find(|e| has_extension(e, &["harpchart"]))
+                    .or_else(|| {
+                        entries.iter().find(|e| harmonicon_score::is_importable_file(&e.path()))
+                    })
+                    .map(|e| e.path())
+            });
             let Some(chart) = chart else {
                 continue;
             };

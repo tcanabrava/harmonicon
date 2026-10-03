@@ -40,10 +40,9 @@ pub struct LessonContext {
 pub fn training_criteria(lesson: Option<&PassCriteria>, tier: Tier) -> PassCriteria {
     let threshold = tier.pass_threshold();
     match lesson {
-        Some(PassCriteria::Technique { technique, .. }) => PassCriteria::Technique {
-            technique: technique.clone(),
-            threshold,
-        },
+        Some(PassCriteria::Technique { technique, .. }) => {
+            PassCriteria::Technique { technique: technique.clone(), threshold }
+        }
         _ => PassCriteria::Accuracy { threshold },
     }
 }
@@ -52,10 +51,7 @@ pub fn training_criteria(lesson: Option<&PassCriteria>, tier: Tier) -> PassCrite
 /// record. `passed_ids` is the caller's view of `PlayerProfile::lessons`
 /// (only the ids with `passed == true`).
 pub fn is_unlocked(manifest: &LessonManifest, passed_ids: &[&str]) -> bool {
-    manifest
-        .prerequisites
-        .iter()
-        .all(|p| passed_ids.contains(&p.as_str()))
+    manifest.prerequisites.iter().all(|p| passed_ids.contains(&p.as_str()))
 }
 
 /// Judges a finished lesson run. `accuracy` is the overall weighted accuracy
@@ -81,10 +77,7 @@ pub fn lesson_passed(
         | Some(PassCriteria::PhraseDiscipline { threshold }) => {
             jam_fraction.is_some_and(|a| a >= *threshold)
         }
-        Some(PassCriteria::Technique {
-            technique,
-            threshold,
-        }) => technique_accuracy
+        Some(PassCriteria::Technique { technique, threshold }) => technique_accuracy
             .iter()
             .find(|(name, _)| name == technique)
             .is_some_and(|(_, acc)| *acc >= *threshold),
@@ -147,10 +140,7 @@ mod tests {
 
     #[test]
     fn technique_criterion_reads_the_matching_bucket() {
-        let c = PassCriteria::Technique {
-            technique: "wah-wah".into(),
-            threshold: 0.5,
-        };
+        let c = PassCriteria::Technique { technique: "wah-wah".into(), threshold: 0.5 };
         let per_technique = [("normal", 1.0_f32), ("wah-wah", 0.4)];
         assert!(!lesson_passed(Some(&c), 1.0, &per_technique, None));
         let per_technique = [("normal", 0.0_f32), ("wah-wah", 0.5)];
@@ -159,10 +149,7 @@ mod tests {
 
     #[test]
     fn technique_criterion_fails_when_the_bucket_was_never_exercised() {
-        let c = PassCriteria::Technique {
-            technique: "wah-wah".into(),
-            threshold: 0.5,
-        };
+        let c = PassCriteria::Technique { technique: "wah-wah".into(), threshold: 0.5 };
         assert!(!lesson_passed(Some(&c), 1.0, &[("normal", 1.0)], None));
     }
 
@@ -212,16 +199,10 @@ mod training_criteria_tests {
     #[test]
     fn a_technique_lesson_keeps_being_judged_on_its_technique() {
         // A bend lesson's drills are still about bends; only the bar moves.
-        let lesson = PassCriteria::Technique {
-            technique: "bend".into(),
-            threshold: 0.5,
-        };
+        let lesson = PassCriteria::Technique { technique: "bend".into(), threshold: 0.5 };
         let c = training_criteria(Some(&lesson), Tier::Interleave);
         match c {
-            PassCriteria::Technique {
-                technique,
-                threshold,
-            } => {
+            PassCriteria::Technique { technique, threshold } => {
                 assert_eq!(technique, "bend");
                 assert_eq!(threshold, Tier::Interleave.pass_threshold());
             }
@@ -258,9 +239,6 @@ mod training_criteria_tests {
     fn a_lesson_with_no_criteria_still_gives_its_drills_a_bar() {
         // Finishing is enough to pass the lesson; a drill you merely reached
         // the end of has not been practised.
-        assert!(matches!(
-            training_criteria(None, Tier::Isolate),
-            PassCriteria::Accuracy { .. }
-        ));
+        assert!(matches!(training_criteria(None, Tier::Isolate), PassCriteria::Accuracy { .. }));
     }
 }

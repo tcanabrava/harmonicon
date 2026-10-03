@@ -88,12 +88,7 @@ fn main() {
 /// Sink constructors whose argument is a literal `Text`/`TextSpan` value —
 /// checked directly, and with a `format!(` wrapper (same line or the line
 /// immediately after, for a `format!(\n    "..."\n)` call).
-const TEXT_CTORS: &[&str] = &[
-    "Text::new(",
-    "Text::from(",
-    "TextSpan::new(",
-    "TextSpan::from(",
-];
+const TEXT_CTORS: &[&str] = &["Text::new(", "Text::from(", "TextSpan::new(", "TextSpan::from("];
 
 /// Shared spawn helpers whose first `&str`/`String` argument is a label/text
 /// that gets displayed as-is — so a literal passed here is exactly as
@@ -140,10 +135,7 @@ fn build() {
             }
         }
     }
-    assert!(
-        roots[0].is_dir(),
-        "build.rs: no src/ — the source lints would silently pass"
-    );
+    assert!(roots[0].is_dir(), "build.rs: no src/ — the source lints would silently pass");
     roots.sort();
 
     let mut rs_files: Vec<std::path::PathBuf> = Vec::new();
@@ -152,12 +144,7 @@ fn build() {
     }
     let sources: Vec<(String, String)> = rs_files
         .iter()
-        .map(|p| {
-            (
-                p.display().to_string(),
-                std::fs::read_to_string(p).unwrap_or_default(),
-            )
-        })
+        .map(|p| (p.display().to_string(), std::fs::read_to_string(p).unwrap_or_default()))
         .collect();
 
     let mut violations: Vec<String> = Vec::new();
@@ -443,11 +430,8 @@ fn check_source(source: &str, report: &mut dyn FnMut(usize, &str)) {
         }
 
         // 5: a bare identifier in any sink, bound to a literal just above.
-        let ident_sinks = TEXT_CTORS
-            .iter()
-            .chain(KNOWN_LABEL_SINKS)
-            .copied()
-            .chain(std::iter::once("Text({"));
+        let ident_sinks =
+            TEXT_CTORS.iter().chain(KNOWN_LABEL_SINKS).copied().chain(std::iter::once("Text({"));
         for sink in ident_sinks {
             let Some(ident) = identifier_argument(line, sink) else {
                 continue;
@@ -470,13 +454,9 @@ fn check_source(source: &str, report: &mut dyn FnMut(usize, &str)) {
 /// the argument is anything else (a literal, a call, a path).
 fn identifier_argument(line: &str, needle: &str) -> Option<String> {
     let pos = line.find(needle)?;
-    let rest = line[pos + needle.len()..]
-        .trim_start()
-        .trim_start_matches('&');
-    let ident: String = rest
-        .chars()
-        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
-        .collect();
+    let rest = line[pos + needle.len()..].trim_start().trim_start_matches('&');
+    let ident: String =
+        rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
     if ident.is_empty() || ident.chars().next().is_some_and(|c| c.is_ascii_digit()) {
         return None;
     }
@@ -504,9 +484,7 @@ fn let_literal_binding(lines: &[&str], from: usize, ident: &str) -> Option<usize
     let start = from.saturating_sub(LET_LOOKBACK_LINES);
     for j in (start..from).rev() {
         let trimmed = lines[j].trim_start();
-        let Some(rest) = trimmed
-            .strip_prefix("let ")
-            .map(|r| r.strip_prefix("mut ").unwrap_or(r))
+        let Some(rest) = trimmed.strip_prefix("let ").map(|r| r.strip_prefix("mut ").unwrap_or(r))
         else {
             continue;
         };
@@ -535,11 +513,7 @@ fn let_literal_binding(lines: &[&str], from: usize, ident: &str) -> Option<usize
                 .take(LOOKAHEAD_LINES)
                 .map(|l| l.trim())
                 .find(|l| !l.is_empty())
-                .and_then(|l| {
-                    l.starts_with('"')
-                        .then(|| extract_quoted_after(l, "\""))
-                        .flatten()
-                })
+                .and_then(|l| l.starts_with('"').then(|| extract_quoted_after(l, "\"")).flatten())
         } else {
             None
         };
@@ -568,9 +542,7 @@ fn collect_declared_messages(source: &str) -> Vec<(usize, String)> {
         if trimmed == "mod tests {" {
             break;
         }
-        let Some(inner) = trimmed
-            .strip_prefix("#[derive(")
-            .and_then(|s| s.strip_suffix(")]"))
+        let Some(inner) = trimmed.strip_prefix("#[derive(").and_then(|s| s.strip_suffix(")]"))
         else {
             continue;
         };
@@ -600,13 +572,8 @@ fn extract_type_name(line: &str) -> Option<String> {
             rest = after_paren[close + 1..].trim_start();
         }
     }
-    let rest = rest
-        .strip_prefix("struct ")
-        .or_else(|| rest.strip_prefix("enum "))?;
-    let name: String = rest
-        .chars()
-        .take_while(|c| c.is_alphanumeric() || *c == '_')
-        .collect();
+    let rest = rest.strip_prefix("struct ").or_else(|| rest.strip_prefix("enum "))?;
+    let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
     (!name.is_empty()).then_some(name)
 }
 
@@ -795,9 +762,8 @@ fn visit_assets(
     out: &mut dyn std::io::Write,
     component_refs: &mut Vec<String>,
 ) -> std::io::Result<()> {
-    let mut entries: Vec<_> = std::fs::read_dir(current)?
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .collect();
+    let mut entries: Vec<_> =
+        std::fs::read_dir(current)?.filter_map(|e| e.ok().map(|e| e.path())).collect();
 
     entries.sort();
 
@@ -877,10 +843,7 @@ mod tests {
     #[test]
     fn flags_natural_language_in_text_new() {
         assert_eq!(violations(r#"Text::new("▶ Play")"#).len(), 1);
-        assert_eq!(
-            violations(r#"Text::new("Another note is already here")"#).len(),
-            1
-        );
+        assert_eq!(violations(r#"Text::new("Another note is already here")"#).len(), 1);
         assert_eq!(violations(r#"Text::new("✓ PERFECT G4 +10 pts")"#).len(), 1);
     }
 
@@ -902,11 +865,7 @@ mod tests {
         let src = "let mut label: String = \"Wait for note\".to_string();\nbutton::small(&label, on_click)";
         assert_eq!(violations(src).len(), 1);
         let src = "let label = format!(\n    \"Play Hole {}\",\n    hole\n);\nText::new(label)";
-        assert_eq!(
-            violations(src).len(),
-            1,
-            "an open format!( binding is followed"
-        );
+        assert_eq!(violations(src).len(), 1, "an open format!( binding is followed");
     }
 
     #[test]
@@ -984,10 +943,7 @@ mod tests {
 
     #[test]
     fn flags_natural_language_label_in_known_helper_same_line() {
-        assert_eq!(
-            violations(r#"button::small("Adaptive Difficulty", on_toggle)"#).len(),
-            1
-        );
+        assert_eq!(violations(r#"button::small("Adaptive Difficulty", on_toggle)"#).len(), 1);
     }
 
     #[test]
@@ -1037,10 +993,7 @@ mod tests {
     use super::message_registration_violations;
 
     fn sources(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
-        pairs
-            .iter()
-            .map(|(p, s)| (p.to_string(), s.to_string()))
-            .collect()
+        pairs.iter().map(|(p, s)| (p.to_string(), s.to_string())).collect()
     }
 
     #[test]
@@ -1078,10 +1031,7 @@ mod tests {
 
     #[test]
     fn ignores_a_message_declared_only_inside_mod_tests() {
-        let src = sources(&[(
-            "a.rs",
-            "mod tests {\n    #[derive(Message)]\n    struct Foo;\n}\n",
-        )]);
+        let src = sources(&[("a.rs", "mod tests {\n    #[derive(Message)]\n    struct Foo;\n}\n")]);
         assert!(message_registration_violations(&src).is_empty());
     }
 

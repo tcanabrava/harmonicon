@@ -126,10 +126,9 @@ pub fn update_natural_check(
     if check.hold_secs >= 0.35 {
         check.confirmed = true;
         if let Some(center) = observed_center_cents(&check.samples) {
-            settings.natural_center_cents.insert(
-                BendingTrainerSettings::center_key(key.name(), target.hole),
-                center,
-            );
+            settings
+                .natural_center_cents
+                .insert(BendingTrainerSettings::center_key(key.name(), target.hole), center);
         }
     }
 }
@@ -194,11 +193,7 @@ pub(super) fn tuner_observation(
             .abs()
             .total_cmp(&(b.frequency.log2() - target_log2).abs())
     };
-    if let Some(heard) = active
-        .0
-        .iter()
-        .filter(|p| family[usize::from(p.midi)])
-        .min_by(by_distance)
+    if let Some(heard) = active.0.iter().filter(|p| family[usize::from(p.midi)]).min_by(by_distance)
     {
         return Some(TunerObservation::TargetFamily(
             1200.0 * (heard.frequency / target_freq).log2() - shift_cents,
@@ -287,10 +282,5 @@ pub fn update_tuner_readout(
         ("bending-cents-flat", Color::srgb(0.90, 0.70, 0.30))
     };
     let args = &[("cents", format!("{cents:+.0}")), ("note", target_note)];
-    set_tuner_readout(
-        &mut text,
-        &mut color,
-        String::from(loc.msg_args(key, args)),
-        color_value,
-    );
+    set_tuner_readout(&mut text, &mut color, String::from(loc.msg_args(key, args)), color_value);
 }

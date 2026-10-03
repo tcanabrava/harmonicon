@@ -68,11 +68,7 @@ fn natural_pitch<'a>(
 ) -> Cow<'a, str> {
     match event.note.as_deref() {
         Some(note) => Cow::Borrowed(note),
-        None => Cow::Owned(
-            chart
-                .harmonica
-                .wind_direction_label(event.hole, &event.action),
-        ),
+        None => Cow::Owned(chart.harmonica.wind_direction_label(event.hole, &event.action)),
     }
 }
 
@@ -116,12 +112,7 @@ pub(super) fn build_phrase_notes(
             let modifiers = event.modifiers.as_deref().unwrap_or_default();
             let natural = natural_pitch(chart, event);
             let freq = target_pitch(&natural, modifiers).map(|m| midi_to_freq_hz(m as f32));
-            notes.push(PhraseNote {
-                tick,
-                len,
-                freq,
-                expr: demo_expr(modifiers),
-            });
+            notes.push(PhraseNote { tick, len, freq, expr: demo_expr(modifiers) });
         }
     }
     notes
@@ -285,10 +276,7 @@ mod tests {
         let notes = build_phrase_notes(&chart, &group, 10.0, 120.0);
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].tick, 0);
-        assert!(
-            notes[0].freq.is_some(),
-            "hole 1 blow is a real C diatonic note"
-        );
+        assert!(notes[0].freq.is_some(), "hole 1 blow is a real C diatonic note");
     }
 
     #[test]
@@ -309,10 +297,8 @@ mod tests {
     fn phrase_notes_map_vibrato_and_wah_modifiers_to_the_matching_expr() {
         let chart = c_diatonic();
         let mut vibrato_item = item(10.0, 0.5, true, &[(1, Action::Blow)]);
-        vibrato_item.events[0].modifiers = Some(vec![Modifier::Vibrato {
-            oscillation_hz: 5.0,
-            intensity: None,
-        }]);
+        vibrato_item.events[0].modifiers =
+            Some(vec![Modifier::Vibrato { oscillation_hz: 5.0, intensity: None }]);
         let notes = build_phrase_notes(&chart, &[vibrato_item], 10.0, 120.0);
         assert_eq!(notes[0].expr, Expr::Vibrato(5.0));
     }

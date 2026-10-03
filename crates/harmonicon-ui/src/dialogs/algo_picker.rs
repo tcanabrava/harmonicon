@@ -48,10 +48,7 @@ fn algo_option_label(algo: PitchAlgorithm, loc: &Localization) -> String {
 /// Every algorithm's option text, in [`PitchAlgorithm::all`]'s order — the
 /// options list for a `dialogs::combobox`-based algorithm picker.
 pub fn algo_labels(loc: &Localization) -> Vec<String> {
-    PitchAlgorithm::all()
-        .iter()
-        .map(|a| algo_option_label(*a, loc))
-        .collect()
+    PitchAlgorithm::all().iter().map(|a| algo_option_label(*a, loc)).collect()
 }
 
 /// A combobox `on_select` that writes straight to the shared global
@@ -69,10 +66,8 @@ pub fn on_algo_selected(
     mut settings: ResMut<AudioSettings>,
     loc: Res<Localization>,
 ) {
-    if let Some(algo) = PitchAlgorithm::all()
-        .iter()
-        .copied()
-        .find(|a| algo_option_label(*a, &loc) == ev.value)
+    if let Some(algo) =
+        PitchAlgorithm::all().iter().copied().find(|a| algo_option_label(*a, &loc) == ev.value)
     {
         settings.pitch_algorithm = algo;
     }

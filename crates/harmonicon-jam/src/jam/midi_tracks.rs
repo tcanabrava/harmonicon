@@ -152,11 +152,7 @@ pub fn update_stem_mute_buttons(
 /// when its stem is muted. A single-track song has no stem index and can
 /// only be ducked.
 fn backing_gain(music_volume: f32, duck: f32, band: f32, muted: bool) -> f32 {
-    if muted {
-        0.0
-    } else {
-        music_volume * duck * band
-    }
+    if muted { 0.0 } else { music_volume * duck * band }
 }
 
 /// Applies `JamStemMute`, `call_response::CallDuck` and the adaptive band's

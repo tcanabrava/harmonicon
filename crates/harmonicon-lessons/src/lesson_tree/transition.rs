@@ -22,11 +22,7 @@ const TRANSITION_SECONDS: f32 = 0.22;
 /// of the whole. Under Reduced Motion it is the whole transition, so every
 /// unit jumps to its end state on the first frame.
 pub(super) fn transition_step(delta_secs: f32, reduced_motion: bool) -> f32 {
-    if reduced_motion {
-        1.0
-    } else {
-        delta_secs / TRANSITION_SECONDS
-    }
+    if reduced_motion { 1.0 } else { delta_secs / TRANSITION_SECONDS }
 }
 
 #[derive(Resource, Default)]
@@ -145,15 +141,7 @@ pub(super) fn screen_space_slides(
             let old_x = *old.get(id)?;
             let drawn = old_x + old_slides.get(id).map_or(0.0, slide_offset) - old_scroll;
             let from_px = drawn - (new_x - new_scroll);
-            (from_px.abs() > 0.5).then(|| {
-                (
-                    id.clone(),
-                    UnitSlide {
-                        from_px,
-                        amount: 0.0,
-                    },
-                )
-            })
+            (from_px.abs() > 0.5).then(|| (id.clone(), UnitSlide { from_px, amount: 0.0 }))
         })
         .collect()
 }
@@ -201,12 +189,7 @@ pub(crate) fn animate_unit_expansion(
     mut chevrons: Query<(&UnitChevron, &mut Text)>,
     mut unit_buttons: Query<(&UnitButton, &mut AccessibilityNode)>,
     mut lesson_buttons: Query<
-        (
-            Entity,
-            &ClusterMember,
-            &mut TabIndex,
-            Has<InteractionDisabled>,
-        ),
+        (Entity, &ClusterMember, &mut TabIndex, Has<InteractionDisabled>),
         With<WidgetButton>,
     >,
 ) {
@@ -231,22 +214,14 @@ pub(crate) fn animate_unit_expansion(
         if transform.scale != scale {
             transform.scale = scale;
         }
-        let wanted = if amount <= 0.0 {
-            Visibility::Hidden
-        } else {
-            Visibility::Visible
-        };
+        let wanted = if amount <= 0.0 { Visibility::Hidden } else { Visibility::Visible };
         if *visibility != wanted {
             *visibility = wanted;
         }
     }
 
     for (chevron, mut text) in &mut chevrons {
-        let label = if collapsed.0.contains(&chevron.0) {
-            "▶"
-        } else {
-            "▼"
-        };
+        let label = if collapsed.0.contains(&chevron.0) { "▶" } else { "▼" };
         if text.0 != label {
             text.0.clear();
             text.0.push_str(label);
@@ -306,14 +281,8 @@ pub(crate) fn animate_unit_slides(
     for (edge, mut node) in &mut edges {
         let from_offset = slides.0.get(&edge.from_unit).map_or(0.0, slide_offset);
         let to_offset = slides.0.get(&edge.to_unit).map_or(0.0, slide_offset);
-        let from = Endpoint {
-            centre: edge.from.centre + Vec2::X * from_offset,
-            ..edge.from
-        };
-        let to = Endpoint {
-            centre: edge.to.centre + Vec2::X * to_offset,
-            ..edge.to
-        };
+        let from = Endpoint { centre: edge.from.centre + Vec2::X * from_offset, ..edge.from };
+        let to = Endpoint { centre: edge.to.centre + Vec2::X * to_offset, ..edge.to };
         set_edge_geometry(&mut node, from, to, edge.thickness);
     }
     slides.0.retain(|_, slide| slide.amount < 1.0);
@@ -329,10 +298,8 @@ pub(crate) fn compact_finished_units(
     if pending.0.is_empty() {
         return;
     }
-    let all_closed = pending
-        .0
-        .iter()
-        .all(|id| expansions.0.get(id).is_none_or(|amount| *amount <= 0.0));
+    let all_closed =
+        pending.0.iter().all(|id| expansions.0.get(id).is_none_or(|amount| *amount <= 0.0));
     if all_closed {
         pending.0.clear();
         relayout.pending = true;
@@ -362,16 +329,10 @@ mod motion_tests {
         app.init_resource::<Time>()
             .insert_resource(ReducedMotion(reduced_motion))
             .insert_resource(CollapsedUnits(HashSet::from(["closing".to_string()])))
-            .insert_resource(UnitExpansions(HashMap::from([(
-                "closing".to_string(),
-                1.0,
-            )])))
+            .insert_resource(UnitExpansions(HashMap::from([("closing".to_string(), 1.0)])))
             .insert_resource(UnitSlides(HashMap::from([(
                 "sliding".to_string(),
-                UnitSlide {
-                    from_px: 120.0,
-                    amount: 0.0,
-                },
+                UnitSlide { from_px: 120.0, amount: 0.0 },
             )])))
             .add_systems(Update, (animate_unit_expansion, animate_unit_slides));
         app.update();
@@ -382,10 +343,7 @@ mod motion_tests {
     fn reduced_motion_jumps_every_transition_to_its_end_on_the_first_frame() {
         let app = one_frame(true);
         assert_eq!(app.world().resource::<UnitExpansions>().0["closing"], 0.0);
-        assert!(
-            app.world().resource::<UnitSlides>().0.is_empty(),
-            "a finished slide is dropped"
-        );
+        assert!(app.world().resource::<UnitSlides>().0.is_empty(), "a finished slide is dropped");
     }
 
     #[test]
@@ -401,17 +359,11 @@ mod motion_tests {
             .world_mut()
             .spawn((
                 LayoutOwner("unit".to_string()),
-                UiTransform {
-                    translation: Val2::px(50.0, 0.0),
-                    ..default()
-                },
+                UiTransform { translation: Val2::px(50.0, 0.0), ..default() },
             ))
             .id();
         app.update();
-        assert_eq!(
-            app.world().get::<UiTransform>(node).unwrap().translation,
-            Val2::px(0.0, 0.0)
-        );
+        assert_eq!(app.world().get::<UiTransform>(node).unwrap().translation, Val2::px(0.0, 0.0));
     }
 
     /// Where a unit is drawn on screen: its canvas position plus its slide
@@ -460,10 +412,7 @@ mod motion_tests {
             400.0,
         );
         // No anchor: the scroll stays put, within the narrower content.
-        assert_eq!(
-            relayout_scroll(None, &old, &none, 900.0, &new, 800.0, 1_200.0),
-            400.0,
-        );
+        assert_eq!(relayout_scroll(None, &old, &none, 900.0, &new, 800.0, 1_200.0), 400.0,);
     }
 
     #[test]
@@ -471,13 +420,8 @@ mod motion_tests {
         // A second toggle lands while `unit` is halfway through sliding in
         // from 200 px to the right: it must start from there, not snap.
         let old = positions(&[("unit", 500.0)]);
-        let halfway = HashMap::from([(
-            "unit".to_string(),
-            UnitSlide {
-                from_px: 200.0,
-                amount: 0.5,
-            },
-        )]);
+        let halfway =
+            HashMap::from([("unit".to_string(), UnitSlide { from_px: 200.0, amount: 0.5 })]);
         let new = positions(&[("unit", 700.0)]);
 
         let slides = screen_space_slides(&old, &halfway, 0.0, &new, 0.0);
@@ -492,10 +436,7 @@ mod motion_tests {
     fn without_reduced_motion_transitions_advance_with_time() {
         let app = one_frame(false);
         assert_eq!(app.world().resource::<UnitExpansions>().0["closing"], 1.0);
-        assert_eq!(
-            app.world().resource::<UnitSlides>().0["sliding"].amount,
-            0.0
-        );
+        assert_eq!(app.world().resource::<UnitSlides>().0["sliding"].amount, 0.0);
     }
 }
 
@@ -506,8 +447,7 @@ mod viewport_tests {
     #[test]
     fn viewport_position_survives_after_the_scroller_is_gone() {
         let mut app = App::new();
-        app.init_resource::<LessonTreeViewport>()
-            .add_systems(Update, remember_viewport);
+        app.init_resource::<LessonTreeViewport>().add_systems(Update, remember_viewport);
         let scroller = app
             .world_mut()
             .spawn((LessonTreeScroller, ScrollPosition(Vec2::new(420.0, 180.0))))
@@ -517,10 +457,7 @@ mod viewport_tests {
         app.world_mut().despawn(scroller);
         app.update();
 
-        assert_eq!(
-            app.world().resource::<LessonTreeViewport>().0,
-            Vec2::new(420.0, 180.0),
-        );
+        assert_eq!(app.world().resource::<LessonTreeViewport>().0, Vec2::new(420.0, 180.0),);
     }
 
     #[test]

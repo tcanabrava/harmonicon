@@ -53,10 +53,9 @@ fn translation_files(root: &Path) -> Vec<(LanguageIdentifier, PathBuf)> {
                 let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                 match stem.parse::<LanguageIdentifier>() {
                     Ok(lang) => found.push((lang, path)),
-                    Err(e) => warn!(
-                        "Skipping {}: {stem:?} is not a language tag ({e})",
-                        path.display()
-                    ),
+                    Err(e) => {
+                        warn!("Skipping {}: {stem:?} is not a language tag ({e})", path.display())
+                    }
                 }
             }
         }
@@ -82,10 +81,7 @@ pub fn load_pack_translations<'a>(roots: impl IntoIterator<Item = &'a Path>) -> 
             }
         }
     }
-    by_lang
-        .into_values()
-        .map(|(lang, sources)| LocaleBundle::from_sources(lang, sources))
-        .collect()
+    by_lang.into_values().map(|(lang, sources)| LocaleBundle::from_sources(lang, sources)).collect()
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -136,42 +132,22 @@ mod tests {
     }
 
     fn lookup(bundles: &[LocaleBundle], lang: &str, key: &str) -> Option<String> {
-        bundles
-            .iter()
-            .find(|b| *b.locale() == lang)
-            .and_then(|b| b.content(key))
+        bundles.iter().find(|b| *b.locale() == lang).and_then(|b| b.content(key))
     }
 
     #[test]
     fn collects_every_locales_folder_by_language() {
         let pack = tempfile::tempdir().unwrap();
         write(pack.path(), "locales/en-US.ftl", "unit-basics = Basics\n");
-        write(
-            pack.path(),
-            "01_basics/01_first/locales/en-US.ftl",
-            "first-title = First\n",
-        );
-        write(
-            pack.path(),
-            "01_basics/01_first/locales/pt-BR.ftl",
-            "first-title = Primeira\n",
-        );
+        write(pack.path(), "01_basics/01_first/locales/en-US.ftl", "first-title = First\n");
+        write(pack.path(), "01_basics/01_first/locales/pt-BR.ftl", "first-title = Primeira\n");
 
         let bundles = load_pack_translations([pack.path()]);
         let langs: Vec<String> = bundles.iter().map(|b| b.locale().to_string()).collect();
         assert_eq!(langs, ["en-US", "pt-BR"]);
-        assert_eq!(
-            lookup(&bundles, "en-US", "unit-basics").as_deref(),
-            Some("Basics")
-        );
-        assert_eq!(
-            lookup(&bundles, "en-US", "first-title").as_deref(),
-            Some("First")
-        );
-        assert_eq!(
-            lookup(&bundles, "pt-BR", "first-title").as_deref(),
-            Some("Primeira")
-        );
+        assert_eq!(lookup(&bundles, "en-US", "unit-basics").as_deref(), Some("Basics"));
+        assert_eq!(lookup(&bundles, "en-US", "first-title").as_deref(), Some("First"));
+        assert_eq!(lookup(&bundles, "pt-BR", "first-title").as_deref(), Some("Primeira"));
     }
 
     #[test]
@@ -188,19 +164,9 @@ mod tests {
         let first = tempfile::tempdir().unwrap();
         let second = tempfile::tempdir().unwrap();
         write(first.path(), "locales/en-US.ftl", "shared = first\n");
-        write(
-            second.path(),
-            "locales/en-US.ftl",
-            "shared = second\nonly-second = yes\n",
-        );
+        write(second.path(), "locales/en-US.ftl", "shared = second\nonly-second = yes\n");
         let bundles = load_pack_translations([first.path(), second.path()]);
-        assert_eq!(
-            lookup(&bundles, "en-US", "shared").as_deref(),
-            Some("first")
-        );
-        assert_eq!(
-            lookup(&bundles, "en-US", "only-second").as_deref(),
-            Some("yes")
-        );
+        assert_eq!(lookup(&bundles, "en-US", "shared").as_deref(), Some("first"));
+        assert_eq!(lookup(&bundles, "en-US", "only-second").as_deref(), Some("yes"));
     }
 }

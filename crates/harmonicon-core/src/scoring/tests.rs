@@ -32,67 +32,43 @@ fn over_holding_is_capped_at_duration() {
 
 #[test]
 fn too_early_before_window() {
-    assert_eq!(
-        classify_note(-0.20, false, 0.06, 0.13, 0.13),
-        NoteOutcome::TooEarly
-    );
+    assert_eq!(classify_note(-0.20, false, 0.06, 0.13, 0.13), NoteOutcome::TooEarly);
 }
 
 #[test]
 fn missed_past_miss_window() {
-    assert_eq!(
-        classify_note(0.20, false, 0.06, 0.13, 0.13),
-        NoteOutcome::Missed
-    );
+    assert_eq!(classify_note(0.20, false, 0.06, 0.13, 0.13), NoteOutcome::Missed);
 }
 
 #[test]
 fn gap_between_good_and_miss_window() {
     // good_window=0.13, miss_window=0.20 → offset 0.15 is in the gap
-    assert_eq!(
-        classify_note(0.15, false, 0.06, 0.13, 0.20),
-        NoteOutcome::Gap
-    );
+    assert_eq!(classify_note(0.15, false, 0.06, 0.13, 0.20), NoteOutcome::Gap);
 }
 
 #[test]
 fn waiting_in_window_but_not_playing() {
-    assert_eq!(
-        classify_note(0.05, false, 0.06, 0.13, 0.13),
-        NoteOutcome::Waiting
-    );
+    assert_eq!(classify_note(0.05, false, 0.06, 0.13, 0.13), NoteOutcome::Waiting);
 }
 
 #[test]
 fn perfect_hit_within_perfect_window() {
-    assert_eq!(
-        classify_note(0.03, true, 0.06, 0.13, 0.13),
-        NoteOutcome::Hit(HitQuality::Perfect)
-    );
+    assert_eq!(classify_note(0.03, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Perfect));
 }
 
 #[test]
 fn perfect_hit_early_side() {
-    assert_eq!(
-        classify_note(-0.04, true, 0.06, 0.13, 0.13),
-        NoteOutcome::Hit(HitQuality::Perfect)
-    );
+    assert_eq!(classify_note(-0.04, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Perfect));
 }
 
 #[test]
 fn good_hit_outside_perfect_window_late() {
-    assert_eq!(
-        classify_note(0.10, true, 0.06, 0.13, 0.13),
-        NoteOutcome::Hit(HitQuality::Good)
-    );
+    assert_eq!(classify_note(0.10, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Good));
 }
 
 #[test]
 fn good_hit_outside_perfect_window_early() {
-    assert_eq!(
-        classify_note(-0.10, true, 0.06, 0.13, 0.13),
-        NoteOutcome::Hit(HitQuality::Good)
-    );
+    assert_eq!(classify_note(-0.10, true, 0.06, 0.13, 0.13), NoteOutcome::Hit(HitQuality::Good));
 }
 
 // ── input latency offset ──────────────────────────────────────────────────
@@ -373,10 +349,7 @@ fn timestamped_sine(freq_hz: f32, amplitude: f32, n: usize, dt: f64) -> Vec<(f64
 #[test]
 fn steady_pitch_is_not_wobble() {
     let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64, 2.0)).collect();
-    assert_eq!(
-        measured_oscillation_hz(&steady, VIBRATO_MIN_SWING_CENTS),
-        None
-    );
+    assert_eq!(measured_oscillation_hz(&steady, VIBRATO_MIN_SWING_CENTS), None);
 }
 
 #[test]
@@ -385,34 +358,22 @@ fn single_bend_is_not_wobble() {
     // not a repeating oscillation.
     let mut values = vec![0.0; 10];
     values.extend((0..10).map(|i| -i as f32 * 4.0));
-    let samples: Vec<(f64, f32)> = values
-        .into_iter()
-        .enumerate()
-        .map(|(i, v)| (i as f64, v))
-        .collect();
-    assert_eq!(
-        measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS),
-        None
-    );
+    let samples: Vec<(f64, f32)> =
+        values.into_iter().enumerate().map(|(i, v)| (i as f64, v)).collect();
+    assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
 }
 
 #[test]
 fn tiny_swing_is_not_wobble_even_with_direction_changes() {
     // Oscillates, but well under the swing threshold — natural jitter.
     let samples = timestamped_sine(5.0, 2.0, 40, 1.0 / 60.0);
-    assert_eq!(
-        measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS),
-        None
-    );
+    assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
 }
 
 #[test]
 fn too_few_samples_is_not_wobble() {
     let samples = [(0.0, 0.0), (1.0, 20.0), (2.0, 0.0)];
-    assert_eq!(
-        measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS),
-        None
-    );
+    assert_eq!(measured_oscillation_hz(&samples, VIBRATO_MIN_SWING_CENTS), None);
 }
 
 #[test]
@@ -435,10 +396,7 @@ fn relative_wobble_scales_with_input_level() {
 #[test]
 fn steady_loudness_is_not_relative_wobble() {
     let steady: Vec<(f64, f32)> = (0..20).map(|i| (i as f64, 0.2)).collect();
-    assert_eq!(
-        measured_relative_oscillation_hz(&steady, WAH_MIN_SWING_FRAC),
-        None
-    );
+    assert_eq!(measured_relative_oscillation_hz(&steady, WAH_MIN_SWING_FRAC), None);
 }
 
 #[test]
@@ -459,19 +417,13 @@ fn measured_oscillation_hz_is_frame_rate_independent() {
     let dense = timestamped_sine(5.0, 25.0, 80, 1.0 / 120.0);
     let hz_sparse = measured_oscillation_hz(&sparse, VIBRATO_MIN_SWING_CENTS).unwrap();
     let hz_dense = measured_oscillation_hz(&dense, VIBRATO_MIN_SWING_CENTS).unwrap();
-    assert!(
-        (hz_sparse - hz_dense).abs() < 0.3,
-        "{hz_sparse} vs {hz_dense}"
-    );
+    assert!((hz_sparse - hz_dense).abs() < 0.3, "{hz_sparse} vs {hz_dense}");
 }
 
 #[test]
 fn measured_oscillation_hz_is_none_below_the_swing_threshold() {
     let flat = timestamped_sine(5.0, 1.0, 40, 1.0 / 60.0); // swing well under 15 cents
-    assert_eq!(
-        measured_oscillation_hz(&flat, VIBRATO_MIN_SWING_CENTS),
-        None
-    );
+    assert_eq!(measured_oscillation_hz(&flat, VIBRATO_MIN_SWING_CENTS), None);
 }
 
 #[test]

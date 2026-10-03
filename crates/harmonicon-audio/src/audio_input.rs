@@ -137,11 +137,8 @@ pub fn start_capture(world: &mut World) {
     // Skip enumeration entirely for the common case (no preference set) — on
     // Linux, listing input devices makes cpal probe every ALSA/JACK backend,
     // which is noisy and pointless when we're just taking the default anyway.
-    let device_name = if wanted.is_empty() {
-        None
-    } else {
-        resolve_device_name(&input_device_names(), &wanted)
-    };
+    let device_name =
+        if wanted.is_empty() { None } else { resolve_device_name(&input_device_names(), &wanted) };
 
     match create_audio_capture(device_name.as_deref()) {
         Ok((stream, capture)) => {
@@ -149,17 +146,14 @@ pub fn start_capture(world: &mut World) {
                 "Audio capture started at {} Hz on \"{}\"",
                 capture.sample_rate, capture.device_name
             );
-            world.insert_resource(MicStatus::Connected {
-                device_name: capture.device_name.clone(),
-            });
+            world
+                .insert_resource(MicStatus::Connected { device_name: capture.device_name.clone() });
             world.insert_non_send(stream);
             world.insert_resource(capture);
         }
         Err(e) => {
             error!("Failed to start audio capture: {e}");
-            world.insert_resource(MicStatus::Failed {
-                reason: e.to_string(),
-            });
+            world.insert_resource(MicStatus::Failed { reason: e.to_string() });
         }
     }
 }
@@ -219,10 +213,7 @@ pub fn detect_stream_failure(
 /// `AwaitingPermission` — which is the truth, and what the Options page
 /// already renders a banner for.
 pub fn retry_capture_when_permission_granted(world: &mut World) {
-    if !matches!(
-        world.get_resource::<MicStatus>(),
-        Some(MicStatus::AwaitingPermission)
-    ) {
+    if !matches!(world.get_resource::<MicStatus>(), Some(MicStatus::AwaitingPermission)) {
         return;
     }
     if !crate::permission::microphone_granted() {
@@ -239,11 +230,9 @@ pub fn create_audio_capture(
     let host = cpal::default_host();
     let device = device_name
         .and_then(|name| {
-            host.input_devices().ok()?.find(|d| {
-                d.description()
-                    .map(|desc| desc.name() == name)
-                    .unwrap_or(false)
-            })
+            host.input_devices()
+                .ok()?
+                .find(|d| d.description().map(|desc| desc.name() == name).unwrap_or(false))
         })
         .or_else(|| host.default_input_device())
         .ok_or("no input device available")?;
@@ -340,12 +329,7 @@ struct ChunkWriter {
 
 impl ChunkWriter {
     fn new() -> Self {
-        Self {
-            samples: Box::new([0.0; CHUNK_SIZE]),
-            len: 0,
-            end_sample: 0,
-            pending: None,
-        }
+        Self { samples: Box::new([0.0; CHUNK_SIZE]), len: 0, end_sample: 0, pending: None }
     }
 
     fn push<T: cpal::Sample>(
@@ -406,10 +390,7 @@ mod tests {
     #[test]
     fn finds_a_currently_available_match() {
         let available = vec!["Mic A".to_string(), "Mic B".to_string()];
-        assert_eq!(
-            resolve_device_name(&available, "Mic B"),
-            Some("Mic B".to_string())
-        );
+        assert_eq!(resolve_device_name(&available, "Mic B"), Some("Mic B".to_string()));
     }
 
     #[test]
@@ -493,23 +474,17 @@ mod tests {
             free_tx.send(Vec::with_capacity(CHUNK_SIZE)).unwrap();
         }
         let mut writer = ChunkWriter::new();
-        let data: Vec<f32> = (0..CHUNK_SIZE + HOP_SIZE)
-            .flat_map(|i| [i as f32, i as f32 + 2.0])
-            .collect();
+        let data: Vec<f32> =
+            (0..CHUNK_SIZE + HOP_SIZE).flat_map(|i| [i as f32, i as f32 + 2.0]).collect();
         for part in data.chunks(254) {
             writer.push(part, 2, &tx, &free_rx);
         }
         let first = rx.try_recv().unwrap().samples;
         let second = rx.try_recv().unwrap().samples;
-        assert_eq!(
-            first,
-            (0..CHUNK_SIZE).map(|i| i as f32 + 1.0).collect::<Vec<_>>()
-        );
+        assert_eq!(first, (0..CHUNK_SIZE).map(|i| i as f32 + 1.0).collect::<Vec<_>>());
         assert_eq!(
             second,
-            (HOP_SIZE..CHUNK_SIZE + HOP_SIZE)
-                .map(|i| i as f32 + 1.0)
-                .collect::<Vec<_>>()
+            (HOP_SIZE..CHUNK_SIZE + HOP_SIZE).map(|i| i as f32 + 1.0).collect::<Vec<_>>()
         );
         assert!(rx.is_empty());
     }
@@ -599,27 +574,18 @@ mod tests {
         // Connected and the player just watched their notes stop scoring.
         let (tx, rx) = bounded::<String>(4);
         tx.try_send("device disconnected".into()).unwrap();
-        let mut app = app_with(
-            MicStatus::Connected {
-                device_name: "Test Device".into(),
-            },
-            rx,
-        );
+        let mut app = app_with(MicStatus::Connected { device_name: "Test Device".into() }, rx);
         app.update();
         assert_eq!(
             *app.world().resource::<MicStatus>(),
-            MicStatus::Failed {
-                reason: "device disconnected".into()
-            }
+            MicStatus::Failed { reason: "device disconnected".into() }
         );
     }
 
     #[test]
     fn a_healthy_stream_leaves_the_status_alone() {
         let (_tx, rx) = bounded::<String>(4);
-        let connected = MicStatus::Connected {
-            device_name: "Test Device".into(),
-        };
+        let connected = MicStatus::Connected { device_name: "Test Device".into() };
         let mut app = app_with(connected.clone(), rx);
         app.update();
         assert_eq!(*app.world().resource::<MicStatus>(), connected);
@@ -634,10 +600,7 @@ mod tests {
         tx.try_send("permission denied".into()).unwrap();
         let mut app = app_with(MicStatus::AwaitingPermission, rx);
         app.update();
-        assert_eq!(
-            *app.world().resource::<MicStatus>(),
-            MicStatus::AwaitingPermission
-        );
+        assert_eq!(*app.world().resource::<MicStatus>(), MicStatus::AwaitingPermission);
     }
 
     #[test]
@@ -648,12 +611,7 @@ mod tests {
         for _ in 0..3 {
             tx.try_send("device disconnected".into()).unwrap();
         }
-        let mut app = app_with(
-            MicStatus::Connected {
-                device_name: "Test Device".into(),
-            },
-            rx,
-        );
+        let mut app = app_with(MicStatus::Connected { device_name: "Test Device".into() }, rx);
         app.update();
         assert!(tx.is_empty(), "every queued error should have been drained");
     }

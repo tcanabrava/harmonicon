@@ -41,25 +41,17 @@ pub(super) fn shift_held(keyboard: &ButtonInput<KeyCode>) -> bool {
 }
 
 pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
-    if let Some(existing) = state
-        .notes
-        .iter()
-        .find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
+    if let Some(existing) =
+        state.notes.iter().find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.select_only(existing.id);
         return;
     }
 
-    let next_start = state
-        .notes
-        .iter()
-        .filter(|n| n.hole == hole && n.tick > tick)
-        .map(|n| n.tick)
-        .min();
+    let next_start =
+        state.notes.iter().filter(|n| n.hole == hole && n.tick > tick).map(|n| n.tick).min();
 
-    let len = next_start
-        .map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT))
-        .max(1);
+    let len = next_start.map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT)).max(1);
 
     // Whatever's already sounding at this exact tick (on another hole)
     // wins over the armed sticky direction — a brand-new chord note has to
@@ -87,15 +79,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 
     let id = state.next_id;
     state.next_id += 1;
-    state.notes.push(GridNote {
-        id,
-        hole,
-        tick,
-        len,
-        dir,
-        pitch,
-        expr,
-    });
+    state.notes.push(GridNote { id, hole, tick, len, dir, pitch, expr });
     state.select_only(id);
     // A chord note whose direction was forced (above), or that's carrying
     // an armed sticky expr, must pull any simultaneous notes on other
@@ -122,10 +106,8 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 /// (creates and exclusively selects a new note): there's nothing existing
 /// to "add" a freshly-placed note to.
 pub(super) fn select_or_add_ctrl(state: &mut EditorState, hole: u8, tick: usize) {
-    if let Some(existing) = state
-        .notes
-        .iter()
-        .find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
+    if let Some(existing) =
+        state.notes.iter().find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.toggle_selected(existing.id);
         return;
@@ -184,11 +166,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         _ => {}
     }
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
-        let dir = if kind == ModButton::Blow {
-            Dir::Blow
-        } else {
-            Dir::Draw
-        };
+        let dir = if kind == ModButton::Blow { Dir::Blow } else { Dir::Draw };
         // Arms the sticky direction regardless of whether anything is
         // selected — a note to edit is optional, arming for future notes
         // isn't. An armed Overblow/Overdraw that no longer matches this
@@ -231,10 +209,8 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         return;
     };
     let ids = state.selected.clone();
-    let selected: Vec<GridNote> = ids
-        .iter()
-        .filter_map(|&i| state.note_by_id(i).copied())
-        .collect();
+    let selected: Vec<GridNote> =
+        ids.iter().filter_map(|&i| state.note_by_id(i).copied()).collect();
 
     // The primary note decides where the button's cycle goes next, exactly
     // as with one note selected; every selected note then takes that value
@@ -299,22 +275,14 @@ fn next_expr(kind: ModButton, current: Expr) -> Expr {
                 Expr::Wah(hz) => hz + WAH_HZ_STEP,
                 _ => WAH_HZ_MIN,
             };
-            if next > WAH_HZ_MAX + f32::EPSILON {
-                Expr::None
-            } else {
-                Expr::Wah(next)
-            }
+            if next > WAH_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Wah(next) }
         }
         _ => {
             let next = match current {
                 Expr::Vibrato(hz) => hz + VIBRATO_HZ_STEP,
                 _ => VIBRATO_HZ_MIN,
             };
-            if next > VIBRATO_HZ_MAX + f32::EPSILON {
-                Expr::None
-            } else {
-                Expr::Vibrato(next)
-            }
+            if next > VIBRATO_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Vibrato(next) }
         }
     }
 }
@@ -330,27 +298,16 @@ fn next_pitch(
     harp: &Harmonica,
 ) -> Option<Pitch> {
     let toggle = |pitch: Pitch| {
-        if anchor.pitch == pitch {
-            Pitch::Normal
-        } else {
-            pitch
-        }
+        if anchor.pitch == pitch { Pitch::Normal } else { pitch }
     };
     Some(match kind {
         ModButton::Bend => {
-            let cap = selected
-                .iter()
-                .map(|n| max_bend(harp, n.hole))
-                .fold(0.0, f32::max);
+            let cap = selected.iter().map(|n| max_bend(harp, n.hole)).fold(0.0, f32::max);
             if cap <= 0.0 {
                 return None;
             }
             let next = anchor.bend() + 0.5;
-            if next > cap + f32::EPSILON {
-                Pitch::Normal
-            } else {
-                Pitch::Bend(next)
-            }
+            if next > cap + f32::EPSILON { Pitch::Normal } else { Pitch::Bend(next) }
         }
         ModButton::Overblow => toggle(Pitch::Overblow),
         ModButton::Overdraw => toggle(Pitch::Overdraw),
@@ -404,9 +361,7 @@ pub(super) fn report_technique_skips(
 /// natural minor but on different holes, and whatever a custom layout's
 /// widest reed pair gives.
 pub(super) fn deepest_bend(harp: &Harmonica) -> f32 {
-    (1..=harp.hole_count())
-        .map(|hole| max_bend(harp, hole))
-        .fold(0.0, f32::max)
+    (1..=harp.hole_count()).map(|hole| max_bend(harp, hole)).fold(0.0, f32::max)
 }
 
 /// Cycles `sticky_pitch`'s bend depth with nothing selected, so there's no
@@ -432,11 +387,7 @@ pub(super) fn cycle_sticky_bend(state: &mut EditorState) {
 /// Overdraw/Slide toggles below (which additionally gate on the selected
 /// note's own hole via `overblow_ok`/`overdraw_ok`).
 pub(super) fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
-    state.sticky_pitch = if state.sticky_pitch == pitch {
-        Pitch::Normal
-    } else {
-        pitch
-    };
+    state.sticky_pitch = if state.sticky_pitch == pitch { Pitch::Normal } else { pitch };
     // Arming Overblow/Overdraw with nothing selected must arm the
     // direction it requires too — otherwise a subsequently placed note
     // could still end up with e.g. `sticky_pitch: Overblow` alongside a
@@ -451,11 +402,7 @@ pub(super) fn cycle_sticky_wah(state: &mut EditorState) {
         Expr::Wah(hz) => hz + WAH_HZ_STEP,
         _ => WAH_HZ_MIN,
     };
-    state.sticky_expr = if next > WAH_HZ_MAX + f32::EPSILON {
-        Expr::None
-    } else {
-        Expr::Wah(next)
-    };
+    state.sticky_expr = if next > WAH_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Wah(next) };
 }
 
 pub(super) fn cycle_sticky_vibrato(state: &mut EditorState) {
@@ -463,11 +410,8 @@ pub(super) fn cycle_sticky_vibrato(state: &mut EditorState) {
         Expr::Vibrato(hz) => hz + VIBRATO_HZ_STEP,
         _ => VIBRATO_HZ_MIN,
     };
-    state.sticky_expr = if next > VIBRATO_HZ_MAX + f32::EPSILON {
-        Expr::None
-    } else {
-        Expr::Vibrato(next)
-    };
+    state.sticky_expr =
+        if next > VIBRATO_HZ_MAX + f32::EPSILON { Expr::None } else { Expr::Vibrato(next) };
 }
 
 // ── Keyboard / scroll systems ─────────────────────────────────────────────────
@@ -642,17 +586,15 @@ pub(super) fn spawn_resize_grips(
             // not a button — it has no click behaviour to give a keyboard
             // user, and `bevy_ui_widgets::Button` would only add one.
             // not-a-widget-button: resize grip, drag-only
-            .observe(
-                move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
-                    if state.dragging.is_some() || state.locked() {
-                        return;
-                    }
-                    let Some(note) = state.selected_note().copied() else {
-                        return;
-                    };
-                    state.dragging = Some(DragState::new(note.id, DragKind::Resize(edge), &note));
-                },
-            )
+            .observe(move |_: On<PointerDragStart>, mut state: ResMut<EditorState>| {
+                if state.dragging.is_some() || state.locked() {
+                    return;
+                }
+                let Some(note) = state.selected_note().copied() else {
+                    return;
+                };
+                state.dragging = Some(DragState::new(note.id, DragKind::Resize(edge), &note));
+            })
             .observe(
                 move |ev: On<PointerDrag>,
                       mut state: ResMut<EditorState>,
@@ -713,20 +655,18 @@ pub(super) fn spawn_resize_grips(
                     }
                 },
             )
-            .observe(
-                move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
-                    let Some(drag) = state.dragging.as_ref() else {
-                        return;
-                    };
-                    if drag.kind != DragKind::Resize(edge) {
-                        return;
-                    }
-                    let id = drag.id;
-                    state.dragging = None;
-                    enforce_direction(&mut state, id);
-                    enforce_expr(&mut state, id);
-                },
-            );
+            .observe(move |_: On<PointerDragEnd>, mut state: ResMut<EditorState>| {
+                let Some(drag) = state.dragging.as_ref() else {
+                    return;
+                };
+                if drag.kind != DragKind::Resize(edge) {
+                    return;
+                }
+                let id = drag.id;
+                state.dragging = None;
+                enforce_direction(&mut state, id);
+                enforce_expr(&mut state, id);
+            });
     }
 }
 
@@ -770,11 +710,7 @@ pub(super) fn update_resize_grips(
 /// instead of only snapping correct once `rebuild_grid` runs after release.
 pub(super) fn live_resize(
     state: Res<EditorState>,
-    mut notes: Query<(
-        &NoteView,
-        &mut Node,
-        Option<&MaterialNode<EditorNoteMaterial>>,
-    )>,
+    mut notes: Query<(&NoteView, &mut Node, Option<&MaterialNode<EditorNoteMaterial>>)>,
     mut note_mats: ResMut<Assets<EditorNoteMaterial>>,
 ) {
     let Some(drag) = state.dragging.as_ref() else {
@@ -804,12 +740,7 @@ pub(super) fn update_move_ghost(
     state: Res<EditorState>,
     theme: Res<LoadedTheme>,
     mut ghost: Query<
-        (
-            &mut Node,
-            &mut Visibility,
-            &mut BackgroundColor,
-            &mut BorderColor,
-        ),
+        (&mut Node, &mut Visibility, &mut BackgroundColor, &mut BorderColor),
         With<MoveGhost>,
     >,
 ) {
@@ -825,11 +756,7 @@ pub(super) fn update_move_ghost(
             node.top = Val::Px(top);
             node.width = Val::Px(drag.start_len as f32 * TICK_W - 2.0);
             *vis = Visibility::Inherited;
-            let color = if drag.valid {
-                colors.ghost_ok
-            } else {
-                colors.ghost_bad
-            };
+            let color = if drag.valid { colors.ghost_ok } else { colors.ghost_bad };
             bg.0 = color.with_alpha(0.30);
             *border = BorderColor::all(color);
         }
@@ -865,11 +792,7 @@ pub(super) fn update_group_move_ghosts(
         return;
     };
     let colors = theme.song_editor_colors();
-    let color = if drag.valid {
-        colors.ghost_ok
-    } else {
-        colors.ghost_bad
-    };
+    let color = if drag.valid { colors.ghost_ok } else { colors.ghost_bad };
     let hole_delta = drag.target_hole as i32 - drag.start_hole as i32;
     let tick_delta = drag.target_tick as i32 - drag.start_tick as i32;
     let hole_count = state.hole_count();

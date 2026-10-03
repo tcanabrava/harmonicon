@@ -150,9 +150,7 @@ fn sync_warning_banner(
     {
         return;
     }
-    let unhearable = notes
-        .as_ref()
-        .is_some_and(|n| chords_are_unhearable(n, &settings));
+    let unhearable = notes.as_ref().is_some_and(|n| chords_are_unhearable(n, &settings));
     let message = warning_text(&status, unhearable, &loc);
     if let Some(message) = &message {
         for mut text in &mut labels {
@@ -160,11 +158,7 @@ fn sync_warning_banner(
         }
     }
     for mut vis in &mut roots {
-        *vis = if message.is_some() {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+        *vis = if message.is_some() { Visibility::Visible } else { Visibility::Hidden };
     }
 }
 
@@ -172,10 +166,7 @@ pub struct WarningBannerPlugin;
 
 impl Plugin for WarningBannerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            sync_warning_banner.run_if(in_state(AppState::Playing)),
-        );
+        app.add_systems(Update, sync_warning_banner.run_if(in_state(AppState::Playing)));
     }
 }
 
@@ -215,9 +206,7 @@ mod tests {
     }
 
     fn connected() -> MicStatus {
-        MicStatus::Connected {
-            device_name: "Some Mic".into(),
-        }
+        MicStatus::Connected { device_name: "Some Mic".into() }
     }
 
     #[test]
@@ -232,12 +221,7 @@ mod tests {
         // send an Android player hunting through Options for nothing.
         assert_ne!(
             warning_key(&MicStatus::AwaitingPermission, false),
-            warning_key(
-                &MicStatus::Failed {
-                    reason: "Device not available".into()
-                },
-                false
-            )
+            warning_key(&MicStatus::Failed { reason: "Device not available".into() }, false)
         );
     }
 
@@ -248,22 +232,14 @@ mod tests {
         // makes that structural rather than a habit: there is nowhere to
         // interpolate it.
         assert_eq!(
-            warning_key(
-                &MicStatus::Failed {
-                    reason: "Device not available".into()
-                },
-                false
-            ),
+            warning_key(&MicStatus::Failed { reason: "Device not available".into() }, false),
             Some("mic-warning-failed")
         );
     }
 
     #[test]
     fn an_unhearable_chord_is_reported_when_the_mic_is_otherwise_fine() {
-        assert_eq!(
-            warning_key(&connected(), true),
-            Some("chord-warning-monophonic")
-        );
+        assert_eq!(warning_key(&connected(), true), Some("chord-warning-monophonic"));
     }
 
     #[test]
@@ -272,12 +248,7 @@ mod tests {
         // and the mic dies. Telling the player about chords then would be
         // actively misleading: nothing at all is being heard.
         assert_eq!(
-            warning_key(
-                &MicStatus::Failed {
-                    reason: "Device not available".into()
-                },
-                true
-            ),
+            warning_key(&MicStatus::Failed { reason: "Device not available".into() }, true),
             Some("mic-warning-failed")
         );
     }
@@ -288,10 +259,7 @@ mod tests {
         // under FFT/NMF and impossible under the other three.
         let chorded = song_notes(vec![62, 67]);
         for algo in PitchAlgorithm::all() {
-            let settings = AudioSettings {
-                pitch_algorithm: *algo,
-                ..Default::default()
-            };
+            let settings = AudioSettings { pitch_algorithm: *algo, ..Default::default() };
             assert_eq!(
                 chords_are_unhearable(&chorded, &settings),
                 !algo.is_polyphonic(),
@@ -304,10 +272,7 @@ mod tests {
     #[test]
     fn a_song_without_chords_never_warns_about_them() {
         let plain = song_notes(vec![]);
-        let settings = AudioSettings {
-            pitch_algorithm: PitchAlgorithm::Yin,
-            ..Default::default()
-        };
+        let settings = AudioSettings { pitch_algorithm: PitchAlgorithm::Yin, ..Default::default() };
         assert!(!chords_are_unhearable(&plain, &settings));
     }
 }

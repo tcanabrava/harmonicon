@@ -41,9 +41,7 @@ pub fn name_says_harmonica(name: Option<&str>) -> bool {
         return false;
     };
     let lower = name.to_lowercase();
-    HARMONICA_TRACK_NAMES
-        .iter()
-        .any(|needle| lower.contains(needle))
+    HARMONICA_TRACK_NAMES.iter().any(|needle| lower.contains(needle))
 }
 
 /// The tracks worth offering in a picker: those with notes.
@@ -56,11 +54,7 @@ mod tests {
     use super::*;
 
     fn track(index: usize, name: Option<&str>, note_count: usize) -> ScoreTrack {
-        ScoreTrack {
-            index,
-            name: name.map(str::to_string),
-            note_count,
-        }
+        ScoreTrack { index, name: name.map(str::to_string), note_count }
     }
 
     #[test]
@@ -85,10 +79,7 @@ mod tests {
         // a harmonica is mostly unreachable notes, and picking it silently
         // is worse than showing a chooser.
         for name in ["Harp", "Concert Harp", "Harpsichord"] {
-            assert!(
-                !name_says_harmonica(Some(name)),
-                "{name} was mistaken for a harmonica"
-            );
+            assert!(!name_says_harmonica(Some(name)), "{name} was mistaken for a harmonica");
         }
     }
 
@@ -112,10 +103,7 @@ mod tests {
     fn a_named_but_empty_track_is_not_picked() {
         // A MIDI tempo track named after the song would otherwise start a
         // song in which nothing ever happens.
-        let tracks = [
-            track(0, Some("Harmonica"), 0),
-            track(1, Some("Harmonica"), 25),
-        ];
+        let tracks = [track(0, Some("Harmonica"), 0), track(1, Some("Harmonica"), 25)];
         assert_eq!(pick_harmonica_track(&tracks), Some(1));
     }
 
@@ -129,11 +117,8 @@ mod tests {
 
     #[test]
     fn a_picker_is_offered_only_tracks_with_notes() {
-        let tracks = [
-            track(0, Some("Conductor"), 0),
-            track(1, Some("Guitar"), 90),
-            track(2, None, 12),
-        ];
+        let tracks =
+            [track(0, Some("Conductor"), 0), track(1, Some("Guitar"), 90), track(2, None, 12)];
         let offered: Vec<usize> = playable_tracks(&tracks).iter().map(|t| t.index).collect();
         assert_eq!(offered, vec![1, 2]);
     }

@@ -28,11 +28,7 @@ pub(super) fn spawn_note_glyphs(
     let stem_up = stem.stem_up;
     // A highlighted note's own marks take the highlight; a beam stays white,
     // since it belongs to its whole group rather than to this note.
-    let ink = if note.highlighted {
-        HIGHLIGHT_COLOR
-    } else {
-        Color::WHITE
-    };
+    let ink = if note.highlighted { HIGHLIGHT_COLOR } else { Color::WHITE };
 
     // Which accidental (if any) is decided over the whole song by
     // `notation::accidentals`, since it depends on what the bar has already
@@ -101,10 +97,7 @@ pub(super) fn spawn_note_glyphs(
             (true, false) => (notehead_y + offset, &tie_material.below),
             (true, true) => (notehead_y + offset, &tie_material.below_highlighted),
             (false, false) => (notehead_y - offset - height, &tie_material.above),
-            (false, true) => (
-                notehead_y - offset - height,
-                &tie_material.above_highlighted,
-            ),
+            (false, true) => (notehead_y - offset - height, &tie_material.above_highlighted),
         };
         parent.spawn((
             Node {
@@ -145,11 +138,8 @@ pub(super) fn spawn_note_glyphs(
 
     // In a chord only one head draws the stem; the rest sit on it.
     if kind.has_stem() && stem.draws_stem {
-        let (anchor_x_sp, anchor_y_sp) = if stem_up {
-            STEM_UP_ANCHOR_SP
-        } else {
-            STEM_DOWN_ANCHOR_SP
-        };
+        let (anchor_x_sp, anchor_y_sp) =
+            if stem_up { STEM_UP_ANCHOR_SP } else { STEM_DOWN_ANCHOR_SP };
         let stem_x = x + anchor_x_sp * STAFF_LINE_SPACING;
         let stem_notehead_y = notehead_y - anchor_y_sp * STAFF_LINE_SPACING;
         // A beamed stem stops at its group's shared beam line instead of
@@ -164,11 +154,7 @@ pub(super) fn spawn_note_glyphs(
                     + STEM_LENGTH_SP * STAFF_LINE_SPACING
             }
         };
-        let stem_top = if stem_up {
-            stem_notehead_y - stem_len_px
-        } else {
-            stem_notehead_y
-        };
+        let stem_top = if stem_up { stem_notehead_y - stem_len_px } else { stem_notehead_y };
         parent.spawn((
             Node {
                 position_type: PositionType::Absolute,
@@ -192,11 +178,8 @@ pub(super) fn spawn_note_glyphs(
             // the outermost always sits at the tip itself.
             for i in 0..b.beams.max(1) {
                 let offset = i as f32 * (BEAM_THICKNESS_PX + BEAM_GAP_PX);
-                let top = if b.stem_up {
-                    beam_y + offset
-                } else {
-                    beam_y - BEAM_THICKNESS_PX - offset
-                };
+                let top =
+                    if b.stem_up { beam_y + offset } else { beam_y - BEAM_THICKNESS_PX - offset };
                 parent.spawn((
                     Node {
                         position_type: PositionType::Absolute,
@@ -224,11 +207,7 @@ pub(super) fn spawn_note_glyphs(
             // `stemDownSW`, both within 0.15 staff spaces of (0, 0)), so
             // no extra offset beyond the shared `GLYPH_BASELINE_
             // CORRECTION` every other glyph in this module already needs.
-            let stem_tip_y = if stem_up {
-                stem_top
-            } else {
-                stem_top + stem_len_px
-            };
+            let stem_tip_y = if stem_up { stem_top } else { stem_top + stem_len_px };
             // A sixteenth takes the two-flag glyph rather than two copies
             // of the eighth's — Bravura draws the pair as one shape with
             // the correct spacing between them.

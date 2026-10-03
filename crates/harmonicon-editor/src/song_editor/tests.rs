@@ -49,24 +49,15 @@ fn cycle_next_treats_an_unknown_current_value_as_the_first_option() {
 
 #[test]
 fn secs_per_tick_reflects_the_songs_own_tempo() {
-    let s = EditorState {
-        tempo: "60".into(),
-        ..EditorState::default()
-    };
+    let s = EditorState { tempo: "60".into(), ..EditorState::default() };
     // 60 BPM: one beat per second, TICKS_PER_BEAT ticks per beat.
     let spt = secs_per_tick(&s);
-    assert!(
-        (spt - 1.0 / TICKS_PER_BEAT as f32).abs() < 1e-6,
-        "got {spt}"
-    );
+    assert!((spt - 1.0 / TICKS_PER_BEAT as f32).abs() < 1e-6, "got {spt}");
 }
 
 #[test]
 fn secs_per_tick_falls_back_to_120_bpm_for_an_unparseable_tempo() {
-    let s = EditorState {
-        tempo: "not-a-number".into(),
-        ..EditorState::default()
-    };
+    let s = EditorState { tempo: "not-a-number".into(), ..EditorState::default() };
     let spt = secs_per_tick(&s);
     let expected = 60.0 / 120.0 / TICKS_PER_BEAT as f32;
     assert!((spt - expected).abs() < 1e-6, "got {spt}");
@@ -128,9 +119,8 @@ fn app_after_play() -> bevy::app::App {
 fn update_until_rendered(app: &mut bevy::app::App) {
     for _ in 0..200 {
         app.update();
-        let mut pending = app
-            .world_mut()
-            .query_filtered::<(), bevy::prelude::With<PendingPlayback>>();
+        let mut pending =
+            app.world_mut().query_filtered::<(), bevy::prelude::With<PendingPlayback>>();
         if pending.iter(app.world()).next().is_none() {
             return;
         }
@@ -168,11 +158,8 @@ fn stopping_before_the_render_lands_cancels_it() {
 
     let mut app = app_after_play();
     // What every stop path does: despawn all editor audio.
-    let audio: Vec<Entity> = app
-        .world_mut()
-        .query_filtered::<Entity, With<EditorAudio>>()
-        .iter(app.world())
-        .collect();
+    let audio: Vec<Entity> =
+        app.world_mut().query_filtered::<Entity, With<EditorAudio>>().iter(app.world()).collect();
     assert_eq!(audio.len(), 1, "the pending render is editor audio");
     for entity in audio {
         app.world_mut().despawn(entity);
@@ -220,10 +207,7 @@ fn serialize_lesson_has_no_warnings_when_id_and_unit_are_set() {
 
 #[test]
 fn serialize_lesson_warns_when_id_or_unit_is_empty() {
-    let s = EditorState {
-        content_kind: ContentKind::Lesson,
-        ..EditorState::default()
-    };
+    let s = EditorState { content_kind: ContentKind::Lesson, ..EditorState::default() };
     let (_json, warnings) = serialize_lesson(&s);
     // An empty id/unit also fails the manifest's own schema (both are
     // required fields), so this expects at least the id/unit warning
@@ -261,10 +245,7 @@ fn serialize_lesson_writes_a_technique_pass_criterion() {
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["pass_criteria"]["type"], "technique");
     assert_eq!(v["pass_criteria"]["technique"], "bend");
-    assert_eq!(
-        v["pass_criteria"]["threshold"].as_f64().unwrap(),
-        0.6_f32 as f64
-    );
+    assert_eq!(v["pass_criteria"]["threshold"].as_f64().unwrap(), 0.6_f32 as f64);
 }
 
 #[test]
@@ -286,19 +267,13 @@ fn serialize_lesson_writes_prerequisites_and_progression() {
 
 #[test]
 fn serialize_lesson_writes_elective_only_when_selected() {
-    let core = EditorState {
-        lesson_id: "core".into(),
-        lesson_unit: "u".into(),
-        ..EditorState::default()
-    };
+    let core =
+        EditorState { lesson_id: "core".into(), lesson_unit: "u".into(), ..EditorState::default() };
     let (json, _) = serialize_lesson(&core);
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert!(value.get("optional").is_none());
 
-    let elective = EditorState {
-        lesson_path: "elective".into(),
-        ..core
-    };
+    let elective = EditorState { lesson_path: "elective".into(), ..core };
     let (json, _) = serialize_lesson(&elective);
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["optional"], true);
@@ -478,12 +453,7 @@ fn group_move_valid_rejects_a_target_overlapping_a_note_outside_the_group() {
     // Moving out of the blocker's way is fine again — the blocker's default
     // length is one full beat (`TICKS_PER_BEAT`), so its span ends there.
     let clear = vec![(99u32, 3, TICKS_PER_BEAT, 4, Pitch::Normal)];
-    assert!(group_move_valid(
-        &s.notes,
-        &build_harp("C", HarmonicaKind::Diatonic),
-        &[99],
-        &clear
-    ));
+    assert!(group_move_valid(&s.notes, &build_harp("C", HarmonicaKind::Diatonic), &[99], &clear));
 }
 
 #[test]
@@ -510,16 +480,8 @@ fn group_move_valid_ignores_overlap_among_the_groups_own_members() {
             expr: Expr::None,
         },
     ];
-    let targets = vec![
-        (1u32, 2, 4, 4, Pitch::Normal),
-        (2u32, 5, 4, 4, Pitch::Normal),
-    ];
-    assert!(group_move_valid(
-        &notes,
-        &build_harp("C", HarmonicaKind::Diatonic),
-        &[1, 2],
-        &targets
-    ));
+    let targets = vec![(1u32, 2, 4, 4, Pitch::Normal), (2u32, 5, 4, 4, Pitch::Normal)];
+    assert!(group_move_valid(&notes, &build_harp("C", HarmonicaKind::Diatonic), &[1, 2], &targets));
 }
 
 #[test]
@@ -528,12 +490,7 @@ fn group_move_valid_rejects_a_pitch_incompatible_with_its_target_hole() {
     // holes 2/3/10 (see `max_bend`) — landing on hole 5
     // must fail even with nothing else in the way.
     let targets = vec![(1u32, 5, 0, 4, Pitch::Bend(1.5))];
-    assert!(!group_move_valid(
-        &[],
-        &build_harp("C", HarmonicaKind::Diatonic),
-        &[1],
-        &targets
-    ));
+    assert!(!group_move_valid(&[], &build_harp("C", HarmonicaKind::Diatonic), &[1], &targets));
 }
 
 // ── Copy/paste ────────────────────────────────────────────────────────────
@@ -586,16 +543,10 @@ fn paste_targets_shifts_the_earliest_note_to_the_target_tick() {
     ];
     let (pasted, next_id) = paste_targets(&clipboard, 20, 10, &[], 100);
     // The earliest note (tick 4) lands at 20; the other keeps its +4 offset.
-    assert_eq!(
-        pasted.iter().map(|n| (n.hole, n.tick)).collect::<Vec<_>>(),
-        vec![(2, 20), (5, 24)]
-    );
+    assert_eq!(pasted.iter().map(|n| (n.hole, n.tick)).collect::<Vec<_>>(), vec![(2, 20), (5, 24)]);
     // Ids are freshly assigned starting at `next_id`, never reusing the
     // clipboard's own copied ids.
-    assert_eq!(
-        pasted.iter().map(|n| n.id).collect::<Vec<_>>(),
-        vec![100, 101]
-    );
+    assert_eq!(pasted.iter().map(|n| n.id).collect::<Vec<_>>(), vec![100, 101]);
     assert_eq!(next_id, 102);
 }
 
@@ -683,10 +634,7 @@ fn unbendable_hole_ignores_bend() {
     s.selected = vec![hole5];
     for _ in 0..2 {
         apply_modifier(&mut s, ModButton::Bend);
-        assert_eq!(
-            s.notes.iter().find(|n| n.hole == 5).unwrap().pitch,
-            Pitch::Normal
-        );
+        assert_eq!(s.notes.iter().find(|n| n.hole == 5).unwrap().pitch, Pitch::Normal);
     }
 }
 
@@ -720,10 +668,7 @@ fn sticky_pitch_falls_back_to_normal_on_an_incompatible_hole_but_stays_armed() {
     assert_eq!(s.notes[0].pitch, Pitch::Normal);
     // ...but the sticky arm itself wasn't cleared by that rejection.
     select_or_add(&mut s, 4, 4);
-    assert_eq!(
-        s.notes.iter().find(|n| n.hole == 4).unwrap().pitch,
-        Pitch::Overblow
-    );
+    assert_eq!(s.notes.iter().find(|n| n.hole == 4).unwrap().pitch, Pitch::Overblow);
 }
 
 #[test]
@@ -748,10 +693,7 @@ fn selecting_an_existing_note_and_editing_it_also_arms_sticky() {
     assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
     // ...and arms sticky the same way a nothing-selected click would.
     select_or_add(&mut s, 3, 4);
-    assert_eq!(
-        s.notes.iter().find(|n| n.hole == 3).unwrap().pitch,
-        Pitch::Bend(0.5)
-    );
+    assert_eq!(s.notes.iter().find(|n| n.hole == 3).unwrap().pitch, Pitch::Bend(0.5));
 }
 
 #[test]
@@ -764,10 +706,7 @@ fn armed_sticky_wah_propagates_to_a_simultaneous_chord_note() {
         s.notes.iter().find(|n| n.hole == 2).unwrap().expr,
         s.notes.iter().find(|n| n.hole == 5).unwrap().expr
     );
-    assert!(matches!(
-        s.notes.iter().find(|n| n.hole == 5).unwrap().expr,
-        Expr::Wah(_)
-    ));
+    assert!(matches!(s.notes.iter().find(|n| n.hole == 5).unwrap().expr, Expr::Wah(_)));
 }
 
 #[test]
@@ -795,11 +734,7 @@ fn arming_overblow_then_draw_with_nothing_selected_clears_the_pitch() {
     assert_eq!(s.sticky_dir, Dir::Blow);
     apply_modifier(&mut s, ModButton::Draw);
     assert_eq!(s.sticky_dir, Dir::Draw);
-    assert_eq!(
-        s.sticky_pitch,
-        Pitch::Normal,
-        "overblow can't survive a switch to Draw"
-    );
+    assert_eq!(s.sticky_pitch, Pitch::Normal, "overblow can't survive a switch to Draw");
 }
 
 #[test]
@@ -871,17 +806,9 @@ fn pitch_and_expression_stack() {
     apply_modifier(&mut s, ModButton::Bend);
     apply_modifier(&mut s, ModButton::Vibrato);
     assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
-    assert_eq!(
-        s.notes[0].expr,
-        Expr::Vibrato(3.0),
-        "first click lands on the min rate"
-    );
+    assert_eq!(s.notes[0].expr, Expr::Vibrato(3.0), "first click lands on the min rate");
     apply_modifier(&mut s, ModButton::Wah);
-    assert_eq!(
-        s.notes[0].expr,
-        Expr::Wah(2.0),
-        "first click lands on the min rate"
-    );
+    assert_eq!(s.notes[0].expr, Expr::Wah(2.0), "first click lands on the min rate");
     assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
 }
 
@@ -894,11 +821,7 @@ fn vibrato_cycles_through_rates_and_caps_at_none() {
         assert_eq!(s.notes[0].expr, Expr::Vibrato(expected));
     }
     apply_modifier(&mut s, ModButton::Vibrato);
-    assert_eq!(
-        s.notes[0].expr,
-        Expr::None,
-        "cycling past the max rate deselects"
-    );
+    assert_eq!(s.notes[0].expr, Expr::None, "cycling past the max rate deselects");
 }
 
 #[test]
@@ -910,11 +833,7 @@ fn wah_cycles_through_rates_and_caps_at_none() {
         assert_eq!(s.notes[0].expr, Expr::Wah(expected));
     }
     apply_modifier(&mut s, ModButton::Wah);
-    assert_eq!(
-        s.notes[0].expr,
-        Expr::None,
-        "cycling past the max rate deselects"
-    );
+    assert_eq!(s.notes[0].expr, Expr::None, "cycling past the max rate deselects");
 }
 
 #[test]
@@ -934,30 +853,19 @@ fn overblow_only_on_holes_with_a_reed_to_overblow() {
         let mut s = EditorState::default();
         select_or_add(&mut s, hole, 0);
         apply_modifier(&mut s, ModButton::Overblow);
-        assert_eq!(
-            s.notes[0].pitch,
-            Pitch::Normal,
-            "hole {hole} has no overblow reed"
-        );
+        assert_eq!(s.notes[0].pitch, Pitch::Normal, "hole {hole} has no overblow reed");
     }
     for hole in [1, 4, 5, 6] {
         let mut s = EditorState::default();
         select_or_add(&mut s, hole, 0);
         apply_modifier(&mut s, ModButton::Overblow);
-        assert_eq!(
-            s.notes[0].pitch,
-            Pitch::Overblow,
-            "hole {hole} does have one"
-        );
+        assert_eq!(s.notes[0].pitch, Pitch::Overblow, "hole {hole} does have one");
     }
 }
 
 #[test]
 fn slide_cycles_on_and_off_on_any_hole() {
-    let mut s = EditorState {
-        harmonica_kind: HarmonicaKind::Chromatic,
-        ..Default::default()
-    };
+    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
     select_or_add(&mut s, 11, 0); // valid on a 12-hole chromatic harp
     apply_modifier(&mut s, ModButton::Slide);
     assert_eq!(s.notes[0].pitch, Pitch::Slide);
@@ -979,10 +887,7 @@ fn hole_count_matches_the_harmonica_kind() {
 
 #[test]
 fn switching_to_diatonic_drops_notes_beyond_hole_ten_and_clears_slide() {
-    let mut s = EditorState {
-        harmonica_kind: HarmonicaKind::Chromatic,
-        ..Default::default()
-    };
+    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
     select_or_add(&mut s, 11, 0);
     apply_modifier(&mut s, ModButton::Slide);
     select_or_add(&mut s, 3, 4);
@@ -991,11 +896,7 @@ fn switching_to_diatonic_drops_notes_beyond_hole_ten_and_clears_slide() {
     s.set_harmonica_kind(HarmonicaKind::Diatonic);
 
     assert_eq!(s.notes.len(), 1, "the hole-11 note doesn't fit anymore");
-    assert_eq!(
-        s.notes[0].pitch,
-        Pitch::Normal,
-        "slide isn't a valid diatonic technique"
-    );
+    assert_eq!(s.notes[0].pitch, Pitch::Normal, "slide isn't a valid diatonic technique");
 }
 
 #[test]
@@ -1011,10 +912,7 @@ fn switching_to_chromatic_clears_diatonic_only_techniques() {
 
 #[test]
 fn switching_kind_deselects_a_note_that_got_dropped() {
-    let mut s = EditorState {
-        harmonica_kind: HarmonicaKind::Chromatic,
-        ..Default::default()
-    };
+    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
     select_or_add(&mut s, 11, 0);
     assert!(!s.selected.is_empty());
 
@@ -1160,11 +1058,7 @@ fn enforce_expr_unifies_overlap_chain_but_not_independent_notes() {
         Expr::Vibrato(5.0),
         "overlapping note shares the vibrato (rate included)"
     );
-    assert_eq!(
-        s.note_by_id(2).unwrap().expr,
-        Expr::None,
-        "independent note is untouched"
-    );
+    assert_eq!(s.note_by_id(2).unwrap().expr, Expr::None, "independent note is untouched");
 }
 
 #[test]
@@ -1220,15 +1114,7 @@ fn left_edge_moves_start_and_resizes_inversely() {
 }
 
 fn note(hole: u8, dir: Dir, pitch: Pitch) -> GridNote {
-    GridNote {
-        id: 0,
-        hole,
-        tick: 0,
-        len: 4,
-        dir,
-        pitch,
-        expr: Expr::None,
-    }
+    GridNote { id: 0, hole, tick: 0, len: 4, dir, pitch, expr: Expr::None }
 }
 
 #[test]
@@ -1301,28 +1187,17 @@ fn render_and_wav_have_expected_size() {
     // `TICKS_PER_BEAT` becoming 12 and is no longer one beat) — the
     // `expected` computation below assumes exactly one beat's worth of
     // note (0.5s at 120bpm) plus the synth's fixed tail.
-    let notes = [GridNote {
-        len: TICKS_PER_BEAT,
-        ..note(4, Dir::Draw, Pitch::Normal)
-    }];
+    let notes = [GridNote { len: TICKS_PER_BEAT, ..note(4, Dir::Draw, Pitch::Normal) }];
     let harp = build_harp("C", HarmonicaKind::Diatonic);
     let phrase: Vec<PhraseNote> = notes
         .iter()
-        .map(|n| PhraseNote {
-            tick: n.tick,
-            len: n.len,
-            freq: note_freq(n, &harp),
-            expr: n.expr,
-        })
+        .map(|n| PhraseNote { tick: n.tick, len: n.len, freq: note_freq(n, &harp), expr: n.expr })
         .collect();
     let secs_per_tick = 60.0 / 120.0 / TICKS_PER_BEAT as f32;
     let pcm = render_pcm(&phrase, secs_per_tick);
     let expected = ((0.5 + 0.25) * SAMPLE_RATE as f32).ceil() as usize;
     assert_eq!(pcm.len(), expected);
-    assert!(
-        pcm.iter().any(|&s| s.abs() > 0.01),
-        "note should be audible"
-    );
+    assert!(pcm.iter().any(|&s| s.abs() > 0.01), "note should be audible");
     let wav = encode_wav(&pcm, SAMPLE_RATE);
     assert_eq!(wav.len(), 44 + pcm.len() * 2);
     assert_eq!(&wav[0..4], b"RIFF");
@@ -1467,11 +1342,7 @@ fn unequal_simultaneous_note_lengths_round_trip_without_being_extended() {
 
 #[test]
 fn serialize_harpchart_omits_audio_file_when_no_music_is_picked() {
-    let mut s = EditorState {
-        name: "Test Song".into(),
-        key: "G".into(),
-        ..Default::default()
-    };
+    let mut s = EditorState { name: "Test Song".into(), key: "G".into(), ..Default::default() };
     select_or_add(&mut s, 2, 0);
 
     let v: serde_json::Value = serde_json::from_str(&serialize_harpchart(&s)).expect("valid JSON");
@@ -1565,10 +1436,8 @@ fn chart_schema_rejects_unknown_diatonic_profiles_before_editor_loading() {
 
 #[test]
 fn chart_schema_rejects_chromatics_above_sixteen_holes_before_editor_loading() {
-    let mut state = EditorState {
-        harmonica_kind: HarmonicaKind::Chromatic16,
-        ..Default::default()
-    };
+    let mut state =
+        EditorState { harmonica_kind: HarmonicaKind::Chromatic16, ..Default::default() };
     select_or_add(&mut state, 1, 0);
     let mut value: serde_json::Value = serde_json::from_str(&serialize_harpchart(&state)).unwrap();
     value["harmonica"]["holes"] = serde_json::json!(17);
@@ -1636,11 +1505,7 @@ fn content_charts() -> Vec<std::path::PathBuf> {
     ] {
         charts_below(&dir, &mut paths);
     }
-    assert!(
-        !paths.is_empty(),
-        "no charts found under {}",
-        repo.display()
-    );
+    assert!(!paths.is_empty(), "no charts found under {}", repo.display());
     paths
 }
 
@@ -1660,12 +1525,7 @@ fn every_bundled_chart_loads_and_resaves_as_a_valid_chart() {
             .sum();
         let mut state = EditorState::default();
         load_harpchart(&value, &mut state, &mut Scroll::default());
-        assert_eq!(
-            state.notes.len(),
-            source_events,
-            "{} lost notes",
-            path.display()
-        );
+        assert_eq!(state.notes.len(), source_events, "{} lost notes", path.display());
         let saved = serialize_harpchart(&state);
         validated_harpchart(&saved)
             .unwrap_or_else(|error| panic!("{} resaved invalidly: {error}", path.display()));
@@ -1725,11 +1585,7 @@ fn canonical_events(chart: &serde_json::Value) -> Vec<CanonicalEvent> {
         if let Some(t) = phrase["tick"].as_u64() {
             t
         } else {
-            seconds_to_tick(
-                phrase["time"].as_f64().unwrap_or(0.0),
-                resolution,
-                &tempo_map,
-            )
+            seconds_to_tick(phrase["time"].as_f64().unwrap_or(0.0), resolution, &tempo_map)
         }
     };
     let mut out = Vec::new();
@@ -1787,11 +1643,9 @@ fn normalize_numbers(v: &serde_json::Value) -> serde_json::Value {
             serde_json::json!((f * 1e6).round() / 1e6)
         }
         Value::Array(items) => Value::Array(items.iter().map(normalize_numbers).collect()),
-        Value::Object(map) => Value::Object(
-            map.iter()
-                .map(|(k, v)| (k.clone(), normalize_numbers(v)))
-                .collect(),
-        ),
+        Value::Object(map) => {
+            Value::Object(map.iter().map(|(k, v)| (k.clone(), normalize_numbers(v))).collect())
+        }
         other => other.clone(),
     }
 }
@@ -1918,10 +1772,7 @@ fn every_bundled_chart_means_the_same_after_a_round_trip() {
             }
         }
     }
-    assert!(
-        report.is_empty(),
-        "charts whose meaning changed on a round trip:{report}"
-    );
+    assert!(report.is_empty(), "charts whose meaning changed on a round trip:{report}");
 }
 
 #[test]
@@ -2051,10 +1902,7 @@ fn combo_settings_are_editable_while_style_bonuses_round_trip() {
     let saved: serde_json::Value = serde_json::from_str(&serialize_harpchart(&loaded)).unwrap();
     assert_eq!(saved["scoring"]["combo"]["enabled"], true);
     assert_eq!(saved["scoring"]["combo"]["max_multiplier"], 8.0);
-    assert_eq!(
-        saved["scoring"]["style_bonus"],
-        value["scoring"]["style_bonus"]
-    );
+    assert_eq!(saved["scoring"]["style_bonus"], value["scoring"]["style_bonus"]);
     validated_harpchart(&saved.to_string()).expect("edited combo satisfies the schema");
 }
 
@@ -2067,10 +1915,7 @@ fn default_song_feel_is_omitted_from_saved_charts() {
 
 #[test]
 fn editor_load_validation_lists_only_semantics_it_cannot_preserve() {
-    let mut state = EditorState {
-        harmonica_kind: HarmonicaKind::Chromatic,
-        ..Default::default()
-    };
+    let mut state = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
     select_or_add(&mut state, 1, 0);
     let mut value: serde_json::Value =
         serde_json::from_str(&serialize_harpchart(&state)).expect("valid chart JSON");
@@ -2085,23 +1930,14 @@ fn editor_load_validation_lists_only_semantics_it_cannot_preserve() {
         { "type": "vibrato", "oscillation_hz": 5.0 },
         { "type": "wah-wah", "oscillation_hz": 4.0 }
     ]);
-    value["track"][0]["events"]
-        .as_array_mut()
-        .unwrap()
-        .push(expression_event);
+    value["track"][0]["events"].as_array_mut().unwrap().push(expression_event);
     value["track"][0]["groove"] = serde_json::json!("laid-back");
     value["track"][0]["call"] = serde_json::json!(true);
     value["track"][0]["play_mode"] = serde_json::json!("split");
 
     let error = validated_harpchart(&value.to_string()).expect_err("unsupported chart must fail");
-    assert!(
-        error.contains("multiple mutually exclusive pitch techniques"),
-        "{error}"
-    );
-    assert!(
-        error.contains("multiple mutually exclusive expressions"),
-        "{error}"
-    );
+    assert!(error.contains("multiple mutually exclusive pitch techniques"), "{error}");
+    assert!(error.contains("multiple mutually exclusive expressions"), "{error}");
     assert!(!error.contains("time-signature changes"));
     assert!(!error.contains("groove annotation"));
     assert!(!error.contains("call-and-response"));
@@ -2125,10 +1961,7 @@ fn custom_expression_intensity_round_trips() {
     assert_eq!(loaded.selected_expression_intensity(), "0.9");
 
     let saved: serde_json::Value = serde_json::from_str(&serialize_harpchart(&loaded)).unwrap();
-    assert_eq!(
-        saved["track"][0]["events"][0]["modifiers"][0]["intensity"],
-        0.9
-    );
+    assert_eq!(saved["track"][0]["events"][0]["modifiers"][0]["intensity"], 0.9);
 }
 
 #[test]
@@ -2155,13 +1988,8 @@ fn serialize_harpchart_writes_the_notes_own_oscillation_hz() {
 
     let json_str = serialize_harpchart(&s);
     let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
-    let modifiers = v["track"][0]["events"][0]["modifiers"]
-        .as_array()
-        .expect("modifiers array");
-    let vibrato = modifiers
-        .iter()
-        .find(|m| m["type"] == "vibrato")
-        .expect("vibrato modifier");
+    let modifiers = v["track"][0]["events"][0]["modifiers"].as_array().expect("modifiers array");
+    let vibrato = modifiers.iter().find(|m| m["type"] == "vibrato").expect("vibrato modifier");
     assert_eq!(vibrato["oscillation_hz"], 5.0);
 }
 
@@ -2183,10 +2011,7 @@ fn oscillation_hz_round_trips_through_save_and_load() {
 
 #[test]
 fn scale_round_trips_through_save_and_load() {
-    let s = EditorState {
-        scale: Scale::SecondPosition,
-        ..Default::default()
-    };
+    let s = EditorState { scale: Scale::SecondPosition, ..Default::default() };
 
     let json_str = serialize_harpchart(&s);
     let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
@@ -2242,9 +2067,7 @@ fn a_typed_line_of_lyrics_lands_one_syllable_per_onset() {
 
     state.set_lyrics_from(TICKS_PER_BEAT, "A- maz- _ ing");
     let lyric = |state: &EditorState, beat: usize| {
-        state
-            .annotation_text(beat * TICKS_PER_BEAT, Field::Lyric)
-            .to_string()
+        state.annotation_text(beat * TICKS_PER_BEAT, Field::Lyric).to_string()
     };
     assert_eq!(
         (0..6).map(|beat| lyric(&state, beat)).collect::<Vec<_>>(),
@@ -2271,10 +2094,7 @@ fn a_lyric_is_saved_once_when_its_onset_splits_into_several_items() {
     let value: serde_json::Value = serde_json::from_str(&serialize_harpchart(&state)).unwrap();
     let track = value["track"].as_array().unwrap();
     assert_eq!(track.len(), 2);
-    let sung: Vec<_> = track
-        .iter()
-        .filter(|item| item.get("lyric").is_some())
-        .collect();
+    let sung: Vec<_> = track.iter().filter(|item| item.get("lyric").is_some()).collect();
     assert_eq!(sung.len(), 1);
 }
 
@@ -2346,10 +2166,7 @@ fn loading_a_chart_without_a_scale_field_leaves_the_current_scale_untouched() {
     let mut v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
     v["harmonica"].as_object_mut().unwrap().remove("scale");
 
-    let mut loaded = EditorState {
-        scale: Scale::Country,
-        ..Default::default()
-    };
+    let mut loaded = EditorState { scale: Scale::Country, ..Default::default() };
     let mut scroll = Scroll::default();
     load_harpchart(&v, &mut loaded, &mut scroll);
     assert_eq!(loaded.scale, Scale::Country);
@@ -2357,10 +2174,7 @@ fn loading_a_chart_without_a_scale_field_leaves_the_current_scale_untouched() {
 
 #[test]
 fn chromatic_chart_round_trips_kind_hole_count_and_slide() {
-    let mut s = EditorState {
-        harmonica_kind: HarmonicaKind::Chromatic,
-        ..Default::default()
-    };
+    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
     select_or_add(&mut s, 11, 0); // only valid on a chromatic (12-hole) harp
     apply_modifier(&mut s, ModButton::Slide);
 
@@ -2380,10 +2194,8 @@ fn chromatic_chart_round_trips_kind_hole_count_and_slide() {
 
 #[test]
 fn sixteen_hole_chromatic_round_trips_high_holes_and_slide() {
-    let mut state = EditorState {
-        harmonica_kind: HarmonicaKind::Chromatic16,
-        ..Default::default()
-    };
+    let mut state =
+        EditorState { harmonica_kind: HarmonicaKind::Chromatic16, ..Default::default() };
     select_or_add(&mut state, 16, 0);
     apply_modifier(&mut state, ModButton::Slide);
 
@@ -2391,13 +2203,7 @@ fn sixteen_hole_chromatic_round_trips_high_holes_and_slide() {
     validated_harpchart(&text).expect("the editor must accept its 16-hole chart");
     let value: serde_json::Value = serde_json::from_str(&text).expect("valid JSON");
     assert_eq!(value["harmonica"]["holes"], 16);
-    assert_eq!(
-        value["harmonica"]["layout"]["blow"]
-            .as_array()
-            .unwrap()
-            .len(),
-        16
-    );
+    assert_eq!(value["harmonica"]["layout"]["blow"].as_array().unwrap().len(), 16);
 
     let mut loaded = EditorState::default();
     let mut scroll = Scroll::default();
@@ -2414,10 +2220,7 @@ fn alternate_diatonic_tunings_round_trip_profile_and_layout() {
         (HarmonicaKind::CountryTuned, "country_tuned", "G4", "F#5"),
         (HarmonicaKind::NaturalMinor, "natural_minor", "G4", "F5"),
     ] {
-        let mut state = EditorState {
-            harmonica_kind: kind,
-            ..Default::default()
-        };
+        let mut state = EditorState { harmonica_kind: kind, ..Default::default() };
         select_or_add(&mut state, 1, 0);
         let text = serialize_harpchart(&state);
         validated_harpchart(&text).expect("the editor must accept its alternate tuning");
@@ -2442,17 +2245,12 @@ fn state_with_custom_layout() -> EditorState {
     value["harmonica"]["layout"]["blow"][0] = serde_json::json!("F#3");
     let mut loaded = EditorState::default();
     load_harpchart(&value, &mut loaded, &mut Scroll::default());
-    assert!(
-        loaded.loaded_harmonica.is_some(),
-        "precondition: layout retained"
-    );
+    assert!(loaded.loaded_harmonica.is_some(), "precondition: layout retained");
     loaded
 }
 
 fn blow_one_of(state: &EditorState) -> String {
-    state
-        .effective_harp()
-        .wind_direction_label(1, &harmonicon_core::chart::Action::Blow)
+    state.effective_harp().wind_direction_label(1, &harmonicon_core::chart::Action::Blow)
 }
 
 #[test]
@@ -2529,10 +2327,7 @@ fn custom_layouts_round_trip_for_every_named_harmonica() {
         HarmonicaKind::Chromatic,
         HarmonicaKind::Chromatic16,
     ] {
-        let mut source = EditorState {
-            harmonica_kind: kind,
-            ..Default::default()
-        };
+        let mut source = EditorState { harmonica_kind: kind, ..Default::default() };
         select_or_add(&mut source, 1, 0);
         let mut value: serde_json::Value =
             serde_json::from_str(&serialize_harpchart(&source)).unwrap();
@@ -2546,9 +2341,7 @@ fn custom_layouts_round_trip_for_every_named_harmonica() {
 
         assert_eq!(saved["harmonica"]["layout"], expected, "{kind:?}");
         assert_eq!(
-            loaded
-                .effective_harp()
-                .wind_direction_label(1, &harmonicon_core::chart::Action::Blow),
+            loaded.effective_harp().wind_direction_label(1, &harmonicon_core::chart::Action::Blow),
             "F#3",
             "{kind:?}"
         );
@@ -2558,23 +2351,14 @@ fn custom_layouts_round_trip_for_every_named_harmonica() {
 #[test]
 fn country_tuned_editor_harp_raises_draw_five() {
     let harp = build_harp("C", HarmonicaKind::CountryTuned);
-    assert_eq!(
-        harp.wind_direction_label(5, &harmonicon_core::chart::Action::Draw),
-        "F#5"
-    );
+    assert_eq!(harp.wind_direction_label(5, &harmonicon_core::chart::Action::Draw), "F#5");
 }
 
 #[test]
 fn natural_minor_editor_harp_uses_minor_reeds() {
     let harp = build_harp("C", HarmonicaKind::NaturalMinor);
-    assert_eq!(
-        harp.wind_direction_label(2, &harmonicon_core::chart::Action::Blow),
-        "D#4"
-    );
-    assert_eq!(
-        harp.wind_direction_label(3, &harmonicon_core::chart::Action::Draw),
-        "A#4"
-    );
+    assert_eq!(harp.wind_direction_label(2, &harmonicon_core::chart::Action::Blow), "D#4");
+    assert_eq!(harp.wind_direction_label(3, &harmonicon_core::chart::Action::Draw), "A#4");
 }
 
 #[test]
@@ -2597,10 +2381,7 @@ fn loading_a_diatonic_chart_drops_holes_beyond_ten() {
 
 #[test]
 fn saved_position_round_trips_through_load() {
-    let s = EditorState {
-        position: "3rd".into(),
-        ..Default::default()
-    };
+    let s = EditorState { position: "3rd".into(), ..Default::default() };
 
     let json_str = serialize_harpchart(&s);
     let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
@@ -2621,9 +2402,7 @@ fn serialize_harpchart_writes_every_tempo_change_point() {
     };
     let json_str = serialize_harpchart(&s);
     let v: serde_json::Value = serde_json::from_str(&json_str).expect("valid JSON");
-    let map = v["timing"]["tempo_map"]
-        .as_array()
-        .expect("tempo_map array");
+    let map = v["timing"]["tempo_map"].as_array().expect("tempo_map array");
     assert_eq!(map.len(), 2);
     assert_eq!(map[0]["tick"], 0);
     assert_eq!(map[0]["bpm"], 120.0);
@@ -2756,10 +2535,7 @@ fn mix_srgba_interpolates_and_keeps_base_alpha() {
 
     let none = mix_srgba(base, tint, 0.0).to_srgba();
     assert_eq!((none.red, none.green, none.blue), (0.0, 0.0, 0.0));
-    assert_eq!(
-        none.alpha, 0.5,
-        "base's own alpha is preserved, not blended"
-    );
+    assert_eq!(none.alpha, 0.5, "base's own alpha is preserved, not blended");
 
     let full = mix_srgba(base, tint, 1.0).to_srgba();
     assert_eq!((full.red, full.green, full.blue), (1.0, 1.0, 1.0));
@@ -2844,28 +2620,13 @@ fn parse_pitch_expr_reads_bend_semitones_as_negative() {
 
 #[test]
 fn parse_pitch_expr_reads_overblow_overdraw_vibrato_wah() {
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "overblow" })]).0,
-        Pitch::Overblow
-    );
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "overdraw" })]).0,
-        Pitch::Overdraw
-    );
+    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "overblow" })]).0, Pitch::Overblow);
+    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "overdraw" })]).0, Pitch::Overdraw);
     // No `oscillation_hz` in the JSON (e.g. a chart saved before it was
     // per-note) falls back to the default rate.
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "vibrato" })]).1,
-        Expr::Vibrato(5.5)
-    );
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah" })]).1,
-        Expr::Wah(4.0)
-    );
-    assert_eq!(
-        parse_pitch_expr(&[serde_json::json!({ "type": "slide" })]).0,
-        Pitch::Slide
-    );
+    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "vibrato" })]).1, Expr::Vibrato(5.5));
+    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah" })]).1, Expr::Wah(4.0));
+    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "slide" })]).0, Pitch::Slide);
 }
 
 #[test]
@@ -2937,11 +2698,7 @@ fn note_rect_advances_one_row_per_hole_and_scales_width_with_len() {
     };
     let (_, top_a, width_a, _) = note_rect(&a);
     let (_, top_b, width_b, _) = note_rect(&b);
-    assert_eq!(
-        top_b - top_a,
-        ROW_H,
-        "hole 2 sits exactly one row below hole 1"
-    );
+    assert_eq!(top_b - top_a, ROW_H, "hole 2 sits exactly one row below hole 1");
     assert_eq!(width_a, width_b);
     assert_eq!(width_a, 3.0 * TICK_W - 2.0);
 }
@@ -2993,11 +2750,7 @@ fn a_pickup_is_typed_in_beats_of_the_opening_meter() {
     };
     assert_eq!(with("1", "4/4").pickup_ticks(), TICKS_PER_BEAT);
     assert_eq!(with("0.5", "4/4").pickup_ticks(), TICKS_PER_BEAT / 2);
-    assert_eq!(
-        with("1", "6/8").pickup_ticks(),
-        TICKS_PER_BEAT / 2,
-        "a 6/8 beat is an eighth"
-    );
+    assert_eq!(with("1", "6/8").pickup_ticks(), TICKS_PER_BEAT / 2, "a 6/8 beat is an eighth");
     for blank in ["", "abc", "-1", "0"] {
         assert_eq!(with(blank, "4/4").pickup_ticks(), 0, "{blank:?}");
     }
@@ -3005,10 +2758,7 @@ fn a_pickup_is_typed_in_beats_of_the_opening_meter() {
 
 #[test]
 fn the_ruler_numbers_a_pickup_as_the_last_beat_of_bar_zero() {
-    let s = EditorState {
-        pickup_beats: "1".into(),
-        ..Default::default()
-    };
+    let s = EditorState { pickup_beats: "1".into(), ..Default::default() };
     assert_eq!(ruler_position(&s, 0), (0, 4));
     assert_eq!(ruler_position(&s, TICKS_PER_BEAT), (1, 1));
     assert_eq!(super::timeline::describe_tick(0, &s.meter_map()), "0.4");
@@ -3016,16 +2766,10 @@ fn the_ruler_numbers_a_pickup_as_the_last_beat_of_bar_zero() {
 
 #[test]
 fn a_pickup_round_trips_through_save_and_load() {
-    let state = EditorState {
-        pickup_beats: "0.5".into(),
-        ..Default::default()
-    };
+    let state = EditorState { pickup_beats: "0.5".into(), ..Default::default() };
     let value: serde_json::Value =
         serde_json::from_str(&serialize_harpchart(&state)).expect("valid chart JSON");
-    assert_eq!(
-        value["timing"]["pickup_ticks"],
-        serde_json::json!(TICKS_PER_BEAT / 2)
-    );
+    assert_eq!(value["timing"]["pickup_ticks"], serde_json::json!(TICKS_PER_BEAT / 2));
     let mut loaded = EditorState::default();
     load_harpchart(&value, &mut loaded, &mut Scroll::default());
     assert_eq!(loaded.pickup_beats, "0.5");
@@ -3033,10 +2777,7 @@ fn a_pickup_round_trips_through_save_and_load() {
     let none = EditorState::default();
     let value: serde_json::Value =
         serde_json::from_str(&serialize_harpchart(&none)).expect("valid chart JSON");
-    assert!(
-        value["timing"].get("pickup_ticks").is_none(),
-        "no pickup, no field"
-    );
+    assert!(value["timing"].get("pickup_ticks").is_none(), "no pickup, no field");
 }
 
 #[test]
@@ -3050,10 +2791,7 @@ fn a_pickup_at_a_foreign_resolution_is_rescaled_on_load() {
     });
     let mut loaded = EditorState::default();
     load_harpchart(&value, &mut loaded, &mut Scroll::default());
-    assert_eq!(
-        loaded.pickup_beats, "1",
-        "480 ticks at 480/quarter is a beat"
-    );
+    assert_eq!(loaded.pickup_beats, "1", "480 ticks at 480/quarter is a beat");
 }
 
 // ── repeats ──────────────────────────────────────────────────────────────────
@@ -3070,10 +2808,7 @@ fn repeats_round_trip_as_written_and_rescale_from_a_foreign_resolution() {
         serde_json::from_str(&serialize_harpchart(&state)).expect("valid chart JSON");
     let mut loaded = EditorState::default();
     load_harpchart(&value, &mut loaded, &mut Scroll::default());
-    assert_eq!(
-        loaded.repeats, state.repeats,
-        "kept as written, not played out"
-    );
+    assert_eq!(loaded.repeats, state.repeats, "kept as written, not played out");
 
     // The same chart at 480 ticks a quarter comes back in editor ticks.
     let scale = 480 / TICKS_PER_BEAT as u64;
@@ -3113,34 +2848,15 @@ fn the_ruler_counts_bars_on_the_downbeat_and_beats_within_one() {
     let s = EditorState::default(); // 4/4
     let beat = TICKS_PER_BEAT;
     let got: Vec<(usize, usize)> = (0..8).map(|i| ruler_position(&s, i * beat)).collect();
-    assert_eq!(
-        got,
-        [
-            (1, 1),
-            (1, 2),
-            (1, 3),
-            (1, 4),
-            (2, 1),
-            (2, 2),
-            (2, 3),
-            (2, 4)
-        ]
-    );
-    assert_eq!(
-        ruler_position(&s, 36 * 4 * beat),
-        (37, 1),
-        "bar 37, not another 1"
-    );
+    assert_eq!(got, [(1, 1), (1, 2), (1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]);
+    assert_eq!(ruler_position(&s, 36 * 4 * beat), (37, 1), "bar 37, not another 1");
 }
 
 #[test]
 fn the_ruler_counts_a_seven_eight_bar_as_seven_eighths() {
     // 7/8 is 3.5 quarter-note columns; the map counts the meter's own beat
     // and puts bar 2 at tick 42, which is not a column boundary at all.
-    let s = EditorState {
-        time_signature: "7/8".into(),
-        ..Default::default()
-    };
+    let s = EditorState { time_signature: "7/8".into(), ..Default::default() };
     let got: Vec<usize> = (0..7).map(|i| ruler_position(&s, i * 6).1).collect();
     assert_eq!(got, [1, 2, 3, 4, 5, 6, 7]);
     assert_eq!(ruler_position(&s, 42), (2, 1));
@@ -3151,20 +2867,12 @@ fn the_ruler_counts_a_seven_eight_bar_as_seven_eighths() {
 fn the_ruler_re_bars_everything_after_a_meter_change() {
     // Two bars of 4/4, then 3/4 from bar 3: bar 4 starts 36 ticks later,
     // not 48, and beats within it count to three.
-    let s = EditorState {
-        meter_changes: vec![(96, "3/4".into())],
-        ..Default::default()
-    };
+    let s = EditorState { meter_changes: vec![(96, "3/4".into())], ..Default::default() };
     assert_eq!(ruler_position(&s, 96), (3, 1));
     assert_eq!(ruler_position(&s, 96 + 24), (3, 3));
     assert_eq!(ruler_position(&s, 96 + 36), (4, 1));
     // And the ruler's bar lines land there too.
-    let bars: Vec<u64> = s
-        .meter_map()
-        .bar_starts(0, 200)
-        .into_iter()
-        .map(|(t, _)| t)
-        .collect();
+    let bars: Vec<u64> = s.meter_map().bar_starts(0, 200).into_iter().map(|(t, _)| t).collect();
     assert_eq!(bars, [0, 48, 96, 132, 168]);
 }
 
@@ -3184,15 +2892,7 @@ fn describe_tick_matches_the_ruler_after_a_change() {
 // ── resize_grip_position ──────────────────────────────────────────────────────
 
 fn grid_note(tick: usize, len: usize) -> GridNote {
-    GridNote {
-        id: 1,
-        hole: 1,
-        tick,
-        len,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    }
+    GridNote { id: 1, hole: 1, tick, len, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None }
 }
 
 #[test]
@@ -3205,10 +2905,7 @@ fn grips_sit_entirely_outside_the_note_at_every_length() {
         let (left, _, width, _) = note_rect(&note);
         let (lx, _) = resize_grip_position(&note, Edge::Left);
         let (rx, _) = resize_grip_position(&note, Edge::Right);
-        assert!(
-            lx + GRIP_D <= left,
-            "len {len}: left grip overlaps the note body"
-        );
+        assert!(lx + GRIP_D <= left, "len {len}: left grip overlaps the note body");
         assert!(rx >= left + width, "len {len}: right grip overlaps it");
         assert!(rx > lx, "len {len}: grips crossed over");
     }
@@ -3251,10 +2948,7 @@ fn envelope_starts_at_zero_and_stays_in_unit_range() {
     let dur = SAMPLE_RATE as usize; // 1 second, comfortably longer than attack+release
     for i in [0, 100, dur / 2, dur - 100, dur - 1] {
         let e = envelope(i, dur);
-        assert!(
-            (0.0..=1.0).contains(&e),
-            "envelope({i}, {dur}) = {e} out of range"
-        );
+        assert!((0.0..=1.0).contains(&e), "envelope({i}, {dur}) = {e} out of range");
     }
     assert_eq!(envelope(0, dur), 0.0);
 }
@@ -3270,10 +2964,7 @@ fn envelope_ramps_down_toward_the_note_end() {
     let dur = SAMPLE_RATE as usize;
     let near_end = envelope(dur - 10, dur);
     let mid = envelope(dur / 2, dur);
-    assert!(
-        near_end < mid,
-        "release should pull the tail down from full sustain"
-    );
+    assert!(near_end < mid, "release should pull the tail down from full sustain");
 }
 
 #[test]
@@ -3292,24 +2983,13 @@ fn envelope_of_a_very_short_note_never_panics_or_exceeds_unity() {
 // ── Timeline erase/remove ────────────────────────────────────────────────────
 
 fn timeline_note(id: u32, hole: u8, tick: usize, len: usize) -> GridNote {
-    GridNote {
-        id,
-        hole,
-        tick,
-        len,
-        dir: Dir::Blow,
-        pitch: Pitch::Normal,
-        expr: Expr::None,
-    }
+    GridNote { id, hole, tick, len, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None }
 }
 
 #[test]
 fn song_end_tick_is_the_last_notes_end() {
-    let notes = vec![
-        timeline_note(0, 1, 0, 4),
-        timeline_note(1, 2, 10, 2),
-        timeline_note(2, 3, 4, 4),
-    ];
+    let notes =
+        vec![timeline_note(0, 1, 0, 4), timeline_note(1, 2, 10, 2), timeline_note(2, 3, 4, 4)];
     assert_eq!(song_end_tick(&notes), 12);
 }
 
@@ -3356,10 +3036,7 @@ fn tempo_map_keeps_the_opening_tempo_when_a_change_collides_with_tick_zero() {
 
 #[test]
 fn toggle_tempo_point_adds_a_point_at_the_clicked_tick() {
-    let mut s = EditorState {
-        tempo: "120".into(),
-        ..Default::default()
-    };
+    let mut s = EditorState { tempo: "120".into(), ..Default::default() };
     toggle_tempo_point(&mut s, 100);
     assert_eq!(s.tempo_changes.len(), 1);
     assert_eq!(s.tempo_changes[0].0, 100);
@@ -3369,10 +3046,7 @@ fn toggle_tempo_point_adds_a_point_at_the_clicked_tick() {
 
 #[test]
 fn toggle_tempo_point_removes_a_point_clicked_again_nearby() {
-    let mut s = EditorState {
-        tempo_changes: vec![(100, 150.0)],
-        ..Default::default()
-    };
+    let mut s = EditorState { tempo_changes: vec![(100, 150.0)], ..Default::default() };
     toggle_tempo_point(&mut s, 101); // within snap distance, not exact
     assert!(s.tempo_changes.is_empty());
 }
@@ -3522,10 +3196,7 @@ fn meter_tool_adds_a_change_on_the_nearest_active_beat() {
 
 #[test]
 fn meter_tool_cycles_an_existing_change_and_eventually_removes_it() {
-    let mut state = EditorState {
-        meter_changes: vec![(48, "3/4".into())],
-        ..Default::default()
-    };
+    let mut state = EditorState { meter_changes: vec![(48, "3/4".into())], ..Default::default() };
     cycle_meter_point(&mut state, 48);
     assert_eq!(state.meter_changes, vec![(48, "2/4".into())]);
     for _ in 0..8 {
@@ -3536,15 +3207,9 @@ fn meter_tool_cycles_an_existing_change_and_eventually_removes_it() {
 
 #[test]
 fn meter_tool_uses_the_changed_meters_beat_grid() {
-    let mut state = EditorState {
-        meter_changes: vec![(48, "7/8".into())],
-        ..Default::default()
-    };
+    let mut state = EditorState { meter_changes: vec![(48, "7/8".into())], ..Default::default() };
     cycle_meter_point(&mut state, 57);
-    assert_eq!(
-        state.meter_changes,
-        vec![(48, "7/8".into()), (60, "5/8".into())]
-    );
+    assert_eq!(state.meter_changes, vec![(48, "7/8".into()), (60, "5/8".into())]);
 }
 
 #[test]
@@ -3598,10 +3263,7 @@ fn tick_at_recenters_the_minus_half_to_half_normalized_range() {
     // `RelativeCursorPosition::normalized` is -0.5..0.5 across the
     // surface's own width, not 0..1 — a click at the surface's left
     // edge (-0.5) must resolve to tick 0, not get clamped away.
-    let geom = TimelineSurfaceGeometry {
-        scroll_px: 0.0,
-        width_px: 20.0 * TICK_W,
-    };
+    let geom = TimelineSurfaceGeometry { scroll_px: 0.0, width_px: 20.0 * TICK_W };
     assert_eq!(geom.tick_at(-0.5), 0);
     assert_eq!(geom.tick_at(0.0), 10);
     assert_eq!(geom.tick_at(0.5), 20);
@@ -3609,20 +3271,14 @@ fn tick_at_recenters_the_minus_half_to_half_normalized_range() {
 
 #[test]
 fn tick_at_offsets_by_the_surfaces_own_scroll_position() {
-    let geom = TimelineSurfaceGeometry {
-        scroll_px: 16.0 * TICK_W,
-        width_px: 20.0 * TICK_W,
-    };
+    let geom = TimelineSurfaceGeometry { scroll_px: 16.0 * TICK_W, width_px: 20.0 * TICK_W };
     // Scrolled 16 ticks in: the surface's left edge sits at tick 16.
     assert_eq!(geom.tick_at(-0.5), 16);
 }
 
 #[test]
 fn tick_at_clamps_outside_the_surfaces_own_bounds() {
-    let geom = TimelineSurfaceGeometry {
-        scroll_px: 0.0,
-        width_px: 20.0 * TICK_W,
-    };
+    let geom = TimelineSurfaceGeometry { scroll_px: 0.0, width_px: 20.0 * TICK_W };
     assert_eq!(geom.tick_at(-5.0), 0);
     assert_eq!(geom.tick_at(5.0), 20);
 }
@@ -3654,10 +3310,7 @@ fn scrollbar_marker_never_pokes_past_the_track_end() {
 // ── UndoHistory ───────────────────────────────────────────────────────────
 
 fn state_with_notes(notes: Vec<GridNote>) -> EditorState {
-    EditorState {
-        notes,
-        ..EditorState::default()
-    }
+    EditorState { notes, ..EditorState::default() }
 }
 
 #[test]
@@ -3727,10 +3380,7 @@ fn undo_drops_a_selection_pointing_at_a_removed_note() {
     history.record_if_changed(&state);
 
     history.undo(&mut state);
-    assert!(
-        state.selected.is_empty(),
-        "the undone note's id must not stay selected"
-    );
+    assert!(state.selected.is_empty(), "the undone note's id must not stay selected");
 }
 
 #[test]
@@ -3739,10 +3389,7 @@ fn redo_reapplies_the_undone_content() {
     let before = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
     history.record_if_changed(&before);
 
-    let after_notes = vec![
-        note(1, Dir::Blow, Pitch::Normal),
-        note(2, Dir::Draw, Pitch::Normal),
-    ];
+    let after_notes = vec![note(1, Dir::Blow, Pitch::Normal), note(2, Dir::Draw, Pitch::Normal)];
     let mut state = state_with_notes(after_notes.clone());
     history.record_if_changed(&state);
 
@@ -3848,24 +3495,15 @@ fn meter_reads_the_chart_meter_not_a_fixed_four() {
 fn ticks_per_bar_is_exact_where_a_whole_quarter_count_has_to_round() {
     let mut s = EditorState::default();
     // 4/4: four quarters, 48 ticks.
-    assert_eq!(
-        s.meter_map().segment_at(0).ticks_per_bar as usize,
-        4 * TICKS_PER_BEAT
-    );
-    assert_eq!(
-        s.meter_map().segment_at(0).ticks_per_beat as usize,
-        TICKS_PER_BEAT
-    );
+    assert_eq!(s.meter_map().segment_at(0).ticks_per_bar as usize, 4 * TICKS_PER_BEAT);
+    assert_eq!(s.meter_map().segment_at(0).ticks_per_beat as usize, TICKS_PER_BEAT);
 
     // 7/8: seven eighths, 3.5 quarters — which rounded to whole quarters
     // would claim a 48-tick bar; the real one is 42.
     s.time_signature = "7/8".into();
     assert_eq!(s.meter().beats_per_bar(), 3.5);
     assert_eq!(s.meter_map().segment_at(0).ticks_per_bar as usize, 42);
-    assert_eq!(
-        s.meter_map().segment_at(0).ticks_per_beat as usize,
-        TICKS_PER_BEAT / 2
-    );
+    assert_eq!(s.meter_map().segment_at(0).ticks_per_beat as usize, TICKS_PER_BEAT / 2);
 
     // 5/8: 2.5 quarters, the other direction.
     s.time_signature = "5/8".into();
@@ -3875,10 +3513,7 @@ fn ticks_per_bar_is_exact_where_a_whole_quarter_count_has_to_round() {
     // six eighths per bar rather than three quarters.
     s.time_signature = "6/8".into();
     assert_eq!(s.meter_map().segment_at(0).ticks_per_bar as usize, 36);
-    assert_eq!(
-        s.meter_map().segment_at(0).ticks_per_beat as usize,
-        TICKS_PER_BEAT / 2
-    );
+    assert_eq!(s.meter_map().segment_at(0).ticks_per_beat as usize, TICKS_PER_BEAT / 2);
 }
 
 #[test]
@@ -3899,18 +3534,9 @@ fn every_offered_meter_divides_the_tick_grid_exactly() {
 
 #[test]
 fn a_meter_too_fine_for_the_tick_grid_falls_back_rather_than_panicking() {
-    let s = EditorState {
-        time_signature: "4/32".into(),
-        ..Default::default()
-    };
-    assert_eq!(
-        s.meter_map().segment_at(0).ticks_per_beat as usize,
-        TICKS_PER_BEAT
-    );
-    assert_eq!(
-        s.meter_map().segment_at(0).ticks_per_bar as usize,
-        TICKS_PER_BEAT * 4
-    );
+    let s = EditorState { time_signature: "4/32".into(), ..Default::default() };
+    assert_eq!(s.meter_map().segment_at(0).ticks_per_beat as usize, TICKS_PER_BEAT);
+    assert_eq!(s.meter_map().segment_at(0).ticks_per_bar as usize, TICKS_PER_BEAT * 4);
 }
 
 #[test]
@@ -3920,24 +3546,15 @@ fn meter_survives_a_malformed_signature() {
     let mut s = EditorState::default();
     for junk in ["", "3", "3/", "3/0", "x/y"] {
         s.time_signature = junk.into();
-        assert!(
-            s.meter_map().segment_at(0).ticks_per_bar as usize >= 1,
-            "{junk:?}"
-        );
-        assert!(
-            s.meter_map().segment_at(0).ticks_per_beat as usize >= 1,
-            "{junk:?}"
-        );
+        assert!(s.meter_map().segment_at(0).ticks_per_bar as usize >= 1, "{junk:?}");
+        assert!(s.meter_map().segment_at(0).ticks_per_beat as usize >= 1, "{junk:?}");
         assert!(s.meter().bar_secs(120.0) > 0.0, "{junk:?}");
     }
 }
 
 #[test]
 fn a_time_signature_round_trips_through_save_and_load() {
-    let s = EditorState {
-        time_signature: "6/8".into(),
-        ..Default::default()
-    };
+    let s = EditorState { time_signature: "6/8".into(), ..Default::default() };
     let v: serde_json::Value = serde_json::from_str(&serialize_harpchart(&s)).unwrap();
     let mut loaded = EditorState::default();
     let mut scroll = Scroll::default();
@@ -3953,10 +3570,7 @@ fn a_time_signature_round_trips_through_save_and_load() {
 // carry them along or clean them up; these pin what "along" means.
 
 fn annotated(section: &str) -> PhraseAnnotation {
-    PhraseAnnotation {
-        section: Some(section.into()),
-        ..Default::default()
-    }
+    PhraseAnnotation { section: Some(section.into()), ..Default::default() }
 }
 
 /// Two notes at tick 0 (a chord on holes 1 and 2), one at tick 24, with a
@@ -3975,9 +3589,7 @@ fn state_with_metadata() -> EditorState {
 }
 
 fn section_at(s: &EditorState, tick: usize) -> Option<&str> {
-    s.phrase_annotations
-        .get(&tick)
-        .and_then(|a| a.section.as_deref())
+    s.phrase_annotations.get(&tick).and_then(|a| a.section.as_deref())
 }
 
 #[test]
@@ -3987,11 +3599,7 @@ fn moving_a_whole_onset_group_takes_its_annotation_along() {
     s.move_notes(&[(0, 1, 12), (1, 2, 12)]);
     assert_eq!(section_at(&s, 0), None);
     assert_eq!(section_at(&s, 12), Some("A"));
-    assert_eq!(
-        section_at(&s, 24),
-        Some("B"),
-        "an unrelated phrase is untouched"
-    );
+    assert_eq!(section_at(&s, 24), Some("B"), "an unrelated phrase is untouched");
 }
 
 #[test]
@@ -4029,10 +3637,7 @@ fn moving_a_note_keeps_its_expression_intensity() {
     // ids would silently lose it.
     let mut s = state_with_metadata();
     s.move_notes(&[(0, 1, 12), (1, 2, 12)]);
-    assert_eq!(
-        s.expression_intensities.get(&0).map(String::as_str),
-        Some("0.8")
-    );
+    assert_eq!(s.expression_intensities.get(&0).map(String::as_str), Some("0.8"));
 }
 
 #[test]
@@ -4047,30 +3652,14 @@ fn copy_paste_carries_intensity_and_annotation_to_the_new_notes() {
     assert_eq!(pasted.len(), 2);
     assert!(pasted.iter().all(|&id| id >= 3));
     // Hole 1's intensity followed it to its new id; hole 2 had none.
-    let new_hole_1 = s
-        .notes
-        .iter()
-        .find(|n| pasted.contains(&n.id) && n.hole == 1)
-        .unwrap();
-    let new_hole_2 = s
-        .notes
-        .iter()
-        .find(|n| pasted.contains(&n.id) && n.hole == 2)
-        .unwrap();
-    assert_eq!(
-        s.expression_intensities
-            .get(&new_hole_1.id)
-            .map(String::as_str),
-        Some("0.8")
-    );
+    let new_hole_1 = s.notes.iter().find(|n| pasted.contains(&n.id) && n.hole == 1).unwrap();
+    let new_hole_2 = s.notes.iter().find(|n| pasted.contains(&n.id) && n.hole == 2).unwrap();
+    assert_eq!(s.expression_intensities.get(&new_hole_1.id).map(String::as_str), Some("0.8"));
     assert!(!s.expression_intensities.contains_key(&new_hole_2.id));
     // The onset's label came too; the originals are untouched.
     assert_eq!(section_at(&s, 48), Some("A"));
     assert_eq!(section_at(&s, 0), Some("A"));
-    assert_eq!(
-        s.expression_intensities.get(&0).map(String::as_str),
-        Some("0.8")
-    );
+    assert_eq!(s.expression_intensities.get(&0).map(String::as_str), Some("0.8"));
 }
 
 #[test]
@@ -4100,10 +3689,7 @@ fn deleting_one_note_of_a_phrase_keeps_the_phrases_annotation() {
     s.selected = vec![0];
     delete_selected(&mut s);
     assert_eq!(section_at(&s, 0), Some("A"), "hole 2 still starts there");
-    assert!(
-        !s.expression_intensities.contains_key(&0),
-        "its intensity goes with it"
-    );
+    assert!(!s.expression_intensities.contains_key(&0), "its intensity goes with it");
 }
 
 #[test]
@@ -4209,10 +3795,7 @@ fn undo_restores_annotations_and_intensities_together_with_the_notes() {
     assert_eq!(section_at(&s, 0), None);
     history.undo(&mut s);
     assert_eq!(section_at(&s, 0), Some("A"));
-    assert_eq!(
-        s.expression_intensities.get(&0).map(String::as_str),
-        Some("0.8")
-    );
+    assert_eq!(s.expression_intensities.get(&0).map(String::as_str), Some("0.8"));
 }
 
 // ── phrase editor ────────────────────────────────────────────────────────────
@@ -4243,11 +3826,7 @@ fn set_annotation_writes_the_phrase_at_that_tick_not_the_selection() {
     s.set_annotation(0, Field::Chord, "C7".into()); // ...but tick 0 edited
     assert_eq!(s.annotation_text(0, Field::Chord), "C7");
     assert_eq!(s.annotation_text(24, Field::Chord), "");
-    assert_eq!(
-        s.annotation_text(0, Field::Section),
-        "A",
-        "other fields kept"
-    );
+    assert_eq!(s.annotation_text(0, Field::Section), "A", "other fields kept");
 }
 
 #[test]
@@ -4299,11 +3878,7 @@ fn depth_steps_up_from_a_value_between_the_quarters() {
     // A chart can carry any 0–1 depth; a click always visibly moves.
     assert_eq!(next_depth_step("0.8"), "1");
     assert_eq!(next_depth_step("0.1"), "0.25");
-    assert_eq!(
-        next_depth_step("garbage"),
-        "0.75",
-        "unparseable counts as the default"
-    );
+    assert_eq!(next_depth_step("garbage"), "0.75", "unparseable counts as the default");
 }
 
 #[test]
@@ -4316,21 +3891,12 @@ fn depth_label_is_a_percentage_or_nothing() {
 
 #[test]
 fn depth_button_steps_the_selected_notes_depth() {
-    let mut s = state_with_notes(vec![GridNote {
-        expr: Expr::Vibrato(5.0),
-        ..timeline_note(0, 1, 0, 4)
-    }]);
+    let mut s =
+        state_with_notes(vec![GridNote { expr: Expr::Vibrato(5.0), ..timeline_note(0, 1, 0, 4) }]);
     s.selected = vec![0];
-    assert_eq!(
-        s.depth_for_button(),
-        "0.5",
-        "default shown before any click"
-    );
+    assert_eq!(s.depth_for_button(), "0.5", "default shown before any click");
     apply_modifier(&mut s, ModButton::Depth);
-    assert_eq!(
-        s.expression_intensities.get(&0).map(String::as_str),
-        Some("0.75")
-    );
+    assert_eq!(s.expression_intensities.get(&0).map(String::as_str), Some("0.75"));
     assert_eq!(s.depth_for_button(), "0.75");
     // Back round to the default, which is stored as absence.
     apply_modifier(&mut s, ModButton::Depth);
@@ -4359,10 +3925,7 @@ fn depth_button_arms_the_sticky_depth_that_a_new_note_gets() {
     s.sticky_expr = Expr::Wah(3.0);
     select_or_add(&mut s, 2, 0);
     let id = s.notes[0].id;
-    assert_eq!(
-        s.expression_intensities.get(&id).map(String::as_str),
-        Some("0.75")
-    );
+    assert_eq!(s.expression_intensities.get(&id).map(String::as_str), Some("0.75"));
     // Without an expression the armed depth has nothing to apply to.
     s.sticky_expr = Expr::None;
     select_or_add(&mut s, 3, 24);
@@ -4416,10 +3979,7 @@ use bevy::math::Vec2;
 fn one_finger_is_not_a_pan_gesture() {
     // A single touch is note placement/drag/resize — panning must not steal
     // it, which is the whole reason the gesture needs two fingers.
-    assert_eq!(
-        super::view_scroll::two_finger_pan_delta(&[Vec2::new(30.0, 0.0)]),
-        None
-    );
+    assert_eq!(super::view_scroll::two_finger_pan_delta(&[Vec2::new(30.0, 0.0)]), None);
 }
 
 #[test]
@@ -4429,11 +3989,7 @@ fn no_touches_is_not_a_pan_gesture() {
 
 #[test]
 fn three_fingers_is_not_a_pan_gesture() {
-    let deltas = [
-        Vec2::new(5.0, 0.0),
-        Vec2::new(5.0, 0.0),
-        Vec2::new(5.0, 0.0),
-    ];
+    let deltas = [Vec2::new(5.0, 0.0), Vec2::new(5.0, 0.0), Vec2::new(5.0, 0.0)];
     assert_eq!(super::view_scroll::two_finger_pan_delta(&deltas), None);
 }
 
@@ -4452,10 +4008,7 @@ fn a_pinch_barely_pans() {
     // instead of the view lurching sideways every time you zoom.
     let deltas = [Vec2::new(-25.0, 0.0), Vec2::new(25.0, 0.0)];
     let pan = super::view_scroll::two_finger_pan_delta(&deltas).expect("two touches pan");
-    assert!(
-        pan.x.abs() < f32::EPSILON,
-        "pinch should not pan, got {pan:?}"
-    );
+    assert!(pan.x.abs() < f32::EPSILON, "pinch should not pan, got {pan:?}");
 }
 
 #[test]
@@ -4473,10 +4026,7 @@ fn an_off_centre_pinch_pans_only_by_its_drift() {
 fn a_view_that_already_fits_cannot_be_panned_vertically() {
     // Desktop: everything fits, so the gesture must be inert rather than
     // letting the player drag the whole editor off the top of the window.
-    assert_eq!(
-        super::view_scroll::vertical_overflow_px(800.0, &[5.0, 424.0, 200.0]),
-        0.0
-    );
+    assert_eq!(super::view_scroll::vertical_overflow_px(800.0, &[5.0, 424.0, 200.0]), 0.0);
 }
 
 #[test]
@@ -4498,15 +4048,9 @@ fn the_sticky_bend_cap_is_the_deepest_any_hole_of_the_harp_allows() {
     // Richter: hole 3's three semitones. Paddy Richter flattens hole 3 to
     // one, so its deepest is elsewhere — hole 2's two.
     assert_eq!(deepest_bend(&build_harp("C", HarmonicaKind::Diatonic)), 3.0);
-    assert_eq!(
-        deepest_bend(&build_harp("C", HarmonicaKind::PaddyRichter)),
-        2.0
-    );
+    assert_eq!(deepest_bend(&build_harp("C", HarmonicaKind::PaddyRichter)), 2.0);
     // And the cycle actually stops there: on Richter, 3.0 wraps to Normal.
-    let mut s = EditorState {
-        sticky_pitch: Pitch::Bend(3.0),
-        ..Default::default()
-    };
+    let mut s = EditorState { sticky_pitch: Pitch::Bend(3.0), ..Default::default() };
     super::interaction::cycle_sticky_bend(&mut s);
     assert_eq!(s.sticky_pitch, Pitch::Normal);
 }
@@ -4515,34 +4059,22 @@ fn the_sticky_bend_cap_is_the_deepest_any_hole_of_the_harp_allows() {
 fn the_bend_button_respects_the_tuning_not_a_richter_table() {
     // Country tuning's raised draw 5 bends a semitone; Richter's hole 5
     // does not. The editor used to consult a Richter table for both.
-    let mut country = EditorState {
-        harmonica_kind: HarmonicaKind::CountryTuned,
-        ..Default::default()
-    };
+    let mut country =
+        EditorState { harmonica_kind: HarmonicaKind::CountryTuned, ..Default::default() };
     select_or_add(&mut country, 5, 0);
     apply_modifier(&mut country, ModButton::Bend);
-    assert_eq!(
-        country.notes[0].pitch,
-        Pitch::Bend(0.5),
-        "country hole 5 bends"
-    );
+    assert_eq!(country.notes[0].pitch, Pitch::Bend(0.5), "country hole 5 bends");
 
     let mut richter = EditorState::default();
     select_or_add(&mut richter, 5, 0);
     apply_modifier(&mut richter, ModButton::Bend);
-    assert_eq!(
-        richter.notes[0].pitch,
-        Pitch::Normal,
-        "Richter hole 5 can't"
-    );
+    assert_eq!(richter.notes[0].pitch, Pitch::Normal, "Richter hole 5 can't");
 
     // Paddy Richter's hole 3 bends one semitone, not Richter's three: the
     // cycle wraps to Normal after 1.0 instead of letting an author place a
     // bend the instrument can't make.
-    let mut paddy = EditorState {
-        harmonica_kind: HarmonicaKind::PaddyRichter,
-        ..Default::default()
-    };
+    let mut paddy =
+        EditorState { harmonica_kind: HarmonicaKind::PaddyRichter, ..Default::default() };
     select_or_add(&mut paddy, 3, 0);
     for _ in 0..2 {
         apply_modifier(&mut paddy, ModButton::Bend);
@@ -4598,14 +4130,7 @@ fn pitches(state: &EditorState) -> Vec<Pitch> {
 fn a_technique_button_applies_to_every_selected_note() {
     let mut state = selection_on(&[4, 5, 6]);
     apply_modifier(&mut state, ModButton::Vibrato);
-    assert!(
-        state
-            .notes
-            .iter()
-            .all(|n| matches!(n.expr, Expr::Vibrato(_))),
-        "{:?}",
-        state.notes
-    );
+    assert!(state.notes.iter().all(|n| matches!(n.expr, Expr::Vibrato(_))), "{:?}", state.notes);
     assert_eq!(state.technique_notice, None);
 }
 
@@ -4614,10 +4139,7 @@ fn notes_that_cannot_take_a_technique_keep_theirs_and_are_counted() {
     // Richter: hole 2 can't overblow; holes 4 and 5 can.
     let mut state = selection_on(&[4, 2, 5]);
     apply_modifier(&mut state, ModButton::Overblow);
-    assert_eq!(
-        pitches(&state),
-        vec![Pitch::Overblow, Pitch::Normal, Pitch::Overblow]
-    );
+    assert_eq!(pitches(&state), vec![Pitch::Overblow, Pitch::Normal, Pitch::Overblow]);
     assert_eq!(state.technique_notice, Some(1));
     assert!(state.notes.iter().all(|n| n.dir == Dir::Blow));
 
@@ -4665,12 +4187,7 @@ fn depth_steps_every_selected_note_with_an_expression() {
 
     state.selected.rotate_right(1); // hole 5 is primary now
     apply_modifier(&mut state, ModButton::Depth);
-    let depth = |i: usize| {
-        state
-            .expression_intensities
-            .get(&state.notes[i].id)
-            .cloned()
-    };
+    let depth = |i: usize| state.expression_intensities.get(&state.notes[i].id).cloned();
     assert_eq!(depth(0), depth(1));
     assert!(depth(0).is_some());
     assert_eq!(depth(2), None);

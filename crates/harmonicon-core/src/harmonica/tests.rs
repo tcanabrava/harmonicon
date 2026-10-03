@@ -143,20 +143,14 @@ fn roots(bars: &[(String, ChordQuality); 12]) -> Vec<&str> {
 #[test]
 fn standard_progression_matches_twelve_bar() {
     let bars = progression_bars("C", Progression::Standard);
-    assert_eq!(
-        roots(&bars),
-        vec!["C", "C", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]
-    );
+    assert_eq!(roots(&bars), vec!["C", "C", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]);
     assert!(bars.iter().all(|(_, q)| *q == ChordQuality::Dominant7));
 }
 
 #[test]
 fn quick_change_moves_bar_two_to_the_iv() {
     let bars = progression_bars("C", Progression::QuickChange);
-    assert_eq!(
-        roots(&bars),
-        vec!["C", "F", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]
-    );
+    assert_eq!(roots(&bars), vec!["C", "F", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]);
     assert!(bars.iter().all(|(_, q)| *q == ChordQuality::Dominant7));
 }
 
@@ -164,17 +158,11 @@ fn quick_change_moves_bar_two_to_the_iv() {
 fn minor_blues_keeps_the_standard_roots_but_i_and_iv_go_minor() {
     let bars = progression_bars("C", Progression::Minor);
     // Same root sequence as Standard...
-    assert_eq!(
-        roots(&bars),
-        vec!["C", "C", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]
-    );
+    assert_eq!(roots(&bars), vec!["C", "C", "C", "C", "F", "F", "C", "C", "G", "F", "C", "G"]);
     // ...but i/iv bars are minor 7th and the V bars stay dominant.
     for (bar, (_, q)) in bars.iter().enumerate() {
-        let expected = if bar == 8 || bar == 11 {
-            ChordQuality::Dominant7
-        } else {
-            ChordQuality::Minor7
-        };
+        let expected =
+            if bar == 8 || bar == 11 { ChordQuality::Dominant7 } else { ChordQuality::Minor7 };
         assert_eq!(*q, expected, "bar {bar}");
     }
 }
@@ -257,10 +245,7 @@ fn twelfth_position_is_one_step_counter_clockwise_from_first() {
     // 6th-11th) — 11 fifths forward and 1 fifth backward land on the same
     // note, which is the more useful way to think about it: a step *back*
     // around the circle of fifths from the harp's own key.
-    assert_eq!(
-        Position::Twelfth.interval_below_jam_key(),
-        (-7i32).rem_euclid(12)
-    );
+    assert_eq!(Position::Twelfth.interval_below_jam_key(), (-7i32).rem_euclid(12));
 }
 
 #[test]
@@ -272,14 +257,8 @@ fn chord_intervals_are_dominant_or_minor_seventh() {
 #[test]
 fn chord_intervals_cover_the_jazz_qualities() {
     assert_eq!(chord_intervals(ChordQuality::Major7), [0, 4, 7, 11]);
-    assert_eq!(
-        chord_intervals(ChordQuality::HalfDiminished7),
-        [0, 3, 6, 10]
-    );
-    assert_eq!(
-        chord_intervals(ChordQuality::Dominant7Alt),
-        [0, 4, 10, 1, 3, 8]
-    );
+    assert_eq!(chord_intervals(ChordQuality::HalfDiminished7), [0, 3, 6, 10]);
+    assert_eq!(chord_intervals(ChordQuality::Dominant7Alt), [0, 4, 10, 1, 3, 8]);
 }
 
 #[test]
@@ -301,23 +280,14 @@ fn blow_label_returns_correct_note() {
     let chart = test_chart();
     assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Blow), "C4");
     assert_eq!(chart.harmonica.wind_direction_label(4, &Action::Blow), "C5");
-    assert_eq!(
-        chart.harmonica.wind_direction_label(10, &Action::Blow),
-        "C7"
-    );
+    assert_eq!(chart.harmonica.wind_direction_label(10, &Action::Blow), "C7");
 }
 
 #[test]
 fn blow_label_out_of_range_returns_dash() {
     let chart = test_chart();
-    assert_eq!(
-        chart.harmonica.wind_direction_label(0, &Action::Blow),
-        "\u{2014}"
-    ); // hole=0 guard
-    assert_eq!(
-        chart.harmonica.wind_direction_label(11, &Action::Blow),
-        "\u{2014}"
-    ); // beyond layout
+    assert_eq!(chart.harmonica.wind_direction_label(0, &Action::Blow), "\u{2014}"); // hole=0 guard
+    assert_eq!(chart.harmonica.wind_direction_label(11, &Action::Blow), "\u{2014}"); // beyond layout
 }
 
 #[test]
@@ -325,10 +295,7 @@ fn draw_label_returns_correct_note() {
     let chart = test_chart();
     assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Draw), "D4");
     assert_eq!(chart.harmonica.wind_direction_label(3, &Action::Draw), "B4");
-    assert_eq!(
-        chart.harmonica.wind_direction_label(0, &Action::Draw),
-        "\u{2014}"
-    );
+    assert_eq!(chart.harmonica.wind_direction_label(0, &Action::Draw), "\u{2014}");
 }
 
 #[test]
@@ -361,10 +328,7 @@ fn wind_direction_label_works_for_chromatic_too() {
     let chart = test_chromatic_chart();
     assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Blow), "C4");
     assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Draw), "D4");
-    assert_eq!(
-        chart.harmonica.wind_direction_label(12, &Action::Blow),
-        "G5"
-    );
+    assert_eq!(chart.harmonica.wind_direction_label(12, &Action::Blow), "G5");
 }
 
 #[test]
@@ -482,10 +446,7 @@ fn key_offset_accepts_flat_spellings_too() {
 
 #[test]
 fn c_harp_keeps_the_reference_layout() {
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = richter_harp("C")
-    else {
+    let Harmonica::Diatonic { layout: Some(l), .. } = richter_harp("C") else {
         panic!("expected diatonic");
     };
     assert_eq!(l.blow.unwrap()[0], "C4");
@@ -494,10 +455,7 @@ fn c_harp_keeps_the_reference_layout() {
 
 #[test]
 fn d_harp_hole_1_blow_is_d4() {
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = richter_harp("D")
-    else {
+    let Harmonica::Diatonic { layout: Some(l), .. } = richter_harp("D") else {
         panic!("expected diatonic");
     };
     assert_eq!(l.blow.unwrap()[0], "D4");
@@ -506,10 +464,7 @@ fn d_harp_hole_1_blow_is_d4() {
 #[test]
 fn g_harp_hole_1_blow_is_g3() {
     // The G harp is a low harp — hole-1 blow sits below C4.
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = richter_harp("G")
-    else {
+    let Harmonica::Diatonic { layout: Some(l), .. } = richter_harp("G") else {
         panic!("expected diatonic");
     };
     assert_eq!(l.blow.unwrap()[0], "G3");
@@ -517,10 +472,7 @@ fn g_harp_hole_1_blow_is_g3() {
 
 #[test]
 fn chromatic_harp_keeps_the_reference_layout_in_c() {
-    let Harmonica::Chromatic {
-        layout: Some(l), ..
-    } = chromatic_harp("C")
-    else {
+    let Harmonica::Chromatic { layout: Some(l), .. } = chromatic_harp("C") else {
         panic!("expected chromatic");
     };
     assert_eq!(l.blow.unwrap()[0], "C4");
@@ -531,10 +483,7 @@ fn chromatic_harp_keeps_the_reference_layout_in_c() {
 
 #[test]
 fn chromatic_harp_transposes_every_table() {
-    let Harmonica::Chromatic {
-        layout: Some(l), ..
-    } = chromatic_harp("D")
-    else {
+    let Harmonica::Chromatic { layout: Some(l), .. } = chromatic_harp("D") else {
         panic!("expected chromatic");
     };
     assert_eq!(l.blow.unwrap()[0], "D4");
@@ -543,22 +492,14 @@ fn chromatic_harp_transposes_every_table() {
 
 #[test]
 fn sixteen_hole_chromatic_spans_four_octaves_of_solo_tuning() {
-    let Harmonica::Chromatic {
-        holes,
-        layout: Some(l),
-        ..
-    } = chromatic_16_harp("C")
-    else {
+    let Harmonica::Chromatic { holes, layout: Some(l), .. } = chromatic_16_harp("C") else {
         panic!("expected chromatic");
     };
     assert_eq!(holes, 16);
     let blow = l.blow.unwrap();
     let draw = l.draw.unwrap();
     assert_eq!((&blow[0], &draw[0]), (&"C3".to_string(), &"D3".to_string()));
-    assert_eq!(
-        (&blow[15], &draw[15]),
-        (&"C7".to_string(), &"B6".to_string())
-    );
+    assert_eq!((&blow[15], &draw[15]), (&"C7".to_string(), &"B6".to_string()));
     assert_eq!(l.blow_slide.unwrap()[0], "C#3");
     assert_eq!(l.draw_slide.unwrap()[15], "C7");
 }
@@ -567,11 +508,7 @@ fn sixteen_hole_chromatic_spans_four_octaves_of_solo_tuning() {
 
 #[test]
 fn paddy_richter_only_changes_hole_three_blow() {
-    let Harmonica::Diatonic {
-        layout: Some(l),
-        bending_profile,
-        ..
-    } = paddy_richter_harp("C")
+    let Harmonica::Diatonic { layout: Some(l), bending_profile, .. } = paddy_richter_harp("C")
     else {
         panic!("expected diatonic");
     };
@@ -581,10 +518,7 @@ fn paddy_richter_only_changes_hole_three_blow() {
     assert_eq!(blow[2], "A4");
     // ...every other hole and every draw note matches standard Richter.
     let standard = richter_harp("C");
-    let Harmonica::Diatonic {
-        layout: Some(sl), ..
-    } = standard
-    else {
+    let Harmonica::Diatonic { layout: Some(sl), .. } = standard else {
         panic!("expected diatonic");
     };
     let standard_blow = sl.blow.unwrap();
@@ -599,10 +533,7 @@ fn paddy_richter_only_changes_hole_three_blow() {
 
 #[test]
 fn paddy_richter_transposes_by_key() {
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = paddy_richter_harp("D")
-    else {
+    let Harmonica::Diatonic { layout: Some(l), .. } = paddy_richter_harp("D") else {
         panic!("expected diatonic");
     };
     assert_eq!(l.blow.unwrap()[0], "D4");
@@ -610,35 +541,24 @@ fn paddy_richter_transposes_by_key() {
 
 #[test]
 fn natural_minor_blow_is_a_tonic_minor_triad() {
-    let Harmonica::Diatonic {
-        layout: Some(l),
-        bending_profile,
-        ..
-    } = natural_minor_harp("C")
+    let Harmonica::Diatonic { layout: Some(l), bending_profile, .. } = natural_minor_harp("C")
     else {
         panic!("expected diatonic");
     };
     assert_eq!(
         l.blow.unwrap(),
-        vec![
-            "C4", "D#4", "G4", "C5", "D#5", "G5", "C6", "D#6", "G6", "C7"
-        ]
+        vec!["C4", "D#4", "G4", "C5", "D#5", "G5", "C6", "D#6", "G6", "C7"]
     );
     assert_eq!(
         l.draw.unwrap(),
-        vec![
-            "D4", "G4", "A#4", "D5", "F5", "G#5", "A#5", "D6", "F6", "G#6"
-        ]
+        vec!["D4", "G4", "A#4", "D5", "F5", "G#5", "A#5", "D6", "F6", "G#6"]
     );
     assert!(matches!(bending_profile, BendingProfile::NaturalMinor));
 }
 
 #[test]
 fn natural_minor_transposes_by_key() {
-    let Harmonica::Diatonic {
-        layout: Some(l), ..
-    } = natural_minor_harp("D")
-    else {
+    let Harmonica::Diatonic { layout: Some(l), .. } = natural_minor_harp("D") else {
         panic!("expected diatonic");
     };
     assert_eq!(l.blow.unwrap()[0], "D4");
@@ -674,11 +594,7 @@ fn hole_10_has_two_blow_bends() {
     // blow C7, draw A6 → blow bends B6, A#6.
     let h = hole_notes(&richter_harp("C"), 10);
     assert_eq!(h.bends, vec!["B6", "A#6"]);
-    assert_eq!(
-        h.over.as_deref(),
-        Some("C#7"),
-        "overdraw a semitone above blow"
-    );
+    assert_eq!(h.over.as_deref(), Some("C#7"), "overdraw a semitone above blow");
 }
 
 #[test]
@@ -690,10 +606,7 @@ fn hole_5_has_no_draw_bend() {
 
 #[test]
 fn hole_1_overblow_is_a_semitone_above_draw() {
-    assert_eq!(
-        hole_notes(&richter_harp("C"), 1).over.as_deref(),
-        Some("D#4")
-    );
+    assert_eq!(hole_notes(&richter_harp("C"), 1).over.as_deref(), Some("D#4"));
 }
 
 /// Every over-technique pitch must be in the valid set.
@@ -734,9 +647,7 @@ fn the_valid_note_set_still_excludes_a_pitch_the_harp_cannot_produce() {
     let valid = harp.build_valid_notes();
     // A semitone below hole 1 blow (C4) is below the instrument entirely:
     // no reed, no bend toward it, no over-technique.
-    let below = note_to_midi("B3")
-        .and_then(|m| u8::try_from(m).ok())
-        .unwrap();
+    let below = note_to_midi("B3").and_then(|m| u8::try_from(m).ok()).unwrap();
     assert!(!valid.contains(&below));
 }
 
@@ -744,10 +655,7 @@ fn the_valid_note_set_still_excludes_a_pitch_the_harp_cannot_produce() {
 
 #[test]
 fn display_omits_the_position_segment_when_the_chart_declares_none() {
-    assert_eq!(
-        richter_harp("C").display(),
-        "Diatonic \u{00B7} 10 holes \u{00B7} Richter"
-    );
+    assert_eq!(richter_harp("C").display(), "Diatonic \u{00B7} 10 holes \u{00B7} Richter");
     assert_eq!(chromatic_harp("C").display(), "Chromatic \u{00B7} 12 holes");
     assert!(!richter_harp("A").display().contains('?'));
 }
@@ -758,8 +666,5 @@ fn display_names_a_declared_position() {
     if let Harmonica::Diatonic { position, .. } = &mut harp {
         *position = Some("2nd".into());
     }
-    assert_eq!(
-        harp.display(),
-        "Diatonic \u{00B7} 10 holes \u{00B7} 2nd position \u{00B7} Richter"
-    );
+    assert_eq!(harp.display(), "Diatonic \u{00B7} 10 holes \u{00B7} 2nd position \u{00B7} Richter");
 }

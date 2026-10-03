@@ -50,11 +50,7 @@ pub(super) fn natural_pitch(expected: u8, modifiers: &[Modifier]) -> Option<u8> 
 
 /// An oscillation rate as a player reads it: `5`, not `5.0`; `4.5` stays.
 pub(super) fn format_rate(hz: f32) -> String {
-    if (hz - hz.round()).abs() < 0.05 {
-        format!("{:.0}", hz.round())
-    } else {
-        format!("{hz:.1}")
-    }
+    if (hz - hz.round()).abs() < 0.05 { format!("{:.0}", hz.round()) } else { format!("{hz:.1}") }
 }
 
 /// One clause of a note's cue: a Fluent key and the arguments it takes.
@@ -79,20 +75,15 @@ pub(super) fn cue_parts(modifiers: &[Modifier], expected: Option<u8>) -> Vec<Cue
             )
         })
     {
-        parts.push(CuePart {
-            key: "cue-target",
-            args: vec![("note", pitch_class_name(midi))],
-        });
+        parts.push(CuePart { key: "cue-target", args: vec![("note", pitch_class_name(midi))] });
     }
     parts.extend(modifiers.iter().filter_map(|m| match m {
-        Modifier::Vibrato { oscillation_hz, .. } => Some(CuePart {
-            key: "cue-vibrato",
-            args: vec![("rate", format_rate(*oscillation_hz))],
-        }),
-        Modifier::WahWah { oscillation_hz, .. } => Some(CuePart {
-            key: "cue-wah",
-            args: vec![("rate", format_rate(*oscillation_hz))],
-        }),
+        Modifier::Vibrato { oscillation_hz, .. } => {
+            Some(CuePart { key: "cue-vibrato", args: vec![("rate", format_rate(*oscillation_hz))] })
+        }
+        Modifier::WahWah { oscillation_hz, .. } => {
+            Some(CuePart { key: "cue-wah", args: vec![("rate", format_rate(*oscillation_hz))] })
+        }
         _ => None,
     }));
     parts
@@ -100,10 +91,7 @@ pub(super) fn cue_parts(modifiers: &[Modifier], expected: Option<u8>) -> Vec<Cue
 
 /// Whether the technique coach has anything to show for this modifier.
 pub(super) fn is_coachable(modifier: &Modifier) -> bool {
-    matches!(
-        modifier,
-        Modifier::Bend { .. } | Modifier::Vibrato { .. } | Modifier::WahWah { .. }
-    )
+    matches!(modifier, Modifier::Bend { .. } | Modifier::Vibrato { .. } | Modifier::WahWah { .. })
 }
 
 /// The localized cue drawn beside a note head, or `None` for a plain note.
@@ -147,12 +135,10 @@ pub(super) fn coach_mode(note: &ScheduledNote) -> Option<CoachMode> {
         return Some(CoachMode::Bend { natural, target });
     }
     note.modifiers.iter().find_map(|m| match m {
-        Modifier::Vibrato { oscillation_hz, .. } => Some(CoachMode::Vibrato {
-            hz: *oscillation_hz,
-        }),
-        Modifier::WahWah { oscillation_hz, .. } => Some(CoachMode::Wah {
-            hz: *oscillation_hz,
-        }),
+        Modifier::Vibrato { oscillation_hz, .. } => {
+            Some(CoachMode::Vibrato { hz: *oscillation_hz })
+        }
+        Modifier::WahWah { oscillation_hz, .. } => Some(CoachMode::Wah { hz: *oscillation_hz }),
         _ => None,
     })
 }
@@ -223,10 +209,7 @@ pub(super) fn bend_reading(
         .filter(|c| *c >= lo - BEND_CAPTURE_CENTS && *c <= hi + BEND_CAPTURE_CENTS)
         .min_by(|a, b| (a - span).abs().total_cmp(&(b - span).abs()));
     let Some(cents) = best else {
-        return BendReading {
-            position: None,
-            advice: BendAdvice::Silent,
-        };
+        return BendReading { position: None, advice: BendAdvice::Silent };
     };
     let miss = cents - span;
     let advice = if miss.abs() <= BEND_ON_TARGET_CENTS {
@@ -236,10 +219,7 @@ pub(super) fn bend_reading(
     } else {
         BendAdvice::BendMore
     };
-    BendReading {
-        position: Some(cents / span),
-        advice,
-    }
+    BendReading { position: Some(cents / span), advice }
 }
 
 /// The on-target band of a bend, in the same 0-to-1 position units.
@@ -373,11 +353,7 @@ pub(super) fn swing_track_pct(swing: f32) -> f32 {
 /// to its right, or to its left for the last hole so it stays on the
 /// highway.
 pub(super) fn beside_lane(hole: u8, hole_count: u8) -> u8 {
-    if hole < hole_count {
-        hole + 1
-    } else {
-        hole.saturating_sub(1).max(1)
-    }
+    if hole < hole_count { hole + 1 } else { hole.saturating_sub(1).max(1) }
 }
 
 #[cfg(test)]
@@ -385,17 +361,11 @@ mod tests {
     use super::*;
 
     fn bend(semitones: f32) -> Modifier {
-        Modifier::Bend {
-            semitones,
-            intensity: None,
-        }
+        Modifier::Bend { semitones, intensity: None }
     }
 
     fn vibrato(hz: f32) -> Modifier {
-        Modifier::Vibrato {
-            oscillation_hz: hz,
-            intensity: None,
-        }
+        Modifier::Vibrato { oscillation_hz: hz, intensity: None }
     }
 
     fn note(
@@ -453,10 +423,7 @@ mod tests {
         let parts = cue_parts(&[bend(-2.0)], Some(69));
         assert_eq!(
             parts,
-            vec![CuePart {
-                key: "cue-target",
-                args: vec![("note", "A".to_string())],
-            }]
+            vec![CuePart { key: "cue-target", args: vec![("note", "A".to_string())] }]
         );
         // Target first, then the wobble, whatever the modifier order.
         let both = cue_parts(&[vibrato(5.0), bend(-1.0)], Some(70));
@@ -475,10 +442,7 @@ mod tests {
     fn an_unproducible_pitch_gets_no_target_clause() {
         assert!(cue_parts(&[bend(-1.0)], None).is_empty());
         assert!(cue_parts(&[Modifier::Overblow], None).is_empty());
-        assert_eq!(
-            cue_parts(&[Modifier::Overblow], Some(63))[0].key,
-            "cue-target"
-        );
+        assert_eq!(cue_parts(&[Modifier::Overblow], Some(63))[0].key, "cue-target");
     }
 
     #[test]
@@ -489,13 +453,7 @@ mod tests {
     #[test]
     fn the_bend_outranks_a_wobble_for_the_gauge() {
         let both = note(0.0, 1.0, Some(69), vec![vibrato(5.0), bend(-2.0)]);
-        assert_eq!(
-            coach_mode(&both),
-            Some(CoachMode::Bend {
-                natural: 71,
-                target: 69
-            })
-        );
+        assert_eq!(coach_mode(&both), Some(CoachMode::Bend { natural: 71, target: 69 }));
         let wobble = note(0.0, 1.0, Some(69), vec![vibrato(5.0)]);
         assert_eq!(coach_mode(&wobble), Some(CoachMode::Vibrato { hz: 5.0 }));
         assert_eq!(coach_mode(&note(0.0, 1.0, Some(69), vec![])), None);

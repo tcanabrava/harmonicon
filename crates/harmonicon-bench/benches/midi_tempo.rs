@@ -19,11 +19,7 @@ fn midi_file(tempo_points: usize) -> Vec<u8> {
     let mut tempos = Vec::with_capacity(tempo_points + 1);
     for i in 0..tempo_points {
         tempos.push(TrackEvent {
-            delta: u28::from(if i == 0 {
-                0
-            } else {
-                (NOTES / tempo_points * 480) as u32
-            }),
+            delta: u28::from(if i == 0 { 0 } else { (NOTES / tempo_points * 480) as u32 }),
             kind: TrackEventKind::Meta(MetaMessage::Tempo(u24::from(
                 450_000 + (i % 7) as u32 * 15_000,
             ))),
@@ -41,20 +37,14 @@ fn midi_file(tempo_points: usize) -> Vec<u8> {
             delta: u28::from(if i == 0 { 0 } else { 240 }),
             kind: TrackEventKind::Midi {
                 channel: u4::from(0),
-                message: MidiMessage::NoteOn {
-                    key,
-                    vel: u7::from(100),
-                },
+                message: MidiMessage::NoteOn { key, vel: u7::from(100) },
             },
         });
         notes.push(TrackEvent {
             delta: u28::from(240),
             kind: TrackEventKind::Midi {
                 channel: u4::from(0),
-                message: MidiMessage::NoteOff {
-                    key,
-                    vel: u7::from(0),
-                },
+                message: MidiMessage::NoteOff { key, vel: u7::from(0) },
             },
         });
     }
@@ -64,10 +54,7 @@ fn midi_file(tempo_points: usize) -> Vec<u8> {
     });
 
     let file = Smf {
-        header: Header {
-            format: Format::Parallel,
-            timing: Timing::Metrical(u15::from(480)),
-        },
+        header: Header { format: Format::Parallel, timing: Timing::Metrical(u15::from(480)) },
         tracks: vec![tempos, notes],
     };
     let mut bytes = Vec::new();

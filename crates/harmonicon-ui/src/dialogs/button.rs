@@ -126,11 +126,7 @@ fn mouse_drag_end(ev: On<PointerDragEnd>, mut states: Query<&mut ButtonInteracti
 /// Registered once app-wide by [`ButtonVisualsPlugin`].
 fn apply_button_visuals(
     mut buttons: Query<
-        (
-            &BaseButtonColor,
-            &ButtonInteractionState,
-            &mut BackgroundColor,
-        ),
+        (&BaseButtonColor, &ButtonInteractionState, &mut BackgroundColor),
         Or<(Changed<BaseButtonColor>, Changed<ButtonInteractionState>)>,
     >,
 ) {
@@ -171,17 +167,13 @@ pub fn make_interactive<'a, 'b>(
     ec: &'a mut EntityCommands<'b>,
     base: Color,
 ) -> &'a mut EntityCommands<'b> {
-    ec.insert((
-        BaseButtonColor(base),
-        BackgroundColor(base),
-        ButtonInteractionState::default(),
-    ))
-    .observe(mouse_over)
-    .observe(mouse_out)
-    .observe(mouse_press)
-    .observe(mouse_release)
-    .observe(mouse_press_interrupted)
-    .observe(mouse_drag_end)
+    ec.insert((BaseButtonColor(base), BackgroundColor(base), ButtonInteractionState::default()))
+        .observe(mouse_over)
+        .observe(mouse_out)
+        .observe(mouse_press)
+        .observe(mouse_release)
+        .observe(mouse_press_interrupted)
+        .observe(mouse_drag_end)
 }
 
 /// A compact button (no 220px min-width, smaller padding/font) for HUD-style
@@ -357,10 +349,7 @@ mod tests {
         schedule.run(&mut world);
         assert_eq!(background(&world, button), base);
 
-        world
-            .get_mut::<ButtonInteractionState>(button)
-            .unwrap()
-            .hovered = true;
+        world.get_mut::<ButtonInteractionState>(button).unwrap().hovered = true;
         schedule.run(&mut world);
         assert_eq!(background(&world, button), brighten(base));
 

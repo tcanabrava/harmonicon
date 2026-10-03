@@ -41,25 +41,19 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let root = args
-        .next()
-        .unwrap_or_else(|| "assets/debug_songs".to_string());
+    let root = args.next().unwrap_or_else(|| "assets/debug_songs".to_string());
     let root = Path::new(&root);
-    let tolerance_secs = args
-        .next()
-        .and_then(|s| s.parse::<f64>().ok())
-        .unwrap_or(DEFAULT_TIMING_TOLERANCE_SECS);
+    let tolerance_secs =
+        args.next().and_then(|s| s.parse::<f64>().ok()).unwrap_or(DEFAULT_TIMING_TOLERANCE_SECS);
 
     // A missing directory just means no debug recording has been made yet
     // (the folder is only created on first save, see `song_editor::
     // debug_record::write_debug_recording_on_save`) — the expected,
     // friendly-message case, not a real error.
     let mut song_dirs: Vec<PathBuf> = match std::fs::read_dir(root) {
-        Ok(entries) => entries
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .filter(|p| p.is_dir())
-            .collect(),
+        Ok(entries) => {
+            entries.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.is_dir()).collect()
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(e) => {
             println!("Couldn't read {}: {e}", root.display());
@@ -79,13 +73,7 @@ fn main() {
         if !chart_path.is_file() || !wav_path.is_file() {
             continue;
         }
-        run_one(
-            song_dir,
-            &chart_path,
-            &wav_path,
-            tolerance_secs,
-            &mut summary,
-        );
+        run_one(song_dir, &chart_path, &wav_path, tolerance_secs, &mut summary);
     }
 
     if !summary.is_empty() {
@@ -173,12 +161,7 @@ fn print_summary(rows: &[SummaryRow]) {
     println!("== summary: per recording, per detector ==");
     let width = rows.iter().map(|r| r.scenario.len()).max().unwrap_or(0);
     for row in rows {
-        println!(
-            "  {:<width$}  {:<7}  {}",
-            row.scenario,
-            row.detector,
-            row.metrics.columns()
-        );
+        println!("  {:<width$}  {:<7}  {}", row.scenario, row.detector, row.metrics.columns());
     }
 }
 
@@ -246,13 +229,7 @@ fn run_one(
             micros_per_chunk,
         );
         println!("         {}", raw.columns());
-        for (want, got, count) in raw
-            .report
-            .confusion
-            .iter()
-            .filter(|(w, d, _)| w != d)
-            .take(5)
-        {
+        for (want, got, count) in raw.report.confusion.iter().filter(|(w, d, _)| w != d).take(5) {
             println!("        {count:>4}x  played {want:?} -> detected {got:?}");
         }
 

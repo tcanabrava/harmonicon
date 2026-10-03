@@ -84,10 +84,7 @@ impl std::fmt::Display for GraphError {
                 write!(f, "prerequisite cycle involving: {}", ids.join(", "))
             }
             GraphError::UnknownPrerequisite { lesson, missing } => {
-                write!(
-                    f,
-                    "lesson '{lesson}' requires '{missing}', which does not exist"
-                )
+                write!(f, "lesson '{lesson}' requires '{missing}', which does not exist")
             }
         }
     }
@@ -159,11 +156,7 @@ impl LessonGraph {
             remaining.retain(|m| !done.contains(m.id.as_str()));
         }
 
-        let index = nodes
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (n.id.clone(), i))
-            .collect();
+        let index = nodes.iter().enumerate().map(|(i, n)| (n.id.clone(), i)).collect();
         Ok(Self { nodes, index })
     }
 
@@ -283,11 +276,7 @@ pub fn choice_report(
             let options: Vec<&str> = graph
                 .available(&passed)
                 .into_iter()
-                .filter(|id| {
-                    chain
-                        .unit_of(id)
-                        .is_none_or(|unit| chain.is_unlocked(unit, &passed))
-                })
+                .filter(|id| chain.unit_of(id).is_none_or(|unit| chain.is_unlocked(unit, &passed)))
                 .collect();
             if options.is_empty() {
                 break;
@@ -302,15 +291,10 @@ pub fn choice_report(
             passed.insert(options[pick]);
         }
     }
-    let mut sole_options: Vec<(String, u32)> = sole
-        .into_iter()
-        .map(|(id, count)| (id.to_string(), count))
-        .collect();
+    let mut sole_options: Vec<(String, u32)> =
+        sole.into_iter().map(|(id, count)| (id.to_string(), count)).collect();
     sole_options.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    ChoiceReport {
-        fewest: if fewest == usize::MAX { 0 } else { fewest },
-        sole_options,
-    }
+    ChoiceReport { fewest: if fewest == usize::MAX { 0 } else { fewest }, sole_options }
 }
 
 #[cfg(test)]

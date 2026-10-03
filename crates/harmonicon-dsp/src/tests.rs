@@ -35,9 +35,8 @@ fn too_short_returns_empty() {
 fn sine_440hz_detected_as_a4() {
     let sample_rate = 44100u32;
     let n = 4096;
-    let samples: Vec<f32> = (0..n)
-        .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
-        .collect();
+    let samples: Vec<f32> =
+        (0..n).map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin()).collect();
     let mut state = FftState::default();
     let pitches = detect_pitches(&samples, sample_rate, &mut state);
     assert!(!pitches.is_empty(), "expected at least one pitch");
@@ -65,9 +64,7 @@ fn non_harmonic_peaks_both_kept() {
 fn fft_peak_buffer_reuses_capacity_across_chunks() {
     let sr = 44_100;
     let tone = |hz: f32| {
-        (0..4096)
-            .map(|i| (2.0 * PI * hz * i as f32 / sr as f32).sin())
-            .collect::<Vec<_>>()
+        (0..4096).map(|i| (2.0 * PI * hz * i as f32 / sr as f32).sin()).collect::<Vec<_>>()
     };
     let mut state = FftState::default();
     let range = PitchRange::default();
@@ -83,16 +80,10 @@ fn fft_peak_buffer_reuses_capacity_across_chunks() {
 fn yin_detects_440hz() {
     let sample_rate = 44100u32;
     let n = 4096;
-    let samples: Vec<f32> = (0..n)
-        .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
-        .collect();
-    let f0 = yin_pitch(
-        &samples,
-        sample_rate,
-        PitchRange::default(),
-        &mut Vec::new(),
-    )
-    .expect("expected a pitch");
+    let samples: Vec<f32> =
+        (0..n).map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin()).collect();
+    let f0 = yin_pitch(&samples, sample_rate, PitchRange::default(), &mut Vec::new())
+        .expect("expected a pitch");
     assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
     assert_eq!(freq_to_note(f0), Some((69, "A".to_string(), 4)));
 }
@@ -101,12 +92,7 @@ fn yin_detects_440hz() {
 fn yin_rejects_silence_and_noise() {
     // Flat silence: no period.
     assert_eq!(
-        yin_pitch(
-            &vec![0.0f32; 4096],
-            44100,
-            PitchRange::default(),
-            &mut Vec::new(),
-        ),
+        yin_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default(), &mut Vec::new(),),
         None
     );
 }
@@ -135,11 +121,7 @@ fn simd_yin_difference_matches_scalar_reference() {
             })
             .sum::<f32>();
         running += sum;
-        let scalar = if running > 0.0 {
-            sum * tau as f32 / running
-        } else {
-            1.0
-        };
+        let scalar = if running > 0.0 { sum * tau as f32 / running } else { 1.0 };
         assert!((simd[tau] - scalar).abs() < 1e-4, "lag {tau}");
     }
     assert!(first_dip_below(&simd, tau_min, tau_max, YIN_THRESHOLD).is_some());
@@ -149,17 +131,11 @@ fn simd_yin_difference_matches_scalar_reference() {
 fn pyin_detects_440hz() {
     let sample_rate = 44100u32;
     let n = 4096;
-    let samples: Vec<f32> = (0..n)
-        .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
-        .collect();
-    let f0 = pyin_pitch(
-        &samples,
-        sample_rate,
-        PitchRange::default(),
-        &mut Vec::new(),
-        &mut Vec::new(),
-    )
-    .expect("expected a pitch");
+    let samples: Vec<f32> =
+        (0..n).map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin()).collect();
+    let f0 =
+        pyin_pitch(&samples, sample_rate, PitchRange::default(), &mut Vec::new(), &mut Vec::new())
+            .expect("expected a pitch");
     assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
 }
 
@@ -181,9 +157,7 @@ fn pyin_rejects_silence() {
 fn pyin_reuses_buffers_without_retaining_previous_probabilities() {
     let sr = 44_100;
     let tone = |hz: f32| {
-        (0..4096)
-            .map(|i| (2.0 * PI * hz * i as f32 / sr as f32).sin())
-            .collect::<Vec<_>>()
+        (0..4096).map(|i| (2.0 * PI * hz * i as f32 / sr as f32).sin()).collect::<Vec<_>>()
     };
     let a = tone(440.0);
     let b = tone(660.0);
@@ -204,28 +178,17 @@ fn pyin_reuses_buffers_without_retaining_previous_probabilities() {
 fn mpm_detects_440hz() {
     let sample_rate = 44100u32;
     let n = 4096;
-    let samples: Vec<f32> = (0..n)
-        .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
-        .collect();
-    let f0 = mpm_pitch(
-        &samples,
-        sample_rate,
-        PitchRange::default(),
-        &mut Vec::new(),
-    )
-    .expect("expected a pitch");
+    let samples: Vec<f32> =
+        (0..n).map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin()).collect();
+    let f0 = mpm_pitch(&samples, sample_rate, PitchRange::default(), &mut Vec::new())
+        .expect("expected a pitch");
     assert!((f0 - 440.0).abs() < 5.0, "expected ~440 Hz, got {f0}");
 }
 
 #[test]
 fn mpm_rejects_silence() {
     assert_eq!(
-        mpm_pitch(
-            &vec![0.0f32; 4096],
-            44100,
-            PitchRange::default(),
-            &mut Vec::new(),
-        ),
+        mpm_pitch(&vec![0.0f32; 4096], 44100, PitchRange::default(), &mut Vec::new(),),
         None
     );
 }
@@ -248,19 +211,14 @@ fn mpm_rejects_unpitched_noise() {
             (seed >> 8) as f32 / (1 << 24) as f32 - 0.5
         })
         .collect();
-    assert_eq!(
-        mpm_pitch(&samples, 44100, PitchRange::default(), &mut Vec::new()),
-        None
-    );
+    assert_eq!(mpm_pitch(&samples, 44100, PitchRange::default(), &mut Vec::new()), None);
 }
 
 #[test]
 fn mpm_reuses_lag_buffer_across_pitches() {
     let sr = 44_100;
     let tone = |hz: f32| {
-        (0..4096)
-            .map(|i| (2.0 * PI * hz * i as f32 / sr as f32).sin())
-            .collect::<Vec<_>>()
+        (0..4096).map(|i| (2.0 * PI * hz * i as f32 / sr as f32).sin()).collect::<Vec<_>>()
     };
     let mut nsdf = Vec::new();
     let range = PitchRange::default();
@@ -303,21 +261,12 @@ fn simd_mpm_difference_matches_scalar_reference() {
 fn magnitudes_of(freqs: &[f32], sample_rate: u32, n: usize) -> Vec<f32> {
     let samples: Vec<f32> = (0..n)
         .map(|i| {
-            freqs
-                .iter()
-                .map(|&f| 0.4 * (2.0 * PI * f * i as f32 / sample_rate as f32).sin())
-                .sum()
+            freqs.iter().map(|&f| 0.4 * (2.0 * PI * f * i as f32 / sample_rate as f32).sin()).sum()
         })
         .collect();
     let mut state = FftState::default();
-    analyze(
-        &samples,
-        sample_rate,
-        &mut state,
-        PitchAlgorithm::Fft,
-        PitchRange::default(),
-    )
-    .magnitudes
+    analyze(&samples, sample_rate, &mut state, PitchAlgorithm::Fft, PitchRange::default())
+        .magnitudes
 }
 
 #[test]
@@ -328,10 +277,7 @@ fn nmf_detects_a_two_note_chord() {
     let mags = magnitudes_of(&[440.0, 554.37], sample_rate, n);
     let dict = build_nmf_dict(sample_rate, mags.len(), PitchRange::default());
     let pitches = nmf_pitches(&mags, &dict, &mut NmfScratch::default());
-    assert!(
-        pitches.iter().any(|p| p.note == "A" && p.octave == 4),
-        "expected A4, got {pitches:?}"
-    );
+    assert!(pitches.iter().any(|p| p.note == "A" && p.octave == 4), "expected A4, got {pitches:?}");
     assert!(
         pitches.iter().any(|p| p.note == "C#" && p.octave == 5),
         "expected C#5, got {pitches:?}"
@@ -355,19 +301,12 @@ fn all_algorithms_agree_on_a_clean_tone() {
     // A 330 Hz tone (E4) should read the same through every detector.
     let sample_rate = 44100u32;
     let n = 4096;
-    let samples: Vec<f32> = (0..n)
-        .map(|i| 0.4 * (2.0 * PI * 330.0 * i as f32 / sample_rate as f32).sin())
-        .collect();
+    let samples: Vec<f32> =
+        (0..n).map(|i| 0.4 * (2.0 * PI * 330.0 * i as f32 / sample_rate as f32).sin()).collect();
     let mut state = FftState::default();
     for algo in PitchAlgorithm::all() {
-        let pitches = analyze(
-            &samples,
-            sample_rate,
-            &mut state,
-            *algo,
-            PitchRange::default(),
-        )
-        .pitches;
+        let pitches =
+            analyze(&samples, sample_rate, &mut state, *algo, PitchRange::default()).pitches;
         assert!(
             pitches.iter().any(|p| p.note == "E" && p.octave == 4),
             "{:?} should detect E4, got {:?}",
@@ -381,18 +320,12 @@ fn all_algorithms_agree_on_a_clean_tone() {
 fn yin_via_analyze_uses_selected_algorithm() {
     let sample_rate = 44100u32;
     let n = 4096;
-    let samples: Vec<f32> = (0..n)
-        .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
-        .collect();
+    let samples: Vec<f32> =
+        (0..n).map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin()).collect();
     let mut state = FftState::default();
-    let pitches = analyze(
-        &samples,
-        sample_rate,
-        &mut state,
-        PitchAlgorithm::Yin,
-        PitchRange::default(),
-    )
-    .pitches;
+    let pitches =
+        analyze(&samples, sample_rate, &mut state, PitchAlgorithm::Yin, PitchRange::default())
+            .pitches;
     assert_eq!(pitches.len(), 1, "YIN is monophonic: one pitch");
     assert_eq!(pitches[0].note, "A");
     assert_eq!(pitches[0].octave, 4);
@@ -402,10 +335,7 @@ fn yin_via_analyze_uses_selected_algorithm() {
 
 #[test]
 fn pitch_range_from_freqs_falls_back_to_default_when_empty() {
-    assert_eq!(
-        PitchRange::from_freqs(std::iter::empty(), 1.0),
-        PitchRange::default()
-    );
+    assert_eq!(PitchRange::from_freqs(std::iter::empty(), 1.0), PitchRange::default());
 }
 
 #[test]
@@ -413,16 +343,8 @@ fn pitch_range_from_freqs_spans_min_and_max_with_margin() {
     // G3 (~196 Hz) to G6 (~1568 Hz), the range of a low-G 10-hole diatonic.
     let range = PitchRange::from_freqs([196.0, 1568.0], 1.0);
     // A semitone below G3 / above G6.
-    assert!(
-        range.min_freq < 196.0,
-        "min {} should be below 196",
-        range.min_freq
-    );
-    assert!(
-        range.max_freq > 1568.0,
-        "max {} should be above 1568",
-        range.max_freq
-    );
+    assert!(range.min_freq < 196.0, "min {} should be below 196", range.min_freq);
+    assert!(range.max_freq > 1568.0, "max {} should be above 1568", range.max_freq);
     // And within ~1 semitone (ratio 2^(1/12) ≈ 1.0595) of the source notes.
     assert!((range.min_freq - 196.0 / 2f32.powf(1.0 / 12.0)).abs() < 0.01);
     assert!((range.max_freq - 1568.0 * 2f32.powf(1.0 / 12.0)).abs() < 0.01);
@@ -435,10 +357,7 @@ fn pitch_range_from_freqs_lets_a_low_g_harp_hole_1_blow_through() {
     // derived range, not the fixed default.
     let range = PitchRange::from_freqs([196.0, 1568.0], 1.0);
     assert!(range.min_freq < 196.0);
-    assert!(
-        196.0 < PitchRange::default().min_freq,
-        "sanity: below the default fixed floor"
-    );
+    assert!(196.0 < PitchRange::default().min_freq, "sanity: below the default fixed floor");
 }
 
 #[test]
@@ -478,10 +397,7 @@ fn chord_samples(freqs: &[f32], sample_rate: u32, n: usize) -> Vec<f32> {
     (0..n)
         .map(|i| {
             let t = i as f32 / sample_rate as f32;
-            freqs
-                .iter()
-                .map(|f| 0.4 * (2.0 * PI * f * t).sin())
-                .sum::<f32>()
+            freqs.iter().map(|f| 0.4 * (2.0 * PI * f * t).sin()).sum::<f32>()
         })
         .collect()
 }
@@ -528,11 +444,7 @@ fn the_monophonic_algorithms_cannot_hear_a_chord() {
     // fundamental by construction. Pinned so the limitation is recorded
     // rather than rediscovered, and so `is_polyphonic` can't drift away
     // from the measured truth.
-    for algo in [
-        PitchAlgorithm::Yin,
-        PitchAlgorithm::Pyin,
-        PitchAlgorithm::Mcleod,
-    ] {
+    for algo in [PitchAlgorithm::Yin, PitchAlgorithm::Pyin, PitchAlgorithm::Mcleod] {
         assert!(
             !hears_both(algo),
             "{} unexpectedly resolved both chord notes — if that is now real, \
@@ -593,24 +505,11 @@ fn a_chord_from_the_real_synth_is_heard_as_both_notes() {
     // Same tick, same length: `render_pcm` sums voices into one buffer, so
     // this is a genuine simultaneity, not two notes in sequence.
     let chord = [
-        PhraseNote {
-            tick: 0,
-            len: 8,
-            freq: Some(CHORD_D4_G4[0]),
-            expr: Expr::None,
-        },
-        PhraseNote {
-            tick: 0,
-            len: 8,
-            freq: Some(CHORD_D4_G4[1]),
-            expr: Expr::None,
-        },
+        PhraseNote { tick: 0, len: 8, freq: Some(CHORD_D4_G4[0]), expr: Expr::None },
+        PhraseNote { tick: 0, len: 8, freq: Some(CHORD_D4_G4[1]), expr: Expr::None },
     ];
     let pcm = render_pcm(&chord, 0.05);
-    assert!(
-        pcm.len() > 4096,
-        "synth produced too little audio to analyse"
-    );
+    assert!(pcm.len() > 4096, "synth produced too little audio to analyse");
 
     // Skip the attack: the envelope's opening ramp is a transient, and pitch
     // detection wants the steady state — the same reason the live path
@@ -619,18 +518,10 @@ fn a_chord_from_the_real_synth_is_heard_as_both_notes() {
     let window = &pcm[start..start + 4096];
 
     let mut state = FftState::default();
-    let out = analyze(
-        window,
-        SAMPLE_RATE,
-        &mut state,
-        PitchAlgorithm::default(),
-        PitchRange::default(),
-    );
-    let names: Vec<String> = out
-        .pitches
-        .iter()
-        .map(|p| format!("{}{}", p.note, p.octave))
-        .collect();
+    let out =
+        analyze(window, SAMPLE_RATE, &mut state, PitchAlgorithm::default(), PitchRange::default());
+    let names: Vec<String> =
+        out.pitches.iter().map(|p| format!("{}{}", p.note, p.octave)).collect();
     assert!(
         out.pitches.iter().any(|p| p.note == "D" && p.octave == 4),
         "expected D4 from the synthesized chord, got {names:?}"

@@ -161,11 +161,7 @@ impl BandListener {
         {
             self.last_answer_beat = Some(next);
             self.answers += 1;
-            return Some(if self.answers % 2 == 1 {
-                BandAnswer::Drums
-            } else {
-                BandAnswer::Chord
-            });
+            return Some(if self.answers % 2 == 1 { BandAnswer::Drums } else { BandAnswer::Chord });
         }
         None
     }
@@ -206,16 +202,12 @@ impl BandListener {
         let start = n.saturating_sub(BEATS_PER_PHRASE - RELEASE_BEATS);
         let split = n - RELEASE_BEATS;
         let body_attacks: u32 = self.beats.range(start..split).map(|b| b.attacks).sum();
-        let released = self
-            .beats
-            .range(split..)
-            .all(|b| b.attacks == 0 && !b.sounding);
+        let released = self.beats.range(split..).all(|b| b.attacks == 0 && !b.sounding);
         body_attacks >= MIN_PHRASE_ATTACKS && released
     }
 
     fn answer_allowed(&self, beat: usize) -> bool {
-        self.last_answer_beat
-            .is_none_or(|last| beat - last >= ANSWER_MIN_GAP_BARS * BEATS_PER_BAR)
+        self.last_answer_beat.is_none_or(|last| beat - last >= ANSWER_MIN_GAP_BARS * BEATS_PER_BAR)
     }
 }
 
@@ -234,10 +226,7 @@ pub struct BandTracker {
 impl BandTracker {
     /// A fresh tracker for a new jam, comping at full.
     pub fn fresh() -> Self {
-        Self {
-            comping_gain: 1.0,
-            ..Self::default()
-        }
+        Self { comping_gain: 1.0, ..Self::default() }
     }
 }
 
@@ -254,11 +243,7 @@ pub fn beat_index(clock_secs: f64, bpm: f32) -> Option<usize> {
 /// range in `ramp_secs`.
 pub fn ease_gain(gain: f32, target: f32, dt_secs: f32, ramp_secs: f32) -> f32 {
     let step = (1.0 - THINNED_COMPING) * dt_secs / ramp_secs.max(1e-3);
-    if gain < target {
-        (gain + step).min(target)
-    } else {
-        (gain - step).max(target)
-    }
+    if gain < target { (gain + step).min(target) } else { (gain - step).max(target) }
 }
 
 /// Keeps the "Adaptive band: ..." readout in step with the toggle.
@@ -323,18 +308,9 @@ pub fn listen_and_react(
         tracker.beat_index = Some(beat);
     }
 
-    let target = if adaptive.0 {
-        listener.comping_target()
-    } else {
-        1.0
-    };
+    let target = if adaptive.0 { listener.comping_target() } else { 1.0 };
     let secs_per_bar = 60.0 / bpm.max(1.0) * BEATS_PER_BAR as f32;
-    tracker.comping_gain = ease_gain(
-        tracker.comping_gain,
-        target,
-        time.delta_secs(),
-        secs_per_bar,
-    );
+    tracker.comping_gain = ease_gain(tracker.comping_gain, target, time.delta_secs(), secs_per_bar);
 
     let Some(answer) = answer.filter(|_| adaptive.0) else {
         return;
@@ -344,9 +320,7 @@ pub fn listen_and_react(
     if pcm.is_empty() {
         return;
     }
-    let source = sources.add(AudioSource {
-        bytes: encode_wav(&pcm, SAMPLE_RATE).into(),
-    });
+    let source = sources.add(AudioSource { bytes: encode_wav(&pcm, SAMPLE_RATE).into() });
     commands.spawn((
         AudioPlayer::<AudioSource>(source),
         PlaybackSettings::DESPAWN.with_volume(Volume::Linear(audio.music_volume)),

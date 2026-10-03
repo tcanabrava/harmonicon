@@ -105,8 +105,7 @@ fn spawn_install(sync: &mut PackSync, kind: PackKind, spec: RepoSpec, engine: &P
         return;
     }
     let Some(packs_dir) = crate::paths::packs_dir() else {
-        sync.failures
-            .insert(slug, "no writable data directory".into());
+        sync.failures.insert(slug, "no writable data directory".into());
         return;
     };
     let (tx, rx) = crossbeam_channel::bounded(1);
@@ -114,24 +113,17 @@ fn spawn_install(sync: &mut PackSync, kind: PackKind, spec: RepoSpec, engine: &P
     let thread_cancel = cancel.clone();
     let engine = engine.0.clone();
     let thread_slug = slug.clone();
-    let spawned = std::thread::Builder::new()
-        .name(format!("pack-sync {slug}"))
-        .spawn(move || {
-            let _span = info_span!("pack_install", slug = thread_slug).entered();
-            let result = git::install(&spec, &packs_dir, kind, &engine, &thread_cancel)
-                .map_err(|e| e.to_string());
-            let _ = tx.send(result);
-        });
+    let spawned = std::thread::Builder::new().name(format!("pack-sync {slug}")).spawn(move || {
+        let _span = info_span!("pack_install", slug = thread_slug).entered();
+        let result = git::install(&spec, &packs_dir, kind, &engine, &thread_cancel)
+            .map_err(|e| e.to_string());
+        let _ = tx.send(result);
+    });
     match spawned {
         Ok(thread) => {
             info!("Downloading {kind} pack {slug}");
             sync.failures.remove(&slug);
-            sync.jobs.push(Job {
-                slug,
-                rx,
-                thread,
-                cancel,
-            });
+            sync.jobs.push(Job { slug, rx, thread, cancel });
         }
         Err(e) => {
             sync.failures.insert(slug, e.to_string());
@@ -153,21 +145,13 @@ fn spawn_check(
     let root = root.to_path_buf();
     let spec = spec.clone();
     let slug = entry_slug.to_string();
-    let spawned = std::thread::Builder::new()
-        .name(format!("pack-check {slug}"))
-        .spawn(move || {
-            let _span = info_span!("pack_check", slug).entered();
-            let _ = tx.send(git::remote_head(&root, &spec).map_err(|e| e.to_string()));
-        });
+    let spawned = std::thread::Builder::new().name(format!("pack-check {slug}")).spawn(move || {
+        let _span = info_span!("pack_check", slug).entered();
+        let _ = tx.send(git::remote_head(&root, &spec).map_err(|e| e.to_string()));
+    });
     if let Ok(thread) = spawned {
-        sync.updates
-            .insert(entry_slug.to_string(), UpdateState::Checking);
-        sync.checks.push(Check {
-            slug: entry_slug.to_string(),
-            installed_commit,
-            rx,
-            thread,
-        });
+        sync.updates.insert(entry_slug.to_string(), UpdateState::Checking);
+        sync.checks.push(Check { slug: entry_slug.to_string(), installed_commit, rx, thread });
     }
 }
 
@@ -179,13 +163,7 @@ fn sync_at_startup(packs: Res<ContentPacks>, engine: Res<PackEngine>, mut sync: 
                 spawn_install(&mut sync, entry.kind, entry.spec.clone(), &engine);
             }
             PackStatus::Ready { commit, .. } if matches!(entry.spec, RepoSpec::Remote { .. }) => {
-                spawn_check(
-                    &mut sync,
-                    &entry.slug,
-                    &entry.root,
-                    &entry.spec,
-                    commit.clone(),
-                );
+                spawn_check(&mut sync, &entry.slug, &entry.root, &entry.spec, commit.clone());
             }
             _ => {}
         }
@@ -207,13 +185,7 @@ fn handle_requests(
             if let (PackStatus::Ready { commit, .. }, RepoSpec::Remote { .. }) =
                 (&entry.status, &entry.spec)
             {
-                spawn_check(
-                    &mut sync,
-                    &entry.slug,
-                    &entry.root,
-                    &entry.spec,
-                    commit.clone(),
-                );
+                spawn_check(&mut sync, &entry.slug, &entry.root, &entry.spec, commit.clone());
             }
         }
     }
@@ -229,14 +201,8 @@ fn collect_results(
 ) {
     // Polled every frame, so it must not mark the resource changed unless
     // something actually finished: the Options page rebuilds on a change.
-    let anything_done = sync_res
-        .jobs
-        .iter()
-        .any(|j| !j.rx.is_empty() || j.thread.is_finished())
-        || sync_res
-            .checks
-            .iter()
-            .any(|c| !c.rx.is_empty() || c.thread.is_finished());
+    let anything_done = sync_res.jobs.iter().any(|j| !j.rx.is_empty() || j.thread.is_finished())
+        || sync_res.checks.iter().any(|c| !c.rx.is_empty() || c.thread.is_finished());
     if !anything_done {
         return;
     }
@@ -273,10 +239,7 @@ fn collect_results(
                 sync.failures.remove(&job.slug);
             }
         }
-        finished.write(PackSyncFinished {
-            slug: job.slug,
-            error,
-        });
+        finished.write(PackSyncFinished { slug: job.slug, error });
     }
     sync.jobs = still_running;
 
@@ -328,9 +291,8 @@ pub fn uninstall(spec: &RepoSpec) -> Result<(), String> {
 }
 
 fn record_install(slug: &str, repo: InstalledRepo) -> Result<(), String> {
-    let path = crate::paths::packs_dir()
-        .ok_or("no writable data directory")?
-        .join("installed.json");
+    let path =
+        crate::paths::packs_dir().ok_or("no writable data directory")?.join("installed.json");
     let mut installed = Installed::load(&path);
     installed.repos.insert(slug.to_string(), repo);
     installed.save(&path).map_err(|e| e.to_string())
@@ -352,11 +314,6 @@ pub(crate) fn build(app: &mut App) {
         .add_message::<CheckPackUpdates>()
         .add_message::<PackSyncFinished>()
         .add_systems(Startup, sync_at_startup.after(ContentPacksSet))
-        .add_systems(
-            Update,
-            (handle_requests, collect_results)
-                .chain()
-                .before(ContentPacksSet),
-        )
+        .add_systems(Update, (handle_requests, collect_results).chain().before(ContentPacksSet))
         .add_systems(Last, cancel_on_exit);
 }

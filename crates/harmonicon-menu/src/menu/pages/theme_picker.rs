@@ -30,11 +30,7 @@ impl Plugin for ThemePickerPlugin {
             // on(...) observers; these systems only react to the selection.
             .add_systems(
                 Update,
-                (
-                    update_button_visuals,
-                    update_preview,
-                    rebuild_on_themes_rescanned,
-                )
+                (update_button_visuals, update_preview, rebuild_on_themes_rescanned)
                     .run_if(in_state(MenuPage::Theme)),
             );
     }
@@ -60,13 +56,8 @@ fn setup(
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
 ) {
-    let (root, header, _page_root) = spawn_menu_root(
-        &mut commands,
-        &loc.msg("theme-title"),
-        None,
-        &theme,
-        "Theme",
-    );
+    let (root, header, _page_root) =
+        spawn_menu_root(&mut commands, &loc.msg("theme-title"), None, &theme, "Theme");
 
     spawn_back_button(
         &mut commands,
@@ -103,8 +94,7 @@ fn setup(
     commands.entity(left).with_children(|l| {
         for name in &themes.0 {
             let is_selected = *name == selected.0;
-            l.spawn_empty()
-                .apply_scene(theme_button_scene(name.clone(), is_selected));
+            l.spawn_empty().apply_scene(theme_button_scene(name.clone(), is_selected));
         }
     });
 
@@ -126,15 +116,8 @@ fn setup(
     ));
     let preview = commands
         .spawn((
-            Node {
-                width: Val::Px(512.0),
-                height: Val::Px(288.0),
-                ..default()
-            },
-            ImageNode {
-                image: preview_handle,
-                ..default()
-            },
+            Node { width: Val::Px(512.0), height: Val::Px(288.0), ..default() },
+            ImageNode { image: preview_handle, ..default() },
             ThemePreviewImage,
         ))
         .id();
@@ -146,11 +129,7 @@ fn setup(
 /// One theme-list button: its label, its dedicated "select this theme" click
 /// callback (capturing the name), and hover highlight — all inline `on(...)`.
 fn theme_button_scene(name: String, is_selected: bool) -> impl Scene {
-    let color = if is_selected {
-        THEME_SELECTED
-    } else {
-        button::color_default()
-    };
+    let color = if is_selected { THEME_SELECTED } else { button::color_default() };
     let label = name.clone();
     let pick = name.clone();
     bsn! {
@@ -219,11 +198,7 @@ fn update_button_visuals(
         return;
     }
     for (btn, mut bg) in &mut buttons {
-        let wanted = if btn.0 == selected.0 {
-            THEME_SELECTED
-        } else {
-            button::color_default()
-        };
+        let wanted = if btn.0 == selected.0 { THEME_SELECTED } else { button::color_default() };
         if bg.0 != wanted {
             bg.0 = wanted;
         }

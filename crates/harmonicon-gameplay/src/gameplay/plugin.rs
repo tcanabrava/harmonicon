@@ -162,10 +162,7 @@ impl Plugin for GameplayPlugin {
         .add_systems(OnEnter(AppState::BendingTrainer), bending_trainer::setup)
         .add_systems(
             OnExit(AppState::BendingTrainer),
-            (
-                lifecycle::cleanup_gameplay,
-                bending_trainer::save_drill_progress,
-            ),
+            (lifecycle::cleanup_gameplay, bending_trainer::save_drill_progress),
         )
         .add_systems(
             Update,
@@ -175,19 +172,14 @@ impl Plugin for GameplayPlugin {
         )
         .add_systems(
             Update,
-            harmonica_overlay::update_harmonica_overlay
-                .in_set(OverlaySet)
-                .run_if(
-                    in_state(AppState::Playing)
-                        .and_then(|p: Res<Paused>| !p.0)
-                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
-                ),
+            harmonica_overlay::update_harmonica_overlay.in_set(OverlaySet).run_if(
+                in_state(AppState::Playing)
+                    .and_then(|p: Res<Paused>| !p.0)
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::JamSession),
+            ),
         )
         // Order against the set, not the system function.
-        .add_systems(
-            Update,
-            bending_trainer::update_drill_progress_tint.after(OverlaySet),
-        )
+        .add_systems(Update, bending_trainer::update_drill_progress_tint.after(OverlaySet))
         .add_systems(
             Update,
             (
@@ -344,21 +336,18 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             call_response::fire_call_cues.after(GameplayLogic).run_if(
-                in_state(AppState::Playing)
-                    .and_then(|p: Res<Paused>| !p.0)
-                    .and_then(|m: Res<GameplayMode>| {
+                in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0).and_then(
+                    |m: Res<GameplayMode>| {
                         matches!(*m, GameplayMode::Play2D | GameplayMode::Play3D)
-                    }),
+                    },
+                ),
             ),
         )
         // Results screen lifecycle. The Retry/Continue buttons carry their own
         // click/hover behaviour as inline on(...) observers (see results::setup).
         .add_systems(OnEnter(AppState::Results), results::setup)
         .add_systems(OnExit(AppState::Results), results::cleanup)
-        .add_systems(
-            Update,
-            results::handle_escape.run_if(in_state(AppState::Results)),
-        )
+        .add_systems(Update, results::handle_escape.run_if(in_state(AppState::Results)))
         // 2D update chain
         .add_systems(
             Update,

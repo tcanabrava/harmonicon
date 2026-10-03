@@ -345,12 +345,8 @@ pub(super) fn update_grid_scrollbar(
     let Ok(mut thumb) = thumbs.single_mut() else {
         return;
     };
-    let view_w = windows
-        .iter()
-        .next()
-        .map(|w| w.width() / ui_scale.0)
-        .unwrap_or(1280.0)
-        - super::HOLE_COL_W;
+    let view_w =
+        windows.iter().next().map(|w| w.width() / ui_scale.0).unwrap_or(1280.0) - super::HOLE_COL_W;
     let total_px = super::ranges::song_end_tick(&state.notes) as f32 * TICK_W;
 
     if !scrollbar_needed(total_px, view_w) {

@@ -130,39 +130,35 @@ fn every_glyph_in_a_locale_string_is_in_a_bundled_font() {
     let covered = bundled_coverage();
     let mut missing: BTreeMap<u32, BTreeSet<String>> = BTreeMap::new();
 
-    walk(
-        &repo_root().join("assets/locales"),
-        "ftl",
-        &mut |path, text| {
-            // A locale file is `key = value` lines plus comments; only the value
-            // is ever drawn.
-            for line in text.lines() {
-                let trimmed = line.trim_start();
-                if trimmed.starts_with('#') {
-                    continue;
-                }
-                let value = match line.split_once('=') {
-                    Some((_, v)) => v,
-                    // Continuation lines of a multi-line message are drawn too.
-                    None if trimmed.is_empty() => continue,
-                    None => line,
-                };
-                for cp in value.chars().map(u32::from) {
-                    if cp >= FIRST_INTERESTING
-                        && !is_invisible_format_char(cp)
-                        && !covered.contains(&cp)
-                    {
-                        let locale = path
-                            .components()
-                            .nth_back(2)
-                            .map(|c| c.as_os_str().to_string_lossy().into_owned())
-                            .unwrap_or_default();
-                        missing.entry(cp).or_default().insert(locale);
-                    }
+    walk(&repo_root().join("assets/locales"), "ftl", &mut |path, text| {
+        // A locale file is `key = value` lines plus comments; only the value
+        // is ever drawn.
+        for line in text.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with('#') {
+                continue;
+            }
+            let value = match line.split_once('=') {
+                Some((_, v)) => v,
+                // Continuation lines of a multi-line message are drawn too.
+                None if trimmed.is_empty() => continue,
+                None => line,
+            };
+            for cp in value.chars().map(u32::from) {
+                if cp >= FIRST_INTERESTING
+                    && !is_invisible_format_char(cp)
+                    && !covered.contains(&cp)
+                {
+                    let locale = path
+                        .components()
+                        .nth_back(2)
+                        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    missing.entry(cp).or_default().insert(locale);
                 }
             }
-        },
-    );
+        }
+    });
 
     assert!(
         missing.is_empty(),
@@ -227,11 +223,7 @@ fn the_bundled_fonts_parse_and_cover_something() {
     );
     // Spot-check one character from each fallback, so a missing *file* is
     // caught rather than quietly reducing coverage.
-    for (name, cp) in [
-        ("emoji 🎵", 0x1F3B5),
-        ("symbols ✓", 0x2713),
-        ("arrows ↶", 0x21B6),
-    ] {
+    for (name, cp) in [("emoji 🎵", 0x1F3B5), ("symbols ✓", 0x2713), ("arrows ↶", 0x21B6)] {
         assert!(
             covered.contains(&cp),
             "{name} (U+{cp:04X}) missing — is assets/fonts/fallback_*.ttf still there?"

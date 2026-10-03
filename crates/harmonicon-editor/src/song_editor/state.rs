@@ -42,14 +42,8 @@ pub(super) const LESSON_FIELDS: [(Field, &str); 10] = [
     (Field::LessonUnit, "editor-field-lesson-unit"),
     (Field::LessonPath, "editor-field-lesson-path"),
     (Field::LessonExplanation, "editor-field-lesson-explanation"),
-    (
-        Field::LessonPrerequisites,
-        "editor-field-lesson-prerequisites",
-    ),
-    (
-        Field::LessonPassCriteria,
-        "editor-field-lesson-pass-criteria",
-    ),
+    (Field::LessonPrerequisites, "editor-field-lesson-prerequisites"),
+    (Field::LessonPassCriteria, "editor-field-lesson-pass-criteria"),
     (Field::LessonThreshold, "editor-field-lesson-threshold"),
     (Field::LessonTechnique, "editor-field-lesson-technique"),
     (Field::LessonProgression, "editor-field-lesson-progression"),
@@ -82,16 +76,8 @@ pub(super) const PASS_CRITERIA_KINDS: [&str; 6] = [
 /// `Field::LessonTechnique`'s cycle — the same technique-bucket vocabulary
 /// `SongStats`/`PlayerProfile::technique_best_accuracy` use, pinned by
 /// `lesson_schema.dtd.json`'s own enum.
-pub(super) const TECHNIQUE_NAMES: [&str; 8] = [
-    "normal",
-    "bend",
-    "vibrato",
-    "wah-wah",
-    "overblow",
-    "overdraw",
-    "slide",
-    "clean-attack",
-];
+pub(super) const TECHNIQUE_NAMES: [&str; 8] =
+    ["normal", "bend", "vibrato", "wah-wah", "overblow", "overdraw", "slide", "clean-attack"];
 
 /// `Field::LessonProgression`'s cycle — `"none"` omits the manifest field
 /// entirely (defaults to Standard in-game); the rest are
@@ -394,10 +380,8 @@ impl EditorState {
         let Ok(beats) = self.pickup_beats.trim().parse::<f64>() else {
             return 0;
         };
-        let beat_ticks = self
-            .meter()
-            .ticks_per_beat(TICKS_PER_BEAT as u32)
-            .unwrap_or(TICKS_PER_BEAT as u32);
+        let beat_ticks =
+            self.meter().ticks_per_beat(TICKS_PER_BEAT as u32).unwrap_or(TICKS_PER_BEAT as u32);
         if beats.is_finite() && beats > 0.0 {
             (beats * f64::from(beat_ticks)).round() as usize
         } else {
@@ -415,10 +399,7 @@ impl EditorState {
     }
 
     pub(super) fn dir_at(&self, tick: usize) -> Option<Dir> {
-        self.notes
-            .iter()
-            .find(|n| n.tick <= tick && tick < n.tick + n.len)
-            .map(|n| n.dir)
+        self.notes.iter().find(|n| n.tick <= tick && tick < n.tick + n.len).map(|n| n.dir)
     }
 
     /// The "primary" selected note — the most recently added to the
@@ -475,18 +456,12 @@ impl EditorState {
     /// is the *opening* meter only, for the consumers that genuinely take
     /// one value (the metronome's click and the staff's head).
     pub(super) fn meter_map(&self) -> harmonicon_ui::music_score::MeterMap {
-        let mut changes: Vec<_> = self
-            .meter_changes
-            .iter()
-            .filter(|(tick, _)| *tick > 0)
-            .collect();
+        let mut changes: Vec<_> = self.meter_changes.iter().filter(|(tick, _)| *tick > 0).collect();
         changes.sort_by_key(|(tick, _)| *tick);
         changes.dedup_by_key(|(tick, _)| *tick);
         harmonicon_ui::music_score::MeterMap::with_pickup(
             std::iter::once((0, self.time_signature.as_str())).chain(
-                changes
-                    .into_iter()
-                    .map(|(tick, signature)| (*tick as u64, signature.as_str())),
+                changes.into_iter().map(|(tick, signature)| (*tick as u64, signature.as_str())),
             ),
             TICKS_PER_BEAT as u32,
             self.pickup_ticks() as u64,
@@ -920,10 +895,11 @@ pub(super) fn build_tempo_map(
     use harmonicon_core::chart::TempoPoint;
     let bpm0: f32 = tempo.parse::<f32>().unwrap_or(120.0).max(1.0);
     let mut map = vec![TempoPoint { tick: 0, bpm: bpm0 }];
-    map.extend(tempo_changes.iter().map(|&(tick, bpm)| TempoPoint {
-        tick: tick as u64,
-        bpm: bpm.max(1.0),
-    }));
+    map.extend(
+        tempo_changes
+            .iter()
+            .map(|&(tick, bpm)| TempoPoint { tick: tick as u64, bpm: bpm.max(1.0) }),
+    );
     map.sort_by_key(|p| p.tick);
     map.dedup_by_key(|p| p.tick);
     map
@@ -934,12 +910,7 @@ pub(super) fn build_tempo_map(
 /// steps a new point's bpm from, so a freshly-added point doesn't silently
 /// jump to some unrelated tempo.
 fn bpm_at(tempo_map: &[harmonicon_core::chart::TempoPoint], tick: usize) -> f32 {
-    tempo_map
-        .iter()
-        .rev()
-        .find(|p| p.tick <= tick as u64)
-        .map(|p| p.bpm)
-        .unwrap_or(120.0)
+    tempo_map.iter().rev().find(|p| p.tick <= tick as u64).map(|p| p.bpm).unwrap_or(120.0)
 }
 
 /// How close (in ticks) a click has to land to an existing tempo-change
