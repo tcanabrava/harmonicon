@@ -26,7 +26,6 @@ pub struct LessonContext {
     /// `gameplay::results` records it under
     /// `PlayerProfile::trainings` instead of `lessons`. A training must
     /// never satisfy a prerequisite — see `profile::TrainingRecord`.
-    #[allow(dead_code)]
     pub tier: Option<u8>,
 }
 

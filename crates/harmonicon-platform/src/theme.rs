@@ -33,16 +33,14 @@ struct ThemeJson {
 
 #[derive(Deserialize, Clone, Debug, Default)]
 struct ButtonThemeJson {
-    // Documented in the theme schema (`button_def.background_image`) but not
-    // yet wired up to rendering — parsed for schema completeness, like
-    // `ButtonShadersJson`'s fields below.
-    #[serde(default)]
-    #[allow(dead_code)]
-    background_image: Option<ImageRefJson>,
+    // The schema's `button_def.background_image` isn't rendered yet, so it
+    // isn't read; serde skips it.
     #[serde(default)]
     icon: Option<ImageRefJson>,
+    /// Only whether a theme declares shaders is read (`has_shaders`); the
+    /// shader paths aren't wired up to rendering yet.
     #[serde(default)]
-    button_shaders: Option<ButtonShadersJson>,
+    button_shaders: Option<serde::de::IgnoredAny>,
     #[serde(default)]
     button_sounds: Option<ButtonSoundsJson>,
 }
@@ -50,16 +48,6 @@ struct ButtonThemeJson {
 #[derive(Deserialize, Clone, Debug)]
 struct ImageRefJson {
     image_file: String,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-struct ButtonShadersJson {
-    #[allow(dead_code)]
-    hover: String,
-    #[allow(dead_code)]
-    click: String,
-    #[allow(dead_code)]
-    idle: String,
 }
 
 #[derive(Deserialize, Clone, Debug)]
