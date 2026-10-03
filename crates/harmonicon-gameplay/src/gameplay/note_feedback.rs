@@ -122,6 +122,31 @@ pub fn judged_now(note: &ScheduledNote) -> Option<bool> {
     }
 }
 
+/// Brings a note visual's [`JudgedState`] up to [`judged_now`], inserting or
+/// removing its [`Judged`] on the transition. Returns the judgment the head
+/// is animating, if any, and the new state when this frame was the
+/// transition (`Some(None)` when a loop cleared the note).
+pub fn observe_judgment(
+    commands: &mut Commands,
+    entity: Entity,
+    note: &ScheduledNote,
+    state: &mut JudgedState,
+    judged: Option<&Judged>,
+    now: f64,
+) -> (Option<Judged>, Option<Option<bool>>) {
+    let current = judged_now(note);
+    if current == state.0 {
+        return (judged.copied(), None);
+    }
+    state.0 = current;
+    let judged = current.map(|hit| Judged { hit, at: now });
+    match judged {
+        Some(j) => commands.entity(entity).insert(j),
+        None => commands.entity(entity).remove::<Judged>(),
+    };
+    (judged, Some(current))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,5 +249,37 @@ mod tests {
         assert_eq!(judged_now(&n), None);
         n.missed = true;
         assert_eq!(judged_now(&n), Some(false));
+    }
+
+    #[test]
+    fn a_judgment_is_stamped_once_and_cleared_by_a_loop() {
+        let mut world = World::new();
+        let entity = world.spawn_empty().id();
+        let mut state = JudgedState::default();
+        let mut observe = |world: &mut World, n: &ScheduledNote, now: f64| {
+            let judged = world.get::<Judged>(entity).copied();
+            let out = observe_judgment(
+                &mut world.commands(),
+                entity,
+                n,
+                &mut state,
+                judged.as_ref(),
+                now,
+            );
+            world.flush();
+            out
+        };
+        let mut n = note(false, 0.0, 1.0, 0.0);
+        assert_eq!(observe(&mut world, &n, 0.0), (None, None));
+
+        n.hit = true;
+        let stamped = Judged { hit: true, at: 1.0 };
+        assert_eq!(observe(&mut world, &n, 1.0), (Some(stamped), Some(Some(true))));
+        // Later frames keep the original instant and report no transition.
+        assert_eq!(observe(&mut world, &n, 2.0), (Some(stamped), None));
+
+        n.hit = false;
+        assert_eq!(observe(&mut world, &n, 3.0), (None, Some(None)));
+        assert!(world.get::<Judged>(entity).is_none());
     }
 }

@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use bevy::prelude::*;
-use harmonicon_core::chart::{Action, HarpChart};
+use harmonicon_core::chart::HarpChart;
 
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
 use harmonicon_platform::assets_management::ShowNoteNumbers;
@@ -19,16 +19,13 @@ use super::hud_panel::{
 };
 use super::judge::{judged_instant, live_technique_status};
 use super::modifier_legend::build_legend_materials;
-use super::note_feedback::{
-    Judged, JudgedState, hold_uniform, judged_now, judged_scale, judged_stamp,
-};
+use super::note_feedback::{Judged, JudgedState, hold_uniform, judged_scale, observe_judgment};
 use super::note_ribbon_2d::NoteRibbon2dMaterial;
 use super::note_ribbon_3d::NoteRibbon3dMaterial;
-use super::song_progress_overlay::{BAR_HEIGHT, NoteMarker, spawn_song_progress};
+use super::song_progress_overlay::{BAR_HEIGHT, spawn_song_progress};
 use super::{
-    ActivePitches, ActiveTargets, COUNTDOWN, GameplayRoot, HoleCell, HoleState, LOOKAHEAD,
-    MusicStarted, PlayedHarp, ScheduledNote, ScoreReadoutAnchor, SongInfo, ValidHarpNotes,
-    spawn_score_readout,
+    ActivePitches, COUNTDOWN, GameplayRoot, HoleCell, HoleState, LOOKAHEAD, MusicStarted,
+    PlayedHarp, ScheduledNote, ScoreReadoutAnchor, SongInfo, ValidHarpNotes, spawn_score_readout,
 };
 use harmonicon_platform::localization::Localization;
 
@@ -236,26 +233,14 @@ pub fn setup(
         &hud.song_info,
         panels,
     );
-    let note_markers: Vec<NoteMarker> = if !panels.progress_notes {
-        Vec::new()
-    } else {
-        note_build
-            .song_notes
-            .notes
-            .iter()
-            .map(|n| NoteMarker {
-                time: n.time,
-                duration: n.duration,
-                hole: n.hole,
-                is_blow: n.is_blow,
-            })
-            .collect()
-    };
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
         manifest.music_duration_secs,
-        &note_markers,
+        &super::gameplay_2d::progress_note_markers(
+            &note_build.song_notes.notes,
+            panels.progress_notes,
+        ),
         played.hole_count(),
         &note_build.adaptive.sections,
         &note_build.adaptive.learned,

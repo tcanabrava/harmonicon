@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
@@ -18,7 +19,8 @@ use super::hud_panel::{HudPanel, LaneSurface, contextual_panels, spawn_hud_panel
 use super::judge::{judged_instant, live_technique_status};
 use super::modifier_legend::build_legend_materials;
 use super::note_feedback::{
-    Judged, JudgedState, head_label_color, hold_uniform, judged_now, judged_scale, judged_stamp,
+    Judged, JudgedState, head_label_color, hold_uniform, judged_scale, judged_stamp,
+    observe_judgment,
 };
 use super::note_ribbon::ribbon_technique;
 use super::note_ribbon_2d::NoteRibbon2dMaterial;
@@ -266,25 +268,11 @@ pub fn setup(
         },
     );
 
-    let note_markers: Vec<NoteMarker> = if !panels.progress_notes {
-        Vec::new()
-    } else {
-        song_notes
-            .notes
-            .iter()
-            .map(|n| NoteMarker {
-                time: n.time,
-                duration: n.duration,
-                hole: n.hole,
-                is_blow: n.is_blow,
-            })
-            .collect()
-    };
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
         manifest.music_duration_secs,
-        &note_markers,
+        &progress_note_markers(&song_notes.notes, panels.progress_notes),
         played.hole_count(),
         &adaptive.sections,
         &adaptive.learned,
@@ -299,6 +287,23 @@ pub fn setup(
     let harp_hint =
         super::song_info::harp_banner_text(played, &effective.song_key_for(chart), &loc);
     spawn_countdown(&mut commands, &loc, Some(&harp_hint), Some(&song_info));
+}
+
+/// The progress bar's per-hole note markers for `notes`, or none when the
+/// contextual panels leave them out (`hud_panel::contextual_panels`).
+pub(super) fn progress_note_markers(notes: &[ScheduledNote], shown: bool) -> Vec<NoteMarker> {
+    if !shown {
+        return Vec::new();
+    }
+    notes
+        .iter()
+        .map(|n| NoteMarker {
+            time: n.time,
+            duration: n.duration,
+            hole: n.hole,
+            is_blow: n.is_blow,
+        })
+        .collect()
 }
 
 /// Wraps `music_score::spawn_music_score` in its own absolutely-positioned,
@@ -715,24 +720,8 @@ pub fn animate_judged_notes(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let current = judged_now(note);
-        let transitioned = current != state.0;
-        let judged = if transitioned {
-            state.0 = current;
-            match current {
-                Some(hit) => {
-                    let j = Judged { hit, at: now };
-                    commands.entity(entity).insert(j);
-                    Some(j)
-                }
-                None => {
-                    commands.entity(entity).remove::<Judged>();
-                    None
-                }
-            }
-        } else {
-            judged.copied()
-        };
+        let (judged, transition) =
+            observe_judgment(&mut commands, entity, note, &mut state, judged, now);
         let scale =
             judged.map_or(1.0, |j| judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0));
         let width = lane_pct * NOTE_W;
@@ -742,13 +731,10 @@ pub fn animate_judged_notes(
             node.width = Val::Percent(scaled);
             node.left = Val::Percent(left);
         }
-        if !transitioned {
+        let Some(current) = transition else {
             continue;
-        }
-        let wanted = match current {
-            Some(hit) => judged_stamp(hit).to_string(),
-            None => head_label(note.hole, note.is_blow, &note.modifiers, show_numbers.0),
         };
+        let wanted = head_text(current, note, show_numbers.0);
         for cap in children.iter().filter_map(|c| caps.get(c).ok()) {
             for label in cap {
                 if let Ok((mut text, mut color)) = labels.get_mut(*label) {
@@ -777,6 +763,15 @@ pub(super) fn head_label(
     let plain = super::phrase_overlay::tab_label(hole, is_blow, &[]);
     let arrow = if is_blow { "\u{2191}" } else { "\u{2193}" };
     format!("{arrow}{}", &tab[plain.len()..])
+}
+
+/// What a note's label reads in judged state `judged`: the ✓/✗ stamp once
+/// judged, its [`head_label`] tab while pending.
+pub(super) fn head_text(judged: Option<bool>, note: &ScheduledNote, show_numbers: bool) -> String {
+    match judged {
+        Some(hit) => judged_stamp(hit).to_string(),
+        None => head_label(note.hole, note.is_blow, &note.modifiers, show_numbers),
+    }
 }
 
 /// The technique cue for one note head (see `technique_cue::note_cue`) and
@@ -847,37 +842,63 @@ pub(super) fn step_hole_glow(
 /// Brightness gap below which [`step_hole_glow`] snaps to its target.
 const GLOW_SETTLE: f32 = 1e-3;
 
-pub fn update_holes(
-    mut sounding: Local<HashSet<u8>>,
-    time: Res<Time>,
-    active: Res<ActivePitches>,
-    valid_notes: Res<ValidHarpNotes>,
-    targets: Res<ActiveTargets>,
-    played: Res<PlayedHarp>,
-    lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
-    mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState)>,
-) {
-    // The harp the player is holding — the one the detected pitches belong
-    // to — not the chart's, or a substituted harp's holes never light.
-    let Some(harp) = played.0.as_ref() else {
-        return;
-    };
-    let dt = time.delta_secs();
+/// Everything a hole cell's glow step reads, shared by `update_holes` and
+/// `update_holes_3d`, which differ only in how they paint the result.
+#[derive(SystemParam)]
+pub(super) struct HoleGlow<'w, 's> {
+    sounding: Local<'s, HashSet<u8>>,
+    time: Res<'w, Time>,
+    active: Res<'w, ActivePitches>,
+    valid_notes: Res<'w, ValidHarpNotes>,
+    targets: Res<'w, ActiveTargets>,
+    played: Res<'w, PlayedHarp>,
+    lesson: Option<Res<'w, harmonicon_song::lessons::LessonContext>>,
+}
 
-    let attack = 1.0 - (-dt * 25.0_f32).exp();
-    let decay = 1.0 - (-dt * 4.0_f32).exp();
-    harp_pitches(&active, &valid_notes, &mut sounding);
+impl HoleGlow<'_, '_> {
+    /// Refreshes this frame's sounding pitches. `false` until a harp is
+    /// being played, in which case the caller leaves its cells alone.
+    pub(super) fn begin_frame(&mut self) -> bool {
+        if self.played.0.is_none() {
+            return false;
+        }
+        harp_pitches(&self.active, &self.valid_notes, &mut self.sounding);
+        true
+    }
 
-    for (cell, mut bg, mut state) in &mut cells {
-        let blow = harp.wind_direction_midi(cell.0, &Action::Blow);
-        let draw = harp.wind_direction_midi(cell.0, &Action::Draw);
-        let hint = if lesson.as_ref().is_some_and(|lesson| lesson.aural) {
+    /// Steps one cell's glow a frame via [`step_hole_glow`]: fast attack,
+    /// slow decay, a dim hint on the scoring overlay's target unless the
+    /// lesson is aural.
+    pub(super) fn step(&self, hole: u8, state: &mut HoleState) {
+        // The harp the player is holding — the one the detected pitches
+        // belong to — not the chart's, or a substituted harp's holes never
+        // light.
+        let Some(harp) = self.played.0.as_ref() else {
+            return;
+        };
+        let dt = self.time.delta_secs();
+        let attack = 1.0 - (-dt * 25.0_f32).exp();
+        let decay = 1.0 - (-dt * 4.0_f32).exp();
+        let blow = harp.wind_direction_midi(hole, &Action::Blow);
+        let draw = harp.wind_direction_midi(hole, &Action::Draw);
+        let hint = if self.lesson.as_ref().is_some_and(|lesson| lesson.aural) {
             None
         } else {
-            targets.0.iter().find(|(h, _)| *h == cell.0).map(|(_, b)| *b)
+            self.targets.0.iter().find(|(h, _)| *h == hole).map(|(_, b)| *b)
         };
+        step_hole_glow(state, blow, draw, hint, &self.sounding, attack, decay);
+    }
+}
 
-        step_hole_glow(&mut state, blow, draw, hint, &sounding, attack, decay);
+pub fn update_holes(
+    mut glow: HoleGlow,
+    mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState)>,
+) {
+    if !glow.begin_frame() {
+        return;
+    }
+    for (cell, mut bg, mut state) in &mut cells {
+        glow.step(cell.0, &mut state);
         let b = state.brightness;
 
         let color = if state.is_blow {

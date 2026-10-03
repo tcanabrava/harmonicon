@@ -153,38 +153,15 @@ pub(super) fn spawn_hole_pads(
 // ── Per-frame systems ─────────────────────────────────────────────────────────
 
 pub fn update_holes_3d(
-    mut sounding: Local<std::collections::HashSet<u8>>,
-    time: Res<Time>,
-    active: Res<ActivePitches>,
-    valid_notes: Res<ValidHarpNotes>,
-    targets: Res<ActiveTargets>,
-    played: Res<PlayedHarp>,
-    lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
+    mut glow: super::super::gameplay_2d::HoleGlow,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut cells: Query<(&HoleCell, &HoleMesh3D, &mut HoleState)>,
 ) {
-    // The played harp's notes, as in `gameplay_2d::update_holes`.
-    let Some(harp) = played.0.as_ref() else {
+    if !glow.begin_frame() {
         return;
-    };
-    let dt = time.delta_secs();
-
-    let attack = 1.0 - (-dt * 25.0_f32).exp();
-    let decay = 1.0 - (-dt * 4.0_f32).exp();
-    super::super::gameplay_2d::harp_pitches(&active, &valid_notes, &mut sounding);
-
+    }
     for (cell, hole_mat, mut state) in &mut cells {
-        let blow = harp.wind_direction_midi(cell.0, &Action::Blow);
-        let draw = harp.wind_direction_midi(cell.0, &Action::Draw);
-        let hint = if lesson.as_ref().is_some_and(|lesson| lesson.aural) {
-            None
-        } else {
-            targets.0.iter().find(|(h, _)| *h == cell.0).map(|(_, b)| *b)
-        };
-
-        super::super::gameplay_2d::step_hole_glow(
-            &mut state, blow, draw, hint, &sounding, attack, decay,
-        );
+        glow.step(cell.0, &mut state);
         let b = state.brightness;
 
         let (emissive, base_color) = if state.is_blow {

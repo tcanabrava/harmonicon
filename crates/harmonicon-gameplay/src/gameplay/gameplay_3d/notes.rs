@@ -400,24 +400,8 @@ pub fn animate_judged_notes_3d(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let current = judged_now(note);
-        let transitioned = current != state.0;
-        let judged = if transitioned {
-            state.0 = current;
-            match current {
-                Some(hit) => {
-                    let j = Judged { hit, at: now };
-                    commands.entity(entity).insert(j);
-                    Some(j)
-                }
-                None => {
-                    commands.entity(entity).remove::<Judged>();
-                    None
-                }
-            }
-        } else {
-            judged.copied()
-        };
+        let (judged, transition) =
+            observe_judgment(&mut commands, entity, note, &mut state, judged, now);
         let scale =
             judged.map_or(1.0, |j| judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0));
         for child in children {
@@ -427,18 +411,10 @@ pub fn animate_judged_notes_3d(
                 transform.scale.x = scale;
             }
         }
-        if !transitioned {
+        let Some(current) = transition else {
             continue;
-        }
-        let wanted = match current {
-            Some(hit) => judged_stamp(hit).to_string(),
-            None => super::super::gameplay_2d::head_label(
-                note.hole,
-                note.is_blow,
-                &note.modifiers,
-                show_numbers.0,
-            ),
         };
+        let wanted = super::super::gameplay_2d::head_text(current, note, show_numbers.0);
         for (label, label_children) in &labels {
             if label.target != entity {
                 continue;
