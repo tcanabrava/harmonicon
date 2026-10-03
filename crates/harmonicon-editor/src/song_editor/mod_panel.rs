@@ -10,16 +10,15 @@ use super::AppState;
 use super::panel_widgets::{
     mod_button, mode_button, panel_separator, timeline_tool_button, transport_button,
 };
-use super::playback::{EditorAudio, Playhead};
-use super::practice::{PracticeState, stop_practice};
-use super::record::{RecordState, stop_record};
 use super::state::{EditorState, Mode, TimelineTool};
-use super::transport::{spawn_file_buttons, spawn_playback_buttons, spawn_record_buttons};
+use super::transport::{
+    Transport, spawn_file_buttons, spawn_playback_buttons, spawn_record_buttons,
+};
 use super::ui::{
     EditModeGroup, EditorToolbar, EditorToolbarContent, ModButton, ModeButton, NoteColumn,
     PlayModeGroup, RecordModeGroup, TimelineToolButton,
 };
-use harmonicon_audio::pitch_detect::{PitchAlgorithm, PitchRange};
+use harmonicon_audio::pitch_detect::PitchAlgorithm;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::settings::ActionButtonStyle;
 use harmonicon_platform::theme::SongEditorColors;
@@ -152,31 +151,9 @@ pub(super) fn spawn_mod_panel(
                                     "\u{270E}",
                                     style,
                                     colors,
-                                    |_: On<Activate>,
-                                     mut state: ResMut<EditorState>,
-                                     playing: Query<Entity, With<EditorAudio>>,
-                                     mut practice: ResMut<PracticeState>,
-                                     mut record: ResMut<RecordState>,
-                                     mut playhead: ResMut<Playhead>,
-                                     mut pitch_range: ResMut<PitchRange>,
-                                     mut count_in: ResMut<super::metronome::CountIn>,
-                                     mut commands: Commands| {
-                                        state.mode = Mode::Edit;
-                                        stop_practice(
-                                            &playing,
-                                            &mut practice,
-                                            &mut playhead,
-                                            &mut commands,
-                                        );
-                                        stop_record(
-                                            &mut state,
-                                            &playing,
-                                            &mut record,
-                                            &mut playhead,
-                                            &mut pitch_range,
-                                            &mut count_in,
-                                            &mut commands,
-                                        );
+                                    |_: On<Activate>, mut t: Transport| {
+                                        t.state.mode = Mode::Edit;
+                                        t.stop_all();
                                     },
                                 );
                                 mode_button(
@@ -187,22 +164,12 @@ pub(super) fn spawn_mod_panel(
                                     "\u{23FA}",
                                     style,
                                     colors,
-                                    |_: On<Activate>,
-                                     mut state: ResMut<EditorState>,
-                                     playing: Query<Entity, With<EditorAudio>>,
-                                     mut practice: ResMut<PracticeState>,
-                                     mut playhead: ResMut<Playhead>,
-                                     mut commands: Commands| {
-                                        state.mode = Mode::Record;
+                                    |_: On<Activate>, mut t: Transport| {
+                                        t.state.mode = Mode::Record;
                                         // A recording can only have been started from this
                                         // mode itself, so only Play-mode playback/practice
                                         // needs stopping here.
-                                        stop_practice(
-                                            &playing,
-                                            &mut practice,
-                                            &mut playhead,
-                                            &mut commands,
-                                        );
+                                        t.stop_practice();
                                     },
                                 );
                                 mode_button(
@@ -213,24 +180,9 @@ pub(super) fn spawn_mod_panel(
                                     "\u{1F3B5}",
                                     style,
                                     colors,
-                                    |_: On<Activate>,
-                                     mut state: ResMut<EditorState>,
-                                     playing: Query<Entity, With<EditorAudio>>,
-                                     mut record: ResMut<RecordState>,
-                                     mut playhead: ResMut<Playhead>,
-                                     mut pitch_range: ResMut<PitchRange>,
-                                     mut count_in: ResMut<super::metronome::CountIn>,
-                                     mut commands: Commands| {
-                                        state.mode = Mode::Play;
-                                        stop_record(
-                                            &mut state,
-                                            &playing,
-                                            &mut record,
-                                            &mut playhead,
-                                            &mut pitch_range,
-                                            &mut count_in,
-                                            &mut commands,
-                                        );
+                                    |_: On<Activate>, mut t: Transport| {
+                                        t.state.mode = Mode::Play;
+                                        t.stop_record();
                                     },
                                 );
                                 mode_button(

@@ -4,10 +4,12 @@
 //! `panel_widgets`' shared button helpers.
 
 use bevy::audio::AudioSource;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
 use super::harpchart::safe_path_segment;
+use super::metronome::{CountIn, begin_count_in};
 use super::panel_widgets::transport_button;
 use super::playback::{EditorAudio, Playhead, start_playback, toggle_pause};
 use super::practice::{PracticeState, start_practice, stop_practice};
@@ -130,38 +132,19 @@ pub(super) fn spawn_playback_buttons(
         "\u{25B6}",
         style,
         colors.transport_play,
-        |_: On<Activate>,
-         mut state: ResMut<EditorState>,
-         mut sources: ResMut<Assets<AudioSource>>,
-         settings: Res<AudioSettings>,
-         playing: Query<Entity, With<EditorAudio>>,
-         sinks: Query<&AudioSink, With<EditorAudio>>,
-         mut practice: ResMut<PracticeState>,
-         mut record: ResMut<RecordState>,
-         mut playhead: ResMut<Playhead>,
-         mut pitch_range: ResMut<PitchRange>,
-         mut count_in: ResMut<super::metronome::CountIn>,
-         mut commands: Commands| {
+        |_: On<Activate>, mut t: Transport| {
             // Paused, not stopped: resume in place rather than restarting.
-            if playhead.playing && playhead.paused {
-                toggle_pause(&mut playhead, &sinks);
+            if t.playhead.playing && t.playhead.paused {
+                t.toggle_pause();
                 return;
             }
-            practice.reset(); // exit practice mode before starting preview playback
+            t.practice.reset(); // exit practice mode before starting preview playback
             // A recording in progress owns the shared `Playhead` clock —
             // close it out (rather than letting `start_playback` below
             // silently repurpose it out from under `record.open`) before
             // taking over.
-            stop_record(
-                &mut state,
-                &playing,
-                &mut record,
-                &mut playhead,
-                &mut pitch_range,
-                &mut count_in,
-                &mut commands,
-            );
-            start_playback(&state, &mut sources, &settings, &playing, &mut playhead, &mut commands);
+            t.stop_record();
+            t.start_playback();
         },
     );
     transport_button(
@@ -171,11 +154,7 @@ pub(super) fn spawn_playback_buttons(
         "\u{23F8}",
         style,
         colors.transport_pause,
-        |_: On<Activate>,
-         mut playhead: ResMut<Playhead>,
-         sinks: Query<&AudioSink, With<EditorAudio>>| {
-            toggle_pause(&mut playhead, &sinks);
-        },
+        |_: On<Activate>, mut t: Transport| t.toggle_pause(),
     );
     transport_button(
         panel,
@@ -184,26 +163,7 @@ pub(super) fn spawn_playback_buttons(
         "\u{25A0}",
         style,
         colors.transport_stop,
-        |_: On<Activate>,
-         mut state: ResMut<EditorState>,
-         playing: Query<Entity, With<EditorAudio>>,
-         mut practice: ResMut<PracticeState>,
-         mut record: ResMut<RecordState>,
-         mut playhead: ResMut<Playhead>,
-         mut pitch_range: ResMut<PitchRange>,
-         mut count_in: ResMut<super::metronome::CountIn>,
-         mut commands: Commands| {
-            stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
-            stop_record(
-                &mut state,
-                &playing,
-                &mut record,
-                &mut playhead,
-                &mut pitch_range,
-                &mut count_in,
-                &mut commands,
-            );
-        },
+        |_: On<Activate>, mut t: Transport| t.stop_all(),
     );
     transport_button(
         panel,
@@ -212,48 +172,17 @@ pub(super) fn spawn_playback_buttons(
         "\u{1F3A4}",
         style,
         colors.transport_practice,
-        |_: On<Activate>,
-         mut state: ResMut<EditorState>,
-         mut sources: ResMut<Assets<AudioSource>>,
-         settings: Res<AudioSettings>,
-         playing: Query<Entity, With<EditorAudio>>,
-         mut practice: ResMut<PracticeState>,
-         mut record: ResMut<RecordState>,
-         mut playhead: ResMut<Playhead>,
-         mut pitch_range: ResMut<PitchRange>,
-         mut count_in: ResMut<super::metronome::CountIn>,
-         mut commands: Commands,
-         loc: Res<Localization>,
-         sinks: Query<&AudioSink, With<EditorAudio>>| {
+        |_: On<Activate>, mut t: Transport| {
             // Paused, not stopped: resume in place rather than stopping.
-            if practice.active && playhead.paused {
-                toggle_pause(&mut playhead, &sinks);
-                return;
-            }
-            if practice.active {
-                stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
+            if t.practice.active && t.playhead.paused {
+                t.toggle_pause();
+            } else if t.practice.active {
+                t.stop_practice();
             } else {
                 // A recording in progress owns the shared `Playhead` clock —
                 // close it out before `start_practice` below repurposes it.
-                stop_record(
-                    &mut state,
-                    &playing,
-                    &mut record,
-                    &mut playhead,
-                    &mut pitch_range,
-                    &mut count_in,
-                    &mut commands,
-                );
-                start_practice(
-                    &state,
-                    &mut sources,
-                    &settings,
-                    &playing,
-                    &mut practice,
-                    &mut playhead,
-                    &mut commands,
-                    &loc,
-                );
+                t.stop_record();
+                t.start_practice();
             }
         },
     );
@@ -277,28 +206,22 @@ pub(super) fn spawn_record_buttons(
         "\u{25B6}",
         style,
         colors.transport_record,
-        |_: On<Activate>,
-         state: Res<EditorState>,
-         mut practice: ResMut<PracticeState>,
-         record: Res<RecordState>,
-         mut playhead: ResMut<Playhead>,
-         sinks: Query<&AudioSink, With<EditorAudio>>,
-         mut count_in: ResMut<super::metronome::CountIn>| {
-            if count_in.active() {
+        |_: On<Activate>, mut t: Transport| {
+            if t.count_in.active() {
                 // Already counting in — a second click shouldn't restart it.
                 return;
             }
-            if record.active {
+            if t.record.active {
                 // Paused, not stopped: resume in place rather than
                 // restarting the take (no count-in — the player is picking
                 // straight back up, not starting fresh).
-                if playhead.paused {
-                    toggle_pause(&mut playhead, &sinks);
+                if t.playhead.paused {
+                    t.toggle_pause();
                 }
                 return;
             }
-            practice.reset();
-            super::metronome::begin_count_in(&state, playhead.elapsed, &mut count_in);
+            t.practice.reset();
+            begin_count_in(&t.state, t.playhead.elapsed, &mut t.count_in);
         },
     );
     transport_button(
@@ -308,26 +231,16 @@ pub(super) fn spawn_record_buttons(
         "\u{23F8}",
         style,
         colors.transport_pause,
-        |_: On<Activate>,
-         mut state: ResMut<EditorState>,
-         mut record: ResMut<RecordState>,
-         mut playhead: ResMut<Playhead>,
-         mut count_in: ResMut<super::metronome::CountIn>,
-         sinks: Query<&AudioSink, With<EditorAudio>>| {
-            if count_in.active() {
+        |_: On<Activate>, mut t: Transport| {
+            if t.count_in.active() {
                 // Nothing has actually started yet — cancel outright rather
                 // than "pausing" a take that was never recording anything.
-                count_in.stop();
-                return;
-            }
-            if !record.active {
-                return;
-            }
-            if playhead.paused {
+                t.count_in.stop();
+            } else if t.record.active && t.playhead.paused {
                 // Toggle back out of pause — same resume the Play button does.
-                toggle_pause(&mut playhead, &sinks);
-            } else {
-                pause_record(&mut state, &mut record, &mut playhead, &sinks);
+                t.toggle_pause();
+            } else if t.record.active {
+                t.pause_record();
             }
         },
     );
@@ -338,24 +251,7 @@ pub(super) fn spawn_record_buttons(
         "\u{25A0}",
         style,
         colors.transport_stop,
-        |_: On<Activate>,
-         mut state: ResMut<EditorState>,
-         playing: Query<Entity, With<EditorAudio>>,
-         mut record: ResMut<RecordState>,
-         mut playhead: ResMut<Playhead>,
-         mut pitch_range: ResMut<PitchRange>,
-         mut count_in: ResMut<super::metronome::CountIn>,
-         mut commands: Commands| {
-            stop_record(
-                &mut state,
-                &playing,
-                &mut record,
-                &mut playhead,
-                &mut pitch_range,
-                &mut count_in,
-                &mut commands,
-            );
-        },
+        |_: On<Activate>, mut t: Transport| t.stop_record(),
     );
     transport_button(
         panel,
@@ -364,24 +260,85 @@ pub(super) fn spawn_record_buttons(
         "\u{23F9}",
         style,
         colors.transport_stop,
-        |_: On<Activate>,
-         mut state: ResMut<EditorState>,
-         playing: Query<Entity, With<EditorAudio>>,
-         mut record: ResMut<RecordState>,
-         mut playhead: ResMut<Playhead>,
-         mut pitch_range: ResMut<PitchRange>,
-         mut count_in: ResMut<super::metronome::CountIn>,
-         mut commands: Commands| {
-            stop_record(
-                &mut state,
-                &playing,
-                &mut record,
-                &mut playhead,
-                &mut pitch_range,
-                &mut count_in,
-                &mut commands,
-            );
-            playhead.elapsed = 0.0;
+        |_: On<Activate>, mut t: Transport| {
+            t.stop_record();
+            t.playhead.elapsed = 0.0;
         },
     );
+}
+
+/// Everything the editor's start/stop/pause helpers touch, so a transport
+/// or mode button takes one parameter instead of a dozen. Each method is a
+/// thin call into the owning module's free function, which stays the unit
+/// under test.
+#[derive(SystemParam)]
+pub(super) struct Transport<'w, 's> {
+    pub state: ResMut<'w, EditorState>,
+    pub practice: ResMut<'w, PracticeState>,
+    pub record: ResMut<'w, RecordState>,
+    pub playhead: ResMut<'w, Playhead>,
+    pub count_in: ResMut<'w, CountIn>,
+    pitch_range: ResMut<'w, PitchRange>,
+    sources: ResMut<'w, Assets<AudioSource>>,
+    settings: Res<'w, AudioSettings>,
+    loc: Res<'w, Localization>,
+    playing: Query<'w, 's, Entity, With<EditorAudio>>,
+    sinks: Query<'w, 's, &'static AudioSink, With<EditorAudio>>,
+    commands: Commands<'w, 's>,
+}
+
+impl Transport<'_, '_> {
+    pub fn toggle_pause(&mut self) {
+        toggle_pause(&mut self.playhead, &self.sinks);
+    }
+
+    pub fn start_playback(&mut self) {
+        start_playback(
+            &self.state,
+            &mut self.sources,
+            &self.settings,
+            &self.playing,
+            &mut self.playhead,
+            &mut self.commands,
+        );
+    }
+
+    pub fn start_practice(&mut self) {
+        start_practice(
+            &self.state,
+            &mut self.sources,
+            &self.settings,
+            &self.playing,
+            &mut self.practice,
+            &mut self.playhead,
+            &mut self.commands,
+            &self.loc,
+        );
+    }
+
+    pub fn stop_practice(&mut self) {
+        stop_practice(&self.playing, &mut self.practice, &mut self.playhead, &mut self.commands);
+    }
+
+    pub fn pause_record(&mut self) {
+        pause_record(&mut self.state, &mut self.record, &mut self.playhead, &self.sinks);
+    }
+
+    pub fn stop_record(&mut self) {
+        stop_record(
+            &mut self.state,
+            &self.playing,
+            &mut self.record,
+            &mut self.playhead,
+            &mut self.pitch_range,
+            &mut self.count_in,
+            &mut self.commands,
+        );
+    }
+
+    /// Stops whatever is running — practice, a take, or a pending count-in.
+    pub fn stop_all(&mut self) {
+        self.stop_practice();
+        self.stop_record();
+    }
 }

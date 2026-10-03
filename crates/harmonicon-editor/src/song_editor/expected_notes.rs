@@ -250,26 +250,9 @@ pub(super) fn spawn_expected_notes_mode_button(
         "\u{2713}",
         style,
         colors,
-        |_: On<Activate>,
-         mut state: ResMut<EditorState>,
-         playing: Query<Entity, With<super::playback::EditorAudio>>,
-         mut practice: ResMut<super::practice::PracticeState>,
-         mut record: ResMut<super::record::RecordState>,
-         mut playhead: ResMut<super::playback::Playhead>,
-         mut pitch_range: ResMut<harmonicon_audio::pitch_detect::PitchRange>,
-         mut count_in: ResMut<super::metronome::CountIn>,
-         mut commands: Commands| {
-            state.mode = Mode::ExpectedNotes;
-            super::practice::stop_practice(&playing, &mut practice, &mut playhead, &mut commands);
-            super::record::stop_record(
-                &mut state,
-                &playing,
-                &mut record,
-                &mut playhead,
-                &mut pitch_range,
-                &mut count_in,
-                &mut commands,
-            );
+        |_: On<Activate>, mut t: super::transport::Transport| {
+            t.state.mode = Mode::ExpectedNotes;
+            t.stop_all();
         },
     );
 }
