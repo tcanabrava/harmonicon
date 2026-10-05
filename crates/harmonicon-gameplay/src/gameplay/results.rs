@@ -162,6 +162,7 @@ pub(super) fn setup(
     stats: Res<SongStats>,
     audio: Res<AudioSettings>,
     selected: Res<SelectedSong>,
+    asset_server: Res<AssetServer>,
     manifests: Res<Assets<SongManifest>>,
     mut profile: ResMut<PlayerProfile>,
     song_notes: Res<SongNotes>,
@@ -219,6 +220,10 @@ pub(super) fn setup(
         None
     } else {
         manifest.map(|manifest| {
+            if let Some(path) = asset_server.get_path(selected.0.id()) {
+                let path = path.to_string();
+                profile.record_song_result(&path, acc);
+            }
             let key = manifest.path.display().to_string();
             let record = profile.songs.entry(key).or_default();
             let improved = record_play(record, score.points, acc, &technique_accuracy);

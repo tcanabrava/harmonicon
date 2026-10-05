@@ -5,17 +5,28 @@
 1. **Select Song** — browse all downloaded songs and anything you've added to
    `~/Harmonicon/songs/` (see
    [Getting Started](getting-started.md#adding-your-own-content)). Click a column
-   header to sort by song name, band, genre, or difficulty; click it again to
+   header to sort by song name, band, genre, difficulty, your rating, mastery, or times played; click it again to
    reverse the order. Search accepts partial words and small typos.
 2. Choose **2d** or **3d** with the switch beside **Play**. [Play 2D](play-2d.md)
    uses a scrolling note highway; [Play 3D](play-3d.md) puts the same notes on
    a lane in perspective. Both share scoring, timing, and the pause menu.
-3. Use Up/Down to select a song and inspect its details, then press Enter or
-   **Play**. Clicking a song starts it directly. `/` focuses Search; **Clear**
-   resets the filter. Hovering a song previews its details without taking focus
-   away from Search.
+3. Click a song once or use Up/Down to select it and inspect its details.
+   Click **Play** to start the selected song. `/` focuses Search; **Clear**
+   resets the search. Moving the pointer over other songs keeps your selection.
 4. Confirm the physical harmonica you are holding. A **3-2-1 countdown** then
    shows the song title and key before the chart and backing track start.
+
+Select a song, then click its **My rating** stars to set the rating directly.
+The left half of a star chooses a half-star step; the right half chooses a
+full star. Click the current rating again to clear it to zero. Ratings range
+from zero to five stars in half-star steps (stored as 0–10).
+**Mastery** shows the accuracy from your latest completed gameplay, even
+when it is lower than an earlier result. **—** means no result has been
+recorded. **Filter mastery** cycles through all songs, unplayed songs,
+below 50%, 50–79%, and 80–100%; it combines with Search. Ratings and latest
+results are saved across restarts, separately for each song source.
+**Times played** counts completed song runs, including previously saved plays;
+click its column header to sort by the count.
 
 When a repository check finds newer songs, an **Update songs** button appears
 above the catalog. Confirm it to download that repository’s latest version;

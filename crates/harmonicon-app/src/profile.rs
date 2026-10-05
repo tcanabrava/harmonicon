@@ -218,12 +218,30 @@ pub fn training_key(lesson_id: &str, tier: u8) -> String {
     format!("{lesson_id}:{tier}")
 }
 
+/// Personal rating (0..=10 half-stars) and the most recent completed run.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct SongPreferences {
+    pub rating: u8,
+    pub last_accuracy: Option<f32>,
+    /// Source-scoped completed runs; None uses the legacy song record count.
+    pub plays: Option<u32>,
+}
+
+impl SongPreferences {
+    pub fn adjust_rating(&mut self, half_steps: i8) {
+        self.rating = (i16::from(self.rating) + i16::from(half_steps)).clamp(0, 10) as u8;
+    }
+}
+
 /// Cross-session player progress. Loaded once at startup and updated as the
 /// player finishes songs; see the module doc comment for the save policy.
 #[derive(Resource, Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(default)]
 pub struct PlayerProfile {
     pub songs: HashMap<String, SongRecord>,
+    /// Personal catalog data, keyed by source and song folder.
+    pub song_preferences: HashMap<String, SongPreferences>,
     pub total_play_secs: f64,
     pub drills: HashMap<String, DrillRecord>,
     pub lessons: HashMap<String, LessonRecord>,
@@ -233,6 +251,26 @@ pub struct PlayerProfile {
 }
 
 impl PlayerProfile {
+    /// Replace the latest catalog result, independently of best scores.
+    pub fn record_song_result(&mut self, asset_path: &str, accuracy: f32) {
+        let identity = harmonicon_platform::song_library::song_identity(asset_path);
+        let plays = self.song_play_count(asset_path).saturating_add(1);
+        let personal = self.song_preferences.entry(identity.to_owned()).or_default();
+        personal.last_accuracy = Some(accuracy);
+        personal.plays = Some(plays);
+    }
+
+    /// Catalog counts include completed plays saved before personal catalog data existed.
+    pub fn song_play_count(&self, asset_path: &str) -> u32 {
+        let identity = harmonicon_platform::song_library::song_identity(asset_path);
+        if let Some(plays) = self.song_preferences.get(identity).and_then(|record| record.plays) {
+            return plays;
+        }
+        // SongManifest::path stores the song folder without the asset source.
+        let folder = identity.split_once("://").map_or(identity, |(_, path)| path);
+        self.songs.get(folder).map_or(0, |record| record.plays)
+    }
+
     /// How much of a lesson's training ladder is done, 0..1 — the mastery
     /// meter. `tiers` is how many the ladder has
     /// (`harmonicon_core::training::Tier::ALL.len()`), passed in rather than
@@ -431,6 +469,77 @@ impl Plugin for ProfilePlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn personal_rating_uses_half_steps_and_stays_in_range() {
+        let mut preferences = SongPreferences::default();
+        preferences.adjust_rating(-1);
+        assert_eq!(preferences.rating, 0);
+        preferences.adjust_rating(1);
+        assert_eq!(preferences.rating, 1);
+        preferences.adjust_rating(1);
+        assert_eq!(preferences.rating, 2);
+        for _ in 0..20 {
+            preferences.adjust_rating(1);
+        }
+        assert_eq!(preferences.rating, 10);
+        preferences.adjust_rating(-1);
+        assert_eq!(preferences.rating, 9);
+    }
+
+    #[test]
+    fn play_counts_preserve_legacy_history_and_increment_once_per_result() {
+        let mut profile: PlayerProfile = serde_json::from_str(
+            r#"{
+            "songs": {"Band/Song": {"plays": 4}},
+            "song_preferences": {"external://Band/Song": {"rating": 6, "last_accuracy": 0.9}}
+        }"#,
+        )
+        .unwrap();
+        let path = "external://Band/Song/song/chart.harpchart";
+        assert_eq!(profile.song_play_count(path), 4);
+        profile.record_song_result(path, 0.7);
+        assert_eq!(profile.song_play_count(path), 5);
+        let renamed = "external://Band/Song/song/renamed.harpchart";
+        profile.record_song_result(renamed, 0.8);
+        assert_eq!(profile.song_play_count(renamed), 6);
+        assert_eq!(profile.songs["Band/Song"].plays, 4);
+        let separate = "packs://repo/Band/Song/song/chart.harpchart";
+        assert_eq!(profile.song_play_count(separate), 0);
+        profile.record_song_result(separate, 0.5);
+        assert_eq!(profile.song_play_count(separate), 1);
+        assert_eq!(profile.song_play_count(path), 6);
+        let restored: PlayerProfile =
+            serde_json::from_slice(&serde_json::to_vec(&profile).unwrap()).unwrap();
+        assert_eq!(restored.song_play_count(path), 6);
+        assert_eq!(restored.song_play_count(separate), 1);
+        assert_eq!(restored.song_play_count("unplayed"), 0);
+    }
+
+    #[test]
+    fn catalog_results_replace_previous_runs_and_survive_serialization() {
+        let first = "packs://first/Band/Song/song/old.harpchart";
+        let renamed = "packs://first/Band/Song/song/new.harpchart";
+        let second = "packs://second/Band/Song/song/old.harpchart";
+        let identity = harmonicon_platform::song_library::song_identity(first);
+        let mut profile: PlayerProfile = serde_json::from_str("{\"songs\":{}} ").unwrap();
+        assert!(profile.song_preferences.is_empty());
+        profile.song_preferences.entry(identity.into()).or_default().rating = 7;
+        profile.record_song_result(first, 0.95);
+        profile.record_song_result(renamed, 0.4);
+        profile.record_song_result(second, 0.8);
+        let restored: PlayerProfile =
+            serde_json::from_slice(&serde_json::to_vec(&profile).unwrap()).unwrap();
+        assert_eq!(
+            restored.song_preferences[identity],
+            SongPreferences { rating: 7, last_accuracy: Some(0.4), plays: Some(2) }
+        );
+        assert_eq!(
+            restored.song_preferences[harmonicon_platform::song_library::song_identity(second)]
+                .last_accuracy,
+            Some(0.8)
+        );
+    }
 
     fn record() -> SongRecord {
         SongRecord::default()

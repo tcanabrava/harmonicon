@@ -12,6 +12,7 @@ use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area;
 
 use harmonicon_app::app::{GameplayMode, SelectedSong};
+use harmonicon_app::profile::{PlayerProfile, SongPreferences, save_profile};
 #[cfg(not(target_arch = "wasm32"))]
 use harmonicon_packs::{pack::PackKind, repo::RepoSpec};
 use harmonicon_platform::assets_management::{AvailableSongs, SongEntry, SongsRescanned};
@@ -20,7 +21,7 @@ use harmonicon_platform::content_packs::{ContentPacks, PackEntry, PackStatus};
 #[cfg(not(target_arch = "wasm32"))]
 use harmonicon_platform::content_sync::{PackSync, UpdateState};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::song_library::SongLibrary;
+use harmonicon_platform::song_library::{SongLibrary, song_identity};
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
@@ -40,11 +41,15 @@ pub(crate) enum SongSort {
     Difficulty,
     Song,
     Genre,
+    Rating,
+    Mastery,
+    TimesPlayed,
 }
 
 #[derive(Resource, Clone, Debug, Default)]
 pub(crate) struct SongPickerState {
     query: String,
+    mastery_filter: u8,
     sort: SongSort,
     selected: Option<String>,
     descending: bool,
@@ -83,6 +88,7 @@ pub(crate) struct SongPickerSearch;
 #[derive(Component, Clone)]
 pub(crate) enum PickerSummary {
     Count,
+    MasteryFilter,
     Title,
     Metadata,
     Empty,
@@ -175,6 +181,8 @@ fn spawn_update_status(commands: &mut Commands, parent: Entity, message: String)
 pub(crate) fn setup_artist_list(
     mut commands: Commands,
     songs: Res<AvailableSongs>,
+    profile: Res<PlayerProfile>,
+    asset_server: Res<AssetServer>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     mode: Res<GameplayMode>,
@@ -220,13 +228,19 @@ pub(crate) fn setup_artist_list(
                 border: {UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) }},
             }
             Children [
-                @sort_choice(SongSort::Song, 40.0, loc.msg("song-sort-name").to_string())
+                @sort_choice(SongSort::Song, 25.0, loc.msg("song-sort-name").to_string())
                 --
-                @sort_choice(SongSort::Band, 25.0, loc.msg("song-sort-band").to_string())
+                @sort_choice(SongSort::Band, 16.0, loc.msg("song-sort-band").to_string())
                 --
-                @sort_choice(SongSort::Genre, 20.0, loc.msg("song-sort-genre").to_string())
+                @sort_choice(SongSort::Genre, 11.0, loc.msg("song-sort-genre").to_string())
                 --
-                @sort_choice(SongSort::Difficulty, 15.0, loc.msg("song-sort-difficulty").to_string())
+                @sort_choice(SongSort::Difficulty, 12.0, loc.msg("song-sort-difficulty").to_string())
+                --
+                @sort_choice(SongSort::Rating, 16.0, loc.msg("song-sort-rating").to_string())
+                --
+                @sort_choice(SongSort::Mastery, 10.0, loc.msg("song-sort-mastery").to_string())
+                --
+                @sort_choice(SongSort::TimesPlayed, 10.0, loc.msg("song-sort-times-played").to_string())
             ]
         })
         .id();
@@ -282,7 +296,7 @@ pub(crate) fn setup_artist_list(
             })
         },
     );
-    populate_rows(&mut commands, rows, &songs, &state, true, &[]);
+    populate_rows(&mut commands, rows, &songs, &state, &profile, Some(&asset_server), true, &[]);
 }
 
 /// The search label, text field, Clear button and result count.
@@ -340,6 +354,13 @@ fn spawn_search_row(commands: &mut Commands, loc: &Localization, query: &str) ->
                 }
             },
         ));
+        r.spawn_empty().apply_scene(button::small(
+            &loc.msg("song-mastery-filter"),
+            |_: On<Activate>, mut state: ResMut<SongPickerState>| {
+                state.mastery_filter = (state.mastery_filter + 1) % 5;
+            },
+        ));
+        r.spawn_empty().apply_scene(summary(PickerSummary::MasteryFilter, 14.0));
         r.spawn_empty().apply_scene(summary(PickerSummary::Count, 14.0));
     });
     row
@@ -513,6 +534,7 @@ fn mode_label(two_d: bool, label: &'static str, is_2d: bool) -> impl Scene {
 pub(crate) fn update_picker_summary(
     state: Res<SongPickerState>,
     songs: Res<AvailableSongs>,
+    profile: Res<PlayerProfile>,
     mode: Res<GameplayMode>,
     loc: Res<Localization>,
     mut summaries: Query<(&mut Text, &mut Node, Ref<PickerSummary>)>,
@@ -537,14 +559,26 @@ pub(crate) fn update_picker_summary(
     }
     if !state.is_changed()
         && !songs.is_changed()
+        && !profile.is_changed()
         && !summaries.iter().any(|(_, _, kind)| kind.is_added())
     {
         return;
     }
-    let visible = collect_songs(&songs, &state);
+    let visible = collect_songs(&songs, &state, &profile);
     let selected = visible.iter().find(|song| Some(&song.asset_path) == state.selected.as_ref());
     for (mut text, mut node, kind) in &mut summaries {
         let label = match *kind {
+            PickerSummary::MasteryFilter => loc
+                .msg(
+                    [
+                        "song-mastery-all",
+                        "song-mastery-unplayed",
+                        "song-mastery-low",
+                        "song-mastery-medium",
+                        "song-mastery-high",
+                    ][state.mastery_filter as usize],
+                )
+                .to_string(),
             PickerSummary::Count => {
                 if visible.len() == 1 {
                     loc.msg("song-result-one").to_string()
@@ -671,16 +705,180 @@ fn levenshtein_substring(query: &[char], word: &str) -> usize {
     previous.into_iter().min().unwrap_or(query.len())
 }
 
-fn collect_songs(available: &AvailableSongs, state: &SongPickerState) -> Vec<SongEntry> {
+fn preferences(profile: &PlayerProfile, path: &str) -> SongPreferences {
+    profile.song_preferences.get(song_identity(path)).cloned().unwrap_or_default()
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct PersonalRating(String);
+
+#[derive(Component, Clone)]
+pub(crate) enum PersonalStat {
+    Mastery(String),
+    TimesPlayed(String),
+}
+
+fn rating_image(server: Option<&AssetServer>, rating: u8) -> Handle<Image> {
+    server.map_or_else(Handle::default, |server| {
+        server.load(format!("ui/ratings/{}.png", rating.min(10)))
+    })
+}
+
+#[derive(Component, Clone)]
+struct RatingChoice {
+    path: String,
+    half_stars: u8,
+}
+
+fn rating_choice(path: String, half_stars: u8) -> impl Scene {
+    bsn! {
+        ~{RatingChoice { path, half_stars }}
+        WidgetButton
+        TabIndex(0)
+        Node {
+            width: {Val::Percent(10.0)},
+            height: {Val::Percent(100.0)},
+            flex_shrink: {0.0_f32},
+        }
+        on(set_rating_choice)
+    }
+}
+
+fn rating_cell(path: String, image: Handle<Image>) -> impl Scene {
+    let personal = PersonalRating(path.clone());
+    bsn! {
+        Node {
+            width: {Val::Percent(16.0)},
+            flex_shrink: {0.0_f32},
+            padding: {UiRect::axes(Val::Px(12.0), Val::Px(12.0))},
+            overflow: {Overflow::clip()},
+        }
+        Children [
+            Node { width: {Val::Px(90.0)}, height: {Val::Px(18.0)} }
+            Children [
+                ~{personal}
+                ImageNode { image: {image} }
+                Node {
+                    position_type: {PositionType::Absolute},
+                    width: {Val::Percent(100.0)}, height: {Val::Percent(100.0)},
+                }
+                ~{bevy::picking::Pickable::IGNORE}
+                --
+                @rating_choice(path.clone(), 1)
+                --
+                @rating_choice(path.clone(), 2)
+                --
+                @rating_choice(path.clone(), 3)
+                --
+                @rating_choice(path.clone(), 4)
+                --
+                @rating_choice(path.clone(), 5)
+                --
+                @rating_choice(path.clone(), 6)
+                --
+                @rating_choice(path.clone(), 7)
+                --
+                @rating_choice(path.clone(), 8)
+                --
+                @rating_choice(path.clone(), 9)
+                --
+                @rating_choice(path.clone(), 10)
+            ]
+        ]
+    }
+}
+
+/// The first click selects a different row. Subsequent clicks set its rating;
+/// clicking the current value again clears it back to zero stars.
+fn choose_rating(
+    state: &mut SongPickerState,
+    profile: &mut PlayerProfile,
+    choice: &RatingChoice,
+) -> bool {
+    if state.selected.as_deref() != Some(choice.path.as_str()) {
+        state.selected = Some(choice.path.clone());
+        return false;
+    }
+    let record =
+        profile.song_preferences.entry(song_identity(&choice.path).to_owned()).or_default();
+    record.rating = if record.rating == choice.half_stars { 0 } else { choice.half_stars };
+    true
+}
+
+fn set_rating_choice(
+    event: On<Activate>,
+    choices: Query<&RatingChoice>,
+    mut state: ResMut<SongPickerState>,
+    mut profile: ResMut<PlayerProfile>,
+) {
+    let Ok(choice) = choices.get(event.entity) else { return };
+    if choose_rating(&mut state, &mut profile, choice) {
+        save_profile(&profile);
+    }
+}
+
+fn mastery_label(personal: &SongPreferences) -> String {
+    personal.last_accuracy.map_or_else(|| "—".into(), |a| format!("{:.0}%", a * 100.0))
+}
+
+fn personal_stat_cell(stat: PersonalStat, label: String) -> impl Scene {
+    bsn! {
+        Node {
+            width: {Val::Percent(10.0)},
+            flex_shrink: {0.0_f32},
+            padding: {UiRect::axes(Val::Px(12.0), Val::Px(12.0))},
+            overflow: {Overflow::clip()},
+        }
+        ~{bevy::picking::Pickable::IGNORE}
+        Children [
+            ~{stat}
+            Text({label})
+            TextFont { font_size: {FontSize::Px(15.0)} }
+            TextColor({Color::srgb(0.76, 0.80, 0.87)})
+            ~{bevy::picking::Pickable::IGNORE}
+        ]
+    }
+}
+
+fn collect_songs(
+    available: &AvailableSongs,
+    state: &SongPickerState,
+    profile: &PlayerProfile,
+) -> Vec<SongEntry> {
     let query = state.query.trim();
     let mut entries: Vec<_> = available
         .0
         .values()
         .flatten()
         .filter(|song| matches_search(query, &[&song.name, &song.artist, &song.genre]))
+        .filter(|song| {
+            let accuracy = preferences(profile, &song.asset_path)
+                .last_accuracy
+                .map(|a| (a * 100.0).round() as u8);
+            match state.mastery_filter {
+                1 => accuracy.is_none(),
+                2 => accuracy.is_some_and(|a| a < 50),
+                3 => accuracy.is_some_and(|a| (50..80).contains(&a)),
+                4 => accuracy.is_some_and(|a| a >= 80),
+                _ => true,
+            }
+        })
         .cloned()
         .collect();
     entries.sort_by(|a, b| match state.sort {
+        SongSort::TimesPlayed => profile
+            .song_play_count(&a.asset_path)
+            .cmp(&profile.song_play_count(&b.asset_path))
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+        SongSort::Rating => preferences(profile, &a.asset_path)
+            .rating
+            .cmp(&preferences(profile, &b.asset_path).rating)
+            .then_with(|| a.name.cmp(&b.name)),
+        SongSort::Mastery => preferences(profile, &a.asset_path)
+            .last_accuracy
+            .partial_cmp(&preferences(profile, &b.asset_path).last_accuracy)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.name.cmp(&b.name)),
         SongSort::Band => a
             .artist
             .to_lowercase()
@@ -728,13 +926,19 @@ fn song_cell(label: String, width: f32, title: bool) -> impl Scene {
     }
 }
 
-/// One song in the list. Moving the pointer over it previews it; activating
-/// it opens the harp check for it.
-fn song_row(song: SongEntry, index: usize, selected: bool) -> impl Scene {
+/// One song in the list. Activation selects it; pointer movement leaves
+/// selection alone so its rating and the bottom panel remain reachable.
+fn song_row(
+    song: SongEntry,
+    index: usize,
+    selected: bool,
+    personal: SongPreferences,
+    rating: Handle<Image>,
+    times_played: u32,
+) -> impl Scene {
     let base = if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
     let border = if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE };
     let path = song.asset_path.clone();
-    let preview_path = path.clone();
     let row = SongRow { path: path.clone(), index };
     bsn! {
         WidgetButton
@@ -749,39 +953,23 @@ fn song_row(song: SongEntry, index: usize, selected: bool) -> impl Scene {
             justify_content: {JustifyContent::FlexStart},
         }
         @button::tinted(base)
-        // Layout changes can emit PointerOver beneath a stationary cursor.
-        // Only actual pointer movement should replace a keyboard selection.
-        on(move |event: On<bevy::picking::events::PointerMove>,
-                 mut state: ResMut<SongPickerState>,
-                 mut focus: ResMut<InputFocus>,
-                 mut visible: ResMut<InputFocusVisible>,
-                 inputs: Query<(), With<EditableText>>| {
-            if event.delta == Vec2::ZERO {
-                return;
-            }
-            if state.selected.as_deref() != Some(preview_path.as_str()) {
-                state.selected = Some(preview_path.clone());
-            }
-            if !focus.get().is_some_and(|entity| inputs.contains(entity)) {
-                focus.set(event.entity, FocusCause::Navigated);
-                visible.0 = false;
-            }
-        })
-        on(move |_: On<Activate>,
-                 asset_server: Res<AssetServer>,
-                 mut page: ResMut<NextState<MenuPage>>,
-                 mut commands: Commands| {
-            commands.insert_resource(SelectedSong(asset_server.load::<SongManifest>(path.clone())));
-            page.set(MenuPage::HarpCheck);
+        on(move |_: On<Activate>, mut state: ResMut<SongPickerState>| {
+            state.selected = Some(path.clone());
         })
         Children [
-            @song_cell(song.name.clone(), 40.0, true)
+            @song_cell(song.name.clone(), 25.0, true)
             --
-            @song_cell(song.artist.clone(), 25.0, false)
+            @song_cell(song.artist.clone(), 16.0, false)
             --
-            @song_cell(song.genre.clone(), 20.0, false)
+            @song_cell(song.genre.clone(), 11.0, false)
             --
-            @song_cell(song.difficulty.clone(), 15.0, false)
+            @song_cell(song.difficulty.clone(), 12.0, false)
+            --
+            @rating_cell(song.asset_path.clone(), rating)
+            --
+            @personal_stat_cell(PersonalStat::Mastery(song.asset_path.clone()), mastery_label(&personal))
+            --
+            @personal_stat_cell(PersonalStat::TimesPlayed(song.asset_path.clone()), times_played.to_string())
         ]
     }
 }
@@ -791,11 +979,13 @@ fn populate_rows(
     root: Entity,
     songs: &AvailableSongs,
     state: &SongPickerState,
+    profile: &PlayerProfile,
+    asset_server: Option<&AssetServer>,
     focus_rows: bool,
     existing: &[(Entity, String)],
 ) {
     let mut children = Vec::new();
-    for (index, song) in collect_songs(songs, state).into_iter().enumerate() {
+    for (index, song) in collect_songs(songs, state, profile).into_iter().enumerate() {
         let path = song.asset_path.clone();
         if let Some((entity, _)) = existing.iter().find(|(_, old_path)| *old_path == path) {
             commands.entity(*entity).insert(SongRow { path, index });
@@ -803,7 +993,16 @@ fn populate_rows(
             continue;
         }
         let selected = state.selected.as_deref() == Some(path.as_str());
-        let row = commands.spawn_scene(song_row(song, index, selected)).id();
+        let row = commands
+            .spawn_scene(song_row(
+                song,
+                index,
+                selected,
+                preferences(profile, &path),
+                rating_image(asset_server, preferences(profile, &path).rating),
+                profile.song_play_count(&path),
+            ))
+            .id();
         if focus_rows && (selected || (state.selected.is_none() && index == 0)) {
             commands.entity(row).insert(AutoFocus);
         }
@@ -845,14 +1044,30 @@ pub(crate) fn handle_song_delete(
 pub(crate) fn refresh_song_picker(
     mut commands: Commands,
     mut rescanned: MessageReader<SongsRescanned>,
+    asset_server: Option<Res<AssetServer>>,
+    mut rating_images: Query<(&PersonalRating, &mut ImageNode)>,
+    mut personal_stats: Query<(&PersonalStat, &mut Text)>,
     songs: Res<AvailableSongs>,
+    profile: Res<PlayerProfile>,
     inputs: Query<&EditableText, With<SongPickerSearch>>,
     roots: Query<Entity, With<SongPickerRows>>,
     mut state: ResMut<SongPickerState>,
-    mut rendered: Local<Option<(String, SongSort, bool)>>,
+    mut rendered: Local<Option<(String, SongSort, bool, u8)>>,
     focus: Res<InputFocus>,
     song_rows: Query<(Entity, &SongRow)>,
 ) {
+    if profile.is_changed() {
+        for (cell, mut image) in &mut rating_images {
+            image.image =
+                rating_image(asset_server.as_deref(), preferences(&profile, &cell.0).rating);
+        }
+        for (cell, mut text) in &mut personal_stats {
+            text.0 = match cell {
+                PersonalStat::Mastery(path) => mastery_label(&preferences(&profile, path)),
+                PersonalStat::TimesPlayed(path) => profile.song_play_count(path).to_string(),
+            };
+        }
+    }
     let input_changed = inputs.iter().next().is_some_and(|input| {
         let query = input.value().to_string().to_lowercase();
         if query != state.query {
@@ -865,16 +1080,18 @@ pub(crate) fn refresh_song_picker(
     let rescanned = rescanned.read().next().is_some();
     if !input_changed
         && !songs.is_changed()
+        && !profile.is_changed()
         && !rescanned
-        && rendered.as_ref() == Some(&(state.query.clone(), state.sort, state.descending))
+        && rendered.as_ref()
+            == Some(&(state.query.clone(), state.sort, state.descending, state.mastery_filter))
     {
         return;
     }
-    let sort_changed = rendered
-        .as_ref()
-        .is_none_or(|(_, sort, descending)| *sort != state.sort || *descending != state.descending);
-    *rendered = Some((state.query.clone(), state.sort, state.descending));
-    let visible = collect_songs(&songs, &state);
+    let sort_changed = rendered.as_ref().is_none_or(|(_, sort, descending, _)| {
+        *sort != state.sort || *descending != state.descending
+    });
+    *rendered = Some((state.query.clone(), state.sort, state.descending, state.mastery_filter));
+    let visible = collect_songs(&songs, &state, &profile);
     if !visible.iter().any(|song| Some(&song.asset_path) == state.selected.as_ref()) {
         state.selected = visible.first().map(|song| song.asset_path.clone());
     }
@@ -892,6 +1109,8 @@ pub(crate) fn refresh_song_picker(
             root,
             &songs,
             &state,
+            &profile,
+            asset_server.as_deref(),
             focus.get().is_none_or(|entity| song_rows.contains(entity)),
             if rescanned { &[] } else { &existing },
         );
@@ -950,8 +1169,7 @@ pub(crate) fn navigate_song_picker(
     let navigating = [KeyCode::ArrowDown, KeyCode::ArrowUp, KeyCode::Home, KeyCode::End]
         .iter()
         .any(|key| keyboard.just_pressed(*key));
-    // Hover can preview another song without stealing focus from Search.
-    // An unchanged keyboard focus must not overwrite that preview each frame.
+    // Only navigation or a focus change should affect the selected row.
     if !navigating && !focus.is_changed() {
         return;
     }
@@ -961,10 +1179,13 @@ pub(crate) fn navigate_song_picker(
         return;
     }
     let current = ordered.iter().position(|(entity, _, _)| Some(*entity) == focus.get());
+    let navigation_origin = current.or_else(|| {
+        ordered.iter().position(|(_, row, _)| state.selected.as_deref() == Some(row.path.as_str()))
+    });
     let next = if keyboard.just_pressed(KeyCode::ArrowDown) {
-        Some(current.map_or(0, |i| (i + 1).min(ordered.len() - 1)))
+        Some(navigation_origin.map_or(0, |i| (i + 1).min(ordered.len() - 1)))
     } else if keyboard.just_pressed(KeyCode::ArrowUp) {
-        Some(current.map_or(ordered.len() - 1, |i| i.saturating_sub(1)))
+        Some(navigation_origin.map_or(ordered.len() - 1, |i| i.saturating_sub(1)))
     } else if keyboard.just_pressed(KeyCode::Home) {
         Some(0)
     } else if keyboard.just_pressed(KeyCode::End) {
@@ -1039,6 +1260,184 @@ pub(crate) fn update_picker_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn row_click_selects_without_playing_and_hover_keeps_selection() {
+        use bevy::picking::{
+            backend::HitData,
+            events::{Pointer, PointerMove},
+            pointer::{Location, PointerId},
+        };
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin))
+            .init_resource::<SongPickerState>()
+            .init_resource::<PlayerProfile>()
+            .init_resource::<NextState<MenuPage>>()
+            .add_systems(Startup, |mut commands: Commands| {
+                for index in 0..2 {
+                    commands.spawn_scene(song_row(
+                        SongEntry {
+                            name: format!("Song {index}"),
+                            artist: "Band".into(),
+                            genre: "Rock".into(),
+                            difficulty: "easy".into(),
+                            source_name: "repo".into(),
+                            retained: false,
+                            asset_path: format!("song-{index}"),
+                        },
+                        index,
+                        false,
+                        SongPreferences::default(),
+                        Handle::default(),
+                        0,
+                    ));
+                }
+            });
+        app.update();
+        let mut rows: Vec<_> = app
+            .world_mut()
+            .query::<(Entity, &SongRow)>()
+            .iter(app.world())
+            .map(|(e, row)| (row.index, e))
+            .collect();
+        rows.sort_by_key(|(i, _)| *i);
+        app.world_mut().trigger(Activate { entity: rows[0].1 });
+        assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song-0"));
+        let camera = app.world_mut().spawn_empty().id();
+        app.world_mut().trigger(PointerMove {
+            entity: rows[1].1,
+            pointer: Pointer::new(
+                PointerId::Mouse,
+                Location {
+                    target: bevy::camera::NormalizedRenderTarget::None { width: 100, height: 100 },
+                    position: Vec2::new(20.0, 20.0),
+                },
+            ),
+            hit: HitData::new(camera, 0.0, None, None),
+            delta: Vec2::new(10.0, 10.0),
+        });
+        assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song-0"));
+        assert!(!app.world().contains_resource::<SelectedSong>());
+        assert!(matches!(app.world().resource::<NextState<MenuPage>>(), NextState::Unchanged));
+        let choices: Vec<_> = app
+            .world_mut()
+            .query::<(Entity, &RatingChoice)>()
+            .iter(app.world())
+            .filter(|(_, c)| c.path == "song-1")
+            .map(|(e, c)| (e, c.half_stars))
+            .collect();
+        assert_eq!(choices.len(), 10);
+        // A star click on another row selects it before changing any rating.
+        app.world_mut().trigger(Activate { entity: choices[0].0 });
+        assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song-1"));
+        assert!(app.world().resource::<PlayerProfile>().song_preferences.is_empty());
+        assert!(!app.world().contains_resource::<SelectedSong>());
+    }
+
+    #[test]
+    fn stars_choose_exact_half_steps_only_after_selection_and_can_clear() {
+        let mut state = SongPickerState { selected: Some("other".into()), ..default() };
+        let mut profile = PlayerProfile::default();
+        let mut choice = RatingChoice { path: "song".into(), half_stars: 7 };
+        assert!(!choose_rating(&mut state, &mut profile, &choice));
+        assert_eq!(state.selected.as_deref(), Some("song"));
+        assert!(profile.song_preferences.is_empty());
+        for half_stars in 1..=10 {
+            choice.half_stars = half_stars;
+            assert!(choose_rating(&mut state, &mut profile, &choice));
+            assert_eq!(preferences(&profile, "song").rating, half_stars);
+        }
+        assert!(choose_rating(&mut state, &mut profile, &choice));
+        assert_eq!(preferences(&profile, "song").rating, 0);
+    }
+
+    #[test]
+    fn navigation_after_rating_stays_relative_to_selected_song() {
+        let (mut app, rows) = navigation_app();
+        let star = app.world_mut().spawn_empty().id();
+        app.world_mut().resource_mut::<InputFocus>().set(star, FocusCause::Navigated);
+        app.world_mut().resource_mut::<SongPickerState>().selected = Some("song-1".into());
+        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::ArrowDown);
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(rows[2]));
+        assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song-2"));
+    }
+
+    #[test]
+    fn personal_columns_refresh_counts_and_mastery_on_existing_rows() {
+        let mut app = App::new();
+        app.init_resource::<SongPickerState>()
+            .init_resource::<PlayerProfile>()
+            .init_resource::<AvailableSongs>()
+            .init_resource::<InputFocus>()
+            .add_message::<SongsRescanned>()
+            .add_systems(Update, refresh_song_picker);
+        let plays =
+            app.world_mut().spawn((PersonalStat::TimesPlayed("song".into()), Text::new("0"))).id();
+        let mastery =
+            app.world_mut().spawn((PersonalStat::Mastery("song".into()), Text::new("—"))).id();
+        app.update();
+        app.world_mut().resource_mut::<PlayerProfile>().record_song_result("song", 0.76);
+        app.update();
+        assert_eq!(app.world().get::<Text>(plays).unwrap().0, "1");
+        assert_eq!(app.world().get::<Text>(mastery).unwrap().0, "76%");
+        app.world_mut().resource_mut::<PlayerProfile>().record_song_result("song", 0.40);
+        app.update();
+        assert_eq!(app.world().get::<Text>(plays).unwrap().0, "2");
+        assert_eq!(app.world().get::<Text>(mastery).unwrap().0, "40%");
+    }
+
+    #[test]
+    fn personal_columns_sort_and_filter_the_latest_result() {
+        let entry = |name: &str| SongEntry {
+            artist: "Band".into(),
+            name: name.into(),
+            genre: "Rock".into(),
+            difficulty: "easy".into(),
+            source_name: "repo".into(),
+            retained: false,
+            asset_path: format!("packs://repo/Band/{name}/song/chart.harpchart"),
+        };
+        let songs = [entry("Unplayed"), entry("Low"), entry("Medium"), entry("High")];
+        let mut available = AvailableSongs::default();
+        available.0.insert("Band".into(), songs.to_vec());
+        let mut profile = PlayerProfile::default();
+        for (song, accuracy, rating) in [(1, 0.49, 9), (2, 0.5, 3), (3, 0.8, 6)] {
+            profile.record_song_result(&songs[song].asset_path, accuracy);
+            profile
+                .song_preferences
+                .get_mut(song_identity(&songs[song].asset_path))
+                .unwrap()
+                .rating = rating;
+        }
+        profile.record_song_result(&songs[1].asset_path, 0.49);
+        profile.record_song_result(&songs[3].asset_path, 0.8);
+        profile.record_song_result(&songs[3].asset_path, 0.8);
+        let mut state = SongPickerState { sort: SongSort::Rating, ..default() };
+        let names = |state: &SongPickerState| {
+            collect_songs(&available, state, &profile)
+                .into_iter()
+                .map(|song| song.name)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(&state), ["Unplayed", "Medium", "High", "Low"]);
+        state.descending = true;
+        assert_eq!(names(&state), ["Low", "High", "Medium", "Unplayed"]);
+        state.sort = SongSort::TimesPlayed;
+        state.descending = false;
+        assert_eq!(names(&state), ["Unplayed", "Medium", "Low", "High"]);
+        state.descending = true;
+        assert_eq!(names(&state), ["High", "Low", "Medium", "Unplayed"]);
+        state.sort = SongSort::Mastery;
+        state.descending = false;
+        assert_eq!(names(&state), ["Unplayed", "Low", "Medium", "High"]);
+        for (filter, expected) in [(1, "Unplayed"), (2, "Low"), (3, "Medium"), (4, "High")] {
+            state.mastery_filter = filter;
+            assert_eq!(names(&state), [expected]);
+        }
+        state.query = "missing".into();
+        assert!(names(&state).is_empty());
+    }
 
     #[test]
     fn cancelling_song_deletion_keeps_selection_and_catalog() {
@@ -1242,6 +1641,7 @@ mod tests {
             .init_resource::<AvailableSongs>()
             .insert_resource(GameplayMode::Play2D)
             .insert_resource(Localization::new())
+            .init_resource::<PlayerProfile>()
             .add_systems(Update, update_picker_summary);
         app.world_mut().resource_mut::<AvailableSongs>().0.insert(
             "band".into(),
@@ -1310,10 +1710,10 @@ mod tests {
             (SongSort::Difficulty, "b"),
         ] {
             let mut state = SongPickerState { sort, ..default() };
-            let ascending = collect_songs(&available, &state);
+            let ascending = collect_songs(&available, &state, &PlayerProfile::default());
             assert_eq!(ascending[0].asset_path, first);
             state.descending = true;
-            let descending = collect_songs(&available, &state);
+            let descending = collect_songs(&available, &state, &PlayerProfile::default());
             assert_eq!(descending[0].asset_path, ascending[1].asset_path);
             assert_eq!(descending[1].asset_path, ascending[0].asset_path);
         }
@@ -1355,6 +1755,7 @@ mod tests {
             .init_resource::<SongPickerState>()
             .init_resource::<AvailableSongs>()
             .add_message::<SongsRescanned>()
+            .init_resource::<PlayerProfile>()
             .add_systems(Update, refresh_song_picker);
         app.world_mut().resource_mut::<AvailableSongs>().0.insert(
             "Eric Clapton".into(),
@@ -1381,6 +1782,10 @@ mod tests {
             assert_eq!(app.world().resource::<InputFocus>().get(), Some(input));
             assert_eq!(app.world().resource::<SongPickerState>().selected.as_deref(), Some("song"));
         }
+        app.world_mut().resource_mut::<PlayerProfile>().record_song_result("song", 0.6);
+        app.update();
+        assert_eq!(app.world().get::<Children>(root).unwrap()[0], row);
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(input));
         app.world_mut().get_mut::<EditableText>(input).unwrap().editor_mut().set_text("jazz");
         app.update();
         assert!(app.world().get::<SongRow>(row).is_none());
@@ -1408,7 +1813,7 @@ mod tests {
     }
 
     #[test]
-    fn unchanged_keyboard_focus_preserves_mouse_preview() {
+    fn unchanged_keyboard_focus_preserves_selection() {
         let (mut app, rows) = navigation_app();
         app.world_mut().resource_mut::<InputFocus>().set(rows[0], FocusCause::Navigated);
         app.update();

@@ -857,7 +857,7 @@ song-clear-search = Clear
 song-results = {$count} songs
 song-none-selected = Select a song
 song-no-results = No matching songs. Try fewer words or clear your search.
-song-picker-keys = Up/Down: Select   Enter: Play   /: Search   Esc: Back
+song-picker-keys = Up/Down: Select   Enter: Select   /: Search   Esc: Back
 song-result-one = 1 song
 
 song-update = Update songs: {$name}
@@ -871,3 +871,14 @@ dialog-overwrite = Replace the existing file {$path}?
 sync-continue = Continue without missing packs
 dialog-yes = Yes
 dialog-no = No
+
+# Personal song ratings and latest gameplay accuracy.
+song-sort-rating = My rating
+song-sort-mastery = Mastery
+song-mastery-filter = Filter mastery
+song-mastery-all = All
+song-mastery-unplayed = Unplayed
+song-mastery-low = Below 50%
+song-mastery-medium = 50–79%
+song-mastery-high = 80–100%
+song-sort-times-played = Times played

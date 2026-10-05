@@ -854,7 +854,7 @@ song-clear-search = Limpar
 song-results = {$count} músicas
 song-none-selected = Selecione uma música
 song-no-results = Nenhuma música encontrada. Tente menos palavras ou limpe a busca.
-song-picker-keys = Cima/Baixo: Selecionar   Enter: Jogar   /: Buscar   Esc: Voltar
+song-picker-keys = Cima/Baixo: Selecionar   Enter: Selecionar   /: Buscar   Esc: Voltar
 song-result-one = 1 música
 
 song-update = Atualizar músicas: {$name}
@@ -868,3 +868,14 @@ dialog-overwrite = Substituir o arquivo existente {$path}?
 sync-continue = Continuar sem os pacotes ausentes
 dialog-yes = Sim
 dialog-no = Não
+
+# Personal song ratings and latest gameplay accuracy.
+song-sort-rating = Minha avaliação
+song-sort-mastery = Domínio
+song-mastery-filter = Filtrar domínio
+song-mastery-all = Todas
+song-mastery-unplayed = Não tocadas
+song-mastery-low = Abaixo de 50%
+song-mastery-medium = 50–79%
+song-mastery-high = 80–100%
+song-sort-times-played = Vezes tocadas
