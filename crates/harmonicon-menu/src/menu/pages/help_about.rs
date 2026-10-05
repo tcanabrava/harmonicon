@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Documentation link, About, Tutorial, and Credits, plus the static
-//! "what is this app" About page reached from here.
+//! Help menu: documentation, Tutorial, first-time setup, and Credits.
 
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
@@ -99,12 +98,6 @@ pub(crate) fn setup_help_about_menu(
             }
         },
     );
-    spawn_button(
-        &mut commands,
-        root,
-        &loc.msg("menu-about"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::About),
-    );
     spawn_button(&mut commands, root, &loc.msg("menu-tutorial"), tutorial::start_tutorial_tour);
     // The first-run welcome, re-runnable: the same three steps a fresh
     // install offers, reachable without deleting the profile.
@@ -135,42 +128,5 @@ pub(crate) fn setup_help_about_menu(
         header,
         &loc.msg("back"),
         |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::Main),
-    );
-}
-
-pub(crate) fn setup_about_page(
-    mut commands: Commands,
-    theme: Res<LoadedTheme>,
-    loc: Res<Localization>,
-) {
-    let (root, header, _page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("about-title"), None, &theme, "About");
-    let body = commands
-        .spawn_empty()
-        .apply_scene(bsn! {
-            Text({String::from(loc.msg("about-body"))})
-            TextFont { font_size: {FontSize::Px(18.0)} }
-            TextColor({Color::srgb(0.85, 0.85, 0.9)})
-            Node { max_width: {Val::Px(560.0)} }
-        })
-        .id();
-    commands.entity(root).add_child(body);
-    let version = commands
-        .spawn_empty()
-        .apply_scene(bsn! {
-            Text({String::from(loc.msg_args(
-                "about-version",
-                &[("version", String::from(env!("CARGO_PKG_VERSION")))],
-            ))})
-            TextFont { font_size: {FontSize::Px(14.0)} }
-            TextColor({Color::srgb(0.6, 0.6, 0.7)})
-        })
-        .id();
-    commands.entity(root).add_child(version);
-    spawn_back_button(
-        &mut commands,
-        header,
-        &loc.msg("back"),
-        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| page.set(MenuPage::HelpAbout),
     );
 }

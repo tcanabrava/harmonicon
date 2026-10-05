@@ -17,7 +17,7 @@ push, and printing a diffstat first.
 
 | File | Why |
 |---|---|
-| `Cargo.toml` | the root `[package]` version — this is `CARGO_PKG_VERSION`, what Help / About shows |
+| `Cargo.toml` | the root `[package]` version — this is `CARGO_PKG_VERSION`, the application version |
 | `Cargo.lock` | carries the workspace's own package version; refreshed by `cargo metadata`, not by hand |
 | `packaging/android/app/build.gradle.kts` | `versionName` **and** `versionCode` |
 | `packaging/flatpak/*.metainfo.xml` | prepends a `<release>` entry dated today; Flathub reads this |

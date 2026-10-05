@@ -74,7 +74,6 @@ STATE_PAGES = [
     "JamSessionMenu",
     "JamGenerate",
     "HelpAbout",
-    "About",
 ]
 
 

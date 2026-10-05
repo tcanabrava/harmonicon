@@ -45,7 +45,7 @@ with the device picker and the "no microphone" warning), **Take the guided
 tour**, and **Start with a lesson**. Each one brings you back here when
 you're done, with a check beside it, so you can take the next; **Skip for
 now** goes straight to the main menu. You can come back to this page any
-time from **Help / About → First-time setup**.
+time from **Help → First-time setup**.
 
 ![The welcome page](images/welcome.png)
 

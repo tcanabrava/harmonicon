@@ -45,7 +45,7 @@ URL = "http://127.0.0.1:15702"
 PAGES = [
     "Main", "Welcome", "Play", "ArtistList", "SongList", "HarpCheck",
     "ModeSelect", "Options", "Theme", "LessonTree", "JamSessionMenu",
-    "JamGenerate", "HelpAbout", "About",
+    "JamGenerate", "HelpAbout",
 ]
 
 # Screens that need a `SelectedSong`: name → how to get there from the main

@@ -52,11 +52,9 @@ pub enum MenuPage {
     /// `harmonicon_jam::jam::backing`) — the no-existing-song alternative to
     /// `ArtistList`'s real-song Jam Session flow.
     JamGenerate,
-    /// Documentation link, About, Tutorial, and Credits — see
+    /// Documentation link, Tutorial, first-time setup, and Credits — see
     /// `pages::help_about::setup_help_about_menu`.
     HelpAbout,
-    /// Static "what is this app" page, reached from `HelpAbout`.
-    About,
 }
 
 /// Escape navigates back one level in the menu hierarchy, mirroring each
@@ -94,7 +92,6 @@ pub(crate) fn handle_menu_escape(
         MenuPage::HarpCheck => MenuPage::ArtistList,
         MenuPage::Theme | MenuPage::ContentSources => MenuPage::Options,
         MenuPage::LessonReader => MenuPage::LessonTree,
-        MenuPage::About => MenuPage::HelpAbout,
     };
     next_page.set(target);
 }

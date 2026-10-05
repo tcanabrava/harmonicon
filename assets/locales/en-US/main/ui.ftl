@@ -9,7 +9,7 @@ app-title = Harmonicon
 # Main menu
 menu-play = Play
 menu-options = Options
-menu-help = Help / About
+menu-help = Help
 menu-credits = Credits
 menu-tutorial = Tutorial
 menu-quit = Quit
@@ -24,14 +24,10 @@ bending-trainer = Bending Trainer
 jam-session-pick-song = Pick a Song
 jam-generate = Generate Jam
 
-# Help / About menu
-help-about-title = Help / About
+# Help menu
+help-about-title = Help
 help-documentation = Documentation
 help-docs-not-found = Documentation isn't built locally yet — run `mdbook build` in docs/book/.
-menu-about = About
-about-title = About Harmonicon
-about-body = Harmonicon is a rhythm game for diatonic and chromatic harmonica: play a real harmonica into your microphone and it's scored in real time against a scrolling chart, built to teach blues and jazz harmonica through play.
-about-version = Version { $version }
 
 # Mode select
 select-mode = Play view
@@ -720,7 +716,7 @@ options-input-lag-tooltip = Shift detected notes earlier/later to match your set
 tutorial-step = Step {$n} of {$total}
 tutorial-skip = Skip Tutorial
 tutorial-title-main = Main Menu
-tutorial-body-main = Your home base — head into Play, open Options, or find Help / About from here.
+tutorial-body-main = Your home base — head into Play, open Options, or find Help from here.
 tutorial-title-play = Play
 tutorial-body-play = Pick a real song, create one, start a jam, practice bends, or work through lessons — choose how you want to play.
 tutorial-title-mode-select = Song picker
@@ -743,8 +739,8 @@ tutorial-title-jam-generate = Generate Jam
 tutorial-body-jam-generate = Spin up an instant backing track in any key and tempo — no song required.
 tutorial-title-song-editor = Song Editor
 tutorial-body-song-editor = Build or edit a chart by hand on this grid, then play it back or practice along with it live.
-tutorial-title-help-about = Help / About
-tutorial-body-help-about = Open the documentation, read about Harmonicon, retake this tour, or check the credits.
+tutorial-title-help-about = Help
+tutorial-body-help-about = Open the documentation, retake this tour, or check the credits.
 
 editor-tab-chart = Chart
 editor-tab-details = Details

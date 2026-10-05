@@ -7,7 +7,7 @@ app-title = Harmonicon
 # Menú principal
 menu-play = Jugar
 menu-options = Opciones
-menu-help = Ayuda / Acerca de
+menu-help = Ayuda
 menu-credits = Créditos
 menu-tutorial = Tutorial
 menu-quit = Salir
@@ -22,14 +22,10 @@ bending-trainer = Entrenador de Bends
 jam-session-pick-song = Elegir una Canción
 jam-generate = Generar Jam
 
-# Menú de Ayuda / Acerca de
-help-about-title = Ayuda / Acerca de
+# Menú de Ayuda
+help-about-title = Ayuda
 help-documentation = Documentación
 help-docs-not-found = La documentación aún no se ha generado localmente — ejecuta `mdbook build` en docs/book/.
-menu-about = Acerca de
-about-title = Acerca de Harmonicon
-about-body = Harmonicon es un juego de ritmo para armónica diatónica y cromática: toca una armónica real en el micrófono y se puntúa en tiempo real contra una partitura, creado para enseñar armónica de blues y jazz jugando.
-about-version = Versión { $version }
 
 # Selección de modo
 select-mode = Vista de juego
@@ -718,7 +714,7 @@ options-input-lag-tooltip = Adelanta/retrasa las notas detectadas para ajustarse
 tutorial-step = Paso {$n} de {$total}
 tutorial-skip = Saltar Tutorial
 tutorial-title-main = Menú Principal
-tutorial-body-main = Tu base — ve a Jugar, abre Opciones o encuentra Ayuda / Acerca de desde aquí.
+tutorial-body-main = Tu base — ve a Jugar, abre Opciones o encuentra Ayuda desde aquí.
 tutorial-title-play = Jugar
 tutorial-body-play = Elige una canción real, crea una, empieza una jam, practica bends o sigue las lecciones — elige cómo quieres jugar.
 tutorial-title-mode-select = Selector de canciones
@@ -741,8 +737,8 @@ tutorial-title-jam-generate = Generar Jam
 tutorial-body-jam-generate = Genera una base instantánea en cualquier tono y tempo — sin necesidad de una canción.
 tutorial-title-song-editor = Editor de Canciones
 tutorial-body-song-editor = Crea o edita una partitura en esta cuadrícula, luego reprodúcela o practica junto a ella en vivo.
-tutorial-title-help-about = Ayuda / Acerca de
-tutorial-body-help-about = Abre la documentación, lee sobre Harmonicon, repite este recorrido o consulta los créditos.
+tutorial-title-help-about = Ayuda
+tutorial-body-help-about = Abre la documentación, repite este recorrido o consulta los créditos.
 
 editor-tab-chart = Partitura
 editor-tab-details = Detalles

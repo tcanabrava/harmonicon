@@ -35,6 +35,6 @@ to practice next.
   behave the way you expect.
 
 If you're brand new, the in-game **[Guided Tour](tutorial.md)** (Main Menu →
-Help / About → Tutorial) gives you a click-free, under-a-minute walk
+Help → Tutorial) gives you a click-free, under-a-minute walk
 through every top-level screen — including a few live seconds of actual
 gameplay — a good first stop before diving into this book.

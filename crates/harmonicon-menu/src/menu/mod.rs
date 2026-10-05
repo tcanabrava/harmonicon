@@ -125,8 +125,6 @@ impl Plugin for MenuPlugin {
             )
             .add_systems(OnEnter(MenuPage::HelpAbout), pages::help_about::setup_help_about_menu)
             .add_systems(OnExit(MenuPage::HelpAbout), scene::cleanup_menu)
-            .add_systems(OnEnter(MenuPage::About), pages::help_about::setup_about_page)
-            .add_systems(OnExit(MenuPage::About), scene::cleanup_menu)
             .add_systems(Update, routing::check_loading.run_if(in_state(AppState::SongLoading)))
             // The guided tour drives `NextState<AppState>`/`NextState<
             // MenuPage>` itself on a timer, and some steps leave

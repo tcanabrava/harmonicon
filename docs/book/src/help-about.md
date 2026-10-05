@@ -1,13 +1,11 @@
-# Help / About
+# Help
 
-**Main Menu → Help / About** collects everything that isn't about playing
+**Main Menu → Help** collects everything that isn't about playing
 the game itself:
 
 - **Documentation** — opens this book in your default browser, if it's
   been built locally (`mdbook build` in `docs/book/`). If it isn't found,
   a status message tells you so instead of failing silently.
-- **About** — a short description of Harmonicon and the version you're
-  running.
 - **Tutorial** — the guided tour of every screen. See
   [Guided Tour](tutorial.md).
 - **First-time setup** — re-opens the welcome page a fresh install starts

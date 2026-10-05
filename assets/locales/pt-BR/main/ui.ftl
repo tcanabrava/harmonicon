@@ -7,7 +7,7 @@ app-title = Harmonicon
 # Menu principal
 menu-play = Tocar
 menu-options = Opções
-menu-help = Ajuda / Sobre
+menu-help = Ajuda
 menu-credits = Créditos
 menu-tutorial = Tutorial
 menu-quit = Sair
@@ -22,14 +22,10 @@ bending-trainer = Treino de Bends
 jam-session-pick-song = Escolher uma Música
 jam-generate = Gerar Jam
 
-# Menu de Ajuda / Sobre
-help-about-title = Ajuda / Sobre
+# Menu de Ajuda
+help-about-title = Ajuda
 help-documentation = Documentação
 help-docs-not-found = A documentação ainda não foi gerada localmente — rode `mdbook build` em docs/book/.
-menu-about = Sobre
-about-title = Sobre o Harmonicon
-about-body = Harmonicon é um jogo de ritmo para gaita diatônica e cromática: toque uma gaita de verdade no microfone e seja pontuado em tempo real contra uma partitura, feito para ensinar gaita de blues e jazz através do jogo.
-about-version = Versão { $version }
 
 # Seleção de modo
 select-mode = Visualização de jogo
@@ -718,7 +714,7 @@ options-input-lag-tooltip = Adianta/atrasa as notas detectadas para bater com o 
 tutorial-step = Passo {$n} de {$total}
 tutorial-skip = Pular Tutorial
 tutorial-title-main = Menu Principal
-tutorial-body-main = Sua base — vá para Jogar, abra as Opções ou encontre Ajuda / Sobre por aqui.
+tutorial-body-main = Sua base — vá para Jogar, abra as Opções ou encontre Ajuda por aqui.
 tutorial-title-play = Jogar
 tutorial-body-play = Escolha uma música de verdade, crie uma, comece uma jam, pratique bends ou siga as lições — escolha como quer jogar.
 tutorial-title-mode-select = Seletor de músicas
@@ -741,8 +737,8 @@ tutorial-title-jam-generate = Gerar Jam
 tutorial-body-jam-generate = Gere uma base instantânea em qualquer tom e andamento — sem precisar de uma música.
 tutorial-title-song-editor = Editor de Canções
 tutorial-body-song-editor = Monte ou edite uma partitura nesta grade, depois toque-a ou pratique junto com ela ao vivo.
-tutorial-title-help-about = Ajuda / Sobre
-tutorial-body-help-about = Abra a documentação, leia sobre o Harmonicon, refaça este tour ou veja os créditos.
+tutorial-title-help-about = Ajuda
+tutorial-body-help-about = Abra a documentação, refaça este tour ou veja os créditos.
 
 editor-tab-chart = Partitura
 editor-tab-details = Detalhes

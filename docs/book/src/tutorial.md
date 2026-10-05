@@ -1,6 +1,6 @@
 # Guided Tour
 
-**Main Menu → Help / About → Tutorial** is a quick, hands-off tour: click
+**Main Menu → Help → Tutorial** is a quick, hands-off tour: click
 it and Harmonicon automatically walks through every top-level screen —
 including a few seconds of **live play**, not just menu captions — before
 returning you right back to where you started:
@@ -9,7 +9,7 @@ Main → Play → Select Mode → **a live [Play 2D](play-2d.md) demo** → Jam
 Session Menu → **a live [Jam Session](jam-session.md) demo** → [Generate a
 Jam](jam-generate.md) → **[Bending Trainer](bending-trainer.md)** →
 Lessons → **[Song Editor](song-editor.md)** → Options → Theme →
-Help / About → back to where you started.
+Help → back to where you started.
 
 ![Guided tour overlay](images/tutorial-overlay.png)
 
