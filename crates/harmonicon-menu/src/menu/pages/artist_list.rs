@@ -12,7 +12,7 @@ use bevy::ui_widgets::{Activate, Button as WidgetButton};
 use harmonicon_ui::dialogs::scroll_area::spawn_scroll_area;
 
 use harmonicon_app::app::{GameplayMode, SelectedSong};
-use harmonicon_app::profile::{PlayerProfile, SongPreferences, save_profile};
+use harmonicon_app::profile::{PlayerProfile, SongPreferences};
 #[cfg(not(target_arch = "wasm32"))]
 use harmonicon_packs::{pack::PackKind, repo::RepoSpec};
 use harmonicon_platform::assets_management::{AvailableSongs, SongEntry, SongsRescanned};
@@ -21,13 +21,24 @@ use harmonicon_platform::content_packs::{ContentPacks, PackEntry, PackStatus};
 #[cfg(not(target_arch = "wasm32"))]
 use harmonicon_platform::content_sync::{PackSync, UpdateState};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
-use harmonicon_platform::song_library::{SongLibrary, song_identity};
+use harmonicon_platform::song_library::SongLibrary;
+#[cfg(test)]
+use harmonicon_platform::song_library::song_identity;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
 use harmonicon_ui::dialogs::button::{BaseButtonColor, CHOICE_SELECTED};
 use harmonicon_ui::dialogs::confirm_dialog::{ConfirmChosen, DialogId, OpenConfirmDialog};
 use harmonicon_ui::dialogs::text_input::spawn_text_input;
+
+mod personal;
+
+use personal::{
+    PersonalRating, PersonalStat, mastery_label, personal_stat_cell, preferences, rating_cell,
+    rating_image,
+};
+#[cfg(test)]
+use personal::{RatingChoice, choose_rating};
 
 const DELETE_SONG: DialogId = DialogId("song_picker_delete");
 
@@ -703,141 +714,6 @@ fn levenshtein_substring(query: &[char], word: &str) -> usize {
         std::mem::swap(&mut previous, &mut current);
     }
     previous.into_iter().min().unwrap_or(query.len())
-}
-
-fn preferences(profile: &PlayerProfile, path: &str) -> SongPreferences {
-    profile.song_preferences.get(song_identity(path)).cloned().unwrap_or_default()
-}
-
-#[derive(Component, Clone)]
-pub(crate) struct PersonalRating(String);
-
-#[derive(Component, Clone)]
-pub(crate) enum PersonalStat {
-    Mastery(String),
-    TimesPlayed(String),
-}
-
-fn rating_image(server: Option<&AssetServer>, rating: u8) -> Handle<Image> {
-    server.map_or_else(Handle::default, |server| {
-        server.load(format!("ui/ratings/{}.png", rating.min(10)))
-    })
-}
-
-#[derive(Component, Clone)]
-struct RatingChoice {
-    path: String,
-    half_stars: u8,
-}
-
-fn rating_choice(path: String, half_stars: u8) -> impl Scene {
-    bsn! {
-        ~{RatingChoice { path, half_stars }}
-        WidgetButton
-        TabIndex(0)
-        Node {
-            width: {Val::Percent(10.0)},
-            height: {Val::Percent(100.0)},
-            flex_shrink: {0.0_f32},
-        }
-        on(set_rating_choice)
-    }
-}
-
-fn rating_cell(path: String, image: Handle<Image>) -> impl Scene {
-    let personal = PersonalRating(path.clone());
-    bsn! {
-        Node {
-            width: {Val::Percent(16.0)},
-            flex_shrink: {0.0_f32},
-            padding: {UiRect::axes(Val::Px(12.0), Val::Px(12.0))},
-            overflow: {Overflow::clip()},
-        }
-        Children [
-            Node { width: {Val::Px(90.0)}, height: {Val::Px(18.0)} }
-            Children [
-                ~{personal}
-                ImageNode { image: {image} }
-                Node {
-                    position_type: {PositionType::Absolute},
-                    width: {Val::Percent(100.0)}, height: {Val::Percent(100.0)},
-                }
-                ~{bevy::picking::Pickable::IGNORE}
-                --
-                @rating_choice(path.clone(), 1)
-                --
-                @rating_choice(path.clone(), 2)
-                --
-                @rating_choice(path.clone(), 3)
-                --
-                @rating_choice(path.clone(), 4)
-                --
-                @rating_choice(path.clone(), 5)
-                --
-                @rating_choice(path.clone(), 6)
-                --
-                @rating_choice(path.clone(), 7)
-                --
-                @rating_choice(path.clone(), 8)
-                --
-                @rating_choice(path.clone(), 9)
-                --
-                @rating_choice(path.clone(), 10)
-            ]
-        ]
-    }
-}
-
-/// The first click selects a different row. Subsequent clicks set its rating;
-/// clicking the current value again clears it back to zero stars.
-fn choose_rating(
-    state: &mut SongPickerState,
-    profile: &mut PlayerProfile,
-    choice: &RatingChoice,
-) -> bool {
-    if state.selected.as_deref() != Some(choice.path.as_str()) {
-        state.selected = Some(choice.path.clone());
-        return false;
-    }
-    let record =
-        profile.song_preferences.entry(song_identity(&choice.path).to_owned()).or_default();
-    record.rating = if record.rating == choice.half_stars { 0 } else { choice.half_stars };
-    true
-}
-
-fn set_rating_choice(
-    event: On<Activate>,
-    choices: Query<&RatingChoice>,
-    mut state: ResMut<SongPickerState>,
-    mut profile: ResMut<PlayerProfile>,
-) {
-    let Ok(choice) = choices.get(event.entity) else { return };
-    if choose_rating(&mut state, &mut profile, choice) {
-        save_profile(&profile);
-    }
-}
-
-fn mastery_label(personal: &SongPreferences) -> String {
-    personal.last_accuracy.map_or_else(|| "—".into(), |a| format!("{:.0}%", a * 100.0))
-}
-
-fn personal_stat_cell(stat: PersonalStat, label: String) -> impl Scene {
-    bsn! {
-        Node {
-            width: {Val::Percent(10.0)},
-            flex_shrink: {0.0_f32},
-            padding: {UiRect::axes(Val::Px(12.0), Val::Px(12.0))},
-            overflow: {Overflow::clip()},
-        }
-        ~{bevy::picking::Pickable::IGNORE}
-        Children [
-            ~{stat}
-            Text({label})
-            TextFont { font_size: {FontSize::Px(15.0)} }
-            TextColor({Color::srgb(0.76, 0.80, 0.87)})
-            ~{bevy::picking::Pickable::IGNORE}
-        ]
-    }
 }
 
 fn collect_songs(
