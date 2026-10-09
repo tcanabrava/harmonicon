@@ -32,7 +32,7 @@ accesskit = "0.24.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 midly = "0.5"
-bevy = { git = "https://github.com/bevyengine/bevy", tag = "v0.20.0-rc.2", features = ["wav"] }
+bevy = { version = "0.20.0", features = ["wav"] }
 cpal = "0.17"
 rustfft = "6.4"
 simsimd = "6.5.16"
