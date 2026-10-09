@@ -60,9 +60,22 @@ done
 
 # The first `version =` at column 0 is the root [package]'s — crates/ members
 # have their own manifests, and this is the one feeding CARGO_PKG_VERSION.
-CURRENT=$(grep -m1 '^version = ' "$CARGO_TOML" | cut -d'"' -f2)
+CARGO_VERSION=$(grep -m1 '^version = ' "$CARGO_TOML" | cut -d'"' -f2)
+
+# Every existing tag, normalised to three parts — the tag line has some
+# four-component strays (v0.0.9.1) that `sort -V` would otherwise rank oddly.
+HIGHEST_TAG=$(git tag \
+    | sed 's/^v//' \
+    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+' \
+    | cut -d. -f1-3 \
+    | sort -V | tail -1 || true)
+
+# The highest tag is the last thing actually released, so it is what gets
+# bumped. Cargo.toml can be ahead of it — a hand edit, or a run that died
+# before tagging — and bumping from that would skip a version on every retry.
+CURRENT="${HIGHEST_TAG:-$CARGO_VERSION}"
 [[ "$CURRENT" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] \
-    || die "Cargo.toml version '$CURRENT' is not a three-part semver"
+    || die "version '$CURRENT' is not a three-part semver"
 MAJOR="${BASH_REMATCH[1]}"; MINOR="${BASH_REMATCH[2]}"; PATCH="${BASH_REMATCH[3]}"
 
 case "$BUMP" in
@@ -80,16 +93,6 @@ higher_of() { printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1; }
 [ "$(higher_of "$CURRENT" "$NEXT")" = "$NEXT" ] && [ "$CURRENT" != "$NEXT" ] \
     || die "refusing to go from $CURRENT to $NEXT"
 
-# Every existing tag, normalised to three parts — the tag line has some
-# four-component strays (v0.0.9.1) that `sort -V` would otherwise rank oddly.
-HIGHEST_TAG=$(git tag \
-    | sed 's/^v//' \
-    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+' \
-    | cut -d. -f1-3 \
-    | sort -V | tail -1 || true)
-if [ -n "$HIGHEST_TAG" ] && [ "$(higher_of "$HIGHEST_TAG" "$NEXT")" != "$NEXT" ]; then
-    die "tag $TAG would not be above the highest existing tag (v$HIGHEST_TAG)"
-fi
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null \
     && die "tag $TAG already exists"
 
@@ -101,7 +104,10 @@ VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
 
 TODAY=$(date +%Y-%m-%d)
 
-printf '\nrelease %s -> %s (tag %s)\n\n' "$CURRENT" "$NEXT" "$TAG"
+printf '\nrelease %s -> %s (tag %s)\n' "$CURRENT" "$NEXT" "$TAG"
+[ "$CARGO_VERSION" = "$CURRENT" ] \
+    || printf '  (Cargo.toml says %s; the latest tag wins)\n' "$CARGO_VERSION"
+echo
 
 # ── Repository state ─────────────────────────────────────────────────────────
 
@@ -184,13 +190,15 @@ restore_touched() {
 
 apply_edits() {
     # Root [package] only: `0,/re/` bounds the substitution to the first match.
-    sed -i "0,/^version = \"$CURRENT\"/s//version = \"$NEXT\"/" "$CARGO_TOML"
+    sed -i "0,/^version = \"$CARGO_VERSION\"/s//version = \"$NEXT\"/" "$CARGO_TOML"
     step "Cargo.toml            version = \"$NEXT\""
 
     # The lock carries the workspace's own package version too. Rewritten by
     # cargo rather than by hand so the rest of the file stays exactly as
-    # cargo would write it.
-    cargo metadata --offline --format-version 1 >/dev/null 2>&1 \
+    # cargo would write it. `update --workspace` touches only the members'
+    # own entries and needs no downloads; `cargo metadata` would fetch every
+    # target's dependencies, which --offline can't when one isn't cached.
+    cargo update --workspace --offline >/dev/null 2>&1 \
         || die "cargo could not refresh $CARGO_LOCK"
     step "Cargo.lock            refreshed by cargo"
 
@@ -264,6 +272,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
     exit 0
 fi
 
+# Same restore on a real run, until the commit lands: a failure or an abort
+# must not leave a half-bumped tree that the next run then has to refuse.
+snapshot_touched
+trap restore_touched EXIT
+
 echo "changing:"
 apply_edits
 
@@ -282,11 +295,13 @@ echo
 read -r -p "Commit, tag $TAG, and push to origin/$RELEASE_BRANCH? [y/N] " reply
 case "$reply" in
     [yY]|[yY][eE][sS]) ;;
-    *) echo "aborted; edits left in the working tree for inspection"; exit 1 ;;
+    *) echo "aborted; reverting the edits"; exit 1 ;;
 esac
 
 git add "$CARGO_TOML" "$CARGO_LOCK" "$GRADLE" "$METAINFO" "$CHANGELOG"
 git commit -q -m "Release $TAG"
+trap - EXIT
+rm -rf "$SNAPSHOT_DIR"
 # Annotated: `git describe` and the release workflow both prefer a real tag
 # object over a lightweight ref.
 git tag -a "$TAG" -m "Release $TAG"
