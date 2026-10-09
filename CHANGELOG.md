@@ -1,5 +1,184 @@
 # Changelog
 
+## v0.0.14 — 2026-10-09
+
+- release.sh: bump from the latest tag, not Cargo.toml
+- Update to bevy 0.20
+- Update dependencies
+- Remove redundant About page and simplify Help navigation
+- Add song ratings, mastery, and play counts to the catalog
+- Protect editor saves and improve alpha startup readiness
+- Reduce harmonica and editor duplication and document structural review
+- Finish removing obsolete 3D model assets and references
+- Remove the 3D harmonica model and its hole editor
+- Stop parsing theme fields nothing reads
+- Drop dependencies nothing uses
+- Close out the code reduction plan
+- Use richter_harp("C") in the jam tests' c_harp helpers
+- Build test lessons from LessonManifest::new
+- Share one scoring World fixture across the judge tests
+- Give ScheduledNote a Default for tests and benches to vary
+- Build editor test notes with GridNote::plain
+- Prune the finished comment phase from the code reduction plan
+- Drop history narration from the CLAUDE.md files
+- Shorten build.rs's and the progress bar's module headers
+- State comments as current behaviour, not history
+- Drop bsn! conversion from the code reduction plan
+- Author the song picker in bsn!
+- Prune the finished clone phase from the code reduction plan
+- Add a before/after capture of the screens that hold still
+- Fold five small duplicated helpers into one each
+- Reuse Edit mode's technique cycle in the expected-notes layer
+- Share the 2D/3D highways' judgment, hole-glow and marker logic
+- Build every button variant on one shared scene
+- Prune the finished SystemParam phase from the code reduction plan
+- Gather the Song Editor's transport resources into one SystemParam
+- Gather persisted settings into two SystemParams
+- Skip the reformat in git blame and prune it from the plan
+- Format with use_small_heuristics = "Max"
+- Add a code reduction plan and the scripts that measured it
+- Fix chart migration tests, minor key round trips, and CI checks
+- Preserve removed songs and persist per-source song exclusions
+- Allow to update the song pack in the song list
+- Update libraries
+- Preserve song picker selection visibility and view mode
+- Align song picker search text within its input field
+- Redesign song picker with fuzzy search and song previews
+- Improve song picker feedback and keyboard navigation
+- Sart to move the android version to fetch songs from git
+- Unify song picker and add song genre metadata
+- Bundle the lesson and song packs into the web build
+- Document Options → Lessons & songs in the player guide
+- Add Options → Lessons & songs for managing content repositories
+- Move the songs into the harmonicon-songs pack
+- Move the lessons into the harmonicon-lessons pack
+- Download missing lesson and song packs at first start
+- Load translations bundled inside lesson and song packs
+- Read installed lesson and song packs
+- Add harmonicon-packs: lessons and songs as git repositories
+- Use BSN for technique coach row
+- Use BSN for technique coach ticks
+- Use BSN for gameplay beat guides
+- Use BSN for lesson tree edge dots
+- Use BSN for jam preparing label
+- Use BSN for credits back anchor
+- Use BSN for editor status line
+- Use BSN for lesson toggle label
+- Use BSN for metadata field values
+- Use BSN for cycle field labels
+- Use BSN for annotation lane text
+- Use BSN for repeat mark labels
+- Use BSN for phrase editor field labels
+- Use BSN for debug recording checkmark
+- Use BSN for debug recording status
+- Use BSN for pause button anchor
+- Use BSN for pause menu backdrop
+- Use BSN for debug recording label
+- Use BSN for expected note direction
+- Use BSN for expected modifier label
+- Use BSN for phrase editor close glyph
+- Use BSN for bending trainer hint
+- Use BSN for bending trace metrics
+- Use BSN for advanced readout placeholders
+- Use BSN for bending knob values
+- Use BSN for bending knob labels
+- Use BSN for bending trainer heading
+- Use BSN for 3D note tab label
+- Use BSN for combobox backdrop
+- Use BSN for combobox dropdown shell
+- Use BSN for tab bar root
+- Use BSN for combobox root layout
+- Use BSN for combobox caption
+- Use BSN for combobox toggle label
+- Use BSN for spectrogram style label
+- Use BSN for lesson training lines
+- Use BSN for optional lesson badge
+- Use BSN for credits divider
+- Use BSN for 2D gameplay overlay
+- Use BSN for 2D gameplay root
+- Use BSN for 2D play mode badge
+- Use BSN for 2D technique cue
+- Use BSN for docs status label
+- Use BSN for 3D note cue text
+- Use BSN for checkbox label
+- Use BSN for harmonica overlay hint
+- Use BSN for jam tempo label
+- Use BSN for about page body
+- Use BSN for welcome body text
+- Use BSN for about version label
+- Use BSN for empty artist list message
+- Use BSN for call response banner
+- Use BSN for harp check readouts
+- Use BSN for jam form strip cells
+- Use BSN for backing stem mute buttons
+- Use BSN for jam position caption
+- Use BSN for jam rhythm guide cells
+- Use BSN for lesson mastery chips
+- Use BSN for lesson review due badge
+- Use BSN for lesson warmup heading
+- Use BSN for lesson review streak line
+- Use BSN for loop range handles
+- Use BSN for harmonica picker label
+- Use BSN for options slider labels
+- Use BSN for phrase, wait-freeze, and technique legend overlays
+- Use BSN for skill tree canvas and unit/lesson labels
+- Use BSN for lesson reader text spawns
+- Use BSN for mod-panel button shell builders
+- Use BSN for note grid decoration spawns
+- Use BSN for calibration screen rows
+- Use BSN for editor color legend rows
+- Use BSN for 2D highway furniture and hole strip
+- Use BSN for remaining pause menu text rows
+- Use BSN for jam hole map cells
+- Use BSN for metronome overlay markers
+- Use BSN for results screen text rows
+- Fix clippy needless_borrow/unused_mut in karaoke test
+- Use BSN for bend rail markers
+- Use BSN for meta form labels
+- Use BSN for countdown overlay text rows
+- Use BSN for jam session text rows
+- Use BSN for song info text rows
+- Use BSN for technique coach labels
+- Use BSN for practice badge cells
+- Use BSN for circle of fifths labels
+- Use BSN for tutorial tour panel
+- Use BSN for section map cells
+- Use BSN for shared credits text layout
+- Use BSN for microphone warning banner
+- Use BSN for checkbox mark tree
+- Use BSN for floating tooltip panel
+- Use BSN for shared scrollbar tracks
+- Use BSN for twelve bar grid cells
+- Use BSN for calibration result block
+- Use BSN for calibration mic meter
+- Use BSN for editor progress bar
+- Use BSN for editor grid scrollbar
+- Use BSN for results grade row
+- Use BSN for harmonica overlay labels
+- Use BSN for rhythm pattern cells
+- Use BSN for phrase looper cells
+- Use BSN for karaoke strip layout
+- Use BSN for confirmation dialog layout
+- Use BSN for results text helpers
+- Use BSN for shared score readout
+- cargo update
+- Update to bevy 20 rc 2
+- fix line budget
+- Simplify 2d and 3d visualizations
+- fix: stop 3D note ribbons z-fighting with the hole pads
+- feat: draw 3D notes as ribbons instead of a capsule and tail
+- feat: rework the 3D view so notes keep pace and show their technique
+- feat: move the technique coach to a fixed bar at the end of the track
+- feat: tell the player how much each technique asks for in Play 2D
+- feat: render readable rests in the shared music score
+- fix: align shared score bar lines with meter and repeats
+- docs: retire completed plan steps and clarify remaining work
+- Benchmark adaptive difficulty note-state transfer
+- Benchmark MIDI note extraction across dense tempo maps
+- Benchmark native chart validation during song loading
+- Benchmark harp selection and pitch mapping
+- Render chord notation with shared stems and benchmark load paths
+
 ## v0.0.13 — 2026-09-27
 
 - Highlight the Song Editor's selected notes on the staff
