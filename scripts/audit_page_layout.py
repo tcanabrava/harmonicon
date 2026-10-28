@@ -22,7 +22,7 @@ Needs a running `--features dev` build (scripts/run-dev.sh).
     python3 scripts/audit_page_layout.py [Page ...]
 
 Menu pages are reached by writing `NextState<MenuPage>`. The gameplay
-screens can't be — Play 2D/3D, Jam Session and Results all want a
+screens can't be — Play 2D, Jam Session and Results all want a
 `SelectedSong` first, and that holds an asset handle no JSON value can
 express — so they are reached the way a player reaches them, by clicking
 through, using `brpctl.py`'s routes. Results additionally needs a song to
@@ -52,12 +52,11 @@ PAGES = [
 # menu. Checked after `PAGES`, and each starts from `home` because a song
 # can end and move to Results on its own schedule.
 GAMEPLAY = {
-    "Play2D": lambda: brpctl.enter_song("Play 2D", "Traditional", "Amazing Grace"),
-    "Play3D": lambda: brpctl.enter_song("Play 3D", "Traditional", "Amazing Grace"),
+    "Play2D": lambda: brpctl.enter_song("Traditional", "Amazing Grace"),
     "JamSession": lambda: brpctl.enter_jam("Traditional", "Amazing Grace"),
     "SongEditor": lambda: brpctl.enter_editor("Traditional", "Amazing Grace"),
     "Results": lambda: (
-        brpctl.enter_song("Play 2D", *brpctl.SHORTEST_SONG),
+        brpctl.enter_song(*brpctl.SHORTEST_SONG),
         brpctl.wait_for_results(),
     ),
 }

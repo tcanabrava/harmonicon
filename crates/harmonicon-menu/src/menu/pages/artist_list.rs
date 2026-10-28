@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Unified song catalog with an inline 2D/3D toggle, sorting and filtering.
+//! Unified song catalog with sorting and filtering.
 
 use bevy::input::keyboard::Key;
 use bevy::input_focus::tab_navigation::TabIndex;
@@ -64,15 +64,8 @@ pub(crate) struct SongPickerState {
     sort: SongSort,
     selected: Option<String>,
     descending: bool,
-    view_2d: Option<bool>,
     pending_delete: Option<String>,
     deletion_error: Option<String>,
-}
-
-impl SongPickerState {
-    pub(super) fn preferred_mode(&self) -> GameplayMode {
-        if self.view_2d.unwrap_or(true) { GameplayMode::Play2D } else { GameplayMode::Play3D }
-    }
 }
 
 #[derive(Component)]
@@ -111,9 +104,6 @@ pub(crate) struct PickerPlay;
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct PickerDelete;
-
-#[derive(Component, Clone, Default)]
-pub(crate) struct ModeLabel(bool);
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct SongUpdates;
@@ -196,7 +186,6 @@ pub(crate) fn setup_artist_list(
     asset_server: Res<AssetServer>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
-    mode: Res<GameplayMode>,
     state: Res<SongPickerState>,
 ) {
     let (content, header, _) =
@@ -284,7 +273,7 @@ pub(crate) fn setup_artist_list(
         },
         BackgroundColor(Color::srgba(0.045, 0.055, 0.085, 0.94)),
     ));
-    let preview = commands.spawn_scene(preview_panel(&loc, *mode == GameplayMode::Play2D)).id();
+    let preview = commands.spawn_scene(preview_panel(&loc)).id();
     let hints = commands
         .spawn_scene(bsn! {
             Text({String::from(loc.msg("song-picker-keys"))})
@@ -418,8 +407,8 @@ fn sort_choice(sort: SongSort, width: f32, label: String) -> impl Scene {
     }
 }
 
-/// The selected song's details, with Delete, the 2D/3D toggle and Play.
-fn preview_panel(loc: &Localization, is_2d: bool) -> impl Scene {
+/// The selected song's details, with Delete and Play.
+fn preview_panel(loc: &Localization) -> impl Scene {
     let delete_label = loc.msg("song-delete").to_string();
     let play_label = loc.msg("menu-play").to_string();
     bsn! {
@@ -448,8 +437,6 @@ fn preview_panel(loc: &Localization, is_2d: bool) -> impl Scene {
             --
             @button::small(&delete_label, request_song_delete)
             PickerDelete
-            --
-            @mode_toggle(is_2d)
             --
             @button::small(&play_label, play_selected_song)
             PickerPlay
@@ -501,55 +488,12 @@ fn summary(kind: PickerSummary, size: f32) -> impl Scene {
     }
 }
 
-/// The 2D/3D switch: one button, the active mode's half highlighted.
-fn mode_toggle(is_2d: bool) -> impl Scene {
-    bsn! {
-        WidgetButton
-        TabIndex(0)
-        Node {
-            border: {UiRect::all(Val::Px(1.0))},
-            padding: {UiRect::all(Val::Px(3.0))},
-            column_gap: {Val::Px(3.0)},
-        }
-        ~{BorderColor::all(Color::srgb(0.30, 0.40, 0.52))}
-        @button::tinted(Color::srgb(0.10, 0.13, 0.19))
-        on(|_: On<Activate>, mut mode: ResMut<GameplayMode>, mut state: ResMut<SongPickerState>| {
-            *mode = if *mode == GameplayMode::Play2D {
-                GameplayMode::Play3D
-            } else {
-                GameplayMode::Play2D
-            };
-            state.view_2d = Some(*mode == GameplayMode::Play2D);
-        })
-        Children [
-            @mode_label(true, "2d", is_2d)
-            --
-            @mode_label(false, "3d", is_2d)
-        ]
-    }
-}
-
-fn mode_label(two_d: bool, label: &'static str, is_2d: bool) -> impl Scene {
-    let bg = if two_d == is_2d { CHOICE_SELECTED } else { Color::NONE };
-    bsn! {
-        ModeLabel({two_d})
-        Text({label})
-        TextFont { font_size: {FontSize::Px(16.0)} }
-        TextColor({Color::WHITE})
-        Node { padding: {UiRect::axes(Val::Px(14.0), Val::Px(8.0))} }
-        BackgroundColor({bg})
-        ~{bevy::picking::Pickable::IGNORE}
-    }
-}
-
 pub(crate) fn update_picker_summary(
     state: Res<SongPickerState>,
     songs: Res<AvailableSongs>,
     profile: Res<PlayerProfile>,
-    mode: Res<GameplayMode>,
     loc: Res<Localization>,
     mut summaries: Query<(&mut Text, &mut Node, Ref<PickerSummary>)>,
-    mut modes: Query<(&ModeLabel, &mut BackgroundColor)>,
     mut plays: Query<
         (
             Entity,
@@ -561,13 +505,6 @@ pub(crate) fn update_picker_summary(
     >,
     mut commands: Commands,
 ) {
-    for (label, mut bg) in &mut modes {
-        bg.set_if_neq(BackgroundColor(if label.0 == (*mode == GameplayMode::Play2D) {
-            CHOICE_SELECTED
-        } else {
-            Color::NONE
-        }));
-    }
     if !state.is_changed()
         && !songs.is_changed()
         && !profile.is_changed()
@@ -1461,31 +1398,13 @@ mod tests {
     }
 
     #[test]
-    fn play_song_restores_last_view_after_a_jam_session() {
+    fn play_song_returns_to_scored_play_after_a_jam_session() {
         let mut app = App::new();
-        app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin))
-            .init_resource::<SongPickerState>()
-            .insert_resource(GameplayMode::Play2D)
-            .init_resource::<NextState<MenuPage>>()
-            .add_systems(Startup, |mut commands: Commands| {
-                commands.spawn_scene(mode_toggle(true));
-            });
-        app.update();
-        let toggle = app
-            .world_mut()
-            .query_filtered::<Entity, With<WidgetButton>>()
-            .single(app.world())
-            .unwrap();
-        app.world_mut().trigger(Activate { entity: toggle });
-        assert_eq!(
-            app.world().resource::<SongPickerState>().preferred_mode(),
-            GameplayMode::Play3D
-        );
-        *app.world_mut().resource_mut::<GameplayMode>() = GameplayMode::JamSession;
+        app.insert_resource(GameplayMode::JamSession).init_resource::<NextState<MenuPage>>();
         let button =
             app.world_mut().spawn_empty().observe(crate::menu::pages::play::open_song_picker).id();
         app.world_mut().trigger(Activate { entity: button });
-        assert_eq!(*app.world().resource::<GameplayMode>(), GameplayMode::Play3D);
+        assert_eq!(*app.world().resource::<GameplayMode>(), GameplayMode::Play2D);
         assert!(matches!(
             app.world().resource::<NextState<MenuPage>>(),
             NextState::Pending(MenuPage::ArtistList)
@@ -1515,7 +1434,6 @@ mod tests {
         let mut app = App::new();
         app.init_resource::<SongPickerState>()
             .init_resource::<AvailableSongs>()
-            .insert_resource(GameplayMode::Play2D)
             .insert_resource(Localization::new())
             .init_resource::<PlayerProfile>()
             .add_systems(Update, update_picker_summary);

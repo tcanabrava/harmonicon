@@ -22,7 +22,7 @@ tools beside it, this is meant to be reachable mid-debugging.
 
     # Getting somewhere, and capturing it under a name you chose
     python3 scripts/brpctl.py home
-    python3 scripts/brpctl.py enter "Play 2D" Traditional "Amazing Grace"
+    python3 scripts/brpctl.py enter Traditional "Amazing Grace"
     python3 scripts/brpctl.py jam Traditional "Amazing Grace"
     python3 scripts/brpctl.py editor Traditional "Amazing Grace"
     python3 scripts/brpctl.py results        # play the shortest chart to its end
@@ -426,27 +426,10 @@ def to_main_menu():
     time.sleep(1.5)
 
 
-def enter_song(mode, artist, song):
+def enter_song(artist, song):
     """Main menu → unified picker → harp check → a playing song."""
     _go("Play", exact=True)
     _go("Play Song")
-    if mode not in ("Play 2D", "Play 3D"):
-        raise ValueError(f"unknown gameplay mode: {mode!r}")
-    wanted = "2d" if mode == "Play 2D" else "3d"
-    background = "bevy_ui::ui_node::BackgroundColor"
-    def alpha(value):
-        if isinstance(value, dict):
-            if "alpha" in value:
-                return value["alpha"]
-            return max((alpha(child) for child in value.values()), default=0)
-        if isinstance(value, list):
-            return max((alpha(child) for child in value), default=0)
-        return 0
-    active = [r for r in query([TEXT, background]) if _unwrap(r["components"][TEXT]) == wanted and alpha(r["components"][background]) > 0]
-    # The picker remembers the last view; flip only if the requested side
-    # isn't filled, rather than assuming each visit begins in 2D.
-    if not active:
-        _go("2d 3d", exact=True)
     _go(f"{song} {artist}")
     _go("Play", exact=True, settle=COUNTDOWN_SETTLE)
 
@@ -505,7 +488,7 @@ def take_all_screenshots(outdir="target/screenshots/tour"):
 
         for fixture, artist, song in FIXTURES:
             to_main_menu()
-            enter_song("Play 2D", artist, song)
+            enter_song(artist, song)
             capture(outdir, f"play2d-{fixture}-{size_name}")
 
             # Only the first fixture needs the transient states; they are a
@@ -528,11 +511,7 @@ def take_all_screenshots(outdir="target/screenshots/tour"):
                 clear_loop()
 
         to_main_menu()
-        enter_song("Play 3D", *FIXTURES[0][1:])
-        capture(outdir, f"play3d-{FIXTURES[0][0]}-{size_name}")
-
-        to_main_menu()
-        enter_song("Play 2D", *SHORTEST_SONG)
+        enter_song(*SHORTEST_SONG)
         print("  waiting for the song to end…")
         wait_for_results()
         capture(outdir, f"results-{size_name}")
@@ -576,13 +555,13 @@ def _main(argv):
     elif command == "home":
         to_main_menu()
     elif command == "enter":
-        enter_song(args[0], args[1], " ".join(args[2:]))
+        enter_song(args[0], " ".join(args[1:]))
     elif command == "jam":
         enter_jam(args[0], " ".join(args[1:]))
     elif command == "editor":
         enter_editor(args[0], " ".join(args[1:]))
     elif command == "results":
-        enter_song("Play 2D", *SHORTEST_SONG)
+        enter_song(*SHORTEST_SONG)
         print("finished" if wait_for_results() else "timed out waiting for the song to end")
     elif command == "pause":
         _pause()

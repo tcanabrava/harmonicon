@@ -186,7 +186,7 @@ Manual testing needs a mic, audio out, and a display.
   | `harmonicon-song` | chart/manifest loading, MIDI-backed songs, lessons | yes |
   | `harmonicon-app` | state machine, routing flags, profile | yes |
   | `harmonicon-ui` | `dialogs`, `music_score`, `spectrogram` | yes |
-  | `harmonicon-gameplay` | clock, judging, 2D/3D highways, overlays, bend trainer | yes |
+  | `harmonicon-gameplay` | clock, judging, 2D highway, overlays, bend trainer | yes |
   | `harmonicon-jam` / `harmonicon-editor` | Jam Session / Song Editor — **siblings**, neither imports the other | yes |
   | `harmonicon-menu` | page state machine, routing, and shared menu chrome | yes |
   | `harmonicon-lessons` | lesson tree/reader UI and pure tree layout | yes |
@@ -292,7 +292,7 @@ Manual testing needs a mic, audio out, and a display.
     `NextState<AppState>`/`NextState<MenuPage>`, and
     `bevy_ui_widgets::Activate`.
   - **`NextState` only reaches screens needing no prior selection.** Play
-    2D/3D, Jam Session and Results each want a `SelectedSong` first, and
+    2D, Jam Session and Results each want a `SelectedSong` first, and
     that holds a `Handle<SongManifest>` — not expressible as a JSON value.
     Those are reached by *clicking*: `world.trigger_event` on `Activate`
     is a remote click on any button, since every click handler here is an
@@ -445,10 +445,12 @@ skills in `.claude/skills/`, loaded on demand rather than living here:
     `CompileOptions { validate: true }`, catching unknown identifiers,
     wrong types and bad arity, not merely a parse failure. The Bevy
     modules our shaders import live inside the Bevy crates at a path that
-    moves with each checkout, so they are **stubbed** in that file, as is
-    the virtual `constants` package. Using a field a stub lacks fails the
-    test; Bevy renaming a field we don't use would not — re-check the
-    stubs against `bevy_ui_render`/`bevy_pbr` on an engine upgrade.
+    moves with each checkout, so they are **stubbed** in that file (only
+    `bevy_ui_render::ui_vertex_output` today — every shader is a
+    `UiMaterial`; a mesh `Material` would need `bevy_pbr`'s modules and the
+    virtual `constants` package stubbed too). Using a field a stub lacks
+    fails the test; Bevy renaming a field we don't use would not — re-check
+    the stubs against `bevy_ui_render` on an engine upgrade.
     `the_compiler_rejects_broken_shaders` beside it proves the check can
     actually fail.
   - `tests/asset_layout.rs::shader_ref_paths_exist` checks every

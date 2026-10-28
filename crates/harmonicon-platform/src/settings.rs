@@ -42,12 +42,12 @@ pub struct AdaptiveDifficultyEnabled(pub bool);
 #[derive(Resource, Default)]
 pub struct FullscreenEnabled(pub bool);
 
-/// Whether scored note visuals (the falling-note highway in Play2D/Play3D)
+/// Whether scored note visuals (the falling-note highway in Play 2D)
 /// use the fixed colorblind-safe blow/draw pair
 /// (`theme::COLORBLIND_NOTE_COLORS`) instead of the active theme's own note
 /// colors. Off by default, same "opt-in, not sprung on a new player"
 /// reasoning as [`AdaptiveDifficultyEnabled`]. Edited on the Options page;
-/// `gameplay_2d`/`gameplay_3d`'s note spawners/tinters read it (via
+/// `gameplay_2d`'s note spawners/tinters read it (via
 /// `theme::effective_note_colors`) alongside `theme::LoadedTheme::
 /// note_colors` every time they resolve a note's blow/draw color.
 #[derive(Resource, Default)]

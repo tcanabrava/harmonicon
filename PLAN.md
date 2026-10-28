@@ -53,9 +53,6 @@ Nothing below can be approved by a test.
 - **Technique symbols beside the notes.** The note-head label drops the
   bend/overblow/slide suffix on purpose, so this reverses a design rather
   than fixing an oversight (`docs/gameplay_improvement_plan.md`, Visual decisions).
-- **Play 3D's hole map and beat guides.** Its lane is world-space geometry,
-  so guides mean projecting `HIT_Z` per beat, not reusing the 2D spawner
-  (`docs/gameplay_improvement_plan.md`, Visual decisions).
 - **The single-lesson `hand` track**: fold it into `tone`, or leave the gap
   visible as a place the curriculum wants more lessons.
 

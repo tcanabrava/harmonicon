@@ -111,8 +111,7 @@ fn technique_legend_toggle_text(loc: &Localization, collapsed: bool) -> String {
 
 /// Spawns the techniques legend: a small ribbon preview beside each
 /// technique's name, drawn as the notes draw it, stacked
-/// one per row under a clickable header that collapses/expands the list. Used
-/// by both the 2D and 3D HUDs. `entries` come from [`build_legend_materials`].
+/// one per row under a clickable header that collapses/expands the list. `entries` come from [`build_legend_materials`].
 pub fn spawn_modifier_legend(
     parent: &mut ChildSpawnerCommands,
     loc: &Localization,

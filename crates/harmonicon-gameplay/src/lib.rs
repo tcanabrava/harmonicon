@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Scored play: the audio-synced clock, note scheduling and judging, the
-//! 2D/3D highways, the shared HUD overlays, and the standalone Bending
+//! 2D highway, the shared HUD overlays, and the standalone Bending
 //! Trainer.
 //!
 //! Owns the clock/bar vocabulary (`GameplayClock`, `CurrentBar`,

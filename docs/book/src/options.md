@@ -19,8 +19,7 @@
   switch algorithms here if pitch detection feels unreliable for your
   particular mic/harmonica combination.
 - **Note labels** — swaps the up/down arrow on falling notes for the
-  actual hole number, in both [Play 2D](play-2d.md) and [Play 3D](
-  play-3d.md).
+  actual hole number in [Play 2D](play-2d.md).
 - **Adaptive Difficulty** — off by default; turns on gradual note
   unlocking for every song (see [Playing a Song](playing-a-song.md)). One
   setting shared by every song, not picked per song — the pause menu's own

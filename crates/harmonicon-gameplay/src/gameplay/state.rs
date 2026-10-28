@@ -144,10 +144,9 @@ impl ValidHarpNotes {
     /// The two differ whenever a harp has been substituted, and this is the
     /// set `judge::score_notes` filters every detected pitch through, so
     /// building it from the chart's harp instead discards everything the
-    /// player sounds. Shared by the 2D and 3D setups so they cannot drift
-    /// apart on which harp they mean — which is also why it returns
-    /// [`PlayedHarp`] rather than leaving each caller to resolve the harp a
-    /// second time and risk resolving it differently.
+    /// player sounds. It returns [`PlayedHarp`] too rather than leaving the
+    /// caller to resolve the harp a second time and risk resolving it
+    /// differently.
     pub(super) fn for_played_harp(
         effective: &EffectiveHarmonica,
         chart: &HarpChart,
@@ -579,8 +578,8 @@ mod valid_harp_notes_tests {
     fn a_substituted_harp_decides_which_pitches_count() {
         // Judging an A harp's pitches against the chart's C harp rejects
         // essentially everything the player can physically sound, so the song
-        // becomes unplayable rather than merely transposed. Both the 2D and
-        // 3D setups go through here for exactly that reason.
+        // becomes unplayable rather than merely transposed. Gameplay setup
+        // goes through here for exactly that reason.
         let chart = chart_in_c();
         let substitute = richter_harp("A");
         let effective = EffectiveHarmonica { harp: Some(substitute.clone()), ..default() };

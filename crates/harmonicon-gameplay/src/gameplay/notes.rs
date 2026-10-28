@@ -32,8 +32,8 @@ pub struct NoteVisual {
 
 /// One chart note's score state. Plain data, not an ECS component — lives in
 /// [`SongNotes`], independent of whatever render entity (if any) currently
-/// represents it on screen. That split is what lets `gameplay_2d`/
-/// `gameplay_3d` spawn note *visuals* only for a [`LOOKAHEAD`] window around
+/// represents it on screen. That split is what lets `gameplay_2d` spawn
+/// note *visuals* only for a [`LOOKAHEAD`] window around
 /// the playhead instead of the whole song up front, and lets
 /// `clock::handle_loop_boundary` reset a note's state without needing it to
 /// have a live entity at all.
@@ -160,8 +160,8 @@ pub struct SongNotes {
 }
 
 /// Indices of notes that should have a spawned visual at `elapsed` but don't
-/// yet (per `already_spawned`) — the windowing logic shared by
-/// `gameplay_2d::spawn_visible_notes` and `gameplay_3d::spawn_visible_notes_3d`.
+/// yet (per `already_spawned`) — the windowing logic behind
+/// `gameplay_2d::spawn_visible_notes`.
 /// `notes` must be sorted by `time` ascending (as `SongNotes::notes` always
 /// is). A note's window is open from [`LOOKAHEAD`] seconds before its `time`
 /// until `elapsed` passes it (recycling/despawning is each mode's own
@@ -294,10 +294,8 @@ pub fn play_mode_label(mode: Option<&PlayMode>) -> Option<&'static str> {
 }
 
 /// Builds every `ScheduledNote` a chart produces, gated by adaptive
-/// difficulty's current unlock state — shared by `gameplay_2d` and
-/// `gameplay_3d`'s note-list builders, which differ only in whether they
-/// also collect each item's [`play_mode_label`] tag (2D's chord/split
-/// badge; 3D has none). Sorted by `time` — `score_notes`/the spawn-window
+/// difficulty's current unlock state, alongside each note's
+/// [`play_mode_label`] tag (the chord/split badge). Sorted by `time` — `score_notes`/the spawn-window
 /// helpers above all rely on that.
 pub fn build_scheduled_notes(
     effective: &EffectiveHarmonica,

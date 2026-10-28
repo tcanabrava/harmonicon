@@ -42,14 +42,14 @@ assembles the entire `AppState::Playing` schedule for all three
 `GameplayMode`s) imports from `jam` to register Jam-Session-specific
 systems (`jam::hole_map::update_hole_map`, `jam::midi_tracks::
 apply_backing_gain`, and so on) into that shared schedule, alongside
-`gameplay`'s own 2D/3D-specific systems. `jam`'s actual feature code, in
+`gameplay`'s own 2D-specific systems. `jam`'s actual feature code, in
 turn, depends on `gameplay`'s core primitives — `GameplayClock`,
 `MusicPlayer`, `BackingStemPlayer` — as shared low-level vocabulary, the
 same way `song_editor` or any other feature would. What makes this
 *not* a real circular dependency in the problematic sense: a composition
 root is expected to depend on everything it wires together (that's its
 whole job), while `jam`'s own feature logic never reaches back into
-`gameplay`'s feature logic (2D/3D rendering, scoring) — only into the
+`gameplay`'s feature logic (2D rendering, scoring) — only into the
 primitives `gameplay::state` exists specifically to share. `jam` is a
 sibling feature that happens to plug into `gameplay`'s shared schedule,
 not a sub-feature of it.

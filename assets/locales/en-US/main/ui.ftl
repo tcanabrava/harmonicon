@@ -31,8 +31,6 @@ help-docs-not-found = Documentation isn't built locally yet — run `mdbook buil
 
 # Mode select
 select-mode = Play view
-play-2d = Play 2D
-play-3d = Play 3D
 
 # Generate Jam (synthesized backing, no song required)
 jam-generate-title = Generate a Jam Backing
@@ -720,7 +718,7 @@ tutorial-body-main = Your home base — head into Play, open Options, or find He
 tutorial-title-play = Play
 tutorial-body-play = Pick a real song, create one, start a jam, practice bends, or work through lessons — choose how you want to play.
 tutorial-title-mode-select = Song picker
-tutorial-body-mode-select = Browse every song, sort by band, difficulty, name, or genre, search the catalog, then choose 2D or 3D on this screen.
+tutorial-body-mode-select = Browse every song, sort by band, difficulty, name, or genre, and search the catalog.
 tutorial-title-gameplay = Playing a Song
 tutorial-body-gameplay = Notes fall toward the hit line — play the right pitch on your harmonica at the right time to score them.
 tutorial-title-jam-session-menu = Jam Session

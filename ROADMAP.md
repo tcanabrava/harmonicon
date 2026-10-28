@@ -220,7 +220,7 @@ remains:
   ask-then-park-then-poll shape `RECORD_AUDIO` now has.
 - Accessibility: mirrored layout for left-handed players, fully
   keyboard-navigable menus. (Colorblind-safe note palettes are done — an
-  Options-page toggle swaps the Play2D/Play3D note highway's blow/draw
+  Options-page toggle swaps the Play 2D note highway's blow/draw
   colors for a fixed blue/yellow pair; themes can also set their own
   `colors.notes` block. The Song Editor, harmonica overlay legend, and
   song-progress/scrollbar minimaps still use their own hardcoded blue/

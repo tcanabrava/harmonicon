@@ -136,7 +136,7 @@ undiagnosable one at runtime.
 ## Running a lesson: mostly the ordinary pipeline, with one exception
 
 **A chart-backed lesson plays through the exact same pipeline as an
-ordinary song** — `Play2D`/`Play3D`, the same `SongChartLoader`, the
+ordinary song** — `Play2D`, the same `SongChartLoader`, the
 same `score_notes`. There is no lesson-specific scoring path. What
 changes is layered on top, via a `LessonContext` resource kept in flight
 for the run's duration: the results screen judges `pass_criteria`
@@ -165,7 +165,7 @@ skinparam componentStyle rectangle
 
 rectangle "Skill tree -> lesson reader -> Start" as start
 rectangle "LessonContext (Resource)\nid, pass_criteria" as context
-rectangle "Chart-backed:\nPlay2D/Play3D, ordinary\nSongChartLoader + score_notes" as chart_lesson
+rectangle "Chart-backed:\nPlay2D, ordinary\nSongChartLoader + score_notes" as chart_lesson
 rectangle "Jam-based (ScaleAdherence /\nChordToneAdherence / PhraseDiscipline):\nJamSession + jam::improv::ImprovStats" as jam_lesson
 rectangle "Results screen judges\npass_criteria against\nnormal score/stats" as chart_judge
 rectangle "\"Finish Lesson\" pause-menu\nbutton judges pass_criteria\nagainst accumulated ImprovStats" as jam_judge

@@ -2,7 +2,7 @@
 
 //! [`GameplayPlugin`]: resource registration and the full system schedule —
 //! setup/cleanup lifecycles, the shared [`GameplayLogic`] chain (clock tick,
-//! scoring, loop handling), and the mode-specific (2D/3D/Jam Session/Bending
+//! scoring, loop handling), and the mode-specific (2D/Jam Session/Bending
 //! Trainer) update chains layered on top of it.
 
 use bevy::prelude::*;
@@ -28,9 +28,9 @@ use super::state::{
 use super::technique_coach;
 use super::{
     adaptive_difficulty, bending_trainer, call_response, countdown_overlay, gameplay_2d,
-    gameplay_3d, harmonica_overlay, metronome_overlay, modifier_legend, music_score_bridge,
-    note_ribbon_2d, note_ribbon_3d, pause_menu, phrase_overlay, results, song_progress_overlay,
-    twelve_bar_blues_overlay, wait_freeze_overlay, warning_banner,
+    harmonica_overlay, metronome_overlay, modifier_legend, music_score_bridge, note_ribbon_2d,
+    pause_menu, phrase_overlay, results, song_progress_overlay, twelve_bar_blues_overlay,
+    wait_freeze_overlay, warning_banner,
 };
 
 pub struct GameplayPlugin;
@@ -76,7 +76,6 @@ impl Plugin for GameplayPlugin {
             modifier_legend::ModifierLegendPlugin,
             phrase_overlay::PhrasePlugin,
             note_ribbon_2d::NoteRibbon2dPlugin,
-            note_ribbon_3d::NoteRibbon3dPlugin,
             song_progress_overlay::SongProgressPlugin,
             warning_banner::WarningBannerPlugin,
             wait_freeze_overlay::WaitFreezePlugin,
@@ -96,7 +95,6 @@ impl Plugin for GameplayPlugin {
         .init_resource::<SongNotes>()
         .init_resource::<adaptive_difficulty::AdaptiveDifficulty>()
         .init_resource::<gameplay_2d::NoteRenderAssets>()
-        .init_resource::<gameplay_3d::NoteRenderAssets3D>()
         .init_resource::<Score>()
         .init_resource::<SongStats>()
         .init_resource::<SongEnd>()
@@ -135,21 +133,17 @@ impl Plugin for GameplayPlugin {
                 // tuple is otherwise unordered.
                 lifecycle::setup_song_info,
                 pause_menu::setup_pause_menu.after(lifecycle::setup_song_info),
-                // Every mode, unlike the 2D/3D-only overlays below.
+                // Every mode, unlike the 2D-only overlays below.
                 warning_banner::setup_warning_banner,
                 gameplay_2d::setup
                     .after(lifecycle::setup_song_info)
                     .run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
-                gameplay_3d::setup
-                    .after(lifecycle::setup_song_info)
-                    .run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 // Call-and-response cues need `SongNotes`' response notes to
                 // lead into — Jam Session never builds those.
-                call_response::setup_call_cues.run_if(|m: Res<GameplayMode>| {
-                    matches!(*m, GameplayMode::Play2D | GameplayMode::Play3D)
-                }),
+                call_response::setup_call_cues
+                    .run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
             )
-                // `gameplay_2d`/`gameplay_3d`'s `setup` read `AdaptiveDifficulty`
+                // `gameplay_2d::setup` reads `AdaptiveDifficulty`
                 // (`Res`) while `setup_adaptive_difficulty` writes it (`ResMut`) —
                 // a real conflict, unlike the resources the earlier systems in
                 // this tuple touch, so it needs an explicit order rather than
@@ -244,14 +238,10 @@ impl Plugin for GameplayPlugin {
             PostUpdate,
             bending_trainer::attach_progress_bars.run_if(in_state(AppState::BendingTrainer)),
         )
-        // Cleanup: shared entity despawn + restore camera on 3D exit
+        // Cleanup: shared entity despawn
         .add_systems(OnExit(AppState::Playing), lifecycle::cleanup_gameplay)
         .add_systems(OnExit(AppState::Playing), lifecycle::reset_pitch_filter)
         .add_systems(OnExit(AppState::Playing), lifecycle::clear_practice_request)
-        .add_systems(
-            OnExit(AppState::Playing),
-            gameplay_3d::restore_camera.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
-        )
         // Pause input always runs during Playing (even when paused). The pause
         // buttons carry their own click/hover behaviour as inline `on(...)`
         // observers (see `setup_pause_menu`), so no button systems here.
@@ -297,11 +287,10 @@ impl Plugin for GameplayPlugin {
             )
                 .chain()
                 .before(GameplayLogic)
-                .run_if(in_state(AppState::Playing).and_then(
-                    |m: Res<GameplayMode>| {
-                        matches!(*m, GameplayMode::Play2D | GameplayMode::Play3D)
-                    },
-                )),
+                .run_if(
+                    in_state(AppState::Playing)
+                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
+                ),
         )
         // Gameplay-logic chains only run when not paused. This set ticks the
         // clock, so every clock reader below must run after it — otherwise the
@@ -336,11 +325,9 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             call_response::fire_call_cues.after(GameplayLogic).run_if(
-                in_state(AppState::Playing).and_then(|p: Res<Paused>| !p.0).and_then(
-                    |m: Res<GameplayMode>| {
-                        matches!(*m, GameplayMode::Play2D | GameplayMode::Play3D)
-                    },
-                ),
+                in_state(AppState::Playing)
+                    .and_then(|p: Res<Paused>| !p.0)
+                    .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
             ),
         )
         // Results screen lifecycle. The Retry/Continue buttons carry their own
@@ -367,27 +354,6 @@ impl Plugin for GameplayPlugin {
                     in_state(AppState::Playing)
                         .and_then(|p: Res<Paused>| !p.0)
                         .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play2D),
-                ),
-        )
-        // 3D update chain
-        .add_systems(
-            Update,
-            (
-                gameplay_3d::spawn_visible_notes_3d,
-                gameplay_3d::update_notes_3d,
-                gameplay_3d::update_note_hole_labels_3d,
-                gameplay_3d::update_note_visuals_3d,
-                gameplay_3d::animate_judged_notes_3d,
-                gameplay_3d::animate_note_ribbons_3d,
-                gameplay_3d::update_holes_3d,
-                technique_coach::update_technique_coach,
-            )
-                .chain()
-                .after(GameplayLogic)
-                .run_if(
-                    in_state(AppState::Playing)
-                        .and_then(|p: Res<Paused>| !p.0)
-                        .and_then(|m: Res<GameplayMode>| *m == GameplayMode::Play3D),
                 ),
         );
         // Registered for reflection by `dev_capture`, so BRP can switch it.

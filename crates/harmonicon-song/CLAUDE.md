@@ -69,8 +69,7 @@ load-bearing about *this* crate.
     one that parses the file itself must call `expand`.
   - Chromatic harps are fully supported: `Harmonica::hole_count()` sizes
     lanes/overlays/editor everywhere (never hardcode 10), and
-    `Modifier::Slide` is onset-validated like overblow/overdraw. No
-    chromatic 3D prop mesh exists yet (art gap). BendingTrainer is
+    `Modifier::Slide` is onset-validated like overblow/overdraw. BendingTrainer is
     diatonic-only by design.
   - `Song::feel: Option<song::chart::Feel>` (`Straight`/`Shuffle`) declares
     the metronome subdivision a chart is written for; `None` (the common
@@ -95,8 +94,8 @@ load-bearing about *this* crate.
     does instead of populating `music`), before giving up
     (`SongManifest::music: Option<Handle<AudioSource>>` — `None` plays
     the chart with no backing track, clock free-running instead of
-    anchoring to a sink, see `should_anchor_to_sink`) — and the `2d/`/`3d/`
-    note asset folders (already-established fallback to the selected note
+    anchoring to a sink, see `should_anchor_to_sink`) — and the `2d/`
+    note asset folder (already-established fallback to the selected note
     theme).
     `Example Song 3` (in the `harmonicon-songs` pack) ships only a chart,
     deliberately, to exercise all of

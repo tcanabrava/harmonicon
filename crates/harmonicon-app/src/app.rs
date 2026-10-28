@@ -49,7 +49,6 @@ pub enum AppState {
 pub enum GameplayMode {
     #[default]
     Play2D,
-    Play3D,
     /// Free-play: the 12-bar chart + metronome, no falling notes.
     JamSession,
 }

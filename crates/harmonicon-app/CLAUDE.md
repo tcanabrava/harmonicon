@@ -14,7 +14,7 @@ load-bearing about *this* crate.
 
 - **States:** `AppState` (Startup/Menu/SongLoading/Playing/Results/
   Calibration/Credits/SongEditor2/BendingTrainer) + `MenuPage` sub-states in
-  `menu/mod.rs`. `GameplayMode` (Play2D/Play3D/JamSession) selects which
+  `menu/mod.rs`. `GameplayMode` (Play2D/JamSession) selects which
   setup/update chains run within `Playing`.
 
 - **Profile:** `<config>/harmonicon/profile.json` (`profile.rs`) — per-song

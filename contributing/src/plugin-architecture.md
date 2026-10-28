@@ -137,7 +137,7 @@ two mechanisms to constrain the parts that need it:
 `.chain()` is used where an entire tuple of systems needs to run in the
 literal order written, most commonly for a short setup sequence where a
 later system genuinely depends on an earlier one's resource writes
-having already landed (e.g. `gameplay_2d::setup`/`gameplay_3d::setup`
+having already landed (e.g. `gameplay_2d::setup`
 reading `AdaptiveDifficulty` while `setup_adaptive_difficulty` writes it,
 in the same `OnEnter(AppState::Playing)` tuple).
 

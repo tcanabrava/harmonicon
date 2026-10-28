@@ -355,7 +355,7 @@ fn clamp_learned(value: f32) -> f32 {
 /// Sets the selected phrase's learned fraction directly to `value`. Updates
 /// both the live `AdaptiveDifficulty` (so the progress bar's rectangle
 /// re-tints immediately, and `resync_notes_on_adaptive_change` in
-/// `gameplay_2d`/`gameplay_3d` rebuilds the note highway next frame) and
+/// `adaptive_difficulty` rebuilds the note highway next frame) and
 /// the persisted `PlayerProfile` (so it survives a restart).
 fn set_selected_phrase_learned(
     value: f32,
@@ -745,7 +745,7 @@ pub(super) fn setup_pause_menu(
     // future touch/mobile build, which has no Escape key at all.
     //
     // Needs its own `GlobalZIndex` strictly between the background layer
-    // each gameplay mode paints at `GlobalZIndex(1)` (gameplay_2d/3d,
+    // each gameplay mode paints at `GlobalZIndex(1)` (gameplay_2d,
     // jam_session — being a sibling top-level node rather than a child of
     // that background root, it wouldn't otherwise inherit painting above
     // it) and the pause overlay's `GlobalZIndex(200)` (so pausing still

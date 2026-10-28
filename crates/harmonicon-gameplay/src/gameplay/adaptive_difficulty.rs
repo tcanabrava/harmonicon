@@ -136,8 +136,8 @@ const fn active_note_count(note_count: usize, learned: f32) -> usize {
 }
 
 /// Per-event `(unlocked, section_index)`, in the same flattened
-/// `for item in items { for _ in 0..event_count }` order `gameplay_2d`/
-/// `gameplay_3d` build their `ScheduledNote`s in, so each can filter while
+/// `for item in items { for _ in 0..event_count }` order
+/// `notes::build_scheduled_notes` builds its `ScheduledNote`s in, so it can filter while
 /// building without duplicating phrase grouping. Within a section, the
 /// first `active_note_count` notes (in time order) are unlocked — a prefix
 /// reveal, not scattered sampling, so a single percentage fully describes
@@ -210,7 +210,7 @@ pub fn bump_learned_sections(
 
 /// `(time, phrase, event_count)` triples for every track item, in chart
 /// order — the shared shape `group_phrase_sections`/`unlocked_flags` and the
-/// note-building loops in `gameplay_2d`/`gameplay_3d` all key off.
+/// note-building loop in `notes::build_scheduled_notes` all key off.
 pub fn track_items<'a>(
     track: &'a [TrackItem],
     timing: &Timing,
@@ -264,15 +264,11 @@ pub fn first_unresolved_index(notes: &[ScheduledNote]) -> usize {
     notes.iter().position(|n| !(n.missed || (n.hit && n.sustain_scored))).unwrap_or(notes.len())
 }
 
-/// The shared core of `gameplay_2d`/`gameplay_3d`'s own
-/// `resync_notes_on_adaptive_change`: rebuilds `song_notes` for `chart`'s
-/// current unlock state, carries over already-resolved score state
+/// The core of `resync_notes_on_adaptive_change`: rebuilds `song_notes` for
+/// `chart`'s current unlock state, carries over already-resolved score state
 /// ([`carry_over_note_state`]), and resets the cursor
-/// ([`first_unresolved_index`]). Each mode keeps only its own
-/// visual-despawn (and, for 2D, `NoteRenderAssets::play_mode_tags`) lines —
-/// this is what both call sites had in common before extraction. Returns
-/// the chord/split-badge tags parallel to the rebuilt notes; 3D has no such
-/// badge and discards them.
+/// ([`first_unresolved_index`]). Returns the chord/split-badge tags parallel
+/// to the rebuilt notes, for `NoteRenderAssets::play_mode_tags`.
 pub fn rebuild_song_notes(
     effective: &harmonicon_app::app::EffectiveHarmonica,
     chart: &harmonicon_core::chart::HarpChart,
@@ -312,7 +308,7 @@ pub(super) fn resync_notes_on_adaptive_change(
 pub(super) fn invalidate_note_visuals(
     mut rebuilt: MessageReader<NotesRebuilt>,
     mut commands: Commands,
-    visuals: Query<Entity, Or<(With<super::NoteVisual>, With<super::gameplay_3d::NoteVisual3D>)>>,
+    visuals: Query<Entity, With<super::NoteVisual>>,
 ) {
     if rebuilt.read().count() == 0 {
         return;
@@ -326,7 +322,7 @@ pub(super) fn invalidate_note_visuals(
 /// state — built once at song start (`setup_adaptive_difficulty`) from the
 /// chart, [`PlayerProfile`] (learned progress), and the global
 /// `settings::AdaptiveDifficultyEnabled` setting, read by the note-unlock
-/// filter (`gameplay_2d`/`gameplay_3d` setup), the progress-bar phrase strip
+/// filter (`gameplay_2d::setup`), the progress-bar phrase strip
 /// (`song_progress_overlay`), and the pause menu's phrase selector. The
 /// pause menu's on/off toggle writes through to both
 /// `settings::AdaptiveDifficultyEnabled` (persisted, global) and this
@@ -342,10 +338,10 @@ pub struct AdaptiveDifficulty {
 /// Populates [`AdaptiveDifficulty`] from the selected song's chart, its
 /// `PlayerProfile` record (learned progress only), and the global
 /// `AdaptiveDifficultyEnabled` Options-menu setting (whether it's on at
-/// all — not per-song). Must run before `gameplay_2d::setup`/
-/// `gameplay_3d::setup` so they see this run's unlock state — ordered by
+/// all — not per-song). Must run before `gameplay_2d::setup` so it sees this
+/// run's unlock state — ordered by
 /// tuple position in `GameplayPlugin::build`, same as `setup_scoring_config`
-/// precedes them today.
+/// precedes it today.
 pub(super) fn setup_adaptive_difficulty(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
@@ -691,20 +687,16 @@ mod invalidation_tests {
     use super::*;
 
     #[test]
-    fn both_presentations_invalidate_only_after_a_successful_rebuild() {
+    fn note_visuals_invalidate_only_after_a_successful_rebuild() {
         let mut app = App::new();
         app.add_message::<NotesRebuilt>().add_systems(Update, invalidate_note_visuals);
         let two = app.world_mut().spawn(super::super::NoteVisual { note_id: 0 }).id();
-        let three =
-            app.world_mut().spawn(super::super::gameplay_3d::NoteVisual3D { note_id: 0 }).id();
         let other = app.world_mut().spawn_empty().id();
         app.update();
         assert!(app.world().get_entity(two).is_ok());
-        assert!(app.world().get_entity(three).is_ok());
         app.world_mut().write_message(NotesRebuilt);
         app.update();
         assert!(app.world().get_entity(two).is_err());
-        assert!(app.world().get_entity(three).is_err());
         assert!(app.world().get_entity(other).is_ok());
     }
 }

@@ -15,7 +15,7 @@ use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::beat_guides;
 use super::countdown_overlay::spawn_countdown;
 use super::highway_2d::{spawn_harmonica_strip, spawn_highway};
-use super::hud_panel::{HudPanel, LaneSurface, contextual_panels, spawn_hud_panel, used_modifiers};
+use super::hud_panel::{HudPanel, contextual_panels, spawn_hud_panel, used_modifiers};
 use super::judge::{judged_instant, live_technique_status};
 use super::modifier_legend::build_legend_materials;
 use super::note_feedback::{
@@ -35,8 +35,7 @@ use harmonicon_platform::localization::Localization;
 use harmonicon_platform::theme::{LoadedTheme, NoteColors, effective_note_colors};
 
 /// Height of the hit line, as a percentage of the play area — the region a
-/// note's leading edge must reach to be judged. Only ever used by the 2D
-/// scroll layout (the 3D lane has no equivalent strip).
+/// note's leading edge must reach to be judged.
 pub const HIT_H_PCT: f32 = 7.0;
 
 /// Chart-level (not per-note) rendering config `spawn_visible_notes` needs
@@ -103,13 +102,7 @@ pub fn setup(
     let aural = display.lesson.is_some_and(|lesson| lesson.aural);
     let modifiers = used_modifiers(chart);
     let lyrics = harmonicon_core::lyrics::lyric_lines(chart);
-    let panels = contextual_panels(
-        LaneSurface::Highway2d,
-        compact,
-        aural,
-        !modifiers.is_empty(),
-        !lyrics.is_empty(),
-    );
+    let panels = contextual_panels(compact, aural, !modifiers.is_empty(), !lyrics.is_empty());
 
     // Animated tail previews for the techniques legend (built up front so the UI
     // closures only borrow a ready slice, not the material store).
@@ -235,9 +228,6 @@ pub fn setup(
                             beats_per_bar,
                             bpm,
                             legend_materials: &legend_materials,
-                            // False here: 2D's key goes under the hole
-                            // strip, beside the colours it explains.
-                            blow_draw_legend: panels.blow_draw_in_panel,
                         },
                     );
                 }
@@ -308,9 +298,7 @@ pub(super) fn progress_note_markers(notes: &[ScheduledNote], shown: bool) -> Vec
 
 /// Wraps `music_score::spawn_music_score` in its own absolutely-positioned,
 /// full-width strip pinned directly below the song-progress bar (`BAR_HEIGHT`
-/// down from the top) — shared by both `gameplay_2d::setup` and
-/// `gameplay_3d::setup`, the same "helper lives in `gameplay_2d`, `gameplay_3d`
-/// reuses it" precedent as `harp_pitches`/`head_label`.
+/// down from the top).
 ///
 /// A sibling top-level entity, not a child of the background-image root each
 /// gameplay mode paints at `GlobalZIndex(1)` (see that root's own comment),
@@ -782,8 +770,7 @@ struct NoteCue {
 }
 
 /// The set of currently-sounding MIDI pitches that are actually producible
-/// on this harp — shared `harp_pitches` builder `update_holes`/
-/// `update_holes_3d` each need before their per-cell glow loop. Refills
+/// on this harp — what `update_holes` needs before its per-cell glow loop. Refills
 /// `out` so a caller's per-frame set keeps its storage.
 pub(super) fn harp_pitches(
     active: &ActivePitches,
@@ -794,10 +781,9 @@ pub(super) fn harp_pitches(
     out.extend(active.0.iter().map(|p| p.midi).filter(|m| valid_notes.0.contains(m)));
 }
 
-/// One hole cell's brightness/hint glow step for one frame — the shared
-/// core of `update_holes`/`update_holes_3d`, which differ only in the final
-/// paint (each caller applies the resulting `state.brightness`/
-/// `state.is_blow` to its own `BackgroundColor`/`StandardMaterial`).
+/// One hole cell's brightness/hint glow step for one frame — the core of
+/// `update_holes`, which paints the resulting `state.brightness`/
+/// `state.is_blow` onto the cell's `BackgroundColor`.
 /// Matches `cell`'s blow/draw MIDI notes against `harp_pitches` (an actual
 /// hit always wins), falls back to a dimmer "hint" floor from the scoring
 /// overlay's `ActiveTargets` if neither reed sounds, and smooths
@@ -842,8 +828,7 @@ pub(super) fn step_hole_glow(
 /// Brightness gap below which [`step_hole_glow`] snaps to its target.
 const GLOW_SETTLE: f32 = 1e-3;
 
-/// Everything a hole cell's glow step reads, shared by `update_holes` and
-/// `update_holes_3d`, which differ only in how they paint the result.
+/// Everything a hole cell's glow step reads, for `update_holes`.
 #[derive(SystemParam)]
 pub(super) struct HoleGlow<'w, 's> {
     sounding: Local<'s, HashSet<u8>>,

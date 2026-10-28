@@ -300,7 +300,7 @@ pub(crate) fn setup_lesson_reader(
                         &chords,
                         key,
                         progression,
-                        &GridConfig::for_3d(),
+                        &GridConfig::for_lesson_reader(),
                         theme.twelve_bar_colors(),
                     );
                 });

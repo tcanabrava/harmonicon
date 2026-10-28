@@ -44,7 +44,7 @@ pub struct SongManifest {
     /// generated jams use the same representation for rhythm-section roles.
     /// Jam Session can play every stem as its own simultaneous sink and mute
     /// individual stems without live re-mixing. Only Jam Session's UI shows a mute row;
-    /// scored Play2D/3D has nothing meaningful to do with a backing track
+    /// scored Play 2D has nothing meaningful to do with a backing track
     /// regardless of stem count.
     pub backing_stems: Option<Vec<BackingStemAudio>>,
     /// Peak-amplitude waveform of `music` (or, when [`backing_stems`]

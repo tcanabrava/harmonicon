@@ -26,8 +26,8 @@ gameplay system reads, anchored to the music sink's own playback
 position once music starts rather than tracking wall-clock time
 directly. See [The Gameplay Clock](gameplay-clock.md).
 
-**`GameplayMode`** — which of three experiences `AppState::Playing`
-currently means: `Play2D`, `Play3D`, or `JamSession`. See
+**`GameplayMode`** — which of two experiences `AppState::Playing`
+currently means: `Play2D` or `JamSession`. See
 [Application States and Modes](app-states.md).
 
 **`GameplayLogic`** — the Bevy `SystemSet` grouping the clock tick,

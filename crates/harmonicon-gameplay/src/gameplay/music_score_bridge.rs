@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Wires gameplay's own note/clock state into the shared `music_score`
-//! overlay — Play 2D and Play 3D only (Jam Session has no [`SongNotes`] to
+//! overlay — Play 2D only (Jam Session has no [`SongNotes`] to
 //! draw from, same reason it's excluded from scoring). Kept as its own
 //! small plugin, separate from `notes.rs` (pure data/logic, no systems) and
 //! `song_progress_overlay.rs` (a different overlay), since this is purely
@@ -31,13 +31,13 @@ impl Plugin for MusicScoreBridgePlugin {
                 sync_music_score_notes.run_if(resource_changed::<SongNotes>),
                 update_music_score_playhead.after(GameplayLogic),
             )
-                .run_if(in_state(AppState::Playing).and_then(playing_2d_or_3d)),
+                .run_if(in_state(AppState::Playing).and_then(playing_2d)),
         );
     }
 }
 
-fn playing_2d_or_3d(mode: Res<GameplayMode>) -> bool {
-    matches!(*mode, GameplayMode::Play2D | GameplayMode::Play3D)
+fn playing_2d(mode: Res<GameplayMode>) -> bool {
+    *mode == GameplayMode::Play2D
 }
 
 /// The loader has already expanded repeats into performance order. Build
@@ -55,8 +55,8 @@ fn bar_map_for_chart(chart: &HarpChart) -> MusicScoreBarMap {
 }
 
 /// Rebuilds [`MusicScoreNotes`] whenever [`SongNotes`] changes — song setup,
-/// and any adaptive-difficulty resync mid-song (`gameplay_2d`/`gameplay_3d`'s
-/// `resync_notes_on_adaptive_change`), so the staff stays in step with
+/// and any adaptive-difficulty resync mid-song (`adaptive_difficulty::
+/// resync_notes_on_adaptive_change`), so the staff stays in step with
 /// whichever notes are actually live.
 fn sync_music_score_notes(
     song_notes: Res<SongNotes>,

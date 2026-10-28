@@ -168,7 +168,7 @@ Note the exact path: `bevy_state::state::resources::NextState`, not
 `harmonicon_app::app::AppState` (`"Calibration"`, `"SongEditor2"`,
 `"BendingTrainer"`, …) for the screens outside the menu hierarchy.
 
-**That is as far as state alone gets you.** Play 2D/3D, Jam Session and
+**That is as far as state alone gets you.** Play 2D, Jam Session and
 Results all need a `SelectedSong` first, which holds a `Handle<SongManifest>`
 — not something a JSON value can express. So the other way is to *click the
 button*, which is why `dev_capture` registers `bevy_ui_widgets::Activate`:

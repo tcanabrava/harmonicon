@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Shared "is the window small enough to need a compact layout" signal —
-//! [`CompactLayout`], read by gameplay 2D/3D and the Song Editor to decide
+//! [`CompactLayout`], read by Play 2D and the Song Editor to decide
 //! which of two layouts to spawn. No live-reflow: each screen reads this
 //! once when it's entered (`OnEnter(AppState::Playing)` /
 //! `OnEnter(AppState::SongEditor2)`), not continuously, so resizing the

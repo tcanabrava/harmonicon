@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-//! A song-progress bar pinned to the top of the screen, shared by the 2D and
-//! 3D gameplay views. A note-lanes strip spans the harp's hole range,
+//! A song-progress bar pinned to the top of the screen, shared by Play 2D
+//! and Jam Session. A note-lanes strip spans the harp's hole range,
 //! highest hole on top (the reverse of the Song Editor's scrollbar minimap,
 //! `song_editor::interaction::scrollbar_marker`, whose "note as a
 //! proportional rect" it borrows). Each note is a rect in its hole's lane,
@@ -168,7 +168,7 @@ struct PhraseMasteryBar(usize);
 /// Marks a note-marker rectangle with which direction it is, so
 /// [`sync_note_marker_colors`] can tint it from the active theme/colorblind
 /// setting without `spawn_song_progress` (called from `gameplay_2d`/
-/// `gameplay_3d`/`jam::session`'s own already near Bevy's system-param-limit
+/// `jam::session`'s own already near Bevy's system-param-limit
 /// setup systems) needing `LoadedTheme`/`ColorblindPalette` threaded in as
 /// extra params just to resolve a color.
 #[derive(Component, Clone, Copy)]
@@ -230,7 +230,7 @@ pub struct RequestLoopRange {
 
 /// One note's timing/direction/hole, as much as the note-lanes strip needs
 /// — decoupled from any richer caller type, since callers differ: scored
-/// modes (2D/3D) have `gameplay::notes::ScheduledNote`, but Jam Session
+/// play (2D) has `gameplay::notes::ScheduledNote`, but Jam Session
 /// (nothing scored there) builds these directly from the chart's track
 /// events instead.
 #[derive(Clone, Copy)]

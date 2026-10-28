@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Gameplay: the scored song-playing experience (2D/3D/Jam Session), the
+//! Gameplay: the scored song-playing experience (2D/Jam Session), the
 //! standalone Bending Trainer, and the results screen. This module is
 //! wiring + re-exports only — see `plugin.rs` for the schedule,
 //! `state.rs`/`notes.rs`/`bars.rs`/`clock.rs` for shared resources and pure
@@ -18,7 +18,6 @@ mod clock;
 pub mod coaching;
 pub mod countdown_overlay;
 mod gameplay_2d;
-mod gameplay_3d;
 pub mod harmonica_overlay;
 mod highway_2d;
 mod hud;
@@ -32,7 +31,6 @@ mod music_score_bridge;
 pub mod note_feedback;
 mod note_ribbon;
 pub mod note_ribbon_2d;
-mod note_ribbon_3d;
 mod notes;
 pub mod pause_menu;
 mod phrase_overlay;

@@ -21,7 +21,7 @@ to practice next.
 
 - **[Getting Started](getting-started.md)** — installing Harmonicon and
   getting your microphone working.
-- **Playing** — the [2D](play-2d.md) and [3D](play-3d.md) scored modes,
+- **Playing** — the scored [Play 2D](play-2d.md) mode,
   free-play [Jam Session](jam-session.md) and its instant
   [Generate a Jam](jam-generate.md) backing, and the
   [Bending Trainer](bending-trainer.md) ear-training drill.

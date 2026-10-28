@@ -59,5 +59,3 @@ the Song Editor, at which point the fixed-up version is what gets written.
 - Practice Speed (pause menu, 50%–100%) slows the highway/metronome down
   without pitch-shifting audio — useful for a genuinely hard passage, but
   won't fix an actual performance problem.
-- Play 3D renders more than Play 2D; if performance is the issue rather
-  than difficulty, try [Play 2D](play-2d.md) instead.

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-//! What a note ribbon draws for a note's techniques — shared by the 2D and
-//! 3D ribbons, so one note reads the same in both modes.
+//! What a note ribbon draws for a note's techniques — shared by the
+//! highway's ribbons and the technique legend's previews, so both read the
+//! same.
 
 use bevy::math::Vec4;
 use harmonicon_core::chart::Modifier;

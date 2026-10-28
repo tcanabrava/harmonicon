@@ -3,7 +3,7 @@
 Harmonicon uses Bevy's `States`/`SubStates` machinery to drive which
 screen is showing and which set of gameplay systems is active. This
 chapter describes the two state machines involved — `AppState` (the
-top-level screen) and `GameplayMode` (which of three different gameplay
+top-level screen) and `GameplayMode` (which of two different gameplay
 experiences `AppState::Playing` currently means) — plus `MenuPage`, the
 sub-state that only exists while `AppState::Menu` is active, and the
 routing-flag pattern used to hand information across a state transition
@@ -69,52 +69,46 @@ error to explain why).
 
 ## `GameplayMode`: what `Playing` actually means
 
-A single `AppState::Playing` covers three quite different experiences,
+A single `AppState::Playing` covers two quite different experiences,
 selected by the `GameplayMode` resource before entering it:
 
 - `Play2D` — falling notes, one lane per hole.
-- `Play3D` — the same scoring, rendered as a lane in perspective.
 - `JamSession` — free play over a 12-bar backing, nothing scored.
 
-All three share the same `AppState::Playing` `OnEnter`/`OnExit` and the
+Both share the same `AppState::Playing` `OnEnter`/`OnExit` and the
 same `GameplayLogic` system set (clock tick, scoring, loop handling —
 see [The Gameplay Clock](gameplay-clock.md)), which is precisely *why*
-they're one `AppState` value with a mode selector, rather than three
-separate `AppState` variants: `AppState::Play2D`, `::Play3D`,
-`::JamSession` would each need their own copy of every shared
+they're one `AppState` value with a mode selector, rather than two
+separate `AppState` variants: `AppState::Play2D` and `::JamSession`
+would each need their own copy of every shared
 `OnEnter`/`OnExit`/`run_if(in_state(...))` registration (pause handling,
-music volume application, HUD overlays that all three modes share), or
-force those registrations to accept a slice of three near-identical
-match arms. A `Res<GameplayMode>` read inside a `run_if` closure —
+music volume application, HUD overlays both modes share). A `Res<GameplayMode>` read inside a `run_if` closure —
 `.run_if(|m: Res<GameplayMode>| *m == GameplayMode::Play2D)` — is the
 one line of difference each mode-specific system actually needs.
 
 ```plantuml
 @startuml
-title A single AppState::Playing, three GameplayModes
+title A single AppState::Playing, two GameplayModes
 skinparam componentStyle rectangle
 
 state Playing {
   state "GameplayMode::Play2D" as play2d
-  state "GameplayMode::Play3D" as play3d
   state "GameplayMode::JamSession" as jam
 
-  state "Shared: GameplayClock, pause menu,\nmusic volume, scoring (2D/3D only)" as shared
+  state "Shared: GameplayClock, pause menu,\nmusic volume, scoring (2D only)" as shared
 }
 
 [*] --> Playing
 Playing --> play2d : mode-gated systems
-Playing --> play3d : mode-gated systems
 Playing --> jam : mode-gated systems
 play2d --> shared
-play3d --> shared
 jam --> shared
 @enduml
 ```
 
 Jam Session doesn't populate `SongNotes` (nothing is scored there), so
 every scoring-adjacent system either no-ops gracefully against an empty
-`SongNotes` or is itself gated to `Play2D`/`Play3D` only — see
+`SongNotes` or is itself gated to `Play2D` only — see
 [The Scoring System](scoring-system.md) for the specific places this
 matters.
 

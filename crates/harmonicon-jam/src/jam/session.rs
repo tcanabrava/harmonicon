@@ -392,7 +392,7 @@ pub fn setup(
                                 &chords,
                                 key,
                                 progression,
-                                &GridConfig::for_2d(),
+                                &GridConfig::for_jam_session(),
                                 theme.twelve_bar_colors(),
                             );
                         });

@@ -110,14 +110,14 @@ this is meant to be reachable in the middle of debugging something else.
 the protocol can't perform — and `loop off` clears it.
 
 Getting to a screen a state write can't reach — anything that needs a song
-picked first — is a route: `enter "Play 2D" <artist> <song>`, `jam`,
+picked first — is a route: `enter <artist> <song>`, `jam`,
 `editor` (loads a chart through the editor's own file dialog) and `results`
 (plays the shortest bundled chart to its end). `scripts/audit_page_layout.py`
 uses the same routes for the screens `NextState` can't reach.
 
 `--take-all-screenshots` drives the whole app and writes one **named** PNG per
 screen: Play 2D on three chart fixtures (no techniques / bend+vibrato+wah /
-chromatic), Play 3D, the pause menu, wait-for-note and results, at 1920×1080 —
+chromatic), the pause menu, wait-for-note and results, at 1920×1080 —
 the supported floor, and the only size worth baselining, since anything
 narrower is Android portrait rather than a small desktop. Takes a few minutes.
 The alternative is a pile of `shot_<millis>.png` distinguishable only by

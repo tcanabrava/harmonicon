@@ -938,8 +938,7 @@ fn score_notes_counts_a_breathy_leak_as_a_hit_but_not_a_clean_attack() {
 
 /// Two `ScheduledNote`s from one chord `TrackItem` (same `time`, sharing
 /// `chord_pitches: [60, 64]`), one per sibling pitch — the shape
-/// `gameplay_2d::build_combined_notes`/`gameplay_3d::build_notes_3d`
-/// actually produce for a multi-event item.
+/// `notes::build_scheduled_notes` actually produces for a multi-event item.
 fn chord_test_notes() -> Vec<ScheduledNote> {
     let base = overlap_test_note(0.49);
     vec![
@@ -1143,7 +1142,7 @@ fn the_detail_line_explains_a_wrong_pitch_and_clears_on_the_next_judgment() {
 
 // ── notes_needing_spawn (windowed rendering) ─────────────────────────────
 //
-// `gameplay_2d`/`gameplay_3d` can't be smoke-tested headlessly (they need
+// `gameplay_2d` can't be smoke-tested headlessly (they need
 // a real render/asset harness), so this pure windowing logic — the part
 // that actually decides which notes get a visual and when — is the one
 // piece of the windowed-spawn refactor that's directly testable. LOOKAHEAD

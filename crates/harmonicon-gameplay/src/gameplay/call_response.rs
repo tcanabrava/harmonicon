@@ -60,7 +60,7 @@ pub(super) fn call_phrase_groups(track: &[TrackItem]) -> Vec<(usize, usize)> {
 }
 
 /// The natural (un-bent) pitch name for `item`'s hole/action, same fallback
-/// `gameplay_2d::build_combined_notes`/`gameplay_3d::build_notes_3d` use: the
+/// `notes::build_scheduled_notes` uses: the
 /// event's own authored `note` if present, else the harmonica's layout.
 fn natural_pitch<'a>(
     chart: &HarpChart,
@@ -121,9 +121,9 @@ pub(super) fn build_phrase_notes(
 /// Synthesizes every call-phrase group in the loaded chart into a scheduled
 /// [`CallCue`], timed to finish playing [`LEAD_BUFFER_SECS`] before the
 /// group's first response note. Runs once at song setup, the same point
-/// `gameplay_2d`/`gameplay_3d`'s own `setup` build `SongNotes` — Jam
-/// Session has no `SongNotes`/response notes to lead into, so this only
-/// runs for the two scored modes (see the `run_if` on its registration).
+/// `gameplay_2d::setup` builds `SongNotes` — Jam Session has no
+/// `SongNotes`/response notes to lead into, so this only runs for scored
+/// play (see the `run_if` on its registration).
 pub(super) fn setup_call_cues(
     mut commands: Commands,
     selected: Res<SelectedSong>,

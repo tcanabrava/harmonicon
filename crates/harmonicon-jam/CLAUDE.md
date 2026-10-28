@@ -187,7 +187,7 @@ load-bearing about *this* crate.
   sums them for real, as separate sinks) so a MIDI-backed song's
   progress bar behaves like an ordinary one.
   **Playback and per-track muting** (`jam::midi_tracks`, Jam Session
-  only — scored Play2D/3D have nothing meaningful to do with a chart's
+  only — scored Play2D has nothing meaningful to do with a chart's
   *backing* track regardless of stem count): `gameplay::
   countdown_overlay::update_countdown` spawns one `AudioPlayer` per
   track, all in the same frame so they start in sync, each tagged both

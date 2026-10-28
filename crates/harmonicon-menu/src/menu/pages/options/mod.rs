@@ -320,7 +320,7 @@ fn spawn_right_column(commands: &mut Commands, parent: Entity, loc: &Localizatio
 }
 
 /// Flips whether falling notes show their hole number instead of the
-/// blow/draw arrow (`gameplay_2d`/`gameplay_3d`'s note spawners read this).
+/// blow/draw arrow (`gameplay_2d`'s note spawners read this).
 fn set_note_numbers(ev: On<ValueChange<bool>>, mut show: ResMut<ShowNoteNumbers>) {
     show.0 = ev.value;
 }

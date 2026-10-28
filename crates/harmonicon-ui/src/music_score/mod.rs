@@ -2,7 +2,7 @@
 
 //! A scrolling music-notation staff, rendered with the
 //! [Bravura](https://github.com/steinbergmedia/bravura) SMuFL font — shared
-//! by the Song Editor and both gameplay render modes, all three of which
+//! by the Song Editor and Play 2D, both of which
 //! spawn [`spawn_music_score`] wherever their own layout calls for it and
 //! drive it by writing [`MusicScoreNotes`]/[`MusicScorePlayhead`].
 //!

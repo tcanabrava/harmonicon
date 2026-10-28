@@ -7,13 +7,10 @@
    [Getting Started](getting-started.md#adding-your-own-content)). Click a column
    header to sort by song name, band, genre, difficulty, your rating, mastery, or times played; click it again to
    reverse the order. Search accepts partial words and small typos.
-2. Choose **2d** or **3d** with the switch beside **Play**. [Play 2D](play-2d.md)
-   uses a scrolling note highway; [Play 3D](play-3d.md) puts the same notes on
-   a lane in perspective. Both share scoring, timing, and the pause menu.
-3. Click a song once or use Up/Down to select it and inspect its details.
+2. Click a song once or use Up/Down to select it and inspect its details.
    Click **Play** to start the selected song. `/` focuses Search; **Clear**
    resets the search. Moving the pointer over other songs keeps your selection.
-4. Confirm the physical harmonica you are holding. A **3-2-1 countdown** then
+3. Confirm the physical harmonica you are holding. A **3-2-1 countdown** then
    shows the song title and key before the chart and backing track start.
 
 Select a song, then click its **My rating** stars to set the rating directly.
@@ -84,8 +81,7 @@ what the chart expects, at that instant:
   terms, not just "was some pitch playing": a bend note checks you actually
   bent to the target pitch, a vibrato/wah note checks the oscillation rate
   you played matches what the chart asks for.
-- **Every note is a ribbon** as long as the note lasts, in both Play 2D
-  and Play 3D. Its bright front edge is the attack — play when it reaches
+- **Every note is a ribbon** as long as the note lasts. Its bright front edge is the attack — play when it reaches
   the hit line — and the technique is drawn along it: a **vibrato** is a
   wavy line and a **wah** pinches the ribbon in and out, both spaced so
   each swing crosses the hit line at the rate the chart asks for (follow

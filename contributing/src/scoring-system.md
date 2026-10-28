@@ -29,13 +29,11 @@ skinparam componentStyle rectangle
 rectangle "SongNotes (Resource)\nVec<ScheduledNote> + cursor" as song_notes
 rectangle "ScheduledNote\n(time, hole, expected_pitch,\nhit, missed, held, ...)" as note
 rectangle "NoteVisual (Component)\nnote_id: usize" as visual2d
-rectangle "NoteVisual3D (Component)\nnote_id: usize" as visual3d
-rectangle "spawn_visible_notes /\nspawn_visible_notes_3d\n(rolling LOOKAHEAD window)" as spawner
+rectangle "spawn_visible_notes\n(rolling LOOKAHEAD window)" as spawner
 
 song_notes *-- note
 spawner -down-> song_notes : reads ScheduledNote::time\nto decide what's due
 spawner -down-> visual2d : spawns, tagged with\nthe note's index
-spawner -down-> visual3d : spawns, tagged with\nthe note's index
 note "Only an index — no note data is\nduplicated onto the entity. Recolor-\non-hit systems re-read SongNotes\nby that index every frame; nothing\nneeds a Changed<ScheduledNote> filter\n(there's no such component to filter\non) since only the spawned window's\nworth of notes have a visual at all." as N1
 visual2d .. N1
 @enduml
@@ -45,8 +43,7 @@ This decoupling is what makes several other things in the codebase
 simple that would otherwise be awkward:
 
 - **Only a rolling window of notes needs a visual at all.**
-  `notes_needing_spawn` (a pure function, shared by the 2D and 3D
-  renderers) answers "which notes should have a visual right now but
+  `notes_needing_spawn` (a pure function) answers "which notes should have a visual right now but
   don't" by binary-searching `SongNotes::notes` (kept sorted by `time`)
   for the `LOOKAHEAD`-second window around the playhead — a whole song
   is typically hundreds of notes, but only a handful are ever visible

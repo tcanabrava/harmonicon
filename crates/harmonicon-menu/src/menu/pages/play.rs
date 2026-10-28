@@ -15,11 +15,10 @@ use crate::menu::scene::{spawn_back_button, spawn_button, spawn_menu_root};
 
 pub(super) fn open_song_picker(
     _: On<Activate>,
-    state: Res<super::artist_list::SongPickerState>,
     mut mode: ResMut<harmonicon_app::app::GameplayMode>,
     mut page: ResMut<NextState<MenuPage>>,
 ) {
-    *mode = state.preferred_mode();
+    *mode = harmonicon_app::app::GameplayMode::Play2D;
     page.set(MenuPage::ArtistList);
 }
 

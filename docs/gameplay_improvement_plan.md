@@ -1,11 +1,10 @@
 # Scored play: remaining experience work
 
-The shared 2D/3D HUD, contextual panels, judgment feedback, practice controls, results coaching, and accessibility work have shipped. `docs/gameplay_validation.md` covers the manual checks; `PLAN.md` tracks open decisions.
+The scored-play HUD, contextual panels, judgment feedback, practice controls, results coaching, and accessibility work have shipped. `docs/gameplay_validation.md` covers the manual checks; `PLAN.md` tracks open decisions.
 
 ## Visual decisions
 
 - Decide whether technique symbols belong beside note heads. The note-head label deliberately omits bend, overblow, and slide suffixes today; the tab ribbon carries that detail.
-- Decide whether Play 3D needs a hole map and beat guides. Its lane uses world-space geometry, so a beat guide would project `HIT_Z` for each beat rather than reuse the 2D UI spawner.
 - At the supported 1920×1080 desktop floor, check that the next notes, hit line, expected hole and direction, score, and pause control remain legible without overlap.
 
 ## Manual timing acceptance
@@ -22,7 +21,5 @@ A graded `Sustain` outcome requires an explicit scoring change; sustain currentl
   to geometry but may not advance or reinterpret time.
 - Keep scoring primitives in `harmonicon-core` and the ECS driver in
   `judge.rs`. UI consumes judgment messages and never decides hits itself.
-- Build one shared scored-play HUD used by 2D and 3D. Mode modules supply the
-  lane surface and note visuals.
 - Derive contextual UI from authored chart data. Do not infer a blues form from
   the song key.

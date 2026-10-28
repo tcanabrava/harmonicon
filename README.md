@@ -6,8 +6,7 @@ and you play them on a *real harmonica* — Harmonicon listens to your
 microphone, detects the pitches you're playing in real time, and scores you on
 timing.
 
-It ships with two render modes (a clean 2D lane view and a perspective 3D lane
-view), a free-play **Jam Session** mode over a 12-bar blues
+It ships with a scrolling note-highway play mode, a free-play **Jam Session** mode over a 12-bar blues
 backing, a guided **Lessons** curriculum, a **Bending Trainer**, a full
 in-game **song editor**, a live audio spectrogram, and a small toolchain for
 turning MIDI files into playable charts.
@@ -23,12 +22,9 @@ turning MIDI files into playable charts.
   choice of five pitch-detection algorithms (FFT, YIN, pYIN, MPM, NMF —
   selectable in Options) to detect the notes you play and grade them as
   `PERFECT` / `GOOD` / miss.
-- **Two gameplay modes:**
-  - **2D** — falling notes, one lane per harmonica hole (sized from the
-    chart's harmonica — 10-hole diatonic or chromatic), with a hit line, hole
-    indicators, and a live score/combo HUD.
-  - **3D** — the same gameplay on perspective lanes, with note ribbons and
-    a row of glowing hole pads.
+- **Scored play** — falling notes, one lane per harmonica hole (sized from
+  the chart's harmonica — 10-hole diatonic or chromatic), with a hit line,
+  hole indicators, and a live score/combo HUD.
 - **Jam Session** — free play over a rolling 12-bar blues chart and metronome,
   with a live hole map that highlights chord tones and blues-scale notes per
   bar of the cycle. A song authored from a MIDI file with its tracks kept
@@ -157,8 +153,7 @@ is matched against the note currently in the hit window.
 
 ## How to play
 
-1. Launch the game and pick **Play → Play Song**, then choose a render mode
-   (2D or 3D), an artist, and a song. (Or pick **Jam Session** for free play.)
+1. Launch the game and pick **Play → Play Song**, then choose a song. (Or pick **Jam Session** for free play.)
 2. A short countdown runs, then the backing track starts and notes begin to
    scroll toward the hit line.
 3. Play each note on your harmonica as it reaches the line. Good timing keeps
@@ -206,8 +201,8 @@ crates/
   harmonicon-app/      # App-wide vocabulary: state machine, routing flags, profile
   harmonicon-ui/       # Reusable widgets (buttons, comboboxes, dialogs, page
                        #   chrome), the SMuFL notation staff, the spectrogram
-  harmonicon-gameplay/ # Scored play: audio-anchored clock, note judging, the 2D/3D
-                       #   highways, HUD overlays, the Bending Trainer
+  harmonicon-gameplay/ # Scored play: audio-anchored clock, note judging, the 2D
+                       #   highway, HUD overlays, the Bending Trainer
   harmonicon-jam/      # Jam Session: free play, generated 12-bar backing, improv
                        #   scoring, call-and-response      (sibling of the editor)
   harmonicon-editor/   # The Song Editor: record/edit/play, MIDI import, undo/redo

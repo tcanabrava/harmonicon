@@ -87,7 +87,7 @@ is the single most valuable property of the split; anything needing
 **Features:**
 
 - [`harmonicon-gameplay`](gameplay-clock.md) — the [clock](
-  gameplay-clock.md), judging, 2D/3D highways, HUD overlays, adaptive
+  gameplay-clock.md), judging, the 2D highway, HUD overlays, adaptive
   difficulty, the Bending Trainer, call-and-response. Also where
   `AppState::Playing`'s schedule is assembled for *every* `GameplayMode`
   — see the composition-root discussion in [Module Boundaries](

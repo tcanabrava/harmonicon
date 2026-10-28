@@ -3,7 +3,7 @@
 //! The karaoke strip: a chart's lyrics under the notation staff, two lines
 //! at a time. The current line fills in syllable by syllable as each one's
 //! note is played; the next line waits dimmed below it, so it can be read
-//! ahead. Play 2D and 3D both show it, whenever the chart has lyrics
+//! ahead. Play 2D shows it whenever the chart has lyrics
 //! (`hud_panel::contextual_panels`).
 //!
 //! All the lyric logic — lines, word joins, where the singer is — is
@@ -30,13 +30,13 @@ impl Plugin for KaraokePlugin {
             Update,
             update_karaoke
                 .after(GameplayLogic)
-                .run_if(in_state(AppState::Playing).and_then(playing_2d_or_3d)),
+                .run_if(in_state(AppState::Playing).and_then(playing_2d)),
         );
     }
 }
 
-fn playing_2d_or_3d(mode: Res<GameplayMode>) -> bool {
-    matches!(*mode, GameplayMode::Play2D | GameplayMode::Play3D)
+fn playing_2d(mode: Res<GameplayMode>) -> bool {
+    *mode == GameplayMode::Play2D
 }
 
 /// The strip's root, holding the lines it draws and the position last drawn,

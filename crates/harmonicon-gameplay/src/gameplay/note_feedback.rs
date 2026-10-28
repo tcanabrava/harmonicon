@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-//! What a judged note does *on the highway*, as pure functions shared by the
-//! 2D and 3D renderers: the hold-progress uniform a sustained note's tail
+//! What a judged note does *on the highway*, as pure functions the 2D
+//! renderer applies: the hold-progress uniform a sustained note's tail
 //! draws from, and the pop / shrink a head performs the instant it is judged.
-//! Both renderers compute the same numbers and only differ in what they
-//! apply them to (a `UiTransform` vs a `Transform`, a UI material vs a mesh
-//! material), so the two modes cannot drift apart on what a hit looks like.
 
 use bevy::prelude::*;
 

@@ -29,8 +29,6 @@ help-docs-not-found = La documentación aún no se ha generado localmente — ej
 
 # Selección de modo
 select-mode = Vista de juego
-play-2d = Jugar en 2D
-play-3d = Jugar en 3D
 
 # Generar Jam (base sintetizada, sin necesidad de una canción)
 jam-generate-title = Generar una Base de Jam
@@ -718,7 +716,7 @@ tutorial-body-main = Tu base — ve a Jugar, abre Opciones o encuentra Ayuda des
 tutorial-title-play = Jugar
 tutorial-body-play = Elige una canción real, crea una, empieza una jam, practica bends o sigue las lecciones — elige cómo quieres jugar.
 tutorial-title-mode-select = Selector de canciones
-tutorial-body-mode-select = Explora todas las canciones, ordénalas por banda, dificultad, nombre o género, búscalas y elige 2D o 3D aquí.
+tutorial-body-mode-select = Explora todas las canciones, ordénalas por banda, dificultad, nombre o género y busca en el catálogo.
 tutorial-title-gameplay = Tocando una Canción
 tutorial-body-gameplay = Las notas caen hacia la línea de acierto — toca la nota correcta en tu armónica en el momento justo para anotar.
 tutorial-title-jam-session-menu = Jam Session

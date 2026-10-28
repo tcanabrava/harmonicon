@@ -19,7 +19,7 @@ pub struct GridConfig {
 }
 
 impl GridConfig {
-    pub fn for_2d() -> Self {
+    pub fn for_jam_session() -> Self {
         Self {
             cell_width: Val::Px(120.0),
             cell_height: Val::Px(54.0),
@@ -29,7 +29,7 @@ impl GridConfig {
         }
     }
 
-    pub fn for_3d() -> Self {
+    pub fn for_lesson_reader() -> Self {
         Self {
             cell_width: Val::Px(76.0),
             cell_height: Val::Px(52.0),

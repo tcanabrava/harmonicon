@@ -58,9 +58,9 @@ pub struct WarningRoot;
 /// player is already being told what to do.
 ///
 /// A system registered on `OnEnter(AppState::Playing)` rather than a helper
-/// called from `gameplay_2d`/`gameplay_3d`'s own setup, which is how
-/// `spawn_wait_freeze_prompt` is wired: those two run only in their own
-/// modes, and Jam Session needs this warning just as much.
+/// called from `gameplay_2d`'s own setup, which is how
+/// `spawn_wait_freeze_prompt` is wired: that runs only in Play 2D, and Jam
+/// Session needs this warning just as much.
 pub fn setup_warning_banner(mut commands: Commands) {
     commands
         .spawn_scene(bsn! {

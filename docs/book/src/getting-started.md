@@ -81,4 +81,4 @@ filename) inside its `song/` subfolder. Everything else is optional —
 art folder — Harmonicon fills in a generated background, plays no backing
 track, and falls back to the selected note theme respectively for
 whatever's missing, rather than refusing to load the song. (A `3d/` folder
-is accepted but no longer used: Play 3D draws every note as a ribbon.)
+is accepted but ignored.)

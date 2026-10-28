@@ -1,6 +1,6 @@
 # harmonicon-gameplay
 
-Scored play: the audio-anchored clock, note judging, the 2D/3D highways,
+Scored play: the audio-anchored clock, note judging, the 2D highway,
 HUD overlays and the Bending Trainer.
 
 Owns the clock/bar vocabulary and the overlay spawners that
@@ -230,11 +230,10 @@ load-bearing about *this* crate.
     still strings; that's a deliberately separate, narrower concern.
   - **Score state lives in `SongNotes` (`Vec<ScheduledNote>` + a `cursor`),
     not on ECS components.** `ScheduledNote` is plain data — this is what
-    lets `gameplay_2d`/`gameplay_3d` spawn note *visuals* (`NoteVisual`/
-    `NoteVisual3D`, carrying only a `note_id` index into `SongNotes::notes`)
-    in a rolling `LOOKAHEAD` window instead of the whole song at once
-    (`spawn_visible_notes`/`spawn_visible_notes_3d`, sharing the windowing
-    logic via `notes_needing_spawn`), and lets `handle_loop_boundary` reset a
+    lets `gameplay_2d` spawn note *visuals* (`NoteVisual`, carrying only a
+    `note_id` index into `SongNotes::notes`) in a rolling `LOOKAHEAD`
+    window instead of the whole song at once (`spawn_visible_notes`, with
+    the windowing logic in the pure `notes_needing_spawn`), and lets `handle_loop_boundary` reset a
     note's state with a binary search + slice mutation instead of an ECS
     query. `notes` is kept sorted by `time` (sorted once at song load) so
     both the scoring cursor and the render window can use `partition_point`/
@@ -285,8 +284,8 @@ load-bearing about *this* crate.
   (`settings::AdaptiveDifficultyEnabled`, an Options-menu toggle, off by
   default) — not per-song; only the learned progress itself is per-song.
   The pause menu's manual override and its own on/off toggle both take
-  effect **immediately, mid-song** — `gameplay_2d`/`gameplay_3d`'s
-  `resync_notes_on_adaptive_change` rebuilds `SongNotes` the moment
+  effect **immediately, mid-song** — `adaptive_difficulty::
+  resync_notes_on_adaptive_change` rebuilds `SongNotes` the moment
   `AdaptiveDifficulty` changes, carrying over already-resolved hit/miss
   state via `carry_over_note_state` (matched by `(time, hole, is_blow)`, not
   array position) so notes already judged don't reset just because the list
@@ -295,43 +294,21 @@ load-bearing about *this* crate.
   enabled` (session cache) together, so the change is both immediate and
   becomes the new default for the next song.
 
-- **One score readout, two modes.** `hud::spawn_score_readout` spawns the
-  `ScoreText`/`ComboText`/`FeedbackText`/`FeedbackDetailText` markers, and
-  both `gameplay_2d` and `gameplay_3d` call it, so the two modes can't
-  drift into looking like different games. Composition is shared; only the
-  `ScoreReadoutAnchor` differs, because the hit line is a different kind of
-  thing in each: 2D's is the bottom of a real UI node (so the readout is a
-  child of the highway, offset by `HIT_H_PCT`), while 3D's is a mesh at
-  `HIT_Z` whose screen position comes from the fixed camera (so it's a
-  measured `HIT_PLANE_BOTTOM_PCT` of window height — **re-measure that if
-  the 3D camera ever moves**). The readout hugs the two edges of its band
-  and leaves the middle clear, so it doesn't sit on top of the lanes a note
-  actually falls down.
-
-- **The scored-play HUD is one spawner, not two.** `hud_panel::
-  spawn_hud_panel` builds the side panel — song title, phrase banner, tab
-  ribbon, metronome, technique legend — and both modes call it, on the same
-  side of the screen, in the same order. Likewise
-  `hud_panel::used_modifiers`: both flattened `chart.track` themselves, and a
-  technique legend that disagrees with the notes is worse than none.
-  - **The one honest difference is the blow/draw key**, and it follows from
-    the lane surface rather than from drift: 2D prints it under its hole
-    strip, beside the colours it explains; 3D has no strip, so it asks for
-    the key inside the panel (`HudPanel::blow_draw_legend`).
-  - 3D's panel uses `theme::HUD_PANEL_BG`, not its own near-black. 2D
-    darkens the whole screen behind its panel; 3D shows the song's artwork
-    through, so a lighter wash left the technique legend unreadable over a
-    bright background.
-  - Still mode-specific and deliberately so: 3D has no hole map, and the
-    beat guides are 2D-only (its lane is world-space geometry with no UI
-    node to hang percentages off).
+- **The scored-play HUD.** `hud::spawn_score_readout` spawns the
+  `ScoreText`/`ComboText`/`FeedbackText`/`FeedbackDetailText` markers as a
+  child of the highway, offset by `HIT_H_PCT` (`ScoreReadoutAnchor`). The
+  readout hugs the two edges of its band and leaves the middle clear, so it
+  doesn't sit on top of the lanes a note actually falls down.
+  `hud_panel::spawn_hud_panel` builds the side panel — song title, phrase
+  banner, tab ribbon, metronome, technique legend; the blow/draw key is
+  printed under the hole strip instead, beside the colours it explains.
+  `hud_panel::used_modifiers` lists the chart's techniques for the legend.
   - **Which contextual pieces appear is decided in one place**,
     `hud_panel::contextual_panels`: the side panel, notation staff,
-    progress-bar note markers, technique legend and the in-panel blow/draw
-    key, from the lane surface, compact layout, an aural lesson and whether
-    the chart uses techniques. Both setups read its answer, and its tests
-    pin each rule — including that the modes differ only in the key. A new
-    conditional piece belongs there, not in an `if` in either setup.
+    progress-bar note markers, technique legend and lyrics, from compact
+    layout, an aural lesson, whether the chart uses techniques and whether
+    it has lyrics. Setup reads its answer, and its tests pin each rule. A
+    new conditional piece belongs there, not in an `if` in the setup.
   - **The karaoke strip** (`karaoke.rs`) is one of those pieces: shown
     whenever the chart has lyrics, compact and aural included, under the
     staff or in its place. It draws `harmonicon_core::lyrics`' answer and
@@ -342,8 +319,7 @@ load-bearing about *this* crate.
     `KaraokePosition` changes, which also covers an A–B loop rewinding.
 
 - **Beat guides reuse the note's own time→screen path, not a second one**
-  (`gameplay/beat_guides.rs`, 2D only — the 3D lane is world-space geometry
-  with no UI highway to hang percentages off). A guide's position is
+  (`gameplay/beat_guides.rs`). A guide's position is
   `bars::beat_ticks_in_range` (off `chart_meter`, so 6/8 gets six eighths to
   the bar) → `chart::seconds_to_tick`/`tick_to_seconds` (which honour the
   tempo map) → `gameplay_2d::note_attack_pct` (the same mapping the
@@ -394,10 +370,10 @@ load-bearing about *this* crate.
   - **`PlayedHarp` and `ValidHarpNotes` are built together** by
     `ValidHarpNotes::for_played_harp`, which returns both. `ValidHarpNotes`
     answers "may this pitch score"; `PlayedHarp` answers "which hole makes
-    it". Both 2D and 3D setup go through that one call precisely so they
-    cannot resolve the `EffectiveHarmonica` substitution differently.
+    it". Building both in one call means they cannot resolve the
+    `EffectiveHarmonica` substitution differently.
   - **Nothing on screen reads `chart.harmonica` for the instrument.** The
-    hole strip's notes, the hole glow (`update_holes`/`update_holes_3d`,
+    hole strip's notes, the hole glow (`update_holes`,
     off `PlayedHarp` rather than re-fetching the manifest), the lane
     count, `SongInfo`'s harp line, the countdown's "grab a G harp" hint and
     Jam Session's hole map all take `effective.harp_for(chart)` — a
@@ -410,7 +386,7 @@ load-bearing about *this* crate.
 
 - **The song-progress bar is a per-hole note-lanes strip, with the phrase
   overlay painted over it, and its timescale survives a music-less song**
-  (`gameplay::song_progress_overlay`, shared by Play 2D/3D and Jam
+  (`gameplay::song_progress_overlay`, shared by Play 2D and Jam
   Session). The strip below the waveform spans the harmonica's whole hole
   range as `hole_count` equal lanes — the highest hole at the *top*, the
   lowest (hole 1) at the *bottom* (`note_lane_geometry`; the opposite
@@ -430,7 +406,7 @@ load-bearing about *this* crate.
   clicks there (see `spawn_song_progress`'s own comment on the trade-off).
   Note markers are `NoteMarker{time, duration, hole, is_blow}` — a small
   type decoupled from any richer one a caller has on hand, since callers
-  differ: 2D/3D map it straight from `ScheduledNote`, but Jam Session has
+  differ: Play 2D maps it straight from `ScheduledNote`, but Jam Session has
   no `SongNotes` at all (nothing is scored there) and instead flattens the
   chart's own `TrackItem`s to one marker per *event* (matching the scored
   modes' own per-event granularity, so a chord/split item's notes each get
@@ -475,16 +451,15 @@ load-bearing about *this* crate.
     loop marker while looping, and clearing the loop mid-song still reaches
     Results.
 
-- **What a judged note does on the highway is decided once, in
-  `gameplay::note_feedback`, and applied by both renderers.** Both draw a
-  note as a ribbon (`note_ribbon_2d`/`note_ribbon_3d`, with the technique
-  drawing shared in `note_ribbon::ribbon_technique`). The pop/shrink curve
-  (`judged_scale`), the ✓/✗ stamp, and the ribbon's `hold` uniform
-  (`hold_uniform`) are pure functions; `gameplay_2d::animate_judged_notes`
-  and `gameplay_3d::animate_judged_notes_3d` apply the curve to the
+- **What a judged note does on the highway is decided in
+  `gameplay::note_feedback`.** A note is drawn as a ribbon
+  (`note_ribbon_2d`, with the technique drawing in
+  `note_ribbon::ribbon_technique`). The pop/shrink curve (`judged_scale`),
+  the ✓/✗ stamp, and the ribbon's `hold` uniform (`hold_uniform`) are pure
+  functions; `gameplay_2d::animate_judged_notes` applies the curve to the
   ribbon's *width only* — its length is the note's duration and must stay
-  true — through layout in 2D (a transform would squash the cap label) and
-  `Transform::scale.x` in 3D. Four things that follow:
+  true — through layout (a transform would squash the cap label). Four
+  things that follow:
   - **The transition is observed, not the state.** Each note visual carries
     a `JudgedState`; the renderer compares it with `judged_now(note)` and
     only on a change inserts/removes `Judged { hit, at }` and rewrites the
@@ -494,8 +469,7 @@ load-bearing about *this* crate.
     `ScheduledNote` per frame.
   - **Techniques are drawn in note time, so they cross the hit line at the
     charted rate.** A vibrato's crests and a wah's pinches are spaced by
-    `oscillation_hz` along the ribbon — per second of note in 2D, per world
-    unit at `lane_speed` in 3D — so the ribbon itself is the pulse to
+    `oscillation_hz` along the ribbon, per second of note, so the ribbon itself is the pulse to
     follow. Anything else drawn along a ribbon should use the same
     convention, or it will scroll at a rate that means nothing.
   - **The ribbon shows hold *state*, not a fill.** It scrolls through the hit

@@ -7,7 +7,6 @@
 - [The Play Menu](play-menu.md)
 - [Playing a Song](playing-a-song.md)
   - [Play 2D](play-2d.md)
-  - [Play 3D](play-3d.md)
 - [Jam Session](jam-session.md)
 - [Generate a Jam](jam-generate.md)
 - [Bending Trainer](bending-trainer.md)

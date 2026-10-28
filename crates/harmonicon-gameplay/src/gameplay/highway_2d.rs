@@ -135,26 +135,13 @@ pub(super) fn spawn_harmonica_strip(
             }
         });
 
-    spawn_blow_draw_legend(col, loc, 20.0, 0.0);
+    spawn_blow_draw_legend(col, loc);
 }
 
-/// The "Blow / Draw" colour-key legend — identical between the 2D harmonica
-/// strip and the 3D HUD overlay, differing only in the row's own spacing
-/// (`column_gap`/top `margin`, which each caller picks to match its
-/// surrounding layout).
-pub(super) fn spawn_blow_draw_legend(
-    parent: &mut ChildSpawnerCommands,
-    loc: &Localization,
-    column_gap: f32,
-    margin_top: f32,
-) {
+/// The "Blow / Draw" colour-key legend under the harmonica strip.
+fn spawn_blow_draw_legend(parent: &mut ChildSpawnerCommands, loc: &Localization) {
     parent
-        .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(column_gap),
-            margin: UiRect::top(Val::Px(margin_top)),
-            ..default()
-        })
+        .spawn(Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(20.0), ..default() })
         .with_children(|leg| {
             leg.spawn_empty().apply_scene(bsn! {
                 Text({String::from(loc.msg("gameplay-legend-blow"))})

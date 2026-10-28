@@ -120,8 +120,8 @@ load-bearing about *this* crate.
   `song_editor::interaction`'s own scroll-clamping already used) crossing a
   single shared `COMPACT_BREAKPOINT_PX` (900.0) — one definition of
   "compact" reused everywhere, rather than each screen picking its own
-  threshold. Deliberately **not live-reactive**: `gameplay_2d::setup`/
-  `gameplay_3d::setup` and `song_editor::ui::setup` each read
+  threshold. Deliberately **not live-reactive**: `gameplay_2d::setup`
+  and `song_editor::ui::setup` each read
   `Res<CompactLayout>` once, at `OnEnter(AppState::Playing)`/
   `OnEnter(AppState::SongEditor2)`, and branch what they spawn — a resize
   *during* a song or edit session doesn't retroactively reflow it. Live-
@@ -129,17 +129,12 @@ load-bearing about *this* crate.
   par with a second setup system, for a scenario that matters far less than
   "the screen you land on already fits" — extend this only if that turns
   out to be wrong.
-  - **Play 2D/3D compact**: the note highway (2D) / 3D scene stays, plus a
+  - **Play 2D compact**: the note highway stays, plus a
     minimal score/combo/feedback readout; everything else gameplay's HUD
     normally shows — song info, phrase banner, tab ribbon, the 12-bar
     grid, metronome, technique legend, and the `music_score` notation
     staff — is skipped entirely rather than shrunk, since none of it is
-    essential to actually playing. `gameplay_3d::setup` bundles `theme`/
-    `loc`/`bravura`/`compact` into a new `HudContext` `SystemParam`
-    (mirroring the file's own pre-existing `NoteBuildState`) purely
-    because plain individual params would have put it one over Bevy's
-    function-system arity limit — nothing about the four belonging
-    together otherwise.
+    essential to actually playing.
   - **Song Editor compact**: `meta_form::spawn_meta_form`'s three
     side-by-side columns (content-kind/harmonica/snap fields, the rest of
     the fields + MIDI row, the color legend) stack vertically instead —

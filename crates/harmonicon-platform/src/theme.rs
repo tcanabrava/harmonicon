@@ -150,7 +150,7 @@ where
 }
 
 /// Blow/draw colors for scored note visuals (the falling-note highway in
-/// Play2D/Play3D), read from a theme's `theme.json` under `"colors": {
+/// Play 2D), read from a theme's `theme.json` under `"colors": {
 /// "notes": { ... } }`. Distinct from [`SongEditorColors`]'s own blow/draw
 /// fields (`lane_a`/`lane_b`) — the Song Editor is an authoring tool, not
 /// the thing a colorblind player stares at while trying to hit notes in
@@ -187,8 +187,8 @@ pub const COLORBLIND_NOTE_COLORS: NoteColors =
 /// fixed [`COLORBLIND_NOTE_COLORS`] pair when the player has the
 /// colorblind-palette setting on, otherwise whatever the active theme
 /// provides (`theme_colors`, from [`LoadedTheme::note_colors`]). Pure so
-/// `gameplay_2d`/`gameplay_3d`'s note spawners/tinters can resolve it once
-/// per frame instead of re-deriving the same branch in each of them.
+/// `gameplay_2d`'s note spawners/tinters can resolve it once per frame
+/// instead of re-deriving the same branch in each of them.
 pub fn effective_note_colors(theme_colors: NoteColors, colorblind: bool) -> NoteColors {
     if colorblind { COLORBLIND_NOTE_COLORS } else { theme_colors }
 }

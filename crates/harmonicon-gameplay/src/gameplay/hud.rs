@@ -29,27 +29,20 @@ pub struct FeedbackText;
 #[derive(Component, Default, Clone)]
 pub struct FeedbackDetailText;
 
-/// Where a mode wants its score readout, expressed against whatever node it
-/// passes as the parent.
-///
-/// The hit line lives somewhere different in each mode — 2D's is the bottom
-/// of a UI highway node, 3D's is a mesh at a fixed `HIT_Z` that only the
-/// camera projects to a screen position — so the shared HUD is *told* where
-/// to sit rather than trying to derive it from geometry it cannot see.
+/// Where the score readout sits, expressed against whatever node the caller
+/// passes as the parent — the highway, whose hit line is `HIT_H_PCT` up from
+/// its bottom.
 pub struct ScoreReadoutAnchor {
     /// Horizontal band to span, so the readout lines up with the lanes
     /// rather than with the window.
     pub left: Val,
     pub width: Val,
     /// Gap from the bottom of the parent up to the readout — i.e. how far
-    /// the hit line is off the bottom in that mode's own layout.
+    /// the hit line is off the bottom of the highway.
     pub bottom: Val,
 }
 
-/// The one score/combo/judgment readout, used by both 2D and 3D.
-///
-/// **Composition is shared; only the anchor differs**, so a change to the
-/// readout is a change to both modes and they can't drift apart.
+/// The score/combo/judgment readout.
 ///
 /// Laid out hugging the two edges of the band with the middle left clear, so
 /// the lanes a note actually falls down stay unobstructed: score and combo on

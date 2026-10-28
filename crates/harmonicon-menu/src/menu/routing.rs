@@ -86,7 +86,7 @@ pub(crate) fn handle_menu_escape(
         MenuPage::JamSessionMenu => MenuPage::Play,
         MenuPage::ArtistList => match *mode {
             GameplayMode::JamSession => MenuPage::JamSessionMenu,
-            GameplayMode::Play2D | GameplayMode::Play3D => MenuPage::Play,
+            GameplayMode::Play2D => MenuPage::Play,
         },
         MenuPage::JamGenerate => MenuPage::JamSessionMenu,
         MenuPage::HarpCheck => MenuPage::ArtistList,

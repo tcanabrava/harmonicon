@@ -57,7 +57,7 @@ pub fn spawn_countdown(
             TextFont { font_size: {FontSize::Px(22.0)} }
             TextColor({Color::srgba(0.85, 0.85, 1.0, 0.80)})
         });
-        // Which physical harp to grab (2D/3D pass this; jam shows it elsewhere).
+        // Which physical harp to grab (2D passes this; jam shows it elsewhere).
         if let Some(hint) = harp_hint {
             ov.spawn_empty().apply_scene(bsn! {
                 Text({hint.to_string()})

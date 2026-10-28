@@ -53,10 +53,9 @@ def go(key, **kw):
     brpctl._go(T[key], **kw)
 
 
-def enter_song(mode_key, artist, song):
+def enter_song(artist, song):
     go("menu-play", exact=True)
     go("play-song")
-    go(mode_key)
     brpctl._go(artist)
     brpctl._go(song)
     go("harp-check-play", exact=True, settle=brpctl.COUNTDOWN_SETTLE)
@@ -120,12 +119,12 @@ def main(outdir):
     # Gameplay, paused, and results — with autoplay so results show hits.
     brpctl.set_autoplay(True)
     brpctl.to_main_menu()
-    enter_song("play-2d", "Traditional", "Amazing Grace")
+    enter_song("Traditional", "Amazing Grace")
     brpctl.capture(outdir, "play2d")
     brpctl._pause()
     brpctl.capture(outdir, "play2d-paused")
     brpctl.to_main_menu()
-    enter_song("play-2d", *brpctl.SHORTEST_SONG)
+    enter_song(*brpctl.SHORTEST_SONG)
     wait_for_results()
     brpctl.capture(outdir, "results")
     brpctl.set_autoplay(False)

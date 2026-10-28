@@ -55,7 +55,7 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
 
 - [ ] **Only one example artist** (`Example Artist` in the
   `harmonicon-songs` pack,
-  three example songs used for 2D/3D/fallback testing). Ship a starter
+  three example songs used for gameplay/fallback testing). Ship a starter
   pack of public-domain blues heads/riffs across difficulties before wider
   release. **Deliberately not attempted unsupervised**: authoring
   rights-clear, well-judged chart content needs real musical judgment.

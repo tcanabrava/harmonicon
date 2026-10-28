@@ -25,6 +25,5 @@ bottom is the attack, and holds the note's tab (`-4`, `-3''` for a bend).
   plain text (e.g. `-4' +5 -4`) as they come up — handy if you're more
   comfortable reading harmonica tab than the highway.
 
-Everything else — scoring, pausing, looping, adaptive difficulty — works
-identically to [Play 3D](play-3d.md); see [Playing a Song](
-playing-a-song.md) for the shared details.
+For scoring, pausing, looping and adaptive difficulty, see [Playing a
+Song](playing-a-song.md).

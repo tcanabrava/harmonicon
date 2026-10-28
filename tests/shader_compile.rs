@@ -6,9 +6,9 @@
 //! A shader is an *asset*: nothing about it is checked by `cargo build`.
 //! `ShaderRef` is a plain string, the source is parsed at runtime, and the
 //! failure arrives as a wgpu validation error the moment some material's
-//! pipeline is first specialized — which for the 3D note tail means
-//! entering Play 3D, and for the tie material means playing a song with a
-//! note crossing a bar line. The Bevy 0.20 port hit exactly this twice.
+//! pipeline is first specialized — which for the tie material means
+//! playing a song with a note crossing a bar line. The Bevy 0.20 port hit
+//! exactly this twice.
 //!
 //! This runs the same compiler Bevy runs — `wesl`, already in the lockfile
 //! via `bevy_shader`, so it costs the build nothing (same reasoning as
@@ -31,8 +31,8 @@ use wesl::syntax::{ModulePath, PathOrigin};
 use wesl::{CompileOptions, ResolveError, Resolver, Wesl};
 
 /// Stand-in for `bevy_ui_render::ui_vertex_output`, copied from
-/// `crates/bevy_ui_render/src/ui_vertex_output.wesl`. Six of our seven
-/// shaders are `UiMaterial`s and take this as their fragment input.
+/// `crates/bevy_ui_render/src/ui_vertex_output.wesl`. Every one of our
+/// shaders is a `UiMaterial` and takes this as its fragment input.
 const UI_VERTEX_OUTPUT: &str = "\
 struct UiVertexOutput {
     @location(0) uv: vec2<f32>,
@@ -43,25 +43,6 @@ struct UiVertexOutput {
     @builtin(position) position: vec4<f32>,
 };
 ";
-
-/// Stand-in for `bevy_pbr::render::forward_io`, used by the one mesh
-/// `Material` we have (`note_ribbon_3d`). The real struct gates several
-/// fields behind `@if(...)` shader defs; only the ones a mesh material
-/// can always rely on are declared here.
-const FORWARD_IO: &str = "\
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) world_position: vec4<f32>,
-    @location(1) world_normal: vec3<f32>,
-    @location(2) uv: vec2<f32>,
-};
-";
-
-/// Stand-in for the virtual `constants` package Bevy's shader cache
-/// synthesises from a pipeline's `ShaderDefVal`s (see `bevy_shader`'s
-/// `ShaderResolver`). `MATERIAL_BIND_GROUP` is pushed by
-/// `bevy_pbr::material`; the value matters only in that it type-checks.
-const CONSTANTS: &str = "const MATERIAL_BIND_GROUP: u32 = 3u;\n";
 
 fn shader_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/shaders")
@@ -99,10 +80,6 @@ impl Resolver for StubResolver {
             (PathOrigin::Package(p), ["ui_vertex_output"]) if p == "bevy_ui_render" => {
                 Ok(Cow::Borrowed(UI_VERTEX_OUTPUT))
             }
-            (PathOrigin::Package(p), ["render", "forward_io"]) if p == "bevy_pbr" => {
-                Ok(Cow::Borrowed(FORWARD_IO))
-            }
-            (PathOrigin::Package(p), []) if p == "constants" => Ok(Cow::Borrowed(CONSTANTS)),
             // Our own shaders, addressed as `package::shaders::<name>`.
             (PathOrigin::Absolute, ["shaders", name]) => {
                 let file = shader_dir().join(format!("{name}.wesl"));
@@ -179,7 +156,7 @@ fn every_shader_compiles() {
 fn the_compiler_rejects_broken_shaders() {
     for (label, source) in [
         // naga_oil's substitution syntax, which is what survived the first
-        // sweep of the port and failed at runtime in Play 3D.
+        // sweep of the port and failed at runtime.
         (
             "naga_oil substitution",
             "@group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> c: vec4<f32>;",

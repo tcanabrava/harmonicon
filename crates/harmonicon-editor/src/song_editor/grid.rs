@@ -762,8 +762,7 @@ pub(super) fn spawn_note(
                 // arrow-key UI zoom, `dialogs::ui_scale`) multiplies up for
                 // display — without dividing it back out here, dragging a
                 // note moves it by the wrong number of ticks/holes at any
-                // zoom level other than 1x. Same fix as
-                // `gameplay_3d::note_label_position`.
+                // zoom level other than 1x.
                 let (hole, tick) = move_target(
                     drag.start_hole,
                     drag.start_tick,

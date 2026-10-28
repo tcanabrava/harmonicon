@@ -14,7 +14,7 @@ load-bearing about *this* crate.
 
 - **A shared music-notation staff renders with the Bravura SMuFL font**
   (`harmonicon-ui`'s `music_score/`, a new top-level module, sibling to `spectrogram` —
-  used by Play 2D/3D, below the song-progress bar, and by the Song Editor,
+  used by Play 2D, below the song-progress bar, and by the Song Editor,
   in its own fixed chrome below the grid). Deliberately coarse, not a
   sight-reading tool: noteheads (whole/half/filled by duration), stems,
   ledger lines, sharp accidentals, ties across a bar line, bar lines and a
