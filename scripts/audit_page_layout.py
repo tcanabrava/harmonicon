@@ -43,9 +43,8 @@ import brpctl  # noqa: E402  (sibling script, same directory)
 URL = "http://127.0.0.1:15702"
 
 PAGES = [
-    "Main", "Welcome", "Play", "ArtistList", "SongList", "HarpCheck",
-    "ModeSelect", "Options", "Theme", "LessonTree", "JamSessionMenu",
-    "JamGenerate", "HelpAbout",
+    "Main", "Welcome", "Play", "ArtistList", "HarpCheck", "Options",
+    "Theme", "LessonTree", "JamSessionMenu", "JamGenerate", "HelpAbout",
 ]
 
 # Screens that need a `SelectedSong`: name → how to get there from the main

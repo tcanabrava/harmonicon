@@ -426,12 +426,19 @@ def to_main_menu():
     time.sleep(1.5)
 
 
+def _pick_and_start(artist, song):
+    """Unified picker → harp check → playing: select the row, the picker's
+    Play opens the harp check, whose own Play starts the countdown."""
+    _go(f"{song} {artist}")
+    _go("Play", exact=True)
+    _go("Play", exact=True, settle=COUNTDOWN_SETTLE)
+
+
 def enter_song(artist, song):
     """Main menu → unified picker → harp check → a playing song."""
     _go("Play", exact=True)
     _go("Play Song")
-    _go(f"{song} {artist}")
-    _go("Play", exact=True, settle=COUNTDOWN_SETTLE)
+    _pick_and_start(artist, song)
 
 
 def enter_jam(artist, song):
@@ -440,8 +447,7 @@ def enter_jam(artist, song):
     _go("Play", exact=True)
     _go("Jam Session")
     _go("Pick a Song")
-    _go(f"{song} {artist}")
-    _go("Play", exact=True, settle=COUNTDOWN_SETTLE)
+    _pick_and_start(artist, song)
 
 
 def enter_editor(artist, song, chart="chart.harpchart"):

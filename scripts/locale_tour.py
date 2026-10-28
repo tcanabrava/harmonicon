@@ -66,7 +66,6 @@ STATE_PAGES = [
     "Welcome",
     "Play",
     "ArtistList",
-    "ModeSelect",
     "Options",
     "Theme",
     "LessonTree",
