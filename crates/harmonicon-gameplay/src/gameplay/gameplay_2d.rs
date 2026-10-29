@@ -7,8 +7,7 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
 use harmonicon_core::chart::{Action, Modifier};
-use harmonicon_core::instrument::{LaneLayout, PlayPosition};
-use harmonicon_core::pitch_map::{HoleAssignment, Technique};
+use harmonicon_core::instrument::LaneLayout;
 use harmonicon_song::song::SongManifest;
 
 use harmonicon_ui::music_score::{self, BravuraFont};
@@ -30,8 +29,8 @@ use super::song_progress_overlay::{BAR_HEIGHT, NoteMarker, spawn_song_progress};
 use super::technique_cue;
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, GameplayRoot, HighwayLanes, HoleCell, HoleState,
-    LOOKAHEAD, MusicStarted, NoteVisual, PlayedHarp, ScheduledNote, ScoreReadoutAnchor, SongInfo,
-    SongNotes, ValidHarpNotes, spawn_score_readout,
+    HoleTab, LOOKAHEAD, MusicStarted, NoteVisual, PlayedHarp, ScheduledNote, ScoreReadoutAnchor,
+    SongInfo, SongNotes, ValidHarpNotes, spawn_score_readout,
 };
 use harmonicon_platform::localization::Localization;
 use harmonicon_platform::theme::{LoadedTheme, NoteColors, effective_note_colors};
@@ -293,11 +292,9 @@ pub(super) fn progress_note_markers(notes: &[ScheduledNote], shown: bool) -> Vec
     }
     notes
         .iter()
-        .map(|n| NoteMarker {
-            time: n.time,
-            duration: n.duration,
-            hole: n.hole,
-            is_blow: n.is_blow,
+        .map(|n| {
+            let tab = HoleTab::of(&n.position);
+            NoteMarker { time: n.time, duration: n.duration, hole: tab.hole, is_blow: tab.is_blow }
         })
         .collect()
 }
@@ -426,9 +423,10 @@ pub fn spawn_visible_notes(
             if note_has_left_view(note, elapsed) {
                 continue;
             }
+            let hole = HoleTab::of(&note.position).hole;
             let cue = technique_cue::note_cue(&loc, note).map(|text| NoteCue {
                 text,
-                on_right: technique_cue::beside_lane(note.hole, lane_count) > note.hole,
+                on_right: technique_cue::beside_lane(hole, lane_count) > hole,
             });
             spawn_note_visual(
                 hw,
@@ -445,12 +443,9 @@ pub fn spawn_visible_notes(
     });
 }
 
-/// The lane `note` is drawn in. Harmonica lanes are one per hole, so the
-/// position only needs the hole; its technique doesn't move the lane.
+/// The lane `note` is drawn in.
 fn note_lane(note: &ScheduledNote, layout: &LaneLayout) -> usize {
-    let action = if note.is_blow { Action::Blow } else { Action::Draw };
-    let hole = HoleAssignment { hole: note.hole, action, technique: Technique::Natural };
-    layout.nearest_lane(&PlayPosition::Hole(hole))
+    layout.nearest_lane(&note.position)
 }
 
 /// Spawns one note's visual: a ribbon down its lane, as long as the note
@@ -469,11 +464,12 @@ fn spawn_note_visual(
     show_numbers: bool,
     colors: NoteColors,
 ) {
-    let label = head_label(note.hole, note.is_blow, &note.modifiers, show_numbers);
+    let tab = HoleTab::of(&note.position);
+    let label = head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers);
     let width_pct = layout.lane_pct() * NOTE_W;
     let left_pct = layout.centred_left_pct(note_lane(note, layout), width_pct);
     let material = shape_materials.add(NoteRibbon2dMaterial {
-        color: ribbon_color(false, note.is_blow, colors),
+        color: ribbon_color(false, tab.is_blow, colors),
         technique: ribbon_technique(&note.modifiers),
         shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
         hold: Vec4::ZERO,
@@ -658,7 +654,7 @@ pub fn update_note_visuals(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let color = ribbon_color(note.missed, note.is_blow, colors);
+        let color = ribbon_color(note.missed, HoleTab::of(&note.position).is_blow, colors);
         // Live hold progress for the shader, from the same samples the judge
         // will verify the technique from when the hold ends.
         let hold = hold_uniform(
@@ -768,7 +764,10 @@ pub(super) fn head_label(
 pub(super) fn head_text(judged: Option<bool>, note: &ScheduledNote, show_numbers: bool) -> String {
     match judged {
         Some(hit) => judged_stamp(hit).to_string(),
-        None => head_label(note.hole, note.is_blow, &note.modifiers, show_numbers),
+        None => {
+            let tab = HoleTab::of(&note.position);
+            head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers)
+        }
     }
 }
 
@@ -911,7 +910,7 @@ pub fn update_holes(
 mod tests {
     use super::*;
     use harmonicon_core::harmonica::{chromatic_16_harp, richter_harp};
-    use harmonicon_core::instrument::InstrumentModel;
+    use harmonicon_core::instrument::{InstrumentModel, PlayPosition};
 
     // ── lanes ─────────────────────────────────────────────────────────────────
 
@@ -925,7 +924,9 @@ mod tests {
             let width = lane_pct * NOTE_W;
             for hole in 1..=harp.hole_count() {
                 for is_blow in [true, false] {
-                    let note = ScheduledNote { hole, is_blow, ..Default::default() };
+                    let action = if is_blow { Action::Blow } else { Action::Draw };
+                    let position = PlayPosition::natural_hole(hole, action);
+                    let note = ScheduledNote { position, ..Default::default() };
                     let lane = note_lane(&note, &layout);
                     assert_eq!(lane, usize::from(hole - 1));
                     let left = layout.centred_left_pct(lane, width);

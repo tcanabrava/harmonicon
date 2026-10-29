@@ -136,9 +136,17 @@ pub(super) fn autoplay_pitches(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harmonicon_core::chart::Action;
+    use harmonicon_core::instrument::PlayPosition;
 
     fn note(time: f64, duration: f64, midi: u8) -> ScheduledNote {
-        ScheduledNote { time, duration, hole: 4, expected_pitch: Some(midi), ..Default::default() }
+        ScheduledNote {
+            time,
+            duration,
+            position: PlayPosition::natural_hole(4, Action::Blow),
+            expected_pitch: Some(midi),
+            ..Default::default()
+        }
     }
 
     #[test]

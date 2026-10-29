@@ -13,10 +13,10 @@ use bevy::prelude::*;
 use harmonicon_app::app::EffectiveHarmonica;
 use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::{PitchAlgorithm, PitchEvent, PitchInfo};
-use harmonicon_core::chart::{HarpChart, Modifier};
+use harmonicon_core::chart::{Action, HarpChart, Modifier};
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
-use harmonicon_core::instrument::{InstrumentModel, LaneLayout};
+use harmonicon_core::instrument::{InstrumentModel, LaneLayout, PlayPosition};
 use harmonicon_core::scoring::{AttackGate, HitQuality, compute_multiplier};
 
 #[derive(Resource, Default)]
@@ -360,6 +360,15 @@ pub const FAILURE_FEEDBACK_SECS: f32 = 0.9;
 pub struct HoleTab {
     pub hole: u8,
     pub is_blow: bool,
+}
+
+impl HoleTab {
+    /// How `position` reads off the highway; its technique is printed
+    /// elsewhere, by the note's modifiers.
+    pub fn of(position: &PlayPosition) -> Self {
+        let PlayPosition::Hole(a) = position;
+        Self { hole: a.hole, is_blow: matches!(a.action, Action::Blow) }
+    }
 }
 
 /// Why a note failed, as decided by `score_notes` at the instant it failed.

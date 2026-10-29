@@ -175,6 +175,8 @@ mod tests {
     use super::super::notes::ScheduledNote;
     use super::*;
     use harmonicon_audio::pitch_detect::PitchAlgorithm;
+    use harmonicon_core::chart::Action;
+    use harmonicon_core::instrument::PlayPosition;
 
     /// One scheduled note carrying `chord_pitches`, wrapped in a `SongNotes`.
     /// Spelled out rather than `..Default::default()` because
@@ -184,8 +186,7 @@ mod tests {
         SongNotes {
             notes: vec![ScheduledNote {
                 duration: 0.5,
-                hole: 2,
-                is_blow: false,
+                position: PlayPosition::natural_hole(2, Action::Draw),
                 expected_pitch: Some(62),
                 chord_pitches,
                 ..Default::default()

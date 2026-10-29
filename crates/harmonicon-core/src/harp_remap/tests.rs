@@ -369,3 +369,24 @@ fn the_same_harp_is_the_identity_for_bent_notes_too() {
         }
     }
 }
+
+/// `technique_of` reads back exactly what `technique_modifier` writes, so a
+/// note's technique survives a trip through the chart in either direction.
+#[test]
+fn technique_of_inverts_technique_modifier() {
+    use crate::pitch_map::technique_of;
+    for technique in [
+        Technique::Natural,
+        Technique::Bend(1.0),
+        Technique::Bend(2.5),
+        Technique::Overblow,
+        Technique::Overdraw,
+        Technique::Slide,
+    ] {
+        let written: Vec<Modifier> = technique_modifier(technique).into_iter().collect();
+        assert_eq!(technique_of(&written), technique, "{written:?}");
+    }
+    let vibrato = Modifier::Vibrato { oscillation_hz: 5.0, intensity: None };
+    assert_eq!(technique_of(&[vibrato.clone(), bend(-1.0)]), Technique::Bend(1.0));
+    assert_eq!(technique_of(&[vibrato]), Technique::Natural);
+}

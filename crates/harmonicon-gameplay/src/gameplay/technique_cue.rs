@@ -359,6 +359,8 @@ pub(super) fn beside_lane(hole: u8, hole_count: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harmonicon_core::chart::Action;
+    use harmonicon_core::instrument::PlayPosition;
 
     fn bend(semitones: f32) -> Modifier {
         Modifier::Bend { semitones, intensity: None }
@@ -377,8 +379,7 @@ mod tests {
         ScheduledNote {
             time,
             duration,
-            hole: 3,
-            is_blow: false,
+            position: PlayPosition::natural_hole(3, Action::Draw),
             expected_pitch: expected,
             modifiers,
             ..Default::default()

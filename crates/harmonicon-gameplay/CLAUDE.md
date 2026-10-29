@@ -287,7 +287,7 @@ load-bearing about *this* crate.
   effect **immediately, mid-song** — `adaptive_difficulty::
   resync_notes_on_adaptive_change` rebuilds `SongNotes` the moment
   `AdaptiveDifficulty` changes, carrying over already-resolved hit/miss
-  state via `carry_over_note_state` (matched by `(time, hole, is_blow)`, not
+  state via `carry_over_note_state` (matched by `(time, position)`, not
   array position) so notes already judged don't reset just because the list
   was rebuilt around them; the pause-menu toggle flips
   `AdaptiveDifficultyEnabled` (persisted) and the live `AdaptiveDifficulty::

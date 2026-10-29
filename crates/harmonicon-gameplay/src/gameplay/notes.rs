@@ -12,7 +12,9 @@ use bevy::prelude::*;
 use harmonicon_app::app::EffectiveHarmonica;
 use harmonicon_core::chart::{Action, HarpChart, Modifier, PlayMode};
 use harmonicon_core::harp_remap;
+use harmonicon_core::instrument::PlayPosition;
 use harmonicon_core::midi::note_to_midi;
+use harmonicon_core::pitch_map::{HoleAssignment, Technique, technique_of};
 
 use super::adaptive_difficulty::{AdaptiveDifficulty, track_items, unlocked_flags};
 use super::state::MissReason;
@@ -42,8 +44,10 @@ pub struct ScheduledNote {
     pub time: f64,
     /// Note length in seconds; long notes reward sustaining the pitch.
     pub duration: f64,
-    pub hole: u8,
-    pub is_blow: bool,
+    /// Where the note is played: for a harmonica, the hole, breath and
+    /// technique. Drawing and coaching read it; scoring never does, since a
+    /// microphone hears the pitch, not the hole (`expected_pitch`).
+    pub position: PlayPosition,
     /// The MIDI note number this note expects, pre-computed at spawn
     /// (`None` for a hole/action/bend combination the harp can't actually
     /// produce — see [`target_pitch`] — which can never be hit).
@@ -121,8 +125,11 @@ impl Default for ScheduledNote {
         Self {
             time: 0.0,
             duration: 0.0,
-            hole: 1,
-            is_blow: true,
+            position: PlayPosition::Hole(HoleAssignment {
+                hole: 1,
+                action: Action::Blow,
+                technique: Technique::Natural,
+            }),
             expected_pitch: None,
             hit: false,
             missed: false,
@@ -367,13 +374,12 @@ pub fn build_scheduled_notes(
             if !unlocked {
                 continue;
             }
-            let is_blow = matches!(action, Action::Blow);
+            let technique = technique_of(&modifiers);
             combined.push((
                 ScheduledNote {
                     time: t,
                     duration: item.duration,
-                    hole,
-                    is_blow,
+                    position: PlayPosition::Hole(HoleAssignment { hole, action, technique }),
                     expected_pitch,
                     hit: false,
                     missed: false,
@@ -425,6 +431,7 @@ pub fn notes_to_notation(
 
 #[cfg(test)]
 mod tests {
+    use super::super::state::HoleTab;
     use super::*;
     use harmonicon_core::harmonica::{chromatic_harp, richter_harp};
     use harmonicon_core::harp_remap::HarpMapping;
@@ -481,9 +488,9 @@ mod tests {
         assert_eq!(notes.len(), 2);
         assert_eq!(tags.len(), 2);
         // Sorted by time even though the track listed them out of order.
-        assert_eq!(notes[0].hole, 1);
+        assert_eq!(HoleTab::of(&notes[0].position).hole, 1);
         assert_eq!(notes[0].time, 0.0);
-        assert_eq!(notes[1].hole, 2);
+        assert_eq!(HoleTab::of(&notes[1].position).hole, 2);
         assert_eq!(notes[1].time, 1.0);
         assert!(notes.iter().all(|n| n.chord_pitches.is_empty()));
         assert!(tags.iter().all(|t| t.is_none()));
@@ -536,7 +543,13 @@ mod tests {
     /// Every note of a small chart, as `(hole, is_blow, expected_pitch)`.
     fn scheduled(effective: &EffectiveHarmonica, chart: &HarpChart) -> Vec<(u8, bool, Option<u8>)> {
         let (notes, _) = build_scheduled_notes(effective, chart, &AdaptiveDifficulty::default());
-        notes.iter().map(|n| (n.hole, n.is_blow, n.expected_pitch)).collect()
+        notes
+            .iter()
+            .map(|n| {
+                let tab = HoleTab::of(&n.position);
+                (tab.hole, tab.is_blow, n.expected_pitch)
+            })
+            .collect()
     }
 
     fn three_note_chart() -> HarpChart {
@@ -550,6 +563,40 @@ mod tests {
                  "events":[{"hole":2,"action":"draw","note":"G4"}]}
             ]"#,
         )
+    }
+
+    /// The position carries the technique the modifiers name, and on the
+    /// played harp it sounds exactly the pitch the judge expects.
+    #[test]
+    fn a_notes_position_records_its_technique() {
+        use harmonicon_core::instrument::InstrumentModel;
+        let chart = c_diatonic_chart(
+            r#"[
+                {"time":0.0,"duration":0.5,"call":false,"phrase":"p1",
+                 "events":[{"hole":3,"action":"draw","note":"B4",
+                            "modifiers":[{"type":"bend","semitones":-2.0}]}]},
+                {"time":0.5,"duration":0.5,"call":false,"phrase":"p1",
+                 "events":[{"hole":6,"action":"blow","note":"A#5",
+                            "modifiers":[{"type":"overblow"}]}]},
+                {"time":1.0,"duration":0.5,"call":false,"phrase":"p1",
+                 "events":[{"hole":4,"action":"blow","note":"C5",
+                            "modifiers":[{"type":"vibrato","oscillation_hz":5.0}]}]}
+            ]"#,
+        );
+        let (notes, _) =
+            build_scheduled_notes(&EffectiveHarmonica::default(), &chart, &Default::default());
+        let techniques: Vec<Technique> = notes
+            .iter()
+            .map(|n| {
+                let PlayPosition::Hole(a) = n.position;
+                a.technique
+            })
+            .collect();
+        assert_eq!(techniques, [Technique::Bend(2.0), Technique::Overblow, Technique::Natural]);
+        let harp = richter_harp("C");
+        for note in &notes {
+            assert_eq!(harp.pitch_of(&note.position), note.expected_pitch, "{:?}", note.position);
+        }
     }
 
     #[test]
@@ -632,7 +679,7 @@ mod tests {
                         valid.contains(&midi),
                         "{key} harp, {mapping:?}: hole {} expects MIDI {midi}, \
                          which ValidHarpNotes would filter out",
-                        note.hole
+                        HoleTab::of(&note.position).hole
                     );
                 }
             }

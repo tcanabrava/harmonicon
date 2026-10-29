@@ -19,7 +19,7 @@
 //! alongside it — a `Chromatic` harp with a `Diatonic` kind argument was
 //! always a bug waiting to happen.
 
-use crate::chart::Action;
+use crate::chart::{Action, Modifier};
 use crate::harmonica::{Harmonica, chromatic_harp, hole_notes, richter_harp};
 use crate::midi::note_to_midi;
 
@@ -40,6 +40,26 @@ pub enum Technique {
     Overdraw,
     /// Chromatic slide button, raising a hole's natural pitch a semitone.
     Slide,
+}
+
+/// The technique a chart event's modifiers ask for: the inverse of how a
+/// [`Technique`] is written back into a chart. An over-technique or slide
+/// wins over a bend if a chart somehow carries both, since it names the
+/// note outright. Expression (vibrato, wah) is not a technique and is
+/// ignored.
+pub fn technique_of(modifiers: &[Modifier]) -> Technique {
+    let mut technique = Technique::Natural;
+    for modifier in modifiers {
+        match modifier {
+            Modifier::Overblow => return Technique::Overblow,
+            Modifier::Overdraw => return Technique::Overdraw,
+            Modifier::Slide => return Technique::Slide,
+            // Charts store a bend as a negative, downward offset.
+            Modifier::Bend { semitones, .. } => technique = Technique::Bend(-semitones),
+            Modifier::Vibrato { .. } | Modifier::WahWah { .. } => {}
+        }
+    }
+    technique
 }
 
 /// One way of producing a pitch on a harmonica.

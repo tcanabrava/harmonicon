@@ -27,8 +27,9 @@ use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_ma
 use harmonicon_app::app::EffectiveHarmonica;
 use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::{AudioFrame, PitchInfo};
-use harmonicon_core::chart::HarpChart;
+use harmonicon_core::chart::{Action, HarpChart};
 use harmonicon_core::harmonica::richter_harp;
+use harmonicon_core::instrument::PlayPosition;
 use harmonicon_core::midi::midi_to_freq_hz;
 use harmonicon_gameplay::gameplay::{
     ActivePitches, AdaptiveDifficulty, GameplayClock, HitFeedback, NoteScored, PitchGate,
@@ -44,7 +45,7 @@ fn note(i: usize) -> ScheduledNote {
     ScheduledNote {
         time: i as f64 * NOTE_SPACING_SECS,
         duration: NOTE_SPACING_SECS * 0.8,
-        hole: (i % PITCHES.len()) as u8 + 1,
+        position: PlayPosition::natural_hole((i % PITCHES.len()) as u8 + 1, Action::Blow),
         expected_pitch: Some(PITCHES[i % PITCHES.len()]),
         ..Default::default()
     }

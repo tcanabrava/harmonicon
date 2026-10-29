@@ -12,7 +12,8 @@ use bevy::prelude::*;
 
 use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::{AudioFrame, PitchInfo};
-use harmonicon_core::chart::{Action, Modifier};
+use harmonicon_core::chart::Modifier;
+use harmonicon_core::instrument::PlayPosition;
 use harmonicon_core::midi::midi_to_freq_hz;
 use harmonicon_core::pitch_map::map_pitch_playable;
 use harmonicon_core::scoring::{
@@ -56,7 +57,8 @@ pub(crate) fn update_active_targets(
             continue;
         }
         if (judged - note.time).abs() <= config.good_window {
-            targets.0.push((note.hole, note.is_blow));
+            let tab = HoleTab::of(&note.position);
+            targets.0.push((tab.hole, tab.is_blow));
         }
     }
 }
@@ -212,7 +214,7 @@ fn observed_failure(
     }
     let expected = note.expected_pitch.filter(|e| !sounding.contains(e))?;
     Some(MissReason::WrongPitch {
-        expected: HoleTab { hole: note.hole, is_blow: note.is_blow },
+        expected: HoleTab::of(&note.position),
         heard: nearest_attacked(attacked, expected).and_then(|pitch| heard_tab(pitch, harp)),
     })
 }
@@ -232,7 +234,7 @@ pub(super) fn nearest_attacked(attacked: impl IntoIterator<Item = u8>, expected:
 /// passes `ValidHarpNotes` for the chart's harp but not the played one.
 pub(super) fn heard_tab(pitch: u8, harp: &PlayedHarp) -> Option<HoleTab> {
     let assignment = map_pitch_playable(pitch, harp.0.as_ref()?)?;
-    Some(HoleTab { hole: assignment.hole, is_blow: matches!(assignment.action, Action::Blow) })
+    Some(HoleTab::of(&PlayPosition::Hole(assignment)))
 }
 
 /// Per-frame working storage for [`score_notes`], kept between frames so

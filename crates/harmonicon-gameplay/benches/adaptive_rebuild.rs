@@ -9,14 +9,18 @@
 use std::hint::black_box;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use harmonicon_core::chart::Action;
+use harmonicon_core::instrument::PlayPosition;
 use harmonicon_gameplay::gameplay::{ScheduledNote, carry_over_note_state};
 
 fn note(i: usize, time: f64) -> ScheduledNote {
     ScheduledNote {
         time,
         duration: 0.2,
-        hole: (i % 10 + 1) as u8,
-        is_blow: i.is_multiple_of(2),
+        position: PlayPosition::natural_hole(
+            (i % 10 + 1) as u8,
+            if i.is_multiple_of(2) { Action::Blow } else { Action::Draw },
+        ),
         expected_pitch: Some(60 + (i % 12) as u8),
         hit: i.is_multiple_of(3),
         missed: i % 3 == 1,

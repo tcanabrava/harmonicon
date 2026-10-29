@@ -223,7 +223,7 @@ pub fn track_items<'a>(
 
 /// Copies resolved score state (`hit`, `missed`, `held`, `sustain_scored`,
 /// `pitch_samples`, `amp_samples`, `miss_evidence`) from `old` into matching notes in `new`,
-/// matched by `(time, hole, is_blow)` — stable across a rebuild since both
+/// matched by `(time, position)` — stable across a rebuild since both
 /// lists derive from the same chart, regardless of which other notes got
 /// unlocked/relocked around a given note. Used when the pause menu changes
 /// `learned`/`enabled` mid-song so already-hit/missed notes don't reset
@@ -235,10 +235,7 @@ pub fn carry_over_note_state(old: &[ScheduledNote], new: &mut [ScheduledNote]) {
     let mut used = vec![false; old.len()];
     for note in new.iter_mut() {
         let Some(idx) = old.iter().enumerate().position(|(i, o)| {
-            !used[i]
-                && o.hole == note.hole
-                && o.is_blow == note.is_blow
-                && (o.time - note.time).abs() < 1e-6
+            !used[i] && o.position == note.position && (o.time - note.time).abs() < 1e-6
         }) else {
             continue;
         };
@@ -375,12 +372,13 @@ pub(super) fn setup_adaptive_difficulty(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harmonicon_core::chart::Action;
+    use harmonicon_core::instrument::PlayPosition;
 
     fn note(hit: bool, missed: bool, section: usize) -> ScheduledNote {
         ScheduledNote {
             duration: 0.1,
-            hole: 4,
-            is_blow: false,
+            position: PlayPosition::natural_hole(4, Action::Draw),
             expected_pitch: Some(62),
             hit,
             missed,
@@ -601,8 +599,10 @@ mod tests {
         ScheduledNote {
             time,
             duration: 0.5,
-            hole,
-            is_blow,
+            position: PlayPosition::natural_hole(
+                hole,
+                if is_blow { Action::Blow } else { Action::Draw },
+            ),
             expected_pitch: Some(60),
             ..Default::default()
         }

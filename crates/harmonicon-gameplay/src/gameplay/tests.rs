@@ -14,7 +14,8 @@ use harmonicon_core::scoring::{combo_label, compute_multiplier};
 use super::bars::{beat_ticks_in_range, pickup_lead_ticks, ticks_per_beat};
 use super::lifecycle::cleanup_gameplay;
 use super::*;
-use harmonicon_core::chart::HarpChart;
+use harmonicon_core::chart::{Action, HarpChart};
+use harmonicon_core::instrument::PlayPosition;
 
 // ── TechniqueStats / SongStats::record_technique ───────────────────────
 
@@ -268,8 +269,7 @@ fn loop_test_note(time: f64) -> ScheduledNote {
     ScheduledNote {
         time,
         duration: 0.5,
-        hole: 1,
-        is_blow: true,
+        position: PlayPosition::natural_hole(1, Action::Blow),
         expected_pitch: Some(60), // C4
         hit: true,
         missed: true,
@@ -943,12 +943,17 @@ fn chord_test_notes() -> Vec<ScheduledNote> {
     let base = overlap_test_note(0.49);
     vec![
         ScheduledNote {
-            hole: 1,
+            position: PlayPosition::natural_hole(1, Action::Blow),
             expected_pitch: Some(60),
             chord_pitches: vec![60, 64],
             ..base.clone()
         },
-        ScheduledNote { hole: 2, expected_pitch: Some(64), chord_pitches: vec![60, 64], ..base },
+        ScheduledNote {
+            position: PlayPosition::natural_hole(2, Action::Blow),
+            expected_pitch: Some(64),
+            chord_pitches: vec![60, 64],
+            ..base
+        },
     ]
 }
 

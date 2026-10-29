@@ -147,12 +147,14 @@ pub fn observe_judgment(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harmonicon_core::chart::Action;
+    use harmonicon_core::instrument::PlayPosition;
 
     fn note(hit: bool, time: f64, duration: f64, held: f64) -> ScheduledNote {
         ScheduledNote {
             time,
             duration,
-            hole: 4,
+            position: PlayPosition::natural_hole(4, Action::Blow),
             expected_pitch: Some(60),
             hit,
             held,

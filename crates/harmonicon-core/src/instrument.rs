@@ -44,6 +44,13 @@ pub enum PlayPosition {
     Hole(HoleAssignment),
 }
 
+impl PlayPosition {
+    /// A harmonica hole played plainly: no bend, overblow or slide.
+    pub fn natural_hole(hole: u8, action: Action) -> Self {
+        Self::Hole(HoleAssignment { hole, action, technique: Technique::Natural })
+    }
+}
+
 impl From<HoleAssignment> for PlayPosition {
     fn from(assignment: HoleAssignment) -> Self {
         Self::Hole(assignment)
