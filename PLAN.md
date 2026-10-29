@@ -81,21 +81,26 @@ Nothing below can be approved by a test.
 `docs/multi_instrument_plan.md` has the design. Every item in this section
 gates 1.0. In order:
 
-- **Chart format 1.8.0**: `instrument`, `NoteEvent.position`, `note`
-  required off-harmonica, multi-part song folders. The score importers
-  (`harmonicon-score`'s `convert`) take an `Instrument` in the same change,
-  since a chart can only name a non-harmonica instrument from here on.
-- **Seam leftovers** that read holes directly and move when they next
-  change: the progress bar's note lanes (`NoteMarker`), the technique
-  cue's side (`beside_lane`), and Jam Session's `hole_map`.
-- **Guitar**: model and tunings, fingering solver, Guitar Pro
-  string/fret pass-through, horizontal tab highway and fretboard strip,
+- **Guitar**. The core model is in (`harmonicon_core::instrument::guitar`).
+  Next, in order:
+  - chart format 1.8.0 naming it: a top-level `instrument`, used instead of
+    `harmonica`, `NoteEvent.position` as string and fret, `note` required
+    off the harmonica, and multi-part song folders. The score importers
+    (`harmonicon-score`'s `convert`) take an `Instrument` in the same
+    change. Each instrument's chart fields arrive with that instrument, so
+    the flute's come with the flute;
+  - a whole-part fingering solver, Guitar Pro string/fret pass-through,
+    horizontal tab highway and fretboard strip,
   editor tab rows, Karplus–Strong synth. Detection needs a recorded guitar
   corpus first (low-string resolution, strum onset spread, decaying
   sustain).
 - **Note Trainer** in place of the Bending Trainer: glide, register,
   position and target modes, offered per instrument.
-- **Flute**: Boehm fingering table, pitch lanes and fingering diagram,
+- **Seam leftovers** that read holes directly and move when they next
+  change: the progress bar's note lanes (`NoteMarker`) and Jam Session's
+  `hole_map`.
+- **Flute**: its chart fields, Boehm fingering table, pitch lanes and
+  fingering diagram,
   register drills, a corpus aimed at octave errors. The foot joint (C or B)
   is a per-instrument setting.
 - **Content and progress**: per-instrument packs, DAGs and profile, a

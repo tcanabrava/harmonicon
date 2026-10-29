@@ -288,12 +288,13 @@ behaviour.
    lane instead of `hole`/`is_blow`) and `highway_2d` through them.
    Existing tests plus pixel-diffed captures (`capture_static_screens.py`)
    prove nothing moved.
-2. **Chart 1.8.0.** Add the `instrument` field, `position`, the
-   conditionally-required `note`, multi-part song folders and validator
-   support. Add fixtures for each instrument.
-3. **Guitar** (two of the three instruments, and the largest library via
+2. **Guitar** (two of the three instruments, and the largest library via
    Guitar Pro):
-   - model and tunings;
+   - the core model (landed);
+   - chart 1.8.0 naming it: the `instrument` field, `position`, the
+     conditionally-required `note`, multi-part song folders and validator
+     support. A chart field is only designed alongside the model it
+     names, so the flute's fields arrive with the flute;
    - fingering solver;
    - Guitar Pro string/fret pass-through;
    - horizontal tab highway and fretboard strip;
@@ -301,13 +302,13 @@ behaviour.
    - Karplus–Strong synth;
    - a recorded corpus, then detection tuning (low-string resolution,
      chord onset spread, decaying sustain).
-4. **Note Trainer.** Generalise the bending trainer onto `TechniqueKind`,
+3. **Note Trainer.** Generalise the bending trainer onto `TechniqueKind`,
    with guitar bends as the second `Glide` implementation (which makes the
    abstraction honest), and add `Target` for every instrument.
-5. **Flute.** Monophonic model, the Boehm fingering table as data
+4. **Flute.** Its chart fields, a monophonic model, the Boehm fingering table as data
    (standard, alternates, harmonics), pitch lanes and fingering diagram,
    the `Register` trainer mode, and a corpus aimed at octave errors.
-6. **Content and progress.** Per-instrument packs and DAGs, a
+5. **Content and progress.** Per-instrument packs and DAGs, a
    per-instrument profile, the "My instruments" page, and per-instrument
    Jam Session.
 
