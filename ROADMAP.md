@@ -19,8 +19,11 @@ these phase numbers, and roadmap phases are separate from package versions.
 0.5–0.7: those milestones are *more*, and 1.0 is about what a first-time
 player hits before any of it matters.
 
-Definition: **a stranger with a C harmonica installs it, gets their
-microphone working, and learns something, without hitting a dead end.**
+Definition: **a stranger with a C harmonica, a guitar or a flute installs
+it, gets their microphone working, and learns something, without hitting a
+dead end.** Multiple instruments are part of 1.0, not after it: see
+"Multiple instruments" below, whose phases gate the release alongside
+rc1–rc3.
 
 Scope is **desktop only** — Linux, Windows, macOS. Android and wasm are
 deliberately post-1.0 (see 0.7+): Android's mic has never been verified on
@@ -229,7 +232,7 @@ remains:
   extend them to the same toggle if that turns out not to be enough.)
 - Localization beyond en-US/pt-BR/es-ES (infrastructure is already enforced).
 
-## Multiple instruments
+## Multiple instruments — in progress, required for 1.0
 
 Harmonicon becomes multi-instrument: guitar (electric and acoustic) first,
 then transverse flute, with the harmonica as the instrument everything is
@@ -242,7 +245,8 @@ phases; `PLAN.md` has them in order.
 - **Guitar**: a horizontal tab highway with a fretboard strip, a tab-row
   Song Editor that enforces one note per string and a hand span, and
   Guitar Pro imports that keep the author's strings and frets.
-- **Flute**: pitch lanes with a fingering diagram for the next note.
+- **Flute**: pitch lanes with a fingering diagram for the next note; the
+  foot joint (C or B) is a per-instrument setting.
 - **A Note Trainer** in place of the Bending Trainer, offering only the
   modes an instrument has: glides (bends), register selection (flute
   overblowing, harmonics), alternate positions, and a plain tuner for all.

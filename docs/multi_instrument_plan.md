@@ -301,15 +301,17 @@ behaviour.
    per-instrument profile, the "My instruments" page, and per-instrument
    Jam Session.
 
-## Decide before building
+## Scheduling
 
-- **Timing relative to 1.0.** 1.0 is a desktop harmonica release
-  (`ROADMAP.md`). Phase 1 is a refactor with no visible change and could
-  happen at any point; phases 3 onwards are a new product surface.
-  Recommendation: phase 1 after 1.0-rc2, because rc1–rc2 touch the same
-  gameplay files.
-- **The flute's foot joint** (C or B), which sets its lowest note and the
-  fingering table's range.
+Every phase above is required for 1.0 (`ROADMAP.md`), and phase 1 is under
+way. rc1–rc2 touch the same gameplay files, so land each phase in small
+commits rather than one long-lived branch.
+
+**The flute's foot joint is configurable**: `FluteConfig` carries a
+`FootJoint::{C, B}` (default C), chosen in "My instruments" alongside the
+guitar's tuning. It sets the lowest note (C4 or B3), so the fingering table
+holds the B-foot-only fingerings (B3, and the low-C♯/B keys used in some
+high-register alternates) and the model filters them out on a C foot.
 
 ## Later instruments
 

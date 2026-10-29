@@ -84,7 +84,7 @@ Nothing below can be approved by a test.
   `InstrumentModel`, `VoiceModel` and `LaneLayout` (with a scroll axis) in
   core, and `pitch_map`, the constraint filter, the editor's
   `enforce_direction`, `ScheduledNote` and `highway_2d` routed through them.
-  Recommended after 1.0-rc2, since rc1–rc2 touch the same gameplay files.
+  In progress. Every item in this section gates 1.0.
 - **Chart format 1.8.0**: `instrument`, `NoteEvent.position`, `note`
   required off-harmonica, multi-part song folders.
 - **Guitar**: model and tunings, fingering solver, Guitar Pro
@@ -95,8 +95,8 @@ Nothing below can be approved by a test.
 - **Note Trainer** in place of the Bending Trainer: glide, register,
   position and target modes, offered per instrument.
 - **Flute**: Boehm fingering table, pitch lanes and fingering diagram,
-  register drills, a corpus aimed at octave errors. Needs the foot joint
-  (C or B) confirmed.
+  register drills, a corpus aimed at octave errors. The foot joint (C or B)
+  is a per-instrument setting.
 - **Content and progress**: per-instrument packs, DAGs and profile, a
   "My instruments" page, per-instrument Jam Session.
 
