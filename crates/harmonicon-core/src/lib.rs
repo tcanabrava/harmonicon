@@ -19,6 +19,7 @@ pub mod config_file;
 pub mod harmonica;
 pub mod harmonica_constraints;
 pub mod harp_remap;
+pub mod instrument;
 pub mod lyrics;
 pub mod midi;
 /// Standard MIDI File parsing — named apart from [`midi`], which is pitch
