@@ -8,24 +8,16 @@
 
 use super::playback::build_harp;
 use super::state::{Dir, HARP_KEYS, HarmonicaKind, Pitch};
-use harmonicon_core::chart::Action;
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::pitch_map::{self, HoleAssignment, Technique};
+use harmonicon_core::pitch_map::{self, HoleAssignment};
 
 /// Core's resolution in the editor's own terms.
 fn from_core(assignment: HoleAssignment) -> (u8, Dir, Pitch) {
-    let dir = match assignment.action {
-        Action::Blow => Dir::Blow,
-        Action::Draw => Dir::Draw,
-    };
-    let pitch = match assignment.technique {
-        Technique::Natural => Pitch::Normal,
-        Technique::Bend(depth) => Pitch::Bend(depth),
-        Technique::Overblow => Pitch::Overblow,
-        Technique::Overdraw => Pitch::Overdraw,
-        Technique::Slide => Pitch::Slide,
-    };
-    (assignment.hole, dir, pitch)
+    (
+        assignment.hole,
+        Dir::from_action(assignment.action),
+        Pitch::from_technique(assignment.technique),
+    )
 }
 
 /// Resolves `target` onto `harp` only if it can genuinely produce it. Core
@@ -64,8 +56,10 @@ pub(super) fn suggest_key(midi_keys: &[u8], kind: HarmonicaKind) -> &'static str
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harmonicon_core::chart::Action;
     use harmonicon_core::harmonica::{chromatic_harp, richter_harp};
     use harmonicon_core::midi::note_to_midi;
+    use harmonicon_core::pitch_map::Technique;
 
     /// The translation, not the resolution — core owns and tests the latter.
     #[test]

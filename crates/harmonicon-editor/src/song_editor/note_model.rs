@@ -7,6 +7,9 @@
 //!
 
 use bevy::prelude::*;
+use harmonicon_core::chart::Action;
+use harmonicon_core::instrument::PlayPosition;
+use harmonicon_core::pitch_map::{HoleAssignment, Technique};
 
 // ── Note model types ─────────────────────────────────────────────────────────
 
@@ -96,6 +99,20 @@ pub(super) enum ContentKind {
 }
 
 impl Dir {
+    pub(super) fn action(self) -> Action {
+        match self {
+            Dir::Blow => Action::Blow,
+            Dir::Draw => Action::Draw,
+        }
+    }
+
+    pub(super) fn from_action(action: Action) -> Self {
+        match action {
+            Action::Blow => Dir::Blow,
+            Action::Draw => Dir::Draw,
+        }
+    }
+
     pub(super) fn arrow(self) -> &'static str {
         match self {
             Dir::Blow => "\u{2191}",
@@ -226,7 +243,44 @@ impl GridNote {
     }
 }
 
+impl Pitch {
+    /// The editor's technique in core's vocabulary.
+    pub(super) fn technique(self) -> Technique {
+        match self {
+            Pitch::Normal => Technique::Natural,
+            Pitch::Bend(depth) => Technique::Bend(depth),
+            Pitch::Overblow => Technique::Overblow,
+            Pitch::Overdraw => Technique::Overdraw,
+            Pitch::Slide => Technique::Slide,
+        }
+    }
+
+    pub(super) fn from_technique(technique: Technique) -> Self {
+        match technique {
+            Technique::Natural => Pitch::Normal,
+            Technique::Bend(depth) => Pitch::Bend(depth),
+            Technique::Overblow => Pitch::Overblow,
+            Technique::Overdraw => Pitch::Overdraw,
+            Technique::Slide => Pitch::Slide,
+        }
+    }
+}
+
 impl GridNote {
+    /// Where the note is played, in core's vocabulary.
+    pub(super) fn position(&self) -> PlayPosition {
+        let technique = self.pitch.technique();
+        PlayPosition::Hole(HoleAssignment { hole: self.hole, action: self.dir.action(), technique })
+    }
+
+    /// Takes `position`'s breath and technique. The hole stays: the editor
+    /// moves notes between holes itself, never through a position.
+    pub(super) fn set_position(&mut self, position: &PlayPosition) {
+        let PlayPosition::Hole(a) = position;
+        self.dir = Dir::from_action(a.action);
+        self.pitch = Pitch::from_technique(a.technique);
+    }
+
     pub(super) fn bend(&self) -> f32 {
         match self.pitch {
             Pitch::Bend(a) => a,

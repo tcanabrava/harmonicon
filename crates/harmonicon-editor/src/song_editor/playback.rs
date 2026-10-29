@@ -4,7 +4,7 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
-use super::state::{Dir, EditorState, GridNote, HarmonicaKind, Pitch};
+use super::state::{EditorState, GridNote, HarmonicaKind, Pitch};
 use super::{TICK_W, TICKS_PER_BEAT};
 use harmonicon_audio::AudioSettings;
 use harmonicon_core::harmonica::{
@@ -108,10 +108,7 @@ pub(super) fn note_midi(note: &GridNote, harp: &Harmonica) -> Option<u8> {
 /// semitones a bend takes it below that. `None` for a combination the harp
 /// can't produce.
 fn resolve_pitch(note: &GridNote, harp: &Harmonica) -> Option<(i32, f32)> {
-    let action = match note.dir {
-        Dir::Blow => harmonicon_core::chart::Action::Blow,
-        Dir::Draw => harmonicon_core::chart::Action::Draw,
-    };
+    let action = note.dir.action();
     let (label, bend) = match note.pitch {
         Pitch::Normal => (harp.wind_direction_label(note.hole, &action), 0.0),
         Pitch::Slide => (harp.slide_label(note.hole, &action), 0.0),

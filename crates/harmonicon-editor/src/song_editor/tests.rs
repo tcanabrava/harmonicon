@@ -887,6 +887,28 @@ fn enforce_unifies_overlap_chain_but_not_independent_notes() {
     assert_eq!(s.note_by_id(2).unwrap().dir, Dir::Draw);
 }
 
+/// A draw bend pulled onto a blown chord can't stay bent: hole 3 only bends
+/// on the draw. It drops to the plain blow reed instead of becoming a note
+/// no harp makes, while a technique the new breath *can* play is kept.
+#[test]
+fn enforce_drops_a_technique_the_chords_breath_cannot_play() {
+    let mut s = EditorState {
+        notes: vec![
+            GridNote::plain(0, 4, 0, 4),
+            GridNote { dir: Dir::Draw, pitch: Pitch::Bend(1.0), ..GridNote::plain(1, 3, 0, 4) },
+            GridNote { dir: Dir::Draw, pitch: Pitch::Bend(0.5), ..GridNote::plain(2, 8, 0, 4) },
+        ],
+        next_id: 3,
+        ..Default::default()
+    };
+    enforce_direction(&mut s, 0);
+    let bent3 = s.note_by_id(1).unwrap();
+    assert_eq!((bent3.dir, bent3.pitch), (Dir::Blow, Pitch::Normal));
+    // Hole 8 bends on the blow, so its half-step bend survives the switch.
+    let bent8 = s.note_by_id(2).unwrap();
+    assert_eq!((bent8.dir, bent8.pitch), (Dir::Blow, Pitch::Bend(0.5)));
+}
+
 // Wah (hand cupping) and vibrato (breath vibrato) are whole-player
 // techniques: every hole sounding at the same instant must share the
 // same one, mirroring how Blow/Draw is already unified above.

@@ -6,6 +6,7 @@ use super::snap::SnapMode;
 use super::{HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use harmonicon_core::chart::Scale;
 use harmonicon_core::harmonica::Harmonica;
+use harmonicon_core::instrument::InstrumentModel;
 
 // The note vocabulary lives in `note_model`; re-exported here because
 // `state` is the name every call site already reaches for, and the two are
@@ -692,17 +693,7 @@ pub(super) fn pitch_compatible(pitch: Pitch, harp: &Harmonica, hole: u8) -> bool
     // Delegated so the editor's idea of what a hole can physically do can't
     // drift from the resolver's — `pitch_map` decides which notes are
     // reachable, and this decides which the UI will let you place.
-    harmonicon_core::pitch_map::technique_fits(
-        match pitch {
-            Pitch::Normal => harmonicon_core::pitch_map::Technique::Natural,
-            Pitch::Bend(depth) => harmonicon_core::pitch_map::Technique::Bend(depth),
-            Pitch::Overblow => harmonicon_core::pitch_map::Technique::Overblow,
-            Pitch::Overdraw => harmonicon_core::pitch_map::Technique::Overdraw,
-            Pitch::Slide => harmonicon_core::pitch_map::Technique::Slide,
-        },
-        harp,
-        hole,
-    )
+    harmonicon_core::pitch_map::technique_fits(pitch.technique(), harp, hole)
 }
 
 /// Returns the localization key for the reason a pitch is not allowed on a hole,
@@ -838,14 +829,22 @@ fn overlapping_group(state: &EditorState, id: u32) -> Vec<u32> {
     group
 }
 
+/// Makes every note sounding with `id`, transitively, playable alongside it,
+/// as the instrument decides (`InstrumentModel::reconcile`): on a harmonica
+/// each takes `id`'s breath, and one whose technique the new breath can't
+/// play drops back to the plain reed rather than becoming a note the harp
+/// can't make.
 pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
-    let Some(dir) = state.note_by_id(id).map(|n| n.dir) else {
+    let Some(anchor) = state.note_by_id(id).map(GridNote::position) else {
         return;
     };
-    let group = overlapping_group(state, id);
-    for n in &mut state.notes {
-        if group.contains(&n.id) {
-            n.dir = dir;
+    let group: Vec<u32> = overlapping_group(state, id).into_iter().filter(|&g| g != id).collect();
+    let mut positions: Vec<_> =
+        group.iter().filter_map(|&g| state.note_by_id(g).map(GridNote::position)).collect();
+    state.effective_harp().reconcile(&anchor, &mut positions);
+    for (&g, position) in group.iter().zip(&positions) {
+        if let Some(n) = state.notes.iter_mut().find(|n| n.id == g) {
+            n.set_position(position);
         }
     }
 }

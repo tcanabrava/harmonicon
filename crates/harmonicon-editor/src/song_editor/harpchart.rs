@@ -8,7 +8,7 @@ use super::state::{
 };
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use harmonicon_core::chart::{
-    Action, CURRENT_FORMAT_VERSION, Scale, TempoPoint, seconds_to_tick, tick_to_seconds,
+    CURRENT_FORMAT_VERSION, Scale, TempoPoint, seconds_to_tick, tick_to_seconds,
 };
 use harmonicon_core::harmonica::{Harmonica, hole_notes};
 use harmonicon_core::midi::{midi_to_note, note_to_midi};
@@ -25,10 +25,7 @@ use harmonicon_ui::dialogs::file_dialog::FileChosen;
 /// editor actually plays; overblow/overdraw resolve via [`hole_notes`],
 /// which knows overblow sits above the *draw* reed on holes 1/4/5/6.
 fn note_name_for(n: &GridNote, harp: &Harmonica) -> String {
-    let action = match n.dir {
-        Dir::Blow => Action::Blow,
-        Dir::Draw => Action::Draw,
-    };
+    let action = n.dir.action();
     let label = match n.pitch {
         Pitch::Normal => harp.wind_direction_label(n.hole, &action),
         Pitch::Slide => harp.slide_label(n.hole, &action),
