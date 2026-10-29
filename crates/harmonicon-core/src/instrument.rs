@@ -176,6 +176,16 @@ pub trait InstrumentModel {
     fn lane_layout(&self) -> LaneLayout;
 }
 
+/// `technique` with a bend's depth rounded to the semitone it sounds, and a
+/// bend that rounds to nothing read as the plain reed.
+fn sounding_technique(technique: Technique) -> Technique {
+    match technique {
+        Technique::Bend(depth) if depth.round() == 0.0 => Technique::Natural,
+        Technique::Bend(depth) => Technique::Bend(depth.round()),
+        other => other,
+    }
+}
+
 impl InstrumentModel for Harmonica {
     fn range(&self) -> Option<(u8, u8)> {
         let notes = self.build_valid_notes();
@@ -190,12 +200,17 @@ impl InstrumentModel for Harmonica {
     /// the technique alone, so a bend on a hole that doesn't bend, or an
     /// overblow on the wrong breath, is unplayable here exactly as it is
     /// everywhere else.
+    ///
+    /// A bend sounds the semitone its depth rounds to, as gameplay judges it
+    /// (`gameplay::notes::target_pitch`): a quarter-tone bend is aimed at,
+    /// but the pitch identity is the nearest semitone.
     fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
         let PlayPosition::Hole(a) = position;
+        let a = &HoleAssignment { technique: sounding_technique(a.technique), ..*a };
         let reed = self.wind_direction_midi(a.hole, &a.action)?;
         let candidate = match a.technique {
             Technique::Natural => Some(reed),
-            Technique::Bend(depth) => reed.checked_sub(depth.round() as u8),
+            Technique::Bend(depth) => reed.checked_sub(depth as u8),
             Technique::Overblow | Technique::Overdraw => {
                 let other = match a.action {
                     Action::Blow => Action::Draw,

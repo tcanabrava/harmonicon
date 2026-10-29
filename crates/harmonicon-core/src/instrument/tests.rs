@@ -87,6 +87,19 @@ fn pitch_of_refuses_what_the_harp_cannot_play() {
     assert_eq!(harp.pitch_of(&hole(4, Action::Blow, Technique::Slide)), None);
 }
 
+/// The Song Editor steps bends by quarter tones; each sounds the semitone it
+/// rounds to, which is the pitch gameplay expects for it.
+#[test]
+fn a_fractional_bend_sounds_the_semitone_it_rounds_to() {
+    let harp = richter_harp("C");
+    let draw3 = |depth| harp.pitch_of(&hole(3, Action::Draw, Technique::Bend(depth)));
+    assert_eq!(draw3(0.5), Some(midi("A#4")));
+    assert_eq!(draw3(1.5), Some(midi("A4")));
+    assert_eq!(draw3(0.25), Some(midi("B4")), "rounds to no bend at all");
+    // Hole 1 bends one semitone; 1.5 rounds past it.
+    assert_eq!(harp.pitch_of(&hole(1, Action::Draw, Technique::Bend(1.5))), None);
+}
+
 #[test]
 fn chromatic_slide_raises_the_reed_a_semitone() {
     let harp = chromatic_harp("C");
