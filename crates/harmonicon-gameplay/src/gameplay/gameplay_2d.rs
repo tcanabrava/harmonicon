@@ -7,6 +7,8 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
 use harmonicon_core::chart::{Action, Modifier};
+use harmonicon_core::instrument::{LaneLayout, PlayPosition};
+use harmonicon_core::pitch_map::{HoleAssignment, Technique};
 use harmonicon_song::song::SongManifest;
 
 use harmonicon_ui::music_score::{self, BravuraFont};
@@ -27,9 +29,9 @@ use super::note_ribbon_2d::NoteRibbon2dMaterial;
 use super::song_progress_overlay::{BAR_HEIGHT, NoteMarker, spawn_song_progress};
 use super::technique_cue;
 use super::{
-    ActivePitches, ActiveTargets, COUNTDOWN, GameplayRoot, HoleCell, HoleState, LOOKAHEAD,
-    MusicStarted, NoteVisual, PlayedHarp, ScheduledNote, ScoreReadoutAnchor, SongInfo, SongNotes,
-    ValidHarpNotes, spawn_score_readout,
+    ActivePitches, ActiveTargets, COUNTDOWN, GameplayRoot, HighwayLanes, HoleCell, HoleState,
+    LOOKAHEAD, MusicStarted, NoteVisual, PlayedHarp, ScheduledNote, ScoreReadoutAnchor, SongInfo,
+    SongNotes, ValidHarpNotes, spawn_score_readout,
 };
 use harmonicon_platform::localization::Localization;
 use harmonicon_platform::theme::{LoadedTheme, NoteColors, effective_note_colors};
@@ -65,6 +67,7 @@ pub fn setup(
     effective: Res<EffectiveHarmonica>,
     mut valid_notes: ResMut<ValidHarpNotes>,
     mut played_harp: ResMut<PlayedHarp>,
+    mut highway_lanes: ResMut<HighwayLanes>,
     song_info: Res<SongInfo>,
     mut song_notes: ResMut<SongNotes>,
     mut render_assets: ResMut<NoteRenderAssets>,
@@ -81,6 +84,7 @@ pub fn setup(
     clock.set_free(-COUNTDOWN);
     music_started.0 = false;
     (*valid_notes, *played_harp) = ValidHarpNotes::for_played_harp(&effective, &manifest.chart);
+    *highway_lanes = HighwayLanes::for_played_harp(&played_harp);
 
     let chart = &manifest.chart;
     // Everything the player *sees* about the instrument — lane count, the
@@ -176,7 +180,9 @@ pub fn setup(
                         NoteHighway,
                     ))
                     .with_children(|hw| {
-                        spawn_highway(hw, played);
+                        if let Some(layout) = &highway_lanes.0 {
+                            spawn_highway(hw, layout);
+                        }
                     })
                     .id();
 
@@ -385,7 +391,7 @@ pub fn spawn_visible_notes(
     clock: Res<super::GameplayClock>,
     song_notes: Res<SongNotes>,
     render_assets: Res<NoteRenderAssets>,
-    played: Res<PlayedHarp>,
+    lanes: Res<HighwayLanes>,
     highway: Query<Entity, With<NoteHighway>>,
     existing: Query<&NoteVisual>,
     mut shape_materials: ResMut<Assets<NoteRibbon2dMaterial>>,
@@ -398,15 +404,12 @@ pub fn spawn_visible_notes(
     if lesson.is_some_and(|lesson| lesson.aural) {
         return;
     }
-    let (Some(harp), Ok(highway_entity)) = (played.0.as_ref(), highway.single()) else {
+    let (Some(layout), Ok(highway_entity)) = (lanes.0.as_ref(), highway.single()) else {
         return;
     };
     let colors = effective_note_colors(theme.note_colors(), colorblind.0);
-
-    // Lanes are the played harp's holes — the same count the strip and
-    // highway were laid out with.
-    let hole_count = harp.hole_count() as usize;
-    let lane_pct = 100.0 / hole_count as f32;
+    // The same layout the highway's stripes were spawned from.
+    let lane_count = u8::try_from(layout.lanes.len()).unwrap_or(u8::MAX);
     let elapsed = clock.get();
 
     already_spawned.clear();
@@ -425,14 +428,14 @@ pub fn spawn_visible_notes(
             }
             let cue = technique_cue::note_cue(&loc, note).map(|text| NoteCue {
                 text,
-                on_right: technique_cue::beside_lane(note.hole, harp.hole_count()) > note.hole,
+                on_right: technique_cue::beside_lane(note.hole, lane_count) > note.hole,
             });
             spawn_note_visual(
                 hw,
                 i,
                 note,
                 cue,
-                lane_pct,
+                layout,
                 render_assets.play_mode_tags.get(i).copied().flatten(),
                 &mut shape_materials,
                 show_numbers.0,
@@ -440,6 +443,14 @@ pub fn spawn_visible_notes(
             );
         }
     });
+}
+
+/// The lane `note` is drawn in. Harmonica lanes are one per hole, so the
+/// position only needs the hole; its technique doesn't move the lane.
+fn note_lane(note: &ScheduledNote, layout: &LaneLayout) -> usize {
+    let action = if note.is_blow { Action::Blow } else { Action::Draw };
+    let hole = HoleAssignment { hole: note.hole, action, technique: Technique::Natural };
+    layout.nearest_lane(&PlayPosition::Hole(hole))
 }
 
 /// Spawns one note's visual: a ribbon down its lane, as long as the note
@@ -452,15 +463,15 @@ fn spawn_note_visual(
     note_id: usize,
     note: &ScheduledNote,
     cue: Option<NoteCue>,
-    lane_pct: f32,
+    layout: &LaneLayout,
     play_mode_tag: Option<&'static str>,
     shape_materials: &mut Assets<NoteRibbon2dMaterial>,
     show_numbers: bool,
     colors: NoteColors,
 ) {
     let label = head_label(note.hole, note.is_blow, &note.modifiers, show_numbers);
-    let width_pct = lane_pct * NOTE_W;
-    let left_pct = (note.hole as f32 - 1.0) * lane_pct + (lane_pct - width_pct) * 0.5;
+    let width_pct = layout.lane_pct() * NOTE_W;
+    let left_pct = layout.centred_left_pct(note_lane(note, layout), width_pct);
     let material = shape_materials.add(NoteRibbon2dMaterial {
         color: ribbon_color(false, note.is_blow, colors),
         technique: ribbon_technique(&note.modifiers),
@@ -687,7 +698,7 @@ pub fn animate_judged_notes(
     clock: Res<super::GameplayClock>,
     show_numbers: Res<harmonicon_platform::assets_management::ShowNoteNumbers>,
     reduced_motion: Res<harmonicon_platform::settings::ReducedMotion>,
-    played: Res<PlayedHarp>,
+    lanes: Res<HighwayLanes>,
     mut notes: Query<(
         Entity,
         &NoteVisual,
@@ -699,10 +710,10 @@ pub fn animate_judged_notes(
     caps: Query<&Children, Without<NoteVisual>>,
     mut labels: Query<(&mut Text, &mut TextColor), With<NoteCapLabel>>,
 ) {
-    let Some(harp) = played.0.as_ref() else {
+    let Some(layout) = lanes.0.as_ref() else {
         return;
     };
-    let lane_pct = 100.0 / f32::from(harp.hole_count().max(1));
+    let width = layout.lane_pct() * NOTE_W;
     let now = clock.get();
     for (entity, visual, mut state, judged, mut node, children) in &mut notes {
         let Some(note) = song_notes.notes.get(visual.note_id) else {
@@ -712,8 +723,7 @@ pub fn animate_judged_notes(
             observe_judgment(&mut commands, entity, note, &mut state, judged, now);
         let scale =
             judged.map_or(1.0, |j| judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0));
-        let width = lane_pct * NOTE_W;
-        let lane_left = (note.hole as f32 - 1.0) * lane_pct + (lane_pct - width) * 0.5;
+        let lane_left = layout.centred_left_pct(note_lane(note, layout), width);
         let (left, scaled) = scaled_span(lane_left, width, scale);
         if node.width != Val::Percent(scaled) {
             node.width = Val::Percent(scaled);
@@ -900,6 +910,31 @@ pub fn update_holes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use harmonicon_core::harmonica::{chromatic_16_harp, richter_harp};
+    use harmonicon_core::instrument::InstrumentModel;
+
+    // ── lanes ─────────────────────────────────────────────────────────────────
+
+    /// A note's ribbon must sit centred over the stripe `spawn_highway` drew
+    /// for its hole, breath either way, on a harp of any size.
+    #[test]
+    fn every_hole_draws_its_note_over_its_own_stripe() {
+        for harp in [richter_harp("C"), chromatic_16_harp("C")] {
+            let layout = harp.lane_layout();
+            let lane_pct = 100.0 / f32::from(harp.hole_count());
+            let width = lane_pct * NOTE_W;
+            for hole in 1..=harp.hole_count() {
+                for is_blow in [true, false] {
+                    let note = ScheduledNote { hole, is_blow, ..Default::default() };
+                    let lane = note_lane(&note, &layout);
+                    assert_eq!(lane, usize::from(hole - 1));
+                    let left = layout.centred_left_pct(lane, width);
+                    let stripe_left = f32::from(hole - 1) * lane_pct;
+                    assert!((left + width * 0.5 - (stripe_left + lane_pct * 0.5)).abs() < 1e-4);
+                }
+            }
+        }
+    }
 
     // ── ribbon geometry ───────────────────────────────────────────────────────
 

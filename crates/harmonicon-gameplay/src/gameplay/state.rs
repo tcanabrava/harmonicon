@@ -16,6 +16,7 @@ use harmonicon_audio::pitch_detect::{PitchAlgorithm, PitchEvent, PitchInfo};
 use harmonicon_core::chart::{HarpChart, Modifier};
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
+use harmonicon_core::instrument::{InstrumentModel, LaneLayout};
 use harmonicon_core::scoring::{AttackGate, HitQuality, compute_multiplier};
 
 #[derive(Resource, Default)]
@@ -135,6 +136,18 @@ pub struct ValidHarpNotes(pub HashSet<u8>);
 /// nothing).
 #[derive(Resource, Default)]
 pub struct PlayedHarp(pub Option<Harmonica>);
+
+/// The highway's lanes, laid out once per song from the played instrument
+/// so the per-frame note systems don't rebuild them. `None` until a song
+/// sets it up.
+#[derive(Resource, Default)]
+pub struct HighwayLanes(pub Option<LaneLayout>);
+
+impl HighwayLanes {
+    pub(super) fn for_played_harp(played: &PlayedHarp) -> Self {
+        Self(played.0.as_ref().map(InstrumentModel::lane_layout))
+    }
+}
 
 impl ValidHarpNotes {
     /// The pitches gameplay will accept, and the harp they came from, taken

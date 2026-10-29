@@ -154,6 +154,34 @@ fn lanes_are_one_per_hole_numbered_from_one() {
 }
 
 #[test]
+fn a_position_without_a_lane_is_drawn_in_the_nearest_one() {
+    let layout = richter_harp("C").lane_layout();
+    assert_eq!(layout.nearest_lane(&hole(4, Action::Blow, Technique::Natural)), 3);
+    assert_eq!(layout.nearest_lane(&hole(0, Action::Blow, Technique::Natural)), 0);
+    assert_eq!(layout.nearest_lane(&hole(99, Action::Draw, Technique::Natural)), 9);
+}
+
+/// The arithmetic the highway used inline before the layout owned it:
+/// `(hole - 1) * lane + (lane - width) / 2` with `lane = 100 / holes`.
+#[test]
+fn a_centred_note_sits_in_the_middle_of_its_lane() {
+    let layout = richter_harp("C").lane_layout();
+    assert_eq!(layout.lane_pct(), 10.0);
+    assert_eq!(layout.centred_left_pct(0, 10.0), 0.0);
+    assert_eq!(layout.centred_left_pct(3, 6.0), 32.0);
+    let chromatic = chromatic_harp("C").lane_layout();
+    let lane = 100.0 / 12.0;
+    assert_eq!(chromatic.centred_left_pct(11, lane * 0.5), 11.0 * lane + lane * 0.25);
+}
+
+#[test]
+fn an_empty_layout_does_not_divide_by_zero() {
+    let layout = LaneLayout { axis: ScrollAxis::Vertical, lanes: Vec::new() };
+    assert_eq!(layout.lane_pct(), 100.0);
+    assert_eq!(layout.nearest_lane(&hole(3, Action::Blow, Technique::Natural)), 0);
+}
+
+#[test]
 fn only_the_diatonic_has_techniques_to_drill() {
     let diatonic = richter_harp("C").techniques();
     assert_eq!(diatonic[0], TechniqueKind::Target);

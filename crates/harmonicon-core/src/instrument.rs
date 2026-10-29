@@ -112,6 +112,28 @@ impl LaneLayout {
         };
         (lane < self.lanes.len()).then_some(lane)
     }
+
+    /// [`lane_of`](Self::lane_of), but a position with no lane of its own is
+    /// drawn in the nearest one, so a note never silently goes missing from
+    /// the highway while still being judged.
+    pub fn nearest_lane(&self, position: &PlayPosition) -> usize {
+        let last = self.lanes.len().saturating_sub(1);
+        match position {
+            PlayPosition::Hole(a) => usize::from(a.hole.saturating_sub(1)).min(last),
+        }
+    }
+
+    /// Each lane's share of the highway's width, in percent.
+    pub fn lane_pct(&self) -> f32 {
+        100.0 / self.lanes.len().max(1) as f32
+    }
+
+    /// The left edge, in percent of the highway, of something `width_pct`
+    /// wide centred in `lane`.
+    pub fn centred_left_pct(&self, lane: usize, width_pct: f32) -> f32 {
+        let lane_pct = self.lane_pct();
+        lane as f32 * lane_pct + (lane_pct - width_pct) * 0.5
+    }
 }
 
 /// What an instrument can play, what it can play at once, and how it is

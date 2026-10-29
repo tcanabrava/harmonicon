@@ -6,14 +6,15 @@
 //! Split out of `gameplay_2d` because it is the half that runs *once*, at
 //! song setup, and never again — the rest of that module spawns, moves and
 //! retires note visuals every frame. The two share only the lane geometry,
-//! and share it by construction: both derive lane width from
-//! `100.0 / hole_count`, which is what keeps a hole number under its own
+//! and share it by construction: both take lane width from the song's
+//! `HighwayLanes` layout, which is what keeps a hole number under its own
 //! lane on any harp, 10-hole diatonic or 12-hole chromatic.
 
 use bevy::prelude::*;
 
 use harmonicon_core::chart::Action;
 use harmonicon_core::harmonica::Harmonica;
+use harmonicon_core::instrument::LaneLayout;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use super::HoleCell;
@@ -21,13 +22,12 @@ use super::gameplay_2d::HIT_H_PCT;
 
 /// Spawns the static highway furniture (lane stripes, dividers, hit zone) —
 /// no notes. Notes are spawned later, lazily, by `spawn_visible_notes`.
-pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, harp: &Harmonica) {
-    // Lane count/width come from the harmonica being played, not a fixed
+pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout) {
+    // Lane count/width come from the instrument being played, not a fixed
     // 10 — a chromatic's 12+ holes need proportionally narrower lanes.
-    let hole_count = harp.hole_count() as usize;
-    let lane_pct = 100.0 / hole_count as f32;
+    let lane_pct = layout.lane_pct();
 
-    for h in 0..hole_count {
+    for h in 0..layout.lanes.len() {
         let left_pct = h as f32 * lane_pct;
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
         hw.spawn_empty().apply_scene(bsn! {

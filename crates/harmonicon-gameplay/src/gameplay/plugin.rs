@@ -21,9 +21,9 @@ use super::lifecycle;
 use super::notes::SongNotes;
 use super::practice_badges;
 use super::state::{
-    ActivePitches, ActiveTargets, HarmonicaPitchFilter, HitFeedback, LoopConfig, MusicStarted,
-    NoteScored, Paused, PitchGate, PlayedHarp, PracticeRequest, Score, ScoringConfig, SongEnd,
-    SongStats, ValidHarpNotes, collect_pitches,
+    ActivePitches, ActiveTargets, HarmonicaPitchFilter, HighwayLanes, HitFeedback, LoopConfig,
+    MusicStarted, NoteScored, Paused, PitchGate, PlayedHarp, PracticeRequest, Score, ScoringConfig,
+    SongEnd, SongStats, ValidHarpNotes, collect_pitches,
 };
 use super::technique_coach;
 use super::{
@@ -90,6 +90,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<MusicStarted>()
         .init_resource::<ValidHarpNotes>()
         .init_resource::<PlayedHarp>()
+        .init_resource::<HighwayLanes>()
         .init_resource::<super::SongInfo>()
         .init_resource::<harmonicon_app::app::EffectiveHarmonica>()
         .init_resource::<SongNotes>()
