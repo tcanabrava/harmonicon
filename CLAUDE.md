@@ -43,6 +43,11 @@ than accumulating history (git log/commit messages are the historical record):
   filtering does today, which of its constants were chosen from measurement
   and which are placeholders, and what needs a recorded corpus before it can
   be tuned rather than guessed at
+- `docs/multi_instrument_plan.md` — extending beyond harmonica (guitar,
+  flute, hurdy gurdy): the instrument model and voice rules in core,
+  per-instrument lanes, the Note Trainer's glide/register split, and the
+  phased rollout. Proposed, not adopted — `ROADMAP.md` still lists
+  non-harmonica instruments as a non-goal
 - `docs/book/` — player-facing mdBook user guide (`mdbook build`/`mdbook
   serve` from that directory); update it when a user-visible feature
   changes, not just internal ones. `docs/book/src/images/*.png` are real
