@@ -25,8 +25,8 @@ use harmonicon_core::scoring::{
 use super::clock::GameplayClock;
 use super::notes::{ScheduledNote, SongNotes};
 use super::state::{
-    ActivePitches, ActiveTargets, FAILURE_FEEDBACK_SECS, HIT_FEEDBACK_SECS, HarmonicaPitchFilter,
-    HitFeedback, HoleTab, JudgmentFeedback, MissReason, NoteScored, PitchGate, PlayedHarp, Score,
+    ActivePitches, ActiveTargets, FAILURE_FEEDBACK_SECS, HIT_FEEDBACK_SECS, HitFeedback, HoleTab,
+    InstrumentPitchFilter, JudgmentFeedback, MissReason, NoteScored, PitchGate, PlayedHarp, Score,
     ScoringConfig, SongStats, ValidHarpNotes, bump,
 };
 
@@ -34,7 +34,7 @@ pub(crate) fn update_active_targets(
     clock: Res<GameplayClock>,
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
-    pitch_filter: Option<Res<HarmonicaPitchFilter>>,
+    pitch_filter: Option<Res<InstrumentPitchFilter>>,
     song_notes: Res<SongNotes>,
     mut targets: ResMut<ActiveTargets>,
 ) {
@@ -145,7 +145,7 @@ pub fn live_technique_status(
 pub fn judged_instant(
     clock: f64,
     audio: &AudioSettings,
-    pitch_filter: Option<&HarmonicaPitchFilter>,
+    pitch_filter: Option<&InstrumentPitchFilter>,
 ) -> f64 {
     clock
         - f64::from(audio.input_latency_ms) / 1000.0
@@ -256,7 +256,7 @@ pub fn score_notes(
     played_harp: Res<PlayedHarp>,
     config: Res<ScoringConfig>,
     audio: Res<AudioSettings>,
-    pitch_filter: Option<Res<HarmonicaPitchFilter>>,
+    pitch_filter: Option<Res<InstrumentPitchFilter>>,
     mut song_notes: ResMut<SongNotes>,
     mut score: ResMut<Score>,
     mut stats: ResMut<SongStats>,
@@ -271,7 +271,7 @@ pub fn score_notes(
     // Compensate for microphone pipeline latency: a pitch detected at clock T
     // was actually played at T - latency. Shift the judgment window accordingly.
     //
-    // Onset confirmation in `HarmonicaPitchFilter` is part of that same
+    // Onset confirmation in `InstrumentPitchFilter` is part of that same
     // pipeline and delays every pitch by the same fixed amount, so it belongs
     // in the same scalar rather than being applied per note. The scan below
     // stops early on the first note past the window and relies on `judged`

@@ -23,7 +23,7 @@ use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use super::judge::judged_instant;
 use super::notes::SongNotes;
-use super::state::{ActivePitches, HarmonicaPitchFilter};
+use super::state::{ActivePitches, InstrumentPitchFilter};
 use super::technique_cue::{
     BendAdvice, CoachMode, RateAdvice, bend_reading, bend_target_band, bend_track_pct,
     bend_track_range, coach_mode, coach_note, format_rate, measured_rate, min_swing_band,
@@ -202,7 +202,7 @@ pub(super) fn update_technique_coach(
     song_notes: Res<SongNotes>,
     clock: Res<super::GameplayClock>,
     audio: Res<AudioSettings>,
-    pitch_filter: Res<HarmonicaPitchFilter>,
+    pitch_filter: Res<InstrumentPitchFilter>,
     active: Res<ActivePitches>,
     loc: Res<Localization>,
     coaches: Query<&TechniqueCoach>,

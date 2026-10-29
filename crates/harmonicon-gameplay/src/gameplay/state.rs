@@ -15,19 +15,20 @@ use harmonicon_audio::AudioSettings;
 use harmonicon_audio::pitch_detect::{PitchAlgorithm, PitchEvent, PitchInfo};
 use harmonicon_core::chart::{Action, HarpChart, Modifier};
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
-use harmonicon_core::instrument::{InstrumentModel, LaneLayout, PlayPosition};
+use harmonicon_core::instrument::{Instrument, InstrumentModel, LaneLayout, PlayPosition};
+use harmonicon_core::note_tracker::{NoteTracker, NoteTrackerConfig};
 use harmonicon_core::scoring::{AttackGate, HitQuality, compute_multiplier};
 
 #[derive(Resource, Default)]
 pub struct ActivePitches(pub Vec<PitchInfo>);
 
-/// Harmonica-aware post-processing for polyphonic detector output. The raw
+/// Instrument-aware post-processing for polyphonic detector output. The raw
 /// `PitchEvent` remains available to diagnostics; gameplay receives only notes
-/// compatible with one wind direction and stable for two audio frames.
+/// the played instrument can sound together (on a harmonica, one wind
+/// direction) and stable for two audio frames.
 #[derive(Resource, Default)]
-pub struct HarmonicaPitchFilter {
-    tracker: Option<HarmonicaNoteTracker>,
+pub struct InstrumentPitchFilter {
+    tracker: Option<NoteTracker>,
     pitches: HashMap<u8, PitchInfo>,
     /// The current hop's MIDI numbers, kept to reuse its storage.
     midis: Vec<u8>,
@@ -38,11 +39,11 @@ pub struct HarmonicaPitchFilter {
     lag_secs: f64,
 }
 
-impl HarmonicaPitchFilter {
+impl InstrumentPitchFilter {
     /// `sample_rate` is `None` when no microphone is open — there are no
     /// detections to filter in that case, and no latency to correct for.
-    pub fn configure(&mut self, harp: Harmonica, sample_rate: Option<u32>) {
-        let tracker = HarmonicaNoteTracker::new(harp, NoteTrackerConfig::default());
+    pub fn configure(&mut self, instrument: &Instrument, sample_rate: Option<u32>) {
+        let tracker = NoteTracker::new(instrument, NoteTrackerConfig::default());
         let hops = tracker.onset_frames().saturating_sub(1) as f64;
         *self = Self {
             lag_secs: sample_rate.map_or(0.0, |rate| {
@@ -554,7 +555,7 @@ pub fn loop_range_valid(start_time: f64, end_time: f64) -> bool {
 pub(super) fn collect_pitches(
     mut reader: MessageReader<PitchEvent>,
     mut active: ResMut<ActivePitches>,
-    mut filter: ResMut<HarmonicaPitchFilter>,
+    mut filter: ResMut<InstrumentPitchFilter>,
     settings: Res<AudioSettings>,
 ) {
     if filter.engaged(settings.pitch_algorithm) {
@@ -644,7 +645,7 @@ mod pitch_filter_tests {
         PitchInfo { midi, note: String::new(), octave: 0, frequency: midi_to_freq_hz(midi as f32) }
     }
 
-    fn run(filter: &mut HarmonicaPitchFilter, raw: &[PitchInfo]) -> Vec<PitchInfo> {
+    fn run(filter: &mut InstrumentPitchFilter, raw: &[PitchInfo]) -> Vec<PitchInfo> {
         let mut out = Vec::new();
         filter.update(raw, &mut out);
         out
@@ -652,8 +653,8 @@ mod pitch_filter_tests {
 
     #[test]
     fn confirms_an_onset_over_two_frames_and_releases_on_the_first_silent_one() {
-        let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"), Some(44_100));
+        let mut filter = InstrumentPitchFilter::default();
+        filter.configure(&richter_harp("C").into(), Some(44_100));
         assert!(run(&mut filter, &[pitch(60)]).is_empty());
         assert_eq!(run(&mut filter, &[pitch(60)])[0].midi, 60);
         assert!(run(&mut filter, &[]).is_empty());
@@ -664,8 +665,8 @@ mod pitch_filter_tests {
         // `score_notes` re-arms `PitchGate` from `ActivePitches` alone
         // (`gate.release_absent`), so a pitch that never leaves this list
         // can only ever satisfy one note however many times it is played.
-        let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"), Some(44_100));
+        let mut filter = InstrumentPitchFilter::default();
+        filter.configure(&richter_harp("C").into(), Some(44_100));
         run(&mut filter, &[pitch(60)]);
         run(&mut filter, &[pitch(60)]);
         assert!(run(&mut filter, &[]).is_empty());
@@ -679,8 +680,8 @@ mod pitch_filter_tests {
         // the shipped hop size — so changing `onset_frames` or `HOP_SIZE`
         // fails here with the real number, rather than registering only as a
         // vague sense that the game got less responsive.
-        let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"), Some(44_100));
+        let mut filter = InstrumentPitchFilter::default();
+        filter.configure(&richter_harp("C").into(), Some(44_100));
         let delay_ms = filter.onset_lag_secs(PitchAlgorithm::Nmf) * 1000.0;
         assert!(
             (delay_ms - 46.4).abs() < 0.1,
@@ -694,8 +695,8 @@ mod pitch_filter_tests {
         // whole frame, which its early break over time-sorted notes needs to
         // stay correct. Whatever has been detected, however long ago, the
         // correction is the same number.
-        let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"), Some(44_100));
+        let mut filter = InstrumentPitchFilter::default();
+        filter.configure(&richter_harp("C").into(), Some(44_100));
         let quiet = filter.onset_lag_secs(PitchAlgorithm::Nmf);
         run(&mut filter, &[pitch(60)]);
         run(&mut filter, &[pitch(60)]);
@@ -710,8 +711,8 @@ mod pitch_filter_tests {
     fn a_monophonic_detector_is_neither_filtered_nor_compensated() {
         // The two must agree: correcting for a latency the pitches never
         // actually incurred would judge every note early.
-        let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"), Some(44_100));
+        let mut filter = InstrumentPitchFilter::default();
+        filter.configure(&richter_harp("C").into(), Some(44_100));
         assert!(!filter.engaged(PitchAlgorithm::Yin));
         assert_eq!(filter.onset_lag_secs(PitchAlgorithm::Yin), 0.0);
         assert!(filter.engaged(PitchAlgorithm::Nmf));
@@ -722,15 +723,15 @@ mod pitch_filter_tests {
     fn an_unconfigured_filter_compensates_for_nothing() {
         // Jam Session and the Bending Trainer share `collect_pitches` but
         // never configure a harp, so nothing there is filtered or shifted.
-        let filter = HarmonicaPitchFilter::default();
+        let filter = InstrumentPitchFilter::default();
         assert!(!filter.engaged(PitchAlgorithm::Nmf));
         assert_eq!(filter.onset_lag_secs(PitchAlgorithm::Nmf), 0.0);
     }
 
     #[test]
     fn rejects_opposite_wind_phantoms() {
-        let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(richter_harp("C"), Some(44_100));
+        let mut filter = InstrumentPitchFilter::default();
+        filter.configure(&richter_harp("C").into(), Some(44_100));
         run(&mut filter, &[pitch(60), pitch(64), pitch(62)]);
         let stable = run(&mut filter, &[pitch(60), pitch(64), pitch(62)]);
         let midis: Vec<u8> = stable.iter().map(|pitch| pitch.midi).collect();

@@ -994,8 +994,8 @@ fn score_notes_judges_every_note_of_a_frame_at_one_instant() {
             pitch_info(60, "C", 4, midi_to_freq_hz(60.0)),
             pitch_info(64, "E", 4, midi_to_freq_hz(64.0)),
         ]);
-        let mut filter = HarmonicaPitchFilter::default();
-        filter.configure(harmonicon_core::harmonica::richter_harp("C"), Some(44_100));
+        let mut filter = InstrumentPitchFilter::default();
+        filter.configure(&harmonicon_core::harmonica::richter_harp("C").into(), Some(44_100));
         world.insert_resource(filter);
         world.resource_mut::<AudioSettings>().pitch_algorithm = PitchAlgorithm::Nmf;
         for note in &mut world.resource_mut::<SongNotes>().notes {

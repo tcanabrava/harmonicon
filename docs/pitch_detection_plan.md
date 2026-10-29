@@ -6,7 +6,7 @@
 - Reject pitches the selected harmonica cannot produce.
 - Infer one blow/draw family per frame and require two opposing frames before
   changing direction.
-- Share one pure `HarmonicaNoteTracker` across gameplay, Song Editor recording,
+- Share one pure `NoteTracker` across gameplay, Song Editor recording,
   and the offline benchmark.
 - In gameplay, confirm new pitches over two detector frames (~46 ms at the
   shipped hop size, compensated out of the judged clock) and release them on

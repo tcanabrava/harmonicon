@@ -17,10 +17,9 @@ use std::collections::HashMap;
 
 use harmonicon_core::chart::{Action, HarpChart, tick_to_seconds};
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::harmonica_constraints::{
-    HarmonicaNoteTracker, NoteTrackerConfig, plausible_notes, reachable_directions,
-};
+use harmonicon_core::harmonica_constraints::{plausible_notes, reachable_directions};
 use harmonicon_core::midi::note_to_midi;
+use harmonicon_core::note_tracker::{NoteTracker, NoteTrackerConfig};
 use harmonicon_dsp::{
     self as pitch_detect, CHUNK_SIZE, FftState, HOP_SIZE, PitchAlgorithm, PitchRange,
 };
@@ -179,7 +178,7 @@ pub fn apply_constraints(harp: &Harmonica, frames: &[Frame]) -> Vec<Frame> {
 /// This is the constrained row to use when judging real recordings; the older
 /// stateless helper remains useful for isolating the direction rule itself.
 pub fn apply_live_constraints(harp: &Harmonica, frames: &[Frame]) -> Vec<Frame> {
-    let mut tracker = HarmonicaNoteTracker::new(harp.clone(), NoteTrackerConfig::default());
+    let mut tracker = NoteTracker::new(&harp.clone().into(), NoteTrackerConfig::default());
     frames
         .iter()
         .map(|frame| Frame {

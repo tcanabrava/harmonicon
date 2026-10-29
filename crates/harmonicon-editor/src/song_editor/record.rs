@@ -47,7 +47,7 @@ use harmonicon_audio::AudioSettings;
 use harmonicon_audio::audio_input::{AudioCapture, CHUNK_SIZE};
 use harmonicon_audio::pitch_detect::{PITCH_RANGE_MARGIN_SEMITONES, PitchEvent, PitchRange};
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
+use harmonicon_core::note_tracker::{NoteTracker, NoteTrackerConfig};
 
 #[cfg(test)]
 use super::TICKS_PER_BEAT;
@@ -106,7 +106,7 @@ pub(super) struct RecordState {
     /// The selected instrument and its current wind-direction estimate. Pitch
     /// reachability alone is insufficient for chords: one breath cannot sound
     /// a blow-only and draw-only reed simultaneously.
-    tracker: Option<HarmonicaNoteTracker>,
+    tracker: Option<NoteTracker>,
     /// Ids of every note created during the current take — the notes a
     /// punch-in must *not* remove (see the module docs). Kept for the whole
     /// take so a chord or earlier phrase of the same take can't be eaten by
@@ -159,8 +159,8 @@ pub(super) fn start_record(
 
     let harp = state.effective_harp();
     record.table = build_pitch_table(&harp);
-    record.tracker = Some(HarmonicaNoteTracker::new(
-        harp.clone(),
+    record.tracker = Some(NoteTracker::new(
+        &harp.clone().into(),
         NoteTrackerConfig { onset_frames: 1, release_frames: 1, direction_change_frames: 2 },
     ));
     // Same harp-sized narrowing gameplay applies from a loaded chart

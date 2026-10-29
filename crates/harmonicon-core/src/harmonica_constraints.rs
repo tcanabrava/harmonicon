@@ -13,11 +13,9 @@
 //! them (most usefully the polyphonic ones).
 //!
 //! This stays in the Bevy-free core beside [`Harmonica`]. The DSP and audio
-//! crates remain instrument-agnostic and publish raw candidates; gameplay,
-//! Song Editor recording, and the offline benchmark supply the selected harp
-//! and share the state tracker below.
-
-use std::collections::HashMap;
+//! crates remain instrument-agnostic and publish raw candidates;
+//! [`crate::note_tracker`] applies [`BreathDirectionTracker`] to them as the
+//! harmonica's voice filter.
 
 use crate::harmonica::{Harmonica, hole_notes};
 use crate::midi::note_to_midi;
@@ -69,7 +67,7 @@ fn visit_directions(harp: &Harmonica, mut visit: impl FnMut(u8, bool)) {
 }
 
 /// Derive all MIDI breath families in a single pass over the harp's holes.
-fn direction_table<const N: usize>(harp: &Harmonica) -> [(bool, bool); N] {
+pub(crate) fn direction_table<const N: usize>(harp: &Harmonica) -> [(bool, bool); N] {
     let mut table = [(false, false); N];
     visit_directions(harp, |midi, blow| {
         if let Some(entry) = table.get_mut(usize::from(midi)) {
@@ -82,7 +80,7 @@ fn direction_table<const N: usize>(harp: &Harmonica) -> [(bool, bool); N] {
 
 /// A pitch's `(blow, draw)` reachability from a [`direction_table`]; a
 /// pitch outside the MIDI range is reachable neither way.
-fn table_directions(table: &[(bool, bool); 128], midi: u8) -> (bool, bool) {
+pub(crate) fn table_directions(table: &[(bool, bool); 128], midi: u8) -> (bool, bool) {
     table.get(usize::from(midi)).copied().unwrap_or((false, false))
 }
 
@@ -134,7 +132,11 @@ impl BreathDirectionTracker {
 
     /// [`filter`](Self::filter) with the reachability question supplied, so
     /// a caller holding a precomputed table needn't re-derive the harp.
-    fn filter_by(&mut self, reach: impl Fn(u8) -> (bool, bool), candidates: &[u8]) -> Vec<u8> {
+    pub(crate) fn filter_by(
+        &mut self,
+        reach: impl Fn(u8) -> (bool, bool),
+        candidates: &[u8],
+    ) -> Vec<u8> {
         if candidates.is_empty() {
             self.silent_frames += 1;
             self.pending = None;
@@ -189,139 +191,6 @@ impl BreathDirectionTracker {
         kept.sort_unstable();
         kept.dedup();
         kept
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NoteTrackerConfig {
-    /// Consecutive frames a pitch must appear in before it counts. Costs
-    /// exactly `onset_frames - 1` hops of latency on every note, which
-    /// gameplay compensates for out of the judged clock.
-    pub onset_frames: u8,
-    /// Frames a confirmed pitch survives without being detected. `1` is no
-    /// grace at all — the pitch is released the first frame it is missing.
-    pub release_frames: u8,
-    pub direction_change_frames: u8,
-}
-
-impl Default for NoteTrackerConfig {
-    fn default() -> Self {
-        Self {
-            // Two frames is what rejects a one-frame phantom; see
-            // `tracker_resists_a_one_frame_direction_flip`.
-            onset_frames: 2,
-            // **No release grace.** A grace frame bridges a detector that
-            // drops a frame mid-sustain, which stops one held breath from
-            // re-arming `AttackGate` and satisfying a second note. It cannot
-            // be told apart from a real re-articulation, though — both look
-            // like one silent frame — and at the shipped hop size a frame is
-            // ~46 ms, so a grace of 2 swallows the gap between chugged
-            // eighth notes on one hole. That figure is the backbone of blues
-            // harmonica; a detector dropping frames mid-sustain is so far
-            // only hypothetical. Prefer the measured cost over the assumed
-            // one, and revisit against the recorded corpus
-            // (`docs/pitch_detection_plan.md`) rather than by taste.
-            release_frames: 1,
-            direction_change_frames: 2,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct TrackedNotes {
-    pub active: Vec<u8>,
-    /// Pitches confirmed on *this* frame — the tracker's onset events.
-    ///
-    /// Every one of them is exactly [`NoteTrackerConfig::onset_frames`]` - 1`
-    /// hops later than the sound that produced it, because a pitch is
-    /// confirmed the instant its run of consecutive frames reaches that
-    /// threshold and never after. So the lag a consumer has to correct for is
-    /// one constant for the whole stream, not a per-pitch quantity — see
-    /// `a_confirmation_is_always_the_same_number_of_frames_late`.
-    pub confirmed: Vec<u8>,
-}
-
-/// Pure harmonica-state tracker shared by gameplay, recording, and benchmarks.
-pub struct HarmonicaNoteTracker {
-    /// Which breath reaches each pitch on the tracked harp, computed once:
-    /// the harp never changes for a tracker's lifetime, and this is asked
-    /// several times per detector hop.
-    reach: [(bool, bool); 128],
-    onset_frames: u8,
-    release_frames: u8,
-    direction: BreathDirectionTracker,
-    pending: HashMap<u8, u8>,
-    active: HashMap<u8, u8>,
-}
-
-impl HarmonicaNoteTracker {
-    pub fn new(harp: Harmonica, config: NoteTrackerConfig) -> Self {
-        Self {
-            reach: direction_table(&harp),
-            // Every threshold is a count of frames to wait, so zero would
-            // mean "decide before observing anything" — floor them all at
-            // one. `direction_change_frames` is floored by
-            // `with_change_frames` rather than here, so each knob has exactly
-            // one owner applying its floor and one place storing it.
-            onset_frames: config.onset_frames.max(1),
-            release_frames: config.release_frames.max(1),
-            direction: BreathDirectionTracker::with_change_frames(config.direction_change_frames),
-            pending: HashMap::new(),
-            active: HashMap::new(),
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.direction.reset();
-        self.pending.clear();
-        self.active.clear();
-    }
-
-    /// Consecutive frames a pitch must be seen in before it is reported.
-    /// Consumers need this to convert the tracker's fixed onset lag into
-    /// real time — it depends on their own hop size, which is not this
-    /// crate's business.
-    pub fn onset_frames(&self) -> u8 {
-        self.onset_frames
-    }
-
-    pub fn update(&mut self, candidates: &[u8]) -> TrackedNotes {
-        // One wind direction first: a pitch the current breath cannot produce
-        // is not a candidate for onset counting at all.
-        let reach = &self.reach;
-        let allowed = self.direction.filter_by(|midi| table_directions(reach, midi), candidates);
-        // `allowed` is sorted and deduplicated, so membership is a binary
-        // search — no per-hop set.
-        let is_allowed = |midi: &u8| allowed.binary_search(midi).is_ok();
-        self.pending.retain(|midi, _| is_allowed(midi));
-
-        let mut confirmed = Vec::new();
-        for &midi in &allowed {
-            if let Some(missed) = self.active.get_mut(&midi) {
-                *missed = 0;
-                continue;
-            }
-            let seen = self.pending.entry(midi).or_default();
-            *seen += 1;
-            if *seen >= self.onset_frames {
-                confirmed.push(midi);
-                self.active.insert(midi, 0);
-            }
-        }
-        self.pending.retain(|midi, _| !self.active.contains_key(midi));
-        self.active.retain(|midi, missed| {
-            if is_allowed(midi) {
-                true
-            } else {
-                *missed += 1;
-                *missed < self.release_frames
-            }
-        });
-
-        let mut active: Vec<u8> = self.active.keys().copied().collect();
-        active.sort_unstable();
-        confirmed.sort_unstable();
-        TrackedNotes { active, confirmed }
     }
 }
 
@@ -504,97 +373,5 @@ mod tests {
         tracker.filter(&harp, &[60]);
         assert!(tracker.filter(&harp, &[62]).is_empty());
         assert_eq!(tracker.filter(&harp, &[62]), vec![62]);
-    }
-
-    #[test]
-    fn note_tracker_preserves_a_pitch_reachable_in_both_directions() {
-        let harp = richter_harp("C");
-        let mut tracker = HarmonicaNoteTracker::new(
-            harp,
-            NoteTrackerConfig { onset_frames: 1, ..NoteTrackerConfig::default() },
-        );
-        // G4: hole 2 draw and hole 3 blow.
-        assert_eq!(tracker.update(&[67]).active, vec![67]);
-    }
-
-    #[test]
-    fn a_re_articulation_after_one_silent_frame_is_a_second_attack() {
-        // Repeated notes on one hole are the basic rhythmic figure of blues
-        // harmonica, and the gap between two of them is short: at the
-        // shipped hop size a detector frame is ~46 ms, so chugged eighths
-        // leave one, sometimes two, silent frames. The tracker has to
-        // report the pitch as gone in that gap — `AttackGate` re-arms on
-        // absence, so a pitch that never goes absent can only ever satisfy
-        // one note, and the second chug scores nothing.
-        let harp = richter_harp("C");
-        let mut tracker = HarmonicaNoteTracker::new(harp, NoteTrackerConfig::default());
-        tracker.update(&[60]);
-        assert_eq!(tracker.update(&[60]).confirmed, vec![60]);
-        assert!(
-            tracker.update(&[]).active.is_empty(),
-            "one silent frame must read as a release, or two chugged notes \
-             merge into a single sustain"
-        );
-        tracker.update(&[60]);
-        assert_eq!(tracker.update(&[60]).confirmed, vec![60], "the re-attack must confirm again");
-    }
-
-    #[test]
-    fn a_zero_frame_threshold_is_floored_to_one() {
-        // Zero would mean deciding before observing anything. Each threshold
-        // is floored by whichever type owns it, so no caller has to know.
-        let harp = richter_harp("C");
-        let mut tracker = HarmonicaNoteTracker::new(
-            harp.clone(),
-            NoteTrackerConfig { onset_frames: 0, release_frames: 0, direction_change_frames: 0 },
-        );
-        assert_eq!(tracker.onset_frames(), 1);
-        assert_eq!(tracker.update(&[60]).confirmed, vec![60]);
-        assert!(tracker.update(&[]).active.is_empty());
-
-        let mut direction = BreathDirectionTracker::with_change_frames(0);
-        direction.filter(&harp, &[60]);
-        assert_eq!(direction.filter(&harp, &[62]), vec![62]);
-    }
-
-    #[test]
-    fn a_longer_release_grace_bridges_a_dropout_when_asked_for() {
-        // The knob still works, and is what a detector measured to drop
-        // frames mid-sustain would want — see `docs/pitch_detection_plan.md`.
-        let harp = richter_harp("C");
-        let mut tracker = HarmonicaNoteTracker::new(
-            harp,
-            NoteTrackerConfig { release_frames: 2, ..NoteTrackerConfig::default() },
-        );
-        tracker.update(&[60]);
-        tracker.update(&[60]);
-        assert_eq!(tracker.update(&[]).active, vec![60]);
-        assert!(tracker.update(&[]).active.is_empty());
-    }
-
-    #[test]
-    fn a_confirmation_is_always_the_same_number_of_frames_late() {
-        // The property the whole latency correction rests on: whatever the
-        // onset threshold, a pitch is confirmed on exactly the frame its run
-        // reaches it — never earlier, never later, however long it goes on
-        // sounding afterwards. So the lag is one constant for the stream, and
-        // a consumer can subtract it from its clock once rather than tracking
-        // a per-pitch age.
-        let harp = richter_harp("C");
-        for onset_frames in 1..=4u8 {
-            let mut tracker = HarmonicaNoteTracker::new(
-                harp.clone(),
-                NoteTrackerConfig { onset_frames, ..NoteTrackerConfig::default() },
-            );
-            let confirmed_on: Vec<usize> =
-                (0..8).filter(|_| !tracker.update(&[60]).confirmed.is_empty()).collect();
-            assert_eq!(
-                confirmed_on,
-                vec![onset_frames as usize - 1],
-                "onset_frames = {onset_frames} should confirm once, on frame \
-                 {}, and never again while the pitch keeps sounding",
-                onset_frames - 1
-            );
-        }
     }
 }

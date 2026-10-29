@@ -126,10 +126,11 @@ rather than misreading it.
 
 ## Pitch detection per instrument
 
-The detectors stay instrument-agnostic, as they are now. What changes is
-the instrument-aware stage after them (`HarmonicaPitchFilter` /
-`HarmonicaNoteTracker`), which becomes `InstrumentPitchFilter`, driven by
-the voice model:
+The detectors stay instrument-agnostic, as they are now. What changes per
+instrument is the stage after them: core's `note_tracker::NoteTracker`
+(behind gameplay's `InstrumentPitchFilter`) applies the instrument's
+`VoiceFilter` before onset counting. Only the harmonica's `Breath` filter
+exists so far; each instrument below adds its own:
 
 - **Guitar:** the hard part. Chords need a polyphonic detector (FFT or
   NMF).

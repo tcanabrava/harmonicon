@@ -639,7 +639,7 @@ pub fn update_note_visuals(
     song_notes: Res<SongNotes>,
     clock: Res<super::GameplayClock>,
     audio: Res<harmonicon_audio::AudioSettings>,
-    pitch_filter: Res<super::HarmonicaPitchFilter>,
+    pitch_filter: Res<super::InstrumentPitchFilter>,
     active: Res<ActivePitches>,
     valid_notes: Res<ValidHarpNotes>,
     notes: Query<(&NoteVisual, &MaterialNode<NoteRibbon2dMaterial>)>,

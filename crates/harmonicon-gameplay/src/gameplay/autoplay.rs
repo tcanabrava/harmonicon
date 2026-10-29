@@ -20,7 +20,7 @@ use harmonicon_core::midi::{midi_to_freq_hz, midi_to_note};
 use super::clock::GameplayClock;
 use super::judge::judged_instant;
 use super::notes::{ScheduledNote, SongNotes};
-use super::state::{ActivePitches, HarmonicaPitchFilter};
+use super::state::{ActivePitches, InstrumentPitchFilter};
 
 /// Switched on over BRP (`scripts/brpctl.py autoplay on [late_ms]`).
 /// `late_ms` sounds every attack that much after the beat, so a run can be
@@ -102,7 +102,7 @@ pub(super) fn autoplay_pitches(
     autoplay: Res<Autoplay>,
     clock: Res<GameplayClock>,
     audio: Res<AudioSettings>,
-    pitch_filter: Res<HarmonicaPitchFilter>,
+    pitch_filter: Res<InstrumentPitchFilter>,
     song_notes: Res<SongNotes>,
     mut active: ResMut<ActivePitches>,
     mut frame: ResMut<AudioFrame>,

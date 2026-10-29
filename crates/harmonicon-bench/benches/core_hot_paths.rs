@@ -2,7 +2,7 @@
 
 //! `harmonicon-core` functions that run on a live path:
 //!
-//! - `HarmonicaNoteTracker::update` runs once per detector hop whenever
+//! - `NoteTracker::update` runs once per detector hop whenever
 //!   harmonica filtering is on. Each iteration feeds it a 64-hop stream, so
 //!   onsets, releases and breath-direction changes all happen as they would
 //!   live. The throughput figure is per hop.
@@ -22,8 +22,8 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, 
 
 use harmonicon_core::chart::{TempoPoint, seconds_to_tick, tick_to_seconds};
 use harmonicon_core::harmonica::richter_harp;
-use harmonicon_core::harmonica_constraints::{HarmonicaNoteTracker, NoteTrackerConfig};
 use harmonicon_core::midi::midi_to_freq_hz;
+use harmonicon_core::note_tracker::{NoteTracker, NoteTrackerConfig};
 use harmonicon_core::synth::{Expr, PhraseNote, TICKS_PER_BEAT, render_pcm};
 
 const HOPS: usize = 64;
@@ -53,7 +53,7 @@ fn tracker_update(c: &mut Criterion) {
     for (label, stream) in tracker_streams() {
         group.bench_function(label, |b| {
             b.iter_batched_ref(
-                || HarmonicaNoteTracker::new(richter_harp("C"), NoteTrackerConfig::default()),
+                || NoteTracker::new(&richter_harp("C").into(), NoteTrackerConfig::default()),
                 |tracker| {
                     for candidates in &stream {
                         black_box(tracker.update(black_box(candidates)));

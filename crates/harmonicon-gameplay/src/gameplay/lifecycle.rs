@@ -17,8 +17,8 @@ use super::clock::GameplayClock;
 use super::notes::{ScheduledNote, SongNotes, last_note_end, resolve_item_time};
 use super::song_info::SongInfo;
 use super::state::{
-    GameplayRoot, HarmonicaPitchFilter, HitFeedback, LoopConfig, MusicPlayer, MusicStarted, Paused,
-    PitchGate, PracticeRequest, Score, ScoringConfig, SongEnd, SongStats, loop_range_valid,
+    GameplayRoot, HitFeedback, InstrumentPitchFilter, LoopConfig, MusicPlayer, MusicStarted,
+    Paused, PitchGate, PracticeRequest, Score, ScoringConfig, SongEnd, SongStats, loop_range_valid,
 };
 use super::wait_freeze_overlay::WaitFreezeState;
 use harmonicon_platform::localization::Localization;
@@ -31,18 +31,18 @@ pub(crate) fn configure_pitch_filter(
     effective: Res<EffectiveHarmonica>,
     manifests: Res<Assets<SongManifest>>,
     capture: Option<Res<AudioCapture>>,
-    mut filter: ResMut<HarmonicaPitchFilter>,
+    mut filter: ResMut<InstrumentPitchFilter>,
 ) {
     if let Some(manifest) = manifests.get(&selected.0) {
         filter.configure(
-            effective.harp_for(&manifest.chart).clone(),
+            &effective.harp_for(&manifest.chart).clone().into(),
             capture.map(|capture| capture.sample_rate),
         );
     }
 }
 
-pub(crate) fn reset_pitch_filter(mut filter: ResMut<HarmonicaPitchFilter>) {
-    *filter = HarmonicaPitchFilter::default();
+pub(crate) fn reset_pitch_filter(mut filter: ResMut<InstrumentPitchFilter>) {
+    *filter = InstrumentPitchFilter::default();
 }
 
 pub(crate) fn reset_score(
