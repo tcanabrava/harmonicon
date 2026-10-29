@@ -76,6 +76,30 @@ Nothing below can be approved by a test.
 - Flathub submission and release signing keys. Version/tag agreement is
   already enforced by `release.yaml`.
 
+## Multiple instruments
+
+`docs/multi_instrument_plan.md` has the design. In order:
+
+- **The seam, harmonica only**, with no visible change: `Instrument`,
+  `InstrumentModel`, `VoiceModel` and `LaneLayout` (with a scroll axis) in
+  core, and `pitch_map`, the constraint filter, the editor's
+  `enforce_direction`, `ScheduledNote` and `highway_2d` routed through them.
+  Recommended after 1.0-rc2, since rc1–rc2 touch the same gameplay files.
+- **Chart format 1.8.0**: `instrument`, `NoteEvent.position`, `note`
+  required off-harmonica, multi-part song folders.
+- **Guitar**: model and tunings, fingering solver, Guitar Pro
+  string/fret pass-through, horizontal tab highway and fretboard strip,
+  editor tab rows, Karplus–Strong synth. Detection needs a recorded guitar
+  corpus first (low-string resolution, strum onset spread, decaying
+  sustain).
+- **Note Trainer** in place of the Bending Trainer: glide, register,
+  position and target modes, offered per instrument.
+- **Flute**: Boehm fingering table, pitch lanes and fingering diagram,
+  register drills, a corpus aimed at octave errors. Needs the foot joint
+  (C or B) confirmed.
+- **Content and progress**: per-instrument packs, DAGs and profile, a
+  "My instruments" page, per-instrument Jam Session.
+
 ## Mobile (post-1.0, needs hardware)
 
 `contributing/src/android-build.md` has the detail.

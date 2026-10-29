@@ -2,11 +2,12 @@
 
 Extending Harmonicon from harmonica-only to any instrument whose notes a
 microphone can hear. The first targets are the instruments on hand to test
-with: electric guitar, acoustic guitar, transverse (Boehm) flute and hurdy
-gurdy.
+with: electric guitar, acoustic guitar and transverse (Boehm) flute.
 
-`ROADMAP.md` currently lists "Non-harmonica instruments" as a non-goal.
-Adopting this plan reverses that; see "Decide before building".
+The hurdy gurdy is out of scope for now. Its drones sound for the whole
+song, its trompette is judged by rhythm rather than pitch, and its keybox
+needs its own model, so it costs more than any of the other three.
+Nothing below rules it out; see "Later instruments".
 
 ## The principle: pitch is universal, position is per-instrument
 
@@ -53,7 +54,6 @@ enum Instrument {
     Harmonica(Harmonica),          // existing type, unchanged
     Guitar(StringedConfig),        // tuning, strings, frets, capo, acoustic/electric
     Flute(FluteConfig),            // foot joint (C or B), range
-    HurdyGurdy(HurdyGurdyConfig),  // keybox layout, chanterelle/drone/trompette tuning
 }
 
 trait InstrumentModel {
@@ -70,7 +70,6 @@ enum PlayPosition {
     Hole { hole: u8, action: Action, technique: Technique },
     Fret { string: u8, fret: u8, technique: StringTechnique },
     Fingering { id: FingeringId, harmonic: u8 },          // flute: fingering + register
-    Key { row: u8, key: u8 },                             // hurdy-gurdy keybox
 }
 ```
 
@@ -89,7 +88,6 @@ model:
 | Harmonica | holes | all sounding holes share one breath direction (today's `enforce_direction` and `BreathDirectionTracker`) |
 | Guitar | 6 strings (or the tuning's count) | one note per string; fretted notes span at most ~4–5 frets (open strings are free); at most 6 notes |
 | Flute | 1 | monophonic: a new note ends the previous one |
-| Hurdy gurdy | melody course + drones + trompette | melody is monophonic (a keybox press sets every chanterelle at once); drones sound all the time and aren't charted per note; trompette is rhythm only |
 
 `ExpressionScope` replaces `enforce_expr`'s hard-coded "vibrato and wah
 apply to every hole" rule. That is right for the harmonica and the flute,
@@ -106,8 +104,8 @@ punish the instrument for doing what it does.
 - New optional top-level `instrument`. If it is absent, the chart is a
   harmonica chart and `harmonica` is the instrument, so every existing chart
   loads unchanged.
-- New optional `NoteEvent.position`, e.g. `{"string": 5, "fret": 3}`,
-  `{"fingering": "C5", "harmonic": 1}` or `{"key": 7}`.
+- New optional `NoteEvent.position`, e.g. `{"string": 5, "fret": 3}` or
+  `{"fingering": "C5", "harmonic": 1}`.
 - For non-harmonica instruments `note` (the pitch) is **required** and is
   the truth. `hole`/`action` become optional, and the schema requires them
   only when the instrument is a harmonica.
@@ -116,11 +114,12 @@ punish the instrument for doing what it does.
   as they are.
 - **One chart is one instrument part.** A song folder may hold several
   charts, e.g. `song/harmonica.harpchart` and `song/guitar.harpchart`. This
-  changes the "first `*.harpchart` under `song/`" rule in both
-  `assets_management` and `generate_bundled_asset_manifest`, which must stay
-  in step. Keep the `.harpchart` extension: the name is now historical, but
-  it is the play format (see the import-source rule) and renaming it costs
-  every pack.
+  keeps the schema flat and lets a pack ship a guitar part for an existing
+  song without touching its harmonica chart. It changes the "first
+  `*.harpchart` under `song/`" rule in both `assets_management` and
+  `generate_bundled_asset_manifest`, which must stay in step. Keep the
+  `.harpchart` extension: the name is now historical, but it is the play
+  format (see the import-source rule) and renaming it costs every pack.
 
 Older engines refuse a 1.8.0 chart through `format_version_supported`
 rather than misreading it.
@@ -150,11 +149,6 @@ the voice model:
   failure is **octave errors**: an overblown note and its fundamental share
   most of their partials. Breath noise is broadband and needs a noise
   floor.
-- **Hurdy gurdy:** the drones sound for the whole song, so a naive detector
-  "hears" them on every frame. The filter has to subtract the configured
-  drone pitches (this works only because the config says what they are). The
-  trompette buzz is broadband and rhythmic, so it is judged by **onset**,
-  not pitch. That is a new note kind for the judge (see phase 5).
 
 Every instrument needs its own recorded corpus through `note_bench` before
 any constant is tuned. This is the same rule `pitch_detection_plan.md`
@@ -163,34 +157,38 @@ already applies to the harmonica.
 ## Play Song: lanes per instrument
 
 A `LaneLayout` built from the instrument replaces `highway_2d`'s
-`100.0 / hole_count` assumption. It holds the scroll axis, the lane
-specs, the position → lane mapping, and the "instrument strip" drawn
-under or beside the hit zone (today's hole strip).
+`100.0 / hole_count` assumption. It holds the **scroll axis** (vertical for
+the harmonica and flute, horizontal for the guitar), the lane specs, the
+position → lane mapping, and the "instrument strip" drawn beside the hit
+zone (today's hole strip).
 
 | Instrument | Highway | Instrument strip |
 |---|---|---|
 | Harmonica | unchanged: vertical hole lanes, blow/draw colour | hole strip and overlay |
-| Guitar | **6 string lanes, Rocksmith/Yousician style**: each string a colour-coded lane, note gems carry the **fret number**, a chord is one gem spanning its strings with the chord name on it | a **fretboard strip** lighting the target frets, with a highlighted **anchor window** (the hand position) that slides ahead of position shifts |
+| Guitar | **horizontal strings scrolling right to left, read like tablature** (Rocksmith's 2D views, Yousician): each string a colour-coded row, note gems carry the **fret number**, a chord is one gem spanning its strings with the chord name on it | a **fretboard strip** at the hit line lighting the target frets, with a highlighted **anchor window** (the hand position) that slides ahead of position shifts |
 | Flute | **pitch lanes** limited to the pitches the chart actually uses (three chromatic octaves would make 37 lanes), labelled by note name with a register mark | a **fingering diagram** (Boehm key layout) for the upcoming note, plus the next one ghosted, so the player prepares the fingers before the note arrives |
-| Hurdy gurdy | **keybox lanes**: one lane per key the chart uses, upper (chromatic) row keys tinted differently from the lower (diatonic) row | a keybox diagram lighting the key, a drone indicator, and a separate **trompette rhythm lane** for buzz strokes |
 
-Each layout is one module, e.g. `gameplay/lanes/{harmonica,strings,pitch,
-keybox}.rs`. The note-spawning half of `gameplay_2d` asks the layout where
-a note goes and never asks which instrument it is.
+The guitar's orientation is chosen so the screen teaches the shape players
+will meet in real tablature everywhere else. It means `LaneLayout` carries
+a scroll axis from the first phase, even though only the harmonica uses it
+then.
+
+Each layout is one module, e.g. `gameplay/lanes/{harmonica,strings,pitch}.rs`.
+The note-spawning half of `gameplay_2d` asks the layout where a note goes
+and never asks which instrument it is.
 
 ## Song Editor
 
 - **Rows come from the instrument.** Harmonica: holes × direction, as
   today. Guitar: 6 tab rows with the fret number drawn on each note. Flute:
-  a monophonic piano roll. Hurdy gurdy: keybox rows plus a trompette row.
+  a monophonic piano roll.
 - **`enforce_direction` becomes `VoiceModel::reconcile(group)`**, run on the
   same `overlapping_group`:
   - harmonica: propagate the direction (today's behaviour);
   - guitar: moving a note onto an occupied string re-voices it to the next
     string that reaches the pitch, or refuses if none does; a chord beyond
     hand span is flagged;
-  - flute and hurdy-gurdy melody: an overlapping note truncates the previous
-    one.
+  - flute: an overlapping note truncates the previous one.
 
   `pitch_compatible`/`pitch_deny_key` already give the refusal path a
   localized reason.
@@ -205,7 +203,7 @@ a note goes and never asks which instrument it is.
   target `Instrument` rather than always a `Harmonica`.
 - The `HarmonicaKind` picker becomes an instrument picker that includes the
   tuning (standard, drop D, DADGAD or capo for guitar; C or B foot for
-  flute; G/C keybox and drone set for hurdy gurdy).
+  flute).
 
 ## Note Trainer (replaces the Bending Trainer)
 
@@ -229,20 +227,20 @@ note-changing one.
 
 So `TechniqueKind` becomes:
 
-| Kind | Trainer mode | Harmonica | Guitar | Flute | Hurdy gurdy |
-|---|---|---|---|---|---|
-| `Glide` | pitch trace to target | bends | string bends, slides | lip bend (fine intonation) | — |
-| `Register` | discrete harmonic ladder | overblow/overdraw | natural harmonics | **overblown octaves/twelfths on one fingering** | — |
-| `Position` | same pitch, different place | (rare) | the same note on different strings | alternate fingerings | — |
-| `Target` | tuner: hit and hold a note | every hole | every fret | every fingering | every key; trompette buzz timing |
+| Kind | Trainer mode | Harmonica | Guitar | Flute |
+|---|---|---|---|---|
+| `Glide` | pitch trace to target | bends | string bends, slides | lip bend (fine intonation) |
+| `Register` | discrete harmonic ladder | overblow/overdraw | natural harmonics | **overblown octaves/twelfths on one fingering** |
+| `Position` | same pitch, different place | (rare) | the same note on different strings | alternate fingerings |
+| `Target` | tuner: hit and hold a note | every hole | every fret | every fingering |
 
-Every instrument gets `Target`, which is the basic tuner drill and covers
-the hurdy gurdy, which has no bends at all. The trainer asks
-`techniques()` which modes to offer and shows only those, with the
-instrument strip from Play Song as its diagram. The training generator's
-`DrillTechnique::Bend` generalises the same way. Its "alternate the plain
-note with the altered one" rule carries over directly to `Register` (play
-the fundamental, then the harmonic).
+Every instrument gets `Target`, the basic tuner drill, so an instrument
+with no bends at all still has a trainer. The trainer asks `techniques()`
+which modes to offer and shows only those, with the instrument strip from
+Play Song as its diagram. The training generator's `DrillTechnique::Bend`
+generalises the same way. Its "alternate the plain note with the altered
+one" rule carries over directly to `Register` (play the fundamental, then
+the harmonic).
 
 ## Content, progress and menus
 
@@ -261,10 +259,9 @@ the fundamental, then the harmonic).
 - **Audition and call-and-response synthesis** need a timbre per
   instrument in core's `synth`:
   - Karplus–Strong for plucked strings: cheap and convincing;
-  - a sine plus filtered breath noise for the flute;
-  - a bowed sawtooth plus drones and a buzz for the hurdy gurdy.
+  - a sine plus filtered breath noise for the flute.
 
-  The phase-integration vibrato rule applies to all of them.
+  The phase-integration vibrato rule applies to both.
 - **Jam Session** generalises later. `hole_map` becomes "where the scale
   lives on this instrument": pentatonic boxes on guitar, scale fingerings on
   flute.
@@ -275,20 +272,21 @@ Each phase lands and is committed on its own. Phase 1 must not change
 behaviour.
 
 1. **The seam, harmonica only.** Add `Instrument`, `InstrumentModel`,
-   `PlayPosition`, `VoiceModel` and `LaneLayout`, with the harmonica as the
-   only implementation. Route `pitch_map`, the constraint filter, the
-   editor's reconcile, `ScheduledNote` (position + lane instead of
-   `hole`/`is_blow`) and `highway_2d` through them. Existing tests plus
-   pixel-diffed captures (`capture_static_screens.py`) prove nothing moved.
+   `PlayPosition`, `VoiceModel` and `LaneLayout` (with its scroll axis),
+   with the harmonica as the only implementation. Route `pitch_map`, the
+   constraint filter, the editor's reconcile, `ScheduledNote` (position +
+   lane instead of `hole`/`is_blow`) and `highway_2d` through them.
+   Existing tests plus pixel-diffed captures (`capture_static_screens.py`)
+   prove nothing moved.
 2. **Chart 1.8.0.** Add the `instrument` field, `position`, the
    conditionally-required `note`, multi-part song folders and validator
    support. Add fixtures for each instrument.
-3. **Guitar** (two of the four instruments, and the largest library via
+3. **Guitar** (two of the three instruments, and the largest library via
    Guitar Pro):
    - model and tunings;
    - fingering solver;
    - Guitar Pro string/fret pass-through;
-   - string-lane highway and fretboard strip;
+   - horizontal tab highway and fretboard strip;
    - editor tab rows;
    - Karplus–Strong synth;
    - a recorded corpus, then detection tuning (low-string resolution,
@@ -299,29 +297,31 @@ behaviour.
 5. **Flute.** Monophonic model, the Boehm fingering table as data
    (standard, alternates, harmonics), pitch lanes and fingering diagram,
    the `Register` trainer mode, and a corpus aimed at octave errors.
-6. **Hurdy gurdy.** Keybox model, drone configuration, the drone-subtraction
-   filter, keybox lanes, an onset-judged trompette note kind and a synth.
-7. **Content and progress.** Per-instrument packs and DAGs, a per-instrument
-   profile, the "My instruments" page, and per-instrument Jam Session.
+6. **Content and progress.** Per-instrument packs and DAGs, a
+   per-instrument profile, the "My instruments" page, and per-instrument
+   Jam Session.
 
 ## Decide before building
 
 - **Timing relative to 1.0.** 1.0 is a desktop harmonica release
   (`ROADMAP.md`). Phase 1 is a refactor with no visible change and could
-  happen at any point. Phases 3 onwards are a new product surface.
-  Recommendation: do phase 1 after 1.0-rc2, because rc1–rc2 touch the same
-  gameplay files, and remove the non-goal when phase 3 starts.
-- **Guitar highway orientation.** Vertical string lanes match today's
-  falling-note highway and reuse the most code. Horizontal strings
-  scrolling right to left read like tablature, which is what Yousician and
-  the 2D Rocksmith views do. Recommendation: horizontal, because players
-  will read real tab elsewhere and the screen should teach that shape. It
-  does mean `LaneLayout` needs a scroll axis from day one.
-- **One chart per part, or several parts in one chart.** Recommendation:
-  one per part (above). It keeps the schema flat and lets a pack ship a
-  guitar part for an existing song without touching its harmonica chart.
-- **Instrument facts to confirm on the real instruments:**
-  - the flute's foot joint (C or B);
-  - the hurdy gurdy's key (G/C or D/G), how many keys its keybox has, its
-    drone strings, and whether it has a trompette with a chien. The
-    keybox and drone model depend on these.
+  happen at any point; phases 3 onwards are a new product surface.
+  Recommendation: phase 1 after 1.0-rc2, because rc1–rc2 touch the same
+  gameplay files.
+- **The flute's foot joint** (C or B), which sets its lowest note and the
+  fingering table's range.
+
+## Later instruments
+
+**Hurdy gurdy** is deferred, not rejected. When it returns, it needs three
+things none of the instruments above do:
+
+- a keybox model: lower diatonic and upper chromatic rows of keys, and a
+  melody that is monophonic because one key press sets every chanterelle;
+- drone subtraction in the pitch filter, since the configured drone pitches
+  sound on every frame of the song;
+- an onset-judged note kind for the trompette, whose buzz is broadband and
+  scored by rhythm rather than pitch.
+
+It also needs the instrument's own facts first: its key (G/C or D/G), how
+many keys, which drones, and whether it has a trompette with a chien.

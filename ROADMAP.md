@@ -1,8 +1,9 @@
 # Roadmap
 
 Where Harmonicon goes from `0.1.0`. The theme of the project is **teaching
-blues and jazz harmonica through play** — every milestone should move a
-self-taught player further than a YouTube tutorial would.
+blues and jazz through play**, harmonica first and then other instruments
+(see "Multiple instruments") — every milestone should move a self-taught
+player further than a YouTube tutorial would.
 
 Near-term bug/cleanup work lives in `TODO.md`; the open work, in order,
 lives in `PLAN.md`.
@@ -228,7 +229,28 @@ remains:
   extend them to the same toggle if that turns out not to be enough.)
 - Localization beyond en-US/pt-BR/es-ES (infrastructure is already enforced).
 
+## Multiple instruments
+
+Harmonicon becomes multi-instrument: guitar (electric and acoustic) first,
+then transverse flute, with the harmonica as the instrument everything is
+built around today. `docs/multi_instrument_plan.md` has the design and the
+phases; `PLAN.md` has them in order.
+
+- **One instrument model** behind the three places harmonica knowledge
+  enters today: pitch ↔ position, what can sound together, and how it is
+  drawn. Scoring stays pitch-only.
+- **Guitar**: a horizontal tab highway with a fretboard strip, a tab-row
+  Song Editor that enforces one note per string and a hand span, and
+  Guitar Pro imports that keep the author's strings and frets.
+- **Flute**: pitch lanes with a fingering diagram for the next note.
+- **A Note Trainer** in place of the Bending Trainer, offering only the
+  modes an instrument has: glides (bends), register selection (flute
+  overblowing, harmonics), alternate positions, and a plain tuner for all.
+- **Per-instrument lesson packs and progress.**
+
+The hurdy gurdy is deferred: drones, the trompette and the keybox each need
+work no other instrument does.
+
 ## Non-goals (for now)
 
 - Multiplayer / online leaderboards.
-- Non-harmonica instruments.
