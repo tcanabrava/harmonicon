@@ -17,6 +17,7 @@ use std::collections::HashMap;
 
 use crate::harmonica_constraints::{BreathDirectionTracker, direction_table, table_directions};
 use crate::instrument::Instrument;
+use crate::instrument::guitar::MAX_BEND;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NoteTrackerConfig {
@@ -74,21 +75,35 @@ pub enum VoiceFilter {
     Breath {
         /// Which breath reaches each pitch, computed once: the harp never
         /// changes for a tracker's lifetime, and this is asked several
-        /// times per detector hop.
-        reach: [(bool, bool); 128],
+        /// times per detector hop. Boxed so the other filters don't carry
+        /// its size.
+        reach: Box<[(bool, bool); 128]>,
         direction: BreathDirectionTracker,
     },
+    /// Strings: any pitch the neck reaches, bent or not, at most one per
+    /// string. Candidates arrive strongest first, so the strongest survive.
+    /// Whether a set can actually be fretted at once is left to a recorded
+    /// corpus to justify rather than guessed here.
+    Strings { low: u8, high: u8, strings: usize },
 }
 
 impl VoiceFilter {
     pub fn for_instrument(instrument: &Instrument, config: &NoteTrackerConfig) -> Self {
         match instrument {
             Instrument::Harmonica(harp) => Self::Breath {
-                reach: direction_table(harp),
+                reach: Box::new(direction_table(harp)),
                 direction: BreathDirectionTracker::with_change_frames(
                     config.direction_change_frames,
                 ),
             },
+            Instrument::Guitar(guitar) => {
+                let (low, high) = guitar.range().unwrap_or((0, 0));
+                Self::Strings {
+                    low,
+                    high: high.saturating_add(MAX_BEND as u8),
+                    strings: guitar.strings.len(),
+                }
+            }
         }
     }
 
@@ -99,12 +114,27 @@ impl VoiceFilter {
             Self::Breath { reach, direction } => {
                 direction.filter_by(|midi| table_directions(reach, midi), candidates)
             }
+            Self::Strings { low, high, strings } => {
+                let mut kept: Vec<u8> = Vec::with_capacity(*strings);
+                for &midi in candidates {
+                    if kept.len() == *strings {
+                        break;
+                    }
+                    if (*low..=*high).contains(&midi) && !kept.contains(&midi) {
+                        kept.push(midi);
+                    }
+                }
+                kept.sort_unstable();
+                kept
+            }
         }
     }
 
     pub fn reset(&mut self) {
         match self {
             Self::Breath { direction, .. } => direction.reset(),
+            // Stateless: each frame is judged on its own.
+            Self::Strings { .. } => {}
         }
     }
 }

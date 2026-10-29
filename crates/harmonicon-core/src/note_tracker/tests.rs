@@ -95,3 +95,15 @@ fn a_confirmation_is_always_the_same_number_of_frames_late() {
         );
     }
 }
+
+#[test]
+fn a_guitar_keeps_at_most_one_pitch_per_string_and_only_what_its_neck_reaches() {
+    use crate::instrument::guitar::{Guitar, GuitarBody};
+    let guitar: Instrument = Guitar::standard(GuitarBody::Electric).into();
+    let mut voices = VoiceFilter::for_instrument(&guitar, &NoteTrackerConfig::default());
+    // Strongest first. 30 is below the low E; the seventh pitch has no
+    // string left once the six strongest are kept.
+    let candidates = [64, 30, 59, 55, 50, 45, 40, 52];
+    assert_eq!(voices.allowed(&candidates), vec![40, 45, 50, 55, 59, 64]);
+    assert_eq!(voices.allowed(&[64, 64]), vec![64], "a repeated pitch is one note");
+}

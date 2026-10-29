@@ -488,9 +488,9 @@ mod tests {
         assert_eq!(notes.len(), 2);
         assert_eq!(tags.len(), 2);
         // Sorted by time even though the track listed them out of order.
-        assert_eq!(HoleTab::of(&notes[0].position).hole, 1);
+        assert_eq!(HoleTab::of(&notes[0].position).unwrap().hole, 1);
         assert_eq!(notes[0].time, 0.0);
-        assert_eq!(HoleTab::of(&notes[1].position).hole, 2);
+        assert_eq!(HoleTab::of(&notes[1].position).unwrap().hole, 2);
         assert_eq!(notes[1].time, 1.0);
         assert!(notes.iter().all(|n| n.chord_pitches.is_empty()));
         assert!(tags.iter().all(|t| t.is_none()));
@@ -546,7 +546,7 @@ mod tests {
         notes
             .iter()
             .map(|n| {
-                let tab = HoleTab::of(&n.position);
+                let tab = HoleTab::of(&n.position).unwrap();
                 (tab.hole, tab.is_blow, n.expected_pitch)
             })
             .collect()
@@ -588,7 +588,9 @@ mod tests {
         let techniques: Vec<Technique> = notes
             .iter()
             .map(|n| {
-                let PlayPosition::Hole(a) = n.position;
+                let PlayPosition::Hole(a) = n.position else {
+                    panic!("a harmonica chart schedules hole positions");
+                };
                 a.technique
             })
             .collect();
@@ -679,7 +681,7 @@ mod tests {
                         valid.contains(&midi),
                         "{key} harp, {mapping:?}: hole {} expects MIDI {midi}, \
                          which ValidHarpNotes would filter out",
-                        HoleTab::of(&note.position).hole
+                        HoleTab::of(&note.position).unwrap().hole
                     );
                 }
             }

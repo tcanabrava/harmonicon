@@ -274,9 +274,13 @@ impl GridNote {
     }
 
     /// Takes `position`'s breath and technique. The hole stays: the editor
-    /// moves notes between holes itself, never through a position.
+    /// moves notes between holes itself, never through a position. A
+    /// position on another instrument is ignored, since a grid note is a
+    /// harmonica note.
     pub(super) fn set_position(&mut self, position: &PlayPosition) {
-        let PlayPosition::Hole(a) = position;
+        let PlayPosition::Hole(a) = position else {
+            return;
+        };
         self.dir = Dir::from_action(a.action);
         self.pitch = Pitch::from_technique(a.technique);
     }

@@ -57,8 +57,11 @@ pub(crate) fn update_active_targets(
             continue;
         }
         if (judged - note.time).abs() <= config.good_window {
-            let tab = HoleTab::of(&note.position);
-            targets.0.push((tab.hole, tab.is_blow));
+            // The hole glow lights the harmonica strip; a note on another
+            // instrument has no hole there to light.
+            if let Some(tab) = HoleTab::of(&note.position) {
+                targets.0.push((tab.hole, tab.is_blow));
+            }
         }
     }
 }
@@ -213,8 +216,10 @@ fn observed_failure(
         return Some(MissReason::IncompleteChord);
     }
     let expected = note.expected_pitch.filter(|e| !sounding.contains(e))?;
+    // Naming the wrong note needs a tab to name it by; without one the miss
+    // reads as unattributed rather than as a wrong note.
     Some(MissReason::WrongPitch {
-        expected: HoleTab::of(&note.position),
+        expected: HoleTab::of(&note.position)?,
         heard: nearest_attacked(attacked, expected).and_then(|pitch| heard_tab(pitch, harp)),
     })
 }
@@ -234,7 +239,7 @@ pub(super) fn nearest_attacked(attacked: impl IntoIterator<Item = u8>, expected:
 /// passes `ValidHarpNotes` for the chart's harp but not the played one.
 pub(super) fn heard_tab(pitch: u8, harp: &PlayedHarp) -> Option<HoleTab> {
     let assignment = map_pitch_playable(pitch, harp.0.as_ref()?)?;
-    Some(HoleTab::of(&PlayPosition::Hole(assignment)))
+    HoleTab::of(&PlayPosition::Hole(assignment))
 }
 
 /// Per-frame working storage for [`score_notes`], kept between frames so

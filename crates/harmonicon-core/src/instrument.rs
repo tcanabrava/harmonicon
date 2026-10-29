@@ -19,9 +19,12 @@
 //! pitch, not which hole or string made it, so the judge only ever compares
 //! [`InstrumentModel::pitch_of`]'s answer.
 
+pub mod guitar;
+
 use crate::chart::Action;
 use crate::harmonica::Harmonica;
 use crate::pitch_map::{HoleAssignment, Technique, playable_assignments};
+use guitar::{FretAssignment, Guitar};
 
 /// The instrument a chart part is played on. A closed enum rather than a
 /// trait object, so a chart can name its instrument in JSON and every UI
@@ -29,6 +32,7 @@ use crate::pitch_map::{HoleAssignment, Technique, playable_assignments};
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instrument {
     Harmonica(Harmonica),
+    Guitar(Guitar),
 }
 
 impl From<Harmonica> for Instrument {
@@ -37,11 +41,19 @@ impl From<Harmonica> for Instrument {
     }
 }
 
+impl From<Guitar> for Instrument {
+    fn from(guitar: Guitar) -> Self {
+        Self::Guitar(guitar)
+    }
+}
+
 /// Where on the instrument a note is played.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PlayPosition {
     /// A harmonica hole, breath direction and technique.
     Hole(HoleAssignment),
+    /// A guitar string, fret and technique.
+    Fret(FretAssignment),
 }
 
 impl PlayPosition {
@@ -67,8 +79,11 @@ pub enum TechniqueKind {
     Target,
     /// A continuous slide in pitch from a position to a target (bends).
     Glide,
-    /// A jump between discrete pitches from one position (overblows).
+    /// A jump between discrete pitches from one position (overblows,
+    /// a guitar's natural harmonics).
     Register,
+    /// The same pitch found in another place (another string).
+    Position,
 }
 
 /// Whether expression (vibrato, wah) shapes the whole sound or one voice.
@@ -94,12 +109,16 @@ pub enum Envelope {
 pub enum ScrollAxis {
     /// Notes fall down columns, one column per lane.
     Vertical,
+    /// Notes travel right to left along rows, one row per lane, the way
+    /// tablature reads.
+    Horizontal,
 }
 
 /// One lane of the play highway.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lane {
-    /// What the instrument strip prints under the lane: a hole number.
+    /// What the instrument strip prints for the lane: a hole number, a
+    /// string's name.
     pub label: String,
 }
 
@@ -116,6 +135,7 @@ impl LaneLayout {
     pub fn lane_of(&self, position: &PlayPosition) -> Option<usize> {
         let lane = match position {
             PlayPosition::Hole(a) => usize::from(a.hole.checked_sub(1)?),
+            PlayPosition::Fret(a) => usize::from(a.string.checked_sub(1)?),
         };
         (lane < self.lanes.len()).then_some(lane)
     }
@@ -127,6 +147,7 @@ impl LaneLayout {
         let last = self.lanes.len().saturating_sub(1);
         match position {
             PlayPosition::Hole(a) => usize::from(a.hole.saturating_sub(1)).min(last),
+            PlayPosition::Fret(a) => usize::from(a.string.saturating_sub(1)).min(last),
         }
     }
 
@@ -205,7 +226,9 @@ impl InstrumentModel for Harmonica {
     /// (`gameplay::notes::target_pitch`): a quarter-tone bend is aimed at,
     /// but the pitch identity is the nearest semitone.
     fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
-        let PlayPosition::Hole(a) = position;
+        let PlayPosition::Hole(a) = position else {
+            return None;
+        };
         let a = &HoleAssignment { technique: sounding_technique(a.technique), ..*a };
         let reed = self.wind_direction_midi(a.hole, &a.action)?;
         let candidate = match a.technique {
@@ -227,7 +250,9 @@ impl InstrumentModel for Harmonica {
     /// direction. Two notes in the same hole can't sound together either,
     /// since a hole holds one reed per direction.
     fn can_sound_together(&self, a: &PlayPosition, b: &PlayPosition) -> bool {
-        let (PlayPosition::Hole(a), PlayPosition::Hole(b)) = (a, b);
+        let (PlayPosition::Hole(a), PlayPosition::Hole(b)) = (a, b) else {
+            return false;
+        };
         a.action == b.action && a.hole != b.hole
     }
 
@@ -235,9 +260,13 @@ impl InstrumentModel for Harmonica {
     /// Song Editor has always done — dropping a technique the new direction
     /// can't play back to the plain reed.
     fn reconcile(&self, anchor: &PlayPosition, others: &mut [PlayPosition]) {
-        let PlayPosition::Hole(anchor) = anchor;
+        let PlayPosition::Hole(anchor) = anchor else {
+            return;
+        };
         for other in others {
-            let PlayPosition::Hole(a) = other;
+            let PlayPosition::Hole(a) = other else {
+                continue;
+            };
             if a.action == anchor.action {
                 continue;
             }
@@ -274,58 +303,140 @@ impl InstrumentModel for Harmonica {
     }
 }
 
+impl InstrumentModel for Guitar {
+    fn range(&self) -> Option<(u8, u8)> {
+        Guitar::range(self)
+    }
+
+    /// Fretted positions only, lowest fret first. A bend or harmonic is a
+    /// technique an author chooses, never a way to reach a pitch the neck
+    /// lacks, so the fretted pitch is always the answer.
+    fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
+        self.fretted_positions(midi).into_iter().map(PlayPosition::Fret).collect()
+    }
+
+    fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
+        let PlayPosition::Fret(a) = position else {
+            return None;
+        };
+        Guitar::pitch_of(self, a)
+    }
+
+    fn can_sound_together(&self, a: &PlayPosition, b: &PlayPosition) -> bool {
+        let (PlayPosition::Fret(a), PlayPosition::Fret(b)) = (a, b) else {
+            return false;
+        };
+        self.can_hold_together(a, b)
+    }
+
+    fn reconcile(&self, anchor: &PlayPosition, others: &mut [PlayPosition]) {
+        let PlayPosition::Fret(anchor) = anchor else {
+            return;
+        };
+        let mut frets: Vec<FretAssignment> = others
+            .iter()
+            .filter_map(|p| match p {
+                PlayPosition::Fret(a) => Some(*a),
+                PlayPosition::Hole(_) => None,
+            })
+            .collect();
+        Guitar::reconcile(self, anchor, &mut frets);
+        let mut frets = frets.into_iter();
+        for other in others {
+            if let PlayPosition::Fret(a) = other
+                && let Some(reconciled) = frets.next()
+            {
+                *a = reconciled;
+            }
+        }
+    }
+
+    fn techniques(&self) -> &'static [TechniqueKind] {
+        &[
+            TechniqueKind::Target,
+            TechniqueKind::Glide,
+            TechniqueKind::Register,
+            TechniqueKind::Position,
+        ]
+    }
+
+    fn expression_scope(&self) -> ExpressionScope {
+        ExpressionScope::PerVoice
+    }
+
+    fn envelope(&self) -> Envelope {
+        Envelope::Decaying
+    }
+
+    fn lane_layout(&self) -> LaneLayout {
+        LaneLayout {
+            axis: ScrollAxis::Horizontal,
+            lanes: self.string_labels().into_iter().map(|label| Lane { label }).collect(),
+        }
+    }
+}
+
 impl InstrumentModel for Instrument {
     fn range(&self) -> Option<(u8, u8)> {
         match self {
             Self::Harmonica(harp) => harp.range(),
+            Self::Guitar(guitar) => InstrumentModel::range(guitar),
         }
     }
 
     fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
         match self {
             Self::Harmonica(harp) => harp.positions_for(midi),
+            Self::Guitar(guitar) => InstrumentModel::positions_for(guitar, midi),
         }
     }
 
     fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
         match self {
             Self::Harmonica(harp) => harp.pitch_of(position),
+            Self::Guitar(guitar) => InstrumentModel::pitch_of(guitar, position),
         }
     }
 
     fn can_sound_together(&self, a: &PlayPosition, b: &PlayPosition) -> bool {
         match self {
             Self::Harmonica(harp) => harp.can_sound_together(a, b),
+            Self::Guitar(guitar) => InstrumentModel::can_sound_together(guitar, a, b),
         }
     }
 
     fn reconcile(&self, anchor: &PlayPosition, others: &mut [PlayPosition]) {
         match self {
             Self::Harmonica(harp) => harp.reconcile(anchor, others),
+            Self::Guitar(guitar) => InstrumentModel::reconcile(guitar, anchor, others),
         }
     }
 
     fn techniques(&self) -> &'static [TechniqueKind] {
         match self {
             Self::Harmonica(harp) => harp.techniques(),
+            Self::Guitar(guitar) => InstrumentModel::techniques(guitar),
         }
     }
 
     fn expression_scope(&self) -> ExpressionScope {
         match self {
             Self::Harmonica(harp) => harp.expression_scope(),
+            Self::Guitar(guitar) => InstrumentModel::expression_scope(guitar),
         }
     }
 
     fn envelope(&self) -> Envelope {
         match self {
             Self::Harmonica(harp) => harp.envelope(),
+            Self::Guitar(guitar) => InstrumentModel::envelope(guitar),
         }
     }
 
     fn lane_layout(&self) -> LaneLayout {
         match self {
             Self::Harmonica(harp) => harp.lane_layout(),
+            Self::Guitar(guitar) => InstrumentModel::lane_layout(guitar),
         }
     }
 }

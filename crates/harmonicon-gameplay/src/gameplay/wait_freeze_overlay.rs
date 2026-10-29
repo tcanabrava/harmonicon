@@ -96,11 +96,9 @@ fn sync_wait_freeze_prompt(
     if !state.is_changed() && !song_notes.is_changed() && !loc.is_changed() {
         return;
     }
-    let target = state.0.and_then(|i| song_notes.notes.get(i)).map(|note| {
-        String::from(
-            loc.msg_args("gameplay-wait-play", &[("tab", tab_label(HoleTab::of(&note.position)))]),
-        )
-    });
+    let tab = state.0.and_then(|i| song_notes.notes.get(i)).and_then(|n| HoleTab::of(&n.position));
+    let target =
+        tab.map(|tab| String::from(loc.msg_args("gameplay-wait-play", &[("tab", tab_label(tab))])));
     for mut vis in &mut roots {
         let wanted = if target.is_some() { Visibility::Visible } else { Visibility::Hidden };
         if *vis != wanted {

@@ -364,11 +364,17 @@ pub struct HoleTab {
 }
 
 impl HoleTab {
-    /// How `position` reads off the highway; its technique is printed
-    /// elsewhere, by the note's modifiers.
-    pub fn of(position: &PlayPosition) -> Self {
-        let PlayPosition::Hole(a) = position;
-        Self { hole: a.hole, is_blow: matches!(a.action, Action::Blow) }
+    /// How `position` reads off the harmonica highway; its technique is
+    /// printed elsewhere, by the note's modifiers. `None` for a position on
+    /// another instrument, which has no hole tab: every caller decides what
+    /// such a note shows instead.
+    pub fn of(position: &PlayPosition) -> Option<Self> {
+        match position {
+            PlayPosition::Hole(a) => {
+                Some(Self { hole: a.hole, is_blow: matches!(a.action, Action::Blow) })
+            }
+            PlayPosition::Fret(_) => None,
+        }
     }
 }
 

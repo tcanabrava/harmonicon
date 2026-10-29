@@ -290,11 +290,17 @@ pub(super) fn progress_note_markers(notes: &[ScheduledNote], shown: bool) -> Vec
     if !shown {
         return Vec::new();
     }
+    // The progress bar's lanes are holes; a note with no hole has no lane.
     notes
         .iter()
-        .map(|n| {
-            let tab = HoleTab::of(&n.position);
-            NoteMarker { time: n.time, duration: n.duration, hole: tab.hole, is_blow: tab.is_blow }
+        .filter_map(|n| {
+            let tab = HoleTab::of(&n.position)?;
+            Some(NoteMarker {
+                time: n.time,
+                duration: n.duration,
+                hole: tab.hole,
+                is_blow: tab.is_blow,
+            })
         })
         .collect()
 }
@@ -423,10 +429,11 @@ pub fn spawn_visible_notes(
             if note_has_left_view(note, elapsed) {
                 continue;
             }
-            let hole = HoleTab::of(&note.position).hole;
+            // `beside_lane` counts lanes from one, as holes are numbered.
+            let lane = u8::try_from(note_lane(note, layout) + 1).unwrap_or(u8::MAX);
             let cue = technique_cue::note_cue(&loc, note).map(|text| NoteCue {
                 text,
-                on_right: technique_cue::beside_lane(hole, lane_count) > hole,
+                on_right: technique_cue::beside_lane(lane, lane_count) > lane,
             });
             spawn_note_visual(
                 hw,
@@ -464,12 +471,11 @@ fn spawn_note_visual(
     show_numbers: bool,
     colors: NoteColors,
 ) {
-    let tab = HoleTab::of(&note.position);
-    let label = head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers);
+    let label = note_head_label(note, show_numbers);
     let width_pct = layout.lane_pct() * NOTE_W;
     let left_pct = layout.centred_left_pct(note_lane(note, layout), width_pct);
     let material = shape_materials.add(NoteRibbon2dMaterial {
-        color: ribbon_color(false, tab.is_blow, colors),
+        color: ribbon_color(false, note_is_blow(note), colors),
         technique: ribbon_technique(&note.modifiers),
         shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
         hold: Vec4::ZERO,
@@ -654,7 +660,7 @@ pub fn update_note_visuals(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let color = ribbon_color(note.missed, HoleTab::of(&note.position).is_blow, colors);
+        let color = ribbon_color(note.missed, note_is_blow(note), colors);
         // Live hold progress for the shader, from the same samples the judge
         // will verify the technique from when the hold ends.
         let hold = hold_uniform(
@@ -764,11 +770,22 @@ pub(super) fn head_label(
 pub(super) fn head_text(judged: Option<bool>, note: &ScheduledNote, show_numbers: bool) -> String {
     match judged {
         Some(hit) => judged_stamp(hit).to_string(),
-        None => {
-            let tab = HoleTab::of(&note.position);
-            head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers)
-        }
+        None => note_head_label(note, show_numbers),
     }
+}
+
+/// [`head_label`] for `note`'s own tab, or nothing for a note with no hole
+/// tab to print.
+fn note_head_label(note: &ScheduledNote, show_numbers: bool) -> String {
+    HoleTab::of(&note.position)
+        .map(|tab| head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers))
+        .unwrap_or_default()
+}
+
+/// Whether `note` takes the blow colour: a note with no breath (off the
+/// harmonica) takes it too, as the highway's base note colour.
+fn note_is_blow(note: &ScheduledNote) -> bool {
+    HoleTab::of(&note.position).is_none_or(|tab| tab.is_blow)
 }
 
 /// The technique cue for one note head (see `technique_cue::note_cue`) and
