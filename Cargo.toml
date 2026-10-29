@@ -32,7 +32,14 @@ accesskit = "0.24.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 midly = "0.5"
-bevy = { version = "0.20.0", features = ["wav"] }
+# Bevy's `default` is `2d` + `3d` + `ui` + `audio`. Nothing here draws in
+# 3D, and `3d` alone pulls in PBR, lighting, glTF and anti-aliasing.
+bevy = { version = "0.20.0", default-features = false, features = [
+    "2d",
+    "ui",
+    "audio",
+    "wav",
+] }
 cpal = "0.17"
 rustfft = "6.4"
 simsimd = "6.5.16"
@@ -93,7 +100,7 @@ dirs = { workspace = true }
 regex = "1.13.1"
 
 [features]
-# Local iteration: Bevy's dev tools + asset file watcher. Never ship it.
+# Local iteration: Bevy's debug names + asset file watcher + BRP. Never ship it.
 # Local dev: `cargo run --features dev`.
 #
 # Deliberately does *not* pull in dynamic_linking. That lives in its own
@@ -103,7 +110,11 @@ regex = "1.13.1"
 # Keeping the two apart means one command — `cargo test --features dev` —
 # runs the whole suite, doctests included.
 dev = [
-    "bevy/dev",
+    # Not `bevy/dev`: that also brings `render_dev_tools`, whose debug
+    # overlay needs the 3D mesh pipeline and panics at startup without the
+    # `3d` feature this game leaves off. Nothing here uses Bevy's dev tools;
+    # the asset file watcher is the part of `bevy/dev` worth having.
+    "bevy/file_watcher",
     "bevy/debug",
     # The Bevy Remote Protocol, for driving a running game from outside
     # (screenshots, video capture, state inspection) — see src/dev_capture.rs

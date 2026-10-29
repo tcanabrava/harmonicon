@@ -25,7 +25,7 @@ thiserror = { workspace = true }
 dirs = { workspace = true }
 
 [features]
-dev = ["bevy/dev", "bevy/debug", "harmonicon-audio/dev", "harmonicon-platform/dev"]
+dev = ["bevy/file_watcher", "bevy/debug", "harmonicon-audio/dev", "harmonicon-platform/dev"]
 dynamic_linking = ["bevy/dynamic_linking", "harmonicon-audio/dynamic_linking", "harmonicon-platform/dynamic_linking"]
 trace_tracy = ["bevy/trace_tracy", "harmonicon-audio/trace_tracy", "harmonicon-platform/trace_tracy"]
 

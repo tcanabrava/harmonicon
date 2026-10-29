@@ -29,7 +29,7 @@ crate-type = ["cdylib"]
 # silently dropped them and broke feature unification.
 [target.'cfg(target_os = "android")'.dependencies]
 harmonicon = { path = "../..", version = "*" }
-# Bevy 0.19's defaults are only 2d/3d/ui/audio — no activity backend — and
+# The workspace builds Bevy with only 2d/ui/audio — no activity backend — and
 # `android-activity` hard-errors at compile time unless exactly one is
 # chosen. GameActivity over NativeActivity for its far better soft-keyboard
 # and IME handling, which the Song Editor's text fields need. It compiles

@@ -97,7 +97,7 @@ dependencies at `opt-level = 3`, so debug builds are already playable.
 
 ### Optional: dev feature
 
-`dev` turns on Bevy's dev tools, the asset file watcher, and a
+`dev` turns on Bevy's debug names, the asset file watcher, and a
 [Bevy Remote Protocol](contributing/src/remote-control.md) server on `127.0.0.1:15702`
 that lets you inspect, screenshot and record a *running* game from a shell.
 Never ship it: that server is unauthenticated and can mutate arbitrary world

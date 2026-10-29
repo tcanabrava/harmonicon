@@ -27,7 +27,7 @@ serde_json = { workspace = true }
 pulldown-cmark = { workspace = true }
 
 [features]
-dev = ["bevy/dev", "bevy/debug", "harmonicon-gameplay/dev"]
+dev = ["bevy/file_watcher", "bevy/debug", "harmonicon-gameplay/dev"]
 dynamic_linking = ["bevy/dynamic_linking", "harmonicon-gameplay/dynamic_linking"]
 trace_tracy = ["bevy/trace_tracy", "harmonicon-gameplay/trace_tracy"]
 

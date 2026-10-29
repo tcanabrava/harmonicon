@@ -24,7 +24,7 @@ rodio = { workspace = true }
 jni = "0.21"
 
 [features]
-dev = ["bevy/dev", "bevy/debug"]
+dev = ["bevy/file_watcher", "bevy/debug"]
 dynamic_linking = ["bevy/dynamic_linking"]
 trace_tracy = ["bevy/trace_tracy"]
 

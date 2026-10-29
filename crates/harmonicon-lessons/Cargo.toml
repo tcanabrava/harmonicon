@@ -17,7 +17,7 @@ harmonicon-menu = { path = "../harmonicon-menu", version = "*" }
 bevy = { workspace = true }
 
 [features]
-dev = ["bevy/dev", "bevy/debug", "harmonicon-audio/dev", "harmonicon-menu/dev"]
+dev = ["bevy/file_watcher", "bevy/debug", "harmonicon-audio/dev", "harmonicon-menu/dev"]
 dynamic_linking = ["bevy/dynamic_linking", "harmonicon-audio/dynamic_linking", "harmonicon-menu/dynamic_linking"]
 trace_tracy = ["bevy/trace_tracy", "harmonicon-audio/trace_tracy", "harmonicon-menu/trace_tracy"]
 

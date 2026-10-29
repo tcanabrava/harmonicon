@@ -181,9 +181,9 @@ which is what surfaced the actual `NoSuchMethodError` in logcat.
 
 ### GameActivity, and why its version is not free to choose
 
-`android-activity` requires exactly one backend and Bevy 0.19 selects
-neither by default (its defaults are just `2d`/`3d`/`ui`/`audio`), so this
-had to be chosen explicitly. GameActivity was picked over NativeActivity for
+`android-activity` requires exactly one backend and Bevy selects neither
+(this game builds it with only `2d`/`ui`/`audio`, and Bevy's own defaults
+add only `3d`), so this had to be chosen explicitly. GameActivity was picked over NativeActivity for
 its far better soft-keyboard/IME handling, which the Song Editor's text
 fields need.
 

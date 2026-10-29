@@ -35,11 +35,13 @@ its own lib.
    features:
    ```toml
    [features]
-   dev = ["bevy/dev", "bevy/debug", "harmonicon-x/dev"]
+   dev = ["bevy/file_watcher", "bevy/debug", "harmonicon-x/dev"]
    dynamic_linking = ["bevy/dynamic_linking", "harmonicon-x/dynamic_linking"]
    trace_tracy = ["bevy/trace_tracy", "harmonicon-x/trace_tracy"]
    ```
-   Add the new crate to all three of the root's lists too. `dynamic_linking`
+   Not `bevy/dev`: it brings `render_dev_tools`, which panics at startup
+   without Bevy's `3d` feature (the root `Cargo.toml` says why). Add the new
+   crate to all three of the root's lists too. `dynamic_linking`
    is deliberately separate from `dev`: it makes doctests unable to load the
    stdlib, so folding it back into `dev` would break `cargo test`.
 4. Rewrite call sites to name the crate: `harmonicon_x::module::Item`.
