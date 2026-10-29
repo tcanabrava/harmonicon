@@ -160,7 +160,14 @@ pub fn unlocked_flags(
             ordinal = 0;
         }
         first = false;
-        let note_count = sections.get(section_idx).map(|s| s.note_count).unwrap_or(count);
+        // No section for this item means the caller never grouped the chart,
+        // so there is nothing to lock it against.
+        let Some(section) = sections.get(section_idx) else {
+            flags.extend(std::iter::repeat_n((true, section_idx), count));
+            ordinal += count;
+            continue;
+        };
+        let note_count = section.note_count;
         let learned_frac = learned.get(section_idx).copied().unwrap_or(0.0);
         let active_count =
             if enabled { active_note_count(note_count, learned_frac) } else { note_count };
@@ -490,6 +497,17 @@ mod tests {
         let sections = group_phrase_sections(&items, 10.0);
         let flags = unlocked_flags(&items, &sections, &[1.0], true);
         assert!(flags.iter().all(|&(u, _)| u));
+    }
+
+    #[test]
+    fn an_ungrouped_chart_locks_nothing() {
+        // Untagged items share one implicit section; with no sections
+        // grouped, every one of them must stay playable, on or off.
+        let items = [(0.0, None, 1usize), (0.5, None, 2), (1.0, None, 1)];
+        for enabled in [false, true] {
+            let flags = unlocked_flags(&items, &[], &[], enabled);
+            assert_eq!(flags, vec![(true, 0); 4], "enabled: {enabled}");
+        }
     }
 
     #[test]
