@@ -78,15 +78,16 @@ Nothing below can be approved by a test.
 
 ## Multiple instruments
 
-`docs/multi_instrument_plan.md` has the design. In order:
+`docs/multi_instrument_plan.md` has the design. Every item in this section
+gates 1.0. In order:
 
-- **The seam, harmonica only**, with no visible change: `Instrument`,
-  `InstrumentModel`, `VoiceModel` and `LaneLayout` (with a scroll axis) in
-  core, and `pitch_map`, the constraint filter, the editor's
-  `enforce_direction`, `ScheduledNote` and `highway_2d` routed through them.
-  In progress. Every item in this section gates 1.0.
 - **Chart format 1.8.0**: `instrument`, `NoteEvent.position`, `note`
-  required off-harmonica, multi-part song folders.
+  required off-harmonica, multi-part song folders. The score importers
+  (`harmonicon-score`'s `convert`) take an `Instrument` in the same change,
+  since a chart can only name a non-harmonica instrument from here on.
+- **Seam leftovers** that read holes directly and move when they next
+  change: the progress bar's note lanes (`NoteMarker`), the technique
+  cue's side (`beside_lane`), and Jam Session's `hole_map`.
 - **Guitar**: model and tunings, fingering solver, Guitar Pro
   string/fret pass-through, horizontal tab highway and fretboard strip,
   editor tab rows, Karplus–Strong synth. Detection needs a recorded guitar

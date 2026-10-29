@@ -57,17 +57,19 @@ enum Instrument {
 }
 
 trait InstrumentModel {
-    fn range(&self) -> (u8, u8);                         // feeds PitchRange
+    fn range(&self) -> Option<(u8, u8)>;                 // feeds PitchRange
     fn positions_for(&self, midi: u8) -> Vec<PlayPosition>;  // generalised pitch_map
     fn pitch_of(&self, p: &PlayPosition) -> Option<u8>;      // generalised hole_notes
-    fn voices(&self) -> VoiceModel;                      // what can sound together
-    fn techniques(&self) -> &[TechniqueKind];            // see Note Trainer
+    fn can_sound_together(&self, a: &PlayPosition, b: &PlayPosition) -> bool;
+    fn reconcile(&self, anchor: &PlayPosition, others: &mut [PlayPosition]);
+    fn techniques(&self) -> &'static [TechniqueKind];    // see Note Trainer
     fn expression_scope(&self) -> ExpressionScope;       // whole-instrument vs per-voice
     fn envelope(&self) -> Envelope;                      // Sustained | Decaying
+    fn lane_layout(&self) -> LaneLayout;                 // the play highway's lanes
 }
 
 enum PlayPosition {
-    Hole { hole: u8, action: Action, technique: Technique },
+    Hole(HoleAssignment),                                 // pitch_map's hole, action, technique
     Fret { string: u8, fret: u8, technique: StringTechnique },
     Fingering { id: FingeringId, harmonic: u8 },          // flute: fingering + register
 }
@@ -76,6 +78,13 @@ enum PlayPosition {
 These belong in core, not a new crate: `chart` has to name the instrument,
 and chart lives in core. The harmonica implementation is an adapter over the
 existing `harmonica`/`pitch_map` code, not a rewrite.
+
+**Phase 1 has landed** (`harmonicon_core::instrument`, harmonica only). What
+the voice model below describes is split across two places in the code:
+`can_sound_together`/`reconcile` on the trait, for the Song Editor, and
+`note_tracker::VoiceFilter`, the stateful per-frame filter live detection
+runs before onset counting. `ScrollAxis` has only `Vertical` so far; the
+guitar adds `Horizontal`.
 
 ### Voice model: what can sound together
 
