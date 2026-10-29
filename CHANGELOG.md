@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.0.15 — 2026-10-29
+
+- Cargo update
+- Build Bevy without its 3D feature set
+- Re-take the song picker capture and fix the BRP song route
+- Remove Play 3D
+- Update dependencies
+- Update dependencies
+- Update dependencies
+
 ## v0.0.14 — 2026-10-09
 
 - release.sh: bump from the latest tag, not Cargo.toml
