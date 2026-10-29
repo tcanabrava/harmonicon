@@ -21,7 +21,7 @@ Each bench's `//!` header says what it measures and why.
 | Bench | Measures | Runs |
 |---|---|---|
 | `harmonicon-bench` `detectors` | `pitch_detect::analyze` per algorithm, warm and fresh `FftState` | every audio hop |
-| `harmonicon-bench` `core_hot_paths` | `HarmonicaNoteTracker::update`, `tick_to_seconds`/`seconds_to_tick`, `synth::render_pcm` | every hop / every frame / on demand |
+| `harmonicon-bench` `core_hot_paths` | `NoteTracker::update`, `tick_to_seconds`/`seconds_to_tick`, `synth::render_pcm` | every hop / every frame / on demand |
 | `harmonicon-bench` `score_import` | MIDI parse, track note extraction, all-track harmonica conversion on two bundled files | opening an imported song |
 | `harmonicon-bench` `harp_mapping` | key and harp selection, strict pitch-to-hole mapping | score import / live pitch event |
 | `harmonicon-gameplay` `judge` | `score_notes`, `build_scheduled_notes` | every frame / on a note-list rebuild |

@@ -234,8 +234,8 @@ fn run_one(
         }
 
         // Same frames, re-filtered through exactly the policy live gameplay
-        // applies (`harmonicon_core::harmonica_constraints`'s
-        // `HarmonicaNoteTracker`: one wind direction at a time, plus onset
+        // applies (`harmonicon_core::note_tracker::NoteTracker`: one wind
+        // direction at a time on a harmonica, plus onset
         // confirmation and release) — printed alongside the raw algorithm so
         // the cost and benefit of that stage are visible side by side.
         let constrained = apply_live_constraints(&chart.harmonica, &frames);
