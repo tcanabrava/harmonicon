@@ -1255,6 +1255,24 @@ fn editor_load_validation_rejects_a_future_chart_version() {
     assert!(error.contains("can't load"));
 }
 
+/// The grid's rows are harmonica holes, so a guitar chart is refused rather
+/// than opened with every note on hole 1.
+#[test]
+fn editor_load_refuses_a_chart_for_another_instrument() {
+    let mut value: serde_json::Value = serde_json::json!({
+        "song": { "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0,
+                  "key": "E", "difficulty": "easy" },
+        "timing": { "resolution": 12, "tempo_map": [{ "tick": 0, "bpm": 120.0 }] },
+        "instrument": { "type": "guitar", "strings": ["E4","B3","G3","D3","A2","E2"], "frets": 22 },
+        "track": [{ "tick": 0, "duration": 0.5,
+                    "events": [{ "position": { "string": 3, "fret": 2 }, "note": "A3" }] }],
+        "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
+    });
+    value["metadata"] = serde_json::json!({ "format_version": "1.8.0" });
+    let error = validated_harpchart(&value.to_string()).expect_err("a guitar chart is refused");
+    assert!(error.contains("other than the harmonica"), "{error}");
+}
+
 #[test]
 fn chart_schema_rejects_unknown_diatonic_profiles_before_editor_loading() {
     let mut state = EditorState::default();

@@ -15,6 +15,7 @@
 //! into gameplay, UI or asset loading.
 
 pub mod chart;
+pub mod chart_check;
 pub mod config_file;
 pub mod harmonica;
 pub mod harmonica_constraints;

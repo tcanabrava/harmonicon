@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::harmonica::Harmonica;
+use crate::instrument::Instrument;
+use crate::instrument::guitar::{Guitar, GuitarBody};
+use crate::midi::note_to_midi;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -10,7 +13,14 @@ pub struct HarpChart {
     pub metadata: Option<Metadata>,
     pub song: Song,
     pub timing: Timing,
-    pub harmonica: Harmonica,
+    /// The harmonica a harmonica chart is written for. A chart has exactly
+    /// one of this and [`instrument`](Self::instrument_spec) (the schema
+    /// enforces it); every chart before format 1.8.0 has this one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub harmonica: Option<Harmonica>,
+    /// Any other instrument, from format 1.8.0.
+    #[serde(default, rename = "instrument", skip_serializing_if = "Option::is_none")]
+    pub instrument_spec: Option<ChartInstrument>,
     pub track: Vec<TrackItem>,
     #[serde(rename = "loop")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -32,13 +42,83 @@ pub struct Metadata {
     pub description: Option<String>,
 }
 
+/// A chart's non-harmonica instrument, as written in its `instrument` field.
+/// Strings are note names (string 1, the highest, first), as a harmonica's
+/// reed layout is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum ChartInstrument {
+    Guitar {
+        strings: Vec<String>,
+        frets: u8,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        capo: u8,
+        #[serde(default)]
+        body: GuitarBody,
+    },
+}
+
+fn is_zero(value: &u8) -> bool {
+    *value == 0
+}
+
+impl ChartInstrument {
+    /// The playable instrument this describes, or `None` if a string names
+    /// no real note.
+    pub fn to_instrument(&self) -> Option<Instrument> {
+        match self {
+            Self::Guitar { strings, frets, capo, body } => {
+                let strings = strings
+                    .iter()
+                    .map(|s| u8::try_from(note_to_midi(s)?).ok())
+                    .collect::<Option<Vec<u8>>>()?;
+                Some(Guitar { strings, frets: *frets, capo: *capo, body: *body }.into())
+            }
+        }
+    }
+}
+
+impl HarpChart {
+    /// The instrument this chart is played on: its harmonica, or the
+    /// instrument its `instrument` field names. `None` only for a chart
+    /// with neither, or an instrument whose strings name no real note,
+    /// both of which validation rejects.
+    pub fn instrument(&self) -> Option<Instrument> {
+        match (&self.harmonica, &self.instrument_spec) {
+            (Some(harp), _) => Some(harp.clone().into()),
+            (None, Some(spec)) => spec.to_instrument(),
+            (None, None) => None,
+        }
+    }
+
+    /// The pitch `event` sounds on the instrument the chart was written for.
+    ///
+    /// On a harmonica a bend's `note` names the **unbent reed** and its
+    /// modifier does the moving (`harp_remap::source_pitch`). On any other
+    /// instrument `note` is required and is the sounding pitch itself,
+    /// technique included.
+    pub fn event_pitch(&self, event: &NoteEvent) -> Option<u8> {
+        match (&self.harmonica, event.hole_action()) {
+            (Some(harp), Some((hole, action))) => crate::harp_remap::source_pitch(
+                hole,
+                action,
+                event.note.as_deref(),
+                event.modifiers.as_deref().unwrap_or(&[]),
+                harp,
+            ),
+            (Some(_), None) => None,
+            (None, _) => u8::try_from(note_to_midi(event.note.as_deref()?)?).ok(),
+        }
+    }
+}
+
 /// The newest `metadata.format_version` this build's loader understands —
 /// bump it whenever a chart-schema change lands (see CLAUDE.md's Chart
 /// format notes) so `song::loader` can catch a chart authored for a newer
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.7.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.8.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.
@@ -482,14 +562,43 @@ pub enum PlayMode {
     Split,
 }
 
+/// One note of a track item. A harmonica event names its `hole` and
+/// `action`; any other instrument's names its `position` and must state its
+/// `note`, the pitch that is scored. The schema accepts either shape and
+/// validation checks it matches the chart's instrument.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoteEvent {
-    pub hole: u8,
-    pub action: Action,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hole: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<Action>,
+    /// Where a stringed instrument plays the note, from format 1.8.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position: Option<FretPosition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modifiers: Option<Vec<Modifier>>,
+}
+
+impl NoteEvent {
+    /// A harmonica event: a hole and breath with no other fields.
+    pub fn hole(hole: u8, action: Action) -> Self {
+        Self { hole: Some(hole), action: Some(action), position: None, note: None, modifiers: None }
+    }
+
+    /// The hole and breath of a harmonica event, `None` for any other.
+    pub fn hole_action(&self) -> Option<(u8, Action)> {
+        Some((self.hole?, self.action?))
+    }
+}
+
+/// A string and fret, string 1 the highest and frets counted from the capo,
+/// as tab writes them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FretPosition {
+    pub string: u8,
+    pub fret: u8,
 }
 
 /// Breath direction. `Copy`/`Eq` because it is two fieldless variants that
@@ -521,6 +630,10 @@ pub enum Modifier {
     /// via the note's own `note` field, not derived from this modifier.
     #[serde(rename = "slide")]
     Slide,
+    /// A stringed instrument's natural harmonic, touched over the event's
+    /// fret. Its pitch is the event's `note`.
+    #[serde(rename = "harmonic")]
+    Harmonic,
     #[serde(rename = "vibrato")]
     Vibrato {
         oscillation_hz: f32,
@@ -676,7 +789,7 @@ mod tests {
     #[test]
     fn diatonic_layout_fields_parsed() {
         let chart: HarpChart = serde_json::from_str(MINIMAL_DIATONIC).unwrap();
-        let Harmonica::Diatonic { holes, layout: Some(ref l), .. } = chart.harmonica else {
+        let Some(Harmonica::Diatonic { holes, layout: Some(ref l), .. }) = chart.harmonica else {
             panic!("expected Diatonic with layout");
         };
         assert_eq!(holes, 10);
@@ -704,7 +817,7 @@ mod tests {
             "scoring": {"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}
         }"#;
         let chart: HarpChart = serde_json::from_str(json).unwrap();
-        assert!(matches!(chart.harmonica, Harmonica::Chromatic { holes: 12, .. }));
+        assert!(matches!(chart.harmonica, Some(Harmonica::Chromatic { holes: 12, .. })));
     }
 
     #[test]
@@ -719,8 +832,7 @@ mod tests {
         let chart: HarpChart = serde_json::from_str(json).unwrap();
         assert_eq!(chart.track.len(), 1);
         let ev = &chart.track[0].events[0];
-        assert_eq!(ev.hole, 4);
-        assert!(matches!(ev.action, Action::Blow));
+        assert_eq!(ev.hole_action(), Some((4, Action::Blow)));
     }
 
     #[test]

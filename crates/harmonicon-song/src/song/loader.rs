@@ -43,6 +43,13 @@ pub enum SongLoadError {
     Json(#[from] serde_json::Error),
     #[error("Chart validation failed:\n{0}")]
     Validation(String),
+    /// A valid chart for an instrument the game can't play yet. Validation
+    /// accepts it so a pack can ship it; play needs that instrument's
+    /// highway first.
+    #[error(
+        "this chart is for an instrument the game can't play yet (only harmonica charts are playable)"
+    )]
+    UnplayableInstrument,
 }
 
 /// Migrates and validates a raw chart using the same rules as the asset
@@ -129,6 +136,9 @@ impl SongChartLoader {
             let _span = info_span!("validate_and_parse_chart").entered();
             validate_and_parse_chart(&mut chart_value)?
         };
+        if chart.harmonica.is_none() {
+            return Err(SongLoadError::UnplayableInstrument);
+        }
         if migrated {
             info!(
                 "Migrated chart at {} to format_version {CURRENT_FORMAT_VERSION}",
@@ -430,6 +440,63 @@ mod tests {
             validate_and_parse_chart(&mut value).is_err(),
             "more passes than the loader plays is refused, not clamped silently"
         );
+    }
+
+    fn guitar_chart() -> serde_json::Value {
+        serde_json::json!({
+            "metadata": { "format_version": CURRENT_FORMAT_VERSION },
+            "song": { "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0,
+                      "key": "E", "difficulty": "easy" },
+            "timing": { "resolution": 12, "tempo_map": [{ "tick": 0, "bpm": 120.0 }] },
+            "instrument": { "type": "guitar", "strings": ["E4","B3","G3","D3","A2","E2"],
+                            "frets": 22, "capo": 0, "body": "acoustic" },
+            "track": [{ "tick": 0, "duration": 0.5, "events": [
+                { "position": { "string": 3, "fret": 2 }, "note": "A3" },
+                { "position": { "string": 2, "fret": 8 }, "note": "A4",
+                  "modifiers": [{ "type": "bend", "semitones": 2 }] },
+                { "position": { "string": 6, "fret": 12 }, "note": "E3",
+                  "modifiers": [{ "type": "harmonic" }] }
+            ] }],
+            "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
+        })
+    }
+
+    #[test]
+    fn a_guitar_chart_passes_the_schema() {
+        let (_, chart) = validate_and_parse_chart(&mut guitar_chart()).unwrap();
+        assert!(chart.harmonica.is_none());
+        assert!(chart.instrument_spec.is_some());
+        assert_eq!(chart.track[0].events.len(), 3);
+    }
+
+    #[test]
+    fn a_chart_names_exactly_one_instrument() {
+        let mut both = guitar_chart();
+        both["harmonica"] = serde_json::json!({ "type": "diatonic", "holes": 10, "bending_profile": "richter_standard" });
+        assert!(validate_and_parse_chart(&mut both).is_err(), "harmonica and instrument");
+
+        let mut neither = guitar_chart();
+        neither.as_object_mut().unwrap().remove("instrument");
+        assert!(validate_and_parse_chart(&mut neither).is_err(), "no instrument at all");
+    }
+
+    #[test]
+    fn an_event_names_a_hole_or_a_string_position() {
+        let mut bare = guitar_chart();
+        bare["track"][0]["events"][0] = serde_json::json!({ "note": "A3" });
+        assert!(validate_and_parse_chart(&mut bare).is_err(), "neither shape");
+
+        let mut no_note = guitar_chart();
+        no_note["track"][0]["events"][0] =
+            serde_json::json!({ "position": { "string": 3, "fret": 2 } });
+        assert!(validate_and_parse_chart(&mut no_note).is_err(), "a position needs its note");
+    }
+
+    #[test]
+    fn a_bend_of_nothing_is_refused_either_way() {
+        let mut flat = guitar_chart();
+        flat["track"][0]["events"][1]["modifiers"][0]["semitones"] = serde_json::json!(0);
+        assert!(validate_and_parse_chart(&mut flat).is_err());
     }
 
     #[test]

@@ -75,7 +75,12 @@ pub fn expected_notes_from_chart(chart: &HarpChart) -> Vec<ExpectedNote> {
             let Ok(midi) = u8::try_from(midi) else {
                 continue;
             };
-            let sign = match event.action {
+            // The benchmark measures harmonica detection; a note with no
+            // hole has no breath to score direction accuracy against.
+            let Some((hole, action)) = event.hole_action() else {
+                continue;
+            };
+            let sign = match action {
                 Action::Draw => "-",
                 Action::Blow => "",
             };
@@ -83,8 +88,8 @@ pub fn expected_notes_from_chart(chart: &HarpChart) -> Vec<ExpectedNote> {
                 start_secs,
                 end_secs,
                 midi,
-                blow: event.action == Action::Blow,
-                label: format!("{sign}{}", event.hole),
+                blow: action == Action::Blow,
+                label: format!("{sign}{hole}"),
             });
         }
     }
@@ -503,7 +508,8 @@ mod tests {
                 pickup_ticks: None,
                 repeats: Vec::new(),
             },
-            harmonica: richter_harp("C"),
+            harmonica: Some(richter_harp("C")),
+            instrument_spec: None,
             track,
             loop_section: None,
             scoring: Scoring {
@@ -528,7 +534,10 @@ mod tests {
             play_mode: Some(PlayMode::Single),
             call: false,
             lyric: None,
-            events: vec![NoteEvent { hole, action, note: Some(note.to_string()), modifiers: None }],
+            events: vec![NoteEvent {
+                note: Some(note.to_string()),
+                ..NoteEvent::hole(hole, action)
+            }],
         }
     }
 
@@ -563,8 +572,9 @@ mod tests {
     fn a_chord_items_events_all_share_one_time_window() {
         let mut item = note_item(0.0, 1.0, 1, Action::Blow, "C4");
         item.events.push(NoteEvent {
-            hole: 2,
-            action: Action::Blow,
+            hole: Some(2),
+            action: Some(Action::Blow),
+            position: None,
             note: Some("E4".into()),
             modifiers: None,
         });

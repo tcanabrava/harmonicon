@@ -263,10 +263,9 @@ pub fn to_chart(
             call: false,
             lyric: None,
             events: vec![NoteEvent {
-                hole: assignment.hole,
-                action: assignment.action,
                 note: Some(chart_note(note.midi, &assignment, harp)),
                 modifiers: (!modifiers.is_empty()).then_some(modifiers),
+                ..NoteEvent::hole(assignment.hole, assignment.action)
             }],
         });
     }
@@ -305,7 +304,8 @@ pub fn to_chart(
             pickup_ticks: None,
             repeats: Vec::new(),
         },
-        harmonica: harp.clone(),
+        harmonica: Some(harp.clone()),
+        instrument_spec: None,
         track: items,
         loop_section: None,
         // The same windows every bundled chart uses.

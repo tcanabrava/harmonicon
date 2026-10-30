@@ -33,11 +33,10 @@ pub(crate) fn configure_pitch_filter(
     capture: Option<Res<AudioCapture>>,
     mut filter: ResMut<InstrumentPitchFilter>,
 ) {
-    if let Some(manifest) = manifests.get(&selected.0) {
-        filter.configure(
-            &effective.harp_for(&manifest.chart).clone().into(),
-            capture.map(|capture| capture.sample_rate),
-        );
+    if let Some(manifest) = manifests.get(&selected.0)
+        && let Some(harp) = effective.harp_for(&manifest.chart)
+    {
+        filter.configure(&harp.clone().into(), capture.map(|capture| capture.sample_rate));
     }
 }
 
@@ -82,7 +81,9 @@ pub(crate) fn setup_song_info(
     mut song_info: ResMut<SongInfo>,
 ) {
     if let Some(manifest) = manifests.get(&selected.0) {
-        let harp = effective.harp_for(&manifest.chart);
+        let Some(harp) = effective.harp_for(&manifest.chart) else {
+            return;
+        };
         let key = effective.song_key_for(&manifest.chart);
         *song_info = SongInfo::from_chart(&manifest.chart, harp, &key, &loc);
     }
@@ -109,7 +110,7 @@ pub(crate) fn setup_scoring_config(
     // standard keys (see TODO.md).
     *pitch_range = effective
         .harp_for(chart)
-        .frequency_range()
+        .and_then(harmonicon_core::harmonica::Harmonica::frequency_range)
         .map(|(lo, hi)| PitchRange::from_freqs([lo, hi], PITCH_RANGE_MARGIN_SEMITONES))
         .unwrap_or_default();
 

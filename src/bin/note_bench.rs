@@ -201,6 +201,10 @@ fn run_one(
         return;
     };
 
+    let Some(harp) = chart.harmonica.as_ref() else {
+        println!("  not a harmonica chart — the benchmark measures harmonica detection, skipping");
+        return;
+    };
     let expected = expected_notes_from_chart(&chart);
     if expected.is_empty() {
         println!("  chart has no expected notes — skipping");
@@ -209,8 +213,7 @@ fn run_one(
 
     // Narrowed to the harp actually being played, same as gameplay/live
     // recording both do — fewer candidates for every algorithm.
-    let range = chart
-        .harmonica
+    let range = harp
         .frequency_range()
         .map(|(lo, hi)| PitchRange::from_freqs([lo, hi], PITCH_RANGE_MARGIN_SEMITONES))
         .unwrap_or_default();
@@ -219,7 +222,7 @@ fn run_one(
         let started = std::time::Instant::now();
         let frames = run_algorithm(&samples, sample_rate, algorithm, range);
         let micros_per_chunk = started.elapsed().as_secs_f64() * 1e6 / frames.len().max(1) as f64;
-        let raw = Metrics::measure(&chart.harmonica, &expected, &frames, tolerance_secs);
+        let raw = Metrics::measure(harp, &expected, &frames, tolerance_secs);
         println!(
             "  {:>5}: hit {:>5}  miss {:>5}  phantom {:>5}  {:>7.1} µs/chunk",
             algorithm.label(),
@@ -238,8 +241,8 @@ fn run_one(
         // direction at a time on a harmonica, plus onset
         // confirmation and release) — printed alongside the raw algorithm so
         // the cost and benefit of that stage are visible side by side.
-        let constrained = apply_live_constraints(&chart.harmonica, &frames);
-        let live = Metrics::measure(&chart.harmonica, &expected, &constrained, tolerance_secs);
+        let constrained = apply_live_constraints(harp, &frames);
+        let live = Metrics::measure(harp, &expected, &constrained, tolerance_secs);
         println!(
             "  {:>5}+HC: hit {:>5}  miss {:>5}  phantom {:>5}",
             algorithm.label(),

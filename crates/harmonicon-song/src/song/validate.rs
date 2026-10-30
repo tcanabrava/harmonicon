@@ -8,6 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use harmonicon_core::chart::HarpChart;
+use harmonicon_core::chart_check::instrument_problems;
 use harmonicon_core::harmonica::{Harmonica, chromatic_harp};
 use harmonicon_core::pitch_map::HARP_KEYS;
 
@@ -52,8 +53,9 @@ pub fn content_dirs(dir: &Path) -> Vec<PathBuf> {
 }
 
 /// Validates one `.harpchart` exactly as the loader would (migration,
-/// schema, format version), plus the one rule the schema can't express: a
-/// chromatic harmonica's layout must be a real instrument's.
+/// schema, format version), plus the rules the schema can't express: every
+/// event matches the chart's instrument (`chart_check`), and a chromatic
+/// harmonica's layout must be a real instrument's.
 pub fn check_chart(path: &Path, root: &Path, report: &mut Report) {
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
@@ -69,10 +71,13 @@ pub fn check_chart(path: &Path, root: &Path, report: &mut Report) {
     let Ok(chart) = serde_json::from_value::<HarpChart>(value) else {
         return; // the loader's own deserialize already passed above
     };
-    if let Harmonica::Chromatic { .. } = &chart.harmonica
+    for problem in instrument_problems(&chart) {
+        report.error(path, root, problem);
+    }
+    if let Some(harp @ Harmonica::Chromatic { .. }) = &chart.harmonica
         && !HARP_KEYS
             .iter()
-            .any(|key| chromatic_layout(&chromatic_harp(key)) == chromatic_layout(&chart.harmonica))
+            .any(|key| chromatic_layout(&chromatic_harp(key)) == chromatic_layout(harp))
     {
         report.error(
             path,

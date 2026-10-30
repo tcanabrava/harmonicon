@@ -49,6 +49,7 @@ fn modifier_kind(modifier: &Modifier) -> u8 {
         Modifier::Overblow => 3,
         Modifier::Overdraw => 4,
         Modifier::Slide => 5,
+        Modifier::Harmonic => 6,
     }
 }
 

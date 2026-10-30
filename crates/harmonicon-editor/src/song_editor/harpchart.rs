@@ -670,6 +670,12 @@ pub(super) fn validated_harpchart(text: &str) -> Result<serde_json::Value, Strin
 /// them successfully and silently erasing their meaning on the next save.
 pub(super) fn unsupported_chart_features(value: &serde_json::Value) -> Vec<String> {
     let mut found = Vec::new();
+    if value.get("instrument").is_some() {
+        // Every grid row is a harmonica hole; a string chart would load with
+        // every note on hole 1.
+        found.push("it is written for an instrument other than the harmonica".to_string());
+        return found;
+    }
     if let Some(track) = value["track"].as_array() {
         for (index, phrase) in track.iter().enumerate() {
             let number = index + 1;

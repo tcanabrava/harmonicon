@@ -24,7 +24,7 @@ use bevy::prelude::*;
 
 use harmonicon_app::app::{JamPositionCycle, JamScale, SelectedSong};
 use harmonicon_core::chart::Scale;
-use harmonicon_core::harmonica::Position;
+use harmonicon_core::harmonica::{Harmonica, Position};
 use harmonicon_gameplay::gameplay::AbsoluteBar;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::{CircleOfFifthsColors, LoadedTheme};
@@ -123,7 +123,7 @@ pub(crate) fn on_position_called(
     };
     let chart = &manifest.chart;
     let key = chart.song.key.as_str();
-    let scale = chart.harmonica.scale().unwrap_or(called);
+    let scale = chart.harmonica.as_ref().and_then(Harmonica::scale).unwrap_or(called);
     guide.scale_classes = scale.classes(key);
 
     let Ok((slot_entity, slot)) = slots.single() else {

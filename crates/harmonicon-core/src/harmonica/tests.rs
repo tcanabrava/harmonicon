@@ -278,30 +278,39 @@ fn ii_v_i_chords_can_use_the_altered_dominant() {
 #[test]
 fn blow_label_returns_correct_note() {
     let chart = test_chart();
-    assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Blow), "C4");
-    assert_eq!(chart.harmonica.wind_direction_label(4, &Action::Blow), "C5");
-    assert_eq!(chart.harmonica.wind_direction_label(10, &Action::Blow), "C7");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(1, &Action::Blow), "C4");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(4, &Action::Blow), "C5");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(10, &Action::Blow), "C7");
 }
 
 #[test]
 fn blow_label_out_of_range_returns_dash() {
     let chart = test_chart();
-    assert_eq!(chart.harmonica.wind_direction_label(0, &Action::Blow), "\u{2014}"); // hole=0 guard
-    assert_eq!(chart.harmonica.wind_direction_label(11, &Action::Blow), "\u{2014}"); // beyond layout
+    assert_eq!(
+        chart.harmonica.as_ref().unwrap().wind_direction_label(0, &Action::Blow),
+        "\u{2014}"
+    ); // hole=0 guard
+    assert_eq!(
+        chart.harmonica.as_ref().unwrap().wind_direction_label(11, &Action::Blow),
+        "\u{2014}"
+    ); // beyond layout
 }
 
 #[test]
 fn draw_label_returns_correct_note() {
     let chart = test_chart();
-    assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Draw), "D4");
-    assert_eq!(chart.harmonica.wind_direction_label(3, &Action::Draw), "B4");
-    assert_eq!(chart.harmonica.wind_direction_label(0, &Action::Draw), "\u{2014}");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(1, &Action::Draw), "D4");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(3, &Action::Draw), "B4");
+    assert_eq!(
+        chart.harmonica.as_ref().unwrap().wind_direction_label(0, &Action::Draw),
+        "\u{2014}"
+    );
 }
 
 #[test]
 fn hole_count_reads_holes_from_either_variant() {
-    assert_eq!(test_chart().harmonica.hole_count(), 10);
-    assert_eq!(test_chromatic_chart().harmonica.hole_count(), 12);
+    assert_eq!(test_chart().harmonica.as_ref().unwrap().hole_count(), 10);
+    assert_eq!(test_chromatic_chart().harmonica.as_ref().unwrap().hole_count(), 12);
 }
 
 fn test_chromatic_chart() -> HarpChart {
@@ -326,20 +335,20 @@ fn test_chromatic_chart() -> HarpChart {
 #[test]
 fn wind_direction_label_works_for_chromatic_too() {
     let chart = test_chromatic_chart();
-    assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Blow), "C4");
-    assert_eq!(chart.harmonica.wind_direction_label(1, &Action::Draw), "D4");
-    assert_eq!(chart.harmonica.wind_direction_label(12, &Action::Blow), "G5");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(1, &Action::Blow), "C4");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(1, &Action::Draw), "D4");
+    assert_eq!(chart.harmonica.as_ref().unwrap().wind_direction_label(12, &Action::Blow), "G5");
 }
 
 #[test]
 fn slide_label_reads_the_slide_tables_for_chromatic_only() {
     let chromatic = test_chromatic_chart();
-    assert_eq!(chromatic.harmonica.slide_label(1, &Action::Blow), "C#4");
-    assert_eq!(chromatic.harmonica.slide_label(1, &Action::Draw), "D#4");
+    assert_eq!(chromatic.harmonica.as_ref().unwrap().slide_label(1, &Action::Blow), "C#4");
+    assert_eq!(chromatic.harmonica.as_ref().unwrap().slide_label(1, &Action::Draw), "D#4");
 
     let diatonic = test_chart();
     assert_eq!(
-        diatonic.harmonica.slide_label(1, &Action::Blow),
+        diatonic.harmonica.as_ref().unwrap().slide_label(1, &Action::Blow),
         "\u{2014}",
         "diatonic harmonicas have no slide button"
     );
@@ -348,7 +357,7 @@ fn slide_label_reads_the_slide_tables_for_chromatic_only() {
 #[test]
 fn build_valid_notes_contains_blow_and_draw() {
     let chart = test_chart();
-    let notes = chart.harmonica.build_valid_notes();
+    let notes = chart.harmonica.as_ref().unwrap().build_valid_notes();
     // C4, E4, G4, C5, E5, G5, C6, E6, G6, C7
     for n in &[60u8, 64, 67, 72, 76, 79, 84, 88, 91, 96] {
         assert!(notes.contains(n), "missing blow note {n}");
@@ -362,7 +371,7 @@ fn build_valid_notes_contains_blow_and_draw() {
 #[test]
 fn build_valid_notes_includes_bend_pitches() {
     let chart = test_chart();
-    let notes = chart.harmonica.build_valid_notes();
+    let notes = chart.harmonica.as_ref().unwrap().build_valid_notes();
     // Hole 1: draw=D4(62) bends down to blow=C4(60) → C#4(61) reachable
     assert!(notes.contains(&61u8), "missing bend note C#4");
     // Hole 2: draw=G4(67) bends down to blow=E4(64) → F4(65), F#4(66) reachable
@@ -373,7 +382,7 @@ fn build_valid_notes_includes_bend_pitches() {
 #[test]
 fn build_valid_notes_excludes_unrelated_notes() {
     let chart = test_chart();
-    let notes = chart.harmonica.build_valid_notes();
+    let notes = chart.harmonica.as_ref().unwrap().build_valid_notes();
     assert!(!notes.contains(&3u8)); // D#0
     assert!(!notes.contains(&108u8)); // C8
 }
@@ -381,7 +390,7 @@ fn build_valid_notes_excludes_unrelated_notes() {
 #[test]
 fn frequency_range_spans_lowest_to_highest_valid_note() {
     let chart = test_chart();
-    let (lo, hi) = chart.harmonica.frequency_range().expect("has a layout");
+    let (lo, hi) = chart.harmonica.as_ref().unwrap().frequency_range().expect("has a layout");
     // Lowest is hole-1 blow (C4 ≈ 261.6 Hz). The top is hole 10's *overdraw*
     // (C#7 ≈ 2217 Hz), a semitone above its blow reed — once the valid set
     // includes over-techniques, the detector's search range has to reach

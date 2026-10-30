@@ -16,7 +16,6 @@
 //! foreign formats.
 
 use harmonicon_core::chart::HarpChart;
-use harmonicon_core::harp_remap::source_pitch;
 
 use crate::{ScoreError, ScoreFile, ScoreFormat, ScoreNote, ScoreTrack};
 
@@ -80,17 +79,11 @@ impl ScoreFile for HarpChartScore {
                 (None, None) => continue,
             };
             for event in &item.events {
-                // `source_pitch` rather than reading `event.note` directly:
-                // the name is the *natural reed*, and a bend or an
-                // over-technique moves the pitch off it. Getting this wrong
-                // reports the unbent note, which is a different tune.
-                let Some(midi) = source_pitch(
-                    event.hole,
-                    event.action,
-                    event.note.as_deref(),
-                    event.modifiers.as_deref().unwrap_or(&[]),
-                    &self.chart.harmonica,
-                ) else {
+                // `event_pitch` rather than reading `event.note` directly:
+                // on a harmonica the name is the *natural reed*, and a bend
+                // or an over-technique moves the pitch off it. Getting this
+                // wrong reports the unbent note, which is a different tune.
+                let Some(midi) = self.chart.event_pitch(event) else {
                     continue;
                 };
                 notes.push(ScoreNote { start_secs: start, duration_secs: item.duration, midi });

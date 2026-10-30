@@ -70,12 +70,15 @@ impl HarpChoice {
     /// gameplay is left on its untouched default path rather than routed
     /// through the remapper for no reason.
     fn matches_chart(&self, chart: &HarpChart) -> bool {
+        let Some(harp) = &chart.harmonica else {
+            return false;
+        };
         let same_kind = matches!(
-            (&chart.harmonica, self.kind),
+            (harp, self.kind),
             (Harmonica::Diatonic { .. }, HarpKind::Diatonic)
                 | (Harmonica::Chromatic { .. }, HarpKind::Chromatic)
         );
-        same_kind && detected_harp_key(&chart.harmonica).as_deref() == Some(self.key.as_str())
+        same_kind && detected_harp_key(harp).as_deref() == Some(self.key.as_str())
     }
 }
 
@@ -135,14 +138,20 @@ fn mapping_labels(loc: &Localization) -> Vec<String> {
 pub(crate) fn cost_of(chart: &HarpChart, choice: &HarpChoice) -> RemapCost {
     let target = choice.harp();
     let mut cost = RemapCost::default();
+    let Some(source) = chart.harmonica.as_ref() else {
+        return cost;
+    };
     for item in &chart.track {
         for event in &item.events {
+            let Some((hole, action)) = event.hole_action() else {
+                continue;
+            };
             cost.add(&remap_event(
-                event.hole,
-                event.action,
+                hole,
+                action,
                 event.note.as_deref(),
                 event.modifiers.as_deref().unwrap_or(&[]),
-                &chart.harmonica,
+                source,
                 &target,
                 choice.mapping,
             ));
@@ -336,13 +345,15 @@ pub(crate) fn setup_harp_check(
 
 /// Points `choice` at whatever the chart asks for.
 fn seed_choice(choice: &mut HarpChoice, chart: &HarpChart) {
-    if let Some(key) = detected_harp_key(&chart.harmonica) {
-        choice.key = key;
+    if let Some(harp) = &chart.harmonica {
+        if let Some(key) = detected_harp_key(harp) {
+            choice.key = key;
+        }
+        choice.kind = match harp {
+            Harmonica::Chromatic { .. } => HarpKind::Chromatic,
+            Harmonica::Diatonic { .. } => HarpKind::Diatonic,
+        };
     }
-    choice.kind = match chart.harmonica {
-        Harmonica::Chromatic { .. } => HarpKind::Chromatic,
-        Harmonica::Diatonic { .. } => HarpKind::Diatonic,
-    };
     choice.mapping = HarpMapping::default();
     choice.seeded = true;
 }
@@ -365,7 +376,8 @@ pub(crate) fn refresh_harp_cost(
     } else if !choice.is_changed() && !loc.is_changed() {
         return;
     }
-    let written_for = harp_name(&chart.harmonica, &loc);
+    let written_for =
+        chart.harmonica.as_ref().map(|harp| harp_name(harp, &loc)).unwrap_or_default();
     for mut label in &mut harp_labels {
         if label.0 != written_for {
             label.0.clone_from(&written_for);

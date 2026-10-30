@@ -228,7 +228,11 @@ pub fn drill_chart(
             play_mode: None,
             call: false,
             lyric: None,
-            events: vec![NoteEvent { hole: step.hole, action, note: Some(reed), modifiers }],
+            events: vec![NoteEvent {
+                note: Some(reed),
+                modifiers,
+                ..NoteEvent::hole(step.hole, action)
+            }],
         });
     }
 
@@ -257,7 +261,8 @@ pub fn drill_chart(
             pickup_ticks: None,
             repeats: Vec::new(),
         },
-        harmonica: harp.clone(),
+        harmonica: Some(harp.clone()),
+        instrument_spec: None,
         track,
         loop_section: None,
         scoring: Scoring {
@@ -352,9 +357,10 @@ fn shuffle(steps: &mut [Step], seed: u64) {
 /// What a drill event should sound, for tests and for callers that want to
 /// check a generated chart against the harp.
 pub fn sounded_pitch(event: &NoteEvent, harp: &Harmonica) -> Option<u8> {
+    let (hole, action) = event.hole_action()?;
     crate::harp_remap::source_pitch(
-        event.hole,
-        event.action,
+        hole,
+        action,
         event.note.as_deref(),
         event.modifiers.as_deref().unwrap_or(&[]),
         harp,

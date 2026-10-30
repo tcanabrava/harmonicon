@@ -256,10 +256,8 @@ fn render_scenario(
                 expr: Expr::None,
             });
             events.push(NoteEvent {
-                hole: ev.hole,
-                action: ev.action,
                 note: Some(midi_to_note(ev.midi as i32)),
-                modifiers: None,
+                ..NoteEvent::hole(ev.hole, ev.action)
             });
         }
         track.push(TrackItem {
@@ -308,7 +306,8 @@ fn render_scenario(
             pickup_ticks: None,
             repeats: Vec::new(),
         },
-        harmonica: harp.clone(),
+        harmonica: Some(harp.clone()),
+        instrument_spec: None,
         track,
         loop_section: None,
         scoring: Scoring {

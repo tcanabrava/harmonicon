@@ -68,7 +68,14 @@ fn natural_pitch<'a>(
 ) -> Cow<'a, str> {
     match event.note.as_deref() {
         Some(note) => Cow::Borrowed(note),
-        None => Cow::Owned(chart.harmonica.wind_direction_label(event.hole, &event.action)),
+        None => Cow::Owned(
+            chart
+                .harmonica
+                .as_ref()
+                .zip(event.hole_action())
+                .map(|(harp, (hole, action))| harp.wind_direction_label(hole, &action))
+                .unwrap_or_default(),
+        ),
     }
 }
 
@@ -205,8 +212,9 @@ mod tests {
             events: holes
                 .iter()
                 .map(|(hole, action)| NoteEvent {
-                    hole: *hole,
-                    action: *action,
+                    hole: Some(*hole),
+                    action: Some(*action),
+                    position: None,
                     note: None,
                     modifiers: None,
                 })

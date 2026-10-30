@@ -89,7 +89,10 @@ pub fn setup(
     // Everything the player *sees* about the instrument — lane count, the
     // hole strip's notes, the "grab a C harp" hint — follows the harp they
     // are holding, exactly as the judge does.
-    let played = effective.harp_for(chart);
+    let Some(played) = effective.harp_for(chart) else {
+        error!("entered Play 2D with a chart that names no harmonica");
+        return;
+    };
 
     // Build every note's score state up front (cheap — plain data, no
     // entities/materials yet) plus the one piece of render data that isn't

@@ -178,6 +178,7 @@ pub(crate) fn modifier_fx_key(modifier: &Modifier) -> &'static str {
         Modifier::Overblow => "overblow",
         Modifier::Overdraw => "overdraw",
         Modifier::Slide => "slide",
+        Modifier::Harmonic => "harmonic",
     }
 }
 

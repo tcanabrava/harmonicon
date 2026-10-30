@@ -166,9 +166,11 @@ pub struct EffectiveHarmonica {
 
 impl EffectiveHarmonica {
     /// The harp to actually use for `chart` — the player's choice, or the
-    /// chart's own when they haven't made one.
-    pub fn harp_for<'a>(&'a self, chart: &'a HarpChart) -> &'a Harmonica {
-        self.harp.as_ref().unwrap_or(&chart.harmonica)
+    /// chart's own when they haven't made one. `None` for a chart written
+    /// for another instrument, which the song loader keeps out of play
+    /// until that instrument has a highway (see `song::loader`).
+    pub fn harp_for<'a>(&'a self, chart: &'a HarpChart) -> Option<&'a Harmonica> {
+        self.harp.as_ref().or(chart.harmonica.as_ref())
     }
 
     /// Whether the player has chosen a harp other than the chart's.
@@ -189,7 +191,7 @@ impl EffectiveHarmonica {
         else {
             return chart_key.to_string();
         };
-        match (detected_harp_key(&chart.harmonica), detected_harp_key(played)) {
+        match (chart.harmonica.as_ref().and_then(detected_harp_key), detected_harp_key(played)) {
             (Some(from), Some(to)) => semitone(chart_key, key_offset(&to) - key_offset(&from)),
             _ => chart_key.to_string(),
         }
@@ -288,7 +290,7 @@ mod tests {
         )
         .unwrap();
         chart.song.key = key.to_string();
-        chart.harmonica = richter_harp(harp_key);
+        chart.harmonica = Some(richter_harp(harp_key));
         chart
     }
 

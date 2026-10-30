@@ -165,7 +165,9 @@ impl ValidHarpNotes {
         effective: &EffectiveHarmonica,
         chart: &HarpChart,
     ) -> (Self, PlayedHarp) {
-        let harp = effective.harp_for(chart).clone();
+        let Some(harp) = effective.harp_for(chart).cloned() else {
+            return (Self::default(), PlayedHarp(None));
+        };
         (Self(harp.build_valid_notes()), PlayedHarp(Some(harp)))
     }
 }
@@ -311,6 +313,9 @@ impl SongStats {
                 Modifier::Overblow => &mut self.overblow,
                 Modifier::Overdraw => &mut self.overdraw,
                 Modifier::Slide => &mut self.slide,
+                // A string harmonic has no harmonica technique to rank it
+                // against; it counts as a plain note here.
+                Modifier::Harmonic => &mut self.normal,
                 Modifier::Vibrato { .. } => &mut self.vibrato,
                 Modifier::WahWah { .. } => &mut self.wah,
             };
@@ -616,7 +621,7 @@ mod valid_harp_notes_tests {
         assert_eq!(valid.0, substitute.build_valid_notes());
         assert_ne!(
             valid.0,
-            chart.harmonica.build_valid_notes(),
+            chart.harmonica.as_ref().unwrap().build_valid_notes(),
             "an A harp and a C harp must not agree on which pitches are valid"
         );
         // The whole harp travels with the pitch set, so nothing downstream has
@@ -633,10 +638,10 @@ mod valid_harp_notes_tests {
         let chart = chart_in_c();
         let effective = EffectiveHarmonica::default();
         let (valid, played) = ValidHarpNotes::for_played_harp(&effective, &chart);
-        assert_eq!(valid.0, chart.harmonica.build_valid_notes());
+        assert_eq!(valid.0, chart.harmonica.as_ref().unwrap().build_valid_notes());
         assert_eq!(
             played.0.map(|harp| harp.build_valid_notes()),
-            Some(chart.harmonica.build_valid_notes())
+            Some(chart.harmonica.as_ref().unwrap().build_valid_notes())
         );
     }
 }

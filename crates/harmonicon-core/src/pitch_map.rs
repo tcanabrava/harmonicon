@@ -56,7 +56,9 @@ pub fn technique_of(modifiers: &[Modifier]) -> Technique {
             Modifier::Slide => return Technique::Slide,
             // Charts store a bend as a negative, downward offset.
             Modifier::Bend { semitones, .. } => technique = Technique::Bend(-semitones),
-            Modifier::Vibrato { .. } | Modifier::WahWah { .. } => {}
+            // A harmonic is a string's technique, and expression shapes a
+            // note rather than choosing it.
+            Modifier::Harmonic | Modifier::Vibrato { .. } | Modifier::WahWah { .. } => {}
         }
     }
     technique

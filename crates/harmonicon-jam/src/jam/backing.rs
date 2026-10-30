@@ -846,7 +846,8 @@ pub fn generated_chart(
             pickup_ticks: None,
             repeats: Vec::new(),
         },
-        harmonica,
+        harmonica: Some(harmonica),
+        instrument_spec: None,
         track: vec![TrackItem {
             id: None,
             time: Some(0.0),
@@ -858,7 +859,7 @@ pub fn generated_chart(
             play_mode: None,
             call: false,
             lyric: None,
-            events: vec![NoteEvent { hole: 1, action: Action::Blow, note: None, modifiers: None }],
+            events: vec![NoteEvent::hole(1, Action::Blow)],
         }],
         loop_section: None,
         scoring: Scoring {
@@ -1299,7 +1300,7 @@ mod tests {
     fn generated_chart_harmonica_is_a_diatonic_richter_harp_in_key_at_first_position() {
         let chart =
             generated_chart("D", 90.0, Progression::Standard, Position::First, Genre::Blues, 30.0);
-        match chart.harmonica {
+        match chart.harmonica.expect("a generated jam is a harmonica chart") {
             harmonicon_core::harmonica::Harmonica::Diatonic { holes, layout, position, .. } => {
                 assert_eq!(holes, 10);
                 let layout = layout.expect("richter_harp always sets a layout");
@@ -1315,7 +1316,7 @@ mod tests {
         // A cross-harp jam in G is played on a C harp.
         let chart =
             generated_chart("G", 90.0, Progression::Standard, Position::Second, Genre::Blues, 30.0);
-        match chart.harmonica {
+        match chart.harmonica.expect("a generated jam is a harmonica chart") {
             harmonicon_core::harmonica::Harmonica::Diatonic { layout, position, .. } => {
                 let layout = layout.expect("richter_harp always sets a layout");
                 assert_eq!(layout.blow.unwrap()[0], "C4");

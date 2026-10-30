@@ -18,7 +18,8 @@ use crate::midi::NOTE_NAMES;
 /// Electric or acoustic. They share the neck; the body changes what the
 /// detector hears (an acoustic decays faster, an unplugged electric is
 /// nearly silent), which is detection's business, not the model's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum GuitarBody {
     #[default]
     Electric,

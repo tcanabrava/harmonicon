@@ -90,7 +90,7 @@ pub fn tab_label(hole: u8, is_blow: bool, modifiers: &[Modifier]) -> String {
             }
             Modifier::Overblow | Modifier::Overdraw => s.push('o'),
             Modifier::Slide => s.push('*'),
-            Modifier::Vibrato { .. } | Modifier::WahWah { .. } => {}
+            Modifier::Harmonic | Modifier::Vibrato { .. } | Modifier::WahWah { .. } => {}
         }
     }
     s
@@ -120,12 +120,13 @@ pub fn phrase_tab_sequence(items: &[(f64, Option<&str>, &[NoteEvent])], clock: f
     items[start_idx..end_idx]
         .iter()
         .flat_map(|(_, _, events)| events.iter())
-        .map(|e| {
-            tab_label(
-                e.hole,
-                matches!(e.action, Action::Blow),
+        .filter_map(|e| {
+            let (hole, action) = e.hole_action()?;
+            Some(tab_label(
+                hole,
+                matches!(action, Action::Blow),
                 e.modifiers.as_deref().unwrap_or(&[]),
-            )
+            ))
         })
         .collect::<Vec<_>>()
         .join(" ")
@@ -386,7 +387,7 @@ mod tests {
     // ── phrase_tab_sequence ────────────────────────────────────────────────────
 
     fn note_event(hole: u8, action: Action) -> NoteEvent {
-        NoteEvent { hole, action, note: None, modifiers: None }
+        NoteEvent::hole(hole, action)
     }
 
     #[test]

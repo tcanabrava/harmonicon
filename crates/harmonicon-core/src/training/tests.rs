@@ -85,10 +85,10 @@ fn no_drill_asks_for_a_bend_deeper_than_the_hole_allows() {
                 })
                 .unwrap_or(0.0);
             assert!(
-                depth <= max_bend(&harp, event.hole),
+                depth <= max_bend(&harp, event.hole.unwrap()),
                 "{tier:?}: hole {} asked for {depth} semitones, max is {}",
-                event.hole,
-                max_bend(&harp, event.hole)
+                event.hole.unwrap(),
+                max_bend(&harp, event.hole.unwrap())
             );
         }
     }
@@ -105,9 +105,9 @@ fn high_register_training_generates_real_blow_bends() {
             if let Modifier::Bend { semitones, .. } = m { Some(*semitones) } else { None }
         });
         if let Some(semitones) = bend {
-            assert_eq!(event.action, Action::Blow);
+            assert_eq!(event.action, Some(Action::Blow));
             assert!(sounded_pitch(event, &harp).is_some());
-            saw_whole_step_ten |= event.hole == 10 && semitones == -2.0;
+            saw_whole_step_ten |= event.hole.unwrap() == 10 && semitones == -2.0;
         }
     }
     assert!(saw_whole_step_ten, "hole 10's deeper blow bend was omitted");
@@ -153,7 +153,7 @@ fn a_phrase_never_repeats_one_note_three_times() {
     for tier in Tier::ALL {
         let chart = drill(tier, &[2, 3, 4]);
         for w in chart.track.windows(3) {
-            let holes: Vec<u8> = w.iter().map(|i| i.events[0].hole).collect();
+            let holes: Vec<u8> = w.iter().map(|i| i.events[0].hole.unwrap()).collect();
             let plain = w.iter().all(|i| i.events[0].modifiers.is_none());
             assert!(
                 !(plain && holes[0] == holes[1] && holes[1] == holes[2]),
@@ -168,12 +168,12 @@ fn a_phrase_never_repeats_one_note_three_times() {
 fn the_isolating_tiers_use_one_hole_and_the_rest_use_them_all() {
     let isolate = drill(Tier::Isolate, &[2, 3, 4]);
     let holes: std::collections::HashSet<u8> =
-        isolate.track.iter().map(|i| i.events[0].hole).collect();
+        isolate.track.iter().map(|i| i.events[0].hole.unwrap()).collect();
     assert_eq!(holes.len(), 1, "isolate must not wander across holes");
 
     let vary = drill(Tier::Vary, &[2, 3, 4]);
     let holes: std::collections::HashSet<u8> =
-        vary.track.iter().map(|i| i.events[0].hole).collect();
+        vary.track.iter().map(|i| i.events[0].hole.unwrap()).collect();
     assert!(holes.len() > 1, "vary must cover more than one hole");
 }
 
@@ -191,7 +191,7 @@ fn a_bend_is_always_preceded_somewhere_by_its_own_plain_reed() {
                         let o = &other.events[0];
                         o.hole == e.hole && o.modifiers.is_none()
                     }),
-                    "{tier:?}: hole {} is bent but never played plain",
+                    "{tier:?}: hole {:?} is bent but never played plain",
                     e.hole
                 );
             }
@@ -239,7 +239,10 @@ fn the_same_seed_gives_the_same_exercise() {
     let a = drill_chart(&spec(Tier::Interleave, &[2, 3, 4]), &harp, "D", "T").unwrap();
     let b = drill_chart(&spec(Tier::Interleave, &[2, 3, 4]), &harp, "D", "T").unwrap();
     let holes = |c: &HarpChart| -> Vec<(u8, bool)> {
-        c.track.iter().map(|i| (i.events[0].hole, i.events[0].modifiers.is_some())).collect()
+        c.track
+            .iter()
+            .map(|i| (i.events[0].hole.unwrap(), i.events[0].modifiers.is_some()))
+            .collect()
     };
     assert_eq!(holes(&a), holes(&b));
 }
@@ -256,7 +259,7 @@ fn a_different_seed_gives_a_different_order() {
             .unwrap()
             .track
             .iter()
-            .map(|i| (i.events[0].hole, i.events[0].modifiers.is_some()))
+            .map(|i| (i.events[0].hole.unwrap(), i.events[0].modifiers.is_some()))
             .collect()
     };
     assert_ne!(holes(&one), holes(&two));

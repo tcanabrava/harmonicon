@@ -313,6 +313,11 @@ pub fn build_scheduled_notes(
     let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
     let mut flags = flags.into_iter();
     let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
+    // Scored play schedules harmonica charts; the song loader keeps any
+    // other instrument's out of play until it has a highway.
+    let Some(chart_harp) = chart.harmonica.as_ref() else {
+        return (Vec::new(), Vec::new());
+    };
     for item in &chart.track {
         let t = resolve_item_time(item, &chart.timing);
         let tag = play_mode_label(item.play_mode.as_ref());
@@ -324,7 +329,10 @@ pub fn build_scheduled_notes(
         let event_data: Vec<(u8, Action, Vec<Modifier>, Option<u8>, bool)> = item
             .events
             .iter()
-            .map(|event| {
+            .filter_map(|event| {
+                // Validation guarantees every event of a harmonica chart
+                // names a hole and breath.
+                let (hole, action) = event.hole_action()?;
                 let modifiers = event.modifiers.clone().unwrap_or_default();
                 match &effective.harp {
                     // The overwhelmingly common case, kept on exactly the
@@ -336,23 +344,24 @@ pub fn build_scheduled_notes(
                     // encodes pitches (an overblow's, a slide's) that a
                     // blow/draw layout lookup cannot reproduce.
                     None => {
-                        let natural_pitch = event.note.clone().unwrap_or_else(|| {
-                            chart.harmonica.wind_direction_label(event.hole, &event.action)
-                        });
+                        let natural_pitch = event
+                            .note
+                            .clone()
+                            .unwrap_or_else(|| chart_harp.wind_direction_label(hole, &action));
                         let expected_pitch = target_pitch(&natural_pitch, &modifiers);
-                        (event.hole, event.action, modifiers, expected_pitch, true)
+                        Some((hole, action, modifiers, expected_pitch, true))
                     }
                     Some(target) => {
                         let r = harp_remap::remap_event(
-                            event.hole,
-                            event.action,
+                            hole,
+                            action,
                             event.note.as_deref(),
                             &modifiers,
-                            &chart.harmonica,
+                            chart_harp,
                             target,
                             effective.mapping,
                         );
-                        (r.hole, r.action, r.modifiers, r.midi, r.playable)
+                        Some((r.hole, r.action, r.modifiers, r.midi, r.playable))
                     }
                 }
             })

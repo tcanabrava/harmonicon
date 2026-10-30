@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 
 use harmonicon_core::chart::Action;
-use harmonicon_core::harmonica::{Position, detected_harp_key, progression_bars};
+use harmonicon_core::harmonica::{Harmonica, Position, detected_harp_key, progression_bars};
 
 use harmonicon_app::app::{EffectiveHarmonica, JamProgression, JamScale, SelectedSong};
 use harmonicon_audio::AudioSettings;
@@ -115,13 +115,16 @@ pub fn setup(
     // authored for e.g. a major-pentatonic melody); otherwise `JamScale`
     // decides — `FirstPosition` (the blues hexatonic) unless "Generate Jam"
     // or a jam-based lesson picked something else.
-    let scale = chart.harmonica.scale().unwrap_or(jam_scale.0);
+    let scale = chart.harmonica.as_ref().and_then(Harmonica::scale).unwrap_or(jam_scale.0);
     // The hole map, the overlay diagram and the "grab a C harp" hint all
     // describe the harp the player is *holding* — the harp-check page runs
     // before a jam too, and a substituted harp has other notes in the same
     // holes. The backing stays in the chart's key regardless: a jam has no
     // tab to transpose, only holes to name.
-    let harp = effective.harp_for(chart);
+    let Some(harp) = effective.harp_for(chart) else {
+        error!("entered Jam Session with a chart that names no harmonica");
+        return;
+    };
     let (holes_info, guide) = build_hole_guide(harp, key, progression, scale);
 
     // Which physical harp to grab: a Richter harp's key is its hole-1 blow note.
@@ -130,7 +133,8 @@ pub fn setup(
     // Same detection, bare (no banner sentence), plus whichever position the
     // chart itself declares — for the live position compass below.
     let harp_key = detected_harp_key(harp);
-    let position = chart.harmonica.position().and_then(Position::from_label);
+    let position =
+        chart.harmonica.as_ref().and_then(Harmonica::position).and_then(Position::from_label);
 
     commands
         .spawn((
@@ -503,11 +507,14 @@ pub fn setup(
         .iter()
         .flat_map(|item| {
             let time = resolve_item_time(item, &chart.timing);
-            item.events.iter().map(move |ev| NoteMarker {
-                time,
-                duration: item.duration,
-                hole: ev.hole,
-                is_blow: matches!(ev.action, Action::Blow),
+            item.events.iter().filter_map(move |ev| {
+                let (hole, action) = ev.hole_action()?;
+                Some(NoteMarker {
+                    time,
+                    duration: item.duration,
+                    hole,
+                    is_blow: matches!(action, Action::Blow),
+                })
             })
         })
         .collect();

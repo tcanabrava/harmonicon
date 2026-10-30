@@ -84,8 +84,8 @@ fn every_converted_note_sounds_the_pitch_it_came_from() {
     for (item, expected) in chart.track.iter().zip(&kept) {
         let event = &item.events[0];
         let sounded = source_pitch(
-            event.hole,
-            event.action,
+            event.hole.unwrap(),
+            event.action.unwrap(),
             event.note.as_deref(),
             event.modifiers.as_deref().unwrap_or(&[]),
             &harp,
