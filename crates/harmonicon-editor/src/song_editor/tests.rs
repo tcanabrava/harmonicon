@@ -1357,6 +1357,22 @@ fn content_charts() -> Vec<std::path::PathBuf> {
         charts_below(&dir, &mut paths);
     }
     assert!(!paths.is_empty(), "no charts found under {}", repo.display());
+    // The editor's rows are harmonica holes, so it refuses another
+    // instrument's chart outright rather than misreading it; such a chart
+    // has nothing to round-trip. Each one left out must really be refused.
+    paths.retain(|path| {
+        let text = std::fs::read_to_string(path).unwrap_or_default();
+        let other_instrument = serde_json::from_str::<serde_json::Value>(&text)
+            .is_ok_and(|chart| chart.get("instrument").is_some());
+        if other_instrument {
+            assert!(
+                validated_harpchart(&text).is_err(),
+                "{} names another instrument, yet the editor opened it",
+                path.display()
+            );
+        }
+        !other_instrument
+    });
     paths
 }
 
