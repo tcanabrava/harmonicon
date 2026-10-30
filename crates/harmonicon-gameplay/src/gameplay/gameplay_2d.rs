@@ -296,11 +296,7 @@ pub fn setup(
     spawn_score_readout(
         &mut commands,
         highway,
-        ScoreReadoutAnchor {
-            left: Val::Percent(0.0),
-            width: Val::Percent(100.0),
-            bottom: Val::Percent(HIT_H_PCT),
-        },
+        score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis)),
     );
 
     spawn_song_progress(
@@ -490,6 +486,24 @@ pub fn spawn_visible_notes(
             );
         }
     });
+}
+
+/// Where the score readout sits on the highway: just above the hit line on a
+/// vertical highway, and along the bottom edge past it on a horizontal one,
+/// whose hit zone is a column at the left holding the string names.
+fn score_anchor(axis: ScrollAxis) -> ScoreReadoutAnchor {
+    match axis {
+        ScrollAxis::Vertical => ScoreReadoutAnchor {
+            left: Val::Percent(0.0),
+            width: Val::Percent(100.0),
+            bottom: Val::Percent(HIT_H_PCT),
+        },
+        ScrollAxis::Horizontal => ScoreReadoutAnchor {
+            left: Val::Percent(HIT_H_PCT),
+            width: Val::Percent(100.0 - HIT_H_PCT),
+            bottom: Val::Percent(0.0),
+        },
+    }
 }
 
 /// The lane `note` is drawn in.
@@ -1027,6 +1041,17 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The readout must stay clear of a horizontal highway's hit zone, which
+    /// holds the string names.
+    #[test]
+    fn the_score_readout_clears_the_hit_zone_on_either_axis() {
+        let vertical = score_anchor(ScrollAxis::Vertical);
+        assert_eq!(vertical.bottom, Val::Percent(HIT_H_PCT));
+        let horizontal = score_anchor(ScrollAxis::Horizontal);
+        assert_eq!(horizontal.left, Val::Percent(HIT_H_PCT));
+        assert_eq!(horizontal.width, Val::Percent(100.0 - HIT_H_PCT));
     }
 
     #[test]
