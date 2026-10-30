@@ -196,6 +196,33 @@ and never asks which instrument it is.
 
 ## Song Editor
 
+The document seam is implemented: `GridNote` stores identity, timing,
+expression and core's `NoteTarget`, with no hole/string/fret fields.
+`NoteTarget::Sounding` preserves a sounding pitch and optionally pins an
+authored placement; `Positioned` preserves a physical instruction across
+instrument tuning changes. Existing harmonica editing uses `Positioned` to
+keep its current same-hole key-change behaviour. This makes the distinction
+explicit without duplicating a pitch that can go stale after retuning.
+
+The current harmonica view uses `harmonica_note.rs`; geometry receives a
+visual row, and audio resolves notes through `InstrumentModel`. Core tests
+exercise alternate guitar placements without changing sounding pitch and
+reject invalid authored assignments. Automatic placement supplies candidates
+to a sequence solver and never rewrites the document during rendering.
+
+The editor state now holds one `InstrumentSelection`, tracked by undo and
+grid invalidation. It resolves a preset or a configured core `Instrument`;
+configured instruments retain their tuning when the song key changes.
+
+Still open: expose instrument selection in the UI and generalize the chart codec, provide a
+pitch-row fallback and guitar tab controls, and make edit validation report
+unresolved/pinned placement conflicts. Keep the editor's guitar load gate
+until those paths round-trip safely. Future flute and clarinet adapters must
+keep written notation separate from sounding pitch and preserve alternate
+fingerings; hurdy-gurdy support additionally needs voice roles and rhythmic
+events rather than forcing every instruction into one pitched lane.
+
+
 - **Rows come from the instrument.** Harmonica: holes × direction, as
   today. Guitar: 6 tab rows with the fret number drawn on each note. Flute:
   a monophonic piano roll.

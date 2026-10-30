@@ -16,8 +16,8 @@ use super::snap::{
     GridlineKind, off_beat_labels, snap_absolute_tick, snap_tick_in_beat, sub_beat_gridlines,
 };
 use super::state::{
-    DragKind, DragState, EditorState, Expr, GridNote, Mode, Pitch, enforce_direction, enforce_expr,
-    move_target, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
+    DragKind, DragState, EditorState, Expr, GridNote, HarpTechnique, Mode, enforce_direction,
+    enforce_expr, move_target, note_rect, pitch_color, pitch_compatible, pitch_deny_key,
 };
 use super::ui::{GridContent, GridItem, NoteView};
 use super::{
@@ -630,13 +630,13 @@ pub(super) fn group_move_targets(
     hole_delta: i32,
     tick_delta: i32,
     hole_count: u8,
-) -> Vec<(u32, u8, usize, usize, Pitch)> {
+) -> Vec<(u32, u8, usize, usize, HarpTechnique)> {
     others
         .iter()
         .map(|n| {
-            let hole = (n.hole as i32 + hole_delta).clamp(1, hole_count as i32) as u8;
+            let hole = (n.hole() as i32 + hole_delta).clamp(1, hole_count as i32) as u8;
             let tick = (n.tick as i32 + tick_delta).max(0) as usize;
-            (n.id, hole, tick, n.len, n.pitch)
+            (n.id, hole, tick, n.len, n.technique())
         })
         .collect()
 }
@@ -650,13 +650,13 @@ pub(super) fn group_move_valid(
     notes: &[GridNote],
     harp: &Harmonica,
     moving_ids: &[u32],
-    targets: &[(u32, u8, usize, usize, Pitch)],
+    targets: &[(u32, u8, usize, usize, HarpTechnique)],
 ) -> bool {
     targets.iter().all(|&(_, hole, tick, len, pitch)| {
         pitch_compatible(pitch, harp, hole)
             && !notes.iter().any(|n| {
                 !moving_ids.contains(&n.id)
-                    && n.hole == hole
+                    && n.hole() == hole
                     && n.tick < tick + len
                     && tick < n.tick + n.len
             })
@@ -672,7 +672,7 @@ pub(super) fn spawn_note(
     locked: bool,
     in_scale: bool,
 ) -> Entity {
-    let (left, top, width, height) = note_rect(&note);
+    let (left, top, width, height) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { colors.accent } else { Color::NONE };
     let id = note.id;
@@ -779,8 +779,8 @@ pub(super) fn spawn_note(
                     .notes
                     .iter()
                     .find(|n| n.id == id)
-                    .map(|n| n.pitch)
-                    .unwrap_or(Pitch::Normal);
+                    .map(|n| n.technique())
+                    .unwrap_or(HarpTechnique::Normal);
                 let harp = state.effective_harp();
                 let pitch_ok = pitch_compatible(pitch, &harp, hole);
                 // The anchor and the rest of the group (if any) are checked
@@ -843,12 +843,14 @@ pub(super) fn spawn_note(
 
     match note.expr {
         Expr::None => {
-            commands.entity(root).insert(BackgroundColor(note_color(pitch_color(note.pitch))));
+            commands
+                .entity(root)
+                .insert(BackgroundColor(note_color(pitch_color(note.technique()))));
         }
         Expr::Wah(_) | Expr::Vibrato(_) => {
             let mode = if matches!(note.expr, Expr::Vibrato(_)) { 0.0 } else { 1.0 };
             let mat = note_mats.add(EditorNoteMaterial {
-                color: note_color(pitch_color(note.pitch)).to_linear(),
+                color: note_color(pitch_color(note.technique())).to_linear(),
                 params: Vec4::new(mode, width, 0.0, 0.0),
             });
             commands.entity(root).insert(MaterialNode(mat));
@@ -857,7 +859,7 @@ pub(super) fn spawn_note(
 
     commands.entity(root).with_children(|r| {
         r.spawn_empty().apply_scene(bsn! {
-            Text({note.dir.arrow()})
+            Text({note.dir().arrow()})
             TextFont { font_size: {FontSize::Px(15.0)} }
             TextColor({Color::WHITE})
             ~{Pickable::IGNORE}

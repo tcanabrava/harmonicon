@@ -4,7 +4,8 @@ use bevy::prelude::*;
 
 use super::save_feedback::SaveFeedback;
 use super::state::{
-    Dir, EditorState, Expr, GridNote, HarmonicaKind, LoadedHarmonica, POSITIONS, Pitch, Scroll,
+    Dir, EditorState, Expr, GridNote, HarmonicaKind, HarpTechnique, LoadedHarmonica, POSITIONS,
+    Scroll,
 };
 use super::{LOAD_PURPOSE, MUSIC_PURPOSE, SAVE_PURPOSE, TICKS_PER_BEAT};
 use harmonicon_core::chart::{
@@ -25,15 +26,15 @@ use harmonicon_ui::dialogs::file_dialog::FileChosen;
 /// editor actually plays; overblow/overdraw resolve via [`hole_notes`],
 /// which knows overblow sits above the *draw* reed on holes 1/4/5/6.
 fn note_name_for(n: &GridNote, harp: &Harmonica) -> String {
-    let action = n.dir.action();
-    let label = match n.pitch {
-        Pitch::Normal => harp.wind_direction_label(n.hole, &action),
-        Pitch::Slide => harp.slide_label(n.hole, &action),
-        Pitch::Overblow | Pitch::Overdraw => {
-            hole_notes(harp, n.hole).over.unwrap_or_else(|| "C4".to_string())
+    let action = n.dir().action();
+    let label = match n.technique() {
+        HarpTechnique::Normal => harp.wind_direction_label(n.hole(), &action),
+        HarpTechnique::Slide => harp.slide_label(n.hole(), &action),
+        HarpTechnique::Overblow | HarpTechnique::Overdraw => {
+            hole_notes(harp, n.hole()).over.unwrap_or_else(|| "C4".to_string())
         }
-        Pitch::Bend(a) => {
-            let base = harp.wind_direction_label(n.hole, &action);
+        HarpTechnique::Bend(a) => {
+            let base = harp.wind_direction_label(n.hole(), &action);
             let midi = note_to_midi(&base).unwrap_or(60);
             return midi_to_note((midi as f32 - a).round() as i32);
         }
@@ -97,20 +98,20 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
                         .get(&n.id)
                         .and_then(|value| value.parse::<f64>().ok())
                         .unwrap_or(0.5);
-                    let action = match n.dir {
+                    let action = match n.dir() {
                         Dir::Blow => "blow",
                         Dir::Draw => "draw",
                     };
                     let note_name = note_name_for(n, &harp);
                     let mut modifiers: Vec<Value> = Vec::new();
-                    match n.pitch {
-                        Pitch::Bend(a) => {
+                    match n.technique() {
+                        HarpTechnique::Bend(a) => {
                             modifiers.push(json!({ "type": "bend", "semitones": -(a as f64) }));
                         }
-                        Pitch::Overblow => modifiers.push(json!({ "type": "overblow" })),
-                        Pitch::Overdraw => modifiers.push(json!({ "type": "overdraw" })),
-                        Pitch::Slide => modifiers.push(json!({ "type": "slide" })),
-                        Pitch::Normal => {}
+                        HarpTechnique::Overblow => modifiers.push(json!({ "type": "overblow" })),
+                        HarpTechnique::Overdraw => modifiers.push(json!({ "type": "overdraw" })),
+                        HarpTechnique::Slide => modifiers.push(json!({ "type": "slide" })),
+                        HarpTechnique::Normal => {}
                     }
                     match n.expr {
                         Expr::Vibrato(hz) => modifiers.push(
@@ -122,7 +123,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
                         Expr::None => {}
                     }
                     let mut event = json!({
-                        "hole": n.hole,
+                        "hole": n.hole(),
                         "action": action,
                         "note": note_name,
                     });
@@ -172,7 +173,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     // here (the physical instrument to grab), but a straight/1st-position
     // song's layout now actually matches its key instead of always reading
     // as a plain, untransposed C harp.
-    let harmonica = match state.harmonica_kind {
+    let harmonica = match state.harmonica_kind() {
         HarmonicaKind::Diatonic
         | HarmonicaKind::CountryTuned
         | HarmonicaKind::PaddyRichter
@@ -183,7 +184,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
                 }
                 _ => (&[][..], &[][..]),
             };
-            let bending_profile = match state.harmonica_kind {
+            let bending_profile = match state.harmonica_kind() {
                 HarmonicaKind::Diatonic => "richter_standard",
                 HarmonicaKind::PaddyRichter => "paddy_richter",
                 HarmonicaKind::CountryTuned => "country_tuned",
@@ -340,18 +341,18 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
 
 // ── Parsing ───────────────────────────────────────────────────────────────────
 
-pub(super) fn parse_pitch_expr(modifiers: &[serde_json::Value]) -> (Pitch, Expr) {
-    let mut pitch = Pitch::Normal;
+pub(super) fn parse_pitch_expr(modifiers: &[serde_json::Value]) -> (HarpTechnique, Expr) {
+    let mut pitch = HarpTechnique::Normal;
     let mut expr = Expr::None;
     for m in modifiers {
         match m["type"].as_str().unwrap_or("") {
             "bend" => {
                 let s = m["semitones"].as_f64().unwrap_or(0.0) as f32;
-                pitch = Pitch::Bend(-s);
+                pitch = HarpTechnique::Bend(-s);
             }
-            "overblow" => pitch = Pitch::Overblow,
-            "overdraw" => pitch = Pitch::Overdraw,
-            "slide" => pitch = Pitch::Slide,
+            "overblow" => pitch = HarpTechnique::Overblow,
+            "overdraw" => pitch = HarpTechnique::Overdraw,
+            "slide" => pitch = HarpTechnique::Slide,
             // Default to the old fixed rates for charts saved before
             // `oscillation_hz` was per-note; clamp away non-positive/absurd
             // values so a hand-edited chart can't divide-by-zero the preview
@@ -457,8 +458,7 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     if let Ok(scale) = serde_json::from_value::<Scale>(v["harmonica"]["scale"].clone()) {
         state.scale = scale;
     }
-    state.harmonica_kind = match (v["harmonica"]["type"].as_str(), v["harmonica"]["holes"].as_u64())
-    {
+    let kind = match (v["harmonica"]["type"].as_str(), v["harmonica"]["holes"].as_u64()) {
         (Some("chromatic"), Some(16)) => HarmonicaKind::Chromatic16,
         (Some("chromatic"), _) => HarmonicaKind::Chromatic,
         _ => match v["harmonica"]["bending_profile"].as_str() {
@@ -468,9 +468,16 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
             _ => HarmonicaKind::Diatonic,
         },
     };
-    state.loaded_harmonica = serde_json::from_value::<Harmonica>(v["harmonica"].clone())
+    state.instrument = serde_json::from_value::<Harmonica>(v["harmonica"].clone())
         .ok()
-        .map(|harp| LoadedHarmonica { key: state.key.clone(), kind: state.harmonica_kind, harp });
+        .map(|harp| {
+            crate::song_editor::state::InstrumentSelection::loaded_harp(LoadedHarmonica {
+                key: state.key.clone(),
+                kind,
+                harp,
+            })
+        })
+        .unwrap_or(crate::song_editor::state::InstrumentSelection::HarmonicaPreset(kind));
     if let Some(meta) = v.get("metadata")
         && let Some(audio) = meta["audio_file"].as_str()
         && !audio.is_empty()
@@ -636,7 +643,13 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
                 {
                     state.expression_intensities.insert(next_id, intensity.to_string());
                 }
-                notes.push(GridNote { id: next_id, hole, tick: start_tick, len, dir, pitch, expr });
+                notes.push(GridNote {
+                    id: next_id,
+                    tick: start_tick,
+                    len,
+                    expr,
+                    target: GridNote::harmonica_target(hole, dir, pitch),
+                });
                 next_id += 1;
             }
         }

@@ -73,17 +73,23 @@ pub(super) fn audition_on_select(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::song_editor::state::{Dir, Expr, Pitch};
+    use crate::song_editor::state::{Dir, Expr, HarpTechnique};
     use harmonicon_core::harmonica::richter_harp;
 
-    fn note(hole: u8, dir: Dir, pitch: Pitch) -> GridNote {
-        GridNote { id: 1, hole, tick: 0, len: 4, dir, pitch, expr: Expr::None }
+    fn note(hole: u8, dir: Dir, pitch: HarpTechnique) -> GridNote {
+        GridNote {
+            id: 1,
+            tick: 0,
+            len: 4,
+            expr: Expr::None,
+            target: GridNote::harmonica_target(hole, dir, pitch),
+        }
     }
 
     #[test]
     fn audition_wav_renders_something_audible_for_a_playable_note() {
         let harp = richter_harp("C");
-        let wav = audition_wav(&note(4, Dir::Blow, Pitch::Normal), &harp).unwrap();
+        let wav = audition_wav(&note(4, Dir::Blow, HarpTechnique::Normal), &harp).unwrap();
         // A real WAV: header plus a nonzero amount of sample data.
         assert!(wav.len() > 44);
     }
@@ -96,7 +102,7 @@ mod tests {
         // is `None` for any hole outside 1/4/5/6/7–10) — so this checks
         // `audition_wav` defends itself against an unproducible note
         // rather than assuming a caller only ever passes it a valid one.
-        let unplayable = note(2, Dir::Blow, Pitch::Overblow);
+        let unplayable = note(2, Dir::Blow, HarpTechnique::Overblow);
         assert_eq!(audition_wav(&unplayable, &harp), None);
     }
 }

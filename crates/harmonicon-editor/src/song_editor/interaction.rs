@@ -13,10 +13,10 @@ use super::grid::group_move_targets;
 use super::material::EditorNoteMaterial;
 use super::snap::snap_absolute_tick;
 use super::state::{
-    DEFAULT_INTENSITY, Dir, DragKind, DragState, Edge, EditorState, Expr, GridNote, Pitch, Scroll,
-    TimelineSelection, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN, VIBRATO_HZ_STEP, WAH_HZ_MAX, WAH_HZ_MIN,
-    WAH_HZ_STEP, apply_resize, enforce_direction, enforce_expr, max_bend, note_rect, overblow_ok,
-    overdraw_ok, pitch_compatible, pitch_forced_dir,
+    DEFAULT_INTENSITY, Dir, DragKind, DragState, Edge, EditorState, Expr, GridNote, HarpTechnique,
+    Scroll, TimelineSelection, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN, VIBRATO_HZ_STEP, WAH_HZ_MAX,
+    WAH_HZ_MIN, WAH_HZ_STEP, apply_resize, enforce_direction, enforce_expr, max_bend, note_rect,
+    overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{
     GridArea, GridContent, GroupMoveGhost, ModButton, MoveGhost, NoteView, ResizeGrip,
@@ -42,14 +42,14 @@ pub(super) fn shift_held(keyboard: &ButtonInput<KeyCode>) -> bool {
 
 pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     if let Some(existing) =
-        state.notes.iter().find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
+        state.notes.iter().find(|n| n.hole() == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.select_only(existing.id);
         return;
     }
 
     let next_start =
-        state.notes.iter().filter(|n| n.hole == hole && n.tick > tick).map(|n| n.tick).min();
+        state.notes.iter().filter(|n| n.hole() == hole && n.tick > tick).map(|n| n.tick).min();
 
     let len = next_start.map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT)).max(1);
 
@@ -66,7 +66,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     let pitch = if pitch_compatible(state.sticky_pitch, &state.effective_harp(), hole) {
         state.sticky_pitch
     } else {
-        Pitch::Normal
+        HarpTechnique::Normal
     };
     // Overblow/Overdraw physically require a specific breath direction
     // (see `pitch_forced_dir`) — that always wins, even over whatever's
@@ -79,7 +79,13 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 
     let id = state.next_id;
     state.next_id += 1;
-    state.notes.push(GridNote { id, hole, tick, len, dir, pitch, expr });
+    state.notes.push(GridNote {
+        id,
+        tick,
+        len,
+        expr,
+        target: GridNote::harmonica_target(hole, dir, pitch),
+    });
     state.select_only(id);
     // A chord note whose direction was forced (above), or that's carrying
     // an armed sticky expr, must pull any simultaneous notes on other
@@ -107,7 +113,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 /// to "add" a freshly-placed note to.
 pub(super) fn select_or_add_ctrl(state: &mut EditorState, hole: u8, tick: usize) {
     if let Some(existing) =
-        state.notes.iter().find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
+        state.notes.iter().find(|n| n.hole() == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.toggle_selected(existing.id);
         return;
@@ -174,13 +180,13 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         // clear it rather than leave e.g. "overblow" armed alongside Draw.
         state.sticky_dir = dir;
         if pitch_forced_dir(state.sticky_pitch).is_some_and(|d| d != dir) {
-            state.sticky_pitch = Pitch::Normal;
+            state.sticky_pitch = HarpTechnique::Normal;
         }
         for id in state.selected.clone() {
             if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
-                n.dir = dir;
-                if pitch_forced_dir(n.pitch).is_some_and(|d| d != dir) {
-                    n.pitch = Pitch::Normal;
+                n.set_dir(dir);
+                if pitch_forced_dir(n.technique()).is_some_and(|d| d != dir) {
+                    n.set_technique(HarpTechnique::Normal);
                 }
             }
             enforce_direction(state, id);
@@ -224,16 +230,16 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                 return;
             };
             for n in state.notes.iter_mut().filter(|n| ids.contains(&n.id)) {
-                if target == Pitch::Normal {
+                if target == HarpTechnique::Normal {
                     // Switching a technique off clears it where it is,
                     // and leaves every other note's technique alone.
-                    if same_technique(kind, n.pitch) {
-                        n.pitch = Pitch::Normal;
+                    if same_technique(kind, n.technique()) {
+                        n.set_technique(HarpTechnique::Normal);
                     }
-                } else if pitch_fits(target, n.hole, &harp) {
-                    n.pitch = target;
+                } else if pitch_fits(target, n.hole(), &harp) {
+                    n.set_technique(target);
                     if let Some(dir) = pitch_forced_dir(target) {
-                        n.dir = dir;
+                        n.set_dir(dir);
                     }
                 } else {
                     skipped += 1;
@@ -262,9 +268,9 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
 pub(super) fn apply_sticky_modifier(state: &mut EditorState, kind: ModButton) {
     match kind {
         ModButton::Bend => cycle_sticky_bend(state),
-        ModButton::Overblow => cycle_sticky_pitch(state, Pitch::Overblow),
-        ModButton::Overdraw => cycle_sticky_pitch(state, Pitch::Overdraw),
-        ModButton::Slide => cycle_sticky_pitch(state, Pitch::Slide),
+        ModButton::Overblow => cycle_sticky_pitch(state, HarpTechnique::Overblow),
+        ModButton::Overdraw => cycle_sticky_pitch(state, HarpTechnique::Overdraw),
+        ModButton::Slide => cycle_sticky_pitch(state, HarpTechnique::Slide),
         ModButton::Wah | ModButton::Vibrato => {
             state.sticky_expr = next_expr(kind, state.sticky_expr);
         }
@@ -302,45 +308,49 @@ pub(super) fn next_pitch(
     anchor: &GridNote,
     selected: &[GridNote],
     harp: &Harmonica,
-) -> Option<Pitch> {
-    let toggle = |pitch: Pitch| {
-        if anchor.pitch == pitch { Pitch::Normal } else { pitch }
+) -> Option<HarpTechnique> {
+    let toggle = |pitch: HarpTechnique| {
+        if anchor.technique() == pitch { HarpTechnique::Normal } else { pitch }
     };
     Some(match kind {
         ModButton::Bend => {
-            let cap = selected.iter().map(|n| max_bend(harp, n.hole)).fold(0.0, f32::max);
+            let cap = selected.iter().map(|n| max_bend(harp, n.hole())).fold(0.0, f32::max);
             if cap <= 0.0 {
                 return None;
             }
             let next = anchor.bend() + 0.5;
-            if next > cap + f32::EPSILON { Pitch::Normal } else { Pitch::Bend(next) }
+            if next > cap + f32::EPSILON {
+                HarpTechnique::Normal
+            } else {
+                HarpTechnique::Bend(next)
+            }
         }
-        ModButton::Overblow => toggle(Pitch::Overblow),
-        ModButton::Overdraw => toggle(Pitch::Overdraw),
-        ModButton::Slide => toggle(Pitch::Slide),
+        ModButton::Overblow => toggle(HarpTechnique::Overblow),
+        ModButton::Overdraw => toggle(HarpTechnique::Overdraw),
+        ModButton::Slide => toggle(HarpTechnique::Slide),
         _ => return None,
     })
 }
 
 /// Whether `pitch` is the technique `kind` switches — what switching it off
 /// clears.
-fn same_technique(kind: ModButton, pitch: Pitch) -> bool {
+fn same_technique(kind: ModButton, pitch: HarpTechnique) -> bool {
     match kind {
-        ModButton::Bend => matches!(pitch, Pitch::Bend(_)),
-        ModButton::Overblow => pitch == Pitch::Overblow,
-        ModButton::Overdraw => pitch == Pitch::Overdraw,
-        ModButton::Slide => pitch == Pitch::Slide,
+        ModButton::Bend => matches!(pitch, HarpTechnique::Bend(_)),
+        ModButton::Overblow => pitch == HarpTechnique::Overblow,
+        ModButton::Overdraw => pitch == HarpTechnique::Overdraw,
+        ModButton::Slide => pitch == HarpTechnique::Slide,
         _ => false,
     }
 }
 
 /// Whether a note on `hole` can play `pitch`.
-pub(super) fn pitch_fits(pitch: Pitch, hole: u8, harp: &Harmonica) -> bool {
+pub(super) fn pitch_fits(pitch: HarpTechnique, hole: u8, harp: &Harmonica) -> bool {
     match pitch {
-        Pitch::Bend(depth) => depth <= max_bend(harp, hole) + f32::EPSILON,
-        Pitch::Overblow => overblow_ok(hole),
-        Pitch::Overdraw => overdraw_ok(hole),
-        Pitch::Slide | Pitch::Normal => true,
+        HarpTechnique::Bend(depth) => depth <= max_bend(harp, hole) + f32::EPSILON,
+        HarpTechnique::Overblow => overblow_ok(hole),
+        HarpTechnique::Overdraw => overdraw_ok(hole),
+        HarpTechnique::Slide | HarpTechnique::Normal => true,
     }
 }
 
@@ -377,23 +387,23 @@ pub(super) fn deepest_bend(harp: &Harmonica) -> f32 {
 /// once a note actually gets placed.
 pub(super) fn cycle_sticky_bend(state: &mut EditorState) {
     let current = match state.sticky_pitch {
-        Pitch::Bend(depth) => depth,
+        HarpTechnique::Bend(depth) => depth,
         _ => 0.0,
     };
     let next = current + 0.5;
     state.sticky_pitch = if next > deepest_bend(&state.effective_harp()) + f32::EPSILON {
-        Pitch::Normal
+        HarpTechnique::Normal
     } else {
-        Pitch::Bend(next)
+        HarpTechnique::Bend(next)
     };
 }
 
-/// Toggles `sticky_pitch` between `Pitch::Normal` and `pitch` — the
+/// Toggles `sticky_pitch` between `HarpTechnique::Normal` and `pitch` — the
 /// hole-free sticky-only equivalent of the selected-note Overblow/
 /// Overdraw/Slide toggles below (which additionally gate on the selected
 /// note's own hole via `overblow_ok`/`overdraw_ok`).
-pub(super) fn cycle_sticky_pitch(state: &mut EditorState, pitch: Pitch) {
-    state.sticky_pitch = if state.sticky_pitch == pitch { Pitch::Normal } else { pitch };
+pub(super) fn cycle_sticky_pitch(state: &mut EditorState, pitch: HarpTechnique) {
+    state.sticky_pitch = if state.sticky_pitch == pitch { HarpTechnique::Normal } else { pitch };
     // Arming Overblow/Overdraw with nothing selected must arm the
     // direction it requires too — otherwise a subsequently placed note
     // could still end up with e.g. `sticky_pitch: Overblow` alongside a
@@ -539,7 +549,7 @@ pub(super) fn handle_undo_redo(
 /// That one note trades part of its body for the grip; every other note
 /// keeps all of it.
 pub(super) fn resize_grip_position(note: &GridNote, edge: Edge) -> (f32, f32) {
-    let (left, top, width, height) = note_rect(note);
+    let (left, top, width, height) = note_rect(note, usize::from(note.hole().saturating_sub(1)));
     let x = match edge {
         Edge::Left => (left - GRIP_D).max(0.0),
         Edge::Right => left + width,
@@ -601,7 +611,7 @@ pub(super) fn spawn_resize_grips(
                     let mut left_bound = 0usize;
                     let mut right_bound: Option<usize> = None;
                     for n in &state.notes {
-                        if n.id == id || n.hole != hole {
+                        if n.id == id || n.hole() != hole {
                             continue;
                         }
                         if n.tick < drag.start_tick {
@@ -713,7 +723,7 @@ pub(super) fn live_resize(
     let Some(note) = state.note_by_id(drag.id) else {
         return;
     };
-    let (left, _top, width, _height) = note_rect(note);
+    let (left, _top, width, _height) = note_rect(note, usize::from(note.hole().saturating_sub(1)));
     for (view, mut node, mat) in &mut notes {
         if view.0 == drag.id {
             node.left = Val::Px(left);

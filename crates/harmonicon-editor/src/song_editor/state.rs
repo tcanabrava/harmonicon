@@ -13,8 +13,8 @@ use harmonicon_core::instrument::InstrumentModel;
 // one concept split only for file size.
 pub(super) use super::loop_settings::{LOOP_TYPES, LoopSettings};
 pub(super) use super::note_model::{
-    ContentKind, Dir, DragKind, DragState, Edge, GridNote, HarmonicaKind, Mode, PhraseAnnotation,
-    Pitch, Side, TimelineDrag, TimelineTool,
+    ContentKind, Dir, DragKind, DragState, Edge, GridNote, HarmonicaKind, HarpTechnique, Mode,
+    PhraseAnnotation, Side, TimelineDrag, TimelineTool,
 };
 pub(super) use super::scoring_settings::ComboSettings;
 pub(super) use harmonicon_core::synth::Expr;
@@ -221,11 +221,7 @@ pub(super) struct EditorState {
     pub(super) legend_visible: bool,
     /// User's own Lock toggle, independent of `mode`. See [`EditorState::locked`].
     pub(super) user_locked: bool,
-    pub(super) harmonica_kind: HarmonicaKind,
-    /// A chart's authored reed layout, retained while its key and named
-    /// instrument identity still match the loaded values. Every pitch
-    /// consumer reaches it through [`EditorState::effective_harp`].
-    pub(super) loaded_harmonica: Option<LoadedHarmonica>,
+    pub(super) instrument: InstrumentSelection,
     /// Which within-beat tick positions a click places a new note at — see
     /// [`SnapMode`]. A UI preference, not chart content or undo-tracked.
     pub(super) snap_mode: SnapMode,
@@ -259,13 +255,13 @@ pub(super) struct EditorState {
     /// placed. Clicking a mod button always updates the relevant one of
     /// these regardless of selection, and it stays armed (see
     /// `interaction::apply_modifier`) until cycled back to "off"
-    /// (`Pitch::Normal`/`Expr::None`; `sticky_dir` has no off value, so it
+    /// (`HarpTechnique::Normal`/`Expr::None`; `sticky_dir` has no off value, so it
     /// only switches) or sanitized away by `set_harmonica_kind`.
     /// `select_or_add` applies these to every newly placed note, silently
-    /// falling back to `Pitch::Normal` for `sticky_pitch` when it doesn't
+    /// falling back to `HarpTechnique::Normal` for `sticky_pitch` when it doesn't
     /// fit the hole.
     pub(super) sticky_dir: Dir,
-    pub(super) sticky_pitch: Pitch,
+    pub(super) sticky_pitch: HarpTechnique,
     pub(super) sticky_expr: Expr,
     /// Vibrato/wah depth a newly placed note gets, as the string the
     /// `expression_intensities` map stores (`"0.5"` is the default and is
@@ -328,8 +324,7 @@ impl Default for EditorState {
             lesson_details_expanded: false,
             legend_visible: true,
             user_locked: false,
-            harmonica_kind: HarmonicaKind::default(),
-            loaded_harmonica: None,
+            instrument: InstrumentSelection::HarmonicaPreset(HarmonicaKind::default()),
             transpose_notice: None,
             technique_notice: None,
             snap_mode: SnapMode::default(),
@@ -339,7 +334,7 @@ impl Default for EditorState {
             timeline_split: None,
             pending_timeline_op: None,
             sticky_dir: Dir::Blow,
-            sticky_pitch: Pitch::Normal,
+            sticky_pitch: HarpTechnique::Normal,
             sticky_expr: Expr::None,
             sticky_intensity: DEFAULT_INTENSITY.into(),
         }
@@ -347,21 +342,46 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    /// The one harmonica used by grid labels, pitch mapping, playback,
-    /// audition, practice, recording, notation, and serialization.
+    /// Generic consumers take one configured instrument. The current editor
+    /// view remains harmonica-only until a second view and codec are ready.
+    pub(super) fn effective_instrument(&self) -> harmonicon_core::instrument::Instrument {
+        match &self.instrument {
+            InstrumentSelection::HarmonicaPreset(kind) => {
+                super::playback::build_harp(&self.key, *kind).into()
+            }
+            InstrumentSelection::Configured { instrument, harmonica_origin } => {
+                if let Some((key, kind)) = harmonica_origin
+                    && key != &self.key
+                {
+                    return super::playback::build_harp(&self.key, *kind).into();
+                }
+                instrument.clone()
+            }
+        }
+    }
+
     pub(super) fn effective_harp(&self) -> Harmonica {
-        self.loaded_harmonica
-            .as_ref()
-            .filter(|loaded| loaded.key == self.key && loaded.kind == self.harmonica_kind)
-            .map(|loaded| loaded.harp.clone())
-            .unwrap_or_else(|| super::playback::build_harp(&self.key, self.harmonica_kind))
+        let harmonicon_core::instrument::Instrument::Harmonica(harp) = self.effective_instrument()
+        else {
+            panic!("harmonica controls require a harmonica view");
+        };
+        harp
+    }
+
+    pub(super) fn harmonica_kind(&self) -> HarmonicaKind {
+        self.instrument.harmonica_kind()
     }
 
     /// Selects a new harp key intentionally, replacing any layout loaded
     /// for the previous instrument identity.
     pub(super) fn set_key(&mut self, key: String) {
         if self.key != key {
-            self.loaded_harmonica = None;
+            if !matches!(
+                &self.instrument,
+                InstrumentSelection::Configured { harmonica_origin: None, .. }
+            ) {
+                self.instrument = InstrumentSelection::HarmonicaPreset(self.harmonica_kind());
+            }
             self.key = key;
         }
     }
@@ -391,7 +411,7 @@ impl EditorState {
 
     #[cfg(test)]
     pub(super) fn note_at(&self, hole: u8, tick: usize) -> Option<&GridNote> {
-        self.notes.iter().find(|n| n.hole == hole && n.tick == tick)
+        self.notes.iter().find(|n| n.hole() == hole && n.tick == tick)
     }
 
     pub(super) fn note_by_id(&self, id: u32) -> Option<&GridNote> {
@@ -399,7 +419,7 @@ impl EditorState {
     }
 
     pub(super) fn dir_at(&self, tick: usize) -> Option<Dir> {
-        self.notes.iter().find(|n| n.tick <= tick && tick < n.tick + n.len).map(|n| n.dir)
+        self.notes.iter().find(|n| n.tick <= tick && tick < n.tick + n.len).map(|n| n.dir())
     }
 
     /// The "primary" selected note — the most recently added to the
@@ -581,7 +601,7 @@ impl EditorState {
 
     /// The number of playable holes for the current [`HarmonicaKind`].
     pub(super) fn hole_count(&self) -> u8 {
-        match self.harmonica_kind {
+        match self.harmonica_kind() {
             HarmonicaKind::Diatonic
             | HarmonicaKind::CountryTuned
             | HarmonicaKind::PaddyRichter
@@ -595,22 +615,24 @@ impl EditorState {
     /// wouldn't be valid on the new harp: notes on holes beyond the new
     /// harp's range are dropped, and pitch techniques exclusive to the old
     /// kind (bend/overblow/overdraw for diatonic, slide for chromatic) fall
-    /// back to `Pitch::Normal` rather than being silently misinterpreted.
+    /// back to `HarpTechnique::Normal` rather than being silently misinterpreted.
     pub(super) fn set_harmonica_kind(&mut self, kind: HarmonicaKind) {
-        if self.harmonica_kind != kind {
-            self.loaded_harmonica = None;
+        if self.harmonica_kind() != kind {
+            self.instrument = InstrumentSelection::HarmonicaPreset(kind);
         }
-        self.harmonica_kind = kind;
         let hole_count = self.hole_count();
-        self.notes.retain(|n| n.hole <= hole_count);
-        let sanitize = |kind: HarmonicaKind, pitch: Pitch| {
-            let incompatible = (kind.is_diatonic() && pitch == Pitch::Slide)
+        self.notes.retain(|n| n.hole() <= hole_count);
+        let sanitize = |kind: HarmonicaKind, pitch: HarpTechnique| {
+            let incompatible = (kind.is_diatonic() && pitch == HarpTechnique::Slide)
                 || (kind.is_chromatic()
-                    && matches!(pitch, Pitch::Bend(_) | Pitch::Overblow | Pitch::Overdraw));
-            if incompatible { Pitch::Normal } else { pitch }
+                    && matches!(
+                        pitch,
+                        HarpTechnique::Bend(_) | HarpTechnique::Overblow | HarpTechnique::Overdraw
+                    ));
+            if incompatible { HarpTechnique::Normal } else { pitch }
         };
         for n in &mut self.notes {
-            n.pitch = sanitize(kind, n.pitch);
+            n.set_technique(sanitize(kind, n.technique()));
         }
         self.sticky_pitch = sanitize(kind, self.sticky_pitch);
         self.prune_selection();
@@ -627,6 +649,40 @@ impl EditorState {
         // Anything that removed notes also stranded whatever metadata was
         // keyed to them — see `metadata_sync`.
         self.drop_orphaned_metadata();
+    }
+}
+
+/// One document instrument. Adding an instrument extends core's enum,
+/// without adding another optional configuration to EditorState.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum InstrumentSelection {
+    HarmonicaPreset(HarmonicaKind),
+    Configured {
+        instrument: harmonicon_core::instrument::Instrument,
+        harmonica_origin: Option<(String, HarmonicaKind)>,
+    },
+}
+impl InstrumentSelection {
+    pub(super) fn loaded_harp(loaded: LoadedHarmonica) -> Self {
+        Self::Configured {
+            instrument: loaded.harp.into(),
+            harmonica_origin: Some((loaded.key, loaded.kind)),
+        }
+    }
+    pub(super) fn harmonica_kind(&self) -> HarmonicaKind {
+        match self {
+            Self::HarmonicaPreset(kind) => *kind,
+            Self::Configured { harmonica_origin: Some((_, kind)), .. } => *kind,
+            _ => panic!("harmonica controls require a harmonica view"),
+        }
+    }
+    #[cfg(test)]
+    pub(super) fn is_configured(&self) -> bool {
+        matches!(self, Self::Configured { .. })
+    }
+    #[cfg(test)]
+    pub(super) fn is_preset(&self) -> bool {
+        matches!(self, Self::HarmonicaPreset(_))
     }
 }
 
@@ -689,7 +745,7 @@ pub(super) struct TimelineSelection {
 /// Whether `pitch` can be placed on `hole` of `harp` — always the editor's
 /// `effective_harp()`, so a chart's custom reeds and the alternate tunings
 /// get *their* bend depths, not Richter's.
-pub(super) fn pitch_compatible(pitch: Pitch, harp: &Harmonica, hole: u8) -> bool {
+pub(super) fn pitch_compatible(pitch: HarpTechnique, harp: &Harmonica, hole: u8) -> bool {
     // Delegated so the editor's idea of what a hole can physically do can't
     // drift from the resolver's — `pitch_map` decides which notes are
     // reachable, and this decides which the UI will let you place.
@@ -698,12 +754,12 @@ pub(super) fn pitch_compatible(pitch: Pitch, harp: &Harmonica, hole: u8) -> bool
 
 /// Returns the localization key for the reason a pitch is not allowed on a hole,
 /// or `""` when the pitch is valid (callers should skip `loc.msg("")`).
-pub(super) fn pitch_deny_key(pitch: Pitch, _hole: u8) -> &'static str {
+pub(super) fn pitch_deny_key(pitch: HarpTechnique, _hole: u8) -> &'static str {
     match pitch {
-        Pitch::Bend(_) => "drag-denied-bend",
-        Pitch::Overblow => "drag-denied-overblow",
-        Pitch::Overdraw => "drag-denied-overdraw",
-        Pitch::Normal | Pitch::Slide => "",
+        HarpTechnique::Bend(_) => "drag-denied-bend",
+        HarpTechnique::Overblow => "drag-denied-overblow",
+        HarpTechnique::Overdraw => "drag-denied-overdraw",
+        HarpTechnique::Normal | HarpTechnique::Slide => "",
     }
 }
 
@@ -736,24 +792,24 @@ pub(super) use harmonicon_core::pitch_map::overdraw_ok;
 /// reed). `Bend`/`Slide` have no such constraint. Used to keep a note's
 /// `dir` and `pitch` from drifting into a physically impossible pairing as
 /// either changes independently.
-pub(super) fn pitch_forced_dir(pitch: Pitch) -> Option<Dir> {
+pub(super) fn pitch_forced_dir(pitch: HarpTechnique) -> Option<Dir> {
     match pitch {
-        Pitch::Overblow => Some(Dir::Blow),
-        Pitch::Overdraw => Some(Dir::Draw),
+        HarpTechnique::Overblow => Some(Dir::Blow),
+        HarpTechnique::Overdraw => Some(Dir::Draw),
         _ => None,
     }
 }
 
-pub(super) fn pitch_color(pitch: Pitch) -> Color {
+pub(super) fn pitch_color(pitch: HarpTechnique) -> Color {
     match pitch {
-        Pitch::Normal => Color::srgb(0.30, 0.60, 0.95),
-        Pitch::Bend(a) => {
+        HarpTechnique::Normal => Color::srgb(0.30, 0.60, 0.95),
+        HarpTechnique::Bend(a) => {
             let t = (a / 1.5).clamp(0.0, 1.0);
             Color::srgb(0.95, 0.55 - 0.30 * t, 0.22)
         }
-        Pitch::Overblow => Color::srgb(0.72, 0.42, 0.95),
-        Pitch::Overdraw => Color::srgb(0.28, 0.85, 0.78),
-        Pitch::Slide => Color::srgb(0.90, 0.80, 0.25),
+        HarpTechnique::Overblow => Color::srgb(0.72, 0.42, 0.95),
+        HarpTechnique::Overdraw => Color::srgb(0.28, 0.85, 0.78),
+        HarpTechnique::Slide => Color::srgb(0.90, 0.80, 0.25),
     }
 }
 
@@ -841,10 +897,10 @@ pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
     let group: Vec<u32> = overlapping_group(state, id).into_iter().filter(|&g| g != id).collect();
     let mut positions: Vec<_> =
         group.iter().filter_map(|&g| state.note_by_id(g).map(GridNote::position)).collect();
-    state.effective_harp().reconcile(&anchor, &mut positions);
+    state.effective_instrument().reconcile(&anchor, &mut positions);
     for (&g, position) in group.iter().zip(&positions) {
         if let Some(n) = state.notes.iter_mut().find(|n| n.id == g) {
-            n.set_position(position);
+            n.set_tab_position(position);
         }
     }
 }
@@ -866,9 +922,9 @@ pub(super) fn enforce_expr(state: &mut EditorState, id: u32) {
 }
 
 /// Absolute pixel rect (left, top, width, height) of a note inside GridContent.
-pub(super) fn note_rect(note: &GridNote) -> (f32, f32, f32, f32) {
+pub(super) fn note_rect(note: &GridNote, row: usize) -> (f32, f32, f32, f32) {
     let left = note.tick as f32 * TICK_W + 1.0;
-    let top = HEADER_H + (note.hole as f32 - 1.0) * ROW_H + NOTE_PAD;
+    let top = HEADER_H + row as f32 * ROW_H + NOTE_PAD;
     let width = note.len as f32 * TICK_W - 2.0;
     let height = ROW_H - 2.0 * NOTE_PAD;
     (left, top, width, height)

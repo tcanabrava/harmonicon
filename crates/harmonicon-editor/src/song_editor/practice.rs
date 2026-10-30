@@ -496,12 +496,12 @@ mod tests {
         let state = state_with_notes("D", &[(2, 0)]);
         let schedule = build_schedule(&state);
         assert_eq!(schedule.len(), 1);
-        let harp = build_harp(&state.key, state.harmonica_kind);
+        let harp = build_harp(&state.key, state.harmonica_kind());
         let expected_freq = note_freq(&state.notes[0], &harp).unwrap();
         assert_eq!(schedule[0].expected_freq, expected_freq);
         // A C-harp draw-2 in D (up a whole step) should not equal the C-key freq.
         let c_state = state_with_notes("C", &[(2, 0)]);
-        let c_harp = build_harp(&c_state.key, c_state.harmonica_kind);
+        let c_harp = build_harp(&c_state.key, c_state.harmonica_kind());
         let c_freq = note_freq(&c_state.notes[0], &c_harp).unwrap();
         assert_ne!(expected_freq, c_freq);
     }

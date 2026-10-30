@@ -18,7 +18,7 @@ use harmonicon_core::harmonica::Harmonica;
 use std::collections::VecDeque;
 
 use super::record::RecordState;
-use super::state::{EditorState, GridNote, HarmonicaKind, LoadedHarmonica, PhraseAnnotation};
+use super::state::{EditorState, GridNote, InstrumentSelection, PhraseAnnotation};
 
 /// History is limited by both edit count and retained allocation size.
 pub(super) const HISTORY_LIMIT: usize = 100;
@@ -37,8 +37,7 @@ struct Snapshot {
     // Changing harp kind can delete holes and sanitize techniques. It must
     // travel with the notes or undo can restore chromatic notes into a
     // diatonic document (and vice versa).
-    harmonica_kind: HarmonicaKind,
-    loaded_harmonica: Option<LoadedHarmonica>,
+    instrument: InstrumentSelection,
 }
 
 impl Snapshot {
@@ -66,11 +65,20 @@ impl Snapshot {
                 .sum::<usize>()
             + self.expression_intensities.len() * std::mem::size_of::<(u32, String)>()
             + self.expression_intensities.values().map(String::capacity).sum::<usize>()
-            + self.loaded_harmonica.as_ref().map_or(0, |loaded| {
-                std::mem::size_of::<LoadedHarmonica>()
-                    + loaded.key.capacity()
-                    + harp_allocated_bytes(&loaded.harp)
-            })
+            + match &self.instrument {
+                InstrumentSelection::HarmonicaPreset(_) => 0,
+                InstrumentSelection::Configured { instrument, harmonica_origin } => {
+                    harmonica_origin.as_ref().map_or(0, |(key, _)| key.capacity())
+                        + match instrument {
+                            harmonicon_core::instrument::Instrument::Harmonica(harp) => {
+                                harp_allocated_bytes(harp)
+                            }
+                            harmonicon_core::instrument::Instrument::Guitar(guitar) => {
+                                guitar.strings.capacity()
+                            }
+                        }
+                }
+            }
     }
 
     fn matches(&self, state: &EditorState) -> bool {
@@ -80,8 +88,7 @@ impl Snapshot {
             && self.repeats == state.repeats
             && self.phrase_annotations == state.phrase_annotations
             && self.expression_intensities == state.expression_intensities
-            && self.harmonica_kind == state.harmonica_kind
-            && self.loaded_harmonica == state.loaded_harmonica
+            && self.instrument == state.instrument
     }
 
     fn capture(state: &EditorState) -> Self {
@@ -92,14 +99,12 @@ impl Snapshot {
             repeats: state.repeats.clone(),
             phrase_annotations: state.phrase_annotations.clone(),
             expression_intensities: state.expression_intensities.clone(),
-            harmonica_kind: state.harmonica_kind,
-            loaded_harmonica: state.loaded_harmonica.clone(),
+            instrument: state.instrument.clone(),
         }
     }
 
     fn restore(self, state: &mut EditorState) {
-        state.harmonica_kind = self.harmonica_kind;
-        state.loaded_harmonica = self.loaded_harmonica;
+        state.instrument = self.instrument;
         state.notes = self.notes;
         state.tempo_changes = self.tempo_changes;
         state.meter_changes = self.meter_changes;
@@ -249,8 +254,9 @@ pub(super) fn track_changes(
 
 #[cfg(test)]
 mod tests {
-    use super::super::state::Pitch;
+    use super::super::state::HarpTechnique;
     use super::*;
+    use crate::song_editor::state::HarmonicaKind;
 
     #[test]
     fn view_changes_preserve_snapshot_allocation_and_redo() {
@@ -314,8 +320,15 @@ mod tests {
     #[test]
     fn undoing_a_harp_kind_change_restores_the_kind_with_its_notes() {
         let mut state = EditorState {
-            harmonica_kind: HarmonicaKind::Chromatic,
-            notes: vec![GridNote { pitch: Pitch::Slide, ..GridNote::plain(1, 12, 0, 4) }],
+            instrument: InstrumentSelection::HarmonicaPreset(HarmonicaKind::Chromatic),
+            notes: vec![GridNote {
+                target: GridNote::harmonica_target(
+                    12,
+                    (GridNote::plain(1, 12, 0, 4)).dir(),
+                    HarpTechnique::Slide,
+                ),
+                ..GridNote::plain(1, 12, 0, 4)
+            }],
             next_id: 2,
             ..Default::default()
         };
@@ -327,9 +340,62 @@ mod tests {
         assert!(state.notes.is_empty());
 
         history.undo(&mut state);
-        assert_eq!(state.harmonica_kind, HarmonicaKind::Chromatic);
+        assert_eq!(state.harmonica_kind(), HarmonicaKind::Chromatic);
         assert_eq!(state.notes.len(), 1);
-        assert_eq!(state.notes[0].hole, 12);
-        assert_eq!(state.notes[0].pitch, Pitch::Slide);
+        assert_eq!(state.notes[0].hole(), 12);
+        assert_eq!(state.notes[0].technique(), HarpTechnique::Slide);
+    }
+    #[test]
+    fn undo_restores_pitch_and_authored_guitar_placement_together() {
+        use harmonicon_core::instrument::{
+            PlayPosition,
+            guitar::{FretAssignment, StringTechnique},
+        };
+        use harmonicon_core::note_target::NoteTarget;
+        let first = NoteTarget::Sounding {
+            midi: 64.0,
+            placement: Some(PlayPosition::Fret(FretAssignment {
+                string: 1,
+                fret: 0,
+                technique: StringTechnique::Fretted,
+            })),
+        };
+        let mut state = EditorState {
+            notes: vec![GridNote {
+                id: 1,
+                tick: 0,
+                len: 4,
+                expr: super::super::state::Expr::None,
+                target: first,
+            }],
+            ..Default::default()
+        };
+        let snapshot = Snapshot::capture(&state);
+        state.notes[0].target = NoteTarget::Sounding { midi: 67.0, placement: None };
+        snapshot.restore(&mut state);
+        assert_eq!(state.notes[0].target, first);
+    }
+    #[test]
+    fn configured_guitar_survives_song_key_changes_and_undo() {
+        use harmonicon_core::instrument::{
+            Instrument,
+            guitar::{Guitar, GuitarBody},
+        };
+        let mut guitar = Guitar::standard(GuitarBody::Acoustic);
+        guitar.capo = 2;
+        let instrument = Instrument::Guitar(guitar);
+        let mut state = EditorState {
+            instrument: InstrumentSelection::Configured {
+                instrument: instrument.clone(),
+                harmonica_origin: None,
+            },
+            ..Default::default()
+        };
+        state.set_key("D".into());
+        assert_eq!(state.effective_instrument(), instrument);
+        let snapshot = Snapshot::capture(&state);
+        state.instrument = InstrumentSelection::HarmonicaPreset(HarmonicaKind::Diatonic);
+        snapshot.restore(&mut state);
+        assert_eq!(state.effective_instrument(), instrument);
     }
 }

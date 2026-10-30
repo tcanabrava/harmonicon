@@ -6,7 +6,9 @@ use bevy::text::{EditableText, TextEdit};
 
 use super::practice::PracticeState;
 use super::record::RecordState;
-use super::state::{ContentKind, Dir, EditorState, Expr, Field, HarmonicaKind, Mode, Pitch};
+use super::state::{
+    ContentKind, Dir, EditorState, Expr, Field, HarmonicaKind, HarpTechnique, Mode,
+};
 use super::ui::{
     BendDot, ContentKindText, EditModeGroup, EditorToolbar, ExpectedNotesGroup, HarmonicaKindText,
     MetaFieldBox, MetaFieldText, ModButton, ModButtonLabel, ModeButton, NoteColumn, PlayModeGroup,
@@ -23,14 +25,19 @@ use harmonicon_ui::dialogs::button::BaseButtonColor;
 /// `GridNote`'s own fields) and the nothing-selected case (`EditorState`'s
 /// `sticky_dir`/`sticky_pitch`/`sticky_expr`, previewing what a *new* note
 /// would get), so the two can't drift out of sync with each other.
-pub(super) fn mod_button_active(kind: ModButton, dir: Dir, pitch: Pitch, expr: Expr) -> bool {
+pub(super) fn mod_button_active(
+    kind: ModButton,
+    dir: Dir,
+    pitch: HarpTechnique,
+    expr: Expr,
+) -> bool {
     match kind {
         ModButton::Blow => dir == Dir::Blow,
         ModButton::Draw => dir == Dir::Draw,
-        ModButton::Bend => matches!(pitch, Pitch::Bend(_)),
-        ModButton::Overblow => pitch == Pitch::Overblow,
-        ModButton::Overdraw => pitch == Pitch::Overdraw,
-        ModButton::Slide => pitch == Pitch::Slide,
+        ModButton::Bend => matches!(pitch, HarpTechnique::Bend(_)),
+        ModButton::Overblow => pitch == HarpTechnique::Overblow,
+        ModButton::Overdraw => pitch == HarpTechnique::Overdraw,
+        ModButton::Slide => pitch == HarpTechnique::Slide,
         ModButton::Wah => matches!(expr, Expr::Wah(_)),
         ModButton::Vibrato => matches!(expr, Expr::Vibrato(_)),
         // Call/Split read the selected note's *phrase*, which needs the
@@ -55,7 +62,7 @@ pub(super) fn update_mod_panel(
     // nothing selected, the sticky fields preview what a newly *added*
     // note would get, exactly matching `select_or_add`.
     let (dir, pitch, expr) = match selected {
-        Some(n) => (n.dir, n.pitch, n.expr),
+        Some(n) => (n.dir(), n.technique(), n.expr),
         None => (state.sticky_dir, state.sticky_pitch, state.sticky_expr),
     };
     let call = state.selected_call();
@@ -68,7 +75,7 @@ pub(super) fn update_mod_panel(
         };
         bg.0 = if active { colors.btn_active } else { colors.btn_bg };
     }
-    let bent = matches!(pitch, Pitch::Bend(_));
+    let bent = matches!(pitch, HarpTechnique::Bend(_));
     for mut vis in &mut dot {
         *vis = if bent { Visibility::Inherited } else { Visibility::Hidden };
     }
@@ -310,7 +317,7 @@ pub(super) fn update_technique_button_visibility(
     state: Res<EditorState>,
     mut buttons: Query<(&ModButton, &mut Node)>,
 ) {
-    let diatonic_only = state.harmonica_kind.is_diatonic();
+    let diatonic_only = state.harmonica_kind().is_diatonic();
     for (kind, mut node) in &mut buttons {
         let visible = match kind {
             ModButton::Bend | ModButton::Overblow | ModButton::Overdraw => diatonic_only,
@@ -324,13 +331,13 @@ pub(super) fn update_technique_button_visibility(
     }
 }
 
-/// Keeps the harmonica-kind toggle's label in sync with `state.harmonica_kind`.
+/// Keeps the harmonica-kind toggle's label in sync with `state.harmonica_kind()`.
 pub(super) fn update_harmonica_kind_text(
     state: Res<EditorState>,
     loc: Res<Localization>,
     mut texts: Query<&mut Text, With<HarmonicaKindText>>,
 ) {
-    let key = match state.harmonica_kind {
+    let key = match state.harmonica_kind() {
         HarmonicaKind::Diatonic => "editor-harmonica-diatonic",
         HarmonicaKind::PaddyRichter => "editor-harmonica-paddy-richter",
         HarmonicaKind::CountryTuned => "editor-harmonica-country-tuned",
@@ -429,8 +436,8 @@ mod tests {
     use super::*;
     use harmonicon_audio::pitch_detect::PitchAlgorithm;
 
-    fn note(dir: Dir, pitch: Pitch, expr: Expr) -> GridNote {
-        GridNote { id: 1, hole: 4, tick: 0, len: 1, dir, pitch, expr }
+    fn note(dir: Dir, pitch: HarpTechnique, expr: Expr) -> GridNote {
+        GridNote { id: 1, tick: 0, len: 1, expr, target: GridNote::harmonica_target(4, dir, pitch) }
     }
 
     #[test]
@@ -455,7 +462,7 @@ mod tests {
     fn update_mod_panel_reflects_the_selected_notes_direction_pitch_and_expr_rate() {
         let mut world = World::new();
         let state = EditorState {
-            notes: vec![note(Dir::Blow, Pitch::Bend(0.5), Expr::Vibrato(5.0))],
+            notes: vec![note(Dir::Blow, HarpTechnique::Bend(0.5), Expr::Vibrato(5.0))],
             selected: vec![1],
             ..Default::default()
         };
@@ -535,7 +542,7 @@ mod tests {
         use super::super::state::PhraseAnnotation;
         let mut world = World::new();
         let mut state = EditorState {
-            notes: vec![note(Dir::Blow, Pitch::Normal, Expr::Vibrato(5.0))],
+            notes: vec![note(Dir::Blow, HarpTechnique::Normal, Expr::Vibrato(5.0))],
             selected: vec![1],
             ..Default::default()
         };
@@ -575,7 +582,7 @@ mod tests {
     fn update_mod_panel_shows_no_depth_for_a_note_with_no_expression() {
         let mut world = World::new();
         world.insert_resource(EditorState {
-            notes: vec![note(Dir::Blow, Pitch::Normal, Expr::None)],
+            notes: vec![note(Dir::Blow, HarpTechnique::Normal, Expr::None)],
             selected: vec![1],
             ..Default::default()
         });
@@ -597,7 +604,7 @@ mod tests {
         let mut world = World::new();
         world.insert_resource(EditorState {
             sticky_dir: Dir::Draw,
-            sticky_pitch: Pitch::Bend(1.0),
+            sticky_pitch: HarpTechnique::Bend(1.0),
             sticky_expr: Expr::Wah(3.0),
             ..Default::default()
         });
@@ -738,7 +745,12 @@ mod tests {
     #[test]
     fn update_technique_button_visibility_shows_bend_family_for_diatonic_and_slide_for_chromatic() {
         let mut world = World::new();
-        let state = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
+        let state = EditorState {
+            instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+                HarmonicaKind::Chromatic,
+            ),
+            ..Default::default()
+        };
         world.insert_resource(state);
 
         let bend = world.spawn((ModButton::Bend, Node::default())).id();
@@ -765,7 +777,12 @@ mod tests {
     #[test]
     fn update_harmonica_kind_text_keys_off_the_current_harmonica_kind() {
         let mut world = World::new();
-        let state = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
+        let state = EditorState {
+            instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+                HarmonicaKind::Chromatic,
+            ),
+            ..Default::default()
+        };
         world.insert_resource(state);
         world.insert_resource(Localization::default());
 

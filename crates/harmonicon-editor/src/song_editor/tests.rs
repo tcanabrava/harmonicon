@@ -18,9 +18,9 @@ use super::ranges::{
 };
 use super::state::Scroll;
 use super::state::{
-    ContentKind, Dir, Edge, EditorState, Expr, Field, GridNote, HarmonicaKind, PhraseAnnotation,
-    Pitch, Side, TimelineTool, apply_resize, build_tempo_map, cycle_next, enforce_direction,
-    enforce_expr, move_target, note_rect, toggle_tempo_point,
+    ContentKind, Dir, Edge, EditorState, Expr, Field, GridNote, HarmonicaKind, HarpTechnique,
+    PhraseAnnotation, Side, TimelineTool, apply_resize, build_tempo_map, cycle_next,
+    enforce_direction, enforce_expr, move_target, note_rect, toggle_tempo_point,
 };
 use super::timeline::{TimelineSurfaceGeometry, cycle_meter_point, drag_end_tick};
 use super::ui::ModButton;
@@ -327,7 +327,7 @@ fn click_adds_then_selects_without_duplicating() {
     assert_eq!(s.notes.len(), 1);
     let added = s.notes[0];
     assert_eq!(s.selected, vec![added.id]);
-    assert_eq!((added.hole, added.tick, added.len), (4, 2, TICKS_PER_BEAT));
+    assert_eq!((added.hole(), added.tick, added.len), (4, 2, TICKS_PER_BEAT));
     select_or_add(&mut s, 4, 2);
     assert_eq!(s.notes.len(), 1);
     assert_eq!(s.selected, vec![added.id]);
@@ -388,8 +388,8 @@ fn group_move_targets_shifts_every_member_by_the_same_delta() {
     assert_eq!(
         targets,
         vec![
-            (2, 4, 8 + TICKS_PER_BEAT, 4, Pitch::Normal),
-            (3, 6, 16 + TICKS_PER_BEAT, 4, Pitch::Normal),
+            (2, 4, 8 + TICKS_PER_BEAT, 4, HarpTechnique::Normal),
+            (3, 6, 16 + TICKS_PER_BEAT, 4, HarpTechnique::Normal),
         ]
     );
 }
@@ -405,7 +405,7 @@ fn group_move_targets_clamps_each_member_to_the_hole_range() {
 fn group_move_valid_rejects_a_target_overlapping_a_note_outside_the_group() {
     let mut s = EditorState::default();
     select_or_add(&mut s, 3, 0); // an unrelated, unselected note
-    let targets = vec![(99u32, 3, 0, 4, Pitch::Normal)];
+    let targets = vec![(99u32, 3, 0, 4, HarpTechnique::Normal)];
     assert!(!group_move_valid(
         &s.notes,
         &build_harp("C", HarmonicaKind::Diatonic),
@@ -414,7 +414,7 @@ fn group_move_valid_rejects_a_target_overlapping_a_note_outside_the_group() {
     ));
     // Moving out of the blocker's way is fine again — the blocker's default
     // length is one full beat (`TICKS_PER_BEAT`), so its span ends there.
-    let clear = vec![(99u32, 3, TICKS_PER_BEAT, 4, Pitch::Normal)];
+    let clear = vec![(99u32, 3, TICKS_PER_BEAT, 4, HarpTechnique::Normal)];
     assert!(group_move_valid(&s.notes, &build_harp("C", HarmonicaKind::Diatonic), &[99], &clear));
 }
 
@@ -423,7 +423,8 @@ fn group_move_valid_ignores_overlap_among_the_groups_own_members() {
     // Two notes in the same group, already overlapping each other (e.g. a
     // chord) — that must not block the move.
     let notes = vec![GridNote::plain(1, 2, 0, 4), GridNote::plain(2, 5, 0, 4)];
-    let targets = vec![(1u32, 2, 4, 4, Pitch::Normal), (2u32, 5, 4, 4, Pitch::Normal)];
+    let targets =
+        vec![(1u32, 2, 4, 4, HarpTechnique::Normal), (2u32, 5, 4, 4, HarpTechnique::Normal)];
     assert!(group_move_valid(&notes, &build_harp("C", HarmonicaKind::Diatonic), &[1, 2], &targets));
 }
 
@@ -432,7 +433,7 @@ fn group_move_valid_rejects_a_pitch_incompatible_with_its_target_hole() {
     // Bend(1.5) needs a hole with at least two semitones of bend, i.e.
     // holes 2/3/10 (see `max_bend`) — landing on hole 5
     // must fail even with nothing else in the way.
-    let targets = vec![(1u32, 5, 0, 4, Pitch::Bend(1.5))];
+    let targets = vec![(1u32, 5, 0, 4, HarpTechnique::Bend(1.5))];
     assert!(!group_move_valid(&[], &build_harp("C", HarmonicaKind::Diatonic), &[1], &targets));
 }
 
@@ -467,7 +468,10 @@ fn paste_targets_shifts_the_earliest_note_to_the_target_tick() {
     let clipboard = vec![GridNote::plain(1, 2, 4, 4), GridNote::plain(2, 5, 8, 4)];
     let (pasted, next_id) = paste_targets(&clipboard, 20, 10, &[], 100);
     // The earliest note (tick 4) lands at 20; the other keeps its +4 offset.
-    assert_eq!(pasted.iter().map(|n| (n.hole, n.tick)).collect::<Vec<_>>(), vec![(2, 20), (5, 24)]);
+    assert_eq!(
+        pasted.iter().map(|n| (n.hole(), n.tick)).collect::<Vec<_>>(),
+        vec![(2, 20), (5, 24)]
+    );
     // Ids are freshly assigned starting at `next_id`, never reusing the
     // clipboard's own copied ids.
     assert_eq!(pasted.iter().map(|n| n.id).collect::<Vec<_>>(), vec![100, 101]);
@@ -512,11 +516,11 @@ fn bend_cycles_and_caps_at_hole_max() {
     let mut s = EditorState::default();
     select_or_add(&mut s, 1, 0);
     apply_modifier(&mut s, ModButton::Bend);
-    assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
     apply_modifier(&mut s, ModButton::Bend);
-    assert_eq!(s.notes[0].pitch, Pitch::Bend(1.0));
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(1.0));
     apply_modifier(&mut s, ModButton::Bend);
-    assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
 }
 
 #[test]
@@ -531,7 +535,10 @@ fn unbendable_hole_ignores_bend() {
     s.selected = vec![hole5];
     for _ in 0..2 {
         apply_modifier(&mut s, ModButton::Bend);
-        assert_eq!(s.notes.iter().find(|n| n.hole == 5).unwrap().pitch, Pitch::Normal);
+        assert_eq!(
+            s.notes.iter().find(|n| n.hole() == 5).unwrap().technique(),
+            HarpTechnique::Normal
+        );
     }
 }
 
@@ -544,7 +551,7 @@ fn clicking_a_mod_button_with_nothing_selected_arms_it_for_new_notes() {
     apply_modifier(&mut s, ModButton::Wah); // -> 2.0
     select_or_add(&mut s, 3, 0);
     let n = &s.notes[0];
-    assert_eq!(n.dir, Dir::Draw);
+    assert_eq!(n.dir(), Dir::Draw);
     assert_eq!(n.expr, Expr::Wah(2.0));
 }
 
@@ -553,7 +560,7 @@ fn sticky_bend_arms_without_a_selection_and_applies_to_a_compatible_hole() {
     let mut s = EditorState::default();
     apply_modifier(&mut s, ModButton::Bend); // -> 0.5
     select_or_add(&mut s, 2, 0); // hole 2: max_bend 2.0, compatible
-    assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
 }
 
 #[test]
@@ -562,10 +569,13 @@ fn sticky_pitch_falls_back_to_normal_on_an_incompatible_hole_but_stays_armed() {
     apply_modifier(&mut s, ModButton::Overblow);
     // Hole 8 can't overblow (only 1/4/5/6) — this one note falls back...
     select_or_add(&mut s, 8, 0);
-    assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
     // ...but the sticky arm itself wasn't cleared by that rejection.
     select_or_add(&mut s, 4, 4);
-    assert_eq!(s.notes.iter().find(|n| n.hole == 4).unwrap().pitch, Pitch::Overblow);
+    assert_eq!(
+        s.notes.iter().find(|n| n.hole() == 4).unwrap().technique(),
+        HarpTechnique::Overblow
+    );
 }
 
 #[test]
@@ -579,7 +589,7 @@ fn cycling_sticky_bend_past_the_richest_cap_turns_it_off() {
     }
     apply_modifier(&mut s, ModButton::Bend); // past the cap -> Normal (off)
     select_or_add(&mut s, 2, 0);
-    assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
 }
 
 #[test]
@@ -587,10 +597,13 @@ fn selecting_an_existing_note_and_editing_it_also_arms_sticky() {
     let mut s = EditorState::default();
     select_or_add(&mut s, 2, 0);
     apply_modifier(&mut s, ModButton::Bend); // edits the selected note...
-    assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
     // ...and arms sticky the same way a nothing-selected click would.
     select_or_add(&mut s, 3, 4);
-    assert_eq!(s.notes.iter().find(|n| n.hole == 3).unwrap().pitch, Pitch::Bend(0.5));
+    assert_eq!(
+        s.notes.iter().find(|n| n.hole() == 3).unwrap().technique(),
+        HarpTechnique::Bend(0.5)
+    );
 }
 
 #[test]
@@ -600,19 +613,19 @@ fn armed_sticky_wah_propagates_to_a_simultaneous_chord_note() {
     apply_modifier(&mut s, ModButton::Wah); // arms sticky Wah, applies to hole 2
     select_or_add(&mut s, 5, 0); // same tick, different hole — a chord
     assert_eq!(
-        s.notes.iter().find(|n| n.hole == 2).unwrap().expr,
-        s.notes.iter().find(|n| n.hole == 5).unwrap().expr
+        s.notes.iter().find(|n| n.hole() == 2).unwrap().expr,
+        s.notes.iter().find(|n| n.hole() == 5).unwrap().expr
     );
-    assert!(matches!(s.notes.iter().find(|n| n.hole == 5).unwrap().expr, Expr::Wah(_)));
+    assert!(matches!(s.notes.iter().find(|n| n.hole() == 5).unwrap().expr, Expr::Wah(_)));
 }
 
 #[test]
 fn switching_harmonica_kind_sanitizes_an_incompatible_sticky_pitch() {
     let mut s = EditorState::default();
     apply_modifier(&mut s, ModButton::Overblow);
-    assert_eq!(s.sticky_pitch, Pitch::Overblow);
+    assert_eq!(s.sticky_pitch, HarpTechnique::Overblow);
     s.set_harmonica_kind(HarmonicaKind::Chromatic);
-    assert_eq!(s.sticky_pitch, Pitch::Normal);
+    assert_eq!(s.sticky_pitch, HarpTechnique::Normal);
 }
 
 // ── Overblow/Overdraw direction pairing ──────────────────────────────────────
@@ -627,22 +640,22 @@ fn switching_harmonica_kind_sanitizes_an_incompatible_sticky_pitch() {
 fn arming_overblow_then_draw_with_nothing_selected_clears_the_pitch() {
     let mut s = EditorState::default();
     apply_modifier(&mut s, ModButton::Overblow);
-    assert_eq!(s.sticky_pitch, Pitch::Overblow);
+    assert_eq!(s.sticky_pitch, HarpTechnique::Overblow);
     assert_eq!(s.sticky_dir, Dir::Blow);
     apply_modifier(&mut s, ModButton::Draw);
     assert_eq!(s.sticky_dir, Dir::Draw);
-    assert_eq!(s.sticky_pitch, Pitch::Normal, "overblow can't survive a switch to Draw");
+    assert_eq!(s.sticky_pitch, HarpTechnique::Normal, "overblow can't survive a switch to Draw");
 }
 
 #[test]
 fn arming_overdraw_then_blow_with_nothing_selected_clears_the_pitch() {
     let mut s = EditorState::default();
     apply_modifier(&mut s, ModButton::Overdraw);
-    assert_eq!(s.sticky_pitch, Pitch::Overdraw);
+    assert_eq!(s.sticky_pitch, HarpTechnique::Overdraw);
     assert_eq!(s.sticky_dir, Dir::Draw);
     apply_modifier(&mut s, ModButton::Blow);
     assert_eq!(s.sticky_dir, Dir::Blow);
-    assert_eq!(s.sticky_pitch, Pitch::Normal);
+    assert_eq!(s.sticky_pitch, HarpTechnique::Normal);
 }
 
 #[test]
@@ -655,8 +668,8 @@ fn a_new_note_placed_with_armed_overblow_is_never_tagged_draw() {
     apply_modifier(&mut s, ModButton::Overblow);
     select_or_add(&mut s, 4, 0);
     let n = &s.notes[0];
-    assert_eq!(n.pitch, Pitch::Overblow);
-    assert_eq!(n.dir, Dir::Blow);
+    assert_eq!(n.technique(), HarpTechnique::Overblow);
+    assert_eq!(n.dir(), Dir::Blow);
 }
 
 #[test]
@@ -666,8 +679,8 @@ fn a_new_note_placed_with_armed_overdraw_is_never_tagged_blow() {
     apply_modifier(&mut s, ModButton::Overdraw);
     select_or_add(&mut s, 8, 0);
     let n = &s.notes[0];
-    assert_eq!(n.pitch, Pitch::Overdraw);
-    assert_eq!(n.dir, Dir::Draw);
+    assert_eq!(n.technique(), HarpTechnique::Overdraw);
+    assert_eq!(n.dir(), Dir::Draw);
 }
 
 #[test]
@@ -678,11 +691,11 @@ fn setting_overblow_on_a_selected_note_forces_its_direction_and_propagates() {
     select_or_add(&mut s, 5, 0); // a simultaneous chord note, also Draw
     s.selected = vec![s.note_at(4, 0).unwrap().id];
     apply_modifier(&mut s, ModButton::Overblow);
-    let hole4 = s.notes.iter().find(|n| n.hole == 4).unwrap();
-    assert_eq!(hole4.pitch, Pitch::Overblow);
-    assert_eq!(hole4.dir, Dir::Blow);
+    let hole4 = s.notes.iter().find(|n| n.hole() == 4).unwrap();
+    assert_eq!(hole4.technique(), HarpTechnique::Overblow);
+    assert_eq!(hole4.dir(), Dir::Blow);
     // The whole chord follows — direction is whole-player, not per-hole.
-    assert_eq!(s.notes.iter().find(|n| n.hole == 5).unwrap().dir, Dir::Blow);
+    assert_eq!(s.notes.iter().find(|n| n.hole() == 5).unwrap().dir(), Dir::Blow);
 }
 
 #[test]
@@ -690,10 +703,10 @@ fn clicking_draw_on_a_selected_overblow_note_clears_its_pitch() {
     let mut s = EditorState::default();
     select_or_add(&mut s, 4, 0);
     apply_modifier(&mut s, ModButton::Overblow);
-    assert_eq!(s.notes[0].pitch, Pitch::Overblow);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Overblow);
     apply_modifier(&mut s, ModButton::Draw);
-    assert_eq!(s.notes[0].dir, Dir::Draw);
-    assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    assert_eq!(s.notes[0].dir(), Dir::Draw);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
 }
 
 #[test]
@@ -702,11 +715,11 @@ fn pitch_and_expression_stack() {
     select_or_add(&mut s, 3, 0);
     apply_modifier(&mut s, ModButton::Bend);
     apply_modifier(&mut s, ModButton::Vibrato);
-    assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
     assert_eq!(s.notes[0].expr, Expr::Vibrato(3.0), "first click lands on the min rate");
     apply_modifier(&mut s, ModButton::Wah);
     assert_eq!(s.notes[0].expr, Expr::Wah(2.0), "first click lands on the min rate");
-    assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
 }
 
 #[test]
@@ -750,24 +763,33 @@ fn overblow_only_on_holes_with_a_reed_to_overblow() {
         let mut s = EditorState::default();
         select_or_add(&mut s, hole, 0);
         apply_modifier(&mut s, ModButton::Overblow);
-        assert_eq!(s.notes[0].pitch, Pitch::Normal, "hole {hole} has no overblow reed");
+        assert_eq!(
+            s.notes[0].technique(),
+            HarpTechnique::Normal,
+            "hole {hole} has no overblow reed"
+        );
     }
     for hole in [1, 4, 5, 6] {
         let mut s = EditorState::default();
         select_or_add(&mut s, hole, 0);
         apply_modifier(&mut s, ModButton::Overblow);
-        assert_eq!(s.notes[0].pitch, Pitch::Overblow, "hole {hole} does have one");
+        assert_eq!(s.notes[0].technique(), HarpTechnique::Overblow, "hole {hole} does have one");
     }
 }
 
 #[test]
 fn slide_cycles_on_and_off_on_any_hole() {
-    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
+    let mut s = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::Chromatic,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut s, 11, 0); // valid on a 12-hole chromatic harp
     apply_modifier(&mut s, ModButton::Slide);
-    assert_eq!(s.notes[0].pitch, Pitch::Slide);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Slide);
     apply_modifier(&mut s, ModButton::Slide);
-    assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
 }
 
 // ── HarmonicaKind switching ──────────────────────────────────────────────
@@ -784,7 +806,12 @@ fn hole_count_matches_the_harmonica_kind() {
 
 #[test]
 fn switching_to_diatonic_drops_notes_beyond_hole_ten_and_clears_slide() {
-    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
+    let mut s = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::Chromatic,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut s, 11, 0);
     apply_modifier(&mut s, ModButton::Slide);
     select_or_add(&mut s, 3, 4);
@@ -793,7 +820,11 @@ fn switching_to_diatonic_drops_notes_beyond_hole_ten_and_clears_slide() {
     s.set_harmonica_kind(HarmonicaKind::Diatonic);
 
     assert_eq!(s.notes.len(), 1, "the hole-11 note doesn't fit anymore");
-    assert_eq!(s.notes[0].pitch, Pitch::Normal, "slide isn't a valid diatonic technique");
+    assert_eq!(
+        s.notes[0].technique(),
+        HarpTechnique::Normal,
+        "slide isn't a valid diatonic technique"
+    );
 }
 
 #[test]
@@ -804,12 +835,17 @@ fn switching_to_chromatic_clears_diatonic_only_techniques() {
 
     s.set_harmonica_kind(HarmonicaKind::Chromatic);
 
-    assert_eq!(s.notes[0].pitch, Pitch::Normal);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
 }
 
 #[test]
 fn switching_kind_deselects_a_note_that_got_dropped() {
-    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
+    let mut s = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::Chromatic,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut s, 11, 0);
     assert!(!s.selected.is_empty());
 
@@ -822,13 +858,13 @@ fn switching_kind_deselects_a_note_that_got_dropped() {
 fn blow_draw_toggles_independently_of_techniques() {
     let mut s = EditorState::default();
     select_or_add(&mut s, 3, 0);
-    assert_eq!(s.notes[0].dir, Dir::Blow);
+    assert_eq!(s.notes[0].dir(), Dir::Blow);
     apply_modifier(&mut s, ModButton::Bend);
     apply_modifier(&mut s, ModButton::Draw);
-    assert_eq!(s.notes[0].dir, Dir::Draw);
-    assert_eq!(s.notes[0].pitch, Pitch::Bend(0.5));
+    assert_eq!(s.notes[0].dir(), Dir::Draw);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
     apply_modifier(&mut s, ModButton::Blow);
-    assert_eq!(s.notes[0].dir, Dir::Blow);
+    assert_eq!(s.notes[0].dir(), Dir::Blow);
 }
 
 #[test]
@@ -857,7 +893,7 @@ fn new_note_adopts_direction_sounding_at_that_beat() {
     select_or_add(&mut s, 2, 0);
     apply_modifier(&mut s, ModButton::Draw);
     select_or_add(&mut s, 5, 0);
-    assert_eq!(s.note_at(5, 0).unwrap().dir, Dir::Draw);
+    assert_eq!(s.note_at(5, 0).unwrap().dir(), Dir::Draw);
 }
 
 #[test]
@@ -867,8 +903,8 @@ fn setting_direction_propagates_to_simultaneous_notes() {
     select_or_add(&mut s, 5, 0);
     s.selected = vec![s.note_at(2, 0).unwrap().id];
     apply_modifier(&mut s, ModButton::Draw);
-    assert_eq!(s.note_at(2, 0).unwrap().dir, Dir::Draw);
-    assert_eq!(s.note_at(5, 0).unwrap().dir, Dir::Draw);
+    assert_eq!(s.note_at(2, 0).unwrap().dir(), Dir::Draw);
+    assert_eq!(s.note_at(5, 0).unwrap().dir(), Dir::Draw);
 }
 
 #[test]
@@ -876,15 +912,21 @@ fn enforce_unifies_overlap_chain_but_not_independent_notes() {
     let mut s = EditorState {
         notes: vec![
             GridNote::plain(0, 1, 0, 3),
-            GridNote { dir: Dir::Draw, ..GridNote::plain(1, 2, 2, 3) },
-            GridNote { dir: Dir::Draw, ..GridNote::plain(2, 3, 10, 1) },
+            GridNote {
+                target: GridNote::harmonica_target(2, Dir::Draw, HarpTechnique::Normal),
+                ..GridNote::plain(1, 2, 2, 3)
+            },
+            GridNote {
+                target: GridNote::harmonica_target(3, Dir::Draw, HarpTechnique::Normal),
+                ..GridNote::plain(2, 3, 10, 1)
+            },
         ],
         next_id: 3,
         ..Default::default()
     };
     enforce_direction(&mut s, 0);
-    assert_eq!(s.note_by_id(1).unwrap().dir, Dir::Blow);
-    assert_eq!(s.note_by_id(2).unwrap().dir, Dir::Draw);
+    assert_eq!(s.note_by_id(1).unwrap().dir(), Dir::Blow);
+    assert_eq!(s.note_by_id(2).unwrap().dir(), Dir::Draw);
 }
 
 /// A draw bend pulled onto a blown chord can't stay bent: hole 3 only bends
@@ -895,18 +937,24 @@ fn enforce_drops_a_technique_the_chords_breath_cannot_play() {
     let mut s = EditorState {
         notes: vec![
             GridNote::plain(0, 4, 0, 4),
-            GridNote { dir: Dir::Draw, pitch: Pitch::Bend(1.0), ..GridNote::plain(1, 3, 0, 4) },
-            GridNote { dir: Dir::Draw, pitch: Pitch::Bend(0.5), ..GridNote::plain(2, 8, 0, 4) },
+            GridNote {
+                target: GridNote::harmonica_target(3, Dir::Draw, HarpTechnique::Bend(1.0)),
+                ..GridNote::plain(1, 3, 0, 4)
+            },
+            GridNote {
+                target: GridNote::harmonica_target(8, Dir::Draw, HarpTechnique::Bend(0.5)),
+                ..GridNote::plain(2, 8, 0, 4)
+            },
         ],
         next_id: 3,
         ..Default::default()
     };
     enforce_direction(&mut s, 0);
     let bent3 = s.note_by_id(1).unwrap();
-    assert_eq!((bent3.dir, bent3.pitch), (Dir::Blow, Pitch::Normal));
+    assert_eq!((bent3.dir(), bent3.technique()), (Dir::Blow, HarpTechnique::Normal));
     // Hole 8 bends on the blow, so its half-step bend survives the switch.
     let bent8 = s.note_by_id(2).unwrap();
-    assert_eq!((bent8.dir, bent8.pitch), (Dir::Blow, Pitch::Bend(0.5)));
+    assert_eq!((bent8.dir(), bent8.technique()), (Dir::Blow, HarpTechnique::Bend(0.5)));
 }
 
 // Wah (hand cupping) and vibrato (breath vibrato) are whole-player
@@ -917,8 +965,14 @@ fn enforce_expr_unifies_overlap_chain_but_not_independent_notes() {
     let mut s = EditorState {
         notes: vec![
             GridNote { expr: Expr::Vibrato(5.0), ..GridNote::plain(0, 1, 0, 3) },
-            GridNote { dir: Dir::Draw, ..GridNote::plain(1, 2, 2, 3) },
-            GridNote { dir: Dir::Draw, ..GridNote::plain(2, 3, 10, 1) },
+            GridNote {
+                target: GridNote::harmonica_target(2, Dir::Draw, HarpTechnique::Normal),
+                ..GridNote::plain(1, 2, 2, 3)
+            },
+            GridNote {
+                target: GridNote::harmonica_target(3, Dir::Draw, HarpTechnique::Normal),
+                ..GridNote::plain(2, 3, 10, 1)
+            },
         ],
         next_id: 3,
         ..Default::default()
@@ -965,8 +1019,8 @@ fn separate_times_keep_independent_directions() {
     select_or_add(&mut s, 2, TICKS_PER_BEAT);
     s.selected = vec![s.note_at(2, TICKS_PER_BEAT).unwrap().id];
     apply_modifier(&mut s, ModButton::Draw);
-    assert_eq!(s.note_at(2, 0).unwrap().dir, Dir::Blow);
-    assert_eq!(s.note_at(2, TICKS_PER_BEAT).unwrap().dir, Dir::Draw);
+    assert_eq!(s.note_at(2, 0).unwrap().dir(), Dir::Blow);
+    assert_eq!(s.note_at(2, TICKS_PER_BEAT).unwrap().dir(), Dir::Draw);
 }
 
 #[test]
@@ -984,33 +1038,43 @@ fn left_edge_moves_start_and_resizes_inversely() {
     assert_eq!(apply_resize(1, 2, Edge::Left, -9, 0, None), (0, 3));
 }
 
-fn note(hole: u8, dir: Dir, pitch: Pitch) -> GridNote {
-    GridNote { id: 0, hole, tick: 0, len: 4, dir, pitch, expr: Expr::None }
+fn note(hole: u8, dir: Dir, pitch: HarpTechnique) -> GridNote {
+    GridNote {
+        id: 0,
+        tick: 0,
+        len: 4,
+        expr: Expr::None,
+        target: GridNote::harmonica_target(hole, dir, pitch),
+    }
 }
 
 #[test]
 fn note_freq_maps_holes_bends_and_key() {
     let c_harp = build_harp("C", HarmonicaKind::Diatonic);
-    let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), &c_harp).unwrap();
+    let c4 = note_freq(&note(1, Dir::Blow, HarpTechnique::Normal), &c_harp).unwrap();
     assert!((c4 - 261.63).abs() < 0.5, "got {c4}");
-    let bent = note_freq(&note(1, Dir::Blow, Pitch::Bend(1.0)), &c_harp).unwrap();
-    assert!(bent < c4, "bend should drop pitch: {bent} !< {c4}");
+    let draw = note_freq(&note(1, Dir::Draw, HarpTechnique::Normal), &c_harp).unwrap();
+    let bent = note_freq(&note(1, Dir::Draw, HarpTechnique::Bend(1.0)), &c_harp).unwrap();
+    assert!(bent < draw, "bend should drop pitch: {bent} !< {draw}");
+    // A blow bend on hole 1 is not a playable instruction. The shared
+    // instrument model must reject it rather than synthesize a phantom tab.
+    assert!(note_freq(&note(1, Dir::Blow, HarpTechnique::Bend(1.0)), &c_harp).is_none());
     // G sits 7 semitones above C, but a real G Richter harp is a "low"
     // harp — its hole-1 blow is pitched *down* to G3 (a fourth below C4),
     // not up to G4 (a fifth above), so the octave-folded key offset is
     // -5, not +7. See `song::harmonica::key_offset`.
     let g_harp = build_harp("G", HarmonicaKind::Diatonic);
-    let g = note_freq(&note(1, Dir::Blow, Pitch::Normal), &g_harp).unwrap();
+    let g = note_freq(&note(1, Dir::Blow, HarpTechnique::Normal), &g_harp).unwrap();
     assert!(
         (g / c4 - 2f32.powf(-5.0 / 12.0)).abs() < 0.001,
         "G harp is the low harp — a fourth down, not a fifth up"
     );
-    assert!(note_freq(&note(11, Dir::Blow, Pitch::Normal), &c_harp).is_none());
+    assert!(note_freq(&note(11, Dir::Blow, HarpTechnique::Normal), &c_harp).is_none());
 }
 
 #[test]
 fn note_freq_resolves_overblow_and_overdraw_from_the_correct_reed() {
-    // The reed comes from the technique, not from `note.dir` plus a
+    // The reed comes from the technique, not from `note.dir()` plus a
     // semitone — which would be wrong for the very common case of an
     // Overblow note left at its default `Dir::Blow`. Overblow (holes
     // 1/4/5/6) always sounds a semitone above the *draw* reed, and
@@ -1020,8 +1084,8 @@ fn note_freq_resolves_overblow_and_overdraw_from_the_correct_reed() {
 
     // Hole 1: blow C4, draw D4 → overblow is D#4 (draw reed + 1), not
     // C#4 (blow reed + 1), even though the note is tagged `Dir::Blow`.
-    let overblow = note_freq(&note(1, Dir::Blow, Pitch::Overblow), &harp).unwrap();
-    let draw_reed = note_freq(&note(1, Dir::Draw, Pitch::Normal), &harp).unwrap();
+    let overblow = note_freq(&note(1, Dir::Blow, HarpTechnique::Overblow), &harp).unwrap();
+    let draw_reed = note_freq(&note(1, Dir::Draw, HarpTechnique::Normal), &harp).unwrap();
     let semitone = 2f32.powf(1.0 / 12.0);
     assert!(
         (overblow / draw_reed - semitone).abs() < 0.001,
@@ -1030,8 +1094,8 @@ fn note_freq_resolves_overblow_and_overdraw_from_the_correct_reed() {
 
     // Hole 10: blow C7, draw A6 → overdraw is C#7 (blow reed + 1), even
     // though the note is tagged `Dir::Draw`.
-    let overdraw = note_freq(&note(10, Dir::Draw, Pitch::Overdraw), &harp).unwrap();
-    let blow_reed = note_freq(&note(10, Dir::Blow, Pitch::Normal), &harp).unwrap();
+    let overdraw = note_freq(&note(10, Dir::Draw, HarpTechnique::Overdraw), &harp).unwrap();
+    let blow_reed = note_freq(&note(10, Dir::Blow, HarpTechnique::Normal), &harp).unwrap();
     assert!(
         (overdraw / blow_reed - semitone).abs() < 0.001,
         "overdraw should be a semitone above the blow reed"
@@ -1041,13 +1105,13 @@ fn note_freq_resolves_overblow_and_overdraw_from_the_correct_reed() {
 #[test]
 fn note_freq_reads_the_chromatic_layout_and_slide_table() {
     let harp = build_harp("C", HarmonicaKind::Chromatic);
-    let c4 = note_freq(&note(1, Dir::Blow, Pitch::Normal), &harp).unwrap();
+    let c4 = note_freq(&note(1, Dir::Blow, HarpTechnique::Normal), &harp).unwrap();
     assert!((c4 - 261.63).abs() < 0.5, "hole 1 blow is C4, got {c4}");
-    let slid = note_freq(&note(1, Dir::Blow, Pitch::Slide), &harp).unwrap();
+    let slid = note_freq(&note(1, Dir::Blow, HarpTechnique::Slide), &harp).unwrap();
     assert!(slid > c4, "slide should raise pitch: {slid} !> {c4}");
     // Chromatic goes up to hole 12; hole 11 is out of range for diatonic
     // but valid here.
-    assert!(note_freq(&note(11, Dir::Blow, Pitch::Normal), &harp).is_some());
+    assert!(note_freq(&note(11, Dir::Blow, HarpTechnique::Normal), &harp).is_some());
 }
 
 #[test]
@@ -1055,7 +1119,7 @@ fn render_and_wav_have_expected_size() {
     // One full beat long (`note()`'s default `len: 4` is a third of one)
     // — `expected` below assumes exactly one beat of note (0.5s at
     // 120bpm) plus the synth's fixed tail.
-    let notes = [GridNote { len: TICKS_PER_BEAT, ..note(4, Dir::Draw, Pitch::Normal) }];
+    let notes = [GridNote { len: TICKS_PER_BEAT, ..note(4, Dir::Draw, HarpTechnique::Normal) }];
     let harp = build_harp("C", HarmonicaKind::Diatonic);
     let phrase: Vec<PhraseNote> = notes
         .iter()
@@ -1092,7 +1156,7 @@ fn move_target_clamps_to_a_chromatic_hole_count() {
 #[test]
 fn move_is_blocked_where_a_note_already_sits() {
     let notes = vec![GridNote::plain(0, 3, 0, 2), GridNote::plain(1, 3, 5, 1)];
-    let target = |hole, tick| vec![(1u32, hole, tick, 1, Pitch::Normal)];
+    let target = |hole, tick| vec![(1u32, hole, tick, 1, HarpTechnique::Normal)];
     assert!(!group_move_valid(
         &notes,
         &build_harp("C", HarmonicaKind::Diatonic),
@@ -1287,8 +1351,12 @@ fn chart_schema_rejects_unknown_diatonic_profiles_before_editor_loading() {
 
 #[test]
 fn chart_schema_rejects_chromatics_above_sixteen_holes_before_editor_loading() {
-    let mut state =
-        EditorState { harmonica_kind: HarmonicaKind::Chromatic16, ..Default::default() };
+    let mut state = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::Chromatic16,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut state, 1, 0);
     let mut value: serde_json::Value = serde_json::from_str(&serialize_harpchart(&state)).unwrap();
     value["harmonica"]["holes"] = serde_json::json!(17);
@@ -1782,7 +1850,12 @@ fn default_song_feel_is_omitted_from_saved_charts() {
 
 #[test]
 fn editor_load_validation_lists_only_semantics_it_cannot_preserve() {
-    let mut state = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
+    let mut state = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::Chromatic,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut state, 1, 0);
     let mut value: serde_json::Value =
         serde_json::from_str(&serialize_harpchart(&state)).expect("valid chart JSON");
@@ -2041,7 +2114,12 @@ fn loading_a_chart_without_a_scale_field_leaves_the_current_scale_untouched() {
 
 #[test]
 fn chromatic_chart_round_trips_kind_hole_count_and_slide() {
-    let mut s = EditorState { harmonica_kind: HarmonicaKind::Chromatic, ..Default::default() };
+    let mut s = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::Chromatic,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut s, 11, 0); // only valid on a chromatic (12-hole) harp
     apply_modifier(&mut s, ModButton::Slide);
 
@@ -2054,15 +2132,19 @@ fn chromatic_chart_round_trips_kind_hole_count_and_slide() {
     let mut loaded = EditorState::default();
     let mut scroll = Scroll::default();
     load_harpchart(&v, &mut loaded, &mut scroll);
-    assert_eq!(loaded.harmonica_kind, HarmonicaKind::Chromatic);
-    assert_eq!(loaded.notes[0].hole, 11);
-    assert_eq!(loaded.notes[0].pitch, Pitch::Slide);
+    assert_eq!(loaded.harmonica_kind(), HarmonicaKind::Chromatic);
+    assert_eq!(loaded.notes[0].hole(), 11);
+    assert_eq!(loaded.notes[0].technique(), HarpTechnique::Slide);
 }
 
 #[test]
 fn sixteen_hole_chromatic_round_trips_high_holes_and_slide() {
-    let mut state =
-        EditorState { harmonica_kind: HarmonicaKind::Chromatic16, ..Default::default() };
+    let mut state = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::Chromatic16,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut state, 16, 0);
     apply_modifier(&mut state, ModButton::Slide);
 
@@ -2075,9 +2157,9 @@ fn sixteen_hole_chromatic_round_trips_high_holes_and_slide() {
     let mut loaded = EditorState::default();
     let mut scroll = Scroll::default();
     load_harpchart(&value, &mut loaded, &mut scroll);
-    assert_eq!(loaded.harmonica_kind, HarmonicaKind::Chromatic16);
-    assert_eq!(loaded.notes[0].hole, 16);
-    assert_eq!(loaded.notes[0].pitch, Pitch::Slide);
+    assert_eq!(loaded.harmonica_kind(), HarmonicaKind::Chromatic16);
+    assert_eq!(loaded.notes[0].hole(), 16);
+    assert_eq!(loaded.notes[0].technique(), HarpTechnique::Slide);
 }
 
 #[test]
@@ -2087,7 +2169,10 @@ fn alternate_diatonic_tunings_round_trip_profile_and_layout() {
         (HarmonicaKind::CountryTuned, "country_tuned", "G4", "F#5"),
         (HarmonicaKind::NaturalMinor, "natural_minor", "G4", "F5"),
     ] {
-        let mut state = EditorState { harmonica_kind: kind, ..Default::default() };
+        let mut state = EditorState {
+            instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(kind),
+            ..Default::default()
+        };
         select_or_add(&mut state, 1, 0);
         let text = serialize_harpchart(&state);
         validated_harpchart(&text).expect("the editor must accept its alternate tuning");
@@ -2099,7 +2184,7 @@ fn alternate_diatonic_tunings_round_trip_profile_and_layout() {
         let mut loaded = EditorState::default();
         let mut scroll = Scroll::default();
         load_harpchart(&value, &mut loaded, &mut scroll);
-        assert_eq!(loaded.harmonica_kind, kind);
+        assert_eq!(loaded.harmonica_kind(), kind);
     }
 }
 
@@ -2112,7 +2197,7 @@ fn state_with_custom_layout() -> EditorState {
     value["harmonica"]["layout"]["blow"][0] = serde_json::json!("F#3");
     let mut loaded = EditorState::default();
     load_harpchart(&value, &mut loaded, &mut Scroll::default());
-    assert!(loaded.loaded_harmonica.is_some(), "precondition: layout retained");
+    assert!(loaded.instrument.is_configured(), "precondition: layout retained");
     loaded
 }
 
@@ -2127,7 +2212,7 @@ fn the_loaded_layout_survives_reselecting_the_same_key_and_kind() {
     // the chart's reeds away.
     let mut s = state_with_custom_layout();
     let key = s.key.clone();
-    let kind = s.harmonica_kind;
+    let kind = s.harmonica_kind();
     s.set_key(key);
     s.set_harmonica_kind(kind);
     assert_eq!(blow_one_of(&s), "F#3");
@@ -2137,7 +2222,7 @@ fn the_loaded_layout_survives_reselecting_the_same_key_and_kind() {
 fn changing_the_key_drops_the_loaded_layout_for_the_preset() {
     let mut s = state_with_custom_layout();
     s.set_key("D".into());
-    assert!(s.loaded_harmonica.is_none());
+    assert!(s.instrument.is_preset());
     // The preset D harp's blow 1 — not the custom reed, and not C's.
     assert_eq!(blow_one_of(&s), "D4");
 }
@@ -2146,7 +2231,7 @@ fn changing_the_key_drops_the_loaded_layout_for_the_preset() {
 fn changing_the_kind_drops_the_loaded_layout_for_the_preset() {
     let mut s = state_with_custom_layout();
     s.set_harmonica_kind(HarmonicaKind::PaddyRichter);
-    assert!(s.loaded_harmonica.is_none());
+    assert!(s.instrument.is_preset());
     assert_ne!(blow_one_of(&s), "F#3");
 }
 
@@ -2179,7 +2264,7 @@ fn a_midi_import_drops_the_loaded_layout_even_when_the_key_matches() {
         diagnostics: Default::default(),
     };
     super::midi_import::apply_imported_track(&mut s, imported, &key);
-    assert!(s.loaded_harmonica.is_none());
+    assert!(s.instrument.is_preset());
     assert!(s.meter_changes.is_empty());
     assert_eq!(blow_one_of(&s), "C4");
 }
@@ -2194,7 +2279,10 @@ fn custom_layouts_round_trip_for_every_named_harmonica() {
         HarmonicaKind::Chromatic,
         HarmonicaKind::Chromatic16,
     ] {
-        let mut source = EditorState { harmonica_kind: kind, ..Default::default() };
+        let mut source = EditorState {
+            instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(kind),
+            ..Default::default()
+        };
         select_or_add(&mut source, 1, 0);
         let mut value: serde_json::Value =
             serde_json::from_str(&serialize_harpchart(&source)).unwrap();
@@ -2418,7 +2506,10 @@ fn note_in_scale_uses_the_bent_target_pitch_not_the_natural_one() {
     let harp = build_harp("C", HarmonicaKind::Diatonic);
 
     // Draw-3 unbent is B4 (the major 7th) — outside the C blues scale.
-    let natural = GridNote { dir: Dir::Draw, ..GridNote::plain(0, 3, 0, 1) };
+    let natural = GridNote {
+        target: GridNote::harmonica_target(3, Dir::Draw, HarpTechnique::Normal),
+        ..GridNote::plain(0, 3, 0, 1)
+    };
     assert!(
         !note_in_scale(&natural, &harp, &scale),
         "unbent B (major 7th) is outside the blues scale"
@@ -2426,7 +2517,10 @@ fn note_in_scale_uses_the_bent_target_pitch_not_the_natural_one() {
 
     // Bending draw-3 down a step-and-a-half reaches Bb (the ♭7) — exactly
     // how a blues player accesses that blue note. Should read as in-scale.
-    let bent = GridNote { dir: Dir::Draw, pitch: Pitch::Bend(1.5), ..GridNote::plain(0, 3, 0, 1) };
+    let bent = GridNote {
+        target: GridNote::harmonica_target(3, Dir::Draw, HarpTechnique::Bend(1.5)),
+        ..GridNote::plain(0, 3, 0, 1)
+    };
     assert!(
         note_in_scale(&bent, &harp, &scale),
         "bending down 1.5 steps reaches Bb, the b7 — in scale"
@@ -2465,19 +2559,25 @@ fn safe_path_segment_of_all_punctuation_is_empty() {
 fn parse_pitch_expr_reads_bend_semitones_as_negative() {
     let mods = vec![serde_json::json!({ "type": "bend", "semitones": -1.5 })];
     let (pitch, expr) = parse_pitch_expr(&mods);
-    assert_eq!(pitch, Pitch::Bend(1.5));
+    assert_eq!(pitch, HarpTechnique::Bend(1.5));
     assert_eq!(expr, Expr::None);
 }
 
 #[test]
 fn parse_pitch_expr_reads_overblow_overdraw_vibrato_wah() {
-    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "overblow" })]).0, Pitch::Overblow);
-    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "overdraw" })]).0, Pitch::Overdraw);
+    assert_eq!(
+        parse_pitch_expr(&[serde_json::json!({ "type": "overblow" })]).0,
+        HarpTechnique::Overblow
+    );
+    assert_eq!(
+        parse_pitch_expr(&[serde_json::json!({ "type": "overdraw" })]).0,
+        HarpTechnique::Overdraw
+    );
     // No `oscillation_hz` in the JSON (e.g. a chart saved before it was
     // per-note) falls back to the default rate.
     assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "vibrato" })]).1, Expr::Vibrato(5.5));
     assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "wah-wah" })]).1, Expr::Wah(4.0));
-    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "slide" })]).0, Pitch::Slide);
+    assert_eq!(parse_pitch_expr(&[serde_json::json!({ "type": "slide" })]).0, HarpTechnique::Slide);
 }
 
 #[test]
@@ -2502,9 +2602,9 @@ fn parse_pitch_expr_clamps_a_nonpositive_oscillation_hz() {
 
 #[test]
 fn parse_pitch_expr_defaults_for_empty_or_unknown_modifiers() {
-    assert_eq!(parse_pitch_expr(&[]), (Pitch::Normal, Expr::None));
+    assert_eq!(parse_pitch_expr(&[]), (HarpTechnique::Normal, Expr::None));
     let unknown = vec![serde_json::json!({ "type": "flutter" })];
-    assert_eq!(parse_pitch_expr(&unknown), (Pitch::Normal, Expr::None));
+    assert_eq!(parse_pitch_expr(&unknown), (HarpTechnique::Normal, Expr::None));
 }
 
 // ── note_rect ─────────────────────────────────────────────────────────────────
@@ -2512,7 +2612,7 @@ fn parse_pitch_expr_defaults_for_empty_or_unknown_modifiers() {
 #[test]
 fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
     let note = GridNote::plain(0, 1, 0, 1);
-    let (left, top, width, height) = note_rect(&note);
+    let (left, top, width, height) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
     assert_eq!(left, 1.0);
     assert_eq!(top, HEADER_H + NOTE_PAD);
     assert_eq!(width, TICK_W - 2.0);
@@ -2523,8 +2623,8 @@ fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
 fn note_rect_advances_one_row_per_hole_and_scales_width_with_len() {
     let a = GridNote::plain(0, 1, 0, 3);
     let b = GridNote::plain(1, 2, 0, 3);
-    let (_, top_a, width_a, _) = note_rect(&a);
-    let (_, top_b, width_b, _) = note_rect(&b);
+    let (_, top_a, width_a, _) = note_rect(&a, usize::from(a.hole().saturating_sub(1)));
+    let (_, top_b, width_b, _) = note_rect(&b, usize::from(b.hole().saturating_sub(1)));
     assert_eq!(top_b - top_a, ROW_H, "hole 2 sits exactly one row below hole 1");
     assert_eq!(width_a, width_b);
     assert_eq!(width_a, 3.0 * TICK_W - 2.0);
@@ -2719,7 +2819,13 @@ fn describe_tick_matches_the_ruler_after_a_change() {
 // ── resize_grip_position ──────────────────────────────────────────────────────
 
 fn grid_note(tick: usize, len: usize) -> GridNote {
-    GridNote { id: 1, hole: 1, tick, len, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None }
+    GridNote {
+        id: 1,
+        tick,
+        len,
+        expr: Expr::None,
+        target: GridNote::harmonica_target(1, Dir::Blow, HarpTechnique::Normal),
+    }
 }
 
 #[test]
@@ -2729,7 +2835,7 @@ fn grips_sit_entirely_outside_the_note_at_every_length() {
     // (tick 12) so the left grip isn't up against the clamp.
     for len in 1..=(TICKS_PER_BEAT * 2) {
         let note = grid_note(TICKS_PER_BEAT, len);
-        let (left, _, width, _) = note_rect(&note);
+        let (left, _, width, _) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
         let (lx, _) = resize_grip_position(&note, Edge::Left);
         let (rx, _) = resize_grip_position(&note, Edge::Right);
         assert!(lx + GRIP_D <= left, "len {len}: left grip overlaps the note body");
@@ -2747,14 +2853,15 @@ fn a_grip_is_the_same_size_however_short_the_note_is() {
     let span = |n: &GridNote| {
         resize_grip_position(n, Edge::Right).0 - resize_grip_position(n, Edge::Left).0
     };
-    let widths = note_rect(&long).2 - note_rect(&short).2;
+    let widths = note_rect(&long, usize::from(long.hole().saturating_sub(1))).2
+        - note_rect(&short, usize::from(short.hole().saturating_sub(1))).2;
     assert!((span(&long) - span(&short) - widths).abs() < 0.001);
 }
 
 #[test]
 fn grips_are_centred_on_the_notes_vertical_middle() {
     let note = grid_note(TICKS_PER_BEAT, TICKS_PER_BEAT);
-    let (_, top, _, height) = note_rect(&note);
+    let (_, top, _, height) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
     let want = top + (height - GRIP_D) / 2.0;
     assert_eq!(resize_grip_position(&note, Edge::Left).1, want);
     assert_eq!(resize_grip_position(&note, Edge::Right).1, want);
@@ -3142,7 +3249,7 @@ fn state_with_notes(notes: Vec<GridNote>) -> EditorState {
 #[test]
 fn the_first_record_seeds_history_without_anything_to_undo() {
     let mut history = UndoHistory::default();
-    let state = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let state = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&state);
     assert!(!history.can_undo());
     assert!(!history.can_redo());
@@ -3151,12 +3258,12 @@ fn the_first_record_seeds_history_without_anything_to_undo() {
 #[test]
 fn a_genuine_content_change_becomes_one_undo_step() {
     let mut history = UndoHistory::default();
-    let before = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let before = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&before);
 
     let after = state_with_notes(vec![
-        note(1, Dir::Blow, Pitch::Normal),
-        note(2, Dir::Draw, Pitch::Normal),
+        note(1, Dir::Blow, HarpTechnique::Normal),
+        note(2, Dir::Draw, HarpTechnique::Normal),
     ]);
     history.record_if_changed(&after);
     assert!(history.can_undo());
@@ -3166,7 +3273,7 @@ fn a_genuine_content_change_becomes_one_undo_step() {
 #[test]
 fn recording_the_same_content_twice_is_a_no_op() {
     let mut history = UndoHistory::default();
-    let mut state = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let mut state = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&state);
     // Only `selected` changes — not part of the undo snapshot at all, see
     // `undo`'s module doc comment.
@@ -3178,12 +3285,12 @@ fn recording_the_same_content_twice_is_a_no_op() {
 #[test]
 fn undo_restores_the_previous_content_and_enables_redo() {
     let mut history = UndoHistory::default();
-    let before = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let before = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&before);
 
     let mut state = state_with_notes(vec![
-        note(1, Dir::Blow, Pitch::Normal),
-        note(2, Dir::Draw, Pitch::Normal),
+        note(1, Dir::Blow, HarpTechnique::Normal),
+        note(2, Dir::Draw, HarpTechnique::Normal),
     ]);
     history.record_if_changed(&state);
 
@@ -3196,12 +3303,12 @@ fn undo_restores_the_previous_content_and_enables_redo() {
 #[test]
 fn undo_drops_a_selection_pointing_at_a_removed_note() {
     let mut history = UndoHistory::default();
-    let before = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let before = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&before);
 
-    let mut added = note(2, Dir::Draw, Pitch::Normal);
+    let mut added = note(2, Dir::Draw, HarpTechnique::Normal);
     added.id = 7;
-    let mut state = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal), added]);
+    let mut state = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal), added]);
     state.selected = vec![7];
     history.record_if_changed(&state);
 
@@ -3212,10 +3319,11 @@ fn undo_drops_a_selection_pointing_at_a_removed_note() {
 #[test]
 fn redo_reapplies_the_undone_content() {
     let mut history = UndoHistory::default();
-    let before = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let before = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&before);
 
-    let after_notes = vec![note(1, Dir::Blow, Pitch::Normal), note(2, Dir::Draw, Pitch::Normal)];
+    let after_notes =
+        vec![note(1, Dir::Blow, HarpTechnique::Normal), note(2, Dir::Draw, HarpTechnique::Normal)];
     let mut state = state_with_notes(after_notes.clone());
     history.record_if_changed(&state);
 
@@ -3229,19 +3337,19 @@ fn redo_reapplies_the_undone_content() {
 #[test]
 fn a_fresh_edit_after_undo_clears_the_redo_stack() {
     let mut history = UndoHistory::default();
-    let before = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let before = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&before);
 
     let mut state = state_with_notes(vec![
-        note(1, Dir::Blow, Pitch::Normal),
-        note(2, Dir::Draw, Pitch::Normal),
+        note(1, Dir::Blow, HarpTechnique::Normal),
+        note(2, Dir::Draw, HarpTechnique::Normal),
     ]);
     history.record_if_changed(&state);
     history.undo(&mut state);
     assert!(history.can_redo());
 
     // A genuinely new edit, not another undo/redo.
-    state.notes.push(note(3, Dir::Blow, Pitch::Normal));
+    state.notes.push(note(3, Dir::Blow, HarpTechnique::Normal));
     history.record_if_changed(&state);
     assert!(!history.can_redo());
 }
@@ -3249,7 +3357,7 @@ fn a_fresh_edit_after_undo_clears_the_redo_stack() {
 #[test]
 fn undo_and_redo_are_no_ops_with_nothing_on_their_stack() {
     let mut history = UndoHistory::default();
-    let mut state = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let mut state = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     let original = state.notes.clone();
     history.undo(&mut state);
     history.redo(&mut state);
@@ -3263,7 +3371,7 @@ fn history_evicts_the_oldest_entry_past_the_limit() {
     history.record_if_changed(&state);
     // One content-changing edit per iteration, well past the cap.
     for i in 0..(HISTORY_LIMIT + 10) {
-        state.notes = vec![note(1, Dir::Blow, Pitch::Bend(0.0))];
+        state.notes = vec![note(1, Dir::Blow, HarpTechnique::Bend(0.0))];
         state.notes[0].tick = i;
         history.record_if_changed(&state);
     }
@@ -3282,7 +3390,7 @@ fn undo_skips_recording_while_a_take_is_active() {
     // none of that should land in the undo history until the take stops —
     // otherwise undo would only ever step back one frame of growth.
     let mut history = UndoHistory::default();
-    let mut state = state_with_notes(vec![note(1, Dir::Blow, Pitch::Normal)]);
+    let mut state = state_with_notes(vec![note(1, Dir::Blow, HarpTechnique::Normal)]);
     history.record_if_changed(&state);
 
     // Simulate several frames of a take growing a note, none recorded —
@@ -3478,8 +3586,8 @@ fn copy_paste_carries_intensity_and_annotation_to_the_new_notes() {
     assert_eq!(pasted.len(), 2);
     assert!(pasted.iter().all(|&id| id >= 3));
     // Hole 1's intensity followed it to its new id; hole 2 had none.
-    let new_hole_1 = s.notes.iter().find(|n| pasted.contains(&n.id) && n.hole == 1).unwrap();
-    let new_hole_2 = s.notes.iter().find(|n| pasted.contains(&n.id) && n.hole == 2).unwrap();
+    let new_hole_1 = s.notes.iter().find(|n| pasted.contains(&n.id) && n.hole() == 1).unwrap();
+    let new_hole_2 = s.notes.iter().find(|n| pasted.contains(&n.id) && n.hole() == 2).unwrap();
     assert_eq!(s.expression_intensities.get(&new_hole_1.id).map(String::as_str), Some("0.8"));
     assert!(!s.expression_intensities.contains_key(&new_hole_2.id));
     // The onset's label came too; the originals are untouched.
@@ -3599,12 +3707,12 @@ fn switching_harmonica_kind_drops_metadata_of_the_holes_it_removes() {
     // 10-hole diatonic removes that note and must take its label and
     // intensity with it, not leave them pointing at nothing.
     let mut s = state_with_notes(vec![GridNote::plain(0, 12, 0, 4), GridNote::plain(1, 1, 24, 4)]);
-    s.harmonica_kind = HarmonicaKind::Chromatic;
+    s.set_harmonica_kind(HarmonicaKind::Chromatic);
     s.phrase_annotations.insert(0, annotated("high"));
     s.phrase_annotations.insert(24, annotated("low"));
     s.expression_intensities.insert(0, "0.9".into());
     s.set_harmonica_kind(HarmonicaKind::Diatonic);
-    assert!(s.notes.iter().all(|n| n.hole <= 10));
+    assert!(s.notes.iter().all(|n| n.hole() <= 10));
     assert_eq!(section_at(&s, 0), None);
     assert!(!s.expression_intensities.contains_key(&0));
     assert_eq!(section_at(&s, 24), Some("low"));
@@ -3878,38 +3986,46 @@ fn the_sticky_bend_cap_is_the_deepest_any_hole_of_the_harp_allows() {
     assert_eq!(deepest_bend(&build_harp("C", HarmonicaKind::Diatonic)), 3.0);
     assert_eq!(deepest_bend(&build_harp("C", HarmonicaKind::PaddyRichter)), 2.0);
     // And the cycle actually stops there: on Richter, 3.0 wraps to Normal.
-    let mut s = EditorState { sticky_pitch: Pitch::Bend(3.0), ..Default::default() };
+    let mut s = EditorState { sticky_pitch: HarpTechnique::Bend(3.0), ..Default::default() };
     super::interaction::cycle_sticky_bend(&mut s);
-    assert_eq!(s.sticky_pitch, Pitch::Normal);
+    assert_eq!(s.sticky_pitch, HarpTechnique::Normal);
 }
 
 #[test]
 fn the_bend_button_respects_the_tuning_not_a_richter_table() {
     // Country tuning's raised draw 5 bends a semitone; Richter's hole 5
     // does not.
-    let mut country =
-        EditorState { harmonica_kind: HarmonicaKind::CountryTuned, ..Default::default() };
+    let mut country = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::CountryTuned,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut country, 5, 0);
     apply_modifier(&mut country, ModButton::Bend);
-    assert_eq!(country.notes[0].pitch, Pitch::Bend(0.5), "country hole 5 bends");
+    assert_eq!(country.notes[0].technique(), HarpTechnique::Bend(0.5), "country hole 5 bends");
 
     let mut richter = EditorState::default();
     select_or_add(&mut richter, 5, 0);
     apply_modifier(&mut richter, ModButton::Bend);
-    assert_eq!(richter.notes[0].pitch, Pitch::Normal, "Richter hole 5 can't");
+    assert_eq!(richter.notes[0].technique(), HarpTechnique::Normal, "Richter hole 5 can't");
 
     // Paddy Richter's hole 3 bends one semitone, not Richter's three: the
     // cycle wraps to Normal after 1.0 instead of letting an author place a
     // bend the instrument can't make.
-    let mut paddy =
-        EditorState { harmonica_kind: HarmonicaKind::PaddyRichter, ..Default::default() };
+    let mut paddy = EditorState {
+        instrument: crate::song_editor::state::InstrumentSelection::HarmonicaPreset(
+            HarmonicaKind::PaddyRichter,
+        ),
+        ..Default::default()
+    };
     select_or_add(&mut paddy, 3, 0);
     for _ in 0..2 {
         apply_modifier(&mut paddy, ModButton::Bend);
     }
-    assert_eq!(paddy.notes[0].pitch, Pitch::Bend(1.0));
+    assert_eq!(paddy.notes[0].technique(), HarpTechnique::Bend(1.0));
     apply_modifier(&mut paddy, ModButton::Bend);
-    assert_eq!(paddy.notes[0].pitch, Pitch::Normal);
+    assert_eq!(paddy.notes[0].technique(), HarpTechnique::Normal);
 }
 
 #[test]
@@ -3950,8 +4066,8 @@ fn selection_on(holes: &[u8]) -> EditorState {
     state
 }
 
-fn pitches(state: &EditorState) -> Vec<Pitch> {
-    state.notes.iter().map(|n| n.pitch).collect()
+fn pitches(state: &EditorState) -> Vec<HarpTechnique> {
+    state.notes.iter().map(|n| n.technique()).collect()
 }
 
 #[test]
@@ -3967,13 +4083,16 @@ fn notes_that_cannot_take_a_technique_keep_theirs_and_are_counted() {
     // Richter: hole 2 can't overblow; holes 4 and 5 can.
     let mut state = selection_on(&[4, 2, 5]);
     apply_modifier(&mut state, ModButton::Overblow);
-    assert_eq!(pitches(&state), vec![Pitch::Overblow, Pitch::Normal, Pitch::Overblow]);
+    assert_eq!(
+        pitches(&state),
+        vec![HarpTechnique::Overblow, HarpTechnique::Normal, HarpTechnique::Overblow]
+    );
     assert_eq!(state.technique_notice, Some(1));
-    assert!(state.notes.iter().all(|n| n.dir == Dir::Blow));
+    assert!(state.notes.iter().all(|n| n.dir() == Dir::Blow));
 
     // Pressed again, the primary is overblown, so it switches them all off.
     apply_modifier(&mut state, ModButton::Overblow);
-    assert_eq!(pitches(&state), vec![Pitch::Normal; 3]);
+    assert_eq!(pitches(&state), vec![HarpTechnique::Normal; 3]);
 }
 
 #[test]
@@ -3981,15 +4100,15 @@ fn a_bend_steps_as_deep_as_any_selected_hole_allows() {
     // Draw 1 bends one semitone, draw 3 three; primary is hole 1.
     let mut state = selection_on(&[3, 1]);
     for n in &mut state.notes {
-        n.dir = Dir::Draw;
+        n.set_dir(Dir::Draw);
     }
     apply_modifier(&mut state, ModButton::Bend);
     apply_modifier(&mut state, ModButton::Bend);
-    assert_eq!(pitches(&state), vec![Pitch::Bend(1.0), Pitch::Bend(1.0)]);
+    assert_eq!(pitches(&state), vec![HarpTechnique::Bend(1.0), HarpTechnique::Bend(1.0)]);
     apply_modifier(&mut state, ModButton::Bend);
     assert_eq!(
         pitches(&state),
-        vec![Pitch::Bend(1.5), Pitch::Bend(1.0)],
+        vec![HarpTechnique::Bend(1.5), HarpTechnique::Bend(1.0)],
         "hole 1 stops at its own depth"
     );
     assert_eq!(state.technique_notice, Some(1));
@@ -3999,7 +4118,7 @@ fn a_bend_steps_as_deep_as_any_selected_hole_allows() {
 fn one_selected_note_that_cannot_take_it_is_silently_unchanged() {
     let mut state = selection_on(&[2]);
     apply_modifier(&mut state, ModButton::Overblow);
-    assert_eq!(pitches(&state), vec![Pitch::Normal]);
+    assert_eq!(pitches(&state), vec![HarpTechnique::Normal]);
     assert_eq!(state.technique_notice, None);
 }
 
@@ -4101,4 +4220,30 @@ fn file_picker_keys_do_not_delete_or_transpose_selected_notes() {
     world.run_system_once(super::interaction::grid_keys).unwrap();
     assert_eq!(world.resource::<EditorState>().notes, vec![note]);
     assert_eq!(world.resource::<EditorState>().selected, vec![0]);
+}
+
+#[test]
+fn visual_rows_do_not_change_guitar_pitch_or_fingering() {
+    use harmonicon_core::instrument::{
+        PlayPosition,
+        guitar::{FretAssignment, Guitar, GuitarBody, StringTechnique},
+    };
+    use harmonicon_core::note_target::NoteTarget;
+    let guitar = Guitar::standard(GuitarBody::Electric);
+    let position = PlayPosition::Fret(FretAssignment {
+        string: 2,
+        fret: 5,
+        technique: StringTechnique::Fretted,
+    });
+    let target = NoteTarget::Sounding { midi: 64.0, placement: None }
+        .with_placement(&guitar, position)
+        .unwrap();
+    let note = GridNote { id: 1, tick: 12, len: 4, expr: Expr::None, target };
+    let tab = note_rect(&note, 1);
+    let piano = note_rect(&note, 24);
+    assert_eq!((tab.0, tab.2, tab.3), (piano.0, piano.2, piano.3));
+    assert_ne!(tab.1, piano.1);
+    assert_eq!(note.target, target);
+    assert_eq!(super::playback::note_midi(&note, &guitar), Some(64));
+    assert!(super::playback::note_freq(&note, &guitar).is_some());
 }

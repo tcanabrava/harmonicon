@@ -12,34 +12,18 @@ load-bearing about *this* crate.
 
 ## Architecture (load-bearing facts)
 
-- **`EditorState::effective_harp()` is the only harmonica the editor
-  plays, draws, maps or saves.** A chart's authored `harmonica.layout` is
-  kept on load as `loaded_harmonica: Option<LoadedHarmonica>` — the reeds
-  plus the key and `HarmonicaKind` they were loaded for — and
-  `effective_harp` returns it while `key` and `harmonica_kind` still match
-  that identity, else the named preset from `playback::build_harp`. Before
-  this, load identified the *kind* and threw the layout away, so saving a
-  chart with one re-tuned reed silently regenerated the preset. Every
-  pitch consumer (grid labels, audition, practice, playback, recording,
-  notation, `serialize_harpchart`) takes the harp from `effective_harp`;
-  **don't call `build_harp` from feature code** — its two legitimate
-  callers are `effective_harp`'s own fallback and `pitch_map::
-  suggest_key`, which scores every preset key as a *candidate*. Three
-  rules keep it safe:
-  - **Only an intentional instrument change drops the layout**:
-    `set_key` and `set_harmonica_kind`, and only when the value actually
-    changes — re-picking what's already selected keeps the reeds. Writing
-    `key` directly bypasses the drop, which is why `effective_harp` also
-    checks the identity itself rather than trusting the field to be
-    `None`.
-  - **MIDI import drops it unconditionally** (`apply_imported_track`),
-    not via `set_key`: every imported pitch was resolved against the
-    *preset* for the suggested key, so if that key happens to equal the
-    chart's, `set_key` would keep reeds the imported holes weren't placed
-    with.
-  - **It's undo-tracked and cache-tracked** (`undo::Snapshot`,
-    `grid_cache::Snapshot`) like `harmonica_kind`, for the same reason:
-    it changes which pitch every hole means.
+- **`EditorState::instrument` is the single instrument selection.**
+  `InstrumentSelection` contains either a harmonica preset or one configured
+  core `Instrument`. Authored harmonicas carry their source key/kind identity
+  so reselecting the same values preserves custom reeds; a genuine physical
+  harp change selects a preset. Configured non-harmonica instruments keep
+  their tuning when the song key changes. `effective_instrument()` is the
+  generic consumer API; `effective_harp()` is the guarded adapter for the
+  current harmonica-only controls. Undo and grid invalidation snapshot the
+  entire selection. MIDI import intentionally selects a preset because its
+  assignments were computed against that preset, even if its key matches a
+  previously loaded custom harp. Never add separate optional instrument
+  fields to `EditorState`.
 
   **Bend depth comes from the reeds too**: `pitch_compatible(pitch, harp,
   hole)` and `max_bend(harp, hole)` (core) count the semitones between a
@@ -73,8 +57,8 @@ load-bearing about *this* crate.
   note the editor's own UI wouldn't allow. (**The resolution itself lives
   in `harmonicon_core::pitch_map`**, where gameplay and score importers
   can reach it too; `song_editor::pitch_map` is the thin adapter
-  translating core's `HoleAssignment` into the editor's own `Dir`/`Pitch`
-  — the vocabulary the mod-panel buttons produce and a `GridNote` stores.
+  translating core's `HoleAssignment` into the editor's own `Dir`/`HarpTechnique`
+  — the vocabulary the mod-panel buttons produce and the harmonica view uses.
   It keeps the `map_pitch` / no-fallback `map_pitch_playable` /
   `suggest_key` names its two callers already used, MIDI import and live
   recording, which want opposite fallback behaviour; see the recording
@@ -171,7 +155,7 @@ load-bearing about *this* crate.
   so a note doesn't freeze one frame short of the actual release. A bend
   played and held resolves correctly because of the shared resolution —
   `PitchInfo::midi` rounds a bent pitch to *its own* nearest semitone,
-  not the unbent note's, so it lands on `Pitch::Bend`, not the
+  not the unbent note's, so it lands on `HarpTechnique::Bend`, not the
   nearest natural note. Recording reuses `Playhead` for its clock rather
   than inventing a second one, with `total: f32::MAX` since a take has no
   natural end the way Play/Practice (bounded by the chart's own last
@@ -895,3 +879,17 @@ load-bearing about *this* crate.
   the same already-accepted simplification `call_response` documents
   above for mid-phrase tempo automation. Extending the synth to follow a
   variable tempo map is future work, not a gap in this feature.
+
+- **A grid note has no instrument-specific fields.** `GridNote` carries
+  identity, timing, expression and core's `NoteTarget`. `Sounding` keeps a
+  pitch with an optional authored placement; `Positioned` preserves a tab
+  instruction across tuning changes. Existing harmonica authoring uses
+  `Positioned`, preserving its same-hole key-change semantics. Do not add
+  `fret`, `hole`, or `dir` back to the generic note. `harmonica_note.rs`
+  is the adapter for the current harmonica-only view and its tools; the
+  loader gate remains until another view and its chart codec are ready.
+  Geometry takes an explicit visual row, and playback resolves pitch through
+  `InstrumentModel`. Merely projecting or inspecting a note cannot rewrite
+  its target. Authored pitch placements must pass `with_placement`/`candidates`;
+  incompatible positions are errors, not permission to guess new fingering.
+  Both intent and placement travel together through clipboard and undo.

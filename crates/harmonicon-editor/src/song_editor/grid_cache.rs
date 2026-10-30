@@ -3,7 +3,7 @@
 //! Grid invalidation tracks rendered content, independently of editor metadata
 //! and selection. Snapshots are copied only when a rebuild is required.
 use super::snap::SnapMode;
-use super::state::{EditorState, GridNote, HarmonicaKind, LoadedHarmonica, Mode, PhraseAnnotation};
+use super::state::{EditorState, GridNote, InstrumentSelection, Mode, PhraseAnnotation};
 use bevy::prelude::*;
 use harmonicon_core::chart::Scale;
 
@@ -22,8 +22,7 @@ struct Snapshot {
     time_signature: String,
     pickup_beats: String,
     repeats: Vec<harmonicon_core::chart::Repeat>,
-    harmonica_kind: HarmonicaKind,
-    loaded_harmonica: Option<LoadedHarmonica>,
+    instrument: InstrumentSelection,
     mode: Mode,
     user_locked: bool,
     scale: Scale,
@@ -55,8 +54,7 @@ impl GridCache {
                     && old.time_signature == state.time_signature
                     && old.pickup_beats == state.pickup_beats
                     && old.repeats == state.repeats
-                    && old.harmonica_kind == state.harmonica_kind
-                    && old.loaded_harmonica == state.loaded_harmonica
+                    && old.instrument == state.instrument
                     && old.mode == state.mode
                     && old.user_locked == state.user_locked
                     && old.scale == state.scale
@@ -78,8 +76,7 @@ impl GridCache {
             snapshot.time_signature.clone_from(&state.time_signature);
             snapshot.pickup_beats.clone_from(&state.pickup_beats);
             snapshot.repeats.clone_from(&state.repeats);
-            snapshot.harmonica_kind = state.harmonica_kind;
-            snapshot.loaded_harmonica.clone_from(&state.loaded_harmonica);
+            snapshot.instrument.clone_from(&state.instrument);
             snapshot.mode = state.mode;
             snapshot.user_locked = state.user_locked;
             snapshot.scale = state.scale;
@@ -98,8 +95,7 @@ impl GridCache {
                 time_signature: state.time_signature.clone(),
                 pickup_beats: state.pickup_beats.clone(),
                 repeats: state.repeats.clone(),
-                harmonica_kind: state.harmonica_kind,
-                loaded_harmonica: state.loaded_harmonica.clone(),
+                instrument: state.instrument.clone(),
                 mode: state.mode,
                 user_locked: state.user_locked,
                 scale: state.scale,

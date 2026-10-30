@@ -55,7 +55,7 @@ use super::pitch_map::map_pitch_playable;
 use super::playback::{
     EditorAudio, PendingMusicSeek, Playhead, secs_per_tick, spawn_background_music, toggle_pause,
 };
-use super::state::{Dir, EditorState, Expr, GridNote, Pitch};
+use super::state::{Dir, EditorState, Expr, GridNote, HarpTechnique};
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ const RELEASE_GRACE_EVENTS: u8 = 2;
 struct OpenNote {
     id: u32,
     start_secs: f32,
-    /// Pitch events this pitch has been present in so far.
+    /// HarpTechnique events this pitch has been present in so far.
     events_seen: u32,
     /// Consecutive pitch events this pitch has been *missing* from — reset
     /// to zero whenever it reappears within the grace window.
@@ -102,8 +102,8 @@ pub(super) struct RecordState {
     /// [`start_record`] so `record_tick` is a table lookup instead of a
     /// per-event harp rebuild, and so non-producible detections are
     /// discarded as noise.
-    table: Vec<Option<(u8, Dir, Pitch)>>,
-    /// The selected instrument and its current wind-direction estimate. Pitch
+    table: Vec<Option<(u8, Dir, HarpTechnique)>>,
+    /// The selected instrument and its current wind-direction estimate. HarpTechnique
     /// reachability alone is insufficient for chords: one breath cannot sound
     /// a blow-only and draw-only reed simultaneously.
     tracker: Option<NoteTracker>,
@@ -272,7 +272,7 @@ pub(super) fn record_tick(
     let t = (playhead.elapsed - record.detect_delay).max(0.0);
     let secs_per_tick = playhead.secs_per_tick;
 
-    // Pitch events arrive at the audio pipeline's chunk rate (~21 Hz), not
+    // HarpTechnique events arrive at the audio pipeline's chunk rate (~21 Hz), not
     // the frame rate — each one is a real detector verdict, so each drives
     // the onset/release debounce counters.
     for ev in pitch_events.read() {
@@ -294,7 +294,7 @@ pub(super) fn record_tick(
 /// MIDI → (hole, dir, pitch) for all 128 MIDI notes on `harp`, `None` where
 /// the harp can't produce that pitch (exactly `map_pitch_playable`'s
 /// verdict, precomputed) — see [`RecordState::table`].
-fn build_pitch_table(harp: &Harmonica) -> Vec<Option<(u8, Dir, Pitch)>> {
+fn build_pitch_table(harp: &Harmonica) -> Vec<Option<(u8, Dir, HarpTechnique)>> {
     (0..=127u8).map(|midi| map_pitch_playable(midi, harp)).collect()
 }
 
@@ -399,12 +399,18 @@ fn finish_open_notes(
 /// afterward, every frame, by [`grow_open_notes`].
 fn spawn_open_note(
     id: u32,
-    (hole, dir, pitch): (u8, Dir, Pitch),
+    (hole, dir, pitch): (u8, Dir, HarpTechnique),
     start_secs: f32,
     secs_per_tick: f32,
 ) -> GridNote {
     let tick = (start_secs / secs_per_tick).round() as usize;
-    GridNote { id, hole, tick, len: 1, dir, pitch, expr: Expr::None }
+    GridNote {
+        id,
+        tick,
+        len: 1,
+        expr: Expr::None,
+        target: GridNote::harmonica_target(hole, dir, pitch),
+    }
 }
 
 /// Extends every currently-sounding note's length to reflect `t` — called
@@ -453,12 +459,14 @@ mod tests {
     fn note(id: u32, tick: usize, len: usize) -> GridNote {
         GridNote {
             id,
-            hole: 1,
             tick,
             len,
-            dir: super::super::state::Dir::Blow,
-            pitch: Pitch::Normal,
             expr: Expr::None,
+            target: GridNote::harmonica_target(
+                1,
+                super::super::state::Dir::Blow,
+                HarpTechnique::Normal,
+            ),
         }
     }
 
@@ -507,7 +515,7 @@ mod tests {
         assert_eq!(table.len(), 128);
         // C4 is hole 1 blow on a C richter harp.
         let c4 = harmonicon_core::midi::note_to_midi("C4").unwrap() as usize;
-        assert_eq!(table[c4], Some((1, Dir::Blow, Pitch::Normal)));
+        assert_eq!(table[c4], Some((1, Dir::Blow, HarpTechnique::Normal)));
         // MIDI 0 is far below anything a C harp can sound.
         assert_eq!(table[0], None);
     }
@@ -522,7 +530,7 @@ mod tests {
         let draw2 = harp.wind_direction_midi(2, &harmonicon_core::chart::Action::Draw).unwrap();
         let table = build_pitch_table(&harp);
         match table[(draw2 - 1) as usize] {
-            Some((2, Dir::Draw, Pitch::Bend(_))) => {}
+            Some((2, Dir::Draw, HarpTechnique::Bend(_))) => {}
             other => panic!("expected a hole-2 draw bend, got {other:?}"),
         }
     }
@@ -530,7 +538,7 @@ mod tests {
     #[test]
     fn spawn_open_note_places_the_tick_and_starts_at_minimum_length() {
         let secs_per_tick = 60.0 / 120.0 / TICKS_PER_BEAT as f32;
-        let n = spawn_open_note(7, (1, Dir::Blow, Pitch::Normal), 0.25, secs_per_tick);
+        let n = spawn_open_note(7, (1, Dir::Blow, HarpTechnique::Normal), 0.25, secs_per_tick);
         assert_eq!(n.id, 7);
         assert_eq!(n.tick, 6); // 0.25 / (0.5 / TICKS_PER_BEAT)
         assert_eq!(n.len, 1);

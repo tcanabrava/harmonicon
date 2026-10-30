@@ -129,7 +129,7 @@ impl EditorState {
 
         for &(id, hole, tick) in targets {
             if let Some(n) = self.notes.iter_mut().find(|n| n.id == id) {
-                n.hole = hole;
+                n.set_hole(hole);
                 n.tick = tick;
             }
         }

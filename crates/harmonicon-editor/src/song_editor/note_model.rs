@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: MIT
 
 //! The editor's note vocabulary: what a placed note is ([`GridNote`],
-//! [`Pitch`], [`Dir`]), what the editor is currently doing to one
+//! [`HarpTechnique`], [`Dir`]), what the editor is currently doing to one
 //! ([`DragState`], [`Edge`]), and the timeline range tools
 //! ([`TimelineTool`], [`TimelineDrag`]).
 //!
 
 use bevy::prelude::*;
 use harmonicon_core::chart::Action;
-use harmonicon_core::instrument::PlayPosition;
-use harmonicon_core::pitch_map::{HoleAssignment, Technique};
+use harmonicon_core::pitch_map::Technique;
 
 // ── Note model types ─────────────────────────────────────────────────────────
 
 /// A note's pitch technique. Bends, overblows, and overdraws apply to
 /// diatonic kinds; the slide applies to chromatic kinds.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub(super) enum Pitch {
+pub(super) enum HarpTechnique {
     Normal,
     Bend(f32),
     Overblow,
@@ -52,7 +51,7 @@ impl HarmonicaKind {
 }
 
 /// An expression technique layered on top of the pitch. At most one at a
-/// time; either may combine with any [`Pitch`]. Both carry their oscillation
+/// time; either may combine with any [`HarpTechnique`]. Both carry their oscillation
 /// rate in Hz, cycled through by repeatedly clicking the mod button.
 /// The shared type lives in `harmonicon_core::synth`.
 pub(super) use harmonicon_core::synth::Expr;
@@ -220,75 +219,50 @@ pub(super) struct TimelineDrag {
     pub(super) live: bool,
 }
 
-/// One placed note: a hole (1..=10) starting at `tick` and lasting `len` ticks,
-/// plus its techniques. `id` is a stable handle so the note keeps its identity
-/// while its `tick`/`len` change under a drag.
+/// One timed musical instruction, independent of grid rows. `target` owns
+/// its pitch/placement intent; `id` survives timeline and visual edits.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) struct GridNote {
     pub(super) id: u32,
-    pub(super) hole: u8,
     pub(super) tick: usize,
     pub(super) len: usize,
-    pub(super) dir: Dir,
-    pub(super) pitch: Pitch,
     pub(super) expr: Expr,
+    pub(super) target: harmonicon_core::note_target::NoteTarget,
 }
 
 #[cfg(test)]
 impl GridNote {
-    /// A plain blow note, the shape most tests start from; set the rest with
-    /// struct-update syntax (`GridNote { dir: Dir::Draw, ..GridNote::plain(…) }`).
+    /// A C-style harmonica tab instruction for existing view tests.
     pub(super) fn plain(id: u32, hole: u8, tick: usize, len: usize) -> Self {
-        Self { id, hole, tick, len, dir: Dir::Blow, pitch: Pitch::Normal, expr: Expr::None }
+        Self {
+            id,
+            tick,
+            len,
+            expr: Expr::None,
+            target: GridNote::harmonica_target(hole, Dir::Blow, HarpTechnique::Normal),
+        }
     }
 }
 
-impl Pitch {
+impl HarpTechnique {
     /// The editor's technique in core's vocabulary.
     pub(super) fn technique(self) -> Technique {
         match self {
-            Pitch::Normal => Technique::Natural,
-            Pitch::Bend(depth) => Technique::Bend(depth),
-            Pitch::Overblow => Technique::Overblow,
-            Pitch::Overdraw => Technique::Overdraw,
-            Pitch::Slide => Technique::Slide,
+            HarpTechnique::Normal => Technique::Natural,
+            HarpTechnique::Bend(depth) => Technique::Bend(depth),
+            HarpTechnique::Overblow => Technique::Overblow,
+            HarpTechnique::Overdraw => Technique::Overdraw,
+            HarpTechnique::Slide => Technique::Slide,
         }
     }
 
     pub(super) fn from_technique(technique: Technique) -> Self {
         match technique {
-            Technique::Natural => Pitch::Normal,
-            Technique::Bend(depth) => Pitch::Bend(depth),
-            Technique::Overblow => Pitch::Overblow,
-            Technique::Overdraw => Pitch::Overdraw,
-            Technique::Slide => Pitch::Slide,
-        }
-    }
-}
-
-impl GridNote {
-    /// Where the note is played, in core's vocabulary.
-    pub(super) fn position(&self) -> PlayPosition {
-        let technique = self.pitch.technique();
-        PlayPosition::Hole(HoleAssignment { hole: self.hole, action: self.dir.action(), technique })
-    }
-
-    /// Takes `position`'s breath and technique. The hole stays: the editor
-    /// moves notes between holes itself, never through a position. A
-    /// position on another instrument is ignored, since a grid note is a
-    /// harmonica note.
-    pub(super) fn set_position(&mut self, position: &PlayPosition) {
-        let PlayPosition::Hole(a) = position else {
-            return;
-        };
-        self.dir = Dir::from_action(a.action);
-        self.pitch = Pitch::from_technique(a.technique);
-    }
-
-    pub(super) fn bend(&self) -> f32 {
-        match self.pitch {
-            Pitch::Bend(a) => a,
-            _ => 0.0,
+            Technique::Natural => HarpTechnique::Normal,
+            Technique::Bend(depth) => HarpTechnique::Bend(depth),
+            Technique::Overblow => HarpTechnique::Overblow,
+            Technique::Overdraw => HarpTechnique::Overdraw,
+            Technique::Slide => HarpTechnique::Slide,
         }
     }
 }
@@ -335,8 +309,8 @@ impl DragState {
             kind,
             start_tick: note.tick,
             start_len: note.len,
-            start_hole: note.hole,
-            target_hole: note.hole,
+            start_hole: note.hole(),
+            target_hole: note.hole(),
             target_tick: note.tick,
             valid: true,
             group: Vec::new(),

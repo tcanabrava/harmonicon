@@ -222,7 +222,7 @@ fn spawn_harmonica_kind_row(
         HarmonicaKindText,
         (),
         |_: On<Activate>, mut state: ResMut<EditorState>| {
-            let next = match state.harmonica_kind {
+            let next = match state.harmonica_kind() {
                 HarmonicaKind::Diatonic => HarmonicaKind::PaddyRichter,
                 HarmonicaKind::PaddyRichter => HarmonicaKind::CountryTuned,
                 HarmonicaKind::CountryTuned => HarmonicaKind::NaturalMinor,
@@ -700,11 +700,13 @@ mod tests {
         world.insert_resource(Localization::default());
         world.init_resource::<Messages<OpenFileDialog>>();
         world.insert_resource(EditorState {
-            loaded_harmonica: Some(super::super::state::LoadedHarmonica {
-                key: "C".into(),
-                kind: HarmonicaKind::Diatonic,
-                harp: harmonicon_core::harmonica::richter_harp("C"),
-            }),
+            instrument: crate::song_editor::state::InstrumentSelection::loaded_harp(
+                super::super::state::LoadedHarmonica {
+                    key: "C".into(),
+                    kind: HarmonicaKind::Diatonic,
+                    harp: harmonicon_core::harmonica::richter_harp("C"),
+                },
+            ),
             ..default()
         });
         world
@@ -735,7 +737,7 @@ mod tests {
             if let Some(field) = field {
                 assert_ne!(world.resource::<EditorState>().field_text(field), before.unwrap());
                 if field == Field::Key {
-                    assert!(world.resource::<EditorState>().loaded_harmonica.is_none());
+                    assert!(world.resource::<EditorState>().instrument.is_preset());
                 }
             }
         }

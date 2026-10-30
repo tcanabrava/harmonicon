@@ -49,8 +49,8 @@ use super::TICKS_PER_BEAT;
 use super::interaction::{apply_sticky_modifier, next_expr, next_pitch, pitch_fits};
 use super::panel::mod_button_active;
 use super::state::{
-    Dir, DragKind, DragState, Edge, EditorState, GridNote, Mode, Pitch, apply_resize, move_target,
-    note_rect, pitch_color, pitch_compatible, pitch_forced_dir,
+    Dir, DragKind, DragState, Edge, EditorState, GridNote, HarpTechnique, Mode, apply_resize,
+    move_target, note_rect, pitch_color, pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{ExpectedNotesGroup, GridContent, ModButton, ModeButton};
 use harmonicon_app::app::AppState;
@@ -93,7 +93,7 @@ pub(super) fn place_or_select_expected(state: &mut EditorState, hole: u8, tick: 
     if let Some(existing) = state
         .expected_notes
         .iter()
-        .find(|n| n.hole == hole && n.tick <= tick && tick < n.tick + n.len)
+        .find(|n| n.hole() == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.expected_selected = Some(existing.id);
         return;
@@ -103,14 +103,20 @@ pub(super) fn place_or_select_expected(state: &mut EditorState, hole: u8, tick: 
     let pitch = if pitch_compatible(state.sticky_pitch, &state.effective_harp(), hole) {
         state.sticky_pitch
     } else {
-        Pitch::Normal
+        HarpTechnique::Normal
     };
     let dir = pitch_forced_dir(pitch).unwrap_or(dir);
     let expr = state.sticky_expr;
 
     let id = state.expected_next_id;
     state.expected_next_id += 1;
-    state.expected_notes.push(GridNote { id, hole, tick, len: TICKS_PER_BEAT, dir, pitch, expr });
+    state.expected_notes.push(GridNote {
+        id,
+        tick,
+        len: TICKS_PER_BEAT,
+        expr,
+        target: GridNote::harmonica_target(hole, dir, pitch),
+    });
     state.expected_selected = Some(id);
 }
 
@@ -149,12 +155,12 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
         let dir = if kind == ModButton::Blow { Dir::Blow } else { Dir::Draw };
         state.sticky_dir = dir;
         if pitch_forced_dir(state.sticky_pitch).is_some_and(|d| d != dir) {
-            state.sticky_pitch = Pitch::Normal;
+            state.sticky_pitch = HarpTechnique::Normal;
         }
         if let Some(note) = state.expected_selected_note_mut() {
-            note.dir = dir;
-            if pitch_forced_dir(note.pitch).is_some_and(|d| d != dir) {
-                note.pitch = Pitch::Normal;
+            note.set_dir(dir);
+            if pitch_forced_dir(note.technique()).is_some_and(|d| d != dir) {
+                note.set_technique(HarpTechnique::Normal);
             }
         }
         return;
@@ -173,10 +179,10 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
     let Some(target) = next_pitch(kind, note, std::slice::from_ref(note), &harp) else {
         return;
     };
-    if target == Pitch::Normal || pitch_fits(target, note.hole, &harp) {
-        note.pitch = target;
+    if target == HarpTechnique::Normal || pitch_fits(target, note.hole(), &harp) {
+        note.set_technique(target);
         if let Some(dir) = pitch_forced_dir(target) {
-            note.dir = dir;
+            note.set_dir(dir);
         }
     }
 }
@@ -291,7 +297,7 @@ fn update_expected_technique_button_visibility(
     state: Res<EditorState>,
     mut buttons: Query<(&ExpectedModButton, &mut Node)>,
 ) {
-    let diatonic_only = state.harmonica_kind.is_diatonic();
+    let diatonic_only = state.harmonica_kind().is_diatonic();
     for (ExpectedModButton(kind), mut node) in &mut buttons {
         let visible = match kind {
             ModButton::Bend | ModButton::Overblow | ModButton::Overdraw => diatonic_only,
@@ -313,7 +319,7 @@ fn update_expected_mod_panel(
     let colors = theme.song_editor_colors();
     let selected = state.expected_selected_note();
     let (dir, pitch, expr) = match selected {
-        Some(n) => (n.dir, n.pitch, n.expr),
+        Some(n) => (n.dir(), n.technique(), n.expr),
         None => (state.sticky_dir, state.sticky_pitch, state.sticky_expr),
     };
     for (ExpectedModButton(kind), mut bg) in &mut buttons {
@@ -364,9 +370,10 @@ fn rebuild_expected_notes_overlay(
     let pick = if interactive { Pickable::default() } else { Pickable::IGNORE };
     commands.entity(content).with_children(|c| {
         for note in &state.expected_notes {
-            let (left, top, width, height) = note_rect(note);
+            let (left, top, width, height) =
+                note_rect(note, usize::from(note.hole().saturating_sub(1)));
             let selected = state.expected_selected == Some(note.id);
-            let color = pitch_color(note.pitch);
+            let color = pitch_color(note.technique());
             let id = note.id;
             let mut ec = c.spawn((
                 ExpectedNoteVisual(id),
@@ -422,9 +429,9 @@ fn rebuild_expected_notes_overlay(
                     let Some(n) = state.expected_notes.iter_mut().find(|n| n.id == id) else {
                         return;
                     };
-                    n.hole = hole;
+                    n.set_hole(hole);
                     n.tick = tick;
-                    let (left, top, _, _) = note_rect(n);
+                    let (left, top, _, _) = note_rect(n, usize::from(n.hole().saturating_sub(1)));
                     if let Ok(mut node) = nodes.get_mut(ev.entity) {
                         node.left = Val::Px(left);
                         node.top = Val::Px(top);
@@ -438,7 +445,7 @@ fn rebuild_expected_notes_overlay(
             });
             ec.with_children(|n| {
                 n.spawn_empty().apply_scene(bsn! {
-                    Text({note.dir.arrow()})
+                    Text({note.dir().arrow()})
                     TextFont { font_size: {FontSize::Px(15.0)} }
                     TextColor({color})
                     ~{Pickable::IGNORE}
@@ -511,7 +518,7 @@ fn spawn_expected_resize_handle(
                 };
                 n.tick = tick;
                 n.len = len;
-                let (left, _, width, _) = note_rect(n);
+                let (left, _, width, _) = note_rect(n, usize::from(n.hole().saturating_sub(1)));
                 // The handle is a child of the note box, so `ev.entity`
                 // (the handle) isn't what needs its `Node` updated — find
                 // the box by its own `ExpectedNoteVisual` id instead.
@@ -564,18 +571,21 @@ mod tests {
     #[test]
     fn overblow_toggles_on_a_hole_that_has_one_and_forces_blow() {
         let mut state = with_note(4);
-        state.expected_notes[0].dir = Dir::Draw;
+        state.expected_notes[0].set_dir(Dir::Draw);
         apply_expected_modifier(&mut state, ModButton::Overblow);
-        assert_eq!((note(&state).pitch, note(&state).dir), (Pitch::Overblow, Dir::Blow));
+        assert_eq!(
+            (note(&state).technique(), note(&state).dir()),
+            (HarpTechnique::Overblow, Dir::Blow)
+        );
         apply_expected_modifier(&mut state, ModButton::Overblow);
-        assert_eq!(note(&state).pitch, Pitch::Normal);
+        assert_eq!(note(&state).technique(), HarpTechnique::Normal);
     }
 
     #[test]
     fn overblow_does_nothing_on_a_hole_without_one() {
         let mut state = with_note(2);
         apply_expected_modifier(&mut state, ModButton::Overblow);
-        assert_eq!(note(&state).pitch, Pitch::Normal);
+        assert_eq!(note(&state).technique(), HarpTechnique::Normal);
     }
 
     #[test]
@@ -586,7 +596,7 @@ mod tests {
         for _ in 0..8 {
             apply_expected_modifier(&mut state, ModButton::Bend);
             depths.push(note(&state).bend());
-            if note(&state).pitch == Pitch::Normal {
+            if note(&state).technique() == HarpTechnique::Normal {
                 break;
             }
         }

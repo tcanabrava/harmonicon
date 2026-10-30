@@ -27,6 +27,7 @@ pub mod midi;
 /// and note-number conversion. Re-exported by the game as `song::midi`.
 pub mod midi_file;
 pub mod note_parser;
+pub mod note_target;
 pub mod note_tracker;
 pub mod pitch_map;
 pub mod repeats;

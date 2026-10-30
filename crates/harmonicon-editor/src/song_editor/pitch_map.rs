@@ -3,39 +3,39 @@
 //! The editor's view of [`harmonicon_core::pitch_map`].
 //!
 //! Core resolves pitches; this module maps assignments to the editor's
-//! `Dir` and `Pitch` types. MIDI import permits nearest-note fallback
+//! `Dir` and `HarpTechnique` types. MIDI import permits nearest-note fallback
 //! through [`map_pitch`], while recording uses [`map_pitch_playable`].
 
 use super::playback::build_harp;
-use super::state::{Dir, HARP_KEYS, HarmonicaKind, Pitch};
+use super::state::{Dir, HARP_KEYS, HarmonicaKind, HarpTechnique};
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::pitch_map::{self, HoleAssignment};
 
 /// Core's resolution in the editor's own terms.
-fn from_core(assignment: HoleAssignment) -> (u8, Dir, Pitch) {
+fn from_core(assignment: HoleAssignment) -> (u8, Dir, HarpTechnique) {
     (
         assignment.hole,
         Dir::from_action(assignment.action),
-        Pitch::from_technique(assignment.technique),
+        HarpTechnique::from_technique(assignment.technique),
     )
 }
 
 /// Resolves `target` onto `harp` only if it can genuinely produce it. Core
 /// reads the harp family off the [`Harmonica`] itself, the one source that
 /// cannot disagree with the layout being searched.
-pub(super) fn map_pitch_playable(target: u8, harp: &Harmonica) -> Option<(u8, Dir, Pitch)> {
+pub(super) fn map_pitch_playable(target: u8, harp: &Harmonica) -> Option<(u8, Dir, HarpTechnique)> {
     pitch_map::map_pitch_playable(target, harp).map(from_core)
 }
 
 /// Every playable resolution of `target`, in core's easiest-first order.
 /// Transposition uses the alternatives when two simultaneous pitches would
 /// otherwise compete for the same hole.
-pub(super) fn playable_assignments(target: u8, harp: &Harmonica) -> Vec<(u8, Dir, Pitch)> {
+pub(super) fn playable_assignments(target: u8, harp: &Harmonica) -> Vec<(u8, Dir, HarpTechnique)> {
     pitch_map::playable_assignments(target, harp).into_iter().map(from_core).collect()
 }
 
 /// [`map_pitch_playable`] with core's nearest-natural-note fallback.
-pub(super) fn map_pitch(target: u8, harp: &Harmonica) -> (u8, Dir, Pitch) {
+pub(super) fn map_pitch(target: u8, harp: &Harmonica) -> (u8, Dir, HarpTechnique) {
     from_core(pitch_map::map_pitch(target, harp))
 }
 
@@ -65,11 +65,11 @@ mod tests {
     #[test]
     fn core_techniques_arrive_as_the_editors_own_pitch_variants() {
         for (technique, expected) in [
-            (Technique::Natural, Pitch::Normal),
-            (Technique::Bend(1.5), Pitch::Bend(1.5)),
-            (Technique::Overblow, Pitch::Overblow),
-            (Technique::Overdraw, Pitch::Overdraw),
-            (Technique::Slide, Pitch::Slide),
+            (Technique::Natural, HarpTechnique::Normal),
+            (Technique::Bend(1.5), HarpTechnique::Bend(1.5)),
+            (Technique::Overblow, HarpTechnique::Overblow),
+            (Technique::Overdraw, HarpTechnique::Overdraw),
+            (Technique::Slide, HarpTechnique::Slide),
         ] {
             let (_, _, pitch) =
                 from_core(HoleAssignment { hole: 4, action: Action::Blow, technique });
@@ -115,7 +115,7 @@ mod tests {
         let harp = richter_harp("C");
         assert_eq!(map_pitch_playable(0, &harp), None);
         let (hole, _, pitch) = map_pitch(0, &harp);
-        assert_eq!(pitch, Pitch::Normal);
+        assert_eq!(pitch, HarpTechnique::Normal);
         assert!((1..=10).contains(&hole));
     }
 
@@ -123,6 +123,6 @@ mod tests {
     fn a_chromatic_harp_still_resolves_its_slide() {
         let harp = chromatic_harp("C");
         let c4 = harmonicon_core::midi::note_to_midi("C4").unwrap() as u8;
-        assert_eq!(map_pitch_playable(c4 + 1, &harp), Some((1, Dir::Blow, Pitch::Slide)));
+        assert_eq!(map_pitch_playable(c4 + 1, &harp), Some((1, Dir::Blow, HarpTechnique::Slide)));
     }
 }

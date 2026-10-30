@@ -69,7 +69,10 @@ pub(super) fn transpose_notes(
             };
             playable_assignments(target, harp)
                 .into_iter()
-                .map(|(hole, dir, pitch)| GridNote { hole, dir, pitch, ..*n })
+                .map(|(hole, dir, pitch)| GridNote {
+                    target: GridNote::harmonica_target(hole, dir, pitch),
+                    ..*n
+                })
                 .collect()
         })
         .collect();
@@ -91,7 +94,7 @@ pub(super) fn transpose_notes(
                     let candidate = candidates[i][choice];
                     notes.iter().enumerate().any(|(j, original)| {
                         let other = choices[j].map_or(*original, |choice| candidates[j][choice]);
-                        j != i && other.hole == candidate.hole && overlaps(&candidate, &other)
+                        j != i && other.hole() == candidate.hole() && overlaps(&candidate, &other)
                     })
                 })
             })
@@ -126,7 +129,7 @@ pub(super) fn transpose_notes(
 /// — and leaves the outcome for the status bar to report.
 pub(super) fn transpose_selection(state: &mut EditorState, semitones: i32) {
     let harp = state.effective_harp();
-    let kind = state.harmonica_kind;
+    let kind = state.harmonica_kind();
     let outcome = transpose_notes(&mut state.notes, &state.selected, semitones, &harp, kind);
     state.transpose_notice = Some(outcome);
 }

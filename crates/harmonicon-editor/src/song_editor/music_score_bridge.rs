@@ -115,18 +115,16 @@ pub(super) fn sync_music_score_playhead(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::song_editor::state::{Dir, Expr, GridNote, Pitch};
+    use crate::song_editor::state::{Dir, Expr, GridNote, HarpTechnique};
     use harmonicon_ui::music_score::rests_between_notes;
 
     fn note(tick: usize, len: usize) -> GridNote {
         GridNote {
             id: 1,
-            hole: 4,
             tick,
             len,
-            dir: Dir::Blow,
-            pitch: Pitch::Normal,
             expr: Expr::None,
+            target: GridNote::harmonica_target(4, Dir::Blow, HarpTechnique::Normal),
         }
     }
 

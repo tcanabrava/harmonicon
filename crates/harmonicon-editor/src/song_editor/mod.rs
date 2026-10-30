@@ -34,6 +34,7 @@ mod details_fields;
 mod expected_notes;
 mod grid;
 mod grid_cache;
+mod harmonica_note;
 mod harpchart;
 mod interaction;
 mod legend;

@@ -4,14 +4,14 @@ use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures_lite::future};
 
-use super::state::{EditorState, GridNote, HarmonicaKind, Pitch};
+use super::state::{EditorState, GridNote, HarmonicaKind};
 use super::{TICK_W, TICKS_PER_BEAT};
 use harmonicon_audio::AudioSettings;
 use harmonicon_core::harmonica::{
-    Harmonica, chromatic_16_harp, chromatic_harp, country_tuned_harp, hole_notes,
-    natural_minor_harp, paddy_richter_harp, richter_harp,
+    Harmonica, chromatic_16_harp, chromatic_harp, country_tuned_harp, natural_minor_harp,
+    paddy_richter_harp, richter_harp,
 };
-use harmonicon_core::midi::{midi_to_freq_hz, note_to_midi};
+use harmonicon_core::midi::midi_to_freq_hz;
 use harmonicon_core::synth::{PhraseNote, SAMPLE_RATE, render_pcm};
 use harmonicon_core::wav::encode_wav;
 
@@ -84,38 +84,28 @@ pub(super) fn build_harp(key: &str, kind: HarmonicaKind) -> Harmonica {
     }
 }
 
-/// `note`'s resolved frequency (Hz) on `harp`, or `None` for a hole/technique
-/// combination the harp can't produce (e.g. Overblow outside holes 1–6).
-/// Bend depth applies as a fractional semitone offset on the natural
-/// blow/draw pitch; overblow/overdraw resolve via [`hole_notes`], which
-/// knows Overblow sits above the *draw* reed on holes 1/4/5/6 and Overdraw
-/// above the *blow* reed on holes 7–10.
-pub(super) fn note_freq(note: &GridNote, harp: &Harmonica) -> Option<f32> {
-    let (midi, bend) = resolve_pitch(note, harp)?;
-    Some(midi_to_freq_hz(midi as f32 - bend))
+/// Resolve musical intent through the configured instrument, independently
+/// of the active editor view. Fractional bends retain their exact frequency.
+pub(super) fn note_freq(
+    note: &GridNote,
+    instrument: &impl harmonicon_core::instrument::InstrumentModel,
+) -> Option<f32> {
+    note.target.sounding_pitch(instrument).map(midi_to_freq_hz)
 }
 
-/// `note`'s resolved MIDI pitch on `harp` — same resolution as [`note_freq`],
-/// but the identity `u8` the shared `music_score` overlay keys notation on
-/// (bends rounded to the nearest semitone, like `gameplay::notes::
-/// target_pitch`). `None` under the same conditions as `note_freq`.
-pub(super) fn note_midi(note: &GridNote, harp: &Harmonica) -> Option<u8> {
-    let (midi, bend) = resolve_pitch(note, harp)?;
-    u8::try_from(midi - bend.round() as i32).ok()
-}
-
-/// The MIDI note `note`'s reed sounds on `harp`, and how many (fractional)
-/// semitones a bend takes it below that. `None` for a combination the harp
-/// can't produce.
-fn resolve_pitch(note: &GridNote, harp: &Harmonica) -> Option<(i32, f32)> {
-    let action = note.dir.action();
-    let (label, bend) = match note.pitch {
-        Pitch::Normal => (harp.wind_direction_label(note.hole, &action), 0.0),
-        Pitch::Slide => (harp.slide_label(note.hole, &action), 0.0),
-        Pitch::Overblow | Pitch::Overdraw => (hole_notes(harp, note.hole).over?, 0.0),
-        Pitch::Bend(depth) => (harp.wind_direction_label(note.hole, &action), depth),
-    };
-    Some((note_to_midi(&label)?, bend))
+/// The scoring identity uses the same rounding as core's instrument model.
+pub(super) fn note_midi(
+    note: &GridNote,
+    instrument: &impl harmonicon_core::instrument::InstrumentModel,
+) -> Option<u8> {
+    match note.target {
+        harmonicon_core::note_target::NoteTarget::Positioned(position) => {
+            instrument.pitch_of(&position)
+        }
+        harmonicon_core::note_target::NoteTarget::Sounding { .. } => {
+            note.target.sounding_pitch(instrument).map(|m| m.round() as u8)
+        }
+    }
 }
 
 /// Ticks-to-seconds for `state.tempo` — the flat nominal-BPM conversion

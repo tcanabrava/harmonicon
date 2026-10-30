@@ -63,13 +63,13 @@ pub(super) fn paste_targets_with_sources(
     let mut id = next_id;
     let mut out = Vec::with_capacity(clipboard.len());
     for n in clipboard {
-        if n.hole > hole_count {
+        if n.hole() > hole_count {
             continue;
         }
         let tick = target_tick + (n.tick - min_tick);
         let collides = existing
             .iter()
-            .any(|e| e.hole == n.hole && e.tick < tick + n.len && tick < e.tick + e.len);
+            .any(|e| e.hole() == n.hole() && e.tick < tick + n.len && tick < e.tick + e.len);
         if collides {
             continue;
         }

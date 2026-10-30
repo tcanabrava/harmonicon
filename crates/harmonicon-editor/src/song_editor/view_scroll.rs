@@ -416,7 +416,7 @@ pub(super) fn update_scrollbar_markers(
             let (left, width) = scrollbar_marker(n.tick, n.len, end_tick);
             // Each lane gets an equal slice of the track's height; the
             // marker fills its lane's slice so adjacent lanes stay distinct.
-            let lane = (n.hole.saturating_sub(1)) as f32;
+            let lane = (n.hole().saturating_sub(1)) as f32;
             commands
                 .spawn((
                     GridScrollMarker,
@@ -428,7 +428,7 @@ pub(super) fn update_scrollbar_markers(
                         height: Val::Percent(100.0 / lanes),
                         ..default()
                     },
-                    BackgroundColor(match n.dir {
+                    BackgroundColor(match n.dir() {
                         Dir::Blow => SCROLLBAR_BLOW_COLOR,
                         Dir::Draw => SCROLLBAR_DRAW_COLOR,
                     }),

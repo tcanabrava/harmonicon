@@ -215,15 +215,15 @@ pub(super) fn phrase_diagnostics(notes: &[GridNote], approximated: usize) -> Imp
     }
     let mut diagnostics = ImportDiagnostics { approximated, ..Default::default() };
     for group in by_tick.values().filter(|group| group.len() > 1) {
-        if group.iter().any(|note| note.dir == super::state::Dir::Blow)
-            && group.iter().any(|note| note.dir == super::state::Dir::Draw)
+        if group.iter().any(|note| note.dir() == super::state::Dir::Blow)
+            && group.iter().any(|note| note.dir() == super::state::Dir::Draw)
         {
             diagnostics.mixed_breath_groups += 1;
         }
         if group
             .iter()
             .enumerate()
-            .any(|(i, note)| group[..i].iter().any(|earlier| earlier.hole == note.hole))
+            .any(|(i, note)| group[..i].iter().any(|earlier| earlier.hole() == note.hole()))
         {
             diagnostics.duplicate_hole_groups += 1;
         }
@@ -237,7 +237,7 @@ pub(super) fn phrase_diagnostics(notes: &[GridNote], approximated: usize) -> Imp
 /// even after a mid-song tempo change.
 /// Replaces the document's notes and timing with an imported track's.
 ///
-/// Also drops any `loaded_harmonica`, **unconditionally** — not via
+/// Also replaces any authored instrument selection with a preset, **unconditionally** — not via
 /// `set_key`, which only clears it when the key actually changes. Every
 /// imported pitch was resolved against the *preset* layout for `key`
 /// (`import_track_notes` builds that harp itself, since the key is chosen
@@ -258,7 +258,8 @@ pub(super) fn apply_imported_track(state: &mut EditorState, imported: ImportedTr
     // would put every imported bar line in the wrong place.
     state.pickup_beats.clear();
     state.repeats.clear();
-    state.loaded_harmonica = None;
+    state.instrument =
+        crate::song_editor::state::InstrumentSelection::HarmonicaPreset(state.harmonica_kind());
     state.set_key(key.to_string());
 }
 
@@ -296,7 +297,13 @@ pub(super) fn import_track_notes(
         let tick = seconds_to_tick(start_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
         let end_tick = seconds_to_tick(end_secs, TICKS_PER_BEAT as u32, &editor_map) as usize;
         let len = end_tick.saturating_sub(tick).max(1);
-        notes.push(GridNote { id: id as u32, hole, tick, len, dir, pitch, expr: Expr::None });
+        notes.push(GridNote {
+            id: id as u32,
+            tick,
+            len,
+            expr: Expr::None,
+            target: GridNote::harmonica_target(hole, dir, pitch),
+        });
     }
     let tempo_changes = editor_map[1..].iter().map(|p| (p.tick as usize, p.bpm)).collect();
     Ok(ImportedTrack {
@@ -486,10 +493,10 @@ fn import_selected_track(
     // disruptive choice than a key, which is just one more click to
     // change if this guess isn't the one the user wanted).
     let key = match track_midi_keys(&midi.bytes, info.index) {
-        Ok(keys) => suggest_key(&keys, state.harmonica_kind).to_string(),
+        Ok(keys) => suggest_key(&keys, state.harmonica_kind()).to_string(),
         Err(_) => state.key.clone(),
     };
-    match import_track_notes(&midi.bytes, info.index, &key, state.harmonica_kind) {
+    match import_track_notes(&midi.bytes, info.index, &key, state.harmonica_kind()) {
         Ok(imported) => {
             let diagnostics = imported.diagnostics;
             apply_imported_track(state, imported, &key);
@@ -524,7 +531,7 @@ fn import_selected_track(
 
 #[cfg(test)]
 mod tests {
-    use super::super::state::{Dir, Pitch};
+    use super::super::state::{Dir, HarpTechnique};
     use super::*;
     use harmonicon_core::midi_file::{meta, note_off, note_on, smf_bytes};
     use midly::MetaMessage;
@@ -664,9 +671,9 @@ mod tests {
         assert_eq!(imported.initial_bpm.round(), 120.0);
         assert_eq!(imported.notes.len(), 1);
         let n = &imported.notes[0];
-        assert_eq!(n.hole, 1);
-        assert_eq!(n.dir, Dir::Blow);
-        assert_eq!(n.pitch, Pitch::Normal);
+        assert_eq!(n.hole(), 1);
+        assert_eq!(n.dir(), Dir::Blow);
+        assert_eq!(n.technique(), HarpTechnique::Normal);
         // One beat at TICKS_PER_BEAT (4) resolution is 4 internal ticks.
         assert_eq!(n.tick, 0);
         assert_eq!(n.len, TICKS_PER_BEAT);
@@ -730,12 +737,10 @@ mod tests {
     fn phrase_diagnostics_find_mixed_breath_and_duplicate_hole_chords() {
         let note = |id, hole, dir| GridNote {
             id,
-            hole,
             tick: 0,
             len: TICKS_PER_BEAT,
-            dir,
-            pitch: Pitch::Normal,
             expr: Expr::None,
+            target: GridNote::harmonica_target(hole, dir, HarpTechnique::Normal),
         };
         let diagnostics = phrase_diagnostics(
             &[note(0, 1, Dir::Blow), note(1, 1, Dir::Draw), note(2, 2, Dir::Blow)],

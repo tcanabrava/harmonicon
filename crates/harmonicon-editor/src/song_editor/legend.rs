@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 
 use super::grid::{OUT_OF_SCALE_MIX, OUT_OF_SCALE_TINT, TEMPO_MARKER_COLOR, mix_srgba};
-use super::state::{Dir, EditorState, Pitch, pitch_color};
+use super::state::{Dir, EditorState, HarpTechnique, pitch_color};
 use super::timeline_overlay::{RANGE_HIGHLIGHT_COLOR, SPLIT_LINE_COLOR};
 use super::ui::LegendColumn;
 use super::view_scroll::{SCROLLBAR_BLOW_COLOR, SCROLLBAR_DRAW_COLOR};
@@ -108,42 +108,42 @@ pub(super) fn spawn_color_legend(
     spawn_legend_row(
         col,
         colors,
-        pitch_color(Pitch::Normal),
+        pitch_color(HarpTechnique::Normal),
         false,
         loc.msg("editor-legend-normal").to_string(),
     );
     spawn_legend_row(
         col,
         colors,
-        pitch_color(Pitch::Bend(1.0)),
+        pitch_color(HarpTechnique::Bend(1.0)),
         false,
         loc.msg("editor-legend-bend").to_string(),
     );
     spawn_legend_row(
         col,
         colors,
-        pitch_color(Pitch::Overblow),
+        pitch_color(HarpTechnique::Overblow),
         false,
         loc.msg("editor-legend-overblow").to_string(),
     );
     spawn_legend_row(
         col,
         colors,
-        pitch_color(Pitch::Overdraw),
+        pitch_color(HarpTechnique::Overdraw),
         false,
         loc.msg("editor-legend-overdraw").to_string(),
     );
     spawn_legend_row(
         col,
         colors,
-        pitch_color(Pitch::Slide),
+        pitch_color(HarpTechnique::Slide),
         false,
         loc.msg("editor-legend-slide").to_string(),
     );
     spawn_legend_row(
         col,
         colors,
-        mix_srgba(pitch_color(Pitch::Normal), OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX),
+        mix_srgba(pitch_color(HarpTechnique::Normal), OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX),
         false,
         loc.msg("editor-legend-out-of-scale").to_string(),
     );
