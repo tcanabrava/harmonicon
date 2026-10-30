@@ -184,7 +184,7 @@ Manual testing needs a mic, audio out, and a display.
   | Crate | Holds | Bevy? |
   |---|---|---|
   | `harmonicon-core` | music theory, chart types, scoring math, pitch/MIDI conversion, pitch→hole resolution (`pitch_map`), the harmonica synth, WAV, grid snapping | **no** |
-  | `harmonicon-score` | reading foreign score files (MIDI, Guitar Pro 3-7, MuseScore, MusicXML) behind one `ScoreFile` trait, and converting a track onto a harmonica | **no** |
+  | `harmonicon-score` | reading foreign score files (MIDI, Guitar Pro 3-7, MuseScore, MusicXML) behind one `ScoreFile` trait, and converting a track onto a harmonica or guitar | **no** |
   | `harmonicon-dsp` | the five pitch detectors (FFT/YIN/pYIN/MPM/NMF) and their windowing | **no** |
   | `harmonicon-packs` | lessons/songs as git repositories: `pack.json` and its compatibility rules, configured/installed repos, the depth-1 `gix` clone | **no** |
   | `harmonicon-audio` | cpal capture, the ECS wrapper over `harmonicon-dsp`, waveform analysis | yes |

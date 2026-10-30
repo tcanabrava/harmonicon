@@ -138,6 +138,7 @@ fn score_tracks(tracks: &[MidiTrackInfo]) -> Vec<ScoreTrack> {
             index: t.index,
             name: Some(t.name.clone()),
             note_count: t.note_count,
+            tuning: None,
         })
         .collect()
 }

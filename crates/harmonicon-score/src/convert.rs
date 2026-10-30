@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-//! Turning any [`ScoreFile`] track into a playable [`HarpChart`].
+//! Turning any [`ScoreFile`] track into a playable [`HarpChart`] for an
+//! [`Instrument`].
 //!
-//! This is where a file that knows nothing about harmonicas becomes one:
-//! every pitch is resolved onto a hole, breath and technique by
-//! `harmonicon_core::pitch_map`, the same resolver the Song Editor's MIDI
+//! On a harmonica every pitch is resolved onto a hole, breath and technique
+//! by `harmonicon_core::pitch_map`, the same resolver the Song Editor's MIDI
 //! import and live recording already use. One mapper, so an imported chart
-//! can't disagree with an authored one about what a harp can play.
+//! can't disagree with an authored one about what a harp can play. On a
+//! guitar a tab's own string and fret are kept wherever they still sound
+//! the note ([`guitar_position`]); a part with no tab takes the lowest
+//! fret until a whole-part fingering solver exists.
 //!
 //! **A converted chart is only as playable as the part it came from.** A
 //! guitar line on a harmonica is mostly notes out of reach; `pick_harmonica_
@@ -15,16 +18,20 @@
 //! can refuse rather than hand the player an unplayable chart.
 
 use harmonicon_core::chart::{
-    Difficulty, HarpChart, Metadata, Modifier, NoteEvent, Scoring, Song, TempoPoint, Timing,
-    TrackItem,
+    ChartInstrument, Difficulty, HarpChart, Metadata, Modifier, NoteEvent, Scoring, Song,
+    TempoPoint, Timing, TrackItem,
 };
 use harmonicon_core::harmonica::Harmonica;
+use harmonicon_core::instrument::Instrument;
+use harmonicon_core::instrument::guitar::{
+    FretAssignment, Guitar, GuitarBody, STANDARD_TUNING, StringTechnique,
+};
 use harmonicon_core::midi::midi_to_note;
 use harmonicon_core::pitch_map::{
     HarpKind, HoleAssignment, Technique, harp_for_key, map_pitch_playable, suggest_key,
 };
 
-use crate::{ScoreError, ScoreFile, ScoreTrack};
+use crate::{ScoreError, ScoreFile, ScoreNote, ScoreTrack};
 
 /// How well a track survived being put on a harmonica.
 ///
@@ -93,7 +100,7 @@ pub fn convert_all_tracks(
     for track in score.tracks().iter().filter(|t| t.is_playable()) {
         let notes = score.notes(track.index)?;
         let harp = suggested_harp(&notes.iter().map(|n| n.midi).collect::<Vec<_>>());
-        let (chart, report) = to_chart(score, track.index, &harp, artist)?;
+        let (chart, report) = to_chart(score, track.index, &harp.into(), artist)?;
         converted.push(TrackConversion { track: track.clone(), chart, report });
     }
     Ok(converted)
@@ -202,21 +209,72 @@ fn chart_note(sounding: u8, assignment: &HoleAssignment, harp: &Harmonica) -> St
 /// chart opens there without rescaling.
 pub const TICKS_PER_BEAT: u32 = harmonicon_core::synth::TICKS_PER_BEAT as u32;
 
-/// Converts one track onto `harp`.
+/// Converts one track onto `instrument`.
 pub fn to_chart(
     score: &dyn ScoreFile,
     track: usize,
-    harp: &Harmonica,
+    instrument: &Instrument,
     artist: &str,
 ) -> Result<(HarpChart, ConversionReport), ScoreError> {
     let notes = score.notes(track)?;
-    let tempo = score.tempo_bpm().max(1.0);
-    let (numerator, denominator) = score.time_signature();
+    let (items, report, key) = match instrument {
+        Instrument::Harmonica(harp) => {
+            let (items, report) = harmonica_items(&notes, harp);
+            (items, report, detected_harmonica_key(harp))
+        }
+        Instrument::Guitar(guitar) => {
+            let (items, report) = guitar_items(&notes, guitar);
+            (items, report, likely_key(&notes))
+        }
+    };
+    let mut chart = chart_shell(score, artist, key, items);
+    match instrument {
+        Instrument::Harmonica(harp) => chart.harmonica = Some(harp.clone()),
+        Instrument::Guitar(guitar) => {
+            chart.instrument_spec = Some(ChartInstrument::from_guitar(guitar));
+        }
+    }
+    Ok((chart, report))
+}
 
+fn detected_harmonica_key(harp: &Harmonica) -> String {
+    harmonicon_core::harmonica::detected_harp_key(harp).unwrap_or_else(|| "C".to_string())
+}
+
+/// A guess at a part's key from nothing but its notes: the pitch class it
+/// sounds most, by time held. A guitar has no key of its own to read one off
+/// the way a harmonica does, and a wrong-but-plausible key is what the chart
+/// author would correct anyway.
+fn likely_key(notes: &[ScoreNote]) -> String {
+    let mut weight = [0.0f64; 12];
+    for note in notes {
+        weight[usize::from(note.midi % 12)] += note.duration_secs.max(0.01);
+    }
+    let tonic = (0..12).max_by(|&a, &b| weight[a].total_cmp(&weight[b]).then(b.cmp(&a)));
+    harmonicon_core::midi::NOTE_NAMES[tonic.unwrap_or(0)].to_string()
+}
+
+/// One track item holding one event.
+fn item(note: &ScoreNote, event: NoteEvent) -> TrackItem {
+    TrackItem {
+        id: None,
+        time: Some(note.start_secs),
+        tick: None,
+        duration: note.duration_secs,
+        phrase: None,
+        groove: None,
+        chord: None,
+        play_mode: None,
+        call: false,
+        lyric: None,
+        events: vec![event],
+    }
+}
+
+fn harmonica_items(notes: &[ScoreNote], harp: &Harmonica) -> (Vec<TrackItem>, ConversionReport) {
     let mut report = ConversionReport::default();
     let mut items = Vec::new();
-
-    for note in &notes {
+    for note in notes {
         report.total += 1;
         // The strict resolver, not the always-resolves one: an importer
         // wanting every note to land *somewhere* is right for authoring,
@@ -251,26 +309,72 @@ pub fn to_chart(
             }
         };
 
-        items.push(TrackItem {
-            id: None,
-            time: Some(note.start_secs),
-            tick: None,
-            duration: note.duration_secs,
-            phrase: None,
-            groove: None,
-            chord: None,
-            play_mode: None,
-            call: false,
-            lyric: None,
-            events: vec![NoteEvent {
+        items.push(item(
+            note,
+            NoteEvent {
                 note: Some(chart_note(note.midi, &assignment, harp)),
                 modifiers: (!modifiers.is_empty()).then_some(modifiers),
                 ..NoteEvent::hole(assignment.hole, assignment.action)
-            }],
-        });
+            },
+        ));
     }
+    (items, report)
+}
 
-    let chart = HarpChart {
+/// Where `note` is played on `guitar`: the author's own string and fret when
+/// the source recorded one and it still sounds this pitch here, else the
+/// lowest-fret position that does. `None` when the neck can't reach it.
+pub fn guitar_position(guitar: &Guitar, note: &ScoreNote) -> Option<FretAssignment> {
+    let authored = note
+        .fret
+        .map(|f| FretAssignment {
+            string: f.string,
+            fret: f.fret,
+            technique: StringTechnique::Fretted,
+        })
+        .filter(|a| guitar.pitch_of(a) == Some(note.midi));
+    authored.or_else(|| guitar.fretted_positions(note.midi).into_iter().next())
+}
+
+fn guitar_items(notes: &[ScoreNote], guitar: &Guitar) -> (Vec<TrackItem>, ConversionReport) {
+    let mut report = ConversionReport::default();
+    let mut items = Vec::new();
+    for note in notes {
+        report.total += 1;
+        let Some(position) = guitar_position(guitar, note) else {
+            report.unreachable += 1;
+            continue;
+        };
+        report.natural += 1;
+        let name = midi_to_note(i32::from(note.midi));
+        items.push(item(note, NoteEvent::fretted(position.string, position.fret, name)));
+    }
+    (items, report)
+}
+
+/// The guitar a track is written for: its own tuning when the source
+/// recorded one (a tab does), standard tuning otherwise. Imported guitars
+/// get 24 frets, enough for anything tab writes; the source's own fret
+/// count isn't read yet.
+pub fn suggested_guitar(track: &ScoreTrack) -> Guitar {
+    Guitar {
+        strings: track.tuning.clone().unwrap_or_else(|| STANDARD_TUNING.to_vec()),
+        frets: 24,
+        capo: 0,
+        body: GuitarBody::Electric,
+    }
+}
+
+/// Everything a converted chart has besides its instrument and notes.
+fn chart_shell(
+    score: &dyn ScoreFile,
+    artist: &str,
+    key: String,
+    track: Vec<TrackItem>,
+) -> HarpChart {
+    let tempo = score.tempo_bpm().max(1.0);
+    let (numerator, denominator) = score.time_signature();
+    HarpChart {
         metadata: Some(Metadata {
             format_version: Some(harmonicon_core::chart::CURRENT_FORMAT_VERSION.to_string()),
             author: None,
@@ -283,8 +387,7 @@ pub fn to_chart(
             artist: artist.to_string(),
             genre: "Uncategorized".to_string(),
             tempo_bpm: tempo,
-            key: harmonicon_core::harmonica::detected_harp_key(harp)
-                .unwrap_or_else(|| "C".to_string()),
+            key,
             // Imported material has no difficulty rating of its own, and
             // guessing one from note density would be a worse lie than a
             // neutral default the author can change.
@@ -304,9 +407,9 @@ pub fn to_chart(
             pickup_ticks: None,
             repeats: Vec::new(),
         },
-        harmonica: Some(harp.clone()),
+        harmonica: None,
         instrument_spec: None,
-        track: items,
+        track,
         loop_section: None,
         // The same windows every bundled chart uses.
         scoring: Scoring {
@@ -316,9 +419,7 @@ pub fn to_chart(
             combo: None,
             style_bonus: None,
         },
-    };
-
-    Ok((chart, report))
+    }
 }
 
 #[cfg(test)]

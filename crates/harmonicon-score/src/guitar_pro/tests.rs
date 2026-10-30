@@ -64,6 +64,25 @@ fn a_fret_becomes_a_pitch_by_way_of_its_strings_tuning() {
     assert_eq!(pitches, vec![64, 67, 60, 45]);
 }
 
+/// The string and fret survive the read, so a guitar chart can keep the
+/// author's fingering instead of guessing one.
+#[test]
+fn every_note_keeps_the_string_and_fret_it_was_written_on() {
+    let score = score_of(vec![track_of("Guitar", standard_tuning(), &[(1, 3), (6, 5)])]);
+    let frets: Vec<Option<(u8, u8)>> =
+        score.notes(0).unwrap().iter().map(|n| n.fret.map(|f| (f.string, f.fret))).collect();
+    assert_eq!(frets, vec![Some((1, 3)), Some((6, 5))]);
+}
+
+/// The track's tuning arrives string 1 first however the file orders it.
+#[test]
+fn a_tracks_tuning_reads_string_one_first() {
+    let mut shuffled = standard_tuning();
+    shuffled.reverse();
+    let score = score_of(vec![track_of("Guitar", shuffled, &[(1, 0)])]);
+    assert_eq!(score.tracks()[0].tuning.as_deref(), Some(&[64, 59, 55, 50, 45, 40][..]));
+}
+
 #[test]
 fn a_retuned_string_moves_every_note_on_it() {
     // Drop D: the sixth string goes from E2 (40) to D2 (38), so the same

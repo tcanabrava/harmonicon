@@ -18,10 +18,19 @@ impl FakeScore {
         let notes: Vec<ScoreNote> = midis
             .iter()
             .enumerate()
-            .map(|(i, &midi)| ScoreNote { start_secs: i as f64 * 0.5, duration_secs: 0.5, midi })
+            .map(|(i, &midi)| ScoreNote {
+                start_secs: i as f64 * 0.5,
+                duration_secs: 0.5,
+                midi,
+                fret: None,
+            })
             .collect();
-        let tracks =
-            vec![ScoreTrack { index: 0, name: Some("Harmonica".into()), note_count: notes.len() }];
+        let tracks = vec![ScoreTrack {
+            index: 0,
+            name: Some("Harmonica".into()),
+            note_count: notes.len(),
+            tuning: None,
+        }];
         Self { notes, tracks }
     }
 }
@@ -57,7 +66,7 @@ fn midi(note: &str) -> u8 {
 #[test]
 fn notes_a_c_harp_plays_naturally_convert_without_technique() {
     let score = FakeScore::of(&[midi("C4"), midi("E4"), midi("G4")]);
-    let (chart, report) = to_chart(&score, 0, &richter_harp("C"), "A").unwrap();
+    let (chart, report) = to_chart(&score, 0, &richter_harp("C").into(), "A").unwrap();
     assert_eq!(report.total, 3);
     assert_eq!(report.natural, 3);
     assert_eq!((report.bends, report.overblows, report.unreachable), (0, 0, 0));
@@ -74,7 +83,7 @@ fn every_converted_note_sounds_the_pitch_it_came_from() {
     // Everything the harp can reach, plus some it can't.
     let source: Vec<u8> = (55u8..=100).collect();
     let score = FakeScore::of(&source);
-    let (chart, _) = to_chart(&score, 0, &harp, "A").unwrap();
+    let (chart, _) = to_chart(&score, 0, &harp.clone().into(), "A").unwrap();
 
     // The pitches that survived, in order — unreachable ones are dropped.
     let kept: Vec<u8> =
@@ -100,7 +109,7 @@ fn a_note_the_harp_cannot_reach_is_dropped_and_counted() {
     // nearest note is a different tune, and a player following along would
     // hear the game ask for something the recording never plays.
     let score = FakeScore::of(&[midi("C4"), 20, midi("G4")]);
-    let (chart, report) = to_chart(&score, 0, &richter_harp("C"), "A").unwrap();
+    let (chart, report) = to_chart(&score, 0, &richter_harp("C").into(), "A").unwrap();
     assert_eq!(report.total, 3);
     assert_eq!(report.unreachable, 1);
     assert_eq!(chart.track.len(), 2, "the unreachable note was not dropped");
@@ -112,7 +121,7 @@ fn a_bend_is_written_with_the_charts_negative_convention() {
     // carries a positive depth. Getting the sign wrong here would raise
     // every bent note instead of lowering it.
     let score = FakeScore::of(&[midi("B4") - 1]);
-    let (chart, report) = to_chart(&score, 0, &richter_harp("C"), "A").unwrap();
+    let (chart, report) = to_chart(&score, 0, &richter_harp("C").into(), "A").unwrap();
     assert_eq!(report.bends, 1);
     let Some(mods) = chart.track[0].events[0].modifiers.as_ref() else {
         panic!("expected a bend modifier");
@@ -128,7 +137,7 @@ fn a_bend_is_written_with_the_charts_negative_convention() {
 #[test]
 fn timing_and_metadata_come_from_the_source() {
     let score = FakeScore::of(&[midi("C4"), midi("E4")]);
-    let (chart, _) = to_chart(&score, 0, &richter_harp("C"), "Some Artist").unwrap();
+    let (chart, _) = to_chart(&score, 0, &richter_harp("C").into(), "Some Artist").unwrap();
     assert_eq!(chart.song.title, "Fake");
     assert_eq!(chart.song.artist, "Some Artist");
     assert_eq!(chart.song.tempo_bpm, 120.0);
@@ -142,7 +151,7 @@ fn a_guitar_shaped_part_is_reported_as_not_worth_playing() {
     // Two octaves below a C harp's range — the realistic outcome of picking
     // a bass or low guitar track. The caller needs to be able to refuse.
     let score = FakeScore::of(&[30, 31, 32, 33, 34]);
-    let (_, report) = to_chart(&score, 0, &richter_harp("C"), "A").unwrap();
+    let (_, report) = to_chart(&score, 0, &richter_harp("C").into(), "A").unwrap();
     assert_eq!(report.unreachable, 5);
     assert!(!report.is_worth_playing());
     assert_eq!(report.reachable_fraction(), 0.0);
@@ -160,7 +169,7 @@ fn a_mostly_playable_part_is_worth_playing() {
         .collect();
     midis.push(20); // one the harp cannot possibly reach
     let score = FakeScore::of(&midis);
-    let (_, report) = to_chart(&score, 0, &harp, "A").unwrap();
+    let (_, report) = to_chart(&score, 0, &harp.clone().into(), "A").unwrap();
     assert_eq!(report.unreachable, 1);
     assert!(report.is_worth_playing(), "{report:?}");
 }
@@ -168,7 +177,7 @@ fn a_mostly_playable_part_is_worth_playing() {
 #[test]
 fn an_empty_track_is_never_worth_playing() {
     let score = FakeScore::of(&[]);
-    let (_, report) = to_chart(&score, 0, &richter_harp("C"), "A").unwrap();
+    let (_, report) = to_chart(&score, 0, &richter_harp("C").into(), "A").unwrap();
     assert!(!report.is_worth_playing());
 }
 
@@ -193,7 +202,7 @@ fn a_chart_converted_onto_its_own_harp_keeps_its_pitches() {
     let source = HarpChartScore::parse(&bytes).unwrap();
     let original: Vec<u8> = source.notes(0).unwrap().iter().map(|n| n.midi).collect();
 
-    let (chart, report) = to_chart(&source, 0, &richter_harp("C"), "A").unwrap();
+    let (chart, report) = to_chart(&source, 0, &richter_harp("C").into(), "A").unwrap();
     assert_eq!(report.unreachable, 0);
 
     let round_tripped: Vec<u8> =
@@ -251,10 +260,15 @@ fn a_chromatic_run_still_fits_a_diatonic() {
 /// A conversion result with only the fields `choose_track` reads.
 fn conversion(index: usize, name: Option<&str>, report: ConversionReport) -> TrackConversion {
     TrackConversion {
-        track: ScoreTrack { index, name: name.map(str::to_string), note_count: report.total },
+        track: ScoreTrack {
+            index,
+            name: name.map(str::to_string),
+            note_count: report.total,
+            tuning: None,
+        },
         // `choose_track` reads only the track and the report; the chart is
         // carried along for the caller, so any valid one will do here.
-        chart: to_chart(&FakeScore::of(&[60]), 0, &richter_harp("C"), "A").unwrap().0,
+        chart: to_chart(&FakeScore::of(&[60]), 0, &richter_harp("C").into(), "A").unwrap().0,
         report,
     }
 }
@@ -333,4 +347,129 @@ fn a_complete_tie_resolves_to_the_earlier_track() {
     // would silently be "the last track" while the docs said otherwise.
     let tracks = [conversion(0, None, report(8, 0, 2)), conversion(1, None, report(8, 0, 2))];
     assert_eq!(choose_track(&tracks), Some(0));
+}
+
+// ── onto a guitar ─────────────────────────────────────────────────────────────
+
+fn tabbed(notes: &[(u8, Option<(u8, u8)>)]) -> FakeScore {
+    let notes: Vec<ScoreNote> = notes
+        .iter()
+        .enumerate()
+        .map(|(i, &(midi, fret))| ScoreNote {
+            start_secs: i as f64 * 0.5,
+            duration_secs: 0.5,
+            midi,
+            fret: fret.map(|(string, fret)| harmonicon_core::chart::FretPosition { string, fret }),
+        })
+        .collect();
+    let tracks = vec![ScoreTrack {
+        index: 0,
+        name: Some("Guitar".into()),
+        note_count: notes.len(),
+        tuning: Some(STANDARD_TUNING.to_vec()),
+    }];
+    FakeScore { notes, tracks }
+}
+
+fn positions(chart: &HarpChart) -> Vec<(u8, u8)> {
+    chart
+        .track
+        .iter()
+        .map(|item| {
+            let p = item.events[0].position.expect("a guitar event has a position");
+            (p.string, p.fret)
+        })
+        .collect()
+}
+
+/// A tab's fingering is the author's, and it beats any guess: A3 written on
+/// the D string's seventh fret stays there rather than moving to the G
+/// string's second.
+#[test]
+fn a_tabbed_note_keeps_the_string_and_fret_it_was_written_on() {
+    let score = tabbed(&[(midi("A3"), Some((4, 7)))]);
+    let guitar = suggested_guitar(&score.tracks()[0]);
+    let (chart, report) = to_chart(&score, 0, &guitar.into(), "A").unwrap();
+    assert_eq!(positions(&chart), [(4, 7)]);
+    assert_eq!(chart.track[0].events[0].note.as_deref(), Some("A3"));
+    assert_eq!((report.total, report.natural, report.unreachable), (1, 1, 0));
+}
+
+#[test]
+fn a_note_with_no_tab_takes_its_lowest_fret() {
+    let score = tabbed(&[(midi("A3"), None)]);
+    let (chart, _) =
+        to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
+    assert_eq!(positions(&chart), [(3, 2)]);
+}
+
+/// A tab position that doesn't sound the note on the target guitar (written
+/// for another tuning) is a wrong answer, not a preference to keep.
+#[test]
+fn a_tab_position_that_sounds_another_note_is_replaced() {
+    let score = tabbed(&[(midi("A3"), Some((1, 0)))]);
+    let (chart, _) =
+        to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
+    assert_eq!(positions(&chart), [(3, 2)]);
+}
+
+#[test]
+fn a_note_below_the_lowest_string_is_reported_unreachable() {
+    let score = tabbed(&[(midi("C2"), None), (midi("E2"), None)]);
+    let (chart, report) =
+        to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
+    assert_eq!((report.total, report.unreachable), (2, 1));
+    assert_eq!(positions(&chart), [(6, 0)]);
+}
+
+/// The whole point: an imported guitar chart is a chart the validator
+/// accepts, naming the guitar and nothing of a harmonica.
+#[test]
+fn a_converted_guitar_chart_is_a_valid_one() {
+    let score =
+        tabbed(&[(midi("E2"), Some((6, 0))), (midi("B3"), Some((3, 4))), (midi("E5"), None)]);
+    let (chart, _) =
+        to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
+    assert!(chart.harmonica.is_none());
+    assert!(matches!(chart.instrument(), Some(Instrument::Guitar(_))));
+    assert_eq!(harmonicon_core::chart_check::instrument_problems(&chart), Vec::<String>::new());
+    let json = serde_json::to_value(&chart).unwrap();
+    let back: HarpChart = serde_json::from_value(json).unwrap();
+    assert_eq!(positions(&back), positions(&chart));
+}
+
+/// A tab's tuning is the guitar it was written for; a part with none (MIDI)
+/// gets standard tuning.
+#[test]
+fn the_suggested_guitar_takes_the_tracks_own_tuning() {
+    let drop_d = ScoreTrack {
+        index: 0,
+        name: None,
+        note_count: 1,
+        tuning: Some(vec![64, 59, 55, 50, 45, 38]),
+    };
+    assert_eq!(suggested_guitar(&drop_d).strings, [64, 59, 55, 50, 45, 38]);
+    let untuned = ScoreTrack { tuning: None, ..drop_d };
+    assert_eq!(suggested_guitar(&untuned).strings, STANDARD_TUNING);
+}
+
+/// Reading a guitar chart back as a score keeps its fingering, so
+/// re-converting it changes nothing.
+#[test]
+fn a_guitar_chart_read_as_a_score_keeps_its_positions() {
+    let score = tabbed(&[(midi("A3"), Some((4, 7)))]);
+    let guitar = suggested_guitar(&score.tracks()[0]);
+    let (chart, _) = to_chart(&score, 0, &guitar.clone().into(), "A").unwrap();
+    let again = HarpChartScore::from_chart(chart);
+    assert_eq!(again.tracks()[0].tuning.as_deref(), Some(&guitar.strings[..]));
+    let (rechart, _) = to_chart(&again, 0, &guitar.into(), "A").unwrap();
+    assert_eq!(positions(&rechart), [(4, 7)]);
+}
+
+#[test]
+fn a_guitar_parts_key_is_the_pitch_class_it_holds_longest() {
+    let score = tabbed(&[(midi("G3"), None), (midi("D4"), None), (midi("G4"), None)]);
+    let (chart, _) =
+        to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
+    assert_eq!(chart.song.key, "G");
 }

@@ -38,7 +38,7 @@ use guitarpro::Song as GpSong;
 use guitarpro::model::legacy::key_signature::Duration as GpDuration;
 use guitarpro::{Beat, NoteType, Track as GpTrack};
 
-use harmonicon_core::chart::{Ending, Repeat};
+use harmonicon_core::chart::{Ending, FretPosition, Repeat};
 use harmonicon_core::repeats::{MAX_PASSES, spans};
 
 use crate::{ScoreError, ScoreFile, ScoreFormat, ScoreNote, ScoreTrack};
@@ -142,6 +142,7 @@ impl GpScore {
                 index,
                 name: (!track.name.trim().is_empty()).then(|| track.name.trim().to_string()),
                 note_count: pitched_note_count(track),
+                tuning: tuning_of(track),
             })
             .collect();
 
@@ -277,6 +278,7 @@ impl ScoreFile for GpScore {
                         start_secs: start_secs + shift,
                         duration_secs: duration_secs.max(0.01),
                         midi,
+                        fret: fret_of(note),
                     });
                 }
             }
@@ -310,6 +312,25 @@ fn pitch_of(note: &guitarpro::Note, track: &GpTrack) -> Option<u8> {
     let tuning = track.strings.get(note.string.checked_sub(1)? as usize)?.1;
     let midi = i32::from(note.value) + i32::from(tuning);
     (0..=127).contains(&midi).then_some(midi as u8)
+}
+
+/// A note's string and fret as written. Frets are read as stored, the same
+/// numbers [`pitch_of`] adds to the open string, so the two agree.
+fn fret_of(note: &guitarpro::Note) -> Option<FretPosition> {
+    let string = u8::try_from(note.string).ok().filter(|&s| s > 0)?;
+    let fret = u8::try_from(note.value).ok()?;
+    Some(FretPosition { string, fret })
+}
+
+/// A fretted track's open strings, string 1 (the highest) first, or `None`
+/// for a percussion track, whose "strings" are drum-kit rows.
+fn tuning_of(track: &GpTrack) -> Option<Vec<u8>> {
+    if track.percussion_track || track.strings.is_empty() {
+        return None;
+    }
+    let mut strings = track.strings.clone();
+    strings.sort_by_key(|&(number, _)| number);
+    strings.into_iter().map(|(_, tuning)| u8::try_from(tuning).ok()).collect()
 }
 
 /// How many notes in this track would actually produce a pitch.

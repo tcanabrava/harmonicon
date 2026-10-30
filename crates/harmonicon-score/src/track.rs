@@ -54,7 +54,7 @@ mod tests {
     use super::*;
 
     fn track(index: usize, name: Option<&str>, note_count: usize) -> ScoreTrack {
-        ScoreTrack { index, name: name.map(str::to_string), note_count }
+        ScoreTrack { index, name: name.map(str::to_string), note_count, tuning: None }
     }
 
     #[test]

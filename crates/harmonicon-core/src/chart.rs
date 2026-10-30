@@ -63,6 +63,20 @@ fn is_zero(value: &u8) -> bool {
 }
 
 impl ChartInstrument {
+    /// How a chart writes `guitar`: its open strings by note name.
+    pub fn from_guitar(guitar: &Guitar) -> Self {
+        Self::Guitar {
+            strings: guitar
+                .strings
+                .iter()
+                .map(|&m| crate::midi::midi_to_note(i32::from(m)))
+                .collect(),
+            frets: guitar.frets,
+            capo: guitar.capo,
+            body: guitar.body,
+        }
+    }
+
     /// The playable instrument this describes, or `None` if a string names
     /// no real note.
     pub fn to_instrument(&self) -> Option<Instrument> {
@@ -585,6 +599,18 @@ impl NoteEvent {
     /// A harmonica event: a hole and breath with no other fields.
     pub fn hole(hole: u8, action: Action) -> Self {
         Self { hole: Some(hole), action: Some(action), position: None, note: None, modifiers: None }
+    }
+
+    /// A stringed instrument's event: a string, a fret and the note they
+    /// sound.
+    pub fn fretted(string: u8, fret: u8, note: String) -> Self {
+        Self {
+            hole: None,
+            action: None,
+            position: Some(FretPosition { string, fret }),
+            note: Some(note),
+            modifiers: None,
+        }
     }
 
     /// The hole and breath of a harmonica event, `None` for any other.

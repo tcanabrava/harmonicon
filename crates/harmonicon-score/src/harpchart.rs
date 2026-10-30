@@ -37,8 +37,12 @@ impl HarpChartScore {
         // A chart has exactly one part. The track list exists so callers
         // need no special case, not because there is a choice to make.
         let note_count = chart.track.iter().map(|item| item.events.len()).sum();
+        let tuning = match chart.instrument() {
+            Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) => Some(guitar.strings),
+            _ => None,
+        };
         let tracks =
-            vec![ScoreTrack { index: 0, name: Some(chart.song.title.clone()), note_count }];
+            vec![ScoreTrack { index: 0, name: Some(chart.song.title.clone()), note_count, tuning }];
         Self { chart, tracks }
     }
 
@@ -86,7 +90,12 @@ impl ScoreFile for HarpChartScore {
                 let Some(midi) = self.chart.event_pitch(event) else {
                     continue;
                 };
-                notes.push(ScoreNote { start_secs: start, duration_secs: item.duration, midi });
+                notes.push(ScoreNote {
+                    start_secs: start,
+                    duration_secs: item.duration,
+                    midi,
+                    fret: event.position,
+                });
             }
         }
         notes.sort_by(|a, b| {

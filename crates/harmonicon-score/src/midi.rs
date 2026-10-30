@@ -39,6 +39,7 @@ impl MidiScore {
                 index,
                 name: midi_file::track_name_of(track),
                 note_count: midi_file::note_on_count(track),
+                tuning: None,
             })
             .collect();
 
@@ -102,6 +103,7 @@ impl ScoreFile for MidiScore {
                     start_secs: start,
                     duration_secs: (end - start).max(0.0),
                     midi: raw.key,
+                    fret: None,
                 }
             })
             .collect();

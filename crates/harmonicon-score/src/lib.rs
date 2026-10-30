@@ -17,10 +17,12 @@
 //! bytes into notes.
 //!
 //! What a format has to supply is deliberately small — notes in seconds, a
-//! tempo, a time signature, and a list of tracks. Everything harmonica-
-//! specific (which hole, which breath, which technique) is *derived* by
-//! [`convert`], using `harmonicon_core::pitch_map`, rather than being asked
-//! of a format that knows nothing about harmonicas.
+//! tempo, a time signature, and a list of tracks. Everything instrument-
+//! specific (which hole and breath, which string and fret) is *derived* by
+//! [`convert`] rather than asked of a format that knows nothing about the
+//! instrument. The one exception is a tab, which already knows its strings
+//! and frets: those travel as [`ScoreNote::fret`] and [`ScoreTrack::tuning`]
+//! for a guitar conversion to keep.
 
 pub mod convert;
 pub mod guitar_pro;
@@ -30,6 +32,7 @@ pub mod track;
 
 pub use track::{HARMONICA_TRACK_NAMES, pick_harmonica_track};
 
+use harmonicon_core::chart::FretPosition;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -169,6 +172,10 @@ pub struct ScoreTrack {
     /// hiding from a picker rather than offering as a choice that plays
     /// silence.
     pub note_count: usize,
+    /// A fretted instrument's open strings as MIDI numbers, string 1 (the
+    /// highest) first. Only formats that record a tuning know it; `None`
+    /// everywhere else.
+    pub tuning: Option<Vec<u8>>,
 }
 
 impl ScoreTrack {
@@ -188,6 +195,10 @@ pub struct ScoreNote {
     pub start_secs: f64,
     pub duration_secs: f64,
     pub midi: u8,
+    /// Where the author fretted it, for a format that records strings and
+    /// frets (a tab). A converter keeps it when it still sounds `midi` on
+    /// the target guitar: it is the author's fingering, which beats a guess.
+    pub fret: Option<FretPosition>,
 }
 
 /// A score file, whatever format it arrived in.
