@@ -91,8 +91,7 @@ gates 1.0. In order:
   - lifting the play gate: the song loader refuses a non-harmonica chart
     (`SongLoadError::UnplayableInstrument`) and the Song Editor won't open
     one, until the guitar highway below exists;
-  - a whole-part fingering solver (an untabbed note takes its lowest
-    fret today), horizontal tab highway and fretboard strip,
+  - horizontal tab highway and fretboard strip,
   editor tab rows, Karplus–Strong synth. Detection needs a recorded guitar
   corpus first (low-string resolution, strum onset spread, decaying
   sustain).

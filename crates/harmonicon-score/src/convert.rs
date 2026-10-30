@@ -7,9 +7,9 @@
 //! by `harmonicon_core::pitch_map`, the same resolver the Song Editor's MIDI
 //! import and live recording already use. One mapper, so an imported chart
 //! can't disagree with an authored one about what a harp can play. On a
-//! guitar a tab's own string and fret are kept wherever they still sound
-//! the note ([`guitar_position`]); a part with no tab takes the lowest
-//! fret until a whole-part fingering solver exists.
+//! guitar the whole part is placed at once so the hand stays in position
+//! (`guitar::fingering`), keeping a tab's own string and fret wherever they
+//! still sound the note.
 //!
 //! **A converted chart is only as playable as the part it came from.** A
 //! guitar line on a harmonica is mostly notes out of reach; `pick_harmonica_
@@ -23,6 +23,7 @@ use harmonicon_core::chart::{
 };
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::instrument::Instrument;
+use harmonicon_core::instrument::guitar::fingering::{Onset, fingering};
 use harmonicon_core::instrument::guitar::{
     FretAssignment, Guitar, GuitarBody, STANDARD_TUNING, StringTechnique,
 };
@@ -321,33 +322,51 @@ fn harmonica_items(notes: &[ScoreNote], harp: &Harmonica) -> (Vec<TrackItem>, Co
     (items, report)
 }
 
-/// Where `note` is played on `guitar`: the author's own string and fret when
-/// the source recorded one and it still sounds this pitch here, else the
-/// lowest-fret position that does. `None` when the neck can't reach it.
-pub fn guitar_position(guitar: &Guitar, note: &ScoreNote) -> Option<FretAssignment> {
-    let authored = note
-        .fret
-        .map(|f| FretAssignment {
-            string: f.string,
-            fret: f.fret,
-            technique: StringTechnique::Fretted,
-        })
-        .filter(|a| guitar.pitch_of(a) == Some(note.midi));
-    authored.or_else(|| guitar.fretted_positions(note.midi).into_iter().next())
-}
-
+/// Places every note of a part on `guitar` at once, so the hand stays in
+/// position (`guitar::fingering`). Notes starting together form one onset
+/// and are voiced as a chord. A tab's own string and fret are kept wherever
+/// they still sound the note; a note the neck can't reach, or a chord no
+/// hand can hold, is reported unreachable.
 fn guitar_items(notes: &[ScoreNote], guitar: &Guitar) -> (Vec<TrackItem>, ConversionReport) {
+    // `notes` is sorted by start; group equal starts.
+    let mut groups: Vec<Vec<&ScoreNote>> = Vec::new();
+    for note in notes {
+        match groups.last_mut() {
+            Some(group) if (group[0].start_secs - note.start_secs).abs() < 1e-6 => group.push(note),
+            _ => groups.push(vec![note]),
+        }
+    }
+    let onsets: Vec<Onset> = groups
+        .iter()
+        .map(|group| Onset {
+            notes: group
+                .iter()
+                .map(|n| {
+                    let authored = n.fret.map(|f| FretAssignment {
+                        string: f.string,
+                        fret: f.fret,
+                        technique: StringTechnique::Fretted,
+                    });
+                    (n.midi, authored)
+                })
+                .collect(),
+        })
+        .collect();
+    let placed = fingering(guitar, &onsets);
+
     let mut report = ConversionReport::default();
     let mut items = Vec::new();
-    for note in notes {
-        report.total += 1;
-        let Some(position) = guitar_position(guitar, note) else {
-            report.unreachable += 1;
+    for (group, voicing) in groups.iter().zip(placed) {
+        report.total += group.len();
+        let Some(voicing) = voicing else {
+            report.unreachable += group.len();
             continue;
         };
-        report.natural += 1;
-        let name = midi_to_note(i32::from(note.midi));
-        items.push(item(note, NoteEvent::fretted(position.string, position.fret, name)));
+        report.natural += group.len();
+        for (note, position) in group.iter().zip(voicing) {
+            let name = midi_to_note(i32::from(note.midi));
+            items.push(item(note, NoteEvent::fretted(position.string, position.fret, name)));
+        }
     }
     (items, report)
 }

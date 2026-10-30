@@ -15,6 +15,8 @@
 
 use crate::midi::NOTE_NAMES;
 
+pub mod fingering;
+
 /// Electric or acoustic. They share the neck; the body changes what the
 /// detector hears (an acoustic decays faster, an unplugged electric is
 /// nearly silent), which is detection's business, not the model's.

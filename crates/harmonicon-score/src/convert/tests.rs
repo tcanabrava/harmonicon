@@ -473,3 +473,26 @@ fn a_guitar_parts_key_is_the_pitch_class_it_holds_longest() {
         to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
     assert_eq!(chart.song.key, "G");
 }
+
+/// The converter places the part as a whole: an untabbed note after a
+/// tabbed one stays near it, and notes starting together become a chord a
+/// hand can hold.
+#[test]
+fn a_guitar_part_is_fingered_as_a_whole() {
+    let mut score = tabbed(&[(midi("A3"), Some((4, 7))), (midi("C4"), None)]);
+    let (chart, _) =
+        to_chart(&score, 0, &suggested_guitar(&score.tracks()[0]).into(), "A").unwrap();
+    assert_eq!(positions(&chart), [(4, 7), (3, 5)], "C4 stays near the seventh fret");
+
+    // An E major chord, struck at once.
+    score.notes = ["E2", "B2", "E3", "G#3"]
+        .iter()
+        .map(|n| ScoreNote { start_secs: 0.0, duration_secs: 1.0, midi: midi(n), fret: None })
+        .collect();
+    let guitar = suggested_guitar(&score.tracks()[0]);
+    let (chart, report) = to_chart(&score, 0, &guitar.clone().into(), "A").unwrap();
+    assert_eq!(report.unreachable, 0);
+    let strings: std::collections::HashSet<u8> = positions(&chart).iter().map(|p| p.0).collect();
+    assert_eq!(strings.len(), 4, "one string per chord note");
+    assert_eq!(harmonicon_core::chart_check::instrument_problems(&chart), Vec::<String>::new());
+}
