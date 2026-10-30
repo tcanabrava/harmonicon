@@ -26,6 +26,7 @@ pub mod midi;
 /// Standard MIDI File parsing — named apart from [`midi`], which is pitch
 /// and note-number conversion. Re-exported by the game as `song::midi`.
 pub mod midi_file;
+pub mod note_event_codec;
 pub mod note_parser;
 pub mod note_target;
 pub mod note_tracker;

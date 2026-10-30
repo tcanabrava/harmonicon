@@ -214,6 +214,14 @@ The editor state now holds one `InstrumentSelection`, tracked by undo and
 grid invalidation. It resolves a preset or a configured core `Instrument`;
 configured instruments retain their tuning when the song key changes.
 
+`harmonicon_core::note_event_codec` now supplies the chart-event boundary:
+it decodes instrument positions into note targets and encodes resolved targets
+back into events while retaining expression modifiers and their intensity.
+Guitar round-trip fixtures cover sounding pitches, fingering, bends and
+harmonics. This boundary rejects incompatible authored placements rather
+than guessing a replacement. It is ready for the editor's guitar view;
+the current harmonica authoring path and its load gate remain in place.
+
 Still open: expose instrument selection in the UI and generalize the chart codec, provide a
 pitch-row fallback and guitar tab controls, and make edit validation report
 unresolved/pinned placement conflicts. Keep the editor's guitar load gate
