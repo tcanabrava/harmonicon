@@ -82,14 +82,14 @@ Nothing below can be approved by a test.
 gates 1.0. In order:
 
 - **Guitar**. The core model, fingering solver, Guitar Pro fingering
-  pass-through, imported guitar arrangements and basic horizontal tab
-  highway are in. Multi-part song folders list every native chart on desktop
-  and bundled targets. Guitar charts now load for Play 2D. Next:
-  - fretboard strip with target frets and an upcoming hand-position window,
-    string colours and grouped chord gems;
-  - editor tab rows (the editor still refuses guitar charts),
-    Karplus–Strong synth. Detection needs a recorded guitar corpus first
-    (low-string resolution, strum onset spread, decaying sustain).
+  pass-through, imported guitar arrangements and the horizontal tab highway
+  (string colours, the fretboard strip with its hand window, chord stems)
+  are in. Multi-part song folders list every native chart on desktop and
+  bundled targets; Jam Session offers only harmonica parts. Next:
+  - Karplus–Strong synth for the guitar's audition and call demos;
+  - editor tab rows (the editor still refuses guitar charts);
+  - detection, which needs a recorded guitar corpus first (low-string
+    resolution, strum onset spread, decaying sustain).
 - **Note Trainer** in place of the Bending Trainer: glide, register,
   position and target modes, offered per instrument.
 - **Seam leftovers** that read holes directly and move when they next
