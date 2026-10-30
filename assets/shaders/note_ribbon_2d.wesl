@@ -11,7 +11,10 @@
 // charted rate as the note scrolls down, and a bend leans the ribbon's
 // core over its first fifth of a second, further for a deeper bend.
 //
-// uv.y = 1 is the attack (bottom), uv.y = 0 the end of the note (top).
+// On a vertical highway uv.y = 1 is the attack (bottom) and uv.y = 0 the
+// end of the note (top). On a horizontal one (axis.x = 1, a guitar's tab
+// highway) the ribbon lies on its side: uv.x = 0 is the attack (left) and
+// uv.y runs across it, so `back`/`across` below stand in for both.
 
 import bevy_ui_render::ui_vertex_output::UiVertexOutput;
 
@@ -28,6 +31,7 @@ import bevy_ui_render::ui_vertex_output::UiVertexOutput;
 @group(1) @binding(1) var<uniform> technique: vec4<f32>;
 @group(1) @binding(2) var<uniform> shape: vec4<f32>;
 @group(1) @binding(3) var<uniform> hold: vec4<f32>;
+@group(1) @binding(4) var<uniform> axis: vec4<f32>;
 
 const TAU: f32 = 6.2831853;
 /// Seconds over which a bend's lean ramps in from the attack.
@@ -42,9 +46,13 @@ fn ease(t: f32) -> f32 {
 
 @fragment
 fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
-    let uv = in.uv;
-    let back = 1.0 - uv.y; // 0 at the attack, 1 at the end of the note
-    let d_px = back * in.size.y;
+    let horizontal = axis.x > 0.5;
+    // 0 at the attack, 1 at the end of the note.
+    let back = select(1.0 - in.uv.y, in.uv.x, horizontal);
+    // Across the ribbon, 0..1 from one edge to the other.
+    let across = select(in.uv.x, in.uv.y, horizontal);
+    let length_px = select(in.size.y, in.size.x, horizontal);
+    let d_px = back * length_px;
     let since_attack = back * shape.x;
     let t = shape.z;
     let secs = since_attack + shape.w * t;
@@ -63,11 +71,11 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let open = 0.5 + 0.5 * cos(secs * hz * TAU);
     let width = mix(1.0, 0.35 + 0.65 * open, is_wah);
 
-    let aa = fwidth(uv.x) + 0.002;
+    let aa = fwidth(across) + 0.002;
     let body_half = 0.5 * width;
-    let body = 1.0 - smoothstep(body_half - aa, body_half + aa, abs(uv.x - 0.5));
+    let body = 1.0 - smoothstep(body_half - aa, body_half + aa, abs(across - 0.5));
     let core_half = mix(0.22, 0.07, f32(mode > 0.5));
-    let core = 1.0 - smoothstep(core_half - aa, core_half + aa, abs(uv.x - centre));
+    let core = 1.0 - smoothstep(core_half - aa, core_half + aa, abs(across - centre));
 
     let cap = f32(d_px < shape.y);
     let edge = f32(d_px < EDGE_PX);

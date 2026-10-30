@@ -91,6 +91,8 @@ pub fn build_legend_materials(
                 technique: ribbon_technique(std::slice::from_ref(&modifier)),
                 shape: Vec4::new(PREVIEW_SECS, PREVIEW_CAP_PX, 0.0, 1.0),
                 hold: Vec4::ZERO,
+                // The legend draws its previews standing up.
+                axis: Vec4::ZERO,
             });
             (handle, name)
         })

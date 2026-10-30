@@ -7,7 +7,11 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
 use harmonicon_core::chart::{Action, Modifier};
-use harmonicon_core::instrument::LaneLayout;
+use harmonicon_core::instrument::{LaneLayout, ScrollAxis};
+
+use super::highway_axis::{
+    across, along_px, along_size, placed, set_across, set_along, set_along_size,
+};
 use harmonicon_song::song::SongManifest;
 
 use harmonicon_ui::music_score::{self, BravuraFont};
@@ -475,40 +479,33 @@ fn spawn_note_visual(
     colors: NoteColors,
 ) {
     let label = note_head_label(note, show_numbers);
-    let width_pct = layout.lane_pct() * NOTE_W;
-    let left_pct = layout.centred_left_pct(note_lane(note, layout), width_pct);
+    let axis = layout.axis;
+    let cross_size = layout.lane_pct() * NOTE_W;
+    let cross_start = layout.centred_left_pct(note_lane(note, layout), cross_size);
     let material = shape_materials.add(NoteRibbon2dMaterial {
         color: ribbon_color(false, note_is_blow(note), colors),
         technique: ribbon_technique(&note.modifiers),
         shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
         hold: Vec4::ZERO,
+        axis: super::note_ribbon_2d::ribbon_axis(layout.axis),
     });
 
     hw.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Percent(left_pct),
-            bottom: Val::Percent(150.0), // placeholder; set in update_notes
-            width: Val::Percent(width_pct),
-            height: Val::Px(CAP_PX), // placeholder; set in size_note_ribbons
-            ..default()
-        },
+        // Along the scroll: placeholders, set by `update_notes` and
+        // `size_note_ribbons`.
+        placed(axis, 150.0, Val::Px(CAP_PX), cross_start, Val::Percent(cross_size)),
         MaterialNode(material),
         NoteVisual { note_id },
         NoteRibbon { duration_frac: (note.duration / LOOKAHEAD) as f32 },
         JudgedState::default(),
     ))
     .with_children(|note_e| {
-        // The tab label, centred in the cap at the bottom.
+        // The tab label, centred in the cap at the attack end.
         note_e.spawn((
             Node {
-                position_type: PositionType::Absolute,
-                bottom: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                height: Val::Px(CAP_PX),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                ..default()
+                ..placed(axis, 0.0, Val::Px(CAP_PX), 0.0, Val::Percent(100.0))
             },
             children![(
                 Text::new(label),
@@ -518,22 +515,31 @@ fn spawn_note_visual(
             )],
         ));
 
-        // What the technique asks for, in the lane beside the cap.
+        // What the technique asks for, in the lane beside the cap: beside
+        // its column on a vertical highway, above or below its row on a
+        // horizontal one (`on_right` there meaning the next row down).
         if let Some(cue) = cue {
+            let (bottom, left, right, top) = match (axis, cue.on_right) {
+                (ScrollAxis::Vertical, true) => {
+                    (Val::Px(2.0), Val::Percent(100.0), Val::Auto, Val::Auto)
+                }
+                (ScrollAxis::Vertical, false) => {
+                    (Val::Px(2.0), Val::Auto, Val::Percent(100.0), Val::Auto)
+                }
+                (ScrollAxis::Horizontal, true) => {
+                    (Val::Auto, Val::Px(2.0), Val::Auto, Val::Percent(100.0))
+                }
+                (ScrollAxis::Horizontal, false) => {
+                    (Val::Percent(100.0), Val::Px(2.0), Val::Auto, Val::Auto)
+                }
+            };
             note_e.spawn_empty().apply_scene(bsn! {
                 Node {
                     position_type: {PositionType::Absolute},
-                    bottom: {Val::Px(2.0)},
-                    left: {if cue.on_right {
-                        Val::Percent(100.0)
-                    } else {
-                        Val::Auto
-                    }},
-                    right: {if cue.on_right {
-                        Val::Auto
-                    } else {
-                        Val::Percent(100.0)
-                    }},
+                    bottom: {bottom},
+                    left: {left},
+                    right: {right},
+                    top: {top},
                     margin: {UiRect::horizontal(Val::Px(4.0))},
                     padding: {UiRect::axes(Val::Px(4.0), Val::Px(1.0))},
                     border_radius: {BorderRadius::all(Val::Px(4.0))},
@@ -587,9 +593,13 @@ fn note_has_left_view(note: &ScheduledNote, elapsed: f64) -> bool {
 pub fn update_notes(
     clock: Res<super::GameplayClock>,
     song_notes: Res<SongNotes>,
+    lanes: Res<HighwayLanes>,
     mut commands: Commands,
     mut notes: Query<(Entity, &NoteVisual, &mut Node)>,
 ) {
+    let Some(axis) = lanes.0.as_ref().map(|layout| layout.axis) else {
+        return;
+    };
     let elapsed = clock.get();
     for (entity, visual, mut node) in &mut notes {
         let Some(note) = song_notes.notes.get(visual.note_id) else {
@@ -604,36 +614,37 @@ pub fn update_notes(
             commands.entity(entity).despawn();
             continue;
         }
-        node.bottom = Val::Percent(note_attack_pct(note.time, elapsed, LOOKAHEAD));
+        set_along(&mut node, axis, note_attack_pct(note.time, elapsed, LOOKAHEAD));
     }
 }
 
-/// A ribbon's on-screen height in logical px for a highway `highway_px`
-/// tall: the distance scrolled during the note, so its top meets the hit
-/// line as the note ends — but never shorter than its cap.
+/// A ribbon's on-screen length in logical px for a highway `highway_px`
+/// long along the scroll: the distance scrolled during the note, so its far
+/// end meets the hit line as the note ends — but never shorter than its cap.
 fn ribbon_height_px(duration_frac: f32, highway_px: f32) -> f32 {
     ((SCROLL_SPAN / 100.0) * duration_frac * highway_px).max(CAP_PX)
 }
 
-/// Lengths every ribbon to be time-accurate against the live highway height
-/// (see [`ribbon_height_px`]).
+/// Lengths every ribbon to be time-accurate against the live highway length
+/// along the scroll (see [`ribbon_height_px`]).
 pub fn size_note_ribbons(
     highway: Query<&ComputedNode, With<NoteHighway>>,
+    lanes: Res<HighwayLanes>,
     mut ribbons: Query<(&NoteRibbon, &mut Node)>,
 ) {
-    let Some(hw) = highway.iter().next() else {
+    let (Some(hw), Some(axis)) = (highway.iter().next(), lanes.0.as_ref().map(|l| l.axis)) else {
         return;
     };
-    let height_px = hw.size().y;
-    if height_px <= 0.0 {
+    let length_px = along_px(axis, hw.size());
+    if length_px <= 0.0 {
         return;
     }
     // ComputedNode sizes are physical px; Node lengths are logical px.
-    let logical = height_px * hw.inverse_scale_factor();
+    let logical = length_px * hw.inverse_scale_factor();
     for (ribbon, mut node) in &mut ribbons {
-        let height = Val::Px(ribbon_height_px(ribbon.duration_frac, logical));
-        if node.height != height {
-            node.height = height;
+        let length = Val::Px(ribbon_height_px(ribbon.duration_frac, logical));
+        if along_size(&node, axis) != length {
+            set_along_size(&mut node, axis, length);
         }
     }
 }
@@ -718,6 +729,7 @@ pub fn animate_judged_notes(
     let Some(layout) = lanes.0.as_ref() else {
         return;
     };
+    let axis = layout.axis;
     let width = layout.lane_pct() * NOTE_W;
     let now = clock.get();
     for (entity, visual, mut state, judged, mut node, children) in &mut notes {
@@ -729,10 +741,9 @@ pub fn animate_judged_notes(
         let scale =
             judged.map_or(1.0, |j| judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0));
         let lane_left = layout.centred_left_pct(note_lane(note, layout), width);
-        let (left, scaled) = scaled_span(lane_left, width, scale);
-        if node.width != Val::Percent(scaled) {
-            node.width = Val::Percent(scaled);
-            node.left = Val::Percent(left);
+        let (start, scaled) = scaled_span(lane_left, width, scale);
+        if across(&node, axis).1 != Val::Percent(scaled) {
+            set_across(&mut node, axis, start, Val::Percent(scaled));
         }
         let Some(current) = transition else {
             continue;

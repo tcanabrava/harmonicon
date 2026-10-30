@@ -28,12 +28,15 @@ use bevy::prelude::*;
 
 use harmonicon_app::app::SelectedSong;
 use harmonicon_core::chart::{seconds_to_tick, tick_to_seconds};
+use harmonicon_core::instrument::ScrollAxis;
 use harmonicon_song::song::SongManifest;
 
 use super::bars::{beat_ticks_in_range, chart_meter, pickup_lead_ticks, ticks_per_beat};
 use super::clock::GameplayClock;
 use super::gameplay_2d::note_attack_pct;
+use super::highway_axis::{across, along_size, set_across, set_along, set_along_size};
 use super::notes::LOOKAHEAD;
+use super::state::HighwayLanes;
 
 /// One line in the pool. Which beat it shows changes every frame; the entity
 /// does not.
@@ -92,8 +95,10 @@ pub(super) fn update_beat_guides(
     clock: Res<GameplayClock>,
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
+    lanes: Res<HighwayLanes>,
     mut guides: Query<(&mut Node, &mut Visibility, &mut BackgroundColor), With<BeatGuide>>,
 ) {
+    let axis = lanes.0.as_ref().map_or(ScrollAxis::Vertical, |layout| layout.axis);
     let mut guides = guides.iter_mut();
     let elapsed = clock.get();
 
@@ -115,17 +120,20 @@ pub(super) fn update_beat_guides(
                 break;
             };
             let beat_time = tick_to_seconds(tick, timing.resolution, &timing.tempo_map);
-            let bottom = note_attack_pct(beat_time, elapsed, LOOKAHEAD);
-            if !(0.0..=100.0).contains(&bottom) {
+            let along = note_attack_pct(beat_time, elapsed, LOOKAHEAD);
+            if !(0.0..=100.0).contains(&along) {
                 set_visibility(&mut visibility, Visibility::Hidden);
                 continue;
             }
-            node.bottom = Val::Percent(bottom);
+            set_along(&mut node, axis, along);
             // Only the position moves every frame; the rest changes when a
             // pooled line switches between a beat and a downbeat or shows up.
-            let height = Val::Px(if is_downbeat { 2.0 } else { 1.0 });
-            if node.height != height {
-                node.height = height;
+            let thickness = Val::Px(if is_downbeat { 2.0 } else { 1.0 });
+            if along_size(&node, axis) != thickness {
+                set_along_size(&mut node, axis, thickness);
+            }
+            if across(&node, axis) != (Val::Percent(0.0), Val::Percent(100.0)) {
+                set_across(&mut node, axis, 0.0, Val::Percent(100.0));
             }
             let tint = if is_downbeat { DOWNBEAT_COLOR } else { BEAT_COLOR };
             if color.0 != tint {

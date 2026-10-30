@@ -27,6 +27,19 @@ pub struct NoteRibbon2dMaterial {
     /// `note_feedback::hold_uniform` for the layout. Zero until then.
     #[uniform(3)]
     pub hold: Vec4,
+    /// x = 1 when the ribbon lies along a horizontal highway, its attack at
+    /// the left end; 0 for a vertical one, its attack at the bottom. See
+    /// [`ribbon_axis`].
+    #[uniform(4)]
+    pub axis: Vec4,
+}
+
+/// The `axis` uniform for a ribbon on a highway scrolling along `axis`.
+pub fn ribbon_axis(axis: harmonicon_core::instrument::ScrollAxis) -> Vec4 {
+    match axis {
+        harmonicon_core::instrument::ScrollAxis::Vertical => Vec4::ZERO,
+        harmonicon_core::instrument::ScrollAxis::Horizontal => Vec4::X,
+    }
 }
 
 impl UiMaterial for NoteRibbon2dMaterial {

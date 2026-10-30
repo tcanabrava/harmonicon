@@ -47,6 +47,7 @@ fn app(ribbons: usize, animate: bool) -> App {
                 technique: Vec4::new(2.0, 5.0, 0.0, 0.0),
                 shape: Vec4::new(0.5 + i as f32 * 0.01, 26.0, 0.0, 0.0),
                 hold: Vec4::ZERO,
+                axis: Vec4::ZERO,
             })
         })
         .collect();

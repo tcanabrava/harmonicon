@@ -19,67 +19,46 @@ use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use super::HoleCell;
 use super::gameplay_2d::HIT_H_PCT;
+use super::highway_axis::placed;
 
 /// Spawns the static highway furniture (lane stripes, dividers, hit zone) —
 /// no notes. Notes are spawned later, lazily, by `spawn_visible_notes`.
 pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout) {
     // Lane count/width come from the instrument being played, not a fixed
     // 10 — a chromatic's 12+ holes need proportionally narrower lanes.
+    let axis = layout.axis;
     let lane_pct = layout.lane_pct();
+    let full = Val::Percent(100.0);
 
     for h in 0..layout.lanes.len() {
-        let left_pct = h as f32 * lane_pct;
+        let start_pct = h as f32 * lane_pct;
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
-        hw.spawn_empty().apply_scene(bsn! {
-            Node {
-                position_type: {PositionType::Absolute},
-                left: {Val::Percent(left_pct)},
-                top: {Val::Percent(0.0)},
-                width: {Val::Percent(lane_pct)},
-                height: {Val::Percent(100.0)},
-            }
-            BackgroundColor({Color::srgba(1.0, 1.0, 1.0, alpha)})
-        });
+        hw.spawn((
+            placed(axis, 0.0, full, start_pct, Val::Percent(lane_pct)),
+            BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha)),
+        ));
         if h > 0 {
-            hw.spawn_empty().apply_scene(bsn! {
-                Node {
-                    position_type: {PositionType::Absolute},
-                    left: {Val::Percent(left_pct)},
-                    top: {Val::Percent(0.0)},
-                    width: {Val::Px(1.0)},
-                    height: {Val::Percent(100.0)},
-                }
-                BackgroundColor({Color::srgba(1.0, 1.0, 1.0, 0.08)})
-            });
+            hw.spawn((
+                placed(axis, 0.0, full, start_pct, Val::Px(1.0)),
+                BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.08)),
+            ));
         }
     }
 
-    // Hit zone: a band a note's head must reach, and the line at its top
+    // Hit zone: a band a note's head must reach, and the line at its far
     // edge that is the actual judgment instant.
-    hw.spawn_empty().apply_scene(bsn! {
-        Node {
-            position_type: {PositionType::Absolute},
-            left: {Val::Percent(0.0)},
-            bottom: {Val::Percent(0.0)},
-            width: {Val::Percent(100.0)},
-            height: {Val::Percent(HIT_H_PCT)},
-        }
-        BackgroundColor({Color::srgba(1.0, 1.0, 0.55, 0.14)})
-    });
+    hw.spawn((
+        placed(axis, 0.0, Val::Percent(HIT_H_PCT), 0.0, full),
+        BackgroundColor(Color::srgba(1.0, 1.0, 0.55, 0.14)),
+    ));
     // Full width, and warmer and heavier than a beat guide. This is the one
     // line on the highway that means "now"; the guides crossing it are
     // white, thinner and far dimmer, so the two can't be mistaken for each
     // other as they scroll past.
-    hw.spawn_empty().apply_scene(bsn! {
-        Node {
-            position_type: {PositionType::Absolute},
-            left: {Val::Percent(0.0)},
-            bottom: {Val::Percent(HIT_H_PCT)},
-            width: {Val::Percent(100.0)},
-            height: {Val::Px(3.0)},
-        }
-        BackgroundColor({Color::srgba(1.0, 0.98, 0.62, 0.85)})
-    });
+    hw.spawn((
+        placed(axis, HIT_H_PCT, Val::Px(3.0), 0.0, full),
+        BackgroundColor(Color::srgba(1.0, 0.98, 0.62, 0.85)),
+    ));
 }
 
 /// The hole strip under the highway, labelled with the notes of the harp

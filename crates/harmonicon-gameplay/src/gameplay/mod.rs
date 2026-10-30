@@ -20,6 +20,7 @@ pub mod countdown_overlay;
 mod gameplay_2d;
 pub mod harmonica_overlay;
 mod highway_2d;
+mod highway_axis;
 mod hud;
 mod hud_panel;
 mod judge;
