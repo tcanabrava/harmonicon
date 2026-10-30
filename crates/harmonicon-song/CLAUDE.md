@@ -67,6 +67,16 @@ load-bearing about *this* crate.
     chart. The editor reads the file directly and keeps the repeats; a new
     reader that goes through `AssetServer` gets the expansion for free, and
     one that parses the file itself must call `expand`.
+  - **A chart names one instrument** (format 1.8.0): `harmonica`, or a
+    top-level `instrument` (only `guitar` so far), never both — the schema's
+    `oneOf`. Rules depending on which (events name a hole *or* a string
+    position, bend sign, techniques per instrument, a position sounding its
+    stated `note`) are core's `chart_check::instrument_problems`, run by
+    `validate-pack`. **`SongChartLoader` refuses a non-harmonica chart**
+    (`SongLoadError::UnplayableInstrument`) after validating it, so nothing
+    that can only draw holes ever receives one; `validate_and_migrate_chart`
+    deliberately does not, since `validate-pack` must accept it. Lift the
+    gate when the guitar highway lands, not before.
   - Chromatic harps are fully supported: `Harmonica::hole_count()` sizes
     lanes/overlays/editor everywhere (never hardcode 10), and
     `Modifier::Slide` is onset-validated like overblow/overdraw. BendingTrainer is

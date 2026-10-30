@@ -83,12 +83,13 @@ gates 1.0. In order:
 
 - **Guitar**. The core model is in (`harmonicon_core::instrument::guitar`).
   Next, in order:
-  - chart format 1.8.0 naming it: a top-level `instrument`, used instead of
-    `harmonica`, `NoteEvent.position` as string and fret, `note` required
-    off the harmonica, and multi-part song folders. The score importers
-    (`harmonicon-score`'s `convert`) take an `Instrument` in the same
-    change. Each instrument's chart fields arrive with that instrument, so
-    the flute's come with the flute;
+  - the rest of chart format 1.8.0 (the fields and validation landed):
+    multi-part song folders, and the score importers (`harmonicon-score`'s
+    `convert`) taking an `Instrument`. Each instrument's chart fields
+    arrive with that instrument, so the flute's come with the flute;
+  - lifting the play gate: the song loader refuses a non-harmonica chart
+    (`SongLoadError::UnplayableInstrument`) and the Song Editor won't open
+    one, until the guitar highway below exists;
   - a whole-part fingering solver, Guitar Pro string/fret pass-through,
     horizontal tab highway and fretboard strip,
   editor tab rows, Karplus–Strong synth. Detection needs a recorded guitar

@@ -110,6 +110,10 @@ punish the instrument for doing what it does.
 
 ## Chart format (format 1.8.0, additive)
 
+Landed except multi-part song folders. A guitar chart validates but the
+loader and Song Editor refuse to play or open it until the guitar
+highway exists.
+
 - New optional top-level `instrument`. If it is absent, the chart is a
   harmonica chart and `harmonica` is the instrument, so every existing chart
   loads unchanged.
@@ -292,9 +296,10 @@ behaviour.
    Guitar Pro):
    - the core model (landed);
    - chart 1.8.0 naming it: the `instrument` field, `position`, the
-     conditionally-required `note`, multi-part song folders and validator
-     support. A chart field is only designed alongside the model it
-     names, so the flute's fields arrive with the flute;
+     conditionally-required `note` and validator support have landed;
+     multi-part song folders and the importers remain. A chart field is
+     only designed alongside the model it names, so the flute's fields
+     arrive with the flute;
    - fingering solver;
    - Guitar Pro string/fret pass-through;
    - horizontal tab highway and fretboard strip;
