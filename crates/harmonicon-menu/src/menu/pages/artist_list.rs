@@ -66,6 +66,10 @@ pub(crate) struct SongPickerState {
     descending: bool,
     pending_delete: Option<String>,
     deletion_error: Option<String>,
+    /// Offer only harmonica parts. Jam Session improvises over the 12-bar
+    /// form on a harmonica's hole map, so a guitar part has nothing to jam
+    /// on there yet. Set from the mode each time the page opens.
+    harmonica_only: bool,
 }
 
 #[derive(Component)]
@@ -186,8 +190,11 @@ pub(crate) fn setup_artist_list(
     asset_server: Res<AssetServer>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
-    state: Res<SongPickerState>,
+    mode: Res<GameplayMode>,
+    mut state: ResMut<SongPickerState>,
 ) {
+    state.harmonica_only = *mode == GameplayMode::JamSession;
+    let state = &*state;
     let (content, header, _) =
         spawn_menu_root_plain(&mut commands, &loc.msg("select-song"), None, &theme, "SongPicker");
     commands.entity(content).insert(Node {
@@ -296,7 +303,7 @@ pub(crate) fn setup_artist_list(
             })
         },
     );
-    populate_rows(&mut commands, rows, &songs, &state, &profile, Some(&asset_server), true, &[]);
+    populate_rows(&mut commands, rows, &songs, state, &profile, Some(&asset_server), true, &[]);
 }
 
 /// The search label, text field, Clear button and result count.
@@ -664,6 +671,7 @@ fn collect_songs(
         .values()
         .flatten()
         .filter(|song| matches_search(query, &[&song.name, &song.artist, &song.genre]))
+        .filter(|song| !state.harmonica_only || song.instrument == "harmonica")
         .filter(|song| {
             let accuracy = preferences(profile, &song.asset_path)
                 .last_accuracy
@@ -1090,6 +1098,7 @@ mod tests {
                 for index in 0..2 {
                     commands.spawn_scene(song_row(
                         SongEntry {
+                            instrument: "harmonica".to_string(),
                             name: format!("Song {index}"),
                             artist: "Band".into(),
                             genre: "Rock".into(),
@@ -1200,9 +1209,42 @@ mod tests {
         assert_eq!(app.world().get::<Text>(mastery).unwrap().0, "40%");
     }
 
+    /// Jam Session plays on a harmonica's hole map, so its picker leaves
+    /// another instrument's part out; Play offers every part.
+    #[test]
+    fn jam_offers_only_harmonica_parts() {
+        let entry = |name: &str, instrument: &str| SongEntry {
+            instrument: instrument.into(),
+            artist: "Band".into(),
+            name: name.into(),
+            genre: "Rock".into(),
+            difficulty: "easy".into(),
+            source_name: "repo".into(),
+            retained: false,
+            asset_path: format!("packs://repo/Band/Duet/song/{name}.harpchart"),
+        };
+        let mut available = AvailableSongs::default();
+        available.0.insert(
+            "Band".into(),
+            vec![entry("guitar", "guitar"), entry("harmonica", "harmonica")],
+        );
+        let profile = PlayerProfile::default();
+        let names = |state: &SongPickerState| {
+            collect_songs(&available, state, &profile)
+                .into_iter()
+                .map(|s| s.name)
+                .collect::<Vec<_>>()
+        };
+        let mut state = SongPickerState { sort: SongSort::Band, ..default() };
+        assert_eq!(names(&state), ["guitar", "harmonica"]);
+        state.harmonica_only = true;
+        assert_eq!(names(&state), ["harmonica"]);
+    }
+
     #[test]
     fn personal_columns_sort_and_filter_the_latest_result() {
         let entry = |name: &str| SongEntry {
+            instrument: "harmonica".to_string(),
             artist: "Band".into(),
             name: name.into(),
             genre: "Rock".into(),
@@ -1440,6 +1482,7 @@ mod tests {
         app.world_mut().resource_mut::<AvailableSongs>().0.insert(
             "band".into(),
             vec![SongEntry {
+                instrument: "harmonica".to_string(),
                 artist: "Band".into(),
                 name: "Song".into(),
                 genre: "Rock".into(),
@@ -1478,6 +1521,7 @@ mod tests {
             "catalog".into(),
             vec![
                 SongEntry {
+                    instrument: "harmonica".to_string(),
                     artist: "Alpha".into(),
                     name: "Zulu".into(),
                     genre: "Rock".into(),
@@ -1487,6 +1531,7 @@ mod tests {
                     asset_path: "a".into(),
                 },
                 SongEntry {
+                    instrument: "harmonica".to_string(),
                     artist: "Zulu".into(),
                     name: "Alpha".into(),
                     genre: "Blues".into(),
@@ -1554,6 +1599,7 @@ mod tests {
         app.world_mut().resource_mut::<AvailableSongs>().0.insert(
             "Eric Clapton".into(),
             vec![SongEntry {
+                instrument: "harmonica".to_string(),
                 artist: "Eric Clapton".into(),
                 name: "Wonderful Tonight".into(),
                 genre: "Rock".into(),

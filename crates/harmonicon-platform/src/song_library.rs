@@ -84,6 +84,7 @@ mod tests {
         library.hide_at("packs://second/Band/Other/song/chart.harpchart", &path).unwrap();
         assert_eq!(library.hidden.len(), 2);
         let entry = |source: &str| crate::assets_management::SongEntry {
+            instrument: "harmonica".to_string(),
             artist: "Band".into(),
             name: "Song".into(),
             genre: "Rock".into(),

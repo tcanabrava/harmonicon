@@ -72,10 +72,10 @@ fn generate_bundled_asset_manifest() {
 
     let mut out = String::new();
     out.push_str("// Auto-generated at build time by build.rs — do not edit.\n");
-    out.push_str("pub static SONGS: &[(&str, &str, &str, &str, &str)] = &[\n");
-    for (artist, name, genre, difficulty, asset_path) in &songs {
+    out.push_str("pub static SONGS: &[(&str, &str, &str, &str, &str, &str)] = &[\n");
+    for (artist, name, genre, difficulty, asset_path, instrument) in &songs {
         out.push_str(&format!(
-            "    ({artist:?}, {name:?}, {genre:?}, {difficulty:?}, {asset_path:?}),\n"
+            "    ({artist:?}, {name:?}, {genre:?}, {difficulty:?}, {asset_path:?}, {instrument:?}),\n"
         ));
     }
     out.push_str("];\n\n");
@@ -105,12 +105,12 @@ fn asset_relative_path(path: &Path, strip: &Path) -> String {
         .join("/")
 }
 
-/// (artist, song name, genre, difficulty, asset-relative chart path) for every song under
+/// (artist, song name, genre, difficulty, asset-relative chart path, instrument) for every song under
 /// `root` — mirrors `assets_management::scan_songs_root`/`scan_artist_song`'s
 /// discovery rules exactly (all `*.harpchart` files directly under each
 /// song's `song/` subfolder), but as a one-shot build-time walk instead of a
 /// runtime `ResMut` system.
-fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, String)> {
+fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, String, String)> {
     let mut out = Vec::new();
     let Ok(artists) = std::fs::read_dir(root) else {
         return out;
@@ -133,27 +133,17 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, 
             }
             let charts = song_parts::charts_in(&song_dir.path().join("song"));
             for chart in &charts {
-                let chart_metadata = std::fs::read(chart)
-                    .ok()
-                    .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
-                let catalog_field = |field: &str| {
-                    chart_metadata
-                        .as_ref()
-                        .and_then(|value| value.get("song")?.get(field)?.as_str())
-                        .unwrap_or("Uncategorized")
-                        .to_string()
-                };
-                let genre = catalog_field("genre");
-                let difficulty = catalog_field("difficulty");
+                let catalog = song_parts::catalog_fields(chart);
                 let name = song_dir.file_name().to_string_lossy().into_owned();
                 // Served under `assets/songs/` by the web bundle.
                 let asset_path = format!("songs/{}", asset_relative_path(chart, root));
                 out.push((
                     artist.clone(),
                     song_parts::part_name(&name, chart, charts.len()),
-                    genre,
-                    difficulty,
+                    catalog.genre,
+                    catalog.difficulty,
                     asset_path,
+                    catalog.instrument,
                 ));
             }
         }
@@ -202,14 +192,20 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let folder = root.path().join("Band/Duet/song");
         std::fs::create_dir_all(&folder).unwrap();
-        for (name, difficulty) in [("guitar", "easy"), ("harmonica", "hard")] {
-            std::fs::write(
-                folder.join(format!("{name}.harpchart")),
-                serde_json::json!({"song": {"genre": "Test", "difficulty": difficulty}})
-                    .to_string(),
-            )
-            .unwrap();
-        }
+        std::fs::write(
+            folder.join("guitar.harpchart"),
+            serde_json::json!({
+                "song": {"genre": "Test", "difficulty": "easy"},
+                "instrument": {"type": "guitar"}
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(
+            folder.join("harmonica.harpchart"),
+            serde_json::json!({"song": {"genre": "Test", "difficulty": "hard"}}).to_string(),
+        )
+        .unwrap();
         std::fs::write(folder.join("music.mid"), "backing").unwrap();
         let songs = super::scan_songs_for_manifest(root.path());
         assert_eq!(
@@ -220,14 +216,16 @@ mod tests {
                     "Duet — guitar".into(),
                     "Test".into(),
                     "easy".into(),
-                    "songs/Band/Duet/song/guitar.harpchart".into()
+                    "songs/Band/Duet/song/guitar.harpchart".into(),
+                    "guitar".into()
                 ),
                 (
                     "Band".into(),
                     "Duet — harmonica".into(),
                     "Test".into(),
                     "hard".into(),
-                    "songs/Band/Duet/song/harmonica.harpchart".into()
+                    "songs/Band/Duet/song/harmonica.harpchart".into(),
+                    "harmonica".into()
                 ),
             ]
         );

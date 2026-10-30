@@ -155,4 +155,8 @@ load-bearing about *this* crate.
   chart file is listed in filename order. Only when none exists is the first
   sorted importable score offered; a sibling MIDI otherwise remains backing
   music. Multi-part display names append the chart filename stem. Single-part
-  names and existing asset paths remain unchanged.
+  names and existing asset paths remain unchanged. `song_parts::catalog_fields`
+  is the one read of a chart's genre, difficulty and instrument for the
+  picker (`SongEntry::instrument`, `harmonica` when the chart names none), so
+  the runtime scan and the bundled manifest can't disagree; Jam Session's
+  picker uses it to offer only harmonica parts.

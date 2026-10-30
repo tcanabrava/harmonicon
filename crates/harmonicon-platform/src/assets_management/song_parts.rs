@@ -36,3 +36,32 @@ pub fn part_name(song: &str, chart: &Path, count: usize) -> String {
         song.to_owned()
     }
 }
+
+/// What the song picker shows about one chart, read without loading or
+/// validating it: its genre and difficulty, and the instrument it's for
+/// (`harmonica` for a chart with no `instrument` field, as every chart
+/// before format 1.8.0 is).
+pub struct CatalogFields {
+    pub genre: String,
+    pub difficulty: String,
+    pub instrument: String,
+}
+
+pub fn catalog_fields(chart: &Path) -> CatalogFields {
+    let value = std::fs::read(chart)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    let song_field = |field: &str| {
+        value
+            .as_ref()
+            .and_then(|v| v.get("song")?.get(field)?.as_str())
+            .unwrap_or("Uncategorized")
+            .to_owned()
+    };
+    let instrument = value
+        .as_ref()
+        .and_then(|v| v.get("instrument")?.get("type")?.as_str())
+        .unwrap_or("harmonica")
+        .to_owned();
+    CatalogFields { genre: song_field("genre"), difficulty: song_field("difficulty"), instrument }
+}

@@ -49,6 +49,10 @@ pub struct SongEntry {
     pub source_name: String,
     pub retained: bool,
     pub asset_path: String,
+    /// The instrument the chart is for, as its `instrument.type` names it:
+    /// `harmonica` for a chart with none, or e.g. `guitar`. Lets a picker
+    /// offer only parts a mode can play without loading every chart.
+    pub instrument: String,
 }
 
 /// Songs indexed by artist name. Each artist maps to a sorted list of songs.
@@ -285,28 +289,19 @@ pub fn scan_artist_song(
             let Some(relative) = asset_relative_path(song_file, songs_root) else {
                 continue;
             };
+            let catalog = song_parts::catalog_fields(song_file);
             available.0.entry(artist.clone()).or_default().push(SongEntry {
                 source_name: String::new(),
                 retained: false,
                 asset_path: format!("{source_prefix}{relative}"),
                 artist: artist.clone(),
                 name: song_parts::part_name(&name, song_file, charts.len()),
-                genre: chart_catalog_field(song_file, "genre"),
-                difficulty: chart_catalog_field(song_file, "difficulty"),
+                genre: catalog.genre,
+                difficulty: catalog.difficulty,
+                instrument: catalog.instrument,
             });
         }
     }
-}
-
-/// Reads the small metadata subset needed by the song picker without
-/// loading or validating the full chart into the asset system.
-#[cfg(not(target_arch = "wasm32"))]
-fn chart_catalog_field(path: &std::path::Path, field: &str) -> String {
-    std::fs::read(path)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-        .and_then(|value| value.get("song")?.get(field)?.as_str().map(str::to_owned))
-        .unwrap_or_else(|| "Uncategorized".to_string())
 }
 
 /// `path` below `root`, `/`-separated whatever the platform, since asset
@@ -422,7 +417,7 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
     available.0.clear();
-    for (artist, name, genre, difficulty, asset_path) in manifest::SONGS {
+    for (artist, name, genre, difficulty, asset_path, instrument) in manifest::SONGS {
         available.0.entry((*artist).to_string()).or_default().push(SongEntry {
             artist: (*artist).to_string(),
             name: (*name).to_string(),
@@ -431,6 +426,7 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
             source_name: String::new(),
             retained: false,
             asset_path: (*asset_path).to_string(),
+            instrument: (*instrument).to_string(),
         });
     }
     scan_song_packs(packs, available);
