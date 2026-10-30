@@ -10,12 +10,13 @@ use harmonicon_app::app::SelectedSong;
 use harmonicon_audio::AudioSettings;
 use harmonicon_core::chart::{HarpChart, Modifier, TrackItem};
 use harmonicon_core::midi::midi_to_freq_hz;
-use harmonicon_core::synth::{Expr, PhraseNote, SAMPLE_RATE, TICKS_PER_BEAT, render_pcm};
+use harmonicon_core::synth::{
+    Expr, PhraseNote, SAMPLE_RATE, TICKS_PER_BEAT, Voice, render_pcm_with,
+};
 use harmonicon_core::wav::encode_wav;
 use harmonicon_song::song::SongManifest;
-use std::borrow::Cow;
 
-use super::{GameplayClock, GameplayRoot, resolve_item_time, target_pitch};
+use super::{GameplayClock, GameplayRoot, resolve_item_time};
 
 /// Silent gap the demo audio is scheduled to finish before its phrase's
 /// first response note reaches the hit line — purely a listening comfort
@@ -59,26 +60,6 @@ pub(super) fn call_phrase_groups(track: &[TrackItem]) -> Vec<(usize, usize)> {
     groups
 }
 
-/// The natural (un-bent) pitch name for `item`'s hole/action, same fallback
-/// `notes::build_scheduled_notes` uses: the
-/// event's own authored `note` if present, else the harmonica's layout.
-fn natural_pitch<'a>(
-    chart: &HarpChart,
-    event: &'a harmonicon_core::chart::NoteEvent,
-) -> Cow<'a, str> {
-    match event.note.as_deref() {
-        Some(note) => Cow::Borrowed(note),
-        None => Cow::Owned(
-            chart
-                .harmonica
-                .as_ref()
-                .zip(event.hole_action())
-                .map(|(harp, (hole, action))| harp.wind_direction_label(hole, &action))
-                .unwrap_or_default(),
-        ),
-    }
-}
-
 /// The expression LFO a call-phrase note's demo audio should carry, mapped
 /// 1:1 from the chart modifiers that have an `audio_system::synth::Expr`
 /// equivalent. Every other modifier (bend, overblow/overdraw, slide) is
@@ -117,8 +98,10 @@ pub(super) fn build_phrase_notes(
         let len = ((item.duration as f32 / secs_per_tick).round() as usize).max(1);
         for event in &item.events {
             let modifiers = event.modifiers.as_deref().unwrap_or_default();
-            let natural = natural_pitch(chart, event);
-            let freq = target_pitch(&natural, modifiers).map(|m| midi_to_freq_hz(m as f32));
+            // The chart's own rule for an event's pitch: on a harmonica the
+            // unbent reed plus its modifiers, on any other instrument its
+            // stated, already-sounding note.
+            let freq = chart.event_pitch(event).map(|m| midi_to_freq_hz(f32::from(m)));
             notes.push(PhraseNote { tick, len, freq, expr: demo_expr(modifiers) });
         }
     }
@@ -151,7 +134,8 @@ pub(super) fn setup_call_cues(
 
         let phrase_notes = build_phrase_notes(chart, group, group_start_time, bpm);
         let secs_per_tick = 60.0 / bpm.max(1.0) / TICKS_PER_BEAT as f32;
-        let pcm = render_pcm(&phrase_notes, secs_per_tick);
+        let voice = chart.instrument().map_or(Voice::Harmonica, |i| i.synth_voice());
+        let pcm = render_pcm_with(&phrase_notes, secs_per_tick, voice);
         if pcm.is_empty() {
             continue;
         }
@@ -275,6 +259,30 @@ mod tests {
             }"#,
         )
         .unwrap()
+    }
+
+    /// A guitar chart's `note` already sounds its bend, so the demo plays it
+    /// as written: a two-semitone bend up to A4 demos at 440 Hz, not a
+    /// further two semitones above it.
+    #[test]
+    fn a_guitar_call_note_demos_the_pitch_it_states() {
+        let chart: HarpChart = serde_json::from_value(serde_json::json!({
+            "song": {"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"E","difficulty":"easy"},
+            "timing": {"resolution":12,"tempo_map":[{"tick":0,"bpm":120.0}]},
+            "instrument": {"type":"guitar","strings":["E4","B3","G3","D3","A2","E2"],"frets":22},
+            "track": [{"time":10.0,"duration":0.5,"call":true,"events":[
+                {"position":{"string":2,"fret":8},"note":"A4",
+                 "modifiers":[{"type":"bend","semitones":2}]}]}],
+            "scoring": {"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}
+        }))
+        .unwrap();
+        let notes = build_phrase_notes(&chart, &chart.track, 10.0, 120.0);
+        let freq = notes[0].freq.expect("a guitar note has a pitch");
+        assert!((freq - 440.0).abs() < 0.01, "{freq} Hz");
+        assert_eq!(
+            chart.instrument().map(|i| i.synth_voice()),
+            Some(harmonicon_core::synth::Voice::PluckedString)
+        );
     }
 
     #[test]

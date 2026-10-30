@@ -41,6 +41,16 @@ impl From<Harmonica> for Instrument {
     }
 }
 
+impl Instrument {
+    /// How the synth sounds this instrument, for demos and auditions.
+    pub fn synth_voice(&self) -> crate::synth::Voice {
+        match self {
+            Self::Harmonica(_) => crate::synth::Voice::Harmonica,
+            Self::Guitar(_) => crate::synth::Voice::PluckedString,
+        }
+    }
+}
+
 impl From<Guitar> for Instrument {
     fn from(guitar: Guitar) -> Self {
         Self::Guitar(guitar)

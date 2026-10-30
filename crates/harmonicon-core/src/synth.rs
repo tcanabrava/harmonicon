@@ -1,13 +1,27 @@
 // SPDX-License-Identifier: MIT
 
-//! Additive-synthesis harmonica voice shared by every feature that needs to
-//! render notes to PCM without a sampled/GM instrument: the Song Editor's
-//! Play/Practice preview and MIDI-import backing mixdown
-//! (`song_editor::playback`/`midi_import`), and `gameplay::call_response`'s
-//! one-shot "call" demo audio. None of those own the synth — it's audio
-//! infrastructure, not an editor or gameplay concern.
+//! The synth shared by every feature that needs to render notes to PCM
+//! without a sampled/GM instrument: the Song Editor's Play/Practice preview
+//! and MIDI-import backing mixdown (`song_editor::playback`/`midi_import`),
+//! and `gameplay::call_response`'s one-shot "call" demo audio. None of those
+//! own the synth — it's audio infrastructure, not an editor or gameplay
+//! concern. It has two [`Voice`]s: the additive harmonica reed below, and a
+//! plucked string (`pluck`, Karplus–Strong) for the guitar.
 
 use std::f32::consts::TAU;
+
+mod pluck;
+
+/// Which instrument [`render_pcm_with`] sounds like.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Voice {
+    /// The additive harmonica reed, with breath noise and expression.
+    #[default]
+    Harmonica,
+    /// A plucked string (Karplus–Strong): bright at the attack, ringing
+    /// down after it. Expression isn't modelled.
+    PluckedString,
+}
 
 /// CD-quality mono output used by every consumer of this synth.
 pub const SAMPLE_RATE: u32 = 44_100;
@@ -227,7 +241,14 @@ pub fn vibrato_phase_bound(freq: f32, rate: f32) -> f32 {
     2.0 * freq * VIBRATO_DEPTH / rate
 }
 
+/// [`render_pcm_with`] in the harmonica's voice.
 pub fn render_pcm(notes: &[PhraseNote], secs_per_tick: f32) -> Vec<f32> {
+    render_pcm_with(notes, secs_per_tick, Voice::Harmonica)
+}
+
+/// Renders `notes` on a `secs_per_tick` grid in `voice`, mixed and
+/// normalised to peak at most 1.0.
+pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -> Vec<f32> {
     let end_tick = notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
     let total =
         ((end_tick as f32 * secs_per_tick + TAIL_SECS) * SAMPLE_RATE as f32).ceil() as usize;
@@ -252,6 +273,10 @@ pub fn render_pcm(notes: &[PhraseNote], secs_per_tick: f32) -> Vec<f32> {
         let mut rng: u32 = LCG_SEED
             .wrapping_add((idx as u32).wrapping_mul(LCG_HOLE_MIX))
             .wrapping_add((n.tick as u32).wrapping_mul(LCG_TICK_MIX));
+        if voice == Voice::PluckedString {
+            pluck::add_pluck(&mut buf, start, dur, freq, rng, NOTE_LEVEL);
+            continue;
+        }
         let mut noise_env = 1.0f32;
         let mut oscillator = Oscillator::new(freq);
 
