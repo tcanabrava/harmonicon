@@ -20,6 +20,9 @@
 
 use std::path::Path;
 
+#[path = "src/assets_management/song_parts.rs"]
+mod song_parts;
+
 fn main() {
     generate_bundled_asset_manifest();
 }
@@ -104,7 +107,7 @@ fn asset_relative_path(path: &Path, strip: &Path) -> String {
 
 /// (artist, song name, genre, difficulty, asset-relative chart path) for every song under
 /// `root` — mirrors `assets_management::scan_songs_root`/`scan_artist_song`'s
-/// discovery rules exactly (first `*.harpchart` file directly under each
+/// discovery rules exactly (all `*.harpchart` files directly under each
 /// song's `song/` subfolder), but as a one-shot build-time walk instead of a
 /// runtime `ResMut` system.
 fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, String)> {
@@ -123,50 +126,36 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, 
             continue;
         };
         for song_dir in song_dirs.flatten() {
-            if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            if !song_dir.file_type().map(|t| t.is_dir()).unwrap_or(false)
+                || song_dir.file_name().to_string_lossy().starts_with('.')
+            {
                 continue;
             }
-            // Mirrors `assets_management::scan_artist_song` exactly,
-            // including its two passes and its use of
-            // `harmonicon_score::IMPORT_EXTENSIONS` — a bundled song whose
-            // chart is a score file would otherwise be visible on desktop
-            // and silently missing on wasm/Android.
-            let chart = std::fs::read_dir(song_dir.path().join("song")).ok().and_then(|entries| {
-                let entries: Vec<_> = entries.flatten().collect();
-                let has_extension = |e: &std::fs::DirEntry, want: &[&str]| {
-                    e.path()
-                        .extension()
-                        .and_then(|x| x.to_str())
-                        .map(|x| x.to_ascii_lowercase())
-                        .is_some_and(|x| want.contains(&x.as_str()))
+            let charts = song_parts::charts_in(&song_dir.path().join("song"));
+            for chart in &charts {
+                let chart_metadata = std::fs::read(chart)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+                let catalog_field = |field: &str| {
+                    chart_metadata
+                        .as_ref()
+                        .and_then(|value| value.get("song")?.get(field)?.as_str())
+                        .unwrap_or("Uncategorized")
+                        .to_string()
                 };
-                entries
-                    .iter()
-                    .find(|e| has_extension(e, &["harpchart"]))
-                    .or_else(|| {
-                        entries.iter().find(|e| harmonicon_score::is_importable_file(&e.path()))
-                    })
-                    .map(|e| e.path())
-            });
-            let Some(chart) = chart else {
-                continue;
-            };
-            let chart_metadata = std::fs::read(&chart)
-                .ok()
-                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
-            let catalog_field = |field: &str| {
-                chart_metadata
-                    .as_ref()
-                    .and_then(|value| value.get("song")?.get(field)?.as_str())
-                    .unwrap_or("Uncategorized")
-                    .to_string()
-            };
-            let genre = catalog_field("genre");
-            let difficulty = catalog_field("difficulty");
-            let name = song_dir.file_name().to_string_lossy().into_owned();
-            // Served under `assets/songs/` by the web bundle.
-            let asset_path = format!("songs/{}", asset_relative_path(&chart, root));
-            out.push((artist.clone(), name, genre, difficulty, asset_path));
+                let genre = catalog_field("genre");
+                let difficulty = catalog_field("difficulty");
+                let name = song_dir.file_name().to_string_lossy().into_owned();
+                // Served under `assets/songs/` by the web bundle.
+                let asset_path = format!("songs/{}", asset_relative_path(chart, root));
+                out.push((
+                    artist.clone(),
+                    song_parts::part_name(&name, chart, charts.len()),
+                    genre,
+                    difficulty,
+                    asset_path,
+                ));
+            }
         }
     }
     out.sort();
@@ -204,4 +193,43 @@ fn scan_ext_stems(dir: &Path, ext: &str) -> Vec<String> {
     names.sort();
     names.dedup();
     names
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn bundled_manifest_lists_each_native_part_with_its_metadata() {
+        let root = tempfile::tempdir().unwrap();
+        let folder = root.path().join("Band/Duet/song");
+        std::fs::create_dir_all(&folder).unwrap();
+        for (name, difficulty) in [("guitar", "easy"), ("harmonica", "hard")] {
+            std::fs::write(
+                folder.join(format!("{name}.harpchart")),
+                serde_json::json!({"song": {"genre": "Test", "difficulty": difficulty}})
+                    .to_string(),
+            )
+            .unwrap();
+        }
+        std::fs::write(folder.join("music.mid"), "backing").unwrap();
+        let songs = super::scan_songs_for_manifest(root.path());
+        assert_eq!(
+            songs,
+            vec![
+                (
+                    "Band".into(),
+                    "Duet — guitar".into(),
+                    "Test".into(),
+                    "easy".into(),
+                    "songs/Band/Duet/song/guitar.harpchart".into()
+                ),
+                (
+                    "Band".into(),
+                    "Duet — harmonica".into(),
+                    "Test".into(),
+                    "hard".into(),
+                    "songs/Band/Duet/song/harmonica.harpchart".into()
+                ),
+            ]
+        );
+    }
 }

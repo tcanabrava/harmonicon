@@ -90,6 +90,13 @@ fn guitar_event_problem(guitar: &Guitar, event: &NoteEvent) -> Option<String> {
     }
 }
 
+/// The string technique a guitar event's modifiers name: a bend up, a
+/// harmonic, or the plain fretted note. Modifiers a guitar can't play (which
+/// validation reports) are ignored here.
+pub fn string_technique(modifiers: &[Modifier]) -> StringTechnique {
+    guitar_technique(modifiers).unwrap_or(StringTechnique::Fretted)
+}
+
 /// The string technique a guitar event's modifiers name, or why they name
 /// none a guitar has.
 fn guitar_technique(modifiers: &[Modifier]) -> Result<StringTechnique, String> {

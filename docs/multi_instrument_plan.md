@@ -83,8 +83,8 @@ existing `harmonica`/`pitch_map` code, not a rewrite.
 the voice model below describes is split across two places in the code:
 `can_sound_together`/`reconcile` on the trait, for the Song Editor, and
 `note_tracker::VoiceFilter`, the stateful per-frame filter live detection
-runs before onset counting. `ScrollAxis` has only `Vertical` so far; the
-guitar adds `Horizontal`.
+runs before onset counting. `ScrollAxis` supports `Vertical` for harmonica
+and `Horizontal` for guitar.
 
 ### Voice model: what can sound together
 
@@ -110,9 +110,10 @@ punish the instrument for doing what it does.
 
 ## Chart format (format 1.8.0, additive)
 
-Landed except multi-part song folders. A guitar chart validates but the
-loader and Song Editor refuse to play or open it until the guitar
-highway exists.
+Landed, including multi-part song discovery. Guitar charts load for Play 2D's
+basic horizontal tab highway. The Song Editor still refuses them until its
+tab rows exist. Score imports offer guitar arrangements alongside harmonica
+arrangements, preserving tab tuning and authored string/fret positions.
 
 - New optional top-level `instrument`. If it is absent, the chart is a
   harmonica chart and `harmonica` is the instrument, so every existing chart
@@ -128,9 +129,11 @@ highway exists.
 - **One chart is one instrument part.** A song folder may hold several
   charts, e.g. `song/harmonica.harpchart` and `song/guitar.harpchart`. This
   keeps the schema flat and lets a pack ship a guitar part for an existing
-  song without touching its harmonica chart. It changes the "first
-  `*.harpchart` under `song/`" rule in both `assets_management` and
-  `generate_bundled_asset_manifest`, which must stay in step. Keep the
+  song without touching its harmonica chart. Desktop discovery and the
+  bundled manifest share `assets_management/song_parts.rs`: every native
+  chart is offered, sorted by filename, with the filename stem appended to
+  the song name when it has multiple parts. A sibling MIDI stays backing
+  audio; imports are a fallback only when no native chart exists. Keep the
   `.harpchart` extension: the name is now historical, but it is the play
   format (see the import-source rule) and renaming it costs every pack.
 
@@ -297,12 +300,12 @@ behaviour.
    - the core model (landed);
    - chart 1.8.0 naming it: the `instrument` field, `position`, the
      conditionally-required `note` and validator support have landed;
-     multi-part song folders and the importers remain. A chart field is
+     multi-part folders are discovered and imports offer both instruments. A chart field is
      only designed alongside the model it names, so the flute's fields
      arrive with the flute;
-   - fingering solver;
-   - Guitar Pro string/fret pass-through;
-   - horizontal tab highway and fretboard strip;
+   - fretboard strip, string colours and grouped chord gems (the basic
+     horizontal tab highway, fingering solver and Guitar Pro string/fret
+     pass-through are implemented);
    - editor tab rows;
    - Karplus–Strong synth;
    - a recorded corpus, then detection tuning (low-string resolution,

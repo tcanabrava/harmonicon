@@ -71,7 +71,7 @@ fn several_unnamed_tracks_are_all_offered_with_one_chosen() {
     let low: Vec<u8> = (40u8..46).collect();
     let converted =
         convert_score("mid", midi_file(&[("", &low), ("", &easy_notes())]), "A", None).unwrap();
-    assert_eq!(converted.tracks.len(), 2, "both parts must remain offerable");
+    assert_eq!(converted.tracks.len(), 4, "both parts must offer both instruments");
     assert_eq!(
         converted.tracks[converted.selected].track.index, 1,
         "the part that actually fits a harmonica should be the default"
@@ -102,7 +102,7 @@ fn every_playable_track_is_converted_not_just_the_chosen_one() {
     .unwrap();
     assert_eq!(
         converted.tracks.len(),
-        2,
+        4,
         "the note-free tempo track is not offerable, the other two are"
     );
     assert!(
@@ -156,4 +156,22 @@ fn a_track_name_is_never_used_as_a_song_title() {
 fn the_title_is_read_from_the_song_folder() {
     let path = std::path::Path::new("songs/Sonny Boy/Help Me/song/tune.mid");
     assert_eq!(title_from_path(path).as_deref(), Some("Help Me"));
+}
+
+#[test]
+fn a_low_guitar_part_loads_and_preserves_its_pitches() {
+    let pitches = [40, 43, 45, 47];
+    let converted = convert_score("mid", midi_file(&[("Guitar", &pitches)]), "A", None).unwrap();
+    let chart = &converted.tracks[converted.selected].chart;
+    assert!(chart.harmonica.is_none());
+    let actual: Vec<_> = chart
+        .track
+        .iter()
+        .flat_map(|item| &item.events)
+        .map(|event| {
+            assert!(event.position.is_some());
+            chart.event_pitch(event).unwrap()
+        })
+        .collect();
+    assert_eq!(actual, pitches);
 }

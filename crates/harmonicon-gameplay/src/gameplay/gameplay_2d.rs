@@ -7,7 +7,8 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
 use harmonicon_core::chart::{Action, Modifier};
-use harmonicon_core::instrument::{LaneLayout, ScrollAxis};
+use harmonicon_core::instrument::guitar::{FretAssignment, StringTechnique};
+use harmonicon_core::instrument::{LaneLayout, PlayPosition, ScrollAxis};
 
 use super::highway_axis::{
     across, along_px, along_size, placed, set_across, set_along, set_along_size,
@@ -87,16 +88,15 @@ pub fn setup(
     clock.set_free(-COUNTDOWN);
     music_started.0 = false;
     (*valid_notes, *played_harp) = ValidHarpNotes::for_played_harp(&effective, &manifest.chart);
-    *highway_lanes = HighwayLanes::for_played_harp(&played_harp);
 
     let chart = &manifest.chart;
     // Everything the player *sees* about the instrument — lane count, the
-    // hole strip's notes, the "grab a C harp" hint — follows the harp they
-    // are holding, exactly as the judge does.
-    let Some(played) = effective.harp_for(chart) else {
-        error!("entered Play 2D with a chart that names no harmonica");
-        return;
-    };
+    // hole strip's notes, the "grab a C harp" hint — follows the instrument
+    // they are holding, exactly as the judge does.
+    *highway_lanes = HighwayLanes::for_instrument(effective.instrument_for(chart).as_ref());
+    // The harmonica, when the chart is played on one: the hole strip and the
+    // "grab a C harp" hint only mean something on a harp.
+    let played = effective.harp_for(chart);
 
     // Build every note's score state up front (cheap — plain data, no
     // entities/materials yet) plus the one piece of render data that isn't
@@ -172,25 +172,46 @@ pub fn setup(
                 ..default()
             })
             .with_children(|left| {
-                // Note highway
-                highway = left
-                    .spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            flex_grow: 1.0,
-                            min_height: Val::Px(120.0),
-                            overflow: Overflow::clip(),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
-                        NoteHighway,
-                    ))
-                    .with_children(|hw| {
-                        if let Some(layout) = &highway_lanes.0 {
-                            spawn_highway(hw, layout);
-                        }
+                let mut spawn_track = |parent: &mut ChildSpawnerCommands| {
+                    // Note highway
+                    highway = parent
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                flex_grow: 1.0,
+                                min_height: Val::Px(120.0),
+                                overflow: Overflow::clip(),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
+                            NoteHighway,
+                        ))
+                        .with_children(|hw| {
+                            if let Some(layout) = &highway_lanes.0 {
+                                spawn_highway(hw, layout);
+                            }
+                        })
+                        .id();
+                };
+                if let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
+                    chart.instrument()
+                {
+                    left.spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_grow: 1.0,
+                        min_height: Val::Px(120.0),
+                        flex_direction: FlexDirection::Row,
+                        ..default()
                     })
-                    .id();
+                    .with_children(|row| {
+                        if !aural {
+                            super::guitar_visuals::spawn_fretboard(row, &guitar);
+                        }
+                        spawn_track(row);
+                    });
+                } else {
+                    spawn_track(left);
+                }
 
                 // The technique coach sits at the end of the track, where
                 // the note it coaches is landing.
@@ -207,7 +228,19 @@ pub fn setup(
                     ..default()
                 })
                 .with_children(|col| {
-                    spawn_harmonica_strip(col, played, &loc);
+                    if let Some(harp) = played {
+                        spawn_harmonica_strip(col, harp, &loc);
+                    } else if !aural
+                        && let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
+                            chart.instrument()
+                    {
+                        col.spawn((
+                            Text::new(""),
+                            TextFont { font_size: FontSize::Px(14.0), ..default() },
+                            TextColor(Color::WHITE),
+                            super::guitar_visuals::FretboardHint(guitar.top_fret()),
+                        ));
+                    }
                 });
             });
 
@@ -275,7 +308,8 @@ pub fn setup(
         &manifest.waveform,
         manifest.music_duration_secs,
         &progress_note_markers(&song_notes.notes, panels.progress_notes),
-        played.hole_count(),
+        // One progress lane per highway lane: a harp's holes.
+        highway_lanes.0.as_ref().map_or(0, |l| u8::try_from(l.lanes.len()).unwrap_or(u8::MAX)),
         &adaptive.sections,
         &adaptive.learned,
     );
@@ -286,9 +320,9 @@ pub fn setup(
     if panels.lyrics {
         super::karaoke::spawn_karaoke(&mut commands, lyrics, super::karaoke::strip_top(staff));
     }
-    let harp_hint =
-        super::song_info::harp_banner_text(played, &effective.song_key_for(chart), &loc);
-    spawn_countdown(&mut commands, &loc, Some(&harp_hint), Some(&song_info));
+    let harp_hint = played
+        .map(|harp| super::song_info::harp_banner_text(harp, &effective.song_key_for(chart), &loc));
+    spawn_countdown(&mut commands, &loc, harp_hint.as_deref(), Some(&song_info));
 }
 
 /// The progress bar's per-hole note markers for `notes`, or none when the
@@ -452,6 +486,7 @@ pub fn spawn_visible_notes(
                 &mut shape_materials,
                 show_numbers.0,
                 colors,
+                super::guitar_visuals::chord_span(note, &song_notes.notes),
             );
         }
     });
@@ -477,13 +512,14 @@ fn spawn_note_visual(
     shape_materials: &mut Assets<NoteRibbon2dMaterial>,
     show_numbers: bool,
     colors: NoteColors,
+    chord: Option<(u8, String)>,
 ) {
     let label = note_head_label(note, show_numbers);
     let axis = layout.axis;
     let cross_size = layout.lane_pct() * NOTE_W;
     let cross_start = layout.centred_left_pct(note_lane(note, layout), cross_size);
     let material = shape_materials.add(NoteRibbon2dMaterial {
-        color: ribbon_color(false, note_is_blow(note), colors),
+        color: note_color(note, colors),
         technique: ribbon_technique(&note.modifiers),
         shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
         hold: Vec4::ZERO,
@@ -500,6 +536,9 @@ fn spawn_note_visual(
         JudgedState::default(),
     ))
     .with_children(|note_e| {
+        if let Some((span, name)) = chord {
+            super::guitar_visuals::spawn_chord_stem(note_e, span, layout.lane_pct(), &name);
+        }
         // The tab label, centred in the cap at the attack end.
         note_e.spawn((
             Node {
@@ -575,6 +614,15 @@ fn spawn_note_visual(
 /// `theme::effective_note_colors`), or dim red once missed. A hit keeps the
 /// base colour: the shader's hold state turns it gold while the pitch is
 /// held and greys it when it drops, so the tint must not also claim it.
+fn note_color(note: &ScheduledNote, colors: NoteColors) -> LinearRgba {
+    if !note.missed
+        && let PlayPosition::Fret(p) = note.position
+    {
+        return super::guitar_visuals::string_color(p.string).with_alpha(0.95).to_linear();
+    }
+    ribbon_color(note.missed, note_is_blow(note), colors)
+}
+
 fn ribbon_color(missed: bool, is_blow: bool, colors: NoteColors) -> LinearRgba {
     if missed {
         return Color::srgba(0.5, 0.13, 0.13, 0.7).to_linear();
@@ -674,7 +722,7 @@ pub fn update_note_visuals(
         let Some(note) = song_notes.notes.get(visual.note_id) else {
             continue;
         };
-        let color = ribbon_color(note.missed, note_is_blow(note), colors);
+        let color = note_color(note, colors);
         // Live hold progress for the shader, from the same samples the judge
         // will verify the technique from when the hold ends.
         let hold = hold_uniform(
@@ -788,12 +836,25 @@ pub(super) fn head_text(judged: Option<bool>, note: &ScheduledNote, show_numbers
     }
 }
 
-/// [`head_label`] for `note`'s own tab, or nothing for a note with no hole
-/// tab to print.
+/// What `note`'s cap reads: a harmonica's [`head_label`] tab, or a string's
+/// [`fret_label`].
 fn note_head_label(note: &ScheduledNote, show_numbers: bool) -> String {
-    HoleTab::of(&note.position)
-        .map(|tab| head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers))
-        .unwrap_or_default()
+    match &note.position {
+        PlayPosition::Fret(a) => fret_label(a),
+        position => HoleTab::of(position)
+            .map(|tab| head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers))
+            .unwrap_or_default(),
+    }
+}
+
+/// A fretted note as tab writes it: the fret (`7`), a bend after it (`7b`),
+/// or a natural harmonic in angle brackets (`<12>`).
+pub(super) fn fret_label(a: &FretAssignment) -> String {
+    match a.technique {
+        StringTechnique::Fretted => a.fret.to_string(),
+        StringTechnique::Bend(_) => format!("{}b", a.fret),
+        StringTechnique::Harmonic => format!("<{}>", a.fret),
+    }
 }
 
 /// Whether `note` takes the blow colour: a note with no breath (off the
@@ -966,6 +1027,14 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn a_fretted_note_reads_as_tab_writes_it() {
+        let at = |technique| FretAssignment { string: 2, fret: 7, technique };
+        assert_eq!(fret_label(&at(StringTechnique::Fretted)), "7");
+        assert_eq!(fret_label(&at(StringTechnique::Bend(2.0))), "7b");
+        assert_eq!(fret_label(&at(StringTechnique::Harmonic)), "<7>");
     }
 
     // ── ribbon geometry ───────────────────────────────────────────────────────

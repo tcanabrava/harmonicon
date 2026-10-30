@@ -43,13 +43,6 @@ pub enum SongLoadError {
     Json(#[from] serde_json::Error),
     #[error("Chart validation failed:\n{0}")]
     Validation(String),
-    /// A valid chart for an instrument the game can't play yet. Validation
-    /// accepts it so a pack can ship it; play needs that instrument's
-    /// highway first.
-    #[error(
-        "this chart is for an instrument the game can't play yet (only harmonica charts are playable)"
-    )]
-    UnplayableInstrument,
 }
 
 /// Migrates and validates a raw chart using the same rules as the asset
@@ -136,9 +129,6 @@ impl SongChartLoader {
             let _span = info_span!("validate_and_parse_chart").entered();
             validate_and_parse_chart(&mut chart_value)?
         };
-        if chart.harmonica.is_none() {
-            return Err(SongLoadError::UnplayableInstrument);
-        }
         if migrated {
             info!(
                 "Migrated chart at {} to format_version {CURRENT_FORMAT_VERSION}",
@@ -459,6 +449,17 @@ mod tests {
             ] }],
             "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
         })
+    }
+
+    #[test]
+    fn guitar_highway_test_song_passes_the_loader() {
+        let mut value =
+            serde_json::from_str(include_str!("../../tests/fixtures/guitar-highway.harpchart"))
+                .unwrap();
+        let (_, chart) = validate_and_parse_chart(&mut value).unwrap();
+        assert_eq!(chart.track.len(), 10);
+        assert!(chart.harmonica.is_none());
+        assert!(harmonicon_core::chart_check::instrument_problems(&chart).is_empty());
     }
 
     #[test]

@@ -34,9 +34,9 @@ pub(crate) fn configure_pitch_filter(
     mut filter: ResMut<InstrumentPitchFilter>,
 ) {
     if let Some(manifest) = manifests.get(&selected.0)
-        && let Some(harp) = effective.harp_for(&manifest.chart)
+        && let Some(instrument) = effective.instrument_for(&manifest.chart)
     {
-        filter.configure(&harp.clone().into(), capture.map(|capture| capture.sample_rate));
+        filter.configure(&instrument, capture.map(|capture| capture.sample_rate));
     }
 }
 
@@ -81,9 +81,7 @@ pub(crate) fn setup_song_info(
     mut song_info: ResMut<SongInfo>,
 ) {
     if let Some(manifest) = manifests.get(&selected.0) {
-        let Some(harp) = effective.harp_for(&manifest.chart) else {
-            return;
-        };
+        let harp = effective.harp_for(&manifest.chart);
         let key = effective.song_key_for(&manifest.chart);
         *song_info = SongInfo::from_chart(&manifest.chart, harp, &key, &loc);
     }
@@ -105,13 +103,16 @@ pub(crate) fn setup_scoring_config(
     let chart = &manifest.chart;
     let s = &chart.scoring;
 
-    // Size the detector to this harmonica instead of a fixed constant, so a
-    // Low-F/Low-D harp's low notes aren't cut off by a floor tuned for
-    // standard keys (see TODO.md).
+    // Size the detector to this instrument instead of a fixed constant, so a
+    // Low-F/Low-D harp's low notes, or a guitar's low E, aren't cut off by a
+    // floor tuned for standard harmonica keys (see TODO.md).
     *pitch_range = effective
-        .harp_for(chart)
-        .and_then(harmonicon_core::harmonica::Harmonica::frequency_range)
-        .map(|(lo, hi)| PitchRange::from_freqs([lo, hi], PITCH_RANGE_MARGIN_SEMITONES))
+        .instrument_for(chart)
+        .and_then(|instrument| harmonicon_core::instrument::InstrumentModel::range(&instrument))
+        .map(|(lo, hi)| {
+            let hz = |midi: u8| harmonicon_core::midi::midi_to_freq_hz(f32::from(midi));
+            PitchRange::from_freqs([hz(lo), hz(hi)], PITCH_RANGE_MARGIN_SEMITONES)
+        })
         .unwrap_or_default();
 
     config.perfect_window = s.perfect_window_ms as f64 / 1000.0;

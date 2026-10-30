@@ -797,7 +797,7 @@ harp-row-slide = slide
 # The track picker on the harp-check page, shown only for an imported score
 # file with more than one playable part.
 harp-check-track = Part to play
-harp-check-track-option = {$name} — {$notes} notes, {$percent}% playable
+harp-check-track-option = {$name} ({$instrument}) — {$notes} notes, {$percent}% playable
 harp-check-track-unnamed = Track {$index}
 # Heading above a lesson's five training tiers, with how much of the ladder
 # is done (the mastery meter).
@@ -876,3 +876,8 @@ song-mastery-low = Below 50%
 song-mastery-medium = 50–79%
 song-mastery-high = 80–100%
 song-sort-times-played = Times played
+
+harp-check-instrument-harmonica = Harmonica
+harp-check-instrument-guitar = Guitar
+
+gameplay-guitar-window = Hand window starts at fret {$fret} · Next: {$next} · 0 = open string

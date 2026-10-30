@@ -38,7 +38,14 @@ impl SongInfo {
     /// `key` is the key the music sounds in — `EffectiveHarmonica::
     /// song_key_for`, which differs from the chart's under a same-holes
     /// substitution.
-    pub fn from_chart(chart: &HarpChart, harp: &Harmonica, key: &str, loc: &Localization) -> Self {
+    /// `harp` is the harmonica it's played on; a chart for another
+    /// instrument has no harp line.
+    pub fn from_chart(
+        chart: &HarpChart,
+        harp: Option<&Harmonica>,
+        key: &str,
+        loc: &Localization,
+    ) -> Self {
         Self {
             title: format!("{} \u{2014} {}", chart.song.artist, chart.song.title),
             meter: String::from(loc.msg_args(
@@ -49,7 +56,7 @@ impl SongInfo {
                     ("time_sig", time_signature_label(chart)),
                 ],
             )),
-            harp: harp_line(&harp.summary(), loc),
+            harp: harp.map(|harp| harp_line(&harp.summary(), loc)).unwrap_or_default(),
             description: chart.metadata.as_ref().and_then(|m| m.description.clone()),
             chart_author: chart.metadata.as_ref().and_then(|m| {
                 m.author.as_ref().map(|author| {

@@ -345,7 +345,10 @@ impl Plugin for GameplayPlugin {
                 gameplay_2d::size_note_ribbons,
                 gameplay_2d::update_note_visuals,
                 gameplay_2d::animate_judged_notes,
+                super::guitar_visuals::align_chord_stems,
                 gameplay_2d::update_holes,
+                super::guitar_visuals::update_fretboard,
+                super::guitar_visuals::update_hint,
                 beat_guides::update_beat_guides,
                 technique_coach::update_technique_coach,
             )

@@ -796,7 +796,7 @@ harp-row-slide = slide
 # El selector de pista en la página de comprobación de la armónica, visible
 # solo para un archivo importado con más de una parte tocable.
 harp-check-track = Parte a tocar
-harp-check-track-option = {$name} — {$notes} notas, {$percent}% tocable
+harp-check-track-option = {$name} ({$instrument}) — {$notes} notas, {$percent}% tocable
 harp-check-track-unnamed = Pista {$index}
 # Encabezado sobre los cinco niveles de entrenamiento de una lección, con
 # cuánto de la escalera se ha completado (el medidor de dominio).
@@ -875,3 +875,8 @@ song-mastery-low = Menos de 50%
 song-mastery-medium = 50–79%
 song-mastery-high = 80–100%
 song-sort-times-played = Veces jugadas
+
+harp-check-instrument-harmonica = Armónica
+harp-check-instrument-guitar = Guitarra
+
+gameplay-guitar-window = Posición de la mano empieza en el traste {$fret} · Siguiente: {$next} · 0 = cuerda al aire

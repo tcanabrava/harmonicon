@@ -188,7 +188,7 @@ fn a_harmonica_position_means_nothing_to_a_guitar() {
 fn the_instrument_enum_answers_as_its_guitar() {
     let guitar = standard();
     let instrument = Instrument::from(guitar.clone());
-    assert_eq!(instrument.range(), Guitar::range(&guitar));
+    assert_eq!(instrument.range(), InstrumentModel::range(&guitar));
     assert_eq!(instrument.lane_layout(), guitar.lane_layout());
     assert_eq!(instrument.positions_for(midi("A2")), guitar.positions_for(midi("A2")));
 }

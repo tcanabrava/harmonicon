@@ -81,20 +81,15 @@ Nothing below can be approved by a test.
 `docs/multi_instrument_plan.md` has the design. Every item in this section
 gates 1.0. In order:
 
-- **Guitar**. The core model is in (`harmonicon_core::instrument::guitar`).
-  Next, in order:
-  - multi-part song folders: a song with both a harmonica and a guitar
-    chart, and the song loader offering an imported part as a guitar
-    (`convert::to_chart` already takes an `Instrument` and keeps a tab's
-    fingering). Each instrument's chart fields arrive with that
-    instrument, so the flute's come with the flute;
-  - lifting the play gate: the song loader refuses a non-harmonica chart
-    (`SongLoadError::UnplayableInstrument`) and the Song Editor won't open
-    one, until the guitar highway below exists;
-  - horizontal tab highway and fretboard strip,
-  editor tab rows, Karplus–Strong synth. Detection needs a recorded guitar
-  corpus first (low-string resolution, strum onset spread, decaying
-  sustain).
+- **Guitar**. The core model, fingering solver, Guitar Pro fingering
+  pass-through, imported guitar arrangements and basic horizontal tab
+  highway are in. Multi-part song folders list every native chart on desktop
+  and bundled targets. Guitar charts now load for Play 2D. Next:
+  - fretboard strip with target frets and an upcoming hand-position window,
+    string colours and grouped chord gems;
+  - editor tab rows (the editor still refuses guitar charts),
+    Karplus–Strong synth. Detection needs a recorded guitar corpus first
+    (low-string resolution, strum onset spread, decaying sustain).
 - **Note Trainer** in place of the Bending Trainer: glide, register,
   position and target modes, offered per instrument.
 - **Seam leftovers** that read holes directly and move when they next

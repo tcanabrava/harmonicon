@@ -72,11 +72,9 @@ load-bearing about *this* crate.
     `oneOf`. Rules depending on which (events name a hole *or* a string
     position, bend sign, techniques per instrument, a position sounding its
     stated `note`) are core's `chart_check::instrument_problems`, run by
-    `validate-pack`. **`SongChartLoader` refuses a non-harmonica chart**
-    (`SongLoadError::UnplayableInstrument`) after validating it, so nothing
-    that can only draw holes ever receives one; `validate_and_migrate_chart`
-    deliberately does not, since `validate-pack` must accept it. Lift the
-    gate when the guitar highway lands, not before.
+    `validate-pack`. A guitar chart loads and plays on Play 2D's horizontal
+    tab highway; the Song Editor still refuses to open one (its grid rows
+    are holes), and Jam Session is harmonica-only.
   - Chromatic harps are fully supported: `Harmonica::hole_count()` sizes
     lanes/overlays/editor everywhere (never hardcode 10), and
     `Modifier::Slide` is onset-validated like overblow/overdraw. BendingTrainer is
@@ -305,3 +303,8 @@ load-bearing about *this* crate.
   - It can't live in `harmonicon-platform`'s build script:
     `include!(concat!(env!("OUT_DIR"), ...))` reads the *including* crate's
     `OUT_DIR`, and `OUT_DIR` is per-package.
+
+- Score imports retain their harmonica default and additionally offer guitar
+  arrangements that meet the converter's playability threshold. The part
+  picker names the target instrument. Guitar conversion uses source tuning
+  and authored frets where supplied; otherwise it uses the fingering solver.

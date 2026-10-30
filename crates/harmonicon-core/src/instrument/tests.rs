@@ -213,3 +213,19 @@ fn the_instrument_enum_answers_as_its_harmonica() {
     assert_eq!(instrument.envelope(), Envelope::Sustained);
     assert_eq!(instrument.expression_scope(), ExpressionScope::WholeInstrument);
 }
+
+#[test]
+fn guitar_detection_includes_harmonics_and_respects_tuning_gaps() {
+    let mut guitar = guitar::Guitar::standard(guitar::GuitarBody::Acoustic);
+    let pitches = guitar.valid_pitches();
+    assert!(pitches.contains(&88), "fifth-fret high-E harmonic sounds E6");
+    assert_eq!(InstrumentModel::range(&guitar), Some((40, 88)));
+    guitar.strings = vec![100, 40];
+    guitar.frets = 5;
+    let pitches = guitar.valid_pitches();
+    assert!(!pitches.contains(&70), "a tuning gap is not a playable pitch");
+    assert!(pitches.contains(&124));
+    let mut filter =
+        crate::note_tracker::VoiceFilter::for_instrument(&guitar.into(), &Default::default());
+    assert_eq!(filter.allowed(&[124, 70, 40]), [40, 124]);
+}

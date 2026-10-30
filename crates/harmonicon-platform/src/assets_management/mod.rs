@@ -7,6 +7,8 @@ use std::fs::DirEntry;
 
 use crate::content_packs::{ContentPacks, ContentPacksChanged, ContentPacksSet};
 
+#[cfg(not(target_arch = "wasm32"))]
+mod song_parts;
 mod watch;
 pub use watch::ExternalFolderChanged;
 
@@ -277,61 +279,22 @@ pub fn scan_artist_song(
             continue;
         }
 
-        // The files for the music are inside of `song` subdirectory.
-        //
-        // A `.harpchart` always wins over an imported format, and the two
-        // are checked in separate passes rather than by first-match:
-        // `song/music.mid` is *backing audio* for a charted song, so a
-        // directory holding both would otherwise pick whichever `read_dir`
-        // happened to yield first and sometimes play the backing track as
-        // the chart. A score file is only the chart when nothing else is
-        // (see `harmonicon_song::song::score_song`).
-        //
-        // The importable extensions come from `harmonicon_score`, never a
-        // list written out here: a format this scan didn't know about
-        // would simply never appear in the song list, with nothing to
-        // explain why.
-        let song_file = (|| {
-            let entries: Vec<_> =
-                std::fs::read_dir(song_dir.path().join("song")).ok()?.flatten().collect();
-            // Case-insensitively, matching `harmonicon_score::parse_import`
-            // — a file saved as `.MID` is as common as `.mid`.
-            let has_extension = |entry: &std::fs::DirEntry, want: &[&str]| {
-                entry
-                    .path()
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(|e| e.to_ascii_lowercase())
-                    .is_some_and(|e| want.contains(&e.as_str()))
-            };
-            entries
-                .iter()
-                .find(|e| has_extension(e, &["harpchart"]))
-                .or_else(|| {
-                    // `.xml` is only offered when its head is MusicXML.
-                    entries.iter().find(|e| harmonicon_score::is_importable_file(&e.path()))
-                })
-                .map(|e| e.path())
-        })();
-
-        let Some(song_file) = song_file else {
-            continue;
-        };
-
-        let Some(relative) = asset_relative_path(&song_file, songs_root) else {
-            continue;
-        };
-
+        let charts = song_parts::charts_in(&song_dir.path().join("song"));
         let name = song_dir.file_name().to_string_lossy().into_owned();
-        available.0.entry(artist.clone()).or_default().push(SongEntry {
-            source_name: String::new(),
-            retained: false,
-            asset_path: format!("{source_prefix}{relative}"),
-            artist: artist.clone(),
-            name,
-            genre: chart_catalog_field(&song_file, "genre"),
-            difficulty: chart_catalog_field(&song_file, "difficulty"),
-        });
+        for song_file in &charts {
+            let Some(relative) = asset_relative_path(song_file, songs_root) else {
+                continue;
+            };
+            available.0.entry(artist.clone()).or_default().push(SongEntry {
+                source_name: String::new(),
+                retained: false,
+                asset_path: format!("{source_prefix}{relative}"),
+                artist: artist.clone(),
+                name: song_parts::part_name(&name, song_file, charts.len()),
+                genre: chart_catalog_field(song_file, "genre"),
+                difficulty: chart_catalog_field(song_file, "difficulty"),
+            });
+        }
     }
 }
 
@@ -504,6 +467,36 @@ mod tests {
             std::fs::write(p, "{}").unwrap();
         }
         dir
+    }
+
+    #[test]
+    fn multipart_songs_offer_every_chart_but_never_the_backing_track() {
+        let root = song_tree(&[
+            "Band/Duet/song/harmonica.harpchart",
+            "Band/Duet/song/guitar.HARPCHART",
+            "Band/Duet/song/music.mid",
+            "Band/Duet/song/.draft.harpchart",
+        ]);
+        // A directory with a chart extension must not be offered as a file.
+        std::fs::create_dir(root.path().join("Band/Duet/song/bad.harpchart")).unwrap();
+        let mut songs = AvailableSongs::default();
+        scan_songs_root(root.path(), "packs://test/", &mut songs);
+        let parts = &songs.0["Band"];
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0].name, "Duet — guitar");
+        assert_eq!(parts[1].name, "Duet — harmonica");
+        assert_eq!(parts[0].asset_path, "packs://test/Band/Duet/song/guitar.HARPCHART");
+        assert_eq!(parts[1].asset_path, "packs://test/Band/Duet/song/harmonica.harpchart");
+    }
+
+    #[test]
+    fn imported_song_fallback_is_deterministic_and_single_chart_names_stay_stable() {
+        let root = song_tree(&["Band/Tune/song/z.mid", "Band/Tune/song/a.mid"]);
+        let mut songs = AvailableSongs::default();
+        scan_songs_root(root.path(), "external://songs/", &mut songs);
+        assert_eq!(songs.0["Band"].len(), 1);
+        assert_eq!(songs.0["Band"][0].name, "Tune");
+        assert!(songs.0["Band"][0].asset_path.ends_with("/a.mid"));
     }
 
     #[test]

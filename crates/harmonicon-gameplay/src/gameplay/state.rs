@@ -145,8 +145,8 @@ pub struct PlayedHarp(pub Option<Harmonica>);
 pub struct HighwayLanes(pub Option<LaneLayout>);
 
 impl HighwayLanes {
-    pub(super) fn for_played_harp(played: &PlayedHarp) -> Self {
-        Self(played.0.as_ref().map(InstrumentModel::lane_layout))
+    pub(super) fn for_instrument(instrument: Option<&Instrument>) -> Self {
+        Self(instrument.map(InstrumentModel::lane_layout))
     }
 }
 
@@ -165,10 +165,11 @@ impl ValidHarpNotes {
         effective: &EffectiveHarmonica,
         chart: &HarpChart,
     ) -> (Self, PlayedHarp) {
-        let Some(harp) = effective.harp_for(chart).cloned() else {
-            return (Self::default(), PlayedHarp(None));
-        };
-        (Self(harp.build_valid_notes()), PlayedHarp(Some(harp)))
+        let valid = effective
+            .instrument_for(chart)
+            .map(|instrument| instrument.valid_pitches())
+            .unwrap_or_default();
+        (Self(valid), PlayedHarp(effective.harp_for(chart).cloned()))
     }
 }
 

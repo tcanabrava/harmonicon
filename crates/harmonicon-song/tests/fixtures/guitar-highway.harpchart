@@ -1,0 +1,25 @@
+{
+  "metadata": { "format_version": "1.8.0", "description": "Temporary test chart for the guitar highway. Safe to delete." },
+  "song": { "title": "Guitar Highway", "artist": "Zz Test (Claude)", "genre": "Test",
+            "tempo_bpm": 90.0, "key": "E", "difficulty": "easy", "time_signature": "4/4" },
+  "timing": { "resolution": 12, "tempo_map": [{ "tick": 0, "bpm": 90.0 }] },
+  "instrument": { "type": "guitar", "strings": ["E4","B3","G3","D3","A2","E2"], "frets": 22 },
+  "track": [
+    { "time": 1.0, "duration": 0.6, "events": [{ "position": { "string": 6, "fret": 0 }, "note": "E2" }] },
+    { "time": 1.7, "duration": 0.6, "events": [{ "position": { "string": 6, "fret": 3 }, "note": "G2" }] },
+    { "time": 2.4, "duration": 0.6, "events": [{ "position": { "string": 5, "fret": 0 }, "note": "A2" }] },
+    { "time": 3.1, "duration": 0.6, "events": [{ "position": { "string": 5, "fret": 2 }, "note": "B2" }] },
+    { "time": 3.8, "duration": 1.2, "events": [
+        { "position": { "string": 6, "fret": 0 }, "note": "E2" },
+        { "position": { "string": 5, "fret": 2 }, "note": "B2" },
+        { "position": { "string": 4, "fret": 2 }, "note": "E3" } ] },
+    { "time": 5.3, "duration": 0.9, "events": [{ "position": { "string": 2, "fret": 8 }, "note": "A4",
+        "modifiers": [{ "type": "bend", "semitones": 2 }] }] },
+    { "time": 6.5, "duration": 0.9, "events": [{ "position": { "string": 3, "fret": 12 }, "note": "G4",
+        "modifiers": [{ "type": "harmonic" }] }] },
+    { "time": 7.7, "duration": 0.6, "events": [{ "position": { "string": 1, "fret": 3 }, "note": "G4" }] },
+    { "time": 8.4, "duration": 0.6, "events": [{ "position": { "string": 1, "fret": 0 }, "note": "E4" }] },
+    { "time": 9.1, "duration": 1.5, "events": [{ "position": { "string": 4, "fret": 2 }, "note": "E3" }] }
+  ],
+  "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
+}

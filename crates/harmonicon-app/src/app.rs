@@ -13,6 +13,7 @@ use bevy::prelude::*;
 use harmonicon_core::chart::{HarpChart, Scale};
 use harmonicon_core::harmonica::{Harmonica, Progression, detected_harp_key, key_offset, semitone};
 use harmonicon_core::harp_remap::HarpMapping;
+use harmonicon_core::instrument::Instrument;
 use harmonicon_song::song::SongManifest;
 
 // ── App-level states ──────────────────────────────────────────────────────────
@@ -167,10 +168,27 @@ pub struct EffectiveHarmonica {
 impl EffectiveHarmonica {
     /// The harp to actually use for `chart` — the player's choice, or the
     /// chart's own when they haven't made one. `None` for a chart written
-    /// for another instrument, which the song loader keeps out of play
-    /// until that instrument has a highway (see `song::loader`).
+    /// for another instrument.
+    ///
+    /// A substitute harp only ever stands in for a chart's own harmonica: a
+    /// chart for another instrument has nothing for it to replace, even if a
+    /// harp was chosen before the chart had loaded.
     pub fn harp_for<'a>(&'a self, chart: &'a HarpChart) -> Option<&'a Harmonica> {
-        self.harp.as_ref().or(chart.harmonica.as_ref())
+        let own = chart.harmonica.as_ref()?;
+        Some(self.harp.as_ref().unwrap_or(own))
+    }
+
+    /// The instrument the player is holding for `chart`: [`harp_for`]'s
+    /// harmonica, or the chart's own instrument when it names no harmonica
+    /// (nothing substitutes for those yet). The one answer every
+    /// instrument-shaped thing in play takes, so they can't disagree.
+    ///
+    /// [`harp_for`]: Self::harp_for
+    pub fn instrument_for(&self, chart: &HarpChart) -> Option<Instrument> {
+        match self.harp_for(chart) {
+            Some(harp) => Some(harp.clone().into()),
+            None => chart.instrument(),
+        }
     }
 
     /// Whether the player has chosen a harp other than the chart's.

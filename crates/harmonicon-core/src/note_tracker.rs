@@ -16,8 +16,7 @@
 use std::collections::HashMap;
 
 use crate::harmonica_constraints::{BreathDirectionTracker, direction_table, table_directions};
-use crate::instrument::Instrument;
-use crate::instrument::guitar::MAX_BEND;
+use crate::instrument::{Instrument, InstrumentModel};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NoteTrackerConfig {
@@ -84,7 +83,7 @@ pub enum VoiceFilter {
     /// string. Candidates arrive strongest first, so the strongest survive.
     /// Whether a set can actually be fretted at once is left to a recorded
     /// corpus to justify rather than guessed here.
-    Strings { low: u8, high: u8, strings: usize },
+    Strings { pitches: std::collections::HashSet<u8>, strings: usize },
 }
 
 impl VoiceFilter {
@@ -97,12 +96,7 @@ impl VoiceFilter {
                 ),
             },
             Instrument::Guitar(guitar) => {
-                let (low, high) = guitar.range().unwrap_or((0, 0));
-                Self::Strings {
-                    low,
-                    high: high.saturating_add(MAX_BEND as u8),
-                    strings: guitar.strings.len(),
-                }
+                Self::Strings { pitches: guitar.valid_pitches(), strings: guitar.strings.len() }
             }
         }
     }
@@ -114,13 +108,13 @@ impl VoiceFilter {
             Self::Breath { reach, direction } => {
                 direction.filter_by(|midi| table_directions(reach, midi), candidates)
             }
-            Self::Strings { low, high, strings } => {
+            Self::Strings { pitches, strings } => {
                 let mut kept: Vec<u8> = Vec::with_capacity(*strings);
                 for &midi in candidates {
                     if kept.len() == *strings {
                         break;
                     }
-                    if (*low..=*high).contains(&midi) && !kept.contains(&midi) {
+                    if pitches.contains(&midi) && !kept.contains(&midi) {
                         kept.push(midi);
                     }
                 }

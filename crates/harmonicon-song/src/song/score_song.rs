@@ -28,7 +28,9 @@
 use bevy::asset::io::Reader;
 use bevy::asset::{AssetLoader, LoadContext};
 use bevy::prelude::*;
-use harmonicon_score::convert::{TrackConversion, choose_track, convert_all_tracks};
+use harmonicon_score::convert::{
+    TrackConversion, choose_track, convert_all_tracks, suggested_guitar, to_chart,
+};
 use harmonicon_score::{IMPORT_EXTENSIONS, parse_import};
 
 use super::SongManifest;
@@ -92,18 +94,30 @@ pub fn convert_score(
     let score = parse_import(extension, bytes).map_err(validation)?;
     let mut tracks = convert_all_tracks(&*score, artist).map_err(validation)?;
 
+    // Keep the harmonica default stable, but offer a guitar arrangement of
+    // every source part too. Tabs retain their tuning and authored fingering.
+    let preferred = choose_track(&tracks);
+    for track in score.tracks().iter().filter(|track| track.is_playable()) {
+        let (chart, report) =
+            to_chart(&*score, track.index, &suggested_guitar(track).into(), artist)
+                .map_err(validation)?;
+        if report.is_worth_playing() {
+            tracks.push(TrackConversion { track: track.clone(), chart, report });
+        }
+    }
+
     if let Some(title) = score.title().map(str::to_string).or(fallback_title) {
         for track in &mut tracks {
             track.chart.song.title = title.clone();
         }
     }
 
-    let selected = choose_track(&tracks).ok_or_else(|| {
-        // Reached only when no part survives the harp — a file with no notes
+    let selected = preferred.or_else(|| choose_track(&tracks)).ok_or_else(|| {
+        // Reached only when neither instrument can play a part — a file with no notes
         // at all was already refused while parsing.
         let best = tracks.iter().map(|t| t.report.reachable_fraction()).fold(0.0f32, f32::max);
         SongLoadError::Validation(format!(
-            "no track in this file is playable on a harmonica — the best manages only \
+            "no track in this file is playable on a harmonica or guitar — the best manages only \
              {percent}% of its notes. Name the harmonica part \"Harmonica\" if there is one.",
             percent = (best * 100.0).round() as u32,
         ))

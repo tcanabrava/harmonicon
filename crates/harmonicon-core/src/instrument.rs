@@ -24,7 +24,7 @@ pub mod guitar;
 use crate::chart::Action;
 use crate::harmonica::Harmonica;
 use crate::pitch_map::{HoleAssignment, Technique, playable_assignments};
-use guitar::{FretAssignment, Guitar};
+use guitar::{FretAssignment, Guitar, StringTechnique};
 
 /// The instrument a chart part is played on. A closed enum rather than a
 /// trait object, so a chart can name its instrument in JSON and every UI
@@ -175,6 +175,10 @@ pub trait InstrumentModel {
     /// Every position that sounds `midi`, easiest first.
     fn positions_for(&self, midi: u8) -> Vec<PlayPosition>;
 
+    /// Every pitch a player of this instrument can sound, by any technique:
+    /// the set a detected pitch must belong to before it may score.
+    fn valid_pitches(&self) -> std::collections::HashSet<u8>;
+
     /// The pitch `position` sounds, or `None` if the instrument can't
     /// actually play it.
     fn pitch_of(&self, position: &PlayPosition) -> Option<u8>;
@@ -215,6 +219,10 @@ impl InstrumentModel for Harmonica {
 
     fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
         playable_assignments(midi, self).into_iter().map(PlayPosition::Hole).collect()
+    }
+
+    fn valid_pitches(&self) -> std::collections::HashSet<u8> {
+        self.build_valid_notes()
     }
 
     /// Checked against [`playable_assignments`] rather than computed from
@@ -305,7 +313,8 @@ impl InstrumentModel for Harmonica {
 
 impl InstrumentModel for Guitar {
     fn range(&self) -> Option<(u8, u8)> {
-        Guitar::range(self)
+        let pitches = self.valid_pitches();
+        Some((*pitches.iter().min()?, *pitches.iter().max()?))
     }
 
     /// Fretted positions only, lowest fret first. A bend or harmonic is a
@@ -313,6 +322,30 @@ impl InstrumentModel for Guitar {
     /// lacks, so the fretted pitch is always the answer.
     fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
         self.fretted_positions(midi).into_iter().map(PlayPosition::Fret).collect()
+    }
+
+    /// Enumerate sounding pitches, including harmonics above a short neck
+    /// and bends. Custom tunings can have gaps, so a range is not enough.
+    fn valid_pitches(&self) -> std::collections::HashSet<u8> {
+        let mut pitches = std::collections::HashSet::new();
+        for string in 1..=self.string_count() {
+            for fret in 0..=self.top_fret() {
+                for technique in [
+                    StringTechnique::Fretted,
+                    StringTechnique::Bend(1.0),
+                    StringTechnique::Bend(2.0),
+                    StringTechnique::Bend(guitar::MAX_BEND),
+                    StringTechnique::Harmonic,
+                ] {
+                    if let Some(pitch) = self.pitch_of(&FretAssignment { string, fret, technique })
+                        && pitch <= 127
+                    {
+                        pitches.insert(pitch);
+                    }
+                }
+            }
+        }
+        pitches
     }
 
     fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
@@ -388,6 +421,13 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.positions_for(midi),
             Self::Guitar(guitar) => InstrumentModel::positions_for(guitar, midi),
+        }
+    }
+
+    fn valid_pitches(&self) -> std::collections::HashSet<u8> {
+        match self {
+            Self::Harmonica(harp) => harp.valid_pitches(),
+            Self::Guitar(guitar) => InstrumentModel::valid_pitches(guitar),
         }
     }
 

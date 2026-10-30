@@ -11,8 +11,10 @@ use bevy::prelude::*;
 
 use harmonicon_app::app::EffectiveHarmonica;
 use harmonicon_core::chart::{Action, HarpChart, Modifier, PlayMode};
+use harmonicon_core::chart_check::string_technique;
 use harmonicon_core::harp_remap;
 use harmonicon_core::instrument::PlayPosition;
+use harmonicon_core::instrument::guitar::FretAssignment;
 use harmonicon_core::midi::note_to_midi;
 use harmonicon_core::pitch_map::{HoleAssignment, Technique, technique_of};
 
@@ -313,27 +315,39 @@ pub fn build_scheduled_notes(
     let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
     let mut flags = flags.into_iter();
     let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
-    // Scored play schedules harmonica charts; the song loader keeps any
-    // other instrument's out of play until it has a highway.
-    let Some(chart_harp) = chart.harmonica.as_ref() else {
-        return (Vec::new(), Vec::new());
-    };
     for item in &chart.track {
         let t = resolve_item_time(item, &chart.timing);
         let tag = play_mode_label(item.play_mode.as_ref());
         // Each event's own modifiers/expected pitch, computed once up front
         // so the chord-target set (below) doesn't need to redo it.
-        // (hole, action, modifiers, expected pitch, playable). Only the
-        // pitch and modifiers move for an ordinary chart; hole and action
-        // change only under `HarpMapping::Transpose`.
-        let event_data: Vec<(u8, Action, Vec<Modifier>, Option<u8>, bool)> = item
+        // (position, modifiers, expected pitch, playable). Only the pitch
+        // and modifiers move for an ordinary chart; hole and action change
+        // only under `HarpMapping::Transpose`.
+        let event_data: Vec<(PlayPosition, Vec<Modifier>, Option<u8>, bool)> = item
             .events
             .iter()
             .filter_map(|event| {
+                let modifiers = event.modifiers.clone().unwrap_or_default();
+                // Any instrument but the harmonica: the event names where it
+                // is played and its sounding note, and there is no
+                // substitute instrument to remap onto.
+                let Some(chart_harp) = chart.harmonica.as_ref() else {
+                    let at = event.position?;
+                    let technique = string_technique(&modifiers);
+                    let position = PlayPosition::Fret(FretAssignment {
+                        string: at.string,
+                        fret: at.fret,
+                        technique,
+                    });
+                    return Some((position, modifiers, chart.event_pitch(event), true));
+                };
                 // Validation guarantees every event of a harmonica chart
                 // names a hole and breath.
                 let (hole, action) = event.hole_action()?;
-                let modifiers = event.modifiers.clone().unwrap_or_default();
+                let hole_position = |hole, action, modifiers: &[Modifier]| {
+                    let technique = technique_of(modifiers);
+                    PlayPosition::Hole(HoleAssignment { hole, action, technique })
+                };
                 match &effective.harp {
                     // The overwhelmingly common case, kept on exactly the
                     // path it has always taken. A chart played on its own
@@ -349,7 +363,12 @@ pub fn build_scheduled_notes(
                             .clone()
                             .unwrap_or_else(|| chart_harp.wind_direction_label(hole, &action));
                         let expected_pitch = target_pitch(&natural_pitch, &modifiers);
-                        Some((hole, action, modifiers, expected_pitch, true))
+                        Some((
+                            hole_position(hole, action, &modifiers),
+                            modifiers,
+                            expected_pitch,
+                            true,
+                        ))
                     }
                     Some(target) => {
                         let r = harp_remap::remap_event(
@@ -361,7 +380,8 @@ pub fn build_scheduled_notes(
                             target,
                             effective.mapping,
                         );
-                        Some((r.hole, r.action, r.modifiers, r.midi, r.playable))
+                        let position = hole_position(r.hole, r.action, &r.modifiers);
+                        Some((position, r.modifiers, r.midi, r.playable))
                     }
                 }
             })
@@ -373,22 +393,21 @@ pub fn build_scheduled_notes(
             event_data
                 .iter()
                 .filter(|(.., playable)| *playable)
-                .filter_map(|(_, _, _, p, _)| *p)
+                .filter_map(|(_, _, p, _)| *p)
                 .collect()
         } else {
             Vec::new()
         };
-        for (hole, action, modifiers, expected_pitch, playable) in event_data {
+        for (position, modifiers, expected_pitch, playable) in event_data {
             let (unlocked, section) = flags.next().unwrap_or((true, 0));
             if !unlocked {
                 continue;
             }
-            let technique = technique_of(&modifiers);
             combined.push((
                 ScheduledNote {
                     time: t,
                     duration: item.duration,
-                    position: PlayPosition::Hole(HoleAssignment { hole, action, technique }),
+                    position,
                     expected_pitch,
                     hit: false,
                     missed: false,
@@ -470,6 +489,74 @@ mod tests {
             }}"#
         ))
         .unwrap()
+    }
+
+    fn guitar_chart(track_json: &str) -> HarpChart {
+        serde_json::from_str(&format!(
+            r#"{{
+                "song": {{"title":"T","artist":"A","genre":"Test","tempo_bpm":120.0,"key":"E","difficulty":"easy"}},
+                "timing": {{"resolution":480,"tempo_map":[{{"tick":0,"bpm":120.0}}]}},
+                "instrument": {{"type":"guitar","strings":["E4","B3","G3","D3","A2","E2"],"frets":22}},
+                "track": {track_json},
+                "scoring": {{"perfect_window_ms":50,"good_window_ms":100,"miss_window_ms":130}}
+            }}"#
+        ))
+        .unwrap()
+    }
+
+    /// A guitar chart schedules its string positions and scores the note
+    /// each one states, bend included, with a chord's pitches shared.
+    #[test]
+    fn a_guitar_chart_schedules_string_positions_and_their_notes() {
+        use harmonicon_core::instrument::guitar::StringTechnique;
+        let chart = guitar_chart(
+            r#"[
+                {"time":0.0,"duration":0.5,"phrase":"p1","events":[
+                    {"position":{"string":6,"fret":0},"note":"E2"},
+                    {"position":{"string":5,"fret":2},"note":"B2"}]},
+                {"time":0.5,"duration":0.5,"phrase":"p2","events":[
+                    {"position":{"string":2,"fret":8},"note":"A4",
+                     "modifiers":[{"type":"bend","semitones":2}]}]}
+            ]"#,
+        );
+        let (notes, _) =
+            build_scheduled_notes(&EffectiveHarmonica::default(), &chart, &Default::default());
+        let placed: Vec<(u8, u8, StringTechnique, Option<u8>)> = notes
+            .iter()
+            .map(|n| {
+                let PlayPosition::Fret(a) = n.position else {
+                    panic!("a guitar chart schedules string positions");
+                };
+                (a.string, a.fret, a.technique, n.expected_pitch)
+            })
+            .collect();
+        assert_eq!(
+            placed,
+            [
+                (6, 0, StringTechnique::Fretted, Some(40)),
+                (5, 2, StringTechnique::Fretted, Some(47)),
+                (2, 8, StringTechnique::Bend(2.0), Some(69)),
+            ]
+        );
+        assert_eq!(notes[0].chord_pitches, [40, 47]);
+        assert!(notes[2].chord_pitches.is_empty());
+    }
+
+    /// A harp chosen on the harp-check page can't stand in for a guitar.
+    #[test]
+    fn a_substitute_harp_never_applies_to_a_guitar_chart() {
+        let chart = guitar_chart(
+            r#"[{"time":0.0,"duration":0.5,"events":[{"position":{"string":3,"fret":2},"note":"A3"}]}]"#,
+        );
+        let effective =
+            EffectiveHarmonica { harp: Some(richter_harp("G")), mapping: HarpMapping::SameHoles };
+        assert!(effective.harp_for(&chart).is_none());
+        assert!(matches!(
+            effective.instrument_for(&chart),
+            Some(harmonicon_core::instrument::Instrument::Guitar(_))
+        ));
+        let (notes, _) = build_scheduled_notes(&effective, &chart, &Default::default());
+        assert_eq!(notes[0].expected_pitch, Some(57));
     }
 
     #[test]

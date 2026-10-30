@@ -794,7 +794,7 @@ harp-row-slide = slide
 # O seletor de faixa na página de verificação da gaita, exibido apenas para
 # um arquivo importado com mais de uma parte tocável.
 harp-check-track = Parte a tocar
-harp-check-track-option = {$name} — {$notes} notas, {$percent}% tocável
+harp-check-track-option = {$name} ({$instrument}) — {$notes} notas, {$percent}% tocável
 harp-check-track-unnamed = Faixa {$index}
 # Cabeçalho acima dos cinco níveis de treino de uma lição, com quanto da
 # escada foi concluído (o medidor de domínio).
@@ -873,3 +873,8 @@ song-mastery-low = Abaixo de 50%
 song-mastery-medium = 50–79%
 song-mastery-high = 80–100%
 song-sort-times-played = Vezes tocadas
+
+harp-check-instrument-harmonica = Gaita
+harp-check-instrument-guitar = Guitarra
+
+gameplay-guitar-window = Posição da mão começa na casa {$fret} · Próxima: {$next} · 0 = corda solta

@@ -149,3 +149,10 @@ load-bearing about *this* crate.
   - **Menu pages are out of scope** — they already handle overflow via
     `menu::scene::spawn_menu_root`'s scroll area, so they were judged
     reasonably small-screen-safe already.
+
+- **Multi-part song discovery** lives in `assets_management/song_parts.rs`,
+  compiled by both the runtime scan and `build.rs`. Every visible native
+  chart file is listed in filename order. Only when none exists is the first
+  sorted importable score offered; a sibling MIDI otherwise remains backing
+  music. Multi-part display names append the chart filename stem. Single-part
+  names and existing asset paths remain unchanged.

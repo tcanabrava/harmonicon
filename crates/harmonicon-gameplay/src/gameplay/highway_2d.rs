@@ -14,7 +14,7 @@ use bevy::prelude::*;
 
 use harmonicon_core::chart::Action;
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::instrument::LaneLayout;
+use harmonicon_core::instrument::{LaneLayout, ScrollAxis};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use super::HoleCell;
@@ -35,7 +35,11 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout) 
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
         hw.spawn((
             placed(axis, 0.0, full, start_pct, Val::Percent(lane_pct)),
-            BackgroundColor(Color::srgba(1.0, 1.0, 1.0, alpha)),
+            BackgroundColor(if axis == ScrollAxis::Horizontal {
+                super::guitar_visuals::string_color((h + 1) as u8).with_alpha(0.08)
+            } else {
+                Color::srgba(1.0, 1.0, 1.0, alpha)
+            }),
         ));
         if h > 0 {
             hw.spawn((
@@ -59,6 +63,32 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout) 
         placed(axis, HIT_H_PCT, Val::Px(3.0), 0.0, full),
         BackgroundColor(Color::srgba(1.0, 0.98, 0.62, 0.85)),
     ));
+
+    // A horizontal highway names its rows where tab does, at their start:
+    // `e B G D A E` down the hit zone. A vertical one has its instrument
+    // strip (the harmonica's holes) beneath it instead.
+    if axis == ScrollAxis::Horizontal {
+        for (row, lane) in layout.lanes.iter().enumerate() {
+            hw.spawn((
+                Node {
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    ..placed(
+                        axis,
+                        0.0,
+                        Val::Percent(HIT_H_PCT),
+                        row as f32 * lane_pct,
+                        Val::Percent(lane_pct),
+                    )
+                },
+                children![(
+                    Text::new(lane.label.clone()),
+                    TextFont { font_size: FontSize::Px(16.0), ..default() },
+                    TextColor(super::guitar_visuals::string_color((row + 1) as u8)),
+                )],
+            ));
+        }
+    }
 }
 
 /// The hole strip under the highway, labelled with the notes of the harp

@@ -254,3 +254,20 @@ Full design and rationale: `docs/bending_trainer_plan.md`. Harps on hand are a C
 - Play 2D shows HUD and active notes — *manual (rendering).*
 - Jam Session functional without a traditional chart — *manual.*
 - Esc pauses and resumes correctly — *automated (flag + overlay); audio manual.*
+
+## Guitar Play 2D
+
+Automated coverage includes guitar scheduling (chords, bends and pitches),
+loader validation of `guitar-highway.harpchart`, imported guitar arrangements,
+and harmonic/tuning-gap filtering. These do not replace the live checks:
+
+- [ ] Play the Guitar Highway test song: high string at the top, low E at
+  the bottom, fret labels and duration ribbons crossing the hit line on time.
+- [ ] Check a guitar import selected after a harmonica part; no harp
+  substitution may affect its sounding pitches.
+- [ ] Record and assess low-string separation, strummed onsets and decaying
+  sustain before tuning detector or scoring constants.
+
+- [ ] With the local `harmonicon-songs` pack selected, open both Amazing
+  Grace parts (`chart` and `guitar`); confirm the original vertical harp
+  highway and horizontal guitar highway, shared timing, and guitar fingering.

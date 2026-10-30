@@ -327,7 +327,8 @@ pub(crate) fn setup_harp_check(
             // Leave the default alone when nothing was actually changed, so
             // an untouched song stays on gameplay's original path.
             effective.harp = match chart {
-                Some(chart) if choice.matches_chart(chart) => None,
+                // Nothing to substitute on a chart for another instrument.
+                Some(chart) if chart.harmonica.is_none() || choice.matches_chart(chart) => None,
                 _ => Some(choice.harp()),
             };
             effective.mapping = choice.mapping;
@@ -417,6 +418,15 @@ pub(crate) fn track_label(entry: &TrackChart, loc: &Localization) -> String {
         "harp-check-track-option",
         &[
             ("name", name),
+            (
+                "instrument",
+                loc.msg(if entry.chart.harmonica.is_some() {
+                    "harp-check-instrument-harmonica"
+                } else {
+                    "harp-check-instrument-guitar"
+                })
+                .to_string(),
+            ),
             ("notes", entry.report.total.to_string()),
             ("percent", ((entry.report.reachable_fraction() * 100.0).round() as u32).to_string()),
         ],

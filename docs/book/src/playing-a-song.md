@@ -33,6 +33,24 @@ existing songs remain available and you can retry the update. Checks are availab
 
 ![Unified song picker](images/song-picker.png)
 
+## Guitar parts
+
+A song folder can contain several charts. Select the part from the song
+list: filenames distinguish entries such as `Duet — harmonica` and
+`Duet — guitar`. Each part uses the same folder's backing audio and
+background. Ratings, play history, adaptive progress and hiding currently
+apply to the song as a whole; separate progress per part is still planned.
+
+Guitar charts use a horizontal tablature highway: strings run from high to
+low, notes approach from the right, and each note shows its fret number.
+A `b` marks a bend; angle brackets mark a natural harmonic. Scoring checks
+the sounding pitch, so an equivalent fingering sounds the same to the game.
+
+For imported scores, the part picker offers guitar arrangements alongside
+harmonica arrangements and names the instrument beside each part. Guitar
+Pro tabs retain their tuning and string/fret positions. The Song Editor
+cannot edit guitar charts yet; the fretboard guide is also still planned.
+
 ## Removed and hidden songs
 
 Updates keep your local copy of songs removed from a repository, including
