@@ -11,7 +11,6 @@ use harmonicon_app::app::AppState;
 use harmonicon_core::instrument::guitar::{FretAssignment, StringTechnique};
 use harmonicon_core::instrument::{Instrument, InstrumentModel, PlayPosition};
 use harmonicon_core::note_target::NoteTarget;
-use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_ui::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 
@@ -23,17 +22,15 @@ pub(super) struct GuitarControls {
     tick: usize,
     fret: u8,
     len: usize,
-    page: usize,
     invalid: bool,
 }
 impl Default for GuitarControls {
     fn default() -> Self {
-        Self { string: 1, tick: 0, fret: 0, len: TICKS_PER_BEAT, page: 0, invalid: false }
+        Self { string: 1, tick: 0, fret: 0, len: TICKS_PER_BEAT, invalid: false }
     }
 }
 #[derive(Component, Clone, Copy)]
-enum Action {
-    Cell(u8, usize),
+pub(super) enum Action {
     Select(u32),
     Fret(i8),
     String(i8),
@@ -48,7 +45,6 @@ enum Action {
     Back,
     Undo,
     Redo,
-    Page(i8),
     Bend,
     Harmonic,
 }
@@ -62,6 +58,59 @@ pub(super) fn is_harmonica(state: Option<Res<EditorState>>) -> bool {
 
 fn button(parent: &mut ChildSpawnerCommands, label: impl Into<String>, action: Action, width: f32) {
     colored_button(parent, label, action, width, Color::srgb(0.15, 0.19, 0.26));
+}
+
+/// A note on the timeline: a button exactly `width` × `height`, in its
+/// string's `color`, so its length on screen is its length in time.
+pub(super) fn note_block_button(
+    parent: &mut ChildSpawnerCommands,
+    label: impl Into<String>,
+    action: Action,
+    width: f32,
+    height: f32,
+    color: Color,
+) {
+    parent
+        .spawn((
+            Button,
+            TabIndex(0),
+            action,
+            Node {
+                width: Val::Px(width),
+                height: Val::Px(height),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(color),
+            children![(
+                Text::new(label),
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextColor(Color::srgb(0.05, 0.05, 0.08))
+            )],
+        ))
+        .observe(handle_action);
+}
+
+/// Moves the cursor to the string and snapped tick under a click on a lane,
+/// and drops the selection so the next Add note goes there.
+// not-a-widget-button: a lane is a continuous surface whose click position
+// is the input; keyboard users move the cursor with S, ‹ and › instead.
+pub(super) fn on_lane_click(
+    ev: On<bevy::picking::events::PointerClick>,
+    lanes: Query<(&super::guitar_timeline::Lane, &bevy::ui::RelativeCursorPosition)>,
+    mut state: ResMut<EditorState>,
+    mut controls: ResMut<GuitarControls>,
+) {
+    let Ok((lane, cursor)) = lanes.get(ev.entity) else { return };
+    let Some(normalized) = cursor.normalized else { return };
+    // `normalized` runs -0.5..0.5 across the node.
+    let tick =
+        super::guitar_timeline::click_tick(normalized.x + 0.5, lane.total_ticks, state.snap_mode);
+    controls.string = lane.string;
+    controls.tick = tick;
+    state.selected.clear();
 }
 
 /// [`button`] in `color`: a note takes its string's colour.
@@ -100,6 +149,7 @@ pub(super) fn setup(
     mut commands: Commands,
     state: Res<EditorState>,
     controls: Res<GuitarControls>,
+    timeline_scroll: Res<super::guitar_timeline::TimelineScroll>,
     loc: Res<Localization>,
 ) {
     let Instrument::Guitar(guitar) = state.effective_instrument() else { return };
@@ -253,102 +303,7 @@ pub(super) fn setup(
                         TextColor(Color::srgb(1.0, 0.4, 0.3)),
                     ));
                 }
-                let start = controls.page * 8 * TICKS_PER_BEAT;
-                root.spawn(Node::default()).with_children(|row| {
-                    button(row, "←", Action::Page(-1), 50.0);
-                    row.spawn((
-                        Text::new(format!("{}–{}", controls.page * 8 + 1, controls.page * 8 + 8)),
-                        TextColor(Color::WHITE),
-                    ));
-                    button(row, "→", Action::Page(1), 50.0);
-                });
-                for string in 1..=guitar.string_count() {
-                    root.spawn(Node {
-                        height: Val::Px(62.0),
-                        min_height: Val::Px(62.0),
-                        flex_shrink: 0.0,
-                        min_width: Val::Px(570.0),
-                        ..default()
-                    })
-                    .with_children(|row| {
-                        row.spawn((
-                            Text::new(
-                                guitar
-                                    .open_pitch(string)
-                                    .map(|m| harmonicon_core::midi::midi_to_note(i32::from(m)))
-                                    .unwrap_or_default(),
-                            ),
-                            Node { width: Val::Px(60.0), ..default() },
-                            TextColor(Color::WHITE),
-                        ));
-                        row.spawn(Node {
-                            position_type: PositionType::Relative,
-                            width: Val::Px(480.0),
-                            height: Val::Px(60.0),
-                            ..default()
-                        })
-                        .with_children(|track| {
-                            for beat in 0..8 {
-                                track
-                                    .spawn(Node {
-                                        position_type: PositionType::Absolute,
-                                        left: Val::Px(beat as f32 * 60.0),
-                                        ..default()
-                                    })
-                                    .with_children(|cell| {
-                                        button(
-                                            cell,
-                                            "·",
-                                            Action::Cell(string, start + beat * TICKS_PER_BEAT),
-                                            54.0,
-                                        );
-                                    });
-                            }
-                            for note in &state.notes {
-                                let Some(PlayPosition::Fret(at)) = note.target.position() else {
-                                    continue;
-                                };
-                                if at.string != string
-                                    || note.tick < start
-                                    || note.tick >= start + 8 * TICKS_PER_BEAT
-                                {
-                                    continue;
-                                }
-                                let label = at.tab_label();
-                                // On the beat cells' own line, drawn over the
-                                // cells it covers, in its string's colour.
-                                let selected = state.selected.contains(&note.id);
-                                let color = string_color(string);
-                                track
-                                    .spawn(Node {
-                                        position_type: PositionType::Absolute,
-                                        left: Val::Px(
-                                            (note.tick - start) as f32 * 60.0
-                                                / TICKS_PER_BEAT as f32,
-                                        ),
-                                        top: Val::Px(0.0),
-                                        border: UiRect::all(Val::Px(if selected {
-                                            2.0
-                                        } else {
-                                            0.0
-                                        })),
-                                        ..default()
-                                    })
-                                    .insert(BorderColor::all(Color::WHITE))
-                                    .with_children(|cell| {
-                                        colored_button(
-                                            cell,
-                                            label,
-                                            Action::Select(note.id),
-                                            (note.len as f32 * 60.0 / TICKS_PER_BEAT as f32 - 4.0)
-                                                .max(20.0),
-                                            color,
-                                        );
-                                    });
-                            }
-                        });
-                    });
-                }
+                super::guitar_timeline::spawn(root, &state, &guitar, timeline_scroll.0);
             });
     });
 }
@@ -433,16 +388,6 @@ fn handle_action(
         }
         Action::Redo => {
             commands.write_message(super::state::DocumentCommand::Redo);
-            return;
-        }
-        Action::Page(delta) => {
-            controls.page = controls.page.saturating_add_signed(isize::from(delta));
-            return;
-        }
-        Action::Cell(string, tick) => {
-            controls.string = string;
-            controls.tick = tick;
-            state.selected.clear();
             return;
         }
         Action::Select(id) => {

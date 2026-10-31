@@ -12,17 +12,19 @@ In an empty document, open **Details → Use guitar** to start a standard-tuned
 guitar chart. **Load** also opens existing guitar `.harpchart` files and
 preserves their tuning and capo. Guitar charts use a dedicated tab view:
 
-- Each row is a string, highest first, labelled with its open pitch. A note
-  is drawn in its string's colour, the same as on the play highway, and
-  reads as tab writes it: `7` for a fret, `7b9` for a bend up to the pitch
-  of fret 9, `<12>` for a harmonic.
-- Click a beat to choose the insertion string/time, set the fret with
-  **F − / F +**, then **Add note**. Click a note to select it for editing.
+- The tab is a timeline like the harmonica's: one lane per string, highest
+  first, with a beat and bar ruler above, scrolling sideways through the
+  song, and the playhead crossing it during **Play**. A note is a block as
+  long as it lasts, in its string's colour (the same as on the play
+  highway), and reads as tab writes it: `7` for a fret, `7b9` for a bend up
+  to the pitch of fret 9, `<12>` for a harmonic.
+- Click a string's lane to put the cursor there, at the nearest snapped
+  time; set the fret with **F − / F +**, then **Add note**. Click a note to
+  select it for editing.
 - **S − / S +** moves a selected note to an equivalent fingering on another
   string, preserving pitch. Impossible positions are refused.
 - **‹ / ›** move the onset; **− / +** change duration. Times are shown in
-  ticks, with twelve ticks per quarter-note beat. **← / →** above the rows
-  turn to the previous or next eight beats.
+  ticks, with twelve ticks per quarter-note beat.
 - **Bend** steps through a half-step bend, a whole-step bend and off;
   **Harmonic** toggles a natural
   harmonic at a playable node. Loaded bends retain their authored depth

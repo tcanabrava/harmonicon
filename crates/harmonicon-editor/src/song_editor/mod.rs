@@ -35,6 +35,7 @@ mod expected_notes;
 mod grid;
 mod grid_cache;
 mod guitar_editor;
+mod guitar_timeline;
 mod harmonica_note;
 mod harpchart;
 mod instrument_chart;
@@ -152,6 +153,7 @@ impl Plugin for SongEditor2Plugin {
             )
             .add_systems(OnExit(AppState::SongEditor2), ui::cleanup)
             .init_resource::<guitar_editor::GuitarControls>()
+            .init_resource::<guitar_timeline::TimelineScroll>()
             .init_resource::<state::Scroll>()
             .init_resource::<state::ToolbarScroll>()
             .init_resource::<practice::PracticeState>()
@@ -326,7 +328,12 @@ impl Plugin for SongEditor2Plugin {
             )
             .add_systems(
                 Update,
-                (guitar_editor::refresh, guitar_editor::update_feedback)
+                (
+                    guitar_editor::refresh,
+                    guitar_editor::update_feedback,
+                    guitar_timeline::remember_scroll,
+                    guitar_timeline::update_playhead,
+                )
                     .chain()
                     .in_set(GuitarPass)
                     .after(EditorPass)
