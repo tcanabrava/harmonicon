@@ -11,6 +11,7 @@ use harmonicon_app::app::AppState;
 use harmonicon_core::instrument::guitar::{FretAssignment, StringTechnique};
 use harmonicon_core::instrument::{Instrument, InstrumentModel, PlayPosition};
 use harmonicon_core::note_target::NoteTarget;
+use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_ui::dialogs::file_dialog::{DialogMode, OpenFileDialog};
 
@@ -60,6 +61,17 @@ pub(super) fn is_harmonica(state: Option<Res<EditorState>>) -> bool {
 }
 
 fn button(parent: &mut ChildSpawnerCommands, label: impl Into<String>, action: Action, width: f32) {
+    colored_button(parent, label, action, width, Color::srgb(0.15, 0.19, 0.26));
+}
+
+/// [`button`] in `color`: a note takes its string's colour.
+fn colored_button(
+    parent: &mut ChildSpawnerCommands,
+    label: impl Into<String>,
+    action: Action,
+    width: f32,
+    color: Color,
+) {
     parent
         .spawn((
             Button,
@@ -74,7 +86,7 @@ fn button(parent: &mut ChildSpawnerCommands, label: impl Into<String>, action: A
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.15, 0.19, 0.26)),
+            BackgroundColor(color),
             children![(
                 Text::new(label),
                 TextFont { font_size: FontSize::Px(14.0), ..default() },
@@ -205,8 +217,11 @@ pub(super) fn setup(
                         ("S +", Action::String(1)),
                         ("F −", Action::Fret(-1)),
                         ("F +", Action::Fret(1)),
-                        ("←", Action::Time(-1)),
-                        ("→", Action::Time(1)),
+                        // `‹`/`›` nudge time; `←`/`→` below turn the page.
+                        // Two pairs of identical arrows would read the same
+                        // to a screen reader for two different actions.
+                        ("‹", Action::Time(-1)),
+                        ("›", Action::Time(1)),
                         ("−", Action::Length(-1)),
                         ("+", Action::Length(1)),
                     ] {
@@ -299,11 +314,11 @@ pub(super) fn setup(
                                 {
                                     continue;
                                 }
-                                let label = match at.technique {
-                                    StringTechnique::Fretted => at.fret.to_string(),
-                                    StringTechnique::Bend(_) => format!("{}b", at.fret),
-                                    StringTechnique::Harmonic => format!("<{}>", at.fret),
-                                };
+                                let label = at.tab_label();
+                                // On the beat cells' own line, drawn over the
+                                // cells it covers, in its string's colour.
+                                let selected = state.selected.contains(&note.id);
+                                let color = string_color(string);
                                 track
                                     .spawn(Node {
                                         position_type: PositionType::Absolute,
@@ -311,16 +326,23 @@ pub(super) fn setup(
                                             (note.tick - start) as f32 * 60.0
                                                 / TICKS_PER_BEAT as f32,
                                         ),
-                                        top: Val::Px(18.0),
+                                        top: Val::Px(0.0),
+                                        border: UiRect::all(Val::Px(if selected {
+                                            2.0
+                                        } else {
+                                            0.0
+                                        })),
                                         ..default()
                                     })
+                                    .insert(BorderColor::all(Color::WHITE))
                                     .with_children(|cell| {
-                                        button(
+                                        colored_button(
                                             cell,
                                             label,
                                             Action::Select(note.id),
                                             (note.len as f32 * 60.0 / TICKS_PER_BEAT as f32 - 4.0)
                                                 .max(20.0),
+                                            color,
                                         );
                                     });
                             }
@@ -441,24 +463,58 @@ fn handle_action(
             state.prune_selection();
             return;
         }
+        Action::String(_)
+        | Action::Fret(_)
+        | Action::Length(_)
+        | Action::Time(_)
+        | Action::Insert
+        | Action::Bend
+        | Action::Harmonic => {}
+    }
+    if !apply_note_edit(&mut state, &mut controls, *action) {
+        controls.invalid = true;
+    }
+}
+
+/// The next bend depth a press of Bend gives a note at `technique`: off, a
+/// half step, a whole step (the guitar's most common bend), then off again.
+/// A harmonic can't be bent, so a press on one starts from a half step.
+fn next_bend(technique: StringTechnique) -> StringTechnique {
+    match technique {
+        StringTechnique::Bend(depth) if depth < 1.5 => StringTechnique::Bend(2.0),
+        StringTechnique::Bend(_) => StringTechnique::Fretted,
+        StringTechnique::Fretted | StringTechnique::Harmonic => StringTechnique::Bend(1.0),
+    }
+}
+
+/// Applies one note-shaping control to the selected note, or adds a note
+/// for Insert. Moves the controls first (string, fret, time, length), then
+/// builds the note they describe and keeps it only if the guitar can play
+/// it alongside everything sounding with it. Returns `false` for an edit
+/// the guitar rejects, which leaves every note as it was. With no note
+/// selected only Insert does anything; the other controls just move.
+fn apply_note_edit(state: &mut EditorState, controls: &mut GuitarControls, action: Action) -> bool {
+    let instrument = state.effective_instrument();
+    let Instrument::Guitar(guitar) = &instrument else { return true };
+    match action {
         Action::String(delta) => {
-            let Instrument::Guitar(guitar) = state.effective_instrument() else { return };
             controls.string =
                 controls.string.saturating_add_signed(delta).clamp(1, guitar.string_count());
         }
         Action::Fret(delta) => controls.fret = controls.fret.saturating_add_signed(delta),
         Action::Length(delta) => {
-            controls.len = controls.len.saturating_add_signed(isize::from(delta)).max(1)
+            controls.len = controls.len.saturating_add_signed(isize::from(delta)).max(1);
         }
         Action::Time(delta) => {
-            controls.tick = controls.tick.saturating_add_signed(isize::from(delta))
+            controls.tick = controls.tick.saturating_add_signed(isize::from(delta));
         }
         Action::Insert | Action::Bend | Action::Harmonic => {}
+        _ => return true,
     }
     let selected =
         state.selected.first().and_then(|id| state.notes.iter().find(|n| n.id == *id)).copied();
     if selected.is_none() && !matches!(action, Action::Insert) {
-        return;
+        return true;
     }
     let mut at = selected
         .and_then(|n| n.target.position())
@@ -470,13 +526,10 @@ fn handle_action(
         });
     at.fret = controls.fret;
     if matches!(action, Action::String(_)) {
-        let instrument = state.effective_instrument();
+        // Moving a note to another string keeps what it sounds: find the
+        // fret there that plays the same pitch, or refuse.
         if let Some(note) = selected {
-            let Some(pitch) = note.target.sounding_pitch(&instrument) else {
-                controls.invalid = true;
-                return;
-            };
-            let Instrument::Guitar(guitar) = &instrument else { return };
+            let Some(pitch) = note.target.sounding_pitch(&instrument) else { return false };
             let Some(fret) = (0..=guitar.top_fret()).find(|fret| {
                 let candidate = PlayPosition::Fret(FretAssignment {
                     string: controls.string,
@@ -487,8 +540,7 @@ fn handle_action(
                     .sounding_pitch(&instrument)
                     .is_some_and(|p| (p - pitch).abs() < 0.001)
             }) else {
-                controls.invalid = true;
-                return;
+                return false;
             };
             at.fret = fret;
             controls.fret = fret;
@@ -496,20 +548,9 @@ fn handle_action(
         at.string = controls.string;
     }
     at.technique = match action {
-        Action::Bend => {
-            if at.technique == StringTechnique::Bend(1.0) {
-                StringTechnique::Fretted
-            } else {
-                StringTechnique::Bend(1.0)
-            }
-        }
-        Action::Harmonic => {
-            if at.technique == StringTechnique::Harmonic {
-                StringTechnique::Fretted
-            } else {
-                StringTechnique::Harmonic
-            }
-        }
+        Action::Bend => next_bend(at.technique),
+        Action::Harmonic if at.technique == StringTechnique::Harmonic => StringTechnique::Fretted,
+        Action::Harmonic => StringTechnique::Harmonic,
         _ => at.technique,
     };
     let candidate = GridNote {
@@ -519,9 +560,8 @@ fn handle_action(
         expr: selected.map_or(Expr::None, |n| n.expr),
         target: NoteTarget::Positioned(PlayPosition::Fret(at)),
     };
-    if !valid(&state, &candidate) {
-        controls.invalid = true;
-        return;
+    if !valid(state, &candidate) {
+        return false;
     }
     if let Some(note) = state.notes.iter_mut().find(|n| n.id == candidate.id) {
         *note = candidate;
@@ -530,6 +570,7 @@ fn handle_action(
         state.next_id += 1;
     }
     state.select_only(candidate.id);
+    true
 }
 
 pub(super) fn refresh(
@@ -601,16 +642,135 @@ pub(super) fn update_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn sustained_strings_and_hand_span_are_checked_before_mutation() {
-        use harmonicon_core::instrument::guitar::{Guitar, GuitarBody};
-        let mut state = EditorState {
+    use harmonicon_core::instrument::guitar::{Guitar, GuitarBody};
+
+    fn guitar_state() -> EditorState {
+        EditorState {
             instrument: super::super::state::InstrumentSelection::Configured {
                 instrument: Guitar::standard(GuitarBody::Electric).into(),
                 harmonica_origin: None,
             },
             ..default()
-        };
+        }
+    }
+
+    fn at(state: &EditorState, id: u32) -> FretAssignment {
+        let note = state.notes.iter().find(|n| n.id == id).expect("note exists");
+        match note.target.position() {
+            Some(PlayPosition::Fret(at)) => at,
+            other => panic!("not a string position: {other:?}"),
+        }
+    }
+
+    /// A3 placed on the third string's second fret, selected.
+    fn with_a3() -> (EditorState, GuitarControls) {
+        let mut state = guitar_state();
+        let mut controls = GuitarControls { string: 3, fret: 2, ..default() };
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Insert));
+        (state, controls)
+    }
+
+    #[test]
+    fn insert_places_a_note_where_the_controls_point_and_selects_it() {
+        let (state, _) = with_a3();
+        assert_eq!(state.notes.len(), 1);
+        assert_eq!(
+            at(&state, 0),
+            FretAssignment { string: 3, fret: 2, technique: StringTechnique::Fretted }
+        );
+        assert_eq!(state.selected, [0]);
+        assert_eq!(state.next_id, 1);
+    }
+
+    #[test]
+    fn fret_time_and_length_controls_reshape_the_selected_note() {
+        let (mut state, mut controls) = with_a3();
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Fret(1)));
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Time(3)));
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Length(-2)));
+        assert_eq!(at(&state, 0).fret, 3);
+        let note = state.notes[0];
+        assert_eq!((note.tick, note.len), (3, TICKS_PER_BEAT - 2));
+    }
+
+    /// Moving to another string keeps the note's sound: A3 on string 4 is
+    /// the seventh fret.
+    #[test]
+    fn a_string_change_finds_the_fret_that_keeps_the_pitch() {
+        let (mut state, mut controls) = with_a3();
+        assert!(apply_note_edit(&mut state, &mut controls, Action::String(1)));
+        assert_eq!(
+            at(&state, 0),
+            FretAssignment { string: 4, fret: 7, technique: StringTechnique::Fretted }
+        );
+        assert_eq!(controls.fret, 7, "the controls follow the note");
+    }
+
+    /// A3 is below the second string's open B3: nowhere to go, nothing moves.
+    #[test]
+    fn a_string_with_no_equivalent_fret_refuses_and_leaves_the_note() {
+        let (mut state, mut controls) = with_a3();
+        assert!(!apply_note_edit(&mut state, &mut controls, Action::String(-1)));
+        assert_eq!(
+            at(&state, 0),
+            FretAssignment { string: 3, fret: 2, technique: StringTechnique::Fretted }
+        );
+    }
+
+    #[test]
+    fn bend_cycles_through_a_half_step_and_a_whole_step_to_off() {
+        let (mut state, mut controls) = with_a3();
+        let mut techniques = Vec::new();
+        for _ in 0..3 {
+            assert!(apply_note_edit(&mut state, &mut controls, Action::Bend));
+            techniques.push(at(&state, 0).technique);
+        }
+        assert_eq!(
+            techniques,
+            [StringTechnique::Bend(1.0), StringTechnique::Bend(2.0), StringTechnique::Fretted]
+        );
+    }
+
+    #[test]
+    fn harmonic_toggles_where_the_fret_has_one() {
+        let mut state = guitar_state();
+        let mut controls = GuitarControls { string: 6, fret: 12, ..default() };
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Insert));
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Harmonic));
+        assert_eq!(at(&state, 0).technique, StringTechnique::Harmonic);
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Harmonic));
+        assert_eq!(at(&state, 0).technique, StringTechnique::Fretted);
+        // No natural harmonic sits over the second fret.
+        let (mut state, mut controls) = with_a3();
+        assert!(!apply_note_edit(&mut state, &mut controls, Action::Harmonic));
+        assert_eq!(at(&state, 0).technique, StringTechnique::Fretted);
+    }
+
+    #[test]
+    fn an_insert_onto_a_sounding_string_is_refused() {
+        let (mut state, mut controls) = with_a3();
+        state.selected.clear();
+        controls.fret = 4;
+        assert!(!apply_note_edit(&mut state, &mut controls, Action::Insert));
+        assert_eq!(state.notes.len(), 1);
+    }
+
+    #[test]
+    fn with_nothing_selected_the_controls_move_and_no_note_changes() {
+        let (mut state, mut controls) = with_a3();
+        state.selected.clear();
+        assert!(apply_note_edit(&mut state, &mut controls, Action::Fret(5)));
+        assert_eq!(controls.fret, 7);
+        assert_eq!(at(&state, 0).fret, 2);
+    }
+
+    #[test]
+    fn a_harmonic_takes_a_half_step_bend_from_the_bend_button() {
+        assert_eq!(next_bend(StringTechnique::Harmonic), StringTechnique::Bend(1.0));
+    }
+    #[test]
+    fn sustained_strings_and_hand_span_are_checked_before_mutation() {
+        let mut state = guitar_state();
         let note = |id, string, fret, tick, len| GridNote {
             id,
             tick,

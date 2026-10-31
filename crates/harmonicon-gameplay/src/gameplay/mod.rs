@@ -18,7 +18,7 @@ mod clock;
 pub mod coaching;
 pub mod countdown_overlay;
 mod gameplay_2d;
-mod guitar_visuals;
+pub mod guitar_visuals;
 pub mod harmonica_overlay;
 mod highway_2d;
 mod highway_axis;

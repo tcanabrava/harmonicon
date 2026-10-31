@@ -74,6 +74,22 @@ pub struct FretAssignment {
     pub technique: StringTechnique,
 }
 
+impl FretAssignment {
+    /// The position as tab writes it: the fret (`7`), a bend with the fret
+    /// whose pitch it reaches (`7b9`, a whole step up from the seventh), or
+    /// a natural harmonic in angle brackets (`<12>`). The highway and the
+    /// Song Editor both label notes with this, so they always agree.
+    pub fn tab_label(&self) -> String {
+        match self.technique {
+            StringTechnique::Fretted => self.fret.to_string(),
+            StringTechnique::Bend(depth) => {
+                format!("{}b{}", self.fret, self.fret.saturating_add(depth.round() as u8))
+            }
+            StringTechnique::Harmonic => format!("<{}>", self.fret),
+        }
+    }
+}
+
 impl Guitar {
     /// A guitar in standard tuning with no capo.
     pub fn standard(body: GuitarBody) -> Self {

@@ -7,7 +7,6 @@ use bevy::prelude::*;
 use bevy::ui::ComputedNode;
 use harmonicon_app::app::{EffectiveHarmonica, SelectedSong};
 use harmonicon_core::chart::{Action, Modifier};
-use harmonicon_core::instrument::guitar::{FretAssignment, StringTechnique};
 use harmonicon_core::instrument::{LaneLayout, PlayPosition, ScrollAxis};
 
 use super::highway_axis::{
@@ -851,23 +850,13 @@ pub(super) fn head_text(judged: Option<bool>, note: &ScheduledNote, show_numbers
 }
 
 /// What `note`'s cap reads: a harmonica's [`head_label`] tab, or a string's
-/// [`fret_label`].
+/// tab label (`FretAssignment::tab_label`).
 fn note_head_label(note: &ScheduledNote, show_numbers: bool) -> String {
     match &note.position {
-        PlayPosition::Fret(a) => fret_label(a),
+        PlayPosition::Fret(a) => a.tab_label(),
         position => HoleTab::of(position)
             .map(|tab| head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers))
             .unwrap_or_default(),
-    }
-}
-
-/// A fretted note as tab writes it: the fret (`7`), a bend after it (`7b`),
-/// or a natural harmonic in angle brackets (`<12>`).
-pub(super) fn fret_label(a: &FretAssignment) -> String {
-    match a.technique {
-        StringTechnique::Fretted => a.fret.to_string(),
-        StringTechnique::Bend(_) => format!("{}b", a.fret),
-        StringTechnique::Harmonic => format!("<{}>", a.fret),
     }
 }
 
@@ -1052,14 +1041,6 @@ mod tests {
         let horizontal = score_anchor(ScrollAxis::Horizontal);
         assert_eq!(horizontal.left, Val::Percent(HIT_H_PCT));
         assert_eq!(horizontal.width, Val::Percent(100.0 - HIT_H_PCT));
-    }
-
-    #[test]
-    fn a_fretted_note_reads_as_tab_writes_it() {
-        let at = |technique| FretAssignment { string: 2, fret: 7, technique };
-        assert_eq!(fret_label(&at(StringTechnique::Fretted)), "7");
-        assert_eq!(fret_label(&at(StringTechnique::Bend(2.0))), "7b");
-        assert_eq!(fret_label(&at(StringTechnique::Harmonic)), "<7>");
     }
 
     // ── ribbon geometry ───────────────────────────────────────────────────────

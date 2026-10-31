@@ -151,6 +151,17 @@ fn reconciled_chord_can_all_be_held_together() {
     }
 }
 
+/// A bend names the fret whose pitch it reaches, so a half-step and a
+/// whole-step bend read differently.
+#[test]
+fn a_position_reads_as_tab_writes_it() {
+    let at = |technique| FretAssignment { string: 2, fret: 7, technique };
+    assert_eq!(at(StringTechnique::Fretted).tab_label(), "7");
+    assert_eq!(at(StringTechnique::Bend(1.0)).tab_label(), "7b8");
+    assert_eq!(at(StringTechnique::Bend(2.0)).tab_label(), "7b9");
+    assert_eq!(at(StringTechnique::Harmonic).tab_label(), "<7>");
+}
+
 #[test]
 fn strings_are_labelled_as_tab_writes_them() {
     assert_eq!(standard().string_labels(), ["e", "B", "G", "D", "A", "E"]);

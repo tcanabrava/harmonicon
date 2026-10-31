@@ -9,7 +9,10 @@ use harmonicon_core::instrument::{
 };
 use harmonicon_platform::localization::LocalizationExt;
 
-pub(super) fn string_color(string: u8) -> Color {
+/// The colour string `string` is drawn in, string 1 first: the same on the
+/// play highway, its fretboard strip and the Song Editor's tab view, so a
+/// string reads as one thing everywhere.
+pub fn string_color(string: u8) -> Color {
     const COLORS: [(f32, f32, f32); 6] = [
         (0.70, 0.45, 0.95),
         (0.25, 0.70, 1.0),

@@ -12,14 +12,19 @@ In an empty document, open **Details → Use guitar** to start a standard-tuned
 guitar chart. **Load** also opens existing guitar `.harpchart` files and
 preserves their tuning and capo. Guitar charts use a dedicated tab view:
 
-- Each row is a string, highest first, labelled with its open pitch.
+- Each row is a string, highest first, labelled with its open pitch. A note
+  is drawn in its string's colour, the same as on the play highway, and
+  reads as tab writes it: `7` for a fret, `7b9` for a bend up to the pitch
+  of fret 9, `<12>` for a harmonic.
 - Click a beat to choose the insertion string/time, set the fret with
   **F − / F +**, then **Add note**. Click a note to select it for editing.
 - **S − / S +** moves a selected note to an equivalent fingering on another
   string, preserving pitch. Impossible positions are refused.
-- The arrows move the onset; **− / +** change duration. Times are shown in
-  ticks, with twelve ticks per quarter-note beat.
-- **Bend** toggles a one-semitone bend; **Harmonic** toggles a natural
+- **‹ / ›** move the onset; **− / +** change duration. Times are shown in
+  ticks, with twelve ticks per quarter-note beat. **← / →** above the rows
+  turn to the previous or next eight beats.
+- **Bend** steps through a half-step bend, a whole-step bend and off;
+  **Harmonic** toggles a natural
   harmonic at a playable node. Loaded bends retain their authored depth
   until deliberately edited.
 - **Delete**, **Undo / Redo**, **Save / Load**, and plucked **Play / Stop**
