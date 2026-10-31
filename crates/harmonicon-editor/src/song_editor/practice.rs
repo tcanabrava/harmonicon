@@ -94,13 +94,13 @@ impl PracticeState {
 
 fn build_schedule(state: &EditorState) -> Vec<PracticeNote> {
     let secs_per_tick = secs_per_tick(state);
-    let harp = state.effective_harp();
+    let instrument = state.effective_instrument();
 
     let mut notes: Vec<PracticeNote> = state
         .notes
         .iter()
         .filter_map(|n| {
-            let freq = note_freq(n, &harp)?;
+            let freq = note_freq(n, &instrument)?;
             let name = freq_to_name(freq);
             Some(PracticeNote {
                 start_secs: n.tick as f64 * secs_per_tick as f64,

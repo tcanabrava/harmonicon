@@ -226,7 +226,24 @@ fn spawn_harmonica_kind_row(
         Some("editor-harmonica-toggle-tooltip"),
         HarmonicaKindText,
         (),
-        |_: On<Activate>, mut state: ResMut<EditorState>| {
+        |_: On<Activate>,
+         mut state: ResMut<EditorState>,
+         mut commands: Commands,
+         mut feedback: ResMut<super::save_feedback::SaveFeedback>,
+         loc: Res<Localization>| {
+            // From a guitar this goes back to a harmonica, which, like the
+            // way in (`guitar_note::spawn_selector`), needs an empty
+            // document: a string position has no hole to become.
+            if super::guitar_note::is_guitar(&state) {
+                if state.notes.is_empty() {
+                    commands.write_message(super::state::DocumentCommand::SelectInstrument(
+                        super::state::InstrumentSelection::HarmonicaPreset(HarmonicaKind::Diatonic),
+                    ));
+                } else {
+                    feedback.set(loc.msg("editor-guitar-select-empty"));
+                }
+                return;
+            }
             let next = match state.harmonica_kind() {
                 HarmonicaKind::Diatonic => HarmonicaKind::PaddyRichter,
                 HarmonicaKind::PaddyRichter => HarmonicaKind::CountryTuned,
@@ -660,7 +677,7 @@ pub(super) fn spawn_meta_form(
         let first_col = spawn_form_column(form, |col| {
             spawn_content_kind_row(col, loc, colors);
             spawn_harmonica_kind_row(col, loc, colors);
-            super::guitar_editor::spawn_selector(col, loc);
+            super::guitar_note::spawn_selector(col, loc);
             spawn_snap_mode_row(col, loc, colors);
             for &(field, label) in &FIELDS[..MID] {
                 spawn_field_row(col, loc, colors, state, field, label);

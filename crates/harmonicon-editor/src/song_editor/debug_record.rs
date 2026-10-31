@@ -479,7 +479,7 @@ impl Plugin for DebugRecordPlugin {
                 write_debug_recording_on_save,
             )
                 .in_set(super::EditorPass)
-                .run_if(super::guitar_editor::is_harmonica)
+                .run_if(super::guitar_note::is_harmonica)
                 .run_if(in_state(AppState::SongEditor2)),
         );
     }

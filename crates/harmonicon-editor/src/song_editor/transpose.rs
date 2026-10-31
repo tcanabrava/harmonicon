@@ -128,6 +128,10 @@ pub(super) fn transpose_notes(
 /// Transposes the selection — or the whole chart when nothing is selected
 /// — and leaves the outcome for the status bar to report.
 pub(super) fn transpose_selection(state: &mut EditorState, semitones: i32) {
+    // Resolution here is onto harmonica holes; a guitar has no transposer.
+    if super::guitar_note::is_guitar(state) {
+        return;
+    }
     let harp = state.effective_harp();
     let kind = state.harmonica_kind();
     let outcome = transpose_notes(&mut state.notes, &state.selected, semitones, &harp, kind);

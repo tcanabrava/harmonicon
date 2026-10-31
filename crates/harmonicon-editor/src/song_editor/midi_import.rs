@@ -259,8 +259,19 @@ pub(super) fn apply_imported_track(state: &mut EditorState, imported: ImportedTr
     state.pickup_beats.clear();
     state.repeats.clear();
     state.instrument =
-        crate::song_editor::state::InstrumentSelection::HarmonicaPreset(state.harmonica_kind());
+        crate::song_editor::state::InstrumentSelection::HarmonicaPreset(import_kind(state));
     state.set_key(key.to_string());
+}
+
+/// The harmonica a MIDI track is imported onto: the selected kind, or a
+/// diatonic when the document is a guitar's — import replaces every note,
+/// and resolves them onto holes.
+fn import_kind(state: &EditorState) -> crate::song_editor::state::HarmonicaKind {
+    if super::guitar_note::is_guitar(state) {
+        crate::song_editor::state::HarmonicaKind::Diatonic
+    } else {
+        state.harmonica_kind()
+    }
 }
 
 pub(super) fn import_track_notes(
@@ -493,10 +504,10 @@ fn import_selected_track(
     // disruptive choice than a key, which is just one more click to
     // change if this guess isn't the one the user wanted).
     let key = match track_midi_keys(&midi.bytes, info.index) {
-        Ok(keys) => suggest_key(&keys, state.harmonica_kind()).to_string(),
+        Ok(keys) => suggest_key(&keys, import_kind(state)).to_string(),
         Err(_) => state.key.clone(),
     };
-    match import_track_notes(&midi.bytes, info.index, &key, state.harmonica_kind()) {
+    match import_track_notes(&midi.bytes, info.index, &key, import_kind(state)) {
         Ok(imported) => {
             let diagnostics = imported.diagnostics;
             apply_imported_track(state, imported, &key);

@@ -10,37 +10,37 @@ without writing JSON directly.
 
 In an empty document, open **Details → Use guitar** to start a standard-tuned
 guitar chart. **Load** also opens existing guitar `.harpchart` files and
-preserves their tuning and capo. Guitar charts use a dedicated tab view:
+preserves their tuning and capo. A guitar chart uses the same grid, tools and
+timeline as a harmonica chart, with one lane per string instead of one per
+hole — highest string at the top, as tab writes it, each labelled with its
+open note in its string's colour. A note is drawn in its string's colour (the
+same as on the play highway) and reads as tab: `7` for a fret, `7b9` for a
+bend up to the pitch of fret 9, `<12>` for a harmonic.
 
-- The tab is a timeline like the harmonica's: one lane per string, highest
-  first, with a beat and bar ruler above, scrolling sideways through the
-  song, and the playhead crossing it during **Play**. A note is a block as
-  long as it lasts, in its string's colour (the same as on the play
-  highway), and reads as tab writes it: `7` for a fret, `7b9` for a bend up
-  to the pitch of fret 9, `<12>` for a harmonic.
-- Click a string's lane to put the cursor there, at the nearest snapped
-  time; set the fret with **F − / F +**, then **Add note**. Click a note to
-  select it for editing.
-- **S − / S +** moves a selected note to an equivalent fingering on another
-  string, preserving pitch. Impossible positions are refused.
-- **‹ / ›** move the onset; **− / +** change duration. Times are shown in
-  ticks, with twelve ticks per quarter-note beat.
+The note column swaps the harmonica's breath and reed buttons for the
+guitar's:
+
+- **Fret − / Fret +** move the selected note a fret down or up on its
+  string. With nothing selected they set the fret a click places the next
+  note at; the button shows that fret.
+- **String ↑ / String ↓** move the selected note to the string above or
+  below at whichever fret keeps its pitch, and refuse when that string
+  can't reach it. Dragging a note to another lane instead keeps its fret.
 - **Bend** steps through a half-step bend, a whole-step bend and off;
-  **Harmonic** toggles a natural
-  harmonic at a playable node. Loaded bends retain their authored depth
-  until deliberately edited.
-- **Delete**, **Undo / Redo**, **Save / Load**, and plucked **Play / Stop**
-  operate on the same document model as the harmonica editor. Selecting or
-  editing a note auditions its pitch. Ctrl+Z and Ctrl+Y also work here.
+  **Harmonic** toggles a natural harmonic where the fret has one.
+  **Vibrato** colours only its own string's note.
 
-An edit cannot put two overlapping notes on one string or require a hand
-span the guitar model cannot reach. These checks include held notes whose
-attacks occurred earlier. The current guitar view does not offer recording;
-real-guitar detection still needs corpus validation.
+Everything else — selecting, dragging, resizing, copy/paste, undo, Play,
+the staff and the timeline tools — works as it does for a harmonica.
+Harmonica transposition, Wah and Record are hidden: recording needs
+real-guitar detection, which still needs validating against recordings.
 
-![Guitar tab editor](images/song-editor-guitar.png)
+No edit puts two overlapping notes on one string, or asks for a hand span
+the guitar can't make, held notes included; one that would is refused and
+the status bar says so. Return to a harmonica from **Details** with the
+document empty.
 
-The layout and tools below describe the harmonica view.
+![Guitar chart in the Song Editor](images/song-editor-guitar.png)
 
 ## Layout
 

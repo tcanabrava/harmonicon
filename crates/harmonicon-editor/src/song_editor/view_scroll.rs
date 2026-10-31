@@ -372,6 +372,20 @@ pub(super) fn update_grid_scrollbar(
 pub(super) const SCROLLBAR_BLOW_COLOR: Color = Color::srgba(0.50, 0.75, 1.00, 0.9);
 pub(super) const SCROLLBAR_DRAW_COLOR: Color = Color::srgba(1.00, 0.62, 0.35, 0.9);
 
+/// A note's minimap colour: blow or draw for a harmonica note, its string's
+/// colour for a guitar note.
+fn scrollbar_marker_color(note: &super::state::GridNote) -> Color {
+    match note.target.position() {
+        Some(harmonicon_core::instrument::PlayPosition::Fret(at)) => {
+            harmonicon_gameplay::gameplay::guitar_visuals::string_color(at.string)
+        }
+        _ => match note.dir() {
+            Dir::Blow => SCROLLBAR_BLOW_COLOR,
+            Dir::Draw => SCROLLBAR_DRAW_COLOR,
+        },
+    }
+}
+
 /// One note's marker geometry on the scrollbar track, as percentages of
 /// the track's width: `(left, width)`. Pure tick math — the track's pixel
 /// width never enters, so markers need no re-layout on resize. Width is
@@ -416,7 +430,7 @@ pub(super) fn update_scrollbar_markers(
             let (left, width) = scrollbar_marker(n.tick, n.len, end_tick);
             // Each lane gets an equal slice of the track's height; the
             // marker fills its lane's slice so adjacent lanes stay distinct.
-            let lane = (n.hole().saturating_sub(1)) as f32;
+            let lane = (n.row().saturating_sub(1)) as f32;
             commands
                 .spawn((
                     GridScrollMarker,
@@ -428,10 +442,7 @@ pub(super) fn update_scrollbar_markers(
                         height: Val::Percent(100.0 / lanes),
                         ..default()
                     },
-                    BackgroundColor(match n.dir() {
-                        Dir::Blow => SCROLLBAR_BLOW_COLOR,
-                        Dir::Draw => SCROLLBAR_DRAW_COLOR,
-                    }),
+                    BackgroundColor(scrollbar_marker_color(n)),
                     Pickable::IGNORE,
                 ))
                 .id()

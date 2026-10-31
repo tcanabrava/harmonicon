@@ -886,27 +886,42 @@ load-bearing about *this* crate.
   instruction across tuning changes. Existing harmonica authoring uses
   `Positioned`, preserving its same-hole key-change semantics. Do not add
   `fret`, `hole`, or `dir` back to the generic note. `harmonica_note.rs`
-  is the adapter for harmonica tools; `guitar_editor.rs` reads string
-  placements directly. Native guitar charts use `instrument_chart.rs` and
-  core's event codec; no string is reinterpreted as a hole.
+  is the adapter for harmonica tools and `guitar_note.rs` for guitar ones.
+  Native guitar charts use `instrument_chart.rs` and core's event codec; no
+  string is reinterpreted as a hole.
   Geometry takes an explicit visual row, and playback resolves pitch through
   `InstrumentModel`. Merely projecting or inspecting a note cannot rewrite
   its target. Authored pitch placements must pass `with_placement`/`candidates`;
   incompatible positions are errors, not permission to guess new fingering.
   Both intent and placement travel together through clipboard and undo.
 
-- **Instrument/view transitions are queued** as `DocumentCommand`s and
-  applied after the view-specific passes. Undo can change the instrument,
-  so observers and keyboard handlers must queue undo/redo too. Shared
-  playback, file operations, audition and history run once for both views.
-  Harmonica-only developer tools belong to the harmonica pass as well.
+- **One grid serves every instrument; a row is a hole or a string.**
+  Shared code asks `GridNote::row()`/`set_row()` and
+  `EditorState::row_count()`, never `hole()`; the grid labels rows
+  (`ui::row_labels`) and draws notes (`grid::note_face`) from the note's
+  `PlayPosition`. Behaviour that differs branches on the instrument at the
+  entry point — `select_or_add`, `apply_modifier`, the drag validator —
+  into `guitar_note`, so the harmonica code below each branch can keep
+  calling `hole()`/`dir()`/`technique()`, which panic on a string. The note
+  column's buttons are chosen by `panel::note_button_visible`. What a
+  guitar doesn't get, and why: transposition (it resolves onto holes —
+  `transpose_selection` returns early), Wah, Record (hidden: detection is
+  untuned) and the harmonica-only dev tools (`guitar_note::is_harmonica`).
+- **Instrument transitions are queued** as `DocumentCommand`s and applied
+  after the editor pass. Undo can change the instrument, so observers and
+  keyboard handlers must queue undo/redo too. Either way in or out of a
+  guitar needs an empty document.
   Snapshots include both instrument configuration and song key, since a
   restored authored harp must retain its source-key identity.
 - **Guitar edits check overlapping sustains**, not only simultaneous
-  attacks: an occupied string or an excessive fret span rejects the edit
-  without moving other notes. String changes search equivalent positions
-  while preserving sounding pitch. The tab view provides native load/save,
-  fret/time/duration controls, bends/harmonics, undo and plucked preview.
-  Guitar recording and detector tuning still need the recorded corpus.
+  attacks (`guitar_note::fits`): an occupied string or an excessive fret
+  span rejects the edit, and sets `unplayable_notice` for the status bar,
+  without moving other notes — which is why `enforce_direction` is
+  breath-only and `enforce_expr` skips a `PerVoice` instrument. A drag
+  keeps the fret on its new string (tab semantics, like a harmonica note
+  keeping its breath); the String buttons search the fret that keeps the
+  sounding pitch. Resizing and paste check only same-row overlap, not the
+  hand's span. Guitar recording and detector tuning still need the
+  recorded corpus.
   Custom bend intensity and multiple mutually exclusive techniques are
   rejected during validation rather than silently dropped on save.

@@ -25,7 +25,7 @@ use super::{
     grid_height, silence_row_top,
 };
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::instrument::{InstrumentModel, PlayPosition};
+use harmonicon_core::instrument::{Instrument, InstrumentModel, PlayPosition};
 use harmonicon_core::midi::{freq_to_midi, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::{LoadedTheme, SongEditorColors};
@@ -630,6 +630,16 @@ fn spawn_silence_gap(
 /// independently clamped the same way; at the grid's edges this can
 /// compress the group's shape slightly rather than blocking the move
 /// outright, an accepted rare edge case.
+/// The reed technique a harmonica drag checks against its target hole.
+/// A guitar note has none: its drag is checked by
+/// `guitar_note::group_fits`, which reads the fingering itself.
+fn drag_technique(note: &GridNote) -> HarpTechnique {
+    match note.target.position() {
+        Some(PlayPosition::Hole(_)) => note.technique(),
+        _ => HarpTechnique::Normal,
+    }
+}
+
 pub(super) fn group_move_targets(
     others: &[GridNote],
     hole_delta: i32,
@@ -641,7 +651,7 @@ pub(super) fn group_move_targets(
         .map(|n| {
             let hole = (n.row() as i32 + hole_delta).clamp(1, hole_count as i32) as u8;
             let tick = (n.tick as i32 + tick_delta).max(0) as usize;
-            (n.id, hole, tick, n.len, n.technique())
+            (n.id, hole, tick, n.len, drag_technique(n))
         })
         .collect()
 }
@@ -800,10 +810,9 @@ pub(super) fn spawn_note(
                     .notes
                     .iter()
                     .find(|n| n.id == id)
-                    .map(|n| n.technique())
+                    .map(drag_technique)
                     .unwrap_or(HarpTechnique::Normal);
-                let harp = state.effective_harp();
-                let pitch_ok = pitch_compatible(pitch, &harp, hole);
+                let instrument = state.effective_instrument();
                 // The anchor and the rest of the group (if any) are checked
                 // together, in one `group_move_valid` call, rather than the
                 // anchor via `can_place` and the group separately: since
@@ -820,11 +829,30 @@ pub(super) fn spawn_note(
                 targets.extend(group_move_targets(&drag.group, hole_delta, tick_delta, hole_count));
                 let mut moving_ids: Vec<u32> = vec![id];
                 moving_ids.extend(drag.group.iter().map(|n| n.id));
-                let valid = group_move_valid(&state.notes, &harp, &moving_ids, &targets);
+                // A guitar note is checked against the guitar's voice rules
+                // instead: same shape, a string's occupancy and the hand's
+                // span in place of reeds and same-hole overlap.
+                let (pitch_ok, valid, denied) = match &instrument {
+                    Instrument::Harmonica(harp) => (
+                        pitch_compatible(pitch, harp, hole),
+                        group_move_valid(&state.notes, harp, &moving_ids, &targets),
+                        "drag-denied-overlap",
+                    ),
+                    _ => (
+                        true,
+                        super::guitar_note::group_fits(
+                            &instrument,
+                            &state.notes,
+                            &moving_ids,
+                            &targets,
+                        ),
+                        "editor-guitar-invalid",
+                    ),
+                };
                 state.drag_msg = if !pitch_ok {
                     loc.msg(pitch_deny_key(pitch, hole))
                 } else if !valid {
-                    loc.msg("drag-denied-overlap")
+                    loc.msg(denied)
                 } else {
                     harmonicon_platform::localization::LocalizedStr::default()
                 };

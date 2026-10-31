@@ -4311,13 +4311,12 @@ fn instrument_transitions_and_undo_happen_after_view_updates() {
     let mut app = App::new();
     app.insert_resource(EditorState::default());
     app.init_resource::<super::record::RecordState>();
-    app.init_resource::<super::guitar_editor::GuitarControls>();
     app.init_resource::<super::undo::UndoHistory>();
     app.add_message::<DocumentCommand>();
     app.add_systems(
         Update,
         (
-            harp_view.run_if(super::guitar_editor::is_harmonica),
+            harp_view.run_if(super::guitar_note::is_harmonica),
             super::undo::track_changes,
             super::undo::apply_document_commands,
         )

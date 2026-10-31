@@ -263,7 +263,6 @@ pub(super) fn apply_document_commands(
     mut commands: MessageReader<super::state::DocumentCommand>,
     mut state: ResMut<EditorState>,
     mut history: ResMut<UndoHistory>,
-    mut controls: ResMut<super::guitar_editor::GuitarControls>,
 ) {
     for command in commands.read() {
         match command {
@@ -275,7 +274,6 @@ pub(super) fn apply_document_commands(
                 }
                 state.instrument = instrument.clone();
                 state.content_kind = super::state::ContentKind::Song;
-                *controls = Default::default();
             }
         }
     }

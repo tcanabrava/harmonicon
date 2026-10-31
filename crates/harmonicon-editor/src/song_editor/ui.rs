@@ -176,7 +176,7 @@ pub(super) struct ResizeGrip(pub(super) Edge);
 #[derive(Component)]
 pub(super) struct GroupMoveGhost;
 
-#[derive(Component, Clone, Copy, PartialEq)]
+#[derive(Component, Clone, Copy, PartialEq, Debug)]
 pub(super) enum ModButton {
     Blow,
     Draw,
@@ -186,6 +186,16 @@ pub(super) enum ModButton {
     /// Chromatic-only: the slide button, a half-step raise. Hidden for
     /// diatonic charts, shown in place of Bend/Overblow/Overdraw.
     Slide,
+    /// Guitar-only: the selected note one fret down/up, on the same string
+    /// — or, with nothing selected, the fret the next placed note gets.
+    FretDown,
+    FretUp,
+    /// Guitar-only: the selected note onto the string above/below, at
+    /// whichever fret keeps its pitch.
+    StringUp,
+    StringDown,
+    /// Guitar-only: toggles a natural harmonic at the note's fret.
+    Harmonic,
     Wah,
     Vibrato,
     /// Vibrato/wah depth, cycled in quarter steps (¼ ½ ¾ 1) the way

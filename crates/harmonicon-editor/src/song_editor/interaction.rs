@@ -53,6 +53,13 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 
     let len = next_start.map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT)).max(1);
 
+    // On a guitar the row is a string, and everything below this is about
+    // breath and reeds.
+    if super::guitar_note::is_guitar(state) {
+        super::guitar_note::place(state, hole, tick, len);
+        return;
+    }
+
     // Whatever's already sounding at this exact tick (on another hole)
     // wins over the armed sticky direction — a brand-new chord note has to
     // match its siblings, not fight them. `sticky_dir` only applies when
@@ -170,6 +177,10 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
             return;
         }
         _ => {}
+    }
+    if super::guitar_note::is_guitar(state) {
+        super::guitar_note::apply_modifier(state, kind);
+        return;
     }
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
         let dir = if kind == ModButton::Blow { Dir::Blow } else { Dir::Draw };
@@ -361,6 +372,10 @@ pub(super) fn report_technique_skips(
     loc: Res<Localization>,
     mut feedback: ResMut<super::save_feedback::SaveFeedback>,
 ) {
+    if state.unplayable_notice {
+        state.bypass_change_detection().unplayable_notice = false;
+        feedback.set(loc.msg("editor-guitar-invalid"));
+    }
     if state.technique_notice.is_none() {
         return;
     }

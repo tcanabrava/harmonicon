@@ -6,7 +6,7 @@ use super::snap::SnapMode;
 use super::{HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
 use harmonicon_core::chart::Scale;
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::instrument::InstrumentModel;
+use harmonicon_core::instrument::{InstrumentModel, PlayPosition};
 
 // The note vocabulary lives in `note_model`; re-exported here because
 // `state` is the name every call site already reaches for, and the two are
@@ -168,6 +168,10 @@ pub(super) struct EditorState {
     /// How many selected notes the last technique button skipped, waiting
     /// for `interaction::report_technique_skips`. Not content either.
     pub(super) technique_notice: Option<usize>,
+    /// Set when a guitar edit was refused as unplayable (an occupied
+    /// string, a fret span no hand makes, a fret off the neck), waiting for
+    /// `interaction::report_technique_skips` to say so. Not content.
+    pub(super) unplayable_notice: bool,
     pub(super) loop_settings: LoopSettings,
     pub(super) time_signature: String,
     pub(super) key: String,
@@ -267,6 +271,10 @@ pub(super) struct EditorState {
     /// `expression_intensities` map stores (`"0.5"` is the default and is
     /// never written). Armed by the Depth button with nothing selected.
     pub(super) sticky_intensity: String,
+    /// The fret a click on a guitar string places a note at — the guitar's
+    /// counterpart of `sticky_dir`, armed by the Fret buttons with nothing
+    /// selected.
+    pub(super) sticky_fret: u8,
 }
 
 impl Default for EditorState {
@@ -327,6 +335,7 @@ impl Default for EditorState {
             instrument: InstrumentSelection::HarmonicaPreset(HarmonicaKind::default()),
             transpose_notice: None,
             technique_notice: None,
+            unplayable_notice: false,
             snap_mode: SnapMode::default(),
             twelve_bar_tint: false,
             phrase_editor: None,
@@ -337,6 +346,7 @@ impl Default for EditorState {
             sticky_pitch: HarpTechnique::Normal,
             sticky_expr: Expr::None,
             sticky_intensity: DEFAULT_INTENSITY.into(),
+            sticky_fret: 0,
         }
     }
 }
@@ -895,7 +905,11 @@ fn overlapping_group(state: &EditorState, id: u32) -> Vec<u32> {
 /// play drops back to the plain reed rather than becoming a note the harp
 /// can't make.
 pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
-    let Some(anchor) = state.note_by_id(id).map(GridNote::position) else {
+    // Breath only: a guitar edit is validated and refused, never repaired
+    // by moving the notes beside it (`guitar_note::fits`).
+    let Some(anchor @ PlayPosition::Hole(_)) =
+        state.note_by_id(id).and_then(|n| n.target.position())
+    else {
         return;
     };
     let group: Vec<u32> = overlapping_group(state, id).into_iter().filter(|&g| g != id).collect();
@@ -914,6 +928,12 @@ pub(super) fn enforce_direction(state: &mut EditorState, id: u32) {
 /// instant, not just one. So `id`'s `expr` is propagated to every note that
 /// overlaps it in time, transitively, same as `enforce_direction` for Blow/Draw.
 pub(super) fn enforce_expr(state: &mut EditorState, id: u32) {
+    // A guitar's vibrato is one string's, not the whole player's.
+    if state.effective_instrument().expression_scope()
+        != harmonicon_core::instrument::ExpressionScope::WholeInstrument
+    {
+        return;
+    }
     let Some(expr) = state.note_by_id(id).map(|n| n.expr) else {
         return;
     };

@@ -784,7 +784,6 @@ pub(super) fn unsupported_chart_features(value: &serde_json::Value) -> Vec<Strin
 pub(super) fn handle_load_chosen(
     mut chosen: MessageReader<FileChosen>,
     mut state: ResMut<EditorState>,
-    mut guitar_controls: Option<ResMut<super::guitar_editor::GuitarControls>>,
     mut recording: Option<ResMut<super::record::RecordState>>,
     mut practice: Option<ResMut<super::practice::PracticeState>>,
     mut playhead: Option<ResMut<super::playback::Playhead>>,
@@ -816,9 +815,6 @@ pub(super) fn handle_load_chosen(
             }
         };
         load_harpchart(&v, &mut state, &mut scroll);
-        if let Some(controls) = guitar_controls.as_mut() {
-            **controls = Default::default();
-        }
         if matches!(
             state.effective_instrument(),
             harmonicon_core::instrument::Instrument::Guitar(_)

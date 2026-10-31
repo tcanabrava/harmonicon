@@ -582,6 +582,17 @@ fn spawn_note_column_buttons(
         style,
         colors,
     );
+    // Guitar-only; `panel::update_technique_button_visibility` shows these
+    // in place of the harmonica's breath and reed buttons.
+    for (kind, key, icon) in [
+        (ModButton::FretDown, "mod-fret-down", "F-"),
+        (ModButton::FretUp, "mod-fret-up", "F+"),
+        (ModButton::StringUp, "mod-string-up", "S\u{2191}"),
+        (ModButton::StringDown, "mod-string-down", "S\u{2193}"),
+        (ModButton::Harmonic, "mod-harmonic", "<>"),
+    ] {
+        mod_button(g, kind, loc.msg(key), loc.msg(&format!("{key}-tooltip")), icon, style, colors);
+    }
     panel_separator(g);
     mod_button(
         g,

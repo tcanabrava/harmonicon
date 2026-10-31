@@ -57,7 +57,7 @@ pub(super) fn sync_music_score(
     if *meter != editor_meter {
         *meter = editor_meter;
     }
-    let harp = state.effective_harp();
+    let instrument = state.effective_instrument();
     let meter_map = state.meter_map();
     let next_bar_map =
         MusicScoreBarMap { meter: meter_map.clone(), quarter_ticks: TICKS_PER_BEAT as u32 };
@@ -68,7 +68,7 @@ pub(super) fn sync_music_score(
         .notes
         .iter()
         .filter_map(|n| {
-            let midi = note_midi(n, &harp)?;
+            let midi = note_midi(n, &instrument)?;
             Some(notation_segments(n, midi, &meter_map, state.is_selected(n.id)))
         })
         .flatten()

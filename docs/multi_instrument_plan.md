@@ -111,7 +111,7 @@ punish the instrument for doing what it does.
 ## Chart format (format 1.8.0, additive)
 
 Landed, including multi-part song discovery. Guitar charts load for Play 2D's
-horizontal tab highway. The Song Editor loads them into its guitar tab view. Score imports offer guitar arrangements alongside harmonica
+horizontal tab highway. The Song Editor edits them on its shared grid, one row per string. Score imports offer guitar arrangements alongside harmonica
 arrangements, preserving tab tuning and authored string/fret positions.
 
 - New optional top-level `instrument`. If it is absent, the chart is a
@@ -219,15 +219,14 @@ back into events while retaining expression modifiers and their intensity.
 Guitar round-trip fixtures cover sounding pitches, fingering, bends and
 harmonics. This boundary rejects incompatible authored placements rather
 than guessing a replacement. Guitar charts now load and save through this
-boundary in the editor's tab view, retaining configured tuning and capo.
+boundary in the editor, retaining configured tuning and capo.
 
-The guitar view offers string rows, fret/time/duration edits, equivalent
-fingering changes that preserve pitch, bends, harmonics, add/delete, undo,
-native chart load/save, and plucked playback/audition. Edits reject occupied
-strings and excessive hand span across overlapping sustains. Document
-transitions and undo/redo are queued after view systems so a frame cannot
-run harmonica controls against a newly selected guitar. Shared transport,
-file operations and history are registered once for both views.
+A guitar chart is edited on the same grid as a harmonica one: one row per
+string, notes in their string's colour labelled as tab, and the note column
+offering fret and string moves (the latter pitch-preserving), bends,
+harmonics and per-string vibrato. Edits reject occupied strings and
+excessive hand span across overlapping sustains. Resize and paste do not
+yet check hand span.
 
 An empty harmonica document can select a standard guitar in Details.
 Loaded parts keep their own tuning/capo. A generic pitch-row fallback and

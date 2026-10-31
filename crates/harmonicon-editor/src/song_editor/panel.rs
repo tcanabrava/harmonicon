@@ -16,6 +16,8 @@ use super::ui::{
 };
 use super::undo::UndoHistory;
 use harmonicon_audio::AudioSettings;
+use harmonicon_core::instrument::PlayPosition;
+use harmonicon_core::instrument::guitar::StringTechnique;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_ui::dialogs::button::BaseButtonColor;
@@ -38,6 +40,13 @@ pub(super) fn mod_button_active(
         ModButton::Overblow => pitch == HarpTechnique::Overblow,
         ModButton::Overdraw => pitch == HarpTechnique::Overdraw,
         ModButton::Slide => pitch == HarpTechnique::Slide,
+        // Guitar buttons light from the note's fingering, which
+        // `update_mod_panel` reads beside this.
+        ModButton::FretDown
+        | ModButton::FretUp
+        | ModButton::StringUp
+        | ModButton::StringDown
+        | ModButton::Harmonic => false,
         ModButton::Wah => matches!(expr, Expr::Wah(_)),
         ModButton::Vibrato => matches!(expr, Expr::Vibrato(_)),
         // Call/Split read the selected note's *phrase*, which needs the
@@ -61,21 +70,37 @@ pub(super) fn update_mod_panel(
     // visually compete with what's actually selected right now. With
     // nothing selected, the sticky fields preview what a newly *added*
     // note would get, exactly matching `select_or_add`.
+    // A guitar note's fingering — or, with nothing selected, the armed fret
+    // — stands in for the harmonica's breath and reed technique.
+    let guitar = super::guitar_note::is_guitar(&state);
+    let fingering = selected.and_then(|n| match n.target.position() {
+        Some(PlayPosition::Fret(at)) => Some(at),
+        _ => None,
+    });
     let (dir, pitch, expr) = match selected {
+        Some(n) if guitar => (state.sticky_dir, HarpTechnique::Normal, n.expr),
         Some(n) => (n.dir(), n.technique(), n.expr),
+        None if guitar => (state.sticky_dir, HarpTechnique::Normal, state.sticky_expr),
         None => (state.sticky_dir, state.sticky_pitch, state.sticky_expr),
     };
+    let string_technique = fingering.map(|at| at.technique);
     let call = state.selected_call();
     let split = state.selected_split();
     for (kind, mut bg) in &mut buttons {
         let active = match kind {
             ModButton::Call => call,
             ModButton::Split => split,
+            ModButton::Bend if guitar => {
+                matches!(string_technique, Some(StringTechnique::Bend(_)))
+            }
+            ModButton::Harmonic => string_technique == Some(StringTechnique::Harmonic),
             _ => mod_button_active(*kind, dir, pitch, expr),
         };
         bg.0 = if active { colors.btn_active } else { colors.btn_bg };
     }
-    let bent = matches!(pitch, HarpTechnique::Bend(_));
+    let fret = fingering.map_or(state.sticky_fret, |at| at.fret);
+    let bent = matches!(pitch, HarpTechnique::Bend(_))
+        || matches!(string_technique, Some(StringTechnique::Bend(_)));
     for mut vis in &mut dot {
         *vis = if bent { Visibility::Inherited } else { Visibility::Hidden };
     }
@@ -90,6 +115,8 @@ pub(super) fn update_mod_panel(
             // Same shape as the rate: the selected note's depth, or the
             // sticky one — and nothing for a note with no expression.
             (ModButton::Depth, _) if !depth.is_empty() => Some(depth.clone()),
+            // Which fret the selected note is on, or the next one goes on.
+            (ModButton::FretDown | ModButton::FretUp, _) if guitar => Some(fret.to_string()),
             _ => None,
         };
         **text = match suffix {
@@ -310,21 +337,73 @@ pub(super) fn update_note_column(
     }
 }
 
-/// Shows Bend/Overblow/Overdraw for a diatonic chart and Slide for a
-/// chromatic one — never both, since the two harmonicas don't share
-/// techniques. Mirrors [`update_mode_visibility`]'s `Node::display` approach.
+/// Which instrument's buttons the note column shows.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum NoteButtons {
+    Diatonic,
+    Chromatic,
+    Guitar,
+}
+
+/// Whether `kind` belongs in the note column for `set`. The two harmonicas
+/// don't share reed techniques (Bend/Overblow/Overdraw against Slide); a
+/// guitar has no breath, cupped-hand wah or harmonica transposition, and
+/// gets fret, string and harmonic buttons instead. Bend, Vibrato, Depth and
+/// the phrase buttons mean something on all three.
+pub(super) fn note_button_visible(kind: ModButton, set: NoteButtons) -> bool {
+    let guitar = set == NoteButtons::Guitar;
+    match kind {
+        ModButton::Blow
+        | ModButton::Draw
+        | ModButton::Wah
+        | ModButton::TransposeUp
+        | ModButton::TransposeDown => !guitar,
+        ModButton::Overblow | ModButton::Overdraw => set == NoteButtons::Diatonic,
+        ModButton::Bend => set != NoteButtons::Chromatic,
+        ModButton::Slide => set == NoteButtons::Chromatic,
+        ModButton::FretDown
+        | ModButton::FretUp
+        | ModButton::StringUp
+        | ModButton::StringDown
+        | ModButton::Harmonic => guitar,
+        ModButton::Vibrato
+        | ModButton::Depth
+        | ModButton::Call
+        | ModButton::Split
+        | ModButton::Phrase
+        | ModButton::Delete => true,
+    }
+}
+
+/// Shows the note column's buttons for the current instrument
+/// ([`note_button_visible`]). Mirrors [`update_mode_visibility`]'s
+/// `Node::display` approach.
 pub(super) fn update_technique_button_visibility(
     state: Res<EditorState>,
     mut buttons: Query<(&ModButton, &mut Node)>,
+    mut modes: Query<(&ModeButton, &mut Node), Without<ModButton>>,
 ) {
-    let diatonic_only = state.harmonica_kind().is_diatonic();
+    let set = if super::guitar_note::is_guitar(&state) {
+        NoteButtons::Guitar
+    } else if state.harmonica_kind().is_diatonic() {
+        NoteButtons::Diatonic
+    } else {
+        NoteButtons::Chromatic
+    };
     for (kind, mut node) in &mut buttons {
-        let visible = match kind {
-            ModButton::Bend | ModButton::Overblow | ModButton::Overdraw => diatonic_only,
-            ModButton::Slide => !diatonic_only,
-            _ => continue,
-        };
+        let visible = note_button_visible(*kind, set);
         let want = if visible { Display::Flex } else { Display::None };
+        if node.display != want {
+            node.display = want;
+        }
+    }
+    // Recording resolves what it hears onto harmonica holes; a guitar's
+    // detection is not tuned yet, so there is no Record mode to enter.
+    for (mode, mut node) in &mut modes {
+        if *mode != ModeButton::Record {
+            continue;
+        }
+        let want = if set == NoteButtons::Guitar { Display::None } else { Display::Flex };
         if node.display != want {
             node.display = want;
         }
@@ -337,17 +416,25 @@ pub(super) fn update_harmonica_kind_text(
     loc: Res<Localization>,
     mut texts: Query<&mut Text, With<HarmonicaKindText>>,
 ) {
-    let key = match state.harmonica_kind() {
+    let key = if super::guitar_note::is_guitar(&state) {
+        "editor-instrument-guitar"
+    } else {
+        harmonica_kind_key(state.harmonica_kind())
+    };
+    let label = String::from(loc.msg(key));
+    for mut text in &mut texts {
+        **text = label.clone();
+    }
+}
+
+fn harmonica_kind_key(kind: HarmonicaKind) -> &'static str {
+    match kind {
         HarmonicaKind::Diatonic => "editor-harmonica-diatonic",
         HarmonicaKind::PaddyRichter => "editor-harmonica-paddy-richter",
         HarmonicaKind::CountryTuned => "editor-harmonica-country-tuned",
         HarmonicaKind::NaturalMinor => "editor-harmonica-natural-minor",
         HarmonicaKind::Chromatic => "editor-harmonica-chromatic",
         HarmonicaKind::Chromatic16 => "editor-harmonica-chromatic-16",
-    };
-    let label = String::from(loc.msg(key));
-    for mut text in &mut texts {
-        **text = label.clone();
     }
 }
 
@@ -755,9 +842,7 @@ mod tests {
 
         let bend = world.spawn((ModButton::Bend, Node::default())).id();
         let slide = world.spawn((ModButton::Slide, Node::default())).id();
-        // Untouched by either branch — must be left exactly as spawned.
-        let blow =
-            world.spawn((ModButton::Blow, Node { display: Display::Grid, ..default() })).id();
+        let fret = world.spawn((ModButton::FretUp, Node::default())).id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_technique_button_visibility);
@@ -765,11 +850,32 @@ mod tests {
 
         assert_eq!(world.get::<Node>(bend).unwrap().display, Display::None);
         assert_eq!(world.get::<Node>(slide).unwrap().display, Display::Flex);
-        assert_eq!(
-            world.get::<Node>(blow).unwrap().display,
-            Display::Grid,
-            "buttons outside the bend/slide family are never touched"
-        );
+        assert_eq!(world.get::<Node>(fret).unwrap().display, Display::None);
+    }
+
+    #[test]
+    fn a_guitar_note_column_trades_breath_and_reeds_for_frets_and_strings() {
+        use NoteButtons::Guitar;
+        for kind in [ModButton::Blow, ModButton::Draw, ModButton::Overblow, ModButton::Slide] {
+            assert!(!note_button_visible(kind, Guitar), "{kind:?}");
+        }
+        assert!(!note_button_visible(ModButton::Wah, Guitar));
+        assert!(!note_button_visible(ModButton::TransposeUp, Guitar));
+        for kind in [
+            ModButton::FretDown,
+            ModButton::FretUp,
+            ModButton::StringUp,
+            ModButton::StringDown,
+            ModButton::Harmonic,
+            ModButton::Bend,
+            ModButton::Vibrato,
+            ModButton::Delete,
+        ] {
+            assert!(note_button_visible(kind, Guitar), "{kind:?}");
+            let harp_only =
+                kind != ModButton::Bend && kind != ModButton::Vibrato && kind != ModButton::Delete;
+            assert_eq!(note_button_visible(kind, NoteButtons::Diatonic), !harp_only, "{kind:?}");
+        }
     }
 
     // ── update_harmonica_kind_text ────────────────────────────────────────────
