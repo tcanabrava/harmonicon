@@ -391,7 +391,7 @@ pub(super) fn sync_chrome_height(
         )>,
     >,
 ) {
-    let h = grid_height(state.hole_count());
+    let h = grid_height(state.row_count());
     for mut node in &mut rows {
         if node.height != Val::Px(h) {
             node.height = Val::Px(h);
@@ -412,7 +412,7 @@ pub(super) fn sync_hole_column(
     let Ok((entity, children)) = col.single() else {
         return;
     };
-    let hole_count = state.hole_count();
+    let hole_count = state.row_count();
     if *last == Some((entity, hole_count)) && !theme.is_changed() && !loc.is_changed() {
         return;
     }
@@ -449,7 +449,7 @@ pub(super) fn setup(
 ) {
     let colors = theme.song_editor_colors();
     let mode = state.mode;
-    let hole_count = state.hole_count();
+    let hole_count = state.row_count();
     let mut root_ec = commands.spawn((
         EditorRoot,
         TabGroup::default(),

@@ -408,7 +408,7 @@ pub(super) fn update_scrollbar_markers(
     if end_tick == 0 {
         return;
     }
-    let lanes = state.hole_count().max(1) as f32;
+    let lanes = state.row_count().max(1) as f32;
     let new: Vec<Entity> = state
         .notes
         .iter()

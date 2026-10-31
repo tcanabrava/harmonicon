@@ -219,7 +219,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
                 };
                 json!({
                     "type": "chromatic",
-                    "holes": state.hole_count(),
+                    "holes": state.row_count(),
                     "position": state.position,
                     "scale": state.scale,
                     "layout": {
@@ -591,7 +591,7 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     let mut next_id = 0u32;
     let instrument = state.effective_instrument();
     let guitar = matches!(instrument, harmonicon_core::instrument::Instrument::Guitar(_));
-    let hole_count = if guitar { 0 } else { state.hole_count() };
+    let hole_count = if guitar { 0 } else { state.row_count() };
 
     if let Some(track) = v["track"].as_array() {
         for phrase in track {

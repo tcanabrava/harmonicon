@@ -94,7 +94,7 @@ pub(super) fn transpose_notes(
                     let candidate = candidates[i][choice];
                     notes.iter().enumerate().any(|(j, original)| {
                         let other = choices[j].map_or(*original, |choice| candidates[j][choice]);
-                        j != i && other.hole() == candidate.hole() && overlaps(&candidate, &other)
+                        j != i && other.row() == candidate.row() && overlaps(&candidate, &other)
                     })
                 })
             })

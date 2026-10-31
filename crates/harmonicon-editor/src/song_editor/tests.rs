@@ -797,11 +797,11 @@ fn slide_cycles_on_and_off_on_any_hole() {
 #[test]
 fn hole_count_matches_the_harmonica_kind() {
     let mut s = EditorState::default();
-    assert_eq!(s.hole_count(), 10);
+    assert_eq!(s.row_count(), 10);
     s.set_harmonica_kind(HarmonicaKind::Chromatic);
-    assert_eq!(s.hole_count(), 12);
+    assert_eq!(s.row_count(), 12);
     s.set_harmonica_kind(HarmonicaKind::Chromatic16);
-    assert_eq!(s.hole_count(), 16);
+    assert_eq!(s.row_count(), 16);
 }
 
 #[test]

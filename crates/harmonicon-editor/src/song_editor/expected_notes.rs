@@ -418,7 +418,7 @@ fn rebuild_expected_notes_overlay(
                     if drag.kind != DragKind::Move {
                         return;
                     }
-                    let hole_count = state.hole_count();
+                    let hole_count = state.row_count();
                     let (hole, tick) = move_target(
                         drag.start_hole,
                         drag.start_tick,

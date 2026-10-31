@@ -230,6 +230,40 @@ pub(super) struct GridNote {
     pub(super) target: harmonicon_core::note_target::NoteTarget,
 }
 
+impl GridNote {
+    /// The grid row the note sits on, counted from 1 at the top: a
+    /// harmonica's hole, a guitar's string. Everything that lays notes out
+    /// or compares where they sit (drawing, dragging, overlap, paste) asks
+    /// this, never the harmonica's own hole.
+    pub(super) fn row(&self) -> u8 {
+        match self.target.position() {
+            Some(harmonicon_core::instrument::PlayPosition::Hole(a)) => a.hole,
+            Some(harmonicon_core::instrument::PlayPosition::Fret(a)) => a.string,
+            None => 1,
+        }
+    }
+
+    /// Moves the note to `row`, keeping the rest of its position: a hole's
+    /// breath and technique, a string's fret and technique. A tab moves the
+    /// same way on either instrument.
+    pub(super) fn set_row(&mut self, row: u8) {
+        use harmonicon_core::instrument::PlayPosition;
+        use harmonicon_core::note_target::NoteTarget;
+        let moved = match self.target.position() {
+            Some(PlayPosition::Hole(mut a)) => {
+                a.hole = row;
+                PlayPosition::Hole(a)
+            }
+            Some(PlayPosition::Fret(mut a)) => {
+                a.string = row;
+                PlayPosition::Fret(a)
+            }
+            None => return,
+        };
+        self.target = NoteTarget::Positioned(moved);
+    }
+}
+
 #[cfg(test)]
 impl GridNote {
     /// A C-style harmonica tab instruction for existing view tests.

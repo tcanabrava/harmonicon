@@ -129,7 +129,7 @@ impl EditorState {
 
         for &(id, hole, tick) in targets {
             if let Some(n) = self.notes.iter_mut().find(|n| n.id == id) {
-                n.set_hole(hole);
+                n.set_row(hole);
                 n.tick = tick;
             }
         }
@@ -169,7 +169,7 @@ impl EditorState {
     /// metadata). The pasted notes become the selection. Returns whether
     /// anything landed.
     pub(super) fn paste(&mut self, clip: &NoteClipboard, target_tick: usize) -> bool {
-        let hole_count = self.hole_count();
+        let hole_count = self.row_count();
         let (placed, next_id) = paste_targets_with_sources(
             &clip.notes,
             target_tick,

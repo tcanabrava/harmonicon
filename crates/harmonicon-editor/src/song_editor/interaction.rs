@@ -42,14 +42,14 @@ pub(super) fn shift_held(keyboard: &ButtonInput<KeyCode>) -> bool {
 
 pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     if let Some(existing) =
-        state.notes.iter().find(|n| n.hole() == hole && n.tick <= tick && tick < n.tick + n.len)
+        state.notes.iter().find(|n| n.row() == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.select_only(existing.id);
         return;
     }
 
     let next_start =
-        state.notes.iter().filter(|n| n.hole() == hole && n.tick > tick).map(|n| n.tick).min();
+        state.notes.iter().filter(|n| n.row() == hole && n.tick > tick).map(|n| n.tick).min();
 
     let len = next_start.map_or(TICKS_PER_BEAT, |start| (start - tick).min(TICKS_PER_BEAT)).max(1);
 
@@ -113,7 +113,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
 /// to "add" a freshly-placed note to.
 pub(super) fn select_or_add_ctrl(state: &mut EditorState, hole: u8, tick: usize) {
     if let Some(existing) =
-        state.notes.iter().find(|n| n.hole() == hole && n.tick <= tick && tick < n.tick + n.len)
+        state.notes.iter().find(|n| n.row() == hole && n.tick <= tick && tick < n.tick + n.len)
     {
         state.toggle_selected(existing.id);
         return;
@@ -548,7 +548,7 @@ pub(super) fn handle_undo_redo(
 /// That one note trades part of its body for the grip; every other note
 /// keeps all of it.
 pub(super) fn resize_grip_position(note: &GridNote, edge: Edge) -> (f32, f32) {
-    let (left, top, width, height) = note_rect(note, usize::from(note.hole().saturating_sub(1)));
+    let (left, top, width, height) = note_rect(note, usize::from(note.row().saturating_sub(1)));
     let x = match edge {
         Edge::Left => (left - GRIP_D).max(0.0),
         Edge::Right => left + width,
@@ -610,7 +610,7 @@ pub(super) fn spawn_resize_grips(
                     let mut left_bound = 0usize;
                     let mut right_bound: Option<usize> = None;
                     for n in &state.notes {
-                        if n.id == id || n.hole() != hole {
+                        if n.id == id || n.row() != hole {
                             continue;
                         }
                         if n.tick < drag.start_tick {
@@ -722,7 +722,7 @@ pub(super) fn live_resize(
     let Some(note) = state.note_by_id(drag.id) else {
         return;
     };
-    let (left, _top, width, _height) = note_rect(note, usize::from(note.hole().saturating_sub(1)));
+    let (left, _top, width, _height) = note_rect(note, usize::from(note.row().saturating_sub(1)));
     for (view, mut node, mat) in &mut notes {
         if view.0 == drag.id {
             node.left = Val::Px(left);
@@ -795,7 +795,7 @@ pub(super) fn update_group_move_ghosts(
     let color = if drag.valid { colors.ghost_ok } else { colors.ghost_bad };
     let hole_delta = drag.target_hole as i32 - drag.start_hole as i32;
     let tick_delta = drag.target_tick as i32 - drag.start_tick as i32;
-    let hole_count = state.hole_count();
+    let hole_count = state.row_count();
     let targets = group_move_targets(&drag.group, hole_delta, tick_delta, hole_count);
     let new: Vec<Entity> = targets
         .iter()

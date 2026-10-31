@@ -130,7 +130,7 @@ pub(super) fn rebuild_grid(
     let bar_colors = theme.twelve_bar_colors();
     let scale = state.scale.classes(&state.key);
     let harp = state.effective_harp();
-    let hole_count = state.hole_count();
+    let hole_count = state.row_count();
     // Locked (user Lock toggle, or Perform mode): grid cells, notes, and
     // resize handles are all spawned non-interactive via `Pickable::IGNORE`,
     // so no click/drag observer below ever fires — a single gate at spawn
@@ -634,7 +634,7 @@ pub(super) fn group_move_targets(
     others
         .iter()
         .map(|n| {
-            let hole = (n.hole() as i32 + hole_delta).clamp(1, hole_count as i32) as u8;
+            let hole = (n.row() as i32 + hole_delta).clamp(1, hole_count as i32) as u8;
             let tick = (n.tick as i32 + tick_delta).max(0) as usize;
             (n.id, hole, tick, n.len, n.technique())
         })
@@ -656,7 +656,7 @@ pub(super) fn group_move_valid(
         pitch_compatible(pitch, harp, hole)
             && !notes.iter().any(|n| {
                 !moving_ids.contains(&n.id)
-                    && n.hole() == hole
+                    && n.row() == hole
                     && n.tick < tick + len
                     && tick < n.tick + n.len
             })
@@ -672,7 +672,7 @@ pub(super) fn spawn_note(
     locked: bool,
     in_scale: bool,
 ) -> Entity {
-    let (left, top, width, height) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
+    let (left, top, width, height) = note_rect(&note, usize::from(note.row().saturating_sub(1)));
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { colors.accent } else { Color::NONE };
     let id = note.id;
@@ -756,7 +756,7 @@ pub(super) fn spawn_note(
                 if drag.id != id || drag.kind != DragKind::Move {
                     return;
                 }
-                let hole_count = state.hole_count();
+                let hole_count = state.row_count();
                 // `PointerDrag::distance` is raw window-pixel motion, but
                 // `TICK_W`/`ROW_H` are logical sizes that `UiScale` (the
                 // arrow-key UI zoom, `dialogs::ui_scale`) multiplies up for
@@ -820,7 +820,7 @@ pub(super) fn spawn_note(
             };
             state.drag_msg = harmonicon_platform::localization::LocalizedStr::default();
             if drag.kind == DragKind::Move && drag.valid {
-                let hole_count = state.hole_count();
+                let hole_count = state.row_count();
                 let hole_delta = drag.target_hole as i32 - drag.start_hole as i32;
                 let tick_delta = drag.target_tick as i32 - drag.start_tick as i32;
                 let group_targets =

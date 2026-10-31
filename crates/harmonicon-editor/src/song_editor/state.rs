@@ -599,8 +599,12 @@ impl EditorState {
         self.user_locked || self.mode != Mode::Edit
     }
 
-    /// The number of playable holes for the current [`HarmonicaKind`].
-    pub(super) fn hole_count(&self) -> u8 {
+    /// How many rows the grid has: a harmonica's holes, a guitar's strings.
+    pub(super) fn row_count(&self) -> u8 {
+        if let harmonicon_core::instrument::Instrument::Guitar(guitar) = self.effective_instrument()
+        {
+            return guitar.string_count();
+        }
         match self.harmonica_kind() {
             HarmonicaKind::Diatonic
             | HarmonicaKind::CountryTuned
@@ -620,7 +624,7 @@ impl EditorState {
         if self.harmonica_kind() != kind {
             self.instrument = InstrumentSelection::HarmonicaPreset(kind);
         }
-        let hole_count = self.hole_count();
+        let hole_count = self.row_count();
         self.notes.retain(|n| n.hole() <= hole_count);
         let sanitize = |kind: HarmonicaKind, pitch: HarpTechnique| {
             let incompatible = (kind.is_diatonic() && pitch == HarpTechnique::Slide)
