@@ -886,10 +886,27 @@ load-bearing about *this* crate.
   instruction across tuning changes. Existing harmonica authoring uses
   `Positioned`, preserving its same-hole key-change semantics. Do not add
   `fret`, `hole`, or `dir` back to the generic note. `harmonica_note.rs`
-  is the adapter for the current harmonica-only view and its tools; the
-  loader gate remains until another view and its chart codec are ready.
+  is the adapter for harmonica tools; `guitar_editor.rs` reads string
+  placements directly. Native guitar charts use `instrument_chart.rs` and
+  core's event codec; no string is reinterpreted as a hole.
   Geometry takes an explicit visual row, and playback resolves pitch through
   `InstrumentModel`. Merely projecting or inspecting a note cannot rewrite
   its target. Authored pitch placements must pass `with_placement`/`candidates`;
   incompatible positions are errors, not permission to guess new fingering.
   Both intent and placement travel together through clipboard and undo.
+
+- **Instrument/view transitions are queued** as `DocumentCommand`s and
+  applied after the view-specific passes. Undo can change the instrument,
+  so observers and keyboard handlers must queue undo/redo too. Shared
+  playback, file operations, audition and history run once for both views.
+  Harmonica-only developer tools belong to the harmonica pass as well.
+  Snapshots include both instrument configuration and song key, since a
+  restored authored harp must retain its source-key identity.
+- **Guitar edits check overlapping sustains**, not only simultaneous
+  attacks: an occupied string or an excessive fret span rejects the edit
+  without moving other notes. String changes search equivalent positions
+  while preserving sounding pitch. The tab view provides native load/save,
+  fret/time/duration controls, bends/harmonics, undo and plucked preview.
+  Guitar recording and detector tuning still need the recorded corpus.
+  Custom bend intensity and multiple mutually exclusive techniques are
+  rejected during validation rather than silently dropped on save.

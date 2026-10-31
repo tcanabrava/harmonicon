@@ -1319,10 +1319,9 @@ fn editor_load_validation_rejects_a_future_chart_version() {
     assert!(error.contains("can't load"));
 }
 
-/// The grid's rows are harmonica holes, so a guitar chart is refused rather
-/// than opened with every note on hole 1.
+/// Guitar charts enter the typed document with their string placement.
 #[test]
-fn editor_load_refuses_a_chart_for_another_instrument() {
+fn editor_load_accepts_a_guitar_chart_with_its_authored_position() {
     let mut value: serde_json::Value = serde_json::json!({
         "song": { "title": "T", "artist": "A", "genre": "Test", "tempo_bpm": 120.0,
                   "key": "E", "difficulty": "easy" },
@@ -1333,8 +1332,18 @@ fn editor_load_refuses_a_chart_for_another_instrument() {
         "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
     });
     value["metadata"] = serde_json::json!({ "format_version": "1.8.0" });
-    let error = validated_harpchart(&value.to_string()).expect_err("a guitar chart is refused");
-    assert!(error.contains("other than the harmonica"), "{error}");
+    let value = validated_harpchart(&value.to_string()).unwrap();
+    let mut state = EditorState::default();
+    load_harpchart(&value, &mut state, &mut Scroll::default());
+    assert!(matches!(
+        state.effective_instrument(),
+        harmonicon_core::instrument::Instrument::Guitar(_)
+    ));
+    assert_eq!(state.notes.len(), 1);
+    assert_eq!(
+        super::playback::note_midi(&state.notes[0], &state.effective_instrument()),
+        Some(57)
+    );
 }
 
 #[test]
@@ -1425,22 +1434,6 @@ fn content_charts() -> Vec<std::path::PathBuf> {
         charts_below(&dir, &mut paths);
     }
     assert!(!paths.is_empty(), "no charts found under {}", repo.display());
-    // The editor's rows are harmonica holes, so it refuses another
-    // instrument's chart outright rather than misreading it; such a chart
-    // has nothing to round-trip. Each one left out must really be refused.
-    paths.retain(|path| {
-        let text = std::fs::read_to_string(path).unwrap_or_default();
-        let other_instrument = serde_json::from_str::<serde_json::Value>(&text)
-            .is_ok_and(|chart| chart.get("instrument").is_some());
-        if other_instrument {
-            assert!(
-                validated_harpchart(&text).is_err(),
-                "{} names another instrument, yet the editor opened it",
-                path.display()
-            );
-        }
-        !other_instrument
-    });
     paths
 }
 
@@ -1497,6 +1490,8 @@ struct CanonicalEvent {
     duration_beats: f64,
     hole: u64,
     action: String,
+    position: Option<(u64, u64)>,
+    sounding_note: Option<String>,
     modifiers: Vec<String>,
     section: Option<String>,
     chord: Option<String>,
@@ -1555,6 +1550,12 @@ fn canonical_events(chart: &serde_json::Value) -> Vec<CanonicalEvent> {
                 duration_beats,
                 hole: event["hole"].as_u64().unwrap_or(0),
                 action: event["action"].as_str().unwrap_or("").to_string(),
+                position: event
+                    .get("position")
+                    .and_then(|p| Some((p["string"].as_u64()?, p["fret"].as_u64()?))),
+                sounding_note: event
+                    .get("position")
+                    .and_then(|_| event["note"].as_str().map(str::to_owned)),
                 modifiers,
                 section: phrase["phrase"].as_str().map(str::to_owned),
                 chord: phrase["chord"].as_str().map(str::to_owned),
@@ -1617,6 +1618,11 @@ fn canonical_rest(chart: &serde_json::Value) -> serde_json::Value {
     if let Some(m) = metadata.as_object_mut() {
         m.remove("format_version");
     }
+    let instrument = chart.get("instrument").map(|spec| {
+        let spec: harmonicon_core::chart::ChartInstrument =
+            serde_json::from_value(spec.clone()).unwrap();
+        normalize_numbers(&serde_json::to_value(spec).unwrap())
+    });
     let mut harmonica = normalize_numbers(&chart["harmonica"]);
     if harmonica.get("scale").is_none() {
         harmonica["scale"] = serde_json::json!("first_position");
@@ -1645,6 +1651,7 @@ fn canonical_rest(chart: &serde_json::Value) -> serde_json::Value {
     serde_json::json!({
         "song": normalize_numbers(&chart["song"]),
         "harmonica": harmonica,
+        "instrument": instrument,
         "scoring": scoring,
         "loop": loop_settings,
         "metadata": metadata,
@@ -4246,4 +4253,51 @@ fn visual_rows_do_not_change_guitar_pitch_or_fingering() {
     assert_eq!(note.target, target);
     assert_eq!(super::playback::note_midi(&note, &guitar), Some(64));
     assert!(super::playback::note_freq(&note, &guitar).is_some());
+}
+
+#[test]
+fn instrument_transitions_and_undo_happen_after_view_updates() {
+    use super::state::{DocumentCommand, InstrumentSelection};
+    use bevy::prelude::*;
+    use harmonicon_core::instrument::{
+        Instrument,
+        guitar::{Guitar, GuitarBody},
+    };
+    fn harp_view(state: Res<EditorState>) {
+        let _ = state.harmonica_kind();
+    }
+    let mut app = App::new();
+    app.insert_resource(EditorState::default());
+    app.init_resource::<super::record::RecordState>();
+    app.init_resource::<super::guitar_editor::GuitarControls>();
+    app.init_resource::<super::undo::UndoHistory>();
+    app.add_message::<DocumentCommand>();
+    app.add_systems(
+        Update,
+        (
+            harp_view.run_if(super::guitar_editor::is_harmonica),
+            super::undo::track_changes,
+            super::undo::apply_document_commands,
+        )
+            .chain(),
+    );
+    app.world_mut().write_message(DocumentCommand::SelectInstrument(
+        InstrumentSelection::Configured {
+            instrument: Guitar::standard(GuitarBody::Electric).into(),
+            harmonica_origin: None,
+        },
+    ));
+    app.update();
+    assert!(matches!(
+        app.world().resource::<EditorState>().effective_instrument(),
+        Instrument::Guitar(_)
+    ));
+    app.update();
+    app.world_mut().write_message(DocumentCommand::Undo);
+    app.update();
+    assert!(matches!(
+        app.world().resource::<EditorState>().effective_instrument(),
+        Instrument::Harmonica(_)
+    ));
+    app.update();
 }

@@ -655,6 +655,7 @@ pub(super) fn spawn_meta_form(
         let first_col = spawn_form_column(form, |col| {
             spawn_content_kind_row(col, loc, colors);
             spawn_harmonica_kind_row(col, loc, colors);
+            super::guitar_editor::spawn_selector(col, loc);
             spawn_snap_mode_row(col, loc, colors);
             for &(field, label) in &FIELDS[..MID] {
                 spawn_field_row(col, loc, colors, state, field, label);

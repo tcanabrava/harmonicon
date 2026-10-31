@@ -48,8 +48,8 @@ the sounding pitch, so an equivalent fingering sounds the same to the game.
 
 For imported scores, the part picker offers guitar arrangements alongside
 harmonica arrangements and names the instrument beside each part. Guitar
-Pro tabs retain their tuning and string/fret positions. The Song Editor
-cannot edit guitar charts yet; the fretboard guide is also still planned.
+Pro tabs retain their tuning and string/fret positions. The Song Editor opens native guitar charts in its tab view. The fretboard
+strip beside the highway highlights the target frets and hand window.
 
 ## Removed and hidden songs
 

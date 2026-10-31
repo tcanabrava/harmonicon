@@ -86,10 +86,6 @@ gates 1.0. In order:
   (string colours, the fretboard strip with its hand window, chord stems)
   are in. Multi-part song folders list every native chart on desktop and
   bundled targets; Jam Session offers only harmonica parts. Next:
-  - editor instrument selector UI, guitar chart round trips and tab rows
-    (the typed note-target seam is in; the editor still refuses guitar charts), auditioning
-    in the plucked voice (`synth::Voice::PluckedString`, already used by
-    the guitar's call demos);
   - detection, which needs a recorded guitar corpus first (low-string
     resolution, strum onset spread, decaying sustain).
 - **Note Trainer** in place of the Bending Trainer: glide, register,

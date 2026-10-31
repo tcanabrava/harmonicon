@@ -881,3 +881,22 @@ harp-check-instrument-harmonica = Harmonica
 harp-check-instrument-guitar = Guitar
 
 gameplay-guitar-window = Hand window starts at fret {$fret} · Next: {$next} · 0 = open string
+
+editor-guitar-tab = Guitar tablature
+editor-guitar-load = Load
+editor-guitar-save = Save
+editor-guitar-play = Play
+editor-guitar-stop = Stop
+editor-guitar-undo = Undo
+editor-guitar-redo = Redo
+editor-guitar-add = Add note
+editor-guitar-delete = Delete
+editor-guitar-bend = Bend
+editor-guitar-harmonic = Harmonic
+editor-guitar-target = String {$string} · Fret {$fret} · Tick {$tick} · Length {$length}
+editor-guitar-help = Click a beat to choose a string and time; click a note to edit. F changes fret; arrows move time; −/+ change duration.
+editor-guitar-invalid = That edit is unplayable: check fret range, occupied strings and hand span.
+editor-guitar-select = Use guitar
+editor-guitar-select-empty = Select an empty document to change instruments. Save your current chart first.
+
+editor-guitar-key = Song key

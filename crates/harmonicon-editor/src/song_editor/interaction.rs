@@ -522,8 +522,7 @@ pub(super) fn handle_copy_paste(
 pub(super) fn handle_undo_redo(
     keyboard: Res<ButtonInput<KeyCode>>,
     file_dialog: Res<FileDialog>,
-    mut state: ResMut<EditorState>,
-    mut history: ResMut<super::undo::UndoHistory>,
+    mut commands: Commands,
     focus: Res<InputFocus>,
     fields: Query<(), With<EditableText>>,
 ) {
@@ -531,9 +530,9 @@ pub(super) fn handle_undo_redo(
         return;
     }
     if keyboard.just_pressed(KeyCode::KeyZ) {
-        history.undo(&mut state);
+        commands.write_message(super::state::DocumentCommand::Undo);
     } else if keyboard.just_pressed(KeyCode::KeyY) {
-        history.redo(&mut state);
+        commands.write_message(super::state::DocumentCommand::Redo);
     }
 }
 

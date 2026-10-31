@@ -12,7 +12,7 @@ use harmonicon_core::harmonica::{
     paddy_richter_harp, richter_harp,
 };
 use harmonicon_core::midi::midi_to_freq_hz;
-use harmonicon_core::synth::{PhraseNote, SAMPLE_RATE, render_pcm};
+use harmonicon_core::synth::{PhraseNote, SAMPLE_RATE, render_pcm_with};
 use harmonicon_core::wav::encode_wav;
 
 // ── Components / Resources ───────────────────────────────────────────────────
@@ -197,15 +197,21 @@ pub(super) fn start_playback(
         return;
     }
     let spt = secs_per_tick(state);
-    let harp = state.effective_harp();
+    let instrument = state.effective_instrument();
+    let voice = instrument.synth_voice();
     let phrase: Vec<PhraseNote> = state
         .notes
         .iter()
-        .map(|n| PhraseNote { tick: n.tick, len: n.len, freq: note_freq(n, &harp), expr: n.expr })
+        .map(|n| PhraseNote {
+            tick: n.tick,
+            len: n.len,
+            freq: note_freq(n, &instrument),
+            expr: n.expr,
+        })
         .collect();
     let end_tick = state.notes.iter().map(|n| n.tick + n.len).max().unwrap_or(0);
     let task = AsyncComputeTaskPool::get()
-        .spawn(async move { encode_wav(&render_pcm(&phrase, spt), SAMPLE_RATE) });
+        .spawn(async move { encode_wav(&render_pcm_with(&phrase, spt, voice), SAMPLE_RATE) });
     commands.spawn((EditorAudio, PendingPlayback { task, end_tick, secs_per_tick: spt }));
 }
 

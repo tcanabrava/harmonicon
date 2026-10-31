@@ -58,7 +58,11 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
 
     let bpm: f32 = state.tempo.parse().unwrap_or(120.0);
     let tempo_map = state.tempo_map();
-    let harp = state.effective_harp();
+    let instrument = state.effective_instrument();
+    let harp = match &instrument {
+        harmonicon_core::instrument::Instrument::Harmonica(harp) => Some(harp),
+        _ => None,
+    };
 
     // A chart phrase has one duration shared by all of its events. Grouping
     // solely by onset would therefore lengthen every shorter chord tone to
@@ -93,6 +97,8 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
             let events: Vec<Value> = notes
                 .iter()
                 .map(|n| {
+                    if harp.is_none() { return super::instrument_chart::encode_note(state, n, &instrument); }
+                    let harp = harp.expect("harmonica branch");
                     let intensity = state
                         .expression_intensities
                         .get(&n.id)
@@ -102,7 +108,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
                         Dir::Blow => "blow",
                         Dir::Draw => "draw",
                     };
-                    let note_name = note_name_for(n, &harp);
+                    let note_name = note_name_for(n, harp);
                     let mut modifiers: Vec<Value> = Vec::new();
                     match n.technique() {
                         HarpTechnique::Bend(a) => {
@@ -173,56 +179,60 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     // here (the physical instrument to grab), but a straight/1st-position
     // song's layout now actually matches its key instead of always reading
     // as a plain, untransposed C harp.
-    let harmonica = match state.harmonica_kind() {
-        HarmonicaKind::Diatonic
-        | HarmonicaKind::CountryTuned
-        | HarmonicaKind::PaddyRichter
-        | HarmonicaKind::NaturalMinor => {
-            let (blow, draw) = match &harp {
-                Harmonica::Diatonic { layout: Some(l), .. } => {
-                    (l.blow.as_deref().unwrap_or(&[]), l.draw.as_deref().unwrap_or(&[]))
-                }
-                _ => (&[][..], &[][..]),
-            };
-            let bending_profile = match state.harmonica_kind() {
-                HarmonicaKind::Diatonic => "richter_standard",
-                HarmonicaKind::PaddyRichter => "paddy_richter",
-                HarmonicaKind::CountryTuned => "country_tuned",
-                HarmonicaKind::NaturalMinor => "natural_minor",
-                _ => unreachable!("matched diatonic variants above"),
-            };
-            json!({
-                "type": "diatonic",
-                "holes": 10,
-                "position": state.position,
-                "scale": state.scale,
-                "bending_profile": bending_profile,
-                "layout": { "blow": blow, "draw": draw }
-            })
+    let harmonica = if let Some(harp) = harp {
+        match state.harmonica_kind() {
+            HarmonicaKind::Diatonic
+            | HarmonicaKind::CountryTuned
+            | HarmonicaKind::PaddyRichter
+            | HarmonicaKind::NaturalMinor => {
+                let (blow, draw) = match &harp {
+                    Harmonica::Diatonic { layout: Some(l), .. } => {
+                        (l.blow.as_deref().unwrap_or(&[]), l.draw.as_deref().unwrap_or(&[]))
+                    }
+                    _ => (&[][..], &[][..]),
+                };
+                let bending_profile = match state.harmonica_kind() {
+                    HarmonicaKind::Diatonic => "richter_standard",
+                    HarmonicaKind::PaddyRichter => "paddy_richter",
+                    HarmonicaKind::CountryTuned => "country_tuned",
+                    HarmonicaKind::NaturalMinor => "natural_minor",
+                    _ => unreachable!("matched diatonic variants above"),
+                };
+                json!({
+                    "type": "diatonic",
+                    "holes": 10,
+                    "position": state.position,
+                    "scale": state.scale,
+                    "bending_profile": bending_profile,
+                    "layout": { "blow": blow, "draw": draw }
+                })
+            }
+            HarmonicaKind::Chromatic | HarmonicaKind::Chromatic16 => {
+                let (blow, draw, blow_slide, draw_slide) = match &harp {
+                    Harmonica::Chromatic { layout: Some(l), .. } => (
+                        l.blow.as_deref().unwrap_or(&[]),
+                        l.draw.as_deref().unwrap_or(&[]),
+                        l.blow_slide.as_deref().unwrap_or(&[]),
+                        l.draw_slide.as_deref().unwrap_or(&[]),
+                    ),
+                    _ => (&[][..], &[][..], &[][..], &[][..]),
+                };
+                json!({
+                    "type": "chromatic",
+                    "holes": state.hole_count(),
+                    "position": state.position,
+                    "scale": state.scale,
+                    "layout": {
+                        "blow": blow,
+                        "draw": draw,
+                        "blow_slide": blow_slide,
+                        "draw_slide": draw_slide
+                    }
+                })
+            }
         }
-        HarmonicaKind::Chromatic | HarmonicaKind::Chromatic16 => {
-            let (blow, draw, blow_slide, draw_slide) = match &harp {
-                Harmonica::Chromatic { layout: Some(l), .. } => (
-                    l.blow.as_deref().unwrap_or(&[]),
-                    l.draw.as_deref().unwrap_or(&[]),
-                    l.blow_slide.as_deref().unwrap_or(&[]),
-                    l.draw_slide.as_deref().unwrap_or(&[]),
-                ),
-                _ => (&[][..], &[][..], &[][..], &[][..]),
-            };
-            json!({
-                "type": "chromatic",
-                "holes": state.hole_count(),
-                "position": state.position,
-                "scale": state.scale,
-                "layout": {
-                    "blow": blow,
-                    "draw": draw,
-                    "blow_slide": blow_slide,
-                    "draw_slide": draw_slide
-                }
-            })
-        }
+    } else {
+        Value::Null
     };
 
     // `audio_file` is optional in the schema and purely a Song Editor
@@ -326,7 +336,7 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
     if !state.repeats.is_empty() {
         timing["repeats"] = json!(state.repeats);
     }
-    let chart = json!({
+    let mut chart = json!({
         "metadata": metadata,
         "song": song,
         "timing": timing,
@@ -336,6 +346,12 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         "scoring": scoring
     });
 
+    if let harmonicon_core::instrument::Instrument::Guitar(guitar) = &instrument {
+        chart.as_object_mut().unwrap().remove("harmonica");
+        chart["instrument"] =
+            serde_json::to_value(harmonicon_core::chart::ChartInstrument::from_guitar(guitar))
+                .unwrap();
+    }
     serde_json::to_string_pretty(&chart).unwrap_or_default()
 }
 
@@ -458,26 +474,31 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     if let Ok(scale) = serde_json::from_value::<Scale>(v["harmonica"]["scale"].clone()) {
         state.scale = scale;
     }
-    let kind = match (v["harmonica"]["type"].as_str(), v["harmonica"]["holes"].as_u64()) {
-        (Some("chromatic"), Some(16)) => HarmonicaKind::Chromatic16,
-        (Some("chromatic"), _) => HarmonicaKind::Chromatic,
-        _ => match v["harmonica"]["bending_profile"].as_str() {
-            Some("paddy_richter") => HarmonicaKind::PaddyRichter,
-            Some("country_tuned") => HarmonicaKind::CountryTuned,
-            Some("natural_minor") => HarmonicaKind::NaturalMinor,
-            _ => HarmonicaKind::Diatonic,
-        },
-    };
-    state.instrument = serde_json::from_value::<Harmonica>(v["harmonica"].clone())
-        .ok()
-        .map(|harp| {
-            crate::song_editor::state::InstrumentSelection::loaded_harp(LoadedHarmonica {
-                key: state.key.clone(),
-                kind,
-                harp,
+    if let Some(instrument) = super::instrument_chart::configured_instrument(v) {
+        state.instrument =
+            super::state::InstrumentSelection::Configured { instrument, harmonica_origin: None };
+    } else {
+        let kind = match (v["harmonica"]["type"].as_str(), v["harmonica"]["holes"].as_u64()) {
+            (Some("chromatic"), Some(16)) => HarmonicaKind::Chromatic16,
+            (Some("chromatic"), _) => HarmonicaKind::Chromatic,
+            _ => match v["harmonica"]["bending_profile"].as_str() {
+                Some("paddy_richter") => HarmonicaKind::PaddyRichter,
+                Some("country_tuned") => HarmonicaKind::CountryTuned,
+                Some("natural_minor") => HarmonicaKind::NaturalMinor,
+                _ => HarmonicaKind::Diatonic,
+            },
+        };
+        state.instrument = serde_json::from_value::<Harmonica>(v["harmonica"].clone())
+            .ok()
+            .map(|harp| {
+                crate::song_editor::state::InstrumentSelection::loaded_harp(LoadedHarmonica {
+                    key: state.key.clone(),
+                    kind,
+                    harp,
+                })
             })
-        })
-        .unwrap_or(crate::song_editor::state::InstrumentSelection::HarmonicaPreset(kind));
+            .unwrap_or(crate::song_editor::state::InstrumentSelection::HarmonicaPreset(kind));
+    }
     if let Some(meta) = v.get("metadata")
         && let Some(audio) = meta["audio_file"].as_str()
         && !audio.is_empty()
@@ -568,7 +589,9 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     state.phrase_annotations.clear();
     state.expression_intensities.clear();
     let mut next_id = 0u32;
-    let hole_count = state.hole_count();
+    let instrument = state.effective_instrument();
+    let guitar = matches!(instrument, harmonicon_core::instrument::Instrument::Guitar(_));
+    let hole_count = if guitar { 0 } else { state.hole_count() };
 
     if let Some(track) = v["track"].as_array() {
         for phrase in track {
@@ -627,6 +650,20 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
 
             let events = phrase["events"].as_array().map_or(&[][..], Vec::as_slice);
             for event in events {
+                if guitar {
+                    if let Some(note) = super::instrument_chart::decode_note(
+                        event,
+                        &instrument,
+                        next_id,
+                        start_tick,
+                        len,
+                        state,
+                    ) {
+                        notes.push(note);
+                        next_id += 1;
+                    }
+                    continue;
+                }
                 let hole = event["hole"].as_u64().unwrap_or(1) as u8;
                 if !(1..=hole_count).contains(&hole) {
                     continue;
@@ -668,6 +705,12 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
 pub(super) fn validated_harpchart(text: &str) -> Result<serde_json::Value, String> {
     let mut value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
     harmonicon_song::song::validate_and_migrate_chart(&mut value).map_err(|e| e.to_string())?;
+    let typed: harmonicon_core::chart::HarpChart =
+        serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
+    let instrument_problems = harmonicon_core::chart_check::instrument_problems(&typed);
+    if !instrument_problems.is_empty() {
+        return Err(instrument_problems.join("\n"));
+    }
     let unsupported = unsupported_chart_features(&value);
     if !unsupported.is_empty() {
         return Err(format!(
@@ -683,12 +726,6 @@ pub(super) fn validated_harpchart(text: &str) -> Result<serde_json::Value, Strin
 /// them successfully and silently erasing their meaning on the next save.
 pub(super) fn unsupported_chart_features(value: &serde_json::Value) -> Vec<String> {
     let mut found = Vec::new();
-    if value.get("instrument").is_some() {
-        // Every grid row is a harmonica hole; a string chart would load with
-        // every note on hole 1.
-        found.push("it is written for an instrument other than the harmonica".to_string());
-        return found;
-    }
     if let Some(track) = value["track"].as_array() {
         for (index, phrase) in track.iter().enumerate() {
             let number = index + 1;
@@ -698,12 +735,18 @@ pub(super) fn unsupported_chart_features(value: &serde_json::Value) -> Vec<Strin
                     let Some(modifiers) = event["modifiers"].as_array() else {
                         continue;
                     };
+                    if modifiers.iter().any(|m| {
+                        m["type"] == "bend"
+                            && m.get("intensity").and_then(|v| v.as_f64()).is_some_and(|v| v != 0.5)
+                    }) {
+                        found.push(format!("phrase {number}, event {} has bend intensity the editor cannot preserve", event_index+1));
+                    }
                     let pitch_count = modifiers
                         .iter()
                         .filter(|modifier| {
                             matches!(
                                 modifier["type"].as_str(),
-                                Some("bend" | "overblow" | "overdraw" | "slide")
+                                Some("bend" | "overblow" | "overdraw" | "slide" | "harmonic")
                             )
                         })
                         .count();
@@ -741,6 +784,12 @@ pub(super) fn unsupported_chart_features(value: &serde_json::Value) -> Vec<Strin
 pub(super) fn handle_load_chosen(
     mut chosen: MessageReader<FileChosen>,
     mut state: ResMut<EditorState>,
+    mut guitar_controls: Option<ResMut<super::guitar_editor::GuitarControls>>,
+    mut recording: Option<ResMut<super::record::RecordState>>,
+    mut practice: Option<ResMut<super::practice::PracticeState>>,
+    mut playhead: Option<ResMut<super::playback::Playhead>>,
+    mut commands: Commands,
+    playing: Query<Entity, With<super::playback::EditorAudio>>,
     mut scroll: ResMut<Scroll>,
     mut feedback: ResMut<SaveFeedback>,
     loc: Res<Localization>,
@@ -767,6 +816,27 @@ pub(super) fn handle_load_chosen(
             }
         };
         load_harpchart(&v, &mut state, &mut scroll);
+        if let Some(controls) = guitar_controls.as_mut() {
+            **controls = Default::default();
+        }
+        if matches!(
+            state.effective_instrument(),
+            harmonicon_core::instrument::Instrument::Guitar(_)
+        ) {
+            state.mode = super::state::Mode::Edit;
+            if let Some(recording) = recording.as_mut() {
+                **recording = Default::default();
+            }
+            if let Some(practice) = practice.as_mut() {
+                **practice = Default::default();
+            }
+            if let Some(playhead) = playhead.as_mut() {
+                **playhead = Default::default();
+            }
+            for entity in &playing {
+                commands.entity(entity).despawn();
+            }
+        }
         info!("Song editor: loaded {}", ev.path.display());
         feedback
             .set(loc.msg_args("editor-load-success", &[("path", ev.path.display().to_string())]));

@@ -271,3 +271,15 @@ and harmonic/tuning-gap filtering. These do not replace the live checks:
 - [ ] With the local `harmonicon-songs` pack selected, open both Amazing
   Grace parts (`chart` and `guitar`); confirm the original vertical harp
   highway and horizontal guitar highway, shared timing, and guitar fingering.
+
+## Guitar editor
+
+- Automated: native guitar round trips, authored pitch/position, bends and
+  harmonics, expression intensity, overlapping-string/hand-span refusals,
+  and deferred instrument-switch/undo transitions.
+- Verified over BRP: select guitar from an empty document; add and edit a
+  note; change string while preserving pitch; audition/play/stop; save and
+  load a chart through the file dialog; undo back to harmonica and redo to
+  guitar; open the sibling pack's Amazing Grace guitar part.
+- [ ] Listening pass on real output and microphone detection corpus checks
+  remain hardware validation, not covered by these UI checks.

@@ -208,33 +208,29 @@ pub(super) fn spawn_mod_panel(
                                 // `undo::UndoHistory`'s doc comment for exactly what
                                 // counts as an undoable edit.
                                 transport_button(
-                    transport,
-                    loc.msg("editor-undo"),
-                    loc.msg("editor-undo-tooltip"),
-                    "\u{21B6}",
-                    style,
-                    colors.btn_bg,
-                    |_: On<Activate>,
-                     mut state: ResMut<EditorState>,
-                     mut history: ResMut<super::undo::UndoHistory>| {
-                        history.undo(&mut state);
-                    },
-                )
-                .insert(super::ui::UndoRedoButton::Undo);
+                                    transport,
+                                    loc.msg("editor-undo"),
+                                    loc.msg("editor-undo-tooltip"),
+                                    "\u{21B6}",
+                                    style,
+                                    colors.btn_bg,
+                                    |_: On<Activate>, mut commands: Commands| {
+                                        commands.write_message(super::state::DocumentCommand::Undo);
+                                    },
+                                )
+                                .insert(super::ui::UndoRedoButton::Undo);
                                 transport_button(
-                    transport,
-                    loc.msg("editor-redo"),
-                    loc.msg("editor-redo-tooltip"),
-                    "\u{21B7}",
-                    style,
-                    colors.btn_bg,
-                    |_: On<Activate>,
-                     mut state: ResMut<EditorState>,
-                     mut history: ResMut<super::undo::UndoHistory>| {
-                        history.redo(&mut state);
-                    },
-                )
-                .insert(super::ui::UndoRedoButton::Redo);
+                                    transport,
+                                    loc.msg("editor-redo"),
+                                    loc.msg("editor-redo-tooltip"),
+                                    "\u{21B7}",
+                                    style,
+                                    colors.btn_bg,
+                                    |_: On<Activate>, mut commands: Commands| {
+                                        commands.write_message(super::state::DocumentCommand::Redo);
+                                    },
+                                )
+                                .insert(super::ui::UndoRedoButton::Redo);
 
                                 // On-screen equivalents of Ctrl+C/Ctrl+V
                                 // (`interaction::handle_copy_paste`) — the *only* way to

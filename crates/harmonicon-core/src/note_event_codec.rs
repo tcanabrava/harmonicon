@@ -50,7 +50,13 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
                 technique: crate::chart_check::string_technique(modifiers),
             });
             let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
-            NoteTarget::Sounding { midi: f32::from(midi), placement: None }
+            if instrument.pitch_of(&position) != Some(midi) {
+                return Err(PlacementError::PitchMismatch);
+            }
+            let acoustic = NoteTarget::Positioned(position)
+                .sounding_pitch(&instrument)
+                .ok_or(PlacementError::Unplayable)?;
+            NoteTarget::Sounding { midi: acoustic, placement: None }
                 .with_placement(&instrument, position)
         }
     }
@@ -171,5 +177,25 @@ mod tests {
         assert_eq!(serde_json::to_value(&event).unwrap(), serde_json::to_value(restored).unwrap());
         event.modifiers = Some(vec![Modifier::Overblow]);
         assert_eq!(decode(&chart, &event), Err(PlacementError::Unplayable));
+    }
+    #[test]
+    fn fractional_string_bends_preserve_audio_pitch_and_chart_pitch() {
+        let mut chart: HarpChart = serde_json::from_str(include_str!(
+            "../../harmonicon-song/tests/fixtures/guitar-highway.harpchart"
+        ))
+        .unwrap();
+        let event = &mut chart.track[5].events[0];
+        event.modifiers = Some(vec![Modifier::Bend { semitones: 1.5, intensity: None }]);
+        // B3 + fret 8 + 1.5 = G#4 plus a quarter tone, scored as A4.
+        let event = event.clone();
+        let target = decode(&chart, &event).unwrap();
+        let instrument = chart.instrument().unwrap();
+        assert_eq!(target.sounding_pitch(&instrument), Some(68.5));
+        let saved = encode(&instrument, target, &event).unwrap();
+        assert_eq!(saved.note, event.note);
+        assert_eq!(
+            serde_json::to_value(saved.modifiers).unwrap(),
+            serde_json::to_value(event.modifiers).unwrap()
+        );
     }
 }

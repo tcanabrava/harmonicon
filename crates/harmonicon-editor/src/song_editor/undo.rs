@@ -38,11 +38,13 @@ struct Snapshot {
     // travel with the notes or undo can restore chromatic notes into a
     // diatonic document (and vice versa).
     instrument: InstrumentSelection,
+    key: String,
 }
 
 impl Snapshot {
     fn bytes(&self) -> usize {
-        self.notes.capacity() * std::mem::size_of::<GridNote>()
+        self.key.capacity()
+            + self.notes.capacity() * std::mem::size_of::<GridNote>()
             + self.tempo_changes.capacity() * std::mem::size_of::<(usize, f32)>()
             + self.meter_changes.capacity() * std::mem::size_of::<(usize, String)>()
             + self.meter_changes.iter().map(|(_, meter)| meter.capacity()).sum::<usize>()
@@ -89,6 +91,7 @@ impl Snapshot {
             && self.phrase_annotations == state.phrase_annotations
             && self.expression_intensities == state.expression_intensities
             && self.instrument == state.instrument
+            && self.key == state.key
     }
 
     fn capture(state: &EditorState) -> Self {
@@ -100,11 +103,13 @@ impl Snapshot {
             phrase_annotations: state.phrase_annotations.clone(),
             expression_intensities: state.expression_intensities.clone(),
             instrument: state.instrument.clone(),
+            key: state.key.clone(),
         }
     }
 
     fn restore(self, state: &mut EditorState) {
         state.instrument = self.instrument;
+        state.key = self.key;
         state.notes = self.notes;
         state.tempo_changes = self.tempo_changes;
         state.meter_changes = self.meter_changes;
@@ -250,6 +255,30 @@ pub(super) fn track_changes(
         return;
     }
     history.record_if_changed(&state);
+}
+
+/// Apply document/view transitions after all view-specific systems. UI
+/// observers queue these so a frame cannot run harp controls on a guitar.
+pub(super) fn apply_document_commands(
+    mut commands: MessageReader<super::state::DocumentCommand>,
+    mut state: ResMut<EditorState>,
+    mut history: ResMut<UndoHistory>,
+    mut controls: ResMut<super::guitar_editor::GuitarControls>,
+) {
+    for command in commands.read() {
+        match command {
+            super::state::DocumentCommand::Undo => history.undo(&mut state),
+            super::state::DocumentCommand::Redo => history.redo(&mut state),
+            super::state::DocumentCommand::SelectInstrument(instrument) => {
+                if !state.notes.is_empty() || state.mode != super::state::Mode::Edit {
+                    continue;
+                }
+                state.instrument = instrument.clone();
+                state.content_kind = super::state::ContentKind::Song;
+                *controls = Default::default();
+            }
+        }
+    }
 }
 
 #[cfg(test)]

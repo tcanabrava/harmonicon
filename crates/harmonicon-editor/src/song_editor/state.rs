@@ -1001,3 +1001,11 @@ pub(super) fn toggle_tempo_point(state: &mut EditorState, tick: usize) {
     let bpm = bpm_at(&state.tempo_map(), tick) + TEMPO_STEP_BPM;
     state.tempo_changes.push((tick, bpm));
 }
+
+/// View-changing edits are applied after view systems finish their frame.
+#[derive(Message)]
+pub(super) enum DocumentCommand {
+    SelectInstrument(InstrumentSelection),
+    Undo,
+    Redo,
+}

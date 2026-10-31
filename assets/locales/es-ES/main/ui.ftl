@@ -880,3 +880,22 @@ harp-check-instrument-harmonica = Armónica
 harp-check-instrument-guitar = Guitarra
 
 gameplay-guitar-window = Posición de la mano empieza en el traste {$fret} · Siguiente: {$next} · 0 = cuerda al aire
+
+editor-guitar-tab = Tablatura de guitarra
+editor-guitar-load = Abrir
+editor-guitar-save = Guardar
+editor-guitar-play = Tocar
+editor-guitar-stop = Parar
+editor-guitar-undo = Deshacer
+editor-guitar-redo = Rehacer
+editor-guitar-add = Añadir nota
+editor-guitar-delete = Eliminar
+editor-guitar-bend = Bend
+editor-guitar-harmonic = Armónico
+editor-guitar-target = Cuerda {$string} · Traste {$fret} · Tick {$tick} · Duración {$length}
+editor-guitar-help = Pulsa un tiempo para elegir cuerda y posición; pulsa una nota para editar. F cambia el traste; las flechas mueven el inicio; −/+ cambian la duración.
+editor-guitar-invalid = Edición imposible: comprueba los trastes, cuerdas ocupadas y alcance de la mano.
+editor-guitar-select = Usar guitarra
+editor-guitar-select-empty = Elige un documento vacío para cambiar de instrumento. Guarda la partitura actual primero.
+
+editor-guitar-key = Tonalidad de la canción

@@ -878,3 +878,22 @@ harp-check-instrument-harmonica = Gaita
 harp-check-instrument-guitar = Guitarra
 
 gameplay-guitar-window = Posição da mão começa na casa {$fret} · Próxima: {$next} · 0 = corda solta
+
+editor-guitar-tab = Tablatura de guitarra
+editor-guitar-load = Abrir
+editor-guitar-save = Salvar
+editor-guitar-play = Tocar
+editor-guitar-stop = Parar
+editor-guitar-undo = Desfazer
+editor-guitar-redo = Refazer
+editor-guitar-add = Adicionar nota
+editor-guitar-delete = Excluir
+editor-guitar-bend = Bend
+editor-guitar-harmonic = Harmônico
+editor-guitar-target = Corda {$string} · Casa {$fret} · Tick {$tick} · Duração {$length}
+editor-guitar-help = Clique num tempo para escolher corda e posição; clique numa nota para editar. F muda a casa; setas movem o início; −/+ mudam a duração.
+editor-guitar-invalid = Edição impossível: verifique as casas, cordas ocupadas e alcance da mão.
+editor-guitar-select = Usar guitarra
+editor-guitar-select-empty = Escolha um documento vazio para mudar de instrumento. Salve a partitura atual primeiro.
+
+editor-guitar-key = Tonalidade da música

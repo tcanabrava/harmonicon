@@ -73,8 +73,8 @@ load-bearing about *this* crate.
     position, bend sign, techniques per instrument, a position sounding its
     stated `note`) are core's `chart_check::instrument_problems`, run by
     `validate-pack`. A guitar chart loads and plays on Play 2D's horizontal
-    tab highway; the Song Editor still refuses to open one (its grid rows
-    are holes), and Jam Session is harmonica-only.
+    tab highway and opens in the Song Editor's guitar tab view. Jam Session
+    remains harmonica-only.
   - Chromatic harps are fully supported: `Harmonica::hole_count()` sizes
     lanes/overlays/editor everywhere (never hardcode 10), and
     `Modifier::Slide` is onset-validated like overblow/overdraw. BendingTrainer is

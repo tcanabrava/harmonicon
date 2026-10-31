@@ -6,6 +6,35 @@ without writing JSON directly.
 
 ![Song Editor screen](images/song-editor.png)
 
+## Guitar charts
+
+In an empty document, open **Details → Use guitar** to start a standard-tuned
+guitar chart. **Load** also opens existing guitar `.harpchart` files and
+preserves their tuning and capo. Guitar charts use a dedicated tab view:
+
+- Each row is a string, highest first, labelled with its open pitch.
+- Click a beat to choose the insertion string/time, set the fret with
+  **F − / F +**, then **Add note**. Click a note to select it for editing.
+- **S − / S +** moves a selected note to an equivalent fingering on another
+  string, preserving pitch. Impossible positions are refused.
+- The arrows move the onset; **− / +** change duration. Times are shown in
+  ticks, with twelve ticks per quarter-note beat.
+- **Bend** toggles a one-semitone bend; **Harmonic** toggles a natural
+  harmonic at a playable node. Loaded bends retain their authored depth
+  until deliberately edited.
+- **Delete**, **Undo / Redo**, **Save / Load**, and plucked **Play / Stop**
+  operate on the same document model as the harmonica editor. Selecting or
+  editing a note auditions its pitch. Ctrl+Z and Ctrl+Y also work here.
+
+An edit cannot put two overlapping notes on one string or require a hand
+span the guitar model cannot reach. These checks include held notes whose
+attacks occurred earlier. The current guitar view does not offer recording;
+real-guitar detection still needs corpus validation.
+
+![Guitar tab editor](images/song-editor-guitar.png)
+
+The layout and tools below describe the harmonica view.
+
 ## Layout
 
 The screen has three parts:

@@ -34,8 +34,10 @@ mod details_fields;
 mod expected_notes;
 mod grid;
 mod grid_cache;
+mod guitar_editor;
 mod harmonica_note;
 mod harpchart;
+mod instrument_chart;
 mod interaction;
 mod legend;
 mod lesson_form;
@@ -140,9 +142,16 @@ impl Plugin for SongEditor2Plugin {
         app.add_plugins(material::EditorNoteMaterialPlugin)
             .add_systems(
                 OnEnter(AppState::SongEditor2),
-                (ui::init_state, ui::setup, ui::force_grid_rebuild).chain(),
+                (
+                    ui::init_state,
+                    ui::setup.run_if(guitar_editor::is_harmonica),
+                    guitar_editor::setup.run_if(guitar_editor::is_guitar),
+                    ui::force_grid_rebuild,
+                )
+                    .chain(),
             )
             .add_systems(OnExit(AppState::SongEditor2), ui::cleanup)
+            .init_resource::<guitar_editor::GuitarControls>()
             .init_resource::<state::Scroll>()
             .init_resource::<state::ToolbarScroll>()
             .init_resource::<practice::PracticeState>()
@@ -160,8 +169,6 @@ impl Plugin for SongEditor2Plugin {
                 Update,
                 (
                     (
-                        playback::finish_pending_playback,
-                        playback::advance_playhead,
                         view_scroll::auto_scroll,
                         view_scroll::pan_keys,
                         view_scroll::pan_wheel,
@@ -215,9 +222,6 @@ impl Plugin for SongEditor2Plugin {
                         metronome::click_metronome.after(playback::advance_playhead),
                         metronome::tick_count_in.after(playback::advance_playhead),
                         metronome::finish_count_in.after(metronome::tick_count_in),
-                        audition::audition_on_select
-                            .run_if(resource_exists_and_changed::<state::EditorState>),
-                        save_feedback::tick_save_feedback,
                         transpose::report_transpose,
                         interaction::report_technique_skips,
                     ),
@@ -227,8 +231,6 @@ impl Plugin for SongEditor2Plugin {
                     (
                         interaction::grid_keys.run_if(not(tour_active)),
                         interaction::handle_copy_paste.run_if(not(tour_active)),
-                        interaction::handle_undo_redo.run_if(not(tour_active)),
-                        undo::track_changes,
                     ),
                     (
                         interaction::live_resize,
@@ -288,13 +290,13 @@ impl Plugin for SongEditor2Plugin {
                             .or_else(resource_changed::<save_feedback::SaveFeedback>),
                     ),
                     (
-                        harpchart::handle_save_chosen,
-                        harpchart::handle_load_chosen,
-                        harpchart::handle_music_chosen,
                         lesson_form::handle_save_lesson_chosen,
                         lesson_form::handle_load_lesson_chosen,
                     ),
                 )
+                    .chain()
+                    .in_set(EditorPass)
+                    .run_if(guitar_editor::is_harmonica)
                     .run_if(in_state(AppState::SongEditor2)),
             )
             .add_systems(
@@ -317,13 +319,101 @@ impl Plugin for SongEditor2Plugin {
                     panel::update_timeline_tool_buttons
                         .run_if(resource_exists_and_changed::<state::EditorState>),
                 )
+                    .chain()
+                    .in_set(EditorPass)
+                    .run_if(guitar_editor::is_harmonica)
                     .run_if(in_state(AppState::SongEditor2)),
             )
+            .add_systems(
+                Update,
+                (guitar_editor::refresh, guitar_editor::update_feedback)
+                    .chain()
+                    .in_set(GuitarPass)
+                    .after(EditorPass)
+                    .run_if(guitar_editor::is_guitar)
+                    .run_if(in_state(AppState::SongEditor2)),
+            )
+            .add_systems(
+                Update,
+                (
+                    playback::finish_pending_playback,
+                    playback::advance_playhead,
+                    save_feedback::tick_save_feedback,
+                )
+                    .chain()
+                    .before(EditorPass)
+                    .before(GuitarPass)
+                    .run_if(in_state(AppState::SongEditor2)),
+            )
+            .add_systems(
+                Update,
+                (
+                    interaction::handle_undo_redo.run_if(not(tour_active)),
+                    undo::track_changes,
+                    undo::apply_document_commands,
+                    harpchart::handle_save_chosen,
+                    harpchart::handle_load_chosen,
+                    harpchart::handle_music_chosen,
+                    audition::audition_on_select,
+                )
+                    .chain()
+                    .in_set(DocumentPass)
+                    .after(EditorPass)
+                    .after(GuitarPass)
+                    .run_if(in_state(AppState::SongEditor2)),
+            )
+            .add_systems(
+                Update,
+                sync_instrument_view
+                    .after(DocumentPass)
+                    .after(EditorPass)
+                    .after(GuitarPass)
+                    .run_if(in_state(AppState::SongEditor2)),
+            )
+            .add_systems(OnExit(AppState::SongEditor2), cleanup_guitar)
+            .add_message::<state::DocumentCommand>()
             .add_message::<midi_import::MidiFileLoaded>();
     }
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+struct EditorPass;
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+struct GuitarPass;
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+struct DocumentPass;
+
+fn sync_instrument_view(
+    mut commands: Commands,
+    state: Res<state::EditorState>,
+    harp_roots: Query<Entity, With<ui::EditorRoot>>,
+    guitar_roots: Query<Entity, With<guitar_editor::GuitarRoot>>,
+) {
+    match state.effective_instrument() {
+        harmonicon_core::instrument::Instrument::Guitar(_) => {
+            for root in &harp_roots {
+                commands.entity(root).despawn();
+            }
+            if guitar_roots.is_empty() {
+                commands.run_system_cached(guitar_editor::setup);
+            }
+        }
+        harmonicon_core::instrument::Instrument::Harmonica(_) => {
+            for root in &guitar_roots {
+                commands.entity(root).despawn();
+            }
+            if harp_roots.is_empty() {
+                commands.run_system_cached(ui::setup);
+            }
+        }
+    }
+}
+
+fn cleanup_guitar(mut commands: Commands, roots: Query<Entity, With<guitar_editor::GuitarRoot>>) {
+    for root in &roots {
+        commands.entity(root).despawn();
+    }
+}
 
 #[cfg(test)]
 mod tests;

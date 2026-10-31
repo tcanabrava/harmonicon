@@ -111,8 +111,7 @@ punish the instrument for doing what it does.
 ## Chart format (format 1.8.0, additive)
 
 Landed, including multi-part song discovery. Guitar charts load for Play 2D's
-basic horizontal tab highway. The Song Editor still refuses them until its
-tab rows exist. Score imports offer guitar arrangements alongside harmonica
+horizontal tab highway. The Song Editor loads them into its guitar tab view. Score imports offer guitar arrangements alongside harmonica
 arrangements, preserving tab tuning and authored string/fret positions.
 
 - New optional top-level `instrument`. If it is absent, the chart is a
@@ -219,17 +218,22 @@ it decodes instrument positions into note targets and encodes resolved targets
 back into events while retaining expression modifiers and their intensity.
 Guitar round-trip fixtures cover sounding pitches, fingering, bends and
 harmonics. This boundary rejects incompatible authored placements rather
-than guessing a replacement. It is ready for the editor's guitar view;
-the current harmonica authoring path and its load gate remain in place.
+than guessing a replacement. Guitar charts now load and save through this
+boundary in the editor's tab view, retaining configured tuning and capo.
 
-Still open: expose instrument selection in the UI and generalize the chart codec, provide a
-pitch-row fallback and guitar tab controls, and make edit validation report
-unresolved/pinned placement conflicts. Keep the editor's guitar load gate
-until those paths round-trip safely. Future flute and clarinet adapters must
-keep written notation separate from sounding pitch and preserve alternate
-fingerings; hurdy-gurdy support additionally needs voice roles and rhythmic
-events rather than forcing every instruction into one pitched lane.
+The guitar view offers string rows, fret/time/duration edits, equivalent
+fingering changes that preserve pitch, bends, harmonics, add/delete, undo,
+native chart load/save, and plucked playback/audition. Edits reject occupied
+strings and excessive hand span across overlapping sustains. Document
+transitions and undo/redo are queued after view systems so a frame cannot
+run harmonica controls against a newly selected guitar. Shared transport,
+file operations and history are registered once for both views.
 
+An empty harmonica document can select a standard guitar in Details.
+Loaded parts keep their own tuning/capo. A generic pitch-row fallback and
+further instrument adapters remain future work. Flute and clarinet adapters
+must separate written notation from sounding pitch and preserve alternate
+fingerings; hurdy-gurdy support also needs voice roles and rhythmic events.
 
 - **Rows come from the instrument.** Harmonica: holes × direction, as
   today. Guitar: 6 tab rows with the fret number drawn on each note. Flute:

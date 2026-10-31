@@ -13,8 +13,8 @@
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
 
-use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::synth::{PhraseNote, SAMPLE_RATE, render_pcm};
+use harmonicon_core::instrument::Instrument;
+use harmonicon_core::synth::{PhraseNote, SAMPLE_RATE, render_pcm_with};
 use harmonicon_core::wav::encode_wav;
 
 use super::playback::note_freq;
@@ -30,15 +30,20 @@ const AUDITION_SECS: f32 = 0.6;
 /// only plays a fresh blip when the primary selection changes to a
 /// different note — not every frame it stays selected.
 #[derive(Resource, Default)]
-pub(super) struct LastAuditioned(Option<u32>);
+pub(super) struct LastAuditioned(
+    Option<(u32, harmonicon_core::note_target::NoteTarget, super::state::Expr)>,
+);
 
 /// Renders a short blip of `note`'s resolved pitch on `harp` as WAV bytes —
 /// `None` for a hole/technique combination that can't sound at all (mirrors
 /// `playback::note_freq`'s own `None` case).
-fn audition_wav(note: &GridNote, harp: &Harmonica) -> Option<Vec<u8>> {
-    let freq = note_freq(note, harp)?;
+fn audition_wav(note: &GridNote, instrument: &Instrument) -> Option<Vec<u8>> {
+    let freq = note_freq(note, instrument)?;
     let phrase = [PhraseNote { tick: 0, len: 1, freq: Some(freq), expr: note.expr }];
-    Some(encode_wav(&render_pcm(&phrase, AUDITION_SECS), SAMPLE_RATE))
+    Some(encode_wav(
+        &render_pcm_with(&phrase, AUDITION_SECS, instrument.synth_voice()),
+        SAMPLE_RATE,
+    ))
 }
 
 /// Plays [`audition_wav`] the instant the primary selection changes to a
@@ -55,12 +60,12 @@ pub(super) fn audition_on_select(
         }
         return;
     };
-    if last.0 == Some(note.id) {
+    if last.0 == Some((note.id, note.target, note.expr)) {
         return;
     }
-    last.0 = Some(note.id);
-    let harp = state.effective_harp();
-    let Some(wav) = audition_wav(note, &harp) else {
+    last.0 = Some((note.id, note.target, note.expr));
+    let instrument = state.effective_instrument();
+    let Some(wav) = audition_wav(note, &instrument) else {
         return;
     };
     let handle = sources.add(AudioSource { bytes: wav.into() });
@@ -89,7 +94,7 @@ mod tests {
     #[test]
     fn audition_wav_renders_something_audible_for_a_playable_note() {
         let harp = richter_harp("C");
-        let wav = audition_wav(&note(4, Dir::Blow, HarpTechnique::Normal), &harp).unwrap();
+        let wav = audition_wav(&note(4, Dir::Blow, HarpTechnique::Normal), &harp.into()).unwrap();
         // A real WAV: header plus a nonzero amount of sample data.
         assert!(wav.len() > 44);
     }
@@ -103,6 +108,6 @@ mod tests {
         // `audition_wav` defends itself against an unproducible note
         // rather than assuming a caller only ever passes it a valid one.
         let unplayable = note(2, Dir::Blow, HarpTechnique::Overblow);
-        assert_eq!(audition_wav(&unplayable, &harp), None);
+        assert_eq!(audition_wav(&unplayable, &harp.into()), None);
     }
 }
