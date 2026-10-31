@@ -33,12 +33,10 @@ use harmonicon_ui::dialogs::text_input::{
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 use harmonicon_ui::music_score::TIME_SIGNATURES;
 
-pub(super) fn spawn_hole_column(
-    row: &mut ChildSpawnerCommands,
-    colors: SongEditorColors,
-    hole_count: u8,
-    loc: &Localization,
-) {
+/// The row-label column's container. Its rows are filled in by
+/// `ui::sync_hole_column`, which runs the same frame and follows the
+/// instrument from then on.
+pub(super) fn spawn_hole_column(row: &mut ChildSpawnerCommands, hole_count: u8) {
     row.spawn((
         HoleColumnContent,
         Node {
@@ -48,10 +46,15 @@ pub(super) fn spawn_hole_column(
             flex_shrink: 0.0,
             ..default()
         },
-    ))
-    .with_children(|col| {
-        spawn_hole_column_rows(col, colors, hole_count, loc);
-    });
+    ));
+}
+
+/// One row of the hole column: a harmonica's hole number or a guitar
+/// string's name, and the swatch beside it — the theme's hole box when
+/// `None`, a string's own colour otherwise.
+pub(super) struct RowLabel {
+    pub(super) text: String,
+    pub(super) swatch: Option<Color>,
 }
 
 /// Respawns the hole column's contents (called from `ui::setup` initially,
@@ -60,11 +63,13 @@ pub(super) fn spawn_hole_column(
 pub(super) fn spawn_hole_column_rows(
     col: &mut ChildSpawnerCommands,
     colors: SongEditorColors,
-    hole_count: u8,
+    rows: &[RowLabel],
     loc: &Localization,
 ) {
     col.spawn(Node { width: Val::Percent(100.0), height: Val::Px(HEADER_H), ..default() });
-    for hole in 1..=hole_count {
+    for row in rows {
+        let text = row.text.clone();
+        let swatch = row.swatch.unwrap_or(colors.hole_box);
         col.spawn(Node {
             width: Val::Percent(100.0),
             height: Val::Px(ROW_H),
@@ -76,7 +81,7 @@ pub(super) fn spawn_hole_column_rows(
         })
         .with_children(|r| {
             r.spawn_empty().apply_scene(bsn! {
-                Text({format!("{hole:02}")})
+                Text({text.clone()})
                 TextFont { font_size: {FontSize::Px(13.0)} }
                 TextColor({colors.label})
             });
@@ -86,7 +91,7 @@ pub(super) fn spawn_hole_column_rows(
                     height: {Val::Px(20.0)},
                     border: {UiRect::all(Val::Px(1.5))},
                 }
-                BackgroundColor({colors.hole_box})
+                BackgroundColor({swatch})
                 ~{BorderColor::all(Color::srgb(0.45, 0.45, 0.55))}
             });
         });

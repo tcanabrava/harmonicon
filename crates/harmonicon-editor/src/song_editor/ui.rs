@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 use bevy::window::WindowResized;
 
-use super::meta_form::{spawn_hole_column, spawn_hole_column_rows};
+use super::meta_form::{RowLabel, spawn_hole_column, spawn_hole_column_rows};
 use super::mod_panel::spawn_mod_panel;
 use super::playback::{EditorAudio, EditorProgressFill, Playhead, PlayheadLine};
 use super::state::{Edge, EditorState, Scroll, TimelineTool};
@@ -399,24 +399,53 @@ pub(super) fn sync_chrome_height(
     }
 }
 
-/// Respawns the hole column's per-hole rows for the current harmonica's hole
-/// count, or when their theme or localized labels change.
+/// The grid's row labels, top row first: a harmonica's zero-padded hole
+/// numbers on the theme's hole box, or a guitar's string names (`e B G D A
+/// E`) each on its string's own colour — the colour its notes are drawn in.
+pub(super) fn row_labels(
+    instrument: &harmonicon_core::instrument::Instrument,
+    row_count: u8,
+) -> Vec<RowLabel> {
+    use harmonicon_core::instrument::Instrument;
+    use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
+    match instrument {
+        Instrument::Guitar(guitar) => (1..=row_count)
+            .zip(guitar.string_labels())
+            .map(|(string, text)| RowLabel { text, swatch: Some(string_color(string)) })
+            .collect(),
+        _ => (1..=row_count)
+            .map(|hole| RowLabel { text: format!("{hole:02}"), swatch: None })
+            .collect(),
+    }
+}
+
+/// Respawns the hole column's rows for the current instrument's rows, or
+/// when their theme or localized labels change.
 pub(super) fn sync_hole_column(
     mut commands: Commands,
     state: Res<EditorState>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
     col: Query<(Entity, Option<&Children>), With<HoleColumnContent>>,
-    mut last: Local<Option<(Entity, u8)>>,
+    mut last: Local<Option<(Entity, Vec<String>)>>,
 ) {
     let Ok((entity, children)) = col.single() else {
         return;
     };
-    let hole_count = state.row_count();
-    if *last == Some((entity, hole_count)) && !theme.is_changed() && !loc.is_changed() {
+    let unchanged = !state.is_changed() && !theme.is_changed() && !loc.is_changed();
+    if unchanged && last.as_ref().is_some_and(|(e, _)| *e == entity) {
         return;
     }
-    *last = Some((entity, hole_count));
+    let hole_count = state.row_count();
+    let rows = row_labels(&state.effective_instrument(), hole_count);
+    let texts: Vec<String> = rows.iter().map(|r| r.text.clone()).collect();
+    if last.as_ref().is_some_and(|(e, t)| *e == entity && *t == texts)
+        && !theme.is_changed()
+        && !loc.is_changed()
+    {
+        return;
+    }
+    *last = Some((entity, texts));
     if let Some(children) = children {
         for &c in children {
             commands.entity(c).despawn();
@@ -431,7 +460,7 @@ pub(super) fn sync_hole_column(
         ..default()
     });
     commands.entity(entity).with_children(|col| {
-        spawn_hole_column_rows(col, colors, hole_count, &loc);
+        spawn_hole_column_rows(col, colors, &rows, &loc);
     });
 }
 
@@ -542,7 +571,7 @@ pub(super) fn setup(
                 },
             ))
             .with_children(|chart| {
-                spawn_fixed_chrome(chart, &loc, colors, hole_count, bravura.as_deref());
+                spawn_fixed_chrome(chart, colors, hole_count, bravura.as_deref());
             });
 
             // The form fields (meta form, lesson form, status bar), in their
@@ -631,7 +660,6 @@ fn on_editor_tab_select(
 /// is the left sidebar beside it (`mod_panel::spawn_mod_panel`).
 fn spawn_fixed_chrome(
     root: &mut ChildSpawnerCommands,
-    loc: &Localization,
     colors: SongEditorColors,
     hole_count: u8,
     bravura: Option<&harmonicon_ui::music_score::BravuraFont>,
@@ -647,7 +675,7 @@ fn spawn_fixed_chrome(
         },
     ))
     .with_children(|row| {
-        spawn_hole_column(row, colors, hole_count, loc);
+        spawn_hole_column(row, hole_count);
         row.spawn((
             GridArea,
             // So `view_scroll::pan_wheel` only pans horizontally

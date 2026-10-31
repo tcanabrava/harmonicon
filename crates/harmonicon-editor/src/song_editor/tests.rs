@@ -2534,6 +2534,48 @@ fn note_in_scale_uses_the_bent_target_pitch_not_the_natural_one() {
     );
 }
 
+#[test]
+fn the_grid_draws_each_instrument_in_its_own_vocabulary() {
+    use super::grid::note_face;
+    use super::state::pitch_color;
+    use super::ui::row_labels;
+    use harmonicon_core::instrument::guitar::{
+        FretAssignment, Guitar, GuitarBody, StringTechnique,
+    };
+    use harmonicon_core::instrument::{Instrument, PlayPosition};
+    use harmonicon_core::note_target::NoteTarget;
+    use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
+
+    let harp: Instrument = build_harp("C", HarmonicaKind::Diatonic).into();
+    let holes = row_labels(&harp, 10);
+    assert_eq!(holes.first().map(|r| r.text.as_str()), Some("01"));
+    assert_eq!(holes.last().map(|r| r.text.as_str()), Some("10"));
+    assert!(holes.iter().all(|r| r.swatch.is_none()), "holes use the theme's box");
+    let draw = GridNote {
+        target: GridNote::harmonica_target(4, Dir::Draw, HarpTechnique::Normal),
+        ..GridNote::plain(0, 4, 0, 1)
+    };
+    assert_eq!(
+        note_face(&draw),
+        (pitch_color(HarpTechnique::Normal), Dir::Draw.arrow().to_string())
+    );
+
+    let guitar = Instrument::Guitar(Guitar::standard(GuitarBody::Electric));
+    let strings = row_labels(&guitar, 6);
+    let texts: Vec<&str> = strings.iter().map(|r| r.text.as_str()).collect();
+    assert_eq!(texts, ["e", "B", "G", "D", "A", "E"], "string 1 is the top row");
+    assert_eq!(strings[2].swatch, Some(string_color(3)));
+    let bend = GridNote {
+        target: NoteTarget::Positioned(PlayPosition::Fret(FretAssignment {
+            string: 3,
+            fret: 7,
+            technique: StringTechnique::Bend(2.0),
+        })),
+        ..GridNote::plain(0, 3, 0, 1)
+    };
+    assert_eq!(note_face(&bend), (string_color(3), "7b9".to_string()));
+}
+
 // ── safe_path_segment ────────────────────────────────────────────────────────
 
 #[test]

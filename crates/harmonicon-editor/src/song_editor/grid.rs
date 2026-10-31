@@ -25,6 +25,7 @@ use super::{
     grid_height, silence_row_top,
 };
 use harmonicon_core::harmonica::Harmonica;
+use harmonicon_core::instrument::{InstrumentModel, PlayPosition};
 use harmonicon_core::midi::{freq_to_midi, midi_to_note};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::{LoadedTheme, SongEditorColors};
@@ -85,8 +86,12 @@ pub(super) const METER_MARKER_COLOR: Color = Color::srgb(0.45, 0.75, 0.95);
 /// how a blues player reaches the ♭7) — falls in `scale`. `None` (a
 /// hole/direction the harp can't produce) counts as in-scale, so it isn't
 /// flagged as "wrong" too.
-pub(super) fn note_in_scale(note: &GridNote, harp: &Harmonica, scale: &HashSet<String>) -> bool {
-    let Some(freq) = note_freq(note, harp) else {
+pub(super) fn note_in_scale(
+    note: &GridNote,
+    instrument: &impl InstrumentModel,
+    scale: &HashSet<String>,
+) -> bool {
+    let Some(freq) = note_freq(note, instrument) else {
         return true;
     };
     let Some(midi) = freq_to_midi(freq) else {
@@ -129,7 +134,7 @@ pub(super) fn rebuild_grid(
     let colors = theme.song_editor_colors();
     let bar_colors = theme.twelve_bar_colors();
     let scale = state.scale.classes(&state.key);
-    let harp = state.effective_harp();
+    let instrument = state.effective_instrument();
     let hole_count = state.row_count();
     // Locked (user Lock toggle, or Perform mode): grid cells, notes, and
     // resize handles are all spawned non-interactive via `Pickable::IGNORE`,
@@ -459,7 +464,7 @@ pub(super) fn rebuild_grid(
     for note in &state.notes {
         if note.tick < last_tick && note.tick + note.len > first_tick {
             let selected = state.is_selected(note.id);
-            let in_scale = note_in_scale(note, &harp, &scale);
+            let in_scale = note_in_scale(note, &instrument, &scale);
             items.push(spawn_note(
                 &mut commands,
                 *note,
@@ -663,6 +668,19 @@ pub(super) fn group_move_valid(
     })
 }
 
+/// What a note block shows, and on what colour: a harmonica note's breath
+/// arrow on its pitch technique's colour, a guitar note's tab label (`7`,
+/// `7b9`, `<12>`) on its string's colour, the same as the highway draws it.
+pub(super) fn note_face(note: &GridNote) -> (Color, String) {
+    match note.target.position() {
+        Some(PlayPosition::Fret(fret)) => (
+            harmonicon_gameplay::gameplay::guitar_visuals::string_color(fret.string),
+            fret.tab_label(),
+        ),
+        _ => (pitch_color(note.technique()), note.dir().arrow().to_string()),
+    }
+}
+
 pub(super) fn spawn_note(
     commands: &mut Commands,
     note: GridNote,
@@ -684,8 +702,11 @@ pub(super) fn spawn_note(
     // e.g. bending draw-3 down a step-and-a-half is how a blues player reaches
     // the ♭7, so that bent note reads as in-scale even though its natural
     // (unbent) pitch wouldn't.
-    let note_color = |base: Color| {
-        if in_scale { base } else { mix_srgba(base, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX) }
+    let (face_color, face_label) = note_face(&note);
+    let face_color = if in_scale {
+        face_color
+    } else {
+        mix_srgba(face_color, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX)
     };
 
     let root = commands
@@ -843,14 +864,12 @@ pub(super) fn spawn_note(
 
     match note.expr {
         Expr::None => {
-            commands
-                .entity(root)
-                .insert(BackgroundColor(note_color(pitch_color(note.technique()))));
+            commands.entity(root).insert(BackgroundColor(face_color));
         }
         Expr::Wah(_) | Expr::Vibrato(_) => {
             let mode = if matches!(note.expr, Expr::Vibrato(_)) { 0.0 } else { 1.0 };
             let mat = note_mats.add(EditorNoteMaterial {
-                color: note_color(pitch_color(note.technique())).to_linear(),
+                color: face_color.to_linear(),
                 params: Vec4::new(mode, width, 0.0, 0.0),
             });
             commands.entity(root).insert(MaterialNode(mat));
@@ -859,7 +878,7 @@ pub(super) fn spawn_note(
 
     commands.entity(root).with_children(|r| {
         r.spawn_empty().apply_scene(bsn! {
-            Text({note.dir().arrow()})
+            Text({face_label.clone()})
             TextFont { font_size: {FontSize::Px(15.0)} }
             TextColor({Color::WHITE})
             ~{Pickable::IGNORE}
