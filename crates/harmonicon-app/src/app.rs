@@ -44,6 +44,10 @@ pub enum AppState {
     /// Standalone bending practice: harmonica bend diagram + metronome, with a
     /// directly pickable key and adjustable tempo (no song).
     BendingTrainer,
+    /// The Note Trainer for a guitar: hit notes, bends, harmonics and the
+    /// same note on another string, drilled against a live tuner. The
+    /// harmonica's trainer is still [`AppState::BendingTrainer`].
+    NoteTrainer,
 }
 
 #[derive(Resource, Default, Clone, PartialEq, Eq, Debug)]

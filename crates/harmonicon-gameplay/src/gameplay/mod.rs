@@ -33,6 +33,7 @@ mod music_score_bridge;
 pub mod note_feedback;
 mod note_ribbon;
 pub mod note_ribbon_2d;
+mod note_trainer;
 mod notes;
 pub mod pause_menu;
 mod phrase_overlay;

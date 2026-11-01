@@ -11,8 +11,9 @@ starts:
   Song** (jam over a real song's backing, see [Jam Session](
   jam-session.md)) or **Generate Jam** (synthesize an instant backing with
   no song required, see [Generate a Jam](jam-generate.md)).
-- **Bending Trainer** — isolated bend practice. See
-  [Bending Trainer](bending-trainer.md).
+- **Note Trainer** — isolated technique practice for your instrument:
+  the harmonica's [Bending Trainer](bending-trainer.md), or the guitar's
+  [Note Trainer](note-trainer.md).
 - **Lessons** — the guided curriculum. See [Lessons](lessons.md).
 
 Press **Esc**, or click **Back**, to return to the Main Menu.

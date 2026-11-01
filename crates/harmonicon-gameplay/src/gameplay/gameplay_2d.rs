@@ -204,7 +204,7 @@ pub fn setup(
                     })
                     .with_children(|row| {
                         if !aural {
-                            super::guitar_visuals::spawn_fretboard(row, &guitar);
+                            super::guitar_visuals::spawn_fretboard(row, &guitar, 180.0);
                         }
                         spawn_track(row);
                     });

@@ -48,6 +48,9 @@ pub enum MenuPage {
     /// real song (`ArtistList`) or synthesize one (`JamGenerate`) — see
     /// `pages::jam_session::setup_jam_session_menu`.
     JamSessionMenu,
+    /// The "Note Trainer" choice on the Play menu: which instrument to
+    /// practise (`pages::note_trainer`).
+    NoteTrainerMenu,
     /// Key/tempo picker for a synthesized Jam Session backing (see
     /// `harmonicon_jam::jam::backing`) — the no-existing-song alternative to
     /// `ArtistList`'s real-song Jam Session flow.
@@ -83,7 +86,7 @@ pub(crate) fn handle_menu_escape(
             welcome.back_target(MenuPage::Play, MenuPage::Welcome, |w| w.lesson_done = true)
         }
         MenuPage::Play | MenuPage::HelpAbout => MenuPage::Main,
-        MenuPage::JamSessionMenu => MenuPage::Play,
+        MenuPage::JamSessionMenu | MenuPage::NoteTrainerMenu => MenuPage::Play,
         MenuPage::ArtistList => match *mode {
             GameplayMode::JamSession => MenuPage::JamSessionMenu,
             GameplayMode::Play2D => MenuPage::Play,

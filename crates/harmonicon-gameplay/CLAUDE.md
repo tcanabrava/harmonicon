@@ -100,6 +100,20 @@ load-bearing about *this* crate.
     3+3 as two dotted-quarter pulses; that's a `MetronomeFeel`-shaped
     design decision, not a bar-length one, and wasn't folded in here.
 
+- **The guitar's Note Trainer (`note_trainer.rs`) is a separate screen
+  from the Bending Trainer**, on `AppState::NoteTrainer`. Which drills
+  exist and how a pitch reads against one are core's
+  (`harmonicon_core::note_trainer::{drills, hear}`); this file only feeds
+  the newest `PitchEvent` to the pure `Practice` and draws it. It reads
+  `PitchEvent` itself rather than `collect_pitches`/`ActivePitches`: one
+  note at a time, the detected pitch nearest the target is the one heard
+  (`nearest_midi`), so a ringing open string can't mask the fretted note.
+  It judges with `BendingTrainerSettings`' tolerance, hold time and A4,
+  so the two trainers agree on "in tune". Its fretboard is the highway's
+  strip (`guitar_visuals::spawn_fretboard`/`paint_cell`). The harmonica
+  moves onto the shared model only after the Bending Trainer's live
+  validation — see `PLAN.md`.
+
 - **Bending Trainer pitch feedback is target-family locked.** Lifecycle,
   the target model and the technique hints stay in `bending_trainer/mod.rs`;
   where things sit on screen is `bending_trainer/layout.rs`; live feedback

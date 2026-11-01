@@ -13,7 +13,7 @@ load-bearing about *this* crate.
 ## Architecture (load-bearing facts)
 
 - **States:** `AppState` (Startup/Menu/SongLoading/Playing/Results/
-  Calibration/Credits/SongEditor2/BendingTrainer) + `MenuPage` sub-states in
+  Calibration/Credits/SongEditor2/BendingTrainer/NoteTrainer) + `MenuPage` sub-states in
   `menu/mod.rs`. `GameplayMode` (Play2D/JamSession) selects which
   setup/update chains run within `Playing`.
 

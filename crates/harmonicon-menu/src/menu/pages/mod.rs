@@ -17,6 +17,7 @@ pub(crate) mod help_about;
 pub(crate) mod jam_generate;
 pub(crate) mod jam_session;
 pub(crate) mod main_menu;
+pub(crate) mod note_trainer;
 pub(crate) mod options;
 pub(crate) mod play;
 pub(crate) mod theme_picker;

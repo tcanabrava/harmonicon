@@ -24,7 +24,8 @@ to practice next.
 - **Playing** — the scored [Play 2D](play-2d.md) mode,
   free-play [Jam Session](jam-session.md) and its instant
   [Generate a Jam](jam-generate.md) backing, and the
-  [Bending Trainer](bending-trainer.md) ear-training drill.
+  [Note Trainer](note-trainer.md) drills: the harmonica's
+  [Bending Trainer](bending-trainer.md) and the guitar's.
 - **[Lessons](lessons.md)** — the guided curriculum, unit by unit.
 - **[Song Editor](song-editor.md)** — for authoring or editing your own
   charts.

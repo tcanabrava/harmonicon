@@ -63,12 +63,13 @@ pub(super) struct FretCell {
     top: u8,
 }
 
-/// A compact movable neck window immediately beside the highway's hit zone.
-/// Column zero always shows the open string; other columns follow the hand.
-pub(super) fn spawn_fretboard(parent: &mut ChildSpawnerCommands, guitar: &Guitar) {
+/// A compact movable neck window, `width` px wide: beside the highway's hit
+/// zone, or the Note Trainer's diagram. Column zero always shows the open
+/// string; other columns follow the hand.
+pub(super) fn spawn_fretboard(parent: &mut ChildSpawnerCommands, guitar: &Guitar, width: f32) {
     parent
         .spawn(Node {
-            width: Val::Px(180.0),
+            width: Val::Px(width),
             height: Val::Percent(100.0),
             flex_shrink: 0.0,
             flex_direction: FlexDirection::Column,
@@ -116,15 +117,33 @@ pub(super) fn update_fretboard(
     }
     let targets = targets(&notes.notes, clock.get());
     for (cell, mut text, mut color) in &mut cells {
-        let fret = if cell.column == 0 { 0 } else { anchor(&targets, cell.top) + cell.column - 1 };
-        text.0 = if fret <= cell.top { fret.to_string() } else { String::new() };
-        color.0 = if targets.iter().any(|p| p.string == cell.string && p.fret == fret) {
-            string_color(cell.string)
-        } else if cell.column > 0 && fret <= cell.top && !targets.is_empty() {
-            string_color(cell.string).with_alpha(0.13)
-        } else {
-            Color::srgb(0.06, 0.07, 0.10)
-        };
+        paint_cell(cell, &targets, &mut text, &mut color);
+    }
+}
+
+/// One fretboard cell, for a hand window placed over `targets`: the fret it
+/// shows, lit in its string's colour where a target sits, the rest of the
+/// window faintly tinted. Shared by the highway and the Note Trainer.
+pub(super) fn paint_cell(
+    cell: &FretCell,
+    targets: &[FretAssignment],
+    text: &mut Text,
+    color: &mut BackgroundColor,
+) {
+    let fret = if cell.column == 0 { 0 } else { anchor(targets, cell.top) + cell.column - 1 };
+    let label = if fret <= cell.top { fret.to_string() } else { String::new() };
+    if text.0 != label {
+        text.0 = label;
+    }
+    let paint = if targets.iter().any(|p| p.string == cell.string && p.fret == fret) {
+        string_color(cell.string)
+    } else if cell.column > 0 && fret <= cell.top && !targets.is_empty() {
+        string_color(cell.string).with_alpha(0.13)
+    } else {
+        Color::srgb(0.06, 0.07, 0.10)
+    };
+    if color.0 != paint {
+        color.0 = paint;
     }
 }
 
@@ -336,7 +355,7 @@ mod tests {
         app.world_mut()
             .commands()
             .spawn(Node::default())
-            .with_children(|p| spawn_fretboard(p, &guitar));
+            .with_children(|p| spawn_fretboard(p, &guitar, 180.0));
         app.world_mut().flush();
         let world = app.world_mut();
         let cells: Vec<_> = world.query::<&FretCell>().iter(world).collect();

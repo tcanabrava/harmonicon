@@ -18,6 +18,7 @@ use super::clock::{self, GameplayClock};
 use super::hud;
 use super::judge;
 use super::lifecycle;
+use super::note_trainer;
 use super::notes::SongNotes;
 use super::practice_badges;
 use super::state::{
@@ -152,6 +153,20 @@ impl Plugin for GameplayPlugin {
                 // guarantee it (a `run_if`-skipped system still satisfies the
                 // ordering edge for the next one in the chain).
                 .chain(),
+        )
+        // The guitar's Note Trainer (its own AppState, no song).
+        .init_resource::<note_trainer::NoteTrainer>()
+        .add_systems(OnEnter(AppState::NoteTrainer), note_trainer::setup)
+        .add_systems(OnExit(AppState::NoteTrainer), lifecycle::cleanup_gameplay)
+        .add_systems(
+            Update,
+            (
+                note_trainer::listen,
+                note_trainer::update_labels.after(note_trainer::listen),
+                note_trainer::update_fretboard.after(note_trainer::listen),
+                note_trainer::handle_escape.run_if(not(tour_active)),
+            )
+                .run_if(in_state(AppState::NoteTrainer)),
         )
         // Standalone Bending Trainer (its own AppState, no song).
         .add_systems(OnEnter(AppState::BendingTrainer), bending_trainer::setup)

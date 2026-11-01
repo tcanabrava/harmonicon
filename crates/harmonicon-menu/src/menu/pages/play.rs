@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! The Play menu: choose Play Song, Create Song, Jam Session, Bending
+//! The Play menu: choose Play Song, Create Song, Jam Session, Note
 //! Trainer, or Lessons.
 
 use bevy::prelude::*;
@@ -45,9 +45,9 @@ pub(crate) fn setup_play_menu(
     spawn_button(
         &mut commands,
         root,
-        &loc.msg("bending-trainer"),
-        |_: On<Activate>, mut state: ResMut<NextState<AppState>>| {
-            state.set(AppState::BendingTrainer)
+        &loc.msg("note-trainer"),
+        |_: On<Activate>, mut page: ResMut<NextState<MenuPage>>| {
+            page.set(MenuPage::NoteTrainerMenu)
         },
     );
     spawn_button(

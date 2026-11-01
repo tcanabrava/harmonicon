@@ -112,6 +112,11 @@ impl Plugin for MenuPlugin {
             )
             .add_systems(OnExit(MenuPage::JamSessionMenu), scene::cleanup_menu)
             .add_systems(
+                OnEnter(MenuPage::NoteTrainerMenu),
+                pages::note_trainer::setup_note_trainer_menu,
+            )
+            .add_systems(OnExit(MenuPage::NoteTrainerMenu), scene::cleanup_menu)
+            .add_systems(
                 OnEnter(MenuPage::JamGenerate),
                 pages::jam_generate::setup_jam_generate_menu,
             )

@@ -297,6 +297,14 @@ generalises the same way. Its "alternate the plain note with the altered
 one" rule carries over directly to `Register` (play the fundamental, then
 the harmonic).
 
+**Landed**: `harmonicon_core::note_trainer` lists each instrument's drills
+per kind and reads a heard pitch against one (`hear`), and the guitar has
+its own trainer screen (`AppState::NoteTrainer`, the highway's fretboard
+strip as its diagram). The Play menu's Note Trainer entry asks for the
+instrument; the harmonica still opens the Bending Trainer, and moves onto
+the shared model only after that trainer's live validation, so the move
+can't be confused with a detection problem.
+
 ## Content, progress and menus
 
 - **Packs declare their instrument** in `pack.json`, with a

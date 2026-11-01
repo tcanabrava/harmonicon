@@ -88,8 +88,13 @@ gates 1.0. In order:
   bundled targets; Jam Session offers only harmonica parts. Next:
   - detection, which needs a recorded guitar corpus first (low-string
     resolution, strum onset spread, decaying sustain).
-- **Note Trainer** in place of the Bending Trainer: glide, register,
-  position and target modes, offered per instrument.
+- **Note Trainer**. The drill model (`harmonicon_core::note_trainer`) and
+  the guitar's screen are in; the harmonica keeps the Bending Trainer
+  behind the same menu entry. Next:
+  - move the harmonica onto the shared drill model, after its live
+    validation pass (above), keeping its drill stats and profile keys;
+  - per-instrument drill progress in the profile (the guitar's landings
+    are per session today), with the content-and-progress work below.
 - **Seam leftovers** that read holes directly and move when they next
   change: the progress bar's note lanes (`NoteMarker`) and Jam Session's
   `hole_map`.

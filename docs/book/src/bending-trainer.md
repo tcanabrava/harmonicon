@@ -1,6 +1,6 @@
 # Bending Trainer
 
-**Play → Bending Trainer** is a practice screen for controlling one bend at a
+**Play → Note Trainer → Harmonica** is a practice screen for controlling one bend at a
 time: no song, just the hole you're working on, a live picture of your pitch,
 and the harmonica's full bend diagram. It's a tool for finding, holding and
 releasing a bend, not a lesson, so it never grades you pass or fail.
