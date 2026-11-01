@@ -89,10 +89,6 @@ pub fn setup(
     (*valid_notes, *played_harp) = ValidHarpNotes::for_played_harp(&effective, &manifest.chart);
 
     let chart = &manifest.chart;
-    // Everything the player *sees* about the instrument — lane count, the
-    // hole strip's notes, the "grab a C harp" hint — follows the instrument
-    // they are holding, exactly as the judge does.
-    *highway_lanes = HighwayLanes::for_instrument(effective.instrument_for(chart).as_ref());
     // The harmonica, when the chart is played on one: the hole strip and the
     // "grab a C harp" hint only mean something on a harp.
     let played = effective.harp_for(chart);
@@ -104,10 +100,16 @@ pub fn setup(
     // one enters the `LOOKAHEAD` window, so a long chart doesn't pay for
     // every note's UI subtree at song load.
     let (notes, play_mode_tags) = super::build_scheduled_notes(&effective, chart, &adaptive);
+    // Everything the player *sees* about the instrument — lane count, the
+    // hole strip's notes, the "grab a C harp" hint — follows the instrument
+    // they are holding, exactly as the judge does.
+    *highway_lanes = HighwayLanes::for_instrument(effective.instrument_for(chart).as_ref());
     *song_notes = SongNotes { notes, cursor: 0 };
     *render_assets = NoteRenderAssets { play_mode_tags };
 
     let compact = display.compact.0;
+    let is_flute =
+        matches!(chart.instrument(), Some(harmonicon_core::instrument::Instrument::Flute(_)));
     let aural = display.lesson.is_some_and(|lesson| lesson.aural);
     let modifiers = used_modifiers(chart);
     let lyrics = harmonicon_core::lyrics::lyric_lines(chart);
@@ -187,12 +189,28 @@ pub fn setup(
                         ))
                         .with_children(|hw| {
                             if let Some(layout) = &highway_lanes.0 {
-                                spawn_highway(hw, layout);
+                                spawn_highway(hw, layout, !is_flute);
                             }
                         })
                         .id();
                 };
-                if let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
+                if let Some(harmonicon_core::instrument::Instrument::Flute(flute)) =
+                    chart.instrument()
+                {
+                    left.spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_grow: 1.0,
+                        min_height: Val::Px(120.0),
+                        flex_direction: FlexDirection::Row,
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        if !aural {
+                            super::flute_visuals::spawn_flute(row, &flute);
+                        }
+                        spawn_track(row);
+                    });
+                } else if let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
                     chart.instrument()
                 {
                     left.spawn(Node {
@@ -229,6 +247,13 @@ pub fn setup(
                 .with_children(|col| {
                     if let Some(harp) = played {
                         spawn_harmonica_strip(col, harp, &loc);
+                    } else if !aural && is_flute {
+                        col.spawn((
+                            Text::new(""),
+                            TextFont { font_size: FontSize::Px(14.0), ..default() },
+                            TextColor(Color::WHITE),
+                            super::flute_visuals::FingeringLabel,
+                        ));
                     } else if !aural
                         && let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
                             chart.instrument()
@@ -439,6 +464,7 @@ pub fn spawn_visible_notes(
     colorblind: Res<harmonicon_platform::settings::ColorblindPalette>,
     lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
     loc: Res<Localization>,
+    flute: Query<&super::flute_visuals::FluteDrawing>,
 ) {
     if lesson.is_some_and(|lesson| lesson.aural) {
         return;
@@ -446,6 +472,7 @@ pub fn spawn_visible_notes(
     let (Some(layout), Ok(highway_entity)) = (lanes.0.as_ref(), highway.single()) else {
         return;
     };
+    let flute = flute.single().ok().map(|drawing| drawing.0);
     let colors = effective_note_colors(theme.note_colors(), colorblind.0);
     // The same layout the highway's stripes were spawned from.
     let lane_count = u8::try_from(layout.lanes.len()).unwrap_or(u8::MAX);
@@ -482,6 +509,7 @@ pub fn spawn_visible_notes(
                 show_numbers.0,
                 colors,
                 super::guitar_visuals::chord_span(note, &song_notes.notes),
+                flute.as_ref(),
             );
         }
     });
@@ -510,6 +538,28 @@ fn note_lane(note: &ScheduledNote, layout: &LaneLayout) -> usize {
     layout.nearest_lane(&note.position)
 }
 
+/// A note's cap label colour: dark on a ribbon's bright cap, but light on
+/// a flute's fingering, whose name sits in an empty row (the trill keys'
+/// middle of the tube) over the dark highway, not on a cap.
+fn cap_label_color(note: &ScheduledNote, judged: Option<bool>) -> Color {
+    if matches!(note.position, PlayPosition::Fingering(_)) {
+        Color::srgba(0.92, 0.94, 1.0, 0.95)
+    } else {
+        head_label_color(judged)
+    }
+}
+
+/// Where `note` sits across the highway, `(start, size)` in percent: its
+/// lane's middle `NOTE_W`, or every row for a flute's fingering, whose
+/// blocks sit in the rows of its pressed keys.
+fn note_span(note: &ScheduledNote, layout: &LaneLayout) -> (f32, f32) {
+    if matches!(note.position, PlayPosition::Fingering(_)) {
+        return (0.0, 100.0);
+    }
+    let size = layout.lane_pct() * NOTE_W;
+    (layout.centred_left_pct(note_lane(note, layout), size), size)
+}
+
 /// Spawns one note's visual: a ribbon down its lane, as long as the note
 /// lasts, whose bright cap at the bottom is the attack and carries the tab
 /// label. Positioned each frame by `update_notes` and lengthened by
@@ -526,29 +576,45 @@ fn spawn_note_visual(
     show_numbers: bool,
     colors: NoteColors,
     chord: Option<(u8, String)>,
+    flute: Option<&harmonicon_core::instrument::flute::Flute>,
 ) {
     let label = note_head_label(note, show_numbers);
     let axis = layout.axis;
-    let cross_size = layout.lane_pct() * NOTE_W;
-    let cross_start = layout.centred_left_pct(note_lane(note, layout), cross_size);
-    let material = shape_materials.add(NoteRibbon2dMaterial {
-        color: note_color(note, colors),
-        technique: ribbon_technique(&note.modifiers),
-        shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
-        hold: Vec4::ZERO,
-        axis: super::note_ribbon_2d::ribbon_axis(layout.axis),
-    });
-
-    hw.spawn((
+    let (cross_start, cross_size) = note_span(note, layout);
+    let mut visual = hw.spawn((
         // Along the scroll: placeholders, set by `update_notes` and
         // `size_note_ribbons`.
         placed(axis, 150.0, Val::Px(CAP_PX), cross_start, Val::Percent(cross_size)),
-        MaterialNode(material),
         NoteVisual { note_id },
         NoteRibbon { duration_frac: (note.duration / LOOKAHEAD) as f32 },
         JudgedState::default(),
-    ))
-    .with_children(|note_e| {
+    ));
+    // A fingering is blocks on its keys' rows, coloured by
+    // `flute_visuals::update_fingering_blocks`; anything else one ribbon.
+    let fingering = match (note.position, flute) {
+        (PlayPosition::Fingering(at), Some(flute)) => Some((at, flute)),
+        _ => None,
+    };
+    if fingering.is_none() {
+        visual.insert(MaterialNode(shape_materials.add(NoteRibbon2dMaterial {
+            color: note_color(note, colors),
+            technique: ribbon_technique(&note.modifiers),
+            shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
+            hold: Vec4::ZERO,
+            axis: super::note_ribbon_2d::ribbon_axis(layout.axis),
+        })));
+    }
+    visual.with_children(|note_e| {
+        if let Some((at, flute)) = fingering {
+            let lane_pct = layout.lane_pct();
+            super::flute_visuals::spawn_fingering_blocks(
+                note_e,
+                flute,
+                at,
+                lane_pct,
+                lane_pct * NOTE_W,
+            );
+        }
         if let Some((span, name)) = chord {
             super::guitar_visuals::spawn_chord_stem(note_e, span, layout.lane_pct(), &name);
         }
@@ -562,7 +628,7 @@ fn spawn_note_visual(
             children![(
                 Text::new(label),
                 TextFont { font_size: FontSize::Px(18.0), ..default() },
-                TextColor(head_label_color(None)),
+                TextColor(cap_label_color(note, None)),
                 NoteCapLabel,
             )],
         ));
@@ -791,7 +857,6 @@ pub fn animate_judged_notes(
         return;
     };
     let axis = layout.axis;
-    let width = layout.lane_pct() * NOTE_W;
     let now = clock.get();
     for (entity, visual, mut state, judged, mut node, children) in &mut notes {
         let Some(note) = song_notes.notes.get(visual.note_id) else {
@@ -801,7 +866,7 @@ pub fn animate_judged_notes(
             observe_judgment(&mut commands, entity, note, &mut state, judged, now);
         let scale =
             judged.map_or(1.0, |j| judged_scale(j.hit, (now - j.at) as f32, reduced_motion.0));
-        let lane_left = layout.centred_left_pct(note_lane(note, layout), width);
+        let (lane_left, width) = note_span(note, layout);
         let (start, scaled) = scaled_span(lane_left, width, scale);
         if across(&node, axis).1 != Val::Percent(scaled) {
             set_across(&mut node, axis, start, Val::Percent(scaled));
@@ -814,7 +879,7 @@ pub fn animate_judged_notes(
             for label in cap {
                 if let Ok((mut text, mut color)) = labels.get_mut(*label) {
                     text.0 = wanted.clone();
-                    color.0 = head_label_color(current);
+                    color.0 = cap_label_color(note, current);
                 }
             }
         }

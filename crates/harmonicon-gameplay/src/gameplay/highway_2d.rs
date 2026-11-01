@@ -23,7 +23,10 @@ use super::highway_axis::placed;
 
 /// Spawns the static highway furniture (lane stripes, dividers, hit zone) —
 /// no notes. Notes are spawned later, lazily, by `spawn_visible_notes`.
-pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout) {
+/// `named_rows` is for a horizontal highway whose rows are strings: tinted
+/// in their colours and named at the hit zone. A flute's rows are its keys,
+/// which the drawing beside them names, so they stay plain.
+pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, named_rows: bool) {
     // Lane count/width come from the instrument being played, not a fixed
     // 10 — a chromatic's 12+ holes need proportionally narrower lanes.
     let axis = layout.axis;
@@ -35,7 +38,7 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout) 
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
         hw.spawn((
             placed(axis, 0.0, full, start_pct, Val::Percent(lane_pct)),
-            BackgroundColor(if axis == ScrollAxis::Horizontal {
+            BackgroundColor(if axis == ScrollAxis::Horizontal && named_rows {
                 super::guitar_visuals::string_color((h + 1) as u8).with_alpha(0.08)
             } else {
                 Color::srgba(1.0, 1.0, 1.0, alpha)
@@ -67,7 +70,7 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout) 
     // A horizontal highway names its rows where tab does, at their start:
     // `e B G D A E` down the hit zone. A vertical one has its instrument
     // strip (the harmonica's holes) beneath it instead.
-    if axis == ScrollAxis::Horizontal {
+    if axis == ScrollAxis::Horizontal && named_rows {
         for (row, lane) in layout.lanes.iter().enumerate() {
             hw.spawn((
                 Node {

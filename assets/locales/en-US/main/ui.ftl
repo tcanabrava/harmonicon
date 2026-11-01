@@ -916,6 +916,7 @@ harp-check-instrument-harmonica = Harmonica
 harp-check-instrument-guitar = Guitar
 
 gameplay-guitar-window = Hand window starts at fret {$fret} · Next: {$next} · 0 = open string
+gameplay-flute-fingering = Now {$now} · next {$next}
 
 editor-guitar-invalid = That edit is unplayable: check fret range, occupied strings and hand span.
 editor-guitar-select = Use guitar

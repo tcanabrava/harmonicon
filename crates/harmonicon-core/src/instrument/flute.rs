@@ -83,6 +83,55 @@ impl Keys {
     }
 }
 
+/// The keys from the mouthpiece end down the tube, as a vertical drawing of
+/// the flute shows them and as its play highway's rows run: the left
+/// thumb, the left hand's plates and its G♯ key, the right hand's plates
+/// with the two trill keys between them, then the right pinky's E♭ key and
+/// the foot's rollers (a B foot's low B last).
+pub fn key_order(foot: FootJoint) -> Vec<u16> {
+    let mut keys = vec![
+        Keys::TH,
+        Keys::L1,
+        Keys::L2,
+        Keys::L3,
+        Keys::GS,
+        Keys::R1,
+        Keys::TRILL_D,
+        Keys::R2,
+        Keys::TRILL_DS,
+        Keys::R3,
+        Keys::EB,
+        Keys::CS,
+        Keys::C,
+    ];
+    if foot == FootJoint::B {
+        keys.push(Keys::B);
+    }
+    keys
+}
+
+/// A key's short name, as a row label: `Th`, `L1`, `G#`, `Dtr`, `Eb`…
+/// ASCII, so every bundled font has it.
+pub fn key_label(key: u16) -> &'static str {
+    match key {
+        Keys::TH => "Th",
+        Keys::L1 => "L1",
+        Keys::L2 => "L2",
+        Keys::L3 => "L3",
+        Keys::GS => "G#",
+        Keys::R1 => "R1",
+        Keys::TRILL_D => "Dtr",
+        Keys::R2 => "R2",
+        Keys::TRILL_DS => "D#tr",
+        Keys::R3 => "R3",
+        Keys::EB => "Eb",
+        Keys::CS => "C#",
+        Keys::C => "C",
+        Keys::B => "B",
+        _ => "",
+    }
+}
+
 /// One table row: a sounding note and the keys of one way to finger it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Fingering {
@@ -195,6 +244,19 @@ impl Flute {
             .collect()
     }
 
+    /// The rows of [`key_order`] whose key `at` presses: where a fingering
+    /// is drawn on the play highway. Empty for a fingering this flute
+    /// doesn't have.
+    pub fn pressed_rows(&self, at: FingeringAssignment) -> Vec<usize> {
+        let Some(keys) = self.keys(at) else { return Vec::new() };
+        key_order(self.foot)
+            .into_iter()
+            .enumerate()
+            .filter(|&(_, key)| keys.pressed(key))
+            .map(|(row, _)| row)
+            .collect()
+    }
+
     /// `note`'s fingerings, standard first.
     pub fn fingerings_for(&self, note: u8) -> Vec<Fingering> {
         self.fingerings().into_iter().filter(|f| f.note == note).collect()
@@ -284,6 +346,18 @@ mod tests {
         let d5 = FingeringAssignment { note: 74, alternate: 0 };
         assert!(pairs.iter().all(|&(_, upper)| upper != d5));
         assert!(pairs.iter().all(|(lower, upper)| lower.note < upper.note));
+    }
+
+    #[test]
+    fn a_fingering_is_drawn_on_the_rows_of_its_pressed_keys() {
+        let f = Flute::default();
+        let e4 = FingeringAssignment { note: 64, alternate: 0 };
+        let labels: Vec<&str> =
+            f.pressed_rows(e4).into_iter().map(|r| key_label(key_order(f.foot)[r])).collect();
+        assert_eq!(labels, ["Th", "L1", "L2", "L3", "R1", "R2", "Eb"]);
+        assert!(f.pressed_rows(FingeringAssignment { note: 100, alternate: 0 }).is_empty());
+        assert_eq!(key_order(FootJoint::B).len(), key_order(FootJoint::C).len() + 1);
+        assert!(key_order(FootJoint::B).iter().all(|&k| !key_label(k).is_empty()));
     }
 
     #[test]

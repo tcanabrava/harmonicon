@@ -17,6 +17,7 @@ mod call_response;
 mod clock;
 pub mod coaching;
 pub mod countdown_overlay;
+mod flute_visuals;
 mod gameplay_2d;
 pub mod guitar_visuals;
 pub mod harmonica_overlay;

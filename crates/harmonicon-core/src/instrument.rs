@@ -140,11 +140,8 @@ pub enum ScrollAxis {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lane {
     /// What the instrument strip prints for the lane: a hole number, a
-    /// string's name, a note.
+    /// string's name, a flute key's.
     pub label: String,
-    /// The pitch a pitch lane carries (a flute's); `None` for a lane that
-    /// is a place on the instrument (a hole, a string).
-    pub pitch: Option<u8>,
 }
 
 /// The lanes notes travel in, and which lane each position belongs to.
@@ -161,9 +158,8 @@ impl LaneLayout {
         let lane = match position {
             PlayPosition::Hole(a) => usize::from(a.hole.checked_sub(1)?),
             PlayPosition::Fret(a) => usize::from(a.string.checked_sub(1)?),
-            PlayPosition::Fingering(a) => {
-                self.lanes.iter().position(|l| l.pitch == Some(a.note))?
-            }
+            // A fingering is many keys, so many rows: `Flute::pressed_rows`.
+            PlayPosition::Fingering(_) => return None,
         };
         (lane < self.lanes.len()).then_some(lane)
     }
@@ -176,13 +172,7 @@ impl LaneLayout {
         match position {
             PlayPosition::Hole(a) => usize::from(a.hole.saturating_sub(1)).min(last),
             PlayPosition::Fret(a) => usize::from(a.string.saturating_sub(1)).min(last),
-            PlayPosition::Fingering(a) => self
-                .lanes
-                .iter()
-                .enumerate()
-                .filter_map(|(i, l)| Some((i, l.pitch?)))
-                .min_by_key(|&(_, pitch)| pitch.abs_diff(a.note))
-                .map_or(0, |(i, _)| i),
+            PlayPosition::Fingering(_) => 0,
         }
     }
 
@@ -341,9 +331,7 @@ impl InstrumentModel for Harmonica {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Vertical,
-            lanes: (1..=self.hole_count())
-                .map(|hole| Lane { label: hole.to_string(), pitch: None })
-                .collect(),
+            lanes: (1..=self.hole_count()).map(|hole| Lane { label: hole.to_string() }).collect(),
         }
     }
 }
@@ -441,17 +429,13 @@ impl InstrumentModel for Guitar {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Horizontal,
-            lanes: self
-                .string_labels()
-                .into_iter()
-                .map(|label| Lane { label, pitch: None })
-                .collect(),
+            lanes: self.string_labels().into_iter().map(|label| Lane { label }).collect(),
         }
     }
 }
 
-/// One voice. Its notes are pitch lanes from the lowest note to C7, and
-/// every position is a fingering from the table in [`flute`].
+/// One voice; every position is a fingering from the table in [`flute`],
+/// and the play highway's rows are its keys.
 impl InstrumentModel for Flute {
     fn range(&self) -> Option<(u8, u8)> {
         let notes = self.fingerings();
@@ -503,15 +487,15 @@ impl InstrumentModel for Flute {
         Envelope::Sustained
     }
 
+    /// One row per key, down the tube ([`flute::key_order`]), travelled
+    /// right to left like tab: a note arrives as the shape of its
+    /// fingering, a block on every key it presses.
     fn lane_layout(&self) -> LaneLayout {
-        let (low, high) = InstrumentModel::range(self).unwrap_or((60, 96));
         LaneLayout {
-            axis: ScrollAxis::Vertical,
-            lanes: (low..=high)
-                .map(|note| Lane {
-                    label: crate::midi::midi_to_note(i32::from(note)),
-                    pitch: Some(note),
-                })
+            axis: ScrollAxis::Horizontal,
+            lanes: flute::key_order(self.foot)
+                .into_iter()
+                .map(|key| Lane { label: flute::key_label(key).to_string() })
                 .collect(),
         }
     }

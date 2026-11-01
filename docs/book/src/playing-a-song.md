@@ -48,8 +48,28 @@ the sounding pitch, so an equivalent fingering sounds the same to the game.
 
 For imported scores, the part picker offers guitar arrangements alongside
 harmonica arrangements and names the instrument beside each part. Guitar
-Pro tabs retain their tuning and string/fret positions. The Song Editor opens native guitar charts in its tab view. The fretboard
+Pro tabs retain their tuning and string/fret positions. The Song Editor opens native guitar charts on its grid, one row per string. The fretboard
 strip beside the highway highlights the target frets and hand window.
+
+## Flute parts
+
+A flute part's highway reads the flute's keys rather than its notes. A
+drawing of the flute stands upright at the left, with each key level with
+its own row: the thumb key at the top, then the left hand, the right hand
+with the two trill keys between its fingers, and the right little finger's
+E♭ and foot keys at the bottom. Each note travels in from the right as the
+shape of its fingering, a block on every key it presses, with its name
+beside it. As a note reaches the hit line the drawing fills its keys, and
+shows the next note's keys faintly so your fingers can get there in time;
+the line under the highway names both.
+
+![A flute part on the highway](images/play-flute.png)
+
+A note's fingering is a suggestion, as on every instrument: the game
+hears only the pitch, so an alternate fingering that sounds the same note
+scores the same. A chart may ask for a particular alternate, and the
+highway then draws that one. Flute charts don't open in the Song Editor
+yet.
 
 ## Removed and hidden songs
 

@@ -913,6 +913,7 @@ harp-check-instrument-harmonica = Gaita
 harp-check-instrument-guitar = Guitarra
 
 gameplay-guitar-window = Posição da mão começa na casa {$fret} · Próxima: {$next} · 0 = corda solta
+gameplay-flute-fingering = Agora {$now} · próxima {$next}
 
 editor-guitar-invalid = Edição impossível: verifique as casas, cordas ocupadas e alcance da mão.
 editor-guitar-select = Usar guitarra

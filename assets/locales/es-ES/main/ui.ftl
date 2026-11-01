@@ -915,6 +915,7 @@ harp-check-instrument-harmonica = Armónica
 harp-check-instrument-guitar = Guitarra
 
 gameplay-guitar-window = Posición de la mano empieza en el traste {$fret} · Siguiente: {$next} · 0 = cuerda al aire
+gameplay-flute-fingering = Ahora {$now} · siguiente {$next}
 
 editor-guitar-invalid = Edición imposible: comprueba los trastes, cuerdas ocupadas y alcance de la mano.
 editor-guitar-select = Usar guitarra

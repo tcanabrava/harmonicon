@@ -100,6 +100,18 @@ load-bearing about *this* crate.
     3+3 as two dotted-quarter pulses; that's a `MetronomeFeel`-shaped
     design decision, not a bar-length one, and wasn't folded in here.
 
+- **A flute's highway rows are its keys, not its notes**
+  (`flute_visuals.rs`; core's `Flute::lane_layout`/`key_order`). A note
+  is still one `NoteVisual`, so judging, holds and the judged pop are
+  shared; it just spans every row (`gameplay_2d::note_span`) and draws a
+  block per pressed key (`spawn_fingering_blocks`) instead of carrying the
+  ribbon material, so `update_note_visuals` (which queries the material)
+  skips it and `update_fingering_blocks` colours it. The vertical flute
+  drawing carries the `Flute` (`FluteDrawing`) for the note spawner to
+  read, because `gameplay_2d::setup` is at Bevy's 16-parameter limit. The
+  note's name sits mid-tube on the trill-key rows, almost never pressed,
+  in a light colour (`cap_label_color`).
+
 - **The guitar's Note Trainer (`note_trainer.rs`) is a separate screen
   from the Bending Trainer**, on `AppState::NoteTrainer`. Which drills
   exist and how a pitch reads against one are core's

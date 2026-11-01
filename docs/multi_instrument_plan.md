@@ -190,7 +190,7 @@ zone (today's hole strip).
 |---|---|---|
 | Harmonica | unchanged: vertical hole lanes, blow/draw colour | hole strip and overlay |
 | Guitar | **horizontal strings scrolling right to left, read like tablature** (Rocksmith's 2D views, Yousician): each string a colour-coded row, note gems carry the **fret number**, a chord is one gem spanning its strings with the chord name on it | a **fretboard strip** at the hit line lighting the target frets, with a highlighted **anchor window** (the hand position) that slides ahead of position shifts |
-| Flute | **pitch lanes** limited to the pitches the chart actually uses (three chromatic octaves would make 37 lanes), labelled by note name with a register mark | a **fingering diagram** (Boehm key layout) for the upcoming note, plus the next one ghosted, so the player prepares the fingers before the note arrives |
+| Flute | **one row per key**, horizontal like tab, down the tube from the thumb key to the foot rollers; a note arrives as its **fingering**, a block on every key it presses, named beside it (landed: `flute_visuals`) | a **vertical drawing of the flute** at the rows' start, each key level with its row, filling the keys of the note at the hit line and ghosting the next note's |
 
 The guitar's orientation is chosen so the screen teaches the shape players
 will meet in real tablature everywhere else. It means `LaneLayout` carries

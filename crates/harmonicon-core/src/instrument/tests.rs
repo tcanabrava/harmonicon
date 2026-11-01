@@ -242,9 +242,8 @@ fn a_flute_is_one_voice_on_pitch_lanes_with_its_fingerings_as_positions() {
     assert!(!InstrumentModel::can_sound_together(&flute, &positions[0], &positions[1]));
     assert_eq!(InstrumentModel::range(&flute), Some((60, 96)));
     let lanes = InstrumentModel::lane_layout(&flute);
-    assert_eq!(lanes.lanes.len(), 37);
-    assert_eq!(lanes.lanes[0].label, "C4");
-    assert_eq!(lanes.lane_of(&positions[0]), Some(26));
-    let below = PlayPosition::Fingering(FingeringAssignment { note: 50, alternate: 0 });
-    assert_eq!((lanes.lane_of(&below), lanes.nearest_lane(&below)), (None, 0));
+    assert_eq!(lanes.axis, ScrollAxis::Horizontal);
+    assert_eq!(lanes.lanes.first().map(|l| l.label.as_str()), Some("Th"), "the thumb key on top");
+    assert_eq!(lanes.lanes.len(), 13, "a C foot has no low-B roller");
+    assert_eq!(lanes.lane_of(&positions[0]), None, "a fingering is many rows, not one");
 }
