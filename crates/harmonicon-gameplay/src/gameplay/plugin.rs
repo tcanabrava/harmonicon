@@ -120,6 +120,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<bending_trainer::GesturePractice>()
         .init_resource::<call_response::CallCues>()
         .init_resource::<pause_menu::WaitForNoteMode>()
+        .init_resource::<super::flute_visuals::FluteView>()
         .init_resource::<pause_menu::PracticeSpeed>()
         .init_resource::<pause_menu::SelectedPhraseIndex>()
         // Setup: shared pause menu + mode-specific scenes
@@ -282,6 +283,7 @@ impl Plugin for GameplayPlugin {
             Update,
             (
                 pause_menu::update_wait_mode_label,
+                super::flute_visuals::update_flute_view_row,
                 practice_badges::update_practice_badges,
                 pause_menu::update_loop_label,
                 pause_menu::update_practice_speed_slider,
@@ -355,6 +357,9 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             (
+                // Before spawning, so a view switch respawns its notes in
+                // the new shape on the same frame.
+                super::flute_visuals::sync_flute_view,
                 gameplay_2d::spawn_visible_notes,
                 gameplay_2d::update_notes,
                 gameplay_2d::size_note_ribbons,

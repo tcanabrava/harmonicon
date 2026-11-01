@@ -247,3 +247,17 @@ fn a_flute_is_one_voice_on_pitch_lanes_with_its_fingerings_as_positions() {
     assert_eq!(lanes.lanes.len(), 13, "a C foot has no low-B roller");
     assert_eq!(lanes.lane_of(&positions[0]), None, "a fingering is many rows, not one");
 }
+
+#[test]
+fn a_flute_tune_in_note_view_gets_a_row_per_pitch_it_uses() {
+    let used: std::collections::BTreeSet<u8> = [72, 64, 67].into_iter().collect();
+    let rows = LaneLayout::pitch_rows(&used);
+    let labels: Vec<&str> = rows.lanes.iter().map(|l| l.label.as_str()).collect();
+    assert_eq!(labels, ["C5", "G4", "E4"], "highest on top");
+    assert!(rows.is_pitch_lanes());
+    let g4 = PlayPosition::Fingering(FingeringAssignment { note: 67, alternate: 1 });
+    assert_eq!(rows.lane_of(&g4), Some(1), "any fingering of the pitch");
+    let f4 = PlayPosition::Fingering(FingeringAssignment { note: 65, alternate: 0 });
+    assert_eq!((rows.lane_of(&f4), rows.nearest_lane(&f4)), (None, 2), "nearest: E4");
+    assert!(!InstrumentModel::lane_layout(&Flute::default()).is_pitch_lanes());
+}

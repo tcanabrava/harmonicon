@@ -111,6 +111,16 @@ load-bearing about *this* crate.
   read, because `gameplay_2d::setup` is at Bevy's 16-parameter limit. The
   note's name sits mid-tube on the trill-key rows, almost never pressed,
   in a light colour (`cap_label_color`).
+  - **The pause menu's Flute view switches to pitch rows**
+    (`FluteView`, `LaneLayout::pitch_rows`) and back, mid-song.
+    `sync_flute_view` runs first in the Play 2D chain: on a change it
+    swaps `HighwayLanes`, rebuilds the highway's furniture inside its
+    `HighwayFurniture` container (the highway's first child, so it stays
+    beneath the notes) and despawns the note visuals for
+    `spawn_visible_notes` to respawn in the new shape — score state is in
+    `SongNotes`, so nothing is lost. A fingering's shape follows the lanes
+    (`LaneLayout::is_pitch_lanes`), not the setting, so the two can't
+    disagree.
 
 - **The guitar's Note Trainer (`note_trainer.rs`) is a separate screen
   from the Bending Trainer**, on `AppState::NoteTrainer`. Which drills

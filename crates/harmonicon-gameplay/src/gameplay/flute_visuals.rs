@@ -13,14 +13,124 @@
 //! the span and colours here.
 use super::{GameplayClock, LOOKAHEAD, ScheduledNote, SongNotes};
 use bevy::prelude::*;
+use bevy::ui_widgets::Activate;
 use harmonicon_core::instrument::PlayPosition;
 use harmonicon_core::instrument::flute::{FingeringAssignment, Flute, Keys, key_order};
+use harmonicon_core::instrument::{InstrumentModel, LaneLayout};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
-/// A pending fingering block: a cool silver, the colour of the instrument.
-const BLOCK: Color = Color::srgb(0.72, 0.80, 0.92);
+/// A pending flute note, block or ribbon: a cool silver, the colour of
+/// the instrument.
+pub(super) const FLUTE_COLOR: Color = Color::srgb(0.72, 0.80, 0.92);
 const BLOCK_HIT: Color = Color::srgb(0.95, 0.80, 0.30);
 const BLOCK_MISSED: Color = Color::srgba(0.55, 0.18, 0.18, 0.7);
+
+/// How a flute part is drawn: as its fingerings on the flute's keys, or as
+/// its notes on a row per pitch the song uses. A standing player preference
+/// like `WaitForNoteMode`, switched from the pause menu and applied at once
+/// by [`sync_flute_view`].
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FluteView {
+    #[default]
+    Fingering,
+    Notes,
+}
+
+/// The pause menu's "Flute view" row, shown only on a flute part.
+#[derive(Component, Default, Clone)]
+pub(super) struct FluteViewRow;
+
+#[derive(Component, Default, Clone)]
+pub(super) struct FluteViewLabel;
+
+pub(super) fn on_toggle_flute_view(_: On<Activate>, mut view: ResMut<FluteView>) {
+    *view = match *view {
+        FluteView::Fingering => FluteView::Notes,
+        FluteView::Notes => FluteView::Fingering,
+    };
+}
+
+pub(super) fn flute_view_label_text(loc: &Localization, view: FluteView) -> String {
+    String::from(loc.msg(match view {
+        FluteView::Fingering => "pause-flute-view-fingering",
+        FluteView::Notes => "pause-flute-view-notes",
+    }))
+}
+
+/// Shows the pause menu's flute-view row only while a flute part plays,
+/// and keeps its readout current.
+pub(super) fn update_flute_view_row(
+    view: Res<FluteView>,
+    loc: Res<Localization>,
+    drawing: Query<(), With<FluteDrawing>>,
+    mut rows: Query<&mut Node, With<FluteViewRow>>,
+    mut labels: Query<&mut Text, With<FluteViewLabel>>,
+) {
+    let want = if drawing.is_empty() { Display::None } else { Display::Flex };
+    for mut node in &mut rows {
+        if node.display != want {
+            node.display = want;
+        }
+    }
+    let text = flute_view_label_text(&loc, *view);
+    for mut label in &mut labels {
+        if label.0 != text {
+            label.0.clone_from(&text);
+        }
+    }
+}
+
+/// Lays the highway out for the current [`FluteView`] whenever it changes,
+/// including the first frame of a flute part: the lanes, the furniture in
+/// their container, the flute drawing and its label shown or hidden, and
+/// every note visual despawned for `spawn_visible_notes` to respawn in the
+/// new shape. Score state lives in `SongNotes`, so a switch mid-song loses
+/// nothing.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn sync_flute_view(
+    mut last: Local<Option<FluteView>>,
+    view: Res<FluteView>,
+    notes: Res<SongNotes>,
+    mut lanes: ResMut<super::HighwayLanes>,
+    mut drawing: Query<(&FluteDrawing, &mut Node)>,
+    mut labels: Query<&mut Node, (With<FingeringLabel>, Without<FluteDrawing>)>,
+    furniture: Query<(Entity, Option<&Children>), With<super::highway_2d::HighwayFurniture>>,
+    visuals: Query<Entity, With<super::NoteVisual>>,
+    mut commands: Commands,
+) {
+    let Ok((FluteDrawing(flute), mut drawing_node)) = drawing.single_mut() else {
+        *last = None;
+        return;
+    };
+    if *last == Some(*view) {
+        return;
+    }
+    *last = Some(*view);
+    let fingering = *view == FluteView::Fingering;
+    let (layout, style) = if fingering {
+        (InstrumentModel::lane_layout(flute), super::highway_2d::RowStyle::Keys)
+    } else {
+        let used = notes.notes.iter().filter_map(|n| n.expected_pitch).collect();
+        (LaneLayout::pitch_rows(&used), super::highway_2d::RowStyle::Pitches)
+    };
+    for (container, children) in &furniture {
+        for &child in children.into_iter().flatten() {
+            commands.entity(child).despawn();
+        }
+        commands
+            .entity(container)
+            .with_children(|f| super::highway_2d::spawn_highway(f, &layout, style));
+    }
+    for visual in &visuals {
+        commands.entity(visual).despawn();
+    }
+    lanes.0 = Some(layout);
+    let display = if fingering { Display::Flex } else { Display::None };
+    drawing_node.display = display;
+    for mut node in &mut labels {
+        node.display = display;
+    }
+}
 
 /// The flute drawing's root, carrying the flute it draws: the note spawner
 /// reads which rows a fingering presses from it.
@@ -205,7 +315,7 @@ pub(super) fn spawn_fingering_blocks(
                 border_radius: BorderRadius::all(Val::Px(4.0)),
                 ..default()
             },
-            BackgroundColor(BLOCK),
+            BackgroundColor(FLUTE_COLOR),
         ));
     }
 }
@@ -218,7 +328,7 @@ fn block_color(note: &ScheduledNote) -> Color {
     } else if note.hit {
         BLOCK_HIT
     } else {
-        BLOCK
+        FLUTE_COLOR
     }
 }
 
@@ -277,7 +387,7 @@ mod tests {
         assert_ne!(key_fill(false, true), Color::NONE);
         assert_eq!(key_fill(false, false), Color::NONE);
         let mut n = note(1.0, 64, 0);
-        assert_eq!(block_color(&n), BLOCK);
+        assert_eq!(block_color(&n), FLUTE_COLOR);
         n.hit = true;
         assert_eq!(block_color(&n), BLOCK_HIT);
         n.missed = true;

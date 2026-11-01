@@ -14,7 +14,7 @@ use bevy::prelude::*;
 
 use harmonicon_core::chart::Action;
 use harmonicon_core::harmonica::Harmonica;
-use harmonicon_core::instrument::{LaneLayout, ScrollAxis};
+use harmonicon_core::instrument::LaneLayout;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use super::HoleCell;
@@ -23,10 +23,46 @@ use super::highway_axis::placed;
 
 /// Spawns the static highway furniture (lane stripes, dividers, hit zone) —
 /// no notes. Notes are spawned later, lazily, by `spawn_visible_notes`.
-/// `named_rows` is for a horizontal highway whose rows are strings: tinted
-/// in their colours and named at the hit zone. A flute's rows are its keys,
-/// which the drawing beside them names, so they stay plain.
-pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, named_rows: bool) {
+/// What a highway's lanes are, which decides how they are tinted and named.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum RowStyle {
+    /// A harmonica's holes, columns named by the hole strip beneath.
+    Holes,
+    /// A guitar's strings: tinted in their colours, named at the hit zone.
+    Strings,
+    /// A flute's keys, named by the flute drawing beside them.
+    Keys,
+    /// A flute's note view: plain rows, each named by its note at the hit
+    /// zone.
+    Pitches,
+}
+
+/// Holds the highway's static furniture, as its first child so it paints
+/// beneath everything else on it. A flute's view switch rebuilds what is
+/// inside without disturbing the notes or beat guides above it.
+#[derive(Component)]
+pub(super) struct HighwayFurniture;
+
+/// Spawns the furniture container and the furniture in it.
+pub(super) fn spawn_highway_furniture(
+    hw: &mut ChildSpawnerCommands,
+    layout: &LaneLayout,
+    style: RowStyle,
+) {
+    hw.spawn((
+        HighwayFurniture,
+        Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            ..default()
+        },
+        bevy::picking::Pickable::IGNORE,
+    ))
+    .with_children(|furniture| spawn_highway(furniture, layout, style));
+}
+
+pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, style: RowStyle) {
     // Lane count/width come from the instrument being played, not a fixed
     // 10 — a chromatic's 12+ holes need proportionally narrower lanes.
     let axis = layout.axis;
@@ -38,7 +74,7 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
         hw.spawn((
             placed(axis, 0.0, full, start_pct, Val::Percent(lane_pct)),
-            BackgroundColor(if axis == ScrollAxis::Horizontal && named_rows {
+            BackgroundColor(if style == RowStyle::Strings {
                 super::guitar_visuals::string_color((h + 1) as u8).with_alpha(0.08)
             } else {
                 Color::srgba(1.0, 1.0, 1.0, alpha)
@@ -70,7 +106,7 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
     // A horizontal highway names its rows where tab does, at their start:
     // `e B G D A E` down the hit zone. A vertical one has its instrument
     // strip (the harmonica's holes) beneath it instead.
-    if axis == ScrollAxis::Horizontal && named_rows {
+    if matches!(style, RowStyle::Strings | RowStyle::Pitches) {
         for (row, lane) in layout.lanes.iter().enumerate() {
             hw.spawn((
                 Node {
@@ -87,7 +123,11 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
                 children![(
                     Text::new(lane.label.clone()),
                     TextFont { font_size: FontSize::Px(16.0), ..default() },
-                    TextColor(super::guitar_visuals::string_color((row + 1) as u8)),
+                    TextColor(if style == RowStyle::Strings {
+                        super::guitar_visuals::string_color((row + 1) as u8)
+                    } else {
+                        Color::WHITE
+                    }),
                 )],
             ));
         }

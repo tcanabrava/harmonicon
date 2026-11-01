@@ -65,6 +65,11 @@ the line under the highway names both.
 
 ![A flute part on the highway](images/play-flute.png)
 
+To read the notes instead, pause and press **Flute view**: the highway
+switches, when you resume, to one row per note the song uses, highest at
+the top, each named at the hit line, and the flute drawing steps aside.
+Press it again for the fingerings. Your choice stays for the next song.
+
 A note's fingering is a suggestion, as on every instrument: the game
 hears only the pitch, so an alternate fingering that sounds the same note
 scores the same. A chart may ask for a particular alternate, and the

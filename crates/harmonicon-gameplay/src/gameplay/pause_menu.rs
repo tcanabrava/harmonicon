@@ -653,6 +653,25 @@ pub(super) fn setup_pause_menu(
                     WaitForNoteLabel
                 ]
             });
+            // A flute part's fingering/note view; hidden on anything else
+            // (`flute_visuals::update_flute_view_row`).
+            children.spawn_empty().apply_scene(bsn! {
+                Node {
+                    flex_direction: {FlexDirection::Row},
+                    align_items: {AlignItems::Center},
+                    column_gap: {Val::Px(8.0)},
+                    display: {Display::None},
+                }
+                super::flute_visuals::FluteViewRow
+                Children [
+                    @button::small(&loc.msg("pause-flute-view-button"), super::flute_visuals::on_toggle_flute_view)
+                    --
+                    Text({String::new()})
+                    TextFont { font_size: {FontSize::Px(15.0)} }
+                    TextColor({Color::srgb(0.70, 0.70, 0.80)})
+                    super::flute_visuals::FluteViewLabel
+                ]
+            });
         });
         spawn_practice_speed_row(&mut commands, aids, &loc, speed.0);
     }
