@@ -21,7 +21,7 @@ use super::state::{
 use super::ui::{
     GridArea, GridContent, GroupMoveGhost, ModButton, MoveGhost, NoteView, ResizeGrip,
 };
-use super::{AppState, GRIP_D, HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
+use super::{AppState, GRIP_D, HEADER_H, TICK_W, TICKS_PER_BEAT, note_pad, row_h};
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::{LoadedTheme, SongEditorColors};
@@ -41,6 +41,11 @@ pub(super) fn shift_held(keyboard: &ButtonInput<KeyCode>) -> bool {
 }
 
 pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
+    // A flute's fingering view draws keys, not pitches, so an empty row
+    // there names no note to place (`state::FluteView`).
+    if state.flute_fingering_view().is_some() {
+        return;
+    }
     if let Some(existing) =
         state.notes.iter().find(|n| n.row() == hole && n.tick <= tick && tick < n.tick + n.len)
     {
@@ -57,6 +62,10 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     // breath and reeds.
     if super::guitar_note::is_guitar(state) {
         super::guitar_note::place(state, hole, tick, len);
+        return;
+    }
+    if super::flute_note::is_flute(state) {
+        super::flute_note::place(state, hole, tick, len);
         return;
     }
 
@@ -180,6 +189,10 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     }
     if super::guitar_note::is_guitar(state) {
         super::guitar_note::apply_modifier(state, kind);
+        return;
+    }
+    if super::flute_note::is_flute(state) {
+        super::flute_note::apply_modifier(state, kind);
         return;
     }
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
@@ -374,7 +387,11 @@ pub(super) fn report_technique_skips(
 ) {
     if state.unplayable_notice {
         state.bypass_change_detection().unplayable_notice = false;
-        feedback.set(loc.msg("editor-guitar-invalid"));
+        feedback.set(loc.msg(if super::flute_note::is_flute(&state) {
+            "editor-flute-invalid"
+        } else {
+            "editor-guitar-invalid"
+        }));
     }
     if state.technique_notice.is_none() {
         return;
@@ -562,8 +579,13 @@ pub(super) fn handle_undo_redo(
 /// left of 0, so an unclamped grip there would be permanently off-screen.
 /// That one note trades part of its body for the grip; every other note
 /// keeps all of it.
-pub(super) fn resize_grip_position(note: &GridNote, edge: Edge) -> (f32, f32) {
-    let (left, top, width, height) = note_rect(note, usize::from(note.row().saturating_sub(1)));
+pub(super) fn resize_grip_position(
+    note: &GridNote,
+    edge: Edge,
+    rows: u8,
+    row: usize,
+) -> (f32, f32) {
+    let (left, top, width, height) = note_rect(note, row, rows);
     let x = match edge {
         Edge::Left => (left - GRIP_D).max(0.0),
         Edge::Right => left + width,
@@ -667,7 +689,7 @@ pub(super) fn spawn_resize_grips(
                     // A guitar note also stops where the next step would
                     // hold a string another note needs, or outgrow the hand.
                     let instrument = state.effective_instrument();
-                    if super::guitar_note::is_guitar(&state)
+                    if !state.plays_harmonica()
                         && let Some(current) = state.note_by_id(id).copied()
                         && !super::guitar_note::fits(
                             &instrument,
@@ -721,7 +743,8 @@ pub(super) fn update_resize_grips(
             }
             continue;
         };
-        let (left, top) = resize_grip_position(&note, grip.0);
+        let (left, top) =
+            resize_grip_position(&note, grip.0, state.display_rows(), state.display_row(&note));
         if node.left != Val::Px(left) || node.top != Val::Px(top) {
             node.left = Val::Px(left);
             node.top = Val::Px(top);
@@ -751,7 +774,8 @@ pub(super) fn live_resize(
     let Some(note) = state.note_by_id(drag.id) else {
         return;
     };
-    let (left, _top, width, _height) = note_rect(note, usize::from(note.row().saturating_sub(1)));
+    let (left, _top, width, _height) =
+        note_rect(note, state.display_row(note), state.display_rows());
     for (view, mut node, mat) in &mut notes {
         if view.0 == drag.id {
             node.left = Val::Px(left);
@@ -780,9 +804,10 @@ pub(super) fn update_move_ghost(
         Some(drag) if drag.kind == DragKind::Move => {
             let colors = theme.song_editor_colors();
             let left = drag.target_tick as f32 * TICK_W + 1.0;
-            let top = HEADER_H + (drag.target_hole as f32 - 1.0) * ROW_H + NOTE_PAD;
+            let (top, height) = ghost_span(&state, drag.target_hole);
             node.left = Val::Px(left);
             node.top = Val::Px(top);
+            node.height = Val::Px(height);
             node.width = Val::Px(drag.start_len as f32 * TICK_W - 2.0);
             *vis = Visibility::Inherited;
             let color = if drag.valid { colors.ghost_ok } else { colors.ghost_bad };
@@ -790,6 +815,18 @@ pub(super) fn update_move_ghost(
             *border = BorderColor::all(color);
         }
         _ => *vis = Visibility::Hidden,
+    }
+}
+
+/// Where a move preview landing on `row` sits, `(top, height)`: its row,
+/// or every row in a flute's fingering view, where a note is a column.
+fn ghost_span(state: &EditorState, row: u8) -> (f32, f32) {
+    let rows = state.display_rows();
+    let (row_h, pad) = (row_h(rows), note_pad(rows));
+    if state.flute_fingering_view().is_some() {
+        (HEADER_H + pad, f32::from(rows) * row_h - 2.0 * pad)
+    } else {
+        (HEADER_H + (row as f32 - 1.0) * row_h + pad, row_h - 2.0 * pad)
     }
 }
 
@@ -830,7 +867,7 @@ pub(super) fn update_group_move_ghosts(
         .iter()
         .map(|&(_, hole, tick, len, _)| {
             let left = tick as f32 * TICK_W + 1.0;
-            let top = HEADER_H + (hole as f32 - 1.0) * ROW_H + NOTE_PAD;
+            let (top, height) = ghost_span(&state, hole);
             let width = len as f32 * TICK_W - 2.0;
             commands
                 .spawn((
@@ -841,7 +878,7 @@ pub(super) fn update_group_move_ghosts(
                         left: Val::Px(left),
                         top: Val::Px(top),
                         width: Val::Px(width),
-                        height: Val::Px(ROW_H - 2.0 * NOTE_PAD),
+                        height: Val::Px(height),
                         border: UiRect::all(Val::Px(2.0)),
                         ..default()
                     },

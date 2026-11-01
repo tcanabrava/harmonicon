@@ -148,4 +148,44 @@ mod tests {
         assert_eq!(events(&source), events(&saved));
         harmonicon_song::song::validate_and_migrate_chart(&mut saved.clone()).unwrap();
     }
+
+    /// The B foot, each note's pitch row, the alternate fingering and the
+    /// vibrato all survive a load and a save.
+    #[test]
+    fn a_flute_document_round_trips_its_foot_fingerings_and_vibrato() {
+        let source: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../harmonicon-song/tests/fixtures/flute-scale.harpchart"
+        ))
+        .unwrap();
+        let mut state = EditorState::default();
+        super::super::harpchart::load_harpchart(
+            &source,
+            &mut state,
+            &mut super::super::state::Scroll::default(),
+        );
+        assert_eq!(state.notes.len(), 7);
+        assert_eq!(state.row_count(), 38, "C7 down to a B foot's B3");
+        assert_eq!(state.notes[0].row(), 38);
+        let saved: serde_json::Value =
+            serde_json::from_str(&super::super::harpchart::serialize_harpchart(&state)).unwrap();
+        assert!(saved.get("harmonica").is_none());
+        assert_eq!(saved["instrument"], source["instrument"]);
+        let notes = |value: &serde_json::Value| -> Vec<(String, Option<u64>, bool)> {
+            value["track"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|item| item["events"].as_array().unwrap().iter())
+                .map(|e| {
+                    (
+                        e["note"].as_str().unwrap().to_string(),
+                        e["fingering"].as_u64(),
+                        e["modifiers"].is_array(),
+                    )
+                })
+                .collect()
+        };
+        assert_eq!(notes(&source), notes(&saved));
+        harmonicon_song::song::validate_and_migrate_chart(&mut saved.clone()).unwrap();
+    }
 }

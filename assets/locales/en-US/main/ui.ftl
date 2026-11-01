@@ -224,6 +224,7 @@ mod-fret-up = Fret +
 mod-string-up = String ↑
 mod-string-down = String ↓
 mod-harmonic = Harmonic
+mod-fingering = Fingering
 mod-wah = Wah
 mod-vibrato = Vibrato
 mod-transpose-up = Transpose up
@@ -276,6 +277,7 @@ editor-harmonica-natural-minor = ‹ Natural Minor (10 holes) ›
 editor-harmonica-chromatic = ‹ Chromatic (12 holes) ›
 editor-harmonica-chromatic-16 = ‹ Chromatic (16 holes) ›
 editor-instrument-guitar = Guitar
+editor-instrument-flute = Flute
 editor-field-content-kind = Recording
 editor-content-kind-song = ‹ Record Song ›
 editor-content-kind-lesson = ‹ Record Lesson ›
@@ -303,6 +305,8 @@ editor-field-twelve-bar-tint = 12-Bar Blues Tint
 # Song Editor 2 — color legend (third meta-form column)
 editor-legend-toggle = Legend
 editor-legend-toggle-tooltip = Show or hide the color-legend column.
+editor-flute-view = Fingering view
+editor-flute-view-tooltip = Show the flute's keys as the rows, each note as the fingering that plays it, instead of its pitch
 editor-legend-notes = Note colors (grid)
 editor-legend-normal = Normal blow/draw note
 editor-legend-bend = Bend (deeper bend = redder)
@@ -421,6 +425,7 @@ mod-fret-up-tooltip = Move the selected guitar note one fret up, or raise the fr
 mod-string-up-tooltip = Move the selected guitar note to the string above, keeping its pitch
 mod-string-down-tooltip = Move the selected guitar note to the string below, keeping its pitch
 mod-harmonic-tooltip = Play the selected guitar note as a natural harmonic
+mod-fingering-tooltip = Play the selected flute note on its next fingering
 mod-wah-tooltip = Cycle the selected note's wah-wah rate
 mod-vibrato-tooltip = Cycle the selected note's vibrato rate
 mod-depth = Depth
@@ -919,6 +924,8 @@ gameplay-guitar-window = Hand window starts at fret {$fret} · Next: {$next} · 
 gameplay-flute-fingering = Now {$now} · next {$next}
 
 editor-guitar-invalid = That edit is unplayable: check fret range, occupied strings and hand span.
+editor-flute-invalid = A flute plays one note at a time: a note can't start with another or go past the flute's range.
 editor-guitar-select = Use guitar
+editor-flute-select = Use flute
 editor-guitar-select-empty = Select an empty document to change instruments. Save your current chart first.
 

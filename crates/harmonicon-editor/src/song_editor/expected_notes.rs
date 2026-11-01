@@ -371,7 +371,7 @@ fn rebuild_expected_notes_overlay(
     commands.entity(content).with_children(|c| {
         for note in &state.expected_notes {
             let (left, top, width, height) =
-                note_rect(note, usize::from(note.hole().saturating_sub(1)));
+                note_rect(note, usize::from(note.hole().saturating_sub(1)), state.row_count());
             let selected = state.expected_selected == Some(note.id);
             let color = pitch_color(note.technique());
             let id = note.id;
@@ -431,7 +431,8 @@ fn rebuild_expected_notes_overlay(
                     };
                     n.set_hole(hole);
                     n.tick = tick;
-                    let (left, top, _, _) = note_rect(n, usize::from(n.hole().saturating_sub(1)));
+                    let (left, top, _, _) =
+                        note_rect(n, usize::from(n.hole().saturating_sub(1)), hole_count);
                     if let Ok(mut node) = nodes.get_mut(ev.entity) {
                         node.left = Val::Px(left);
                         node.top = Val::Px(top);
@@ -513,12 +514,14 @@ fn spawn_expected_resize_handle(
                 let steps = ((ev.distance.x / ui_scale.0) / super::TICK_W).round() as i32;
                 let (tick, len) =
                     apply_resize(drag.start_tick, drag.start_len, edge, steps, 0, None);
+                let rows = state.row_count();
                 let Some(n) = state.expected_notes.iter_mut().find(|n| n.id == id) else {
                     return;
                 };
                 n.tick = tick;
                 n.len = len;
-                let (left, _, width, _) = note_rect(n, usize::from(n.hole().saturating_sub(1)));
+                let (left, _, width, _) =
+                    note_rect(n, usize::from(n.hole().saturating_sub(1)), rows);
                 // The handle is a child of the note box, so `ev.entity`
                 // (the handle) isn't what needs its `Node` updated — find
                 // the box by its own `ExpectedNoteVisual` id instead.

@@ -2661,7 +2661,8 @@ fn parse_pitch_expr_defaults_for_empty_or_unknown_modifiers() {
 #[test]
 fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
     let note = GridNote::plain(0, 1, 0, 1);
-    let (left, top, width, height) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
+    let (left, top, width, height) =
+        note_rect(&note, usize::from(note.hole().saturating_sub(1)), 10);
     assert_eq!(left, 1.0);
     assert_eq!(top, HEADER_H + NOTE_PAD);
     assert_eq!(width, TICK_W - 2.0);
@@ -2672,8 +2673,8 @@ fn note_rect_places_hole_one_tick_zero_at_the_grid_origin() {
 fn note_rect_advances_one_row_per_hole_and_scales_width_with_len() {
     let a = GridNote::plain(0, 1, 0, 3);
     let b = GridNote::plain(1, 2, 0, 3);
-    let (_, top_a, width_a, _) = note_rect(&a, usize::from(a.hole().saturating_sub(1)));
-    let (_, top_b, width_b, _) = note_rect(&b, usize::from(b.hole().saturating_sub(1)));
+    let (_, top_a, width_a, _) = note_rect(&a, usize::from(a.hole().saturating_sub(1)), 10);
+    let (_, top_b, width_b, _) = note_rect(&b, usize::from(b.hole().saturating_sub(1)), 10);
     assert_eq!(top_b - top_a, ROW_H, "hole 2 sits exactly one row below hole 1");
     assert_eq!(width_a, width_b);
     assert_eq!(width_a, 3.0 * TICK_W - 2.0);
@@ -2884,9 +2885,9 @@ fn grips_sit_entirely_outside_the_note_at_every_length() {
     // (tick 12) so the left grip isn't up against the clamp.
     for len in 1..=(TICKS_PER_BEAT * 2) {
         let note = grid_note(TICKS_PER_BEAT, len);
-        let (left, _, width, _) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
-        let (lx, _) = resize_grip_position(&note, Edge::Left);
-        let (rx, _) = resize_grip_position(&note, Edge::Right);
+        let (left, _, width, _) = note_rect(&note, usize::from(note.hole().saturating_sub(1)), 10);
+        let (lx, _) = resize_grip_position(&note, Edge::Left, 10, usize::from(&note.row() - 1));
+        let (rx, _) = resize_grip_position(&note, Edge::Right, 10, usize::from(&note.row() - 1));
         assert!(lx + GRIP_D <= left, "len {len}: left grip overlaps the note body");
         assert!(rx >= left + width, "len {len}: right grip overlaps it");
         assert!(rx > lx, "len {len}: grips crossed over");
@@ -2900,20 +2901,21 @@ fn a_grip_is_the_same_size_however_short_the_note_is() {
     let short = grid_note(TICKS_PER_BEAT, TICKS_PER_BEAT / 4);
     let long = grid_note(TICKS_PER_BEAT, TICKS_PER_BEAT * 2);
     let span = |n: &GridNote| {
-        resize_grip_position(n, Edge::Right).0 - resize_grip_position(n, Edge::Left).0
+        resize_grip_position(n, Edge::Right, 10, usize::from(n.row() - 1)).0
+            - resize_grip_position(n, Edge::Left, 10, usize::from(n.row() - 1)).0
     };
-    let widths = note_rect(&long, usize::from(long.hole().saturating_sub(1))).2
-        - note_rect(&short, usize::from(short.hole().saturating_sub(1))).2;
+    let widths = note_rect(&long, usize::from(long.hole().saturating_sub(1)), 10).2
+        - note_rect(&short, usize::from(short.hole().saturating_sub(1)), 10).2;
     assert!((span(&long) - span(&short) - widths).abs() < 0.001);
 }
 
 #[test]
 fn grips_are_centred_on_the_notes_vertical_middle() {
     let note = grid_note(TICKS_PER_BEAT, TICKS_PER_BEAT);
-    let (_, top, _, height) = note_rect(&note, usize::from(note.hole().saturating_sub(1)));
+    let (_, top, _, height) = note_rect(&note, usize::from(note.hole().saturating_sub(1)), 10);
     let want = top + (height - GRIP_D) / 2.0;
-    assert_eq!(resize_grip_position(&note, Edge::Left).1, want);
-    assert_eq!(resize_grip_position(&note, Edge::Right).1, want);
+    assert_eq!(resize_grip_position(&note, Edge::Left, 10, usize::from(&note.row() - 1)).1, want);
+    assert_eq!(resize_grip_position(&note, Edge::Right, 10, usize::from(&note.row() - 1)).1, want);
 }
 
 #[test]
@@ -2921,7 +2923,7 @@ fn the_left_grip_of_a_note_at_tick_zero_stays_on_screen() {
     // `GridArea` clips its overflow and the grid can't scroll left of 0, so
     // an unclamped grip there would never be reachable.
     let note = grid_note(0, TICKS_PER_BEAT);
-    assert_eq!(resize_grip_position(&note, Edge::Left).0, 0.0);
+    assert_eq!(resize_grip_position(&note, Edge::Left, 10, usize::from(&note.row() - 1)).0, 0.0);
 }
 
 // ── envelope ──────────────────────────────────────────────────────────────────
@@ -4288,8 +4290,8 @@ fn visual_rows_do_not_change_guitar_pitch_or_fingering() {
         .with_placement(&guitar, position)
         .unwrap();
     let note = GridNote { id: 1, tick: 12, len: 4, expr: Expr::None, target };
-    let tab = note_rect(&note, 1);
-    let piano = note_rect(&note, 24);
+    let tab = note_rect(&note, 1, 6);
+    let piano = note_rect(&note, 24, 6);
     assert_eq!((tab.0, tab.2, tab.3), (piano.0, piano.2, piano.3));
     assert_ne!(tab.1, piano.1);
     assert_eq!(note.target, target);

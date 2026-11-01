@@ -46,7 +46,8 @@ pub(super) fn mod_button_active(
         | ModButton::FretUp
         | ModButton::StringUp
         | ModButton::StringDown
-        | ModButton::Harmonic => false,
+        | ModButton::Harmonic
+        | ModButton::Fingering => false,
         ModButton::Wah => matches!(expr, Expr::Wah(_)),
         ModButton::Vibrato => matches!(expr, Expr::Vibrato(_)),
         // Call/Split read the selected note's *phrase*, which needs the
@@ -73,14 +74,15 @@ pub(super) fn update_mod_panel(
     // A guitar note's fingering — or, with nothing selected, the armed fret
     // — stands in for the harmonica's breath and reed technique.
     let guitar = super::guitar_note::is_guitar(&state);
+    let harmonica = state.plays_harmonica();
     let fingering = selected.and_then(|n| match n.target.position() {
         Some(PlayPosition::Fret(at)) => Some(at),
         _ => None,
     });
     let (dir, pitch, expr) = match selected {
-        Some(n) if guitar => (state.sticky_dir, HarpTechnique::Normal, n.expr),
+        Some(n) if !harmonica => (state.sticky_dir, HarpTechnique::Normal, n.expr),
         Some(n) => (n.dir(), n.technique(), n.expr),
-        None if guitar => (state.sticky_dir, HarpTechnique::Normal, state.sticky_expr),
+        None if !harmonica => (state.sticky_dir, HarpTechnique::Normal, state.sticky_expr),
         None => (state.sticky_dir, state.sticky_pitch, state.sticky_expr),
     };
     let string_technique = fingering.map(|at| at.technique);
@@ -99,6 +101,19 @@ pub(super) fn update_mod_panel(
         bg.0 = if active { colors.btn_active } else { colors.btn_bg };
     }
     let fret = fingering.map_or(state.sticky_fret, |at| at.fret);
+    let flute_fingering = match (state.effective_instrument(), selected) {
+        (harmonicon_core::instrument::Instrument::Flute(flute), Some(n)) => {
+            match n.target.position() {
+                Some(PlayPosition::Fingering(at)) => Some(format!(
+                    "{}/{}",
+                    at.alternate + 1,
+                    super::flute_note::fingering_count(&flute, &n)
+                )),
+                _ => None,
+            }
+        }
+        _ => None,
+    };
     let bent = matches!(pitch, HarpTechnique::Bend(_))
         || matches!(string_technique, Some(StringTechnique::Bend(_)));
     for mut vis in &mut dot {
@@ -117,6 +132,8 @@ pub(super) fn update_mod_panel(
             (ModButton::Depth, _) if !depth.is_empty() => Some(depth.clone()),
             // Which fret the selected note is on, or the next one goes on.
             (ModButton::FretDown | ModButton::FretUp, _) if guitar => Some(fret.to_string()),
+            // Which of the note's fingerings it plays, of how many.
+            (ModButton::Fingering, _) => flute_fingering.clone(),
             _ => None,
         };
         **text = match suffix {
@@ -343,6 +360,7 @@ pub(super) enum NoteButtons {
     Diatonic,
     Chromatic,
     Guitar,
+    Flute,
 }
 
 /// Whether `kind` belongs in the note column for `set`. The two harmonicas
@@ -352,14 +370,13 @@ pub(super) enum NoteButtons {
 /// the phrase buttons mean something on all three.
 pub(super) fn note_button_visible(kind: ModButton, set: NoteButtons) -> bool {
     let guitar = set == NoteButtons::Guitar;
+    let harmonica = matches!(set, NoteButtons::Diatonic | NoteButtons::Chromatic);
     match kind {
-        ModButton::Blow
-        | ModButton::Draw
-        | ModButton::Wah
-        | ModButton::TransposeUp
-        | ModButton::TransposeDown => !guitar,
+        ModButton::Blow | ModButton::Draw | ModButton::Wah => harmonica,
+        ModButton::TransposeUp | ModButton::TransposeDown => !guitar,
         ModButton::Overblow | ModButton::Overdraw => set == NoteButtons::Diatonic,
-        ModButton::Bend => set != NoteButtons::Chromatic,
+        ModButton::Bend => matches!(set, NoteButtons::Diatonic | NoteButtons::Guitar),
+        ModButton::Fingering => set == NoteButtons::Flute,
         ModButton::Slide => set == NoteButtons::Chromatic,
         ModButton::FretDown
         | ModButton::FretUp
@@ -382,9 +399,26 @@ pub(super) fn update_technique_button_visibility(
     state: Res<EditorState>,
     mut buttons: Query<(&ModButton, &mut Node)>,
     mut modes: Query<(&ModeButton, &mut Node), Without<ModButton>>,
+    mut flute_view: Query<
+        (&mut Node, &mut BaseButtonColor),
+        (With<super::ui::FluteViewButton>, Without<ModButton>, Without<ModeButton>),
+    >,
+    theme: Res<LoadedTheme>,
 ) {
+    let colors = theme.song_editor_colors();
+    let flute = super::flute_note::is_flute(&state);
+    for (mut node, mut bg) in &mut flute_view {
+        let want = if flute { Display::Flex } else { Display::None };
+        if node.display != want {
+            node.display = want;
+        }
+        let on = flute && state.flute_view == super::state::FluteView::Fingering;
+        bg.0 = if on { colors.btn_active } else { colors.btn_bg };
+    }
     let set = if super::guitar_note::is_guitar(&state) {
         NoteButtons::Guitar
+    } else if super::flute_note::is_flute(&state) {
+        NoteButtons::Flute
     } else if state.harmonica_kind().is_diatonic() {
         NoteButtons::Diatonic
     } else {
@@ -403,7 +437,8 @@ pub(super) fn update_technique_button_visibility(
         if *mode != ModeButton::Record {
             continue;
         }
-        let want = if set == NoteButtons::Guitar { Display::None } else { Display::Flex };
+        let harmonica = matches!(set, NoteButtons::Diatonic | NoteButtons::Chromatic);
+        let want = if harmonica { Display::Flex } else { Display::None };
         if node.display != want {
             node.display = want;
         }
@@ -418,6 +453,8 @@ pub(super) fn update_harmonica_kind_text(
 ) {
     let key = if super::guitar_note::is_guitar(&state) {
         "editor-instrument-guitar"
+    } else if super::flute_note::is_flute(&state) {
+        "editor-instrument-flute"
     } else {
         harmonica_kind_key(state.harmonica_kind())
     };
@@ -839,6 +876,7 @@ mod tests {
             ..Default::default()
         };
         world.insert_resource(state);
+        world.insert_resource(LoadedTheme::default());
 
         let bend = world.spawn((ModButton::Bend, Node::default())).id();
         let slide = world.spawn((ModButton::Slide, Node::default())).id();

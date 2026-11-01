@@ -907,6 +907,17 @@ load-bearing about *this* crate.
   guitar doesn't get, and why: transposition (it resolves onto holes —
   `transpose_selection` returns early), Wah, Record (hidden: detection is
   untuned) and the harmonica-only dev tools (`guitar_note::is_harmonica`).
+- **A flute has two views of one document** (`state::FluteView`, the ♫
+  toggle; `flute_note.rs` is its adapter). `row_count()` is always the
+  notes' own rows — pitch rows, C7 down (`note_model::FLUTE_TOP_NOTE`) —
+  and is what drags, paste and save use; `display_rows()`/`display_row()`
+  are what is *drawn*, which in fingering view is the flute's keys with
+  every note a full-height column at the middle row. Fingering view pins
+  drags to time and places nothing on an empty row (`select_or_add`). A
+  view is a UI preference like `snap_mode`, so it is in the grid cache,
+  not undo. Rows above 16 share 16 rows' height (`mod::row_h`), so the
+  flute's 37–38 rows fit. A flute's voice rule (one note at a time) is
+  `guitar_note::fits`, which is instrument-generic despite its home.
 - **Instrument transitions are queued** as `DocumentCommand`s and applied
   after the editor pass. Undo can change the instrument, so observers and
   keyboard handlers must queue undo/redo too. Either way in or out of a

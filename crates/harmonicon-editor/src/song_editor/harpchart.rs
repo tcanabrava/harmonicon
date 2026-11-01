@@ -346,11 +346,18 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         "scoring": scoring
     });
 
-    if let harmonicon_core::instrument::Instrument::Guitar(guitar) = &instrument {
+    let spec = match &instrument {
+        harmonicon_core::instrument::Instrument::Guitar(guitar) => {
+            Some(harmonicon_core::chart::ChartInstrument::from_guitar(guitar))
+        }
+        harmonicon_core::instrument::Instrument::Flute(flute) => {
+            Some(harmonicon_core::chart::ChartInstrument::from_flute(flute))
+        }
+        harmonicon_core::instrument::Instrument::Harmonica(_) => None,
+    };
+    if let Some(spec) = spec {
         chart.as_object_mut().unwrap().remove("harmonica");
-        chart["instrument"] =
-            serde_json::to_value(harmonicon_core::chart::ChartInstrument::from_guitar(guitar))
-                .unwrap();
+        chart["instrument"] = serde_json::to_value(spec).unwrap();
     }
     serde_json::to_string_pretty(&chart).unwrap_or_default()
 }
@@ -590,7 +597,9 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     state.expression_intensities.clear();
     let mut next_id = 0u32;
     let instrument = state.effective_instrument();
-    let guitar = matches!(instrument, harmonicon_core::instrument::Instrument::Guitar(_));
+    // Any instrument but the harmonica: its events decode through core's
+    // codec, never as holes.
+    let guitar = !matches!(instrument, harmonicon_core::instrument::Instrument::Harmonica(_));
     let hole_count = if guitar { 0 } else { state.row_count() };
 
     if let Some(track) = v["track"].as_array() {
@@ -726,11 +735,6 @@ pub(super) fn validated_harpchart(text: &str) -> Result<serde_json::Value, Strin
 /// them successfully and silently erasing their meaning on the next save.
 pub(super) fn unsupported_chart_features(value: &serde_json::Value) -> Vec<String> {
     let mut found = Vec::new();
-    // The grid has no flute rows or note column yet; loading one would
-    // route its notes through the harmonica's tools.
-    if value["instrument"]["type"] == "flute" {
-        found.push("a flute part, which the Song Editor can't edit yet".to_string());
-    }
     if let Some(track) = value["track"].as_array() {
         for (index, phrase) in track.iter().enumerate() {
             let number = index + 1;
@@ -820,10 +824,7 @@ pub(super) fn handle_load_chosen(
             }
         };
         load_harpchart(&v, &mut state, &mut scroll);
-        if matches!(
-            state.effective_instrument(),
-            harmonicon_core::instrument::Instrument::Guitar(_)
-        ) {
+        if !state.plays_harmonica() {
             state.mode = super::state::Mode::Edit;
             if let Some(recording) = recording.as_mut() {
                 **recording = Default::default();

@@ -180,7 +180,7 @@ impl EditorState {
         // On a guitar a pasted note must also be playable with what sounds
         // around it — what is already there and what this paste has kept.
         // One that isn't is skipped, like one that collides.
-        if super::guitar_note::is_guitar(self) {
+        if !self.plays_harmonica() {
             let instrument = self.effective_instrument();
             let mut sounding = self.notes.clone();
             placed.retain(|(_, note)| {

@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use super::snap::SnapMode;
-use super::{HEADER_H, NOTE_PAD, ROW_H, TICK_W, TICKS_PER_BEAT};
+use super::{HEADER_H, TICK_W, TICKS_PER_BEAT, note_pad, row_h};
 use harmonicon_core::chart::Scale;
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::instrument::{InstrumentModel, PlayPosition};
@@ -275,6 +275,32 @@ pub(super) struct EditorState {
     /// counterpart of `sticky_dir`, armed by the Fret buttons with nothing
     /// selected.
     pub(super) sticky_fret: u8,
+    /// Whether a flute document shows its pitch rows or its keys — see
+    /// [`FluteView`]. A view, like `snap_mode`: not chart content, not
+    /// undo-tracked, but in the grid cache, since it changes every row.
+    pub(super) flute_view: FluteView,
+}
+
+/// How the grid draws a flute. In `Notes` a row is a pitch and every edit
+/// works; in `Fingering` a row is one of the flute's keys and a note is a
+/// column with a block on each key it presses, so it can be read the way it
+/// is played. A key is not a pitch, so there only edits in time (select,
+/// move sideways, resize, delete, copy/paste) and the note column work;
+/// new notes are placed in note view.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) enum FluteView {
+    #[default]
+    Notes,
+    Fingering,
+}
+
+impl FluteView {
+    pub(super) fn toggled(self) -> Self {
+        match self {
+            Self::Notes => Self::Fingering,
+            Self::Fingering => Self::Notes,
+        }
+    }
 }
 
 impl Default for EditorState {
@@ -347,6 +373,7 @@ impl Default for EditorState {
             sticky_expr: Expr::None,
             sticky_intensity: DEFAULT_INTENSITY.into(),
             sticky_fret: 0,
+            flute_view: FluteView::default(),
         }
     }
 }
@@ -367,6 +394,43 @@ impl EditorState {
                 }
                 instrument.clone()
             }
+        }
+    }
+
+    /// Whether the document is a harmonica's. Everything else (a guitar, a
+    /// flute) is checked by its instrument's own voice rules rather than
+    /// the harmonica's breath and reed logic.
+    pub(super) fn plays_harmonica(&self) -> bool {
+        matches!(self.effective_instrument(), harmonicon_core::instrument::Instrument::Harmonica(_))
+    }
+
+    /// The flute, when this is a flute document shown in fingering view.
+    pub(super) fn flute_fingering_view(&self) -> Option<harmonicon_core::instrument::flute::Flute> {
+        match (self.flute_view, self.effective_instrument()) {
+            (FluteView::Fingering, harmonicon_core::instrument::Instrument::Flute(flute)) => {
+                Some(flute)
+            }
+            _ => None,
+        }
+    }
+
+    /// How many rows the grid draws: [`row_count`](Self::row_count), except a
+    /// flute in fingering view, which draws one per key.
+    pub(super) fn display_rows(&self) -> u8 {
+        match self.flute_fingering_view() {
+            Some(flute) => harmonicon_core::instrument::flute::key_order(flute.foot).len() as u8,
+            None => self.row_count(),
+        }
+    }
+
+    /// The row, from 0, `note` is drawn on: its own, except in fingering
+    /// view, where every note spans all rows and its middle stands in for
+    /// it (where the resize grips sit).
+    pub(super) fn display_row(&self, note: &GridNote) -> usize {
+        if self.flute_fingering_view().is_some() {
+            usize::from(self.display_rows() / 2)
+        } else {
+            usize::from(note.row().saturating_sub(1))
         }
     }
 
@@ -840,7 +904,7 @@ pub(super) fn move_target(
     hole_count: u8,
 ) -> (u8, usize) {
     let steps_x = (dist_x / TICK_W).round() as i32;
-    let steps_y = (dist_y / ROW_H).round() as i32;
+    let steps_y = (dist_y / row_h(hole_count)).round() as i32;
     let hole = (start_hole as i32 + steps_y).clamp(1, hole_count as i32) as u8;
     let tick = (start_tick as i32 + steps_x).max(0) as usize;
     (hole, tick)
@@ -950,12 +1014,13 @@ pub(super) fn enforce_expr(state: &mut EditorState, id: u32) {
     }
 }
 
-/// Absolute pixel rect (left, top, width, height) of a note inside GridContent.
-pub(super) fn note_rect(note: &GridNote, row: usize) -> (f32, f32, f32, f32) {
+/// Absolute pixel rect (left, top, width, height) of a note on `row` (from
+/// 0) of a grid `rows` rows tall, inside GridContent.
+pub(super) fn note_rect(note: &GridNote, row: usize, rows: u8) -> (f32, f32, f32, f32) {
     let left = note.tick as f32 * TICK_W + 1.0;
-    let top = HEADER_H + row as f32 * ROW_H + NOTE_PAD;
+    let top = HEADER_H + row as f32 * row_h(rows) + note_pad(rows);
     let width = note.len as f32 * TICK_W - 2.0;
-    let height = ROW_H - 2.0 * NOTE_PAD;
+    let height = row_h(rows) - 2.0 * note_pad(rows);
     (left, top, width, height)
 }
 

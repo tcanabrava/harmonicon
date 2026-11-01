@@ -42,6 +42,30 @@ document empty.
 
 ![Guitar chart in the Song Editor](images/song-editor-guitar.png)
 
+## Flute charts
+
+In an empty document, open **Details → Use flute** to start a flute chart;
+**Load** opens existing ones with their foot joint. The grid has one row per
+pitch, C7 at the top down to the flute's lowest note, rows drawn narrower so
+the whole range fits. Click a row to place a note there; a flute plays one
+note at a time, so a new note ends the one sounding and a note can't start
+with another. Each note shows its name, and `D6·1` means its first
+alternate fingering.
+
+The note column has **Fingering**, which steps the selected note through
+its fingerings (the button shows which, e.g. `2/3`), plus vibrato and its
+depth, the phrase buttons, transpose (♯ ♭, a semitone, onto each new note's
+standard fingering) and delete.
+
+**Fingering view** (♫ in the left column) turns the rows into the flute's
+keys, from the thumb key at the top to the foot rollers, and draws each note
+as the fingering that plays it: a block on every key it presses. Press it
+again for note view. A key isn't a pitch, so in fingering view notes move
+only in time: select, drag sideways, resize, delete, copy and paste, and
+the note column all work, while new notes are placed in note view.
+
+![A flute chart in fingering view](images/song-editor-flute.png)
+
 ## Layout
 
 The screen has three parts:

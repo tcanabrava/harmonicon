@@ -118,6 +118,11 @@ pub(super) struct GridScrollThumb;
 #[derive(Component)]
 pub(super) struct HoleColumnContent;
 
+/// The flute's note-view/fingering-view toggle in the toolbar, shown only
+/// on a flute document (`panel::update_technique_button_visibility`).
+#[derive(Component)]
+pub(super) struct FluteViewButton;
+
 /// The label showing the current [`super::state::HarmonicaKind`] ("Diatonic"
 /// / "Chromatic") next to its toggle button.
 #[derive(Component)]
@@ -196,6 +201,8 @@ pub(super) enum ModButton {
     StringDown,
     /// Guitar-only: toggles a natural harmonic at the note's fret.
     Harmonic,
+    /// Flute-only: steps the selected note to its next fingering.
+    Fingering,
     Wah,
     Vibrato,
     /// Vibrato/wah depth, cycled in quarter steps (¼ ½ ¾ 1) the way
@@ -401,7 +408,7 @@ pub(super) fn sync_chrome_height(
         )>,
     >,
 ) {
-    let h = grid_height(state.row_count());
+    let h = grid_height(state.display_rows());
     for mut node in &mut rows {
         if node.height != Val::Px(h) {
             node.height = Val::Px(h);
@@ -423,7 +430,19 @@ pub(super) fn row_labels(
             .zip(guitar.string_labels())
             .map(|(string, text)| RowLabel { text, swatch: Some(string_color(string)) })
             .collect(),
-        _ => (1..=row_count)
+        // A pitch per row, C7 at the top; the accidentals' swatches dark, as
+        // a keyboard's black keys.
+        Instrument::Flute(_) => (1..=row_count)
+            .map(|row| {
+                let note = super::note_model::FLUTE_TOP_NOTE + 1 - row;
+                let sharp = matches!(note % 12, 1 | 3 | 6 | 8 | 10);
+                RowLabel {
+                    text: harmonicon_core::midi::midi_to_note(i32::from(note)),
+                    swatch: sharp.then_some(Color::srgb(0.12, 0.12, 0.16)),
+                }
+            })
+            .collect(),
+        Instrument::Harmonica(_) => (1..=row_count)
             .map(|hole| RowLabel { text: format!("{hole:02}"), swatch: None })
             .collect(),
     }
@@ -446,8 +465,18 @@ pub(super) fn sync_hole_column(
     if unchanged && last.as_ref().is_some_and(|(e, _)| *e == entity) {
         return;
     }
-    let hole_count = state.row_count();
-    let rows = row_labels(&state.effective_instrument(), hole_count);
+    let hole_count = state.display_rows();
+    let rows = match state.flute_fingering_view() {
+        // Fingering view: the flute's keys, down the tube.
+        Some(flute) => harmonicon_core::instrument::flute::key_order(flute.foot)
+            .into_iter()
+            .map(|key| RowLabel {
+                text: harmonicon_core::instrument::flute::key_label(key).to_string(),
+                swatch: None,
+            })
+            .collect(),
+        None => row_labels(&state.effective_instrument(), hole_count),
+    };
     let texts: Vec<String> = rows.iter().map(|r| r.text.clone()).collect();
     if last.as_ref().is_some_and(|(e, t)| *e == entity && *t == texts)
         && !theme.is_changed()
@@ -488,7 +517,7 @@ pub(super) fn setup(
 ) {
     let colors = theme.song_editor_colors();
     let mode = state.mode;
-    let hole_count = state.row_count();
+    let hole_count = state.display_rows();
     let mut root_ec = commands.spawn((
         EditorRoot,
         TabGroup::default(),

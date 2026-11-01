@@ -101,8 +101,6 @@ gates 1.0. In order:
 - **Flute**. The model (`instrument::flute`, a C or B foot), the sourced
   Boehm fingering table, chart format 1.9.0, its drills in the trainer
   model, score conversion and a flute synth voice are in. Next:
-  - the Song Editor's flute rows and note column (it refuses a flute
-    chart until then);
   - the Note Trainer's flute screen (`Register` is the overblown pairs);
   - a recorded corpus aimed at octave errors, before any detection tuning;
   - choosing the foot joint in "My instruments" (content and progress).

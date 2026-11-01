@@ -33,6 +33,7 @@ mod details_fields;
 // module docs. Same gating as `debug_record` above.
 #[cfg(feature = "dev")]
 mod expected_notes;
+mod flute_note;
 mod grid;
 mod grid_cache;
 mod guitar_note;
@@ -114,14 +115,34 @@ const TICK_W: f32 = BEAT_W / TICKS_PER_BEAT as f32;
 // row of its own.
 const SILENCE_ROW_H: f32 = 24.0;
 
+/// The most rows drawn at full [`ROW_H`]: a 16-hole chromatic's. An
+/// instrument with more (a flute's pitch rows, three octaves of them)
+/// shares that height between them, as a piano roll does, rather than
+/// pushing the staff and the rest of the chrome off the screen.
+const FULL_HEIGHT_ROWS: u8 = 16;
+
+/// How tall each of `rows` rows is.
+fn row_h(rows: u8) -> f32 {
+    if rows <= FULL_HEIGHT_ROWS {
+        ROW_H
+    } else {
+        ROW_H * f32::from(FULL_HEIGHT_ROWS) / f32::from(rows)
+    }
+}
+
+/// The gap above and below a note inside its row, in step with [`row_h`].
+fn note_pad(rows: u8) -> f32 {
+    NOTE_PAD * row_h(rows) / ROW_H
+}
+
 fn grid_height(hole_count: u8) -> f32 {
-    HEADER_H + ROW_H * hole_count as f32 + SILENCE_ROW_H
+    HEADER_H + row_h(hole_count) * hole_count as f32 + SILENCE_ROW_H
 }
 
 /// Top of the silence track, inside `GridContent`'s coordinate space —
 /// directly below the last hole lane.
 fn silence_row_top(hole_count: u8) -> f32 {
-    HEADER_H + ROW_H * hole_count as f32
+    HEADER_H + row_h(hole_count) * hole_count as f32
 }
 
 // ── Colours ───────────────────────────────────────────────────────────────────

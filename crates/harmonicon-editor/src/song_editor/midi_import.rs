@@ -267,7 +267,7 @@ pub(super) fn apply_imported_track(state: &mut EditorState, imported: ImportedTr
 /// diatonic when the document is a guitar's — import replaces every note,
 /// and resolves them onto holes.
 fn import_kind(state: &EditorState) -> crate::song_editor::state::HarmonicaKind {
-    if super::guitar_note::is_guitar(state) {
+    if !state.plays_harmonica() {
         crate::song_editor::state::HarmonicaKind::Diatonic
     } else {
         state.harmonica_kind()

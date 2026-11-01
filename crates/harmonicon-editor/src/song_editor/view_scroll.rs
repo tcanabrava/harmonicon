@@ -379,6 +379,9 @@ fn scrollbar_marker_color(note: &super::state::GridNote) -> Color {
         Some(harmonicon_core::instrument::PlayPosition::Fret(at)) => {
             harmonicon_gameplay::gameplay::guitar_visuals::string_color(at.string)
         }
+        Some(harmonicon_core::instrument::PlayPosition::Fingering(_)) => {
+            super::grid::FLUTE_NOTE_COLOR
+        }
         _ => match note.dir() {
             Dir::Blow => SCROLLBAR_BLOW_COLOR,
             Dir::Draw => SCROLLBAR_DRAW_COLOR,

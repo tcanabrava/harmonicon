@@ -21,8 +21,8 @@ use super::state::{
 };
 use super::ui::{GridContent, GridItem, NoteView};
 use super::{
-    BEAT_W, HEADER_H, ROW_H, SILENCE_ROW_H, TICK_W, TICKS_PER_BEAT, WAVEFORM_H, WAVEFORM_TOP,
-    grid_height, silence_row_top,
+    BEAT_W, HEADER_H, SILENCE_ROW_H, TICK_W, TICKS_PER_BEAT, WAVEFORM_H, WAVEFORM_TOP, grid_height,
+    silence_row_top,
 };
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::instrument::{Instrument, InstrumentModel, PlayPosition};
@@ -135,7 +135,9 @@ pub(super) fn rebuild_grid(
     let bar_colors = theme.twelve_bar_colors();
     let scale = state.scale.classes(&state.key);
     let instrument = state.effective_instrument();
-    let hole_count = state.row_count();
+    // The rows drawn: a flute in fingering view draws its keys.
+    let hole_count = state.display_rows();
+    let fingering_view = state.flute_fingering_view();
     // Locked (user Lock toggle, or Perform mode): grid cells, notes, and
     // resize handles are all spawned non-interactive via `Pickable::IGNORE`,
     // so no click/drag observer below ever fires — a single gate at spawn
@@ -193,7 +195,7 @@ pub(super) fn rebuild_grid(
             .flatten();
 
         for hole in 1..=hole_count {
-            let y = HEADER_H + (hole as f32 - 1.0) * ROW_H;
+            let y = HEADER_H + (hole as f32 - 1.0) * super::row_h(hole_count);
             let lane = if hole % 2 == 0 { colors.lane_a } else { colors.lane_b };
             let lane = match bar_tint {
                 Some(tint) => mix_srgba(lane, tint, BAR_TINT_MIX),
@@ -208,7 +210,7 @@ pub(super) fn rebuild_grid(
                     left: Val::Px(x),
                     top: Val::Px(y),
                     width: Val::Px(BEAT_W),
-                    height: Val::Px(ROW_H),
+                    height: Val::Px(super::row_h(hole_count)),
                     ..default()
                 },
                 BackgroundColor(lane),
@@ -473,6 +475,8 @@ pub(super) fn rebuild_grid(
                 colors,
                 locked,
                 in_scale,
+                hole_count,
+                fingering_view,
             ));
         }
     }
@@ -678,6 +682,10 @@ pub(super) fn group_move_valid(
     })
 }
 
+/// A flute note's colour on the grid and the minimap: the silver of the
+/// highway's fingering blocks.
+pub(super) const FLUTE_NOTE_COLOR: Color = Color::srgb(0.55, 0.65, 0.80);
+
 /// What a note block shows, and on what colour: a harmonica note's breath
 /// arrow on its pitch technique's colour, a guitar note's tab label (`7`,
 /// `7b9`, `<12>`) on its string's colour, the same as the highway draws it.
@@ -686,6 +694,18 @@ pub(super) fn note_face(note: &GridNote) -> (Color, String) {
         Some(PlayPosition::Fret(fret)) => (
             harmonicon_gameplay::gameplay::guitar_visuals::string_color(fret.string),
             fret.tab_label(),
+        ),
+        // A flute note's name, and which alternate when it isn't the
+        // standard fingering (`D6·1`).
+        Some(PlayPosition::Fingering(at)) => (
+            FLUTE_NOTE_COLOR,
+            match at.alternate {
+                0 => harmonicon_core::midi::midi_to_note(i32::from(at.note)),
+                alt => format!(
+                    "{}\u{b7}{alt}",
+                    harmonicon_core::midi::midi_to_note(i32::from(at.note))
+                ),
+            },
         ),
         _ => (pitch_color(note.technique()), note.dir().arrow().to_string()),
     }
@@ -699,8 +719,22 @@ pub(super) fn spawn_note(
     colors: SongEditorColors,
     locked: bool,
     in_scale: bool,
+    rows: u8,
+    fingering_view: Option<harmonicon_core::instrument::flute::Flute>,
 ) -> Entity {
-    let (left, top, width, height) = note_rect(&note, usize::from(note.row().saturating_sub(1)));
+    // In a flute's fingering view a note is a column over every key row,
+    // with a block on each key it presses (spawned below).
+    let fingering = fingering_view.zip(match note.target.position() {
+        Some(PlayPosition::Fingering(at)) => Some(at),
+        _ => None,
+    });
+    let (left, top, width, height) = if fingering.is_some() {
+        let (left, _, width, _) = note_rect(&note, 0, rows);
+        let pad = super::note_pad(rows);
+        (left, HEADER_H + pad, width, f32::from(rows) * super::row_h(rows) - 2.0 * pad)
+    } else {
+        note_rect(&note, usize::from(note.row().saturating_sub(1)), rows)
+    };
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { colors.accent } else { Color::NONE };
     let id = note.id;
@@ -718,6 +752,8 @@ pub(super) fn spawn_note(
     } else {
         mix_srgba(face_color, OUT_OF_SCALE_TINT, OUT_OF_SCALE_MIX)
     };
+    // A fingering column is a faint wash; its key blocks carry the colour.
+    let body_color = if fingering.is_some() { face_color.with_alpha(0.15) } else { face_color };
 
     let root = commands
         .spawn((
@@ -798,7 +834,13 @@ pub(super) fn spawn_note(
                     drag.start_hole,
                     drag.start_tick,
                     ev.distance.x / ui_scale.0,
-                    ev.distance.y / ui_scale.0,
+                    // A key row is not a pitch: in a flute's fingering
+                    // view a drag only moves the note in time.
+                    if state.flute_fingering_view().is_some() {
+                        0.0
+                    } else {
+                        ev.distance.y / ui_scale.0
+                    },
                     hole_count,
                 );
                 // Snapped the same way a fresh note's placement already is
@@ -846,7 +888,11 @@ pub(super) fn spawn_note(
                             &moving_ids,
                             &targets,
                         ),
-                        "editor-guitar-invalid",
+                        if matches!(instrument, Instrument::Flute(_)) {
+                            "editor-flute-invalid"
+                        } else {
+                            "editor-guitar-invalid"
+                        },
                     ),
                 };
                 state.drag_msg = if !pitch_ok {
@@ -892,12 +938,12 @@ pub(super) fn spawn_note(
 
     match note.expr {
         Expr::None => {
-            commands.entity(root).insert(BackgroundColor(face_color));
+            commands.entity(root).insert(BackgroundColor(body_color));
         }
         Expr::Wah(_) | Expr::Vibrato(_) => {
             let mode = if matches!(note.expr, Expr::Vibrato(_)) { 0.0 } else { 1.0 };
             let mat = note_mats.add(EditorNoteMaterial {
-                color: face_color.to_linear(),
+                color: body_color.to_linear(),
                 params: Vec4::new(mode, width, 0.0, 0.0),
             });
             commands.entity(root).insert(MaterialNode(mat));
@@ -905,9 +951,29 @@ pub(super) fn spawn_note(
     }
 
     commands.entity(root).with_children(|r| {
+        if let Some((flute, at)) = fingering {
+            let row_h = super::row_h(rows);
+            let pad = super::note_pad(rows);
+            for row in flute.pressed_rows(at) {
+                r.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(0.0),
+                        width: Val::Percent(100.0),
+                        top: Val::Px(row as f32 * row_h),
+                        height: Val::Px(row_h - 2.0 * pad),
+                        ..default()
+                    },
+                    BackgroundColor(face_color),
+                    Pickable::IGNORE,
+                ));
+            }
+        }
+        let font =
+            if fingering.is_some() { super::row_h(rows).min(13.0) } else { height.min(15.0) };
         r.spawn_empty().apply_scene(bsn! {
             Text({face_label.clone()})
-            TextFont { font_size: {FontSize::Px(15.0)} }
+            TextFont { font_size: {FontSize::Px(font)} }
             TextColor({Color::WHITE})
             ~{Pickable::IGNORE}
         });

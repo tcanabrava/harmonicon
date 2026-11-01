@@ -68,8 +68,8 @@ the line under the highway names both.
 A note's fingering is a suggestion, as on every instrument: the game
 hears only the pitch, so an alternate fingering that sounds the same note
 scores the same. A chart may ask for a particular alternate, and the
-highway then draws that one. Flute charts don't open in the Song Editor
-yet.
+highway then draws that one. Flute charts open in the Song Editor; see
+[Flute charts](song-editor.md#flute-charts).
 
 ## Removed and hidden songs
 

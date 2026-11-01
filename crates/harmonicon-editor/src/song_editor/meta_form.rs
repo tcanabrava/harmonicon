@@ -19,7 +19,7 @@ use super::ui::{
     MetaFieldText, MidiTrackComboboxSlot, ScaleComboboxSlot, SnapModeText,
     TimeSignatureComboboxSlot,
 };
-use super::{HEADER_H, MIDI_PURPOSE, MUSIC_PURPOSE, ROW_H, SILENCE_ROW_H, grid_height};
+use super::{HEADER_H, MIDI_PURPOSE, MUSIC_PURPOSE, SILENCE_ROW_H, grid_height};
 use harmonicon_core::chart::Scale;
 use harmonicon_platform::localization::{Localization, LocalizationExt, enum_label_key};
 use harmonicon_platform::theme::SongEditorColors;
@@ -67,12 +67,17 @@ pub(super) fn spawn_hole_column_rows(
     loc: &Localization,
 ) {
     col.spawn(Node { width: Val::Percent(100.0), height: Val::Px(HEADER_H), ..default() });
+    // Box and label shrink with the row on a tall instrument (a flute's
+    // pitch rows), so neither spills into its neighbours.
+    let row_h = super::row_h(rows.len() as u8);
+    let box_px = (row_h - 4.0).min(20.0);
+    let font_px = (row_h - 1.0).min(13.0);
     for row in rows {
         let text = row.text.clone();
         let swatch = row.swatch.unwrap_or(colors.hole_box);
         col.spawn(Node {
             width: Val::Percent(100.0),
-            height: Val::Px(ROW_H),
+            height: Val::Px(row_h),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -82,13 +87,13 @@ pub(super) fn spawn_hole_column_rows(
         .with_children(|r| {
             r.spawn_empty().apply_scene(bsn! {
                 Text({text.clone()})
-                TextFont { font_size: {FontSize::Px(13.0)} }
+                TextFont { font_size: {FontSize::Px(font_px)} }
                 TextColor({colors.label})
             });
             r.spawn_empty().apply_scene(bsn! {
                 Node {
-                    width: {Val::Px(20.0)},
-                    height: {Val::Px(20.0)},
+                    width: {Val::Px(box_px)},
+                    height: {Val::Px(box_px)},
                     border: {UiRect::all(Val::Px(1.5))},
                 }
                 BackgroundColor({swatch})
@@ -234,7 +239,7 @@ fn spawn_harmonica_kind_row(
             // From a guitar this goes back to a harmonica, which, like the
             // way in (`guitar_note::spawn_selector`), needs an empty
             // document: a string position has no hole to become.
-            if super::guitar_note::is_guitar(&state) {
+            if !state.plays_harmonica() {
                 if state.notes.is_empty() {
                     commands.write_message(super::state::DocumentCommand::SelectInstrument(
                         super::state::InstrumentSelection::HarmonicaPreset(HarmonicaKind::Diatonic),
@@ -677,7 +682,21 @@ pub(super) fn spawn_meta_form(
         let first_col = spawn_form_column(form, |col| {
             spawn_content_kind_row(col, loc, colors);
             spawn_harmonica_kind_row(col, loc, colors);
-            super::guitar_note::spawn_selector(col, loc);
+            super::guitar_note::spawn_selector(
+                col,
+                loc,
+                "editor-guitar-select",
+                harmonicon_core::instrument::guitar::Guitar::standard(
+                    harmonicon_core::instrument::guitar::GuitarBody::Electric,
+                )
+                .into(),
+            );
+            super::guitar_note::spawn_selector(
+                col,
+                loc,
+                "editor-flute-select",
+                harmonicon_core::instrument::flute::Flute::default().into(),
+            );
             spawn_snap_mode_row(col, loc, colors);
             for &(field, label) in &FIELDS[..MID] {
                 spawn_field_row(col, loc, colors, state, field, label);
