@@ -2,6 +2,7 @@
 
 use crate::harmonica::Harmonica;
 use crate::instrument::Instrument;
+use crate::instrument::flute::{Flute, FootJoint};
 use crate::instrument::guitar::{Guitar, GuitarBody};
 use crate::midi::note_to_midi;
 use serde::{Deserialize, Serialize};
@@ -56,6 +57,12 @@ pub enum ChartInstrument {
         #[serde(default)]
         body: GuitarBody,
     },
+    /// A Boehm flute, from format 1.9.0. Its foot joint decides the lowest
+    /// note; a C foot when not given.
+    Flute {
+        #[serde(default)]
+        foot: FootJoint,
+    },
 }
 
 fn is_zero(value: &u8) -> bool {
@@ -77,10 +84,16 @@ impl ChartInstrument {
         }
     }
 
+    /// How a chart writes `flute`.
+    pub fn from_flute(flute: &Flute) -> Self {
+        Self::Flute { foot: flute.foot }
+    }
+
     /// The playable instrument this describes, or `None` if a string names
     /// no real note.
     pub fn to_instrument(&self) -> Option<Instrument> {
         match self {
+            Self::Flute { foot } => Some(Flute::new(*foot).into()),
             Self::Guitar { strings, frets, capo, body } => {
                 let strings = strings
                     .iter()
@@ -132,7 +145,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.8.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.9.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.
@@ -589,6 +602,11 @@ pub struct NoteEvent {
     /// Where a stringed instrument plays the note, from format 1.8.0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<FretPosition>,
+    /// Which of a flute note's fingerings, from format 1.9.0: 0 or absent
+    /// the standard one, then the alternates in the order
+    /// `instrument::flute`'s table lists them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingering: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -598,7 +616,14 @@ pub struct NoteEvent {
 impl NoteEvent {
     /// A harmonica event: a hole and breath with no other fields.
     pub fn hole(hole: u8, action: Action) -> Self {
-        Self { hole: Some(hole), action: Some(action), position: None, note: None, modifiers: None }
+        Self {
+            hole: Some(hole),
+            action: Some(action),
+            position: None,
+            fingering: None,
+            note: None,
+            modifiers: None,
+        }
     }
 
     /// A stringed instrument's event: a string, a fret and the note they
@@ -608,6 +633,20 @@ impl NoteEvent {
             hole: None,
             action: None,
             position: Some(FretPosition { string, fret }),
+            fingering: None,
+            note: Some(note),
+            modifiers: None,
+        }
+    }
+
+    /// A flute's event: the note, and which of its fingerings when it isn't
+    /// the standard one.
+    pub fn fingered(note: String, alternate: u8) -> Self {
+        Self {
+            hole: None,
+            action: None,
+            position: None,
+            fingering: (alternate > 0).then_some(alternate),
             note: Some(note),
             modifiers: None,
         }

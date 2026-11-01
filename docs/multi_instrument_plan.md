@@ -71,7 +71,7 @@ trait InstrumentModel {
 enum PlayPosition {
     Hole(HoleAssignment),                                 // pitch_map's hole, action, technique
     Fret { string: u8, fret: u8, technique: StringTechnique },
-    Fingering { id: FingeringId, harmonic: u8 },          // flute: fingering + register
+    Fingering(FingeringAssignment),                       // flute: note + which fingering
 }
 ```
 
@@ -117,8 +117,14 @@ arrangements, preserving tab tuning and authored string/fret positions.
 - New optional top-level `instrument`. If it is absent, the chart is a
   harmonica chart and `harmonica` is the instrument, so every existing chart
   loads unchanged.
-- New optional `NoteEvent.position`, e.g. `{"string": 5, "fret": 3}` or
-  `{"fingering": "C5", "harmonic": 1}`.
+- New optional `NoteEvent.position`, e.g. `{"string": 5, "fret": 3}`.
+- **Flute (format 1.9.0):** `"instrument": {"type": "flute", "foot":
+  "c"|"b"}`, and an event is its `note` plus an optional `fingering`, the
+  index of an alternate (absent or 0 the standard). It is not
+  `{fingering, harmonic}` as first sketched: the source chart gives the
+  third octave as key sets with no partial number, and two notes on the
+  same keys already *are* a register pair (`Flute::overblown_pairs`),
+  so nothing needs a harmonic number written down.
 - For non-harmonica instruments `note` (the pitch) is **required** and is
   the truth. `hole`/`action` become optional, and the schema requires them
   only when the instrument is a harmonica.
@@ -136,8 +142,10 @@ arrangements, preserving tab tuning and authored string/fret positions.
   `.harpchart` extension: the name is now historical, but it is the play
   format (see the import-source rule) and renaming it costs every pack.
 
-Older engines refuse a 1.8.0 chart through `format_version_supported`
-rather than misreading it.
+Older engines refuse a 1.8.0 chart (or a flute's 1.9.0) through
+`format_version_supported` rather than misreading it. The loader runs
+`chart_check::instrument_problems` after the schema, since what an event
+must name depends on the root's instrument.
 
 ## Pitch detection per instrument
 

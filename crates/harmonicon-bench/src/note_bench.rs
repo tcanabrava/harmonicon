@@ -575,6 +575,7 @@ mod tests {
             hole: Some(2),
             action: Some(Action::Blow),
             position: None,
+            fingering: None,
             note: Some("E4".into()),
             modifiers: None,
         });

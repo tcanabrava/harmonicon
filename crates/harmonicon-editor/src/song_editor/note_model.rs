@@ -230,15 +230,22 @@ pub(super) struct GridNote {
     pub(super) target: harmonicon_core::note_target::NoteTarget,
 }
 
+/// The flute's highest note, C7: the grid's top row on a flute.
+pub(super) const FLUTE_TOP_NOTE: u8 = 96;
+
 impl GridNote {
     /// The grid row the note sits on, counted from 1 at the top: a
-    /// harmonica's hole, a guitar's string. Everything that lays notes out
+    /// harmonica's hole, a guitar's string, a flute's pitch counted down
+    /// from C7 ([`FLUTE_TOP_NOTE`]). Everything that lays notes out
     /// or compares where they sit (drawing, dragging, overlap, paste) asks
     /// this, never the harmonica's own hole.
     pub(super) fn row(&self) -> u8 {
         match self.target.position() {
             Some(harmonicon_core::instrument::PlayPosition::Hole(a)) => a.hole,
             Some(harmonicon_core::instrument::PlayPosition::Fret(a)) => a.string,
+            Some(harmonicon_core::instrument::PlayPosition::Fingering(a)) => {
+                FLUTE_TOP_NOTE.saturating_sub(a.note) + 1
+            }
             None => 1,
         }
     }
@@ -257,6 +264,14 @@ impl GridNote {
             Some(PlayPosition::Fret(mut a)) => {
                 a.string = row;
                 PlayPosition::Fret(a)
+            }
+            // A flute row is a pitch, and an alternate fingering belongs
+            // to one note, so the moved note takes its new one's standard.
+            Some(PlayPosition::Fingering(_)) => {
+                PlayPosition::Fingering(harmonicon_core::instrument::flute::FingeringAssignment {
+                    note: FLUTE_TOP_NOTE + 1 - row,
+                    alternate: 0,
+                })
             }
             None => return,
         };

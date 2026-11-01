@@ -199,6 +199,7 @@ mod tests {
                     hole: Some(*hole),
                     action: Some(*action),
                     position: None,
+                    fingering: None,
                     note: None,
                     modifiers: None,
                 })

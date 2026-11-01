@@ -726,6 +726,11 @@ pub(super) fn validated_harpchart(text: &str) -> Result<serde_json::Value, Strin
 /// them successfully and silently erasing their meaning on the next save.
 pub(super) fn unsupported_chart_features(value: &serde_json::Value) -> Vec<String> {
     let mut found = Vec::new();
+    // The grid has no flute rows or note column yet; loading one would
+    // route its notes through the harmonica's tools.
+    if value["instrument"]["type"] == "flute" {
+        found.push("a flute part, which the Song Editor can't edit yet".to_string());
+    }
     if let Some(track) = value["track"].as_array() {
         for (index, phrase) in track.iter().enumerate() {
             let number = index + 1;

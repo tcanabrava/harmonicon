@@ -4,7 +4,9 @@
 use super::state::{EditorState, GridNote};
 use harmonicon_core::chart::{Modifier, NoteEvent};
 use harmonicon_core::instrument::InstrumentModel;
-use harmonicon_core::instrument::{Instrument, PlayPosition, guitar::FretAssignment};
+use harmonicon_core::instrument::{
+    Instrument, PlayPosition, flute::FingeringAssignment, guitar::FretAssignment,
+};
 use harmonicon_core::note_target::NoteTarget;
 
 pub(super) fn configured_instrument(value: &serde_json::Value) -> Option<Instrument> {
@@ -23,15 +25,23 @@ pub(super) fn decode_note(
     state: &mut EditorState,
 ) -> Option<GridNote> {
     let event: NoteEvent = serde_json::from_value(value.clone()).ok()?;
-    let at = event.position?;
-    let position = PlayPosition::Fret(FretAssignment {
-        string: at.string,
-        fret: at.fret,
-        technique: harmonicon_core::chart_check::string_technique(
-            event.modifiers.as_deref().unwrap_or(&[]),
-        ),
-    });
     let midi = harmonicon_core::midi::note_to_midi(event.note.as_deref()?)? as f32;
+    let position = match instrument {
+        Instrument::Flute(_) => PlayPosition::Fingering(FingeringAssignment {
+            note: midi as u8,
+            alternate: event.fingering.unwrap_or(0),
+        }),
+        _ => {
+            let at = event.position?;
+            PlayPosition::Fret(FretAssignment {
+                string: at.string,
+                fret: at.fret,
+                technique: harmonicon_core::chart_check::string_technique(
+                    event.modifiers.as_deref().unwrap_or(&[]),
+                ),
+            })
+        }
+    };
     if instrument.pitch_of(&position)? != midi as u8 {
         return None;
     }
@@ -82,7 +92,14 @@ pub(super) fn encode_note(
         }
         super::state::Expr::None => None,
     };
-    let original = NoteEvent { hole: None, action: None, position: None, note: None, modifiers };
+    let original = NoteEvent {
+        hole: None,
+        action: None,
+        position: None,
+        fingering: None,
+        note: None,
+        modifiers,
+    };
     serde_json::to_value(
         harmonicon_core::note_event_codec::encode(instrument, note.target, &original)
             .expect("only validated placements enter the editor document"),

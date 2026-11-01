@@ -68,12 +68,18 @@ load-bearing about *this* crate.
     reader that goes through `AssetServer` gets the expansion for free, and
     one that parses the file itself must call `expand`.
   - **A chart names one instrument** (format 1.8.0): `harmonica`, or a
-    top-level `instrument` (only `guitar` so far), never both — the schema's
-    `oneOf`. Rules depending on which (events name a hole *or* a string
-    position, bend sign, techniques per instrument, a position sounding its
-    stated `note`) are core's `chart_check::instrument_problems`, run by
-    `validate-pack`. A guitar chart loads and plays on Play 2D's horizontal
-    tab highway and opens in the Song Editor's guitar tab view. Jam Session
+    top-level `instrument` — `guitar`, or `flute` from 1.9.0 — never both,
+    the schema's `oneOf`. Rules depending on which (events name a hole, a
+    string position, or for a flute only its note and optional
+    `fingering`; bend sign; techniques per instrument; a position sounding
+    its stated `note`; a note within a flute's foot joint) are core's
+    `chart_check::instrument_problems`. **The loader runs it too**, after
+    the schema, not only `validate-pack`: a schema can't make a nested
+    event's shape depend on the root's instrument, so since the flute's
+    note-only event became schema-legal, only that check refuses a guitar
+    event missing its string. A guitar chart plays on Play 2D's
+    horizontal tab highway and opens in the Song Editor; a flute chart
+    loads, but the editor refuses it until it has flute rows. Jam Session
     remains harmonica-only.
   - Chromatic harps are fully supported: `Harmonica::hole_count()` sizes
     lanes/overlays/editor everywhere (never hardcode 10), and

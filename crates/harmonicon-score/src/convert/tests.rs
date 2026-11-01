@@ -496,3 +496,17 @@ fn a_guitar_part_is_fingered_as_a_whole() {
     assert_eq!(strings.len(), 4, "one string per chord note");
     assert_eq!(harmonicon_core::chart_check::instrument_problems(&chart), Vec::<String>::new());
 }
+
+#[test]
+fn a_flute_plays_the_top_of_a_chord_one_note_at_a_time_and_drops_what_it_lacks() {
+    use harmonicon_core::instrument::flute::{Flute, FootJoint};
+    let note =
+        |start_secs, duration_secs, midi| ScoreNote { start_secs, duration_secs, midi, fret: None };
+    let notes = [note(0.0, 1.5, 60), note(0.0, 1.5, 64), note(1.0, 0.5, 67), note(2.0, 0.5, 40)];
+    let (items, report) = flute_items(&notes, &Flute::new(FootJoint::C));
+    let played: Vec<(f64, f64, Option<&str>)> =
+        items.iter().map(|i| (i.time.unwrap(), i.duration, i.events[0].note.as_deref())).collect();
+    assert_eq!(played, [(0.0, 1.0, Some("E4")), (1.0, 0.5, Some("G4"))]);
+    assert_eq!((report.total, report.natural, report.unreachable), (4, 2, 2));
+    assert!(items.iter().all(|i| i.events[0].fingering.is_none()), "standard fingerings");
+}

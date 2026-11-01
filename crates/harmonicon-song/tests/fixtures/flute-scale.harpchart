@@ -1,0 +1,18 @@
+{
+  "metadata": { "format_version": "1.9.0", "description": "Test chart for the flute: a B foot's low B, the overblown octave, an alternate fingering and breath vibrato." },
+  "song": { "title": "Flute Scale", "artist": "Zz Test (Claude)", "genre": "Test",
+            "tempo_bpm": 80.0, "key": "C", "difficulty": "easy", "time_signature": "4/4" },
+  "timing": { "resolution": 12, "tempo_map": [{ "tick": 0, "bpm": 80.0 }] },
+  "instrument": { "type": "flute", "foot": "b" },
+  "track": [
+    { "time": 1.0, "duration": 0.7, "events": [{ "note": "B3" }] },
+    { "time": 1.8, "duration": 0.7, "events": [{ "note": "C4" }] },
+    { "time": 2.6, "duration": 0.7, "events": [{ "note": "E4" }] },
+    { "time": 3.4, "duration": 0.7, "events": [{ "note": "E5" }] },
+    { "time": 4.2, "duration": 0.7, "events": [{ "note": "D6", "fingering": 1 }] },
+    { "time": 5.0, "duration": 0.7, "events": [{ "note": "G6" }] },
+    { "time": 5.8, "duration": 1.6, "events": [{ "note": "C7",
+        "modifiers": [{ "type": "vibrato", "oscillation_hz": 5.0 }] }] }
+  ],
+  "scoring": { "perfect_window_ms": 50, "good_window_ms": 100, "miss_window_ms": 130 }
+}

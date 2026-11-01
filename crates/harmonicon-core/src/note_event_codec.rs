@@ -3,6 +3,7 @@
 //! Conversion between chart positions and layout-independent note intent.
 //! Expression modifiers are retained on the chart event, outside the target.
 use crate::chart::{FretPosition, HarpChart, Modifier, NoteEvent};
+use crate::instrument::flute::FingeringAssignment;
 use crate::instrument::guitar::FretAssignment;
 use crate::instrument::{Instrument, InstrumentModel, PlayPosition};
 use crate::note_target::{NoteTarget, PlacementError};
@@ -59,6 +60,22 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             NoteTarget::Sounding { midi: acoustic, placement: None }
                 .with_placement(&instrument, position)
         }
+        Instrument::Flute(_) => {
+            if event.hole.is_some()
+                || event.action.is_some()
+                || event.position.is_some()
+                || modifiers.iter().any(|m| !matches!(m, Modifier::Vibrato { .. }))
+            {
+                return Err(PlacementError::Unplayable);
+            }
+            let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
+            let position = PlayPosition::Fingering(FingeringAssignment {
+                note: midi,
+                alternate: event.fingering.unwrap_or(0),
+            });
+            NoteTarget::Sounding { midi: f32::from(midi), placement: None }
+                .with_placement(&instrument, position)
+        }
     }
 }
 
@@ -74,6 +91,7 @@ pub fn encode(
     let position = target.position().ok_or(PlacementError::Unplayable)?;
     target.with_placement(instrument, position)?;
     let mut result = original.clone();
+    result.fingering = None;
     let mut modifiers: Vec<_> = original
         .modifiers
         .as_deref()
@@ -129,6 +147,16 @@ pub fn encode(
                 StringTechnique::Harmonic => modifiers.push(Modifier::Harmonic),
             }
         }
+        PlayPosition::Fingering(at) => {
+            result.hole = None;
+            result.action = None;
+            result.position = None;
+            result.fingering = (at.alternate > 0).then_some(at.alternate);
+            // Breath vibrato is all a flute keeps of the original's
+            // expression.
+            modifiers.retain(|m| matches!(m, Modifier::Vibrato { .. }));
+            result.note = Some(crate::midi::midi_to_note(i32::from(at.note)));
+        }
     }
     result.modifiers = (!modifiers.is_empty()).then_some(modifiers);
     Ok(result)
@@ -153,6 +181,49 @@ mod tests {
             );
         }
     }
+    fn flute_fixture() -> HarpChart {
+        serde_json::from_str(include_str!(
+            "../../harmonicon-song/tests/fixtures/flute-scale.harpchart"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn flute_fixture_round_trips_its_fingerings_and_is_sound() {
+        let chart = flute_fixture();
+        assert!(crate::chart_check::instrument_problems(&chart).is_empty());
+        let instrument = chart.instrument().unwrap();
+        for event in chart.track.iter().flat_map(|item| &item.events) {
+            let target = decode(&chart, event).unwrap();
+            let restored = encode(&instrument, target, event).unwrap();
+            assert_eq!(
+                serde_json::to_value(event).unwrap(),
+                serde_json::to_value(restored).unwrap()
+            );
+        }
+        let d6 = decode(&chart, &chart.track[4].events[0]).unwrap();
+        assert_eq!(
+            d6.position(),
+            Some(PlayPosition::Fingering(FingeringAssignment { note: 86, alternate: 1 }))
+        );
+    }
+
+    #[test]
+    fn a_flute_event_out_of_range_or_with_a_reed_technique_is_refused() {
+        let mut chart = flute_fixture();
+        chart.instrument_spec =
+            Some(crate::chart::ChartInstrument::Flute { foot: Default::default() });
+        let problems = crate::chart_check::instrument_problems(&chart);
+        assert_eq!(problems.len(), 1, "B3 needs a B foot: {problems:?}");
+        assert!(problems[0].starts_with("track[0]"));
+        let mut event = chart.track[1].events[0].clone();
+        event.fingering = Some(4);
+        assert_eq!(decode(&chart, &event), Err(PlacementError::Unplayable));
+        event.fingering = None;
+        event.modifiers = Some(vec![Modifier::Overblow]);
+        assert_eq!(decode(&chart, &event), Err(PlacementError::Unplayable));
+    }
+
     #[test]
     fn mismatched_pinned_guitar_pitch_is_refused() {
         let mut chart: HarpChart = serde_json::from_str(include_str!(

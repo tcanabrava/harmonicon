@@ -98,10 +98,16 @@ gates 1.0. In order:
 - **Seam leftovers** that read holes directly and move when they next
   change: the progress bar's note lanes (`NoteMarker`) and Jam Session's
   `hole_map`.
-- **Flute**: its chart fields, Boehm fingering table, pitch lanes and
-  fingering diagram,
-  register drills, a corpus aimed at octave errors. The foot joint (C or B)
-  is a per-instrument setting.
+- **Flute**. The model (`instrument::flute`, a C or B foot), the sourced
+  Boehm fingering table, chart format 1.9.0, its drills in the trainer
+  model, score conversion and a flute synth voice are in. Next:
+  - Play 2D: pitch lanes limited to the notes a chart uses, and the
+    fingering diagram for the upcoming note;
+  - the Song Editor's flute rows and note column (it refuses a flute
+    chart until then);
+  - the Note Trainer's flute screen (`Register` is the overblown pairs);
+  - a recorded corpus aimed at octave errors, before any detection tuning;
+  - choosing the foot joint in "My instruments" (content and progress).
 - **Content and progress**: per-instrument packs, DAGs and profile, a
   "My instruments" page, per-instrument Jam Session.
 

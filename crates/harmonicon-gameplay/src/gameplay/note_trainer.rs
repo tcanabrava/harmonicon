@@ -130,7 +130,7 @@ impl NoteTrainer {
     fn guitar(&self) -> Option<&Guitar> {
         match &self.instrument {
             Instrument::Guitar(guitar) => Some(guitar),
-            Instrument::Harmonica(_) => None,
+            Instrument::Harmonica(_) | Instrument::Flute(_) => None,
         }
     }
 

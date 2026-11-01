@@ -23,6 +23,7 @@ use harmonicon_core::chart::{
 };
 use harmonicon_core::harmonica::Harmonica;
 use harmonicon_core::instrument::Instrument;
+use harmonicon_core::instrument::flute::Flute;
 use harmonicon_core::instrument::guitar::fingering::{Onset, fingering};
 use harmonicon_core::instrument::guitar::{
     FretAssignment, Guitar, GuitarBody, STANDARD_TUNING, StringTechnique,
@@ -227,12 +228,19 @@ pub fn to_chart(
             let (items, report) = guitar_items(&notes, guitar);
             (items, report, likely_key(&notes))
         }
+        Instrument::Flute(flute) => {
+            let (items, report) = flute_items(&notes, flute);
+            (items, report, likely_key(&notes))
+        }
     };
     let mut chart = chart_shell(score, artist, key, items);
     match instrument {
         Instrument::Harmonica(harp) => chart.harmonica = Some(harp.clone()),
         Instrument::Guitar(guitar) => {
             chart.instrument_spec = Some(ChartInstrument::from_guitar(guitar));
+        }
+        Instrument::Flute(flute) => {
+            chart.instrument_spec = Some(ChartInstrument::from_flute(flute));
         }
     }
     Ok((chart, report))
@@ -367,6 +375,42 @@ fn guitar_items(notes: &[ScoreNote], guitar: &Guitar) -> (Vec<TrackItem>, Conver
             let name = midi_to_note(i32::from(note.midi));
             items.push(item(note, NoteEvent::fretted(position.string, position.fret, name)));
         }
+    }
+    (items, report)
+}
+
+/// A track as a flute plays it: one note at a time, on each note's standard
+/// fingering. Of notes starting together only the highest is kept (a
+/// melody sits on top), and a note still sounding when the next starts is
+/// cut short there, since the flute has one voice to give it. A note
+/// outside the flute's range is dropped and counted, never moved an
+/// octave: that would be a different tune.
+fn flute_items(notes: &[ScoreNote], flute: &Flute) -> (Vec<TrackItem>, ConversionReport) {
+    let mut report = ConversionReport { total: notes.len(), ..Default::default() };
+    let mut line: Vec<ScoreNote> = Vec::new();
+    for note in notes {
+        match line.last_mut() {
+            Some(last) if (last.start_secs - note.start_secs).abs() < 1e-6 => {
+                if note.midi > last.midi {
+                    *last = *note;
+                }
+                report.unreachable += 1;
+            }
+            _ => line.push(*note),
+        }
+    }
+    let mut items = Vec::new();
+    for (i, note) in line.iter().enumerate() {
+        if flute.fingerings_for(note.midi).is_empty() {
+            report.unreachable += 1;
+            continue;
+        }
+        report.natural += 1;
+        let mut note = *note;
+        if let Some(next) = line.get(i + 1) {
+            note.duration_secs = note.duration_secs.min(next.start_secs - note.start_secs);
+        }
+        items.push(item(&note, NoteEvent::fingered(midi_to_note(i32::from(note.midi)), 0)));
     }
     (items, report)
 }

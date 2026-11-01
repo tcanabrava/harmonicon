@@ -21,6 +21,10 @@ pub enum Voice {
     /// A plucked string (Karplus–Strong): bright at the attack, ringing
     /// down after it. Expression isn't modelled.
     PluckedString,
+    /// A flute: nearly a sine, with a breath that never quite goes away.
+    /// Vibrato is breath vibrato, as on the harmonica; wah has no flute
+    /// meaning, so it stays the harmonica's.
+    Flute,
 }
 
 /// CD-quality mono output used by every consumer of this synth.
@@ -143,6 +147,23 @@ fn voice_phase(freq: f32, t: f64, phase_mod: f32) -> f32 {
 /// note the synth renders, including a whole song when the Song Editor
 /// plays. The pair comes from an [`Oscillator`] for a steady note and from
 /// `voice_phase(..).sin_cos()` under vibrato.
+/// A flute's tone from the fundamental's `sin`/`cos`: the fundamental with
+/// a little of the second and third partials, which is most of what tells
+/// a flute from a sine. `(tone, tone)`, so a wah crossfade leaves it be.
+fn flute_wave(sin_x: f32, cos_x: f32) -> (f32, f32) {
+    const SECOND: f32 = 0.18;
+    const THIRD: f32 = 0.06;
+    let sin_2x = 2.0 * sin_x * cos_x;
+    let sin_3x = sin_x * (3.0 - 4.0 * sin_x * sin_x);
+    let tone = (sin_x + SECOND * sin_2x + THIRD * sin_3x) / (1.0 + SECOND + THIRD);
+    (tone, tone)
+}
+
+/// The share of the attack's breath noise a flute keeps for the rest of the
+/// note: the air across the embouchure hole doesn't stop when the tone
+/// speaks, as a harmonica reed's does.
+const FLUTE_BREATH_FLOOR: f32 = 0.35;
+
 fn harmonica_wave(sin_x: f32, cos_x: f32) -> (f32, f32) {
     const AMPS: [f32; 6] = [P1, P2, P3, P4, P5, P6];
     let two_cos = 2.0 * cos_x;
@@ -316,7 +337,11 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
             // Amplitude dips toward WAH_AMP_CLOSED when cupped.
             // Tone color is crossfaded from muffled (fundamental only) to the
             // full bright harmonic stack as the hands open.
-            let (bright, muffled) = harmonica_wave(sin_x, cos_x);
+            let (bright, muffled) = if voice == Voice::Flute {
+                flute_wave(sin_x, cos_x)
+            } else {
+                harmonica_wave(sin_x, cos_x)
+            };
             let (tone, amp_mod) = if let Expr::Wah(rate) = n.expr {
                 let wah_open = ((TAU * rate * t).sin() + 1.0) * 0.5;
                 let blended = muffled + wah_open * (bright - muffled);
@@ -330,7 +355,8 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
             rng = rng.wrapping_mul(LCG_MUL).wrapping_add(LCG_INC);
             let noise_sample = (rng as i32) as f32 / i32::MAX as f32;
             // Full level through the attack, then e^(DECAY·t) from its end.
-            let breath = noise_sample * BREATH_NOISE_AMP * noise_env;
+            let floor = if voice == Voice::Flute { FLUTE_BREATH_FLOOR } else { 0.0 };
+            let breath = noise_sample * BREATH_NOISE_AMP * noise_env.max(floor);
             if i >= attack_samples {
                 noise_env *= noise_decay_step;
             }
@@ -361,6 +387,30 @@ mod tests {
     /// sharp across a long one. The invariant that separates them is
     /// boundedness: the correct phase deviation oscillates inside a fixed
     /// window forever, the naive one grows without limit.
+    /// How much of a rendered note is its fundamental: the correlation with a
+    /// pure sine at `freq`, over the note's middle.
+    fn fundamental_share(voice: Voice, freq: f32) -> f32 {
+        let note = PhraseNote { tick: 0, len: 1, freq: Some(freq), expr: Expr::None };
+        let pcm = render_pcm_with(&[note], 0.5, voice);
+        let middle = &pcm[4_000..18_000];
+        let (mut sin, mut cos, mut energy) = (0.0f32, 0.0f32, 0.0f32);
+        for (i, x) in middle.iter().enumerate() {
+            let phase = TAU * freq * i as f32 / SAMPLE_RATE as f32;
+            sin += x * phase.sin();
+            cos += x * phase.cos();
+            energy += x * x;
+        }
+        2.0 * (sin * sin + cos * cos) / (energy * middle.len() as f32)
+    }
+
+    #[test]
+    fn a_flute_sounds_mostly_its_fundamental_as_a_harmonica_does_not() {
+        let flute = fundamental_share(Voice::Flute, 440.0);
+        let harp = fundamental_share(Voice::Harmonica, 440.0);
+        assert!(flute > 0.8, "flute {flute}");
+        assert!(flute > harp + 0.2, "flute {flute} vs harmonica {harp}");
+    }
+
     #[test]
     fn vibrato_phase_deviation_stays_bounded_however_long_the_note() {
         let (freq, rate) = (440.0, 5.0);

@@ -199,44 +199,59 @@
     },
 
     "instrument": {
-      "type": "object",
-      "description": "A non-harmonica instrument, used instead of harmonica (format 1.8.0). Strings are note names, string 1 (the highest) first; frets count from the nut and capo is the fret the capo sits on.",
-      "required": ["type", "strings", "frets"],
-      "additionalProperties": false,
+      "description": "A non-harmonica instrument, used instead of harmonica: a guitar (format 1.8.0) or a flute (format 1.9.0).",
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "A guitar (format 1.8.0). Strings are note names, string 1 (the highest) first; frets count from the nut and capo is the fret the capo sits on.",
+          "required": ["type", "strings", "frets"],
+          "additionalProperties": false,
 
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["guitar"]
-        },
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["guitar"]
+            },
 
-        "strings": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 12,
-          "items": {
-            "type": "string",
-            "pattern": "^[A-G][#b]?[0-9]$"
+            "strings": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 12,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-G][#b]?[0-9]$"
+              }
+            },
+
+            "frets": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 36
+            },
+
+            "capo": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 24
+            },
+
+            "body": {
+              "type": "string",
+              "enum": ["electric", "acoustic"]
+            }
           }
         },
-
-        "frets": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 36
-        },
-
-        "capo": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 24
-        },
-
-        "body": {
-          "type": "string",
-          "enum": ["electric", "acoustic"]
+        {
+          "type": "object",
+          "description": "A Boehm flute (format 1.9.0). foot is its foot joint: c reaches C4, b reaches B3. Defaults to c.",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["flute"] },
+            "foot": { "type": "string", "enum": ["c", "b"] }
+          }
         }
-      }
+      ]
     },
 
     "harmonica": {
@@ -445,11 +460,12 @@
             "items": {
               "type": "object",
 
-              "description": "A harmonica event names hole and action; a stringed instrument's names position and note. Which one a chart needs is validated by the engine against its instrument.",
+              "description": "A harmonica event names hole and action; a stringed instrument's names position and note; a flute's names its note, and optionally which fingering. Which one a chart needs is validated by the engine against its instrument.",
 
               "anyOf": [
                 { "required": ["hole", "action"] },
-                { "required": ["position", "note"] }
+                { "required": ["position", "note"] },
+                { "required": ["note"], "not": { "anyOf": [{ "required": ["hole"] }, { "required": ["position"] }] } }
               ],
 
               "additionalProperties": false,
@@ -478,6 +494,12 @@
                     "string": { "type": "integer", "minimum": 1 },
                     "fret": { "type": "integer", "minimum": 0 }
                   }
+                },
+
+                "fingering": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Which of a flute note's fingerings (format 1.9.0): 0 or absent the standard one, then its alternates in the engine's table order."
                 },
 
                 "note": {

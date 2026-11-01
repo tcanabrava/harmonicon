@@ -9,6 +9,7 @@
 //! a player, so they are plain English rather than localized.
 
 use crate::chart::{FretPosition, HarpChart, Modifier, NoteEvent};
+use crate::instrument::flute::{FingeringAssignment, Flute};
 use crate::instrument::guitar::{FretAssignment, Guitar, StringTechnique};
 use crate::instrument::{Instrument, InstrumentModel, PlayPosition};
 use crate::midi::note_to_midi;
@@ -26,6 +27,7 @@ pub fn instrument_problems(chart: &HarpChart) -> Vec<String> {
             let problem = match &instrument {
                 Instrument::Harmonica(_) => harmonica_event_problem(event),
                 Instrument::Guitar(guitar) => guitar_event_problem(guitar, event),
+                Instrument::Flute(flute) => flute_event_problem(flute, event),
             };
             problems.extend(problem.map(|p| format!("{at}: {p}")));
         }
@@ -87,6 +89,32 @@ fn guitar_event_problem(guitar: &Guitar, event: &NoteEvent) -> Option<String> {
             crate::midi::midi_to_note(i32::from(sounds))
         )),
         Some(_) => None,
+    }
+}
+
+fn flute_event_problem(flute: &Flute, event: &NoteEvent) -> Option<String> {
+    if event.hole.is_some() || event.action.is_some() || event.position.is_some() {
+        return Some(
+            "a flute event names a note and a fingering, not a hole or string".to_string(),
+        );
+    }
+    let Some(note) = event.note.as_deref() else {
+        return Some("a flute event needs its note".to_string());
+    };
+    if let Some(other) = modifiers(event).iter().find(|m| !matches!(m, Modifier::Vibrato { .. })) {
+        return Some(format!("a flute has no {other:?}; only vibrato"));
+    }
+    let Some(midi) = note_to_midi(note).and_then(|m| u8::try_from(m).ok()) else {
+        return Some(format!("{note} is not a note"));
+    };
+    let alternate = event.fingering.unwrap_or(0);
+    let position = PlayPosition::Fingering(FingeringAssignment { note: midi, alternate });
+    match InstrumentModel::pitch_of(flute, &position) {
+        Some(_) => None,
+        None if flute.fingerings_for(midi).is_empty() => {
+            Some(format!("{note} is outside this flute's range"))
+        }
+        None => Some(format!("{note} has no fingering {alternate}")),
     }
 }
 

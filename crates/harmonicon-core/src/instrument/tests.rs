@@ -229,3 +229,22 @@ fn guitar_detection_includes_harmonics_and_respects_tuning_gaps() {
         crate::note_tracker::VoiceFilter::for_instrument(&guitar.into(), &Default::default());
     assert_eq!(filter.allowed(&[124, 70, 40]), [40, 124]);
 }
+
+#[test]
+fn a_flute_is_one_voice_on_pitch_lanes_with_its_fingerings_as_positions() {
+    use flute::FootJoint;
+    let flute = Flute::new(FootJoint::C);
+    let positions = InstrumentModel::positions_for(&flute, 86);
+    assert_eq!(positions.len(), 3, "D6: the standard fingering and two alternates");
+    assert!(positions.iter().all(|p| InstrumentModel::pitch_of(&flute, p) == Some(86)));
+    let missing = PlayPosition::Fingering(FingeringAssignment { note: 86, alternate: 3 });
+    assert_eq!(InstrumentModel::pitch_of(&flute, &missing), None);
+    assert!(!InstrumentModel::can_sound_together(&flute, &positions[0], &positions[1]));
+    assert_eq!(InstrumentModel::range(&flute), Some((60, 96)));
+    let lanes = InstrumentModel::lane_layout(&flute);
+    assert_eq!(lanes.lanes.len(), 37);
+    assert_eq!(lanes.lanes[0].label, "C4");
+    assert_eq!(lanes.lane_of(&positions[0]), Some(26));
+    let below = PlayPosition::Fingering(FingeringAssignment { note: 50, alternate: 0 });
+    assert_eq!((lanes.lane_of(&below), lanes.nearest_lane(&below)), (None, 0));
+}

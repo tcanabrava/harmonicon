@@ -854,6 +854,7 @@ pub(super) fn head_text(judged: Option<bool>, note: &ScheduledNote, show_numbers
 fn note_head_label(note: &ScheduledNote, show_numbers: bool) -> String {
     match &note.position {
         PlayPosition::Fret(a) => a.tab_label(),
+        PlayPosition::Fingering(a) => harmonicon_core::midi::midi_to_note(i32::from(a.note)),
         position => HoleTab::of(position)
             .map(|tab| head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers))
             .unwrap_or_default(),

@@ -17,6 +17,7 @@
 
 use crate::chart::Action;
 use crate::harmonica::Harmonica;
+use crate::instrument::flute::{FingeringAssignment, Flute};
 use crate::instrument::guitar::{FretAssignment, Guitar, StringTechnique};
 use crate::instrument::{Instrument, InstrumentModel, PlayPosition, TechniqueKind};
 use crate::note_target::NoteTarget;
@@ -45,6 +46,7 @@ pub fn drills(instrument: &Instrument, kind: TechniqueKind) -> Vec<Drill> {
     let candidates = match instrument {
         Instrument::Harmonica(harp) => harmonica_candidates(harp, kind),
         Instrument::Guitar(guitar) => guitar_candidates(guitar, kind),
+        Instrument::Flute(flute) => flute_candidates(flute, kind),
     };
     let pitch = |p: PlayPosition| NoteTarget::Positioned(p).sounding_pitch(instrument);
     candidates
@@ -136,6 +138,35 @@ fn guitar_candidates(
         }
     }
     out
+}
+
+/// `(position, the position it starts from)` for each flute drill of
+/// `kind`. A register jump is one set of keys overblown from its lower note
+/// to its upper one ([`Flute::overblown_pairs`]); a position drill is every
+/// fingering of a note that has more than one.
+fn flute_candidates(
+    flute: &Flute,
+    kind: TechniqueKind,
+) -> Vec<(PlayPosition, Option<PlayPosition>)> {
+    let at = |note, alternate| PlayPosition::Fingering(FingeringAssignment { note, alternate });
+    let (low, high) = InstrumentModel::range(flute).unwrap_or((60, 96));
+    match kind {
+        TechniqueKind::Target => (low..=high).map(|note| (at(note, 0), None)).collect(),
+        TechniqueKind::Register => flute
+            .overblown_pairs()
+            .into_iter()
+            .map(|(lower, upper)| {
+                (PlayPosition::Fingering(upper), Some(PlayPosition::Fingering(lower)))
+            })
+            .collect(),
+        TechniqueKind::Position => (low..=high)
+            .flat_map(|note| {
+                let count = flute.fingerings_for(note).len() as u8;
+                (0..count).filter(move |_| count > 1).map(move |alt| (at(note, alt), None))
+            })
+            .collect(),
+        TechniqueKind::Glide => Vec::new(),
+    }
 }
 
 /// How far from a drill's target a pitch may sit and still count as
@@ -292,6 +323,21 @@ mod tests {
             start: Some(71.0),
             target: 69.0,
         }
+    }
+
+    #[test]
+    fn a_flute_drills_every_note_its_overblown_octaves_and_alternates() {
+        use crate::instrument::flute::FootJoint;
+        let flute: Instrument = Flute::new(FootJoint::C).into();
+        assert_eq!(drills(&flute, TechniqueKind::Target).len(), 37, "C4 to C7");
+        assert!(drills(&flute, TechniqueKind::Glide).is_empty(), "a lip bend isn't a new note");
+        let e5 = PlayPosition::Fingering(FingeringAssignment { note: 76, alternate: 0 });
+        let d = find(&drills(&flute, TechniqueKind::Register), e5).expect("E5 is E4 overblown");
+        assert_eq!((d.start, d.target), (Some(64.0), 76.0));
+        let positions = drills(&flute, TechniqueKind::Position);
+        assert!(positions.iter().all(|d| d.target >= 86.0), "only the third octave has alternates");
+        let b_foot: Instrument = Flute::new(FootJoint::B).into();
+        assert_eq!(drills(&b_foot, TechniqueKind::Target).first().map(|d| d.target), Some(59.0));
     }
 
     #[test]

@@ -11,10 +11,8 @@ use bevy::prelude::*;
 
 use harmonicon_app::app::EffectiveHarmonica;
 use harmonicon_core::chart::{Action, HarpChart, Modifier, PlayMode};
-use harmonicon_core::chart_check::string_technique;
 use harmonicon_core::harp_remap;
 use harmonicon_core::instrument::PlayPosition;
-use harmonicon_core::instrument::guitar::FretAssignment;
 use harmonicon_core::midi::note_to_midi;
 use harmonicon_core::pitch_map::{HoleAssignment, Technique, technique_of};
 
@@ -331,14 +329,11 @@ pub fn build_scheduled_notes(
                 // Any instrument but the harmonica: the event names where it
                 // is played and its sounding note, and there is no
                 // substitute instrument to remap onto.
+                // Where that is comes from core's codec, the one reading of
+                // an event per instrument (a string and fret, a fingering).
                 let Some(chart_harp) = chart.harmonica.as_ref() else {
-                    let at = event.position?;
-                    let technique = string_technique(&modifiers);
-                    let position = PlayPosition::Fret(FretAssignment {
-                        string: at.string,
-                        fret: at.fret,
-                        technique,
-                    });
+                    let position =
+                        harmonicon_core::note_event_codec::decode(chart, event).ok()?.position()?;
                     return Some((position, modifiers, chart.event_pitch(event), true));
                 };
                 // Validation guarantees every event of a harmonica chart
@@ -540,6 +535,27 @@ mod tests {
         );
         assert_eq!(notes[0].chord_pitches, [40, 47]);
         assert!(notes[2].chord_pitches.is_empty());
+    }
+
+    /// A flute event names only its note and fingering; every one is
+    /// scheduled, on the pitch its note gives.
+    #[test]
+    fn a_flute_chart_schedules_every_note_on_its_fingering() {
+        let chart: HarpChart = serde_json::from_str(include_str!(
+            "../../../harmonicon-song/tests/fixtures/flute-scale.harpchart"
+        ))
+        .unwrap();
+        let (notes, _) =
+            build_scheduled_notes(&EffectiveHarmonica::default(), &chart, &Default::default());
+        assert_eq!(notes.len(), 7);
+        let d6 = notes.iter().find(|n| n.expected_pitch == Some(86)).expect("D6");
+        assert_eq!(
+            d6.position,
+            PlayPosition::Fingering(harmonicon_core::instrument::flute::FingeringAssignment {
+                note: 86,
+                alternate: 1,
+            })
+        );
     }
 
     /// A harp chosen on the harp-check page can't stand in for a guitar.

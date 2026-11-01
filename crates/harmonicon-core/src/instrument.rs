@@ -19,11 +19,13 @@
 //! pitch, not which hole or string made it, so the judge only ever compares
 //! [`InstrumentModel::pitch_of`]'s answer.
 
+pub mod flute;
 pub mod guitar;
 
 use crate::chart::Action;
 use crate::harmonica::Harmonica;
 use crate::pitch_map::{HoleAssignment, Technique, playable_assignments};
+use flute::{FingeringAssignment, Flute};
 use guitar::{FretAssignment, Guitar, StringTechnique};
 
 /// The instrument a chart part is played on. A closed enum rather than a
@@ -33,6 +35,7 @@ use guitar::{FretAssignment, Guitar, StringTechnique};
 pub enum Instrument {
     Harmonica(Harmonica),
     Guitar(Guitar),
+    Flute(Flute),
 }
 
 impl From<Harmonica> for Instrument {
@@ -47,7 +50,14 @@ impl Instrument {
         match self {
             Self::Harmonica(_) => crate::synth::Voice::Harmonica,
             Self::Guitar(_) => crate::synth::Voice::PluckedString,
+            Self::Flute(_) => crate::synth::Voice::Flute,
         }
+    }
+}
+
+impl From<Flute> for Instrument {
+    fn from(flute: Flute) -> Self {
+        Self::Flute(flute)
     }
 }
 
@@ -64,6 +74,8 @@ pub enum PlayPosition {
     Hole(HoleAssignment),
     /// A guitar string, fret and technique.
     Fret(FretAssignment),
+    /// A flute note, and which of its fingerings.
+    Fingering(FingeringAssignment),
 }
 
 impl PlayPosition {
@@ -128,8 +140,11 @@ pub enum ScrollAxis {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lane {
     /// What the instrument strip prints for the lane: a hole number, a
-    /// string's name.
+    /// string's name, a note.
     pub label: String,
+    /// The pitch a pitch lane carries (a flute's); `None` for a lane that
+    /// is a place on the instrument (a hole, a string).
+    pub pitch: Option<u8>,
 }
 
 /// The lanes notes travel in, and which lane each position belongs to.
@@ -146,6 +161,9 @@ impl LaneLayout {
         let lane = match position {
             PlayPosition::Hole(a) => usize::from(a.hole.checked_sub(1)?),
             PlayPosition::Fret(a) => usize::from(a.string.checked_sub(1)?),
+            PlayPosition::Fingering(a) => {
+                self.lanes.iter().position(|l| l.pitch == Some(a.note))?
+            }
         };
         (lane < self.lanes.len()).then_some(lane)
     }
@@ -158,6 +176,13 @@ impl LaneLayout {
         match position {
             PlayPosition::Hole(a) => usize::from(a.hole.saturating_sub(1)).min(last),
             PlayPosition::Fret(a) => usize::from(a.string.saturating_sub(1)).min(last),
+            PlayPosition::Fingering(a) => self
+                .lanes
+                .iter()
+                .enumerate()
+                .filter_map(|(i, l)| Some((i, l.pitch?)))
+                .min_by_key(|&(_, pitch)| pitch.abs_diff(a.note))
+                .map_or(0, |(i, _)| i),
         }
     }
 
@@ -316,7 +341,9 @@ impl InstrumentModel for Harmonica {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Vertical,
-            lanes: (1..=self.hole_count()).map(|hole| Lane { label: hole.to_string() }).collect(),
+            lanes: (1..=self.hole_count())
+                .map(|hole| Lane { label: hole.to_string(), pitch: None })
+                .collect(),
         }
     }
 }
@@ -380,7 +407,7 @@ impl InstrumentModel for Guitar {
             .iter()
             .filter_map(|p| match p {
                 PlayPosition::Fret(a) => Some(*a),
-                PlayPosition::Hole(_) => None,
+                PlayPosition::Hole(_) | PlayPosition::Fingering(_) => None,
             })
             .collect();
         Guitar::reconcile(self, anchor, &mut frets);
@@ -414,7 +441,78 @@ impl InstrumentModel for Guitar {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Horizontal,
-            lanes: self.string_labels().into_iter().map(|label| Lane { label }).collect(),
+            lanes: self
+                .string_labels()
+                .into_iter()
+                .map(|label| Lane { label, pitch: None })
+                .collect(),
+        }
+    }
+}
+
+/// One voice. Its notes are pitch lanes from the lowest note to C7, and
+/// every position is a fingering from the table in [`flute`].
+impl InstrumentModel for Flute {
+    fn range(&self) -> Option<(u8, u8)> {
+        let notes = self.fingerings();
+        Some((notes.first()?.note, notes.last()?.note))
+    }
+
+    /// The note's fingerings, standard first.
+    fn positions_for(&self, midi: u8) -> Vec<PlayPosition> {
+        (0..self.fingerings_for(midi).len())
+            .map(|alternate| {
+                PlayPosition::Fingering(FingeringAssignment {
+                    note: midi,
+                    alternate: alternate as u8,
+                })
+            })
+            .collect()
+    }
+
+    fn valid_pitches(&self) -> std::collections::HashSet<u8> {
+        self.fingerings().into_iter().map(|f| f.note).collect()
+    }
+
+    fn pitch_of(&self, position: &PlayPosition) -> Option<u8> {
+        let PlayPosition::Fingering(a) = position else {
+            return None;
+        };
+        self.keys(*a).map(|_| a.note)
+    }
+
+    /// Never: a flute sounds one note at a time.
+    fn can_sound_together(&self, _: &PlayPosition, _: &PlayPosition) -> bool {
+        false
+    }
+
+    /// Nothing to change in the others: an overlapping note on a flute
+    /// isn't a fingering problem, it is a new note ending the last.
+    fn reconcile(&self, _: &PlayPosition, _: &mut [PlayPosition]) {}
+
+    /// Its lip bend is intonation, not a way to a new note, so no `Glide`.
+    fn techniques(&self) -> &'static [TechniqueKind] {
+        &[TechniqueKind::Target, TechniqueKind::Register, TechniqueKind::Position]
+    }
+
+    fn expression_scope(&self) -> ExpressionScope {
+        ExpressionScope::WholeInstrument
+    }
+
+    fn envelope(&self) -> Envelope {
+        Envelope::Sustained
+    }
+
+    fn lane_layout(&self) -> LaneLayout {
+        let (low, high) = InstrumentModel::range(self).unwrap_or((60, 96));
+        LaneLayout {
+            axis: ScrollAxis::Vertical,
+            lanes: (low..=high)
+                .map(|note| Lane {
+                    label: crate::midi::midi_to_note(i32::from(note)),
+                    pitch: Some(note),
+                })
+                .collect(),
         }
     }
 }
@@ -424,6 +522,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.range(),
             Self::Guitar(guitar) => InstrumentModel::range(guitar),
+            Self::Flute(flute) => InstrumentModel::range(flute),
         }
     }
 
@@ -431,6 +530,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.positions_for(midi),
             Self::Guitar(guitar) => InstrumentModel::positions_for(guitar, midi),
+            Self::Flute(flute) => InstrumentModel::positions_for(flute, midi),
         }
     }
 
@@ -438,6 +538,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.valid_pitches(),
             Self::Guitar(guitar) => InstrumentModel::valid_pitches(guitar),
+            Self::Flute(flute) => InstrumentModel::valid_pitches(flute),
         }
     }
 
@@ -445,6 +546,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.pitch_of(position),
             Self::Guitar(guitar) => InstrumentModel::pitch_of(guitar, position),
+            Self::Flute(flute) => InstrumentModel::pitch_of(flute, position),
         }
     }
 
@@ -452,6 +554,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.can_sound_together(a, b),
             Self::Guitar(guitar) => InstrumentModel::can_sound_together(guitar, a, b),
+            Self::Flute(flute) => InstrumentModel::can_sound_together(flute, a, b),
         }
     }
 
@@ -459,6 +562,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.reconcile(anchor, others),
             Self::Guitar(guitar) => InstrumentModel::reconcile(guitar, anchor, others),
+            Self::Flute(flute) => InstrumentModel::reconcile(flute, anchor, others),
         }
     }
 
@@ -466,6 +570,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.techniques(),
             Self::Guitar(guitar) => InstrumentModel::techniques(guitar),
+            Self::Flute(flute) => InstrumentModel::techniques(flute),
         }
     }
 
@@ -473,6 +578,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.expression_scope(),
             Self::Guitar(guitar) => InstrumentModel::expression_scope(guitar),
+            Self::Flute(flute) => InstrumentModel::expression_scope(flute),
         }
     }
 
@@ -480,6 +586,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.envelope(),
             Self::Guitar(guitar) => InstrumentModel::envelope(guitar),
+            Self::Flute(flute) => InstrumentModel::envelope(flute),
         }
     }
 
@@ -487,6 +594,7 @@ impl InstrumentModel for Instrument {
         match self {
             Self::Harmonica(harp) => harp.lane_layout(),
             Self::Guitar(guitar) => InstrumentModel::lane_layout(guitar),
+            Self::Flute(flute) => InstrumentModel::lane_layout(flute),
         }
     }
 }

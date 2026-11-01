@@ -98,6 +98,11 @@ impl VoiceFilter {
             Instrument::Guitar(guitar) => {
                 Self::Strings { pitches: guitar.valid_pitches(), strings: guitar.strings.len() }
             }
+            // One voice: the same rule as a one-string guitar, the
+            // strongest pitch the flute can play.
+            Instrument::Flute(flute) => {
+                Self::Strings { pitches: InstrumentModel::valid_pitches(flute), strings: 1 }
+            }
         }
     }
 

@@ -70,6 +70,14 @@ fn validate_and_parse_chart(
 
     // Deserializes from a borrow: no copy of the whole JSON tree.
     let chart = <HarpChart as serde::Deserialize>::deserialize(&*chart_value)?;
+    // What an event must name depends on the chart's instrument (a hole, a
+    // string, or for a flute only its note), which a schema can't express
+    // from inside an event; the engine's own check, the one `validate-pack`
+    // runs, decides it here too.
+    let problems = harmonicon_core::chart_check::instrument_problems(&chart);
+    if !problems.is_empty() {
+        return Err(SongLoadError::Validation(problems.join("\n")));
+    }
     let declared_version = chart.metadata.as_ref().and_then(|m| m.format_version.as_deref());
     if !format_version_supported(declared_version, CURRENT_FORMAT_VERSION) {
         return Err(SongLoadError::Validation(format!(
@@ -468,6 +476,32 @@ mod tests {
         assert!(chart.harmonica.is_none());
         assert!(chart.instrument_spec.is_some());
         assert_eq!(chart.track[0].events.len(), 3);
+    }
+
+    fn flute_chart() -> serde_json::Value {
+        serde_json::from_str(include_str!("../../tests/fixtures/flute-scale.harpchart")).unwrap()
+    }
+
+    #[test]
+    fn a_flute_chart_loads_with_its_foot_joint_and_fingerings() {
+        let (_, chart) = validate_and_parse_chart(&mut flute_chart()).unwrap();
+        assert!(matches!(
+            chart.instrument(),
+            Some(harmonicon_core::instrument::Instrument::Flute(f))
+                if f.foot == harmonicon_core::instrument::flute::FootJoint::B
+        ));
+        assert_eq!(chart.track[4].events[0].fingering, Some(1));
+    }
+
+    /// B3 needs a B foot; the schema can't know that, the engine check can.
+    #[test]
+    fn a_note_below_the_flutes_foot_is_refused_at_load() {
+        let mut c_foot = flute_chart();
+        c_foot["instrument"]["foot"] = serde_json::json!("c");
+        let Err(SongLoadError::Validation(why)) = validate_and_parse_chart(&mut c_foot) else {
+            panic!("a C foot has no B3");
+        };
+        assert!(why.contains("track[0]"), "{why}");
     }
 
     #[test]
