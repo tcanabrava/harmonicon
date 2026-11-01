@@ -30,6 +30,7 @@ pub mod note_event_codec;
 pub mod note_parser;
 pub mod note_target;
 pub mod note_tracker;
+pub mod note_trainer;
 pub mod pitch_map;
 pub mod repeats;
 pub mod scoring;
