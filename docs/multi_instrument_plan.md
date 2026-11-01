@@ -225,8 +225,8 @@ A guitar chart is edited on the same grid as a harmonica one: one row per
 string, notes in their string's colour labelled as tab, and the note column
 offering fret and string moves (the latter pitch-preserving), bends,
 harmonics and per-string vibrato. Edits reject occupied strings and
-excessive hand span across overlapping sustains. Resize and paste do not
-yet check hand span.
+excessive hand span across overlapping sustains, including while a note
+is resized or pasted.
 
 An empty harmonica document can select a standard guitar in Details.
 Loaded parts keep their own tuning/capo. A generic pitch-row fallback and

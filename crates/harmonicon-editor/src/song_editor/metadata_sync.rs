@@ -170,13 +170,27 @@ impl EditorState {
     /// anything landed.
     pub(super) fn paste(&mut self, clip: &NoteClipboard, target_tick: usize) -> bool {
         let hole_count = self.row_count();
-        let (placed, next_id) = paste_targets_with_sources(
+        let (mut placed, next_id) = paste_targets_with_sources(
             &clip.notes,
             target_tick,
             hole_count,
             &self.notes,
             self.next_id,
         );
+        // On a guitar a pasted note must also be playable with what sounds
+        // around it — what is already there and what this paste has kept.
+        // One that isn't is skipped, like one that collides.
+        if super::guitar_note::is_guitar(self) {
+            let instrument = self.effective_instrument();
+            let mut sounding = self.notes.clone();
+            placed.retain(|(_, note)| {
+                let fits = super::guitar_note::fits(&instrument, &sounding, note, &[]);
+                if fits {
+                    sounding.push(*note);
+                }
+                fits
+            });
+        }
         if placed.is_empty() {
             return false;
         }

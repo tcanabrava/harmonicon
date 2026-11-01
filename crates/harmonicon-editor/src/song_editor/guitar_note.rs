@@ -360,6 +360,23 @@ mod tests {
         assert_eq!(at(&state, 0).technique, StringTechnique::Fretted);
     }
 
+    /// A3 held on the third string for two beats: a copy of a note fretted
+    /// ten frets away can't land under it, though the same copy pasted
+    /// after it has ended can.
+    #[test]
+    fn a_paste_skips_a_note_the_hand_cannot_reach() {
+        let mut state = with_a3();
+        state.notes[0].len = 24;
+        state.selected.clear();
+        state.sticky_fret = 12;
+        place(&mut state, 1, 30, 6);
+        let clip = state.copy_selection();
+        assert!(!state.paste(&clip, 12), "fret 12 beside a held fret 2");
+        assert_eq!(state.notes.len(), 2);
+        assert!(state.paste(&clip, 24));
+        assert_eq!(state.notes.len(), 3);
+    }
+
     #[test]
     fn sustained_strings_and_hand_span_are_checked_before_anything_changes() {
         let mut state = guitar_state();

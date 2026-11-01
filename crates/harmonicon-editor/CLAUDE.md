@@ -920,8 +920,9 @@ load-bearing about *this* crate.
   breath-only and `enforce_expr` skips a `PerVoice` instrument. A drag
   keeps the fret on its new string (tab semantics, like a harmonica note
   keeping its breath); the String buttons search the fret that keeps the
-  sounding pitch. Resizing and paste check only same-row overlap, not the
-  hand's span. Guitar recording and detector tuning still need the
+  sounding pitch. A resize stops at the last playable length, and a paste
+  skips a note that doesn't fit, as both already do for a same-row
+  collision. Guitar recording and detector tuning still need the
   recorded corpus.
   Custom bend intensity and multiple mutually exclusive techniques are
   rejected during validation rather than silently dropped on save.

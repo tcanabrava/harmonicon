@@ -664,6 +664,20 @@ pub(super) fn spawn_resize_grips(
                             (start, end - start)
                         }
                     };
+                    // A guitar note also stops where the next step would
+                    // hold a string another note needs, or outgrow the hand.
+                    let instrument = state.effective_instrument();
+                    if super::guitar_note::is_guitar(&state)
+                        && let Some(current) = state.note_by_id(id).copied()
+                        && !super::guitar_note::fits(
+                            &instrument,
+                            &state.notes,
+                            &GridNote { tick, len, ..current },
+                            &[],
+                        )
+                    {
+                        return;
+                    }
                     if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                         n.tick = tick;
                         n.len = len;
