@@ -5,13 +5,18 @@
 1. **Select Song** — browse all downloaded songs and anything you've added to
    `~/Harmonicon/songs/` (see
    [Getting Started](getting-started.md#adding-your-own-content)). Click a column
-   header to sort by song name, band, genre, difficulty, your rating, mastery, or times played; click it again to
-   reverse the order. Search accepts partial words and small typos.
+   header to sort by song name, band, instrument, genre, difficulty, your
+   rating, mastery, or times played; click it again to reverse the order.
+   The **Instrument** column says whether a song is a harmonica, guitar or
+   flute part. Search accepts partial words and small typos, and matches
+   the instrument too.
 2. Click a song once or use Up/Down to select it and inspect its details.
    Click **Play** to start the selected song. `/` focuses Search; **Clear**
    resets the search. Moving the pointer over other songs keeps your selection.
-3. Confirm the physical harmonica you are holding. A **3-2-1 countdown** then
-   shows the song title and key before the chart and backing track start.
+3. Say what you are holding: the harmonica's key and type for a harmonica
+   part, the **tuning** for a guitar part, the **foot joint** for a flute
+   part (see below). A **3-2-1 countdown** then shows the song title and
+   key before the chart and backing track start.
 
 Select a song, then click its **My rating** stars to set the rating directly.
 The left half of a star chooses a half-star step; the right half chooses a
@@ -51,6 +56,15 @@ harmonica arrangements and names the instrument beside each part. Guitar
 Pro tabs retain their tuning and string/fret positions. The Song Editor opens native guitar charts on its grid, one row per string. The fretboard
 strip beside the highway highlights the target frets and hand window.
 
+Before a guitar part starts, **Your guitar** asks for your tuning:
+standard, drop D, half a step down, DADGAD, open G or open D, or **As
+written**. It opens on the chart's own. Pick another and the notes stay
+the same pitches but move to the frets your tuning plays them on; the page
+says how many move. A bend keeps its bend; a natural harmonic, whose pitch
+depends on the open string, is played as the fretted note it sounded.
+
+![Choosing a tuning before a guitar part](images/instrument-check-guitar.png)
+
 ## Flute parts
 
 A flute part's highway reads the flute's keys rather than its notes. A
@@ -64,6 +78,11 @@ shows the next note's keys faintly so your fingers can get there in time;
 the line under the highway names both.
 
 ![A flute part on the highway](images/play-flute.png)
+
+Before a flute part starts, **Your flute** asks for its foot joint: a C
+foot goes down to C4, a B foot to B3. It opens on the one the chart was
+written for. A note below your foot (a B3 on a C foot) is still shown but
+doesn't count, and the page says how many there are.
 
 To read the notes instead, pause and press **Flute view**: the highway
 switches, when you resume, to one row per note the song uses, highest at

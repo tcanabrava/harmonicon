@@ -53,7 +53,7 @@ pub(super) fn rating_cell(path: String, image: Handle<Image>) -> impl Scene {
     let personal = PersonalRating(path.clone());
     bsn! {
         Node {
-            width: {Val::Percent(16.0)},
+            width: {Val::Percent(14.0)},
             flex_shrink: {0.0_f32},
             padding: {UiRect::axes(Val::Px(12.0), Val::Px(12.0))},
             overflow: {Overflow::clip()},

@@ -249,7 +249,11 @@ phases; `PLAN.md` has them in order.
 - **Flute** (in, but for detection tuning): a highway whose rows are the
   flute's keys beside an upright drawing of it, or pitch rows, switched
   from the pause menu; the same two views in the Song Editor; a C or B
-  foot joint.
+  foot joint, asked for before each song.
+- **Your instrument before play**: the song list names each part's
+  instrument, and the page before a song asks for the harmonica's key and
+  type, the guitar's tuning or the flute's foot joint, and plays the chart
+  on that answer, pitches kept.
 - **A Note Trainer** (in for the guitar and the flute; the harmonica keeps
   the Bending Trainer until its validation pass), offering only the modes
   an instrument has: glides (bends), register selection (flute octaves,

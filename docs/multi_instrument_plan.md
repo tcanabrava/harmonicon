@@ -336,8 +336,12 @@ can't be confused with a detection problem.
   selected instrument's DAG.
 - **"My instruments"** generalises the harp-check page's
   bring-your-own-harp choice. The player lists what they own, with tunings.
-  Song select shows which parts they can play, and the harp-check page
-  becomes an instrument check before play.
+  Song select shows which parts they can play. **Landed already:** the
+  song list names each part's instrument, and the harp-check page is an
+  instrument check: a guitar part asks for the tuning, a flute part for
+  the foot joint, per song, and play places the chart onto the answer
+  (`instrument::substitute`, carried in `EffectiveHarmonica::instrument`).
+  "My instruments" makes those answers stick.
 - **Audition and call-and-response synthesis** need a timbre per
   instrument in core's `synth`:
   - Karplus–Strong for plucked strings: cheap and convincing;

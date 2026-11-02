@@ -105,13 +105,15 @@ gates 1.0. In order:
   rows, switched from the pause menu), the Song Editor (note and
   fingering views) and the Note Trainer's flute tabs are in. Next:
   - a recorded corpus aimed at octave errors, before any detection tuning;
-  - choosing the foot joint in "My instruments" (content and progress);
-  - remembering Play 2D's flute view across sessions — a settings field,
-    with "My instruments" (it lasts a session today).
+  - remembering the player's foot joint and Play 2D's flute view across
+    songs and sessions, with "My instruments" (today the foot joint is
+    picked per song before play, and the view lasts a session).
 - **Content and progress** (phase 5, not started, and the next phase):
-  per-instrument packs, DAGs and profile, a "My instruments" page holding
-  each instrument's tuning, capo and foot joint, and per-instrument Jam
-  Session. What guitar and flute content ships is still to be decided.
+  per-instrument packs, DAGs and profile, a "My instruments" page that
+  remembers each instrument's tuning, capo and foot joint (the pre-song
+  page already asks for tuning and foot joint per song, and plays the
+  chart on the answer), and per-instrument Jam Session. What guitar and
+  flute content ships is still to be decided. Capo isn't asked for yet.
 
 ## Mobile (post-1.0, needs hardware)
 

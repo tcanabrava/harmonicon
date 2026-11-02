@@ -32,7 +32,13 @@ fn plain_chart() -> HarpChart {
 }
 
 fn choice(key: &str, mapping: HarpMapping) -> HarpChoice {
-    HarpChoice { key: key.to_string(), kind: HarpKind::Diatonic, mapping, seeded: true }
+    HarpChoice {
+        key: key.to_string(),
+        kind: HarpKind::Diatonic,
+        mapping,
+        played: None,
+        seeded: true,
+    }
 }
 
 #[test]
@@ -89,6 +95,7 @@ fn a_chromatic_choice_never_matches_a_diatonic_chart() {
         key: "C".to_string(),
         kind: HarpKind::Chromatic,
         mapping: HarpMapping::SameHoles,
+        played: None,
         seeded: true,
     };
     assert!(
@@ -176,4 +183,34 @@ fn only_techniques_the_swap_adds_are_reported() {
             "{key}, same holes, reported an added cost"
         );
     }
+}
+
+fn fixture(name: &str) -> HarpChart {
+    let path = format!(
+        "{}/../harmonicon-song/tests/fixtures/{name}.harpchart",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+/// A guitar or flute chart opens on its own instrument, so nothing moves;
+/// another tuning or foot joint reports what it changes.
+#[test]
+fn a_guitar_or_flute_reports_what_the_players_instrument_changes() {
+    let guitar = fixture("guitar-highway");
+    let mut choice = HarpChoice::default();
+    seed_choice(&mut choice, &guitar);
+    let own = choice.played.clone().expect("seeded with the chart's guitar");
+    assert_eq!(substitution_cost(&guitar, &own), (0, 0));
+    let Instrument::Guitar(standard) = own else { panic!("a guitar") };
+    let drop_d = TUNINGS.iter().find(|t| t.id == "drop-d").unwrap();
+    let played: Instrument = Guitar { strings: drop_d.strings.to_vec(), ..standard }.into();
+    let (moved, unreachable) = substitution_cost(&guitar, &played);
+    assert!(moved > 0, "the low E moves to the second fret");
+    assert_eq!(unreachable, 0);
+
+    let flute = fixture("flute-scale");
+    assert_eq!(substitution_cost(&flute, &Flute::new(FootJoint::C).into()), (0, 1), "its B3");
+    assert_eq!(controls_for(&flute), ControlsFor::Flute);
+    assert_eq!(controls_for(&plain_chart()), ControlsFor::Harmonica);
 }

@@ -167,6 +167,11 @@ pub struct SelectedSong(pub Handle<SongManifest>);
 pub struct EffectiveHarmonica {
     pub harp: Option<Harmonica>,
     pub mapping: HarpMapping,
+    /// The guitar or flute the player holds, when it isn't the chart's (a
+    /// guitar in another tuning, a flute with the other foot joint). Only
+    /// stands in for a chart's own instrument of the same kind; the chart
+    /// is placed onto it by `harmonicon_core::instrument::substitute`.
+    pub instrument: Option<Instrument>,
 }
 
 impl EffectiveHarmonica {
@@ -189,15 +194,25 @@ impl EffectiveHarmonica {
     ///
     /// [`harp_for`]: Self::harp_for
     pub fn instrument_for(&self, chart: &HarpChart) -> Option<Instrument> {
-        match self.harp_for(chart) {
-            Some(harp) => Some(harp.clone().into()),
-            None => chart.instrument(),
+        if let Some(harp) = self.harp_for(chart) {
+            return Some(harp.clone().into());
         }
+        let own = chart.instrument()?;
+        Some(match (&own, &self.instrument) {
+            (Instrument::Guitar(_), Some(played @ Instrument::Guitar(_)))
+            | (Instrument::Flute(_), Some(played @ Instrument::Flute(_))) => played.clone(),
+            _ => own,
+        })
     }
 
     /// Whether the player has chosen a harp other than the chart's.
     pub fn is_substituted(&self) -> bool {
         self.harp.is_some()
+    }
+
+    /// Whether play has to place the chart onto another guitar or flute.
+    pub fn substitutes_for(&self, chart: &HarpChart) -> bool {
+        chart.harmonica.is_none() && self.instrument_for(chart) != chart.instrument()
     }
 
     /// The key the music actually sounds in. Under `HarpMapping::SameHoles`
@@ -320,7 +335,11 @@ mod tests {
     fn the_sounding_key_moves_with_the_harp_only_under_same_holes() {
         // A chart in C for a C harp, played on a G harp.
         let chart = chart_in("C", "C");
-        let on_g = |mapping| EffectiveHarmonica { harp: Some(richter_harp("G")), mapping };
+        let on_g = |mapping| EffectiveHarmonica {
+            harp: Some(richter_harp("G")),
+            mapping,
+            instrument: None,
+        };
         assert_eq!(on_g(HarpMapping::SameHoles).song_key_for(&chart), "G");
         assert_eq!(on_g(HarpMapping::Transpose).song_key_for(&chart), "C");
         assert_eq!(EffectiveHarmonica::default().song_key_for(&chart), "C");
@@ -331,8 +350,11 @@ mod tests {
         // A tune in G on a C harp (2nd position), played on an A harp: the
         // harp moved up a major sixth (C → A), so the tune moves G → E.
         let chart = chart_in("G", "C");
-        let on_a =
-            EffectiveHarmonica { harp: Some(richter_harp("A")), mapping: HarpMapping::SameHoles };
+        let on_a = EffectiveHarmonica {
+            harp: Some(richter_harp("A")),
+            mapping: HarpMapping::SameHoles,
+            instrument: None,
+        };
         assert_eq!(on_a.song_key_for(&chart), "E");
     }
 }

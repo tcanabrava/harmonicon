@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: MIT
 
-//! "Which harmonica are you holding?" — shown after picking a song, before
-//! it loads.
+//! "Which harmonica are you holding?" — or which tuning is the guitar in,
+//! which foot joint has the flute — shown after picking a song, before it
+//! loads.
 //!
-//! A chart names the harp it was written for, and until this page existed
-//! that was a hard requirement: own a G and a C-harp chart was simply
-//! unplayable. Here the player can say what they actually have, and what
-//! swapping should preserve — see `harmonicon_core::harp_remap`.
+//! A chart names the instrument it was written for, and until this page
+//! existed that was a hard requirement: own a G and a C-harp chart was
+//! simply unplayable. Here the player can say what they actually have. A
+//! harmonica also picks what the swap should preserve
+//! (`harmonicon_core::harp_remap`); a guitar or a flute always keeps the
+//! pitches and moves the positions (`instrument::substitute`).
+//!
+//! The page builds all three sets of controls and shows the chart's: the
+//! chart may still be decoding when it is built, so which instrument it is
+//! is only known on the frame it arrives (`refresh_harp_cost`).
 //!
 //! **The cost readout is the point, not decoration.** Under
 //! [`HarpMapping::Transpose`] a different harp can turn a plain melody into
@@ -25,6 +32,10 @@ use harmonicon_app::app::{AppState, EffectiveHarmonica, SelectedSong};
 use harmonicon_core::chart::HarpChart;
 use harmonicon_core::harmonica::{Harmonica, detected_harp_key};
 use harmonicon_core::harp_remap::{HarpMapping, RemapCost, remap_event};
+use harmonicon_core::instrument::Instrument;
+use harmonicon_core::instrument::flute::{Flute, FootJoint};
+use harmonicon_core::instrument::guitar::{Guitar, TUNINGS, tuning_of};
+use harmonicon_core::instrument::substitute::substitute_chart;
 use harmonicon_core::pitch_map::{HARP_KEYS, HarpKind, harp_for_key};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
@@ -42,6 +53,9 @@ pub(crate) struct HarpChoice {
     pub key: String,
     pub kind: HarpKind,
     pub mapping: HarpMapping,
+    /// The guitar or flute the player holds, for a chart written for one:
+    /// the chart's own until a tuning or foot joint is picked.
+    pub played: Option<Instrument>,
     /// Whether the fields above have been pointed at the chart yet. The
     /// chart may still be decoding when this page is built, so seeding can't
     /// simply happen on entry; it happens on whichever frame the manifest
@@ -56,6 +70,7 @@ impl Default for HarpChoice {
             key: HARP_KEYS[0].to_string(),
             kind: HarpKind::Diatonic,
             mapping: HarpMapping::default(),
+            played: None,
             seeded: false,
         }
     }
@@ -89,6 +104,88 @@ pub(crate) struct HarpCostLabel;
 /// The line naming the harmonica the chart was written for.
 #[derive(Component)]
 pub(crate) struct ChartHarpLabel;
+
+/// The page's opening line, worded for the chart's instrument.
+#[derive(Component)]
+pub(crate) struct IntroLabel;
+
+/// Which instrument's controls a container holds; only the chart's shows.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ControlsFor {
+    Harmonica,
+    Guitar,
+    Flute,
+}
+
+fn controls_for(chart: &HarpChart) -> ControlsFor {
+    match chart.instrument() {
+        Some(Instrument::Guitar(_)) => ControlsFor::Guitar,
+        Some(Instrument::Flute(_)) => ControlsFor::Flute,
+        _ => ControlsFor::Harmonica,
+    }
+}
+
+/// A tuning's name: `guitar-tuning-<id>`, or "as written" for a chart's
+/// tuning none of the named ones match.
+fn tuning_label(id: Option<&str>, loc: &Localization) -> String {
+    match id {
+        Some(id) => String::from(loc.msg(&format!("guitar-tuning-{id}"))),
+        None => String::from(loc.msg("guitar-tuning-charted")),
+    }
+}
+
+fn foot_label(foot: FootJoint, loc: &Localization) -> String {
+    String::from(loc.msg(match foot {
+        FootJoint::C => "flute-foot-c",
+        FootJoint::B => "flute-foot-b",
+    }))
+}
+
+/// `(moved, unreachable)`: how many of `chart`'s notes `played` puts
+/// somewhere other than the chart did, and how many it can't sound.
+pub(crate) fn substitution_cost(chart: &HarpChart, played: &Instrument) -> (usize, usize) {
+    let Some(own) = chart.instrument() else { return (0, 0) };
+    let charted = substitute_chart(chart, &own);
+    let placed = substitute_chart(chart, played);
+    let pairs = || charted.iter().flatten().zip(placed.iter().flatten());
+    let unreachable = pairs().filter(|(_, p)| p.is_none()).count();
+    let moved = pairs().filter(|(c, p)| p.is_some() && c != p).count();
+    (moved, unreachable)
+}
+
+/// What the player's guitar or flute changes for `chart`: how many notes
+/// move to another place, and how many it can't sound. Empty when nothing
+/// does.
+pub(crate) fn substitution_message(
+    chart: &HarpChart,
+    played: &Instrument,
+    loc: &Localization,
+) -> String {
+    if chart.harmonica.is_some() {
+        return String::new();
+    }
+    let (moved, unreachable) = substitution_cost(chart, played);
+    if unreachable == 0 && moved == 0 {
+        return String::from(loc.msg("instrument-check-cost-clean"));
+    }
+    let mut parts = Vec::new();
+    if moved > 0 {
+        let key = match played {
+            Instrument::Flute(_) => "instrument-check-cost-fingerings",
+            _ => "instrument-check-cost-frets",
+        };
+        parts.push(String::from(loc.msg_args(key, &[("count", moved.to_string())])));
+    }
+    if unreachable > 0 {
+        parts.push(String::from(
+            loc.msg_args(
+                "instrument-check-cost-unreachable",
+                &[("count", unreachable.to_string())],
+            ),
+        ));
+    }
+    parts.join("  ·  ")
+}
 
 fn kind_label(kind: HarpKind, loc: &Localization) -> String {
     String::from(match kind {
@@ -221,8 +318,15 @@ pub(crate) fn setup_harp_check(
         seed_choice(&mut choice, chart);
     }
 
+    let chart = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart);
+    let shown = chart.map_or(ControlsFor::Harmonica, controls_for);
+    let title = match shown {
+        ControlsFor::Harmonica => "harp-check-title",
+        ControlsFor::Guitar => "instrument-check-title-guitar",
+        ControlsFor::Flute => "instrument-check-title-flute",
+    };
     let (root, header, page_root) =
-        spawn_menu_root(&mut commands, &loc.msg("harp-check-title"), None, &theme, "HarpCheck");
+        spawn_menu_root(&mut commands, &loc.msg(title), None, &theme, "HarpCheck");
 
     let intro = commands
         .spawn_empty()
@@ -232,6 +336,7 @@ pub(crate) fn setup_harp_check(
             TextColor({Color::srgb(0.82, 0.82, 0.88)})
             Node { max_width: {Val::Px(560.0)} }
         })
+        .insert(IntroLabel)
         .id();
     commands.entity(root).add_child(intro);
 
@@ -246,9 +351,87 @@ pub(crate) fn setup_harp_check(
         .id();
     commands.entity(root).add_child(written_for);
 
+    // One container per instrument; `refresh_harp_cost` shows the chart's.
+    let container = |commands: &mut Commands, which: ControlsFor| {
+        let display = if which == shown { Display::Flex } else { Display::None };
+        let entity = commands
+            .spawn((
+                which,
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(12.0),
+                    display,
+                    ..default()
+                },
+            ))
+            .id();
+        commands.entity(root).add_child(entity);
+        entity
+    };
+    let harp_box = container(&mut commands, ControlsFor::Harmonica);
+    let guitar_box = container(&mut commands, ControlsFor::Guitar);
+    let flute_box = container(&mut commands, ControlsFor::Flute);
+
+    // A guitar's tuning: the named ones, plus the chart's own when it is
+    // none of them. Picking one places the chart's notes onto it.
+    let mut tunings: Vec<String> = TUNINGS.iter().map(|t| tuning_label(Some(t.id), &loc)).collect();
+    tunings.insert(0, tuning_label(None, &loc));
+    let current_tuning = match &choice.played {
+        Some(Instrument::Guitar(g)) => tuning_label(tuning_of(&g.strings).map(|t| t.id), &loc),
+        _ => tuning_label(None, &loc),
+    };
     combobox::spawn_combobox(
         &mut commands,
-        root,
+        guitar_box,
+        page_root,
+        &loc.msg("instrument-check-tuning"),
+        &tunings,
+        &current_tuning,
+        |ev: On<combobox::ComboboxSelect>,
+         mut choice: ResMut<HarpChoice>,
+         loc: Res<Localization>,
+         selected: Option<Res<SelectedSong>>,
+         manifests: Res<Assets<SongManifest>>| {
+            let chart = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart);
+            let Some(Instrument::Guitar(own)) = chart.and_then(HarpChart::instrument) else {
+                return;
+            };
+            let strings = TUNINGS
+                .iter()
+                .find(|t| tuning_label(Some(t.id), &loc) == ev.value)
+                .map_or_else(|| own.strings.clone(), |t| t.strings.to_vec());
+            choice.played = Some(Guitar { strings, ..own }.into());
+        },
+    );
+
+    // A flute's foot joint.
+    let feet = vec![foot_label(FootJoint::C, &loc), foot_label(FootJoint::B, &loc)];
+    let current_foot = match &choice.played {
+        Some(Instrument::Flute(f)) => foot_label(f.foot, &loc),
+        _ => foot_label(FootJoint::C, &loc),
+    };
+    combobox::spawn_combobox(
+        &mut commands,
+        flute_box,
+        page_root,
+        &loc.msg("instrument-check-foot"),
+        &feet,
+        &current_foot,
+        |ev: On<combobox::ComboboxSelect>,
+         mut choice: ResMut<HarpChoice>,
+         loc: Res<Localization>| {
+            let foot = if ev.value == foot_label(FootJoint::B, &loc) {
+                FootJoint::B
+            } else {
+                FootJoint::C
+            };
+            choice.played = Some(Flute::new(foot).into());
+        },
+    );
+
+    combobox::spawn_combobox(
+        &mut commands,
+        harp_box,
         page_root,
         &loc.msg("harp-check-key"),
         &HARP_KEYS.iter().map(|k| k.to_string()).collect::<Vec<_>>(),
@@ -260,7 +443,7 @@ pub(crate) fn setup_harp_check(
 
     combobox::spawn_combobox(
         &mut commands,
-        root,
+        harp_box,
         page_root,
         &loc.msg("harp-check-type"),
         &kind_labels(&loc),
@@ -276,7 +459,7 @@ pub(crate) fn setup_harp_check(
     let current_mapping = &mapping_options[usize::from(choice.mapping == HarpMapping::Transpose)];
     combobox::spawn_combobox(
         &mut commands,
-        root,
+        harp_box,
         page_root,
         &loc.msg("harp-check-mapping"),
         &mapping_options,
@@ -332,6 +515,12 @@ pub(crate) fn setup_harp_check(
                 _ => Some(choice.harp()),
             };
             effective.mapping = choice.mapping;
+            // A guitar's tuning or a flute's foot joint, only when it
+            // differs from the chart's own.
+            effective.instrument = choice
+                .played
+                .clone()
+                .filter(|played| chart.and_then(HarpChart::instrument).as_ref() != Some(played));
             state.set(AppState::SongLoading);
         },
     );
@@ -356,6 +545,7 @@ fn seed_choice(choice: &mut HarpChoice, chart: &HarpChart) {
         };
     }
     choice.mapping = HarpMapping::default();
+    choice.played = chart.harmonica.is_none().then(|| chart.instrument()).flatten();
     choice.seeded = true;
 }
 
@@ -368,6 +558,11 @@ pub(crate) fn refresh_harp_cost(
     manifests: Res<Assets<SongManifest>>,
     mut labels: Query<&mut Text, With<HarpCostLabel>>,
     mut harp_labels: Query<&mut Text, (With<ChartHarpLabel>, Without<HarpCostLabel>)>,
+    mut intros: Query<
+        &mut Text,
+        (With<IntroLabel>, Without<HarpCostLabel>, Without<ChartHarpLabel>),
+    >,
+    mut boxes: Query<(&ControlsFor, &mut Node)>,
 ) {
     let Some(chart) = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart) else {
         return;
@@ -377,16 +572,47 @@ pub(crate) fn refresh_harp_cost(
     } else if !choice.is_changed() && !loc.is_changed() {
         return;
     }
-    let written_for =
-        chart.harmonica.as_ref().map(|harp| harp_name(harp, &loc)).unwrap_or_default();
+    let shown = controls_for(chart);
+    for (which, mut node) in &mut boxes {
+        let want = if *which == shown { Display::Flex } else { Display::None };
+        if node.display != want {
+            node.display = want;
+        }
+    }
+    let intro = String::from(loc.msg(match shown {
+        ControlsFor::Harmonica => "harp-check-intro",
+        ControlsFor::Guitar => "instrument-check-intro-guitar",
+        ControlsFor::Flute => "instrument-check-intro-flute",
+    }));
+    for mut label in &mut intros {
+        if label.0 != intro {
+            label.0.clone_from(&intro);
+        }
+    }
+    let written_for = match chart.instrument() {
+        Some(Instrument::Harmonica(harp)) => harp_name(&harp, &loc),
+        Some(Instrument::Guitar(guitar)) => String::from(loc.msg_args(
+            "instrument-check-chart-guitar",
+            &[("tuning", tuning_label(tuning_of(&guitar.strings).map(|t| t.id), &loc))],
+        )),
+        Some(Instrument::Flute(flute)) => String::from(
+            loc.msg_args("instrument-check-chart-flute", &[("foot", foot_label(flute.foot, &loc))]),
+        ),
+        None => String::new(),
+    };
     for mut label in &mut harp_labels {
         if label.0 != written_for {
             label.0.clone_from(&written_for);
         }
     }
 
-    let baseline = cost_of(chart, &baseline_choice(chart));
-    let text = cost_message(&cost_of(chart, &choice), &baseline, &loc);
+    let text = match &choice.played {
+        Some(played) if chart.harmonica.is_none() => substitution_message(chart, played, &loc),
+        _ => {
+            let baseline = cost_of(chart, &baseline_choice(chart));
+            cost_message(&cost_of(chart, &choice), &baseline, &loc)
+        }
+    };
     for mut label in &mut labels {
         if label.0 != text {
             label.0.clone_from(&text);
@@ -420,10 +646,10 @@ pub(crate) fn track_label(entry: &TrackChart, loc: &Localization) -> String {
             ("name", name),
             (
                 "instrument",
-                loc.msg(if entry.chart.harmonica.is_some() {
-                    "harp-check-instrument-harmonica"
-                } else {
-                    "harp-check-instrument-guitar"
+                loc.msg(match entry.chart.instrument() {
+                    Some(Instrument::Guitar(_)) => "harp-check-instrument-guitar",
+                    Some(Instrument::Flute(_)) => "harp-check-instrument-flute",
+                    _ => "harp-check-instrument-harmonica",
                 })
                 .to_string(),
             ),

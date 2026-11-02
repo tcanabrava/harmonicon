@@ -44,6 +44,9 @@ impl GridNote {
     pub(super) fn set_tab_position(&mut self, position: &PlayPosition) {
         self.target = harmonicon_core::note_target::NoteTarget::Positioned(*position);
     }
+    /// Only the dev-only expected-notes layer moves a note by hole; the
+    /// grid moves rows (`GridNote::set_row`).
+    #[cfg(feature = "dev")]
     pub(super) fn set_hole(&mut self, hole: u8) {
         let mut tab = self.harp_tab();
         tab.hole = hole;

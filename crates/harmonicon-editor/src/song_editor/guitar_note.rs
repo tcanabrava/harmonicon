@@ -210,6 +210,7 @@ pub(super) fn group_fits<T>(
 
 /// Run condition for the harmonica-only developer tools (`expected_notes`,
 /// `debug_record`), which read every note as a hole.
+#[cfg(any(feature = "dev", test))]
 pub(super) fn is_harmonica(state: Option<bevy::prelude::Res<EditorState>>) -> bool {
     state.is_none_or(|s| matches!(s.effective_instrument(), Instrument::Harmonica(_)))
 }

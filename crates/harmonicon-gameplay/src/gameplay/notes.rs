@@ -313,7 +313,14 @@ pub fn build_scheduled_notes(
     let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
     let mut flags = flags.into_iter();
     let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
-    for item in &chart.track {
+    // A guitar in another tuning or a flute with the other foot joint: every
+    // event placed on what the player holds (`instrument::substitute`),
+    // pitches kept.
+    let substituted =
+        effective.substitutes_for(chart).then(|| effective.instrument_for(chart)).flatten().map(
+            |played| harmonicon_core::instrument::substitute::substitute_chart(chart, &played),
+        );
+    for (item_index, item) in chart.track.iter().enumerate() {
         let t = resolve_item_time(item, &chart.timing);
         let tag = play_mode_label(item.play_mode.as_ref());
         // Each event's own modifiers/expected pitch, computed once up front
@@ -324,16 +331,32 @@ pub fn build_scheduled_notes(
         let event_data: Vec<(PlayPosition, Vec<Modifier>, Option<u8>, bool)> = item
             .events
             .iter()
-            .filter_map(|event| {
-                let modifiers = event.modifiers.clone().unwrap_or_default();
+            .enumerate()
+            .filter_map(|(event_index, event)| {
+                let mut modifiers = event.modifiers.clone().unwrap_or_default();
                 // Any instrument but the harmonica: the event names where it
                 // is played and its sounding note, and there is no
                 // substitute instrument to remap onto.
                 // Where that is comes from core's codec, the one reading of
                 // an event per instrument (a string and fret, a fingering).
                 let Some(chart_harp) = chart.harmonica.as_ref() else {
-                    let position =
+                    let charted =
                         harmonicon_core::note_event_codec::decode(chart, event).ok()?.position()?;
+                    let Some(placed) = &substituted else {
+                        return Some((charted, modifiers, chart.event_pitch(event), true));
+                    };
+                    // Out of the player's reach (a B3 on a C foot): shown
+                    // where charted, not judged.
+                    let Some(position) = placed[item_index][event_index] else {
+                        return Some((charted, modifiers, chart.event_pitch(event), false));
+                    };
+                    // A harmonic replayed as a fretted note is no harmonic.
+                    if let PlayPosition::Fret(at) = position
+                        && at.technique
+                            == harmonicon_core::instrument::guitar::StringTechnique::Fretted
+                    {
+                        modifiers.retain(|m| !matches!(m, Modifier::Harmonic));
+                    }
                     return Some((position, modifiers, chart.event_pitch(event), true));
                 };
                 // Validation guarantees every event of a harmonica chart
@@ -558,14 +581,38 @@ mod tests {
         );
     }
 
+    /// The flute fixture is written for a B foot. Played on a C foot its B3
+    /// is out of reach, so it is shown but not judged; the rest play as
+    /// charted.
+    #[test]
+    fn a_flute_with_a_c_foot_leaves_a_b_foot_charts_low_b_unjudged() {
+        use harmonicon_core::instrument::flute::{Flute, FootJoint};
+        let chart: HarpChart = serde_json::from_str(include_str!(
+            "../../../harmonicon-song/tests/fixtures/flute-scale.harpchart"
+        ))
+        .unwrap();
+        let effective = EffectiveHarmonica {
+            instrument: Some(Flute::new(FootJoint::C).into()),
+            ..Default::default()
+        };
+        assert!(effective.substitutes_for(&chart));
+        let (notes, _) = build_scheduled_notes(&effective, &chart, &Default::default());
+        let playable: Vec<bool> = notes.iter().map(|n| n.playable).collect();
+        assert_eq!(playable, [false, true, true, true, true, true, true]);
+        assert_eq!(notes[0].expected_pitch, Some(59));
+    }
+
     /// A harp chosen on the harp-check page can't stand in for a guitar.
     #[test]
     fn a_substitute_harp_never_applies_to_a_guitar_chart() {
         let chart = guitar_chart(
             r#"[{"time":0.0,"duration":0.5,"events":[{"position":{"string":3,"fret":2},"note":"A3"}]}]"#,
         );
-        let effective =
-            EffectiveHarmonica { harp: Some(richter_harp("G")), mapping: HarpMapping::SameHoles };
+        let effective = EffectiveHarmonica {
+            harp: Some(richter_harp("G")),
+            mapping: HarpMapping::SameHoles,
+            instrument: None,
+        };
         assert!(effective.harp_for(&chart).is_none());
         assert!(matches!(
             effective.instrument_for(&chart),
@@ -732,8 +779,11 @@ mod tests {
     #[test]
     fn same_holes_keeps_the_tab_and_moves_every_expected_pitch() {
         let chart = three_note_chart();
-        let effective =
-            EffectiveHarmonica { harp: Some(richter_harp("G")), mapping: HarpMapping::SameHoles };
+        let effective = EffectiveHarmonica {
+            harp: Some(richter_harp("G")),
+            mapping: HarpMapping::SameHoles,
+            instrument: None,
+        };
         let notes = scheduled(&effective, &chart);
         let holes: Vec<(u8, bool)> = notes.iter().map(|(h, b, _)| (*h, *b)).collect();
         assert_eq!(
@@ -756,8 +806,11 @@ mod tests {
     #[test]
     fn transpose_keeps_every_expected_pitch_and_moves_the_tab() {
         let chart = three_note_chart();
-        let effective =
-            EffectiveHarmonica { harp: Some(richter_harp("G")), mapping: HarpMapping::Transpose };
+        let effective = EffectiveHarmonica {
+            harp: Some(richter_harp("G")),
+            mapping: HarpMapping::Transpose,
+            instrument: None,
+        };
         let original = scheduled(&EffectiveHarmonica::default(), &chart);
         let moved = scheduled(&effective, &chart);
         assert_eq!(
@@ -779,7 +832,11 @@ mod tests {
             let harp = richter_harp(key);
             let valid = harp.build_valid_notes();
             for mapping in HarpMapping::all() {
-                let effective = EffectiveHarmonica { harp: Some(harp.clone()), mapping: *mapping };
+                let effective = EffectiveHarmonica {
+                    harp: Some(harp.clone()),
+                    mapping: *mapping,
+                    instrument: None,
+                };
                 let (notes, _) =
                     build_scheduled_notes(&effective, &chart, &AdaptiveDifficulty::default());
                 for note in &notes {
@@ -809,8 +866,11 @@ mod tests {
         let chart = c_diatonic_chart(
             r#"[{"time":0.0,"duration":0.5,"events":[{"hole":1,"action":"blow","note":"C4"}]}]"#,
         );
-        let effective =
-            EffectiveHarmonica { harp: Some(chromatic_harp("C")), mapping: HarpMapping::SameHoles };
+        let effective = EffectiveHarmonica {
+            harp: Some(chromatic_harp("C")),
+            mapping: HarpMapping::SameHoles,
+            instrument: None,
+        };
         let (notes, _) = build_scheduled_notes(&effective, &chart, &AdaptiveDifficulty::default());
         assert!(notes.iter().all(|n| n.playable), "hole 1 exists on both");
     }

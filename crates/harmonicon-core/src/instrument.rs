@@ -21,6 +21,7 @@
 
 pub mod flute;
 pub mod guitar;
+pub mod substitute;
 
 use crate::chart::Action;
 use crate::harmonica::Harmonica;

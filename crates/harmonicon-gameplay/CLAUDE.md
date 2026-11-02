@@ -419,6 +419,15 @@ load-bearing about *this* crate.
     with the harp (C chart on a G harp sounds in G), under `Transpose` it
     doesn't. The one legitimate `chart.harmonica` read left in the note
     path is `harp_remap::remap_event`'s *source* harp.
+  - **A guitar or flute substitutes the same way, through
+    `EffectiveHarmonica::instrument`** (set by the pre-song page's tuning or
+    foot-joint choice). `instrument_for` returns it only for a chart of the
+    same kind, so lanes, `ValidHarpNotes` and the detection range follow
+    it; `build_scheduled_notes` places every event on it with
+    `instrument::substitute::substitute_chart` when `substitutes_for` says
+    it differs. A note the played instrument can't sound (a B3 on a C foot)
+    keeps its charted position for display and `playable: false`, so it
+    isn't judged.
 
 - **The song-progress bar is a per-hole note-lanes strip, with the phrase
   overlay painted over it, and its timescale survives a music-less song**

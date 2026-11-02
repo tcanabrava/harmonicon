@@ -52,6 +52,7 @@ pub(crate) enum SongSort {
     Difficulty,
     Song,
     Genre,
+    Instrument,
     Rating,
     Mastery,
     TimesPlayed,
@@ -235,15 +236,17 @@ pub(crate) fn setup_artist_list(
                 border: {UiRect { left: Val::Px(4.0), ..UiRect::all(Val::Px(1.0)) }},
             }
             Children [
-                @sort_choice(SongSort::Song, 25.0, loc.msg("song-sort-name").to_string())
+                @sort_choice(SongSort::Song, 22.0, loc.msg("song-sort-name").to_string())
                 --
-                @sort_choice(SongSort::Band, 16.0, loc.msg("song-sort-band").to_string())
+                @sort_choice(SongSort::Band, 14.0, loc.msg("song-sort-band").to_string())
                 --
-                @sort_choice(SongSort::Genre, 11.0, loc.msg("song-sort-genre").to_string())
+                @sort_choice(SongSort::Instrument, 10.0, loc.msg("song-sort-instrument").to_string())
                 --
-                @sort_choice(SongSort::Difficulty, 12.0, loc.msg("song-sort-difficulty").to_string())
+                @sort_choice(SongSort::Genre, 10.0, loc.msg("song-sort-genre").to_string())
                 --
-                @sort_choice(SongSort::Rating, 16.0, loc.msg("song-sort-rating").to_string())
+                @sort_choice(SongSort::Difficulty, 10.0, loc.msg("song-sort-difficulty").to_string())
+                --
+                @sort_choice(SongSort::Rating, 14.0, loc.msg("song-sort-rating").to_string())
                 --
                 @sort_choice(SongSort::Mastery, 10.0, loc.msg("song-sort-mastery").to_string())
                 --
@@ -303,7 +306,17 @@ pub(crate) fn setup_artist_list(
             })
         },
     );
-    populate_rows(&mut commands, rows, &songs, state, &profile, Some(&asset_server), true, &[]);
+    populate_rows(
+        &mut commands,
+        rows,
+        &songs,
+        state,
+        &profile,
+        Some(&asset_server),
+        true,
+        &[],
+        &loc,
+    );
 }
 
 /// The search label, text field, Clear button and result count.
@@ -670,7 +683,9 @@ fn collect_songs(
         .0
         .values()
         .flatten()
-        .filter(|song| matches_search(query, &[&song.name, &song.artist, &song.genre]))
+        .filter(|song| {
+            matches_search(query, &[&song.name, &song.artist, &song.genre, &song.instrument])
+        })
         .filter(|song| !state.harmonica_only || song.instrument == "harmonica")
         .filter(|song| {
             let accuracy = preferences(profile, &song.asset_path)
@@ -713,6 +728,10 @@ fn collect_songs(
             .to_lowercase()
             .cmp(&b.name.to_lowercase())
             .then_with(|| a.artist.to_lowercase().cmp(&b.artist.to_lowercase())),
+        SongSort::Instrument => a
+            .instrument
+            .cmp(&b.instrument)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
         SongSort::Genre => a
             .genre
             .to_lowercase()
@@ -723,6 +742,16 @@ fn collect_songs(
         entries.reverse();
     }
     entries
+}
+
+/// A song part's instrument, as the list names it. The catalogue reads it
+/// from the chart's `instrument` (`harmonica` when it has none).
+fn instrument_label(instrument: &str, loc: &Localization) -> String {
+    String::from(loc.msg(match instrument {
+        "guitar" => "song-instrument-guitar",
+        "flute" => "song-instrument-flute",
+        _ => "song-instrument-harmonica",
+    }))
 }
 
 /// Shared column widths and padding keep headers and song metadata aligned.
@@ -756,6 +785,7 @@ fn song_row(
     personal: SongPreferences,
     rating: Handle<Image>,
     times_played: u32,
+    instrument: String,
 ) -> impl Scene {
     let base = if selected { Color::srgb(0.16, 0.30, 0.43) } else { Color::srgb(0.11, 0.11, 0.16) };
     let border = if selected { Color::srgb(0.65, 0.85, 1.0) } else { Color::NONE };
@@ -778,13 +808,15 @@ fn song_row(
             state.selected = Some(path.clone());
         })
         Children [
-            @song_cell(song.name.clone(), 25.0, true)
+            @song_cell(song.name.clone(), 22.0, true)
             --
-            @song_cell(song.artist.clone(), 16.0, false)
+            @song_cell(song.artist.clone(), 14.0, false)
             --
-            @song_cell(song.genre.clone(), 11.0, false)
+            @song_cell(instrument, 10.0, false)
             --
-            @song_cell(song.difficulty.clone(), 12.0, false)
+            @song_cell(song.genre.clone(), 10.0, false)
+            --
+            @song_cell(song.difficulty.clone(), 10.0, false)
             --
             @rating_cell(song.asset_path.clone(), rating)
             --
@@ -804,6 +836,7 @@ fn populate_rows(
     asset_server: Option<&AssetServer>,
     focus_rows: bool,
     existing: &[(Entity, String)],
+    loc: &Localization,
 ) {
     let mut children = Vec::new();
     for (index, song) in collect_songs(songs, state, profile).into_iter().enumerate() {
@@ -814,6 +847,7 @@ fn populate_rows(
             continue;
         }
         let selected = state.selected.as_deref() == Some(path.as_str());
+        let song_instrument = song.instrument.clone();
         let row = commands
             .spawn_scene(song_row(
                 song,
@@ -822,6 +856,7 @@ fn populate_rows(
                 preferences(profile, &path),
                 rating_image(asset_server, preferences(profile, &path).rating),
                 profile.song_play_count(&path),
+                instrument_label(&song_instrument, loc),
             ))
             .id();
         if focus_rows && (selected || (state.selected.is_none() && index == 0)) {
@@ -876,6 +911,7 @@ pub(crate) fn refresh_song_picker(
     mut rendered: Local<Option<(String, SongSort, bool, u8)>>,
     focus: Res<InputFocus>,
     song_rows: Query<(Entity, &SongRow)>,
+    loc: Res<Localization>,
 ) {
     if profile.is_changed() {
         for (cell, mut image) in &mut rating_images {
@@ -934,6 +970,7 @@ pub(crate) fn refresh_song_picker(
             asset_server.as_deref(),
             focus.get().is_none_or(|entity| song_rows.contains(entity)),
             if rescanned { &[] } else { &existing },
+            &loc,
         );
     }
 }
@@ -1112,6 +1149,7 @@ mod tests {
                         SongPreferences::default(),
                         Handle::default(),
                         0,
+                        "Harmonica".to_string(),
                     ));
                 }
             });
@@ -1189,6 +1227,7 @@ mod tests {
     fn personal_columns_refresh_counts_and_mastery_on_existing_rows() {
         let mut app = App::new();
         app.init_resource::<SongPickerState>()
+            .init_resource::<Localization>()
             .init_resource::<PlayerProfile>()
             .init_resource::<AvailableSongs>()
             .init_resource::<InputFocus>()
@@ -1591,6 +1630,7 @@ mod tests {
     fn filtering_keeps_existing_song_entities_and_focus() {
         let mut app = App::new();
         app.init_resource::<InputFocus>()
+            .init_resource::<Localization>()
             .init_resource::<SongPickerState>()
             .init_resource::<AvailableSongs>()
             .add_message::<SongsRescanned>()

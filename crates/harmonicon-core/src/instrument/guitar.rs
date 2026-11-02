@@ -43,6 +43,30 @@ pub struct Guitar {
 /// Standard tuning, string 1 first: E4 B3 G3 D3 A2 E2.
 pub const STANDARD_TUNING: [u8; 6] = [64, 59, 55, 50, 45, 40];
 
+/// A named six-string tuning a player can say their guitar is in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Tuning {
+    /// Stable name, also the localization key's suffix (`guitar-tuning-…`).
+    pub id: &'static str,
+    /// Open strings, string 1 (the highest) first, as MIDI.
+    pub strings: [u8; 6],
+}
+
+/// The common six-string tunings, standard first.
+pub const TUNINGS: &[Tuning] = &[
+    Tuning { id: "standard", strings: STANDARD_TUNING },
+    Tuning { id: "drop-d", strings: [64, 59, 55, 50, 45, 38] },
+    Tuning { id: "half-step-down", strings: [63, 58, 54, 49, 44, 39] },
+    Tuning { id: "dadgad", strings: [62, 57, 55, 50, 45, 38] },
+    Tuning { id: "open-g", strings: [62, 59, 55, 50, 43, 38] },
+    Tuning { id: "open-d", strings: [62, 57, 54, 50, 45, 38] },
+];
+
+/// The named tuning `strings` are in, if any.
+pub fn tuning_of(strings: &[u8]) -> Option<&'static Tuning> {
+    TUNINGS.iter().find(|t| t.strings[..] == *strings)
+}
+
 /// How far a fretting hand reaches across frets without moving: notes held
 /// together may sit at most this many frets apart. Open strings are free.
 pub const HAND_SPAN_FRETS: u8 = 4;
