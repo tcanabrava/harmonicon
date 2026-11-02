@@ -12,8 +12,8 @@ starts:
   jam-session.md)) or **Generate Jam** (synthesize an instant backing with
   no song required, see [Generate a Jam](jam-generate.md)).
 - **Note Trainer** — isolated technique practice for your instrument:
-  the harmonica's [Bending Trainer](bending-trainer.md), or the guitar's
-  [Note Trainer](note-trainer.md).
+  the harmonica's [Bending Trainer](bending-trainer.md), or the
+  [Note Trainer](note-trainer.md) for the guitar or the flute.
 - **Lessons** — the guided curriculum. See [Lessons](lessons.md).
 
 Press **Esc**, or click **Back**, to return to the Main Menu.

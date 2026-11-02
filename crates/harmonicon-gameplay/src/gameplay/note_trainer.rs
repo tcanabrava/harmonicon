@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: MIT
 
-//! The Note Trainer for a guitar: the drills `harmonicon_core::note_trainer`
-//! lists, one at a time, against a live tuner.
+//! The Note Trainer for a guitar or a flute: the drills
+//! `harmonicon_core::note_trainer` lists, one at a time, against a live
+//! tuner.
 //!
-//! Four kinds, chosen from a tab bar: notes to hit and hold, bends to push
-//! up to pitch, natural harmonics, and a note to find on one particular
-//! string. A drill is landed by holding its pitch within the trainer's
+//! The kinds are the instrument's own `techniques()`, chosen from a tab
+//! bar. A guitar: notes to hit and hold, bends to push up to pitch, natural
+//! harmonics, and a note to find on one particular string. A flute: notes,
+//! octaves (one fingering overblown to the note above), and alternate
+//! fingerings. A drill is landed by holding its pitch within the trainer's
 //! tolerance for its hold time (both from `BendingTrainerSettings`, so the
-//! two trainers judge alike); the next drill follows on its own. The
-//! fretboard strip from the guitar highway shows where to put the hand.
+//! trainers judge alike); the next drill follows on its own. The guitar's
+//! fretboard strip or the flute's upright drawing, both from the play
+//! highway, shows where the fingers go.
 //!
-//! What it can't check: detection hears a pitch, not a string, so a
-//! position drill trusts the player to use the string it names.
+//! What it can't check: detection hears a pitch, not a string or a
+//! fingering, so a position drill trusts the player to play it as asked.
 
 use bevy::audio::{AudioPlayer, AudioSource, PlaybackSettings, Volume};
 use bevy::prelude::*;
@@ -32,11 +36,9 @@ use harmonicon_ui::dialogs::page_chrome::{header_scene, spawn_back_button, title
 use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
 use super::GameplayRoot;
+use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys, spawn_flute};
 use super::guitar_visuals::{FretCell, paint_cell, spawn_fretboard};
-
-/// The kinds the tab bar offers, in its order.
-const KINDS: [TechniqueKind; 4] =
-    [TechniqueKind::Target, TechniqueKind::Glide, TechniqueKind::Register, TechniqueKind::Position];
+use harmonicon_core::instrument::flute::Flute;
 
 /// Seconds the "Landed!" line stays up before the live status returns.
 const LANDED_SECS: f32 = 1.2;
@@ -120,18 +122,43 @@ pub struct NoteTrainer {
 
 impl Default for NoteTrainer {
     fn default() -> Self {
-        let instrument: Instrument = Guitar::standard(GuitarBody::Electric).into();
-        let practice = Practice::new(drills(&instrument, TechniqueKind::Target));
-        Self { instrument, kind: TechniqueKind::Target, practice }
+        Self::for_instrument(Guitar::standard(GuitarBody::Electric).into())
     }
 }
 
 impl NoteTrainer {
+    /// A fresh session on `instrument`, on its first kind of drill.
+    pub fn for_instrument(instrument: Instrument) -> Self {
+        let kind = instrument.techniques().first().copied().unwrap_or(TechniqueKind::Target);
+        let practice = Practice::new(drills(&instrument, kind));
+        Self { instrument, kind, practice }
+    }
+
+    /// Switches to `instrument`, keeping the session when it is the same
+    /// one — so leaving and coming back resumes where the player was.
+    pub fn choose(&mut self, instrument: Instrument) {
+        if self.instrument != instrument {
+            *self = Self::for_instrument(instrument);
+        }
+    }
+
     fn guitar(&self) -> Option<&Guitar> {
         match &self.instrument {
             Instrument::Guitar(guitar) => Some(guitar),
             Instrument::Harmonica(_) | Instrument::Flute(_) => None,
         }
+    }
+
+    fn flute(&self) -> Option<&Flute> {
+        match &self.instrument {
+            Instrument::Flute(flute) => Some(flute),
+            Instrument::Harmonica(_) | Instrument::Guitar(_) => None,
+        }
+    }
+
+    /// The kinds the tab bar offers, in its order: the instrument's own.
+    fn kinds(&self) -> &'static [TechniqueKind] {
+        self.instrument.techniques()
     }
 
     fn set_kind(&mut self, kind: TechniqueKind) {
@@ -146,7 +173,7 @@ impl NoteTrainer {
 /// detected note sits nearest `target`. Detection can report several at
 /// once (a ringing open string under the fretted one); the drill only
 /// cares about the one the player is aiming at.
-pub fn nearest_midi(pitches: &[PitchInfo], target: f32, a4_hz: f32) -> Option<f32> {
+pub(super) fn nearest_midi(pitches: &[PitchInfo], target: f32, a4_hz: f32) -> Option<f32> {
     pitches
         .iter()
         .filter(|p| p.frequency > 0.0)
@@ -158,19 +185,54 @@ fn note_name(midi: f32) -> String {
     midi_to_note(midi.round() as i32)
 }
 
-/// The localized name of a kind, as the tab bar shows it for a guitar.
-fn kind_key(kind: TechniqueKind) -> &'static str {
+/// The localized name of a kind, as the tab bar shows it: a flute's
+/// register jump is its octaves, and its positions its alternate
+/// fingerings.
+fn kind_key(instrument: &Instrument, kind: TechniqueKind) -> &'static str {
+    let flute = matches!(instrument, Instrument::Flute(_));
     match kind {
         TechniqueKind::Target => "note-trainer-kind-target",
         TechniqueKind::Glide => "note-trainer-kind-glide",
+        TechniqueKind::Register if flute => "note-trainer-kind-register-flute",
         TechniqueKind::Register => "note-trainer-kind-register",
+        TechniqueKind::Position if flute => "note-trainer-kind-position-flute",
         TechniqueKind::Position => "note-trainer-kind-position",
     }
 }
 
-/// What to play, in words: string, fret and what to do there. A position
+/// What to play, in words, on whichever instrument the trainer has.
+fn instruction(loc: &Localization, instrument: &Instrument, drill: &Drill) -> String {
+    match instrument {
+        Instrument::Guitar(guitar) => guitar_instruction(loc, guitar, drill),
+        Instrument::Flute(_) => flute_instruction(loc, drill),
+        Instrument::Harmonica(_) => String::new(),
+    }
+}
+
+/// A flute drill in words: the note; for an octave, the note it is
+/// overblown from on the same keys; for a position, which fingering.
+fn flute_instruction(loc: &Localization, drill: &Drill) -> String {
+    let PlayPosition::Fingering(at) = drill.position else { return String::new() };
+    let note = note_name(drill.target);
+    let start = drill.start.map(note_name).unwrap_or_default();
+    match (drill.kind, at.alternate) {
+        (TechniqueKind::Register, _) => String::from(
+            loc.msg_args("note-trainer-flute-register", &[("note", note), ("start", start)]),
+        ),
+        (TechniqueKind::Position, 0) => {
+            String::from(loc.msg_args("note-trainer-flute-position-standard", &[("note", note)]))
+        }
+        (TechniqueKind::Position, alternate) => String::from(loc.msg_args(
+            "note-trainer-flute-position",
+            &[("note", note), ("alternate", alternate.to_string())],
+        )),
+        _ => String::from(loc.msg_args("note-trainer-flute-target", &[("note", note)])),
+    }
+}
+
+/// What to play on a guitar: string, fret and what to do there. A position
 /// drill names only the string — finding the fret is the drill.
-fn instruction(loc: &Localization, guitar: &Guitar, drill: &Drill) -> String {
+fn guitar_instruction(loc: &Localization, guitar: &Guitar, drill: &Drill) -> String {
     let PlayPosition::Fret(at) = drill.position else { return String::new() };
     let open = guitar.string_labels().get(usize::from(at.string - 1)).cloned().unwrap_or_default();
     let args = [
@@ -244,13 +306,15 @@ pub struct HoldBar;
 #[derive(Component)]
 pub struct LandedLabel;
 
-pub fn setup(
+pub(super) fn setup(
     mut commands: Commands,
     trainer: Res<NoteTrainer>,
     mut pitch_range: ResMut<PitchRange>,
     loc: Res<Localization>,
 ) {
-    let Some(guitar) = trainer.guitar() else { return };
+    if trainer.guitar().is_none() && trainer.flute().is_none() {
+        return;
+    }
     if let Some((low, high)) = trainer.instrument.range() {
         *pitch_range = PitchRange::from_freqs(
             [midi_to_freq_hz(f32::from(low)), midi_to_freq_hz(f32::from(high))],
@@ -270,7 +334,11 @@ pub fn setup(
         ))
         .id();
     let title = commands
-        .spawn_scene(title_column_scene(String::from(loc.msg("note-trainer-guitar-title"))))
+        .spawn_scene(title_column_scene(String::from(loc.msg(if trainer.flute().is_some() {
+            "note-trainer-flute-title"
+        } else {
+            "note-trainer-guitar-title"
+        }))))
         .id();
     let header = commands.spawn_scene(header_scene()).id();
     commands.entity(header).add_child(title);
@@ -291,15 +359,17 @@ pub fn setup(
         .spawn(Node { padding: UiRect::axes(Val::Px(24.0), Val::Px(8.0)), ..default() })
         .id();
     commands.entity(root).add_child(tabs);
-    let labels: Vec<String> = KINDS.iter().map(|&k| String::from(loc.msg(kind_key(k)))).collect();
-    let selected = KINDS.iter().position(|&k| k == trainer.kind).unwrap_or(0);
+    let kinds = trainer.kinds();
+    let labels: Vec<String> =
+        kinds.iter().map(|&k| String::from(loc.msg(kind_key(&trainer.instrument, k)))).collect();
+    let selected = kinds.iter().position(|&k| k == trainer.kind).unwrap_or(0);
     spawn_tab_bar(
         &mut commands,
         tabs,
         &labels,
         selected,
         |ev: On<TabSelect>, mut trainer: ResMut<NoteTrainer>| {
-            if let Some(&kind) = KINDS.get(ev.index) {
+            if let Some(&kind) = trainer.kinds().get(ev.index) {
                 trainer.set_kind(kind);
             }
         },
@@ -362,15 +432,21 @@ pub fn setup(
             ));
         });
         root.spawn(Node {
-            height: Val::Px(320.0),
+            // The upright flute needs the height its fourteen keys take.
+            height: Val::Px(if trainer.flute().is_some() { 520.0 } else { 320.0 }),
             padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
             ..default()
         })
-        .with_children(|strip| spawn_fretboard(strip, guitar, 560.0));
+        .with_children(|strip| match (trainer.guitar(), trainer.flute()) {
+            (Some(guitar), _) => spawn_fretboard(strip, guitar, 560.0),
+            (_, Some(flute)) => spawn_flute(strip, flute),
+            _ => {}
+        });
     });
 }
 
-/// Plucks the current drill's target, at the trainer's A4 reference.
+/// Sounds the current drill's target in the instrument's own voice, at the
+/// trainer's A4 reference.
 fn play_reference(
     _: On<Activate>,
     trainer: Res<NoteTrainer>,
@@ -378,11 +454,11 @@ fn play_reference(
     mut sources: ResMut<Assets<AudioSource>>,
     mut commands: Commands,
 ) {
-    use harmonicon_core::synth::{Expr, PhraseNote, SAMPLE_RATE, Voice, render_pcm_with};
+    use harmonicon_core::synth::{Expr, PhraseNote, SAMPLE_RATE, render_pcm_with};
     let Some(drill) = trainer.practice.drill() else { return };
     let freq = settings.a4_hz * 2f32.powf((drill.target - 69.0) / 12.0);
     let note = PhraseNote { tick: 0, len: 1, freq: Some(freq), expr: Expr::None };
-    let pcm = render_pcm_with(&[note], 1.5, Voice::PluckedString);
+    let pcm = render_pcm_with(&[note], 1.5, trainer.instrument.synth_voice());
     let wav = harmonicon_core::wav::encode_wav(&pcm, SAMPLE_RATE);
     commands.spawn((
         AudioPlayer::<AudioSource>(sources.add(AudioSource { bytes: wav.into() })),
@@ -391,7 +467,7 @@ fn play_reference(
 }
 
 /// Feeds the newest detection to the practice.
-pub fn listen(
+pub(super) fn listen(
     mut reader: MessageReader<PitchEvent>,
     mut trainer: ResMut<NoteTrainer>,
     settings: Res<BendingTrainerSettings>,
@@ -406,7 +482,7 @@ pub fn listen(
     trainer.practice.listen(midi, time.delta_secs(), settings.tolerance_cents, settings.hold_secs);
 }
 
-pub fn update_labels(
+pub(super) fn update_labels(
     trainer: Res<NoteTrainer>,
     settings: Res<BendingTrainerSettings>,
     loc: Res<Localization>,
@@ -417,14 +493,14 @@ pub fn update_labels(
     )>,
     mut bars: Query<&mut Node, With<HoldBar>>,
 ) {
-    let Some(guitar) = trainer.guitar() else { return };
     let practice = &trainer.practice;
     let set = |text: &mut Text, value: String| {
         if text.0 != value {
             text.0 = value;
         }
     };
-    let what = practice.drill().map(|d| instruction(&loc, guitar, d)).unwrap_or_default();
+    let what =
+        practice.drill().map(|d| instruction(&loc, &trainer.instrument, d)).unwrap_or_default();
     for mut text in &mut texts.p0() {
         set(&mut text, what.clone());
     }
@@ -451,7 +527,7 @@ pub fn update_labels(
     }
 }
 
-pub fn update_fretboard(
+pub(super) fn update_fretboard(
     trainer: Res<NoteTrainer>,
     mut cells: Query<(&FretCell, &mut Text, &mut BackgroundColor)>,
 ) {
@@ -461,8 +537,23 @@ pub fn update_fretboard(
     }
 }
 
+/// Lights the flute drawing's keys for the drill's fingering. A position
+/// drill shows the alternate it asks for, which is the thing to learn.
+pub(super) fn update_flute_drawing(
+    trainer: Res<NoteTrainer>,
+    drawing: Query<&FluteDrawing>,
+    mut keys: Query<(&FluteKey, &mut BackgroundColor)>,
+) {
+    let Ok(FluteDrawing(flute)) = drawing.single() else { return };
+    let now = trainer.practice.drill().and_then(|d| match d.position {
+        PlayPosition::Fingering(at) => Some(at),
+        _ => None,
+    });
+    paint_flute_keys(flute, now, None, &mut keys);
+}
+
 /// Esc returns to the Play menu, as the Back button does.
-pub fn handle_escape(
+pub(super) fn handle_escape(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut next: ResMut<NextState<AppState>>,
     mut ret_play: ResMut<harmonicon_app::app::ReturnToPlay>,
@@ -542,6 +633,23 @@ mod tests {
         assert!(lit(found.first()).is_empty());
         let notes = drills(&guitar, TechniqueKind::Target);
         assert_eq!(lit(notes.first()).len(), 1);
+    }
+
+    #[test]
+    fn a_flute_session_offers_its_own_kinds_and_choosing_keeps_a_session() {
+        let flute: Instrument = Flute::default().into();
+        let mut trainer = NoteTrainer::for_instrument(flute.clone());
+        assert_eq!(
+            trainer.kinds(),
+            [TechniqueKind::Target, TechniqueKind::Register, TechniqueKind::Position]
+        );
+        assert_eq!(trainer.practice.drill().map(|d| d.target), Some(60.0), "C4 first");
+        trainer.practice.step_by(5);
+        trainer.choose(flute);
+        assert_eq!(trainer.practice.index, 5, "the same flute resumes");
+        trainer.choose(Guitar::standard(GuitarBody::Electric).into());
+        assert_eq!(trainer.practice.index, 0, "another instrument starts afresh");
+        assert!(trainer.guitar().is_some());
     }
 
     #[test]

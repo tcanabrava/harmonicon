@@ -258,6 +258,25 @@ fn key_fill(now: bool, next: bool) -> Color {
     }
 }
 
+/// Fills the drawing's keys: solid for `now`'s fingering, ghosted for
+/// `next`'s. Shared by the play highway and the Note Trainer.
+pub(super) fn paint_flute_keys(
+    flute: &Flute,
+    now: Option<FingeringAssignment>,
+    next: Option<FingeringAssignment>,
+    keys: &mut Query<(&FluteKey, &mut BackgroundColor)>,
+) {
+    let pressed = |at: Option<FingeringAssignment>, key| {
+        at.and_then(|at| flute.keys(at)).is_some_and(|k| k.pressed(key))
+    };
+    for (key, mut fill) in keys.iter_mut() {
+        let want = key_fill(pressed(now, key.0), pressed(next, key.0));
+        if fill.0 != want {
+            fill.0 = want;
+        }
+    }
+}
+
 pub(super) fn update_flute(
     clock: Res<GameplayClock>,
     notes: Res<SongNotes>,
@@ -268,15 +287,7 @@ pub(super) fn update_flute(
 ) {
     let Ok(FluteDrawing(flute)) = drawing.single() else { return };
     let (now, next) = targets(&notes.notes, clock.get());
-    let pressed = |at: Option<FingeringAssignment>, key| {
-        at.and_then(|at| flute.keys(at)).is_some_and(|k| k.pressed(key))
-    };
-    for (key, mut fill) in &mut keys {
-        let want = key_fill(pressed(now, key.0), pressed(next, key.0));
-        if fill.0 != want {
-            fill.0 = want;
-        }
-    }
+    paint_flute_keys(flute, now, next, &mut keys);
     let name = |at: Option<FingeringAssignment>| {
         at.map_or_else(
             || "—".to_string(),

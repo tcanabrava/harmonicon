@@ -2,7 +2,7 @@
 
 **Play → Note Trainer** asks which instrument you're practising.
 **Harmonica** opens the [Bending Trainer](bending-trainer.md); **Guitar**
-opens the guitar's Note Trainer, described here. Like the Bending Trainer
+and **Flute** open the Note Trainer described here. Like the Bending Trainer
 it is practice, not a lesson: there is no song and nothing to fail.
 
 ![Note Trainer for the guitar](images/note-trainer-guitar.png)
@@ -32,3 +32,21 @@ come from the same settings as the Bending Trainer's.
 
 The trainer hears a pitch, not a string, so in Positions it trusts you to
 play the note on the string it asks for.
+
+## Flute
+
+The flute's tabs are:
+
+- **Notes**: every note from the lowest to C7; play it and hold it.
+- **Octaves**: finger the lower note, then blow faster to jump to the
+  note above on the very same keys, the way the flute's second octave
+  sits on its first.
+- **Alternate fingerings**: a high note on one particular fingering, the
+  standard one or one of its alternates.
+
+The upright flute below lights the keys of the fingering to use, and
+**Listen** plays the note in the game's flute voice. As with the guitar,
+the trainer hears the pitch, so it trusts you to use the fingering it
+shows.
+
+![Note Trainer for the flute](images/note-trainer-flute.png)
