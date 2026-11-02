@@ -236,22 +236,32 @@ harmonics and per-string vibrato. Edits reject occupied strings and
 excessive hand span across overlapping sustains, including while a note
 is resized or pasted.
 
-An empty harmonica document can select a standard guitar in Details.
-Loaded parts keep their own tuning/capo. A generic pitch-row fallback and
-further instrument adapters remain future work. Flute and clarinet adapters
-must separate written notation from sounding pitch and preserve alternate
-fingerings; hurdy-gurdy support also needs voice roles and rhythmic events.
+A flute chart is a piano roll of pitch rows, C7 at the top, rows narrower
+above sixteen so the range fits. A note plays its standard fingering unless
+the note column's Fingering button picks an alternate; one voice, so a new
+note ends the one sounding and two onsets together are refused. A
+fingering view draws the flute's keys as the rows and each note as the
+fingering that plays it; a key is not a pitch, so there notes edit only
+in time.
+
+An empty harmonica document can select a standard guitar or a flute in
+Details. Loaded parts keep their own tuning, capo and foot joint; picking
+them for a new document belongs with "My instruments" (phase 5). A
+clarinet adapter would also have to separate written notation from
+sounding pitch; hurdy-gurdy support needs voice roles and rhythmic events.
 
 - **Rows come from the instrument.** Harmonica: holes × direction, as
   today. Guitar: 6 tab rows with the fret number drawn on each note. Flute:
-  a monophonic piano roll.
+  a monophonic piano roll, or its keys in fingering view (all landed).
 - **`enforce_direction` becomes `VoiceModel::reconcile(group)`**, run on the
   same `overlapping_group`:
   - harmonica: propagate the direction (today's behaviour);
   - guitar: moving a note onto an occupied string re-voices it to the next
     string that reaches the pitch, or refuses if none does; a chord beyond
     hand span is flagged;
-  - flute: an overlapping note truncates the previous one.
+  - flute: a new note ends the previous one (landed: `flute_note::place`,
+    and `guitar_note::fits` refusing any overlap on drag, resize and
+    paste).
 
   `pitch_compatible`/`pitch_deny_key` already give the refusal path a
   localized reason.
@@ -266,7 +276,8 @@ fingerings; hurdy-gurdy support also needs voice roles and rhythmic events.
   target `Instrument` rather than always a `Harmonica`.
 - The `HarmonicaKind` picker becomes an instrument picker that includes the
   tuning (standard, drop D, DADGAD or capo for guitar; C or B foot for
-  flute).
+  flute). **Open**, with "My instruments": today Details has "Use guitar"
+  and "Use flute" for a standard guitar and a C-foot flute.
 
 ## Note Trainer (replaces the Bending Trainer)
 
@@ -308,7 +319,7 @@ the harmonic).
 **Landed**: `harmonicon_core::note_trainer` lists each instrument's drills
 per kind and reads a heard pitch against one (`hear`), and the guitar has
 its own trainer screen (`AppState::NoteTrainer`, the highway's fretboard
-strip as its diagram). The Play menu's Note Trainer entry asks for the
+strip as its diagram), and so does the flute (its upright drawing). The Play menu's Note Trainer entry asks for the
 instrument; the harmonica still opens the Bending Trainer, and moves onto
 the shared model only after that trainer's live validation, so the move
 can't be confused with a detection problem.
@@ -342,7 +353,7 @@ can't be confused with a detection problem.
 Each phase lands and is committed on its own. Phase 1 must not change
 behaviour.
 
-1. **The seam, harmonica only.** Add `Instrument`, `InstrumentModel`,
+1. **The seam, harmonica only** (landed). Add `Instrument`, `InstrumentModel`,
    `PlayPosition`, `VoiceModel` and `LaneLayout` (with its scroll axis),
    with the harmonica as the only implementation. Route `pitch_map`, the
    constraint filter, the editor's reconcile, `ScheduledNote` (position +
@@ -360,29 +371,39 @@ behaviour.
    - fretboard strip, string colours and grouped chord gems (the basic
      horizontal tab highway, fingering solver and Guitar Pro string/fret
      pass-through are implemented);
-   - editor tab rows;
-   - Karplus–Strong synth;
-   - a recorded corpus, then detection tuning (low-string resolution,
-     chord onset spread, decaying sustain).
-3. **Note Trainer.** Generalise the bending trainer onto `TechniqueKind`,
-   with guitar bends as the second `Glide` implementation (which makes the
-   abstraction honest), and add `Target` for every instrument.
-4. **Flute.** Its chart fields, a monophonic model, the Boehm fingering table as data
-   (standard, alternates, harmonics), pitch lanes and fingering diagram,
-   the `Register` trainer mode, and a corpus aimed at octave errors.
-5. **Content and progress.** Per-instrument packs and DAGs, a
-   per-instrument profile, the "My instruments" page, and per-instrument
-   Jam Session.
+   - editor rows, on the shared grid, one per string (landed);
+   - Karplus–Strong synth (landed);
+   - **open:** a recorded corpus, then detection tuning (low-string
+     resolution, chord onset spread, decaying sustain).
+3. **Note Trainer** (landed for the guitar and the flute). The drill
+   model in core is generic over `TechniqueKind`; the guitar and the flute
+   have the trainer screen. **Open:** the harmonica moves onto it from the
+   Bending Trainer after that trainer's live validation, keeping its drill
+   stats and profile keys.
+4. **Flute** (landed but for its corpus). Chart format 1.9.0, a
+   monophonic model with a C or B foot, the Boehm fingering table as data
+   (standard fingerings and third-octave alternates, from the Woodwind
+   Fingering Guide; register pairs are read off matching key sets, not
+   written as harmonic numbers), Play 2D in a fingering view (the keys as
+   rows, an upright flute drawing) or a note view (pitch rows), the Song
+   Editor in the same two views, and the trainer's `Register` and
+   `Position` tabs. **Open:** a corpus aimed at octave errors.
+5. **Content and progress** (next, not started). Per-instrument packs
+   and DAGs, a per-instrument profile, the "My instruments" page, and
+   per-instrument Jam Session.
 
 ## Scheduling
 
-Every phase above is required for 1.0 (`ROADMAP.md`), and phase 1 is under
-way. rc1–rc2 touch the same gameplay files, so land each phase in small
-commits rather than one long-lived branch.
+Every phase above is required for 1.0 (`ROADMAP.md`). Phases 1–4 have
+landed apart from the two recorded corpora (guitar, flute) and the
+harmonica's move onto the shared trainer; phase 5 is next. rc1–rc2 touch
+the same gameplay files, so land each phase in small commits rather than
+one long-lived branch.
 
-**The flute's foot joint is configurable**: `FluteConfig` carries a
-`FootJoint::{C, B}` (default C), chosen in "My instruments" alongside the
-guitar's tuning. It sets the lowest note (C4 or B3), so the fingering table
+**The flute's foot joint is configurable**: `Flute` carries a
+`FootJoint::{C, B}` (default C), written in the chart's `instrument` and,
+once phase 5 lands, chosen in "My instruments" alongside the guitar's
+tuning. It sets the lowest note (C4 or B3), so the fingering table
 holds the B-foot-only fingerings (B3, and the low-C♯/B keys used in some
 high-register alternates) and the model filters them out on a C foot.
 

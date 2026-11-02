@@ -49,7 +49,9 @@ than accumulating history (git log/commit messages are the historical record):
   Note Trainer's glide/register split, and the phased rollout. Required for
   1.0. The seam, the guitar's core model and chart format 1.8.0 have
   landed; guitar charts play on a basic horizontal tab highway. The
-  flute's model, fingering table and chart format 1.9.0 are in (`PLAN.md`)
+  flute is in too (chart format 1.9.0, its highway, editor and Note
+  Trainer); what's open is the two recorded corpora and phase 5, content
+  and progress (`PLAN.md`)
 - `docs/book/` — player-facing mdBook user guide (`mdbook build`/`mdbook
   serve` from that directory); update it when a user-visible feature
   changes, not just internal ones. `docs/book/src/images/*.png` are real

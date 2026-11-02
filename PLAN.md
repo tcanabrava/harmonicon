@@ -89,22 +89,29 @@ gates 1.0. In order:
   - detection, which needs a recorded guitar corpus first (low-string
     resolution, strum onset spread, decaying sustain).
 - **Note Trainer**. The drill model (`harmonicon_core::note_trainer`) and
-  the guitar's screen are in; the harmonica keeps the Bending Trainer
-  behind the same menu entry. Next:
+  the guitar's and flute's screens are in; the harmonica keeps the Bending
+  Trainer behind the same menu entry. Next:
   - move the harmonica onto the shared drill model, after its live
     validation pass (above), keeping its drill stats and profile keys;
-  - per-instrument drill progress in the profile (the guitar's landings
-    are per session today), with the content-and-progress work below.
+  - per-instrument drill progress in the profile (guitar and flute
+    landings are per session today), with the content-and-progress work
+    below.
 - **Seam leftovers** that read holes directly and move when they next
   change: the progress bar's note lanes (`NoteMarker`) and Jam Session's
   `hole_map`.
 - **Flute**. The model (`instrument::flute`, a C or B foot), the sourced
-  Boehm fingering table, chart format 1.9.0, its drills in the trainer
-  model, score conversion and a flute synth voice are in. Next:
+  Boehm fingering table, chart format 1.9.0, score conversion, a flute
+  synth voice, Play 2D (key rows with the upright flute drawing, or pitch
+  rows, switched from the pause menu), the Song Editor (note and
+  fingering views) and the Note Trainer's flute tabs are in. Next:
   - a recorded corpus aimed at octave errors, before any detection tuning;
-  - choosing the foot joint in "My instruments" (content and progress).
-- **Content and progress**: per-instrument packs, DAGs and profile, a
-  "My instruments" page, per-instrument Jam Session.
+  - choosing the foot joint in "My instruments" (content and progress);
+  - remembering Play 2D's flute view across sessions — a settings field,
+    with "My instruments" (it lasts a session today).
+- **Content and progress** (phase 5, not started, and the next phase):
+  per-instrument packs, DAGs and profile, a "My instruments" page holding
+  each instrument's tuning, capo and foot joint, and per-instrument Jam
+  Session. What guitar and flute content ships is still to be decided.
 
 ## Mobile (post-1.0, needs hardware)
 

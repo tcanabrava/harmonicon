@@ -242,15 +242,21 @@ phases; `PLAN.md` has them in order.
 - **One instrument model** behind the three places harmonica knowledge
   enters today: pitch ↔ position, what can sound together, and how it is
   drawn. Scoring stays pitch-only.
-- **Guitar**: a horizontal tab highway with a fretboard strip, a tab-row
-  Song Editor that enforces one note per string and a hand span, and
-  Guitar Pro imports that keep the author's strings and frets.
-- **Flute**: pitch lanes with a fingering diagram for the next note; the
-  foot joint (C or B) is a per-instrument setting.
-- **A Note Trainer** in place of the Bending Trainer, offering only the
-  modes an instrument has: glides (bends), register selection (flute
-  overblowing, harmonics), alternate positions, and a plain tuner for all.
-- **Per-instrument lesson packs and progress.**
+- **Guitar** (in, but for detection tuning): a horizontal tab highway with
+  a fretboard strip, Song Editor rows per string that enforce one note per
+  string and a hand span, and Guitar Pro imports that keep the author's
+  strings and frets.
+- **Flute** (in, but for detection tuning): a highway whose rows are the
+  flute's keys beside an upright drawing of it, or pitch rows, switched
+  from the pause menu; the same two views in the Song Editor; a C or B
+  foot joint.
+- **A Note Trainer** (in for the guitar and the flute; the harmonica keeps
+  the Bending Trainer until its validation pass), offering only the modes
+  an instrument has: glides (bends), register selection (flute octaves,
+  harmonics), alternate positions, and a plain tuner for all.
+- **Per-instrument lesson packs and progress** (next): a "My instruments"
+  page with each instrument's tuning and foot joint, per-instrument
+  curricula and profile, per-instrument Jam Session.
 
 The hurdy gurdy is deferred: drones, the trompette and the keybox each need
 work no other instrument does.
