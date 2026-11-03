@@ -19,7 +19,9 @@ use harmonicon_ui::music_score::{self, BravuraFont};
 use super::adaptive_difficulty::AdaptiveDifficulty;
 use super::beat_guides;
 use super::countdown_overlay::spawn_countdown;
-use super::highway_2d::{RowStyle, spawn_harmonica_strip, spawn_highway_furniture};
+use super::highway_2d::{
+    RowStyle, spawn_harmonica_strip, spawn_highway_furniture, spawn_highway_furniture_container,
+};
 use super::hud_panel::{HudPanel, contextual_panels, spawn_hud_panel, used_modifiers};
 use super::judge::{judged_instant, live_technique_status};
 use super::modifier_legend::build_legend_materials;
@@ -192,16 +194,19 @@ pub fn setup(
                         ))
                         .with_children(|hw| {
                             if let Some(layout) = &highway_lanes.0 {
-                                // A flute starts on its keys; `flute_visuals::
-                                // sync_flute_view` rebuilds this for note view.
-                                let style = if is_flute {
-                                    RowStyle::Keys
-                                } else if layout.axis == ScrollAxis::Horizontal {
+                                // A flute's furniture is built by `flute_
+                                // visuals::sync_flute_view` for its view;
+                                // the container is all it needs here.
+                                let style = if layout.axis == ScrollAxis::Horizontal {
                                     RowStyle::Strings
                                 } else {
                                     RowStyle::Holes
                                 };
-                                spawn_highway_furniture(hw, layout, style);
+                                if is_flute {
+                                    spawn_highway_furniture_container(hw);
+                                } else {
+                                    spawn_highway_furniture(hw, layout, style);
+                                }
                             }
                         })
                         .id();
@@ -216,12 +221,12 @@ pub fn setup(
                         flex_direction: FlexDirection::Row,
                         ..default()
                     })
-                    .with_children(|row| {
-                        if !aural {
-                            super::flute_visuals::spawn_flute(row, &flute);
-                        }
-                        spawn_track(row);
-                    });
+                    .with_children(|row| spawn_track(row));
+                    // The fingering strip under the highway, shown or hidden
+                    // by `flute_visuals::sync_flute_view`.
+                    if !aural {
+                        super::flute_visuals::spawn_flute_stage(left, &flute, &loc);
+                    }
                 } else if let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
                     instrument.clone()
                 {
@@ -259,13 +264,6 @@ pub fn setup(
                 .with_children(|col| {
                     if let Some(harp) = played {
                         spawn_harmonica_strip(col, harp, &loc);
-                    } else if !aural && is_flute {
-                        col.spawn((
-                            Text::new(""),
-                            TextFont { font_size: FontSize::Px(14.0), ..default() },
-                            TextColor(Color::WHITE),
-                            super::flute_visuals::FingeringLabel,
-                        ));
                     } else if !aural
                         && let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
                             instrument.clone()
@@ -435,6 +433,9 @@ pub(super) struct NoteRibbon {
 /// logical px, and so also the shortest a ribbon is drawn: a very short
 /// note is always at least its cap.
 const CAP_PX: f32 = 26.0;
+/// A guitar note's fret number, in px: large enough to read across the
+/// highway at a glance (`spawn_note_visual`).
+const FRET_LABEL_PX: f32 = 40.0;
 
 /// A note's width as a fraction of its lane, leaving a gap so neighbouring
 /// lanes stay distinct.
@@ -479,8 +480,6 @@ pub fn spawn_visible_notes(
     colorblind: Res<harmonicon_platform::settings::ColorblindPalette>,
     lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
     loc: Res<Localization>,
-    flute: Query<&super::flute_visuals::FluteDrawing>,
-    mine: Res<harmonicon_platform::settings::MyInstruments>,
 ) {
     if lesson.is_some_and(|lesson| lesson.aural) {
         return;
@@ -488,12 +487,6 @@ pub fn spawn_visible_notes(
     let (Some(layout), Ok(highway_entity)) = (lanes.0.as_ref(), highway.single()) else {
         return;
     };
-    // Fingering blocks only in fingering view; note view draws ribbons.
-    let flute = flute
-        .single()
-        .ok()
-        .filter(|_| mine.flute_view == harmonicon_platform::settings::FluteView::Fingering)
-        .map(|drawing| drawing.0);
     let colors = effective_note_colors(theme.note_colors(), colorblind.0);
     // The same layout the highway's stripes were spawned from.
     let lane_count = u8::try_from(layout.lanes.len()).unwrap_or(u8::MAX);
@@ -530,7 +523,6 @@ pub fn spawn_visible_notes(
                 show_numbers.0,
                 colors,
                 super::guitar_visuals::chord_span(note, &song_notes.notes),
-                flute.as_ref(),
             );
         }
     });
@@ -559,25 +551,9 @@ fn note_lane(note: &ScheduledNote, layout: &LaneLayout) -> usize {
     layout.nearest_lane(&note.position)
 }
 
-/// A note's cap label colour: dark on a ribbon's bright cap, but light on
-/// a flute's fingering, whose name sits in the gap between the hands
-/// (`flute_visuals::name_row_span`) over the dark highway, not on a cap.
-fn cap_label_color(note: &ScheduledNote, judged: Option<bool>, layout: &LaneLayout) -> Color {
-    if matches!(note.position, PlayPosition::Fingering(_)) && !layout.is_pitch_lanes() {
-        Color::srgba(0.92, 0.94, 1.0, 0.95)
-    } else {
-        head_label_color(judged)
-    }
-}
-
 /// Where `note` sits across the highway, `(start, size)` in percent: its
-/// lane's middle `NOTE_W`, or every row for a flute's fingering, whose
-/// blocks sit in the rows of its pressed keys.
+/// lane's middle `NOTE_W`.
 fn note_span(note: &ScheduledNote, layout: &LaneLayout) -> (f32, f32) {
-    // In a flute's note view a fingering has a pitch lane like any note.
-    if matches!(note.position, PlayPosition::Fingering(_)) && !layout.is_pitch_lanes() {
-        return (0.0, 100.0);
-    }
     let size = layout.lane_pct() * NOTE_W;
     (layout.centred_left_pct(note_lane(note, layout), size), size)
 }
@@ -598,7 +574,6 @@ fn spawn_note_visual(
     show_numbers: bool,
     colors: NoteColors,
     chord: Option<(u8, String)>,
-    flute: Option<&harmonicon_core::instrument::flute::Flute>,
 ) {
     let label = note_head_label(note, show_numbers);
     let axis = layout.axis;
@@ -611,44 +586,39 @@ fn spawn_note_visual(
         NoteRibbon { duration_frac: (note.duration / LOOKAHEAD) as f32 },
         JudgedState::default(),
     ));
-    // A fingering is blocks on its keys' rows, coloured by
-    // `flute_visuals::update_fingering_blocks`; anything else one ribbon.
-    let fingering = match (note.position, flute) {
-        (PlayPosition::Fingering(at), Some(flute)) => Some((at, flute)),
-        _ => None,
-    };
-    if fingering.is_none() {
-        visual.insert(MaterialNode(shape_materials.add(NoteRibbon2dMaterial {
-            color: note_color(note, colors),
-            technique: ribbon_technique(&note.modifiers),
-            shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
-            hold: Vec4::ZERO,
-            axis: super::note_ribbon_2d::ribbon_axis(layout.axis),
-        })));
-    }
+    visual.insert(MaterialNode(shape_materials.add(NoteRibbon2dMaterial {
+        color: note_color(note, colors),
+        technique: ribbon_technique(&note.modifiers),
+        shape: Vec4::new(note.duration as f32, CAP_PX, 0.0, 0.0),
+        hold: Vec4::ZERO,
+        axis: super::note_ribbon_2d::ribbon_axis(layout.axis),
+    })));
     visual.with_children(|note_e| {
-        if let Some((at, flute)) = fingering {
-            super::flute_visuals::spawn_fingering_blocks(note_e, flute, at, layout, NOTE_W);
-        }
         if let Some((span, name)) = chord {
             super::guitar_visuals::spawn_chord_stem(note_e, span, layout.lane_pct(), &name);
         }
-        // The tab label, centred in the cap at the attack end — for a
-        // fingering, in the gap between the hands, which no key ever fills.
-        let (label_start, label_size) = match fingering {
-            Some((_, flute)) => super::flute_visuals::name_row_span(flute, layout),
-            None => (0.0, 100.0),
+        // The tab label, centred in the cap at the attack end.
+        // A guitar's fret number is the whole instruction, read at a glance
+        // across a string's lane: set large, and allowed to run past the cap
+        // onto the ribbon, whose light fill the dark label reads on too.
+        let fret = matches!(note.position, PlayPosition::Fret(_));
+        let (along, justify, font_px) = if fret {
+            (Val::Auto, JustifyContent::FlexStart, FRET_LABEL_PX)
+        } else {
+            (Val::Px(CAP_PX), JustifyContent::Center, 18.0)
         };
         note_e.spawn((
             Node {
-                justify_content: JustifyContent::Center,
+                justify_content: justify,
                 align_items: AlignItems::Center,
-                ..placed(axis, 0.0, Val::Px(CAP_PX), label_start, Val::Percent(label_size))
+                padding: UiRect::horizontal(Val::Px(if fret { 4.0 } else { 0.0 })),
+                ..placed(axis, 0.0, along, 0.0, Val::Percent(100.0))
             },
             children![(
                 Text::new(label),
-                TextFont { font_size: FontSize::Px(18.0), ..default() },
-                TextColor(cap_label_color(note, None, layout)),
+                TextFont { font_size: FontSize::Px(font_px), ..default() },
+                TextLayout::no_wrap(),
+                TextColor(head_label_color(None)),
                 NoteCapLabel,
             )],
         ));
@@ -902,7 +872,7 @@ pub fn animate_judged_notes(
             for label in cap {
                 if let Ok((mut text, mut color)) = labels.get_mut(*label) {
                     text.0 = wanted.clone();
-                    color.0 = cap_label_color(note, current, layout);
+                    color.0 = head_label_color(current);
                 }
             }
         }

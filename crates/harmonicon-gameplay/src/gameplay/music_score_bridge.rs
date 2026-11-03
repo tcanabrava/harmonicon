@@ -19,6 +19,7 @@ use harmonicon_ui::music_score::{
 };
 
 use super::bars::pickup_lead_ticks;
+use super::flute_visuals::StaffHighlight;
 use super::{GameplayClock, GameplayLogic, SongNotes, chart_meter, notes_to_notation};
 
 pub struct MusicScoreBridgePlugin;
@@ -28,7 +29,9 @@ impl Plugin for MusicScoreBridgePlugin {
         app.add_systems(
             Update,
             (
-                sync_music_score_notes.run_if(resource_changed::<SongNotes>),
+                sync_music_score_notes.run_if(
+                    resource_changed::<SongNotes>.or_else(resource_changed::<StaffHighlight>),
+                ),
                 update_music_score_playhead.after(GameplayLogic),
             )
                 .run_if(in_state(AppState::Playing).and_then(playing_2d)),
@@ -65,6 +68,7 @@ fn sync_music_score_notes(
     mut score_notes: ResMut<MusicScoreNotes>,
     mut meter: ResMut<MusicScoreMeter>,
     mut bar_map: ResMut<MusicScoreBarMap>,
+    highlight: Res<StaffHighlight>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
@@ -80,8 +84,13 @@ fn sync_music_score_notes(
     if *bar_map != next_bar_map {
         *bar_map = next_bar_map;
     }
-    score_notes.0 =
-        notes_to_notation(&song_notes.notes, timing.resolution, &timing.tempo_map, &bar_map);
+    score_notes.0 = notes_to_notation(
+        &song_notes.notes,
+        timing.resolution,
+        &timing.tempo_map,
+        &bar_map,
+        highlight.0,
+    );
 }
 
 /// Keeps [`MusicScorePlayhead`] following the same [`GameplayClock`] every

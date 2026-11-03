@@ -79,17 +79,21 @@ shown but doesn't count.
 
 ## Flute parts
 
-A flute part's highway reads the flute's keys rather than its notes. A
-drawing of the flute stands upright at the left, laid out like a printed
-fingering chart: the six finger holes in a line down the tube, left hand
-above a gap and right hand below it. The small keys sit beside the tube.
-The thumb key is to the left of the first hole. The G♯ key, the two trill
-keys and the right little finger's E♭ and foot keys are to the right.
-Each key is level with its own row. Each note travels in from the right
-as the shape of its fingering, a block on every key it presses, with its
-name in the gap between the hands. As a note reaches the hit line the drawing fills its keys, and
-shows the next note's keys faintly so your fingers can get there in time;
-the line under the highway names both.
+A flute part's highway has one row per note the song uses, highest at the
+top, each named at the hit line, and every note carries its name as it
+travels in from the right.
+
+Under the highway, a **fingering chart** shows how to play the note that's
+coming. It is drawn the way a printed chart is, lying along the screen
+with the head joint at the left: the six finger holes in a line on the
+tube, left hand then a gap then right hand. The thumb key sits below the
+first hole, and the G♯ key, the two trill keys and the right little
+finger's E♭ and foot keys sit small above the line. The keys to press are
+filled in, with the note's name before the chart. The bar under it fills
+as the note approaches, turns gold when the note starts, and empties as
+you hold it. The keys turn gold too while the game hears the note. To the
+right, a smaller, dimmer chart shows the note after it, so your fingers
+can get there in time. The staff at the top marks the same note in gold.
 
 ![A flute part on the highway](images/play-flute.png)
 
@@ -99,16 +103,14 @@ instruments](options.md#my-instruments), or the chart's own until you've
 picked one, and your answer is remembered. A note below your foot (a B3 on a C foot) is still shown but
 doesn't count, and the page says how many there are.
 
-To read the notes instead, pause and press **Flute view**: the highway
-switches, when you resume, to one row per note the song uses, highest at
-the top, each named at the hit line, and the flute drawing steps aside.
-Press it again for the fingerings. Your choice is kept for later songs
-and sessions; Options sets it too.
+To hide the fingering chart, pause and press **Fingering chart**; the
+highway takes its space. Press it again to bring it back. Your choice is
+kept for later songs and sessions; Options sets it too.
 
 A note's fingering is a suggestion, as on every instrument: the game
 hears only the pitch, so an alternate fingering that sounds the same note
 scores the same. A chart may ask for a particular alternate, and the
-highway then draws that one. Flute charts open in the Song Editor; see
+fingering chart then shows that one. Flute charts open in the Song Editor; see
 [Flute charts](song-editor.md#flute-charts).
 
 ## Removed and hidden songs

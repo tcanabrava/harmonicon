@@ -461,15 +461,17 @@ pub fn notes_to_notation(
     resolution: u32,
     tempo_map: &[harmonicon_core::chart::TempoPoint],
     bar_map: &harmonicon_ui::music_score::MusicScoreBarMap,
+    highlight: Option<usize>,
 ) -> Vec<harmonicon_ui::music_score::NotationNote> {
     notes
         .iter()
-        .filter_map(|n| {
+        .enumerate()
+        .filter_map(|(i, n)| {
             let midi = n.expected_pitch?;
             let start_tick = harmonicon_core::chart::seconds_to_tick(n.time, resolution, tempo_map);
             let end_tick =
                 harmonicon_core::chart::seconds_to_tick(n.time + n.duration, resolution, tempo_map);
-            Some(bar_map.split_note(start_tick, end_tick, midi, false))
+            Some(bar_map.split_note(start_tick, end_tick, midi, highlight == Some(i)))
         })
         .flatten()
         .collect()

@@ -101,8 +101,8 @@ gates 1.0. In order:
   `hole_map`.
 - **Flute**. The model (`instrument::flute`, a C or B foot), the sourced
   Boehm fingering table, chart format 1.9.0, score conversion, a flute
-  synth voice, Play 2D (key rows with the upright flute drawing, or pitch
-  rows, switched from the pause menu), the Song Editor (note and
+  synth voice, Play 2D (pitch rows with a horizontal fingering strip under
+  them, hidden from the pause menu), the Song Editor (note and
   fingering views) and the Note Trainer's flute tabs are in. Next:
   - a recorded corpus aimed at octave errors, before any detection tuning.
 - **Content and progress** (phase 5, started): "My instruments" is in

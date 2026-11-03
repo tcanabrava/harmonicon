@@ -217,7 +217,7 @@ fn a_pickup_ends_the_staffs_first_bar() {
         meter: harmonicon_ui::music_score::MeterMap::with_pickup([(0, "4/4")], 480, 480),
         quarter_ticks: 480,
     };
-    let staff = super::notes_to_notation(&[pickup, across], 480, &tempo, &bar_map);
+    let staff = super::notes_to_notation(&[pickup, across], 480, &tempo, &bar_map, None);
     let starts: Vec<f64> = staff.iter().map(|n| n.start_beat).collect();
     assert_eq!(starts, vec![3.0, 7.0, 8.0]);
     assert!(staff[2].tied_from_previous);

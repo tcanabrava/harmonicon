@@ -92,6 +92,7 @@ impl Plugin for GameplayPlugin {
         .init_resource::<ValidHarpNotes>()
         .init_resource::<PlayedHarp>()
         .init_resource::<HighwayLanes>()
+        .init_resource::<super::flute_visuals::StaffHighlight>()
         .init_resource::<super::SongInfo>()
         .init_resource::<harmonicon_app::app::EffectiveHarmonica>()
         .init_resource::<SongNotes>()
@@ -369,8 +370,7 @@ impl Plugin for GameplayPlugin {
                 gameplay_2d::update_holes,
                 super::guitar_visuals::update_fretboard,
                 super::guitar_visuals::update_hint,
-                super::flute_visuals::update_flute,
-                super::flute_visuals::update_fingering_blocks,
+                super::flute_visuals::update_flute_stage,
                 beat_guides::update_beat_guides,
                 technique_coach::update_technique_coach,
             )

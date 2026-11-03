@@ -246,9 +246,9 @@ phases; `PLAN.md` has them in order.
   a fretboard strip, Song Editor rows per string that enforce one note per
   string and a hand span, and Guitar Pro imports that keep the author's
   strings and frets.
-- **Flute** (in, but for detection tuning): a highway whose rows are the
-  flute's keys beside an upright drawing of it, or pitch rows, switched
-  from the pause menu; the same two views in the Song Editor; a C or B
+- **Flute** (in, but for detection tuning): a highway of named pitch
+  rows with a fingering chart under it for the note to play now and the
+  next; a note view and a fingering view in the Song Editor; a C or B
   foot joint, asked for before each song.
 - **Your instrument before play**: the song list names each part's
   instrument, and the page before a song asks for the harmonica's key and

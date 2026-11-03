@@ -51,8 +51,8 @@ What you play on, so you only say it once:
   song is written.
 - **Flute foot joint** — a C or B foot, or as each song is written. Notes
   below your foot are shown but not counted.
-- **Flute parts show** — fingerings or notes; the same setting as the
-  pause menu's **Flute view**.
+- **Flute fingering chart** — shown or hidden under a flute part's
+  highway; the same setting as the pause menu's **Fingering chart**.
 
 The page before each guitar or flute song opens on these, and an answer
 given there is saved here too.

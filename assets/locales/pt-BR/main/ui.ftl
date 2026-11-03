@@ -167,10 +167,10 @@ options-my-instruments-tooltip = O que você toca. Uma música escrita para outr
 options-guitar-tuning = Afinação da guitarra
 options-guitar-capo = Capotraste da guitarra
 options-flute-foot = Pé da flauta
-options-flute-view = Partes de flauta mostram
+options-flute-view = Quadro de dedilhado da flauta
 options-follow-chart = Como cada música está escrita
-options-flute-view-fingering = Dedilhados
-options-flute-view-notes = Notas
+options-flute-view-fingering = Visível
+options-flute-view-notes = Oculto
 options-theme = Tema
 options-language = Idioma
 options-adaptive-difficulty = Dificuldade Adaptativa
@@ -566,9 +566,9 @@ pause-finish-lesson = Concluir lição
 pause-wait-for-note-button = ⏸ Esperar nota
 pause-wait-for-note-on = Esperar nota: ligado
 pause-wait-for-note-off = Esperar nota: desligado
-pause-flute-view-button = Visão da flauta
-pause-flute-view-fingering = Mostrando: dedilhados
-pause-flute-view-notes = Mostrando: notas
+pause-flute-view-button = Quadro de dedilhado
+pause-flute-view-fingering = Quadro de dedilhado: visível
+pause-flute-view-notes = Quadro de dedilhado: oculto
 pause-speed = Velocidade: {$pct}%
 pause-adaptive-difficulty-button = Dificuldade adaptativa
 pause-adaptive-difficulty-on = Dificuldade adaptativa: ligada
@@ -970,7 +970,7 @@ harp-check-instrument-flute = Flauta
 
 gameplay-guitar-window = Posição da mão começa na casa {$fret} · Próxima: {$next} · 0 = corda solta
 gameplay-guitar-window-capo = Posição da mão começa na casa {$fret} · Próxima: {$next} · 0 = o capotraste, na casa {$capo}
-gameplay-flute-fingering = Agora {$now} · próxima {$next}
+gameplay-flute-next = Próxima
 
 editor-guitar-invalid = Edição impossível: verifique as casas, cordas ocupadas e alcance da mão.
 editor-flute-invalid = A flauta toca uma nota por vez: uma nota não pode começar junto com outra nem sair da extensão da flauta.

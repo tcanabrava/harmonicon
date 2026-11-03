@@ -167,10 +167,10 @@ options-my-instruments-tooltip = Lo que tocas. Una canción escrita para otra af
 options-guitar-tuning = Afinación de la guitarra
 options-guitar-capo = Cejilla de la guitarra
 options-flute-foot = Pie de la flauta
-options-flute-view = Las partes de flauta muestran
+options-flute-view = Tabla de digitación de la flauta
 options-follow-chart = Como está escrita cada canción
-options-flute-view-fingering = Digitaciones
-options-flute-view-notes = Notas
+options-flute-view-fingering = Visible
+options-flute-view-notes = Oculta
 options-theme = Tema
 options-language = Idioma
 options-adaptive-difficulty = Dificultad Adaptativa
@@ -566,9 +566,9 @@ pause-finish-lesson = Terminar lección
 pause-wait-for-note-button = ⏸ Esperar nota
 pause-wait-for-note-on = Esperar nota: activado
 pause-wait-for-note-off = Esperar nota: desactivado
-pause-flute-view-button = Vista de la flauta
-pause-flute-view-fingering = Mostrando: digitaciones
-pause-flute-view-notes = Mostrando: notas
+pause-flute-view-button = Tabla de digitación
+pause-flute-view-fingering = Tabla de digitación: visible
+pause-flute-view-notes = Tabla de digitación: oculta
 pause-speed = Velocidad: {$pct}%
 pause-adaptive-difficulty-button = Dificultad adaptativa
 pause-adaptive-difficulty-on = Dificultad adaptativa: activada
@@ -972,7 +972,7 @@ harp-check-instrument-flute = Flauta
 
 gameplay-guitar-window = Posición de la mano empieza en el traste {$fret} · Siguiente: {$next} · 0 = cuerda al aire
 gameplay-guitar-window-capo = Posición de la mano empieza en el traste {$fret} · Siguiente: {$next} · 0 = la cejilla, en el traste {$capo}
-gameplay-flute-fingering = Ahora {$now} · siguiente {$next}
+gameplay-flute-next = Siguiente
 
 editor-guitar-invalid = Edición imposible: comprueba los trastes, cuerdas ocupadas y alcance de la mano.
 editor-flute-invalid = La flauta toca una nota a la vez: una nota no puede empezar junto a otra ni salir de la extensión de la flauta.

@@ -169,10 +169,10 @@ options-my-instruments-tooltip = What you play on. A song written for another tu
 options-guitar-tuning = Guitar tuning
 options-guitar-capo = Guitar capo
 options-flute-foot = Flute foot joint
-options-flute-view = Flute parts show
+options-flute-view = Flute fingering chart
 options-follow-chart = As each song is written
-options-flute-view-fingering = Fingerings
-options-flute-view-notes = Notes
+options-flute-view-fingering = Shown
+options-flute-view-notes = Hidden
 options-theme = Theme
 options-language = Language
 options-adaptive-difficulty = Adaptive Difficulty
@@ -568,9 +568,9 @@ pause-finish-lesson = Finish Lesson
 pause-wait-for-note-button = ⏸ Wait for Note
 pause-wait-for-note-on = Wait for Note: on
 pause-wait-for-note-off = Wait for Note: off
-pause-flute-view-button = Flute view
-pause-flute-view-fingering = Shown: fingerings
-pause-flute-view-notes = Shown: notes
+pause-flute-view-button = Fingering chart
+pause-flute-view-fingering = Fingering chart: shown
+pause-flute-view-notes = Fingering chart: hidden
 pause-speed = Speed: {$pct}%
 pause-adaptive-difficulty-button = Adaptive Difficulty
 pause-adaptive-difficulty-on = Adaptive Difficulty: on
@@ -973,7 +973,7 @@ harp-check-instrument-flute = Flute
 
 gameplay-guitar-window = Hand window starts at fret {$fret} · Next: {$next} · 0 = open string
 gameplay-guitar-window-capo = Hand window starts at fret {$fret} · Next: {$next} · 0 = the capo, at fret {$capo}
-gameplay-flute-fingering = Now {$now} · next {$next}
+gameplay-flute-next = Next
 
 editor-guitar-invalid = That edit is unplayable: check fret range, occupied strings and hand span.
 editor-flute-invalid = A flute plays one note at a time: a note can't start with another or go past the flute's range.

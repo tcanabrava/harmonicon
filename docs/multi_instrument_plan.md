@@ -190,7 +190,7 @@ zone (today's hole strip).
 |---|---|---|
 | Harmonica | unchanged: vertical hole lanes, blow/draw colour | hole strip and overlay |
 | Guitar | **horizontal strings scrolling right to left, read like tablature** (Rocksmith's 2D views, Yousician): each string a colour-coded row, note gems carry the **fret number**, a chord is one gem spanning its strings with the chord name on it | a **fretboard strip** at the hit line lighting the target frets, with a highlighted **anchor window** (the hand position) that slides ahead of position shifts |
-| Flute | **one row per key**, horizontal like tab, down the tube from the thumb key to the foot rollers, weighted like a fingering chart (`flute::key_rows`: full rows for the six holes, thinner rows for side keys, a gap row between the hands); a note arrives as its **fingering**, a block on every key it presses, named in the gap row (landed: `flute_visuals`) | a **vertical drawing of the flute laid out as a standard fingering chart**: the six holes in a line on the tube, the thumb key offset left, G♯/trill/E♭/foot keys small to the right, no labels. Each key is level with its row, filling the keys of the note at the hit line and ghosting the next note's. The pause menu's **Flute view** switches the highway to **pitch rows** for the notes the song uses (landed; `FluteView`) |
+| Flute | **one row per pitch** the song uses, horizontal like tab, each row named at the hit line and each note carrying its name (landed: `flute_visuals`, `LaneLayout::pitch_rows`). A highway of key rows, with each fingering as blocks on its keys, was built and dropped: a fingering is a whole-hand shape and read poorly streaming past | a **fingering strip under the highway**: a chart lying along the screen as a horizontal printed chart draws it (head joint left, six holes on the line, the thumb key below, G♯/trill/E♭/foot keys small above) for the note to play now, its name, and a bar filling to its start then emptying as it is held, plus a smaller, dimmer chart for the next note. The staff marks the same note gold. The pause menu's **Fingering chart** hides it (landed; `FluteView`) |
 
 The guitar's orientation is chosen so the screen teaches the shape players
 will meet in real tablature everywhere else. It means `LaneLayout` carries
@@ -402,8 +402,8 @@ behaviour.
    monophonic model with a C or B foot, the Boehm fingering table as data
    (standard fingerings and third-octave alternates, from the Woodwind
    Fingering Guide; register pairs are read off matching key sets, not
-   written as harmonic numbers), Play 2D in a fingering view (the keys as
-   rows, an upright flute drawing) or a note view (pitch rows), the Song
+   written as harmonic numbers), Play 2D (pitch rows with a horizontal
+   fingering strip under them, which can be hidden), the Song
    Editor in the same two views, and the trainer's `Register` and
    `Position` tabs. **Open:** a corpus aimed at octave errors.
 5. **Content and progress** (next, not started). Per-instrument packs

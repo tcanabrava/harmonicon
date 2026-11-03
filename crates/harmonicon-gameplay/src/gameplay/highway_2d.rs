@@ -30,8 +30,6 @@ pub(super) enum RowStyle {
     Holes,
     /// A guitar's strings: tinted in their colours, named at the hit zone.
     Strings,
-    /// A flute's keys, named by the flute drawing beside them.
-    Keys,
     /// A flute's note view: plain rows, each named by its note at the hit
     /// zone.
     Pitches,
@@ -49,7 +47,18 @@ pub(super) fn spawn_highway_furniture(
     layout: &LaneLayout,
     style: RowStyle,
 ) {
-    hw.spawn((
+    hw.spawn(furniture_container())
+        .with_children(|furniture| spawn_highway(furniture, layout, style));
+}
+
+/// An empty furniture container, for a highway whose furniture is built
+/// later (a flute's, by `flute_visuals::sync_flute_view`).
+pub(super) fn spawn_highway_furniture_container(hw: &mut ChildSpawnerCommands) {
+    hw.spawn(furniture_container());
+}
+
+fn furniture_container() -> impl Bundle {
+    (
         HighwayFurniture,
         Node {
             position_type: PositionType::Absolute,
@@ -58,8 +67,7 @@ pub(super) fn spawn_highway_furniture(
             ..default()
         },
         bevy::picking::Pickable::IGNORE,
-    ))
-    .with_children(|furniture| spawn_highway(furniture, layout, style));
+    )
 }
 
 pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, style: RowStyle) {

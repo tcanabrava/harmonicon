@@ -100,32 +100,25 @@ load-bearing about *this* crate.
     3+3 as two dotted-quarter pulses; that's a `MetronomeFeel`-shaped
     design decision, not a bar-length one, and wasn't folded in here.
 
-- **A flute's highway rows are its keys, not its notes**
-  (`flute_visuals.rs`; core's `Flute::lane_layout`/`key_order`). A note
-  is still one `NoteVisual`, so judging, holds and the judged pop are
-  shared; it just spans every row (`gameplay_2d::note_span`) and draws a
-  block per pressed key (`spawn_fingering_blocks`) instead of carrying the
-  ribbon material, so `update_note_visuals` (which queries the material)
-  skips it and `update_fingering_blocks` colours it. The vertical flute
-  drawing carries the `Flute` (`FluteDrawing`) for the note spawner to
-  read, because `gameplay_2d::setup` is at Bevy's 16-parameter limit. The
-  note's name sits in the gap row between the hands, which no key
-  fills (`name_row_span`), in a light colour (`cap_label_color`). The rows
-  are weighted like a fingering chart drawn upright (`flute::key_rows`,
-  `LaneLayout::span`): six finger holes full-height on the tube, the
-  thumb, G♯, trill, E♭ and foot keys thinner and drawn beside it.
-  - **The pause menu's Flute view switches to pitch rows**
-    (`LaneLayout::pitch_rows`) and back, mid-song. The view is
-    `harmonicon_platform::settings::MyInstruments::flute_view`, a
-    persisted setting Options also edits, not a gameplay resource.
-    `sync_flute_view` runs first in the Play 2D chain: on a change it
-    swaps `HighwayLanes`, rebuilds the highway's furniture inside its
-    `HighwayFurniture` container (the highway's first child, so it stays
-    beneath the notes) and despawns the note visuals for
-    `spawn_visible_notes` to respawn in the new shape — score state is in
-    `SongNotes`, so nothing is lost. A fingering's shape follows the lanes
-    (`LaneLayout::is_pitch_lanes`), not the setting, so the two can't
-    disagree.
+- **A flute part is a pitch-row highway with a fingering strip under it**
+  (`flute_visuals.rs`). The highway has one row per pitch the song uses
+  (`LaneLayout::pitch_rows`), so a flute note is an ordinary ribbon. The
+  strip below holds two fingering charts lying down (`spawn_flute_chart`,
+  `ChartAxis::Horizontal`; the Note Trainer's is the same chart upright):
+  the note to play now, with its name and countdown bar, and a smaller
+  next. `update_flute_stage` paints them from `SongNotes` and the clock,
+  and sets `StaffHighlight` so `music_score_bridge` draws that note gold
+  on the staff.
+  - **`gameplay_2d::setup` spawns the instrument's own lanes; the pitch
+    rows come from `sync_flute_view`**, which runs first in the Play 2D
+    chain. On a flute part's first frame it builds the rows into the
+    empty `HighwayFurniture` container, swaps `HighwayLanes` and despawns
+    any visuals spawned against the old lanes. On a later change of
+    `MyInstruments::flute_view` (the pause menu's "Fingering chart",
+    persisted, Options edits it too) it only shows or hides the strip.
+    Its `Local` is keyed on the strip's entity, because a `Local` outlives
+    the song and the next flute part in the same view must still be laid
+    out.
 
 - **The guitar's Note Trainer (`note_trainer.rs`) is a separate screen
   from the Bending Trainer**, on `AppState::NoteTrainer`. Which drills
