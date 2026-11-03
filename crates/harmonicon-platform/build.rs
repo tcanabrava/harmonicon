@@ -72,10 +72,10 @@ fn generate_bundled_asset_manifest() {
 
     let mut out = String::new();
     out.push_str("// Auto-generated at build time by build.rs — do not edit.\n");
-    out.push_str("pub static SONGS: &[(&str, &str, &str, &str, &str, &str)] = &[\n");
-    for (artist, name, genre, difficulty, asset_path, instrument) in &songs {
+    out.push_str("pub static SONGS: &[(&str, &str, &str, &str, &str, &str, &str)] = &[\n");
+    for (artist, name, genre, difficulty, asset_path, instrument, part) in &songs {
         out.push_str(&format!(
-            "    ({artist:?}, {name:?}, {genre:?}, {difficulty:?}, {asset_path:?}, {instrument:?}),\n"
+            "    ({artist:?}, {name:?}, {genre:?}, {difficulty:?}, {asset_path:?}, {instrument:?}, {part:?}),\n"
         ));
     }
     out.push_str("];\n\n");
@@ -110,7 +110,9 @@ fn asset_relative_path(path: &Path, strip: &Path) -> String {
 /// discovery rules exactly (all `*.harpchart` files directly under each
 /// song's `song/` subfolder), but as a one-shot build-time walk instead of a
 /// runtime `ResMut` system.
-fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, String, String)> {
+fn scan_songs_for_manifest(
+    root: &Path,
+) -> Vec<(String, String, String, String, String, String, String)> {
     let mut out = Vec::new();
     let Ok(artists) = std::fs::read_dir(root) else {
         return out;
@@ -144,6 +146,7 @@ fn scan_songs_for_manifest(root: &Path) -> Vec<(String, String, String, String, 
                     catalog.difficulty,
                     asset_path,
                     catalog.instrument,
+                    catalog.part,
                 ));
             }
         }
@@ -217,7 +220,9 @@ mod tests {
                     "Test".into(),
                     "easy".into(),
                     "songs/Band/Duet/song/guitar.harpchart".into(),
-                    "guitar".into()
+                    "guitar".into(),
+                    // Not a whole chart, so there are no pitches to keep.
+                    String::new()
                 ),
                 (
                     "Band".into(),
@@ -225,7 +230,8 @@ mod tests {
                     "Test".into(),
                     "hard".into(),
                     "songs/Band/Duet/song/harmonica.harpchart".into(),
-                    "harmonica".into()
+                    "harmonica".into(),
+                    String::new()
                 ),
             ]
         );

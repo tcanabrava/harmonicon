@@ -153,6 +153,7 @@ song-sort-genre = Gênero
 song-sort-instrument = Instrumento
 song-instrument-harmonica = Gaita
 song-instrument-guitar = Guitarra
+song-instrument-reach = {$instrument} · {$percent}%
 song-instrument-flute = Flauta
 editor-field-genre = Gênero
 editor-field-genre-tooltip = O gênero musical da música.

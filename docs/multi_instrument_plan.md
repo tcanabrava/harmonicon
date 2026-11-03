@@ -335,8 +335,8 @@ can't be confused with a detection problem.
   (you practised today, whatever you played). The skill tree shows the
   selected instrument's DAG.
 - **"My instruments"** generalises the harp-check page's
-  bring-your-own-harp choice. The player lists what they own, with tunings.
-  Song select shows which parts they can play. **Landed already:** the
+  bring-your-own-harp choice. It describes how each instrument the player
+  holds is set up rather than listing which they own. **Landed already:** the
   song list names each part's instrument, and the harp-check page is an
   instrument check: a guitar part asks for the tuning, a flute part for
   the foot joint, per song, and play places the chart onto the answer
@@ -348,8 +348,14 @@ can't be confused with a detection problem.
   and Options has a "My instruments" section for them. Play 2D draws the
   fretboard strip, flute drawing and hint line from the played instrument
   (`EffectiveHarmonica::instrument_for`), so a capo's frets count from it
-  and the hint names it. **Open:** showing in song select which parts the
-  player's instruments can play.
+  and the hint names it. Song select's Instrument column shows each
+  guitar or flute part's reach on the player's setup ("Guitar · 83%"):
+  the scan keeps each part's instrument and sounding pitches
+  (`song_parts::catalog_fields` → `SongEntry::part`, also through the
+  bundled manifest), and `substitute::reach` counts the pitches with
+  any position on the played instrument. Per note, so it can't see a
+  chord asking two notes of one string; the pre-song page's count is
+  exact.
 - **Audition and call-and-response synthesis** need a timbre per
   instrument in core's `synth`:
   - Karplus–Strong for plucked strings: cheap and convincing;

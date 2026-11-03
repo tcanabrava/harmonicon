@@ -53,6 +53,32 @@ pub struct SongEntry {
     /// `harmonica` for a chart with none, or e.g. `guitar`. Lets a picker
     /// offer only parts a mode can play without loading every chart.
     pub instrument: String,
+    /// For a guitar or flute part, the instrument it was written for and
+    /// every pitch it sounds (`song_parts::catalog_fields`), so the picker
+    /// can say how much of it the player's own tuning, capo or foot joint
+    /// reaches without loading the chart. `None` for a harmonica part.
+    pub part: Option<SongPart>,
+}
+
+/// What [`SongEntry::part`] keeps of a guitar or flute chart.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SongPart {
+    pub instrument: harmonicon_core::instrument::Instrument,
+    pub pitches: Vec<u8>,
+}
+
+impl SongPart {
+    /// Reads the summary `song_parts::catalog_fields` writes; `None` for an
+    /// empty one (a harmonica part) or one that doesn't parse.
+    pub fn parse(summary: &str) -> Option<Self> {
+        #[derive(serde::Deserialize)]
+        struct Summary {
+            instrument: harmonicon_core::chart::ChartInstrument,
+            pitches: Vec<u8>,
+        }
+        let summary: Summary = serde_json::from_str(summary).ok()?;
+        Some(Self { instrument: summary.instrument.to_instrument()?, pitches: summary.pitches })
+    }
 }
 
 /// Songs indexed by artist name. Each artist maps to a sorted list of songs.
@@ -299,6 +325,7 @@ pub fn scan_artist_song(
                 genre: catalog.genre,
                 difficulty: catalog.difficulty,
                 instrument: catalog.instrument,
+                part: SongPart::parse(&catalog.part),
             });
         }
     }
@@ -417,7 +444,7 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&ContentPacks>) {
     available.0.clear();
-    for (artist, name, genre, difficulty, asset_path, instrument) in manifest::SONGS {
+    for (artist, name, genre, difficulty, asset_path, instrument, part) in manifest::SONGS {
         available.0.entry((*artist).to_string()).or_default().push(SongEntry {
             artist: (*artist).to_string(),
             name: (*name).to_string(),
@@ -427,6 +454,7 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
             retained: false,
             asset_path: (*asset_path).to_string(),
             instrument: (*instrument).to_string(),
+            part: SongPart::parse(part),
         });
     }
     scan_song_packs(packs, available);
@@ -435,6 +463,38 @@ pub fn scan_all_songs_into(available: &mut AvailableSongs, packs: Option<&Conten
 
 #[cfg(test)]
 mod tests {
+
+    fn fixture(name: &str) -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../harmonicon-song/tests/fixtures")
+            .join(format!("{name}.harpchart"))
+    }
+
+    /// A guitar or flute part carries its instrument and pitches through
+    /// the catalogue; the summary parses back into the same instrument.
+    #[test]
+    fn a_guitar_or_flute_part_is_summarised_for_the_picker() {
+        for name in ["guitar-highway", "flute-scale"] {
+            let fields = song_parts::catalog_fields(&fixture(name));
+            assert_ne!(fields.instrument, "harmonica");
+            let part = super::SongPart::parse(&fields.part).expect(name);
+            let text = std::fs::read_to_string(fixture(name)).unwrap();
+            let chart: harmonicon_core::chart::HarpChart = serde_json::from_str(&text).unwrap();
+            assert_eq!(Some(part.instrument), chart.instrument());
+            assert_eq!(
+                part.pitches,
+                harmonicon_core::instrument::substitute::sounding_pitches(&chart)
+            );
+            assert!(!part.pitches.is_empty());
+        }
+    }
+
+    #[test]
+    fn a_part_with_no_summary_reads_as_none() {
+        assert_eq!(super::SongPart::parse(""), None);
+        assert_eq!(super::SongPart::parse("not json"), None);
+    }
+
     use super::*;
     use bevy::ecs::schedule::Schedule;
     use harmonicon_packs::pack::PackKind;

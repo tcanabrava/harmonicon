@@ -261,7 +261,8 @@ phases; `PLAN.md` has them in order.
 - **Per-instrument lesson packs and progress** (next): per-instrument
   curricula and profile, per-instrument Jam Session. "My instruments"
   (Options; the guitar's tuning and capo, the flute's foot joint and
-  flute view, remembered) is in.
+  flute view, remembered) is in, and song select shows how much of each
+  guitar or flute part that setup reaches.
 
 The hurdy gurdy is deferred: drones, the trompette and the keybox each need
 work no other instrument does.

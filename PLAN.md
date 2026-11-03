@@ -107,8 +107,8 @@ gates 1.0. In order:
   - a recorded corpus aimed at octave errors, before any detection tuning.
 - **Content and progress** (phase 5, started): "My instruments" is in
   (`settings::MyInstruments`: tuning, capo, foot joint and flute view,
-  set in Options or on the pre-song page and remembered). Next:
-  - song select marking which parts the player's instruments can play;
+  set in Options or on the pre-song page and remembered), and song
+  select shows each guitar or flute part's reach on that setup. Next:
   - per-instrument packs, DAGs and profile, and per-instrument Jam
     Session. What guitar and flute content ships is still to be decided.
 

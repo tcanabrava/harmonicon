@@ -45,6 +45,11 @@ pub struct CatalogFields {
     pub genre: String,
     pub difficulty: String,
     pub instrument: String,
+    /// For a guitar or flute chart, `{"instrument": …, "pitches": […]}`:
+    /// the chart's own `instrument` and every pitch it sounds
+    /// (`substitute::sounding_pitches`). Empty for a harmonica chart. A
+    /// string because the build-time manifest carries it as one.
+    pub part: String,
 }
 
 pub fn catalog_fields(chart: &Path) -> CatalogFields {
@@ -63,5 +68,15 @@ pub fn catalog_fields(chart: &Path) -> CatalogFields {
         .and_then(|v| v.get("instrument")?.get("type")?.as_str())
         .unwrap_or("harmonica")
         .to_owned();
-    CatalogFields { genre: song_field("genre"), difficulty: song_field("difficulty"), instrument }
+    let (genre, difficulty) = (song_field("genre"), song_field("difficulty"));
+    let part = value
+        .filter(|_| instrument != "harmonica")
+        .and_then(|value| {
+            let spec = value.get("instrument")?.clone();
+            let chart: harmonicon_core::chart::HarpChart = serde_json::from_value(value).ok()?;
+            let pitches = harmonicon_core::instrument::substitute::sounding_pitches(&chart);
+            Some(serde_json::json!({ "instrument": spec, "pitches": pitches }).to_string())
+        })
+        .unwrap_or_default();
+    CatalogFields { genre, difficulty, instrument, part }
 }

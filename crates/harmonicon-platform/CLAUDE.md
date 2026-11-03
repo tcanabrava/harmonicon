@@ -159,4 +159,9 @@ load-bearing about *this* crate.
   is the one read of a chart's genre, difficulty and instrument for the
   picker (`SongEntry::instrument`, `harmonica` when the chart names none), so
   the runtime scan and the bundled manifest can't disagree; Jam Session's
-  picker uses it to offer only harmonica parts.
+  picker uses it to offer only harmonica parts. For a guitar or flute
+  chart it also parses the whole chart (core's `HarpChart`, hence
+  `harmonicon-core` in the **build**-dependencies too) and keeps a JSON
+  summary, its `instrument` and sounding pitches, as `SongEntry::part`
+  (`SongPart::parse`), which the song list uses to show a part's reach
+  on the player's setup without loading it.

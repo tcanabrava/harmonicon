@@ -19,7 +19,7 @@
 use super::flute::{FingeringAssignment, Flute};
 use super::guitar::fingering::{Onset, fingering};
 use super::guitar::{FretAssignment, Guitar, StringTechnique};
-use super::{Instrument, PlayPosition};
+use super::{Instrument, InstrumentModel, PlayPosition};
 use crate::chart::HarpChart;
 
 /// Every event of `chart` placed on `played`, by track item and then event,
@@ -123,6 +123,25 @@ fn onto_guitar(
         .collect()
 }
 
+/// Every pitch `chart` sounds, event by event, on the instrument it was
+/// written for: the compact summary a song list keeps of a part, enough
+/// for [`reach`] without the chart.
+pub fn sounding_pitches(chart: &HarpChart) -> Vec<u8> {
+    chart.track.iter().flat_map(|item| &item.events).filter_map(|e| chart.event_pitch(e)).collect()
+}
+
+/// How many of `pitches` `played` can sound at all: a pitch with somewhere
+/// to go on its strings or among its fingerings. A per-note answer, so it
+/// can't see a chord asking two notes of one string; the pre-song page's
+/// [`substitute_chart`] count is the exact one.
+pub fn reach(pitches: &[u8], played: &Instrument) -> usize {
+    let mut cache = std::collections::HashMap::new();
+    pitches
+        .iter()
+        .filter(|&&p| *cache.entry(p).or_insert_with(|| !played.positions_for(p).is_empty()))
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +235,26 @@ mod tests {
             }
         }
         assert!(kept > 0, "the rest of the part still plays");
+    }
+
+    /// The per-note reach agrees with the exact substitution where no chord
+    /// is involved: a capo at 2 loses the open low E, a C foot the B3.
+    #[test]
+    fn reach_counts_the_pitches_the_played_instrument_can_sound() {
+        let guitar = guitar_chart();
+        let pitches = sounding_pitches(&guitar);
+        assert_eq!(pitches.len(), guitar.track.iter().map(|i| i.events.len()).sum::<usize>());
+        let own = guitar.instrument().unwrap();
+        assert_eq!(reach(&pitches, &own), pitches.len(), "its own guitar sounds all of it");
+        let capo: Instrument = Guitar { capo: 2, ..Guitar::standard(GuitarBody::Electric) }.into();
+        let lower = pitches.iter().filter(|&&p| p < 40 + 2).count();
+        assert!(lower > 0);
+        assert_eq!(reach(&pitches, &capo), pitches.len() - lower);
+
+        let flute = flute_chart();
+        let pitches = sounding_pitches(&flute);
+        let c_foot: Instrument = Flute::new(FootJoint::C).into();
+        assert_eq!(reach(&pitches, &c_foot), pitches.len() - 1, "all but its B3");
     }
 
     /// Down a half step, the 12th-fret harmonic on G (G4) can only be the

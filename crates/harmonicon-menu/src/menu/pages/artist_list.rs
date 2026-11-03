@@ -191,6 +191,7 @@ pub(crate) fn setup_artist_list(
     asset_server: Res<AssetServer>,
     theme: Res<LoadedTheme>,
     loc: Res<Localization>,
+    mine: Res<harmonicon_platform::settings::MyInstruments>,
     mode: Res<GameplayMode>,
     mut state: ResMut<SongPickerState>,
 ) {
@@ -316,6 +317,7 @@ pub(crate) fn setup_artist_list(
         true,
         &[],
         &loc,
+        &mine,
     );
 }
 
@@ -744,14 +746,43 @@ fn collect_songs(
     entries
 }
 
-/// A song part's instrument, as the list names it. The catalogue reads it
-/// from the chart's `instrument` (`harmonica` when it has none).
-fn instrument_label(instrument: &str, loc: &Localization) -> String {
-    String::from(loc.msg(match instrument {
+/// A song part's instrument, as the list names it, and for a guitar or a
+/// flute how much of the part the player's own reaches ("Guitar · 92%").
+/// The catalogue reads the instrument from the chart's `instrument`
+/// (`harmonica` when it has none).
+fn instrument_label(
+    song: &SongEntry,
+    mine: &harmonicon_platform::settings::MyInstruments,
+    loc: &Localization,
+) -> String {
+    let name = String::from(loc.msg(match song.instrument.as_str() {
         "guitar" => "song-instrument-guitar",
         "flute" => "song-instrument-flute",
         _ => "song-instrument-harmonica",
-    }))
+    }));
+    match song.part.as_ref().and_then(|part| reach_percent(part, mine)) {
+        Some(percent) => String::from(loc.msg_args(
+            "song-instrument-reach",
+            &[("instrument", name), ("percent", percent.to_string())],
+        )),
+        None => name,
+    }
+}
+
+/// How much of `part`, in whole percent, the player's guitar or flute can
+/// sound: rounded down, so a part missing even one note never reads 100.
+/// `None` for a part with no notes.
+fn reach_percent(
+    part: &harmonicon_platform::assets_management::SongPart,
+    mine: &harmonicon_platform::settings::MyInstruments,
+) -> Option<usize> {
+    if part.pitches.is_empty() {
+        return None;
+    }
+    let own = Some(part.instrument.clone());
+    let played = super::harp_check::played_for(own, mine)?;
+    let reached = harmonicon_core::instrument::substitute::reach(&part.pitches, &played);
+    Some(reached * 100 / part.pitches.len())
 }
 
 /// Shared column widths and padding keep headers and song metadata aligned.
@@ -837,6 +868,7 @@ fn populate_rows(
     focus_rows: bool,
     existing: &[(Entity, String)],
     loc: &Localization,
+    mine: &harmonicon_platform::settings::MyInstruments,
 ) {
     let mut children = Vec::new();
     for (index, song) in collect_songs(songs, state, profile).into_iter().enumerate() {
@@ -847,7 +879,7 @@ fn populate_rows(
             continue;
         }
         let selected = state.selected.as_deref() == Some(path.as_str());
-        let song_instrument = song.instrument.clone();
+        let instrument = instrument_label(&song, mine, loc);
         let row = commands
             .spawn_scene(song_row(
                 song,
@@ -856,7 +888,7 @@ fn populate_rows(
                 preferences(profile, &path),
                 rating_image(asset_server, preferences(profile, &path).rating),
                 profile.song_play_count(&path),
-                instrument_label(&song_instrument, loc),
+                instrument,
             ))
             .id();
         if focus_rows && (selected || (state.selected.is_none() && index == 0)) {
@@ -912,6 +944,7 @@ pub(crate) fn refresh_song_picker(
     focus: Res<InputFocus>,
     song_rows: Query<(Entity, &SongRow)>,
     loc: Res<Localization>,
+    mine: Res<harmonicon_platform::settings::MyInstruments>,
 ) {
     if profile.is_changed() {
         for (cell, mut image) in &mut rating_images {
@@ -971,6 +1004,7 @@ pub(crate) fn refresh_song_picker(
             focus.get().is_none_or(|entity| song_rows.contains(entity)),
             if rescanned { &[] } else { &existing },
             &loc,
+            &mine,
         );
     }
 }
@@ -1130,12 +1164,14 @@ mod tests {
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), bevy::scene::ScenePlugin))
             .init_resource::<SongPickerState>()
             .init_resource::<PlayerProfile>()
+            .init_resource::<harmonicon_platform::settings::MyInstruments>()
             .init_resource::<NextState<MenuPage>>()
             .add_systems(Startup, |mut commands: Commands| {
                 for index in 0..2 {
                     commands.spawn_scene(song_row(
                         SongEntry {
                             instrument: "harmonica".to_string(),
+                            part: None,
                             name: format!("Song {index}"),
                             artist: "Band".into(),
                             genre: "Rock".into(),
@@ -1229,6 +1265,7 @@ mod tests {
         app.init_resource::<SongPickerState>()
             .init_resource::<Localization>()
             .init_resource::<PlayerProfile>()
+            .init_resource::<harmonicon_platform::settings::MyInstruments>()
             .init_resource::<AvailableSongs>()
             .init_resource::<InputFocus>()
             .add_message::<SongsRescanned>()
@@ -1250,10 +1287,29 @@ mod tests {
 
     /// Jam Session plays on a harmonica's hole map, so its picker leaves
     /// another instrument's part out; Play offers every part.
+    /// A guitar part's reach follows the player's capo, rounded down so a
+    /// lost note never reads 100%; a part with no notes reports nothing.
+    #[test]
+    fn a_parts_reach_follows_the_players_instrument() {
+        use harmonicon_core::instrument::guitar::{Guitar, GuitarBody};
+        use harmonicon_platform::assets_management::SongPart;
+        use harmonicon_platform::settings::MyInstruments;
+        // E2 (the open low E), then 199 notes any guitar plays.
+        let mut pitches = vec![40];
+        pitches.extend(std::iter::repeat_n(60, 199));
+        let part = SongPart { instrument: Guitar::standard(GuitarBody::Electric).into(), pitches };
+        assert_eq!(reach_percent(&part, &MyInstruments::default()), Some(100));
+        let capo = MyInstruments { guitar_capo: Some(2), ..default() };
+        assert_eq!(reach_percent(&part, &capo), Some(99), "199 of 200 is not 100%");
+        let empty = SongPart { pitches: Vec::new(), ..part };
+        assert_eq!(reach_percent(&empty, &capo), None);
+    }
+
     #[test]
     fn jam_offers_only_harmonica_parts() {
         let entry = |name: &str, instrument: &str| SongEntry {
             instrument: instrument.into(),
+            part: None,
             artist: "Band".into(),
             name: name.into(),
             genre: "Rock".into(),
@@ -1284,6 +1340,7 @@ mod tests {
     fn personal_columns_sort_and_filter_the_latest_result() {
         let entry = |name: &str| SongEntry {
             instrument: "harmonica".to_string(),
+            part: None,
             artist: "Band".into(),
             name: name.into(),
             genre: "Rock".into(),
@@ -1517,11 +1574,13 @@ mod tests {
             .init_resource::<AvailableSongs>()
             .insert_resource(Localization::new())
             .init_resource::<PlayerProfile>()
+            .init_resource::<harmonicon_platform::settings::MyInstruments>()
             .add_systems(Update, update_picker_summary);
         app.world_mut().resource_mut::<AvailableSongs>().0.insert(
             "band".into(),
             vec![SongEntry {
                 instrument: "harmonica".to_string(),
+                part: None,
                 artist: "Band".into(),
                 name: "Song".into(),
                 genre: "Rock".into(),
@@ -1561,6 +1620,7 @@ mod tests {
             vec![
                 SongEntry {
                     instrument: "harmonica".to_string(),
+                    part: None,
                     artist: "Alpha".into(),
                     name: "Zulu".into(),
                     genre: "Rock".into(),
@@ -1571,6 +1631,7 @@ mod tests {
                 },
                 SongEntry {
                     instrument: "harmonica".to_string(),
+                    part: None,
                     artist: "Zulu".into(),
                     name: "Alpha".into(),
                     genre: "Blues".into(),
@@ -1635,11 +1696,13 @@ mod tests {
             .init_resource::<AvailableSongs>()
             .add_message::<SongsRescanned>()
             .init_resource::<PlayerProfile>()
+            .init_resource::<harmonicon_platform::settings::MyInstruments>()
             .add_systems(Update, refresh_song_picker);
         app.world_mut().resource_mut::<AvailableSongs>().0.insert(
             "Eric Clapton".into(),
             vec![SongEntry {
                 instrument: "harmonica".to_string(),
+                part: None,
                 artist: "Eric Clapton".into(),
                 name: "Wonderful Tonight".into(),
                 genre: "Rock".into(),

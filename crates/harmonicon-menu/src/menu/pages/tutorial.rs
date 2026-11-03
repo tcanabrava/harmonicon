@@ -430,6 +430,7 @@ mod tests {
         for (artist, name) in entries {
             songs.0.entry(artist.to_string()).or_default().push(SongEntry {
                 instrument: "harmonica".to_string(),
+                part: None,
                 artist: artist.to_string(),
                 name: name.to_string(),
                 genre: "Uncategorized".to_string(),

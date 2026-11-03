@@ -8,7 +8,11 @@
    header to sort by song name, band, instrument, genre, difficulty, your
    rating, mastery, or times played; click it again to reverse the order.
    The **Instrument** column says whether a song is a harmonica, guitar or
-   flute part. Search accepts partial words and small typos, and matches
+   flute part. A guitar or flute part also says how much of it your own
+   instrument can play, from the tuning, capo and foot joint in [My
+   instruments](options.md#my-instruments): "Guitar · 83%" with a capo
+   that puts the low notes out of reach. It counts note by note; the page
+   before the song gives the exact count. Search accepts partial words and small typos, and matches
    the instrument too.
 2. Click a song once or use Up/Down to select it and inspect its details.
    Click **Play** to start the selected song. `/` focuses Search; **Clear**

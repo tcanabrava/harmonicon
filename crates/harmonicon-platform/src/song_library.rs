@@ -85,6 +85,7 @@ mod tests {
         assert_eq!(library.hidden.len(), 2);
         let entry = |source: &str| crate::assets_management::SongEntry {
             instrument: "harmonica".to_string(),
+            part: None,
             artist: "Band".into(),
             name: "Song".into(),
             genre: "Rock".into(),
