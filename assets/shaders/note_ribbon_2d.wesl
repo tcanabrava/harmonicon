@@ -27,6 +27,9 @@ import bevy_ui_render::ui_vertex_output::UiVertexOutput;
 // hold:      x = pitch sounding now (1/0), y = hold integrity so far (0..1),
 //            z = technique status (1 confirmed, -1 not heard, 0 n/a), w = 1
 //            once hit — all zero until then
+// axis:      x = 1 on a horizontal highway; y = seconds of the note already
+//            consumed by the hit line, so the drawn ribbon starts that far
+//            into the note (0 for the legend's previews)
 @group(1) @binding(0) var<uniform> color: vec4<f32>;
 @group(1) @binding(1) var<uniform> technique: vec4<f32>;
 @group(1) @binding(2) var<uniform> shape: vec4<f32>;
@@ -53,7 +56,8 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let across = select(in.uv.x, in.uv.y, horizontal);
     let length_px = select(in.size.y, in.size.x, horizontal);
     let d_px = back * length_px;
-    let since_attack = back * shape.x;
+    let consumed = axis.y;
+    let since_attack = consumed + back * max(shape.x - consumed, 0.0);
     let t = shape.z;
     let secs = since_attack + shape.w * t;
 

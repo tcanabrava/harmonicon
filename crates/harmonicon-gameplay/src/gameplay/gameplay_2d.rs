@@ -705,9 +705,23 @@ fn ribbon_color(missed: bool, is_blow: bool, colors: NoteColors) -> LinearRgba {
 
 // ── Per-frame systems ─────────────────────────────────────────────────────────
 
+/// How long a note's cap stays at the hit line after the note ends, so its
+/// ✓ or ✗ is seen before it goes.
+const LINGER_SECS: f64 = 0.25;
+
+/// Whether a note is finished with: ended, and its cap's moment at the line
+/// over. The hit line consumes a ribbon (see [`consumed_secs`]), so nothing
+/// of it is drawn past the line to wait for.
 fn note_has_left_view(note: &ScheduledNote, elapsed: f64) -> bool {
-    let ribbon_pct = SCROLL_SPAN * (note.duration / LOOKAHEAD) as f32;
-    note_attack_pct(note.time, elapsed, LOOKAHEAD) < -(ribbon_pct + 15.0)
+    elapsed > note.time + note.duration + LINGER_SECS
+}
+
+/// Seconds of `note` already played past the hit line, which the line has
+/// eaten: the ribbon draws only what is still to come, its cap sitting on
+/// the line while the note sounds. 0 before the attack, the whole note
+/// after its end.
+pub(super) fn consumed_secs(note: &ScheduledNote, elapsed: f64) -> f64 {
+    (elapsed - note.time).clamp(0.0, note.duration.max(0.0))
 }
 
 pub fn update_notes(
@@ -734,23 +748,28 @@ pub fn update_notes(
             commands.entity(entity).despawn();
             continue;
         }
-        set_along(&mut node, axis, note_attack_pct(note.time, elapsed, LOOKAHEAD));
+        // Never past the hit line: the line consumes the ribbon.
+        set_along(&mut node, axis, note_attack_pct(note.time, elapsed, LOOKAHEAD).max(HIT_H_PCT));
     }
 }
 
 /// A ribbon's on-screen length in logical px for a highway `highway_px`
-/// long along the scroll: the distance scrolled during the note, so its far
-/// end meets the hit line as the note ends — but never shorter than its cap.
+/// long along the scroll: the distance scrolled during the part of the
+/// note still to come, so its far end meets the hit line as the note
+/// ends — but never shorter than its cap.
 fn ribbon_height_px(duration_frac: f32, highway_px: f32) -> f32 {
     ((SCROLL_SPAN / 100.0) * duration_frac * highway_px).max(CAP_PX)
 }
 
 /// Lengths every ribbon to be time-accurate against the live highway length
-/// along the scroll (see [`ribbon_height_px`]).
+/// along the scroll (see [`ribbon_height_px`]), less what the hit line has
+/// already consumed of it ([`consumed_secs`]).
 pub fn size_note_ribbons(
     highway: Query<&ComputedNode, With<NoteHighway>>,
     lanes: Res<HighwayLanes>,
-    mut ribbons: Query<(&NoteRibbon, &mut Node)>,
+    clock: Res<super::GameplayClock>,
+    song_notes: Res<SongNotes>,
+    mut ribbons: Query<(&NoteRibbon, &NoteVisual, &mut Node)>,
 ) {
     let (Some(hw), Some(axis)) = (highway.iter().next(), lanes.0.as_ref().map(|l| l.axis)) else {
         return;
@@ -761,8 +780,14 @@ pub fn size_note_ribbons(
     }
     // ComputedNode sizes are physical px; Node lengths are logical px.
     let logical = length_px * hw.inverse_scale_factor();
-    for (ribbon, mut node) in &mut ribbons {
-        let length = Val::Px(ribbon_height_px(ribbon.duration_frac, logical));
+    let elapsed = clock.get();
+    for (ribbon, visual, mut node) in &mut ribbons {
+        let consumed = song_notes
+            .notes
+            .get(visual.note_id)
+            .map_or(0.0, |note| (consumed_secs(note, elapsed) / LOOKAHEAD) as f32);
+        let remaining = (ribbon.duration_frac - consumed).max(0.0);
+        let length = Val::Px(ribbon_height_px(remaining, logical));
         if along_size(&node, axis) != length {
             set_along_size(&mut node, axis, length);
         }
@@ -803,13 +828,19 @@ pub fn update_note_visuals(
             note.expected_pitch.is_some_and(|m| sounding.contains(&m)),
             live_technique_status(&note.modifiers, &note.pitch_samples, &note.amp_samples),
         );
+        // What the hit line has eaten, so the technique drawing along the
+        // ribbon starts that far into the note.
+        let consumed = consumed_secs(note, clock.get()) as f32;
         // Writing through `get_mut` queues `AssetEvent::Modified` and a GPU
         // re-upload even for an unchanged value, so compare first.
-        if ribbons.get(&material.0).is_some_and(|m| m.color != color || m.hold != hold)
+        if ribbons
+            .get(&material.0)
+            .is_some_and(|m| m.color != color || m.hold != hold || m.axis.y != consumed)
             && let Some(mut m) = ribbons.get_mut(&material.0)
         {
             m.color = color;
             m.hold = hold;
+            m.axis.y = consumed;
         }
     }
 }
@@ -1263,5 +1294,19 @@ mod visibility_regression_tests {
         assert!(!note_has_left_view(&note, 0.0));
         note.duration = 4.0;
         assert!(!note_has_left_view(&note, 1.0));
+    }
+
+    /// The hit line eats a note as it plays: nothing before the attack,
+    /// the played part while it sounds, the whole note after. It lingers
+    /// at the line only briefly once over.
+    #[test]
+    fn the_hit_line_consumes_a_note_as_it_plays() {
+        let mut note = super::super::tests::overlap_test_note(2.0);
+        note.duration = 1.0;
+        assert_eq!(consumed_secs(&note, 1.5), 0.0, "still coming");
+        assert!((consumed_secs(&note, 2.25) - 0.25).abs() < 1e-9);
+        assert_eq!(consumed_secs(&note, 9.0), 1.0, "all of it, never more");
+        assert!(!note_has_left_view(&note, 3.0 + LINGER_SECS / 2.0), "its cap lingers");
+        assert!(note_has_left_view(&note, 3.0 + LINGER_SECS * 2.0));
     }
 }

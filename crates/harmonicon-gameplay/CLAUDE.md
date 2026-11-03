@@ -515,10 +515,16 @@ load-bearing about *this* crate.
     `oscillation_hz` along the ribbon, per second of note, so the ribbon itself is the pulse to
     follow. Anything else drawn along a ribbon should use the same
     convention, or it will scroll at a rate that means nothing.
-  - **The ribbon shows hold *state*, not a fill.** It scrolls through the hit
-    line time-accurately, so the part already credited is below the line
-    and off-screen within a fraction of a second; a fill was tried and is
-    invisible. The part above the line shows whether the expected pitch is
+  - **The hit line consumes the ribbon** (`gameplay_2d::consumed_secs`).
+    A ribbon's attack is clamped to the line and its length shrinks by what
+    has played, so a held note feeds into the line with its cap (and ✓/✗)
+    sitting on it, lingers `LINGER_SECS` once over and is despawned. On a
+    horizontal highway the line is at the left, beside the row names, and
+    a ribbon scrolling on past it read as a hit that never registered. The
+    shader gets the consumed seconds in `axis.y`, so the technique pattern
+    still crosses the line at the charted rate.
+  - **The ribbon shows hold *state*, not a fill.** What has played is
+    consumed at the line, so a fill would show nothing. The part above the line shows whether the expected pitch is
     sounding this frame, how much of the hold so far was credited, and the
     sustained technique's live status (`judge::live_technique_status`, the
     same samples the end-of-hold verdict reads, with "not measurable yet"

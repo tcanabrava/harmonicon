@@ -29,7 +29,9 @@ pub struct NoteRibbon2dMaterial {
     pub hold: Vec4,
     /// x = 1 when the ribbon lies along a horizontal highway, its attack at
     /// the left end; 0 for a vertical one, its attack at the bottom. See
-    /// [`ribbon_axis`].
+    /// [`ribbon_axis`]. y = seconds of the note the hit line has consumed
+    /// (`gameplay_2d::consumed_secs`): the ribbon drawn starts that far into
+    /// the note, so its technique pattern still crosses the line on time.
     #[uniform(4)]
     pub axis: Vec4,
 }
