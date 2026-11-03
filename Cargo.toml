@@ -167,6 +167,10 @@ workspace = true
 name = "validate-pack"
 path = "src/bin/validate_pack.rs"
 
+[[bin]]
+name = "port-part"
+path = "src/bin/port_part.rs"
+
 [profile.dev]
 opt-level = 1
 # Enough debug info for a backtrace to name a file and line, without the
