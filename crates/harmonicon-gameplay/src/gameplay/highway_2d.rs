@@ -66,11 +66,10 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
     // Lane count/width come from the instrument being played, not a fixed
     // 10 — a chromatic's 12+ holes need proportionally narrower lanes.
     let axis = layout.axis;
-    let lane_pct = layout.lane_pct();
     let full = Val::Percent(100.0);
 
     for h in 0..layout.lanes.len() {
-        let start_pct = h as f32 * lane_pct;
+        let (start_pct, lane_pct) = layout.span(h);
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
         hw.spawn((
             placed(axis, 0.0, full, start_pct, Val::Percent(lane_pct)),
@@ -116,8 +115,8 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
                         axis,
                         0.0,
                         Val::Percent(HIT_H_PCT),
-                        row as f32 * lane_pct,
-                        Val::Percent(lane_pct),
+                        layout.span(row).0,
+                        Val::Percent(layout.span(row).1),
                     )
                 },
                 children![(

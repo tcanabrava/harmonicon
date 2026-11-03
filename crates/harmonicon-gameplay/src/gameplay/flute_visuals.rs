@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! The flute on the play highway. Its rows are the flute's keys, top to
-//! bottom down the tube (`instrument::flute::key_order`), and a vertical
+//! bottom down the tube (`instrument::flute::key_rows`), and a vertical
 //! drawing of the flute stands at the left of them with each key level
 //! with its row. A note travels in as the shape of its fingering — a block
 //! on every key it presses — and the drawing lights the keys of the note
@@ -15,7 +15,7 @@ use super::{GameplayClock, LOOKAHEAD, ScheduledNote, SongNotes};
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
 use harmonicon_core::instrument::PlayPosition;
-use harmonicon_core::instrument::flute::{FingeringAssignment, Flute, Keys, key_order};
+use harmonicon_core::instrument::flute::{FingeringAssignment, Flute, Side, key_rows};
 use harmonicon_core::instrument::{InstrumentModel, LaneLayout};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
@@ -170,16 +170,20 @@ fn targets(
     (fingering(current), next)
 }
 
-/// Finger plates are drawn large; the thumb, G♯, trill and pinky keys small.
-fn is_plate(key: u16) -> bool {
-    matches!(key, Keys::L1 | Keys::L2 | Keys::L3 | Keys::R1 | Keys::R2 | Keys::R3)
-}
-
-/// The flute standing upright beside the highway's rows: a tube, and on it
-/// one key per row, each centred on its row.
+/// The flute standing upright beside the highway's rows, drawn as a
+/// fingering chart draws it: the six finger holes as large circles on the
+/// tube's line, the left hand above the gap and the right hand below; the
+/// thumb key as a small circle to the left of the first hole; the G♯,
+/// trill, E♭ and foot keys as small circles to the right. Each sits in its
+/// own row, at the same height the highway gives that row
+/// (`InstrumentModel::lane_layout`, weighted by `flute::key_rows`).
 pub(super) fn spawn_flute(parent: &mut ChildSpawnerCommands, flute: &Flute) {
-    let keys = key_order(flute.foot);
-    let row_pct = 100.0 / keys.len() as f32;
+    const TUBE_LEFT: f32 = 30.0;
+    const TUBE_W: f32 = 26.0;
+    const HOLE: f32 = 22.0;
+    const SIDE_KEY: f32 = 12.0;
+    let rows = key_rows(flute.foot);
+    let layout = InstrumentModel::lane_layout(flute);
     parent
         .spawn((
             FluteDrawing(*flute),
@@ -195,51 +199,44 @@ pub(super) fn spawn_flute(parent: &mut ChildSpawnerCommands, flute: &Flute) {
             drawing.spawn((
                 Node {
                     position_type: PositionType::Absolute,
-                    left: Val::Px(20.0),
-                    width: Val::Px(24.0),
+                    left: Val::Px(TUBE_LEFT),
+                    width: Val::Px(TUBE_W),
                     top: Val::Percent(0.0),
                     height: Val::Percent(100.0),
-                    border_radius: BorderRadius::all(Val::Px(6.0)),
+                    border_radius: BorderRadius::all(Val::Px(8.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgb(0.30, 0.33, 0.38)),
             ));
-            for (row, key) in keys.into_iter().enumerate() {
-                let size = if is_plate(key) { 22.0 } else { 13.0 };
+            for (row, key_row) in rows.into_iter().enumerate() {
+                let Some(key) = key_row.key else { continue };
+                let (top, height) = layout.span(row);
+                let (size, left) = match key_row.side {
+                    Side::Tube => (HOLE, TUBE_LEFT + (TUBE_W - HOLE) * 0.5),
+                    Side::Left => (SIDE_KEY, TUBE_LEFT - SIDE_KEY - 6.0),
+                    Side::Right => (SIDE_KEY, TUBE_LEFT + TUBE_W + 6.0),
+                };
                 drawing
                     .spawn(Node {
                         position_type: PositionType::Absolute,
-                        top: Val::Percent(row as f32 * row_pct),
-                        height: Val::Percent(row_pct),
-                        width: Val::Percent(100.0),
+                        top: Val::Percent(top),
+                        height: Val::Percent(height),
+                        left: Val::Px(left),
                         align_items: AlignItems::Center,
                         ..default()
                     })
                     .with_children(|slot| {
-                        // Centred on the tube, whatever its size.
-                        slot.spawn(Node {
-                            width: Val::Px(64.0),
-                            justify_content: JustifyContent::Center,
-                            ..default()
-                        })
-                        .with_children(|centre| {
-                            centre.spawn((
-                                FluteKey(key),
-                                Node {
-                                    width: Val::Px(size),
-                                    height: Val::Px(size),
-                                    border: UiRect::all(Val::Px(2.0)),
-                                    border_radius: BorderRadius::MAX,
-                                    ..default()
-                                },
-                                BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.75)),
-                                BackgroundColor(Color::NONE),
-                            ));
-                        });
                         slot.spawn((
-                            Text::new(harmonicon_core::instrument::flute::key_label(key)),
-                            TextFont { font_size: FontSize::Px(11.0), ..default() },
-                            TextColor(Color::srgba(1.0, 1.0, 1.0, 0.55)),
+                            FluteKey(key),
+                            Node {
+                                width: Val::Px(size),
+                                height: Val::Px(size),
+                                border: UiRect::all(Val::Px(2.0)),
+                                border_radius: BorderRadius::MAX,
+                                ..default()
+                            },
+                            BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.75)),
+                            BackgroundColor(Color::NONE),
                         ));
                     });
             }
@@ -304,6 +301,16 @@ pub(super) fn update_flute(
     }
 }
 
+/// Where a fingering note's name goes across the highway, `(start, size)`
+/// in percent: the row of the gap between the hands, the one row no
+/// fingering presses, so the name never sits on a block.
+pub(super) fn name_row_span(flute: &Flute, layout: &LaneLayout) -> (f32, f32) {
+    key_rows(flute.foot)
+        .iter()
+        .position(|row| row.key.is_none())
+        .map_or((0.0, 100.0), |gap| layout.span(gap))
+}
+
 /// One fingering note's blocks, as children of its note visual, which
 /// spans every row: one block per key the fingering presses, in that key's
 /// row, and the note's name in the cap at its attack end.
@@ -311,18 +318,21 @@ pub(super) fn spawn_fingering_blocks(
     note_e: &mut ChildSpawnerCommands,
     flute: &Flute,
     at: FingeringAssignment,
-    lane_pct: f32,
-    block_pct: f32,
+    layout: &LaneLayout,
+    fill: f32,
 ) {
+    // Each block fills `fill` of its own row, so a side key's block is as
+    // much thinner than a finger hole's as its row is.
     for row in flute.pressed_rows(at) {
+        let (start, size) = layout.span(row);
         note_e.spawn((
             FingeringBlock,
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 width: Val::Percent(100.0),
-                top: Val::Percent(row as f32 * lane_pct + (lane_pct - block_pct) * 0.5),
-                height: Val::Percent(block_pct),
+                top: Val::Percent(start + size * (1.0 - fill) * 0.5),
+                height: Val::Percent(size * fill),
                 border_radius: BorderRadius::all(Val::Px(4.0)),
                 ..default()
             },

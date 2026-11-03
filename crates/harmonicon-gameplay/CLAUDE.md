@@ -109,8 +109,11 @@ load-bearing about *this* crate.
   skips it and `update_fingering_blocks` colours it. The vertical flute
   drawing carries the `Flute` (`FluteDrawing`) for the note spawner to
   read, because `gameplay_2d::setup` is at Bevy's 16-parameter limit. The
-  note's name sits mid-tube on the trill-key rows, almost never pressed,
-  in a light colour (`cap_label_color`).
+  note's name sits in the gap row between the hands, which no key
+  fills (`name_row_span`), in a light colour (`cap_label_color`). The rows
+  are weighted like a fingering chart drawn upright (`flute::key_rows`,
+  `LaneLayout::span`): six finger holes full-height on the tube, the
+  thumb, G♯, trill, E♭ and foot keys thinner and drawn beside it.
   - **The pause menu's Flute view switches to pitch rows**
     (`FluteView`, `LaneLayout::pitch_rows`) and back, mid-song.
     `sync_flute_view` runs first in the Play 2D chain: on a change it

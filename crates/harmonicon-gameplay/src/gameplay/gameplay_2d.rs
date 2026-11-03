@@ -554,8 +554,8 @@ fn note_lane(note: &ScheduledNote, layout: &LaneLayout) -> usize {
 }
 
 /// A note's cap label colour: dark on a ribbon's bright cap, but light on
-/// a flute's fingering, whose name sits in an empty row (the trill keys'
-/// middle of the tube) over the dark highway, not on a cap.
+/// a flute's fingering, whose name sits in the gap between the hands
+/// (`flute_visuals::name_row_span`) over the dark highway, not on a cap.
 fn cap_label_color(note: &ScheduledNote, judged: Option<bool>, layout: &LaneLayout) -> Color {
     if matches!(note.position, PlayPosition::Fingering(_)) && !layout.is_pitch_lanes() {
         Color::srgba(0.92, 0.94, 1.0, 0.95)
@@ -622,24 +622,22 @@ fn spawn_note_visual(
     }
     visual.with_children(|note_e| {
         if let Some((at, flute)) = fingering {
-            let lane_pct = layout.lane_pct();
-            super::flute_visuals::spawn_fingering_blocks(
-                note_e,
-                flute,
-                at,
-                lane_pct,
-                lane_pct * NOTE_W,
-            );
+            super::flute_visuals::spawn_fingering_blocks(note_e, flute, at, layout, NOTE_W);
         }
         if let Some((span, name)) = chord {
             super::guitar_visuals::spawn_chord_stem(note_e, span, layout.lane_pct(), &name);
         }
-        // The tab label, centred in the cap at the attack end.
+        // The tab label, centred in the cap at the attack end — for a
+        // fingering, in the gap between the hands, which no key ever fills.
+        let (label_start, label_size) = match fingering {
+            Some((_, flute)) => super::flute_visuals::name_row_span(flute, layout),
+            None => (0.0, 100.0),
+        };
         note_e.spawn((
             Node {
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                ..placed(axis, 0.0, Val::Px(CAP_PX), 0.0, Val::Percent(100.0))
+                ..placed(axis, 0.0, Val::Px(CAP_PX), label_start, Val::Percent(label_size))
             },
             children![(
                 Text::new(label),

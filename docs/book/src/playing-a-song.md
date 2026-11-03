@@ -68,12 +68,14 @@ depends on the open string, is played as the fretted note it sounded.
 ## Flute parts
 
 A flute part's highway reads the flute's keys rather than its notes. A
-drawing of the flute stands upright at the left, with each key level with
-its own row: the thumb key at the top, then the left hand, the right hand
-with the two trill keys between its fingers, and the right little finger's
-E♭ and foot keys at the bottom. Each note travels in from the right as the
-shape of its fingering, a block on every key it presses, with its name
-beside it. As a note reaches the hit line the drawing fills its keys, and
+drawing of the flute stands upright at the left, laid out like a printed
+fingering chart: the six finger holes in a line down the tube, left hand
+above a gap and right hand below it. The small keys sit beside the tube.
+The thumb key is to the left of the first hole. The G♯ key, the two trill
+keys and the right little finger's E♭ and foot keys are to the right.
+Each key is level with its own row. Each note travels in from the right
+as the shape of its fingering, a block on every key it presses, with its
+name in the gap between the hands. As a note reaches the hit line the drawing fills its keys, and
 shows the next note's keys faintly so your fingers can get there in time;
 the line under the highway names both.
 

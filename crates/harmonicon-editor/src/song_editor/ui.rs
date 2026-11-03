@@ -467,12 +467,17 @@ pub(super) fn sync_hole_column(
     }
     let hole_count = state.display_rows();
     let rows = match state.flute_fingering_view() {
-        // Fingering view: the flute's keys, down the tube.
-        Some(flute) => harmonicon_core::instrument::flute::key_order(flute.foot)
+        // Fingering view: the flute's keys, down the tube, as the play
+        // highway's rows run, the empty row the gap between the hands.
+        Some(flute) => harmonicon_core::instrument::flute::key_rows(flute.foot)
             .into_iter()
-            .map(|key| RowLabel {
-                text: harmonicon_core::instrument::flute::key_label(key).to_string(),
-                swatch: None,
+            .map(|row| RowLabel {
+                text: row
+                    .key
+                    .map(harmonicon_core::instrument::flute::key_label)
+                    .unwrap_or_default()
+                    .to_string(),
+                swatch: row.key.is_none().then_some(Color::NONE),
             })
             .collect(),
         None => row_labels(&state.effective_instrument(), hole_count),

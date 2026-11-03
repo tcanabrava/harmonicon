@@ -146,6 +146,18 @@ pub struct Lane {
     /// The pitch a pitch lane carries (a flute's note view); `None` for a
     /// lane that is a place on the instrument (a hole, a string, a key).
     pub pitch: Option<u8>,
+    /// The lane's share of the highway relative to the others, in
+    /// hundredths: 100 for a full lane. Equal for every instrument but the
+    /// flute, whose side keys and the gap between its hands are thinner
+    /// than its finger holes (`flute::key_rows`).
+    pub weight: u16,
+}
+
+impl Lane {
+    /// An ordinary, full-width lane.
+    pub fn new(label: String, pitch: Option<u8>) -> Self {
+        Self { label, pitch, weight: 100 }
+    }
 }
 
 /// The lanes notes travel in, and which lane each position belongs to.
@@ -204,24 +216,38 @@ impl LaneLayout {
             lanes: used
                 .iter()
                 .rev()
-                .map(|&pitch| Lane {
-                    label: crate::midi::midi_to_note(i32::from(pitch)),
-                    pitch: Some(pitch),
-                })
+                .map(|&pitch| Lane::new(crate::midi::midi_to_note(i32::from(pitch)), Some(pitch)))
                 .collect(),
         }
     }
 
-    /// Each lane's share of the highway's width, in percent.
+    /// An even lane's share of the highway's width, in percent: exact when
+    /// every lane has the same weight, as on every instrument but the
+    /// flute's key rows, which [`span`](Self::span) lays out.
     pub fn lane_pct(&self) -> f32 {
         100.0 / self.lanes.len().max(1) as f32
+    }
+
+    /// Where `lane` sits across the highway, `(start, size)` in percent,
+    /// by the lanes' weights.
+    pub fn span(&self, lane: usize) -> (f32, f32) {
+        // Even lanes keep the exact arithmetic every instrument but the
+        // flute's key rows has always used.
+        if self.lanes.windows(2).all(|pair| pair[0].weight == pair[1].weight) {
+            let pct = self.lane_pct();
+            return (lane as f32 * pct, pct);
+        }
+        let total: f32 = self.lanes.iter().map(|l| f32::from(l.weight)).sum::<f32>().max(1.0);
+        let before: f32 = self.lanes.iter().take(lane).map(|l| f32::from(l.weight)).sum();
+        let own = self.lanes.get(lane).map_or(0.0, |l| f32::from(l.weight));
+        (before / total * 100.0, own / total * 100.0)
     }
 
     /// The left edge, in percent of the highway, of something `width_pct`
     /// wide centred in `lane`.
     pub fn centred_left_pct(&self, lane: usize, width_pct: f32) -> f32 {
-        let lane_pct = self.lane_pct();
-        lane as f32 * lane_pct + (lane_pct - width_pct) * 0.5
+        let (start, size) = self.span(lane);
+        start + (size - width_pct) * 0.5
     }
 }
 
@@ -367,9 +393,7 @@ impl InstrumentModel for Harmonica {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Vertical,
-            lanes: (1..=self.hole_count())
-                .map(|hole| Lane { label: hole.to_string(), pitch: None })
-                .collect(),
+            lanes: (1..=self.hole_count()).map(|hole| Lane::new(hole.to_string(), None)).collect(),
         }
     }
 }
@@ -467,11 +491,7 @@ impl InstrumentModel for Guitar {
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Horizontal,
-            lanes: self
-                .string_labels()
-                .into_iter()
-                .map(|label| Lane { label, pitch: None })
-                .collect(),
+            lanes: self.string_labels().into_iter().map(|label| Lane::new(label, None)).collect(),
         }
     }
 }
@@ -529,15 +549,19 @@ impl InstrumentModel for Flute {
         Envelope::Sustained
     }
 
-    /// One row per key, down the tube ([`flute::key_order`]), travelled
+    /// One row per key, down the tube ([`flute::key_rows`]), travelled
     /// right to left like tab: a note arrives as the shape of its
     /// fingering, a block on every key it presses.
     fn lane_layout(&self) -> LaneLayout {
         LaneLayout {
             axis: ScrollAxis::Horizontal,
-            lanes: flute::key_order(self.foot)
+            lanes: flute::key_rows(self.foot)
                 .into_iter()
-                .map(|key| Lane { label: flute::key_label(key).to_string(), pitch: None })
+                .map(|row| Lane {
+                    label: row.key.map(flute::key_label).unwrap_or_default().to_string(),
+                    pitch: None,
+                    weight: (row.weight * 100.0).round() as u16,
+                })
                 .collect(),
         }
     }

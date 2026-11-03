@@ -193,7 +193,8 @@ mod tests {
         assert_eq!(at(&state, 1).alternate, 0, "nothing to cycle to");
     }
 
-    /// Fingering view draws thirteen key rows on a C foot, every note in
+    /// Fingering view draws fourteen rows on a C foot (its keys and the
+    /// gap between the hands), every note in
     /// the middle one's place, and refuses to place a note on a key row;
     /// note view is untouched by it.
     #[test]
@@ -202,9 +203,9 @@ mod tests {
         place(&mut state, 33, 0, 12);
         assert_eq!((state.display_rows(), state.row_count()), (37, 37));
         state.flute_view = super::super::state::FluteView::Fingering;
-        assert_eq!(state.display_rows(), 13);
+        assert_eq!(state.display_rows(), 14, "a C foot's rows, the hands' gap included");
         assert_eq!(state.row_count(), 37, "the notes' own rows are still pitches");
-        assert_eq!(state.display_row(&state.notes[0]), 6);
+        assert_eq!(state.display_row(&state.notes[0]), 7);
         super::super::interaction::select_or_add(&mut state, 3, 24);
         assert_eq!(state.notes.len(), 1);
         state.flute_view = state.flute_view.toggled();

@@ -418,7 +418,7 @@ impl EditorState {
     /// flute in fingering view, which draws one per key.
     pub(super) fn display_rows(&self) -> u8 {
         match self.flute_fingering_view() {
-            Some(flute) => harmonicon_core::instrument::flute::key_order(flute.foot).len() as u8,
+            Some(flute) => harmonicon_core::instrument::flute::key_rows(flute.foot).len() as u8,
             None => self.row_count(),
         }
     }

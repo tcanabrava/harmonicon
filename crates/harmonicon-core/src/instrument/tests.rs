@@ -244,7 +244,11 @@ fn a_flute_is_one_voice_on_pitch_lanes_with_its_fingerings_as_positions() {
     let lanes = InstrumentModel::lane_layout(&flute);
     assert_eq!(lanes.axis, ScrollAxis::Horizontal);
     assert_eq!(lanes.lanes.first().map(|l| l.label.as_str()), Some("Th"), "the thumb key on top");
-    assert_eq!(lanes.lanes.len(), 13, "a C foot has no low-B roller");
+    assert_eq!(lanes.lanes.len(), 14, "a C foot's rows, the hands' gap included");
+    // A finger hole's row is wider than the thumb key's beside it.
+    assert!(lanes.span(1).1 > lanes.span(0).1);
+    let (start, size) = lanes.span(lanes.lanes.len() - 1);
+    assert!((start + size - 100.0).abs() < 1e-3, "the rows fill the highway");
     assert_eq!(lanes.lane_of(&positions[0]), None, "a fingering is many rows, not one");
 }
 
