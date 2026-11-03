@@ -194,6 +194,30 @@ mod tests {
         ));
     }
 
+    /// A capo at 2 raises every open string a whole step: the open low E2
+    /// is below anything the guitar can now sound, and every other note
+    /// keeps its pitch on frets counted from the capo.
+    #[test]
+    fn a_capo_drops_what_falls_below_it_and_keeps_every_other_pitch() {
+        let chart = guitar_chart();
+        let played: Instrument =
+            Guitar { capo: 2, ..Guitar::standard(GuitarBody::Electric) }.into();
+        let placed = substitute_chart(&chart, &played);
+        assert_eq!(placed[0][0], None, "E2 is below the capoed low string");
+        let own = chart.instrument().unwrap();
+        let written = substitute_chart(&chart, &own);
+        let mut kept = 0;
+        for (item, own_item) in placed.iter().zip(&written) {
+            for (p, o) in item.iter().zip(own_item) {
+                if let (Some(p), Some(o)) = (p, o) {
+                    assert_eq!(played.pitch_of(p), own.pitch_of(o));
+                    kept += 1;
+                }
+            }
+        }
+        assert!(kept > 0, "the rest of the part still plays");
+    }
+
     /// Down a half step, the 12th-fret harmonic on G (G4) can only be the
     /// plain fretted G4.
     #[test]

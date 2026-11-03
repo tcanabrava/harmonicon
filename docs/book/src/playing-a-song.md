@@ -65,6 +65,12 @@ the same pitches but move to the frets your tuning plays them on; the page
 says how many move. A bend keeps its bend; a natural harmonic, whose pitch
 depends on the open string, is played as the fretted note it sounded.
 
+**Capo** works the same way: say which fret yours is on, or **No capo**,
+and it is remembered too. Frets then count from the capo, as tab for a
+capoed guitar does, and the line under the highway says so ("0 = the
+capo, at fret 2"). A note lower than your capoed strings can reach is
+shown but doesn't count.
+
 ![Choosing a tuning before a guitar part](images/instrument-check-guitar.png)
 
 ## Flute parts

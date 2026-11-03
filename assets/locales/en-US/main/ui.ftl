@@ -166,6 +166,7 @@ options-subtitle-audio = Audio
 options-my-instruments = My instruments
 options-my-instruments-tooltip = What you play on. A song written for another tuning or foot joint is placed onto yours, and the page before each song opens on it.
 options-guitar-tuning = Guitar tuning
+options-guitar-capo = Guitar capo
 options-flute-foot = Flute foot joint
 options-flute-view = Flute parts show
 options-follow-chart = As each song is written
@@ -944,17 +945,21 @@ harp-check-instrument-harmonica = Harmonica
 harp-check-instrument-guitar = Guitar
 instrument-check-title-guitar = Your guitar
 instrument-check-title-flute = Your flute
-instrument-check-intro-guitar = If your guitar is in another tuning, say so: the notes stay the same and move to the frets your tuning plays them on.
+instrument-check-intro-guitar = If your guitar is in another tuning or has a capo on, say so: the notes stay the same and move to the frets your guitar plays them on.
 instrument-check-intro-flute = Say which foot joint your flute has. A C foot's lowest note is C4; a B foot reaches B3.
 instrument-check-tuning = Tuning
 instrument-check-foot = Foot joint
 instrument-check-chart-guitar = Written for a guitar in {$tuning}.
 instrument-check-chart-flute = Written for a flute with a {$foot}.
 instrument-check-cost-clean = Plays as written on your instrument.
-instrument-check-cost-frets = {$count} note(s) move to other frets for your tuning
+instrument-check-cost-frets = {$count} note(s) move to other frets on your guitar
 instrument-check-cost-fingerings = {$count} note(s) use another fingering on your flute
 instrument-check-cost-unreachable = {$count} note(s) are out of your instrument's reach and won't count
 guitar-tuning-charted = As written
+instrument-check-capo = Capo
+instrument-check-chart-guitar-capo = Written for a guitar in {$tuning}, capo at fret {$fret}.
+guitar-capo-none = No capo
+guitar-capo-fret = Fret {$fret}
 guitar-tuning-standard = Standard (E A D G B E)
 guitar-tuning-drop-d = Drop D (D A D G B E)
 guitar-tuning-half-step-down = Half step down (Eb Ab Db Gb Bb Eb)
@@ -966,6 +971,7 @@ flute-foot-b = B foot (down to B3)
 harp-check-instrument-flute = Flute
 
 gameplay-guitar-window = Hand window starts at fret {$fret} · Next: {$next} · 0 = open string
+gameplay-guitar-window-capo = Hand window starts at fret {$fret} · Next: {$next} · 0 = the capo, at fret {$capo}
 gameplay-flute-fingering = Now {$now} · next {$next}
 
 editor-guitar-invalid = That edit is unplayable: check fret range, occupied strings and hand span.

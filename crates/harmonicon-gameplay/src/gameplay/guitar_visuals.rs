@@ -251,8 +251,13 @@ pub(super) fn spawn_chord_stem(
     }
 }
 
+/// The line under the highway naming where the hand sits. Fret 0 is the
+/// open string, or the capo on a capoed guitar, and the line says which.
 #[derive(Component)]
-pub(super) struct FretboardHint(pub u8);
+pub(super) struct FretboardHint {
+    pub top_fret: u8,
+    pub capo: u8,
+}
 
 pub(super) fn update_hint(
     clock: Res<GameplayClock>,
@@ -275,22 +280,16 @@ pub(super) fn update_hint(
         .filter_map(|n| if let PlayPosition::Fret(p) = n.position { Some(p) } else { None })
         .collect();
     for (hint, mut text) in &mut labels {
-        text.0 = loc
-            .msg_args(
-                "gameplay-guitar-window",
-                &[
-                    ("fret", anchor(&current, hint.0).to_string()),
-                    (
-                        "next",
-                        if next.is_empty() {
-                            "—".into()
-                        } else {
-                            anchor(&next, hint.0).to_string()
-                        },
-                    ),
-                ],
-            )
-            .to_string();
+        let next =
+            if next.is_empty() { "—".into() } else { anchor(&next, hint.top_fret).to_string() };
+        let mut args = vec![("fret", anchor(&current, hint.top_fret).to_string()), ("next", next)];
+        let key = if hint.capo == 0 {
+            "gameplay-guitar-window"
+        } else {
+            args.push(("capo", hint.capo.to_string()));
+            "gameplay-guitar-window-capo"
+        };
+        text.0 = loc.msg_args(key, &args).to_string();
     }
 }
 

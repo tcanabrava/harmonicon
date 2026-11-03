@@ -47,6 +47,8 @@ What you play on, so you only say it once:
 - **Guitar tuning** — the tuning your guitar is in, or **As each song is
   written** to follow each chart. A song written for another tuning plays
   the same notes on the frets yours needs.
+- **Guitar capo** — the fret your capo is on, **No capo**, or as each
+  song is written.
 - **Flute foot joint** — a C or B foot, or as each song is written. Notes
   below your foot are shown but not counted.
 - **Flute parts show** — fingerings or notes; the same setting as the

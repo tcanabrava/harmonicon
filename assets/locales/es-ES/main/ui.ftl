@@ -164,6 +164,7 @@ options-subtitle-audio = Audio
 options-my-instruments = Mis instrumentos
 options-my-instruments-tooltip = Lo que tocas. Una canción escrita para otra afinación u otro pie se coloca en el tuyo, y la página antes de cada canción ya abre en él.
 options-guitar-tuning = Afinación de la guitarra
+options-guitar-capo = Cejilla de la guitarra
 options-flute-foot = Pie de la flauta
 options-flute-view = Las partes de flauta muestran
 options-follow-chart = Como está escrita cada canción
@@ -943,17 +944,21 @@ harp-check-instrument-harmonica = Armónica
 harp-check-instrument-guitar = Guitarra
 instrument-check-title-guitar = Tu guitarra
 instrument-check-title-flute = Tu flauta
-instrument-check-intro-guitar = Si tu guitarra está en otra afinación, dilo aquí: las notas siguen siendo las mismas y pasan a los trastes donde tu afinación las toca.
+instrument-check-intro-guitar = Si tu guitarra está en otra afinación o lleva cejilla, dilo aquí: las notas siguen siendo las mismas y pasan a los trastes donde tu guitarra las toca.
 instrument-check-intro-flute = Di qué pie tiene tu flauta. La nota más grave del pie en Do es C4; el pie en Si llega a B3.
 instrument-check-tuning = Afinación
 instrument-check-foot = Pie
 instrument-check-chart-guitar = Escrita para guitarra en {$tuning}.
 instrument-check-chart-flute = Escrita para flauta con {$foot}.
 instrument-check-cost-clean = Suena como está escrita en tu instrumento.
-instrument-check-cost-frets = {$count} nota(s) cambian de traste con tu afinación
+instrument-check-cost-frets = {$count} nota(s) cambian de traste en tu guitarra
 instrument-check-cost-fingerings = {$count} nota(s) usan otra digitación en tu flauta
 instrument-check-cost-unreachable = {$count} nota(s) quedan fuera del alcance de tu instrumento y no cuentan
 guitar-tuning-charted = Como está escrita
+instrument-check-capo = Cejilla
+instrument-check-chart-guitar-capo = Escrita para guitarra en {$tuning}, cejilla en el traste {$fret}.
+guitar-capo-none = Sin cejilla
+guitar-capo-fret = Traste {$fret}
 guitar-tuning-standard = Estándar (E A D G B E)
 guitar-tuning-drop-d = Drop D (D A D G B E)
 guitar-tuning-half-step-down = Medio tono abajo (Eb Ab Db Gb Bb Eb)
@@ -965,6 +970,7 @@ flute-foot-b = Pie en Si (hasta B3)
 harp-check-instrument-flute = Flauta
 
 gameplay-guitar-window = Posición de la mano empieza en el traste {$fret} · Siguiente: {$next} · 0 = cuerda al aire
+gameplay-guitar-window-capo = Posición de la mano empieza en el traste {$fret} · Siguiente: {$next} · 0 = la cejilla, en el traste {$capo}
 gameplay-flute-fingering = Ahora {$now} · siguiente {$next}
 
 editor-guitar-invalid = Edición imposible: comprueba los trastes, cuerdas ocupadas y alcance de la mano.

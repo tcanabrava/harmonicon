@@ -163,7 +163,8 @@ options-title = Opções
 options-subtitle-audio = Áudio
 options-my-instruments = Meus instrumentos
 options-my-instruments-tooltip = O que você toca. Uma música escrita para outra afinação ou outro pé é colocada no seu, e a página antes de cada música já abre nele.
-options-guitar-tuning = Afinação do violão
+options-guitar-tuning = Afinação da guitarra
+options-guitar-capo = Capotraste da guitarra
 options-flute-foot = Pé da flauta
 options-flute-view = Partes de flauta mostram
 options-follow-chart = Como cada música está escrita
@@ -941,17 +942,21 @@ harp-check-instrument-harmonica = Gaita
 harp-check-instrument-guitar = Guitarra
 instrument-check-title-guitar = Sua guitarra
 instrument-check-title-flute = Sua flauta
-instrument-check-intro-guitar = Se sua guitarra está em outra afinação, diga aqui: as notas continuam as mesmas e vão para as casas em que sua afinação as toca.
+instrument-check-intro-guitar = Se sua guitarra está em outra afinação ou com capotraste, diga aqui: as notas continuam as mesmas e vão para as casas em que sua guitarra as toca.
 instrument-check-intro-flute = Diga qual pé sua flauta tem. A nota mais grave do pé em Dó é C4; o pé em Si chega a B3.
 instrument-check-tuning = Afinação
 instrument-check-foot = Pé
 instrument-check-chart-guitar = Escrita para guitarra em {$tuning}.
 instrument-check-chart-flute = Escrita para flauta com {$foot}.
 instrument-check-cost-clean = Toca como escrito no seu instrumento.
-instrument-check-cost-frets = {$count} nota(s) mudam de casa na sua afinação
+instrument-check-cost-frets = {$count} nota(s) mudam de casa na sua guitarra
 instrument-check-cost-fingerings = {$count} nota(s) usam outro dedilhado na sua flauta
 instrument-check-cost-unreachable = {$count} nota(s) estão fora do alcance do seu instrumento e não contam
 guitar-tuning-charted = Como escrita
+instrument-check-capo = Capotraste
+instrument-check-chart-guitar-capo = Escrita para guitarra em {$tuning}, capotraste na casa {$fret}.
+guitar-capo-none = Sem capotraste
+guitar-capo-fret = Casa {$fret}
 guitar-tuning-standard = Padrão (E A D G B E)
 guitar-tuning-drop-d = Drop D (D A D G B E)
 guitar-tuning-half-step-down = Meio tom abaixo (Eb Ab Db Gb Bb Eb)
@@ -963,6 +968,7 @@ flute-foot-b = Pé em Si (até B3)
 harp-check-instrument-flute = Flauta
 
 gameplay-guitar-window = Posição da mão começa na casa {$fret} · Próxima: {$next} · 0 = corda solta
+gameplay-guitar-window-capo = Posição da mão começa na casa {$fret} · Próxima: {$next} · 0 = o capotraste, na casa {$capo}
 gameplay-flute-fingering = Agora {$now} · próxima {$next}
 
 editor-guitar-invalid = Edição impossível: verifique as casas, cordas ocupadas e alcance da mão.

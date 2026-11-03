@@ -236,3 +236,19 @@ fn a_remembered_tuning_or_foot_joint_is_what_the_page_opens_on() {
 
     assert_eq!(played_for(plain_chart().instrument(), &drop_d), None, "a harmonica asks elsewhere");
 }
+
+/// A remembered capo goes on the chart's guitar, and an unset one keeps
+/// the chart's own.
+#[test]
+fn a_remembered_capo_is_put_on_the_charts_guitar() {
+    let guitar = fixture("guitar-highway");
+    let capo_3 = MyInstruments { guitar_capo: Some(3), ..default() };
+    let Some(Instrument::Guitar(played)) = played_for(guitar.instrument(), &capo_3) else {
+        panic!("a guitar")
+    };
+    assert_eq!(played.capo, 3);
+    let Some(Instrument::Guitar(own)) = guitar.instrument() else { panic!("a guitar") };
+    assert_eq!(own.capo, 0);
+    let (_, unreachable) = substitution_cost(&guitar, &played.into());
+    assert!(unreachable > 0, "the open low E is below a capo at 3");
+}

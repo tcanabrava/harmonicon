@@ -182,6 +182,8 @@ pub struct MyInstruments {
     /// The guitar's tuning, by `harmonicon_core::instrument::guitar::Tuning`
     /// id (`"drop-d"`). An id no tuning has any more reads as `None`.
     pub guitar_tuning: Option<String>,
+    /// The fret the guitar's capo sits on, `Some(0)` for none.
+    pub guitar_capo: Option<u8>,
     /// The flute's foot joint.
     pub flute_foot: Option<harmonicon_core::instrument::flute::FootJoint>,
     /// How Play 2D draws a flute part, switched from its pause menu.
@@ -612,6 +614,7 @@ mod tests {
     fn my_instruments_round_trip_through_the_settings_file() {
         let mine = MyInstruments {
             guitar_tuning: Some("drop-d".into()),
+            guitar_capo: Some(2),
             flute_foot: Some(harmonicon_core::instrument::flute::FootJoint::B),
             flute_view: FluteView::Notes,
         };

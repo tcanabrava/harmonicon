@@ -106,9 +106,8 @@ gates 1.0. In order:
   fingering views) and the Note Trainer's flute tabs are in. Next:
   - a recorded corpus aimed at octave errors, before any detection tuning.
 - **Content and progress** (phase 5, started): "My instruments" is in
-  (`settings::MyInstruments`: tuning, foot joint and flute view, set in
-  Options or on the pre-song page and remembered). Next:
-  - a capo, on the pre-song page and in "My instruments";
+  (`settings::MyInstruments`: tuning, capo, foot joint and flute view,
+  set in Options or on the pre-song page and remembered). Next:
   - song select marking which parts the player's instruments can play;
   - per-instrument packs, DAGs and profile, and per-instrument Jam
     Session. What guitar and flute content ships is still to be decided.

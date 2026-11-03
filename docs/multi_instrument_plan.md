@@ -342,12 +342,14 @@ can't be confused with a detection problem.
   the foot joint, per song, and play places the chart onto the answer
   (`instrument::substitute`, carried in `EffectiveHarmonica::instrument`).
   **Landed too:** those answers stick. `settings::MyInstruments` holds
-  the guitar's tuning, the flute's foot joint (each `None` = follow each
-  chart) and the flute view, persisted in `settings.json`; the pre-song
+  the guitar's tuning and capo, the flute's foot joint (each `None` =
+  follow each chart) and the flute view, persisted in `settings.json`; the pre-song
   page opens on them (`harp_check::played_for`) and saves each answer,
-  and Options has a "My instruments" section for all three. **Open:** a
-  capo, which neither the page nor Options asks for yet, and showing in
-  song select which parts the player's instruments can play.
+  and Options has a "My instruments" section for them. Play 2D draws the
+  fretboard strip, flute drawing and hint line from the played instrument
+  (`EffectiveHarmonica::instrument_for`), so a capo's frets count from it
+  and the hint names it. **Open:** showing in song select which parts the
+  player's instruments can play.
 - **Audition and call-and-response synthesis** need a timbre per
   instrument in core's `synth`:
   - Karplus–Strong for plucked strings: cheap and convincing;
@@ -400,8 +402,7 @@ behaviour.
    `Position` tabs. **Open:** a corpus aimed at octave errors.
 5. **Content and progress** (next, not started). Per-instrument packs
    and DAGs, a per-instrument profile, and per-instrument Jam Session.
-   "My instruments" (tuning, foot joint, flute view) has landed; capo is
-   open.
+   "My instruments" (tuning, capo, foot joint, flute view) has landed.
 
 ## Scheduling
 

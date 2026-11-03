@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-//! The Options page's "My instruments" section: the guitar's tuning, the
-//! flute's foot joint and how a flute part is drawn, all persisted in
+//! The Options page's "My instruments" section: the guitar's tuning and
+//! capo, the flute's foot joint and how a flute part is drawn, all persisted in
 //! `settings::MyInstruments`. The pre-song page reads and writes the same
 //! resource, so the answer given in either place is the one the other shows.
 //!
@@ -16,6 +16,8 @@ use harmonicon_core::instrument::guitar::TUNINGS;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::settings::{FluteView, MyInstruments};
 use harmonicon_ui::dialogs::combobox;
+
+use crate::menu::pages::harp_check::{capo_from_index, capo_index, capo_options};
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 
 const FEET: [FootJoint; 2] = [FootJoint::C, FootJoint::B];
@@ -110,6 +112,19 @@ pub(super) fn spawn_my_instruments(
         },
     );
 
+    let capos = capo_options(follow_chart(loc), loc);
+    combobox::spawn_combobox(
+        commands,
+        parent,
+        page_root,
+        &loc.msg("options-guitar-capo"),
+        &capos,
+        &capos[capo_index(mine.guitar_capo)],
+        |ev: On<combobox::ComboboxSelect>, mut mine: ResMut<MyInstruments>| {
+            mine.guitar_capo = capo_from_index(ev.index);
+        },
+    );
+
     let feet = foot_options(loc);
     combobox::spawn_combobox(
         commands,
@@ -154,6 +169,18 @@ mod tests {
         assert_eq!(tuning_index(None), 0);
         assert_eq!(tuning_index(Some("no-such-tuning")), 0);
         assert_eq!(tuning_from_index(TUNINGS.len() + 1), None);
+    }
+
+    #[test]
+    fn every_capo_option_reads_back_as_the_capo_it_names() {
+        use crate::menu::pages::harp_check::MAX_CAPO;
+        assert_eq!(capo_from_index(0), None, "the first follows each song");
+        for capo in 0..=MAX_CAPO {
+            assert_eq!(capo_from_index(capo_index(Some(capo))), Some(capo));
+        }
+        assert_eq!(capo_index(None), 0);
+        assert_eq!(capo_index(Some(MAX_CAPO + 1)), 0, "out of range follows each song");
+        assert_eq!(capo_from_index(usize::from(MAX_CAPO) + 2), None);
     }
 
     #[test]

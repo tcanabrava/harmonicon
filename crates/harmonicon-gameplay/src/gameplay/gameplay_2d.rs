@@ -103,13 +103,16 @@ pub fn setup(
     // Everything the player *sees* about the instrument — lane count, the
     // hole strip's notes, the "grab a C harp" hint — follows the instrument
     // they are holding, exactly as the judge does.
-    *highway_lanes = HighwayLanes::for_instrument(effective.instrument_for(chart).as_ref());
+    // The instrument in the player's hands: the chart's, or the tuning,
+    // capo or foot joint they named. The drawing beside the highway and its
+    // hint line show this one, as the lanes do.
+    let instrument = effective.instrument_for(chart);
+    *highway_lanes = HighwayLanes::for_instrument(instrument.as_ref());
     *song_notes = SongNotes { notes, cursor: 0 };
     *render_assets = NoteRenderAssets { play_mode_tags };
 
     let compact = display.compact.0;
-    let is_flute =
-        matches!(chart.instrument(), Some(harmonicon_core::instrument::Instrument::Flute(_)));
+    let is_flute = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Flute(_)));
     let aural = display.lesson.is_some_and(|lesson| lesson.aural);
     let modifiers = used_modifiers(chart);
     let lyrics = harmonicon_core::lyrics::lyric_lines(chart);
@@ -204,7 +207,7 @@ pub fn setup(
                         .id();
                 };
                 if let Some(harmonicon_core::instrument::Instrument::Flute(flute)) =
-                    chart.instrument()
+                    instrument.clone()
                 {
                     left.spawn(Node {
                         width: Val::Percent(100.0),
@@ -220,7 +223,7 @@ pub fn setup(
                         spawn_track(row);
                     });
                 } else if let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
-                    chart.instrument()
+                    instrument.clone()
                 {
                     left.spawn(Node {
                         width: Val::Percent(100.0),
@@ -265,13 +268,16 @@ pub fn setup(
                         ));
                     } else if !aural
                         && let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
-                            chart.instrument()
+                            instrument.clone()
                     {
                         col.spawn((
                             Text::new(""),
                             TextFont { font_size: FontSize::Px(14.0), ..default() },
                             TextColor(Color::WHITE),
-                            super::guitar_visuals::FretboardHint(guitar.top_fret()),
+                            super::guitar_visuals::FretboardHint {
+                                top_fret: guitar.top_fret(),
+                                capo: guitar.capo,
+                            },
                         ));
                     }
                 });

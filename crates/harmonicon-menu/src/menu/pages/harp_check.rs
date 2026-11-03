@@ -151,14 +151,41 @@ pub(crate) fn played_for(own: Option<Instrument>, mine: &MyInstruments) -> Optio
         Instrument::Guitar(guitar) => {
             let tuning =
                 mine.guitar_tuning.as_deref().and_then(|id| TUNINGS.iter().find(|t| t.id == id));
-            Some(match tuning {
-                Some(t) => Guitar { strings: t.strings.to_vec(), ..guitar }.into(),
-                None => guitar.into(),
-            })
+            let strings = tuning.map_or_else(|| guitar.strings.clone(), |t| t.strings.to_vec());
+            let capo = mine.guitar_capo.map_or(guitar.capo, |c| c.min(MAX_CAPO));
+            Some(Guitar { strings, capo, ..guitar }.into())
         }
         Instrument::Flute(flute) => Some(Flute::new(mine.flute_foot.unwrap_or(flute.foot)).into()),
         Instrument::Harmonica(_) => None,
     }
+}
+
+/// The highest fret a capo is offered on.
+pub(crate) const MAX_CAPO: u8 = 9;
+
+/// A capo position's name: "No capo" or "Fret 3".
+pub(crate) fn capo_label(capo: u8, loc: &Localization) -> String {
+    if capo == 0 {
+        String::from(loc.msg("guitar-capo-none"))
+    } else {
+        String::from(loc.msg_args("guitar-capo-fret", &[("fret", capo.to_string())]))
+    }
+}
+
+/// `first` (following each chart), then no capo, then each fret up to
+/// [`MAX_CAPO`].
+pub(crate) fn capo_options(first: String, loc: &Localization) -> Vec<String> {
+    std::iter::once(first).chain((0..=MAX_CAPO).map(|c| capo_label(c, loc))).collect()
+}
+
+/// The capo an option of [`capo_options`] names; `None` for the first.
+pub(crate) fn capo_from_index(index: usize) -> Option<u8> {
+    index.checked_sub(1).and_then(|i| u8::try_from(i).ok()).filter(|c| *c <= MAX_CAPO)
+}
+
+/// Where `capo` sits in [`capo_options`].
+pub(crate) fn capo_index(capo: Option<u8>) -> usize {
+    capo.filter(|c| *c <= MAX_CAPO).map_or(0, |c| usize::from(c) + 1)
 }
 
 /// `(moved, unreachable)`: how many of `chart`'s notes `played` puts
@@ -427,6 +454,31 @@ pub(crate) fn setup_harp_check(
         },
     );
 
+    // A guitar's capo: as written first, then none, then each fret.
+    let capos = capo_options(String::from(loc.msg("guitar-tuning-charted")), &loc);
+    combobox::spawn_combobox(
+        &mut commands,
+        guitar_box,
+        page_root,
+        &loc.msg("instrument-check-capo"),
+        &capos,
+        &capos[capo_index(mine.guitar_capo)],
+        |ev: On<combobox::ComboboxSelect>,
+         mut choice: ResMut<HarpChoice>,
+         mut mine: ResMut<MyInstruments>,
+         selected: Option<Res<SelectedSong>>,
+         manifests: Res<Assets<SongManifest>>| {
+            let chart = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart);
+            let own = chart.and_then(HarpChart::instrument);
+            if !matches!(own, Some(Instrument::Guitar(_))) {
+                return;
+            }
+            // Remembered like the tuning; "as written" follows each chart.
+            mine.guitar_capo = capo_from_index(ev.index);
+            choice.played = played_for(own, &mine);
+        },
+    );
+
     // A flute's foot joint.
     let feet = vec![foot_label(FootJoint::C, &loc), foot_label(FootJoint::B, &loc)];
     let current_foot = match &choice.played {
@@ -619,10 +671,17 @@ pub(crate) fn refresh_harp_cost(
     }
     let written_for = match chart.instrument() {
         Some(Instrument::Harmonica(harp)) => harp_name(&harp, &loc),
-        Some(Instrument::Guitar(guitar)) => String::from(loc.msg_args(
-            "instrument-check-chart-guitar",
-            &[("tuning", tuning_label(tuning_of(&guitar.strings).map(|t| t.id), &loc))],
-        )),
+        Some(Instrument::Guitar(guitar)) => {
+            let tuning = tuning_label(tuning_of(&guitar.strings).map(|t| t.id), &loc);
+            String::from(if guitar.capo == 0 {
+                loc.msg_args("instrument-check-chart-guitar", &[("tuning", tuning)])
+            } else {
+                loc.msg_args(
+                    "instrument-check-chart-guitar-capo",
+                    &[("tuning", tuning), ("fret", guitar.capo.to_string())],
+                )
+            })
+        }
         Some(Instrument::Flute(flute)) => String::from(
             loc.msg_args("instrument-check-chart-flute", &[("foot", foot_label(flute.foot, &loc))]),
         ),
