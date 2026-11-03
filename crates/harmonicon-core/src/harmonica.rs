@@ -243,20 +243,37 @@ pub fn hole_notes(harp: &Harmonica, hole: u8) -> HoleNotes {
         _ => None,
     };
 
-    // Bends fill the chromatic steps between blow and draw: drawn down from the
-    // draw reed on holes 1–6, down from the blow reed on holes 7–10.
+    // Bends fill the chromatic steps between blow and draw, pulled down
+    // from whichever reed bends (`bending_reed`).
     let mut bends = Vec::new();
     if let (Some(b), Some(d)) = (&blow, &draw)
         && let (Some(bm), Some(dm)) = (note_to_midi(b), note_to_midi(d))
     {
-        if hole <= 6 && dm > bm + 1 {
-            bends = (1..dm - bm).map(|k| midi_to_note(dm - k)).collect();
-        } else if hole >= 7 && bm > dm + 1 {
-            bends = (1..bm - dm).map(|k| midi_to_note(bm - k)).collect();
-        }
+        bends = match bending_reed(harp, hole) {
+            Some(Action::Draw) => (1..dm - bm).map(|k| midi_to_note(dm - k)).collect(),
+            Some(Action::Blow) => (1..bm - dm).map(|k| midi_to_note(bm - k)).collect(),
+            None => Vec::new(),
+        };
     }
 
     HoleNotes { over, blow, draw, bends }
+}
+
+/// The breath whose reed bends on `hole`, if any: the draw on holes 1–6 and
+/// the blow on 7–10, wherever that reed sits more than a semitone above the
+/// hole's other one (a bend pulls a reed down toward its partner, so with
+/// a semitone or less between them there's nothing to bend to). A bend
+/// played on the other breath doesn't exist on the instrument.
+pub fn bending_reed(harp: &Harmonica, hole: u8) -> Option<Action> {
+    let reed = |action| note_to_midi(&harp.wind_direction_label(hole, action));
+    let (blow, draw) = (reed(&Action::Blow)?, reed(&Action::Draw)?);
+    if hole <= 6 && draw > blow + 1 {
+        Some(Action::Draw)
+    } else if hole >= 7 && blow > draw + 1 {
+        Some(Action::Blow)
+    } else {
+        None
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

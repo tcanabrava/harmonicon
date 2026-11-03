@@ -37,6 +37,13 @@ load-bearing about *this* crate.
   instrument (1/4/5/6 and 7–10), not reed physics. The hole-free sticky
   cap is `interaction::deepest_bend(harp)`, asked of the effective harp
   at cycle time, not a constant.
+  **A bend forces its breath on its hole** (`state::forced_dir`, from
+  core's `harmonica::bending_reed`, the same rule `hole_notes` builds its
+  bends from): the draw on a Richter's holes 1–6, the blow on 8–10.
+  Placing, bending and Blow/Draw all go through it, and a forced breath
+  pulls the notes sounding with it into agreement (`enforce_direction`).
+  An *armed* bend has no hole, so `pitch_forced_dir` forces nothing for it
+  and it takes its breath where it is placed.
 - **The Song Editor can import a MIDI file** (`song_editor::midi_import`).
   The harmonica selector cycles through standard Richter, Paddy Richter,
   natural-minor, 12-hole chromatic, and 16-hole chromatic layouts. These use

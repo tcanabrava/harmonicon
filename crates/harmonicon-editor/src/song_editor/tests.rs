@@ -523,6 +523,51 @@ fn bend_cycles_and_caps_at_hole_max() {
     assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
 }
 
+/// A bend is played on the reed that bends: the draw on holes 1–6, the
+/// blow on 8–10. Bending a blow note on hole 2 makes it a draw; bending a
+/// draw note on hole 9 makes it a blow.
+#[test]
+fn a_bend_takes_the_breath_whose_reed_bends() {
+    let mut s = EditorState::default();
+    select_or_add(&mut s, 2, 0);
+    assert_eq!(s.notes[0].dir(), Dir::Blow, "the default breath");
+    apply_modifier(&mut s, ModButton::Bend);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
+    assert_eq!(s.notes[0].dir(), Dir::Draw);
+
+    let mut s = EditorState::default();
+    apply_modifier(&mut s, ModButton::Draw);
+    select_or_add(&mut s, 9, 0);
+    apply_modifier(&mut s, ModButton::Bend);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
+    assert_eq!(s.notes[0].dir(), Dir::Blow);
+}
+
+/// An armed bend has no hole, so it forces nothing until placed; then the
+/// note takes the bending breath, and arming stays as it was.
+#[test]
+fn an_armed_bend_takes_its_breath_where_it_lands() {
+    let mut s = EditorState::default();
+    apply_modifier(&mut s, ModButton::Bend);
+    assert_eq!(s.sticky_dir, Dir::Blow, "no hole yet, so no breath forced");
+    select_or_add(&mut s, 3, 0);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Bend(0.5));
+    assert_eq!(s.notes[0].dir(), Dir::Draw);
+    assert_eq!(s.sticky_dir, Dir::Blow);
+}
+
+/// Blowing a bent draw note on hole 3 can't keep the bend.
+#[test]
+fn switching_a_bent_note_to_the_other_breath_drops_the_bend() {
+    let mut s = EditorState::default();
+    select_or_add(&mut s, 3, 0);
+    apply_modifier(&mut s, ModButton::Bend);
+    assert_eq!(s.notes[0].dir(), Dir::Draw);
+    apply_modifier(&mut s, ModButton::Blow);
+    assert_eq!(s.notes[0].dir(), Dir::Blow);
+    assert_eq!(s.notes[0].technique(), HarpTechnique::Normal);
+}
+
 #[test]
 fn unbendable_hole_ignores_bend() {
     // Hole 5's two reeds are a semitone apart (E and F on a C harp), so

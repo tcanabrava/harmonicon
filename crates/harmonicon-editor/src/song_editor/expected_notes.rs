@@ -50,7 +50,7 @@ use super::interaction::{apply_sticky_modifier, next_expr, next_pitch, pitch_fit
 use super::panel::mod_button_active;
 use super::state::{
     Dir, DragKind, DragState, Edge, EditorState, GridNote, HarpTechnique, Mode, apply_resize,
-    move_target, note_rect, pitch_color, pitch_compatible, pitch_forced_dir,
+    forced_dir, move_target, note_rect, pitch_color, pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{ExpectedNotesGroup, GridContent, ModButton, ModeButton};
 use harmonicon_app::app::AppState;
@@ -105,7 +105,7 @@ pub(super) fn place_or_select_expected(state: &mut EditorState, hole: u8, tick: 
     } else {
         HarpTechnique::Normal
     };
-    let dir = pitch_forced_dir(pitch).unwrap_or(dir);
+    let dir = forced_dir(pitch, hole, &state.effective_harp()).unwrap_or(dir);
     let expr = state.sticky_expr;
 
     let id = state.expected_next_id;
@@ -181,7 +181,7 @@ pub(super) fn apply_expected_modifier(state: &mut EditorState, kind: ModButton) 
     };
     if target == HarpTechnique::Normal || pitch_fits(target, note.hole(), &harp) {
         note.set_technique(target);
-        if let Some(dir) = pitch_forced_dir(target) {
+        if let Some(dir) = forced_dir(target, note.hole(), &harp) {
             note.set_dir(dir);
         }
     }

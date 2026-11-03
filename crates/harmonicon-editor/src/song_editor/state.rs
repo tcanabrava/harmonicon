@@ -872,14 +872,33 @@ pub(super) use harmonicon_core::pitch_map::overdraw_ok;
 /// of which reed the resulting pitch sits near (`song::harmonica::
 /// hole_notes`: overblow sounds a semitone above the *draw* reed, overdraw
 /// above the *blow* reed — the technique name is about breath action, not
-/// reed). `Bend`/`Slide` have no such constraint. Used to keep a note's
-/// `dir` and `pitch` from drifting into a physically impossible pairing as
-/// either changes independently.
+/// reed). `Slide` has no such constraint, and a `Bend`'s breath depends on
+/// the hole, so it has none *here*, where there is no hole — an armed bend
+/// takes its breath when it is placed ([`forced_dir`]). Used to keep a
+/// note's `dir` and `pitch` from drifting into a physically impossible
+/// pairing as either changes independently.
 pub(super) fn pitch_forced_dir(pitch: HarpTechnique) -> Option<Dir> {
     match pitch {
         HarpTechnique::Overblow => Some(Dir::Blow),
         HarpTechnique::Overdraw => Some(Dir::Draw),
         _ => None,
+    }
+}
+
+/// The breath `pitch` requires on `hole` of `harp`: [`pitch_forced_dir`]'s,
+/// and for a bend the breath whose reed bends there
+/// (`harmonica::bending_reed` — the draw on holes 1–6 of a Richter harp,
+/// the blow on 8–10). A bend on the other breath doesn't exist, and saves a
+/// note gameplay can never score.
+pub(super) fn forced_dir(pitch: HarpTechnique, hole: u8, harp: &Harmonica) -> Option<Dir> {
+    match pitch {
+        HarpTechnique::Bend(_) => {
+            harmonicon_core::harmonica::bending_reed(harp, hole).map(|a| match a {
+                harmonicon_core::chart::Action::Blow => Dir::Blow,
+                harmonicon_core::chart::Action::Draw => Dir::Draw,
+            })
+        }
+        other => pitch_forced_dir(other),
     }
 }
 

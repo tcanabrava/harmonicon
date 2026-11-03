@@ -675,3 +675,21 @@ fn display_names_a_declared_position() {
     }
     assert_eq!(harp.display(), "Diatonic \u{00B7} 10 holes \u{00B7} 2nd position \u{00B7} Richter");
 }
+
+/// On a Richter harp the draw bends on holes 1–4 and 6, the blow on 8–10.
+/// Holes 5 (E5, F5) and 7 (C6, B5) have only a semitone between their
+/// reeds, so neither has a bend to make.
+#[test]
+fn the_bending_reed_is_the_draw_low_and_the_blow_high() {
+    let harp = richter_harp("C");
+    for hole in [1, 2, 3, 4, 6] {
+        assert_eq!(bending_reed(&harp, hole), Some(Action::Draw), "hole {hole}");
+    }
+    for hole in [5, 7] {
+        assert_eq!(bending_reed(&harp, hole), None, "hole {hole}");
+        assert_eq!(hole_notes(&harp, hole).bends.len(), 0);
+    }
+    for hole in 8..=10 {
+        assert_eq!(bending_reed(&harp, hole), Some(Action::Blow), "hole {hole}");
+    }
+}

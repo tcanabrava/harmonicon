@@ -15,8 +15,8 @@ use super::snap::snap_absolute_tick;
 use super::state::{
     DEFAULT_INTENSITY, Dir, DragKind, DragState, Edge, EditorState, Expr, GridNote, HarpTechnique,
     Scroll, TimelineSelection, VIBRATO_HZ_MAX, VIBRATO_HZ_MIN, VIBRATO_HZ_STEP, WAH_HZ_MAX,
-    WAH_HZ_MIN, WAH_HZ_STEP, apply_resize, enforce_direction, enforce_expr, max_bend, note_rect,
-    overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
+    WAH_HZ_MIN, WAH_HZ_STEP, apply_resize, enforce_direction, enforce_expr, forced_dir, max_bend,
+    note_rect, overblow_ok, overdraw_ok, pitch_compatible, pitch_forced_dir,
 };
 use super::ui::{
     GridArea, GridContent, GroupMoveGhost, ModButton, MoveGhost, NoteView, ResizeGrip,
@@ -88,7 +88,8 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     // (see `pitch_forced_dir`) — that always wins, even over whatever's
     // already sounding at this tick, since a mismatched pairing (e.g.
     // "overblow" on a note tagged Draw) can't exist for real.
-    if let Some(forced) = pitch_forced_dir(pitch) {
+    let forced = forced_dir(pitch, hole, &state.effective_harp());
+    if let Some(forced) = forced {
         dir = forced;
     }
     let expr = state.sticky_expr;
@@ -107,7 +108,7 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
     // an armed sticky expr, must pull any simultaneous notes on other
     // holes into agreement too — direction and wah/vibrato are both
     // whole-player techniques, not per-hole.
-    if pitch_forced_dir(pitch).is_some() {
+    if forced.is_some() {
         enforce_direction(state, id);
     }
     if expr != Expr::None {
@@ -206,10 +207,12 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         if pitch_forced_dir(state.sticky_pitch).is_some_and(|d| d != dir) {
             state.sticky_pitch = HarpTechnique::Normal;
         }
+        let harp = state.effective_harp();
         for id in state.selected.clone() {
             if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                 n.set_dir(dir);
-                if pitch_forced_dir(n.technique()).is_some_and(|d| d != dir) {
+                // A bend on 1–6 is a draw: blowing it drops the bend.
+                if forced_dir(n.technique(), n.hole(), &harp).is_some_and(|d| d != dir) {
                     n.set_technique(HarpTechnique::Normal);
                 }
             }
@@ -238,6 +241,7 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     // as with one note selected; every selected note then takes that value
     // if it fits its hole, and is counted as skipped if it doesn't.
     let mut skipped = 0;
+    let mut breath_moved = false;
     match kind {
         ModButton::Wah | ModButton::Vibrato => {
             let target = next_expr(kind, anchor.expr);
@@ -262,7 +266,8 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
                     }
                 } else if pitch_fits(target, n.hole(), &harp) {
                     n.set_technique(target);
-                    if let Some(dir) = pitch_forced_dir(target) {
+                    if let Some(dir) = forced_dir(target, n.hole(), &harp) {
+                        breath_moved |= n.dir() != dir;
                         n.set_dir(dir);
                     }
                 } else {
@@ -271,10 +276,15 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
             }
             state.sticky_pitch = target;
             // Overblow/Overdraw force a direction — mirror it into the
-            // sticky direction, and pull simultaneous notes on other holes
-            // into agreement (direction is whole-player, not per-hole).
+            // sticky direction. A bend forces one only on its hole, so it
+            // leaves the sticky alone. Either way, pull simultaneous notes
+            // on other holes into agreement (direction is whole-player,
+            // not per-hole).
             if let Some(dir) = pitch_forced_dir(target) {
                 state.sticky_dir = dir;
+                breath_moved = true;
+            }
+            if breath_moved {
                 for &i in &ids {
                     enforce_direction(state, i);
                 }

@@ -117,6 +117,9 @@ hovering always tells you what it does.
   step), and every selected note that can play it takes it. Notes that
   can't, such as an overblow on hole 2, keep what they had, and the status
   bar says how many.
+  A bend is played on the reed that bends, so it sets the breath too: a
+  bend on holes 1–6 is a draw and on 8–10 a blow, and blowing a bent note
+  on hole 3 drops the bend.
   Use **Transpose up** (♯) or **Transpose down** (♭) to move the selection by
   one semitone; with no selection, they transpose the whole chart. Harmonicon
   recomputes the hole, breath, and technique on the current harp and leaves a

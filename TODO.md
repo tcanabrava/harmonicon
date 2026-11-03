@@ -23,20 +23,6 @@ See `ROADMAP.md`'s 1.0 section for the bar and `PLAN.md` for the order.
   lines is arguably the better trade, since that crate's version tracks
   Bevy's and gated this upgrade.
 
-- [ ] **The Song Editor places bends on the breath that can't bend.** The
-  Bend button checks the hole's depth (`pitch_fits`) but never the breath,
-  and only overblow/overdraw force one (`pitch_forced_dir`). So the default
-  blow note on holes 1–6 takes a bend, plays as the blow reed lowered
-  (F♯4 on a C harp's hole 3, which no Richter harp makes), and saves a
-  chart whose note gameplay can never score — its expected pitch is outside
-  `ValidHarpNotes`. Holes 7–10 have the mirror case on the draw. The fix is
-  a bend forcing the breath whose reed bends (draw on 1–6, blow on 7–10
-  for Richter; ask `InstrumentModel::pitch_of` rather than restating the
-  table). The open question is the *sticky* bend armed before a note
-  exists: it has no hole, so it has no forced breath until placement.
-  Most of the editor's bend tests place on hole 1 with the default blow
-  and will need the breath they mean.
-
 ## Bring your own harp, bring your own songs (post-1.0)
 
 `ROADMAP.md` has the reasoning, `PLAN.md` the order. Phase 0 blocks both.
