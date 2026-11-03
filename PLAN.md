@@ -96,9 +96,9 @@ gates 1.0. In order:
   - per-instrument drill progress in the profile (guitar and flute
     landings are per session today), with the content-and-progress work
     below.
-- **Seam leftovers** that read holes directly and move when they next
-  change: the progress bar's note lanes (`NoteMarker`) and Jam Session's
-  `hole_map`.
+- **Seam leftover**: Jam Session's `hole_map` still reads holes directly.
+  Jam Session only offers harmonica parts, so it moves with per-instrument
+  Jam Session (content and progress, below).
 - **Flute**. The model (`instrument::flute`, a C or B foot), the sourced
   Boehm fingering table, chart format 1.9.0, score conversion, a flute
   synth voice, Play 2D (pitch rows with a horizontal fingering strip under

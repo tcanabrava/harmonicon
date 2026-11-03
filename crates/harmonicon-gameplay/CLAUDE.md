@@ -427,15 +427,19 @@ load-bearing about *this* crate.
     keeps its charted position for display and `playable: false`, so it
     isn't judged.
 
-- **The song-progress bar is a per-hole note-lanes strip, with the phrase
+- **The song-progress bar is a per-lane note strip, with the phrase
   overlay painted over it, and its timescale survives a music-less song**
   (`gameplay::song_progress_overlay`, shared by Play 2D and Jam
-  Session). The strip below the waveform spans the harmonica's whole hole
-  range as `hole_count` equal lanes — the highest hole at the *top*, the
-  lowest (hole 1) at the *bottom* (`note_lane_geometry`; the opposite
-  vertical order from the Song Editor's own scrollbar minimap, which the
-  rest of this design otherwise mirrors) — with one rectangle per note in
-  its own hole's lane: left/width from `note_marker_geometry` (proportional
+  Session). The strip below the waveform has one equal lane per highway
+  lane, stacked as the player sees them (`gameplay_2d::
+  progress_note_markers`, off `HighwayLanes`): a harp's highest hole at the
+  *top* and hole 1 at the *bottom* (`hole_lane`; the opposite vertical
+  order from the Song Editor's own scrollbar minimap, which the rest of
+  this design otherwise mirrors), a guitar's strings and a flute's pitch
+  rows in their highway order. A `NoteMarker` carries its lane from the
+  top and a `MarkerTint`: the theme's blow/draw colour (re-synced on a
+  theme or palette change) or a fixed one (a string's, the flute's). One
+  rectangle per note in its lane: left/width from `note_marker_geometry` (proportional
   to the note's own duration, floored so a very short note doesn't
   vanish), tinted blue (blow) or orange (draw), the same "note as a
   proportional colored rect" language `song_editor::interaction::

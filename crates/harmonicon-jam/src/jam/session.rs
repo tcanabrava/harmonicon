@@ -27,7 +27,7 @@ use harmonicon_gameplay::gameplay::countdown_overlay::spawn_countdown;
 use harmonicon_gameplay::gameplay::harmonica_overlay::spawn_harmonica_overlay;
 use harmonicon_gameplay::gameplay::metronome_overlay::spawn_metronome;
 use harmonicon_gameplay::gameplay::song_progress_overlay::{
-    BAR_HEIGHT, NoteMarker, spawn_song_progress,
+    BAR_HEIGHT, MarkerTint, NoteMarker, hole_lane, spawn_song_progress,
 };
 use harmonicon_ui::dialogs::twelve_bar_grid::{GridConfig, spawn_12_bar_grid};
 use harmonicon_ui::spectrogram::{OscMaterial, SpectrogramStyle, spawn_spectrogram};
@@ -502,6 +502,7 @@ pub fn setup(
     // marker per event (not per item), matching the scored modes' own
     // per-event `ScheduledNote` granularity, so a chord/split item's
     // notes each get their own correctly-tinted marker.
+    let hole_count = harp.hole_count();
     let note_markers: Vec<NoteMarker> = chart
         .track
         .iter()
@@ -512,8 +513,12 @@ pub fn setup(
                 Some(NoteMarker {
                     time,
                     duration: item.duration,
-                    hole,
-                    is_blow: matches!(action, Action::Blow),
+                    lane: hole_lane(hole, hole_count),
+                    tint: if matches!(action, Action::Blow) {
+                        MarkerTint::Blow
+                    } else {
+                        MarkerTint::Draw
+                    },
                 })
             })
         })
@@ -525,7 +530,7 @@ pub fn setup(
         &manifest.waveform,
         manifest.music_duration_secs,
         &note_markers,
-        harp.hole_count(),
+        hole_count,
         &[],
         &[],
     );

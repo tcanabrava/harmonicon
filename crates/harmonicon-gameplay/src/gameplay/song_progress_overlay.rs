@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 
 //! A song-progress bar pinned to the top of the screen, shared by Play 2D
-//! and Jam Session. A note-lanes strip spans the harp's hole range,
-//! highest hole on top (the reverse of the Song Editor's scrollbar minimap,
+//! and Jam Session. A note-lanes strip has one lane per highway lane, in
+//! the order the player sees them: a harp's highest hole on top (the
+//! reverse of the Song Editor's scrollbar minimap,
 //! `song_editor::interaction::scrollbar_marker`, whose "note as a
-//! proportional rect" it borrows). Each note is a rect in its hole's lane,
-//! sized to its duration and tinted blow/draw, drawn over the song's
+//! proportional rect" it borrows), a guitar's strings and a flute's pitch
+//! rows as their highway stacks them. Each note is a rect in its lane,
+//! sized to its duration and tinted (blow/draw, a string's colour, the
+//! flute's), drawn over the song's
 //! waveform (`SongManifest::waveform`), so where a note sits and how loud
 //! the backing is there read at one glance. A thin red playhead marks the
 //! current position.
@@ -173,7 +176,17 @@ struct PhraseMasteryBar(usize);
 /// extra params just to resolve a color.
 #[derive(Component, Clone, Copy)]
 struct NoteMarkerRect {
-    is_blow: bool,
+    tint: MarkerTint,
+}
+
+/// How a note marker is coloured: by the theme's blow or draw colour, kept
+/// in step with it (`sync_note_marker_colors`), or by a colour of its own
+/// (a guitar string's, the flute's).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MarkerTint {
+    Blow,
+    Draw,
+    Fixed(Color),
 }
 
 /// The single entity that accepts click-and-drag input for setting a loop
@@ -228,7 +241,7 @@ pub struct RequestLoopRange {
     pub end_time: f64,
 }
 
-/// One note's timing/direction/hole, as much as the note-lanes strip needs
+/// One note's timing, lane and tint, as much as the note-lanes strip needs
 /// — decoupled from any richer caller type, since callers differ: scored
 /// play (2D) has `gameplay::notes::ScheduledNote`, but Jam Session
 /// (nothing scored there) builds these directly from the chart's track
@@ -237,15 +250,16 @@ pub struct RequestLoopRange {
 pub struct NoteMarker {
     pub time: f64,
     pub duration: f64,
-    pub hole: u8,
-    pub is_blow: bool,
+    /// Which lane, counted from the top of the strip.
+    pub lane: u8,
+    pub tint: MarkerTint,
 }
 
 /// Spawns the full-width progress bar at the top of the screen: the
 /// waveform (from `waveform`, one entry per bar in 0..1, see
 /// `SongManifest::waveform`) as a background layer, then the (pause-only)
-/// phrase-mastery overlay above it, then the note-lanes strip (`hole_count`
-/// lanes, highest hole at top) on top of both, then the loop marker and
+/// phrase-mastery overlay above it, then the note-lanes strip (`lane_count`
+/// lanes) on top of both, then the loop marker and
 /// playhead on top of everything. Tagged `GameplayRoot` so it's torn down
 /// with the scene. `duration_secs` is the audio's real length if there is
 /// one (see [`AudioDuration`]); a song with no background music falls back
@@ -257,7 +271,7 @@ pub fn spawn_song_progress(
     waveform: &[f32],
     duration_secs: f64,
     notes: &[NoteMarker],
-    hole_count: u8,
+    lane_count: u8,
     sections: &[PhraseSection],
     learned: &[f32],
 ) {
@@ -424,13 +438,13 @@ pub fn spawn_song_progress(
                     else {
                         continue;
                     };
-                    let Some((top, height)) = note_lane_geometry(note.hole, hole_count) else {
+                    let Some((top, height)) = note_lane_geometry(note.lane, lane_count) else {
                         continue;
                     };
-                    let fallback = if note.is_blow {
-                        NOTE_MARKER_BLOW_FALLBACK
-                    } else {
-                        NOTE_MARKER_DRAW_FALLBACK
+                    let fallback = match note.tint {
+                        MarkerTint::Blow => NOTE_MARKER_BLOW_FALLBACK,
+                        MarkerTint::Draw => NOTE_MARKER_DRAW_FALLBACK,
+                        MarkerTint::Fixed(colour) => colour.with_alpha(NOTE_MARKER_ALPHA),
                     };
                     strip.spawn((
                         Node {
@@ -442,7 +456,7 @@ pub fn spawn_song_progress(
                             ..default()
                         },
                         BackgroundColor(fallback),
-                        NoteMarkerRect { is_blow: note.is_blow },
+                        NoteMarkerRect { tint: note.tint },
                         Pickable::IGNORE,
                     ));
                 }
@@ -588,20 +602,24 @@ pub(super) fn drag_marker_geometry(
 }
 
 /// Top offset and height (fractions 0..1 of the note-lanes strip) for
-/// `hole`'s lane, out of `hole_count` total — the highest hole (`hole_count`
-/// itself) at the top, the lowest (hole 1) at the bottom, each getting an
-/// equal slice. `None` only when there are no holes to divide the strip
-/// into (a chart with a zero hole count, which shouldn't happen for a real
-/// harmonica but isn't this function's job to rule out). `hole` is clamped
-/// into range rather than rejected, so an out-of-range value degrades to
-/// the nearest real lane instead of silently dropping the note's marker.
-fn note_lane_geometry(hole: u8, hole_count: u8) -> Option<(f32, f32)> {
-    if hole_count == 0 {
+/// lane `lane` (counted from the top), out of `lane_count`, each getting
+/// an equal slice. `None` only when there are no lanes to divide the strip
+/// into. `lane` is clamped into range rather than rejected, so an
+/// out-of-range value degrades to the bottom lane instead of silently
+/// dropping the note's marker.
+fn note_lane_geometry(lane: u8, lane_count: u8) -> Option<(f32, f32)> {
+    if lane_count == 0 {
         return None;
     }
-    let lanes = hole_count as f32;
-    let lane_from_top = (hole_count - hole.clamp(1, hole_count)) as f32;
-    Some((lane_from_top / lanes, 1.0 / lanes))
+    let lanes = f32::from(lane_count);
+    Some((f32::from(lane.min(lane_count - 1)) / lanes, 1.0 / lanes))
+}
+
+/// A harp's hole as a lane counted from the top: the highest hole on top,
+/// hole 1 at the bottom. Holes outside `1..=hole_count` clamp to the
+/// nearest end.
+pub fn hole_lane(hole: u8, hole_count: u8) -> u8 {
+    hole_count.saturating_sub(hole.clamp(1, hole_count.max(1)))
 }
 
 /// The timescale to lay the whole bar out on: `duration_secs` verbatim if
@@ -857,7 +875,11 @@ fn sync_note_marker_colors(
         if !all && !marker.is_added() {
             continue;
         }
-        let base = if marker.is_blow { colors.blow } else { colors.draw };
+        let base = match marker.tint {
+            MarkerTint::Blow => colors.blow,
+            MarkerTint::Draw => colors.draw,
+            MarkerTint::Fixed(colour) => colour,
+        };
         *color = BackgroundColor(base.with_alpha(NOTE_MARKER_ALPHA));
     }
 }
@@ -990,13 +1012,13 @@ mod tests {
     // ── note_lane_geometry ─────────────────────────────────────────────────────
 
     #[test]
-    fn note_lane_hidden_with_a_zero_hole_count() {
-        assert_eq!(note_lane_geometry(1, 0), None);
+    fn note_lane_hidden_with_no_lanes() {
+        assert_eq!(note_lane_geometry(0, 0), None);
     }
 
     #[test]
     fn highest_hole_is_the_top_lane() {
-        let (top, height) = note_lane_geometry(10, 10).unwrap();
+        let (top, height) = note_lane_geometry(hole_lane(10, 10), 10).unwrap();
         assert_eq!(top, 0.0);
         assert!((height - 0.1).abs() < 1e-6);
     }
@@ -1005,38 +1027,38 @@ mod tests {
     fn lowest_hole_is_the_bottom_lane() {
         // Hole 1 of 10 is the *last* lane (bottom), not the first —
         // opposite the Song Editor's own scrollbar minimap ordering.
-        let (top, height) = note_lane_geometry(1, 10).unwrap();
+        let (top, height) = note_lane_geometry(hole_lane(1, 10), 10).unwrap();
         assert!((top - 0.9).abs() < 1e-6);
         assert!((height - 0.1).abs() < 1e-6);
     }
 
     #[test]
     fn middle_hole_lands_in_its_own_slice() {
-        // Hole 5 of 10: 5 lanes down from the highest (holes 10..6 above
-        // it), so lane_from_top = 10 - 5 = 5.
+        // Hole 5 of 10: 5 lanes down from the highest (holes 10..6 above).
+        assert_eq!(hole_lane(5, 10), 5);
         let (top, height) = note_lane_geometry(5, 10).unwrap();
         assert!((top - 0.5).abs() < 1e-6);
         assert!((height - 0.1).abs() < 1e-6);
     }
 
     #[test]
-    fn lanes_are_narrower_on_a_chromatic_harp() {
-        let (_, height_10) = note_lane_geometry(1, 10).unwrap();
-        let (_, height_12) = note_lane_geometry(1, 12).unwrap();
+    fn lanes_are_narrower_with_more_of_them() {
+        let (_, height_10) = note_lane_geometry(0, 10).unwrap();
+        let (_, height_12) = note_lane_geometry(0, 12).unwrap();
         assert!(height_12 < height_10);
     }
 
     #[test]
-    fn note_lane_geometry_clamps_an_out_of_range_hole() {
-        // Defensive: a hole past hole_count degrades to the top lane
-        // rather than vanishing the marker entirely.
-        assert_eq!(note_lane_geometry(99, 10), note_lane_geometry(10, 10));
+    fn an_out_of_range_lane_or_hole_degrades_rather_than_vanishing() {
+        assert_eq!(note_lane_geometry(99, 10), note_lane_geometry(9, 10));
+        assert_eq!(hole_lane(99, 10), 0, "past the top hole: the top lane");
+        assert_eq!(hole_lane(0, 10), 9, "below hole 1: the bottom lane");
     }
 
     // ── effective_duration (the no-background-music fallback) ────────────────
 
     fn marker(time: f64, duration: f64) -> NoteMarker {
-        NoteMarker { time, duration, hole: 1, is_blow: true }
+        NoteMarker { time, duration, lane: 0, tint: MarkerTint::Blow }
     }
 
     fn section(start_time: f64, end_time: f64) -> PhraseSection {
