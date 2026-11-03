@@ -25,6 +25,10 @@ note in tune until the bar fills and the drill is **landed**; the next one
 follows on its own. **‹ Previous** and **Next ›** move through the drills
 yourself, and **Listen** plays the target on a plucked string.
 
+Each tab keeps its own progress, for the guitar and the flute separately:
+how many drills you've landed, and which drill you were on. Coming back,
+even after closing the game, picks up there.
+
 The fretboard below is the one from the guitar highway: the drill's fret is
 lit in its string's colour (except in Positions, where the fret is what
 you're looking for). How close counts as in tune, and how long to hold,

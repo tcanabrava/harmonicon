@@ -158,10 +158,14 @@ impl Plugin for GameplayPlugin {
         // The guitar's Note Trainer (its own AppState, no song).
         .init_resource::<note_trainer::NoteTrainer>()
         .add_systems(OnEnter(AppState::NoteTrainer), note_trainer::setup)
-        .add_systems(OnExit(AppState::NoteTrainer), lifecycle::cleanup_gameplay)
+        .add_systems(
+            OnExit(AppState::NoteTrainer),
+            (note_trainer::save_progress, lifecycle::cleanup_gameplay),
+        )
         .add_systems(
             Update,
             (
+                note_trainer::restore_progress.before(note_trainer::listen),
                 note_trainer::listen,
                 note_trainer::update_labels.after(note_trainer::listen),
                 note_trainer::update_fretboard.after(note_trainer::listen),

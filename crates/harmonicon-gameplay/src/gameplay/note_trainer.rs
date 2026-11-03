@@ -14,6 +14,11 @@
 //! fretboard strip or the flute's upright drawing, both from the play
 //! highway, shows where the fingers go.
 //!
+//! Progress is kept in the profile per instrument and kind
+//! (`profile::NoteTrainerRecord`): how many drills have been landed, and
+//! which drill to resume on. A landing saves at once; leaving the trainer
+//! saves where the player was.
+//!
 //! What it can't check: detection hears a pitch, not a string or a
 //! fingering, so a position drill trusts the player to play it as asked.
 
@@ -53,9 +58,14 @@ pub struct Practice {
     heard: Option<Heard>,
     /// What was heard instead, when it was elsewhere — named in the status.
     heard_midi: Option<f32>,
+    /// Drills landed on this kind, ever: the profile's count plus this
+    /// session's.
     landed: u32,
     /// Counts down from [`LANDED_SECS`] after a landing.
     celebrate: f32,
+    /// Whether the profile's record has been applied yet
+    /// (`restore_progress`).
+    restored: bool,
 }
 
 impl Practice {
@@ -103,6 +113,24 @@ impl Practice {
         self.celebrate = LANDED_SECS;
         self.step_by(1);
         true
+    }
+
+    /// Picks up a saved session: its landed count and the drill it was on
+    /// (wrapped, in case the list has since changed length).
+    pub fn resume(&mut self, landed: u32, position: u32) {
+        self.landed = landed;
+        if !self.drills.is_empty() {
+            self.index = position as usize % self.drills.len();
+        }
+        self.held = 0.0;
+    }
+
+    /// What the profile keeps of this practice.
+    fn record(&self) -> harmonicon_app::profile::NoteTrainerRecord {
+        harmonicon_app::profile::NoteTrainerRecord {
+            landed: self.landed,
+            position: u32::try_from(self.index).unwrap_or(0),
+        }
     }
 
     /// How far through the hold the player is, 0 to 1.
@@ -156,16 +184,83 @@ impl NoteTrainer {
         }
     }
 
+    /// Where the profile keeps this instrument's progress on its current
+    /// kind. `None` for a harmonica, which keeps the Bending Trainer's.
+    fn record_key(&self) -> Option<String> {
+        let instrument = match self.instrument {
+            Instrument::Guitar(_) => "guitar",
+            Instrument::Flute(_) => "flute",
+            Instrument::Harmonica(_) => return None,
+        };
+        Some(harmonicon_app::profile::note_trainer_key(instrument, kind_id(self.kind)))
+    }
+
+    /// Writes this kind's progress into `profile`. Returns whether there was
+    /// anything to write.
+    fn remember(&self, profile: &mut harmonicon_app::profile::PlayerProfile) -> bool {
+        let Some(key) = self.record_key().filter(|_| self.practice.restored) else {
+            return false;
+        };
+        profile.note_trainer.insert(key, self.practice.record());
+        true
+    }
+
     /// The kinds the tab bar offers, in its order: the instrument's own.
     fn kinds(&self) -> &'static [TechniqueKind] {
         self.instrument.techniques()
     }
 
-    fn set_kind(&mut self, kind: TechniqueKind) {
-        if self.kind != kind {
-            self.kind = kind;
-            self.practice = Practice::new(drills(&self.instrument, kind));
+    /// Shows `kind`, after keeping the one being left in `profile`.
+    /// Returns whether `profile` changed, for the caller to save.
+    fn set_kind(
+        &mut self,
+        kind: TechniqueKind,
+        profile: &mut harmonicon_app::profile::PlayerProfile,
+    ) -> bool {
+        if self.kind == kind {
+            return false;
         }
+        let remembered = self.remember(profile);
+        self.kind = kind;
+        self.practice = Practice::new(drills(&self.instrument, kind));
+        remembered
+    }
+}
+
+/// A kind's name in the profile's keys. Stable: changing one loses the
+/// progress saved under it.
+fn kind_id(kind: TechniqueKind) -> &'static str {
+    match kind {
+        TechniqueKind::Target => "target",
+        TechniqueKind::Glide => "glide",
+        TechniqueKind::Register => "register",
+        TechniqueKind::Position => "position",
+    }
+}
+
+/// Applies the profile's record for the kind on show, the first frame it
+/// is shown.
+pub(super) fn restore_progress(
+    mut trainer: ResMut<NoteTrainer>,
+    profile: Res<harmonicon_app::profile::PlayerProfile>,
+) {
+    if trainer.practice.restored {
+        return;
+    }
+    let record = trainer.record_key().and_then(|key| profile.note_trainer.get(&key).copied());
+    if let Some(record) = record {
+        trainer.practice.resume(record.landed, record.position);
+    }
+    trainer.practice.restored = true;
+}
+
+/// Keeps where the player was, on leaving the trainer.
+pub(super) fn save_progress(
+    trainer: Res<NoteTrainer>,
+    mut profile: ResMut<harmonicon_app::profile::PlayerProfile>,
+) {
+    if trainer.remember(&mut profile) {
+        harmonicon_app::profile::save_profile(&profile);
     }
 }
 
@@ -368,9 +463,13 @@ pub(super) fn setup(
         tabs,
         &labels,
         selected,
-        |ev: On<TabSelect>, mut trainer: ResMut<NoteTrainer>| {
-            if let Some(&kind) = trainer.kinds().get(ev.index) {
-                trainer.set_kind(kind);
+        |ev: On<TabSelect>,
+         mut trainer: ResMut<NoteTrainer>,
+         mut profile: ResMut<harmonicon_app::profile::PlayerProfile>| {
+            if let Some(&kind) = trainer.kinds().get(ev.index)
+                && trainer.set_kind(kind, &mut profile)
+            {
+                harmonicon_app::profile::save_profile(&profile);
             }
         },
     );
@@ -473,13 +572,24 @@ pub(super) fn listen(
     settings: Res<BendingTrainerSettings>,
     time: Res<Time>,
     mut last: Local<Vec<PitchInfo>>,
+    mut profile: ResMut<harmonicon_app::profile::PlayerProfile>,
 ) {
     if let Some(ev) = reader.read().last() {
         last.clone_from(&ev.0);
     }
     let Some(target) = trainer.practice.drill().map(|d| d.target) else { return };
     let midi = nearest_midi(&last, target, settings.a4_hz);
-    trainer.practice.listen(midi, time.delta_secs(), settings.tolerance_cents, settings.hold_secs);
+    let landed = trainer.practice.listen(
+        midi,
+        time.delta_secs(),
+        settings.tolerance_cents,
+        settings.hold_secs,
+    );
+    // A landing is rare and worth keeping at once, as the Bending Trainer
+    // keeps a drill's record.
+    if landed && trainer.remember(&mut profile) {
+        harmonicon_app::profile::save_profile(&profile);
+    }
 }
 
 pub(super) fn update_labels(
@@ -656,8 +766,33 @@ mod tests {
     fn switching_kind_starts_that_kinds_drills_from_the_top() {
         let mut trainer = NoteTrainer::default();
         trainer.practice.step_by(3);
-        trainer.set_kind(TechniqueKind::Glide);
+        let mut profile = harmonicon_app::profile::PlayerProfile::default();
+        assert!(!trainer.set_kind(TechniqueKind::Glide, &mut profile), "nothing restored yet");
         assert_eq!(trainer.practice.index, 0);
         assert!(trainer.practice.drill().is_some_and(|d| d.kind == TechniqueKind::Glide));
+    }
+
+    /// A kind's progress goes into the profile under its instrument and
+    /// kind, and comes back wrapped onto the list it resumes.
+    #[test]
+    fn progress_is_kept_per_instrument_and_kind_and_resumes() {
+        let mut trainer = NoteTrainer::default();
+        let mut profile = harmonicon_app::profile::PlayerProfile::default();
+        assert!(!trainer.remember(&mut profile), "not before the saved one is applied");
+        trainer.practice.restored = true;
+        trainer.practice.step_by(2);
+        trainer.practice.landed = 4;
+        assert!(trainer.set_kind(TechniqueKind::Glide, &mut profile));
+        let record = profile.note_trainer["guitar:target"];
+        assert_eq!((record.landed, record.position), (4, 2));
+
+        let mut back = NoteTrainer::default();
+        let total = back.practice.drills.len() as u32;
+        back.practice.resume(record.landed, record.position + total);
+        assert_eq!((back.practice.landed, back.practice.index), (4, 2), "wrapped onto the list");
+        assert_eq!(
+            NoteTrainer::for_instrument(Flute::default().into()).record_key().as_deref(),
+            Some("flute:target")
+        );
     }
 }

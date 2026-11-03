@@ -19,7 +19,8 @@ load-bearing about *this* crate.
 
 - **Profile:** `<config>/harmonicon/profile.json` (`profile.rs`) — per-song
   best score/accuracy, per-technique best accuracy, bend-trainer drill
-  records, total play time. Unlike settings it saves directly at the
+  records, the guitar's and flute's Note Trainer progress
+  (`NoteTrainerRecord`, keyed `"{instrument}:{kind}"`), total play time. Unlike settings it saves directly at the
   (infrequent) points where a record changes, plus a flush on `AppExit` for
   play time — deliberately no debounce machinery; keep new fields on that
   pattern.

@@ -92,10 +92,7 @@ gates 1.0. In order:
   the guitar's and flute's screens are in; the harmonica keeps the Bending
   Trainer behind the same menu entry. Next:
   - move the harmonica onto the shared drill model, after its live
-    validation pass (above), keeping its drill stats and profile keys;
-  - per-instrument drill progress in the profile (guitar and flute
-    landings are per session today), with the content-and-progress work
-    below.
+    validation pass (above), keeping its drill stats and profile keys.
 - **Seam leftover**: Jam Session's `hole_map` still reads holes directly.
   Jam Session only offers harmonica parts, so it moves with per-instrument
   Jam Session (content and progress, below).

@@ -112,6 +112,25 @@ pub struct DrillRecord {
     pub practiced_at: u32,
 }
 
+/// The Note Trainer's progress on one instrument's kind of drill, keyed
+/// `"{instrument}:{kind}"` (e.g. `"guitar:glide"`) in
+/// [`PlayerProfile::note_trainer`] — plain strings for the same dependency
+/// reasoning as [`DrillRecord`].
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(default)]
+pub struct NoteTrainerRecord {
+    /// Drills landed, ever.
+    pub landed: u32,
+    /// The drill to resume on, by its place in the kind's list.
+    pub position: u32,
+}
+
+/// The [`PlayerProfile::note_trainer`] key for one kind of drill on one
+/// instrument.
+pub fn note_trainer_key(instrument: &str, kind: &str) -> String {
+    format!("{instrument}:{kind}")
+}
+
 /// Cross-session result for one lesson, keyed by the lesson manifest's
 /// stable `id` in [`PlayerProfile::lessons`] — a plain string rather than a
 /// type from `harmonicon_song::lessons`, same dependency reasoning as [`DrillRecord`].
@@ -248,6 +267,9 @@ pub struct PlayerProfile {
     pub trainings: HashMap<String, TrainingRecord>,
     /// Practice days in a row; see [`PracticeStreak`].
     pub practice: PracticeStreak,
+    /// The guitar's and flute's Note Trainer, per instrument and kind; see
+    /// [`NoteTrainerRecord`].
+    pub note_trainer: HashMap<String, NoteTrainerRecord>,
 }
 
 impl PlayerProfile {
@@ -469,6 +491,19 @@ impl Plugin for ProfilePlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn note_trainer_progress_round_trips_and_an_older_profile_has_none() {
+        let older: PlayerProfile = serde_json::from_str(r#"{"total_play_secs":3.0}"#).unwrap();
+        assert!(older.note_trainer.is_empty());
+        let mut profile = PlayerProfile::default();
+        let key = note_trainer_key("guitar", "glide");
+        assert_eq!(key, "guitar:glide");
+        profile.note_trainer.insert(key.clone(), NoteTrainerRecord { landed: 7, position: 3 });
+        let back: PlayerProfile =
+            serde_json::from_str(&serde_json::to_string(&profile).unwrap()).unwrap();
+        assert_eq!(back.note_trainer[&key], NoteTrainerRecord { landed: 7, position: 3 });
+    }
 
     #[test]
     fn personal_rating_uses_half_steps_and_stays_in_range() {
