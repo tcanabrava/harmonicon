@@ -258,9 +258,10 @@ phases; `PLAN.md` has them in order.
   the Bending Trainer until its validation pass), offering only the modes
   an instrument has: glides (bends), register selection (flute octaves,
   harmonics), alternate positions, and a plain tuner for all.
-- **Per-instrument lesson packs and progress** (next): a "My instruments"
-  page with each instrument's tuning and foot joint, per-instrument
-  curricula and profile, per-instrument Jam Session.
+- **Per-instrument lesson packs and progress** (next): per-instrument
+  curricula and profile, per-instrument Jam Session, and a capo. "My
+  instruments" (Options; each guitar's tuning, flute's foot joint and
+  flute view, remembered) is in.
 
 The hurdy gurdy is deferred: drones, the trompette and the keybox each need
 work no other instrument does.

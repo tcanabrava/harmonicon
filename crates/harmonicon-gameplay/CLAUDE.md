@@ -115,7 +115,9 @@ load-bearing about *this* crate.
   `LaneLayout::span`): six finger holes full-height on the tube, the
   thumb, G♯, trill, E♭ and foot keys thinner and drawn beside it.
   - **The pause menu's Flute view switches to pitch rows**
-    (`FluteView`, `LaneLayout::pitch_rows`) and back, mid-song.
+    (`LaneLayout::pitch_rows`) and back, mid-song. The view is
+    `harmonicon_platform::settings::MyInstruments::flute_view`, a
+    persisted setting Options also edits, not a gameplay resource.
     `sync_flute_view` runs first in the Play 2D chain: on a change it
     swaps `HighwayLanes`, rebuilds the highway's furniture inside its
     `HighwayFurniture` container (the highway's first child, so it stays

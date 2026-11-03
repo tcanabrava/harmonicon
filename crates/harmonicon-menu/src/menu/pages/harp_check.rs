@@ -38,6 +38,7 @@ use harmonicon_core::instrument::guitar::{Guitar, TUNINGS, tuning_of};
 use harmonicon_core::instrument::substitute::substitute_chart;
 use harmonicon_core::pitch_map::{HARP_KEYS, HarpKind, harp_for_key};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::settings::MyInstruments;
 use harmonicon_platform::theme::LoadedTheme;
 use harmonicon_song::song::{SongManifest, TrackChart};
 use harmonicon_ui::dialogs::combobox;
@@ -139,6 +140,25 @@ fn foot_label(foot: FootJoint, loc: &Localization) -> String {
         FootJoint::C => "flute-foot-c",
         FootJoint::B => "flute-foot-b",
     }))
+}
+
+/// The guitar or flute the player holds for a chart written for `own`: the
+/// chart's own, with "My instruments"' tuning or foot joint put on it when
+/// the player has named one. `None` for a harmonica, which this page asks
+/// about separately.
+pub(crate) fn played_for(own: Option<Instrument>, mine: &MyInstruments) -> Option<Instrument> {
+    match own? {
+        Instrument::Guitar(guitar) => {
+            let tuning =
+                mine.guitar_tuning.as_deref().and_then(|id| TUNINGS.iter().find(|t| t.id == id));
+            Some(match tuning {
+                Some(t) => Guitar { strings: t.strings.to_vec(), ..guitar }.into(),
+                None => guitar.into(),
+            })
+        }
+        Instrument::Flute(flute) => Some(Flute::new(mine.flute_foot.unwrap_or(flute.foot)).into()),
+        Instrument::Harmonica(_) => None,
+    }
 }
 
 /// `(moved, unreachable)`: how many of `chart`'s notes `played` puts
@@ -261,7 +281,7 @@ pub(crate) fn cost_of(chart: &HarpChart, choice: &HarpChoice) -> RemapCost {
 /// every other choice is priced against.
 pub(crate) fn baseline_choice(chart: &HarpChart) -> HarpChoice {
     let mut c = HarpChoice::default();
-    seed_choice(&mut c, chart);
+    seed_choice(&mut c, chart, &MyInstruments::default());
     c
 }
 
@@ -310,12 +330,13 @@ pub(crate) fn setup_harp_check(
     selected: Option<Res<SelectedSong>>,
     manifests: Res<Assets<SongManifest>>,
     mut choice: ResMut<HarpChoice>,
+    mine: Res<MyInstruments>,
 ) {
     // Seed from the chart when it's already resident (the common case: the
     // song list holds a strong handle, so it is usually decoded by now).
     // When it isn't, `refresh_harp_cost` seeds on the frame it arrives.
     if let Some(chart) = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart) {
-        seed_choice(&mut choice, chart);
+        seed_choice(&mut choice, chart, &mine);
     }
 
     let chart = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart);
@@ -389,18 +410,20 @@ pub(crate) fn setup_harp_check(
         &current_tuning,
         |ev: On<combobox::ComboboxSelect>,
          mut choice: ResMut<HarpChoice>,
+         mut mine: ResMut<MyInstruments>,
          loc: Res<Localization>,
          selected: Option<Res<SelectedSong>>,
          manifests: Res<Assets<SongManifest>>| {
             let chart = selected.as_ref().and_then(|s| manifests.get(&s.0)).map(|m| &m.chart);
-            let Some(Instrument::Guitar(own)) = chart.and_then(HarpChart::instrument) else {
+            let own = chart.and_then(HarpChart::instrument);
+            if !matches!(own, Some(Instrument::Guitar(_))) {
                 return;
-            };
-            let strings = TUNINGS
-                .iter()
-                .find(|t| tuning_label(Some(t.id), &loc) == ev.value)
-                .map_or_else(|| own.strings.clone(), |t| t.strings.to_vec());
-            choice.played = Some(Guitar { strings, ..own }.into());
+            }
+            // Remembered: the next guitar chart opens on this tuning too.
+            // "As written" goes back to following each chart.
+            let picked = TUNINGS.iter().find(|t| tuning_label(Some(t.id), &loc) == ev.value);
+            mine.guitar_tuning = picked.map(|t| t.id.to_owned());
+            choice.played = played_for(own, &mine);
         },
     );
 
@@ -419,12 +442,15 @@ pub(crate) fn setup_harp_check(
         &current_foot,
         |ev: On<combobox::ComboboxSelect>,
          mut choice: ResMut<HarpChoice>,
+         mut mine: ResMut<MyInstruments>,
          loc: Res<Localization>| {
             let foot = if ev.value == foot_label(FootJoint::B, &loc) {
                 FootJoint::B
             } else {
                 FootJoint::C
             };
+            // Remembered: a flute's foot joint doesn't change between songs.
+            mine.flute_foot = Some(foot);
             choice.played = Some(Flute::new(foot).into());
         },
     );
@@ -533,8 +559,9 @@ pub(crate) fn setup_harp_check(
     );
 }
 
-/// Points `choice` at whatever the chart asks for.
-fn seed_choice(choice: &mut HarpChoice, chart: &HarpChart) {
+/// Points `choice` at whatever the chart asks for, or for a guitar or a
+/// flute at the one in "My instruments".
+fn seed_choice(choice: &mut HarpChoice, chart: &HarpChart, mine: &MyInstruments) {
     if let Some(harp) = &chart.harmonica {
         if let Some(key) = detected_harp_key(harp) {
             choice.key = key;
@@ -545,7 +572,7 @@ fn seed_choice(choice: &mut HarpChoice, chart: &HarpChart) {
         };
     }
     choice.mapping = HarpMapping::default();
-    choice.played = chart.harmonica.is_none().then(|| chart.instrument()).flatten();
+    choice.played = played_for(chart.instrument(), mine);
     choice.seeded = true;
 }
 
@@ -553,6 +580,7 @@ fn seed_choice(choice: &mut HarpChoice, chart: &HarpChart) {
 /// finally decodes, which may be after this page was built.
 pub(crate) fn refresh_harp_cost(
     mut choice: ResMut<HarpChoice>,
+    mine: Res<MyInstruments>,
     loc: Res<Localization>,
     selected: Option<Res<SelectedSong>>,
     manifests: Res<Assets<SongManifest>>,
@@ -568,7 +596,7 @@ pub(crate) fn refresh_harp_cost(
         return;
     };
     if !choice.seeded {
-        seed_choice(&mut choice, chart);
+        seed_choice(&mut choice, chart, &mine);
     } else if !choice.is_changed() && !loc.is_changed() {
         return;
     }

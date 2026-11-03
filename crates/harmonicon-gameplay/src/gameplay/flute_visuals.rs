@@ -18,23 +18,13 @@ use harmonicon_core::instrument::PlayPosition;
 use harmonicon_core::instrument::flute::{FingeringAssignment, Flute, Side, key_rows};
 use harmonicon_core::instrument::{InstrumentModel, LaneLayout};
 use harmonicon_platform::localization::{Localization, LocalizationExt};
+use harmonicon_platform::settings::{FluteView, MyInstruments};
 
 /// A pending flute note, block or ribbon: a cool silver, the colour of
 /// the instrument.
 pub(super) const FLUTE_COLOR: Color = Color::srgb(0.72, 0.80, 0.92);
 const BLOCK_HIT: Color = Color::srgb(0.95, 0.80, 0.30);
 const BLOCK_MISSED: Color = Color::srgba(0.55, 0.18, 0.18, 0.7);
-
-/// How a flute part is drawn: as its fingerings on the flute's keys, or as
-/// its notes on a row per pitch the song uses. A standing player preference
-/// like `WaitForNoteMode`, switched from the pause menu and applied at once
-/// by [`sync_flute_view`].
-#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum FluteView {
-    #[default]
-    Fingering,
-    Notes,
-}
 
 /// The pause menu's "Flute view" row, shown only on a flute part.
 #[derive(Component, Default, Clone)]
@@ -43,8 +33,10 @@ pub(super) struct FluteViewRow;
 #[derive(Component, Default, Clone)]
 pub(super) struct FluteViewLabel;
 
-pub(super) fn on_toggle_flute_view(_: On<Activate>, mut view: ResMut<FluteView>) {
-    *view = match *view {
+/// Flips the flute view. It is one of "My instruments", so it persists:
+/// the next flute part, and the next session, open on it.
+pub(super) fn on_toggle_flute_view(_: On<Activate>, mut mine: ResMut<MyInstruments>) {
+    mine.flute_view = match mine.flute_view {
         FluteView::Fingering => FluteView::Notes,
         FluteView::Notes => FluteView::Fingering,
     };
@@ -60,7 +52,7 @@ pub(super) fn flute_view_label_text(loc: &Localization, view: FluteView) -> Stri
 /// Shows the pause menu's flute-view row only while a flute part plays,
 /// and keeps its readout current.
 pub(super) fn update_flute_view_row(
-    view: Res<FluteView>,
+    mine: Res<MyInstruments>,
     loc: Res<Localization>,
     drawing: Query<(), With<FluteDrawing>>,
     mut rows: Query<&mut Node, With<FluteViewRow>>,
@@ -72,7 +64,7 @@ pub(super) fn update_flute_view_row(
             node.display = want;
         }
     }
-    let text = flute_view_label_text(&loc, *view);
+    let text = flute_view_label_text(&loc, mine.flute_view);
     for mut label in &mut labels {
         if label.0 != text {
             label.0.clone_from(&text);
@@ -80,7 +72,7 @@ pub(super) fn update_flute_view_row(
     }
 }
 
-/// Lays the highway out for the current [`FluteView`] whenever it changes,
+/// Lays the highway out for the player's [`FluteView`] whenever it changes,
 /// including the first frame of a flute part: the lanes, the furniture in
 /// their container, the flute drawing and its label shown or hidden, and
 /// every note visual despawned for `spawn_visible_notes` to respawn in the
@@ -89,7 +81,7 @@ pub(super) fn update_flute_view_row(
 #[allow(clippy::too_many_arguments)]
 pub(super) fn sync_flute_view(
     mut last: Local<Option<FluteView>>,
-    view: Res<FluteView>,
+    mine: Res<MyInstruments>,
     notes: Res<SongNotes>,
     mut lanes: ResMut<super::HighwayLanes>,
     mut drawing: Query<(&FluteDrawing, &mut Node)>,
@@ -102,11 +94,12 @@ pub(super) fn sync_flute_view(
         *last = None;
         return;
     };
-    if *last == Some(*view) {
+    let view = mine.flute_view;
+    if *last == Some(view) {
         return;
     }
-    *last = Some(*view);
-    let fingering = *view == FluteView::Fingering;
+    *last = Some(view);
+    let fingering = view == FluteView::Fingering;
     let (layout, style) = if fingering {
         (InstrumentModel::lane_layout(flute), super::highway_2d::RowStyle::Keys)
     } else {

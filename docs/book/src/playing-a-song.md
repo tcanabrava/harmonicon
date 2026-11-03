@@ -58,7 +58,9 @@ strip beside the highway highlights the target frets and hand window.
 
 Before a guitar part starts, **Your guitar** asks for your tuning:
 standard, drop D, half a step down, DADGAD, open G or open D, or **As
-written**. It opens on the chart's own. Pick another and the notes stay
+written**. It opens on the tuning in [My instruments](options.md#my-instruments),
+or the chart's own if you haven't named one there, and your answer is
+remembered for the next guitar part. Pick another and the notes stay
 the same pitches but move to the frets your tuning plays them on; the page
 says how many move. A bend keeps its bend; a natural harmonic, whose pitch
 depends on the open string, is played as the fretted note it sounded.
@@ -82,14 +84,16 @@ the line under the highway names both.
 ![A flute part on the highway](images/play-flute.png)
 
 Before a flute part starts, **Your flute** asks for its foot joint: a C
-foot goes down to C4, a B foot to B3. It opens on the one the chart was
-written for. A note below your foot (a B3 on a C foot) is still shown but
+foot goes down to C4, a B foot to B3. It opens on the one in [My
+instruments](options.md#my-instruments), or the chart's own until you've
+picked one, and your answer is remembered. A note below your foot (a B3 on a C foot) is still shown but
 doesn't count, and the page says how many there are.
 
 To read the notes instead, pause and press **Flute view**: the highway
 switches, when you resume, to one row per note the song uses, highest at
 the top, each named at the hit line, and the flute drawing steps aside.
-Press it again for the fingerings. Your choice stays for the next song.
+Press it again for the fingerings. Your choice is kept for later songs
+and sessions; Options sets it too.
 
 A note's fingering is a suggestion, as on every instrument: the game
 hears only the pitch, so an alternate fingering that sounds the same note

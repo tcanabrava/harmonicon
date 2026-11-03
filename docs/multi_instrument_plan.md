@@ -341,7 +341,13 @@ can't be confused with a detection problem.
   instrument check: a guitar part asks for the tuning, a flute part for
   the foot joint, per song, and play places the chart onto the answer
   (`instrument::substitute`, carried in `EffectiveHarmonica::instrument`).
-  "My instruments" makes those answers stick.
+  **Landed too:** those answers stick. `settings::MyInstruments` holds
+  the guitar's tuning, the flute's foot joint (each `None` = follow each
+  chart) and the flute view, persisted in `settings.json`; the pre-song
+  page opens on them (`harp_check::played_for`) and saves each answer,
+  and Options has a "My instruments" section for all three. **Open:** a
+  capo, which neither the page nor Options asks for yet, and showing in
+  song select which parts the player's instruments can play.
 - **Audition and call-and-response synthesis** need a timbre per
   instrument in core's `synth`:
   - Karplus–Strong for plucked strings: cheap and convincing;
@@ -393,21 +399,22 @@ behaviour.
    Editor in the same two views, and the trainer's `Register` and
    `Position` tabs. **Open:** a corpus aimed at octave errors.
 5. **Content and progress** (next, not started). Per-instrument packs
-   and DAGs, a per-instrument profile, the "My instruments" page, and
-   per-instrument Jam Session.
+   and DAGs, a per-instrument profile, and per-instrument Jam Session.
+   "My instruments" (tuning, foot joint, flute view) has landed; capo is
+   open.
 
 ## Scheduling
 
 Every phase above is required for 1.0 (`ROADMAP.md`). Phases 1–4 have
 landed apart from the two recorded corpora (guitar, flute) and the
-harmonica's move onto the shared trainer; phase 5 is next. rc1–rc2 touch
+harmonica's move onto the shared trainer; phase 5 has started, with
+"My instruments". rc1–rc2 touch
 the same gameplay files, so land each phase in small commits rather than
 one long-lived branch.
 
 **The flute's foot joint is configurable**: `Flute` carries a
-`FootJoint::{C, B}` (default C), written in the chart's `instrument` and,
-once phase 5 lands, chosen in "My instruments" alongside the guitar's
-tuning. It sets the lowest note (C4 or B3), so the fingering table
+`FootJoint::{C, B}` (default C), written in the chart's `instrument` and
+chosen in "My instruments" alongside the guitar's tuning. It sets the lowest note (C4 or B3), so the fingering table
 holds the B-foot-only fingerings (B3, and the low-C♯/B keys used in some
 high-register alternates) and the model filters them out on a C foot.
 

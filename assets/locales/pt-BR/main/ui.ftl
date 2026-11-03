@@ -161,6 +161,14 @@ no-songs-found = Nenhuma música encontrada. Adicione pastas em assets/songs/<ar
 # Opções
 options-title = Opções
 options-subtitle-audio = Áudio
+options-my-instruments = Meus instrumentos
+options-my-instruments-tooltip = O que você toca. Uma música escrita para outra afinação ou outro pé é colocada no seu, e a página antes de cada música já abre nele.
+options-guitar-tuning = Afinação do violão
+options-flute-foot = Pé da flauta
+options-flute-view = Partes de flauta mostram
+options-follow-chart = Como cada música está escrita
+options-flute-view-fingering = Dedilhados
+options-flute-view-notes = Notas
 options-theme = Tema
 options-language = Idioma
 options-adaptive-difficulty = Dificuldade Adaptativa

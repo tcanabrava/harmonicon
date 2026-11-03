@@ -169,6 +169,35 @@ impl BendingTrainerSettings {
     }
 }
 
+/// "My instruments": what the player holds, remembered across songs and
+/// sessions. The pre-song page opens on these rather than on the chart's
+/// own, and saves each answer back here, so a player tuned to Drop D or
+/// owning a B-foot flute says so once.
+///
+/// `None` means "whatever each chart asks for": the default, and what
+/// picking a chart's own tuning ("as written") goes back to.
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MyInstruments {
+    /// The guitar's tuning, by `harmonicon_core::instrument::guitar::Tuning`
+    /// id (`"drop-d"`). An id no tuning has any more reads as `None`.
+    pub guitar_tuning: Option<String>,
+    /// The flute's foot joint.
+    pub flute_foot: Option<harmonicon_core::instrument::flute::FootJoint>,
+    /// How Play 2D draws a flute part, switched from its pause menu.
+    pub flute_view: FluteView,
+}
+
+/// How a flute part is drawn: as its fingerings on the flute's keys, or as
+/// its notes on a row per pitch the song uses.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FluteView {
+    #[default]
+    Fingering,
+    Notes,
+}
+
 /// How the Song Editor's action buttons (transport strip, mod panel,
 /// timeline tools, ...) render their icon/label — see
 /// `song_editor::panel_widgets::spawn_button_shell`, which is the one place
@@ -236,6 +265,7 @@ struct Settings {
     action_button_style: ActionButtonStyle,
     bending_trainer: BendingTrainerSettings,
     content_sources: ContentSources,
+    my_instruments: MyInstruments,
 }
 
 impl Default for Settings {
@@ -256,6 +286,7 @@ impl Default for Settings {
             action_button_style: ActionButtonStyle::default(),
             bending_trainer: BendingTrainerSettings::default(),
             content_sources: ContentSources::default(),
+            my_instruments: MyInstruments::default(),
         }
     }
 }
@@ -320,6 +351,7 @@ impl Plugin for SettingsPlugin {
             .init_resource::<ActionButtonStyle>()
             .init_resource::<BendingTrainerSettings>()
             .init_resource::<ContentSources>()
+            .init_resource::<MyInstruments>()
             .init_resource::<PendingSave>()
             .add_systems(Startup, apply_loaded_settings)
             // Save whenever a persisted resource changes. The Startup load
@@ -366,6 +398,7 @@ struct PersistedSettings<'w> {
     action_button_style: Res<'w, ActionButtonStyle>,
     bending_trainer: Res<'w, BendingTrainerSettings>,
     content_sources: Res<'w, ContentSources>,
+    my_instruments: Res<'w, MyInstruments>,
 }
 
 impl PersistedSettings<'_> {
@@ -381,6 +414,7 @@ impl PersistedSettings<'_> {
             || self.action_button_style.is_changed()
             || self.bending_trainer.is_changed()
             || self.content_sources.is_changed()
+            || self.my_instruments.is_changed()
     }
 
     fn to_settings(&self) -> Settings {
@@ -400,6 +434,7 @@ impl PersistedSettings<'_> {
             action_button_style: *self.action_button_style,
             bending_trainer: self.bending_trainer.clone(),
             content_sources: self.content_sources.clone(),
+            my_instruments: self.my_instruments.clone(),
         }
     }
 }
@@ -418,6 +453,7 @@ pub struct PersistedSettingsMut<'w> {
     action_button_style: ResMut<'w, ActionButtonStyle>,
     bending_trainer: ResMut<'w, BendingTrainerSettings>,
     content_sources: ResMut<'w, ContentSources>,
+    my_instruments: ResMut<'w, MyInstruments>,
 }
 
 impl PersistedSettingsMut<'_> {
@@ -440,6 +476,7 @@ impl PersistedSettingsMut<'_> {
         // trainer's maths before the player ever opens the drawer.
         *self.bending_trainer = settings.bending_trainer.clamped();
         *self.content_sources = settings.content_sources;
+        *self.my_instruments = settings.my_instruments;
     }
 }
 
@@ -560,6 +597,30 @@ mod tests {
         assert_eq!(older.music_volume, 0.5);
         assert_eq!(older.input_latency_ms, 20);
         assert_eq!(older.bending_trainer, BendingTrainerSettings::default());
+    }
+
+    #[test]
+    fn my_instruments_follow_each_chart_until_the_player_says_otherwise() {
+        let older: Settings = serde_json::from_str(r#"{"music_volume":0.5}"#).unwrap();
+        assert_eq!(older.my_instruments, MyInstruments::default());
+        assert_eq!(older.my_instruments.guitar_tuning, None);
+        assert_eq!(older.my_instruments.flute_foot, None);
+        assert_eq!(older.my_instruments.flute_view, FluteView::Fingering);
+    }
+
+    #[test]
+    fn my_instruments_round_trip_through_the_settings_file() {
+        let mine = MyInstruments {
+            guitar_tuning: Some("drop-d".into()),
+            flute_foot: Some(harmonicon_core::instrument::flute::FootJoint::B),
+            flute_view: FluteView::Notes,
+        };
+        let json =
+            serde_json::to_string(&Settings { my_instruments: mine.clone(), ..default() }).unwrap();
+        assert!(json.contains(r#""flute_foot":"b""#), "{json}");
+        assert!(json.contains(r#""flute_view":"notes""#), "{json}");
+        let back: Settings = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.my_instruments, mine);
     }
 
     #[test]

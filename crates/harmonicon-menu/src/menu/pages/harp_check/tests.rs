@@ -109,7 +109,7 @@ fn seeding_points_the_choice_at_the_charts_own_harmonica() {
     let chart = plain_chart();
     let mut c = HarpChoice::default();
     assert!(!c.seeded);
-    seed_choice(&mut c, &chart);
+    seed_choice(&mut c, &chart, &MyInstruments::default());
     assert!(c.seeded);
     assert_eq!(c.key, "C");
     assert_eq!(c.kind, HarpKind::Diatonic);
@@ -199,7 +199,7 @@ fn fixture(name: &str) -> HarpChart {
 fn a_guitar_or_flute_reports_what_the_players_instrument_changes() {
     let guitar = fixture("guitar-highway");
     let mut choice = HarpChoice::default();
-    seed_choice(&mut choice, &guitar);
+    seed_choice(&mut choice, &guitar, &MyInstruments::default());
     let own = choice.played.clone().expect("seeded with the chart's guitar");
     assert_eq!(substitution_cost(&guitar, &own), (0, 0));
     let Instrument::Guitar(standard) = own else { panic!("a guitar") };
@@ -213,4 +213,26 @@ fn a_guitar_or_flute_reports_what_the_players_instrument_changes() {
     assert_eq!(substitution_cost(&flute, &Flute::new(FootJoint::C).into()), (0, 1), "its B3");
     assert_eq!(controls_for(&flute), ControlsFor::Flute);
     assert_eq!(controls_for(&plain_chart()), ControlsFor::Harmonica);
+}
+
+/// "My instruments" puts the player's tuning or foot joint on a chart
+/// written for another, and an unset or unknown one follows the chart.
+#[test]
+fn a_remembered_tuning_or_foot_joint_is_what_the_page_opens_on() {
+    let guitar = fixture("guitar-highway");
+    let own = guitar.instrument();
+    assert_eq!(played_for(own.clone(), &MyInstruments::default()), own);
+    let unknown = MyInstruments { guitar_tuning: Some("no-such-tuning".into()), ..default() };
+    assert_eq!(played_for(own.clone(), &unknown), own);
+
+    let drop_d = MyInstruments { guitar_tuning: Some("drop-d".into()), ..default() };
+    let Some(Instrument::Guitar(played)) = played_for(own, &drop_d) else { panic!("a guitar") };
+    assert_eq!(tuning_of(&played.strings).map(|t| t.id), Some("drop-d"));
+
+    let flute = fixture("flute-scale");
+    let c_foot = MyInstruments { flute_foot: Some(FootJoint::C), ..default() };
+    assert_eq!(played_for(flute.instrument(), &c_foot), Some(Flute::new(FootJoint::C).into()));
+    assert_eq!(played_for(flute.instrument(), &MyInstruments::default()), flute.instrument());
+
+    assert_eq!(played_for(plain_chart().instrument(), &drop_d), None, "a harmonica asks elsewhere");
 }

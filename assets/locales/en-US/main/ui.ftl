@@ -163,6 +163,14 @@ no-songs-found = No songs found. Add folders under assets/songs/<artist>/<song>/
 # Options
 options-title = Options
 options-subtitle-audio = Audio
+options-my-instruments = My instruments
+options-my-instruments-tooltip = What you play on. A song written for another tuning or foot joint is placed onto yours, and the page before each song opens on it.
+options-guitar-tuning = Guitar tuning
+options-flute-foot = Flute foot joint
+options-flute-view = Flute parts show
+options-follow-chart = As each song is written
+options-flute-view-fingering = Fingerings
+options-flute-view-notes = Notes
 options-theme = Theme
 options-language = Language
 options-adaptive-difficulty = Adaptive Difficulty

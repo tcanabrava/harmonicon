@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 //! The Options page: audio volume sliders, the microphone and pitch-detection
-//! pickers, and display toggles. Owns its page lifecycle via
+//! pickers, display toggles, and "My instruments" (`instruments`). Owns its page lifecycle via
 //! [`OptionsPlugin`]; the menu shell only routes to it.
 
 use bevy::ecs::system::IntoObserverSystem;
@@ -33,6 +33,7 @@ use harmonicon_ui::dialogs::checkbox;
 use harmonicon_ui::dialogs::combobox;
 use harmonicon_ui::dialogs::tooltip::Tooltip;
 
+mod instruments;
 mod microphone;
 mod sliders;
 #[cfg(test)]
@@ -143,6 +144,7 @@ fn setup_options_menu(
     colorblind_palette: Res<harmonicon_platform::settings::ColorblindPalette>,
     reduced_motion: Res<harmonicon_platform::settings::ReducedMotion>,
     action_button_style: Res<harmonicon_platform::settings::ActionButtonStyle>,
+    my_instruments: Res<harmonicon_platform::settings::MyInstruments>,
     ui_scale: Res<UiScale>,
 ) {
     let (root, header, page_root) = spawn_menu_root(
@@ -216,6 +218,13 @@ fn setup_options_menu(
         ui_scale.0,
     );
     spawn_right_column(&mut commands, right_layout, &loc);
+    instruments::spawn_my_instruments(
+        &mut commands,
+        right_layout,
+        page_root,
+        &loc,
+        &my_instruments,
+    );
 }
 
 fn spawn_left_column(

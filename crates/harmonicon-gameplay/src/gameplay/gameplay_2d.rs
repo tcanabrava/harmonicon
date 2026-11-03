@@ -474,7 +474,7 @@ pub fn spawn_visible_notes(
     lesson: Option<Res<harmonicon_song::lessons::LessonContext>>,
     loc: Res<Localization>,
     flute: Query<&super::flute_visuals::FluteDrawing>,
-    flute_view: Res<super::flute_visuals::FluteView>,
+    mine: Res<harmonicon_platform::settings::MyInstruments>,
 ) {
     if lesson.is_some_and(|lesson| lesson.aural) {
         return;
@@ -486,7 +486,7 @@ pub fn spawn_visible_notes(
     let flute = flute
         .single()
         .ok()
-        .filter(|_| *flute_view == super::flute_visuals::FluteView::Fingering)
+        .filter(|_| mine.flute_view == harmonicon_platform::settings::FluteView::Fingering)
         .map(|drawing| drawing.0);
     let colors = effective_note_colors(theme.note_colors(), colorblind.0);
     // The same layout the highway's stripes were spawned from.

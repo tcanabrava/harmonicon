@@ -40,5 +40,20 @@
   their updates: see [Lessons & Songs](content-sources.md).
 - **Calibrate input lag** — opens [input-lag calibration](calibration.md).
 
+## My instruments
+
+What you play on, so you only say it once:
+
+- **Guitar tuning** — the tuning your guitar is in, or **As each song is
+  written** to follow each chart. A song written for another tuning plays
+  the same notes on the frets yours needs.
+- **Flute foot joint** — a C or B foot, or as each song is written. Notes
+  below your foot are shown but not counted.
+- **Flute parts show** — fingerings or notes; the same setting as the
+  pause menu's **Flute view**.
+
+The page before each guitar or flute song opens on these, and an answer
+given there is saved here too.
+
 All Options settings persist to disk automatically and apply the moment
 you change them — there's no separate "Apply" or "Save" step.

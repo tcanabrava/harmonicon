@@ -120,7 +120,6 @@ impl Plugin for GameplayPlugin {
         .init_resource::<bending_trainer::GesturePractice>()
         .init_resource::<call_response::CallCues>()
         .init_resource::<pause_menu::WaitForNoteMode>()
-        .init_resource::<super::flute_visuals::FluteView>()
         .init_resource::<pause_menu::PracticeSpeed>()
         .init_resource::<pause_menu::SelectedPhraseIndex>()
         // Setup: shared pause menu + mode-specific scenes
