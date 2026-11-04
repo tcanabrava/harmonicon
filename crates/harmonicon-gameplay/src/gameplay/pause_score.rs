@@ -24,6 +24,8 @@ pub(super) struct Playhead;
 #[derive(Component)]
 pub(super) struct Selection;
 #[derive(Component)]
+pub(super) struct SelectionSummary;
+#[derive(Component)]
 pub(super) struct Band(f64);
 #[derive(Component)]
 pub(super) struct Zone {
@@ -85,6 +87,7 @@ pub(super) fn update_pause_score(
     mut viewports: Query<(Ref<ComputedNode>, &mut ScrollPosition), With<Viewport>>,
     mut was_paused: Local<bool>,
     mut viewport_width: Local<f32>,
+    mut summaries: Query<&mut Text, With<SelectionSummary>>,
 ) {
     let ScoreData {
         selected,
@@ -132,108 +135,117 @@ pub(super) fn update_pause_score(
                     TextFont { font_size: FontSize::Px(16.0), ..default() },
                     TextColor(Color::WHITE),
                 ));
+                p.spawn((
+                    SelectionSummary,
+                    Text::new(loc.msg("pause-score-no-selection").to_string()),
+                    TextFont { font_size: FontSize::Px(18.0), ..default() },
+                    TextColor(Color::srgb(0.65, 0.82, 1.0)),
+                ));
                 viewport = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area_xy(
                     p,
                     Color::srgb(0.55, 0.60, 0.7),
                     Color::srgb(0.12, 0.14, 0.18),
                 );
             });
-            commands.entity(viewport).insert(Viewport).with_children(|p| {
-                p.spawn((
-                    Content,
-                    Node {
-                        width: Val::Px(width),
-                        flex_shrink: 0.0,
-                        height: Val::Px(score_height + 44.0),
-                        flex_direction: FlexDirection::Column,
-                        ..default()
-                    },
-                ))
-                .with_children(|content| {
-                    content
-                        .spawn((
-                            Band(end),
-                            RelativeCursorPosition::default(),
+            commands
+                .entity(viewport)
+                .insert((Viewport, BackgroundColor(Color::srgb(0.06, 0.07, 0.09))))
+                .with_children(|p| {
+                    p.spawn((
+                        Content,
+                        Node {
+                            width: Val::Px(width),
+                            flex_shrink: 0.0,
+                            height: Val::Px(score_height + 32.0),
+                            flex_direction: FlexDirection::Column,
+                            ..default()
+                        },
+                    ))
+                    .with_children(|content| {
+                        content
+                            .spawn((
+                                Band(end),
+                                RelativeCursorPosition::default(),
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    height: Val::Px(32.0),
+                                    flex_shrink: 0.0,
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgb(0.11, 0.13, 0.18)),
+                            ))
+                            .observe(reset_selection_click)
+                            .observe(begin_selection)
+                            .observe(drag_selection)
+                            .observe(end_selection)
+                            .with_children(|band| {
+                                for (index, section) in adaptive.sections.iter().enumerate() {
+                                    let left = music_score::score_beat_x(
+                                        time_beat(section.start_time, chart),
+                                        spacing.0,
+                                    );
+                                    let right = music_score::score_beat_x(
+                                        time_beat(section.end_time, chart),
+                                        spacing.0,
+                                    );
+                                    band.spawn((
+                                        Zone {
+                                            index,
+                                            start: section.start_time,
+                                            end: section.end_time,
+                                        },
+                                        Node {
+                                            position_type: PositionType::Absolute,
+                                            left: Val::Px(left),
+                                            width: Val::Px((right - left).max(1.0)),
+                                            height: Val::Percent(100.0),
+                                            border: UiRect::all(Val::Px(1.0)),
+                                            overflow: Overflow::clip(),
+                                            ..default()
+                                        },
+                                        BorderColor::all(Color::srgb(0.45, 0.5, 0.6)),
+                                        BackgroundColor(Color::srgb(0.16, 0.21, 0.28)),
+                                    ))
+                                    .observe(select_zone)
+                                    .with_children(|p| {
+                                        p.spawn((
+                                            Text::new(section.name.clone()),
+                                            TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                            TextColor(Color::WHITE),
+                                            Pickable::IGNORE,
+                                        ));
+                                    });
+                                }
+                            });
+                        music_score::spawn_full_score(content, &bravura, grand);
+                        content.spawn((
+                            Selection,
                             Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Px(44.0),
-                                flex_shrink: 0.0,
+                                position_type: PositionType::Absolute,
+                                top: Val::Px(0.0),
+                                height: Val::Percent(100.0),
+                                display: Display::None,
+                                border: UiRect::horizontal(Val::Px(2.0)),
                                 ..default()
                             },
-                            BackgroundColor(Color::srgb(0.11, 0.13, 0.18)),
-                        ))
-                        .observe(reset_selection_click)
-                        .observe(begin_selection)
-                        .observe(drag_selection)
-                        .observe(end_selection)
-                        .with_children(|band| {
-                            for (index, section) in adaptive.sections.iter().enumerate() {
-                                let left = music_score::score_beat_x(
-                                    time_beat(section.start_time, chart),
-                                    spacing.0,
-                                );
-                                let right = music_score::score_beat_x(
-                                    time_beat(section.end_time, chart),
-                                    spacing.0,
-                                );
-                                band.spawn((
-                                    Zone {
-                                        index,
-                                        start: section.start_time,
-                                        end: section.end_time,
-                                    },
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        left: Val::Px(left),
-                                        width: Val::Px((right - left).max(1.0)),
-                                        height: Val::Percent(100.0),
-                                        border: UiRect::all(Val::Px(1.0)),
-                                        overflow: Overflow::clip(),
-                                        ..default()
-                                    },
-                                    BorderColor::all(Color::srgb(0.45, 0.5, 0.6)),
-                                    BackgroundColor(Color::srgb(0.16, 0.21, 0.28)),
-                                ))
-                                .observe(select_zone)
-                                .with_children(|p| {
-                                    p.spawn((
-                                        Text::new(section.name.clone()),
-                                        TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                        TextColor(Color::WHITE),
-                                        Pickable::IGNORE,
-                                    ));
-                                });
-                            }
-                        });
-                    music_score::spawn_full_score(content, &bravura, grand);
-                    content.spawn((
-                        Selection,
-                        Node {
-                            position_type: PositionType::Absolute,
-                            top: Val::Px(0.0),
-                            height: Val::Percent(100.0),
-                            display: Display::None,
-                            border: UiRect::horizontal(Val::Px(2.0)),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.3, 0.65, 1.0, 0.18)),
-                        BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
-                        Pickable::IGNORE,
-                    ));
-                    content.spawn((
-                        Playhead,
-                        Node {
-                            position_type: PositionType::Absolute,
-                            top: Val::Px(0.0),
-                            height: Val::Percent(100.0),
-                            width: Val::Px(3.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(1.0, 0.15, 0.18)),
-                        Pickable::IGNORE,
-                    ));
+                            BackgroundColor(Color::srgba(0.3, 0.65, 1.0, 0.06)),
+                            BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
+                            Pickable::IGNORE,
+                        ));
+                        content.spawn((
+                            Playhead,
+                            Node {
+                                position_type: PositionType::Absolute,
+                                top: Val::Px(0.0),
+                                height: Val::Percent(100.0),
+                                width: Val::Px(3.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(1.0, 0.15, 0.18)),
+                            Pickable::IGNORE,
+                        ));
+                    });
                 });
-            });
         }
     }
     if !paused.0 {
@@ -256,6 +268,19 @@ pub(super) fn update_pause_score(
                 .active
                 .then(|| (time_beat(loops.start_time, chart), time_beat(loops.end_time, chart)))
         });
+    for mut text in &mut summaries {
+        text.0 = if let Some((a, b)) = range {
+            let start = beat_time(a, chart);
+            let end = beat_time(b, chart);
+            loc.msg_args(
+                "pause-score-selection",
+                &[("start", format!("{start:.1}")), ("end", format!("{end:.1}"))],
+            )
+            .to_string()
+        } else {
+            loc.msg("pause-score-no-selection").to_string()
+        };
+    }
     for mut node in &mut positions.p2() {
         node.display = if range.is_some() { Display::Flex } else { Display::None };
         if let Some((a, b)) = range {

@@ -1366,6 +1366,24 @@ fn rebuild_full_score(
             &mut signatures,
             full.grand,
         );
+        commands.entity(layer).with_children(|parent| {
+            for (index, beat) in std::iter::once(0.0).chain(bars.beats(0.0, end)).enumerate() {
+                let number = index + usize::from(!bars.meter.has_pickup());
+                parent.spawn((
+                    MusicScoreNoteGlyph,
+                    Text::new(number.to_string()),
+                    TextFont { font_size: FontSize::Px(12.0), ..default() },
+                    TextColor(Color::srgb(0.65, 0.72, 0.82)),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(beat as f32 * spacing.0),
+                        top: Val::Px(2.0),
+                        ..default()
+                    },
+                    bevy::picking::Pickable::IGNORE,
+                ));
+            }
+        });
     }
 }
 

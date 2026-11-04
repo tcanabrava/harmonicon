@@ -999,4 +999,7 @@ gameplay-guitar-neck-next = Próximo { $chord }
 
 gameplay-piano-hands = Esquerda / graves: azul · Direita / agudos: âmbar · Divisão no dó central (C4)
 
-pause-score-instructions = Partitura de treino · Role para ler · Arraste a faixa acima das notas para repetir um trecho · Clique numa seção para treiná-la
+pause-score-instructions = Arraste acima dos compassos para selecionar um trecho. Role para explorar.
+
+pause-score-no-selection = Nenhum trecho selecionado
+pause-score-selection = Repetir { $start }–{ $end } s · Retome para praticar

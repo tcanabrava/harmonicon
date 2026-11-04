@@ -568,10 +568,10 @@ pub(super) fn setup_pause_menu(
                 flex_direction: {FlexDirection::Column},
                 justify_content: {JustifyContent::Center},
                 align_items: {AlignItems::Center},
-                padding: {UiRect::all(Val::Px(16.0)).with_top(Val::Px(8.0 + BAR_HEIGHT))},
+                padding: {if is_jam { UiRect::all(Val::Px(16.0)).with_top(Val::Px(8.0 + BAR_HEIGHT)) } else { UiRect::all(Val::Px(16.0)) }},
             }
-            BackgroundColor({MODAL_BACKDROP_BG})
-            GlobalZIndex(200)
+            BackgroundColor({if is_jam { MODAL_BACKDROP_BG } else { Color::srgb(0.045, 0.05, 0.07) }})
+            GlobalZIndex(300)
         })
         .insert((GameplayRoot, PauseMenuRoot, Visibility::Hidden))
         .id();
