@@ -88,6 +88,8 @@ pub(super) enum ChartSlot {
     #[default]
     Now,
     Next,
+    /// A snapshot of the previous fingering, retained until its exit ends.
+    Outgoing,
 }
 
 /// A fingering chart's root, carrying the flute it draws.
@@ -192,8 +194,16 @@ pub(super) fn spawn_flute_chart(
                 width: if vertical { Val::Px(thickness) } else { full },
                 height: if vertical { full } else { Val::Px(thickness) },
                 flex_shrink: 0.0,
+                position_type: if slot == ChartSlot::Outgoing {
+                    PositionType::Absolute
+                } else {
+                    PositionType::Relative
+                },
+                left: if slot == ChartSlot::Outgoing { Val::Px(0.0) } else { Val::Auto },
+                top: if slot == ChartSlot::Outgoing { Val::Px(0.0) } else { Val::Auto },
                 ..default()
             },
+            if slot == ChartSlot::Outgoing { Visibility::Hidden } else { Visibility::Inherited },
         ))
         .with_children(|drawing| {
             // The tube, behind the keys.
@@ -363,6 +373,7 @@ pub(super) fn spawn_flute_stage(
         .spawn((
             FluteStage(*flute),
             Node {
+                overflow: Overflow::clip(),
                 width: Val::Percent(100.0),
                 display: Display::None,
                 flex_shrink: 0.0,
@@ -434,6 +445,15 @@ pub(super) fn spawn_flute_stage(
                             })
                             .with_children(|chart| {
                                 spawn_flute_chart(chart, flute, scale, slot, ChartAxis::Horizontal);
+                                if slot == ChartSlot::Now {
+                                    spawn_flute_chart(
+                                        chart,
+                                        flute,
+                                        scale,
+                                        ChartSlot::Outgoing,
+                                        ChartAxis::Horizontal,
+                                    );
+                                }
                             });
                         });
                     });
@@ -474,17 +494,29 @@ pub(super) struct StageMotion {
     current: Option<usize>,
     next: Option<usize>,
     elapsed: f32,
+    duration: f32,
+    outgoing: Option<ScheduledNote>,
+    snapshot: Option<ScheduledNote>,
+    promote: bool,
 }
 
-/// Ease the previous preview down into the current chart over 240 ms.
-fn promotion_transform(progress: f32) -> UiTransform {
+/// Quintic easing starts and finishes with zero velocity and acceleration.
+fn motion_ease(progress: f32) -> f32 {
     let t = progress.clamp(0.0, 1.0);
-    let remaining = 1.0 - t * t * (3.0 - 2.0 * t);
+    t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+}
+
+fn promotion_transform(progress: f32) -> UiTransform {
+    let remaining = 1.0 - motion_ease(progress);
     UiTransform {
         translation: Val2::new(Val::Percent(-20.0 * remaining), Val::Px(-96.0 * remaining)),
         scale: Vec2::splat(1.0 - 0.4 * remaining),
         ..UiTransform::IDENTITY
     }
+}
+
+fn exit_transform(progress: f32) -> UiTransform {
+    UiTransform::from_translation(Val2::new(Val::Px(0.0), Val::Px(160.0 * motion_ease(progress))))
 }
 
 /// Paints the strip from the notes and the clock: each chart's keys, the
@@ -496,7 +528,7 @@ pub(super) fn update_flute_stage(
     stage: Query<(Entity, &FluteStage)>,
     time: Res<Time>,
     mut motion: Local<StageMotion>,
-    mut drawings: Query<(&ChartSlot, &mut UiTransform), With<FluteDrawing>>,
+    mut drawings: Query<(&ChartSlot, &mut UiTransform, &mut Visibility), With<FluteDrawing>>,
     mut keys: Query<(&FluteKey, &mut BackgroundColor)>,
     mut names: Query<(&StageNoteName, &mut Text)>,
     mut bars: Query<(&mut Node, &mut BackgroundColor), (With<StageCountdown>, Without<FluteKey>)>,
@@ -511,21 +543,42 @@ pub(super) fn update_flute_stage(
         .is_some_and(|(seen, previous)| seen == entity && now >= previous && now - previous < 0.5);
     if !shown || !continuous {
         motion.elapsed = 1.0;
+        motion.duration = 0.36;
+        motion.outgoing = None;
+        motion.promote = false;
     } else if current != motion.current {
-        motion.elapsed = if current.is_some() && current == motion.next { 0.0 } else { 1.0 };
+        motion.outgoing = motion.snapshot.clone();
+        motion.promote = current.is_some() && current == motion.next;
+        motion.elapsed = 0.0;
+        // Finish within the note interval so fast passages don't pile up.
+        let interval = current
+            .zip(next)
+            .map(|(a, b)| notes.notes[b].time - notes.notes[a].time)
+            .unwrap_or(0.5);
+        motion.duration = (interval as f32 * 0.75).clamp(0.08, 0.36);
     } else {
         motion.elapsed += time.delta_secs();
     }
     motion.seen = shown.then_some((entity, now));
     motion.current = current;
     motion.next = next;
-    let progress = (motion.elapsed / 0.24).clamp(0.0, 1.0);
-    for (slot, mut transform) in &mut drawings {
-        *transform = if *slot == ChartSlot::Now {
-            promotion_transform(progress)
-        } else {
-            // Let the new preview emerge as the previous one moves away.
-            UiTransform::from_scale(Vec2::splat(0.65 + 0.35 * progress))
+    motion.snapshot = current.map(|i| notes.notes[i].clone());
+    let progress = (motion.elapsed / motion.duration.max(0.08)).clamp(0.0, 1.0);
+    for (slot, mut transform, mut visibility) in &mut drawings {
+        let visible = match slot {
+            ChartSlot::Now => current.is_some(),
+            ChartSlot::Next => next.is_some() && (!motion.promote || progress >= 0.45),
+            ChartSlot::Outgoing => motion.outgoing.is_some() && progress < 1.0,
+        };
+        *visibility = if visible && shown { Visibility::Inherited } else { Visibility::Hidden };
+        *transform = match slot {
+            ChartSlot::Now if motion.promote => promotion_transform(progress),
+            ChartSlot::Now => UiTransform::IDENTITY,
+            ChartSlot::Outgoing => exit_transform(progress),
+            ChartSlot::Next => UiTransform::from_translation(Val2::new(
+                Val::Px(0.0),
+                Val::Px(-36.0 * (1.0 - motion_ease((progress - 0.45) / 0.55))),
+            )),
         };
     }
     let want = StaffHighlight(current.filter(|_| shown));
@@ -552,6 +605,9 @@ pub(super) fn update_flute_stage(
                 }
             }
             ChartSlot::Next if pressed(next, key.key) => KEY_NEXT,
+            ChartSlot::Outgoing if pressed(motion.outgoing.as_ref(), key.key) => {
+                if motion.outgoing.as_ref().is_some_and(|n| n.hit) { KEY_HELD } else { KEY_NOW }
+            }
             _ => Color::NONE,
         };
         if colour.0 != want {
@@ -630,6 +686,79 @@ pub(super) fn sync_flute_view(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn previous_fingering_survives_until_its_exit_completes() {
+        let mut app = App::new();
+        app.init_resource::<GameplayClock>()
+            .init_resource::<SongNotes>()
+            .init_resource::<Time>()
+            .init_resource::<MyInstruments>()
+            .init_resource::<StaffHighlight>()
+            .add_systems(Update, update_flute_stage);
+        app.world_mut().resource_mut::<MyInstruments>().flute_view = FluteView::Fingering;
+        app.world_mut().resource_mut::<SongNotes>().notes =
+            vec![note(1.0, 64, 0), note(2.0, 67, 0)];
+        let flute = Flute::default();
+        let loc = Localization::default();
+        app.world_mut()
+            .commands()
+            .spawn(Node::default())
+            .with_children(|p| spawn_flute_stage(p, &flute, &loc));
+        app.world_mut().flush();
+        app.world_mut().resource_mut::<GameplayClock>().set_free(1.4);
+        app.update();
+        app.world_mut().resource_mut::<GameplayClock>().set_free(1.6);
+        app.update();
+        let world = app.world_mut();
+        let outgoing = world
+            .query::<(&ChartSlot, &Visibility, &UiTransform)>()
+            .iter(world)
+            .find(|(slot, _, _)| **slot == ChartSlot::Outgoing)
+            .unwrap();
+        assert_eq!(*outgoing.1, Visibility::Inherited);
+        assert_eq!(outgoing.2.translation, Val2::ZERO, "exit starts at old position");
+        let old_keys = flute.keys(FingeringAssignment { note: 64, alternate: 0 }).unwrap();
+        for (key, color) in world
+            .query::<(&FluteKey, &BackgroundColor)>()
+            .iter(world)
+            .filter(|(key, _)| key.slot == ChartSlot::Outgoing)
+        {
+            assert_eq!(color.0, if old_keys.pressed(key.key) { KEY_NOW } else { Color::NONE });
+        }
+        app.world_mut().resource_mut::<Time>().advance_by(std::time::Duration::from_millis(400));
+        app.world_mut().resource_mut::<GameplayClock>().set_free(1.7);
+        app.update();
+        let world = app.world_mut();
+        let outgoing = world
+            .query::<(&ChartSlot, &Visibility)>()
+            .iter(world)
+            .find(|(slot, _)| **slot == ChartSlot::Outgoing)
+            .unwrap();
+        assert_eq!(*outgoing.1, Visibility::Hidden, "hide only after sliding out");
+        app.world_mut().resource_mut::<GameplayClock>().set_free(0.0);
+        app.update();
+        let world = app.world_mut();
+        let outgoing = world
+            .query::<(&ChartSlot, &Visibility)>()
+            .iter(world)
+            .find(|(slot, _)| **slot == ChartSlot::Outgoing)
+            .unwrap();
+        assert_eq!(*outgoing.1, Visibility::Hidden, "seeks clear stale outgoing charts");
+    }
+
+    #[test]
+    fn easing_and_exit_preserve_continuity() {
+        assert_eq!(motion_ease(0.0), 0.0);
+        assert_eq!(motion_ease(1.0), 1.0);
+        assert!(motion_ease(0.01) < 0.0001, "gentle acceleration");
+        assert!(1.0 - motion_ease(0.99) < 0.0001, "gentle settling");
+        assert_eq!(exit_transform(0.0).translation, Val2::ZERO);
+        assert_eq!(exit_transform(1.0).translation.y, Val::Px(160.0));
+        for step in 1..=100 {
+            assert!(motion_ease(step as f32 / 100.0) >= motion_ease((step - 1) as f32 / 100.0));
+        }
+    }
 
     #[test]
     fn promotion_starts_at_preview_size_and_settles_without_overshoot() {
