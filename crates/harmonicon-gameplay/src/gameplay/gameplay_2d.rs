@@ -130,6 +130,7 @@ pub fn setup(
     *render_assets = NoteRenderAssets { play_mode_tags };
 
     let compact = display.compact.0;
+    let is_guitar = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Guitar(_)));
     let is_flute = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Flute(_)));
     let aural = display.lesson.is_some_and(|lesson| lesson.aural);
     let modifiers = used_modifiers(chart);
@@ -248,19 +249,10 @@ pub fn setup(
                 } else if let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
                     instrument.clone()
                 {
-                    left.spawn(Node {
-                        width: Val::Percent(100.0),
-                        flex_grow: 1.0,
-                        min_height: Val::Px(120.0),
-                        flex_direction: FlexDirection::Row,
-                        ..default()
-                    })
-                    .with_children(|row| {
-                        if !aural {
-                            super::guitar_visuals::spawn_fretboard(row, &guitar, 180.0);
-                        }
-                        spawn_track(row);
-                    });
+                    if !aural {
+                        super::guitar_visuals::spawn_neck_overview(left, &guitar, &loc);
+                    }
+                    spawn_track(left);
                 } else if let Some((low, high)) = piano_roll {
                     left.spawn(Node {
                         width: Val::Percent(100.0),
@@ -317,19 +309,6 @@ pub fn setup(
                 .with_children(|col| {
                     if let Some(harp) = played {
                         spawn_harmonica_strip(col, harp, &loc);
-                    } else if !aural
-                        && let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
-                            instrument.clone()
-                    {
-                        col.spawn((
-                            Text::new(""),
-                            TextFont { font_size: FontSize::Px(14.0), ..default() },
-                            TextColor(Color::WHITE),
-                            super::guitar_visuals::FretboardHint {
-                                top_fret: guitar.top_fret(),
-                                capo: guitar.capo,
-                            },
-                        ));
                     }
                 });
             });
@@ -346,7 +325,13 @@ pub fn setup(
                 // banner, tab ribbon, metronome, technique legend — and the
                 // width it gave up goes to the highway, which is the thing
                 // the player is actually reading.
-                width: if compact { Val::Px(140.0) } else { Val::Percent(26.0) },
+                width: if compact {
+                    Val::Px(if is_guitar { 210.0 } else { 140.0 })
+                } else {
+                    Val::Percent(26.0)
+                },
+                min_width: if is_guitar { Val::Px(210.0) } else { Val::Px(0.0) },
+                flex_shrink: if is_guitar { 0.0 } else { 1.0 },
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect { top: Val::Px(right_top_padding), ..UiRect::all(Val::Px(12.0)) },
@@ -354,6 +339,12 @@ pub fn setup(
                 ..default()
             })
             .with_children(|right| {
+                if !aural
+                    && let Some(harmonicon_core::instrument::Instrument::Guitar(guitar)) =
+                        &instrument
+                {
+                    super::guitar_visuals::spawn_chord_diagram(right, guitar);
+                }
                 if panels.side_panel {
                     spawn_hud_panel(
                         right,

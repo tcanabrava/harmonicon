@@ -374,7 +374,7 @@ impl Plugin for GameplayPlugin {
                 super::guitar_visuals::align_chord_stems,
                 gameplay_2d::update_holes,
                 super::guitar_visuals::update_fretboard,
-                super::guitar_visuals::update_hint,
+                super::guitar_visuals::update_neck_overview,
                 super::flute_visuals::update_flute_stage,
                 super::piano_visuals::update_piano_keyboard,
                 beat_guides::update_beat_guides,

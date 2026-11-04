@@ -63,11 +63,9 @@ pub(super) struct FretCell {
     top: u8,
 }
 
-/// A compact movable neck window, `width` px wide: beside the highway's hit
-/// zone, or the Note Trainer's diagram. Column zero always shows the open
-/// string; other columns follow the hand.
+/// The Note Trainer's compact movable neck window. Column zero shows the
+/// open string; other columns follow the hand. Play uses the full overview.
 pub(super) fn spawn_fretboard(parent: &mut ChildSpawnerCommands, guitar: &Guitar, width: f32) {
-    spawn_chord_diagram(parent, guitar);
     parent
         .spawn(Node {
             width: Val::Px(width),
@@ -114,12 +112,13 @@ pub(super) fn update_fretboard(
     mut cells: Query<(&FretCell, &mut Text, &mut BackgroundColor)>,
     mut diagrams: Query<(&ChordDiagram, &mut Text, &mut Node), Without<FretCell>>,
 ) {
-    if cells.is_empty() {
-        return;
-    }
     let targets = targets(&notes.notes, clock.get());
     for (diagram, mut text, mut node) in &mut diagrams {
         let first = targets.iter().filter(|p| p.fret > 0).map(|p| p.fret).min().unwrap_or(1);
+        if diagram.0 == 255 {
+            text.0 = group_name(&attack_group(&notes.notes, clock.get(), None));
+            continue;
+        }
         if diagram.0 == 0 {
             text.0 = if targets.is_empty() { String::new() } else { first.to_string() };
             continue;
@@ -145,7 +144,7 @@ pub(super) fn update_fretboard(
 
 /// One fretboard cell, for a hand window placed over `targets`: the fret it
 /// shows, lit in its string's colour where a target sits, the rest of the
-/// window faintly tinted. Shared by the highway and the Note Trainer.
+/// window faintly tinted in the Note Trainer.
 pub(super) fn paint_cell(
     cell: &FretCell,
     targets: &[FretAssignment],
@@ -273,48 +272,6 @@ pub(super) fn spawn_chord_stem(
     }
 }
 
-/// The line under the highway naming where the hand sits. Fret 0 is the
-/// open string, or the capo on a capoed guitar, and the line says which.
-#[derive(Component)]
-pub(super) struct FretboardHint {
-    pub top_fret: u8,
-    pub capo: u8,
-}
-
-pub(super) fn update_hint(
-    clock: Res<GameplayClock>,
-    notes: Res<SongNotes>,
-    loc: Res<harmonicon_platform::localization::Localization>,
-    mut labels: Query<(&FretboardHint, &mut Text)>,
-) {
-    let now = clock.get();
-    let current = targets(&notes.notes, now);
-    let next_time = notes
-        .notes
-        .iter()
-        .filter(|n| n.playable && !n.missed && n.time > now && n.time <= now + LOOKAHEAD)
-        .map(|n| n.time)
-        .min_by(f64::total_cmp);
-    let next: Vec<_> = notes
-        .notes
-        .iter()
-        .filter(|n| Some(n.time) == next_time && n.playable && !n.missed)
-        .filter_map(|n| if let PlayPosition::Fret(p) = n.position { Some(p) } else { None })
-        .collect();
-    for (hint, mut text) in &mut labels {
-        let next =
-            if next.is_empty() { "—".into() } else { anchor(&next, hint.top_fret).to_string() };
-        let mut args = vec![("fret", anchor(&current, hint.top_fret).to_string()), ("next", next)];
-        let key = if hint.capo == 0 {
-            "gameplay-guitar-window"
-        } else {
-            args.push(("capo", hint.capo.to_string()));
-            "gameplay-guitar-window-capo"
-        };
-        text.0 = loc.msg_args(key, &args).to_string();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,6 +288,75 @@ mod tests {
             ..default()
         }
     }
+    #[test]
+    fn overview_keeps_current_and_next_attacks_distinct_before_the_first_note() {
+        let notes = vec![note(1.0, 6, 0), note(1.0, 5, 2), note(2.0, 2, 12)];
+        let current = attack_group(&notes, 0.0, None);
+        let next = attack_group(&notes, 0.0, current.first().map(|n| n.time));
+        assert_eq!(current.len(), 2);
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0].time, 2.0);
+        assert!(attack_group(&notes, 4.0, None).is_empty());
+        assert_eq!(attack_group(&notes, 0.0, None).len(), 2, "seek resets guidance");
+        assert_eq!(
+            hand_region(
+                &[FretAssignment { string: 6, fret: 0, technique: StringTechnique::Fretted }],
+                22
+            ),
+            None,
+            "open strings have no hand region"
+        );
+        assert_eq!(
+            hand_region(
+                &[FretAssignment { string: 1, fret: 22, technique: StringTechnique::Fretted }],
+                22
+            ),
+            Some((18, 22))
+        );
+    }
+
+    #[test]
+    fn overview_updates_without_a_highway_fret_grid() {
+        let mut app = App::new();
+        app.init_resource::<GameplayClock>()
+            .init_resource::<SongNotes>()
+            .init_resource::<harmonicon_platform::localization::Localization>()
+            .add_systems(Update, (update_fretboard, update_neck_overview));
+        let mut guitar =
+            Guitar::standard(harmonicon_core::instrument::guitar::GuitarBody::Electric);
+        guitar.capo = 2;
+        guitar.strings.pop();
+        let loc = harmonicon_platform::localization::Localization::default();
+        app.world_mut().commands().spawn(Node::default()).with_children(|p| {
+            spawn_neck_overview(p, &guitar, &loc);
+            spawn_chord_diagram(p, &guitar);
+        });
+        app.world_mut().flush();
+        let mut notes = app.world_mut().resource_mut::<SongNotes>();
+        notes.notes = vec![note(1.0, 1, 3), note(2.0, 5, 8)];
+        app.update();
+        let world = app.world_mut();
+        assert_eq!(world.query::<&FretCell>().iter(world).count(), 0);
+        let visible: Vec<_> = world
+            .query::<(&NeckDot, &Node)>()
+            .iter(world)
+            .filter(|(_, node)| node.display != Display::None)
+            .collect();
+        assert_eq!(visible.len(), 2, "one current dot and one next ring");
+        let current = visible.iter().find(|(dot, _)| !dot.next).unwrap();
+        assert_eq!(
+            current.1.left,
+            Val::Percent(5.5 * 100.0 / (f32::from(guitar.frets) + 1.0)),
+            "relative fret 3 is physical fret 5 with capo 2"
+        );
+        assert!(visible.iter().all(|(dot, _)| dot.string <= 5));
+        let labels: Vec<_> = world.query::<(&ChordDiagram, &Text)>().iter(world).collect();
+        assert!(
+            labels.iter().any(|(marker, text)| marker.0 == 1 && text.0 == "●"),
+            "right-panel diagram updates without FretCell entities"
+        );
+    }
+
     #[test]
     fn window_previews_shifts_keeps_holds_and_rewinds() {
         let notes = vec![note(1.0, 6, 0), note(1.0, 5, 2), note(3.0, 2, 12)];
@@ -390,19 +416,26 @@ mod tests {
 #[derive(Component)]
 pub(super) struct ChordDiagram(u8);
 
-fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar) {
+pub(super) fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar) {
     parent
         .spawn((
             Node {
                 width: Val::Px(150.0),
                 height: Val::Px(152.0),
                 flex_shrink: 0.0,
-                margin: UiRect::horizontal(Val::Px(12.0)),
+                margin: UiRect { top: Val::Px(28.0), ..UiRect::horizontal(Val::Px(12.0)) },
                 ..default()
             },
             BackgroundColor(Color::srgb(0.08, 0.10, 0.14)),
         ))
         .with_children(|chart| {
+            chart.spawn((
+                ChordDiagram(255),
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextColor(Color::WHITE),
+                Node { position_type: PositionType::Absolute, top: Val::Px(-28.0), ..default() },
+            ));
             chart.spawn((
                 ChordDiagram(0),
                 Text::new(""),
@@ -457,4 +490,321 @@ fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar) {
                 ));
             }
         });
+}
+
+/// The first eligible attack, or the attack strictly after a given one.
+/// Holds remain eligible after being heard, and seeks need no cached cursor.
+fn attack_group(notes: &[ScheduledNote], now: f64, after: Option<f64>) -> Vec<&ScheduledNote> {
+    let eligible = |n: &&ScheduledNote| {
+        matches!(n.position, PlayPosition::Fret(_))
+            && n.playable
+            && !n.missed
+            && n.time + n.duration > now
+            && n.time <= now + LOOKAHEAD
+            && after.is_none_or(|previous| n.time > previous)
+    };
+    let Some(first) = notes.iter().filter(eligible).min_by(|a, b| a.time.total_cmp(&b.time)) else {
+        return Vec::new();
+    };
+    notes.iter().filter(eligible).filter(|n| n.time == first.time).collect()
+}
+
+fn group_name(group: &[&ScheduledNote]) -> String {
+    let pitches = group
+        .iter()
+        .find(|n| n.chord_pitches.len() > 1)
+        .map(|n| n.chord_pitches.clone())
+        .unwrap_or_else(|| group.iter().filter_map(|n| n.expected_pitch).collect());
+    chord_name(&pitches).unwrap_or_default()
+}
+
+fn hand_region(positions: &[FretAssignment], top: u8) -> Option<(u8, u8)> {
+    let highest = positions.iter().filter(|p| p.fret > 0).map(|p| p.fret).max()?;
+    let first = anchor(positions, top);
+    Some((first, (first + HAND_SPAN_FRETS).max(highest).min(top)))
+}
+
+#[derive(Component)]
+pub(super) struct NeckOverview(Guitar);
+#[derive(Component)]
+pub(super) struct NeckRegion(bool);
+#[derive(Component)]
+pub(super) struct NeckDot {
+    next: bool,
+    string: u8,
+}
+#[derive(Component)]
+pub(super) struct NeckLabel(bool);
+#[derive(Component)]
+pub(super) struct NeckDash;
+
+const NECK_NOW: Color = Color::srgb(0.98, 0.82, 0.35);
+const NECK_NEXT: Color = Color::srgb(0.48, 0.77, 1.0);
+
+/// A schematic full neck: physical frets left to right, string 1 on top.
+/// Two outlined windows guide the hand; dots alone say which strings to play.
+pub(super) fn spawn_neck_overview(
+    parent: &mut ChildSpawnerCommands,
+    guitar: &Guitar,
+    loc: &harmonicon_platform::localization::Localization,
+) {
+    parent
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(198.0),
+            flex_shrink: 0.0,
+            flex_direction: FlexDirection::Column,
+            ..default()
+        })
+        .with_children(|panel| {
+            let caption = if guitar.capo == 0 {
+                loc.msg("gameplay-guitar-neck").to_string()
+            } else {
+                loc.msg_args("gameplay-guitar-neck-capo", &[("capo", guitar.capo.to_string())])
+                    .to_string()
+            };
+            panel.spawn((
+                Text::new(caption),
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextColor(Color::srgb(0.7, 0.75, 0.82)),
+            ));
+            panel
+                .spawn((
+                    NeckOverview(guitar.clone()),
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(92.0),
+                        margin: UiRect { top: Val::Px(25.0), bottom: Val::Px(46.0), ..default() },
+                        flex_shrink: 0.0,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.10, 0.09, 0.08)),
+                ))
+                .with_children(|board| {
+                    let columns = f32::from(guitar.frets) + 1.0;
+                    for fret in 0..=guitar.frets {
+                        let x = f32::from(fret) * 100.0 / columns;
+                        board.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Percent(x),
+                                width: Val::Px(if fret == 1 || fret == guitar.capo + 1 {
+                                    3.0
+                                } else {
+                                    1.0
+                                }),
+                                height: Val::Percent(100.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(0.45, 0.44, 0.40)),
+                        ));
+                        if fret == 0 || matches!(fret, 3 | 5 | 7 | 9 | 12 | 15 | 17 | 19 | 21 | 24)
+                        {
+                            board.spawn((
+                                Text::new(fret.to_string()),
+                                TextFont { font_size: FontSize::Px(11.0), ..default() },
+                                TextColor(Color::srgb(0.67, 0.7, 0.75)),
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    left: Val::Percent((f32::from(fret) + 0.25) * 100.0 / columns),
+                                    bottom: Val::Px(-16.0),
+                                    ..default()
+                                },
+                            ));
+                        }
+                    }
+                    for string in 1..=guitar.string_count() {
+                        let y =
+                            (f32::from(string) - 0.5) * 100.0 / f32::from(guitar.string_count());
+                        board.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                top: Val::Percent(y),
+                                width: Val::Percent(100.0),
+                                height: Val::Px(1.0),
+                                ..default()
+                            },
+                            BackgroundColor(string_color(string).with_alpha(0.5)),
+                        ));
+                    }
+                    for next in [false, true] {
+                        let color = if next { NECK_NEXT } else { NECK_NOW };
+                        board
+                            .spawn((
+                                NeckRegion(next),
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    height: Val::Percent(100.0),
+                                    border: UiRect::all(Val::Px(if next { 0.0 } else { 2.0 })),
+                                    ..default()
+                                },
+                                BorderColor::all(color),
+                                BackgroundColor(color.with_alpha(if next { 0.05 } else { 0.14 })),
+                            ))
+                            .with_children(|region| {
+                                if next {
+                                    // Segmented edges remain distinguishable without colour.
+                                    for segment in 0..8 {
+                                        for bottom in [false, true] {
+                                            region.spawn((
+                                                NeckDash,
+                                                Node {
+                                                    position_type: PositionType::Absolute,
+                                                    left: Val::Percent(segment as f32 * 12.5),
+                                                    top: if bottom {
+                                                        Val::Auto
+                                                    } else {
+                                                        Val::Px(0.0)
+                                                    },
+                                                    bottom: if bottom {
+                                                        Val::Px(0.0)
+                                                    } else {
+                                                        Val::Auto
+                                                    },
+                                                    width: Val::Percent(7.0),
+                                                    height: Val::Px(2.0),
+                                                    ..default()
+                                                },
+                                                BackgroundColor(color),
+                                            ));
+                                        }
+                                    }
+                                    for segment in 0..5 {
+                                        for right in [false, true] {
+                                            region.spawn((
+                                                NeckDash,
+                                                Node {
+                                                    position_type: PositionType::Absolute,
+                                                    left: if right {
+                                                        Val::Auto
+                                                    } else {
+                                                        Val::Px(0.0)
+                                                    },
+                                                    right: if right {
+                                                        Val::Px(0.0)
+                                                    } else {
+                                                        Val::Auto
+                                                    },
+                                                    top: Val::Percent(segment as f32 * 20.0),
+                                                    width: Val::Px(2.0),
+                                                    height: Val::Percent(12.0),
+                                                    ..default()
+                                                },
+                                                BackgroundColor(color),
+                                            ));
+                                        }
+                                    }
+                                }
+                                region.spawn((
+                                    NeckLabel(next),
+                                    Text::new(""),
+                                    TextLayout::no_wrap(),
+                                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                    TextColor(color),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        top: Val::Px(if next { 112.0 } else { -22.0 }),
+                                        ..default()
+                                    },
+                                ));
+                            });
+                        // Next rings are drawn first, with solid current dots on top.
+                    }
+                    for next in [true, false] {
+                        for string in 1..=guitar.string_count() {
+                            board.spawn((
+                                NeckDot { next, string },
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    width: Val::Px(if next { 18.0 } else { 10.0 }),
+                                    height: Val::Px(if next { 18.0 } else { 10.0 }),
+                                    border_radius: BorderRadius::MAX,
+                                    border: UiRect::all(Val::Px(2.0)),
+                                    ..default()
+                                },
+                                UiTransform::from_translation(Val2::all(Val::Percent(-50.0))),
+                                BorderColor::all(if next { NECK_NEXT } else { NECK_NOW }),
+                                BackgroundColor(if next { Color::NONE } else { NECK_NOW }),
+                            ));
+                        }
+                    }
+                });
+        });
+}
+
+pub(super) fn update_neck_overview(
+    clock: Res<GameplayClock>,
+    notes: Res<SongNotes>,
+    loc: Res<harmonicon_platform::localization::Localization>,
+    boards: Query<&NeckOverview>,
+    mut regions: Query<
+        (&NeckRegion, &mut Node, &mut BackgroundColor, &mut BorderColor),
+        (Without<NeckDot>, Without<NeckLabel>),
+    >,
+    mut dots: Query<(&NeckDot, &mut Node), (Without<NeckRegion>, Without<NeckLabel>)>,
+    mut labels: Query<(&NeckLabel, &mut Text, &mut Node), (Without<NeckRegion>, Without<NeckDot>)>,
+    mut dashes: Query<&mut BackgroundColor, (With<NeckDash>, Without<NeckRegion>)>,
+) {
+    let Ok(NeckOverview(guitar)) = boards.single() else { return };
+    let current = attack_group(&notes.notes, clock.get(), None);
+    let next = attack_group(&notes.notes, clock.get(), current.first().map(|n| n.time));
+    let positions = |group: &[&ScheduledNote]| {
+        group
+            .iter()
+            .filter_map(|n| if let PlayPosition::Fret(p) = n.position { Some(p) } else { None })
+            .collect::<Vec<_>>()
+    };
+    let now_positions = positions(&current);
+    let next_positions = positions(&next);
+    let columns = f32::from(guitar.frets) + 1.0;
+    let now_span = hand_region(&now_positions, guitar.top_fret());
+    let next_span = hand_region(&next_positions, guitar.top_fret());
+    let shared = now_span.is_some() && now_span == next_span;
+    for mut dash in &mut dashes {
+        dash.0 = if shared || next_span.is_none() { Color::NONE } else { NECK_NEXT };
+    }
+    for (region, mut node, mut fill, mut border) in &mut regions {
+        let group = if region.0 { &next_positions } else { &now_positions };
+        let span = hand_region(group, guitar.top_fret());
+        let color = if region.0 { NECK_NEXT } else { NECK_NOW };
+        fill.0 = if span.is_none() || (region.0 && shared) {
+            Color::NONE
+        } else {
+            color.with_alpha(if region.0 { 0.05 } else { 0.14 })
+        };
+        *border = BorderColor::all(if span.is_none() { Color::NONE } else { color });
+        if let Some((first, last)) = span {
+            node.display = Display::Flex;
+            node.left = Val::Percent(f32::from(first + guitar.capo) * 100.0 / columns);
+            node.width = Val::Percent(f32::from(last - first + 1) * 100.0 / columns);
+        } else {
+            // All-open groups still need their action label, at the nut/capo.
+            node.display = if group.is_empty() { Display::None } else { Display::Flex };
+            node.left = Val::Percent(f32::from(guitar.capo) * 100.0 / columns);
+            node.width = Val::Percent(100.0 / columns);
+        }
+    }
+    for (dot, mut node) in &mut dots {
+        let group = if dot.next { &next_positions } else { &now_positions };
+        if let Some(position) = group.iter().find(|p| p.string == dot.string) {
+            node.display = Display::Flex;
+            node.left =
+                Val::Percent((f32::from(position.fret + guitar.capo) + 0.5) * 100.0 / columns);
+            node.top = Val::Percent(
+                (f32::from(dot.string) - 0.5) * 100.0 / f32::from(guitar.string_count()),
+            );
+        } else {
+            node.display = Display::None;
+        }
+    }
+    for (label, mut text, mut node) in &mut labels {
+        let span = if label.0 { next_span } else { now_span };
+        let near_end =
+            span.is_some_and(|(_, last)| last + guitar.capo >= guitar.frets.saturating_sub(3));
+        node.left = if near_end { Val::Auto } else { Val::Px(0.0) };
+        node.right = if near_end { Val::Px(0.0) } else { Val::Auto };
+        let name = group_name(if label.0 { &next } else { &current });
+        let key = if label.0 { "gameplay-guitar-neck-next" } else { "gameplay-guitar-neck-now" };
+        text.0 = loc.msg_args(key, &[("chord", name)]).to_string();
+    }
 }

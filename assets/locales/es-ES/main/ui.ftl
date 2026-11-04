@@ -993,3 +993,8 @@ editor-guitar-select-empty = Elige un documento vacío para cambiar de instrumen
 
 gameplay-harmonica-blow-cue = Orificio { $hole } · Soplar / exhalar
 gameplay-harmonica-draw-cue = Orificio { $hole } · Aspirar / inhalar
+
+gameplay-guitar-neck = Diapasón · trastes físicos · puntos = tocar
+gameplay-guitar-neck-capo = Diapasón · trastes físicos · cejilla { $capo }
+gameplay-guitar-neck-now = Ahora { $chord }
+gameplay-guitar-neck-next = Siguiente { $chord }

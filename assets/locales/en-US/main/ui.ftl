@@ -994,3 +994,8 @@ editor-guitar-select-empty = Select an empty document to change instruments. Sav
 
 gameplay-harmonica-blow-cue = Hole { $hole } · Blow / exhale
 gameplay-harmonica-draw-cue = Hole { $hole } · Draw / inhale
+
+gameplay-guitar-neck = Fretboard · physical frets · dots = play
+gameplay-guitar-neck-capo = Fretboard · physical frets · capo { $capo }
+gameplay-guitar-neck-now = Now { $chord }
+gameplay-guitar-neck-next = Next { $chord }
