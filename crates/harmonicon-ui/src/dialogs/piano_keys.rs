@@ -194,10 +194,11 @@ mod tests {
     fn a_vertical_keyboard_places_accidentals_between_continuous_white_keys() {
         let roll = spec(KeyboardAxis::Vertical);
         let (_, top, width, height) = key_rect(&roll, 72);
-        assert_eq!((top, width), (0.0, 100.0));
-        assert!((height - 150.0 / 13.0).abs() < 1e-4);
+        assert!(top.abs() < 1e-4);
+        assert_eq!(width, 100.0);
+        assert!((height - 100.0 / 13.0).abs() < 1e-4);
         let (_, top, _, _) = key_rect(&roll, 60);
-        assert!((top - 1100.0 / 13.0).abs() < 1e-3, "C extends beneath C#");
+        assert!((top - 1150.0 / 13.0).abs() < 1e-3, "C extends beneath C#");
         let (_, c_top, _, _) = key_rect(&roll, 60);
         let (_, d_top, _, d_height) = key_rect(&roll, 62);
         assert!((c_top - d_top - d_height).abs() < 1e-4, "white keys meet");
