@@ -27,6 +27,7 @@ pub(super) fn decode_note(
     let event: NoteEvent = serde_json::from_value(value.clone()).ok()?;
     let midi = harmonicon_core::midi::note_to_midi(event.note.as_deref()?)? as f32;
     let position = match instrument {
+        Instrument::Piano(_) => PlayPosition::Key(midi as u8),
         Instrument::Flute(_) => PlayPosition::Fingering(FingeringAssignment {
             note: midi as u8,
             alternate: event.fingering.unwrap_or(0),
@@ -171,7 +172,13 @@ mod tests {
             .sum::<usize>();
         assert_eq!(state.notes.len(), events);
         assert_eq!(state.row_count(), 88);
-        assert!(state.notes.iter().all(|n| state.row_visible(n.row())), "every note in the window");
+        // This two-hand fixture spans more pitches than the scrollable
+        // keyboard window can show at once. Keep every note in the document
+        // and centre the view, rather than dropping offscreen notes.
+        let low = state.notes.iter().map(GridNote::row).min().unwrap();
+        let high = state.notes.iter().map(GridNote::row).max().unwrap();
+        assert!(state.row_visible(((u16::from(low) + u16::from(high)) / 2) as u8));
+        assert!(state.notes.iter().any(|n| state.row_visible(n.row())));
         let saved: serde_json::Value =
             serde_json::from_str(&super::super::harpchart::serialize_harpchart(&state)).unwrap();
         assert_eq!(saved["instrument"], serde_json::json!({ "type": "piano", "keys": 88 }));

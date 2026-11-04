@@ -1013,3 +1013,9 @@ pause-repeat-section = Repetir seção · alternar
 pause-repeat-on = Repetir seção: ligado
 
 pause-repeat-off = Repetir seção: desligado
+
+editor-field-instrument = Instrumento
+
+editor-instrument-harmonica = Harmônica
+
+editor-instrument-select-empty = Escolha outro instrumento num documento vazio ou crie um novo.

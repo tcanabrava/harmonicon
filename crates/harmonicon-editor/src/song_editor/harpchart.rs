@@ -705,6 +705,9 @@ pub(super) fn load_harpchart(v: &serde_json::Value, state: &mut EditorState, scr
     }
 
     state.notes = notes;
+    if super::piano_note::is_piano(state) {
+        super::piano_note::centre_on_notes(state);
+    }
     state.next_id = next_id;
     state.selected.clear();
     state.dragging = None;

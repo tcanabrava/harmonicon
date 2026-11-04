@@ -1016,3 +1016,9 @@ pause-repeat-section = Repeat section · toggle
 pause-repeat-on = Repeat section: on
 
 pause-repeat-off = Repeat section: off
+
+editor-field-instrument = Instrument
+
+editor-instrument-harmonica = Harmonica
+
+editor-instrument-select-empty = Choose another instrument in an empty document, or create a new document.

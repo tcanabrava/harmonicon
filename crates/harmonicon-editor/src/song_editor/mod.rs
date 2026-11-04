@@ -40,6 +40,7 @@ mod guitar_note;
 mod harmonica_note;
 mod harpchart;
 mod instrument_chart;
+mod instrument_ui;
 mod interaction;
 mod legend;
 mod lesson_form;
@@ -277,8 +278,12 @@ impl Plugin for SongEditor2Plugin {
                     ),
                     (panel::update_mode_visibility, panel::update_note_column)
                         .run_if(resource_exists_and_changed::<state::EditorState>),
-                    legend::update_legend_visibility
-                        .run_if(resource_exists_and_changed::<state::EditorState>),
+                    (
+                        instrument_ui::sync_scopes,
+                        legend::update_legend_visibility
+                            .run_if(resource_exists_and_changed::<state::EditorState>),
+                    )
+                        .chain(),
                     panel::update_technique_button_visibility
                         .run_if(resource_exists_and_changed::<state::EditorState>),
                     panel::update_meta_fields.run_if(

@@ -241,7 +241,7 @@ fn spawn_content_kind_row(
     );
 }
 
-fn spawn_harmonica_kind_row(
+pub(super) fn spawn_harmonica_kind_row(
     col: &mut ChildSpawnerCommands,
     loc: &Localization,
     colors: SongEditorColors,
@@ -703,43 +703,89 @@ pub(super) fn spawn_meta_form(
     })
     .with_children(|form| {
         let first_col = spawn_form_column(form, |col| {
-            spawn_content_kind_row(col, loc, colors);
-            spawn_harmonica_kind_row(col, loc, colors);
-            super::guitar_note::spawn_selector(
+            super::instrument_ui::spawn_selector(col, loc, colors);
+            super::instrument_ui::scoped(
                 col,
-                loc,
-                "editor-guitar-select",
-                harmonicon_core::instrument::guitar::Guitar::standard(
-                    harmonicon_core::instrument::guitar::GuitarBody::Electric,
-                )
-                .into(),
-            );
-            super::guitar_note::spawn_selector(
-                col,
-                loc,
-                "editor-flute-select",
-                harmonicon_core::instrument::flute::Flute::default().into(),
-            );
-            super::guitar_note::spawn_selector(
-                col,
-                loc,
-                "editor-piano-select",
-                harmonicon_core::instrument::piano::Piano::grand().into(),
+                super::instrument_ui::InstrumentScope::Harmonica,
+                |col| {
+                    spawn_content_kind_row(col, loc, colors);
+                    spawn_harmonica_kind_row(col, loc, colors);
+                },
             );
             spawn_snap_mode_row(col, loc, colors);
             for &(field, label) in &FIELDS[..MID] {
-                spawn_field_row(col, loc, colors, state, field, label);
+                if field == Field::Position {
+                    super::instrument_ui::scoped(
+                        col,
+                        super::instrument_ui::InstrumentScope::Harmonica,
+                        |col| {
+                            spawn_field_row(col, loc, colors, state, field, label);
+                        },
+                    );
+                } else {
+                    spawn_field_row(col, loc, colors, state, field, label);
+                }
             }
         });
         spawn_twelve_bar_tint_row(&mut form.commands(), first_col, loc, state.twelve_bar_tint);
         spawn_form_column(form, |col| {
             for &(field, label) in &FIELDS[MID..] {
-                spawn_field_row(col, loc, colors, state, field, label);
+                if field == Field::Position {
+                    super::instrument_ui::scoped(
+                        col,
+                        super::instrument_ui::InstrumentScope::Harmonica,
+                        |col| {
+                            spawn_field_row(col, loc, colors, state, field, label);
+                        },
+                    );
+                } else {
+                    spawn_field_row(col, loc, colors, state, field, label);
+                }
             }
-            spawn_midi_track_row(col, loc, colors);
+            super::instrument_ui::scoped(
+                col,
+                super::instrument_ui::InstrumentScope::Harmonica,
+                |col| spawn_midi_track_row(col, loc, colors),
+            );
         });
         let legend_col = spawn_form_column(form, |col| {
-            super::legend::spawn_color_legend(col, loc, colors);
+            super::instrument_ui::scoped(
+                col,
+                super::instrument_ui::InstrumentScope::Harmonica,
+                |col| super::legend::spawn_color_legend(col, loc, colors),
+            );
+            super::instrument_ui::scoped(
+                col,
+                super::instrument_ui::InstrumentScope::OtherInstruments,
+                |col| {
+                    super::legend::spawn_legend_heading(
+                        col,
+                        colors,
+                        loc.msg("editor-legend-notes").to_string(),
+                    );
+                    super::legend::spawn_legend_row(
+                        col,
+                        colors,
+                        colors.accent,
+                        true,
+                        loc.msg("editor-legend-selected").to_string(),
+                    );
+                    super::legend::spawn_legend_row(
+                        col,
+                        colors,
+                        Color::srgb(0.3, 0.8, 0.4),
+                        false,
+                        loc.msg("editor-legend-drag-ok").to_string(),
+                    );
+                    super::legend::spawn_legend_row(
+                        col,
+                        colors,
+                        Color::srgb(0.9, 0.3, 0.3),
+                        false,
+                        loc.msg("editor-legend-drag-bad").to_string(),
+                    );
+                },
+            );
         });
         form.commands().entity(legend_col).insert((
             LegendColumn,

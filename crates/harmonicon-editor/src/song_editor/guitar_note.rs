@@ -215,47 +215,6 @@ pub(super) fn is_harmonica(state: Option<bevy::prelude::Res<EditorState>>) -> bo
     state.is_none_or(|s| matches!(s.effective_instrument(), Instrument::Harmonica(_)))
 }
 
-/// A Details form button switching the document to `instrument` ("Use
-/// guitar", "Use flute"), labelled with `label_key`. Only an empty document
-/// changes instrument: a hole has no string or fingering to become.
-pub(super) fn spawn_selector(
-    parent: &mut bevy::prelude::ChildSpawnerCommands,
-    loc: &harmonicon_platform::localization::Localization,
-    label_key: &str,
-    instrument: Instrument,
-) {
-    use bevy::input_focus::tab_navigation::TabIndex;
-    use bevy::prelude::*;
-    use bevy::ui_widgets::{Activate, Button};
-    use harmonicon_platform::localization::{Localization, LocalizationExt};
-    parent
-        .spawn((
-            Button,
-            TabIndex(0),
-            Node { padding: UiRect::all(Val::Px(8.0)), ..default() },
-            BackgroundColor(Color::srgb(0.15, 0.19, 0.26)),
-            children![(Text::new(loc.msg(label_key).to_string()), TextColor(Color::WHITE))],
-        ))
-        .observe(
-            move |_: On<Activate>,
-                  state: Res<EditorState>,
-                  mut commands: Commands,
-                  mut feedback: ResMut<super::save_feedback::SaveFeedback>,
-                  loc: Res<Localization>| {
-                if !state.notes.is_empty() || state.mode != super::state::Mode::Edit {
-                    feedback.set(loc.msg("editor-guitar-select-empty"));
-                    return;
-                }
-                commands.write_message(super::state::DocumentCommand::SelectInstrument(
-                    super::state::InstrumentSelection::Configured {
-                        instrument: instrument.clone(),
-                        harmonica_origin: None,
-                    },
-                ));
-            },
-        );
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
