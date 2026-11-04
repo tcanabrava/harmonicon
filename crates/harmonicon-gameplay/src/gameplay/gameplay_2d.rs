@@ -363,7 +363,7 @@ pub fn setup(
         score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis)),
     );
 
-    spawn_song_progress(
+    let progress_bar = spawn_song_progress(
         &mut commands,
         &manifest.waveform,
         // Hidden piano markers must not shorten a chart-only song's
@@ -375,13 +375,18 @@ pub fn setup(
         &progress_note_markers(
             &song_notes.notes,
             highway_lanes.0.as_ref(),
-            panels.progress_notes && piano_roll.is_none(),
+            panels.progress_notes && piano_roll.is_none() && !is_guitar,
         ),
         // One progress lane per highway lane: a harp's holes.
         highway_lanes.0.as_ref().map_or(0, |l| u8::try_from(l.lanes.len()).unwrap_or(u8::MAX)),
         &adaptive.sections,
         &adaptive.learned,
     );
+    // Harmonica players use the note overview as their practice map;
+    // keep it interactive above the opaque pause score.
+    if matches!(instrument, Some(harmonicon_core::instrument::Instrument::Harmonica(_))) {
+        commands.entity(progress_bar).insert(GlobalZIndex(350));
+    }
     let staff = panels.notation_staff && display.bravura.is_some();
     if staff && let Some(bravura) = &display.bravura {
         spawn_gameplay_music_score(&mut commands, bravura, piano_roll.is_some());

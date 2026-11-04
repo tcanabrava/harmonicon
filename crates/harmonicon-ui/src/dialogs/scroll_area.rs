@@ -277,7 +277,9 @@ pub fn update_scrollbar_visibility(
         };
         // Written only on a flip: every menu page has a scroll area, and an
         // unconditional `Node` write each frame forces a UI layout pass.
-        let visibility = if needed { Visibility::Visible } else { Visibility::Hidden };
+        // Visible overrides a hidden ancestor. Scrollbars must disappear
+        // with their dialog (including the pause menu after resuming).
+        let visibility = if needed { Visibility::Inherited } else { Visibility::Hidden };
         if *vis != visibility {
             *vis = visibility;
         }

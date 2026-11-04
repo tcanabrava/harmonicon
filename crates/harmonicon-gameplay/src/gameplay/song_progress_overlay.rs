@@ -274,7 +274,7 @@ pub fn spawn_song_progress(
     lane_count: u8,
     sections: &[PhraseSection],
     learned: &[f32],
-) {
+) -> Entity {
     let duration_secs = effective_duration(duration_secs, notes, sections);
     commands.insert_resource(AudioDuration(duration_secs));
     commands
@@ -531,7 +531,8 @@ pub fn spawn_song_progress(
                 Pickable::IGNORE,
                 ProgressPlayhead,
             ));
-        });
+        })
+        .id()
 }
 
 /// Sweeps the playhead from the left edge at song start to the right edge at

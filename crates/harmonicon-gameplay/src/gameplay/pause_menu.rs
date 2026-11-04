@@ -543,7 +543,15 @@ pub(super) fn setup_pause_menu(
     adaptive: Res<AdaptiveDifficulty>,
     song_info: Res<SongInfo>,
     loc: Res<Localization>,
+    selected: Res<SelectedSong>,
+    manifests: Res<Assets<SongManifest>>,
 ) {
+    let keep_note_overview = manifests.get(&selected.0).is_some_and(|manifest| {
+        matches!(
+            manifest.chart.instrument(),
+            Some(harmonicon_core::instrument::Instrument::Harmonica(_))
+        )
+    });
     let is_jam = *mode == GameplayMode::JamSession;
     // A scale-adherence lesson (see `PassCriteria::ScaleAdherence`) is the
     // one lesson type that never reaches the results screen on its own —
@@ -568,7 +576,7 @@ pub(super) fn setup_pause_menu(
                 flex_direction: {FlexDirection::Column},
                 justify_content: {JustifyContent::Center},
                 align_items: {AlignItems::Center},
-                padding: {if is_jam { UiRect::all(Val::Px(16.0)).with_top(Val::Px(8.0 + BAR_HEIGHT)) } else { UiRect::all(Val::Px(16.0)) }},
+                padding: {if is_jam || keep_note_overview { UiRect::all(Val::Px(16.0)).with_top(Val::Px(8.0 + BAR_HEIGHT)) } else { UiRect::all(Val::Px(16.0)) }},
             }
             BackgroundColor({if is_jam { MODAL_BACKDROP_BG } else { Color::srgb(0.045, 0.05, 0.07) }})
             GlobalZIndex(300)
