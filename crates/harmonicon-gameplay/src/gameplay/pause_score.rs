@@ -202,6 +202,7 @@ pub(super) fn update_pause_score(
                                             left: Val::Px(left),
                                             width: Val::Px((right - left).max(1.0)),
                                             height: Val::Percent(100.0),
+                                            padding: UiRect::horizontal(Val::Px(14.0)),
                                             border: UiRect::all(Val::Px(1.0)),
                                             overflow: Overflow::clip(),
                                             ..default()
@@ -212,7 +213,7 @@ pub(super) fn update_pause_score(
                                     .observe(select_zone)
                                     .with_children(|p| {
                                         p.spawn((
-                                            Text::new((index + 1).to_string()),
+                                            Text::new(section.name.clone()),
                                             TextLayout::no_wrap(),
                                             TextFont { font_size: FontSize::Px(13.0), ..default() },
                                             TextColor(Color::WHITE),

@@ -16,6 +16,7 @@ use harmonicon_core::chart::seconds_to_tick;
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::music_score::{
     MeterMap, MusicScoreBarMap, MusicScoreMeter, MusicScoreNotes, MusicScorePlayhead,
+    MusicScoreSections, MusicScoreSelection, ScoreSection,
 };
 
 use super::bars::pickup_lead_ticks;
@@ -26,6 +27,10 @@ pub struct MusicScoreBridgePlugin;
 
 impl Plugin for MusicScoreBridgePlugin {
     fn build(&self, app: &mut App) {
+        app.add_systems(OnExit(AppState::Playing), |mut commands: Commands| {
+            commands.insert_resource(MusicScoreSections::default());
+            commands.insert_resource(MusicScoreSelection::default());
+        });
         app.add_systems(
             Update,
             (
@@ -66,6 +71,7 @@ fn sync_music_score_notes(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut score_notes: ResMut<MusicScoreNotes>,
+    mut sections: ResMut<MusicScoreSections>,
     mut meter: ResMut<MusicScoreMeter>,
     mut bar_map: ResMut<MusicScoreBarMap>,
     highlight: Res<StaffHighlight>,
@@ -84,6 +90,27 @@ fn sync_music_score_notes(
     if *bar_map != next_bar_map {
         *bar_map = next_bar_map;
     }
+    let chart = &manifest.chart;
+    let phrases = super::adaptive_difficulty::group_phrase_sections(
+        &super::adaptive_difficulty::track_items(&chart.track, timing),
+        super::last_note_end(&chart.track, timing),
+    );
+    let beat = |time| {
+        (seconds_to_tick(time, timing.resolution, &timing.tempo_map) + pickup_lead_ticks(chart))
+            as f64
+            / timing.resolution.max(1) as f64
+    };
+    let mapped: Vec<_> = phrases
+        .iter()
+        .map(|section| ScoreSection {
+            start: beat(section.start_time),
+            end: beat(section.end_time),
+            label: section.name.clone(),
+        })
+        .collect();
+    if sections.0 != mapped {
+        sections.0 = mapped;
+    }
     score_notes.0 = notes_to_notation(
         &song_notes.notes,
         timing.resolution,
@@ -101,6 +128,8 @@ fn update_music_score_playhead(
     selected: Res<SelectedSong>,
     manifests: Res<Assets<SongManifest>>,
     mut playhead: ResMut<MusicScorePlayhead>,
+    loops: Res<super::LoopConfig>,
+    mut selection: ResMut<MusicScoreSelection>,
 ) {
     let Some(manifest) = manifests.get(&selected.0) else {
         return;
@@ -110,6 +139,15 @@ fn update_music_score_playhead(
     // The same lead the notes carry, so the playhead reads against them.
     let tick = tick + pickup_lead_ticks(&manifest.chart);
     let beat = tick as f64 / timing.resolution.max(1) as f64;
+    let to_beat = |time| {
+        (seconds_to_tick(time, timing.resolution, &timing.tempo_map)
+            + pickup_lead_ticks(&manifest.chart)) as f64
+            / timing.resolution.max(1) as f64
+    };
+    let range = loops.active.then(|| (to_beat(loops.start_time), to_beat(loops.end_time)));
+    if selection.0 != range {
+        selection.0 = range;
+    }
     // Unchanged while paused or frozen on a wait-for-note.
     if playhead.0 != beat {
         playhead.0 = beat;

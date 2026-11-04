@@ -267,6 +267,18 @@ pub struct BravuraFont(pub Handle<Font>);
 #[derive(Resource, Default)]
 pub struct MusicScoreNotes(pub Vec<NotationNote>);
 
+/// Section boundaries in the same beat coordinate system as score notes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScoreSection {
+    pub start: f64,
+    pub end: f64,
+    pub label: String,
+}
+#[derive(Resource, Default)]
+pub struct MusicScoreSections(pub Vec<ScoreSection>);
+#[derive(Resource, Default)]
+pub struct MusicScoreSelection(pub Option<(f64, f64)>);
+
 /// Bar grid for the same score as [`MusicScoreNotes`]. Both callers provide
 /// their chart's meter map; gameplay uses the expanded performance chart.
 #[derive(Resource, Clone, Debug, PartialEq, Eq)]
@@ -592,6 +604,8 @@ impl Plugin for MusicScorePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TieMaterialPlugin)
             .init_resource::<MusicScoreNotes>()
+            .init_resource::<MusicScoreSections>()
+            .init_resource::<MusicScoreSelection>()
             .init_resource::<MusicScorePlayhead>()
             .init_resource::<MusicScoreMeter>()
             .init_resource::<MusicScoreBarMap>()
@@ -610,6 +624,8 @@ impl Plugin for MusicScorePlugin {
                 rebuild_score_notes
                     .run_if(
                         resource_changed::<MusicScoreNotes>
+                            .or_else(resource_changed::<MusicScoreSections>)
+                            .or_else(resource_changed::<MusicScoreSelection>)
                             .or_else(resource_changed::<MusicScoreMeter>)
                             .or_else(resource_changed::<MusicScoreBarMap>)
                             .or_else(resource_changed::<MusicScorePlayhead>)
@@ -641,6 +657,33 @@ pub struct PianoGrandStaff;
 pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont) -> Entity {
     spawn_score(parent, bravura, false)
 }
+/// Space for section labels inside the live score, above the notation.
+pub const SECTION_HEADER_HEIGHT: f32 = 24.0;
+
+pub fn spawn_sectioned_score(
+    parent: &mut ChildSpawnerCommands,
+    bravura: &BravuraFont,
+    grand: bool,
+) -> Entity {
+    let root = spawn_score(parent, bravura, grand);
+    parent.commands().queue(move |world: &mut World| {
+        let height = PANEL_HEIGHT * if grand { 2.0 } else { 1.0 } + SECTION_HEADER_HEIGHT;
+        world.get_mut::<Node>(root).unwrap().height = Val::Px(height);
+        let children: Vec<_> = world.get::<Children>(root).into_iter().flatten().copied().collect();
+        for child in children {
+            if world.get::<MusicScoreReference>(child).is_some() {
+                world.get_mut::<Node>(child).unwrap().height = Val::Px(height);
+            } else {
+                world.entity_mut(child).insert(UiTransform::from_translation(Val2::new(
+                    Val::Px(0.0),
+                    Val::Px(SECTION_HEADER_HEIGHT),
+                )));
+            }
+        }
+    });
+    root
+}
+
 pub fn spawn_piano_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont) -> Entity {
     spawn_score(parent, bravura, true)
 }
@@ -750,7 +793,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                 height: Val::Px(PANEL_HEIGHT * if grand { 2.0 } else { 1.0 }),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.95, 0.80, 0.35, 0.5)),
+            BackgroundColor(Color::srgb(1.0, 0.15, 0.18)),
             MusicScoreReference,
         ));
         // Notes layer: its local x=0 is the beat the glyphs were last
@@ -808,6 +851,8 @@ fn rebuild_score_notes(
     bravura: Option<Res<BravuraFont>>,
     tie_material: Option<Res<TieMaterialHandle>>,
     notes: Res<MusicScoreNotes>,
+    sections: Res<MusicScoreSections>,
+    selection: Res<MusicScoreSelection>,
     playhead: Res<MusicScorePlayhead>,
     panels: Query<(&ComputedNode, Option<&PianoGrandStaff>), With<MusicScorePanel>>,
     mut layers: Query<(Entity, &mut Node), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
@@ -851,6 +896,8 @@ fn rebuild_score_notes(
     });
     if !covered
         || notes.is_changed()
+        || sections.is_changed()
+        || selection.is_changed()
         || meter.is_changed()
         || bar_map.is_changed()
         || spacing.is_changed()
@@ -875,6 +922,82 @@ fn rebuild_score_notes(
             &mut time_sigs,
             panels.iter().next().is_some_and(|(_, grand)| grand.is_some()),
         );
+        commands.entity(layer).with_children(|parent| {
+            for section in &sections.0 {
+                if section.end < lo || section.start > hi {
+                    continue;
+                }
+                parent
+                    .spawn((
+                        MusicScoreNoteGlyph,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(((section.start - now) * scale as f64) as f32),
+                            top: Val::Px(-SECTION_HEADER_HEIGHT),
+                            width: Val::Px(((section.end - section.start) * scale as f64) as f32),
+                            height: Val::Px(20.0),
+                            padding: UiRect::horizontal(Val::Px(14.0)),
+                            overflow: Overflow::clip(),
+                            border: UiRect::left(Val::Px(1.0)),
+                            ..default()
+                        },
+                        BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
+                        BackgroundColor(Color::srgb(0.08, 0.11, 0.16)),
+                        bevy::picking::Pickable::IGNORE,
+                    ))
+                    .with_children(|p| {
+                        p.spawn((
+                            Text::new(section.label.clone()),
+                            TextLayout::no_wrap(),
+                            TextFont { font_size: FontSize::Px(12.0), ..default() },
+                            TextColor(Color::srgb(0.75, 0.82, 0.9)),
+                            bevy::picking::Pickable::IGNORE,
+                        ));
+                    });
+            }
+        });
+        if let Some((start, end)) = selection.0 {
+            let height = PANEL_HEIGHT
+                * if panels.iter().next().is_some_and(|(_, grand)| grand.is_some()) {
+                    2.0
+                } else {
+                    1.0
+                }
+                + SECTION_HEADER_HEIGHT;
+            commands.entity(layer).with_children(|p| {
+                p.spawn((
+                    MusicScoreNoteGlyph,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(((start - now) * scale as f64) as f32),
+                        width: Val::Px(((end - start) * scale as f64) as f32),
+                        top: Val::Px(-SECTION_HEADER_HEIGHT),
+                        height: Val::Px(height),
+                        border: UiRect::horizontal(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
+                    BackgroundColor(Color::srgba(0.4, 0.75, 1.0, 0.06)),
+                    bevy::picking::Pickable::IGNORE,
+                ))
+                .with_children(|p| {
+                    for (right, label) in [(false, "A"), (true, "B")] {
+                        p.spawn((
+                            Text::new(label),
+                            TextFont { font_size: FontSize::Px(12.0), ..default() },
+                            TextColor(Color::srgb(0.4, 0.75, 1.0)),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: if right { Val::Auto } else { Val::Px(2.0) },
+                                right: if right { Val::Px(2.0) } else { Val::Auto },
+                                ..default()
+                            },
+                            bevy::picking::Pickable::IGNORE,
+                        ));
+                    }
+                });
+            });
+        }
         *window = Some(SpawnedWindow { layer, panel_width, origin: now, lo, hi });
     }
 
@@ -1263,6 +1386,27 @@ mod tests {
 #[cfg(test)]
 mod piano_staff_tests {
     use super::*;
+    #[test]
+    fn section_headers_live_inside_the_score_panel() {
+        let mut app = App::new();
+        app.world_mut().commands().spawn(Node::default()).with_children(|p| {
+            spawn_sectioned_score(p, &BravuraFont(Handle::default()), false);
+        });
+        app.world_mut().flush();
+        let world = app.world_mut();
+        let panel = world.query_filtered::<&Node, With<MusicScorePanel>>().single(world).unwrap();
+        let height = panel.height;
+        assert_eq!(height, Val::Px(PANEL_HEIGHT + SECTION_HEADER_HEIGHT));
+        let layer = world
+            .query_filtered::<&UiTransform, With<MusicScoreNotesLayer>>()
+            .single(world)
+            .unwrap();
+        assert_eq!(layer.translation.y, Val::Px(SECTION_HEADER_HEIGHT));
+        let reference =
+            world.query_filtered::<&Node, With<MusicScoreReference>>().single(world).unwrap();
+        assert_eq!(reference.height, height, "one playhead spans the integrated score");
+    }
+
     #[test]
     fn piano_score_has_both_clefs_and_reserves_two_staves() {
         let mut app = App::new();

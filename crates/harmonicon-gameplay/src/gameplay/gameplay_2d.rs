@@ -31,7 +31,8 @@ use super::note_feedback::{
 };
 use super::note_ribbon::ribbon_technique;
 use super::note_ribbon_2d::NoteRibbon2dMaterial;
-use super::song_progress_overlay::{BAR_HEIGHT, MarkerTint, NoteMarker, spawn_song_progress};
+#[cfg(test)]
+use super::song_progress_overlay::{MarkerTint, NoteMarker};
 use super::technique_cue;
 use super::{
     ActivePitches, ActiveTargets, COUNTDOWN, GameplayRoot, HighwayLanes, HoleCell, HoleState,
@@ -153,7 +154,7 @@ pub fn setup(
     // — everything else here is a child, so it always paints above
     // the background. The song-progress bar (`BAR_Z_INDEX`) still
     // paints above this whole layout; panels below reserve
-    // `BAR_HEIGHT` of top space so it doesn't cover their text.
+    // The score height is reserved so it does not cover their text.
     commands
         .spawn_empty()
         .apply_scene(bsn! {
@@ -178,9 +179,9 @@ pub fn setup(
 
             // ── Left panel: note highway + harmonica ─────────────────────────
             let left_top_padding = if compact {
-                8.0 + BAR_HEIGHT
+                8.0
             } else {
-                8.0 + BAR_HEIGHT
+                8.0 + music_score::SECTION_HEADER_HEIGHT
                     + music_score::PANEL_HEIGHT * if piano_roll.is_some() { 2.0 } else { 1.0 }
             };
             root.spawn(Node {
@@ -296,9 +297,9 @@ pub fn setup(
 
             // ── Right panel: info + 12-bar + metronome + score ───────────────
             let right_top_padding = if compact {
-                12.0 + BAR_HEIGHT
+                12.0
             } else {
-                12.0 + BAR_HEIGHT
+                12.0 + music_score::SECTION_HEADER_HEIGHT
                     + music_score::PANEL_HEIGHT * if piano_roll.is_some() { 2.0 } else { 1.0 }
             };
             root.spawn(Node {
@@ -363,34 +364,29 @@ pub fn setup(
         score_anchor(highway_lanes.0.as_ref().map_or(ScrollAxis::Vertical, |l| l.axis)),
     );
 
-    let progress_bar = spawn_song_progress(
-        &mut commands,
-        &manifest.waveform,
-        // Hidden piano markers must not shorten a chart-only song's
-        // seek/loop timeline: retain the notes' full duration separately.
+    // Retain the timeline duration for loop policy without a second map.
+    commands.insert_resource(super::song_progress_overlay::AudioDuration(
         song_notes
             .notes
             .iter()
             .fold(manifest.music_duration_secs, |end, note| end.max(note.time + note.duration)),
-        &progress_note_markers(
-            &song_notes.notes,
-            highway_lanes.0.as_ref(),
-            panels.progress_notes && piano_roll.is_none() && !is_guitar,
-        ),
-        // One progress lane per highway lane: a harp's holes.
-        highway_lanes.0.as_ref().map_or(0, |l| u8::try_from(l.lanes.len()).unwrap_or(u8::MAX)),
-        &adaptive.sections,
-        &adaptive.unlock_levels,
-    );
-    // Harmonica players use the note overview as their practice map;
-    // keep it interactive above the opaque pause score.
-    commands.entity(progress_bar).insert(GlobalZIndex(350));
+    ));
     let staff = panels.notation_staff && display.bravura.is_some();
     if staff && let Some(bravura) = &display.bravura {
         spawn_gameplay_music_score(&mut commands, bravura, piano_roll.is_some());
     }
     if panels.lyrics {
-        super::karaoke::spawn_karaoke(&mut commands, lyrics, super::karaoke::strip_top(staff));
+        super::karaoke::spawn_karaoke(
+            &mut commands,
+            lyrics,
+            super::karaoke::strip_top(staff)
+                + if staff {
+                    music_score::SECTION_HEADER_HEIGHT
+                        + if piano_roll.is_some() { music_score::PANEL_HEIGHT } else { 0.0 }
+                } else {
+                    0.0
+                },
+        );
     }
     let harp_hint = played
         .map(|harp| super::song_info::harp_banner_text(harp, &effective.song_key_for(chart), &loc));
@@ -399,6 +395,7 @@ pub fn setup(
 
 /// The progress bar's per-hole note markers for `notes`, or none when the
 /// contextual panels leave them out (`hud_panel::contextual_panels`).
+#[cfg(test)]
 pub(super) fn progress_note_markers(
     notes: &[ScheduledNote],
     layout: Option<&LaneLayout>,
@@ -439,18 +436,8 @@ pub(super) fn progress_note_markers(
         .collect()
 }
 
-/// Wraps `music_score::spawn_music_score` in its own absolutely-positioned,
-/// full-width strip pinned directly below the song-progress bar (`BAR_HEIGHT`
-/// down from the top).
-///
-/// A sibling top-level entity, not a child of the background-image root each
-/// gameplay mode paints at `GlobalZIndex(1)` (see that root's own comment),
-/// so it needs its own `GlobalZIndex` to render above it — same "strictly
-/// between the background layer and the pause overlay's `GlobalZIndex(200)`"
-/// reasoning `pause_menu`'s always-visible pause button already documents,
-/// reusing the identical `GlobalZIndex(100)` so pausing still covers it too.
-/// Without this it defaulted to `GlobalZIndex(0)`, below the background's
-/// `1`, and the background image painted over the whole panel.
+/// One live score pinned to the top of Play. Its section header and
+/// repeat boundaries share the notation's scroll and beat coordinates.
 pub(super) fn spawn_gameplay_music_score(
     commands: &mut Commands,
     bravura: &BravuraFont,
@@ -460,21 +447,20 @@ pub(super) fn spawn_gameplay_music_score(
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: Val::Px(BAR_HEIGHT),
+                top: Val::Px(0.0),
                 left: Val::Px(0.0),
                 width: Val::Percent(100.0),
-                height: Val::Px(music_score::PANEL_HEIGHT * if piano { 2.0 } else { 1.0 }),
+                height: Val::Px(
+                    music_score::SECTION_HEADER_HEIGHT
+                        + music_score::PANEL_HEIGHT * if piano { 2.0 } else { 1.0 },
+                ),
                 ..default()
             },
             GlobalZIndex(100),
             GameplayRoot,
         ))
         .with_children(|panel| {
-            if piano {
-                music_score::spawn_piano_score(panel, bravura);
-            } else {
-                music_score::spawn_music_score(panel, bravura);
-            }
+            music_score::spawn_sectioned_score(panel, bravura, piano);
         });
 }
 

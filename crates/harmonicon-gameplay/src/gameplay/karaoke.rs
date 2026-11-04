@@ -63,7 +63,7 @@ struct KaraokeNext;
 /// too when one is drawn.
 pub(super) fn strip_top(staff: bool) -> f32 {
     let staff_height = if staff { harmonicon_ui::music_score::PANEL_HEIGHT } else { 0.0 };
-    super::song_progress_overlay::BAR_HEIGHT + staff_height
+    staff_height
 }
 
 /// Spawns the strip `top` px below the window's top edge, full width —
