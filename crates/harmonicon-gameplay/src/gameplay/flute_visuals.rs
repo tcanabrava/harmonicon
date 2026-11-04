@@ -186,6 +186,7 @@ pub(super) fn spawn_flute_chart(
     parent
         .spawn((
             FluteDrawing(*flute),
+            UiTransform::IDENTITY,
             slot,
             Node {
                 width: if vertical { Val::Px(thickness) } else { full },
@@ -291,8 +292,16 @@ pub(super) fn spawn_flute_chart(
                     cell.spawn((
                         FluteKey { key, slot },
                         Node {
-                            width: Val::Px(size),
-                            height: Val::Px(size),
+                            width: Val::Px(if key_row.side == Side::Tube || vertical {
+                                size
+                            } else {
+                                size * 1.7
+                            }),
+                            height: Val::Px(if key_row.side == Side::Tube || !vertical {
+                                size
+                            } else {
+                                size * 1.7
+                            }),
                             border: UiRect::all(Val::Px(border)),
                             border_radius: BorderRadius::MAX,
                             ..default()
@@ -367,7 +376,7 @@ pub(super) fn spawn_flute_stage(
         .with_children(|strip| {
             // The preview sits above the current chart, on the same axis:
             // eyes and hands can compare changes without scanning sideways.
-            for (slot, scale) in [(ChartSlot::Next, 0.8), (ChartSlot::Now, 1.25)] {
+            for (slot, scale) in [(ChartSlot::Next, 0.75), (ChartSlot::Now, 1.25)] {
                 strip
                     .spawn(Node {
                         width: Val::Percent(100.0),
@@ -415,7 +424,17 @@ pub(super) fn spawn_flute_stage(
                             ..default()
                         })
                         .with_children(|c| {
-                            spawn_flute_chart(c, flute, scale, slot, ChartAxis::Horizontal)
+                            c.spawn(Node {
+                                width: Val::Percent(if slot == ChartSlot::Next {
+                                    60.0
+                                } else {
+                                    100.0
+                                }),
+                                ..default()
+                            })
+                            .with_children(|chart| {
+                                spawn_flute_chart(chart, flute, scale, slot, ChartAxis::Horizontal);
+                            });
                         });
                     });
             }
@@ -448,22 +467,67 @@ const COUNTDOWN_COMING: Color = Color::srgb(0.45, 0.70, 1.0);
 #[derive(Resource, Default, PartialEq, Eq)]
 pub struct StaffHighlight(pub Option<usize>);
 
+/// Motion is presentation-only: chart time still selects and scores notes.
+#[derive(Default)]
+pub(super) struct StageMotion {
+    seen: Option<(Entity, f64)>,
+    current: Option<usize>,
+    next: Option<usize>,
+    elapsed: f32,
+}
+
+/// Ease the previous preview down into the current chart over 240 ms.
+fn promotion_transform(progress: f32) -> UiTransform {
+    let t = progress.clamp(0.0, 1.0);
+    let remaining = 1.0 - t * t * (3.0 - 2.0 * t);
+    UiTransform {
+        translation: Val2::new(Val::Percent(-20.0 * remaining), Val::Px(-96.0 * remaining)),
+        scale: Vec2::splat(1.0 - 0.4 * remaining),
+        ..UiTransform::IDENTITY
+    }
+}
+
 /// Paints the strip from the notes and the clock: each chart's keys, the
 /// two names, the countdown bar, and which note the staff highlights.
 pub(super) fn update_flute_stage(
     clock: Res<GameplayClock>,
     notes: Res<SongNotes>,
     mine: Res<MyInstruments>,
-    stage: Query<&FluteStage>,
+    stage: Query<(Entity, &FluteStage)>,
+    time: Res<Time>,
+    mut motion: Local<StageMotion>,
+    mut drawings: Query<(&ChartSlot, &mut UiTransform), With<FluteDrawing>>,
     mut keys: Query<(&FluteKey, &mut BackgroundColor)>,
     mut names: Query<(&StageNoteName, &mut Text)>,
     mut bars: Query<(&mut Node, &mut BackgroundColor), (With<StageCountdown>, Without<FluteKey>)>,
     mut highlight: ResMut<StaffHighlight>,
 ) {
-    let Ok(FluteStage(flute)) = stage.single() else { return };
+    let Ok((entity, FluteStage(flute))) = stage.single() else { return };
     let shown = mine.flute_view == FluteView::Fingering;
     let now = clock.get();
     let (current, next) = stage_notes(&notes.notes, now);
+    let continuous = motion
+        .seen
+        .is_some_and(|(seen, previous)| seen == entity && now >= previous && now - previous < 0.5);
+    if !shown || !continuous {
+        motion.elapsed = 1.0;
+    } else if current != motion.current {
+        motion.elapsed = if current.is_some() && current == motion.next { 0.0 } else { 1.0 };
+    } else {
+        motion.elapsed += time.delta_secs();
+    }
+    motion.seen = shown.then_some((entity, now));
+    motion.current = current;
+    motion.next = next;
+    let progress = (motion.elapsed / 0.24).clamp(0.0, 1.0);
+    for (slot, mut transform) in &mut drawings {
+        *transform = if *slot == ChartSlot::Now {
+            promotion_transform(progress)
+        } else {
+            // Let the new preview emerge as the previous one moves away.
+            UiTransform::from_scale(Vec2::splat(0.65 + 0.35 * progress))
+        };
+    }
     let want = StaffHighlight(current.filter(|_| shown));
     if *highlight != want {
         *highlight = want;
@@ -566,6 +630,18 @@ pub(super) fn sync_flute_view(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn promotion_starts_at_preview_size_and_settles_without_overshoot() {
+        let start = promotion_transform(0.0);
+        assert_eq!(start.scale, Vec2::splat(0.6));
+        assert_eq!(start.translation.y, Val::Px(-96.0));
+        let end = promotion_transform(1.0);
+        assert_eq!(end.scale, Vec2::ONE);
+        assert_eq!(end.translation, Val2::ZERO);
+        assert_eq!(promotion_transform(2.0).scale, Vec2::ONE);
+        assert!(promotion_transform(0.5).scale.x > start.scale.x);
+    }
 
     fn note(time: f64, midi: u8, alternate: u8) -> ScheduledNote {
         ScheduledNote {
