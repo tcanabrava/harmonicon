@@ -116,14 +116,10 @@ pub fn setup(
         let used = song_notes.notes.iter().filter_map(|n| n.expected_pitch).collect();
         highway_lanes.0 = Some(LaneLayout::pitch_rows(&used));
     }
-    // A piano's is a roll: every key across the song's range, so the rows
-    // line up with the keyboard drawn beside them.
+    // Keep the full physical keyboard fixed across songs; sparse passages
+    // occupy their actual register rather than stretching to fill the screen.
     let piano_roll = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Piano(_)))
-        .then(|| {
-            super::piano_visuals::roll_range(
-                song_notes.notes.iter().filter_map(|n| n.expected_pitch),
-            )
-        });
+        .then_some((21, 108));
     if let Some((low, high)) = piano_roll {
         highway_lanes.0 = Some(LaneLayout::keyboard_rows(low, high));
     }
@@ -188,10 +184,19 @@ pub fn setup(
                     + music_score::PANEL_HEIGHT * if piano_roll.is_some() { 2.0 } else { 1.0 }
             };
             root.spawn(Node {
-                width: if compact { Val::Percent(88.0) } else { Val::Percent(74.0) },
+                width: if piano_roll.is_some() {
+                    Val::Percent(100.0)
+                } else if compact {
+                    Val::Percent(88.0)
+                } else {
+                    Val::Percent(74.0)
+                },
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
-                padding: UiRect { top: Val::Px(left_top_padding), ..UiRect::all(Val::Px(8.0)) },
+                padding: UiRect {
+                    top: Val::Px(left_top_padding),
+                    ..UiRect::all(Val::Px(if piano_roll.is_some() { 0.0 } else { 8.0 }))
+                },
                 row_gap: Val::Px(4.0),
                 ..default()
             })
@@ -255,17 +260,14 @@ pub fn setup(
                     }
                     spawn_track(left);
                 } else if let Some((low, high)) = piano_roll {
+                    spawn_track(left);
                     if !aural {
+                        super::piano_visuals::spawn_keyboard(left, low, high, 96.0);
                         left.spawn((
                             Text::new(loc.msg("gameplay-piano-hands").to_string()),
                             TextFont { font_size: FontSize::Px(13.0), ..default() },
                             TextColor(Color::WHITE),
                         ));
-                        super::piano_visuals::spawn_keyboard(left, 21, 108, 42.0);
-                    }
-                    spawn_track(left);
-                    if !aural {
-                        super::piano_visuals::spawn_keyboard(left, low, high, 96.0);
                     }
                 } else {
                     spawn_track(left);
@@ -300,6 +302,7 @@ pub fn setup(
                     + music_score::PANEL_HEIGHT * if piano_roll.is_some() { 2.0 } else { 1.0 }
             };
             root.spawn(Node {
+                display: if piano_roll.is_some() { Display::None } else { Display::Flex },
                 // Narrower than the 40% it held when the song's description
                 // lived here. What's left is live material only — phrase
                 // banner, tab ribbon, metronome, technique legend — and the
