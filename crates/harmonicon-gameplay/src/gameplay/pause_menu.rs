@@ -593,6 +593,23 @@ pub(super) fn setup_pause_menu(
             ..default()
         })
         .id();
+    if !is_jam {
+        commands.entity(root).insert((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(38.0),
+                min_height: Val::Px(0.0),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                overflow: Overflow::scroll_y(),
+                column_gap: Val::Px(24.0),
+                row_gap: Val::Px(16.0),
+                ..default()
+            },
+            bevy::ui_widgets::ScrollArea,
+        ));
+    }
     commands.entity(backdrop).add_child(root);
 
     // ── Session actions ──────────────────────────────────────────────────

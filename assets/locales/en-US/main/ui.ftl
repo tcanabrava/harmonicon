@@ -1001,3 +1001,5 @@ gameplay-guitar-neck-now = Now { $chord }
 gameplay-guitar-neck-next = Next { $chord }
 
 gameplay-piano-hands = Left / bass: blue · Right / treble: amber · Split at middle C (C4)
+
+pause-score-instructions = Practice score · Scroll to read · Drag the band above the notes to repeat a passage · Click a section to train it

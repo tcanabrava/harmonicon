@@ -37,6 +37,7 @@ pub mod note_ribbon_2d;
 pub mod note_trainer;
 mod notes;
 pub mod pause_menu;
+mod pause_score;
 mod phrase_overlay;
 mod piano_visuals;
 pub mod plugin;

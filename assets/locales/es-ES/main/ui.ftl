@@ -1000,3 +1000,5 @@ gameplay-guitar-neck-now = Ahora { $chord }
 gameplay-guitar-neck-next = Siguiente { $chord }
 
 gameplay-piano-hands = Izquierda / graves: azul · Derecha / agudos: ámbar · División en do central (C4)
+
+pause-score-instructions = Partitura de práctica · Desplázate para leer · Arrastra la banda superior para repetir un pasaje · Pulsa una sección para practicarla

@@ -288,6 +288,7 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             (
+                super::pause_score::update_pause_score,
                 pause_menu::update_wait_mode_label,
                 super::flute_visuals::update_flute_view_row,
                 practice_badges::update_practice_badges,

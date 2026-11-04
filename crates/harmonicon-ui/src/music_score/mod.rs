@@ -569,6 +569,8 @@ struct MusicScoreNotesLayer;
 /// [`choose_clef`] picks a different one for the newly loaded notes.
 #[derive(Component)]
 struct MusicScoreClef;
+#[derive(Component)]
+struct MusicScoreReference;
 
 /// The two time-signature digits at the staff head, updated alongside the
 /// clef. `numerator: true` is the upper digit.
@@ -595,6 +597,7 @@ impl Plugin for MusicScorePlugin {
             .init_resource::<MusicScoreBarMap>()
             .init_resource::<MusicScoreSpacing>()
             .add_systems(Startup, load_bravura_font)
+            .add_systems(Update, rebuild_full_score.after(derive_score_spacing))
             .add_systems(
                 Update,
                 derive_score_spacing.run_if(
@@ -748,6 +751,7 @@ fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: 
                 ..default()
             },
             BackgroundColor(Color::srgba(0.95, 0.80, 0.35, 0.5)),
+            MusicScoreReference,
         ));
         // Notes layer: its local x=0 is the beat the glyphs were last
         // spawned around, and `rebuild_score_notes` slides it so that beat
@@ -1273,5 +1277,114 @@ mod piano_staff_tests {
             world.query::<&Text>().iter(world).map(|text| text.0.as_str()).collect();
         assert!(glyphs.contains(&Clef::Treble.glyph()));
         assert!(glyphs.contains(&Clef::Bass.glyph()));
+    }
+}
+
+/// The same beat geometry used for the full pause score and its selection band.
+pub fn score_beat_x(beat: f64, spacing: f32) -> f32 {
+    PLAYHEAD_X + beat as f32 * spacing
+}
+
+#[derive(Component)]
+struct FullScoreLayer {
+    grand: bool,
+    root: Entity,
+    dirty: bool,
+}
+
+/// Static, full-song notation. Unlike the live staff it never follows the
+/// playhead; its parent viewport owns scrolling.
+pub fn spawn_full_score(
+    parent: &mut ChildSpawnerCommands,
+    bravura: &BravuraFont,
+    grand: bool,
+) -> Entity {
+    let root = spawn_score(parent, bravura, grand);
+    parent.commands().queue(move |world: &mut World| {
+        world.entity_mut(root).remove::<MusicScorePanel>();
+        let children: Vec<_> = world.get::<Children>(root).into_iter().flatten().copied().collect();
+        for child in children {
+            if world.get::<MusicScoreReference>(child).is_some() {
+                world.despawn(child);
+                continue;
+            }
+            if world.get::<MusicScoreNotesLayer>(child).is_some() {
+                world.entity_mut(child).remove::<MusicScoreNotesLayer>().insert(FullScoreLayer {
+                    grand,
+                    root,
+                    dirty: true,
+                });
+            }
+        }
+    });
+    root
+}
+
+fn rebuild_full_score(
+    mut commands: Commands,
+    bravura: Option<Res<BravuraFont>>,
+    tie: Option<Res<TieMaterialHandle>>,
+    notes: Res<MusicScoreNotes>,
+    meter: Res<MusicScoreMeter>,
+    bars: Res<MusicScoreBarMap>,
+    spacing: Res<MusicScoreSpacing>,
+    mut layers: Query<(Entity, &mut FullScoreLayer)>,
+    visibility: Query<&InheritedVisibility>,
+    existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
+    mut clefs: Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
+    mut signatures: Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
+    mut roots: Query<&mut Node, Without<MusicScoreClef>>,
+) {
+    let (Some(bravura), Some(tie)) = (bravura, tie) else { return };
+    for (layer, mut full) in &mut layers {
+        if notes.is_changed() || bars.is_changed() || meter.is_changed() || spacing.is_changed() {
+            full.dirty = true;
+        }
+        if !full.dirty || !visibility.get(full.root).is_ok_and(|v| v.get()) {
+            continue;
+        }
+        full.dirty = false;
+        let end = notes.0.iter().map(|n| n.start_beat + n.duration_beats).fold(0.0, f64::max);
+        if let Ok(mut root) = roots.get_mut(full.root) {
+            root.width = Val::Px(score_beat_x(end, spacing.0) + 80.0);
+            root.flex_shrink = 0.0;
+        }
+        spawn_window(
+            &mut commands,
+            &bravura,
+            &tie,
+            &notes.0,
+            &meter,
+            &bars,
+            spacing.0,
+            layer,
+            0.0,
+            -1.0,
+            end + 1.0,
+            &existing,
+            &mut clefs,
+            &mut signatures,
+            full.grand,
+        );
+    }
+}
+
+#[cfg(test)]
+mod full_score_tests {
+    use super::*;
+    #[test]
+    fn full_score_has_an_independent_layer_and_no_fixed_live_reference() {
+        let mut app = App::new();
+        app.world_mut().commands().spawn(Node::default()).with_children(|p| {
+            let font = BravuraFont(Handle::default());
+            spawn_music_score(p, &font);
+            spawn_full_score(p, &font, true);
+        });
+        app.world_mut().flush();
+        let world = app.world_mut();
+        assert_eq!(world.query::<&MusicScorePanel>().iter(world).count(), 1);
+        assert_eq!(world.query::<&MusicScoreNotesLayer>().iter(world).count(), 1);
+        assert_eq!(world.query::<&FullScoreLayer>().iter(world).count(), 1);
+        assert_eq!(world.query::<&MusicScoreReference>().iter(world).count(), 1);
     }
 }

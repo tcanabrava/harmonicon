@@ -998,3 +998,5 @@ gameplay-guitar-neck-now = Agora { $chord }
 gameplay-guitar-neck-next = Próximo { $chord }
 
 gameplay-piano-hands = Esquerda / graves: azul · Direita / agudos: âmbar · Divisão no dó central (C4)
+
+pause-score-instructions = Partitura de treino · Role para ler · Arraste a faixa acima das notas para repetir um trecho · Clique numa seção para treiná-la
