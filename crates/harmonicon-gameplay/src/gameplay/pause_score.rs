@@ -55,7 +55,9 @@ fn beat_time(beat: f64, chart: &harmonicon_core::chart::HarpChart) -> f64 {
     )
 }
 fn cursor_beat(normalized: Option<Vec2>, width: f32, spacing: f32) -> Option<f64> {
-    let x = normalized?.x * width;
+    // Bevy's node coordinates are centred: -0.5 is the left edge,
+    // +0.5 the right edge. Convert to a left-based score coordinate.
+    let x = (normalized?.x + 0.5) * width;
     Some(((x - music_score::score_beat_x(0.0, spacing)) / spacing.max(1.0)).max(0.0) as f64)
 }
 
@@ -398,12 +400,31 @@ mod tests {
         let spacing = 40.0;
         let x = music_score::score_beat_x(4.0, spacing);
         assert!(
-            (cursor_beat(Some(Vec2::new(x / width, 0.5)), width, spacing).unwrap() - 4.0).abs()
+            (cursor_beat(Some(Vec2::new(x / width - 0.5, 0.0)), width, spacing).unwrap() - 4.0)
+                .abs()
                 < 0.001
         );
-        assert_eq!(cursor_beat(Some(Vec2::ZERO), width, spacing), Some(0.0));
+        assert_eq!(cursor_beat(Some(Vec2::new(-0.5, 0.0)), width, spacing), Some(0.0));
         assert_eq!(cursor_beat(None, width, spacing), None);
     }
+    #[test]
+    fn drag_positions_on_both_halves_do_not_jump_to_zero() {
+        let spacing = 40.0;
+        let width = 2000.0;
+        for beat in [2.0, 8.0, 20.0, 32.0, 44.0] {
+            let x = music_score::score_beat_x(beat, spacing);
+            let normalized = Vec2::new(x / width - 0.5, 0.0);
+            let actual = cursor_beat(Some(normalized), width, spacing).unwrap();
+            assert!((actual - beat).abs() < 0.001, "beat {beat} became {actual}");
+        }
+        // Scrolling changes the point's screen coordinate, not its
+        // normalized position within the full score content.
+        let scroll = 700.0;
+        let screen_x = 156.0;
+        let normalized = Vec2::new((scroll + screen_x) / width - 0.5, 0.0);
+        assert!((cursor_beat(Some(normalized), width, spacing).unwrap() - 20.0).abs() < 0.001);
+    }
+
     #[test]
     fn practice_selection_round_trips_through_tempo_changes_and_pickup() {
         let mut chart: harmonicon_core::chart::HarpChart = serde_json::from_str(include_str!(
