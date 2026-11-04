@@ -1,17 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-//! Per-phrase note unlocking ("adaptive difficulty"). A chart is divided
-//! into musical-phrase sections using the existing `TrackItem::phrase` tag
-//! (same boundary rule as `phrase_overlay`) — no schema change needed.
-//! Each section has its own persisted "learned" fraction
-//! (`profile::SongRecord::phrase_learned`); only a prefix of its notes are
-//! unlocked (spawned/scored) at a time, and clearing a section cleanly
-//! bumps that fraction, unlocking more on the next attempt. A manual
-//! pause-menu override takes effect immediately mid-song —
-//! [`resync_notes_on_adaptive_change`] rebuilds
-//! `SongNotes` the moment [`AdaptiveDifficulty`] changes, carrying over
-//! already-resolved score state via [`carry_over_note_state`] so a
-//! previously hit/missed note doesn't reset just because the list rebuilt.
+//! Selected per-phrase coverage. The runtime unlock level remains normalized
+//! to the legacy 10–100% curve for compatibility; the UI and profile store
+//! actual coverage. Coverage is a user choice, never evidence of mastery.
 
 use bevy::prelude::*;
 use std::collections::HashMap;
@@ -63,16 +54,8 @@ pub fn group_phrase_sections(
     sections
 }
 
-/// Stable per-section keys for persisting `learned` progress across a chart
-/// re-edit: a section's own phrase name, unless an earlier section already
-/// used it (e.g. two "chorus" sections), in which case later occurrences
-/// get a `" #2"`, `" #3"`, ... suffix. The read/write boundary
-/// [`learned_vec_from_map`]/[`write_learned_into_map`] use to translate
-/// between the session's ordinal `Vec<f32>` (indexed by section position,
-/// what `unlocked_flags`/`bump_learned_sections` expect) and
-/// `profile::SongRecord::phrase_learned`'s persisted, name-keyed map —
-/// keying by name means reordering/inserting/removing a phrase tag
-/// elsewhere in the chart can't misapply an unrelated section's progress.
+/// Stable section keys for selected coverage. Repeated names receive
+/// ordinal suffixes so each occurrence keeps its own exercise setting.
 pub fn section_keys(sections: &[PhraseSection]) -> Vec<String> {
     let mut counts: HashMap<&str, usize> = HashMap::new();
     sections
@@ -85,46 +68,21 @@ pub fn section_keys(sections: &[PhraseSection]) -> Vec<String> {
         .collect()
 }
 
-/// Builds the session's ordinal `learned` vector (indexed by section
-/// position, as [`unlocked_flags`]/[`bump_learned_sections`] expect) from the
-/// persisted, name-keyed map — the read side of the scheme [`section_keys`]
-/// documents. A section with no entry in `map` (never played, or renamed
-/// since it was) reads as unlearned (0.0).
-pub fn learned_vec_from_map(sections: &[PhraseSection], map: &HashMap<String, f32>) -> Vec<f32> {
-    section_keys(sections).iter().map(|key| map.get(key).copied().unwrap_or(0.0)).collect()
+/// Fraction of a phrase's notes unlocked at a given `unlock_levels` level (clamped
+/// to 0..=1): 10% at `unlock_levels = 0`, scaling linearly up to 100% at
+/// `unlock_levels = 1` — the "start with a skeleton, fill in as you learn it" curve.
+pub const fn visible_fraction(unlock_levels: f32) -> f32 {
+    (0.1 + 0.9 * unlock_levels.clamp(0.0, 1.0)).min(1.0)
 }
 
-/// Writes the session's ordinal `learned` vector back into the persisted,
-/// name-keyed map — the write side of the scheme [`section_keys`]
-/// documents. Extra entries in `map` for keys no longer present among
-/// `sections` (e.g. a renamed/removed phrase) are left alone rather than
-/// pruned — harmless stale data, not worth the risk of deleting a section
-/// that's only temporarily absent from a partial rebuild.
-pub fn write_learned_into_map(
-    sections: &[PhraseSection],
-    learned: &[f32],
-    map: &mut HashMap<String, f32>,
-) {
-    for (key, &value) in section_keys(sections).iter().zip(learned) {
-        map.insert(key.clone(), value);
-    }
-}
-
-/// Fraction of a phrase's notes unlocked at a given `learned` level (clamped
-/// to 0..=1): 10% at `learned = 0`, scaling linearly up to 100% at
-/// `learned = 1` — the "start with a skeleton, fill in as you learn it" curve.
-pub const fn visible_fraction(learned: f32) -> f32 {
-    (0.1 + 0.9 * learned.clamp(0.0, 1.0)).min(1.0)
-}
-
-/// How many of a section's `note_count` notes are unlocked at `learned` —
+/// How many of a section's `note_count` notes are unlocked at `unlock_levels` —
 /// always at least 1 (never a fully silent phrase) and never more than
 /// `note_count`.
-const fn active_note_count(note_count: usize, learned: f32) -> usize {
+const fn active_note_count(note_count: usize, unlock_levels: f32) -> usize {
     if note_count == 0 {
         return 0;
     }
-    let visible = visible_fraction(learned);
+    let visible = visible_fraction(unlock_levels);
     let count = (visible * note_count as f32).ceil() as usize;
     if count < 1 {
         1
@@ -141,23 +99,26 @@ const fn active_note_count(note_count: usize, learned: f32) -> usize {
 /// building without duplicating phrase grouping. Within a section, the
 /// first `active_note_count` notes (in time order) are unlocked — a prefix
 /// reveal, not scattered sampling, so a single percentage fully describes
-/// how far into the phrase play has been unlocked. `learned` is indexed by
+/// how far into the phrase play has been unlocked. `unlock_levels` is indexed by
 /// section ordinal; a missing/short entry defaults to unlearned (0.0).
-/// `enabled: false` unlocks every note regardless of `learned`.
+/// `enabled: false` unlocks every note regardless of `unlock_levels`.
 pub fn unlocked_flags(
     items: &[(f64, Option<&str>, usize)],
     sections: &[PhraseSection],
-    learned: &[f32],
+    unlock_levels: &[f32],
     enabled: bool,
 ) -> Vec<(bool, usize)> {
     let mut flags = Vec::with_capacity(items.iter().map(|item| item.2).sum());
     let mut section_idx = 0usize;
     let mut ordinal = 0usize;
     let mut first = true;
-    for &(_, phrase, count) in items {
+    let mut attack_time = None;
+    let mut include_attack = false;
+    for &(time, phrase, count) in items {
         if phrase.is_some() && !first {
             section_idx += 1;
             ordinal = 0;
+            attack_time = None;
         }
         first = false;
         // No section for this item means the caller never grouped the chart,
@@ -168,51 +129,20 @@ pub fn unlocked_flags(
             continue;
         };
         let note_count = section.note_count;
-        let learned_frac = learned.get(section_idx).copied().unwrap_or(0.0);
+        let learned_frac = unlock_levels.get(section_idx).copied().unwrap_or(0.0);
         let active_count =
             if enabled { active_note_count(note_count, learned_frac) } else { note_count };
+        if attack_time != Some(time) {
+            include_attack = ordinal < active_count;
+            attack_time = Some(time);
+        }
         for _ in 0..count {
-            flags.push((ordinal < active_count, section_idx));
+            // A coverage boundary must not cut a chord into a new voicing.
+            flags.push((include_attack, section_idx));
             ordinal += 1;
         }
     }
     flags
-}
-
-/// How much a phrase section's `learned` fraction advances per clean clear
-/// (every unlocked note hit, none missed) — reaches 100% after four clean
-/// clears from scratch.
-pub const PHRASE_LEARN_STEP: f32 = 0.25;
-
-/// After a full playthrough, bumps each phrase section's learned fraction by
-/// [`PHRASE_LEARN_STEP`] (capped at 1.0) if every one of its notes present
-/// in `notes` was hit cleanly (no misses) — locked notes never made it into
-/// `notes` in the first place (see [`unlocked_flags`]), so this only judges
-/// what was actually playable. `learned` grows to at least `section_count`
-/// entries (new sections start at 0.0, same as a song's first-ever play).
-/// Sections with no notes seen this run (e.g. a partial/looped play that
-/// never reached them) are left untouched — nothing to judge a clear from.
-pub fn bump_learned_sections(
-    notes: &[ScheduledNote],
-    section_count: usize,
-    learned: &mut Vec<f32>,
-) {
-    if learned.len() < section_count {
-        learned.resize(section_count, 0.0);
-    }
-    let mut clear = vec![None; section_count];
-    for note in notes {
-        let idx = note.phrase_section;
-        if idx >= section_count {
-            continue;
-        }
-        clear[idx] = Some(clear[idx].unwrap_or(true) && note.hit && !note.missed);
-    }
-    for i in 0..section_count {
-        if clear[i] == Some(true) {
-            learned[i] = (learned[i] + PHRASE_LEARN_STEP).min(1.0);
-        }
-    }
 }
 
 /// `(time, phrase, event_count)` triples for every track item, in chart
@@ -233,7 +163,7 @@ pub fn track_items<'a>(
 /// matched by `(time, position)` — stable across a rebuild since both
 /// lists derive from the same chart, regardless of which other notes got
 /// unlocked/relocked around a given note. Used when the pause menu changes
-/// `learned`/`enabled` mid-song so already-hit/missed notes don't reset
+/// `unlock_levels`/`enabled` mid-song so already-hit/missed notes don't reset
 /// just because the list was rebuilt. A note with no match in `old`
 /// (freshly unlocked) keeps its default unresolved state; `used` guards
 /// against double-matching two notes sharing an identical key (e.g. a
@@ -324,7 +254,7 @@ pub(super) fn invalidate_note_visuals(
 
 /// Live per-session cache of a song's phrase sections + adaptive-difficulty
 /// state — built once at song start (`setup_adaptive_difficulty`) from the
-/// chart, [`PlayerProfile`] (learned progress), and the global
+/// chart, [`PlayerProfile`] (unlock_levels progress), and the global
 /// `settings::AdaptiveDifficultyEnabled` setting, read by the note-unlock
 /// filter (`gameplay_2d::setup`), the progress-bar phrase strip
 /// (`song_progress_overlay`), and the pause menu's phrase selector. The
@@ -336,11 +266,27 @@ pub(super) fn invalidate_note_visuals(
 pub struct AdaptiveDifficulty {
     pub enabled: bool,
     pub sections: Vec<PhraseSection>,
-    pub learned: Vec<f32>,
+    pub unlock_levels: Vec<f32>,
+}
+
+fn unlock_levels_from_record(
+    sections: &[PhraseSection],
+    record: Option<&harmonicon_app::profile::SongRecord>,
+) -> Vec<f32> {
+    section_keys(sections)
+        .iter()
+        .map(|name| {
+            record
+                .and_then(|r| r.phrase_coverage.get(name).copied())
+                .map(|fraction| ((fraction - 0.1) / 0.9).clamp(0.0, 1.0))
+                .or_else(|| record.and_then(|r| r.phrase_learned.get(name).copied()))
+                .unwrap_or(0.0)
+        })
+        .collect()
 }
 
 /// Populates [`AdaptiveDifficulty`] from the selected song's chart, its
-/// `PlayerProfile` record (learned progress only), and the global
+/// `PlayerProfile` record (unlock_levels progress only), and the global
 /// `AdaptiveDifficultyEnabled` Options-menu setting (whether it's on at
 /// all — not per-song). Must run before `gameplay_2d::setup` so it sees this
 /// run's unlock state — ordered by
@@ -363,7 +309,7 @@ pub(super) fn setup_adaptive_difficulty(
     let song_end = last_note_end(&chart.track, &chart.timing);
     let sections = group_phrase_sections(&items, song_end);
 
-    // A lesson chart is a curriculum unit, not a song being learned
+    // A lesson chart is a curriculum unit, not a song being unlock_levels
     // phrase-by-phrase: its pass criteria assume every note is present, so
     // adaptive gating stays off for lesson runs regardless of the global
     // setting.
@@ -371,9 +317,9 @@ pub(super) fn setup_adaptive_difficulty(
 
     let key = manifest.path.display().to_string();
     let record = profile.songs.get(&key);
-    let learned =
-        record.map(|r| learned_vec_from_map(&sections, &r.phrase_learned)).unwrap_or_default();
-    *adaptive = AdaptiveDifficulty { enabled: enabled_for_lesson && setting.0, learned, sections };
+    let unlock_levels = unlock_levels_from_record(&sections, record);
+    *adaptive =
+        AdaptiveDifficulty { enabled: enabled_for_lesson && setting.0, unlock_levels, sections };
 }
 
 #[cfg(test)]
@@ -382,19 +328,37 @@ mod tests {
     use harmonicon_core::chart::Action;
     use harmonicon_core::instrument::PlayPosition;
 
-    fn note(hit: bool, missed: bool, section: usize) -> ScheduledNote {
-        ScheduledNote {
-            duration: 0.1,
-            position: PlayPosition::natural_hole(4, Action::Draw),
-            expected_pitch: Some(62),
-            hit,
-            missed,
-            phrase_section: section,
-            ..Default::default()
-        }
+    // ── group_phrase_sections ──────────────────────────────────────────────
+
+    #[test]
+    fn coverage_is_separate_and_legacy_levels_are_only_exercise_settings() {
+        let sections = group_phrase_sections(&[(0.0, Some("A"), 10)], 10.0);
+        let mut record = harmonicon_app::profile::SongRecord::default();
+        record.phrase_learned.insert("A".into(), 0.5);
+        assert_eq!(unlock_levels_from_record(&sections, Some(&record)), vec![0.5]);
+        record.phrase_coverage.insert("A".into(), 0.64);
+        let level = unlock_levels_from_record(&sections, Some(&record))[0];
+        assert!((visible_fraction(level) - 0.64).abs() < 0.001);
+        assert_eq!(record.phrase_learned["A"], 0.5, "legacy evidence is not rewritten");
+    }
+    #[test]
+    fn coverage_never_splits_a_chord_attack() {
+        let items = [(0.0, Some("A"), 3usize), (1.0, None, 1usize)];
+        let sections = group_phrase_sections(&items, 2.0);
+        assert_eq!(
+            unlocked_flags(&items, &sections, &[0.0], true),
+            vec![(true, 0), (true, 0), (true, 0), (false, 0)]
+        );
     }
 
-    // ── group_phrase_sections ──────────────────────────────────────────────
+    #[test]
+    fn simultaneous_tracks_stay_together_at_a_coverage_boundary() {
+        let items = [(0.0, Some("A"), 1usize), (0.0, None, 3usize), (1.0, None, 1usize)];
+        let sections = group_phrase_sections(&items, 2.0);
+        let flags = unlocked_flags(&items, &sections, &[0.0], true);
+        assert!(flags[..4].iter().all(|(included, _)| *included));
+        assert!(!flags[4].0);
+    }
 
     #[test]
     fn empty_items_yields_no_sections() {
@@ -473,7 +437,8 @@ mod tests {
 
     #[test]
     fn unlearned_section_unlocks_only_a_prefix() {
-        let items = [(0.0, Some("intro"), 10usize)];
+        let items: Vec<_> =
+            (0..10).map(|i| (i as f64, (i == 0).then_some("intro"), 1usize)).collect();
         let sections = group_phrase_sections(&items, 10.0);
         let flags = unlocked_flags(&items, &sections, &[0.0], true);
         let unlocked_count = flags.iter().filter(|&&(u, _)| u).count();
@@ -485,7 +450,8 @@ mod tests {
 
     #[test]
     fn missing_learned_entry_defaults_to_unlearned() {
-        let items = [(0.0, Some("intro"), 10usize)];
+        let items: Vec<_> =
+            (0..10).map(|i| (i as f64, (i == 0).then_some("intro"), 1usize)).collect();
         let sections = group_phrase_sections(&items, 10.0);
         let flags = unlocked_flags(&items, &sections, &[], true);
         assert_eq!(flags.iter().filter(|&&(u, _)| u).count(), 1);
@@ -493,7 +459,8 @@ mod tests {
 
     #[test]
     fn fully_learned_section_unlocks_everything() {
-        let items = [(0.0, Some("intro"), 10usize)];
+        let items: Vec<_> =
+            (0..10).map(|i| (i as f64, (i == 0).then_some("intro"), 1usize)).collect();
         let sections = group_phrase_sections(&items, 10.0);
         let flags = unlocked_flags(&items, &sections, &[1.0], true);
         assert!(flags.iter().all(|&(u, _)| u));
@@ -520,48 +487,6 @@ mod tests {
 
     // ── bump_learned_sections ────────────────────────────────────────────────
 
-    #[test]
-    fn clean_clear_bumps_learned_by_one_step() {
-        let notes = vec![note(true, false, 0), note(true, false, 0)];
-        let mut learned = vec![0.0];
-        bump_learned_sections(&notes, 1, &mut learned);
-        assert!((learned[0] - PHRASE_LEARN_STEP).abs() < 1e-6);
-    }
-
-    #[test]
-    fn a_miss_leaves_learned_unchanged() {
-        let notes = vec![note(true, false, 0), note(false, true, 0)];
-        let mut learned = vec![0.25];
-        bump_learned_sections(&notes, 1, &mut learned);
-        assert_eq!(learned[0], 0.25);
-    }
-
-    #[test]
-    fn repeated_clean_clears_cap_at_one() {
-        let notes = vec![note(true, false, 0)];
-        let mut learned = vec![0.9];
-        bump_learned_sections(&notes, 1, &mut learned);
-        assert_eq!(learned[0], 1.0);
-    }
-
-    #[test]
-    fn a_section_with_no_notes_seen_is_left_untouched() {
-        let notes = vec![note(true, false, 0)]; // section 1 never appears
-        let mut learned = vec![0.2, 0.2];
-        bump_learned_sections(&notes, 2, &mut learned);
-        assert!((learned[0] - (0.2 + PHRASE_LEARN_STEP)).abs() < 1e-6);
-        assert_eq!(learned[1], 0.2);
-    }
-
-    #[test]
-    fn learned_vec_grows_to_fit_new_sections() {
-        let notes = vec![note(true, false, 2)];
-        let mut learned = vec![0.0]; // only one section previously known
-        bump_learned_sections(&notes, 3, &mut learned);
-        assert_eq!(learned.len(), 3);
-        assert!((learned[2] - PHRASE_LEARN_STEP).abs() < 1e-6);
-    }
-
     // ── section_keys / learned_vec_from_map / write_learned_into_map ────────
 
     fn section(name: &str) -> PhraseSection {
@@ -578,37 +503,6 @@ mod tests {
     fn section_keys_disambiguates_repeated_names() {
         let sections = [section("chorus"), section("verse"), section("chorus")];
         assert_eq!(section_keys(&sections), vec!["chorus", "verse", "chorus #2"]);
-    }
-
-    #[test]
-    fn learned_vec_from_map_reads_by_name_not_position() {
-        let sections = [section("intro"), section("turnaround")];
-        let mut map = HashMap::new();
-        map.insert("turnaround".to_string(), 0.75);
-        assert_eq!(learned_vec_from_map(&sections, &map), vec![0.0, 0.75]);
-    }
-
-    #[test]
-    fn reordering_sections_keeps_progress_with_the_right_name() {
-        // The bug this whole scheme fixes: re-editing a chart can reorder
-        // phrase tags. Progress recorded against "turnaround" must stay
-        // with "turnaround" even though its ordinal position changed.
-        let old_sections = [section("intro"), section("turnaround")];
-        let mut map = HashMap::new();
-        map.insert("turnaround".to_string(), 0.75);
-        let reordered = [section("turnaround"), section("intro")];
-        assert_eq!(learned_vec_from_map(&old_sections, &map), vec![0.0, 0.75]);
-        assert_eq!(learned_vec_from_map(&reordered, &map), vec![0.75, 0.0]);
-    }
-
-    #[test]
-    fn write_learned_into_map_round_trips_through_learned_vec_from_map() {
-        let sections = [section("intro"), section("turnaround")];
-        let mut map = HashMap::new();
-        write_learned_into_map(&sections, &[0.25, 1.0], &mut map);
-        assert_eq!(map.get("intro"), Some(&0.25));
-        assert_eq!(map.get("turnaround"), Some(&1.0));
-        assert_eq!(learned_vec_from_map(&sections, &map), vec![0.25, 1.0]);
     }
 
     // ── carry_over_note_state / first_unresolved_index ──────────────────────

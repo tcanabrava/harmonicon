@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 //! A scrollable full score with a beat-aligned practice selection band.
 use super::pause_menu::{PauseMenuRoot, SelectedPhraseIndex};
-use super::song_progress_overlay::RequestLoopRange;
 use super::{LoopConfig, Paused, adaptive_difficulty::AdaptiveDifficulty};
 use bevy::prelude::*;
 use bevy::ui::{RelativeCursorPosition, ScrollPosition};
 use harmonicon_app::app::{GameplayMode, SelectedSong};
-use harmonicon_core::chart::{seconds_to_tick, tick_to_seconds};
+use harmonicon_core::chart::seconds_to_tick;
+#[cfg(test)]
+use harmonicon_core::chart::tick_to_seconds;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::music_score::{
-    self, BravuraFont, MusicScoreNotes, MusicScorePlayhead, MusicScoreSpacing,
+    self, BravuraFont, MusicScoreBarMap, MusicScoreNotes, MusicScorePlayhead, MusicScoreSpacing,
 };
 
 #[derive(Component)]
@@ -26,18 +27,12 @@ pub(super) struct Selection;
 #[derive(Component)]
 pub(super) struct SelectionSummary;
 #[derive(Component)]
-pub(super) struct Band(f64);
+pub(super) struct Band;
 #[derive(Component)]
 pub(super) struct Zone {
     index: usize,
     start: f64,
     end: f64,
-}
-#[derive(Resource, Default)]
-pub(super) struct SelectionDrag {
-    start: Option<f64>,
-    end: f64,
-    suppress_click: bool,
 }
 
 fn time_beat(seconds: f64, chart: &harmonicon_core::chart::HarpChart) -> f64 {
@@ -46,6 +41,7 @@ fn time_beat(seconds: f64, chart: &harmonicon_core::chart::HarpChart) -> f64 {
         + super::bars::pickup_lead_ticks(chart)) as f64
         / timing.resolution.max(1) as f64
 }
+#[cfg(test)]
 fn beat_time(beat: f64, chart: &harmonicon_core::chart::HarpChart) -> f64 {
     let tick = (beat.max(0.0) * chart.timing.resolution.max(1) as f64).round() as u64;
     tick_to_seconds(
@@ -54,6 +50,7 @@ fn beat_time(beat: f64, chart: &harmonicon_core::chart::HarpChart) -> f64 {
         &chart.timing.tempo_map,
     )
 }
+#[cfg(test)]
 fn cursor_beat(normalized: Option<Vec2>, width: f32, spacing: f32) -> Option<f64> {
     // Bevy's node coordinates are centred: -0.5 is the left edge,
     // +0.5 the right edge. Convert to a left-based score coordinate.
@@ -72,7 +69,8 @@ pub(super) struct ScoreData<'w> {
     adaptive: Res<'w, AdaptiveDifficulty>,
     loops: Res<'w, LoopConfig>,
     loc: Res<'w, Localization>,
-    drag: Option<Res<'w, SelectionDrag>>,
+    bars: Res<'w, MusicScoreBarMap>,
+    selected_phrase: Res<'w, SelectedPhraseIndex>,
 }
 
 pub(super) fn update_pause_score(
@@ -101,14 +99,20 @@ pub(super) fn update_pause_score(
         adaptive,
         loops,
         loc,
-        drag,
+        bars,
+        selected_phrase,
     } = data;
     if *mode != GameplayMode::Play2D {
         return;
     }
     let Some(manifest) = manifests.get(&selected.0) else { return };
     let chart = &manifest.chart;
-    let end = notes.0.iter().map(|n| n.start_beat + n.duration_beats).fold(1.0, f64::max);
+    let end = adaptive
+        .sections
+        .iter()
+        .map(|section| time_beat(section.end_time, chart))
+        .chain(notes.0.iter().map(|n| n.start_beat + n.duration_beats))
+        .fold(1.0, f64::max);
     let width = music_score::score_beat_x(end, spacing.0) + 80.0;
     let grand =
         matches!(chart.instrument(), Some(harmonicon_core::instrument::Instrument::Piano(_)));
@@ -117,7 +121,6 @@ pub(super) fn update_pause_score(
         && let Some(bravura) = bravura
     {
         for root in &roots {
-            commands.init_resource::<SelectionDrag>();
             commands.entity(root).insert(Mounted);
             let panel = commands
                 .spawn(Node {
@@ -166,7 +169,7 @@ pub(super) fn update_pause_score(
                     .with_children(|content| {
                         content
                             .spawn((
-                                Band(end),
+                                Band,
                                 RelativeCursorPosition::default(),
                                 Node {
                                     width: Val::Percent(100.0),
@@ -176,10 +179,6 @@ pub(super) fn update_pause_score(
                                 },
                                 BackgroundColor(Color::srgb(0.11, 0.13, 0.18)),
                             ))
-                            .observe(reset_selection_click)
-                            .observe(begin_selection)
-                            .observe(drag_selection)
-                            .observe(end_selection)
                             .with_children(|band| {
                                 for (index, section) in adaptive.sections.iter().enumerate() {
                                     let left = music_score::score_beat_x(
@@ -191,6 +190,8 @@ pub(super) fn update_pause_score(
                                         spacing.0,
                                     );
                                     band.spawn((
+                                        bevy::ui_widgets::Button,
+                                        bevy::input_focus::tab_navigation::TabIndex(0),
                                         Zone {
                                             index,
                                             start: section.start_time,
@@ -211,7 +212,8 @@ pub(super) fn update_pause_score(
                                     .observe(select_zone)
                                     .with_children(|p| {
                                         p.spawn((
-                                            Text::new(section.name.clone()),
+                                            Text::new((index + 1).to_string()),
+                                            TextLayout::no_wrap(),
                                             TextFont { font_size: FontSize::Px(13.0), ..default() },
                                             TextColor(Color::WHITE),
                                             Pickable::IGNORE,
@@ -219,21 +221,39 @@ pub(super) fn update_pause_score(
                                     });
                                 }
                             });
-                        music_score::spawn_full_score(content, &bravura, grand);
-                        content.spawn((
-                            Selection,
-                            Node {
-                                position_type: PositionType::Absolute,
-                                top: Val::Px(0.0),
-                                height: Val::Percent(100.0),
-                                display: Display::None,
-                                border: UiRect::horizontal(Val::Px(2.0)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgba(0.3, 0.65, 1.0, 0.06)),
-                            BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
-                            Pickable::IGNORE,
-                        ));
+                        music_score::spawn_full_score(content, &bravura, grand, end);
+                        content
+                            .spawn((
+                                Selection,
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    top: Val::Px(0.0),
+                                    height: Val::Percent(100.0),
+                                    display: Display::None,
+                                    border: UiRect::horizontal(Val::Px(2.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.3, 0.65, 1.0, 0.06)),
+                                BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
+                                Pickable::IGNORE,
+                            ))
+                            .with_children(|p| {
+                                for (right, text) in [(false, "A"), (true, "B")] {
+                                    p.spawn((
+                                        Text::new(text),
+                                        TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                        TextColor(Color::srgb(0.4, 0.75, 1.0)),
+                                        Node {
+                                            position_type: PositionType::Absolute,
+                                            left: if right { Val::Auto } else { Val::Px(2.0) },
+                                            right: if right { Val::Px(2.0) } else { Val::Auto },
+                                            top: Val::Px(0.0),
+                                            ..default()
+                                        },
+                                        Pickable::IGNORE,
+                                    ));
+                                }
+                            });
                         content.spawn((
                             Playhead,
                             Node {
@@ -251,9 +271,6 @@ pub(super) fn update_pause_score(
         }
     }
     if !paused.0 {
-        if *was_paused {
-            commands.insert_resource(SelectionDrag::default());
-        }
         *was_paused = false;
         return;
     }
@@ -264,19 +281,39 @@ pub(super) fn update_pause_score(
     for mut node in &mut positions.p1() {
         node.left = Val::Px(x);
     }
-    let range =
-        drag.as_ref().and_then(|d| d.start.map(|s| (s.min(d.end), s.max(d.end)))).or_else(|| {
-            loops
-                .active
-                .then(|| (time_beat(loops.start_time, chart), time_beat(loops.end_time, chart)))
-        });
+    let section = adaptive.sections.get(selected_phrase.0);
+    let range = section
+        .map(|section| (time_beat(section.start_time, chart), time_beat(section.end_time, chart)));
     for mut text in &mut summaries {
-        text.0 = if let Some((a, b)) = range {
-            let start = beat_time(a, chart);
-            let end = beat_time(b, chart);
+        text.0 = if let Some(section) = section {
+            let start_tick = seconds_to_tick(
+                section.start_time,
+                chart.timing.resolution,
+                &chart.timing.tempo_map,
+            );
+            let end_tick =
+                seconds_to_tick(section.end_time, chart.timing.resolution, &chart.timing.tempo_map)
+                    .saturating_sub(1);
+            let number = |tick| {
+                bars.meter
+                    .bar_number(bars.meter.position(tick).bar)
+                    .map(|bar| bar.to_string())
+                    .unwrap_or_else(|| loc.msg("pause-score-pickup").to_string())
+            };
             loc.msg_args(
-                "pause-score-selection",
-                &[("start", format!("{start:.1}")), ("end", format!("{end:.1}"))],
+                "pause-score-section",
+                &[
+                    ("name", section.name.clone()),
+                    ("first", number(start_tick)),
+                    ("last", number(end_tick)),
+                    ("start", format!("{:.1}", section.start_time)),
+                    ("end", format!("{:.1}", section.end_time)),
+                    (
+                        "state",
+                        loc.msg(if loops.active { "pause-repeat-on" } else { "pause-repeat-off" })
+                            .to_string(),
+                    ),
+                ],
             )
             .to_string()
         } else {
@@ -306,89 +343,19 @@ pub(super) fn update_pause_score(
     *was_paused = true;
 }
 
-fn begin_selection(
-    mut ev: On<PointerDragStart>,
-    paused: Res<Paused>,
-    band: Query<(&RelativeCursorPosition, &ComputedNode, &Band)>,
-    spacing: Res<MusicScoreSpacing>,
-    mut drag: ResMut<SelectionDrag>,
-) {
-    if !paused.0 || ev.button != PointerButton::Primary {
-        return;
-    }
-    let Ok((cursor, node, band)) = band.single() else { return };
-    if let Some(beat) =
-        cursor_beat(cursor.normalized, node.size().x * node.inverse_scale_factor(), spacing.0)
-    {
-        let beat = beat.min(band.0);
-        drag.start = Some(beat);
-        drag.end = beat;
-        drag.suppress_click = true;
-        ev.propagate(false);
-    }
-}
-fn drag_selection(
-    mut ev: On<PointerDrag>,
-    band: Query<(&RelativeCursorPosition, &ComputedNode, &Band)>,
-    spacing: Res<MusicScoreSpacing>,
-    mut drag: ResMut<SelectionDrag>,
-) {
-    if drag.start.is_none() {
-        return;
-    }
-    let Ok((cursor, node, band)) = band.single() else { return };
-    if let Some(beat) =
-        cursor_beat(cursor.normalized, node.size().x * node.inverse_scale_factor(), spacing.0)
-    {
-        drag.end = beat.min(band.0);
-        ev.propagate(false);
-    }
-}
-fn end_selection(
-    mut ev: On<PointerDragEnd>,
-    mut drag: ResMut<SelectionDrag>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
-    mut requests: MessageWriter<RequestLoopRange>,
-) {
-    if ev.button != PointerButton::Primary {
-        return;
-    }
-    let Some(start) = drag.start.take() else { return };
-    if let Some(manifest) = manifests.get(&selected.0) {
-        requests.write(RequestLoopRange {
-            start_time: beat_time(start.min(drag.end), &manifest.chart),
-            end_time: beat_time(start.max(drag.end), &manifest.chart),
-        });
-    }
-    ev.propagate(false);
-}
-// not-a-widget-button: these are phrase regions inside the score's drag-selection
-// band, with no Button component; pointer clicks must be distinguished from
-// completed range drags so a drag cannot activate its starting phrase.
 fn select_zone(
-    mut ev: On<PointerClick>,
+    ev: On<bevy::ui_widgets::Activate>,
     zones: Query<&Zone>,
     mut selected: ResMut<SelectedPhraseIndex>,
-    drag: Res<SelectionDrag>,
-    mut requests: MessageWriter<RequestLoopRange>,
+    mut loops: ResMut<LoopConfig>,
 ) {
-    if ev.button != PointerButton::Primary {
-        return;
-    }
-    if drag.suppress_click {
-        ev.propagate(false);
-        return;
-    }
     if let Ok(zone) = zones.get(ev.entity) {
         selected.0 = zone.index;
-        requests.write(RequestLoopRange { start_time: zone.start, end_time: zone.end });
-        ev.propagate(false);
+        if loops.active {
+            loops.start_time = zone.start;
+            loops.end_time = zone.end;
+        }
     }
-}
-
-fn reset_selection_click(_: On<PointerPress>, mut drag: ResMut<SelectionDrag>) {
-    drag.suppress_click = false;
 }
 
 #[cfg(test)]

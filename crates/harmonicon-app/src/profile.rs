@@ -33,20 +33,14 @@ pub struct SongRecord {
     /// ...), each in `[0.0, 1.0]` — an improving high-water mark across
     /// sessions, not a full log of every play.
     pub technique_best_accuracy: HashMap<String, f32>,
-    /// Adaptive difficulty's "learned" fraction (0.0..=1.0) per musical
-    /// phrase section, keyed by the section's own stable key — its phrase
-    /// name, disambiguated for repeats — rather than its ordinal position
-    /// in the track (see `gameplay::adaptive_difficulty::section_keys`).
-    /// Keying by position let a chart re-edit that reorders/inserts/removes
-    /// a phrase tag silently apply old progress to the wrong section;
-    /// keying by name survives that, at the cost of resetting progress if a
-    /// section is later *renamed*. Empty until the song's first play or
-    /// manual adjustment; a missing key reads as unlearned (0.0). Whether
-    /// adaptive difficulty is on at all is a single global setting
-    /// (`settings::AdaptiveDifficultyEnabled`, an Options-menu toggle), not
-    /// per-song — only the learned progress itself lives here.
+    /// Legacy mixed difficulty/progress data. Never written by current
+    /// practice controls or results; read only to preserve old exercise
+    /// settings when no explicit coverage value exists.
     #[serde(deserialize_with = "deserialize_phrase_learned")]
     pub phrase_learned: HashMap<String, f32>,
+    /// Selected note coverage, not assessed achievement. Legacy learned
+    /// values are read only as exercise settings during migration.
+    pub phrase_coverage: HashMap<String, f32>,
 }
 
 impl Default for SongRecord {
@@ -57,6 +51,7 @@ impl Default for SongRecord {
             plays: 0,
             technique_best_accuracy: HashMap::new(),
             phrase_learned: HashMap::new(),
+            phrase_coverage: HashMap::new(),
         }
     }
 }

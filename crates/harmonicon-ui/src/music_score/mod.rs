@@ -1290,6 +1290,7 @@ struct FullScoreLayer {
     grand: bool,
     root: Entity,
     dirty: bool,
+    end: f64,
 }
 
 /// Static, full-song notation. Unlike the live staff it never follows the
@@ -1298,6 +1299,7 @@ pub fn spawn_full_score(
     parent: &mut ChildSpawnerCommands,
     bravura: &BravuraFont,
     grand: bool,
+    end: f64,
 ) -> Entity {
     let root = spawn_score(parent, bravura, grand);
     parent.commands().queue(move |world: &mut World| {
@@ -1313,6 +1315,7 @@ pub fn spawn_full_score(
                     grand,
                     root,
                     dirty: true,
+                    end,
                 });
             }
         }
@@ -1344,7 +1347,7 @@ fn rebuild_full_score(
             continue;
         }
         full.dirty = false;
-        let end = notes.0.iter().map(|n| n.start_beat + n.duration_beats).fold(0.0, f64::max);
+        let end = notes.0.iter().map(|n| n.start_beat + n.duration_beats).fold(full.end, f64::max);
         if let Ok(mut root) = roots.get_mut(full.root) {
             root.width = Val::Px(score_beat_x(end, spacing.0) + 80.0);
             root.flex_shrink = 0.0;
@@ -1396,7 +1399,7 @@ mod full_score_tests {
         app.world_mut().commands().spawn(Node::default()).with_children(|p| {
             let font = BravuraFont(Handle::default());
             spawn_music_score(p, &font);
-            spawn_full_score(p, &font, true);
+            spawn_full_score(p, &font, true, 16.0);
         });
         app.world_mut().flush();
         let world = app.world_mut();

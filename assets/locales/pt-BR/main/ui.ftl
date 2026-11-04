@@ -564,7 +564,7 @@ pause-quit-song = Sair da música
 pause-paused = PAUSADO
 pause-resume = Continuar
 pause-restart = Recomeçar
-pause-learned-label = Aprendido:
+pause-learned-label = Cobertura desejada:
 pause-finish-lesson = Concluir lição
 pause-wait-for-note-button = ⏸ Esperar nota
 pause-wait-for-note-on = Esperar nota: ligado
@@ -573,17 +573,17 @@ pause-flute-view-button = Quadro de dedilhado
 pause-flute-view-fingering = Quadro de dedilhado: visível
 pause-flute-view-notes = Quadro de dedilhado: oculto
 pause-speed = Velocidade: {$pct}%
-pause-adaptive-difficulty-button = Dificuldade adaptativa
-pause-adaptive-difficulty-on = Dificuldade adaptativa: ligada
-pause-adaptive-difficulty-off = Dificuldade adaptativa: desligada
-pause-phrase-section = Seção: {$name} — Aprendido: {$pct}%
+pause-adaptive-difficulty-button = Cobertura da frase
+pause-adaptive-difficulty-on = Ativada
+pause-adaptive-difficulty-off = Desativada · todas as notas
+pause-phrase-section = Seção: { $name } · Cobertura: { $pct }%
 pause-phrase-no-sections = Nenhuma frase nesta música
-pause-drag-section-hint = Clique numa seção na barra de progresso acima para selecioná-la
-pause-notes-update-hint = As notas são atualizadas ao vivo — retome para vê-las
+pause-drag-section-hint = Selecione uma seção no mapa ou na partitura.
+pause-notes-update-hint = A cobertura revela o início da frase e preserva os acordes completos.
 pause-clear-loop = Limpar repetição
 pause-loop-off = Repetição: desligada
 pause-loop-range = Repetição: {$start}s–{$end}s
-pause-drag-loop-hint = Arraste na barra de progresso acima para definir um intervalo de repetição
+pause-drag-loop-hint = Selecione uma seção e ative Repetir seção.
 
 # Overlay do metrônomo
 metronome-click-off = clique: desligado
@@ -999,7 +999,17 @@ gameplay-guitar-neck-next = Próximo { $chord }
 
 gameplay-piano-hands = Esquerda / graves: azul · Direita / agudos: âmbar · Divisão no dó central (C4)
 
-pause-score-instructions = Arraste acima dos compassos para selecionar um trecho. Role para explorar.
+pause-score-instructions = Selecione uma seção acima da partitura. Ative Repetir seção para praticar.
 
 pause-score-no-selection = Nenhum trecho selecionado
 pause-score-selection = Repetir { $start }–{ $end } s · Retome para praticar
+
+pause-score-section = { $name } · compassos { $first }–{ $last } · { $state } ({ $start }–{ $end } s)
+
+pause-achievement-not-assessed = Conquista · Não avaliada
+
+pause-repeat-section = Repetir seção · alternar
+
+pause-repeat-on = Repetir seção: ligado
+
+pause-repeat-off = Repetir seção: desligado

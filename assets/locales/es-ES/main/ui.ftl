@@ -564,7 +564,7 @@ pause-quit-song = Salir de la canción
 pause-paused = EN PAUSA
 pause-resume = Continuar
 pause-restart = Reiniciar
-pause-learned-label = Aprendido:
+pause-learned-label = Cobertura objetivo:
 pause-finish-lesson = Terminar lección
 pause-wait-for-note-button = ⏸ Esperar nota
 pause-wait-for-note-on = Esperar nota: activado
@@ -573,17 +573,17 @@ pause-flute-view-button = Tabla de digitación
 pause-flute-view-fingering = Tabla de digitación: visible
 pause-flute-view-notes = Tabla de digitación: oculta
 pause-speed = Velocidad: {$pct}%
-pause-adaptive-difficulty-button = Dificultad adaptativa
-pause-adaptive-difficulty-on = Dificultad adaptativa: activada
-pause-adaptive-difficulty-off = Dificultad adaptativa: desactivada
-pause-phrase-section = Sección: {$name} — Aprendido: {$pct}%
+pause-adaptive-difficulty-button = Cobertura de frase
+pause-adaptive-difficulty-on = Activada
+pause-adaptive-difficulty-off = Desactivada · todas las notas
+pause-phrase-section = Sección: { $name } · Cobertura: { $pct }%
 pause-phrase-no-sections = No hay frases en esta canción
-pause-drag-section-hint = Haz clic en una sección de la barra de progreso de arriba para seleccionarla
-pause-notes-update-hint = Las notas se actualizan en vivo — reanuda para verlas
+pause-drag-section-hint = Selecciona una sección del mapa o de la partitura.
+pause-notes-update-hint = La cobertura revela el comienzo de la frase y conserva los acordes completos.
 pause-clear-loop = Borrar bucle
 pause-loop-off = Bucle: desactivado
 pause-loop-range = Bucle: {$start}s–{$end}s
-pause-drag-loop-hint = Arrastra en la barra de progreso de arriba para definir un rango de bucle
+pause-drag-loop-hint = Selecciona una sección y activa Repetir sección.
 
 # Overlay del metrónomo
 metronome-click-off = clic: apagado
@@ -1001,7 +1001,17 @@ gameplay-guitar-neck-next = Siguiente { $chord }
 
 gameplay-piano-hands = Izquierda / graves: azul · Derecha / agudos: ámbar · División en do central (C4)
 
-pause-score-instructions = Arrastra sobre los compases para seleccionar un bucle. Desplázate para explorar.
+pause-score-instructions = Selecciona una sección sobre la partitura. Activa Repetir sección para practicar.
 
 pause-score-no-selection = No hay un intervalo seleccionado
 pause-score-selection = Repetir { $start }–{ $end } s · Reanuda para practicar
+
+pause-score-section = { $name } · compases { $first }–{ $last } · { $state } ({ $start }–{ $end } s)
+
+pause-achievement-not-assessed = Logro · Sin evaluar
+
+pause-repeat-section = Repetir sección · activar/desactivar
+
+pause-repeat-on = Repetir sección: sí
+
+pause-repeat-off = Repetir sección: no

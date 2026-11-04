@@ -45,7 +45,7 @@ mod practice_badges;
 mod results;
 mod song_info;
 pub mod song_progress_overlay;
-mod song_waveform_material;
+pub mod song_waveform_material;
 mod state;
 mod technique_coach;
 mod technique_cue;

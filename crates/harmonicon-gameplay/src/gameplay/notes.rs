@@ -310,7 +310,8 @@ pub fn build_scheduled_notes(
     adaptive: &AdaptiveDifficulty,
 ) -> (Vec<ScheduledNote>, Vec<Option<&'static str>>) {
     let items = track_items(&chart.track, &chart.timing);
-    let flags = unlocked_flags(&items, &adaptive.sections, &adaptive.learned, adaptive.enabled);
+    let flags =
+        unlocked_flags(&items, &adaptive.sections, &adaptive.unlock_levels, adaptive.enabled);
     let mut flags = flags.into_iter();
     let mut combined: Vec<(ScheduledNote, Option<&'static str>)> = Vec::new();
     // A guitar in another tuning or a flute with the other foot joint: every

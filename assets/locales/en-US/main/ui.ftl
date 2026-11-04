@@ -566,7 +566,7 @@ pause-quit-song = Quit Song
 pause-paused = PAUSED
 pause-resume = Resume
 pause-restart = Restart
-pause-learned-label = Learned:
+pause-learned-label = Phrase coverage target:
 pause-finish-lesson = Finish Lesson
 pause-wait-for-note-button = ⏸ Wait for Note
 pause-wait-for-note-on = Wait for Note: on
@@ -575,17 +575,17 @@ pause-flute-view-button = Fingering chart
 pause-flute-view-fingering = Fingering chart: shown
 pause-flute-view-notes = Fingering chart: hidden
 pause-speed = Speed: {$pct}%
-pause-adaptive-difficulty-button = Adaptive Difficulty
-pause-adaptive-difficulty-on = Adaptive Difficulty: on
-pause-adaptive-difficulty-off = Adaptive Difficulty: off
-pause-phrase-section = Section: {$name} — Learned: {$pct}%
+pause-adaptive-difficulty-button = Phrase coverage
+pause-adaptive-difficulty-on = Enabled
+pause-adaptive-difficulty-off = Off · all notes shown
+pause-phrase-section = Section: { $name } · Coverage: { $pct }%
 pause-phrase-no-sections = No phrases in this song
-pause-drag-section-hint = Click a section on the progress bar above to select it
-pause-notes-update-hint = Notes update live — resume to see them
+pause-drag-section-hint = Select a section in the song map or score.
+pause-notes-update-hint = Coverage reveals the beginning of the phrase; complete chord attacks stay together.
 pause-clear-loop = Clear Loop
 pause-loop-off = Loop: off
 pause-loop-range = Loop: {$start}s–{$end}s
-pause-drag-loop-hint = Drag on the progress bar above to set a loop range
+pause-drag-loop-hint = Select a section, then toggle Repeat section.
 
 # Metronome overlay
 metronome-click-off = click: off
@@ -1002,7 +1002,17 @@ gameplay-guitar-neck-next = Next { $chord }
 
 gameplay-piano-hands = Left / bass: blue · Right / treble: amber · Split at middle C (C4)
 
-pause-score-instructions = Drag above the measures to select a repeat range. Scroll to browse.
+pause-score-instructions = Select a section above the score. Use Repeat section to practise it.
 
 pause-score-no-selection = No repeat range selected
 pause-score-selection = Repeat { $start }–{ $end } s · Resume to practice
+
+pause-score-section = { $name } · bars { $first }–{ $last } · { $state } ({ $start }–{ $end } s)
+
+pause-achievement-not-assessed = Achievement · Not assessed
+
+pause-repeat-section = Repeat section · toggle
+
+pause-repeat-on = Repeat section: on
+
+pause-repeat-off = Repeat section: off

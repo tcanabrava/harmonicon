@@ -29,33 +29,26 @@
 //! drag sweeps out an A–B loop range and fires [`RequestLoopRange`] rather
 //! than writing `LoopConfig`, keeping the gesture and the loop policy apart.
 
-use bevy::picking::events::{PointerClick, PointerDrag, PointerDragEnd, PointerDragStart};
-use bevy::picking::pointer::PointerButton;
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
-use bevy::ui_render::prelude::MaterialNode;
 
 use harmonicon_app::app::AppState;
 
 use super::adaptive_difficulty::{AdaptiveDifficulty, PhraseSection};
 use super::pause_menu::SelectedPhraseIndex;
-use super::song_waveform_material::{
-    SongWaveformMaterial, SongWaveformMaterialPlugin, pack_amplitudes,
-};
+use super::song_waveform_material::SongWaveformMaterialPlugin;
 use super::{
     GameplayClock, GameplayLogic, GameplayRoot, LoopConfig, Paused, SongEnd, loop_range_valid,
 };
 
 /// Every bar keeps at least this much height (as a fraction 0..1) even during
 /// silence, so the waveform reads as a continuous shape rather than gaps.
-const WAVEFORM_FLOOR: f32 = 0.04;
 
 /// Waveform fill color — a desaturated, receding, dark gray-blue,
 /// deliberately *not* the same hue as a note marker's blow color drawn over
 /// it, or "there's sound here" and "this is a blow note" read as the same
 /// signal. Translucent (alpha 0.55) because it sits directly behind the
 /// note markers — see [`spawn_song_progress`].
-const WAVEFORM_COLOR: Color = Color::srgba(0.32, 0.37, 0.45, 0.55);
 
 /// Height (px) of the note-lanes strip — tall enough that even a 12-hole
 /// chromatic's lanes stay individually legible (5px each; a 10-hole
@@ -80,6 +73,7 @@ pub const BAR_HEIGHT: f32 = NOTE_LANES_HEIGHT;
 /// Narrowest a note's marker is ever drawn (fraction 0..1 of the bar),
 /// regardless of how short the note actually is — a proportionally-accurate
 /// but sub-pixel-wide marker would be invisible. See [`note_marker_geometry`].
+#[cfg(test)]
 const MIN_NOTE_MARKER_FRAC: f32 = 0.003;
 
 /// A freshly-spawned note-marker rect's fill, before [`sync_note_marker_colors`]
@@ -90,8 +84,6 @@ const MIN_NOTE_MARKER_FRAC: f32 = 0.003;
 /// Editor's scrollbar minimap uses by default
 /// (`song_editor::interaction::SCROLLBAR_BLOW_COLOR`/`SCROLLBAR_DRAW_COLOR`),
 /// for the same "note as a colored rect" language.
-const NOTE_MARKER_BLOW_FALLBACK: Color = Color::srgba(0.50, 0.75, 1.00, 0.9);
-const NOTE_MARKER_DRAW_FALLBACK: Color = Color::srgba(1.00, 0.62, 0.35, 0.9);
 
 /// Alpha applied to whichever blow/draw [`harmonicon_platform::theme::NoteColors`] a note
 /// marker resolves to (the theme colors themselves carry no alpha of their
@@ -106,13 +98,13 @@ const NOTE_MARKER_ALPHA: f32 = 0.9;
 /// Translucent rather than solid — it still visibly covers the waveform
 /// behind it (the whole point of this overlay), just as a tint over it
 /// rather than fully replacing it.
-const PHRASE_BAR_COLOR: Color = Color::srgba(0.85, 0.75, 0.35, 0.45);
 
 /// A phrase's mastery bar is never shorter than this (px), even at a
 /// learned fraction near zero — same "never fully disappear" reasoning as
 /// [`WAVEFORM_FLOOR`], just an absolute pixel floor instead of a fractional
 /// one, since this bar's height is computed directly in pixels against
 /// [`BAR_HEIGHT`] rather than as a percentage of a fixed-height row.
+#[cfg(test)]
 const PHRASE_BAR_MIN_HEIGHT_PX: f32 = 2.0;
 
 /// Above the pause overlay's own backdrop (`pause_menu::setup_pause_menu`,
@@ -135,7 +127,7 @@ enum LoopEdge {
 
 /// Solid, unlike the range wash it bounds: an edge has to be findable at a
 /// glance, and a translucent edge on a translucent band is neither.
-const LOOP_HANDLE_COLOR: Color = Color::srgb(1.0, 0.85, 0.35);
+const LOOP_HANDLE_COLOR: Color = Color::srgb(0.4, 0.75, 1.0);
 
 /// Highlights the current A–B loop range within the bar — either the
 /// committed `LoopConfig` range, or a live preview of an in-progress drag
@@ -165,8 +157,6 @@ struct PhraseSectionRect(usize);
 /// component (rather than reading it back off the parent) so
 /// [`update_phrase_mastery_bars`] can resize it with one more disjoint query
 /// instead of walking the hierarchy. See [`phrase_bar_height_px`].
-#[derive(Component, Clone, Copy)]
-struct PhraseMasteryBar(usize);
 
 /// Marks a note-marker rectangle with which direction it is, so
 /// [`sync_note_marker_colors`] can tint it from the active theme/colorblind
@@ -268,12 +258,12 @@ pub struct NoteMarker {
 /// waveform background stays empty in that case.
 pub fn spawn_song_progress(
     commands: &mut Commands,
-    waveform: &[f32],
+    _waveform: &[f32],
     duration_secs: f64,
     notes: &[NoteMarker],
-    lane_count: u8,
+    _lane_count: u8,
     sections: &[PhraseSection],
-    learned: &[f32],
+    _learned: &[f32],
 ) -> Entity {
     let duration_secs = effective_duration(duration_secs, notes, sections);
     commands.insert_resource(AudioDuration(duration_secs));
@@ -300,59 +290,7 @@ pub fn spawn_song_progress(
             RelativeCursorPosition::default(),
             ProgressBarDragSurface,
         ))
-        .observe(on_drag_start)
-        .observe(on_drag)
-        .observe(on_drag_end)
         .with_children(|bar| {
-            // The waveform as the note-lanes strip's own background — a
-            // single shader-drawn node (`SongWaveformMaterial`/`assets/
-            // shaders/song_waveform.wesl`) instead of one `Node` per
-            // bucket. A sibling of `strip` (not nested inside it) sized and
-            // positioned to exactly overlap it, spawned *first* so it's the
-            // bottom layer of this whole `bar`: under the phrase-mastery
-            // overlay (which needs to cover it while paused) and under
-            // `strip`'s own opaque note markers (which need to stay legible
-            // regardless of what's playing underneath). Nesting it inside
-            // `strip` instead would put it *above* the mastery overlay,
-            // since paint order follows each sibling's whole subtree, not
-            // individual grandchildren interleaved across siblings. The
-            // material asset itself can't be created here (`spawn_song_
-            // progress` only has `Commands`, not `Assets<
-            // SongWaveformMaterial>`, and every caller's own setup system
-            // is already near Bevy's system-param limit) — deferred via
-            // `commands.queue` instead, same "no extra system param
-            // needed" trick `audio_input::start_capture` uses.
-            let waveform_node = bar
-                .spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        top: Val::Px(0.0),
-                        left: Val::Px(0.0),
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
-                        ..default()
-                    },
-                    Pickable::IGNORE,
-                ))
-                .id();
-            let waveform_amplitudes = pack_amplitudes(waveform, WAVEFORM_FLOOR);
-            bar.commands().queue(move |world: &mut World| {
-                let mut materials = world.resource_mut::<Assets<SongWaveformMaterial>>();
-                let handle = materials.add(SongWaveformMaterial {
-                    color: WAVEFORM_COLOR.into(),
-                    amplitudes: waveform_amplitudes,
-                });
-                world.entity_mut(waveform_node).insert(MaterialNode(handle));
-            });
-
-            // The per-phrase mastery overlay — spawned after the waveform
-            // (so it paints above/covers it) but before `strip` (so
-            // `strip`'s own opaque note markers still end up on top of it,
-            // keeping notes legible even with the overlay showing). Starts
-            // hidden (`Display::None`) — matches the default unpaused state
-            // a song always starts in, so no 1-frame flash;
-            // `sync_phrase_overlay_visibility` shows it once actually
-            // paused.
             if duration_secs > 0.0 {
                 bar.spawn((
                     Node {
@@ -361,7 +299,7 @@ pub fn spawn_song_progress(
                         left: Val::Px(0.0),
                         width: Val::Percent(100.0),
                         height: Val::Percent(100.0),
-                        display: Display::None,
+                        display: Display::Flex,
                         ..default()
                     },
                     PhraseOverlay,
@@ -376,7 +314,6 @@ pub fn spawn_song_progress(
                         ) else {
                             continue;
                         };
-                        let learned_frac = learned.get(i).copied().unwrap_or(0.0);
                         // Deliberately pickable (unlike everything else in
                         // this bar) — see `on_phrase_rect_click`. Its
                         // default `should_block_lower: true` means a drag
@@ -401,20 +338,16 @@ pub fn spawn_song_progress(
                                 },
                                 BorderColor::all(PHRASE_RECT_BORDER_COLOR),
                                 PhraseSectionRect(i),
+                                bevy::ui_widgets::Button,
+                                bevy::input_focus::tab_navigation::TabIndex(0),
                             ))
                             .observe(on_phrase_rect_click)
                             .with_children(|column| {
                                 column.spawn((
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        left: Val::Px(0.0),
-                                        bottom: Val::Px(0.0),
-                                        width: Val::Percent(100.0),
-                                        height: Val::Px(phrase_bar_height_px(learned_frac)),
-                                        ..default()
-                                    },
-                                    BackgroundColor(PHRASE_BAR_COLOR),
-                                    PhraseMasteryBar(i),
+                                    Text::new((i + 1).to_string()),
+                                    TextLayout::no_wrap(),
+                                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                    TextColor(Color::WHITE),
                                     Pickable::IGNORE,
                                 ));
                             });
@@ -424,53 +357,13 @@ pub fn spawn_song_progress(
 
             bar.spawn((
                 Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Px(NOTE_LANES_HEIGHT),
-                    position_type: PositionType::Relative,
-                    ..default()
-                },
-                Pickable::IGNORE,
-            ))
-            .with_children(|strip| {
-                for note in notes {
-                    let Some((left, width)) =
-                        note_marker_geometry(note.time, note.duration, duration_secs)
-                    else {
-                        continue;
-                    };
-                    let Some((top, height)) = note_lane_geometry(note.lane, lane_count) else {
-                        continue;
-                    };
-                    let fallback = match note.tint {
-                        MarkerTint::Blow => NOTE_MARKER_BLOW_FALLBACK,
-                        MarkerTint::Draw => NOTE_MARKER_DRAW_FALLBACK,
-                        MarkerTint::Fixed(colour) => colour.with_alpha(NOTE_MARKER_ALPHA),
-                    };
-                    strip.spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: Val::Percent(left * 100.0),
-                            top: Val::Percent(top * 100.0),
-                            width: Val::Percent(width * 100.0),
-                            height: Val::Percent(height * 100.0),
-                            ..default()
-                        },
-                        BackgroundColor(fallback),
-                        NoteMarkerRect { tint: note.tint },
-                        Pickable::IGNORE,
-                    ));
-                }
-            });
-
-            bar.spawn((
-                Node {
                     position_type: PositionType::Absolute,
                     left: Val::Percent(0.0),
                     width: Val::Percent(0.0),
                     height: Val::Percent(100.0),
                     ..default()
                 },
-                BackgroundColor(Color::srgba(1.0, 0.85, 0.35, 0.30)),
+                BackgroundColor(Color::srgba(0.4, 0.75, 1.0, 0.06)),
                 Visibility::Hidden,
                 Pickable::IGNORE,
                 LoopRangeMarker,
@@ -608,6 +501,7 @@ pub(super) fn drag_marker_geometry(
 /// into. `lane` is clamped into range rather than rejected, so an
 /// out-of-range value degrades to the bottom lane instead of silently
 /// dropping the note's marker.
+#[cfg(test)]
 fn note_lane_geometry(lane: u8, lane_count: u8) -> Option<(f32, f32)> {
     if lane_count == 0 {
         return None;
@@ -645,6 +539,7 @@ fn effective_duration(duration_secs: f64, notes: &[NoteMarker], sections: &[Phra
 /// Floored to [`MIN_NOTE_MARKER_FRAC`] so a very short note still shows as
 /// a visible speck, and clamped so a floored marker near the end can't
 /// poke past the bar. `None` only when there's no known duration.
+#[cfg(test)]
 fn note_marker_geometry(time: f64, duration: f64, total_duration: f64) -> Option<(f32, f32)> {
     if total_duration <= 0.0 {
         return None;
@@ -673,6 +568,7 @@ fn phrase_rect_geometry(start_time: f64, end_time: f64, duration_secs: f64) -> O
 /// fills the whole column (covering the waveform behind it), a fresh
 /// phrase near 0% still shows [`PHRASE_BAR_MIN_HEIGHT_PX`] as a thin line
 /// rather than vanishing outright.
+#[cfg(test)]
 fn phrase_bar_height_px(learned: f32) -> f32 {
     (learned.clamp(0.0, 1.0) * BAR_HEIGHT).max(PHRASE_BAR_MIN_HEIGHT_PX)
 }
@@ -685,12 +581,13 @@ const PHRASE_RECT_BORDER_COLOR: Color = Color::srgba(1.0, 1.0, 1.0, 1.0);
 /// Border color for whichever section is currently selected (see
 /// [`update_selected_phrase_border`]) — a bright gold, distinct from the
 /// plain white every other section's border stays.
-const SELECTED_PHRASE_RECT_BORDER_COLOR: Color = Color::srgba(1.0, 0.85, 0.25, 1.0);
+const SELECTED_PHRASE_RECT_BORDER_COLOR: Color = Color::srgb(0.4, 0.75, 1.0);
 
 /// Converts a `RelativeCursorPosition::normalized` reading (-0.5..0.5
 /// within the node's bounds; not clamped when the pointer is outside them,
 /// which happens constantly mid-drag) into a clamped 0..`duration_secs`
 /// time. `None` for an untracked cursor or a non-positive duration.
+#[cfg(test)]
 fn cursor_to_time(normalized_x: Option<f32>, duration_secs: f64) -> Option<f64> {
     let x = normalized_x?;
     if duration_secs <= 0.0 {
@@ -708,61 +605,6 @@ fn sync_progress_bar_mode(paused: Res<Paused>, mut mode: ResMut<ProgressBarMode>
     if *mode != wanted {
         *mode = wanted;
     }
-}
-
-fn on_drag_start(
-    ev: On<PointerDragStart>,
-    mode: Res<ProgressBarMode>,
-    duration: Res<AudioDuration>,
-    surfaces: Query<&RelativeCursorPosition, With<ProgressBarDragSurface>>,
-    mut drag: ResMut<LoopDrag>,
-) {
-    if *mode != ProgressBarMode::Edit || ev.button != PointerButton::Primary {
-        return;
-    }
-    let Ok(rel) = surfaces.get(ev.entity) else {
-        return;
-    };
-    let Some(time) = cursor_to_time(rel.normalized.map(|n| n.x), duration.0) else {
-        return;
-    };
-    *drag = LoopDrag { active: true, origin_time: time, current_time: time };
-}
-
-fn on_drag(
-    ev: On<PointerDrag>,
-    mode: Res<ProgressBarMode>,
-    duration: Res<AudioDuration>,
-    surfaces: Query<&RelativeCursorPosition, With<ProgressBarDragSurface>>,
-    mut drag: ResMut<LoopDrag>,
-) {
-    if *mode != ProgressBarMode::Edit || !drag.active || ev.button != PointerButton::Primary {
-        return;
-    }
-    let Ok(rel) = surfaces.get(ev.entity) else {
-        return;
-    };
-    if let Some(time) = cursor_to_time(rel.normalized.map(|n| n.x), duration.0) {
-        drag.current_time = time;
-    }
-}
-
-/// Releasing the mouse ends the drag and requests the range it swept out —
-/// see [`RequestLoopRange`]'s doc comment for why this doesn't just write
-/// `LoopConfig` directly.
-fn on_drag_end(
-    ev: On<PointerDragEnd>,
-    mut drag: ResMut<LoopDrag>,
-    mut requests: MessageWriter<RequestLoopRange>,
-) {
-    if !drag.active || ev.button != PointerButton::Primary {
-        return;
-    }
-    drag.active = false;
-    requests.write(RequestLoopRange {
-        start_time: drag.origin_time.min(drag.current_time),
-        end_time: drag.origin_time.max(drag.current_time),
-    });
 }
 
 /// Applies a requested loop range to `LoopConfig`. `loop_range_valid` decides
@@ -824,18 +666,6 @@ fn update_loop_marker(
 /// [`spawn_song_progress`], since their count/geometry only changes when
 /// the song itself does. Colour is fixed ([`PHRASE_BAR_COLOR`]), so this
 /// never needs `ColorblindPalette`.
-fn update_phrase_mastery_bars(
-    adaptive: Res<AdaptiveDifficulty>,
-    mut bars: Query<(&PhraseMasteryBar, &mut Node)>,
-) {
-    if !adaptive.is_changed() {
-        return;
-    }
-    for (bar, mut node) in &mut bars {
-        let learned = adaptive.learned.get(bar.0).copied().unwrap_or(0.0);
-        node.height = Val::Px(phrase_bar_height_px(learned));
-    }
-}
 
 /// Shows the per-phrase mastery overlay only while actually paused — see
 /// the module doc comment for why (Rocksmith keeps mastery/difficulty
@@ -852,7 +682,7 @@ fn sync_phrase_overlay_visibility(
         return;
     }
     for mut node in &mut overlays {
-        node.display = if paused.0 { Display::Flex } else { Display::None };
+        node.display = Display::Flex;
     }
 }
 
@@ -893,10 +723,12 @@ fn sync_note_marker_colors(
 // sized to the phrase rather than to a hit target; the keyboard route to a
 // phrase is the pause menu's phrase list.
 fn on_phrase_rect_click(
-    ev: On<PointerClick>,
+    ev: On<bevy::ui_widgets::Activate>,
     rects: Query<&PhraseSectionRect>,
     mode: Res<ProgressBarMode>,
     mut selected: ResMut<SelectedPhraseIndex>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut loops: ResMut<LoopConfig>,
 ) {
     if *mode != ProgressBarMode::Edit {
         return;
@@ -905,6 +737,12 @@ fn on_phrase_rect_click(
         return;
     };
     selected.0 = rect.0;
+    if loops.active
+        && let Some(section) = adaptive.sections.get(rect.0)
+    {
+        loops.start_time = section.start_time;
+        loops.end_time = section.end_time;
+    }
 }
 
 /// A brighter border on the currently-selected phrase-section rectangle —
@@ -955,7 +793,6 @@ impl Plugin for SongProgressPlugin {
             .add_systems(
                 Update,
                 (
-                    update_phrase_mastery_bars,
                     update_selected_phrase_border,
                     sync_note_marker_colors,
                     sync_phrase_overlay_visibility,

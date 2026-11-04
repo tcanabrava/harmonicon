@@ -191,27 +191,18 @@ pub(super) fn update_practice_speed_slider(
 /// The "Loop: ..." readout, kept in step with [`LoopConfig`].
 #[derive(Component, Default, Clone)]
 pub(super) struct LoopRangeLabel;
+#[derive(Component)]
+pub(super) struct RepeatButtonLabel;
 
 /// The loop range itself is set by click-and-drag directly on the
 /// song-progress bar while paused (`song_progress_overlay`'s
 /// `ProgressBarMode::Edit` — see its module doc comment); this button only
 /// ever clears it.
-fn on_clear_loop(_: On<Activate>, mut loop_cfg: ResMut<LoopConfig>) {
-    *loop_cfg = LoopConfig::default();
-}
 
 /// Pure so both possible readouts (off / a valid range) are unit-testable
 /// without spinning up an `App`.
 fn loop_label_text(loc: &Localization, cfg: &LoopConfig) -> String {
-    if cfg.active {
-        loc.msg_args(
-            "pause-loop-range",
-            &[("start", format!("{:.0}", cfg.start_time)), ("end", format!("{:.0}", cfg.end_time))],
-        )
-        .into()
-    } else {
-        loc.msg("pause-loop-off").into()
-    }
+    if cfg.active { loc.msg("pause-repeat-on").into() } else { loc.msg("pause-repeat-off").into() }
 }
 
 /// Keeps the "Loop: ..." readout in step with [`LoopConfig`]. Not gated on
@@ -219,7 +210,7 @@ fn loop_label_text(loc: &Localization, cfg: &LoopConfig) -> String {
 pub(super) fn update_loop_label(
     loop_cfg: Res<LoopConfig>,
     loc: Res<Localization>,
-    mut labels: Query<&mut Text, With<LoopRangeLabel>>,
+    mut labels: Query<&mut Text, Or<(With<LoopRangeLabel>, With<RepeatButtonLabel>)>>,
 ) {
     if !loop_cfg.is_changed() && !loc.is_changed() {
         return;
@@ -264,7 +255,16 @@ fn phrase_selector_text(loc: &Localization, name: Option<&str>, learned: f32) ->
         Some(name) => loc
             .msg_args(
                 "pause-phrase-section",
-                &[("name", name.to_string()), ("pct", format!("{:.0}", learned * 100.0))],
+                &[
+                    ("name", name.to_string()),
+                    (
+                        "pct",
+                        format!(
+                            "{:.0}",
+                            super::adaptive_difficulty::visible_fraction(learned) * 100.0
+                        ),
+                    ),
+                ],
             )
             .into(),
         None => loc.msg("pause-phrase-no-sections").into(),
@@ -284,8 +284,9 @@ pub(super) fn update_phrase_selector_label(
         return;
     }
     let section = adaptive.sections.get(selected.0);
-    let learned =
-        section.map(|_| adaptive.learned.get(selected.0).copied().unwrap_or(0.0)).unwrap_or(0.0);
+    let learned = section
+        .map(|_| adaptive.unlock_levels.get(selected.0).copied().unwrap_or(0.0))
+        .unwrap_or(0.0);
     let text = phrase_selector_text(&loc, section.map(|s| s.name.as_str()), learned);
     for mut label in &mut labels {
         if label.0 != text {
@@ -336,6 +337,8 @@ fn on_toggle_adaptive_difficulty(
 /// the selected phrase changes.
 #[derive(Component, Default, Clone)]
 pub(super) struct PhraseLearnedSlider;
+#[derive(Component)]
+pub(super) struct CoverageRow;
 
 /// The fill bar inside the phrase-learned slider track.
 #[derive(Component, Default, Clone)]
@@ -369,10 +372,10 @@ fn set_selected_phrase_learned(
         return;
     }
     let value = clamp_learned(value);
-    if adaptive.learned.len() <= selected.0 {
-        adaptive.learned.resize(selected.0 + 1, 0.0);
+    if adaptive.unlock_levels.len() <= selected.0 {
+        adaptive.unlock_levels.resize(selected.0 + 1, 0.0);
     }
-    adaptive.learned[selected.0] = value;
+    adaptive.unlock_levels[selected.0] = value;
     let Some(key) = song_key(selected_song, manifests) else {
         return;
     };
@@ -380,7 +383,9 @@ fn set_selected_phrase_learned(
     if let Some(section_key) =
         super::adaptive_difficulty::section_keys(&adaptive.sections).get(selected.0)
     {
-        record.phrase_learned.insert(section_key.clone(), value);
+        record
+            .phrase_coverage
+            .insert(section_key.clone(), super::adaptive_difficulty::visible_fraction(value));
     }
     harmonicon_app::profile::save_profile(profile);
 }
@@ -394,7 +399,7 @@ fn on_phrase_learned_slider_change(
     mut adaptive: ResMut<AdaptiveDifficulty>,
 ) {
     set_selected_phrase_learned(
-        ev.value,
+        ((ev.value - 0.1) / 0.9).clamp(0.0, 1.0),
         &selected,
         &selected_song,
         &manifests,
@@ -414,6 +419,7 @@ fn spawn_phrase_learned_row(
     value: f32,
     loc: &Localization,
 ) {
+    let value = super::adaptive_difficulty::visible_fraction(value);
     let row = commands
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -421,6 +427,7 @@ fn spawn_phrase_learned_row(
             column_gap: Val::Px(10.0),
             ..default()
         })
+        .insert(CoverageRow)
         .id();
     commands.entity(row).with_children(|r| {
         r.spawn_empty().apply_scene(bsn! {
@@ -431,7 +438,7 @@ fn spawn_phrase_learned_row(
     });
     let track = commands
         .spawn_scene(phrase_learned_slider_scene(value))
-        .insert((SliderRange::new(0.0, 1.0), SliderStep(0.01)))
+        .insert((SliderRange::new(0.1, 1.0), SliderStep(0.01)))
         .id();
     commands.entity(row).add_child(track);
     commands.entity(row).with_children(|r| {
@@ -474,14 +481,20 @@ pub(super) fn update_phrase_learned_slider(
     selected: Res<SelectedPhraseIndex>,
     adaptive: Res<AdaptiveDifficulty>,
     sliders: Query<(Entity, &SliderValue), With<PhraseLearnedSlider>>,
-    mut fills: Query<&mut Node, With<PhraseLearnedFill>>,
+    mut fills: Query<&mut Node, (With<PhraseLearnedFill>, Without<CoverageRow>)>,
+    mut rows: Query<&mut Node, (With<CoverageRow>, Without<PhraseLearnedFill>)>,
     mut labels: Query<&mut Text, With<PhraseLearnedValueLabel>>,
     mut commands: Commands,
 ) {
-    if !selected.is_changed() && !adaptive.is_changed() {
-        return;
+    for mut row in &mut rows {
+        let display = if adaptive.enabled { Display::Flex } else { Display::None };
+        if row.display != display {
+            row.display = display;
+        }
     }
-    let value = adaptive.learned.get(selected.0).copied().unwrap_or(0.0);
+    let value = super::adaptive_difficulty::visible_fraction(
+        adaptive.unlock_levels.get(selected.0).copied().unwrap_or(0.0),
+    );
     // `SliderValue` is an immutable component (bevy_ui_widgets), so it can
     // only be replaced wholesale via `insert`, not mutated in place — same
     // as `slider_self_update` does for a drag-driven change.
@@ -543,22 +556,15 @@ pub(super) fn setup_pause_menu(
     adaptive: Res<AdaptiveDifficulty>,
     song_info: Res<SongInfo>,
     loc: Res<Localization>,
-    selected: Res<SelectedSong>,
-    manifests: Res<Assets<SongManifest>>,
 ) {
-    let keep_note_overview = manifests.get(&selected.0).is_some_and(|manifest| {
-        matches!(
-            manifest.chart.instrument(),
-            Some(harmonicon_core::instrument::Instrument::Harmonica(_))
-        )
-    });
+    let keep_note_overview = true;
     let is_jam = *mode == GameplayMode::JamSession;
     // A scale-adherence lesson (see `PassCriteria::ScaleAdherence`) is the
     // one lesson type that never reaches the results screen on its own —
     // Jam Session has no natural end — so it needs its own explicit
     // "submit for judgment" action here instead.
     let is_lesson_jam = is_jam && lesson.is_some();
-    let learned = adaptive.learned.get(selected_phrase.0).copied().unwrap_or(0.0);
+    let learned = adaptive.unlock_levels.get(selected_phrase.0).copied().unwrap_or(0.0);
     let phrase_text = phrase_selector_text(
         &loc,
         adaptive.sections.get(selected_phrase.0).map(|s| s.name.as_str()),
@@ -744,6 +750,29 @@ pub(super) fn setup_pause_menu(
             });
         });
         spawn_phrase_learned_row(&mut commands, practice, learned, &loc);
+        commands.entity(practice).with_children(|p| {
+            p.spawn((
+                Text::new(loc.msg("pause-achievement-not-assessed").to_string()),
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextColor(Color::srgb(0.65, 0.7, 0.78)),
+            ));
+            p.spawn((
+                bevy::ui_widgets::Button,
+                bevy::input_focus::tab_navigation::TabIndex(0),
+                RepeatButtonLabel,
+                Text::new(loc.msg("pause-repeat-off").to_string()),
+                TextFont { font_size: FontSize::Px(16.0), ..default() },
+                TextColor(Color::WHITE),
+                Node {
+                    padding: UiRect::axes(Val::Px(12.0), Val::Px(8.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.12, 0.22, 0.32)),
+                BorderColor::all(Color::srgb(0.4, 0.75, 1.0)),
+            ))
+            .observe(on_repeat_section);
+        });
         commands.entity(practice).with_children(|children| {
             children.spawn_empty().apply_scene(bsn! {
                 Text({String::from(loc.msg("pause-drag-section-hint"))})
@@ -766,8 +795,6 @@ pub(super) fn setup_pause_menu(
                 column_gap: {Val::Px(8.0)},
             }
             Children [
-                @button::small(&loc.msg("pause-clear-loop"), on_clear_loop)
-                --
                 Text({loop_label_text(&loc, &LoopConfig::default())})
                 TextFont { font_size: {FontSize::Px(15.0)} }
                 TextColor({Color::srgb(0.70, 0.70, 0.80)})
@@ -1025,7 +1052,7 @@ mod tests {
     #[test]
     fn loop_label_is_off_by_default() {
         let loc = Localization::default();
-        assert_eq!(loop_label_text(&loc, &LoopConfig::default()), "pause-loop-off");
+        assert_eq!(loop_label_text(&loc, &LoopConfig::default()), "pause-repeat-off");
     }
 
     #[test]
@@ -1034,14 +1061,14 @@ mod tests {
         // nonzero but inactive — the readout should still read "off".
         let loc = Localization::default();
         let cfg = LoopConfig { active: false, start_time: 8.0, end_time: 8.0 };
-        assert_eq!(loop_label_text(&loc, &cfg), "pause-loop-off");
+        assert_eq!(loop_label_text(&loc, &cfg), "pause-repeat-off");
     }
 
     #[test]
     fn loop_label_shows_the_range_once_active() {
         let loc = Localization::default();
         let cfg = LoopConfig { active: true, start_time: 8.0, end_time: 16.0 };
-        assert_eq!(loop_label_text(&loc, &cfg), "pause-loop-range");
+        assert_eq!(loop_label_text(&loc, &cfg), "pause-repeat-on");
     }
 
     // ── practice_speed_label_text ──────────────────────────────────────────────
@@ -1080,4 +1107,45 @@ mod tests {
         assert_eq!(clamp_learned(1.5), 1.0);
         assert_eq!(clamp_learned(0.42), 0.42);
     }
+}
+
+fn on_repeat_section(
+    _: On<Activate>,
+    selected: Res<SelectedPhraseIndex>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut loops: ResMut<LoopConfig>,
+) {
+    let Some(section) = adaptive.sections.get(selected.0) else { return };
+    if loops.active && loops.start_time == section.start_time && loops.end_time == section.end_time
+    {
+        loops.active = false;
+    } else {
+        loops.start_time = section.start_time;
+        loops.end_time = section.end_time;
+        loops.active = super::loop_range_valid(section.start_time, section.end_time);
+    }
+}
+
+pub(super) fn resume_section_repeat(
+    paused: Res<Paused>,
+    loops: Res<LoopConfig>,
+    mut clock: ResMut<super::GameplayClock>,
+    mut notes: ResMut<super::SongNotes>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    if !paused.is_changed() || paused.0 || !loops.active {
+        return;
+    }
+    clock.rewind_to(loops.start_time, sinks.single().ok());
+    let (start, end) = super::loop_reset_range(&notes.notes, loops.start_time, loops.end_time);
+    for note in &mut notes.notes[start..end] {
+        note.hit = false;
+        note.missed = false;
+        note.held = 0.0;
+        note.sustain_scored = false;
+        note.pitch_samples.clear();
+        note.amp_samples.clear();
+        note.miss_evidence = None;
+    }
+    notes.cursor = start;
 }

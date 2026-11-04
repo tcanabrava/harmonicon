@@ -20,9 +20,6 @@ use harmonicon_song::lessons::{LessonContext, PassCriteria, lesson_passed};
 use harmonicon_song::song::SongManifest;
 use harmonicon_ui::dialogs::button;
 
-use super::adaptive_difficulty::{
-    AdaptiveDifficulty, bump_learned_sections, learned_vec_from_map, write_learned_into_map,
-};
 use super::coaching::{
     Observation, latency_suggestion, lesson_progress, mean_offset_ms, missed_range, observation,
     ranked_techniques, technique_buckets,
@@ -167,7 +164,6 @@ pub(super) fn setup(
     mut profile: ResMut<PlayerProfile>,
     song_notes: Res<SongNotes>,
     config: Res<ScoringConfig>,
-    adaptive: Res<AdaptiveDifficulty>,
     lesson: Option<Res<LessonContext>>,
     loc: Res<Localization>,
 ) {
@@ -227,9 +223,8 @@ pub(super) fn setup(
             let key = manifest.path.display().to_string();
             let record = profile.songs.entry(key).or_default();
             let improved = record_play(record, score.points, acc, &technique_accuracy);
-            let mut learned = learned_vec_from_map(&adaptive.sections, &record.phrase_learned);
-            bump_learned_sections(&song_notes.notes, adaptive.sections.len(), &mut learned);
-            write_learned_into_map(&adaptive.sections, &learned, &mut record.phrase_learned);
+            // Exercise coverage is a user choice. A clean result does not
+            // overwrite it or establish reliability at an unattempted level.
             let best_score = record.best_score;
             save_profile(&profile);
             (improved, best_score)
