@@ -110,13 +110,34 @@ pub(super) fn update_fretboard(
     clock: Res<GameplayClock>,
     notes: Res<SongNotes>,
     mut cells: Query<(&FretCell, &mut Text, &mut BackgroundColor)>,
-    mut diagrams: Query<(&ChordDiagram, &mut Text, &mut Node), Without<FretCell>>,
+    mut diagrams: Query<
+        (&ChordDiagram, &mut Text, &mut Node),
+        (Without<FretCell>, Without<DiagramRoot>),
+    >,
+    mut roots: Query<(&DiagramRoot, &mut Node), Without<ChordDiagram>>,
+    loc: Res<harmonicon_platform::localization::Localization>,
 ) {
+    let current = attack_group(&notes.notes, clock.get(), None);
+    let next = attack_group(&notes.notes, clock.get(), current.first().map(|n| n.time));
+    let preview = different_chord(&current, &next);
+    for (root, mut node) in &mut roots {
+        node.display = if root.0 && !preview { Display::None } else { Display::Flex };
+    }
     let targets = targets(&notes.notes, clock.get());
+    let upcoming: Vec<_> = next
+        .iter()
+        .filter_map(|n| if let PlayPosition::Fret(p) = n.position { Some(p) } else { None })
+        .collect();
     for (diagram, mut text, mut node) in &mut diagrams {
+        let targets = if diagram.1 { &upcoming } else { &targets };
         let first = targets.iter().filter(|p| p.fret > 0).map(|p| p.fret).min().unwrap_or(1);
         if diagram.0 == 255 {
-            text.0 = group_name(&attack_group(&notes.notes, clock.get(), None));
+            let name = group_name(if diagram.1 { &next } else { &current });
+            text.0 = if diagram.1 {
+                loc.msg_args("gameplay-guitar-neck-next", &[("chord", name)]).to_string()
+            } else {
+                name
+            };
             continue;
         }
         if diagram.0 == 0 {
@@ -135,7 +156,11 @@ pub(super) fn update_fretboard(
             .into()
         };
         let fret = target.map_or(0, |p| p.fret);
-        node.top = Val::Px(if fret == 0 { 0.0 } else { 24.0 + f32::from(fret - first) * 24.0 });
+        node.top = Val::Px(if fret == 0 {
+            0.0
+        } else {
+            (24.0 + f32::from(fret - first) * 24.0) * diagram.2
+        });
     }
     for (cell, mut text, mut color) in &mut cells {
         paint_cell(cell, &targets, &mut text, &mut color);
@@ -289,6 +314,35 @@ mod tests {
         }
     }
     #[test]
+    fn hand_region_glides_and_seeks_snap() {
+        let mut motion = NeckMotion::default();
+        let first = Vec2::new(5.0, 20.0);
+        let next = Vec2::new(40.0, 25.0);
+        assert_eq!(motion.step(first, 0.0, 0.0, true), first);
+        assert_eq!(motion.step(next, 0.1, 0.1, true), first);
+        let middle = motion.step(next, 0.225, 0.125, true);
+        assert!((middle.x - 22.5).abs() < 0.001);
+        assert_eq!(motion.step(next, 0.35, 0.125, true), next);
+        assert_eq!(motion.step(first, 0.0, 0.01, true), first, "seek snaps");
+        motion.step(first, 0.1, 0.1, false);
+        assert_eq!(motion.step(next, 0.2, 0.1, true), next, "rest clears motion");
+    }
+
+    #[test]
+    fn next_chord_preview_requires_a_changed_shape() {
+        let current = vec![note(1.0, 6, 0), note(1.0, 5, 2)];
+        let same = vec![note(2.0, 5, 2), note(2.0, 6, 0)];
+        let changed = vec![note(2.0, 5, 3), note(2.0, 6, 1)];
+        fn refs(notes: &[ScheduledNote]) -> Vec<&ScheduledNote> {
+            notes.iter().collect()
+        }
+        assert!(!different_chord(&refs(&current), &refs(&same)));
+        assert!(different_chord(&refs(&current), &refs(&changed)));
+        assert!(!different_chord(&refs(&current), &refs(&vec![note(2.0, 1, 3)])));
+        assert!(!different_chord(&refs(&current), &[]));
+    }
+
+    #[test]
     fn overview_keeps_current_and_next_attacks_distinct_before_the_first_note() {
         let notes = vec![note(1.0, 6, 0), note(1.0, 5, 2), note(2.0, 2, 12)];
         let current = attack_group(&notes, 0.0, None);
@@ -318,7 +372,8 @@ mod tests {
     #[test]
     fn overview_updates_without_a_highway_fret_grid() {
         let mut app = App::new();
-        app.init_resource::<GameplayClock>()
+        app.init_resource::<Time>()
+            .init_resource::<GameplayClock>()
             .init_resource::<SongNotes>()
             .init_resource::<harmonicon_platform::localization::Localization>()
             .add_systems(Update, (update_fretboard, update_neck_overview));
@@ -337,6 +392,11 @@ mod tests {
         app.update();
         let world = app.world_mut();
         assert_eq!(world.query::<&FretCell>().iter(world).count(), 0);
+        assert_eq!(world.query::<&NeckRegion>().iter(world).count(), 1, "only current rectangle");
+        let preview =
+            world.query::<(&DiagramRoot, &Node)>().iter(world).find(|(root, _)| root.0).unwrap();
+        assert_eq!(preview.1.display, Display::None, "single notes are not chord previews");
+        assert_eq!(preview.1.width, Val::Px(150.0 * 0.65));
         let visible: Vec<_> = world
             .query::<(&NeckDot, &Node)>()
             .iter(world)
@@ -414,37 +474,52 @@ mod tests {
 /// Printed-chart convention: bass strings at left, nut at top. Dots are
 /// positions from the chart, never guessed finger numbers.
 #[derive(Component)]
-pub(super) struct ChordDiagram(u8);
+pub(super) struct ChordDiagram(u8, bool, f32);
+#[derive(Component)]
+pub(super) struct DiagramRoot(bool);
 
 pub(super) fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar) {
+    spawn_diagram(parent, guitar, false, 1.0);
+    spawn_diagram(parent, guitar, true, 0.65);
+}
+
+fn spawn_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar, next: bool, scale: f32) {
     parent
         .spawn((
+            DiagramRoot(next),
             Node {
-                width: Val::Px(150.0),
-                height: Val::Px(152.0),
+                width: Val::Px(150.0 * scale),
+                height: Val::Px(152.0 * scale),
                 flex_shrink: 0.0,
-                margin: UiRect { top: Val::Px(28.0), ..UiRect::horizontal(Val::Px(12.0)) },
+                margin: UiRect {
+                    top: Val::Px(28.0 * scale),
+                    ..UiRect::horizontal(Val::Px(12.0 * scale))
+                },
                 ..default()
             },
             BackgroundColor(Color::srgb(0.08, 0.10, 0.14)),
         ))
         .with_children(|chart| {
             chart.spawn((
-                ChordDiagram(255),
+                ChordDiagram(255, next, scale),
                 Text::new(""),
-                TextFont { font_size: FontSize::Px(20.0), ..default() },
-                TextColor(Color::WHITE),
-                Node { position_type: PositionType::Absolute, top: Val::Px(-28.0), ..default() },
-            ));
-            chart.spawn((
-                ChordDiagram(0),
-                Text::new(""),
-                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextFont { font_size: FontSize::Px(20.0 * scale), ..default() },
                 TextColor(Color::WHITE),
                 Node {
                     position_type: PositionType::Absolute,
-                    left: Val::Px(-10.0),
-                    top: Val::Px(28.0),
+                    top: Val::Px(-28.0 * scale),
+                    ..default()
+                },
+            ));
+            chart.spawn((
+                ChordDiagram(0, next, scale),
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(12.0 * scale), ..default() },
+                TextColor(Color::WHITE),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(-10.0 * scale),
+                    top: Val::Px(28.0 * scale),
                     ..default()
                 },
             ));
@@ -453,9 +528,9 @@ pub(super) fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Gu
                 chart.spawn((
                     Node {
                         position_type: PositionType::Absolute,
-                        left: Val::Px(10.0),
-                        right: Val::Px(10.0),
-                        top: Val::Px(24.0 + fret as f32 * 24.0),
+                        left: Val::Px(10.0 * scale),
+                        right: Val::Px(10.0 * scale),
+                        top: Val::Px((24.0 + fret as f32 * 24.0) * scale),
                         height: Val::Px(if fret == 0 { 3.0 } else { 1.0 }),
                         ..default()
                     },
@@ -468,22 +543,22 @@ pub(super) fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Gu
                 chart.spawn((
                     Node {
                         position_type: PositionType::Absolute,
-                        left: Val::Px(x),
-                        top: Val::Px(24.0),
+                        left: Val::Px(x * scale),
+                        top: Val::Px(24.0 * scale),
                         width: Val::Px(1.0),
-                        height: Val::Px(120.0),
+                        height: Val::Px(120.0 * scale),
                         ..default()
                     },
                     BackgroundColor(string_color(string).with_alpha(0.7)),
                 ));
                 chart.spawn((
-                    ChordDiagram(string),
+                    ChordDiagram(string, next, scale),
                     Text::new(""),
-                    TextFont { font_size: FontSize::Px(20.0), ..default() },
+                    TextFont { font_size: FontSize::Px(20.0 * scale), ..default() },
                     TextColor(Color::srgb(0.98, 0.85, 0.47)),
                     Node {
                         position_type: PositionType::Absolute,
-                        left: Val::Px(x - 8.0),
+                        left: Val::Px((x - 8.0) * scale),
                         top: Val::Px(0.0),
                         ..default()
                     },
@@ -535,14 +610,12 @@ pub(super) struct NeckDot {
 }
 #[derive(Component)]
 pub(super) struct NeckLabel(bool);
-#[derive(Component)]
-pub(super) struct NeckDash;
 
 const NECK_NOW: Color = Color::srgb(0.98, 0.82, 0.35);
 const NECK_NEXT: Color = Color::srgb(0.48, 0.77, 1.0);
 
 /// A schematic full neck: physical frets left to right, string 1 on top.
-/// Two outlined windows guide the hand; dots alone say which strings to play.
+/// One moving window guides the hand; dots alone say which strings to play.
 pub(super) fn spawn_neck_overview(
     parent: &mut ChildSpawnerCommands,
     guitar: &Guitar,
@@ -551,7 +624,7 @@ pub(super) fn spawn_neck_overview(
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
-            height: Val::Px(198.0),
+            height: Val::Px(174.0),
             flex_shrink: 0.0,
             flex_direction: FlexDirection::Column,
             ..default()
@@ -574,7 +647,7 @@ pub(super) fn spawn_neck_overview(
                     Node {
                         width: Val::Percent(100.0),
                         height: Val::Px(92.0),
-                        margin: UiRect { top: Val::Px(25.0), bottom: Val::Px(46.0), ..default() },
+                        margin: UiRect { top: Val::Px(25.0), bottom: Val::Px(26.0), ..default() },
                         flex_shrink: 0.0,
                         ..default()
                     },
@@ -627,11 +700,12 @@ pub(super) fn spawn_neck_overview(
                             BackgroundColor(string_color(string).with_alpha(0.5)),
                         ));
                     }
-                    for next in [false, true] {
+                    for next in [false] {
                         let color = if next { NECK_NEXT } else { NECK_NOW };
                         board
                             .spawn((
                                 NeckRegion(next),
+                                NeckMotion::default(),
                                 Node {
                                     position_type: PositionType::Absolute,
                                     height: Val::Percent(100.0),
@@ -642,59 +716,6 @@ pub(super) fn spawn_neck_overview(
                                 BackgroundColor(color.with_alpha(if next { 0.05 } else { 0.14 })),
                             ))
                             .with_children(|region| {
-                                if next {
-                                    // Segmented edges remain distinguishable without colour.
-                                    for segment in 0..8 {
-                                        for bottom in [false, true] {
-                                            region.spawn((
-                                                NeckDash,
-                                                Node {
-                                                    position_type: PositionType::Absolute,
-                                                    left: Val::Percent(segment as f32 * 12.5),
-                                                    top: if bottom {
-                                                        Val::Auto
-                                                    } else {
-                                                        Val::Px(0.0)
-                                                    },
-                                                    bottom: if bottom {
-                                                        Val::Px(0.0)
-                                                    } else {
-                                                        Val::Auto
-                                                    },
-                                                    width: Val::Percent(7.0),
-                                                    height: Val::Px(2.0),
-                                                    ..default()
-                                                },
-                                                BackgroundColor(color),
-                                            ));
-                                        }
-                                    }
-                                    for segment in 0..5 {
-                                        for right in [false, true] {
-                                            region.spawn((
-                                                NeckDash,
-                                                Node {
-                                                    position_type: PositionType::Absolute,
-                                                    left: if right {
-                                                        Val::Auto
-                                                    } else {
-                                                        Val::Px(0.0)
-                                                    },
-                                                    right: if right {
-                                                        Val::Px(0.0)
-                                                    } else {
-                                                        Val::Auto
-                                                    },
-                                                    top: Val::Percent(segment as f32 * 20.0),
-                                                    width: Val::Px(2.0),
-                                                    height: Val::Percent(12.0),
-                                                    ..default()
-                                                },
-                                                BackgroundColor(color),
-                                            ));
-                                        }
-                                    }
-                                }
                                 region.spawn((
                                     NeckLabel(next),
                                     Text::new(""),
@@ -738,12 +759,12 @@ pub(super) fn update_neck_overview(
     loc: Res<harmonicon_platform::localization::Localization>,
     boards: Query<&NeckOverview>,
     mut regions: Query<
-        (&NeckRegion, &mut Node, &mut BackgroundColor, &mut BorderColor),
+        (&NeckRegion, &mut Node, &mut BackgroundColor, &mut BorderColor, &mut NeckMotion),
         (Without<NeckDot>, Without<NeckLabel>),
     >,
     mut dots: Query<(&NeckDot, &mut Node), (Without<NeckRegion>, Without<NeckLabel>)>,
     mut labels: Query<(&NeckLabel, &mut Text, &mut Node), (Without<NeckRegion>, Without<NeckDot>)>,
-    mut dashes: Query<&mut BackgroundColor, (With<NeckDash>, Without<NeckRegion>)>,
+    time: Res<Time>,
 ) {
     let Ok(NeckOverview(guitar)) = boards.single() else { return };
     let current = attack_group(&notes.notes, clock.get(), None);
@@ -759,15 +780,11 @@ pub(super) fn update_neck_overview(
     let columns = f32::from(guitar.frets) + 1.0;
     let now_span = hand_region(&now_positions, guitar.top_fret());
     let next_span = hand_region(&next_positions, guitar.top_fret());
-    let shared = now_span.is_some() && now_span == next_span;
-    for mut dash in &mut dashes {
-        dash.0 = if shared || next_span.is_none() { Color::NONE } else { NECK_NEXT };
-    }
-    for (region, mut node, mut fill, mut border) in &mut regions {
+    for (region, mut node, mut fill, mut border, mut motion) in &mut regions {
         let group = if region.0 { &next_positions } else { &now_positions };
         let span = hand_region(group, guitar.top_fret());
         let color = if region.0 { NECK_NEXT } else { NECK_NOW };
-        fill.0 = if span.is_none() || (region.0 && shared) {
+        fill.0 = if span.is_none() {
             Color::NONE
         } else {
             color.with_alpha(if region.0 { 0.05 } else { 0.14 })
@@ -782,6 +799,16 @@ pub(super) fn update_neck_overview(
             node.display = if group.is_empty() { Display::None } else { Display::Flex };
             node.left = Val::Percent(f32::from(guitar.capo) * 100.0 / columns);
             node.width = Val::Percent(100.0 / columns);
+        }
+        if let (Val::Percent(left), Val::Percent(width)) = (node.left, node.width) {
+            let value = motion.step(
+                Vec2::new(left, width),
+                clock.get(),
+                time.delta_secs(),
+                !group.is_empty(),
+            );
+            node.left = Val::Percent(value.x);
+            node.width = Val::Percent(value.y);
         }
     }
     for (dot, mut node) in &mut dots {
@@ -806,5 +833,53 @@ pub(super) fn update_neck_overview(
         let name = group_name(if label.0 { &next } else { &current });
         let key = if label.0 { "gameplay-guitar-neck-next" } else { "gameplay-guitar-neck-now" };
         text.0 = loc.msg_args(key, &[("chord", name)]).to_string();
+    }
+}
+
+/// A preview is useful when the next chord asks for a different shape.
+/// Reordering the chart's simultaneous notes does not count as a change.
+fn different_chord(current: &[&ScheduledNote], next: &[&ScheduledNote]) -> bool {
+    let signature = |group: &[&ScheduledNote]| {
+        let mut positions: Vec<_> = group
+            .iter()
+            .filter_map(|n| {
+                if let PlayPosition::Fret(p) = n.position { Some((p.string, p.fret)) } else { None }
+            })
+            .collect();
+        positions.sort_unstable();
+        positions.dedup();
+        positions
+    };
+    let next_shape = signature(next);
+    next_shape.len() >= 2 && next_shape != signature(current)
+}
+
+#[derive(Component, Default)]
+pub(super) struct NeckMotion {
+    clock: Option<f64>,
+    value: Vec2,
+    start: Vec2,
+    goal: Vec2,
+    elapsed: f32,
+}
+impl NeckMotion {
+    fn step(&mut self, goal: Vec2, clock: f64, delta: f32, visible: bool) -> Vec2 {
+        if !visible || self.clock.is_none_or(|previous| clock < previous || clock - previous >= 0.5)
+        {
+            self.value = goal;
+            self.goal = goal;
+            self.start = goal;
+            self.elapsed = 0.25;
+        } else if self.goal != goal {
+            self.start = self.value;
+            self.goal = goal;
+            self.elapsed = 0.0;
+        } else {
+            self.elapsed += delta;
+        }
+        self.clock = visible.then_some(clock);
+        let t = (self.elapsed / 0.25).clamp(0.0, 1.0);
+        self.value = self.start.lerp(self.goal, t * t * (3.0 - 2.0 * t));
+        self.value
     }
 }
