@@ -314,6 +314,23 @@ mod tests {
         }
     }
     #[test]
+    fn suggested_fingers_keep_position_without_inventing_fifth_fingers() {
+        let at = |fret| FretAssignment { string: 1, fret, technique: StringTechnique::Fretted };
+        assert_eq!(suggested_finger(&at(5), &[at(5)], &[at(3)]), Some(3));
+        assert_eq!(suggested_finger(&at(9), &[at(9)], &[at(3)]), Some(1));
+        assert_eq!(suggested_finger(&at(7), &[at(3), at(7)], &[at(3)]), None);
+    }
+
+    #[test]
+    fn d_major_uses_separate_fingers_on_the_same_fret() {
+        let at =
+            |string, fret| FretAssignment { string, fret, technique: StringTechnique::Fretted };
+        let chord = [at(1, 2), at(2, 3), at(3, 2), at(4, 0)];
+        assert_eq!(suggested_finger(&chord[0], &chord, &chord), Some(2));
+        assert_eq!(suggested_finger(&chord[2], &chord, &chord), Some(1));
+    }
+
+    #[test]
     fn hand_region_glides_and_seeks_snap() {
         let mut motion = NeckMotion::default();
         let first = Vec2::new(5.0, 20.0);
@@ -735,10 +752,20 @@ pub(super) fn spawn_neck_overview(
                         for string in 1..=guitar.string_count() {
                             board.spawn((
                                 NeckDot { next, string },
+                                Text::new(""),
+                                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                TextLayout::no_wrap(),
+                                TextColor(if next {
+                                    NECK_NEXT
+                                } else {
+                                    Color::srgb(0.08, 0.08, 0.10)
+                                }),
                                 Node {
+                                    align_items: AlignItems::Center,
+                                    justify_content: JustifyContent::Center,
                                     position_type: PositionType::Absolute,
-                                    width: Val::Px(if next { 18.0 } else { 10.0 }),
-                                    height: Val::Px(if next { 18.0 } else { 10.0 }),
+                                    width: Val::Px(if next { 24.0 } else { 22.0 }),
+                                    height: Val::Px(if next { 24.0 } else { 22.0 }),
                                     border_radius: BorderRadius::MAX,
                                     border: UiRect::all(Val::Px(2.0)),
                                     ..default()
@@ -762,7 +789,7 @@ pub(super) fn update_neck_overview(
         (&NeckRegion, &mut Node, &mut BackgroundColor, &mut BorderColor, &mut NeckMotion),
         (Without<NeckDot>, Without<NeckLabel>),
     >,
-    mut dots: Query<(&NeckDot, &mut Node), (Without<NeckRegion>, Without<NeckLabel>)>,
+    mut dots: Query<(&NeckDot, &mut Node, &mut Text), (Without<NeckRegion>, Without<NeckLabel>)>,
     mut labels: Query<(&NeckLabel, &mut Text, &mut Node), (Without<NeckRegion>, Without<NeckDot>)>,
     time: Res<Time>,
 ) {
@@ -811,10 +838,17 @@ pub(super) fn update_neck_overview(
             node.width = Val::Percent(value.y);
         }
     }
-    for (dot, mut node) in &mut dots {
+    for (dot, mut node, mut text) in &mut dots {
         let group = if dot.next { &next_positions } else { &now_positions };
         if let Some(position) = group.iter().find(|p| p.string == dot.string) {
             node.display = Display::Flex;
+            text.0 = if position.fret == 0 {
+                "0".into()
+            } else {
+                suggested_finger(position, group, &now_positions)
+                    .map(|finger| finger.to_string())
+                    .unwrap_or_default()
+            };
             node.left =
                 Val::Percent((f32::from(position.fret + guitar.capo) + 0.5) * 100.0 / columns);
             node.top = Val::Percent(
@@ -882,4 +916,53 @@ impl NeckMotion {
         self.value = self.start.lerp(self.goal, t * t * (3.0 - 2.0 * t));
         self.value
     }
+}
+
+/// A suggested one-finger-per-fret position, never an authored fingering.
+/// Keep the current hand position if the entire attack fits four fingers.
+/// Wider stretches are left unnumbered rather than assigning a fifth finger.
+fn suggested_finger(
+    position: &FretAssignment,
+    attack: &[FretAssignment],
+    current: &[FretAssignment],
+) -> Option<u8> {
+    let fret = position.fret;
+    let mut shape = [255; 6];
+    for p in attack {
+        if let Some(cell) = shape.get_mut(usize::from(p.string.saturating_sub(1))) {
+            *cell = p.fret;
+        }
+    }
+    for (frets, fingers) in [
+        ([0, 0, 1, 2, 2, 0], [0, 0, 1, 3, 2, 0]),     // E
+        ([0, 0, 0, 2, 2, 0], [0, 0, 0, 3, 2, 0]),     // Em
+        ([0, 1, 2, 2, 0, 255], [0, 1, 3, 2, 0, 0]),   // Am
+        ([0, 1, 0, 2, 3, 255], [0, 1, 0, 2, 3, 0]),   // C
+        ([3, 0, 0, 0, 2, 3], [3, 0, 0, 0, 1, 2]),     // G
+        ([2, 3, 2, 0, 255, 255], [2, 3, 1, 0, 0, 0]), // D
+        ([1, 3, 2, 0, 255, 255], [1, 3, 2, 0, 0, 0]), // Dm
+    ] {
+        if shape == frets {
+            return fingers.get(usize::from(position.string.saturating_sub(1))).copied();
+        }
+    }
+    // Unknown chords on the same fret may need separate fingers rather than
+    // a barre. Keep their position dots instead of inventing that technique.
+    if attack
+        .iter()
+        .filter(|p| p.fret > 0)
+        .any(|p| attack.iter().any(|other| other.string != p.string && other.fret == p.fret))
+    {
+        return None;
+    }
+    let minimum = |positions: &[FretAssignment]| {
+        positions.iter().filter(|p| p.fret > 0).map(|p| p.fret).min()
+    };
+    let fits = |base: u8| {
+        attack.iter().filter(|p| p.fret > 0).all(|p| p.fret >= base && p.fret - base < 4)
+    };
+    let base = minimum(current)
+        .filter(|base| fits(*base))
+        .or_else(|| minimum(attack).filter(|base| fits(*base)))?;
+    (fret >= base && fret - base < 4).then(|| fret - base + 1)
 }
