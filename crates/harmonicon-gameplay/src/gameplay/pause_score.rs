@@ -336,6 +336,9 @@ fn end_selection(
     }
     ev.propagate(false);
 }
+// not-a-widget-button: these are phrase regions inside the score's drag-selection
+// band, with no Button component; pointer clicks must be distinguished from
+// completed range drags so a drag cannot activate its starting phrase.
 fn select_zone(
     mut ev: On<PointerClick>,
     zones: Query<&Zone>,
