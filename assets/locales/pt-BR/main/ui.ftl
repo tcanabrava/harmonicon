@@ -996,3 +996,5 @@ gameplay-guitar-neck = Braço · trastes físicos · pontos = tocar
 gameplay-guitar-neck-capo = Braço · trastes físicos · capotraste { $capo }
 gameplay-guitar-neck-now = Agora { $chord }
 gameplay-guitar-neck-next = Próximo { $chord }
+
+gameplay-piano-hands = Esquerda / graves: azul · Direita / agudos: âmbar · Divisão no dó central (C4)

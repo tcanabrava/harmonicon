@@ -235,14 +235,12 @@ impl LaneLayout {
         }
     }
 
-    /// A keyboard's rows: one per semitone from `high` down to `low`, every
-    /// key between them included, so the rows line up with a drawn
-    /// keyboard's keys (a piano roll). Travelled right to left.
+    /// Falling-note columns, low to high from left to right, aligned with
+    /// white keys and the accidentals between them.
     pub fn keyboard_rows(low: u8, high: u8) -> Self {
         Self {
-            axis: ScrollAxis::Horizontal,
+            axis: ScrollAxis::Vertical,
             lanes: (low.min(high)..=high.max(low))
-                .rev()
                 .map(|pitch| Lane::new(crate::midi::midi_to_note(i32::from(pitch)), Some(pitch)))
                 .collect(),
         }
@@ -258,6 +256,25 @@ impl LaneLayout {
     /// Where `lane` sits across the highway, `(start, size)` in percent,
     /// by the lanes' weights.
     pub fn span(&self, lane: usize) -> (f32, f32) {
+        // Piano columns follow white-key spacing; accidentals straddle
+        // adjacent whites, matching the horizontal keyboard drawing.
+        if self.axis == ScrollAxis::Vertical
+            && self.lanes.iter().all(|l| {
+                l.pitch.is_some_and(|p| l.label == crate::midi::midi_to_note(i32::from(p)))
+            })
+        {
+            let white = |p: u8| !crate::instrument::piano::is_black(p);
+            let total = self.lanes.iter().filter(|l| white(l.pitch.unwrap())).count().max(1) as f32;
+            if let Some(own) = self.lanes.get(lane) {
+                let before =
+                    self.lanes.iter().take(lane).filter(|l| white(l.pitch.unwrap())).count() as f32;
+                return if white(own.pitch.unwrap()) {
+                    (before * 100.0 / total, 100.0 / total)
+                } else {
+                    ((before - 0.3) * 100.0 / total, 60.0 / total)
+                };
+            }
+        }
         // Even lanes keep the exact arithmetic every instrument but the
         // flute's key rows has always used.
         if self.lanes.windows(2).all(|pair| pair[0].weight == pair[1].weight) {

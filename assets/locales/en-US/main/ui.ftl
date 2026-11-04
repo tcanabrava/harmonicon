@@ -999,3 +999,5 @@ gameplay-guitar-neck = Fretboard · physical frets · dots = play
 gameplay-guitar-neck-capo = Fretboard · physical frets · capo { $capo }
 gameplay-guitar-neck-now = Now { $chord }
 gameplay-guitar-neck-next = Next { $chord }
+
+gameplay-piano-hands = Left / bass: blue · Right / treble: amber · Split at middle C (C4)

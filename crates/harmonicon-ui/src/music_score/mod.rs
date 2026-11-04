@@ -632,11 +632,20 @@ fn load_bravura_font(mut fonts: ResMut<Assets<Font>>, mut commands: Commands) {
 /// where it sits on screen beyond its own fixed [`PANEL_HEIGHT`] — each
 /// caller places it in their own layout (below `song_progress_overlay`'s
 /// bar in gameplay; wherever fits in the Song Editor's own chrome).
+#[derive(Component)]
+pub struct PianoGrandStaff;
+
 pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont) -> Entity {
+    spawn_score(parent, bravura, false)
+}
+pub fn spawn_piano_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont) -> Entity {
+    spawn_score(parent, bravura, true)
+}
+fn spawn_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFont, grand: bool) -> Entity {
     let mut root = parent.spawn((
         Node {
             width: Val::Percent(100.0),
-            height: Val::Px(PANEL_HEIGHT),
+            height: Val::Px(PANEL_HEIGHT * if grand { 2.0 } else { 1.0 }),
             overflow: Overflow::clip_x(),
             // A top border rather than a separate divider node — this
             // panel is its own top-level entity (see `gameplay_2d::
@@ -651,8 +660,46 @@ pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFon
         BorderColor::all(harmonicon_platform::theme::HUD_DIVIDER_COLOR),
         MusicScorePanel,
     ));
+    if grand {
+        root.insert(PianoGrandStaff);
+    }
     let root_id = root.id();
     root.with_children(|panel| {
+        if grand {
+            for line in 0..5 {
+                panel.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(PANEL_HEIGHT + y_for_step(line * 2)),
+                        width: Val::Percent(100.0),
+                        height: Val::Px(1.0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.75, 0.75, 0.80, 0.6)),
+                ));
+            }
+            panel.spawn(glyph(
+                bravura,
+                Clef::Bass.glyph(),
+                CLEF_X,
+                PANEL_HEIGHT + y_for_step(Clef::Bass.anchor_step()),
+                Color::WHITE,
+            ));
+            for (numerator, step, digit) in
+                [(true, TIME_SIG_NUMERATOR_STEP, 4), (false, TIME_SIG_DENOMINATOR_STEP, 4)]
+            {
+                panel.spawn((
+                    glyph(
+                        bravura,
+                        time_sig_glyphs(digit),
+                        TIME_SIG_X,
+                        PANEL_HEIGHT + y_for_step(step),
+                        Color::WHITE,
+                    ),
+                    MusicScoreTimeSig { numerator },
+                ));
+            }
+        }
         // The 5 staff lines: steps 0, 2, 4, 6, 8.
         for line in 0..5 {
             let step = line * 2;
@@ -697,7 +744,7 @@ pub fn spawn_music_score(parent: &mut ChildSpawnerCommands, bravura: &BravuraFon
                 left: Val::Px(PLAYHEAD_X),
                 top: Val::Px(0.0),
                 width: Val::Px(1.0),
-                height: Val::Px(PANEL_HEIGHT),
+                height: Val::Px(PANEL_HEIGHT * if grand { 2.0 } else { 1.0 }),
                 ..default()
             },
             BackgroundColor(Color::srgba(0.95, 0.80, 0.35, 0.5)),
@@ -758,9 +805,9 @@ fn rebuild_score_notes(
     tie_material: Option<Res<TieMaterialHandle>>,
     notes: Res<MusicScoreNotes>,
     playhead: Res<MusicScorePlayhead>,
-    panels: Query<&ComputedNode, With<MusicScorePanel>>,
+    panels: Query<(&ComputedNode, Option<&PianoGrandStaff>), With<MusicScorePanel>>,
     mut layers: Query<(Entity, &mut Node), (With<MusicScoreNotesLayer>, Without<MusicScoreClef>)>,
-    existing: Query<Entity, With<MusicScoreNoteGlyph>>,
+    existing: Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     meter: Res<MusicScoreMeter>,
     bar_map: Res<MusicScoreBarMap>,
     spacing: Res<MusicScoreSpacing>,
@@ -780,7 +827,8 @@ fn rebuild_score_notes(
     // px, so this needs `inverse_scale_factor()` to match — same
     // conversion `gameplay_2d::size_note_ribbons` already applies for the
     // same reason.
-    let Some(panel_width) = panels.iter().next().map(|n| n.size().x * n.inverse_scale_factor())
+    let Some(panel_width) =
+        panels.iter().next().map(|(n, _)| n.size().x * n.inverse_scale_factor())
     else {
         return;
     };
@@ -821,6 +869,7 @@ fn rebuild_score_notes(
             &existing,
             &mut clefs,
             &mut time_sigs,
+            panels.iter().next().is_some_and(|(_, grand)| grand.is_some()),
         );
         *window = Some(SpawnedWindow { layer, panel_width, origin: now, lo, hi });
     }
@@ -853,13 +902,106 @@ fn spawn_window(
     origin: f64,
     lo: f64,
     hi: f64,
-    existing: &Query<Entity, With<MusicScoreNoteGlyph>>,
+    existing: &Query<(Entity, &ChildOf), With<MusicScoreNoteGlyph>>,
     clefs: &mut Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
     time_sigs: &mut Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
+    grand: bool,
+) {
+    for (glyph, parent) in existing {
+        if parent.parent() == layer {
+            commands.entity(glyph).despawn();
+        }
+    }
+    if grand {
+        let upper: Vec<_> = notes.iter().filter(|n| n.midi >= 60).cloned().collect();
+        let lower: Vec<_> = notes.iter().filter(|n| n.midi < 60).cloned().collect();
+        spawn_staff_window(
+            commands,
+            bravura,
+            tie_material,
+            &upper,
+            meter,
+            bar_map,
+            scale,
+            layer,
+            origin,
+            lo,
+            hi,
+            clefs,
+            time_sigs,
+            Some(Clef::Treble),
+            true,
+        );
+        let bass = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: Val::Px(PANEL_HEIGHT),
+                    width: Val::Percent(100.0),
+                    height: Val::Px(PANEL_HEIGHT),
+                    ..default()
+                },
+                MusicScoreNoteGlyph,
+            ))
+            .id();
+        commands.entity(layer).add_child(bass);
+        spawn_staff_window(
+            commands,
+            bravura,
+            tie_material,
+            &lower,
+            meter,
+            bar_map,
+            scale,
+            bass,
+            origin,
+            lo,
+            hi,
+            clefs,
+            time_sigs,
+            Some(Clef::Bass),
+            false,
+        );
+    } else {
+        spawn_staff_window(
+            commands,
+            bravura,
+            tie_material,
+            notes,
+            meter,
+            bar_map,
+            scale,
+            layer,
+            origin,
+            lo,
+            hi,
+            clefs,
+            time_sigs,
+            None,
+            true,
+        );
+    }
+}
+fn spawn_staff_window(
+    commands: &mut Commands,
+    bravura: &BravuraFont,
+    tie_material: &TieMaterialHandle,
+    notes: &[NotationNote],
+    meter: &MusicScoreMeter,
+    bar_map: &MusicScoreBarMap,
+    scale: f32,
+    layer: Entity,
+    origin: f64,
+    lo: f64,
+    hi: f64,
+    clefs: &mut Query<(&mut Text, &mut Node), With<MusicScoreClef>>,
+    time_sigs: &mut Query<(&MusicScoreTimeSig, &mut Text), Without<MusicScoreClef>>,
+    forced: Option<Clef>,
+    update_clef: bool,
 ) {
     // One clef for the whole song, from its own range — see `choose_clef`.
-    let clef = choose_clef(notes);
-    for (mut text, mut node) in clefs.iter_mut() {
+    let clef = forced.unwrap_or_else(|| choose_clef(notes));
+    for (mut text, mut node) in clefs.iter_mut().filter(|_| update_clef) {
         let glyph = clef.glyph();
         if text.0 != glyph {
             text.0 = glyph.to_string();
@@ -881,10 +1023,6 @@ fn spawn_window(
     // when the note that established it has already scrolled off.
     let stems = stem_roles(notes, clef);
     let marks = accidentals(notes, clef, meter.beats_per_bar());
-
-    for glyph in existing {
-        commands.entity(glyph).despawn();
-    }
 
     commands.entity(layer).with_children(|parent| {
         // Bar lines first, so a notehead always paints over one rather than
@@ -1115,5 +1253,25 @@ mod tests {
         let (behind_narrow, _) = visible_beats(200.0, PIXELS_PER_BEAT);
         let (behind_wide, _) = visible_beats(2000.0, PIXELS_PER_BEAT);
         assert_eq!(behind_narrow, behind_wide);
+    }
+}
+
+#[cfg(test)]
+mod piano_staff_tests {
+    use super::*;
+    #[test]
+    fn piano_score_has_both_clefs_and_reserves_two_staves() {
+        let mut app = App::new();
+        app.world_mut().commands().spawn(Node::default()).with_children(|parent| {
+            spawn_piano_score(parent, &BravuraFont(Handle::default()));
+        });
+        app.world_mut().flush();
+        let world = app.world_mut();
+        let panel = world.query_filtered::<&Node, With<PianoGrandStaff>>().single(world).unwrap();
+        assert_eq!(panel.height, Val::Px(PANEL_HEIGHT * 2.0));
+        let glyphs: Vec<_> =
+            world.query::<&Text>().iter(world).map(|text| text.0.as_str()).collect();
+        assert!(glyphs.contains(&Clef::Treble.glyph()));
+        assert!(glyphs.contains(&Clef::Bass.glyph()));
     }
 }

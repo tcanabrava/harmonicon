@@ -1,0 +1,485 @@
+{
+  "metadata": {
+    "format_version": "1.10.0",
+    "description": "Original eight-bar C major study. Right-hand melody in treble clef, sustained left-hand triads in bass clef. Middle C divides the two staves.",
+    "author": "Harmonicon",
+    "license": "CC0-1.0"
+  },
+  "song": {
+    "title": "Two Hands Together",
+    "artist": "Harmonicon",
+    "genre": "Practice",
+    "tempo_bpm": 80.0,
+    "key": "C",
+    "difficulty": "easy",
+    "time_signature": "4/4"
+  },
+  "timing": {
+    "resolution": 12,
+    "tempo_map": [
+      {
+        "tick": 0,
+        "bpm": 80.0
+      }
+    ]
+  },
+  "instrument": {
+    "type": "piano",
+    "keys": 88
+  },
+  "track": [
+    {
+      "time": 1.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "C3"
+        },
+        {
+          "note": "E3"
+        },
+        {
+          "note": "G3"
+        }
+      ]
+    },
+    {
+      "time": 1.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "C4"
+        }
+      ]
+    },
+    {
+      "time": 1.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "time": 2.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 3.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "time": 4.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "A2"
+        },
+        {
+          "note": "C3"
+        },
+        {
+          "note": "E3"
+        }
+      ]
+    },
+    {
+      "time": 4.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 4.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "time": 5.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "C4"
+        }
+      ]
+    },
+    {
+      "time": 6.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 7.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "F2"
+        },
+        {
+          "note": "A2"
+        },
+        {
+          "note": "C3"
+        }
+      ]
+    },
+    {
+      "time": 7.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "F4"
+        }
+      ]
+    },
+    {
+      "time": 7.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 8.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "time": 9.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "C4"
+        }
+      ]
+    },
+    {
+      "time": 10.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "G2"
+        },
+        {
+          "note": "B2"
+        },
+        {
+          "note": "D3"
+        }
+      ]
+    },
+    {
+      "time": 10.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "time": 10.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "time": 11.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "F4"
+        }
+      ]
+    },
+    {
+      "time": 12.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "time": 13.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "C3"
+        },
+        {
+          "note": "E3"
+        },
+        {
+          "note": "G3"
+        }
+      ]
+    },
+    {
+      "time": 13.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 13.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "time": 14.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "C5"
+        }
+      ]
+    },
+    {
+      "time": 15.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "B4"
+        }
+      ]
+    },
+    {
+      "time": 16.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "A2"
+        },
+        {
+          "note": "C3"
+        },
+        {
+          "note": "E3"
+        }
+      ]
+    },
+    {
+      "time": 16.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "A4"
+        }
+      ]
+    },
+    {
+      "time": 16.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "time": 17.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 18.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "C4"
+        }
+      ]
+    },
+    {
+      "time": 19.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "F2"
+        },
+        {
+          "note": "A2"
+        },
+        {
+          "note": "C3"
+        }
+      ]
+    },
+    {
+      "time": 19.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "F4"
+        }
+      ]
+    },
+    {
+      "time": 19.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 20.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "time": 21.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "G4"
+        }
+      ]
+    },
+    {
+      "time": 22.0,
+      "duration": 2.8,
+      "play_mode": "chord",
+      "events": [
+        {
+          "note": "G2"
+        },
+        {
+          "note": "B2"
+        },
+        {
+          "note": "D3"
+        }
+      ]
+    },
+    {
+      "time": 22.0,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "E4"
+        }
+      ]
+    },
+    {
+      "time": 22.75,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "D4"
+        }
+      ]
+    },
+    {
+      "time": 23.5,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "C4"
+        }
+      ]
+    },
+    {
+      "time": 24.25,
+      "duration": 0.68,
+      "play_mode": "single",
+      "events": [
+        {
+          "note": "C4"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "perfect_window_ms": 50,
+    "good_window_ms": 100,
+    "miss_window_ms": 130
+  }
+}

@@ -998,3 +998,5 @@ gameplay-guitar-neck = Diapasón · trastes físicos · puntos = tocar
 gameplay-guitar-neck-capo = Diapasón · trastes físicos · cejilla { $capo }
 gameplay-guitar-neck-now = Ahora { $chord }
 gameplay-guitar-neck-next = Siguiente { $chord }
+
+gameplay-piano-hands = Izquierda / graves: azul · Derecha / agudos: ámbar · División en do central (C4)

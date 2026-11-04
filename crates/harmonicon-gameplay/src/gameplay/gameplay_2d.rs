@@ -184,7 +184,8 @@ pub fn setup(
             let left_top_padding = if compact {
                 8.0 + BAR_HEIGHT
             } else {
-                8.0 + BAR_HEIGHT + music_score::PANEL_HEIGHT
+                8.0 + BAR_HEIGHT
+                    + music_score::PANEL_HEIGHT * if piano_roll.is_some() { 2.0 } else { 1.0 }
             };
             root.spawn(Node {
                 width: if compact { Val::Percent(88.0) } else { Val::Percent(74.0) },
@@ -254,40 +255,18 @@ pub fn setup(
                     }
                     spawn_track(left);
                 } else if let Some((low, high)) = piano_roll {
-                    left.spawn(Node {
-                        width: Val::Percent(100.0),
-                        flex_grow: 1.0,
-                        min_height: Val::Px(120.0),
-                        flex_direction: FlexDirection::Row,
-                        ..default()
-                    })
-                    .with_children(|row| {
-                        // The keyboard, each key level with its row of the
-                        // roll: the highway's lanes span the same keys.
-                        if !aural {
-                            row.spawn(Node {
-                                width: Val::Px(96.0),
-                                height: Val::Percent(100.0),
-                                flex_shrink: 0.0,
-                                ..default()
-                            })
-                            .with_children(|keys| {
-                                use harmonicon_ui::dialogs::piano_keys::{
-                                    KeyboardAxis, KeyboardSpec, spawn_piano_keys,
-                                };
-                                spawn_piano_keys(
-                                    keys,
-                                    KeyboardSpec {
-                                        low,
-                                        high,
-                                        axis: KeyboardAxis::Vertical,
-                                        label_cs: true,
-                                    },
-                                );
-                            });
-                        }
-                        spawn_track(row);
-                    });
+                    if !aural {
+                        left.spawn((
+                            Text::new(loc.msg("gameplay-piano-hands").to_string()),
+                            TextFont { font_size: FontSize::Px(13.0), ..default() },
+                            TextColor(Color::WHITE),
+                        ));
+                        super::piano_visuals::spawn_keyboard(left, 21, 108, 42.0);
+                    }
+                    spawn_track(left);
+                    if !aural {
+                        super::piano_visuals::spawn_keyboard(left, low, high, 96.0);
+                    }
                 } else {
                     spawn_track(left);
                 }
@@ -317,7 +296,8 @@ pub fn setup(
             let right_top_padding = if compact {
                 12.0 + BAR_HEIGHT
             } else {
-                12.0 + BAR_HEIGHT + music_score::PANEL_HEIGHT
+                12.0 + BAR_HEIGHT
+                    + music_score::PANEL_HEIGHT * if piano_roll.is_some() { 2.0 } else { 1.0 }
             };
             root.spawn(Node {
                 // Narrower than the 40% it held when the song's description
@@ -392,7 +372,7 @@ pub fn setup(
     );
     let staff = panels.notation_staff && display.bravura.is_some();
     if staff && let Some(bravura) = &display.bravura {
-        spawn_gameplay_music_score(&mut commands, bravura);
+        spawn_gameplay_music_score(&mut commands, bravura, piano_roll.is_some());
     }
     if panels.lyrics {
         super::karaoke::spawn_karaoke(&mut commands, lyrics, super::karaoke::strip_top(staff));
@@ -456,7 +436,11 @@ pub(super) fn progress_note_markers(
 /// reusing the identical `GlobalZIndex(100)` so pausing still covers it too.
 /// Without this it defaulted to `GlobalZIndex(0)`, below the background's
 /// `1`, and the background image painted over the whole panel.
-pub(super) fn spawn_gameplay_music_score(commands: &mut Commands, bravura: &BravuraFont) {
+pub(super) fn spawn_gameplay_music_score(
+    commands: &mut Commands,
+    bravura: &BravuraFont,
+    piano: bool,
+) {
     commands
         .spawn((
             Node {
@@ -464,14 +448,18 @@ pub(super) fn spawn_gameplay_music_score(commands: &mut Commands, bravura: &Brav
                 top: Val::Px(BAR_HEIGHT),
                 left: Val::Px(0.0),
                 width: Val::Percent(100.0),
-                height: Val::Px(music_score::PANEL_HEIGHT),
+                height: Val::Px(music_score::PANEL_HEIGHT * if piano { 2.0 } else { 1.0 }),
                 ..default()
             },
             GlobalZIndex(100),
             GameplayRoot,
         ))
         .with_children(|panel| {
-            music_score::spawn_music_score(panel, bravura);
+            if piano {
+                music_score::spawn_piano_score(panel, bravura);
+            } else {
+                music_score::spawn_music_score(panel, bravura);
+            }
         });
 }
 
@@ -619,7 +607,7 @@ fn note_lane(note: &ScheduledNote, layout: &LaneLayout) -> usize {
 /// Where `note` sits across the highway, `(start, size)` in percent: its
 /// lane's middle `NOTE_W`.
 fn note_span(note: &ScheduledNote, layout: &LaneLayout) -> (f32, f32) {
-    let size = layout.lane_pct() * NOTE_W;
+    let size = layout.span(note_lane(note, layout)).1 * NOTE_W;
     (layout.centred_left_pct(note_lane(note, layout), size), size)
 }
 
@@ -757,8 +745,10 @@ fn note_color(note: &ScheduledNote, colors: NoteColors) -> LinearRgba {
     if !note.missed && matches!(note.position, PlayPosition::Fingering(_)) {
         return super::flute_visuals::FLUTE_COLOR.to_linear();
     }
-    if !note.missed && matches!(note.position, PlayPosition::Key(_)) {
-        return super::piano_visuals::PIANO_COLOR.to_linear();
+    if !note.missed
+        && let PlayPosition::Key(key) = note.position
+    {
+        return super::piano_visuals::hand_color(key).to_linear();
     }
     ribbon_color(note.missed, note_is_blow(note), colors)
 }

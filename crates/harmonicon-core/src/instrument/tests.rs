@@ -282,8 +282,13 @@ fn a_piano_plays_any_keys_together_on_a_row_per_semitone() {
 
     let rows = LaneLayout::keyboard_rows(60, 72);
     assert_eq!(rows.lanes.len(), 13, "every key from C4 to C5");
-    assert_eq!(rows.lanes[0].pitch, Some(72), "highest on top");
-    assert_eq!(rows.lane_of(&PlayPosition::Key(61)), Some(11));
-    assert_eq!(rows.nearest_lane(&PlayPosition::Key(40)), 12, "off the rows: the nearest");
+    assert_eq!(rows.axis, ScrollAxis::Vertical);
+    let (c, cw) = rows.span(0);
+    let (cs, csw) = rows.span(1);
+    assert!((cs + csw / 2.0 - c - cw).abs() < 0.001, "C# straddles C/D");
+
+    assert_eq!(rows.lanes[0].pitch, Some(60), "lowest on left");
+    assert_eq!(rows.lane_of(&PlayPosition::Key(61)), Some(1));
+    assert_eq!(rows.nearest_lane(&PlayPosition::Key(40)), 0, "off the rows: the nearest");
     assert_eq!(piano.lane_layout().lanes.len(), 88);
 }

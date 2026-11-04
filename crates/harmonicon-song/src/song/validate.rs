@@ -147,6 +147,13 @@ mod tests {
     }
 
     #[test]
+    fn piano_two_hand_example_is_a_valid_song_pack() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/song-pack");
+        let report = validate_song_pack(&root);
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+    }
+
+    #[test]
     fn a_valid_pack_passes() {
         let dir = tempfile::tempdir().unwrap();
         write(dir.path(), "Bach/Minuet/song/chart.harpchart", CHART);
