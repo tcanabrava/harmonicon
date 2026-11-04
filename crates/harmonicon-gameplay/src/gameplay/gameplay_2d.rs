@@ -366,8 +366,17 @@ pub fn setup(
     spawn_song_progress(
         &mut commands,
         &manifest.waveform,
-        manifest.music_duration_secs,
-        &progress_note_markers(&song_notes.notes, highway_lanes.0.as_ref(), panels.progress_notes),
+        // Hidden piano markers must not shorten a chart-only song's
+        // seek/loop timeline: retain the notes' full duration separately.
+        song_notes
+            .notes
+            .iter()
+            .fold(manifest.music_duration_secs, |end, note| end.max(note.time + note.duration)),
+        &progress_note_markers(
+            &song_notes.notes,
+            highway_lanes.0.as_ref(),
+            panels.progress_notes && piano_roll.is_none(),
+        ),
         // One progress lane per highway lane: a harp's holes.
         highway_lanes.0.as_ref().map_or(0, |l| u8::try_from(l.lanes.len()).unwrap_or(u8::MAX)),
         &adaptive.sections,
