@@ -71,6 +71,25 @@ pub(super) fn pan_wheel(
     }
 }
 
+/// Scrolls a piano's window up and down the keyboard with the wheel, while
+/// the pointer is over the keyboard drawn beside the grid
+/// (`ui::EditorKeyboard`); the wheel over the grid itself still pans time.
+/// Wheel up goes up the keyboard, three keys a notch.
+pub(super) fn scroll_keyboard(
+    mut wheel: MessageReader<MouseWheel>,
+    keyboard: Query<&Hovered, With<super::ui::EditorKeyboard>>,
+    mut state: ResMut<EditorState>,
+) {
+    let delta: f32 = wheel.read().map(|ev| ev.y).sum();
+    if delta == 0.0 || !keyboard.iter().any(Hovered::get) {
+        return;
+    }
+    let keys = (-delta * 3.0).round() as i32;
+    if keys != 0 {
+        super::piano_note::scroll_keys(&mut state, keys);
+    }
+}
+
 /// The pan a two-finger gesture asks for this frame, given every active
 /// touch's per-frame movement — or `None` when the gesture isn't two fingers.
 ///

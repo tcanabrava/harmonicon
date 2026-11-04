@@ -1,0 +1,163 @@
+{
+ "metadata": {
+  "format_version": "1.10.0",
+  "description": "Test chart for the piano: a C major scale over left-hand triads, both hands at once."
+ },
+ "song": {
+  "title": "Piano Scale",
+  "artist": "Zz Test (Claude)",
+  "genre": "Test",
+  "tempo_bpm": 80.0,
+  "key": "C",
+  "difficulty": "easy",
+  "time_signature": "4/4"
+ },
+ "timing": {
+  "resolution": 12,
+  "tempo_map": [
+   {
+    "tick": 0,
+    "bpm": 80.0
+   }
+  ]
+ },
+ "instrument": {
+  "type": "piano",
+  "keys": 88
+ },
+ "track": [
+  {
+   "time": 1.0,
+   "duration": 0.7,
+   "play_mode": "chord",
+   "events": [
+    {
+     "note": "C4"
+    },
+    {
+     "note": "C3"
+    },
+    {
+     "note": "E3"
+    },
+    {
+     "note": "G3"
+    }
+   ]
+  },
+  {
+   "time": 1.75,
+   "duration": 0.7,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "D4"
+    }
+   ]
+  },
+  {
+   "time": 2.5,
+   "duration": 0.7,
+   "play_mode": "chord",
+   "events": [
+    {
+     "note": "E4"
+    },
+    {
+     "note": "C3"
+    },
+    {
+     "note": "E3"
+    },
+    {
+     "note": "G3"
+    }
+   ]
+  },
+  {
+   "time": 3.25,
+   "duration": 0.7,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "F4"
+    }
+   ]
+  },
+  {
+   "time": 4.0,
+   "duration": 0.7,
+   "play_mode": "chord",
+   "events": [
+    {
+     "note": "G4"
+    },
+    {
+     "note": "G2"
+    },
+    {
+     "note": "B2"
+    },
+    {
+     "note": "D3"
+    }
+   ]
+  },
+  {
+   "time": 4.75,
+   "duration": 0.7,
+   "play_mode": "single",
+   "events": [
+    {
+     "note": "A4"
+    }
+   ]
+  },
+  {
+   "time": 5.5,
+   "duration": 0.7,
+   "play_mode": "chord",
+   "events": [
+    {
+     "note": "B4"
+    },
+    {
+     "note": "G2"
+    },
+    {
+     "note": "B2"
+    },
+    {
+     "note": "D3"
+    }
+   ]
+  },
+  {
+   "time": 6.25,
+   "duration": 0.7,
+   "play_mode": "chord",
+   "events": [
+    {
+     "note": "C5"
+    },
+    {
+     "note": "C3"
+    },
+    {
+     "note": "E3"
+    },
+    {
+     "note": "G3"
+    },
+    {
+     "note": "C4"
+    }
+   ]
+  }
+ ],
+ "scoring": {
+  "perfect_window_ms": 50,
+  "good_window_ms": 100,
+  "miss_window_ms": 130
+ }
+}

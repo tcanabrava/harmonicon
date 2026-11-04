@@ -233,6 +233,9 @@ pub(super) struct GridNote {
 /// The flute's highest note, C7: the grid's top row on a flute.
 pub(super) const FLUTE_TOP_NOTE: u8 = 96;
 
+/// The piano's highest key, C8: the grid's top row on a piano.
+pub(super) const PIANO_TOP_NOTE: u8 = 108;
+
 impl GridNote {
     /// The grid row the note sits on, counted from 1 at the top: a
     /// harmonica's hole, a guitar's string, a flute's pitch counted down
@@ -245,6 +248,9 @@ impl GridNote {
             Some(harmonicon_core::instrument::PlayPosition::Fret(a)) => a.string,
             Some(harmonicon_core::instrument::PlayPosition::Fingering(a)) => {
                 FLUTE_TOP_NOTE.saturating_sub(a.note) + 1
+            }
+            Some(harmonicon_core::instrument::PlayPosition::Key(key)) => {
+                PIANO_TOP_NOTE.saturating_sub(key) + 1
             }
             None => 1,
         }
@@ -273,6 +279,7 @@ impl GridNote {
                     alternate: 0,
                 })
             }
+            Some(PlayPosition::Key(_)) => PlayPosition::Key(PIANO_TOP_NOTE + 1 - row),
             None => return,
         };
         self.target = NoteTarget::Positioned(moved);

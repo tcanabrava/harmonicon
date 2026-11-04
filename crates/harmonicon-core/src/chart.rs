@@ -63,6 +63,16 @@ pub enum ChartInstrument {
         #[serde(default)]
         foot: FootJoint,
     },
+    /// A piano, from format 1.10.0, with `keys` keys (88 when not given);
+    /// see `instrument::piano::KEYBOARDS` for the sizes.
+    Piano {
+        #[serde(default = "grand_keys")]
+        keys: u8,
+    },
+}
+
+fn grand_keys() -> u8 {
+    88
 }
 
 fn is_zero(value: &u8) -> bool {
@@ -89,11 +99,19 @@ impl ChartInstrument {
         Self::Flute { foot: flute.foot }
     }
 
+    /// How a chart writes `piano`.
+    pub fn from_piano(piano: &crate::instrument::piano::Piano) -> Self {
+        Self::Piano { keys: piano.keys }
+    }
+
     /// The playable instrument this describes, or `None` if a string names
     /// no real note.
     pub fn to_instrument(&self) -> Option<Instrument> {
         match self {
             Self::Flute { foot } => Some(Flute::new(*foot).into()),
+            Self::Piano { keys } => {
+                crate::instrument::piano::Piano::with_keys(*keys).map(Into::into)
+            }
             Self::Guitar { strings, frets, capo, body } => {
                 let strings = strings
                     .iter()
@@ -145,7 +163,7 @@ impl HarpChart {
 /// spec than this build supports up front, with a clear error, instead of
 /// failing on some confusing downstream `additionalProperties` schema
 /// rejection or (worse) silently misreading a field whose meaning changed.
-pub const CURRENT_FORMAT_VERSION: &str = "1.9.0";
+pub const CURRENT_FORMAT_VERSION: &str = "1.10.0";
 
 /// Parses a `"MAJOR.MINOR.PATCH"` version string into a comparable tuple.
 /// `None` for anything that isn't exactly three dot-separated integers.
@@ -650,6 +668,11 @@ impl NoteEvent {
             note: Some(note),
             modifiers: None,
         }
+    }
+
+    /// An event naming only its note: a piano key.
+    pub fn keyed(note: String) -> Self {
+        Self::fingered(note, 0)
     }
 
     /// The hole and breath of a harmonica event, `None` for any other.

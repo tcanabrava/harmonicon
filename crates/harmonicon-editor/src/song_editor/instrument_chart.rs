@@ -149,6 +149,35 @@ mod tests {
         harmonicon_song::song::validate_and_migrate_chart(&mut saved.clone()).unwrap();
     }
 
+    /// Every key, chords included, survives a load and a save, and the
+    /// window opens on the notes.
+    #[test]
+    fn a_piano_document_round_trips_its_keys_and_opens_on_them() {
+        let source: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../harmonicon-song/tests/fixtures/piano-chords.harpchart"
+        ))
+        .unwrap();
+        let mut state = EditorState::default();
+        super::super::harpchart::load_harpchart(
+            &source,
+            &mut state,
+            &mut super::super::state::Scroll::default(),
+        );
+        let events = source["track"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| i["events"].as_array().unwrap().len())
+            .sum::<usize>();
+        assert_eq!(state.notes.len(), events);
+        assert_eq!(state.row_count(), 88);
+        assert!(state.notes.iter().all(|n| state.row_visible(n.row())), "every note in the window");
+        let saved: serde_json::Value =
+            serde_json::from_str(&super::super::harpchart::serialize_harpchart(&state)).unwrap();
+        assert_eq!(saved["instrument"], serde_json::json!({ "type": "piano", "keys": 88 }));
+        harmonicon_song::song::validate_and_migrate_chart(&mut saved.clone()).unwrap();
+    }
+
     /// The B foot, each note's pitch row, the alternate fingering and the
     /// vibrato all survive a load and a save.
     #[test]

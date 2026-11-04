@@ -28,6 +28,7 @@ pub fn instrument_problems(chart: &HarpChart) -> Vec<String> {
                 Instrument::Harmonica(_) => harmonica_event_problem(event),
                 Instrument::Guitar(guitar) => guitar_event_problem(guitar, event),
                 Instrument::Flute(flute) => flute_event_problem(flute, event),
+                Instrument::Piano(piano) => piano_event_problem(piano, event),
             };
             problems.extend(problem.map(|p| format!("{at}: {p}")));
         }
@@ -116,6 +117,29 @@ fn flute_event_problem(flute: &Flute, event: &NoteEvent) -> Option<String> {
         }
         None => Some(format!("{note} has no fingering {alternate}")),
     }
+}
+
+fn piano_event_problem(
+    piano: &crate::instrument::piano::Piano,
+    event: &NoteEvent,
+) -> Option<String> {
+    if event.hole.is_some()
+        || event.action.is_some()
+        || event.position.is_some()
+        || event.fingering.is_some()
+    {
+        return Some("a piano event names only its note".to_string());
+    }
+    let Some(note) = event.note.as_deref() else {
+        return Some("a piano event needs its note".to_string());
+    };
+    if let Some(other) = modifiers(event).first() {
+        return Some(format!("a piano has no {other:?}"));
+    }
+    let Some(midi) = note_to_midi(note).and_then(|m| u8::try_from(m).ok()) else {
+        return Some(format!("{note} is not a note"));
+    };
+    (!piano.has(midi)).then(|| format!("{note} is outside a {}-key keyboard", piano.keys))
 }
 
 /// The string technique a guitar event's modifiers name: a bend up, a

@@ -265,3 +265,25 @@ fn a_flute_tune_in_note_view_gets_a_row_per_pitch_it_uses() {
     assert_eq!((rows.lane_of(&f4), rows.nearest_lane(&f4)), (None, 2), "nearest: E4");
     assert!(!InstrumentModel::lane_layout(&Flute::default()).is_pitch_lanes());
 }
+
+/// A piano's keys are its pitches; any two keys sound together; its rows
+/// are a contiguous keyboard, highest on top.
+#[test]
+fn a_piano_plays_any_keys_together_on_a_row_per_semitone() {
+    use super::piano::Piano;
+    let piano: Instrument = Piano::grand().into();
+    assert_eq!(piano.range(), Some((21, 108)));
+    assert_eq!(piano.positions_for(60), vec![PlayPosition::Key(60)]);
+    assert!(piano.positions_for(110).is_empty());
+    assert_eq!(piano.pitch_of(&PlayPosition::Key(60)), Some(60));
+    assert!(piano.can_sound_together(&PlayPosition::Key(60), &PlayPosition::Key(64)));
+    assert!(!piano.can_sound_together(&PlayPosition::Key(60), &PlayPosition::Key(60)));
+    assert_eq!(piano.synth_voice(), crate::synth::Voice::Piano);
+
+    let rows = LaneLayout::keyboard_rows(60, 72);
+    assert_eq!(rows.lanes.len(), 13, "every key from C4 to C5");
+    assert_eq!(rows.lanes[0].pitch, Some(72), "highest on top");
+    assert_eq!(rows.lane_of(&PlayPosition::Key(61)), Some(11));
+    assert_eq!(rows.nearest_lane(&PlayPosition::Key(40)), 12, "off the rows: the nearest");
+    assert_eq!(piano.lane_layout().lanes.len(), 88);
+}

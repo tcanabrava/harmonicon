@@ -76,6 +76,19 @@ pub fn decode(chart: &HarpChart, event: &NoteEvent) -> Result<NoteTarget, Placem
             NoteTarget::Sounding { midi: f32::from(midi), placement: None }
                 .with_placement(&instrument, position)
         }
+        Instrument::Piano(_) => {
+            if event.hole.is_some()
+                || event.action.is_some()
+                || event.position.is_some()
+                || event.fingering.is_some()
+                || !modifiers.is_empty()
+            {
+                return Err(PlacementError::Unplayable);
+            }
+            let midi = chart.event_pitch(event).ok_or(PlacementError::Unplayable)?;
+            NoteTarget::Sounding { midi: f32::from(midi), placement: None }
+                .with_placement(&instrument, PlayPosition::Key(midi))
+        }
     }
 }
 
@@ -157,6 +170,14 @@ pub fn encode(
             modifiers.retain(|m| matches!(m, Modifier::Vibrato { .. }));
             result.note = Some(crate::midi::midi_to_note(i32::from(at.note)));
         }
+        PlayPosition::Key(note) => {
+            result.hole = None;
+            result.action = None;
+            result.position = None;
+            // A piano key has no expression to keep.
+            modifiers.clear();
+            result.note = Some(crate::midi::midi_to_note(i32::from(note)));
+        }
     }
     result.modifiers = (!modifiers.is_empty()).then_some(modifiers);
     Ok(result)
@@ -206,6 +227,43 @@ mod tests {
             d6.position(),
             Some(PlayPosition::Fingering(FingeringAssignment { note: 86, alternate: 1 }))
         );
+    }
+
+    fn piano_fixture() -> HarpChart {
+        serde_json::from_str(include_str!(
+            "../../harmonicon-song/tests/fixtures/piano-chords.harpchart"
+        ))
+        .unwrap()
+    }
+
+    /// A piano event is its note and nothing else; it round-trips as a
+    /// key, and a hole, a technique or a key off the keyboard is refused.
+    #[test]
+    fn a_piano_event_is_a_key_and_round_trips() {
+        let chart = piano_fixture();
+        assert!(crate::chart_check::instrument_problems(&chart).is_empty());
+        let instrument = chart.instrument().unwrap();
+        for event in chart.track.iter().flat_map(|item| &item.events) {
+            let target = decode(&chart, event).unwrap();
+            let restored = encode(&instrument, target, event).unwrap();
+            assert_eq!(
+                serde_json::to_value(event).unwrap(),
+                serde_json::to_value(restored).unwrap()
+            );
+        }
+        assert_eq!(
+            decode(&chart, &chart.track[0].events[0]).unwrap().position(),
+            Some(PlayPosition::Key(60))
+        );
+
+        let mut chart = piano_fixture();
+        chart.track[0].events[0].hole = Some(4);
+        assert!(decode(&chart, &chart.track[0].events[0]).is_err());
+        assert!(!crate::chart_check::instrument_problems(&chart).is_empty());
+        let mut chart = piano_fixture();
+        chart.instrument_spec = Some(crate::chart::ChartInstrument::Piano { keys: 61 });
+        chart.track[4].events[1].note = Some("G1".into());
+        assert!(crate::chart_check::instrument_problems(&chart)[0].contains("61-key"));
     }
 
     #[test]

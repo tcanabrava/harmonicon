@@ -135,6 +135,16 @@ pub(super) fn transpose_selection(state: &mut EditorState, semitones: i32) {
         state.transpose_notice = Some(outcome);
         return;
     }
+    if super::piano_note::is_piano(state) {
+        let outcome = super::piano_note::transpose(state, semitones);
+        state.transpose_notice = Some(outcome);
+        // Keep the note being moved in the window, so an octave jump
+        // doesn't send it out of sight.
+        if let Some(row) = state.selected_note().map(super::state::GridNote::row) {
+            super::piano_note::reveal_row(state, row);
+        }
+        return;
+    }
     if !state.plays_harmonica() {
         return;
     }

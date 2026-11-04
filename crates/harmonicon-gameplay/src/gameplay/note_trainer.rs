@@ -173,14 +173,21 @@ impl NoteTrainer {
     fn guitar(&self) -> Option<&Guitar> {
         match &self.instrument {
             Instrument::Guitar(guitar) => Some(guitar),
-            Instrument::Harmonica(_) | Instrument::Flute(_) => None,
+            Instrument::Harmonica(_) | Instrument::Flute(_) | Instrument::Piano(_) => None,
+        }
+    }
+
+    fn piano(&self) -> Option<&harmonicon_core::instrument::piano::Piano> {
+        match &self.instrument {
+            Instrument::Piano(piano) => Some(piano),
+            _ => None,
         }
     }
 
     fn flute(&self) -> Option<&Flute> {
         match &self.instrument {
             Instrument::Flute(flute) => Some(flute),
-            Instrument::Harmonica(_) | Instrument::Guitar(_) => None,
+            Instrument::Harmonica(_) | Instrument::Guitar(_) | Instrument::Piano(_) => None,
         }
     }
 
@@ -190,6 +197,7 @@ impl NoteTrainer {
         let instrument = match self.instrument {
             Instrument::Guitar(_) => "guitar",
             Instrument::Flute(_) => "flute",
+            Instrument::Piano(_) => "piano",
             Instrument::Harmonica(_) => return None,
         };
         Some(harmonicon_app::profile::note_trainer_key(instrument, kind_id(self.kind)))
@@ -300,6 +308,10 @@ fn instruction(loc: &Localization, instrument: &Instrument, drill: &Drill) -> St
     match instrument {
         Instrument::Guitar(guitar) => guitar_instruction(loc, guitar, drill),
         Instrument::Flute(_) => flute_instruction(loc, drill),
+        // A key is its note: there is nothing to say but which.
+        Instrument::Piano(_) => String::from(
+            loc.msg_args("note-trainer-flute-target", &[("note", note_name(drill.target))]),
+        ),
         Instrument::Harmonica(_) => String::new(),
     }
 }
@@ -407,7 +419,7 @@ pub(super) fn setup(
     mut pitch_range: ResMut<PitchRange>,
     loc: Res<Localization>,
 ) {
-    if trainer.guitar().is_none() && trainer.flute().is_none() {
+    if trainer.guitar().is_none() && trainer.flute().is_none() && trainer.piano().is_none() {
         return;
     }
     if let Some((low, high)) = trainer.instrument.range() {
@@ -431,6 +443,8 @@ pub(super) fn setup(
     let title = commands
         .spawn_scene(title_column_scene(String::from(loc.msg(if trainer.flute().is_some() {
             "note-trainer-flute-title"
+        } else if trainer.piano().is_some() {
+            "note-trainer-piano-title"
         } else {
             "note-trainer-guitar-title"
         }))))
@@ -536,10 +550,32 @@ pub(super) fn setup(
             padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
             ..default()
         })
-        .with_children(|strip| match (trainer.guitar(), trainer.flute()) {
-            (Some(guitar), _) => spawn_fretboard(strip, guitar, 560.0),
-            (_, Some(flute)) => spawn_flute(strip, flute),
-            _ => {}
+        .with_children(|strip| {
+            match (trainer.guitar(), trainer.flute(), trainer.piano()) {
+                (Some(guitar), _, _) => spawn_fretboard(strip, guitar, 560.0),
+                (_, Some(flute), _) => spawn_flute(strip, flute),
+                // The same keyboard the piano roll draws, lying as the player
+                // faces it: two octaves either side of the drills' middle.
+                (_, _, Some(_)) => {
+                    strip
+                        .spawn(Node { width: Val::Px(900.0), height: Val::Px(180.0), ..default() })
+                        .with_children(|keys| {
+                            use harmonicon_ui::dialogs::piano_keys::{
+                                KeyboardAxis, KeyboardSpec, spawn_piano_keys,
+                            };
+                            spawn_piano_keys(
+                                keys,
+                                KeyboardSpec {
+                                    low: 48,
+                                    high: 84,
+                                    axis: KeyboardAxis::Horizontal,
+                                    label_cs: true,
+                                },
+                            );
+                        });
+                }
+                _ => {}
+            }
         });
     });
 }
@@ -644,6 +680,23 @@ pub(super) fn update_fretboard(
     let targets = lit(trainer.practice.drill());
     for (cell, mut text, mut color) in &mut cells {
         paint_cell(cell, &targets, &mut text, &mut color);
+    }
+}
+
+/// Lights the key the drill asks for on the piano's keyboard.
+pub(super) fn update_piano_keys(
+    trainer: Res<NoteTrainer>,
+    keyboards: Query<Entity, With<harmonicon_ui::dialogs::piano_keys::PianoKeyboard>>,
+    mut keys: Query<(&harmonicon_ui::dialogs::piano_keys::PianoKey, &mut BackgroundColor)>,
+) {
+    let target = trainer.practice.drill().and_then(|d| match d.position {
+        PlayPosition::Key(key) => Some(key),
+        _ => None,
+    });
+    for keyboard in &keyboards {
+        harmonicon_ui::dialogs::piano_keys::paint_piano_keys(keyboard, &mut keys, |midi| {
+            (Some(midi) == target).then_some(Color::srgb(0.98, 0.80, 0.25))
+        });
     }
 }
 

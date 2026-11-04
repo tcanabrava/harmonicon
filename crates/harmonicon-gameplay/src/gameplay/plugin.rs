@@ -170,6 +170,7 @@ impl Plugin for GameplayPlugin {
                 note_trainer::update_labels.after(note_trainer::listen),
                 note_trainer::update_fretboard.after(note_trainer::listen),
                 note_trainer::update_flute_drawing.after(note_trainer::listen),
+                note_trainer::update_piano_keys.after(note_trainer::listen),
                 note_trainer::handle_escape.run_if(not(tour_active)),
             )
                 .run_if(in_state(AppState::NoteTrainer)),
@@ -375,6 +376,7 @@ impl Plugin for GameplayPlugin {
                 super::guitar_visuals::update_fretboard,
                 super::guitar_visuals::update_hint,
                 super::flute_visuals::update_flute_stage,
+                super::piano_visuals::update_piano_keyboard,
                 beat_guides::update_beat_guides,
                 technique_coach::update_technique_coach,
             )

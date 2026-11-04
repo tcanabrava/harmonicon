@@ -422,6 +422,7 @@ pub(super) fn sync_chrome_height(
 pub(super) fn row_labels(
     instrument: &harmonicon_core::instrument::Instrument,
     row_count: u8,
+    row_offset: u8,
 ) -> Vec<RowLabel> {
     use harmonicon_core::instrument::Instrument;
     use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
@@ -442,11 +443,26 @@ pub(super) fn row_labels(
                 }
             })
             .collect(),
+        // The window's keys, from the top: drawn as a keyboard, but named
+        // here too, so a scrolled window reads as changed.
+        Instrument::Piano(_) => (1..=row_count)
+            .map(|row| RowLabel {
+                text: harmonicon_core::midi::midi_to_note(i32::from(super::piano_note::row_note(
+                    row + row_offset,
+                ))),
+                swatch: None,
+            })
+            .collect(),
         Instrument::Harmonica(_) => (1..=row_count)
             .map(|hole| RowLabel { text: format!("{hole:02}"), swatch: None })
             .collect(),
     }
 }
+
+/// The keyboard a piano document draws in the row-label column, which the
+/// wheel scrolls through the keys (`view_scroll::scroll_keyboard`).
+#[derive(Component)]
+pub(super) struct EditorKeyboard;
 
 /// Respawns the hole column's rows for the current instrument's rows, or
 /// when their theme or localized labels change.
@@ -480,8 +496,14 @@ pub(super) fn sync_hole_column(
                 swatch: row.key.is_none().then_some(Color::NONE),
             })
             .collect(),
-        None => row_labels(&state.effective_instrument(), hole_count),
+        None => row_labels(&state.effective_instrument(), hole_count, state.row_offset),
     };
+    // A piano's window onto its keyboard: the keys of its first and last
+    // rows, drawn as the keyboard rather than as labels.
+    let keyboard = super::piano_note::is_piano(&state).then(|| {
+        let top = super::piano_note::row_note(state.row_offset + 1);
+        (top + 1 - hole_count, top)
+    });
     let texts: Vec<String> = rows.iter().map(|r| r.text.clone()).collect();
     if last.as_ref().is_some_and(|(e, t)| *e == entity && *t == texts)
         && !theme.is_changed()
@@ -504,7 +526,7 @@ pub(super) fn sync_hole_column(
         ..default()
     });
     commands.entity(entity).with_children(|col| {
-        spawn_hole_column_rows(col, colors, &rows, &loc);
+        spawn_hole_column_rows(col, colors, &rows, &loc, keyboard);
     });
 }
 

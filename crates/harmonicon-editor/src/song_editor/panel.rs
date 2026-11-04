@@ -361,16 +361,30 @@ pub(super) enum NoteButtons {
     Chromatic,
     Guitar,
     Flute,
+    Piano,
 }
 
 /// Whether `kind` belongs in the note column for `set`. The two harmonicas
 /// don't share reed techniques (Bend/Overblow/Overdraw against Slide); a
 /// guitar has no breath, cupped-hand wah or harmonica transposition, and
 /// gets fret, string and harmonic buttons instead. Bend, Vibrato, Depth and
-/// the phrase buttons mean something on all three.
+/// the phrase buttons mean something on all three. A piano key has no
+/// technique or expression at all: it keeps transposition, the phrase
+/// buttons and Delete.
 pub(super) fn note_button_visible(kind: ModButton, set: NoteButtons) -> bool {
     let guitar = set == NoteButtons::Guitar;
     let harmonica = matches!(set, NoteButtons::Diatonic | NoteButtons::Chromatic);
+    if set == NoteButtons::Piano {
+        return matches!(
+            kind,
+            ModButton::TransposeUp
+                | ModButton::TransposeDown
+                | ModButton::Call
+                | ModButton::Split
+                | ModButton::Phrase
+                | ModButton::Delete
+        );
+    }
     match kind {
         ModButton::Blow | ModButton::Draw | ModButton::Wah => harmonica,
         ModButton::TransposeUp | ModButton::TransposeDown => !guitar,
@@ -419,6 +433,8 @@ pub(super) fn update_technique_button_visibility(
         NoteButtons::Guitar
     } else if super::flute_note::is_flute(&state) {
         NoteButtons::Flute
+    } else if super::piano_note::is_piano(&state) {
+        NoteButtons::Piano
     } else if state.harmonica_kind().is_diatonic() {
         NoteButtons::Diatonic
     } else {
@@ -455,6 +471,8 @@ pub(super) fn update_harmonica_kind_text(
         "editor-instrument-guitar"
     } else if super::flute_note::is_flute(&state) {
         "editor-instrument-flute"
+    } else if super::piano_note::is_piano(&state) {
+        "editor-instrument-piano"
     } else {
         harmonica_kind_key(state.harmonica_kind())
     };

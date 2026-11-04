@@ -239,10 +239,13 @@ pub(super) fn rebuild_grid(
                         super::expected_notes::place_or_select_expected(&mut state, hole, tick);
                         return;
                     }
+                    // A drawn row, plus however far a piano's window is
+                    // scrolled, is the note's own row.
+                    let row = hole + state.row_offset;
                     if ctrl_held(&keyboard) {
-                        select_or_add_ctrl(&mut state, hole, tick);
+                        select_or_add_ctrl(&mut state, row, tick);
                     } else {
-                        select_or_add(&mut state, hole, tick);
+                        select_or_add(&mut state, row, tick);
                     }
                 },
             );
@@ -464,7 +467,10 @@ pub(super) fn rebuild_grid(
     );
 
     for note in &state.notes {
-        if note.tick < last_tick && note.tick + note.len > first_tick {
+        if note.tick < last_tick
+            && note.tick + note.len > first_tick
+            && state.row_visible(note.row())
+        {
             let selected = state.is_selected(note.id);
             let in_scale = note_in_scale(note, &instrument, &scale);
             items.push(spawn_note(
@@ -476,6 +482,7 @@ pub(super) fn rebuild_grid(
                 locked,
                 in_scale,
                 hole_count,
+                state.display_row(note),
                 fingering_view,
             ));
         }
@@ -720,6 +727,7 @@ pub(super) fn spawn_note(
     locked: bool,
     in_scale: bool,
     rows: u8,
+    display_row: usize,
     fingering_view: Option<harmonicon_core::instrument::flute::Flute>,
 ) -> Entity {
     // In a flute's fingering view a note is a column over every key row,
@@ -733,7 +741,7 @@ pub(super) fn spawn_note(
         let pad = super::note_pad(rows);
         (left, HEADER_H + pad, width, f32::from(rows) * super::row_h(rows) - 2.0 * pad)
     } else {
-        note_rect(&note, usize::from(note.row().saturating_sub(1)), rows)
+        note_rect(&note, display_row, rows)
     };
     let border = if selected { 2.0 } else { 0.0 };
     let border_color = if selected { colors.accent } else { Color::NONE };
@@ -890,6 +898,8 @@ pub(super) fn spawn_note(
                         ),
                         if matches!(instrument, Instrument::Flute(_)) {
                             "editor-flute-invalid"
+                        } else if matches!(instrument, Instrument::Piano(_)) {
+                            "editor-piano-invalid"
                         } else {
                             "editor-guitar-invalid"
                         },

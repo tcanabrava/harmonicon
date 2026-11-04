@@ -29,6 +29,7 @@ struct Snapshot {
     snap_mode: SnapMode,
     twelve_bar_tint: bool,
     flute_view: super::state::FluteView,
+    row_offset: u8,
     scroll_beat: usize,
     cols: usize,
 }
@@ -62,6 +63,7 @@ impl GridCache {
                     && old.snap_mode == state.snap_mode
                     && old.twelve_bar_tint == state.twelve_bar_tint
                     && old.flute_view == state.flute_view
+                    && old.row_offset == state.row_offset
                     && old.scroll_beat == state.scroll_beat
                     && old.cols == cols
             })
@@ -85,6 +87,7 @@ impl GridCache {
             snapshot.snap_mode = state.snap_mode;
             snapshot.twelve_bar_tint = state.twelve_bar_tint;
             snapshot.flute_view = state.flute_view;
+            snapshot.row_offset = state.row_offset;
             snapshot.scroll_beat = state.scroll_beat;
             snapshot.cols = cols;
         } else {
@@ -105,6 +108,7 @@ impl GridCache {
                 snap_mode: state.snap_mode,
                 twelve_bar_tint: state.twelve_bar_tint,
                 flute_view: state.flute_view,
+                row_offset: state.row_offset,
                 scroll_beat: state.scroll_beat,
                 cols,
             });

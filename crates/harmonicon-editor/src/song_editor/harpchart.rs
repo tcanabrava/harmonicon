@@ -353,6 +353,9 @@ pub(super) fn serialize_harpchart_notes(state: &EditorState, notes: &[GridNote])
         harmonicon_core::instrument::Instrument::Flute(flute) => {
             Some(harmonicon_core::chart::ChartInstrument::from_flute(flute))
         }
+        harmonicon_core::instrument::Instrument::Piano(piano) => {
+            Some(harmonicon_core::chart::ChartInstrument::from_piano(piano))
+        }
         harmonicon_core::instrument::Instrument::Harmonica(_) => None,
     };
     if let Some(spec) = spec {
@@ -824,6 +827,10 @@ pub(super) fn handle_load_chosen(
             }
         };
         load_harpchart(&v, &mut state, &mut scroll);
+        // A piano chart opens with its notes in the window.
+        if super::piano_note::is_piano(&state) {
+            super::piano_note::centre_on_notes(&mut state);
+        }
         if !state.plays_harmonica() {
             state.mode = super::state::Mode::Edit;
             if let Some(recording) = recording.as_mut() {

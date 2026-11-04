@@ -5,11 +5,14 @@
 //! and MIDI-import backing mixdown (`song_editor::playback`/`midi_import`),
 //! and `gameplay::call_response`'s one-shot "call" demo audio. None of those
 //! own the synth — it's audio infrastructure, not an editor or gameplay
-//! concern. It has two [`Voice`]s: the additive harmonica reed below, and a
-//! plucked string (`pluck`, Karplus–Strong) for the guitar.
+//! concern. Its [`Voice`]s: the additive harmonica reed below (and the
+//! flute's near-sine on the same oscillator), a plucked string (`pluck`,
+//! Karplus–Strong) for the guitar, and a struck string (`piano`) for the
+//! piano.
 
 use std::f32::consts::TAU;
 
+mod piano;
 mod pluck;
 
 /// Which instrument [`render_pcm_with`] sounds like.
@@ -25,6 +28,9 @@ pub enum Voice {
     /// Vibrato is breath vibrato, as on the harmonica; wah has no flute
     /// meaning, so it stays the harmonica's.
     Flute,
+    /// A struck piano string: inharmonic partials decaying from the
+    /// hammer, damped when the key lifts. Expression isn't modelled.
+    Piano,
 }
 
 /// CD-quality mono output used by every consumer of this synth.
@@ -296,6 +302,10 @@ pub fn render_pcm_with(notes: &[PhraseNote], secs_per_tick: f32, voice: Voice) -
             .wrapping_add((n.tick as u32).wrapping_mul(LCG_TICK_MIX));
         if voice == Voice::PluckedString {
             pluck::add_pluck(&mut buf, start, dur, freq, rng, NOTE_LEVEL);
+            continue;
+        }
+        if voice == Voice::Piano {
+            piano::add_piano(&mut buf, start, dur, freq, NOTE_LEVEL);
             continue;
         }
         let mut noise_env = 1.0f32;

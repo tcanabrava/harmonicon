@@ -65,6 +65,7 @@ pub(super) fn spawn_hole_column_rows(
     colors: SongEditorColors,
     rows: &[RowLabel],
     loc: &Localization,
+    keyboard: Option<(u8, u8)>,
 ) {
     col.spawn(Node { width: Val::Percent(100.0), height: Val::Px(HEADER_H), ..default() });
     // Box and label shrink with the row on a tall instrument (a flute's
@@ -72,7 +73,29 @@ pub(super) fn spawn_hole_column_rows(
     let row_h = super::row_h(rows.len() as u8);
     let box_px = (row_h - 4.0).min(20.0);
     let font_px = (row_h - 1.0).min(13.0);
-    for row in rows {
+    // A piano draws its keyboard instead, the window's keys from `low` to
+    // `high`, each level with its row: the same keyboard Play 2D and the
+    // Note Trainer draw. The wheel over it scrolls the keys
+    // (`view_scroll::scroll_keyboard`).
+    if let Some((low, high)) = keyboard {
+        use harmonicon_ui::dialogs::piano_keys::{KeyboardAxis, KeyboardSpec, spawn_piano_keys};
+        col.spawn((
+            super::ui::EditorKeyboard,
+            bevy::picking::hover::Hovered::default(),
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(row_h * rows.len() as f32),
+                ..default()
+            },
+        ))
+        .with_children(|keys| {
+            spawn_piano_keys(
+                keys,
+                KeyboardSpec { low, high, axis: KeyboardAxis::Vertical, label_cs: true },
+            );
+        });
+    }
+    for row in rows.iter().filter(|_| keyboard.is_none()) {
         let text = row.text.clone();
         let swatch = row.swatch.unwrap_or(colors.hole_box);
         col.spawn(Node {
@@ -696,6 +719,12 @@ pub(super) fn spawn_meta_form(
                 loc,
                 "editor-flute-select",
                 harmonicon_core::instrument::flute::Flute::default().into(),
+            );
+            super::guitar_note::spawn_selector(
+                col,
+                loc,
+                "editor-piano-select",
+                harmonicon_core::instrument::piano::Piano::grand().into(),
             );
             spawn_snap_mode_row(col, loc, colors);
             for &(field, label) in &FIELDS[..MID] {

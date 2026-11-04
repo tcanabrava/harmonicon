@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 //! The "Note Trainer" choice: which instrument to practise. The harmonica
-//! opens the Bending Trainer; the guitar and the flute open the Note
-//! Trainer on that instrument.
+//! opens the Bending Trainer; the guitar, the flute and the piano open the
+//! Note Trainer on that instrument.
 
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
@@ -51,6 +51,17 @@ pub(crate) fn setup_note_trainer_menu(
          mut trainer: ResMut<NoteTrainer>,
          mut state: ResMut<NextState<AppState>>| {
             trainer.choose(Flute::default().into());
+            state.set(AppState::NoteTrainer);
+        },
+    );
+    spawn_button(
+        &mut commands,
+        root,
+        &loc.msg("note-trainer-piano"),
+        |_: On<Activate>,
+         mut trainer: ResMut<NoteTrainer>,
+         mut state: ResMut<NextState<AppState>>| {
+            trainer.choose(harmonicon_core::instrument::piano::Piano::grand().into());
             state.set(AppState::NoteTrainer);
         },
     );

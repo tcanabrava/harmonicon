@@ -47,6 +47,7 @@ pub fn drills(instrument: &Instrument, kind: TechniqueKind) -> Vec<Drill> {
         Instrument::Harmonica(harp) => harmonica_candidates(harp, kind),
         Instrument::Guitar(guitar) => guitar_candidates(guitar, kind),
         Instrument::Flute(flute) => flute_candidates(flute, kind),
+        Instrument::Piano(piano) => piano_candidates(piano),
     };
     let pitch = |p: PlayPosition| NoteTarget::Positioned(p).sounding_pitch(instrument);
     candidates
@@ -138,6 +139,15 @@ fn guitar_candidates(
         }
     }
     out
+}
+
+/// A piano's drills: every key from C3 to C6 that the keyboard has, lowest
+/// first. The extremes of a keyboard are where a microphone hears a piano
+/// least reliably, and they teach nothing the middle doesn't.
+fn piano_candidates(
+    piano: &crate::instrument::piano::Piano,
+) -> Vec<(PlayPosition, Option<PlayPosition>)> {
+    (48..=84).filter(|&m| piano.has(m)).map(|m| (PlayPosition::Key(m), None)).collect()
 }
 
 /// `(position, the position it starts from)` for each flute drill of

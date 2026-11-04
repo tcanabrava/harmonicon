@@ -232,6 +232,10 @@ pub fn to_chart(
             let (items, report) = flute_items(&notes, flute);
             (items, report, likely_key(&notes))
         }
+        Instrument::Piano(piano) => {
+            let (items, report) = piano_items(&notes, piano);
+            (items, report, likely_key(&notes))
+        }
     };
     let mut chart = chart_shell(score, artist, key, items);
     match instrument {
@@ -241,6 +245,9 @@ pub fn to_chart(
         }
         Instrument::Flute(flute) => {
             chart.instrument_spec = Some(ChartInstrument::from_flute(flute));
+        }
+        Instrument::Piano(piano) => {
+            chart.instrument_spec = Some(ChartInstrument::from_piano(piano));
         }
     }
     Ok((chart, report))
@@ -411,6 +418,25 @@ fn flute_items(notes: &[ScoreNote], flute: &Flute) -> (Vec<TrackItem>, Conversio
             note.duration_secs = note.duration_secs.min(next.start_secs - note.start_secs);
         }
         items.push(item(&note, NoteEvent::fingered(midi_to_note(i32::from(note.midi)), 0)));
+    }
+    (items, report)
+}
+
+/// A piano plays every note the keyboard has, chords included, each where
+/// the score has it; a note off the keyboard is the only one lost.
+fn piano_items(
+    notes: &[ScoreNote],
+    piano: &harmonicon_core::instrument::piano::Piano,
+) -> (Vec<TrackItem>, ConversionReport) {
+    let mut report = ConversionReport { total: notes.len(), ..Default::default() };
+    let mut items = Vec::new();
+    for note in notes {
+        if !piano.has(note.midi) {
+            report.unreachable += 1;
+            continue;
+        }
+        report.natural += 1;
+        items.push(item(note, NoteEvent::keyed(midi_to_note(i32::from(note.midi)))));
     }
     (items, report)
 }

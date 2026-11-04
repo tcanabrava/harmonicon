@@ -758,6 +758,7 @@ fn instrument_label(
     let name = String::from(loc.msg(match song.instrument.as_str() {
         "guitar" => "song-instrument-guitar",
         "flute" => "song-instrument-flute",
+        "piano" => "song-instrument-piano",
         _ => "song-instrument-harmonica",
     }));
     match song.part.as_ref().and_then(|part| reach_percent(part, mine)) {

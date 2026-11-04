@@ -116,6 +116,17 @@ pub fn setup(
         let used = song_notes.notes.iter().filter_map(|n| n.expected_pitch).collect();
         highway_lanes.0 = Some(LaneLayout::pitch_rows(&used));
     }
+    // A piano's is a roll: every key across the song's range, so the rows
+    // line up with the keyboard drawn beside them.
+    let piano_roll = matches!(instrument, Some(harmonicon_core::instrument::Instrument::Piano(_)))
+        .then(|| {
+            super::piano_visuals::roll_range(
+                song_notes.notes.iter().filter_map(|n| n.expected_pitch),
+            )
+        });
+    if let Some((low, high)) = piano_roll {
+        highway_lanes.0 = Some(LaneLayout::keyboard_rows(low, high));
+    }
     *render_assets = NoteRenderAssets { play_mode_tags };
 
     let compact = display.compact.0;
@@ -202,7 +213,9 @@ pub fn setup(
                                 // A flute's furniture is built by `flute_
                                 // visuals::sync_flute_view` for its view;
                                 // the container is all it needs here.
-                                let style = if layout.axis == ScrollAxis::Horizontal {
+                                let style = if piano_roll.is_some() {
+                                    RowStyle::Keyboard
+                                } else if layout.axis == ScrollAxis::Horizontal {
                                     RowStyle::Strings
                                 } else {
                                     RowStyle::Holes
@@ -245,6 +258,41 @@ pub fn setup(
                     .with_children(|row| {
                         if !aural {
                             super::guitar_visuals::spawn_fretboard(row, &guitar, 180.0);
+                        }
+                        spawn_track(row);
+                    });
+                } else if let Some((low, high)) = piano_roll {
+                    left.spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_grow: 1.0,
+                        min_height: Val::Px(120.0),
+                        flex_direction: FlexDirection::Row,
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        // The keyboard, each key level with its row of the
+                        // roll: the highway's lanes span the same keys.
+                        if !aural {
+                            row.spawn(Node {
+                                width: Val::Px(96.0),
+                                height: Val::Percent(100.0),
+                                flex_shrink: 0.0,
+                                ..default()
+                            })
+                            .with_children(|keys| {
+                                use harmonicon_ui::dialogs::piano_keys::{
+                                    KeyboardAxis, KeyboardSpec, spawn_piano_keys,
+                                };
+                                spawn_piano_keys(
+                                    keys,
+                                    KeyboardSpec {
+                                        low,
+                                        high,
+                                        axis: KeyboardAxis::Vertical,
+                                        label_cs: true,
+                                    },
+                                );
+                            });
                         }
                         spawn_track(row);
                     });
@@ -391,6 +439,7 @@ pub(super) fn progress_note_markers(
                     MarkerTint::Fixed(super::guitar_visuals::string_color(at.string))
                 }
                 PlayPosition::Fingering(_) => MarkerTint::Fixed(super::flute_visuals::FLUTE_COLOR),
+                PlayPosition::Key(_) => MarkerTint::Fixed(super::piano_visuals::PIANO_COLOR),
                 PlayPosition::Hole(_) if note_is_blow(n) => MarkerTint::Blow,
                 PlayPosition::Hole(_) => MarkerTint::Draw,
             };
@@ -717,6 +766,9 @@ fn note_color(note: &ScheduledNote, colors: NoteColors) -> LinearRgba {
     if !note.missed && matches!(note.position, PlayPosition::Fingering(_)) {
         return super::flute_visuals::FLUTE_COLOR.to_linear();
     }
+    if !note.missed && matches!(note.position, PlayPosition::Key(_)) {
+        return super::piano_visuals::PIANO_COLOR.to_linear();
+    }
     ribbon_color(note.missed, note_is_blow(note), colors)
 }
 
@@ -969,6 +1021,7 @@ fn note_head_label(note: &ScheduledNote, show_numbers: bool) -> String {
     match &note.position {
         PlayPosition::Fret(a) => a.tab_label(),
         PlayPosition::Fingering(a) => harmonicon_core::midi::midi_to_note(i32::from(a.note)),
+        PlayPosition::Key(note) => harmonicon_core::midi::midi_to_note(i32::from(*note)),
         position => HoleTab::of(position)
             .map(|tab| head_label(tab.hole, tab.is_blow, &note.modifiers, show_numbers))
             .unwrap_or_default(),

@@ -68,7 +68,8 @@ load-bearing about *this* crate.
     reader that goes through `AssetServer` gets the expansion for free, and
     one that parses the file itself must call `expand`.
   - **A chart names one instrument** (format 1.8.0): `harmonica`, or a
-    top-level `instrument` — `guitar`, or `flute` from 1.9.0 — never both,
+    top-level `instrument` — `guitar`, `flute` from 1.9.0, or `piano`
+    from 1.10.0 — never both,
     the schema's `oneOf`. Rules depending on which (events name a hole, a
     string position, or for a flute only its note and optional
     `fingering`; bend sign; techniques per instrument; a position sounding

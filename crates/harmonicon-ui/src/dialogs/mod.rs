@@ -12,6 +12,7 @@ pub mod keyboard_nav;
 pub mod metronome;
 pub mod page_chrome;
 pub mod phrase_looper;
+pub mod piano_keys;
 pub mod rhythm_pattern;
 pub mod scroll_area;
 pub mod tab_bar;

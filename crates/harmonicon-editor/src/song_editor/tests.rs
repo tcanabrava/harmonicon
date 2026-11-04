@@ -2592,7 +2592,7 @@ fn the_grid_draws_each_instrument_in_its_own_vocabulary() {
     use harmonicon_gameplay::gameplay::guitar_visuals::string_color;
 
     let harp: Instrument = build_harp("C", HarmonicaKind::Diatonic).into();
-    let holes = row_labels(&harp, 10);
+    let holes = row_labels(&harp, 10, 0);
     assert_eq!(holes.first().map(|r| r.text.as_str()), Some("01"));
     assert_eq!(holes.last().map(|r| r.text.as_str()), Some("10"));
     assert!(holes.iter().all(|r| r.swatch.is_none()), "holes use the theme's box");
@@ -2606,7 +2606,7 @@ fn the_grid_draws_each_instrument_in_its_own_vocabulary() {
     );
 
     let guitar = Instrument::Guitar(Guitar::standard(GuitarBody::Electric));
-    let strings = row_labels(&guitar, 6);
+    let strings = row_labels(&guitar, 6, 0);
     let texts: Vec<&str> = strings.iter().map(|r| r.text.as_str()).collect();
     assert_eq!(texts, ["e", "B", "G", "D", "A", "E"], "string 1 is the top row");
     assert_eq!(strings[2].swatch, Some(string_color(3)));

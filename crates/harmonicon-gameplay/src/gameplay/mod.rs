@@ -38,6 +38,7 @@ pub mod note_trainer;
 mod notes;
 pub mod pause_menu;
 mod phrase_overlay;
+mod piano_visuals;
 pub mod plugin;
 mod practice_badges;
 mod results;

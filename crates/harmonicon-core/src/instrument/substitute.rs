@@ -48,6 +48,15 @@ pub fn substitute_chart(chart: &HarpChart, played: &Instrument) -> Vec<Vec<Optio
             .map(|item| item.into_iter().map(|p| p.and_then(|p| onto_flute(flute, p))).collect())
             .collect(),
         (Instrument::Guitar(from), Instrument::Guitar(to)) => onto_guitar(from, to, &decoded),
+        // A smaller keyboard keeps every key it has.
+        (Instrument::Piano(_), Instrument::Piano(piano)) => decoded
+            .into_iter()
+            .map(|item| {
+                item.into_iter()
+                    .map(|p| p.filter(|p| InstrumentModel::pitch_of(piano, p).is_some()))
+                    .collect()
+            })
+            .collect(),
         // Nothing substitutes across instruments.
         _ => decoded.iter().map(|item| vec![None; item.len()]).collect(),
     }
@@ -255,6 +264,23 @@ mod tests {
         let pitches = sounding_pitches(&flute);
         let c_foot: Instrument = Flute::new(FootJoint::C).into();
         assert_eq!(reach(&pitches, &c_foot), pitches.len() - 1, "all but its B3");
+    }
+
+    /// A smaller keyboard keeps the keys it has and loses the rest: a C7
+    /// is on a 61-key keyboard (C2 to C7) but not a 49-key one (C2 to C6).
+    #[test]
+    fn a_smaller_keyboard_drops_only_the_keys_it_lacks() {
+        use super::super::piano::Piano;
+        let mut chart =
+            chart(include_str!("../../../harmonicon-song/tests/fixtures/piano-chords.harpchart"));
+        chart.track[7].events[0].note = Some("C7".into());
+        let lost = |keys| {
+            let played: Instrument = Piano::with_keys(keys).unwrap().into();
+            substitute_chart(&chart, &played).iter().flatten().filter(|p| p.is_none()).count()
+        };
+        assert_eq!(lost(88), 0);
+        assert_eq!(lost(61), 0);
+        assert_eq!(lost(49), 1, "only the C7");
     }
 
     /// Down a half step, the 12th-fret harmonic on G (G4) can only be the

@@ -116,12 +116,15 @@ pub(crate) enum ControlsFor {
     Harmonica,
     Guitar,
     Flute,
+    /// Nothing to choose yet: a part's keyboard is the one it is played on.
+    Piano,
 }
 
 fn controls_for(chart: &HarpChart) -> ControlsFor {
     match chart.instrument() {
         Some(Instrument::Guitar(_)) => ControlsFor::Guitar,
         Some(Instrument::Flute(_)) => ControlsFor::Flute,
+        Some(Instrument::Piano(_)) => ControlsFor::Piano,
         _ => ControlsFor::Harmonica,
     }
 }
@@ -156,6 +159,7 @@ pub(crate) fn played_for(own: Option<Instrument>, mine: &MyInstruments) -> Optio
             Some(Guitar { strings, capo, ..guitar }.into())
         }
         Instrument::Flute(flute) => Some(Flute::new(mine.flute_foot.unwrap_or(flute.foot)).into()),
+        Instrument::Piano(piano) => Some(piano.into()),
         Instrument::Harmonica(_) => None,
     }
 }
@@ -372,6 +376,7 @@ pub(crate) fn setup_harp_check(
         ControlsFor::Harmonica => "harp-check-title",
         ControlsFor::Guitar => "instrument-check-title-guitar",
         ControlsFor::Flute => "instrument-check-title-flute",
+        ControlsFor::Piano => "instrument-check-title-piano",
     };
     let (root, header, page_root) =
         spawn_menu_root(&mut commands, &loc.msg(title), None, &theme, "HarpCheck");
@@ -663,6 +668,7 @@ pub(crate) fn refresh_harp_cost(
         ControlsFor::Harmonica => "harp-check-intro",
         ControlsFor::Guitar => "instrument-check-intro-guitar",
         ControlsFor::Flute => "instrument-check-intro-flute",
+        ControlsFor::Piano => "instrument-check-intro-piano",
     }));
     for mut label in &mut intros {
         if label.0 != intro {
@@ -684,6 +690,9 @@ pub(crate) fn refresh_harp_cost(
         }
         Some(Instrument::Flute(flute)) => String::from(
             loc.msg_args("instrument-check-chart-flute", &[("foot", foot_label(flute.foot, &loc))]),
+        ),
+        Some(Instrument::Piano(piano)) => String::from(
+            loc.msg_args("instrument-check-chart-piano", &[("keys", piano.keys.to_string())]),
         ),
         None => String::new(),
     };
@@ -736,6 +745,7 @@ pub(crate) fn track_label(entry: &TrackChart, loc: &Localization) -> String {
                 loc.msg(match entry.chart.instrument() {
                     Some(Instrument::Guitar(_)) => "harp-check-instrument-guitar",
                     Some(Instrument::Flute(_)) => "harp-check-instrument-flute",
+                    Some(Instrument::Piano(_)) => "harp-check-instrument-piano",
                     _ => "harp-check-instrument-harmonica",
                 })
                 .to_string(),

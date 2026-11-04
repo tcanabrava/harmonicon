@@ -199,7 +199,7 @@
     },
 
     "instrument": {
-      "description": "A non-harmonica instrument, used instead of harmonica: a guitar (format 1.8.0) or a flute (format 1.9.0).",
+      "description": "A non-harmonica instrument, used instead of harmonica: a guitar (format 1.8.0), a flute (format 1.9.0) or a piano (format 1.10.0).",
       "oneOf": [
         {
           "type": "object",
@@ -249,6 +249,16 @@
           "properties": {
             "type": { "type": "string", "enum": ["flute"] },
             "foot": { "type": "string", "enum": ["c", "b"] }
+          }
+        },
+        {
+          "type": "object",
+          "description": "A piano (format 1.10.0). keys is the keyboard's size: 88 (A0 to C8, the default), 76 (E1 to G7), 61 (C2 to C7) or 49 (C2 to C6). Its events name only their note.",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["piano"] },
+            "keys": { "type": "integer", "enum": [88, 76, 61, 49] }
           }
         }
       ]

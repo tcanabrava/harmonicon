@@ -279,6 +279,10 @@ pub(super) struct EditorState {
     /// [`FluteView`]. A view, like `snap_mode`: not chart content, not
     /// undo-tracked, but in the grid cache, since it changes every row.
     pub(super) flute_view: FluteView,
+    /// How far a piano's grid is scrolled down its keyboard: the rows
+    /// above the window `piano_note` shows. 0 on every other instrument,
+    /// which shows all its rows. A view, in the grid cache, not undo.
+    pub(super) row_offset: u8,
 }
 
 /// How the grid draws a flute. In `Notes` a row is a pitch and every edit
@@ -374,6 +378,7 @@ impl Default for EditorState {
             sticky_intensity: DEFAULT_INTENSITY.into(),
             sticky_fret: 0,
             flute_view: FluteView::default(),
+            row_offset: 0,
         }
     }
 }
@@ -415,23 +420,35 @@ impl EditorState {
     }
 
     /// How many rows the grid draws: [`row_count`](Self::row_count), except a
-    /// flute in fingering view, which draws one per key.
+    /// flute in fingering view, which draws one per key, and a piano, which
+    /// draws a scrolling window onto its keyboard (`piano_note`).
     pub(super) fn display_rows(&self) -> u8 {
+        if super::piano_note::is_piano(self) {
+            return self.row_count().min(super::piano_note::WINDOW_ROWS);
+        }
         match self.flute_fingering_view() {
             Some(flute) => harmonicon_core::instrument::flute::key_rows(flute.foot).len() as u8,
             None => self.row_count(),
         }
     }
 
-    /// The row, from 0, `note` is drawn on: its own, except in fingering
-    /// view, where every note spans all rows and its middle stands in for
-    /// it (where the resize grips sit).
+    /// The row, from 0, `note` is drawn on: its own, less the rows a
+    /// piano's window is scrolled past, except in fingering view, where
+    /// every note spans all rows and its middle stands in for it (where the
+    /// resize grips sit). Only meaningful for a note [`row_visible`]
+    /// (Self::row_visible) says is in view.
     pub(super) fn display_row(&self, note: &GridNote) -> usize {
         if self.flute_fingering_view().is_some() {
             usize::from(self.display_rows() / 2)
         } else {
-            usize::from(note.row().saturating_sub(1))
+            usize::from(note.row().saturating_sub(1 + self.row_offset))
         }
+    }
+
+    /// Whether note row `row` (from 1) is in the window the grid shows.
+    pub(super) fn row_visible(&self, row: u8) -> bool {
+        self.flute_fingering_view().is_some()
+            || (self.row_offset < row && row <= self.row_offset + self.display_rows())
     }
 
     pub(super) fn effective_harp(&self) -> Harmonica {
@@ -681,6 +698,9 @@ impl EditorState {
             }
             harmonicon_core::instrument::Instrument::Flute(flute) => {
                 return super::note_model::FLUTE_TOP_NOTE + 1 - flute.lowest();
+            }
+            harmonicon_core::instrument::Instrument::Piano(piano) => {
+                return super::note_model::PIANO_TOP_NOTE + 1 - piano.lowest();
             }
             harmonicon_core::instrument::Instrument::Harmonica(_) => {}
         }

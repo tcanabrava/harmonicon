@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 
-//! `port-part`: writes a guitar or flute part from a harmonica chart, for a
-//! song folder that has only the harmonica's.
+//! `port-part`: writes a guitar, flute or piano part from a harmonica
+//! chart, for a song folder that has only the harmonica's.
 //!
 //! ```text
 //! cargo run --bin port-part -- guitar path/to/song/chart.harpchart
 //! cargo run --bin port-part -- flute  path/to/song/chart.harpchart
+//! cargo run --bin port-part -- piano  path/to/song/chart.harpchart
 //! ```
 //!
-//! It writes `guitar.harpchart` or `flute.harpchart` beside the source, so
+//! It writes `guitar.harpchart`, `flute.harpchart` or `piano.harpchart`
+//! beside the source, so
 //! the game lists it as another part of the same song (sharing the folder's
 //! backing audio). The timing, lyrics and phrases are the source's, and the
 //! pitches are the ones the harmonica sounds, bends included, moved by
@@ -23,6 +25,8 @@
 //!   included; an onset it can't voice is reduced to its top note.
 //! - **A flute** is a C foot, playing one note at a time: a chord keeps
 //!   its top note, the melody. Fingerings are the standard ones.
+//! - **A piano** is the full 88 keys and plays every note, chords
+//!   included, the melody centred around C5, where a right hand plays it.
 //! - **What can't be played is dropped**, and harmonica techniques (bends,
 //!   overblows) become the plain note they sounded. Vibrato survives on a
 //!   flute.
@@ -45,6 +49,7 @@ use serde_json::{Value, json};
 enum Target {
     Guitar,
     Flute,
+    Piano,
 }
 
 impl Target {
@@ -52,6 +57,7 @@ impl Target {
         match name {
             "guitar" => Some(Self::Guitar),
             "flute" => Some(Self::Flute),
+            "piano" => Some(Self::Piano),
             _ => None,
         }
     }
@@ -60,6 +66,7 @@ impl Target {
         match self {
             Self::Guitar => "guitar",
             Self::Flute => "flute",
+            Self::Piano => "piano",
         }
     }
 
@@ -67,6 +74,7 @@ impl Target {
         match self {
             Self::Guitar => Guitar::standard(GuitarBody::Acoustic).into(),
             Self::Flute => Flute::new(FootJoint::C).into(),
+            Self::Piano => harmonicon_core::instrument::piano::Piano::grand().into(),
         }
     }
 
@@ -75,6 +83,7 @@ impl Target {
         match self {
             Self::Guitar => 60,
             Self::Flute => 74,
+            Self::Piano => 72,
         }
     }
 }
@@ -137,7 +146,7 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
                 item_pitches(&chart, i).into_iter().filter_map(|p| shifted(p, shift)).collect();
             match target {
                 Target::Flute => pitches.into_iter().take(1).collect(),
-                Target::Guitar => pitches,
+                Target::Guitar | Target::Piano => pitches,
             }
         })
         .collect();
@@ -213,7 +222,8 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
     let spec = match &instrument {
         Instrument::Guitar(guitar) => ChartInstrument::from_guitar(guitar),
         Instrument::Flute(flute) => ChartInstrument::from_flute(flute),
-        Instrument::Harmonica(_) => unreachable!("the target is a guitar or a flute"),
+        Instrument::Piano(piano) => ChartInstrument::from_piano(piano),
+        Instrument::Harmonica(_) => unreachable!("the target is a guitar, flute or piano"),
     };
     let object = out.as_object_mut().ok_or("the chart is not an object")?;
     object.remove("harmonica");
@@ -227,12 +237,17 @@ fn port(source: &Path, target: Target) -> Result<(PathBuf, usize, usize, i32), S
     let what = match target {
         Target::Guitar => "a standard-tuned guitar",
         Target::Flute => "a C-foot flute",
+        Target::Piano => "an 88-key piano",
+    };
+    let review = match target {
+        Target::Piano => "Generated part",
+        Target::Guitar | Target::Flute => "Generated fingering",
     };
     let metadata = &mut out["metadata"];
     metadata["format_version"] = json!(harmonicon_core::chart::CURRENT_FORMAT_VERSION);
     metadata["description"] = json!(format!(
         "The harmonica part's melody, {moved}, for {what}. Timing and phrasing match the \
-         harmonica part. Generated fingering; live play review pending."
+         harmonica part. {review}; live play review pending."
     ));
 
     let dest = source.with_file_name(format!("{}.harpchart", target.name()));

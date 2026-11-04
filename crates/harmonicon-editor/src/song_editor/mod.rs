@@ -55,6 +55,7 @@ mod note_model;
 mod panel;
 mod panel_widgets;
 mod phrase_editor;
+mod piano_note;
 mod pitch_map;
 mod ranges;
 mod repeat_marks;
@@ -187,6 +188,7 @@ impl Plugin for SongEditor2Plugin {
                         view_scroll::auto_scroll,
                         view_scroll::pan_keys,
                         view_scroll::pan_wheel,
+                        view_scroll::scroll_keyboard,
                         view_scroll::pan_touch,
                         view_scroll::wheel_toolbar,
                         view_scroll::apply_scroll,

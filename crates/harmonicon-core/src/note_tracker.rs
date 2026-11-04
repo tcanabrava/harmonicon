@@ -103,6 +103,10 @@ impl VoiceFilter {
             Instrument::Flute(flute) => {
                 Self::Strings { pitches: InstrumentModel::valid_pitches(flute), strings: 1 }
             }
+            // Ten fingers: any keys at once, the ten strongest heard.
+            Instrument::Piano(piano) => {
+                Self::Strings { pitches: InstrumentModel::valid_pitches(piano), strings: 10 }
+            }
         }
     }
 

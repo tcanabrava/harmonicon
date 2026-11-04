@@ -68,6 +68,10 @@ pub(super) fn select_or_add(state: &mut EditorState, hole: u8, tick: usize) {
         super::flute_note::place(state, hole, tick, len);
         return;
     }
+    if super::piano_note::is_piano(state) {
+        super::piano_note::place(state, hole, tick, len);
+        return;
+    }
 
     // Whatever's already sounding at this exact tick (on another hole)
     // wins over the armed sticky direction — a brand-new chord note has to
@@ -194,6 +198,10 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
     }
     if super::flute_note::is_flute(state) {
         super::flute_note::apply_modifier(state, kind);
+        return;
+    }
+    // A key has no technique to change.
+    if super::piano_note::is_piano(state) {
         return;
     }
     if matches!(kind, ModButton::Blow | ModButton::Draw) {
@@ -399,6 +407,8 @@ pub(super) fn report_technique_skips(
         state.bypass_change_detection().unplayable_notice = false;
         feedback.set(loc.msg(if super::flute_note::is_flute(&state) {
             "editor-flute-invalid"
+        } else if super::piano_note::is_piano(&state) {
+            "editor-piano-invalid"
         } else {
             "editor-guitar-invalid"
         }));
@@ -500,6 +510,15 @@ pub(super) fn grid_keys(
             super::transpose::transpose_selection(&mut state, step);
         } else if keyboard.just_pressed(KeyCode::ArrowDown) {
             super::transpose::transpose_selection(&mut state, -step);
+        }
+    } else if super::piano_note::is_piano(&state) {
+        // Plain ↑/↓ scroll a piano's window up and down the keyboard, a
+        // key at a time, or an octave with Shift.
+        let step = if shift_held(&keyboard) { 12 } else { 1 };
+        if keyboard.just_pressed(KeyCode::ArrowUp) {
+            super::piano_note::scroll_keys(&mut state, -step);
+        } else if keyboard.just_pressed(KeyCode::ArrowDown) {
+            super::piano_note::scroll_keys(&mut state, step);
         }
     }
     if keyboard.just_pressed(KeyCode::Escape) && !file_dialog.open {
@@ -743,9 +762,11 @@ pub(super) fn update_resize_grips(
     state: Res<EditorState>,
     mut grips: Query<(&ResizeGrip, &mut Node, &mut Visibility)>,
 ) {
+    // A piano's note scrolled out of its window has nothing to grip.
     let target = (state.selected.len() == 1 && !state.locked())
         .then(|| state.selected_note().copied())
-        .flatten();
+        .flatten()
+        .filter(|note| state.row_visible(note.row()));
     for (grip, mut node, mut vis) in &mut grips {
         let Some(note) = target else {
             if *vis != Visibility::Hidden {
@@ -836,7 +857,9 @@ fn ghost_span(state: &EditorState, row: u8) -> (f32, f32) {
     if state.flute_fingering_view().is_some() {
         (HEADER_H + pad, f32::from(rows) * row_h - 2.0 * pad)
     } else {
-        (HEADER_H + (row as f32 - 1.0) * row_h + pad, row_h - 2.0 * pad)
+        // A note row, drawn where a piano's window puts it.
+        let drawn = f32::from(row) - 1.0 - f32::from(state.row_offset);
+        (HEADER_H + drawn * row_h + pad, row_h - 2.0 * pad)
     }
 }
 
