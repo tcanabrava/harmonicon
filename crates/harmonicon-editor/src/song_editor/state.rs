@@ -1138,6 +1138,7 @@ pub(super) fn toggle_tempo_point(state: &mut EditorState, tick: usize) {
 /// View-changing edits are applied after view systems finish their frame.
 #[derive(Message)]
 pub(super) enum DocumentCommand {
+    New(InstrumentSelection),
     SelectInstrument(InstrumentSelection),
     Undo,
     Redo,

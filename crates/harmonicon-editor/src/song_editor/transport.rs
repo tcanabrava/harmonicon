@@ -49,6 +49,21 @@ pub(super) fn spawn_file_buttons(
 ) {
     transport_button(
         panel,
+        loc.msg("editor-new"),
+        loc.msg("editor-new-tooltip"),
+        "+",
+        style,
+        colors.transport_load,
+        |_: On<Activate>,
+         mut transport: Transport,
+         mut picker: ResMut<super::document_picker::DocumentPicker>| {
+            transport.stop_all();
+            picker.open = true;
+            picker.initial = false;
+        },
+    );
+    transport_button(
+        panel,
         loc.msg("editor-save"),
         loc.msg("editor-save-tooltip"),
         "\u{1F4BE}",

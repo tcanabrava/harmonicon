@@ -268,6 +268,10 @@ pub(super) fn apply_document_commands(
 ) {
     for command in commands.read() {
         match command {
+            super::state::DocumentCommand::New(instrument) => {
+                *state = super::document_picker::fresh(instrument.clone());
+                *history = UndoHistory::default();
+            }
             super::state::DocumentCommand::Undo => history.undo(&mut state),
             super::state::DocumentCommand::Redo => history.redo(&mut state),
             super::state::DocumentCommand::SelectInstrument(instrument) => {

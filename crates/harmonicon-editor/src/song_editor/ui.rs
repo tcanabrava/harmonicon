@@ -348,7 +348,21 @@ pub(super) struct TimeSignatureComboboxSlot;
 
 // ── Lifecycle systems ─────────────────────────────────────────────────────────
 
-pub(super) fn init_state(mut commands: Commands, existing: Option<Res<EditorState>>) {
+pub(super) fn init_state(
+    mut commands: Commands,
+    existing: Option<Res<EditorState>>,
+    mut picker: ResMut<super::document_picker::DocumentPicker>,
+) {
+    let fresh = existing.is_none()
+        || (!picker.chosen
+            && existing.as_ref().is_some_and(|state| !super::document_picker::has_content(state)));
+    if fresh {
+        picker.open = true;
+        picker.initial = true;
+    } else {
+        picker.chosen = true;
+        picker.open = false;
+    }
     if existing.is_none() {
         commands.insert_resource(EditorState::default());
     }

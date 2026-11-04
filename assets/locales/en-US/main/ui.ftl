@@ -1022,3 +1022,13 @@ editor-field-instrument = Instrument
 editor-instrument-harmonica = Harmonica
 
 editor-instrument-select-empty = Choose another instrument in an empty document, or create a new document.
+
+editor-new = New
+
+editor-new-tooltip = Create a new musical document
+
+editor-new-title = New document
+
+editor-new-instrument-question = Which instrument is this document for?
+
+editor-new-replace-warning = Create a new document and discard the current notes and metadata? Save your work first if you want to keep it.

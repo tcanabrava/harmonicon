@@ -29,6 +29,7 @@ mod clipboard;
 #[cfg(feature = "dev")]
 mod debug_record;
 mod details_fields;
+mod document_picker;
 // Dev-only ("--features dev") benchmark-authoring workflow — see its own
 // module docs. Same gating as `debug_record` above.
 #[cfg(feature = "dev")]
@@ -163,6 +164,13 @@ impl Plugin for SongEditor2Plugin {
         #[cfg(feature = "dev")]
         app.add_plugins((debug_record::DebugRecordPlugin, expected_notes::ExpectedNotesPlugin));
 
+        app.init_resource::<document_picker::DocumentPicker>().add_systems(
+            Update,
+            (document_picker::handle_confirmation, document_picker::sync_picker)
+                .chain()
+                .in_set(EditorPass)
+                .run_if(in_state(AppState::SongEditor2)),
+        );
         app.add_plugins(material::EditorNoteMaterialPlugin)
             .add_systems(
                 OnEnter(AppState::SongEditor2),
