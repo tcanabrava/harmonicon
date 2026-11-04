@@ -211,11 +211,58 @@ pub(super) fn spawn_flute_chart(
                     border_radius: BorderRadius::all(Val::Px(8.0 * scale)),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.30, 0.33, 0.38)),
+                BackgroundColor(Color::srgb(0.40, 0.47, 0.54)),
+            ));
+            // A silver highlight and joint collars give the tube a readable
+            // instrument silhouette without obscuring the fingering circles.
+            for along in [2.0, 14.0, 83.0, 97.0] {
+                drawing.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: if vertical {
+                            Val::Px(tube_at - 3.0 * scale)
+                        } else {
+                            Val::Percent(along)
+                        },
+                        top: if vertical {
+                            Val::Percent(along)
+                        } else {
+                            Val::Px(tube_at - 3.0 * scale)
+                        },
+                        width: if vertical {
+                            Val::Px(tube_w + 6.0 * scale)
+                        } else {
+                            Val::Px(4.0 * scale)
+                        },
+                        height: if vertical {
+                            Val::Px(4.0 * scale)
+                        } else {
+                            Val::Px(tube_w + 6.0 * scale)
+                        },
+                        border_radius: BorderRadius::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.72, 0.78, 0.83)),
+                ));
+            }
+            drawing.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: if vertical { Val::Px(tube_at + 5.0 * scale) } else { Val::Percent(6.0) },
+                    top: if vertical { Val::Percent(6.0) } else { Val::Px(tube_at + 5.0 * scale) },
+                    width: Val::Px(16.0 * scale),
+                    height: Val::Px(16.0 * scale),
+                    border: UiRect::all(Val::Px(3.0 * scale)),
+                    border_radius: BorderRadius::MAX,
+                    ..default()
+                },
+                BorderColor::all(Color::srgb(0.85, 0.89, 0.93)),
+                BackgroundColor(Color::srgb(0.07, 0.10, 0.14)),
             ));
             for (row, key_row) in key_rows(flute.foot).into_iter().enumerate() {
                 let Some(key) = key_row.key else { continue };
                 let (along, length) = layout.span(row);
+                let (along, length) = (16.0 + along * 0.80, length * 0.80);
                 let (size, across) = match key_row.side {
                     Side::Tube => (hole, tube_at + (tube_w - hole) * 0.5),
                     Side::Left => (side_key, before),
@@ -295,7 +342,7 @@ pub(super) fn paint_flute_keys(
 }
 
 /// The fingering strip under the highway: the chart for the note to play
-/// now, its name before it and its countdown bar under it, and beside it a
+/// now, its name before it and its countdown bar under it, and above it a
 /// smaller, dimmer chart for the next one, each lying along the screen with
 /// the head joint at the left. Hidden until [`sync_flute_view`] shows it.
 pub(super) fn spawn_flute_stage(
@@ -303,20 +350,6 @@ pub(super) fn spawn_flute_stage(
     flute: &Flute,
     loc: &Localization,
 ) {
-    const NOW_SCALE: f32 = 1.6;
-    const NOW_LENGTH: f32 = 560.0;
-    const NEXT_SCALE: f32 = 1.0;
-    const NEXT_LENGTH: f32 = 360.0;
-    // Wide enough for the longest name ("C#6"), so a chart never shifts as
-    // the names change.
-    const NAME_W: f32 = 120.0;
-    let name_cell = || Node {
-        width: Val::Px(NAME_W),
-        flex_direction: FlexDirection::Column,
-        align_items: AlignItems::FlexEnd,
-        flex_shrink: 0.0,
-        ..default()
-    };
     parent
         .spawn((
             FluteStage(*flute),
@@ -324,85 +357,85 @@ pub(super) fn spawn_flute_stage(
                 width: Val::Percent(100.0),
                 display: Display::None,
                 flex_shrink: 0.0,
-                flex_direction: FlexDirection::Row,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                column_gap: Val::Px(24.0),
-                padding: UiRect::vertical(Val::Px(10.0)),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(4.0),
+                padding: UiRect::axes(Val::Px(24.0), Val::Px(8.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.06, 0.06, 0.09)),
+            BackgroundColor(Color::srgb(0.06, 0.08, 0.11)),
         ))
         .with_children(|strip| {
-            strip.spawn(name_cell()).with_children(|cell| {
-                cell.spawn((
-                    Text::new(""),
-                    TextFont { font_size: FontSize::Px(52.0), ..default() },
-                    TextColor(Color::WHITE),
-                    StageNoteName(ChartSlot::Now),
-                ));
-            });
-            strip
-                .spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(10.0),
-                    flex_shrink: 0.0,
-                    ..default()
-                })
-                .with_children(|column| {
-                    column.spawn(Node { width: Val::Px(NOW_LENGTH), ..default() }).with_children(
-                        |c| {
-                            spawn_flute_chart(
-                                c,
-                                flute,
-                                NOW_SCALE,
-                                ChartSlot::Now,
-                                ChartAxis::Horizontal,
-                            );
-                        },
-                    );
-                    column
-                        .spawn((
-                            Node {
-                                width: Val::Px(NOW_LENGTH),
-                                height: Val::Px(10.0),
-                                border_radius: BorderRadius::all(Val::Px(5.0)),
-                                overflow: Overflow::clip(),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.18, 0.19, 0.24)),
-                        ))
-                        .with_children(|bar| {
-                            bar.spawn((
-                                Node {
-                                    width: Val::Percent(0.0),
-                                    height: Val::Percent(100.0),
+            // The preview sits above the current chart, on the same axis:
+            // eyes and hands can compare changes without scanning sideways.
+            for (slot, scale) in [(ChartSlot::Next, 0.8), (ChartSlot::Now, 1.25)] {
+                strip
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(16.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        row.spawn(Node {
+                            width: Val::Px(104.0),
+                            flex_shrink: 0.0,
+                            flex_direction: FlexDirection::Column,
+                            ..default()
+                        })
+                        .with_children(|name| {
+                            if slot == ChartSlot::Next {
+                                name.spawn((
+                                    Text::new(String::from(loc.msg("gameplay-flute-next"))),
+                                    TextFont { font_size: FontSize::Px(14.0), ..default() },
+                                    TextColor(Color::srgb(0.65, 0.73, 0.83)),
+                                ));
+                            }
+                            name.spawn((
+                                StageNoteName(slot),
+                                Text::new(""),
+                                TextFont {
+                                    font_size: FontSize::Px(if slot == ChartSlot::Now {
+                                        44.0
+                                    } else {
+                                        26.0
+                                    }),
                                     ..default()
                                 },
-                                BackgroundColor(COUNTDOWN_COMING),
-                                StageCountdown,
+                                TextColor(if slot == ChartSlot::Now {
+                                    Color::WHITE
+                                } else {
+                                    KEY_NEXT
+                                }),
                             ));
                         });
-                });
-            // Space between the two, so the next chart reads as apart.
-            strip.spawn(Node { width: Val::Px(40.0), ..default() });
-            strip.spawn(name_cell()).with_children(|cell| {
-                cell.spawn((
-                    Text::new(String::from(loc.msg("gameplay-flute-next"))),
-                    TextFont { font_size: FontSize::Px(16.0), ..default() },
-                    TextColor(Color::srgb(0.62, 0.66, 0.74)),
-                ));
-                cell.spawn((
-                    Text::new(""),
-                    TextFont { font_size: FontSize::Px(30.0), ..default() },
-                    TextColor(Color::srgb(0.70, 0.74, 0.82)),
-                    StageNoteName(ChartSlot::Next),
-                ));
-            });
+                        row.spawn(Node {
+                            flex_grow: 1.0,
+                            flex_basis: Val::Px(0.0),
+                            min_width: Val::Px(0.0),
+                            ..default()
+                        })
+                        .with_children(|c| {
+                            spawn_flute_chart(c, flute, scale, slot, ChartAxis::Horizontal)
+                        });
+                    });
+            }
             strip
-                .spawn(Node { width: Val::Px(NEXT_LENGTH), flex_shrink: 0.0, ..default() })
-                .with_children(|c| {
-                    spawn_flute_chart(c, flute, NEXT_SCALE, ChartSlot::Next, ChartAxis::Horizontal);
+                .spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(6.0),
+                        border_radius: BorderRadius::MAX,
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.18, 0.23, 0.30)),
+                ))
+                .with_children(|bar| {
+                    bar.spawn((
+                        StageCountdown,
+                        Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+                        BackgroundColor(COUNTDOWN_COMING),
+                    ));
                 });
         });
 }
