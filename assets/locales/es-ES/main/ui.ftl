@@ -990,3 +990,6 @@ editor-piano-select = Usar piano
 editor-piano-invalid = Una tecla no suena dos veces a la vez, y solo se pueden tocar las teclas del propio teclado.
 editor-guitar-select-empty = Elige un documento vacío para cambiar de instrumento. Guarda la partitura actual primero.
 
+
+gameplay-harmonica-blow-cue = Orificio { $hole } · Soplar / exhalar
+gameplay-harmonica-draw-cue = Orificio { $hole } · Aspirar / inhalar

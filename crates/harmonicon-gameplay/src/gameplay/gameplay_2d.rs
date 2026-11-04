@@ -38,7 +38,7 @@ use super::{
     HoleTab, LOOKAHEAD, MusicStarted, NoteVisual, PlayedHarp, ScheduledNote, ScoreReadoutAnchor,
     SongInfo, SongNotes, ValidHarpNotes, spawn_score_readout,
 };
-use harmonicon_platform::localization::Localization;
+use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::{LoadedTheme, NoteColors, effective_note_colors};
 
 /// Height of the hit line, as a percentage of the play area — the region a
@@ -1147,14 +1147,71 @@ impl HoleGlow<'_, '_> {
     }
 }
 
+/// Show the breath through a sustained note, including after a successful
+/// attack. The scoring target alone disappears as soon as the attack is hit.
+fn harmonica_guidance(notes: &[ScheduledNote], now: f64) -> Vec<(u8, bool)> {
+    let mut targets = Vec::new();
+    let mut attack = None;
+    for note in notes.iter().take_while(|n| n.time <= now + 0.35) {
+        if !note.playable || note.missed || note.time + note.duration <= now {
+            continue;
+        }
+        if let Some(tab) = HoleTab::of(&note.position) {
+            if attack.is_some_and(|time| time != note.time) {
+                break;
+            }
+            attack = Some(note.time);
+            let target = (tab.hole, tab.is_blow);
+            if !targets.contains(&target) {
+                targets.push(target);
+            }
+        }
+    }
+    targets
+}
+
 pub fn update_holes(
     mut glow: HoleGlow,
-    mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState)>,
+    clock: Res<super::GameplayClock>,
+    notes: Res<SongNotes>,
+    mut cells: Query<(&HoleCell, &mut BackgroundColor, &mut HoleState, &mut BorderColor)>,
+    loc: Res<Localization>,
+    mut cues: Query<&mut Text, With<super::highway_2d::HarmonicaCue>>,
 ) {
     if !glow.begin_frame() {
         return;
     }
-    for (cell, mut bg, mut state) in &mut cells {
+    let show_targets = !glow.lesson.as_ref().is_some_and(|lesson| lesson.aural);
+    let guidance = harmonica_guidance(&notes.notes, clock.get());
+    let cue = if show_targets {
+        guidance
+            .iter()
+            .map(|(hole, blow)| {
+                loc.msg_args(
+                    if *blow {
+                        "gameplay-harmonica-blow-cue"
+                    } else {
+                        "gameplay-harmonica-draw-cue"
+                    },
+                    &[("hole", hole.to_string())],
+                )
+                .to_string()
+            })
+            .collect::<Vec<_>>()
+            .join("   ·   ")
+    } else {
+        String::new()
+    };
+    for mut text in &mut cues {
+        if text.0 != cue {
+            text.0.clone_from(&cue);
+        }
+    }
+    for (cell, mut bg, mut state, mut border) in &mut cells {
+        let target = show_targets && guidance.iter().any(|(hole, _)| *hole == cell.0);
+        let edge =
+            if target { Color::srgb(0.98, 0.85, 0.47) } else { Color::srgb(0.28, 0.30, 0.40) };
+        *border = BorderColor::all(edge);
         glow.step(cell.0, &mut state);
         let b = state.brightness;
 
@@ -1174,6 +1231,24 @@ mod tests {
     use super::*;
     use harmonicon_core::harmonica::{chromatic_16_harp, richter_harp};
     use harmonicon_core::instrument::{InstrumentModel, PlayPosition};
+
+    #[test]
+    fn harmonica_cue_prepares_then_holds_after_a_successful_attack() {
+        let mut note = ScheduledNote {
+            time: 1.0,
+            duration: 2.0,
+            playable: true,
+            position: PlayPosition::natural_hole(6, Action::Draw),
+            ..default()
+        };
+        assert!(harmonica_guidance(&[note.clone()], 0.0).is_empty());
+        assert_eq!(harmonica_guidance(&[note.clone()], 0.8), vec![(6, false)]);
+        note.hit = true;
+        assert_eq!(harmonica_guidance(&[note.clone()], 2.0), vec![(6, false)]);
+        assert!(harmonica_guidance(&[note.clone()], 3.0).is_empty());
+        note.missed = true;
+        assert!(harmonica_guidance(&[note], 2.0).is_empty());
+    }
 
     // ── lanes ─────────────────────────────────────────────────────────────────
 

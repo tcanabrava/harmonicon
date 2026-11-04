@@ -991,3 +991,6 @@ editor-piano-select = Use piano
 editor-piano-invalid = A key can't sound twice at once, and only the keyboard's own keys can be played.
 editor-guitar-select-empty = Select an empty document to change instruments. Save your current chart first.
 
+
+gameplay-harmonica-blow-cue = Hole { $hole } · Blow / exhale
+gameplay-harmonica-draw-cue = Hole { $hole } · Draw / inhale

@@ -18,6 +18,10 @@ use harmonicon_core::instrument::LaneLayout;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 
 use super::HoleCell;
+
+/// A single readable action cue, separate from the pitch reference cells.
+#[derive(Component)]
+pub(super) struct HarmonicaCue;
 use super::gameplay_2d::HIT_H_PCT;
 use super::highway_axis::placed;
 
@@ -167,75 +171,105 @@ pub(super) fn spawn_harmonica_strip(
 ) {
     let hole_count = harp.hole_count();
     let lane_pct = 100.0 / hole_count as f32;
-    col.spawn(Node { flex_direction: FlexDirection::Row, width: Val::Percent(100.0), ..default() })
-        .with_children(|row| {
-            for hole in 1u8..=hole_count {
-                let b = harp.wind_direction_label(hole, &Action::Blow);
-                let d = harp.wind_direction_label(hole, &Action::Draw);
-                // Fixed px, not Vh — Vh resolves from the physical viewport and
-                // doesn't respond to `UiScale`, unlike this cell's own text, so
-                // the cell would stay a fixed size on screen while its labels
-                // scaled independently.
-                row.spawn_empty()
-                    .apply_scene(bsn! {
-                        Node {
-                            width: {Val::Percent(lane_pct)},
-                            height: {Val::Px(116.0)},
-                            flex_direction: {FlexDirection::Column},
-                            align_items: {AlignItems::Center},
-                            justify_content: {JustifyContent::SpaceAround},
-                            border: {UiRect::axes(Val::Px(1.0), Val::Px(3.0))},
-                            border_radius: {BorderRadius::all(Val::Px(8.0))},
-                            padding: {UiRect::vertical(Val::Px(6.0))},
-                        }
-                        BackgroundColor({Color::srgb(0.10, 0.12, 0.16)})
-                        ~{BorderColor::all(Color::srgb(0.28, 0.30, 0.40))}
-                        HoleCell(hole)
-                    })
-                    .with_children(|cell| {
-                        cell.spawn_empty().apply_scene(bsn! {
-                            Text({b})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(0.50, 0.75, 1.00)})
-                        });
-                        cell.spawn_empty().apply_scene(bsn! {
-                            Text({format!("↓ {hole} ↑")})
-                            TextFont { font_size: {FontSize::Px(25.0)} }
-                            TextColor({Color::srgb(0.96, 0.92, 0.80)})
-                            Node {
-                                min_width: {Val::Px(34.0)},
-                                padding: {UiRect::axes(Val::Px(8.0), Val::Px(2.0))},
-                                border_radius: {BorderRadius::all(Val::Px(6.0))},
-                                border: {UiRect::all(Val::Px(1.0))},
-                                justify_content: {JustifyContent::Center},
-                            }
-                            BackgroundColor({Color::srgb(0.035, 0.045, 0.065)})
-                            ~{BorderColor::all(Color::srgb(0.45, 0.49, 0.56))}
-                        });
-                        cell.spawn_empty().apply_scene(bsn! {
-                            Text({d})
-                            TextFont { font_size: {FontSize::Px(15.0)} }
-                            TextColor({Color::srgb(1.00, 0.62, 0.35)})
-                        });
-                    });
-            }
-        });
-
     spawn_blow_draw_legend(col, loc);
+    col.spawn(Node {
+        flex_direction: FlexDirection::Row,
+        width: Val::Percent(100.0),
+        height: Val::Px(104.0),
+        flex_shrink: 0.0,
+        ..default()
+    })
+    .with_children(|row| {
+        for hole in 1u8..=hole_count {
+            let b = harp.wind_direction_label(hole, &Action::Blow);
+            let d = harp.wind_direction_label(hole, &Action::Draw);
+            // Fixed px, not Vh — Vh resolves from the physical viewport and
+            // doesn't respond to `UiScale`, unlike this cell's own text, so
+            // the cell would stay a fixed size on screen while its labels
+            // scaled independently.
+            row.spawn_empty()
+                .apply_scene(bsn! {
+                    Node {
+                        width: {Val::Percent(lane_pct)},
+                        height: {Val::Percent(100.0)},
+                        min_width: {Val::Px(0.0)},
+                        flex_shrink: {0.0_f32},
+                        overflow: {Overflow::clip()},
+                        flex_direction: {FlexDirection::Column},
+                        align_items: {AlignItems::Center},
+                        justify_content: {JustifyContent::SpaceAround},
+                        border: {UiRect::axes(Val::Px(1.0), Val::Px(3.0))},
+                        border_radius: {BorderRadius::all(Val::Px(8.0))},
+                        padding: {UiRect::vertical(Val::Px(6.0))},
+                    }
+                    BackgroundColor({Color::srgb(0.10, 0.12, 0.16)})
+                    ~{BorderColor::all(Color::srgb(0.28, 0.30, 0.40))}
+                    HoleCell(hole)
+                })
+                .with_children(|cell| {
+                    cell.spawn_empty().apply_scene(bsn! {
+                        Text({b})
+                            ~{TextLayout::no_wrap()}
+                        TextFont { font_size: {FontSize::Px(15.0)} }
+                        TextColor({Color::srgb(0.50, 0.75, 1.00)})
+                    });
+                    cell.spawn_empty().apply_scene(bsn! {
+                        Text({hole.to_string()})
+                            ~{TextLayout::no_wrap()}
+                        TextFont { font_size: {FontSize::Px(25.0)} }
+                        TextColor({Color::srgb(0.96, 0.92, 0.80)})
+                        Node {
+                            flex_shrink: {0.0_f32},
+                            height: {Val::Px(34.0)},
+                            align_items: {AlignItems::Center},
+                            padding: {UiRect::horizontal(Val::Px(8.0))},
+                            border_radius: {BorderRadius::all(Val::Px(6.0))},
+                            border: {UiRect::all(Val::Px(1.0))},
+                            justify_content: {JustifyContent::Center},
+                        }
+                        BackgroundColor({Color::srgb(0.035, 0.045, 0.065)})
+                        ~{BorderColor::all(Color::srgb(0.45, 0.49, 0.56))}
+                    });
+                    cell.spawn_empty().apply_scene(bsn! {
+                        Text({d})
+                            ~{TextLayout::no_wrap()}
+                        TextFont { font_size: {FontSize::Px(15.0)} }
+                        TextColor({Color::srgb(1.00, 0.62, 0.35)})
+                    });
+                });
+        }
+    });
 }
 
-/// The "Blow / Draw" colour-key legend under the harmonica strip.
+/// A reserved action/legend row above the mouthpiece, outside its cells.
 fn spawn_blow_draw_legend(parent: &mut ChildSpawnerCommands, loc: &Localization) {
     parent
-        .spawn(Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(20.0), ..default() })
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(36.0),
+            flex_shrink: 0.0,
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(20.0),
+            align_items: AlignItems::Center,
+            overflow: Overflow::clip(),
+            ..default()
+        })
         .with_children(|leg| {
+            leg.spawn((
+                HarmonicaCue,
+                Text::new(""),
+                TextLayout::no_wrap(),
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextColor(Color::WHITE),
+                Node { flex_grow: 1.0, min_width: Val::Px(0.0), ..default() },
+            ));
             leg.spawn_empty().apply_scene(bsn! {
-                Text({format!("↓ {}", loc.msg("gameplay-legend-blow"))})
+                Text({String::from(loc.msg("gameplay-legend-blow"))})
                 TextFont { font_size: {FontSize::Px(15.0)} }
                 TextColor({Color::srgb(0.50, 0.75, 1.00)})
             });
             leg.spawn_empty().apply_scene(bsn! {
-                Text({format!("↑ {}", loc.msg("gameplay-legend-draw"))})
+                Text({String::from(loc.msg("gameplay-legend-draw"))})
                 TextFont { font_size: {FontSize::Px(15.0)} }
                 TextColor({Color::srgb(1.00, 0.62, 0.35)})
             });
@@ -274,5 +308,9 @@ mod tests {
         assert!(a.contains(&"A4".to_string()) && !a.contains(&"C4".to_string()));
         assert!(c.contains(&"C4".to_string()) && !c.contains(&"A4".to_string()));
         assert_eq!(a.len(), c.len(), "same hole count, same rows");
+        for hole in 1..=10 {
+            assert!(a.contains(&hole.to_string()), "hole numbers stand alone");
+        }
+        assert!(a.iter().all(|text| !text.contains(['↑', '↓'])), "no ambiguous arrows");
     }
 }
