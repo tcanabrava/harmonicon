@@ -668,12 +668,10 @@ pub(super) fn update_flute_stage(
     }
 }
 
-/// Lays a flute part out on its first frame, and shows or hides the
-/// fingering strip whenever the player's [`FluteView`] changes: pitch rows
-/// on the highway for the notes the song uses, and the strip under it in
-/// `Fingering`. Keyed on the strip's entity as well as the view, since a
-/// `Local` outlives the song and the next flute part still has to be laid
-/// out.
+/// Keeps the flute's pitch rows in sync with the currently unlocked notes,
+/// including coverage changes while paused. Rebuilds furniture and ribbons
+/// only when the pitch set changes; ordinary scoring updates keep the layout.
+/// The view preference separately controls the fingering strip's visibility.
 pub(super) fn sync_flute_view(
     mut last: Local<Option<(Entity, FluteView)>>,
     mine: Res<MyInstruments>,
@@ -689,17 +687,20 @@ pub(super) fn sync_flute_view(
         return;
     };
     let view = mine.flute_view;
-    if *last == Some((entity, view)) {
+    if *last == Some((entity, view)) && !notes.is_changed() {
         return;
     }
     let first = last.is_none_or(|(seen, _)| seen != entity);
     *last = Some((entity, view));
-    node.display = if view == FluteView::Fingering { Display::Flex } else { Display::None };
-    if !first {
-        return;
+    let display = if view == FluteView::Fingering { Display::Flex } else { Display::None };
+    if node.display != display {
+        node.display = display;
     }
     let used = notes.notes.iter().filter_map(|n| n.expected_pitch).collect();
     let rows = LaneLayout::pitch_rows(&used);
+    if !first && lanes.0.as_ref() == Some(&rows) {
+        return;
+    }
     for (container, children) in &furniture {
         for &child in children.into_iter().flatten() {
             commands.entity(child).despawn();
@@ -718,6 +719,54 @@ pub(super) fn sync_flute_view(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coverage_changes_rebuild_pitch_rows_without_toggling_flute_view() {
+        let mut app = App::new();
+        app.init_resource::<MyInstruments>()
+            .init_resource::<SongNotes>()
+            .init_resource::<super::super::HighwayLanes>()
+            .add_systems(Update, sync_flute_view);
+        app.world_mut().spawn((FluteStage(Flute::default()), Node::default()));
+        let furniture = app
+            .world_mut()
+            .spawn((super::super::highway_2d::HighwayFurniture, Node::default()))
+            .id();
+        let mut first = note(1.0, 64, 0);
+        first.expected_pitch = Some(64);
+        app.world_mut().resource_mut::<SongNotes>().notes = vec![first];
+        app.update();
+        let first_layout = app.world().resource::<super::super::HighwayLanes>().0.clone().unwrap();
+        assert_eq!(first_layout.lanes.len(), 1);
+        let mut added = note(2.0, 67, 0);
+        added.expected_pitch = Some(67);
+        app.world_mut().resource_mut::<SongNotes>().notes.push(added);
+        let old_visual = app.world_mut().spawn(super::super::NoteVisual { note_id: 0 }).id();
+        app.update();
+        let layout = app.world().resource::<super::super::HighwayLanes>().0.as_ref().unwrap();
+        assert_eq!(
+            layout.lanes.iter().map(|lane| lane.pitch).collect::<Vec<_>>(),
+            vec![Some(67), Some(64)]
+        );
+        assert!(
+            app.world().get_entity(old_visual).is_err(),
+            "ribbons must respawn against updated rows"
+        );
+        let children = app.world().get::<Children>(furniture).unwrap().to_vec();
+        app.world_mut().resource_mut::<SongNotes>().notes[0].hit = true;
+        app.update();
+        assert_eq!(
+            app.world().get::<Children>(furniture).unwrap().to_vec(),
+            children,
+            "ordinary hit updates must not rebuild the highway"
+        );
+        app.world_mut().resource_mut::<SongNotes>().notes.pop();
+        app.update();
+        assert_eq!(
+            app.world().resource::<super::super::HighwayLanes>().0.as_ref().unwrap(),
+            &first_layout
+        );
+    }
 
     #[test]
     fn preview_skips_repeated_fingerings_without_skipping_attacks() {

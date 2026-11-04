@@ -312,6 +312,7 @@ impl Plugin for GameplayPlugin {
             (
                 adaptive_difficulty::resync_notes_on_adaptive_change,
                 adaptive_difficulty::invalidate_note_visuals,
+                super::flute_visuals::sync_flute_view,
             )
                 .chain()
                 .before(GameplayLogic)
@@ -367,9 +368,6 @@ impl Plugin for GameplayPlugin {
         .add_systems(
             Update,
             (
-                // Before spawning, so a view switch respawns its notes in
-                // the new shape on the same frame.
-                super::flute_visuals::sync_flute_view,
                 gameplay_2d::spawn_visible_notes,
                 gameplay_2d::update_notes,
                 gameplay_2d::size_note_ribbons,
