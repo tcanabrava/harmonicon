@@ -112,19 +112,33 @@ pub(super) struct StageNoteName(ChartSlot);
 pub(super) struct StageCountdown;
 
 /// What the stage shows: the note to play now (still sounding, or the
-/// first still to come) and the one after it, as indices into `notes`.
+/// first still to come) and the next different fingering, as indices into `notes`.
 /// Computed from chart time, so a seek, a loop or an adaptive rebuild needs
 /// no reset. A missed note hands the stage straight to the next.
-fn stage_notes(notes: &[ScheduledNote], now: f64) -> (Option<usize>, Option<usize>) {
+fn stage_notes(notes: &[ScheduledNote], now: f64, flute: &Flute) -> (Option<usize>, Option<usize>) {
     let is_fingering = |n: &ScheduledNote| matches!(n.position, PlayPosition::Fingering(_));
     let mut ahead = notes
         .iter()
         .enumerate()
         .filter(|(_, n)| n.playable && !n.missed && n.time + n.duration > now && is_fingering(n));
     let Some((current, note)) = ahead.next() else { return (None, None) };
-    let next = ahead.find(|(_, n)| n.time > note.time).map(|(i, _)| i);
+    let next =
+        ahead.find(|(_, n)| n.time > note.time && !same_fingering(flute, note, n)).map(|(i, _)| i);
     (Some(current), next)
 }
+
+fn same_fingering(flute: &Flute, a: &ScheduledNote, b: &ScheduledNote) -> bool {
+    match (fingering(a), fingering(b)) {
+        (Some(a), Some(b)) => match (flute.keys(a), flute.keys(b)) {
+            (Some(a), Some(b)) => a == b,
+            _ => a == b,
+        },
+        _ => false,
+    }
+}
+
+#[derive(Component)]
+pub(super) struct StageRow(ChartSlot);
 
 fn fingering(note: &ScheduledNote) -> Option<FingeringAssignment> {
     match note.position {
@@ -389,12 +403,16 @@ pub(super) fn spawn_flute_stage(
             // eyes and hands can compare changes without scanning sideways.
             for (slot, scale) in [(ChartSlot::Next, 0.75), (ChartSlot::Now, 1.25)] {
                 strip
-                    .spawn(Node {
-                        width: Val::Percent(100.0),
-                        align_items: AlignItems::Center,
-                        column_gap: Val::Px(16.0),
-                        ..default()
-                    })
+                    .spawn((
+                        StageRow(slot),
+                        Visibility::Inherited,
+                        Node {
+                            width: Val::Percent(100.0),
+                            align_items: AlignItems::Center,
+                            column_gap: Val::Px(16.0),
+                            ..default()
+                        },
+                    ))
                     .with_children(|row| {
                         row.spawn(Node {
                             width: Val::Px(104.0),
@@ -529,6 +547,7 @@ pub(super) fn update_flute_stage(
     time: Res<Time>,
     mut motion: Local<StageMotion>,
     mut drawings: Query<(&ChartSlot, &mut UiTransform, &mut Visibility), With<FluteDrawing>>,
+    mut rows: Query<(&StageRow, &mut Visibility), Without<FluteDrawing>>,
     mut keys: Query<(&FluteKey, &mut BackgroundColor)>,
     mut names: Query<(&StageNoteName, &mut Text)>,
     mut bars: Query<(&mut Node, &mut BackgroundColor), (With<StageCountdown>, Without<FluteKey>)>,
@@ -537,7 +556,7 @@ pub(super) fn update_flute_stage(
     let Ok((entity, FluteStage(flute))) = stage.single() else { return };
     let shown = mine.flute_view == FluteView::Fingering;
     let now = clock.get();
-    let (current, next) = stage_notes(&notes.notes, now);
+    let (current, next) = stage_notes(&notes.notes, now, flute);
     let continuous = motion
         .seen
         .is_some_and(|(seen, previous)| seen == entity && now >= previous && now - previous < 0.5);
@@ -546,7 +565,13 @@ pub(super) fn update_flute_stage(
         motion.duration = 0.36;
         motion.outgoing = None;
         motion.promote = false;
-    } else if current != motion.current {
+    } else if current != motion.current
+        && !motion
+            .snapshot
+            .as_ref()
+            .zip(current.map(|i| &notes.notes[i]))
+            .is_some_and(|(previous, current)| same_fingering(flute, previous, current))
+    {
         motion.outgoing = motion.snapshot.clone();
         motion.promote = current.is_some() && current == motion.next;
         motion.elapsed = 0.0;
@@ -564,6 +589,13 @@ pub(super) fn update_flute_stage(
     motion.next = next;
     motion.snapshot = current.map(|i| notes.notes[i].clone());
     let progress = (motion.elapsed / motion.duration.max(0.08)).clamp(0.0, 1.0);
+    for (row, mut visibility) in &mut rows {
+        *visibility = if row.0 == ChartSlot::Next && next.is_none() {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+    }
     for (slot, mut transform, mut visibility) in &mut drawings {
         let visible = match slot {
             ChartSlot::Now => current.is_some(),
@@ -688,6 +720,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn preview_skips_repeated_fingerings_without_skipping_attacks() {
+        let flute = Flute::default();
+        let notes = vec![note(1.0, 64, 0), note(2.0, 64, 0), note(3.0, 67, 0)];
+        assert_eq!(stage_notes(&notes, 1.1, &flute), (Some(0), Some(2)));
+        assert_eq!(stage_notes(&notes, 2.1, &flute), (Some(1), Some(2)));
+        assert_eq!(stage_notes(&notes[..2], 1.1, &flute), (Some(0), None));
+        assert_eq!(stage_notes(&notes, 0.0, &flute), (Some(0), Some(2)));
+    }
+
+    #[test]
     fn previous_fingering_survives_until_its_exit_completes() {
         let mut app = App::new();
         app.init_resource::<GameplayClock>()
@@ -745,6 +787,24 @@ mod tests {
             .find(|(slot, _)| **slot == ChartSlot::Outgoing)
             .unwrap();
         assert_eq!(*outgoing.1, Visibility::Hidden, "seeks clear stale outgoing charts");
+        app.world_mut().resource_mut::<SongNotes>().notes[1] = note(2.0, 64, 0);
+        app.world_mut().resource_mut::<GameplayClock>().set_free(1.4);
+        app.update();
+        app.world_mut().resource_mut::<GameplayClock>().set_free(1.6);
+        app.update();
+        let world = app.world_mut();
+        let preview = world
+            .query::<(&StageRow, &Visibility)>()
+            .iter(world)
+            .find(|(row, _)| row.0 == ChartSlot::Next)
+            .unwrap();
+        assert_eq!(*preview.1, Visibility::Hidden, "hide preview heading as well as drawing");
+        let outgoing = world
+            .query::<(&ChartSlot, &Visibility)>()
+            .iter(world)
+            .find(|(slot, _)| **slot == ChartSlot::Outgoing)
+            .unwrap();
+        assert_eq!(*outgoing.1, Visibility::Hidden, "repeated fingering stays in place");
     }
 
     #[test]
@@ -785,18 +845,34 @@ mod tests {
     #[test]
     fn the_stage_shows_the_note_at_hand_then_the_next_and_rewinds() {
         let notes = vec![note(1.0, 64, 0), note(2.0, 67, 0), note(3.0, 86, 1)];
-        assert_eq!(stage_notes(&notes, -9.0), (Some(0), Some(1)), "the first, however far off");
-        assert_eq!(stage_notes(&notes, 1.2), (Some(0), Some(1)), "held through its duration");
-        assert_eq!(stage_notes(&notes, 2.6), (Some(2), None), "the last has no next");
-        assert_eq!(stage_notes(&notes, 9.0), (None, None), "the song is over");
-        assert_eq!(stage_notes(&notes, 0.0), (Some(0), Some(1)), "a loop back reads afresh");
+        assert_eq!(
+            stage_notes(&notes, -9.0, &Flute::default()),
+            (Some(0), Some(1)),
+            "the first, however far off"
+        );
+        assert_eq!(
+            stage_notes(&notes, 1.2, &Flute::default()),
+            (Some(0), Some(1)),
+            "held through its duration"
+        );
+        assert_eq!(
+            stage_notes(&notes, 2.6, &Flute::default()),
+            (Some(2), None),
+            "the last has no next"
+        );
+        assert_eq!(stage_notes(&notes, 9.0, &Flute::default()), (None, None), "the song is over");
+        assert_eq!(
+            stage_notes(&notes, 0.0, &Flute::default()),
+            (Some(0), Some(1)),
+            "a loop back reads afresh"
+        );
     }
 
     #[test]
     fn a_missed_note_hands_the_stage_to_the_next() {
         let mut notes = vec![note(1.0, 64, 0), note(2.0, 67, 0)];
         notes[0].missed = true;
-        assert_eq!(stage_notes(&notes, 1.2), (Some(1), None));
+        assert_eq!(stage_notes(&notes, 1.2, &Flute::default()), (Some(1), None));
     }
 
     /// The bar fills over the lead to the note's start, then empties
