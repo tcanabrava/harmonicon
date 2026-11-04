@@ -27,3 +27,12 @@ bottom is the attack, and holds the note's tab (`-4`, `-3''` for a bend).
 
 For scoring, pausing, looping and adaptive difficulty, see [Playing a
 Song](playing-a-song.md).
+
+## Guitar fingering guide
+
+The full-neck guide above the guitar highway labels playable fretted targets
+with suggested fingers: **1** index, **2** middle, **3** ring, **4** little
+finger, and **0** for an open string. Common open chords use their usual
+fingerings; other targets use the current four-fret hand position where
+possible. These are suggestions, not finger assignments authored in the chart.
+Shapes without a safe suggestion retain their target dots without a number.

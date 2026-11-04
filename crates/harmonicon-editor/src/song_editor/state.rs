@@ -384,8 +384,8 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    /// Generic consumers take one configured instrument. The current editor
-    /// view remains harmonica-only until a second view and codec are ready.
+    /// Shared editor consumers and instrument adapters use this configuration
+    /// for editing and serialization.
     pub(super) fn effective_instrument(&self) -> harmonicon_core::instrument::Instrument {
         match &self.instrument {
             InstrumentSelection::HarmonicaPreset(kind) => {

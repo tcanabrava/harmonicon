@@ -6,10 +6,23 @@ without writing JSON directly.
 
 ![Song Editor screen](images/song-editor.png)
 
+## Choosing an instrument
+
+Opening a fresh editor asks you to choose **Harmonica**, **Guitar**, **Piano**,
+or **Flute**. Returning to an existing draft keeps its instrument and notes.
+**New** opens the chooser again; replacing a document with content asks for
+confirmation. Save first to retain that draft. Cancelling keeps it intact.
+In an empty document, **Details → Instrument** can also change the instrument.
+Loading a chart uses its saved instrument configuration.
+
+The grid, score, timeline, metadata, selection and undo tools are shared.
+Each instrument supplies its own note positions, techniques, validation and
+serialization. Harmonica tuning, playing position, recording, MIDI-to-harp
+mapping and lesson authoring are shown only for harmonica documents.
+
 ## Guitar charts
 
-In an empty document, open **Details → Use guitar** to start a standard-tuned
-guitar chart. **Load** also opens existing guitar `.harpchart` files and
+Choose **Guitar** for a new document to start a standard-tuned guitar chart. **Load** also opens existing guitar `.harpchart` files and
 preserves their tuning and capo. A guitar chart uses the same grid, tools and
 timeline as a harmonica chart, with one lane per string instead of one per
 hole — highest string at the top, as tab writes it, each labelled with its
@@ -44,7 +57,7 @@ document empty.
 
 ## Flute charts
 
-In an empty document, open **Details → Use flute** to start a flute chart;
+Choose **Flute** for a new document to start a flute chart;
 **Load** opens existing ones with their foot joint. The grid has one row per
 pitch, C7 at the top down to the flute's lowest note, rows drawn narrower so
 the whole range fits. Click a row to place a note there; a flute plays one
@@ -66,6 +79,14 @@ the note column all work, while new notes are placed in note view.
 
 ![A flute chart in fingering view](images/song-editor-flute.png)
 
+## Piano charts
+
+Choose **Piano** for a new document. Each row is a key; simultaneous notes
+can form chords or two-hand passages. The editor shows a scrollable 24-key
+window, centered on the notes when a chart loads. Notes outside the visible
+window remain in the document. The Play screen's full keyboard is independent
+of this editing window. Preview uses the piano voice.
+
 ## Layout
 
 The screen has three parts:
@@ -74,16 +95,16 @@ The screen has three parts:
   column** is about the song and the tools: Back, the mode buttons, lock,
   undo/redo, copy/paste, the Select/Erase/Remove/Tempo/Meter tools, the
   [Repeat and Ending](#repeats-and-endings) buttons, metronome,
-  legend, and Save/Load. The **right column** is about *the note* — the
-  selected one, or the next one you'll place: Blow/Draw, bend/overblow/
-  overdraw (or slide), wah/vibrato and their depth, the phrase's Call and
+  legend, and New/Save/Load. The **right column** is about *the note* — the
+  selected one, or the next one you'll place: instrument-specific positions
+  and techniques (for harmonica, Blow/Draw, bend/overblow/overdraw or slide), the phrase's Call and
   Split marks, the phrase editor, and Delete. With nothing selected the
   right column previews what a newly placed note gets, so it's never
   empty. It only appears in Edit mode; Record and Play fold the sidebar
   back to one column and give the grid the width. Either column scrolls —
   **drag it** or use the **mouse wheel** over it — because on a short
   screen the whole palette doesn't fit at once.
-- The **note grid**, one lane per harmonica hole, under the **Chart**
+- The **note grid**, with string, pitch or hole rows for the chosen instrument, under the **Chart**
   tab, with a **notation staff** below it showing the same notes as sheet
   music. The staff follows the grid as you scroll (and the playhead while
   playing), and the notes you select are drawn in gold on it too, so you
@@ -128,7 +149,7 @@ hovering always tells you what it does.
   grid for you, with its own Play/Pause/Stop/Finish transport (see
   [Recording notes live](#recording-notes-live) below).
 - **Play mode** — plays the chart back (▶ Play / ⏸ Pause / ■ Stop), or
-  switches to **Practice**: play along on your actual harmonica and get
+  switches to **Practice**: play along on your instrument and get
   the same live pitch feedback a real song gives, against the chart
   you're currently editing — the fastest way to sanity-check a chart
   actually feels right before saving it.
@@ -142,7 +163,7 @@ see at a glance where the phrases are and drag straight to them.
 
 ## Grid snap: Straight, Shuffle, Triplet
 
-The **Grid Snap** button (next to the harmonica-type toggle) cycles
+The **Grid Snap** button cycles
 between three subdivisions of each beat, controlling where a note lands
 when you place, move, or resize it:
 
@@ -161,11 +182,10 @@ resize lands — it never moves notes that are already sitting off-grid.
 
 ## Chart metadata
 
-The meta-form covers a chart's song-level fields: music tempo, harp key,
-playing position, harmonica type (standard, Paddy Richter, country-tuned, or
-natural-minor 10-hole diatonic; 12-/16-hole chromatic),
-background music file, and song name/author — everything under `song` and
-`harmonica` in the `.harpchart` format.
+The shared Details form covers tempo, musical key, background music and
+song name/author. Instrument-specific controls appear alongside it: harmonica
+documents additionally offer playing position and harmonica type (standard,
+Paddy Richter, country-tuned or natural-minor diatonic; 12-/16-hole chromatic).
 
 **Section**, **Chord**, **Groove** and **Lyric** describe the phrase that
 begins at a note. Select a note and press the sidebar's **Phrase** (§)
@@ -303,7 +323,7 @@ never changes which notes you can actually place.
 ### Auditioning a note
 
 Clicking a note plays a short blip of exactly what it sounds like — the
-same synthesized harmonica voice used everywhere else in the editor — so
+instrument voice used for that chart in the editor — so
 you can confirm a bend, overblow, overdraw, or slide actually sounds
 right without reaching for Play/Practice or a real harp. It only fires
 when the selection actually changes to a *different* note; clicking the
@@ -311,7 +331,7 @@ same note again doesn't replay it.
 
 ## Authoring a lesson
 
-The **Recording** field in the meta form cycles between **Record Song**
+For harmonica documents, the **Recording** field in the meta form cycles between **Record Song**
 and **Record Lesson**. Switching to Record Lesson doesn't change anything
 about editing notes, playing back, or practicing — it just adds a
 curriculum layer on top of the chart you're building, so a lesson's chart
@@ -384,7 +404,7 @@ purely a display — nothing on it is clickable.
 
 ## Importing MIDI
 
-**Import MIDI** loads a `.mid`/`.midi` file and lists its tracks in a
+For harmonica documents, **Import MIDI** loads a `.mid`/`.midi` file and lists its tracks in a
 dropdown; picking one drops that track's notes onto the grid, mapped onto
 your currently selected harp key and type — an exact note where one exists,
 a bend or (on a chromatic harp) a slide where one doesn't, otherwise the
@@ -416,7 +436,7 @@ before the take starts.
 
 ## Recording notes live
 
-**Record mode** writes a chart by ear, with a transport of its own:
+**Record mode**, available for harmonica documents, writes a chart by ear, with a transport of its own:
 
 - **▶ Play** starts a take from the current playhead position — the
   beginning on a fresh take, wherever you clicked on the ruler, wherever

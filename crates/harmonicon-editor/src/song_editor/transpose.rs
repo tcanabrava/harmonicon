@@ -168,6 +168,17 @@ pub(super) fn outcome_message(outcome: &TransposeOutcome, loc: &Localization) ->
             "editor-transposed",
             &[("count", outcome.moved.to_string()), ("semitones", semitones)],
         )
+    } else if outcome.diagnostics.mixed_breath_groups == 0
+        && outcome.diagnostics.duplicate_hole_groups == 0
+    {
+        loc.msg_args(
+            "editor-transposed-position-warning",
+            &[
+                ("count", outcome.moved.to_string()),
+                ("semitones", semitones),
+                ("kept", outcome.kept.to_string()),
+            ],
+        )
     } else {
         loc.msg_args(
             "editor-transposed-warning",

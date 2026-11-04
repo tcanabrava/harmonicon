@@ -259,16 +259,15 @@ pub(super) fn spawn_harmonica_kind_row(
          mut commands: Commands,
          mut feedback: ResMut<super::save_feedback::SaveFeedback>,
          loc: Res<Localization>| {
-            // From a guitar this goes back to a harmonica, which, like the
-            // way in (`guitar_note::spawn_selector`), needs an empty
-            // document: a string position has no hole to become.
+            // Guard against a stale activation after the instrument changes.
+            // Positions from another instrument cannot become harp holes.
             if !state.plays_harmonica() {
                 if state.notes.is_empty() {
                     commands.write_message(super::state::DocumentCommand::SelectInstrument(
                         super::state::InstrumentSelection::HarmonicaPreset(HarmonicaKind::Diatonic),
                     ));
                 } else {
-                    feedback.set(loc.msg("editor-guitar-select-empty"));
+                    feedback.set(loc.msg("editor-instrument-select-empty"));
                 }
                 return;
             }

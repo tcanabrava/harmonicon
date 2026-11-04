@@ -142,5 +142,8 @@ fn a_clean_transposition_signs_its_interval() {
     assert!(message.contains("editor-transposed"));
     assert!(!message.contains("warning"));
     let outcome = TransposeOutcome { kept: 1, ..outcome };
+    assert!(outcome_message(&outcome, &loc).contains("editor-transposed-position-warning"));
+    let mut outcome = outcome;
+    outcome.diagnostics.mixed_breath_groups = 1;
     assert!(outcome_message(&outcome, &loc).contains("editor-transposed-warning"));
 }
