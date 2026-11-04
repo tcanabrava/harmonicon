@@ -67,6 +67,7 @@ pub(super) struct FretCell {
 /// zone, or the Note Trainer's diagram. Column zero always shows the open
 /// string; other columns follow the hand.
 pub(super) fn spawn_fretboard(parent: &mut ChildSpawnerCommands, guitar: &Guitar, width: f32) {
+    spawn_chord_diagram(parent, guitar);
     parent
         .spawn(Node {
             width: Val::Px(width),
@@ -111,11 +112,32 @@ pub(super) fn update_fretboard(
     clock: Res<GameplayClock>,
     notes: Res<SongNotes>,
     mut cells: Query<(&FretCell, &mut Text, &mut BackgroundColor)>,
+    mut diagrams: Query<(&ChordDiagram, &mut Text, &mut Node), Without<FretCell>>,
 ) {
     if cells.is_empty() {
         return;
     }
     let targets = targets(&notes.notes, clock.get());
+    for (diagram, mut text, mut node) in &mut diagrams {
+        let first = targets.iter().filter(|p| p.fret > 0).map(|p| p.fret).min().unwrap_or(1);
+        if diagram.0 == 0 {
+            text.0 = if targets.is_empty() { String::new() } else { first.to_string() };
+            continue;
+        }
+        let target = targets.iter().find(|p| p.string == diagram.0);
+        text.0 = if targets.is_empty() {
+            String::new()
+        } else {
+            match target {
+                Some(p) if p.fret == 0 => "○",
+                Some(_) => "●",
+                None => "×",
+            }
+            .into()
+        };
+        let fret = target.map_or(0, |p| p.fret);
+        node.top = Val::Px(if fret == 0 { 0.0 } else { 24.0 + f32::from(fret - first) * 24.0 });
+    }
     for (cell, mut text, mut color) in &mut cells {
         paint_cell(cell, &targets, &mut text, &mut color);
     }
@@ -361,4 +383,78 @@ mod tests {
         assert_eq!(cells.len(), 5 * usize::from(HAND_SPAN_FRETS + 2));
         assert!(cells.iter().all(|cell| cell.string <= 5 && cell.top == 20));
     }
+}
+
+/// Printed-chart convention: bass strings at left, nut at top. Dots are
+/// positions from the chart, never guessed finger numbers.
+#[derive(Component)]
+pub(super) struct ChordDiagram(u8);
+
+fn spawn_chord_diagram(parent: &mut ChildSpawnerCommands, guitar: &Guitar) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Px(150.0),
+                height: Val::Px(152.0),
+                flex_shrink: 0.0,
+                margin: UiRect::horizontal(Val::Px(12.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.08, 0.10, 0.14)),
+        ))
+        .with_children(|chart| {
+            chart.spawn((
+                ChordDiagram(0),
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextColor(Color::WHITE),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(-10.0),
+                    top: Val::Px(28.0),
+                    ..default()
+                },
+            ));
+            let count = guitar.string_count();
+            for fret in 0..=5 {
+                chart.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(10.0),
+                        right: Val::Px(10.0),
+                        top: Val::Px(24.0 + fret as f32 * 24.0),
+                        height: Val::Px(if fret == 0 { 3.0 } else { 1.0 }),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.55, 0.60, 0.67)),
+                ));
+            }
+            for string in 1..=count {
+                let x = 10.0
+                    + f32::from(count - string) * 130.0 / f32::from(count.saturating_sub(1).max(1));
+                chart.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x),
+                        top: Val::Px(24.0),
+                        width: Val::Px(1.0),
+                        height: Val::Px(120.0),
+                        ..default()
+                    },
+                    BackgroundColor(string_color(string).with_alpha(0.7)),
+                ));
+                chart.spawn((
+                    ChordDiagram(string),
+                    Text::new(""),
+                    TextFont { font_size: FontSize::Px(20.0), ..default() },
+                    TextColor(Color::srgb(0.98, 0.85, 0.47)),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(x - 8.0),
+                        top: Val::Px(0.0),
+                        ..default()
+                    },
+                ));
+            }
+        });
 }
