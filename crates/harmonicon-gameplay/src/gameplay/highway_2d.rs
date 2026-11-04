@@ -33,6 +33,9 @@ pub(super) enum RowStyle {
     /// A flute's note view: plain rows, each named by its note at the hit
     /// zone.
     Pitches,
+    /// A piano roll: a row per semitone, the black keys' rows darker, named
+    /// by the keyboard drawn beside them rather than in text.
+    Keyboard,
 }
 
 /// Holds the highway's static furniture, as its first child so it paints
@@ -81,10 +84,23 @@ pub(super) fn spawn_highway(hw: &mut ChildSpawnerCommands, layout: &LaneLayout, 
         let alpha = if h % 2 == 0 { 0.04f32 } else { 0.0f32 };
         hw.spawn((
             placed(axis, 0.0, full, start_pct, Val::Percent(lane_pct)),
-            BackgroundColor(if style == RowStyle::Strings {
-                super::guitar_visuals::string_color((h + 1) as u8).with_alpha(0.08)
-            } else {
-                Color::srgba(1.0, 1.0, 1.0, alpha)
+            BackgroundColor(match style {
+                RowStyle::Strings => {
+                    super::guitar_visuals::string_color((h + 1) as u8).with_alpha(0.08)
+                }
+                // A black key's row is darker, as a piano roll draws it, so
+                // the rows read as the keyboard beside them.
+                RowStyle::Keyboard => {
+                    let black = layout.lanes[h]
+                        .pitch
+                        .is_some_and(harmonicon_core::instrument::piano::is_black);
+                    if black {
+                        Color::srgba(0.0, 0.0, 0.0, 0.25)
+                    } else {
+                        Color::srgba(1.0, 1.0, 1.0, 0.05)
+                    }
+                }
+                _ => Color::srgba(1.0, 1.0, 1.0, alpha),
             }),
         ));
         if h > 0 {
@@ -164,11 +180,13 @@ pub(super) fn spawn_harmonica_strip(
                     .apply_scene(bsn! {
                         Node {
                             width: {Val::Percent(lane_pct)},
-                            height: {Val::Px(96.0)},
+                            height: {Val::Px(116.0)},
                             flex_direction: {FlexDirection::Column},
                             align_items: {AlignItems::Center},
                             justify_content: {JustifyContent::SpaceAround},
-                            border: {UiRect::all(Val::Px(1.0))},
+                            border: {UiRect::axes(Val::Px(1.0), Val::Px(3.0))},
+                            border_radius: {BorderRadius::all(Val::Px(8.0))},
+                            padding: {UiRect::vertical(Val::Px(6.0))},
                         }
                         BackgroundColor({Color::srgb(0.10, 0.12, 0.16)})
                         ~{BorderColor::all(Color::srgb(0.28, 0.30, 0.40))}
@@ -181,9 +199,18 @@ pub(super) fn spawn_harmonica_strip(
                             TextColor({Color::srgb(0.50, 0.75, 1.00)})
                         });
                         cell.spawn_empty().apply_scene(bsn! {
-                            Text({format!("{hole}")})
-                            TextFont { font_size: {FontSize::Px(16.0)} }
-                            TextColor({Color::WHITE})
+                            Text({format!("↓ {hole} ↑")})
+                            TextFont { font_size: {FontSize::Px(25.0)} }
+                            TextColor({Color::srgb(0.96, 0.92, 0.80)})
+                            Node {
+                                min_width: {Val::Px(34.0)},
+                                padding: {UiRect::axes(Val::Px(8.0), Val::Px(2.0))},
+                                border_radius: {BorderRadius::all(Val::Px(6.0))},
+                                border: {UiRect::all(Val::Px(1.0))},
+                                justify_content: {JustifyContent::Center},
+                            }
+                            BackgroundColor({Color::srgb(0.035, 0.045, 0.065)})
+                            ~{BorderColor::all(Color::srgb(0.45, 0.49, 0.56))}
                         });
                         cell.spawn_empty().apply_scene(bsn! {
                             Text({d})
@@ -203,12 +230,12 @@ fn spawn_blow_draw_legend(parent: &mut ChildSpawnerCommands, loc: &Localization)
         .spawn(Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(20.0), ..default() })
         .with_children(|leg| {
             leg.spawn_empty().apply_scene(bsn! {
-                Text({String::from(loc.msg("gameplay-legend-blow"))})
+                Text({format!("↓ {}", loc.msg("gameplay-legend-blow"))})
                 TextFont { font_size: {FontSize::Px(15.0)} }
                 TextColor({Color::srgb(0.50, 0.75, 1.00)})
             });
             leg.spawn_empty().apply_scene(bsn! {
-                Text({String::from(loc.msg("gameplay-legend-draw"))})
+                Text({format!("↑ {}", loc.msg("gameplay-legend-draw"))})
                 TextFont { font_size: {FontSize::Px(15.0)} }
                 TextColor({Color::srgb(1.00, 0.62, 0.35)})
             });
