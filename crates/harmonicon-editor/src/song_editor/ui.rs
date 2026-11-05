@@ -664,7 +664,7 @@ pub(super) fn setup(
                 DetailsTabPanel,
                 Node {
                     width: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Row,
+                    flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
                     min_height: Val::Px(0.0),
                     // The Chart tab is what opens first.
@@ -672,30 +672,49 @@ pub(super) fn setup(
                     ..default()
                 },
             ))
-            .with_children(|outer| {
-                let scroll_area = outer
-                    .spawn((
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            flex_grow: 1.0,
-                            min_height: Val::Px(0.0),
-                            overflow: Overflow::scroll_y(),
-                            ..default()
-                        },
-                        ScrollArea,
-                    ))
-                    .with_children(|scroll| {
-                        super::scroll::spawn_form_scroll_content(
-                            scroll,
-                            &loc,
-                            colors,
-                            &state,
-                            compact.0,
-                            state.legend_visible,
-                        );
+            .with_children(|details| {
+                details.spawn((
+                    super::guitar_setup::TuningSlot,
+                    Node {
+                        display: Display::None,
+                        flex_shrink: 0.0,
+                        padding: UiRect::all(Val::Px(12.0)),
+                        ..default()
+                    },
+                ));
+                details
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Row,
+                        flex_grow: 1.0,
+                        min_height: Val::Px(0.0),
+                        ..default()
                     })
-                    .id();
-                super::scroll::spawn_editor_scrollbar(outer, scroll_area, colors);
+                    .with_children(|outer| {
+                        let scroll_area = outer
+                            .spawn((
+                                Node {
+                                    flex_direction: FlexDirection::Column,
+                                    flex_grow: 1.0,
+                                    min_height: Val::Px(0.0),
+                                    overflow: Overflow::scroll_y(),
+                                    ..default()
+                                },
+                                ScrollArea,
+                            ))
+                            .with_children(|scroll| {
+                                super::scroll::spawn_form_scroll_content(
+                                    scroll,
+                                    &loc,
+                                    colors,
+                                    &state,
+                                    compact.0,
+                                    state.legend_visible,
+                                );
+                            })
+                            .id();
+                        super::scroll::spawn_editor_scrollbar(outer, scroll_area, colors);
+                    });
             });
         });
     });

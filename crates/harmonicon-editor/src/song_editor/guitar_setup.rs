@@ -9,6 +9,7 @@ use harmonicon_core::instrument::{Instrument, PlayPosition, guitar::Guitar};
 use harmonicon_core::note_target::NoteTarget;
 use harmonicon_platform::localization::{Localization, LocalizationExt};
 use harmonicon_platform::theme::LoadedTheme;
+use harmonicon_ui::dialogs::combobox::{ComboboxSelect, ComboboxValue, spawn_combobox};
 use harmonicon_ui::dialogs::{
     button,
     text_input::{TextInputCommitted, spawn_text_input},
@@ -16,6 +17,83 @@ use harmonicon_ui::dialogs::{
 
 #[derive(Component)]
 pub(super) struct GuitarSetup;
+
+/// Outside the Details scroll viewport so its open list is not clipped.
+#[derive(Component)]
+pub(super) struct TuningSlot;
+
+const TUNING_KEYS: [&str; 6] = [
+    "guitar-tuning-standard",
+    "guitar-tuning-drop-d",
+    "guitar-tuning-half-step-down",
+    "guitar-tuning-dadgad",
+    "guitar-tuning-open-g",
+    "guitar-tuning-open-d",
+];
+
+fn tuning_label(guitar: &Guitar, loc: &Localization) -> String {
+    let index = harmonicon_core::instrument::guitar::TUNINGS
+        .iter()
+        .position(|tuning| tuning.strings.as_slice() == guitar.strings.as_slice());
+    loc.msg(index.map_or("editor-guitar-tuning-custom", |i| TUNING_KEYS[i])).to_string()
+}
+
+pub(super) fn sync_tuning(
+    mut commands: Commands,
+    state: Res<EditorState>,
+    loc: Res<Localization>,
+    slots: Query<(Entity, Option<&Children>), With<TuningSlot>>,
+    roots: Query<Entity, With<super::ui::EditorRoot>>,
+    mut values: Query<&mut ComboboxValue>,
+    mut nodes: Query<&mut Node, With<TuningSlot>>,
+) {
+    let Ok((slot, children)) = slots.single() else { return };
+    let guitar = current(&state);
+    if let Ok(mut node) = nodes.get_mut(slot) {
+        node.display = if guitar.is_some() { Display::Flex } else { Display::None };
+    }
+    let Some(guitar) = guitar else { return };
+    let label = tuning_label(&guitar, &loc);
+    if let Some(children) = children {
+        for child in children {
+            if let Ok(mut value) = values.get_mut(*child) {
+                if value.0 != label {
+                    value.0.clone_from(&label);
+                }
+            }
+        }
+    } else if let Ok(root) = roots.single() {
+        let options: Vec<String> = TUNING_KEYS.iter().map(|key| loc.msg(key).to_string()).collect();
+        spawn_combobox(
+            &mut commands,
+            slot,
+            root,
+            &loc.msg("options-guitar-tuning"),
+            &options,
+            &label,
+            |ev: On<ComboboxSelect>,
+             mut state: ResMut<EditorState>,
+             loc: Res<Localization>,
+             mut feedback: ResMut<SaveFeedback>,
+             mut values: Query<&mut ComboboxValue>| {
+                let Some(mut guitar) = current(&state) else { return };
+                let Some(tuning) = harmonicon_core::instrument::guitar::TUNINGS.get(ev.index)
+                else {
+                    return;
+                };
+                guitar.strings = tuning.strings.to_vec();
+                let ok = configure(&mut state, guitar);
+                if !ok
+                    && let Some(actual) = current(&state)
+                    && let Ok(mut value) = values.get_mut(ev.combobox)
+                {
+                    value.0 = tuning_label(&actual, &loc);
+                }
+                report(ok, &loc, &mut feedback);
+            },
+        );
+    }
+}
 
 fn current(state: &EditorState) -> Option<Guitar> {
     match state.effective_instrument() {
@@ -118,38 +196,6 @@ pub(super) fn sync(
             TextFont { font_size: FontSize::Px(13.0), ..default() },
             TextColor(colors.label),
         ));
-        p.spawn(Node {
-            flex_wrap: FlexWrap::Wrap,
-            column_gap: Val::Px(4.0),
-            row_gap: Val::Px(4.0),
-            ..default()
-        })
-        .with_children(|row| {
-            for (index, key) in [
-                "guitar-tuning-standard",
-                "guitar-tuning-drop-d",
-                "guitar-tuning-half-step-down",
-                "guitar-tuning-dadgad",
-                "guitar-tuning-open-g",
-                "guitar-tuning-open-d",
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                row.spawn_empty().apply_scene(button::small(
-                    &loc.msg(key),
-                    move |_: On<Activate>,
-                          mut state: ResMut<EditorState>,
-                          loc: Res<Localization>,
-                          mut feedback: ResMut<SaveFeedback>| {
-                        let Some(mut guitar) = current(&state) else { return };
-                        guitar.strings =
-                            harmonicon_core::instrument::guitar::TUNINGS[index].strings.to_vec();
-                        report(configure(&mut state, guitar), &loc, &mut feedback);
-                    },
-                ));
-            }
-        });
         p.spawn(Node { align_items: AlignItems::Center, column_gap: Val::Px(8.0), ..default() })
             .with_children(|row| {
                 row.spawn((

@@ -1043,3 +1043,5 @@ editor-guitar-string-count = Cuerdas · {$count}
 editor-guitar-add-string = Añadir cuerda
 editor-guitar-remove-string = Quitar última cuerda
 editor-guitar-string-number = Cuerda {$number}
+
+editor-guitar-tuning-custom = Personalizada

@@ -387,7 +387,10 @@ impl Plugin for SongEditor2Plugin {
             )
             .add_systems(
                 Update,
-                guitar_setup::sync.in_set(EditorPass).run_if(in_state(AppState::SongEditor2)),
+                (guitar_setup::sync_tuning, guitar_setup::sync)
+                    .chain()
+                    .in_set(EditorPass)
+                    .run_if(in_state(AppState::SongEditor2)),
             )
             .add_message::<state::DocumentCommand>()
             .add_message::<midi_import::MidiFileLoaded>();

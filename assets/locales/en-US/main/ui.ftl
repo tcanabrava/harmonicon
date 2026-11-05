@@ -1044,3 +1044,5 @@ editor-guitar-string-count = Strings · {$count}
 editor-guitar-add-string = Add string
 editor-guitar-remove-string = Remove last string
 editor-guitar-string-number = String {$number}
+
+editor-guitar-tuning-custom = Custom

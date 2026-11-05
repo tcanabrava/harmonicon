@@ -34,8 +34,9 @@ bend up to the pitch of fret 9, `<12>` for a harmonic.
 
 ### Tuning and strings
 
-**Details → Guitar setup** offers named six-string tunings and an editable
-pitch for each string. Use scientific pitch names with an octave (`E4`,
+**Details** has a **Guitar tuning** combobox for named six-string tunings.
+It shows **Custom** when individual pitches do not match a preset.
+**Guitar setup** below it provides an editable pitch for each string. Use scientific pitch names with an octave (`E4`,
 `F#3`, `Bb2`); string 1 is the top tab row. **Add string** and **Remove last
 string** change the count from 1 to 12, including 7- and 10-string setups.
 Added bass strings start a fourth below the previous string, stopping at C0;
