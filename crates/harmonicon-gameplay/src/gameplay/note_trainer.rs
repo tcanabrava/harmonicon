@@ -44,7 +44,7 @@ use super::GameplayRoot;
 use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
 mod piano;
 mod teaching;
-use super::guitar_visuals::{FretCell, paint_cell, spawn_fretboard};
+use super::guitar_visuals::spawn_trainer_neck;
 use harmonicon_core::instrument::flute::Flute;
 pub(super) use piano::update_hands;
 pub(super) use teaching::sync_score;
@@ -70,6 +70,7 @@ pub struct Practice {
     /// Whether the profile's record has been applied yet
     /// (`restore_progress`).
     restored: bool,
+    revealed: bool,
 }
 
 impl Practice {
@@ -91,6 +92,7 @@ impl Practice {
         self.held = 0.0;
         self.heard = None;
         self.heard_midi = None;
+        self.revealed = false;
     }
 
     /// Feeds one frame: the pitch heard nearest the target (`None` in
@@ -173,6 +175,17 @@ impl NoteTrainer {
     pub fn choose(&mut self, instrument: Instrument) {
         if self.instrument != instrument {
             *self = Self::for_instrument(instrument);
+        }
+    }
+
+    pub(super) fn guitar_targets(&self) -> Vec<FretAssignment> {
+        if self.practice.revealed {
+            match self.practice.drill().map(|d| d.position) {
+                Some(PlayPosition::Fret(at)) => vec![at],
+                _ => Vec::new(),
+            }
+        } else {
+            lit(self.practice.drill())
         }
     }
 
@@ -592,7 +605,23 @@ pub(super) fn setup(
         })
         .with_children(|strip| {
             match (trainer.guitar(), trainer.flute(), trainer.piano()) {
-                (Some(guitar), _, _) => spawn_fretboard(strip, guitar, 560.0),
+                (Some(guitar), _, _) => {
+                    spawn_trainer_neck(strip, guitar, &loc);
+                    strip
+                        .spawn((
+                            PositionHint,
+                            Node::default(),
+                            harmonicon_ui::dialogs::drawer::Drawer { open: false },
+                        ))
+                        .with_children(|hint| {
+                            hint.spawn_empty().apply_scene(button::small(
+                                &loc.msg("note-trainer-show-position"),
+                                |_: On<Activate>, mut trainer: ResMut<NoteTrainer>| {
+                                    trainer.practice.revealed = true
+                                },
+                            ));
+                        });
+                }
                 (_, Some(flute), _) => {
                     use super::flute_visuals::{ChartAxis, ChartSlot, spawn_flute_chart};
                     strip
@@ -716,13 +745,15 @@ pub(super) fn update_labels(
     }
 }
 
-pub(super) fn update_fretboard(
+#[derive(Component)]
+pub struct PositionHint;
+
+pub(super) fn update_position_hint(
     trainer: Res<NoteTrainer>,
-    mut cells: Query<(&FretCell, &mut Text, &mut BackgroundColor)>,
+    mut hints: Query<&mut harmonicon_ui::dialogs::drawer::Drawer, With<PositionHint>>,
 ) {
-    let targets = lit(trainer.practice.drill());
-    for (cell, mut text, mut color) in &mut cells {
-        paint_cell(cell, &targets, &mut text, &mut color);
+    for mut hint in &mut hints {
+        hint.open = trainer.kind == TechniqueKind::Position && !trainer.practice.revealed;
     }
 }
 
@@ -845,6 +876,13 @@ mod tests {
         assert!(lit(found.first()).is_empty());
         let notes = drills(&guitar, TechniqueKind::Target);
         assert_eq!(lit(notes.first()).len(), 1);
+        let mut trainer = NoteTrainer::default();
+        trainer.practice = Practice::new(found);
+        assert!(trainer.guitar_targets().is_empty());
+        trainer.practice.revealed = true;
+        assert_eq!(trainer.guitar_targets().len(), 1);
+        trainer.practice.step_by(1);
+        assert!(trainer.guitar_targets().is_empty(), "the next question hides its answer");
     }
 
     #[test]

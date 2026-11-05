@@ -29,10 +29,13 @@ Each tab keeps its own progress, for the guitar and the flute separately:
 how many drills you've landed, and which drill you were on. Coming back,
 even after closing the game, picks up there.
 
-The fretboard below is the one from the guitar highway: the drill's fret is
-lit in its string's colour (except in Positions, where the fret is what
-you're looking for). How close counts as in tune, and how long to hold,
-come from the same settings as the Bending Trainer's.
+The full fretboard shows every physical fret, with string 1 at the top,
+and marks the target on its string. A shaded region suggests the hand's
+position. The target dot uses suggested finger numbers (0 for an open
+string), matching the song-play guide. **Positions** hides the target fret
+until **Show position** is pressed; the next drill hides it again.
+How close counts as in tune, and how long to hold, come from the same
+settings as the Bending Trainer's.
 
 The trainer hears a pitch, not a string, so in Positions it trusts you to
 play the note on the string it asks for.

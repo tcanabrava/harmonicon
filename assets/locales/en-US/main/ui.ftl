@@ -1053,3 +1053,5 @@ note-trainer-flute-key-help = Filled keys: press · Outlined keys: leave open ·
 note-trainer-piano-hands-help = Suggested five-finger positions; either hand may be used. Gold key: target · Blue key: detected note
 note-trainer-left-hand = Left hand
 note-trainer-right-hand = Right hand
+
+note-trainer-show-position = Show position

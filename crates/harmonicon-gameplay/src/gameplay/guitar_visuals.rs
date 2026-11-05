@@ -65,6 +65,7 @@ pub(super) struct FretCell {
 
 /// The Note Trainer's compact movable neck window. Column zero shows the
 /// open string; other columns follow the hand. Play uses the full overview.
+#[cfg(test)]
 pub(super) fn spawn_fretboard(parent: &mut ChildSpawnerCommands, guitar: &Guitar, width: f32) {
     parent
         .spawn(Node {
@@ -638,10 +639,28 @@ pub(super) fn spawn_neck_overview(
     guitar: &Guitar,
     loc: &harmonicon_platform::localization::Localization,
 ) {
+    spawn_neck(parent, guitar, loc, 92.0, false);
+}
+
+pub(super) fn spawn_trainer_neck(
+    parent: &mut ChildSpawnerCommands,
+    guitar: &Guitar,
+    loc: &harmonicon_platform::localization::Localization,
+) {
+    spawn_neck(parent, guitar, loc, 180.0, true);
+}
+
+fn spawn_neck(
+    parent: &mut ChildSpawnerCommands,
+    guitar: &Guitar,
+    loc: &harmonicon_platform::localization::Localization,
+    height: f32,
+    label_every_fret: bool,
+) {
     parent
         .spawn(Node {
             width: Val::Percent(100.0),
-            height: Val::Px(174.0),
+            height: Val::Px(height + 82.0),
             flex_shrink: 0.0,
             flex_direction: FlexDirection::Column,
             ..default()
@@ -663,7 +682,7 @@ pub(super) fn spawn_neck_overview(
                     NeckOverview(guitar.clone()),
                     Node {
                         width: Val::Percent(100.0),
-                        height: Val::Px(92.0),
+                        height: Val::Px(height),
                         margin: UiRect { top: Val::Px(25.0), bottom: Val::Px(26.0), ..default() },
                         flex_shrink: 0.0,
                         ..default()
@@ -688,7 +707,9 @@ pub(super) fn spawn_neck_overview(
                             },
                             BackgroundColor(Color::srgb(0.45, 0.44, 0.40)),
                         ));
-                        if fret == 0 || matches!(fret, 3 | 5 | 7 | 9 | 12 | 15 | 17 | 19 | 21 | 24)
+                        if label_every_fret
+                            || fret == 0
+                            || matches!(fret, 3 | 5 | 7 | 9 | 12 | 15 | 17 | 19 | 21 | 24)
                         {
                             board.spawn((
                                 Text::new(fret.to_string()),
@@ -965,4 +986,79 @@ fn suggested_finger(
         .filter(|base| fits(*base))
         .or_else(|| minimum(attack).filter(|base| fits(*base)))?;
     (fret >= base && fret - base < 4).then(|| fret - base + 1)
+}
+
+/// The Note Trainer uses the same full neck, with just its current target.
+pub(super) fn update_trainer_neck(
+    trainer: Res<super::note_trainer::NoteTrainer>,
+    boards: Query<&NeckOverview>,
+    mut dots: Query<(&NeckDot, &mut Node, &mut Text), (Without<NeckRegion>, Without<NeckLabel>)>,
+    mut regions: Query<(&NeckRegion, &mut Node), (Without<NeckDot>, Without<NeckLabel>)>,
+    mut labels: Query<(&NeckLabel, &mut Text), (Without<NeckDot>, Without<NeckRegion>)>,
+) {
+    let Ok(NeckOverview(guitar)) = boards.single() else { return };
+    let positions = trainer.guitar_targets();
+    let columns = f32::from(guitar.frets) + 1.0;
+    for (dot, mut node, mut text) in &mut dots {
+        let position = positions.iter().find(|p| !dot.next && p.string == dot.string);
+        node.display = if position.is_some() { Display::Flex } else { Display::None };
+        if let Some(position) = position {
+            node.left =
+                Val::Percent((f32::from(position.fret + guitar.capo) + 0.5) * 100.0 / columns);
+            node.top = Val::Percent(
+                (f32::from(position.string) - 0.5) * 100.0 / f32::from(guitar.string_count()),
+            );
+            text.0 = if position.fret == 0 {
+                "0".into()
+            } else {
+                suggested_finger(position, &positions, &positions)
+                    .map(|n| n.to_string())
+                    .unwrap_or_default()
+            };
+        }
+    }
+    for (region, mut node) in &mut regions {
+        let span = hand_region(&positions, guitar.top_fret())
+            .or_else(|| (!positions.is_empty()).then_some((0, 0)));
+        node.display = if !region.0 && span.is_some() { Display::Flex } else { Display::None };
+        if let Some((first, last)) = span {
+            node.left = Val::Percent(f32::from(first + guitar.capo) * 100.0 / columns);
+            node.width = Val::Percent(f32::from(last - first + 1) * 100.0 / columns);
+        }
+    }
+    for (_, mut text) in &mut labels {
+        text.0.clear();
+    }
+}
+
+#[cfg(test)]
+mod trainer_guide_tests {
+    use super::*;
+    #[test]
+    fn trainer_marks_one_target_on_the_full_sized_neck() {
+        let mut app = App::new();
+        app.init_resource::<super::super::note_trainer::NoteTrainer>()
+            .add_systems(Update, update_trainer_neck);
+        let guitar = Guitar::standard(harmonicon_core::instrument::guitar::GuitarBody::Electric);
+        app.world_mut().commands().spawn(Node::default()).with_children(|p| {
+            spawn_trainer_neck(
+                p,
+                &guitar,
+                &harmonicon_platform::localization::Localization::default(),
+            );
+        });
+        app.update();
+        let world = app.world_mut();
+        let visible: Vec<_> = world
+            .query::<(&NeckDot, &Node)>()
+            .iter(world)
+            .filter(|(_, node)| node.display != Display::None)
+            .collect();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].0.string, 1, "first drill is the open high E");
+        assert!(!visible[0].0.next);
+        let board = world.query_filtered::<&Node, With<NeckOverview>>().single(world).unwrap();
+        assert_eq!(board.height, Val::Px(180.0));
+        assert!(world.query::<&Text>().iter(world).any(|text| text.0 == guitar.frets.to_string()));
+    }
 }

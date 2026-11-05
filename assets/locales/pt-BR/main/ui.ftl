@@ -1050,3 +1050,5 @@ note-trainer-flute-key-help = Chaves preenchidas: pressione · Contornos: deixe 
 note-trainer-piano-hands-help = Posições sugeridas de cinco dedos; você pode usar qualquer mão. Tecla dourada: alvo · Azul: nota detectada
 note-trainer-left-hand = Mão esquerda
 note-trainer-right-hand = Mão direita
+
+note-trainer-show-position = Mostrar posição
