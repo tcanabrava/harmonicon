@@ -40,6 +40,19 @@ impl NoteTrainer {
     }
 }
 
+/// Bevy normalizes UI cursor positions around the node's centre, not its
+/// top-left. Convert once; the component already accounts for scale/scroll.
+fn board_position(guitar: &Guitar, normalized: Vec2) -> Option<(u8, u8)> {
+    let point = normalized + Vec2::splat(0.5);
+    if !(0.0..1.0).contains(&point.x) || !(0.0..1.0).contains(&point.y) || guitar.strings.is_empty()
+    {
+        return None;
+    }
+    let physical = (point.x * (f32::from(guitar.frets) + 1.0)).floor() as u8;
+    let string = (point.y * f32::from(guitar.string_count())).floor() as u8 + 1;
+    Some((string, physical.checked_sub(guitar.capo)?))
+}
+
 pub(super) fn make_board_selectable(commands: &mut Commands, board: Entity) {
     commands
         .entity(board)
@@ -57,10 +70,7 @@ pub(super) fn make_board_selectable(commands: &mut Commands, board: Entity) {
                     return;
                 };
                 let Some(guitar) = trainer.guitar() else { return };
-                let physical = (cursor.x.clamp(0.0, 0.999) * f32::from(guitar.frets + 1)) as u8;
-                let string =
-                    (cursor.y.clamp(0.0, 0.999) * f32::from(guitar.string_count())) as u8 + 1;
-                if let Some(fret) = physical.checked_sub(guitar.capo) {
+                if let Some((string, fret)) = board_position(guitar, cursor) {
                     if trainer.select_guitar_position(string, fret)
                         && trainer.kind == TechniqueKind::Position
                     {
@@ -254,6 +264,58 @@ pub(crate) fn sync_controls(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn every_rendered_cell_selects_its_own_string_and_fret() {
+        for strings in [6, 7] {
+            for capo in [0, 2] {
+                let mut guitar = Guitar::standard(GuitarBody::Electric);
+                guitar.capo = capo;
+                if strings == 7 {
+                    guitar.strings.push(35);
+                }
+                let mut trainer = NoteTrainer::for_instrument(guitar.clone().into());
+                for string in 1..=guitar.string_count() {
+                    for fret in 0..=guitar.top_fret() {
+                        // Same centres used by the rendered target dots.
+                        let cursor = Vec2::new(
+                            (f32::from(fret + capo) + 0.5) / (f32::from(guitar.frets) + 1.0) - 0.5,
+                            (f32::from(string) - 0.5) / f32::from(guitar.string_count()) - 0.5,
+                        );
+                        assert_eq!(board_position(&guitar, cursor), Some((string, fret)));
+                        let (picked_string, picked_fret) = board_position(&guitar, cursor).unwrap();
+                        assert!(trainer.select_guitar_position(picked_string, picked_fret));
+                        assert!(matches!(trainer.practice.drill().unwrap().position,
+                        PlayPosition::Fret(at) if at.string == string && at.fret == fret));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn off_board_clicks_are_ignored_instead_of_clamped_to_a_wrong_note() {
+        let guitar = Guitar::standard(GuitarBody::Electric);
+        for cursor in [
+            Vec2::new(-0.51, 0.0),
+            Vec2::new(0.5, 0.0),
+            Vec2::new(0.0, -0.51),
+            Vec2::new(0.0, 0.5),
+            Vec2::splat(f32::NAN),
+        ] {
+            assert_eq!(board_position(&guitar, cursor), None);
+        }
+        assert_eq!(board_position(&guitar, Vec2::splat(-0.5)), Some((1, 0)));
+        assert_eq!(board_position(&guitar, Vec2::splat(0.499)), Some((6, 22)));
+    }
+
+    #[test]
+    fn physical_frets_below_the_capo_are_not_playable_targets() {
+        let mut guitar = Guitar::standard(GuitarBody::Electric);
+        guitar.capo = 2;
+        let before_capo = Vec2::new(1.5 / 23.0 - 0.5, -0.4);
+        assert_eq!(board_position(&guitar, before_capo), None);
+    }
+
     #[test]
     fn selecting_a_position_pins_the_exercise_until_release_and_replay() {
         let mut trainer = NoteTrainer::default();
