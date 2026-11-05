@@ -73,12 +73,41 @@ when you've read and understood them.
 The flute path begins with setup and a steady B4, then introduces breathing,
 rests and pulse. Next, connect B4–A4–G4, add C5 and D5, and play short phrases
 using those five notes. An E4/E5 octave exercise is optional after the main
-path. All exercises fit both C-foot and B-foot concert flutes.
+path. A fourth unit teaches note lengths, counted rests, paired eighth
+notes and phrasing in 3/4, using the notes already learned. All exercises
+fit both C-foot and B-foot concert flutes.
 
-Nine short exercises use the normal flute score and horizontal fingering
+Thirteen short exercises use the normal flute score and horizontal fingering
 view. Pitch and timing count toward passing; posture, comfortable breathing,
 fingering choice and articulation quality need your own listening or a
 teacher’s feedback. The setup lesson is completed by self-assessment.
+
+## Piano: first steps
+
+Nine lessons take you from locating middle C to a short two-hand piece.
+Begin with right-hand C4–G4, then read left-hand C3–G3 on the bass staff.
+Alternating-hand exercises and counted rests prepare the first simultaneous
+entrances. The last core exercise combines a melody with simple bass notes;
+a C-major chord lesson is optional afterward.
+
+The eight playable exercises fit any keyboard covering C3–G4 and use the
+normal grand staff and full keyboard view. For simultaneous notes, select
+FFT or NMF chord detection in Options. The microphone checks sounding pitches
+and timing; hand choice, fingering, posture and balance need your own
+attention or a teacher’s feedback.
+
+## Guitar: first steps
+
+Ten lessons introduce a six-string guitar in standard E–A–D–G–B–E tuning
+without a capo. Learn all six open strings, then frets 1 and 3 on strings
+1 and 2. A two-string melody and counted rests lead to an E-minor arpeggio.
+An Em strum is optional after the main path.
+
+The nine playable exercises carry explicit string and fret positions and
+show sounding pitches. The arpeggio sounds one string at a time; the optional
+strum needs FFT or NMF chord detection. Scoring cannot identify the string,
+finger or strum direction, so check the written positions and listen for
+unwanted string noise as well as following the score.
 
 ## Practice tools on the page
 
