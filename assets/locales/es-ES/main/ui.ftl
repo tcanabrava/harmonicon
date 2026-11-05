@@ -1098,3 +1098,5 @@ trainer-chord-detector = Usar detección de acordes (NMF)
 trainer-chord-board-help = Consulta el diagrama para las cuerdas al aire y silenciadas. El diapasón marca toda la posición.
 
 trainer-reference-playing = Sonando la referencia — tu entrada no se está evaluando.
+
+trainer-flute-pick-help = Elige una nota en la partitura para repetirla · También puedes usar Tab y Intro · Las notas atenuadas no están disponibles para este ejercicio. Dorado: objetivo · Contorno blanco: nota inicial.

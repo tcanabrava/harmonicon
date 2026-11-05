@@ -1096,3 +1096,5 @@ trainer-chord-detector = Usar detecção de acordes (NMF)
 trainer-chord-board-help = Veja no diagrama as cordas soltas e abafadas. O braço marca a posição inteira.
 
 trainer-reference-playing = Referência tocando — sua entrada não está sendo avaliada.
+
+trainer-flute-pick-help = Escolha uma nota na partitura para repeti-la · Você também pode usar Tab e Enter · As notas esmaecidas não estão disponíveis neste exercício. Dourado: alvo · Contorno branco: nota inicial.

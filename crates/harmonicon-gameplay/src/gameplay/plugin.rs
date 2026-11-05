@@ -175,6 +175,7 @@ impl Plugin for GameplayPlugin {
                 super::guitar_visuals::update_trainer_neck.after(note_trainer::listen),
                 note_trainer::update_position_hint.after(note_trainer::listen),
                 note_trainer::update_flute_drawing.after(note_trainer::listen),
+                note_trainer::update_flute_picker.after(note_trainer::listen),
                 note_trainer::update_piano_keys.after(note_trainer::listen),
                 note_trainer::update_hands.after(note_trainer::listen),
                 note_trainer::handle_escape.run_if(not(tour_active)),

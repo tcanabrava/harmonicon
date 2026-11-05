@@ -43,6 +43,9 @@ use bevy::prelude::*;
 use bevy::text::{FontHinting, LineHeight};
 use bevy::ui::ComputedNode;
 
+mod pitch_picker;
+pub use pitch_picker::{PitchChoiceInk, spawn_pitch_choices};
+
 mod note_glyphs;
 mod tie_material;
 use note_glyphs::spawn_note_glyphs;

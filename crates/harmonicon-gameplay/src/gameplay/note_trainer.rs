@@ -46,6 +46,8 @@ use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
 mod bend;
 mod chords;
 pub(super) use chords::update as update_chords;
+mod flute_picker;
+pub(super) use flute_picker::update as update_flute_picker;
 mod layout;
 mod piano;
 mod selection;

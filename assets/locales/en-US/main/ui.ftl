@@ -1099,3 +1099,5 @@ trainer-chord-detector = Use chord detection (NMF)
 trainer-chord-board-help = Read the chord diagram for open and muted strings. The fretboard marks the full shape.
 
 trainer-reference-playing = Reference playing — your input is not being assessed.
+
+trainer-flute-pick-help = Choose a note on the score to repeat it · Tab and Enter work too · Dimmed notes are unavailable for this exercise. Gold: target · White outline: starting note.

@@ -54,8 +54,14 @@ The flute's tabs are:
 
 The horizontal flute below lights the keys of the fingering to use, with
 the headjoint at the left. Filled keys are pressed; outlines stay open.
-The staff shows the target in gold and, for octave drills, the starting
-note in white.
+Choose a note directly on the score: each note and its name form one
+clickable target, also reachable with Tab and Enter. The score covers the
+flute’s full range, including low B when using a B foot joint. Gold marks
+the selected target; a white outline marks the starting note for an octave
+drill. Dimmed notes are unavailable in the current exercise. Selecting a
+note keeps it for repeated attempts; enable **Auto-advance** to work through
+the sequence instead. Use Previous and Next to step through alternate
+fingerings of the same pitch.
 **Listen** plays the note in the game's flute voice. As with the guitar,
 the trainer hears the pitch, so it trusts you to use the fingering it
 shows.

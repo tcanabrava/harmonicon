@@ -163,7 +163,7 @@ pub(crate) fn setup(
     commands.entity(content).with_children(|root| {
         root.spawn(Node {
             width: Val::Percent(100.0),
-            flex_direction: if trainer.guitar().is_some() {
+            flex_direction: if trainer.guitar().is_some() || trainer.flute().is_some() {
                 FlexDirection::Row
             } else {
                 FlexDirection::Column
@@ -178,7 +178,13 @@ pub(crate) fn setup(
             workspace
                 .spawn(Node {
                     width: Val::Percent(100.0),
-                    flex_basis: if trainer.guitar().is_some() { Val::Px(420.0) } else { Val::Auto },
+                    flex_basis: if trainer.guitar().is_some() {
+                        Val::Px(420.0)
+                    } else if trainer.flute().is_some() {
+                        Val::Px(300.0)
+                    } else {
+                        Val::Auto
+                    },
                     flex_grow: 1.0,
                     min_width: Val::Px(0.0),
                     flex_shrink: 0.0,
@@ -254,6 +260,8 @@ pub(crate) fn setup(
                         width: Val::Percent(100.0),
                         flex_basis: if trainer.guitar().is_some() {
                             Val::Px(400.0)
+                        } else if trainer.flute().is_some() {
+                            Val::Px(680.0)
                         } else {
                             Val::Auto
                         },
@@ -278,7 +286,16 @@ pub(crate) fn setup(
                                 ..default()
                             })
                             .with_children(|staff| {
-                                teaching::spawn_staff(staff, font, trainer.piano().is_some(), &loc);
+                                if let Some(flute) = trainer.flute() {
+                                    flute_picker::spawn(staff, font, flute, &loc);
+                                } else {
+                                    teaching::spawn_staff(
+                                        staff,
+                                        font,
+                                        trainer.piano().is_some(),
+                                        &loc,
+                                    );
+                                }
                             });
                     });
             }
