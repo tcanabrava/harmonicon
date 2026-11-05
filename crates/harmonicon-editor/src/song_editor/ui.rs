@@ -885,9 +885,16 @@ fn spawn_fixed_chrome(
     // `sync_music_score` writing `MusicScoreNotes`/`MusicScorePlayhead` from
     // `EditorState`/`Playhead` each time either changes.
     if let Some(bravura) = bravura {
+        // SMuFL glyphs and ledger-line notes can extend below the score's
+        // nominal panel. Reserve that ink space in layout so the following
+        // controls cannot paint over the notation.
+        const SCORE_BOTTOM_CLEARANCE: f32 = 48.0;
         root.spawn(Node {
             width: Val::Percent(100.0),
+            min_height: Val::Px(harmonicon_ui::music_score::PANEL_HEIGHT + SCORE_BOTTOM_CLEARANCE),
+            flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
+            padding: UiRect::bottom(Val::Px(SCORE_BOTTOM_CLEARANCE)),
             margin: UiRect::top(Val::Px(6.0)),
             ..default()
         })
@@ -916,6 +923,7 @@ fn spawn_fixed_chrome(
         flex_direction: FlexDirection::Row,
         align_items: AlignItems::Center,
         column_gap: Val::Px(8.0),
+        flex_shrink: 0.0,
         padding: UiRect::top(Val::Px(6.0)),
         ..default()
     })
