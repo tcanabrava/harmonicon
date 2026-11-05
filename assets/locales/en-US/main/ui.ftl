@@ -1034,3 +1034,5 @@ editor-new-instrument-question = Which instrument is this document for?
 editor-new-replace-warning = Create a new document and discard the current notes and metadata? Save your work first if you want to keep it.
 
 editor-transposed-position-warning = Transposed {$count} notes {$semitones} semitones — {$kept} left unchanged (unplayable or spot taken)
+
+dialog-cancel = Cancel

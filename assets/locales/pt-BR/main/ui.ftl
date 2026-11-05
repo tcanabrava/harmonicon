@@ -1031,3 +1031,5 @@ editor-new-instrument-question = Para qual instrumento é este documento?
 editor-new-replace-warning = Criar um novo documento e descartar as notas e metadados atuais? Salve antes se quiser mantê-los.
 
 editor-transposed-position-warning = {$count} notas transpostas {$semitones} semitons — {$kept} mantidas (impossíveis ou lugar ocupado)
+
+dialog-cancel = Cancelar

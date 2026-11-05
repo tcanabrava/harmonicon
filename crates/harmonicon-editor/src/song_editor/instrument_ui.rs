@@ -97,6 +97,26 @@ pub(super) fn spawn_selector(
         TextFont { font_size: FontSize::Px(14.0), ..default() },
         TextColor(colors.label),
     ));
+    parent.spawn((
+        Text::new(loc.msg("editor-instrument-select-empty").to_string()),
+        TextFont { font_size: FontSize::Px(13.0), ..default() },
+        TextColor(colors.label),
+    ));
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
+            column_gap: Val::Px(6.0),
+            ..default()
+        })
+        .with_children(|p| {
+            super::transport::spawn_file_buttons(
+                p,
+                loc,
+                colors,
+                harmonicon_platform::settings::ActionButtonStyle::TextOnly,
+            );
+        });
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
