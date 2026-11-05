@@ -1033,3 +1033,11 @@ editor-new-replace-warning = Criar um novo documento e descartar as notas e meta
 editor-transposed-position-warning = {$count} notas transpostas {$semitones} semitons — {$kept} mantidas (impossíveis ou lugar ocupado)
 
 dialog-cancel = Cancelar
+
+editor-guitar-setup = Configuração da guitarra
+editor-guitar-setup-help = A corda 1 é a linha superior. Digite notas com oitava, como E4 ou F#3. Afinar mantém os trastes e muda os sons. Até 12 cordas independentes; pares não estão vinculados.
+editor-guitar-setup-refused = Sem alterações. Use o modo Editar, notas válidas (C0 ou acima) e 1–12 cordas. Apague as notas de uma corda antes de removê-la; todos os trastes devem continuar tocáveis.
+editor-guitar-string-count = Cordas · {$count}
+editor-guitar-add-string = Adicionar corda
+editor-guitar-remove-string = Remover última corda
+editor-guitar-string-number = Corda {$number}

@@ -13,7 +13,9 @@ or **Flute**. Returning to an existing draft keeps its instrument and notes.
 **New** opens the chooser again; replacing a document with content asks for
 confirmation. Save first to retain that draft. Cancelling keeps it intact.
 In an empty document, **Details → Instrument** can also change the instrument.
-Loading a chart uses its saved instrument configuration.
+Loading a chart uses its saved instrument configuration. The Details pane
+provides **Save**, **New**, and **Load** beside the instrument choices, so you
+can save a populated chart and start a document for another instrument.
 
 The grid, score, timeline, metadata, selection and undo tools are shared.
 Each instrument supplies its own note positions, techniques, validation and
@@ -30,6 +32,22 @@ open note in its string's colour. A note is drawn in its string's colour (the
 same as on the play highway) and reads as tab: `7` for a fret, `7b9` for a
 bend up to the pitch of fret 9, `<12>` for a harmonic.
 
+### Tuning and strings
+
+**Details → Guitar setup** offers named six-string tunings and an editable
+pitch for each string. Use scientific pitch names with an octave (`E4`,
+`F#3`, `Bb2`); string 1 is the top tab row. **Add string** and **Remove last
+string** change the count from 1 to 12, including 7- and 10-string setups.
+Added bass strings start a fourth below the previous string, stopping at C0;
+edit their pitches to match your instrument. Named presets replace the whole
+string list with six strings.
+
+Retuning keeps fret positions and changes sounding pitches. Setup changes
+can be undone and are retained when saving and loading. Removing an occupied
+string is refused: move or delete its notes first. All existing notes must
+remain playable. Up to 12 strings are independent tab lanes; paired courses
+on a conventional 12-string guitar are not automatically linked.
+
 The note column swaps the harmonica's breath and reed buttons for the
 guitar's:
 
@@ -38,7 +56,8 @@ guitar's:
   note at; the button shows that fret.
 - **String ↑ / String ↓** move the selected note to the string above or
   below at whichever fret keeps its pitch, and refuse when that string
-  can't reach it. Dragging a note to another lane instead keeps its fret.
+  can't reach it. A successful move eases into its new row; a refused move
+  nudges toward that row and returns, with a status message. Dragging a note to another lane instead keeps its fret.
 - **Bend** steps through a half-step bend, a whole-step bend and off;
   **Harmonic** toggles a natural harmonic where the fret has one.
   **Vibrato** colours only its own string's note.
@@ -58,8 +77,8 @@ document empty.
 ## Flute charts
 
 Choose **Flute** for a new document to start a flute chart;
-**Load** opens existing ones with their foot joint. The grid has one row per
-pitch, C7 at the top down to the flute's lowest note, rows drawn narrower so
+**Load** opens existing ones with their foot joint. The grid has a keyboard beside one row per
+pitch, C7 at the top down to the flute's lowest note (C4, or B3 with a B foot), rows drawn narrower so
 the whole range fits. Click a row to place a note there; a flute plays one
 note at a time, so a new note ends the one sounding and a note can't start
 with another. Each note shows its name, and `D6·1` means its first

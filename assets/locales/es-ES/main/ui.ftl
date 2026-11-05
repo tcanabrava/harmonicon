@@ -1035,3 +1035,11 @@ editor-new-replace-warning = ¿Crear un documento nuevo y descartar las notas y 
 editor-transposed-position-warning = {$count} notas transpuestas {$semitones} semitonos — {$kept} sin cambios (imposibles o sitio ocupado)
 
 dialog-cancel = Cancelar
+
+editor-guitar-setup = Configuración de guitarra
+editor-guitar-setup-help = La cuerda 1 es la fila superior. Escribe notas con octava, p. ej. E4 o F#3. Afinar conserva los trastes y cambia los sonidos. Hasta 12 cuerdas independientes; los pares no están vinculados.
+editor-guitar-setup-refused = Sin cambios. Usa el modo Editar, notas válidas (C0 o superiores) y 1–12 cuerdas. Borra las notas de una cuerda antes de quitarla; todos los trastes deben seguir siendo tocables.
+editor-guitar-string-count = Cuerdas · {$count}
+editor-guitar-add-string = Añadir cuerda
+editor-guitar-remove-string = Quitar última cuerda
+editor-guitar-string-number = Cuerda {$number}

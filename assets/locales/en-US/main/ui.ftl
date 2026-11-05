@@ -1036,3 +1036,11 @@ editor-new-replace-warning = Create a new document and discard the current notes
 editor-transposed-position-warning = Transposed {$count} notes {$semitones} semitones — {$kept} left unchanged (unplayable or spot taken)
 
 dialog-cancel = Cancel
+
+editor-guitar-setup = Guitar setup
+editor-guitar-setup-help = String 1 is the top tab row. Enter pitches with octaves, e.g. E4 or F#3. Retuning keeps frets and changes sounding pitches. Up to 12 independent strings; paired courses are not linked.
+editor-guitar-setup-refused = Setup unchanged. Use Edit mode, valid pitches (C0 or above), and 1–12 strings. Remove notes from a string before removing it; all existing frets must remain playable.
+editor-guitar-string-count = Strings · {$count}
+editor-guitar-add-string = Add string
+editor-guitar-remove-string = Remove last string
+editor-guitar-string-number = String {$number}

@@ -146,6 +146,7 @@ pub(super) fn spawn_selector(
                 ));
             }
         });
+    parent.spawn((super::guitar_setup::GuitarSetup, Node::default()));
 }
 
 #[cfg(test)]
