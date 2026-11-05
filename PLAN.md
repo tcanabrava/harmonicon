@@ -75,6 +75,9 @@ Nothing below can be approved by a test.
 
 - Flathub submission and release signing keys. Version/tag agreement is
   already enforced by `release.yaml`.
+- **Per-crate code review**, bottom-up from `harmonicon-core` to the root
+  package (`docs/code_review_plan.md`). Delete this line when the last
+  crate's findings are recorded.
 
 ## Multiple instruments
 

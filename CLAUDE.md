@@ -30,6 +30,9 @@ than accumulating history (git log/commit messages are the historical record):
   training records, tree view, per-lesson mastery ring, the spaced
   "Warm-up" review queue and the practice streak are built; trainings
   exist only for the `bend` track (`PLAN.md` has what's open)
+- `docs/code_review_plan.md` — the per-crate correctness review: order,
+  method, cross-cutting checklist, each crate's focus list, and the
+  findings recorded as each crate is done
 - `docs/gameplay_validation.md` — manual + automated validation checklist;
   update it when changing gameplay/timing behaviour
 - `docs/gameplay_improvement_plan.md` — the phased rework of what scored play
