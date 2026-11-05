@@ -43,6 +43,11 @@ play the note on the string it asks for.
 
 ## Flute
 
+Choose **Flute foot joint** above the exercise: **C foot** starts at C4,
+while **B foot** includes B3. This is remembered in **My instruments** and
+used the next time you open the trainer. Changing it updates both the
+score and the fingering drawing, keeping your current note when possible.
+
 The flute's tabs are:
 
 - **Notes**: every note from the lowest to C7; play it and hold it.

@@ -48,9 +48,10 @@ pub(crate) fn setup_note_trainer_menu(
         root,
         &loc.msg("note-trainer-flute"),
         |_: On<Activate>,
+         mine: Res<harmonicon_platform::settings::MyInstruments>,
          mut trainer: ResMut<NoteTrainer>,
          mut state: ResMut<NextState<AppState>>| {
-            trainer.choose(Flute::default().into());
+            trainer.choose(Flute::new(mine.flute_foot.unwrap_or_default()).into());
             state.set(AppState::NoteTrainer);
         },
     );

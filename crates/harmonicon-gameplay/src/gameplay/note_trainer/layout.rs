@@ -111,6 +111,10 @@ pub(crate) fn setup(
         },
     );
 
+    if let Some(flute) = trainer.flute() {
+        flute_setup::spawn(&mut commands, root, flute, &loc);
+    }
+
     let previous = String::from(loc.msg("note-trainer-previous"));
     let next = String::from(loc.msg("note-trainer-next"));
     let listen = String::from(loc.msg("note-trainer-listen"));

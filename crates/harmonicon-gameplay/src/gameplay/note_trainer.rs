@@ -47,6 +47,7 @@ mod bend;
 mod chords;
 pub(super) use chords::update as update_chords;
 mod flute_picker;
+mod flute_setup;
 pub(super) use flute_picker::update as update_flute_picker;
 mod layout;
 mod piano;
