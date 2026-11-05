@@ -533,7 +533,7 @@ fn cycle_field(field: Field) -> Option<(&'static [&'static str], Option<&'static
 /// system like [`rebuild_midi_track_combobox`](super::midi_import::
 /// rebuild_midi_track_combobox), since [`Scale::all`]'s option list never
 /// changes at runtime. Needs `EditorRoot` as the dropdown's backdrop parent,
-/// which doesn't exist yet the frame `ui::spawn_fixed_chrome` spawns the
+/// which doesn't exist yet the frame `ui::setup` spawns the Details
 /// slot — hence deferring the spawn to this system instead of doing it
 /// inline there.
 ///

@@ -341,8 +341,8 @@ pub(super) struct ScaleComboboxSlot;
 
 /// Empty container [`super::meta_form::spawn_time_signature_combobox`]
 /// spawns the meter picker under, once — a fixed option list like
-/// [`ScaleComboboxSlot`]'s, and in the fixed chrome for the same
-/// dropdown-clipping reason.
+/// [`ScaleComboboxSlot`]'s, and above the Details scroll viewport for the
+/// same dropdown-clipping reason.
 #[derive(Component)]
 pub(super) struct TimeSignatureComboboxSlot;
 
@@ -549,7 +549,6 @@ pub(super) fn setup(
     theme: Res<LoadedTheme>,
     state: Res<EditorState>,
     audio: Res<AudioSettings>,
-    bravura: Option<Res<harmonicon_ui::music_score::BravuraFont>>,
     compact: Res<harmonicon_platform::responsive::CompactLayout>,
     action_button_style: Res<ActionButtonStyle>,
 ) {
@@ -648,7 +647,7 @@ pub(super) fn setup(
                 },
             ))
             .with_children(|chart| {
-                spawn_fixed_chrome(chart, colors, hole_count, bravura.as_deref());
+                spawn_fixed_chrome(chart, colors, hole_count);
             });
 
             // The form fields (meta form, lesson form, status bar), in their
@@ -771,12 +770,7 @@ fn on_editor_tab_select(
 /// grid row (hole column + grid + its own horizontal scrollbar). Kept out of
 /// the `ScrollArea` — see [`setup`]'s own comment for why. The tool palette
 /// is the left sidebar beside it (`mod_panel::spawn_mod_panel`).
-fn spawn_fixed_chrome(
-    root: &mut ChildSpawnerCommands,
-    colors: SongEditorColors,
-    hole_count: u8,
-    bravura: Option<&harmonicon_ui::music_score::BravuraFont>,
-) {
+fn spawn_fixed_chrome(root: &mut ChildSpawnerCommands, colors: SongEditorColors, hole_count: u8) {
     root.spawn((
         GridRowContainer,
         Node {
@@ -895,30 +889,16 @@ fn spawn_fixed_chrome(
         ]
     });
 
-    // The music-notation staff: a supplementary read of the chart's current
-    // notes, shared with both gameplay render modes — see `music_score`'s
-    // own module doc comment. Fixed chrome, not the scrollable form area
-    // below, so it stays visible while editing; driven by
-    // `sync_music_score` writing `MusicScoreNotes`/`MusicScorePlayhead` from
-    // `EditorState`/`Playhead` each time either changes.
-    if let Some(bravura) = bravura {
-        // SMuFL glyphs and ledger-line notes can extend below the score's
-        // nominal panel. Reserve that ink space in layout so the following
-        // controls cannot paint over the notation.
-        const SCORE_BOTTOM_CLEARANCE: f32 = 48.0;
-        root.spawn(Node {
+    root.spawn((
+        EditorScoreSlot,
+        Node {
             width: Val::Percent(100.0),
-            min_height: Val::Px(harmonicon_ui::music_score::PANEL_HEIGHT + SCORE_BOTTOM_CLEARANCE),
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
-            padding: UiRect::bottom(Val::Px(SCORE_BOTTOM_CLEARANCE)),
             margin: UiRect::top(Val::Px(6.0)),
             ..default()
-        })
-        .with_children(|row| {
-            harmonicon_ui::music_score::spawn_music_score(row, bravura);
-        });
-    }
+        },
+    ));
 
     // Dev-only debugging aid — see `debug_record`'s own module docs. Placed
     // right below the grid's own scrollbar.
@@ -964,6 +944,95 @@ mod pitch_keyboard_tests {
             );
             state.flute_view = super::super::state::FluteView::Fingering;
             assert_eq!(pitch_keyboard(&state), None);
+        }
+    }
+}
+
+/// A document can change instrument after the editor UI has been spawned.
+#[derive(Component)]
+pub(super) struct EditorScoreSlot;
+
+pub(super) fn sync_editor_score(
+    mut commands: Commands,
+    state: Res<EditorState>,
+    bravura: Option<Res<harmonicon_ui::music_score::BravuraFont>>,
+    slots: Query<(Entity, Option<&Children>), With<EditorScoreSlot>>,
+    mut last: Local<Option<(Entity, bool)>>,
+) {
+    let Some(bravura) = bravura else { return };
+    let Ok((slot, children)) = slots.single() else { return };
+    let piano = super::piano_note::is_piano(&state);
+    if *last == Some((slot, piano)) {
+        return;
+    }
+    *last = Some((slot, piano));
+    if let Some(children) = children {
+        for &child in children {
+            commands.entity(child).despawn();
+        }
+    }
+    // Reserve the full grand staff, including the lower glyph clearance.
+    const BOTTOM_CLEARANCE: f32 = 48.0;
+    let height = harmonicon_ui::music_score::PANEL_HEIGHT * if piano { 2.0 } else { 1.0 };
+    commands
+        .entity(slot)
+        .insert(Node {
+            width: Val::Percent(100.0),
+            min_height: Val::Px(height + BOTTOM_CLEARANCE),
+            flex_direction: FlexDirection::Column,
+            flex_shrink: 0.0,
+            padding: UiRect::bottom(Val::Px(BOTTOM_CLEARANCE)),
+            margin: UiRect::top(Val::Px(6.0)),
+            ..default()
+        })
+        .with_children(|parent| {
+            if piano {
+                harmonicon_ui::music_score::spawn_piano_score(parent, &bravura);
+            } else {
+                harmonicon_ui::music_score::spawn_music_score(parent, &bravura);
+            }
+        });
+}
+
+#[cfg(test)]
+mod editor_score_tests {
+    use super::super::instrument_ui::InstrumentKind;
+    use super::*;
+    use harmonicon_ui::music_score::{BravuraFont, Clef, PANEL_HEIGHT, PianoGrandStaff};
+
+    #[test]
+    fn editor_score_changes_to_a_grand_staff_when_a_piano_document_is_chosen() {
+        let mut app = App::new();
+        app.insert_resource(super::super::document_picker::fresh(
+            InstrumentKind::Flute.selection(),
+        ))
+        .insert_resource(BravuraFont(Handle::default()))
+        .add_systems(Update, sync_editor_score);
+        let slot = app.world_mut().spawn((EditorScoreSlot, Node::default())).id();
+        app.update();
+        for (kind, staff_count) in [
+            (InstrumentKind::Piano, 2.0),
+            (InstrumentKind::Guitar, 1.0),
+            (InstrumentKind::Piano, 2.0),
+        ] {
+            app.world_mut().resource_mut::<EditorState>().instrument = kind.selection();
+            app.update();
+            let world = app.world_mut();
+            let child = world.get::<Children>(slot).unwrap()[0];
+            assert_eq!(
+                world.get::<Node>(child).unwrap().height,
+                Val::Px(PANEL_HEIGHT * staff_count)
+            );
+            assert_eq!(
+                world.get::<PianoGrandStaff>(child).is_some(),
+                kind == InstrumentKind::Piano
+            );
+            if kind == InstrumentKind::Piano {
+                let glyphs: Vec<_> =
+                    world.query::<&Text>().iter(world).map(|t| t.0.clone()).collect();
+                assert!(glyphs.contains(&Clef::Treble.glyph().to_string()), "treble clef");
+                assert!(glyphs.contains(&Clef::Bass.glyph().to_string()), "bass clef");
+            }
         }
     }
 }

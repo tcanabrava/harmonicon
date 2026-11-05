@@ -105,7 +105,8 @@ Choose **Piano** for a new document. Each row is a key; simultaneous notes
 can form chords or two-hand passages. The editor shows a scrollable 24-key
 window, centered on the notes when a chart loads. Notes outside the visible
 window remain in the document. The Play screen's full keyboard is independent
-of this editing window. Preview uses the piano voice.
+of this editing window. Preview uses the piano voice. The score uses a grand staff with treble and
+bass clefs, showing the upper and lower registers together.
 
 ## Layout
 

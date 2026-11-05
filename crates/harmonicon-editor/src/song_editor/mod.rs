@@ -392,6 +392,10 @@ impl Plugin for SongEditor2Plugin {
                     .in_set(EditorPass)
                     .run_if(in_state(AppState::SongEditor2)),
             )
+            .add_systems(
+                Update,
+                ui::sync_editor_score.in_set(EditorPass).run_if(in_state(AppState::SongEditor2)),
+            )
             .add_message::<state::DocumentCommand>()
             .add_message::<midi_import::MidiFileLoaded>();
     }
