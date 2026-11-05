@@ -537,8 +537,8 @@ fn cycle_field(field: Field) -> Option<(&'static [&'static str], Option<&'static
 /// slot — hence deferring the spawn to this system instead of doing it
 /// inline there.
 ///
-/// The slot deliberately lives in the *fixed* chrome
-/// (`ui::spawn_fixed_chrome`), not the scrollable meta form: `bevy_ui_
+/// The slot deliberately lives in the fixed area above the Details form,
+/// outside its scroll viewport: `bevy_ui_
 /// widgets::Popover` requires the dropdown list to be a literal ECS child
 /// of its toggle, and Bevy's UI overflow clipping follows that same
 /// ancestry, not the popover's computed screen position — a combobox

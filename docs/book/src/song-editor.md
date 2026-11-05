@@ -200,6 +200,10 @@ which subdivisions are which, regardless of which mode is currently
 active. Switching modes only changes where the *next* placement, move, or
 resize lands — it never moves notes that are already sitting off-grid.
 
+Scale and Time Signature are in the fixed area at the top of **Details**,
+alongside the instrument's tuning controls. Their dropdowns remain outside the
+scrolling form so the option lists stay accessible.
+
 ## Chart metadata
 
 The shared Details form covers tempo, musical key, background music and

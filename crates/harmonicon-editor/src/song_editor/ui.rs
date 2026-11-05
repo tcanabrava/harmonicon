@@ -673,6 +673,23 @@ pub(super) fn setup(
                 },
             ))
             .with_children(|details| {
+                // Keep dropdowns outside the scrolling form so their lists
+                // can open without being clipped by its viewport.
+                details
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_wrap: FlexWrap::Wrap,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(16.0),
+                        row_gap: Val::Px(8.0),
+                        flex_shrink: 0.0,
+                        padding: UiRect::all(Val::Px(12.0)),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        row.spawn((ScaleComboboxSlot, Node::default()));
+                        row.spawn((TimeSignatureComboboxSlot, Node::default()));
+                    });
                 details.spawn((
                     super::guitar_setup::TuningSlot,
                     Node {
@@ -907,34 +924,6 @@ fn spawn_fixed_chrome(
     // right below the grid's own scrollbar.
     #[cfg(feature = "dev")]
     super::debug_record::spawn_debug_waveform_strip(root, colors);
-
-    // The Scale combobox's slot — deliberately part of the *fixed* chrome,
-    // not the scrollable meta form its other fields live in. See
-    // `meta_form::spawn_scale_combobox`'s doc comment: `bevy_ui_widgets::
-    // Popover`'s dropdown list must be a literal ECS child of its toggle to
-    // position itself, and Bevy's UI clipping follows that same ancestry —
-    // nested inside the form's `Overflow::scroll_y()` `ScrollArea`, the open
-    // dropdown would get clipped to that scrollable viewport regardless of
-    // `GlobalZIndex`, rendering behind (and stealing clicks from) whatever's
-    // fixed here instead. `ScaleComboboxSlot` fills in once, the same
-    // spawn-once gate the rest of that system's doc comment describes.
-    root.spawn(Node {
-        width: Val::Percent(100.0),
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        column_gap: Val::Px(8.0),
-        flex_shrink: 0.0,
-        padding: UiRect::top(Val::Px(6.0)),
-        ..default()
-    })
-    .with_children(|row| {
-        row.spawn(Node { width: Val::Px(HOLE_COL_W), flex_shrink: 0.0, ..default() });
-        row.spawn((ScaleComboboxSlot, Node { flex_direction: FlexDirection::Column, ..default() }));
-        row.spawn((
-            TimeSignatureComboboxSlot,
-            Node { flex_direction: FlexDirection::Column, ..default() },
-        ));
-    });
 }
 
 /// Pitch rows share a keyboard; flute key/fingering rows keep their own labels.
