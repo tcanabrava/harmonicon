@@ -520,3 +520,48 @@ fn a_gp7_file_keeps_each_bar_in_its_place() {
         assert_eq!(starts, vec![0.0, 2.0, 4.0], ".{extension}");
     }
 }
+
+/// A `.gpx` whose inner file claims a negative size. `guitarpro` reads that
+/// size as `i32` and widens it with `as usize`, so -1 becomes `usize::MAX`
+/// and `Vec::with_capacity` panics — one changed field in a valid file.
+fn gpx_claiming_size(size: i32) -> Vec<u8> {
+    use guitarpro::io::gpx::{compress_bcfz, pack_bcfs};
+    let mut bcfs = pack_bcfs("score.gpif", b"<GPIF/>");
+    // The directory entry is sector 1; its size field sits at +0x8C. The
+    // 4-byte "BCFS" magic comes first.
+    let at = 4 + 0x1000 + 0x8C;
+    bcfs[at..at + 4].copy_from_slice(&size.to_le_bytes());
+    compress_bcfz(&bcfs)
+}
+
+#[test]
+fn a_reader_panic_on_a_crafted_file_is_an_error() {
+    let err = crate::parse_import("gpx", gpx_claiming_size(-1));
+    assert!(err.is_err(), "a negative inner size was accepted");
+}
+
+#[test]
+fn a_zipped_score_that_unpacks_past_the_limit_is_refused() {
+    use std::io::Write;
+    // Zeros deflate to almost nothing, so a small archive can unpack huge.
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    {
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        zip.start_file("score.musicxml", options).unwrap();
+        let chunk = vec![0u8; 1024 * 1024];
+        for _ in 0..=super::MAX_ZIP_ENTRY_BYTES / chunk.len() as u64 {
+            zip.write_all(&chunk).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+    let bytes = bytes.into_inner();
+    assert!(bytes.len() < 1024 * 1024, "the archive itself stays small");
+    for extension in ["mxl", "mscz"] {
+        let Err(err) = crate::parse_import(extension, bytes.clone()) else {
+            panic!(".{extension} accepted an oversized entry");
+        };
+        assert!(err.to_string().contains("unpacks"), ".{extension}: {err}");
+    }
+}

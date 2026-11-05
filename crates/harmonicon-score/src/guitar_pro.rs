@@ -78,39 +78,71 @@ impl GpScore {
     /// The extension has already been matched by [`crate::parse_import`];
     /// an unknown one here is a programming error rather than a bad file,
     /// so it reports [`ScoreError::UnsupportedFormat`] the same way.
+    ///
+    /// **A reader panic is an error here, not a crash.** The `guitarpro`
+    /// crate trusts length fields it reads from the file (a negative entry
+    /// size in a `.gpx` widens to `usize::MAX` and panics in
+    /// `Vec::with_capacity`), and this runs inside an asset loader, where a
+    /// panic takes the game down with it. So the whole read and conversion
+    /// run under `catch_unwind`. It cannot catch an allocation that aborts,
+    /// which is why zipped formats are size-checked first
+    /// ([`check_zip_sizes`]).
     pub fn parse(extension: &str, bytes: Vec<u8>) -> Result<Self, ScoreError> {
+        let format: &'static str = match extension {
+            "gp3" => "gp3",
+            "gp4" => "gp4",
+            "gp5" => "gp5",
+            "gpx" => "gpx",
+            "gp" => "gp",
+            "mscz" => "mscz",
+            "musicxml" | "xml" => "musicxml",
+            "mxl" => "mxl",
+            other => return Err(ScoreError::UnsupportedFormat(other.to_string())),
+        };
+        if matches!(format, "mscz" | "mxl" | "gp") {
+            check_zip_sizes(format, &bytes)?;
+        }
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Self::parse_unguarded(extension, &bytes)
+        }))
+        .unwrap_or_else(|_| {
+            Err(parse_error(format, "the file is malformed (its reader failed on it)"))
+        })
+    }
+
+    fn parse_unguarded(extension: &str, bytes: &[u8]) -> Result<Self, ScoreError> {
         let mut song = GpSong::default();
         let format = match extension {
             "gp3" => {
-                song.read_gp3(&bytes).map_err(|e| parse_error("gp3", e))?;
+                song.read_gp3(bytes).map_err(|e| parse_error("gp3", e))?;
                 ScoreFormat::GuitarPro
             }
             "gp4" => {
-                song.read_gp4(&bytes).map_err(|e| parse_error("gp4", e))?;
+                song.read_gp4(bytes).map_err(|e| parse_error("gp4", e))?;
                 ScoreFormat::GuitarPro
             }
             "gp5" => {
-                song.read_gp5(&bytes).map_err(|e| parse_error("gp5", e))?;
+                song.read_gp5(bytes).map_err(|e| parse_error("gp5", e))?;
                 ScoreFormat::GuitarPro
             }
             "gpx" => {
-                song.read_gpx(&bytes).map_err(|e| parse_error("gpx", e))?;
+                song.read_gpx(bytes).map_err(|e| parse_error("gpx", e))?;
                 ScoreFormat::GuitarPro
             }
             "gp" => {
-                song.read_gp(&bytes).map_err(|e| parse_error("gp", e))?;
+                song.read_gp(bytes).map_err(|e| parse_error("gp", e))?;
                 ScoreFormat::GuitarPro
             }
             "mscz" => {
-                song = mscz_song(&bytes)?;
+                song = mscz_song(bytes)?;
                 ScoreFormat::MuseScore
             }
             "musicxml" | "xml" => {
-                song = musicxml_song(&bytes)?;
+                song = musicxml_song(bytes)?;
                 ScoreFormat::MusicXml
             }
             "mxl" => {
-                song = musicxml_song(&unzip_mxl(&bytes)?)?;
+                song = musicxml_song(&unzip_mxl(bytes)?)?;
                 ScoreFormat::MusicXml
             }
             other => return Err(ScoreError::UnsupportedFormat(other.to_string())),
@@ -155,7 +187,7 @@ impl GpScore {
     /// slows for a bridge would otherwise drift further out of time with
     /// every bar after it.
     fn seconds_at(&self, tick: i64) -> f64 {
-        let tick = (tick - self.origin).max(0);
+        let tick = tick.saturating_sub(self.origin).max(0);
         let mut seconds = 0.0;
         for (index, &(start, bpm)) in self.tempo_map.iter().enumerate() {
             if tick <= start {
@@ -200,7 +232,7 @@ impl GpScore {
                     let start = beat.start.unwrap_or(cursor);
                     let length = beat_ticks(&beat.duration);
                     placed.push((start, length, beat));
-                    cursor = start + length.round() as i64;
+                    cursor = start.saturating_add(length.round() as i64);
                 }
                 measure_end = measure_end.max(cursor);
             }
@@ -256,16 +288,17 @@ impl ScoreFile for GpScore {
 
         let mut notes = Vec::new();
         for &(start, written, beat) in &placed {
+            // `onsets` is sorted, so the next one is a binary search away;
+            // a linear scan per beat made a long tab quadratic to load.
             let next = onsets
-                .iter()
-                .copied()
-                .find(|&t| t > start)
-                .map(|t| (t - start) as f64)
+                .get(onsets.partition_point(|&t| t <= start))
+                .map(|&t| t.saturating_sub(start) as f64)
                 .unwrap_or(written);
             let length = written.min(next).max(1.0);
             let start_secs = self.seconds_at(start);
-            let duration_secs = self.seconds_at(start + length.round() as i64) - start_secs;
-            let tick = (start - self.origin).max(0) as u64;
+            let duration_secs =
+                self.seconds_at(start.saturating_add(length.round() as i64)) - start_secs;
+            let tick = start.saturating_sub(self.origin).max(0) as u64;
             for (span, shift) in &played {
                 if !(span.written_start..span.written_end).contains(&tick) {
                     continue;
@@ -393,7 +426,7 @@ fn build_tempo_map(song: &GpSong, measure_starts: &[i64], origin: i64) -> Vec<(i
             // Keyed off the computed measure position, not `header.start`,
             // for the same reason beats are: the GP6/GP7 importer leaves
             // that field at its default on every header.
-            let at = measure_starts.get(index).copied().unwrap_or(origin) - origin;
+            let at = measure_starts.get(index).copied().unwrap_or(origin).saturating_sub(origin);
             map.push((at.max(0), current));
         }
     }
@@ -417,7 +450,7 @@ fn measure_starts(song: &GpSong, origin: i64) -> Vec<i64> {
         starts.push(at);
         let numerator = f64::from(header.time_signature.numerator.max(1));
         let denominator = f64::from(denominator_of(&header.time_signature.denominator).max(1));
-        at += (whole * numerator / denominator).round() as i64;
+        at = at.saturating_add((whole * numerator / denominator).round() as i64);
     }
     starts
 }
@@ -441,7 +474,9 @@ fn measure_marks(song: &GpSong, measure_starts: &[i64], origin: i64) -> Vec<Meas
         .iter()
         .enumerate()
         .map(|(index, header)| {
-            let at = |i: usize| measure_starts.get(i).map(|&tick| (tick - origin).max(0) as u64);
+            let at = |i: usize| {
+                measure_starts.get(i).map(|&tick| tick.saturating_sub(origin).max(0) as u64)
+            };
             let start = at(index).unwrap_or(0);
             // The last bar has no successor to end at; its own length is
             // the next start `measure_starts` would have produced.
@@ -536,6 +571,31 @@ fn mscz_song(bytes: &[u8]) -> Result<GpSong, ScoreError> {
     Ok(guitarpro::convert::legacy::loaded_score_to_legacy_song(&outcome.score))
 }
 
+/// The most any one entry of a zipped score may hold once unpacked. A real
+/// score is a few megabytes at most; the limit is there for a zip whose
+/// header claims (or whose data inflates to) gigabytes, which would exhaust
+/// memory, an abort `catch_unwind` cannot turn into an error.
+const MAX_ZIP_ENTRY_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Refuses a zip archive with an entry claiming more than
+/// [`MAX_ZIP_ENTRY_BYTES`] unpacked, before `guitarpro` pre-allocates that
+/// claim. Bytes that aren't a zip at all are left for the reader to reject.
+fn check_zip_sizes(format: &'static str, bytes: &[u8]) -> Result<(), ScoreError> {
+    let Ok(mut archive) = zip::ZipArchive::new(std::io::Cursor::new(bytes)) else {
+        return Ok(());
+    };
+    for index in 0..archive.len() {
+        let entry = archive.by_index_raw(index).map_err(|e| parse_error(format, e))?;
+        if entry.size() > MAX_ZIP_ENTRY_BYTES {
+            return Err(parse_error(
+                format,
+                format!("{} unpacks to {} bytes, more than a score holds", entry.name(), entry.size()),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// `.mxl` is a zip holding the MusicXML plus a `META-INF/container.xml`
 /// that names it (`<rootfile full-path="…"/>`). Follows that when present,
 /// otherwise takes the first `.xml`/`.musicxml` entry outside `META-INF`.
@@ -563,12 +623,18 @@ pub(crate) fn unzip_mxl(bytes: &[u8]) -> Result<Vec<u8>, ScoreError> {
                 .cloned()
         })
         .ok_or_else(|| parse_error("mxl", "no MusicXML inside the archive"))?;
+    // Bounded by what was read, not by the size the header claims: a
+    // deflate stream can inflate past its stated size.
     let mut out = Vec::new();
     archive
         .by_name(&root)
         .map_err(|e| parse_error("mxl", e))?
+        .take(MAX_ZIP_ENTRY_BYTES + 1)
         .read_to_end(&mut out)
         .map_err(|e| parse_error("mxl", e))?;
+    if out.len() as u64 > MAX_ZIP_ENTRY_BYTES {
+        return Err(parse_error("mxl", "the MusicXML inside unpacks past the size limit"));
+    }
     Ok(out)
 }
 

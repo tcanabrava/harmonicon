@@ -11,6 +11,7 @@ use harmonicon_core::midi::note_to_midi;
 struct FakeScore {
     notes: Vec<ScoreNote>,
     tracks: Vec<ScoreTrack>,
+    tempo: f32,
 }
 
 impl FakeScore {
@@ -31,7 +32,7 @@ impl FakeScore {
             note_count: notes.len(),
             tuning: None,
         }];
-        Self { notes, tracks }
+        Self { notes, tracks, tempo: 120.0 }
     }
 }
 
@@ -52,7 +53,7 @@ impl ScoreFile for FakeScore {
         Ok(self.notes.clone())
     }
     fn tempo_bpm(&self) -> f32 {
-        120.0
+        self.tempo
     }
     fn time_signature(&self) -> (u8, u8) {
         (4, 4)
@@ -368,7 +369,7 @@ fn tabbed(notes: &[(u8, Option<(u8, u8)>)]) -> FakeScore {
         note_count: notes.len(),
         tuning: Some(STANDARD_TUNING.to_vec()),
     }];
-    FakeScore { notes, tracks }
+    FakeScore { notes, tracks, tempo: 120.0 }
 }
 
 fn positions(chart: &HarpChart) -> Vec<(u8, u8)> {
@@ -509,4 +510,15 @@ fn a_flute_plays_the_top_of_a_chord_one_note_at_a_time_and_drops_what_it_lacks()
     assert_eq!(played, [(0.0, 1.0, Some("E4")), (1.0, 0.5, Some("G4"))]);
     assert_eq!((report.total, report.natural, report.unreachable), (4, 2, 2));
     assert!(items.iter().all(|i| i.events[0].fingering.is_none()), "standard fingerings");
+}
+
+#[test]
+fn a_tempo_outside_the_schemas_range_is_clamped_into_it() {
+    // A MIDI tempo event of 0 µs per quarter reads as an infinite BPM.
+    for (stated, written) in [(f32::INFINITY, 300.0), (900.0, 300.0), (5.0, 20.0), (96.0, 96.0)] {
+        let score = FakeScore { tempo: stated, ..FakeScore::of(&[midi("C4")]) };
+        let (chart, _) = to_chart(&score, 0, &richter_harp("C").into(), "A").unwrap();
+        assert_eq!(chart.song.tempo_bpm, written, "{stated}");
+        assert_eq!(chart.timing.tempo_map[0].bpm, written, "{stated}");
+    }
 }

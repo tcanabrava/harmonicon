@@ -461,7 +461,10 @@ fn chart_shell(
     key: String,
     track: Vec<TrackItem>,
 ) -> HarpChart {
-    let tempo = score.tempo_bpm().max(1.0);
+    // Into the range the chart schema allows (`tempo_map[].bpm`, 20–300): a
+    // file can state anything, and a MIDI tempo of 0 µs per quarter is an
+    // infinite BPM. Notes keep their own seconds, so this moves none of them.
+    let tempo = score.tempo_bpm().clamp(20.0, 300.0);
     let (numerator, denominator) = score.time_signature();
     HarpChart {
         metadata: Some(Metadata {

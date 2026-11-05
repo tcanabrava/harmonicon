@@ -308,6 +308,33 @@ computed at every song load and no longer read by anything.
   peak-picking, buffer reuse across chunks, NaN handling in MPM's peak
   scan and NMF's ranking.
 
+### 3. `harmonicon-score` — done 2026-11-05
+
+The binary and XML parsing is the `guitarpro` crate's (0.4.4 in the
+lock); this crate adapts its model. Findings:
+
+- **Bug, fixed**: `guitarpro` trusts size fields it reads. A `.gpx`
+  whose inner file claims a negative size widens it with `as usize` and
+  panics in `Vec::with_capacity`, one changed field in a valid file, and
+  this runs in an asset loader. `GpScore::parse` now runs the third-party
+  read under `catch_unwind` (no profile sets `panic = "abort"`), with a
+  test built from the crate's own `pack_bcfs`/`compress_bcfz`. **Worth
+  reporting upstream**: `io/gpx.rs`'s `read_le_i32(...) as usize`.
+- **Bug, fixed**: `.mscz`/`.mxl`/`.gp` are zips, and both `guitarpro`
+  and `unzip_mxl` read an entry whole with no bound; a small archive can
+  inflate to gigabytes, an abort `catch_unwind` can't catch. Entries over
+  64 MiB unpacked are refused before parsing, and `unzip_mxl` reads
+  through `take`.
+- **Bug, fixed**: converted charts took the source tempo with only
+  `.max(1.0)`; a MIDI tempo of 0 µs/quarter is an infinite BPM, and the
+  schema allows 20–300. Clamped.
+- **Efficiency, fixed**: `GpScore::notes` linear-scanned every onset for
+  every beat; now a binary search. File-derived tick arithmetic
+  (`Beat::start`, measure origins) saturates.
+- Checked and sound: track picking, harpchart adapter, MIDI adapter
+  (core's `midi_file` already refuses a 0-tick header), the zero-numerator
+  meter (downstream parses `0/4` as 4/4), fret/string lookups.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again
