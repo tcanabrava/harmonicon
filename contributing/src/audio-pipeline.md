@@ -121,11 +121,11 @@ switchable live from the Options page:
 
 | Algorithm | Character |
 |---|---|
-| **FFT** (default) | Peak-picking with harmonic suppression on the FFT spectrum. Can report *multiple* simultaneous pitches — the only algorithm here that can, which matters for chord-tone detection. |
+| **FFT** (default) | Peak-picking with harmonic suppression on the FFT spectrum. Can report *multiple* simultaneous pitches, as NMF can and the three below can't — which matters for chords (`PitchAlgorithm::is_polyphonic`). |
 | **YIN** | Cumulative mean-difference function. Monophonic (one pitch), classically robust for a single clean voice/instrument. |
-| **pYIN** | Probabilistic YIN — aggregates YIN's own estimate over a Beta-weighted range of candidate lags for a more stable estimate at the cost of more computation. |
+| **pYIN** | Probabilistic YIN — runs YIN under a sweep of thresholds weighted by a Beta prior and keeps the lag that gathers the most weight; steadier on quiet input at the cost of more computation. Monophonic. |
 | **MPM** | McLeod Pitch Method — normalized square-difference autocorrelation; often the most reliable choice for a single harmonica note (see `docs/lessons_plan.md`/`CLAUDE.md`'s recording-workflow notes, which specifically recommend it for Song Editor Record mode). |
-| **NMF** | Non-negative matrix factorization against a dictionary of harmonica note spectra, rebuilt whenever the detection range changes. The one algorithm that's *chart-aware* by construction, since its dictionary is built from exactly the notes the current harp/chart can produce. |
+| **NMF** | Non-negative matrix factorization of the FFT spectrum against a dictionary of synthetic harmonic templates, one per chromatic note inside `PitchRange`, rebuilt whenever the range changes. Polyphonic: reports up to six notes of a chord. |
 
 **`PitchRange` is chart-driven, not a fixed global constant.** Detecting
 across the full audible spectrum wastes computation and increases false

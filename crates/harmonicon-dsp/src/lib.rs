@@ -56,10 +56,13 @@ pub const PITCH_RANGE_MARGIN_SEMITONES: f32 = 1.0;
 impl PitchRange {
     /// Bounds spanning `freqs`, widened by `margin_semitones` on each side so
     /// a bend or attack landing just past a charted note still detects.
-    /// Falls back to [`PitchRange::default`] when `freqs` is empty.
+    /// Falls back to [`PitchRange::default`] when `freqs` holds no positive,
+    /// finite frequency.
     pub fn from_freqs(freqs: impl IntoIterator<Item = f32>, margin_semitones: f32) -> Self {
-        let (lo, hi) =
-            freqs.into_iter().fold((f32::MAX, f32::MIN), |(lo, hi), f| (lo.min(f), hi.max(f)));
+        let (lo, hi) = freqs
+            .into_iter()
+            .filter(|f| f.is_finite() && *f > 0.0)
+            .fold((f32::MAX, f32::MIN), |(lo, hi), f| (lo.min(f), hi.max(f)));
         if lo > hi {
             return Self::default();
         }
@@ -453,13 +456,8 @@ fn yin_cmnd(
     range: PitchRange,
     cmnd: &mut Vec<f32>,
 ) -> Option<(usize, usize)> {
-    let sr = sample_rate as f32;
-    let tau_min = ((sr / range.max_freq).floor() as usize).max(2);
-    let tau_max = (sr / range.min_freq).ceil() as usize;
+    let (tau_min, tau_max) = lag_bounds(samples.len(), sample_rate, range)?;
     let n = samples.len();
-    if tau_max < tau_min || n < tau_max + 2 {
-        return None;
-    }
     // Comparison window: each τ compares this many sample pairs.
     let w = n - tau_max;
 
@@ -474,6 +472,23 @@ fn yin_cmnd(
         cmnd[tau] = if running > 0.0 { sum * tau as f32 / running } else { 1.0 };
     }
     Some((tau_min, tau_max))
+}
+
+/// The lag span `[tau_min, tau_max]` covering `range` at `sample_rate`,
+/// shared by YIN and MPM: the shortest period is the highest frequency's.
+/// `None` when a block of `n` samples is too short to compare the longest
+/// lag, or `range` gives no finite positive span (a `min_freq` of 0 would
+/// otherwise make the longest lag `usize::MAX`).
+fn lag_bounds(n: usize, sample_rate: u32, range: PitchRange) -> Option<(usize, usize)> {
+    let sr = sample_rate as f32;
+    let longest = (sr / range.min_freq).ceil();
+    let shortest = (sr / range.max_freq).floor();
+    if !(longest.is_finite() && shortest.is_finite() && shortest >= 0.0) {
+        return None;
+    }
+    let tau_min = (shortest as usize).max(2);
+    let tau_max = longest as usize;
+    (tau_min <= tau_max && n >= tau_max.checked_add(2)?).then_some((tau_min, tau_max))
 }
 
 /// First τ in `[tau_min, tau_max]` whose d' dips below `threshold`, descended to
@@ -585,12 +600,8 @@ fn mpm_pitch(
     nsdf: &mut Vec<f32>,
 ) -> Option<f32> {
     let sr = sample_rate as f32;
-    let tau_min = ((sr / range.max_freq).floor() as usize).max(2);
-    let tau_max = (sr / range.min_freq).ceil() as usize;
+    let (tau_min, tau_max) = lag_bounds(samples.len(), sample_rate, range)?;
     let n = samples.len();
-    if tau_max < tau_min || n < tau_max + 2 {
-        return None;
-    }
 
     // Normalized square difference function over the τ range.
     nsdf.resize(tau_max + 1, 0.0);
@@ -703,8 +714,11 @@ fn build_nmf_dict(sample_rate: u32, n_bins: usize, range: PitchRange) -> NmfDict
     // magnitudes span DC..Nyquist over n_bins, so each bin is this wide.
     let freq_res = nyquist / n_bins.max(1) as f32;
 
-    let midi_lo = (12.0 * (range.min_freq / 440.0).log2() + 69.0).ceil() as i32;
-    let midi_hi = (12.0 * (range.max_freq / 440.0).log2() + 69.0).floor() as i32;
+    // Clamped to MIDI's own range: a template outside it could never be
+    // reported (`freq_to_note`), and an unclamped `min_freq` of 0 would make
+    // `midi_lo` `i32::MIN` and the loop below build billions of columns.
+    let midi_lo = ((12.0 * (range.min_freq / 440.0).log2() + 69.0).ceil() as i32).max(0);
+    let midi_hi = ((12.0 * (range.max_freq / 440.0).log2() + 69.0).floor() as i32).min(127);
 
     let mut freqs = Vec::new();
     let mut columns: Vec<Vec<f32>> = Vec::new();

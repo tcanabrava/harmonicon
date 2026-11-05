@@ -285,6 +285,29 @@ Carried into the song session (8): `song/mod.rs` still re-exports
 `song::*`, against the no-facades rule. `SongManifest::waveform` is
 computed at every song load and no longer read by anything.
 
+### 2. `harmonicon-dsp` — done 2026-11-05
+
+- **Hazard, fixed**: a `PitchRange` with a zero `min_freq` overflowed
+  YIN/MPM's lag arithmetic and sent NMF's dictionary builder into
+  billions of columns. Unreachable today (every range comes from
+  instrument pitches through `from_freqs`), but both are now guarded:
+  `from_freqs` drops non-positive/non-finite input, YIN and MPM share
+  one checked `lag_bounds`, and NMF clamps its notes to MIDI's range.
+- **Docs, fixed**: `contributing/src/audio-pipeline.md` called FFT the
+  only polyphonic detector, described pYIN as weighting lags rather than
+  thresholds, and NMF's dictionary as harmonica spectra limited to the
+  harp's notes; it is synthetic templates for every chromatic note in
+  range.
+- **Open, needs the corpus**: `suppress_harmonics` only drops a peak that
+  is a multiple of a *stronger* one. A fundamental weaker than its own
+  second harmonic, common low on a harmonica, is reported alongside its
+  octave as two notes. Whether that happens on real input, and how often,
+  is a question for the recorded corpus in `docs/pitch_detection_plan.md`,
+  not a constant to change blind.
+- Checked and sound: silence and short-input gates, bin bounds in FFT
+  peak-picking, buffer reuse across chunks, NaN handling in MPM's peak
+  scan and NMF's ranking.
+
 ### Carried into later sessions
 
 Found while making `cargo clippy --all-targets -- -D warnings` pass again

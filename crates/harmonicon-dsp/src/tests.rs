@@ -531,3 +531,35 @@ fn a_chord_from_the_real_synth_is_heard_as_both_notes() {
         "expected G4 from the synthesized chord, got {names:?}"
     );
 }
+
+// ── degenerate ranges ─────────────────────────────────────────────────────
+
+#[test]
+fn a_degenerate_range_reports_nothing_rather_than_panicking() {
+    let sample_rate = 44100u32;
+    let samples: Vec<f32> = (0..CHUNK_SIZE)
+        .map(|i| 0.5 * (2.0 * PI * 440.0 * i as f32 / sample_rate as f32).sin())
+        .collect();
+    let ranges = [
+        PitchRange { min_freq: 0.0, max_freq: 2500.0 },
+        PitchRange { min_freq: f32::NAN, max_freq: 2500.0 },
+        PitchRange { min_freq: 200.0, max_freq: 0.0 },
+        PitchRange { min_freq: 2500.0, max_freq: 200.0 },
+    ];
+    for range in ranges {
+        for &algorithm in PitchAlgorithm::all() {
+            let mut state = FftState::default();
+            // Only the no-panic, bounded-time property is the point here;
+            // FFT and NMF may still find the tone in a half-open range.
+            let pitches = analyze(&samples, sample_rate, &mut state, algorithm, range).pitches;
+            assert!(pitches.len() <= NMF_MAX_NOTES, "{algorithm:?} over {range:?}");
+        }
+    }
+}
+
+#[test]
+fn pitch_range_from_freqs_ignores_non_positive_and_non_finite_input() {
+    let range = PitchRange::from_freqs([0.0, f32::NAN, -5.0, 440.0, f32::INFINITY], 0.0);
+    assert_eq!(range, PitchRange { min_freq: 440.0, max_freq: 440.0 });
+    assert_eq!(PitchRange::from_freqs([0.0, f32::NAN], 1.0), PitchRange::default());
+}
