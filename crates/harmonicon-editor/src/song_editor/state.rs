@@ -172,6 +172,7 @@ pub(super) struct EditorState {
     /// string, a fret span no hand makes, a fret off the neck), waiting for
     /// `interaction::report_technique_skips` to say so. Not content.
     pub(super) unplayable_notice: bool,
+    pub(super) note_motion: Vec<super::note_motion::Request>,
     pub(super) loop_settings: LoopSettings,
     pub(super) time_signature: String,
     pub(super) key: String,
@@ -366,6 +367,7 @@ impl Default for EditorState {
             transpose_notice: None,
             technique_notice: None,
             unplayable_notice: false,
+            note_motion: Vec::new(),
             snap_mode: SnapMode::default(),
             twelve_bar_tint: false,
             phrase_editor: None,

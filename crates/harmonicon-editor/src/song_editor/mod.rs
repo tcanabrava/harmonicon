@@ -38,6 +38,7 @@ mod flute_note;
 mod grid;
 mod grid_cache;
 mod guitar_note;
+mod guitar_setup;
 mod harmonica_note;
 mod harpchart;
 mod instrument_chart;
@@ -54,6 +55,7 @@ mod midi_import;
 mod mod_panel;
 mod music_score_bridge;
 mod note_model;
+mod note_motion;
 mod panel;
 mod panel_widgets;
 mod phrase_editor;
@@ -378,6 +380,14 @@ impl Plugin for SongEditor2Plugin {
                     .in_set(DocumentPass)
                     .after(EditorPass)
                     .run_if(in_state(AppState::SongEditor2)),
+            )
+            .add_systems(
+                Update,
+                note_motion::animate.after(DocumentPass).run_if(in_state(AppState::SongEditor2)),
+            )
+            .add_systems(
+                Update,
+                guitar_setup::sync.in_set(EditorPass).run_if(in_state(AppState::SongEditor2)),
             )
             .add_message::<state::DocumentCommand>()
             .add_message::<midi_import::MidiFileLoaded>();

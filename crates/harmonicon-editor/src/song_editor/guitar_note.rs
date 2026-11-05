@@ -170,11 +170,27 @@ pub(super) fn apply_modifier(state: &mut EditorState, kind: ModButton) {
         };
         match candidate.filter(|c| fits(&instrument, &state.notes, c, &[])) {
             Some(edited) => {
+                if matches!(kind, ModButton::StringUp | ModButton::StringDown) {
+                    state.note_motion.push(super::note_motion::Request {
+                        id,
+                        rows: f32::from(note.row()) - f32::from(edited.row()),
+                        rejected: false,
+                    });
+                }
                 if let Some(n) = state.notes.iter_mut().find(|n| n.id == id) {
                     *n = edited;
                 }
             }
-            None => refused += 1,
+            None => {
+                refused += 1;
+                if matches!(kind, ModButton::StringUp | ModButton::StringDown) {
+                    state.note_motion.push(super::note_motion::Request {
+                        id,
+                        rows: if kind == ModButton::StringUp { -1.0 } else { 1.0 },
+                        rejected: true,
+                    });
+                }
+            }
         }
     }
     if kind == ModButton::Vibrato {
@@ -244,6 +260,18 @@ mod tests {
         state.sticky_fret = 2;
         place(&mut state, 3, 0, 12);
         state
+    }
+
+    #[test]
+    fn string_buttons_queue_movement_or_rejection_feedback() {
+        let mut state = with_a3();
+        apply_modifier(&mut state, ModButton::StringUp);
+        assert_eq!(at(&state, 0), fretted(3, 2));
+        assert!(state.note_motion.last().unwrap().rejected);
+        apply_modifier(&mut state, ModButton::StringDown);
+        assert_eq!(at(&state, 0), fretted(4, 7));
+        assert!(!state.note_motion.last().unwrap().rejected);
+        assert_eq!(state.note_motion.last().unwrap().rows, -1.0);
     }
 
     #[test]
