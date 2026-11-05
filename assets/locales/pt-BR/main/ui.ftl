@@ -1046,3 +1046,7 @@ editor-guitar-tuning-custom = Personalizada
 
 note-trainer-score-help = Nota dourada: alvo · Nota branca, quando exibida: comece aqui
 note-trainer-flute-key-help = Chaves preenchidas: pressione · Contornos: deixe abertas · Cabeça à esquerda
+
+note-trainer-piano-hands-help = Posições sugeridas de cinco dedos; você pode usar qualquer mão. Tecla dourada: alvo · Azul: nota detectada
+note-trainer-left-hand = Mão esquerda
+note-trainer-right-hand = Mão direita

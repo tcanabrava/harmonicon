@@ -42,9 +42,11 @@ use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
 use super::GameplayRoot;
 use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
+mod piano;
 mod teaching;
 use super::guitar_visuals::{FretCell, paint_cell, spawn_fretboard};
 use harmonicon_core::instrument::flute::Flute;
+pub(super) use piano::update_hands;
 pub(super) use teaching::sync_score;
 
 /// Seconds the "Landed!" line stays up before the live status returns.
@@ -87,6 +89,8 @@ impl Practice {
         let len = self.drills.len() as isize;
         self.index = (self.index as isize + delta).rem_euclid(len) as usize;
         self.held = 0.0;
+        self.heard = None;
+        self.heard_midi = None;
     }
 
     /// Feeds one frame: the pitch heard nearest the target (`None` in
@@ -501,8 +505,18 @@ pub(super) fn setup(
     let previous = String::from(loc.msg("note-trainer-previous"));
     let next = String::from(loc.msg("note-trainer-next"));
     let listen = String::from(loc.msg("note-trainer-listen"));
-    commands.entity(root).with_children(|root| {
+    let mut content = root;
+    commands.entity(root).with_children(|parent| {
+        content = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area(
+            parent,
+            Color::srgb(0.4, 0.55, 0.7),
+            Color::srgb(0.1, 0.12, 0.16),
+        );
+    });
+    commands.entity(content).with_children(|root| {
         root.spawn(Node {
+            width: Val::Percent(100.0),
+            flex_shrink: 0.0,
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(12.0),
             padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
@@ -522,7 +536,12 @@ pub(super) fn setup(
                 TextColor(Color::srgb(0.75, 0.85, 1.0)),
             ));
             card.spawn((
-                Node { width: Val::Px(320.0), height: Val::Px(10.0), ..default() },
+                Node {
+                    width: Val::Percent(100.0),
+                    max_width: Val::Px(320.0),
+                    height: Val::Px(10.0),
+                    ..default()
+                },
                 BackgroundColor(Color::srgb(0.12, 0.13, 0.18)),
             ))
             .with_children(|track| {
@@ -561,7 +580,13 @@ pub(super) fn setup(
             width: Val::Percent(100.0),
             flex_direction: FlexDirection::Column,
             flex_shrink: 0.0,
-            min_height: Val::Px(if trainer.flute().is_some() { 156.0 } else { 320.0 }),
+            min_height: Val::Px(if trainer.flute().is_some() {
+                156.0
+            } else if trainer.piano().is_some() {
+                250.0
+            } else {
+                320.0
+            }),
             padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
             ..default()
         })
@@ -591,26 +616,7 @@ pub(super) fn setup(
                         TextColor(Color::WHITE),
                     ));
                 }
-                // The same keyboard the piano roll draws, lying as the player
-                // faces it: two octaves either side of the drills' middle.
-                (_, _, Some(_)) => {
-                    strip
-                        .spawn(Node { width: Val::Px(900.0), height: Val::Px(180.0), ..default() })
-                        .with_children(|keys| {
-                            use harmonicon_ui::dialogs::piano_keys::{
-                                KeyboardAxis, KeyboardSpec, spawn_piano_keys,
-                            };
-                            spawn_piano_keys(
-                                keys,
-                                KeyboardSpec {
-                                    low: 48,
-                                    high: 84,
-                                    axis: KeyboardAxis::Horizontal,
-                                    label_cs: true,
-                                },
-                            );
-                        });
-                }
+                (_, _, Some(piano)) => piano::spawn(strip, piano, &loc),
                 _ => {}
             }
         });
@@ -732,7 +738,13 @@ pub(super) fn update_piano_keys(
     });
     for keyboard in &keyboards {
         harmonicon_ui::dialogs::piano_keys::paint_piano_keys(keyboard, &mut keys, |midi| {
-            (Some(midi) == target).then_some(Color::srgb(0.98, 0.80, 0.25))
+            if Some(midi) == target {
+                Some(Color::srgb(0.98, 0.80, 0.25))
+            } else if trainer.practice.heard_midi.is_some_and(|heard| heard.round() as u8 == midi) {
+                Some(Color::srgb(0.3, 0.65, 1.0))
+            } else {
+                None
+            }
         });
     }
 }

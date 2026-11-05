@@ -2,7 +2,7 @@
 
 **Play → Note Trainer** asks which instrument you're practising.
 **Harmonica** opens the [Bending Trainer](bending-trainer.md); **Guitar**
-and **Flute** open the Note Trainer described here. Like the Bending Trainer
+**Flute** and **Piano** open the Note Trainer described here. Like the Bending Trainer
 it is practice, not a lesson: there is no song and nothing to fail.
 
 ![Note Trainer for the guitar](images/note-trainer-guitar.png)
@@ -57,3 +57,12 @@ the trainer hears the pitch, so it trusts you to use the fingering it
 shows.
 
 ![Note Trainer for the flute](images/note-trainer-flute.png)
+
+## Piano
+
+The trainer shows all 88 keys from A0 to C8 at a stable width. Gold marks
+the target and blue the detected note. The grand staff shows both clefs.
+Labelled left- and right-hand rectangles suggest five-finger positions,
+keeping a position until the target requires a move. These are suggestions,
+not required hand assignments: pitch detection cannot tell which hand played.
+The drills cover C3–C6. On short screens, scroll to reach the keyboard.

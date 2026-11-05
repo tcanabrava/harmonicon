@@ -172,6 +172,7 @@ impl Plugin for GameplayPlugin {
                 note_trainer::update_fretboard.after(note_trainer::listen),
                 note_trainer::update_flute_drawing.after(note_trainer::listen),
                 note_trainer::update_piano_keys.after(note_trainer::listen),
+                note_trainer::update_hands.after(note_trainer::listen),
                 note_trainer::handle_escape.run_if(not(tour_active)),
             )
                 .run_if(in_state(AppState::NoteTrainer)),
