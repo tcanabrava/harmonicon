@@ -12,8 +12,6 @@ use super::{GameplayClock, ScheduledNote, SongNotes};
 
 /// A pending treble note's ribbon: warm amber, distinct from an unlit ivory key.
 pub(super) const PIANO_COLOR: Color = Color::srgb(1.0, 0.65, 0.35);
-/// A key under the hit line.
-
 /// A key under the hit line that is being heard.
 const KEY_HELD: Color = Color::srgb(0.98, 0.80, 0.25);
 /// A key about to be played.
@@ -60,6 +58,33 @@ pub(super) fn update_piano_keyboard(
     for keyboard in &keyboards {
         paint_piano_keys(keyboard, &mut keys, |midi| key_state(&window, midi, now));
     }
+}
+
+pub(super) fn spawn_keyboard(parent: &mut ChildSpawnerCommands, low: u8, high: u8, height: f32) {
+    parent
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(height),
+            flex_shrink: 0.0,
+            ..default()
+        })
+        .with_children(|p| {
+            harmonicon_ui::dialogs::piano_keys::spawn_piano_keys(
+                p,
+                harmonicon_ui::dialogs::piano_keys::KeyboardSpec {
+                    low,
+                    high,
+                    axis: harmonicon_ui::dialogs::piano_keys::KeyboardAxis::Horizontal,
+                    label_cs: true,
+                },
+            );
+        });
+}
+
+/// The teaching split used by the two-staff practice view: bass below
+/// middle C, treble at and above it. Crossing hands needs authored voices.
+pub(super) fn hand_color(midi: u8) -> Color {
+    if midi < 60 { Color::srgb(0.40, 0.70, 1.0) } else { PIANO_COLOR }
 }
 
 #[cfg(test)]
@@ -112,31 +137,4 @@ mod tests {
         notes[1].missed = true;
         assert_eq!(key_state(&notes, 64, 2.2), None, "a missed note lights nothing");
     }
-}
-
-pub(super) fn spawn_keyboard(parent: &mut ChildSpawnerCommands, low: u8, high: u8, height: f32) {
-    parent
-        .spawn(Node {
-            width: Val::Percent(100.0),
-            height: Val::Px(height),
-            flex_shrink: 0.0,
-            ..default()
-        })
-        .with_children(|p| {
-            harmonicon_ui::dialogs::piano_keys::spawn_piano_keys(
-                p,
-                harmonicon_ui::dialogs::piano_keys::KeyboardSpec {
-                    low,
-                    high,
-                    axis: harmonicon_ui::dialogs::piano_keys::KeyboardAxis::Horizontal,
-                    label_cs: true,
-                },
-            );
-        });
-}
-
-/// The teaching split used by the two-staff practice view: bass below
-/// middle C, treble at and above it. Crossing hands needs authored voices.
-pub(super) fn hand_color(midi: u8) -> Color {
-    if midi < 60 { Color::srgb(0.40, 0.70, 1.0) } else { PIANO_COLOR }
 }

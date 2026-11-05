@@ -287,7 +287,7 @@ pub(crate) fn setup_lesson_tree(
     }
     // A fresh build already reflects every toggle made so far.
     request.pending = false;
-    let tree = match build_layout(&lessons, &profile, &laid_out_collapsed(&collapsed, &pending)) {
+    let tree = match build_layout(lessons, &profile, &laid_out_collapsed(&collapsed, &pending)) {
         Ok(tree) => tree,
         // A cycle or a dangling prerequisite. `validate-pack` fails a pack's
         // CI over either, so this only fires for an unvalidated pack or a

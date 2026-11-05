@@ -56,10 +56,10 @@ pub(super) fn sync_tuning(
     let label = tuning_label(&guitar, &loc);
     if let Some(children) = children {
         for child in children {
-            if let Ok(mut value) = values.get_mut(*child) {
-                if value.0 != label {
-                    value.0.clone_from(&label);
-                }
+            if let Ok(mut value) = values.get_mut(*child)
+                && value.0 != label
+            {
+                value.0.clone_from(&label);
             }
         }
     } else if let Ok(root) = roots.single() {

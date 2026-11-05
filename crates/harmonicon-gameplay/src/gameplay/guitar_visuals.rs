@@ -360,7 +360,7 @@ mod tests {
         }
         assert!(!different_chord(&refs(&current), &refs(&same)));
         assert!(different_chord(&refs(&current), &refs(&changed)));
-        assert!(!different_chord(&refs(&current), &refs(&vec![note(2.0, 1, 3)])));
+        assert!(!different_chord(&refs(&current), &refs(&[note(2.0, 1, 3)])));
         assert!(!different_chord(&refs(&current), &[]));
     }
 
@@ -743,37 +743,36 @@ fn spawn_neck(
                             BackgroundColor(string_color(string).with_alpha(0.5)),
                         ));
                     }
-                    for next in [false] {
-                        let color = if next { NECK_NEXT } else { NECK_NOW };
-                        board
-                            .spawn((
-                                NeckRegion(next),
-                                NeckMotion::default(),
+                    // Only the current hand position gets a region; the next
+                    // group is shown by its rings alone.
+                    board
+                        .spawn((
+                            NeckRegion(false),
+                            NeckMotion::default(),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                height: Val::Percent(100.0),
+                                border: UiRect::all(Val::Px(2.0)),
+                                ..default()
+                            },
+                            BorderColor::all(NECK_NOW),
+                            BackgroundColor(NECK_NOW.with_alpha(0.14)),
+                        ))
+                        .with_children(|region| {
+                            region.spawn((
+                                NeckLabel(false),
+                                Text::new(""),
+                                TextLayout::no_wrap(),
+                                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                                TextColor(NECK_NOW),
                                 Node {
                                     position_type: PositionType::Absolute,
-                                    height: Val::Percent(100.0),
-                                    border: UiRect::all(Val::Px(if next { 0.0 } else { 2.0 })),
+                                    top: Val::Px(-22.0),
                                     ..default()
                                 },
-                                BorderColor::all(color),
-                                BackgroundColor(color.with_alpha(if next { 0.05 } else { 0.14 })),
-                            ))
-                            .with_children(|region| {
-                                region.spawn((
-                                    NeckLabel(next),
-                                    Text::new(""),
-                                    TextLayout::no_wrap(),
-                                    TextFont { font_size: FontSize::Px(13.0), ..default() },
-                                    TextColor(color),
-                                    Node {
-                                        position_type: PositionType::Absolute,
-                                        top: Val::Px(if next { 112.0 } else { -22.0 }),
-                                        ..default()
-                                    },
-                                ));
-                            });
-                        // Next rings are drawn first, with solid current dots on top.
-                    }
+                            ));
+                        });
+                    // Next rings are drawn first, with solid current dots on top.
                     for next in [true, false] {
                         for string in 1..=guitar.string_count() {
                             board

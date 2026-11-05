@@ -25,12 +25,12 @@ fn spec(piano: &Piano) -> KeyboardSpec {
 /// five white keys around the target. This suggests a span, never a fingering.
 fn span(piano: &Piano, previous: Option<u8>, target: u8) -> (u8, u8) {
     let whites: Vec<u8> = (piano.lowest()..=piano.highest()).filter(|&k| !is_black(k)).collect();
-    if let Some(low) = previous {
-        if let Some(index) = whites.iter().position(|&k| k == low) {
-            let high = whites[(index + 4).min(whites.len() - 1)];
-            if (low..=high).contains(&target) {
-                return (low, high);
-            }
+    if let Some(low) = previous
+        && let Some(index) = whites.iter().position(|&k| k == low)
+    {
+        let high = whites[(index + 4).min(whites.len() - 1)];
+        if (low..=high).contains(&target) {
+            return (low, high);
         }
     }
     let at = whites.partition_point(|&k| k <= target).saturating_sub(1);

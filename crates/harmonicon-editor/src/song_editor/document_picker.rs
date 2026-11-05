@@ -238,8 +238,7 @@ mod tests {
     }
     #[test]
     fn metadata_and_notes_are_protected_but_scroll_is_not_content() {
-        let mut state = EditorState::default();
-        state.scroll_beat = 10;
+        let mut state = EditorState { scroll_beat: 10, ..default() };
         assert!(!has_content(&state));
         state.name = "An unsaved title".into();
         assert!(has_content(&state));

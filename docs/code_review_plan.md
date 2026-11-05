@@ -253,3 +253,34 @@ Highest data-loss risk in the codebase — prioritise save/load.
 ## Findings
 
 Add a `### <crate>` heading here as each review completes.
+
+### Carried into later sessions
+
+Found while making `cargo clippy --all-targets -- -D warnings` pass again
+before the review began (main was failing it in gameplay, editor and
+lessons):
+
+- **gameplay (d), Hazard/Cleanup**: `05127afa` removed the progress bar's
+  waveform, note markers, mastery bars and drag-to-loop, but left
+  `song_progress_overlay.rs` describing them. The module `//!` header and
+  the crate `CLAUDE.md` still describe the old bar. `note_marker_geometry`,
+  `phrase_bar_height_px` and `cursor_to_time` are now `#[cfg(test)]`, so their
+  tests cover code that never runs. `spawn_song_progress` keeps
+  `_waveform`/`_lane_count`/`_learned` parameters, and
+  `SongWaveformMaterialPlugin` is still registered. Decide what the bar is
+  now, then delete the rest.
+- **gameplay (a), possible Bug**: `pause_menu::resume_section_repeat`
+  rewinds on `paused.is_changed()`. That is also true on the system's
+  first run, so a song started with an active `LoopConfig` (Practice missed
+  section) may rewind during the countdown before the sink exists. This
+  would race `start_at_practice_range`. Verify with an App test.
+- **gameplay (a), Hazard**: the per-note reset block in
+  `resume_section_repeat` duplicates `handle_loop_boundary`'s; a new
+  `ScheduledNote` score field has to be cleared in both. Share one
+  `reset_note_score_state`.
+- **gameplay (c), Cleanup**: the guitar neck's "next" hand region was
+  dropped (a `for next in [false]` loop); `NeckRegion(bool)`/
+  `NeckLabel(bool)` and `update_neck_overview`'s `next_span` branches
+  still carry the dead half.
+- **gameplay (d), Docs**: `karaoke::strip_top` says the strip starts
+  under the progress bar, but it only offsets by the staff.

@@ -70,12 +70,11 @@ pub(super) fn make_board_selectable(commands: &mut Commands, board: Entity) {
                     return;
                 };
                 let Some(guitar) = trainer.guitar() else { return };
-                if let Some((string, fret)) = board_position(guitar, cursor) {
-                    if trainer.select_guitar_position(string, fret)
-                        && trainer.kind == TechniqueKind::Position
-                    {
-                        trainer.practice.revealed = true;
-                    }
+                if let Some((string, fret)) = board_position(guitar, cursor)
+                    && trainer.select_guitar_position(string, fret)
+                    && trainer.kind == TechniqueKind::Position
+                {
+                    trainer.practice.revealed = true;
                 }
             },
         );

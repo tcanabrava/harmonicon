@@ -145,18 +145,18 @@ impl Practice {
             self.started = false;
             self.start_held = 0.0;
         }
-        if drill.kind == TechniqueKind::Glide {
-            if let Some(start) = drill.start {
-                self.trace_tick += dt;
-                if self.trace_tick >= 0.05 {
-                    self.trace_tick = 0.0;
-                    let point = midi
-                        .map(|m| (m - start) / (drill.target - start))
-                        .filter(|v| (-0.5..=1.5).contains(v));
-                    self.trace.push_back(point);
-                    if self.trace.len() > 80 {
-                        self.trace.pop_front();
-                    }
+        if drill.kind == TechniqueKind::Glide
+            && let Some(start) = drill.start
+        {
+            self.trace_tick += dt;
+            if self.trace_tick >= 0.05 {
+                self.trace_tick = 0.0;
+                let point = midi
+                    .map(|m| (m - start) / (drill.target - start))
+                    .filter(|v| (-0.5..=1.5).contains(v));
+                self.trace.push_back(point);
+                if self.trace.len() > 80 {
+                    self.trace.pop_front();
                 }
             }
         }
@@ -871,8 +871,7 @@ mod tests {
         assert!(lit(found.first()).is_empty());
         let notes = drills(&guitar, TechniqueKind::Target);
         assert_eq!(lit(notes.first()).len(), 1);
-        let mut trainer = NoteTrainer::default();
-        trainer.practice = Practice::new(found);
+        let mut trainer = NoteTrainer { practice: Practice::new(found), ..default() };
         assert!(trainer.guitar_targets().is_empty());
         trainer.practice.revealed = true;
         assert_eq!(trainer.guitar_targets().len(), 1);
@@ -961,8 +960,7 @@ mod reference_tests {
     #[test]
     fn reference_playback_cannot_complete_an_attempt_through_the_microphone() {
         let mut app = App::new();
-        let mut trainer = NoteTrainer::default();
-        trainer.reference_remaining = 1.8;
+        let trainer = NoteTrainer { reference_remaining: 1.8, ..default() };
         let target = trainer.practice.drill().unwrap().target;
         app.insert_resource(trainer)
             .init_resource::<BendingTrainerSettings>()

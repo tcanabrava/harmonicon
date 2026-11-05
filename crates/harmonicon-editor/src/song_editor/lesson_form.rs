@@ -519,10 +519,12 @@ mod instrument_tests {
     #[test]
     fn instructional_lessons_keep_their_instrument_when_saved_and_reopened() {
         for kind in super::super::instrument_ui::InstrumentKind::ALL {
-            let mut original = EditorState::default();
-            original.instrument = kind.selection();
-            original.lesson_id = "instrument-roundtrip".into();
-            original.lesson_unit = "basics".into();
+            let original = EditorState {
+                instrument: kind.selection(),
+                lesson_id: "instrument-roundtrip".into(),
+                lesson_unit: "basics".into(),
+                ..default()
+            };
             let (json, warnings) = serialize_lesson(&original);
             assert!(warnings.is_empty(), "{warnings:?}");
             let manifest = parse_lesson(json.as_bytes()).unwrap();

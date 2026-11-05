@@ -62,8 +62,7 @@ struct KaraokeNext;
 /// Where the strip starts: under the song-progress bar, and under the staff
 /// too when one is drawn.
 pub(super) fn strip_top(staff: bool) -> f32 {
-    let staff_height = if staff { harmonicon_ui::music_score::PANEL_HEIGHT } else { 0.0 };
-    staff_height
+    if staff { harmonicon_ui::music_score::PANEL_HEIGHT } else { 0.0 }
 }
 
 /// Spawns the strip `top` px below the window's top edge, full width —

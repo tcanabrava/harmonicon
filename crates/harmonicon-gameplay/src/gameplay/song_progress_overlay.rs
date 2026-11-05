@@ -41,15 +41,6 @@ use super::{
     GameplayClock, GameplayLogic, GameplayRoot, LoopConfig, Paused, SongEnd, loop_range_valid,
 };
 
-/// Every bar keeps at least this much height (as a fraction 0..1) even during
-/// silence, so the waveform reads as a continuous shape rather than gaps.
-
-/// Waveform fill color — a desaturated, receding, dark gray-blue,
-/// deliberately *not* the same hue as a note marker's blow color drawn over
-/// it, or "there's sound here" and "this is a blow note" read as the same
-/// signal. Translucent (alpha 0.55) because it sits directly behind the
-/// note markers — see [`spawn_song_progress`].
-
 /// Height (px) of the note-lanes strip — tall enough that even a 12-hole
 /// chromatic's lanes stay individually legible (5px each; a 10-hole
 /// diatonic gets 6px). See [`note_lane_geometry`]. Also the waveform's own
@@ -76,34 +67,14 @@ pub const BAR_HEIGHT: f32 = NOTE_LANES_HEIGHT;
 #[cfg(test)]
 const MIN_NOTE_MARKER_FRAC: f32 = 0.003;
 
-/// A freshly-spawned note-marker rect's fill, before [`sync_note_marker_colors`]
-/// corrects it to the actual active theme/colorblind colors — used only so
-/// a marker isn't fully invisible for the one frame between spawning and
-/// that system's first run (see its own doc comment for why spawn time
-/// itself can't just resolve the real color directly). Same hues the Song
-/// Editor's scrollbar minimap uses by default
-/// (`song_editor::interaction::SCROLLBAR_BLOW_COLOR`/`SCROLLBAR_DRAW_COLOR`),
-/// for the same "note as a colored rect" language.
-
 /// Alpha applied to whichever blow/draw [`harmonicon_platform::theme::NoteColors`] a note
 /// marker resolves to (the theme colors themselves carry no alpha of their
 /// own).
 const NOTE_MARKER_ALPHA: f32 = 0.9;
 
-/// Single fixed color for every [`PhraseMasteryBar`] — learned fraction is
-/// encoded by the bar's *height* (see [`phrase_bar_height_px`]). A
-/// warm gold, distinct from blow (blue-ish)/draw (orange-ish) note colors
-/// and the waveform's own gray-blue, and echoing
-/// [`SELECTED_PHRASE_RECT_BORDER_COLOR`]'s gold for a cohesive "meter" look.
-/// Translucent rather than solid — it still visibly covers the waveform
-/// behind it (the whole point of this overlay), just as a tint over it
-/// rather than fully replacing it.
-
 /// A phrase's mastery bar is never shorter than this (px), even at a
-/// learned fraction near zero — same "never fully disappear" reasoning as
-/// [`WAVEFORM_FLOOR`], just an absolute pixel floor instead of a fractional
-/// one, since this bar's height is computed directly in pixels against
-/// [`BAR_HEIGHT`] rather than as a percentage of a fixed-height row.
+/// learned fraction near zero, computed directly in pixels against
+/// [`BAR_HEIGHT`].
 #[cfg(test)]
 const PHRASE_BAR_MIN_HEIGHT_PX: f32 = 2.0;
 
@@ -151,12 +122,6 @@ struct PhraseOverlay;
 /// learned fraction changes (e.g. a manual pause-menu edit).
 #[derive(Component, Clone, Copy)]
 struct PhraseSectionRect(usize);
-
-/// The bar that actually grows upward from a phrase column's bottom edge —
-/// same section index as its parent [`PhraseSectionRect`], kept as its own
-/// component (rather than reading it back off the parent) so
-/// [`update_phrase_mastery_bars`] can resize it with one more disjoint query
-/// instead of walking the hierarchy. See [`phrase_bar_height_px`].
 
 /// Marks a note-marker rectangle with which direction it is, so
 /// [`sync_note_marker_colors`] can tint it from the active theme/colorblind
@@ -563,7 +528,7 @@ fn phrase_rect_geometry(start_time: f64, end_time: f64, duration_secs: f64) -> O
     Some((left, (right - left).max(0.0)))
 }
 
-/// Height (px) of a phrase's [`PhraseMasteryBar`] for a given learned
+/// Height (px) of a phrase's mastery bar for a given learned
 /// fraction (clamped 0..1): linear against [`BAR_HEIGHT`] — 100% learned
 /// fills the whole column (covering the waveform behind it), a fresh
 /// phrase near 0% still shows [`PHRASE_BAR_MIN_HEIGHT_PX`] as a thin line
@@ -659,13 +624,6 @@ fn update_loop_marker(
         }
     }
 }
-
-/// Resizes each [`PhraseMasteryBar`] when `AdaptiveDifficulty` changes (a
-/// manual pause-menu edit, or a fresh song's initial load) without
-/// respawning — the bars themselves are only ever (re)created in
-/// [`spawn_song_progress`], since their count/geometry only changes when
-/// the song itself does. Colour is fixed ([`PHRASE_BAR_COLOR`]), so this
-/// never needs `ColorblindPalette`.
 
 /// Shows the per-phrase mastery overlay only while actually paused — see
 /// the module doc comment for why (Rocksmith keeps mastery/difficulty

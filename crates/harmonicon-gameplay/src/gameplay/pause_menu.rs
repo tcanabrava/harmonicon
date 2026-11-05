@@ -194,11 +194,6 @@ pub(super) struct LoopRangeLabel;
 #[derive(Component)]
 pub(super) struct RepeatButtonLabel;
 
-/// The loop range itself is set by click-and-drag directly on the
-/// song-progress bar while paused (`song_progress_overlay`'s
-/// `ProgressBarMode::Edit` — see its module doc comment); this button only
-/// ever clears it.
-
 /// Pure so both possible readouts (off / a valid range) are unit-testable
 /// without spinning up an `App`.
 fn loop_label_text(loc: &Localization, cfg: &LoopConfig) -> String {
@@ -964,6 +959,47 @@ fn on_pause_button_click(
     toggle_pause(&mut paused, &mut overlay, &sinks);
 }
 
+fn on_repeat_section(
+    _: On<Activate>,
+    selected: Res<SelectedPhraseIndex>,
+    adaptive: Res<AdaptiveDifficulty>,
+    mut loops: ResMut<LoopConfig>,
+) {
+    let Some(section) = adaptive.sections.get(selected.0) else { return };
+    if loops.active && loops.start_time == section.start_time && loops.end_time == section.end_time
+    {
+        loops.active = false;
+    } else {
+        loops.start_time = section.start_time;
+        loops.end_time = section.end_time;
+        loops.active = super::loop_range_valid(section.start_time, section.end_time);
+    }
+}
+
+pub(super) fn resume_section_repeat(
+    paused: Res<Paused>,
+    loops: Res<LoopConfig>,
+    mut clock: ResMut<super::GameplayClock>,
+    mut notes: ResMut<super::SongNotes>,
+    sinks: Query<&AudioSink, With<MusicPlayer>>,
+) {
+    if !paused.is_changed() || paused.0 || !loops.active {
+        return;
+    }
+    clock.rewind_to(loops.start_time, sinks.single().ok());
+    let (start, end) = super::loop_reset_range(&notes.notes, loops.start_time, loops.end_time);
+    for note in &mut notes.notes[start..end] {
+        note.hit = false;
+        note.missed = false;
+        note.held = 0.0;
+        note.sustain_scored = false;
+        note.pitch_samples.clear();
+        note.amp_samples.clear();
+        note.miss_evidence = None;
+    }
+    notes.cursor = start;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1106,45 +1142,4 @@ mod tests {
         assert_eq!(clamp_learned(1.5), 1.0);
         assert_eq!(clamp_learned(0.42), 0.42);
     }
-}
-
-fn on_repeat_section(
-    _: On<Activate>,
-    selected: Res<SelectedPhraseIndex>,
-    adaptive: Res<AdaptiveDifficulty>,
-    mut loops: ResMut<LoopConfig>,
-) {
-    let Some(section) = adaptive.sections.get(selected.0) else { return };
-    if loops.active && loops.start_time == section.start_time && loops.end_time == section.end_time
-    {
-        loops.active = false;
-    } else {
-        loops.start_time = section.start_time;
-        loops.end_time = section.end_time;
-        loops.active = super::loop_range_valid(section.start_time, section.end_time);
-    }
-}
-
-pub(super) fn resume_section_repeat(
-    paused: Res<Paused>,
-    loops: Res<LoopConfig>,
-    mut clock: ResMut<super::GameplayClock>,
-    mut notes: ResMut<super::SongNotes>,
-    sinks: Query<&AudioSink, With<MusicPlayer>>,
-) {
-    if !paused.is_changed() || paused.0 || !loops.active {
-        return;
-    }
-    clock.rewind_to(loops.start_time, sinks.single().ok());
-    let (start, end) = super::loop_reset_range(&notes.notes, loops.start_time, loops.end_time);
-    for note in &mut notes.notes[start..end] {
-        note.hit = false;
-        note.missed = false;
-        note.held = 0.0;
-        note.sustain_scored = false;
-        note.pitch_samples.clear();
-        note.amp_samples.clear();
-        note.miss_evidence = None;
-    }
-    notes.cursor = start;
 }
