@@ -377,6 +377,15 @@ pub fn setup(
     windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
     loc: Res<Localization>,
 ) {
+    use harmonicon_ui::music_score::{
+        MusicScoreBarMap, MusicScoreMeter, MusicScorePlayhead, MusicScoreSections,
+        MusicScoreSelection,
+    };
+    commands.insert_resource(MusicScoreBarMap::default());
+    commands.insert_resource(MusicScoreMeter::default());
+    commands.insert_resource(MusicScorePlayhead::default());
+    commands.insert_resource(MusicScoreSelection::default());
+    commands.insert_resource(MusicScoreSections::default());
     clock.set_free(0.0);
     *pitch_range = pitch_range_for_harp(key.harp());
     tempo.meter = harmonicon_ui::music_score::MusicScoreMeter::default();
@@ -509,11 +518,22 @@ pub fn handle_escape(
 /// "Target: Hole 2 · ½-step bend" — or a note that the current harp can't
 /// actually produce there, so the reader knows why Listen did nothing.
 fn target_label_text(loc: &Localization, hole: u8, technique: Technique) -> String {
-    let technique = loc.msg(technique.label_key(hole));
-    String::from(loc.msg_args(
-        "bending-target-label",
-        &[("hole", hole.to_string()), ("technique", technique.to_string())],
-    ))
+    let target = TrainerTarget { hole, technique };
+    let breath = loc.msg(teaching::breath(target)).to_string();
+    let key = if matches!(technique, Technique::Blow | Technique::Draw) {
+        "bending-target-focus-natural"
+    } else {
+        "bending-target-focus"
+    };
+    loc.msg_args(
+        key,
+        &[
+            ("hole", hole.to_string()),
+            ("breath", breath),
+            ("technique", loc.msg(technique.label_key(hole)).to_string()),
+        ],
+    )
+    .to_string()
 }
 
 /// Keep the "Target: ..." readout in step with the chosen hole/technique.
@@ -556,6 +576,8 @@ mod drill;
 mod feedback;
 mod gesture;
 mod layout;
+mod teaching;
+pub(super) use teaching::sync_teaching_score;
 #[cfg(test)]
 mod tests;
 mod trace;

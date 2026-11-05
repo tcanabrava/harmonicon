@@ -5,6 +5,10 @@ use harmonicon_ui::music_score::{BravuraFont, MusicScoreNotes, NotationNote};
 
 pub(super) fn notation(drill: Option<&Drill>) -> Vec<NotationNote> {
     let Some(drill) = drill else { return Vec::new() };
+    pitch_notation(drill.start, drill.target)
+}
+
+pub(crate) fn pitch_notation(start: Option<f32>, target: f32) -> Vec<NotationNote> {
     let note = |midi: f32, beat, highlighted| NotationNote {
         start_beat: beat,
         duration_beats: 1.0,
@@ -13,14 +17,14 @@ pub(super) fn notation(drill: Option<&Drill>) -> Vec<NotationNote> {
         highlighted,
     };
     let mut notes = Vec::new();
-    if let Some(start) = drill.start {
+    if let Some(start) = start {
         notes.push(note(start, 0.0, false));
     }
-    notes.push(note(drill.target, if drill.start.is_some() { 1.0 } else { 0.0 }, true));
+    notes.push(note(target, if start.is_some() { 1.0 } else { 0.0 }, true));
     notes
 }
 
-pub(super) fn spawn_staff(
+pub(crate) fn spawn_staff(
     parent: &mut ChildSpawnerCommands,
     font: &BravuraFont,
     piano: bool,

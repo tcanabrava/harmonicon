@@ -100,3 +100,15 @@ microphone can't tell.
 There's no pause menu here, because there's no song to pause. Click **Back**
 in the header, or press **Esc**, to return to the Play menu. Your drill
 progress is saved on the way out.
+
+## Reading the selected target
+
+The focus card names the hole and says whether to breathe in (draw) or out
+(blow), including the direction needed for bends and overblows/overdraws.
+The staff shows the target in gold. When the exercise changes the reed's
+pitch, its natural starting note appears in white before the target.
+These notes follow the chosen harp key. The bend rail remains the live
+feedback surface, and the technique map remains the target selector.
+
+On a shorter window, the focus card scrolls so the notation and practice
+controls remain reachable while the technique selector stays beside it.

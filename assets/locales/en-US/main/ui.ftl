@@ -1055,3 +1055,8 @@ note-trainer-left-hand = Left hand
 note-trainer-right-hand = Right hand
 
 note-trainer-show-position = Show position
+
+bending-breath-out = Blow · breathe out ↓
+bending-breath-in = Draw · breathe in ↑
+bending-target-focus-natural = Hole {$hole} · {$breath}
+bending-target-focus = Hole {$hole} · {$breath} · {$technique}

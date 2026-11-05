@@ -1054,3 +1054,8 @@ note-trainer-left-hand = Mano izquierda
 note-trainer-right-hand = Mano derecha
 
 note-trainer-show-position = Mostrar posición
+
+bending-breath-out = Sopla · exhala ↓
+bending-breath-in = Aspira · inhala ↑
+bending-target-focus-natural = Agujero {$hole} · {$breath}
+bending-target-focus = Agujero {$hole} · {$breath} · {$technique}

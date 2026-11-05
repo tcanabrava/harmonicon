@@ -1052,3 +1052,8 @@ note-trainer-left-hand = Mão esquerda
 note-trainer-right-hand = Mão direita
 
 note-trainer-show-position = Mostrar posição
+
+bending-breath-out = Sopre · expire ↓
+bending-breath-in = Aspire · inspire ↑
+bending-target-focus-natural = Furo {$hole} · {$breath}
+bending-target-focus = Furo {$hole} · {$breath} · {$technique}

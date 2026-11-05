@@ -218,11 +218,20 @@ pub(super) fn spawn_body(
             min_height: Val::Px(0.0),
             align_self: AlignSelf::Stretch,
             flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Stretch,
+            justify_content: JustifyContent::FlexStart,
             ..default()
         })
-        .with_children(|centre| spawn_target_card(centre, loc, key, target));
+        .with_children(|centre| {
+            let area = harmonicon_ui::dialogs::scroll_area::spawn_scroll_area(
+                centre,
+                Color::srgb(0.4, 0.55, 0.7),
+                Color::srgb(0.1, 0.12, 0.16),
+            );
+            centre.commands().entity(area).with_children(|content| {
+                spawn_target_card(content, loc, key, target);
+            });
+        });
 
         body.spawn(Node {
             flex_direction: FlexDirection::Column,
@@ -322,6 +331,7 @@ fn spawn_target_card(
             Node {
                 width: Val::Percent(100.0),
                 max_width: Val::Px(960.0),
+                flex_shrink: 0.0,
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(10.0),
                 padding: UiRect::all(Val::Px(18.0)),
@@ -348,6 +358,10 @@ fn spawn_target_card(
                 ));
                 row.spawn((label(progress_text(loc, None), 14.0, MUTED), TargetProgressLabel));
             });
+            card.spawn((
+                super::teaching::ScoreSlot,
+                Node { width: Val::Percent(100.0), flex_shrink: 0.0, ..default() },
+            ));
             card.spawn((label(String::new(), 20.0, Color::srgb(0.55, 0.85, 0.60)), TunerReadout));
             spawn_bend_rail(card, loc);
 

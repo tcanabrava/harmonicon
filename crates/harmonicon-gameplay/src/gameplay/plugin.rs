@@ -178,6 +178,12 @@ impl Plugin for GameplayPlugin {
             )
                 .run_if(in_state(AppState::NoteTrainer)),
         )
+        .add_systems(
+            Update,
+            bending_trainer::sync_teaching_score
+                .after(bending_trainer::drill_update)
+                .run_if(in_state(AppState::BendingTrainer)),
+        )
         // Standalone Bending Trainer (its own AppState, no song).
         .add_systems(OnEnter(AppState::BendingTrainer), bending_trainer::setup)
         .add_systems(

@@ -43,7 +43,7 @@ use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 use super::GameplayRoot;
 use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
 mod piano;
-mod teaching;
+pub(super) mod teaching;
 use super::guitar_visuals::spawn_trainer_neck;
 use harmonicon_core::instrument::flute::Flute;
 pub(super) use piano::update_hands;
@@ -446,6 +446,7 @@ pub(super) fn setup(
     commands.insert_resource(MusicScoreMeter::default());
     commands.insert_resource(MusicScorePlayhead::default());
     commands.insert_resource(MusicScoreSelection::default());
+    commands.insert_resource(harmonicon_ui::music_score::MusicScoreSections::default());
     if trainer.guitar().is_none() && trainer.flute().is_none() && trainer.piano().is_none() {
         return;
     }
