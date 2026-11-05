@@ -168,6 +168,7 @@ impl Plugin for GameplayPlugin {
                 note_trainer::restore_progress.before(note_trainer::listen),
                 note_trainer::listen,
                 note_trainer::update_labels.after(note_trainer::listen),
+                note_trainer::sync_score.after(note_trainer::listen),
                 note_trainer::update_fretboard.after(note_trainer::listen),
                 note_trainer::update_flute_drawing.after(note_trainer::listen),
                 note_trainer::update_piano_keys.after(note_trainer::listen),

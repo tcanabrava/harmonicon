@@ -162,7 +162,7 @@ fn countdown(note: &ScheduledNote, now: f64) -> (f32, bool) {
 /// Which way a chart lies.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ChartAxis {
-    /// Upright, the head joint at the top: the Note Trainer's.
+    /// Upright, the head joint at the top.
     Vertical,
     /// Lying down, the head joint at the left, as a horizontal printed
     /// chart draws it: the score view's stage.
@@ -336,11 +336,6 @@ pub(super) fn spawn_flute_chart(
                 });
             }
         });
-}
-
-/// The Note Trainer's chart, at its natural size.
-pub(super) fn spawn_flute(parent: &mut ChildSpawnerCommands, flute: &Flute) {
-    spawn_flute_chart(parent, flute, 1.0, ChartSlot::Now, ChartAxis::Vertical);
 }
 
 /// A drawn key's fill: solid for the note at hand, a ghost for the one

@@ -1045,3 +1045,6 @@ editor-guitar-remove-string = Quitar última cuerda
 editor-guitar-string-number = Cuerda {$number}
 
 editor-guitar-tuning-custom = Personalizada
+
+note-trainer-score-help = Nota dorada: objetivo · Nota blanca, si aparece: empieza aquí
+note-trainer-flute-key-help = Llaves rellenas: pulsa · Llaves delineadas: deja abiertas · Cabeza a la izquierda

@@ -48,7 +48,10 @@ The flute's tabs are:
 - **Alternate fingerings**: a high note on one particular fingering, the
   standard one or one of its alternates.
 
-The upright flute below lights the keys of the fingering to use, and
+The horizontal flute below lights the keys of the fingering to use, with
+the headjoint at the left. Filled keys are pressed; outlines stay open.
+The staff shows the target in gold and, for octave drills, the starting
+note in white.
 **Listen** plays the note in the game's flute voice. As with the guitar,
 the trainer hears the pitch, so it trusts you to use the fingering it
 shows.

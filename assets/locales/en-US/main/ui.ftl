@@ -1046,3 +1046,6 @@ editor-guitar-remove-string = Remove last string
 editor-guitar-string-number = String {$number}
 
 editor-guitar-tuning-custom = Custom
+
+note-trainer-score-help = Gold note: target · White note, when shown: start here
+note-trainer-flute-key-help = Filled keys: press · Outlined keys: leave open · Headjoint at the left

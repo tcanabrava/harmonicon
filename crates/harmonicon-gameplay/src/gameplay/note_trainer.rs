@@ -11,7 +11,7 @@
 //! fingerings. A drill is landed by holding its pitch within the trainer's
 //! tolerance for its hold time (both from `BendingTrainerSettings`, so the
 //! trainers judge alike); the next drill follows on its own. The guitar's
-//! fretboard strip or the flute's upright drawing, both from the play
+//! fretboard strip or the flute's horizontal drawing, both from the play
 //! highway, shows where the fingers go.
 //!
 //! Progress is kept in the profile per instrument and kind
@@ -41,9 +41,11 @@ use harmonicon_ui::dialogs::page_chrome::{header_scene, spawn_back_button, title
 use harmonicon_ui::dialogs::tab_bar::{TabSelect, spawn_tab_bar};
 
 use super::GameplayRoot;
-use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys, spawn_flute};
+use super::flute_visuals::{FluteDrawing, FluteKey, paint_flute_keys};
+mod teaching;
 use super::guitar_visuals::{FretCell, paint_cell, spawn_fretboard};
 use harmonicon_core::instrument::flute::Flute;
+pub(super) use teaching::sync_score;
 
 /// Seconds the "Landed!" line stays up before the live status returns.
 const LANDED_SECS: f32 = 1.2;
@@ -418,7 +420,15 @@ pub(super) fn setup(
     trainer: Res<NoteTrainer>,
     mut pitch_range: ResMut<PitchRange>,
     loc: Res<Localization>,
+    font: Option<Res<harmonicon_ui::music_score::BravuraFont>>,
 ) {
+    use harmonicon_ui::music_score::{
+        MusicScoreBarMap, MusicScoreMeter, MusicScorePlayhead, MusicScoreSelection,
+    };
+    commands.insert_resource(MusicScoreBarMap::default());
+    commands.insert_resource(MusicScoreMeter::default());
+    commands.insert_resource(MusicScorePlayhead::default());
+    commands.insert_resource(MusicScoreSelection::default());
     if trainer.guitar().is_none() && trainer.flute().is_none() && trainer.piano().is_none() {
         return;
     }
@@ -544,16 +554,43 @@ pub(super) fn setup(
                 TextColor(Color::srgb(0.6, 0.65, 0.75)),
             ));
         });
+        if let Some(font) = font.as_deref() {
+            teaching::spawn_staff(root, font, trainer.piano().is_some(), &loc);
+        }
         root.spawn(Node {
-            // The upright flute needs the height its fourteen keys take.
-            height: Val::Px(if trainer.flute().is_some() { 520.0 } else { 320.0 }),
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            flex_shrink: 0.0,
+            min_height: Val::Px(if trainer.flute().is_some() { 156.0 } else { 320.0 }),
             padding: UiRect::axes(Val::Px(24.0), Val::Px(12.0)),
             ..default()
         })
         .with_children(|strip| {
             match (trainer.guitar(), trainer.flute(), trainer.piano()) {
                 (Some(guitar), _, _) => spawn_fretboard(strip, guitar, 560.0),
-                (_, Some(flute), _) => spawn_flute(strip, flute),
+                (_, Some(flute), _) => {
+                    use super::flute_visuals::{ChartAxis, ChartSlot, spawn_flute_chart};
+                    strip
+                        .spawn(Node {
+                            width: Val::Percent(100.0),
+                            max_width: Val::Px(1080.0),
+                            ..default()
+                        })
+                        .with_children(|drawing| {
+                            spawn_flute_chart(
+                                drawing,
+                                flute,
+                                1.25,
+                                ChartSlot::Now,
+                                ChartAxis::Horizontal,
+                            )
+                        });
+                    strip.spawn((
+                        Text::new(loc.msg("note-trainer-flute-key-help").to_string()),
+                        TextFont { font_size: FontSize::Px(14.0), ..default() },
+                        TextColor(Color::WHITE),
+                    ));
+                }
                 // The same keyboard the piano roll draws, lying as the player
                 // faces it: two octaves either side of the drills' middle.
                 (_, _, Some(_)) => {
